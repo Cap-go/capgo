@@ -2,18 +2,20 @@
 -- This was a regression from migration 20250913161225_lint_warning_fixes_followup.sql
 -- which removed the UNION with tmp_users table
 
-DROP FUNCTION IF EXISTS public.get_org_members (uuid, uuid);
+DROP FUNCTION IF EXISTS public.get_org_members(uuid, uuid);
 
-CREATE FUNCTION "public"."get_org_members" ("user_id" uuid, "guild_id" uuid) RETURNS TABLE (
-  "aid" bigint,
-  "uid" uuid,
-  "email" varchar,
-  "image_url" varchar,
-  "role" public.user_min_right,
-  "is_tmp" boolean
+CREATE FUNCTION public.get_org_members(
+    "user_id" uuid, "guild_id" uuid
+) RETURNS TABLE (
+    aid bigint,
+    uid uuid,
+    email varchar,
+    image_url varchar,
+    role public.user_min_right,
+    is_tmp boolean
 ) LANGUAGE plpgsql SECURITY DEFINER
 SET
-  search_path = '' AS $$
+search_path = '' AS $$
 BEGIN
   PERFORM user_id;
   RETURN QUERY

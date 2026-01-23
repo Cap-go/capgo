@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import type { Bindings } from './cloudflare.ts'
 import type { DeletePayload, InsertPayload, UpdatePayload } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
@@ -37,6 +38,9 @@ export interface MiddlewareKeyVariables {
     subkey?: Database['public']['Tables']['apikeys']['Row']
     webhookBody?: any
     oldRecord?: any
+    // RBAC context variables
+    rbacEnabled?: boolean
+    resolvedOrgId?: string
   }
 }
 
@@ -57,12 +61,12 @@ export function triggerValidator(
 
     if (body.table !== String(table)) {
       cloudlog({ requestId: c.get('requestId'), message: `Not ${String(table)}` })
-      return simpleError('table_not_match', 'Not table', { body })
+      throw simpleError('table_not_match', 'Not table', { body })
     }
 
     if (body.type !== type) {
       cloudlog({ requestId: c.get('requestId'), message: `Not ${type}` })
-      return simpleError('type_not_match', 'Not type', { body })
+      throw simpleError('type_not_match', 'Not type', { body })
     }
 
     // Store the validated body in context for next middleware
@@ -77,7 +81,7 @@ export function triggerValidator(
       c.set('oldRecord', body.old_record)
     }
     else {
-      return simpleError('invalid_payload', 'Invalid payload', { body })
+      throw simpleError('invalid_payload', 'Invalid payload', { body })
     }
 
     await next()
@@ -97,7 +101,7 @@ export async function getBodyOrQuery<T>(c: Context<MiddlewareKeyVariables, any, 
   }
   if (!body || Object.keys(body).length === 0) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot find body', query: c.req.query() })
-    return simpleError('invalid_json_parse_body', 'Invalid JSON body')
+    throw simpleError('invalid_json_parse_body', 'Invalid JSON body')
   }
   if ((body as any).device_id) {
     (body as any).device_id = (body as any).device_id.toLowerCase()
@@ -109,9 +113,27 @@ export const middlewareAuth = honoFactory.createMiddleware(async (c, next) => {
   const authorization = c.req.header('authorization')
   if (!authorization) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot find authorization', query: c.req.query() })
-    return simpleError('cannot_find_authorization', 'Cannot find authorization')
+    return quickError(401, 'no_jwt_apikey_or_subkey', 'No JWT, apikey or subkey provided')
   }
   c.set('authorization', authorization)
+
+  // Validate JWT and set auth context
+  const { supabaseClient: supabaseClientFn } = await import('./supabase.ts')
+  const supabase = supabaseClientFn(c, authorization)
+  const { data: authData, error: authError } = await supabase.auth.getUser()
+  if (authError || !authData.user) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid JWT', error: authError })
+    throw simpleError('invalid_jwt', 'Invalid JWT')
+  }
+
+  // Set auth context for RBAC
+  c.set('auth', {
+    userId: authData.user.id,
+    authType: 'jwt',
+    apikey: null,
+    jwt: authorization,
+  } as AuthInfo)
+
   await next()
 })
 
@@ -122,11 +144,11 @@ export const middlewareAPISecret = honoFactory.createMiddleware(async (c, next) 
   // timingSafeEqual is here to prevent a timing attack
   if (!authorizationSecret || !API_SECRET) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot find authorizationSecret or API_SECRET', query: c.req.query() })
-    return simpleError('cannot_find_authorization_secret', 'Cannot find authorization')
+    throw simpleError('cannot_find_authorization_secret', 'Cannot find authorization')
   }
   if (!await timingSafeEqual(authorizationSecret, API_SECRET)) {
     cloudlog({ requestId: c.get('requestId'), message: 'Invalid API secret', query: c.req.query() })
-    return simpleError('invalid_api_secret', 'Invalid API secret')
+    throw simpleError('invalid_api_secret', 'Invalid API secret')
   }
   c.set('APISecret', authorizationSecret)
   await next()
@@ -211,7 +233,10 @@ export interface SimpleErrorResponse {
 }
 
 export function simpleError200(c: Context, errorCode: string, message: string, moreInfo: any = {}) {
-  const status = 200
+  return simpleErrorWithStatus(c, 200, errorCode, message, moreInfo)
+}
+
+export function simpleErrorWithStatus(c: Context, status: ContentfulStatusCode, errorCode: string, message: string, moreInfo: any = {}) {
   const res: SimpleErrorResponse = {
     error: errorCode,
     message,
@@ -245,13 +270,16 @@ export function simpleRateLimit(moreInfo: any = {}, cause?: any): never {
 }
 
 export function simpleError(errorCode: string, message: string, moreInfo: any = {}, cause?: any): never {
+  if (errorCode === 'invalid_jwt') {
+    return quickError(401, errorCode, message, moreInfo, cause)
+  }
   return quickError(400, errorCode, message, moreInfo, cause)
 }
 
 export function parseBody<T>(c: Context) {
   return c.req.json<T>()
     .catch((e) => {
-      return simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
+      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
     })
     .then((body) => {
       if ((body as any).device_id) {

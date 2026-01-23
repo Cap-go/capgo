@@ -21,6 +21,7 @@ const props = defineProps<{
 const emit = defineEmits(['done', 'closeStep'])
 const displayStore = useDisplayStore()
 const isLoading = ref(false)
+const isDemoLoading = ref(false)
 const step = ref(0)
 const clicked = ref(0)
 const appId = ref<string>()
@@ -125,6 +126,51 @@ function openInviteDialog() {
 
 function onInviteSuccess() {
   goToNextStep('step_card_1')
+}
+
+async function createDemoApp() {
+  const orgId = organizationStore.currentOrganization?.gid
+  if (!orgId) {
+    toast.error(t('onboarding-demo-error-no-org'))
+    return
+  }
+
+  isDemoLoading.value = true
+  try {
+    sendEvent({
+      channel: 'onboarding-v2',
+      event: 'onboarding-create-demo-app',
+      icon: '👶',
+      user_id: orgId,
+      notify: false,
+    }).catch()
+    pushEvent('user:onboarding-create-demo-app', config.supaHost)
+
+    const { data, error } = await supabase.functions.invoke('app/demo', {
+      method: 'POST',
+      body: { owner_org: orgId },
+    })
+
+    if (error || !data?.app_id) {
+      console.error('Error creating demo app:', error)
+      toast.error(t('onboarding-demo-error-create'))
+      return
+    }
+
+    appId.value = data.app_id
+    toast.success(t('onboarding-demo-success'))
+
+    // Skip directly to discover dashboard step
+    step.value = 2
+    setLog()
+  }
+  catch (err) {
+    console.error('Error creating demo app:', err)
+    toast.error(t('onboarding-demo-error-create'))
+  }
+  finally {
+    isDemoLoading.value = false
+  }
 }
 
 function clearWatchers() {
@@ -377,7 +423,51 @@ onUnmounted(() => {
                 <br v-if="s.command">
               </div>
             </div>
-            <div v-if="i === 0" class="pt-6 border-t border-gray-200">
+            <div v-if="i === 0 && props.onboarding" class="pt-6 border-t border-gray-200">
+              <!-- Invite Teammate Option -->
+              <div class="pb-6 mb-6 border-b border-gray-200">
+                <h3 class="text-lg font-semibold text-gray-900 font-pj">
+                  {{ t('onboarding-invite-option-title') }}
+                </h3>
+                <p class="mt-2 text-sm text-gray-600">
+                  {{ t('onboarding-invite-option-subtitle') }}
+                </p>
+                <button
+                  type="button"
+                  class="inline-flex items-center px-4 py-2 mt-4 text-sm font-semibold transition-colors duration-200 rounded-md cursor-pointer focus:ring-2 focus:ring-offset-2 bg-muted-blue-50 text-muted-blue-800 hover:bg-muted-blue-100 focus:outline-hidden focus:ring-muted-blue-500"
+                  @click="openInviteDialog"
+                >
+                  {{ t('onboarding-invite-option-cta') }}
+                </button>
+                <p class="mt-4 text-xs text-gray-400">
+                  {{ t('onboarding-manual-setup-prefix') }}
+                  <a
+                    href="https://capgo.app/docs/getting-started/add-an-app/#manual-setup"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="underline hover:text-gray-600"
+                  >{{ t('onboarding-manual-setup-link') }}</a>
+                </p>
+              </div>
+
+              <!-- Demo App Option (last option) -->
+              <h3 class="text-lg font-semibold text-gray-900 font-pj">
+                {{ t('onboarding-demo-option-title') }}
+              </h3>
+              <p class="mt-2 text-sm text-gray-600">
+                {{ t('onboarding-demo-option-subtitle') }}
+              </p>
+              <button
+                type="button"
+                :disabled="isDemoLoading"
+                class="inline-flex items-center px-4 py-2 mt-4 text-sm font-semibold text-white transition-colors duration-200 rounded-md cursor-pointer focus:ring-2 focus:ring-offset-2 bg-pumpkin-orange-900 hover:bg-pumpkin-orange-800 focus:outline-hidden focus:ring-pumpkin-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                @click="createDemoApp"
+              >
+                <IconLoader v-if="isDemoLoading" class="w-4 h-4 mr-2 animate-spin" />
+                {{ isDemoLoading ? t('onboarding-demo-loading') : t('onboarding-demo-option-cta') }}
+              </button>
+            </div>
+            <div v-else-if="i === 0" class="pt-6 border-t border-gray-200">
               <h3 class="text-lg font-semibold text-gray-900 font-pj">
                 {{ t('onboarding-invite-option-title') }}
               </h3>
@@ -386,7 +476,7 @@ onUnmounted(() => {
               </p>
               <button
                 type="button"
-                class="inline-flex items-center px-4 py-2 mt-4 text-sm font-semibold transition-colors duration-200 rounded-md focus:ring-2 focus:ring-offset-2 bg-muted-blue-50 text-muted-blue-800 hover:bg-muted-blue-100 focus:outline-hidden focus:ring-muted-blue-500"
+                class="inline-flex items-center px-4 py-2 mt-4 text-sm font-semibold transition-colors duration-200 rounded-md cursor-pointer focus:ring-2 focus:ring-offset-2 bg-muted-blue-50 text-muted-blue-800 hover:bg-muted-blue-100 focus:outline-hidden focus:ring-muted-blue-500"
                 @click="openInviteDialog"
               >
                 {{ t('onboarding-invite-option-cta') }}

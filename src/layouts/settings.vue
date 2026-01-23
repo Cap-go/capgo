@@ -2,15 +2,18 @@
 import type { Ref } from 'vue'
 import type { Tab } from '~/components/comp_def'
 import { Capacitor } from '@capacitor/core'
+import { computedAsync } from '@vueuse/core'
 import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconBilling from '~icons/mingcute/bill-fill'
+import AdminOnlyModal from '~/components/AdminOnlyModal.vue'
 import FailedCard from '~/components/FailedCard.vue'
 import Tabs from '~/components/Tabs.vue'
 import { accountTabs } from '~/constants/accountTabs'
 import { organizationTabs as baseOrgTabs } from '~/constants/organizationTabs'
 import { settingsTabs } from '~/constants/settingsTabs'
+import { checkPermissions } from '~/services/permissions'
 import { openPortal } from '~/services/stripe'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -18,6 +21,33 @@ const { t } = useI18n()
 const organizationStore = useOrganizationStore()
 const router = useRouter()
 const route = useRoute()
+
+// Modal state for non-admin billing access (triggered by billing tab click)
+const showBillingModal = ref(false)
+
+// Routes that require super_admin access (security-sensitive settings)
+const adminOnlyRoutes = [
+  '/settings/organization/audit-logs',
+  '/settings/organization/auditlogs',
+  '/settings/organization/security',
+]
+
+// Check if user is super_admin
+const isSuperAdmin = computed(() => {
+  const orgId = organizationStore.currentOrganization?.gid
+  return organizationStore.hasPermissionsInRole('super_admin', ['org_super_admin'], orgId)
+})
+
+// Check if current route is admin-only and user is not admin
+const isOnAdminOnlyRoute = computed(() => {
+  const path = route.path.replace(/\/$/, '')
+  return adminOnlyRoutes.some(r => path === r || path.startsWith(`${r}/`))
+})
+
+// Show admin-only modal when non-admin is on admin-only route
+const showAdminOnlyModal = computed(() => {
+  return !isSuperAdmin.value && isOnAdminOnlyRoute.value
+})
 
 // Check if user needs to setup 2FA or update password for organization access
 const needsSecurityCompliance = computed(() => {
@@ -35,9 +65,37 @@ const shouldBlockContent = computed(() => {
 // keep Tab icon typing (including ShallowRef) instead of Vue's UnwrapRef narrowing
 const organizationTabs = ref<Tab[]>([...baseOrgTabs]) as Ref<Tab[]>
 
+const canReadBilling = computedAsync(async () => {
+  const orgId = organizationStore.currentOrganization?.gid
+  if (!orgId)
+    return false
+  return await checkPermissions('org.read_billing', { orgId })
+}, false)
+
+const canUpdateBilling = computedAsync(async () => {
+  const orgId = organizationStore.currentOrganization?.gid
+  if (!orgId)
+    return false
+  return await checkPermissions('org.update_billing', { orgId })
+}, false)
+
+const canReadAuditLogs = computedAsync(async () => {
+  const orgId = organizationStore.currentOrganization?.gid
+  if (!orgId)
+    return false
+  return await checkPermissions('org.read_audit', { orgId })
+}, false)
+
+const canManageSecurity = computedAsync(async () => {
+  const orgId = organizationStore.currentOrganization?.gid
+  if (!orgId)
+    return false
+  return await checkPermissions('org.update_settings', { orgId })
+}, false)
+
 watchEffect(() => {
   // ensure usage/plans tabs based on permissions (keeps icons from base)
-  const needsUsage = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  const needsUsage = canReadBilling.value
   const hasUsage = organizationTabs.value.find(tab => tab.key === '/settings/organization/usage')
   if (needsUsage && !hasUsage) {
     const base = baseOrgTabs.find(t => t.key === '/settings/organization/usage')
@@ -47,7 +105,7 @@ watchEffect(() => {
   if (!needsUsage && hasUsage)
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/usage')
 
-  const needsCredits = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  const needsCredits = canUpdateBilling.value
   const hasCredits = organizationTabs.value.find(tab => tab.key === '/settings/organization/credits')
 
   if (needsCredits && !hasCredits) {
@@ -59,7 +117,7 @@ watchEffect(() => {
   if (!needsCredits && hasCredits)
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/credits')
 
-  const needsPlans = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  const needsPlans = canUpdateBilling.value
   const hasPlans = organizationTabs.value.find(tab => tab.key === '/settings/organization/plans')
   if (needsPlans && !hasPlans) {
     const base = baseOrgTabs.find(t => t.key === '/settings/organization/plans')
@@ -70,7 +128,7 @@ watchEffect(() => {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/plans')
 
   // Audit logs - visible only to super_admins
-  const needsAuditLogs = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  const needsAuditLogs = canReadAuditLogs.value
   const hasAuditLogs = organizationTabs.value.find(tab => tab.key === '/settings/organization/audit-logs')
   if (needsAuditLogs && !hasAuditLogs) {
     const base = baseOrgTabs.find(t => t.key === '/settings/organization/audit-logs')
@@ -81,7 +139,7 @@ watchEffect(() => {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/audit-logs')
 
   // Security - visible only to super_admins
-  const needsSecurity = organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+  const needsSecurity = canManageSecurity.value
   const hasSecurity = organizationTabs.value.find(tab => tab.key === '/settings/organization/security')
   if (needsSecurity && !hasSecurity) {
     const base = baseOrgTabs.find(t => t.key === '/settings/organization/security')
@@ -91,17 +149,26 @@ watchEffect(() => {
   if (!needsSecurity && hasSecurity)
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/security')
 
+  // Check billing access - users with org.read_billing permission can access billing
   if (!Capacitor.isNativePlatform()
-    && organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
+    && canReadBilling.value
     && !organizationTabs.value.find(tab => tab.key === '/billing')) {
     organizationTabs.value.push({
       label: 'billing',
       icon: IconBilling,
       key: '/billing',
-      onClick: () => openPortal(organizationStore.currentOrganization?.gid ?? '', t),
+      onClick: () => {
+        // Check permissions at click time to handle role changes
+        if (organizationStore.hasPermissionsInRole('super_admin', ['org_super_admin'], organizationStore.currentOrganization?.gid)) {
+          openPortal(organizationStore.currentOrganization?.gid ?? '', t)
+        }
+        else {
+          showBillingModal.value = true
+        }
+      },
     })
   }
-  else if (!organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])) {
+  else if (!canReadBilling.value) {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/billing')
   }
 })
@@ -159,12 +226,19 @@ function handleSecondary(val: string) {
       @update:active-tab="handlePrimary"
       @update:secondary-active-tab="handleSecondary"
     />
-    <main class="flex flex-1 w-full min-h-0 mt-0 overflow-hidden bg-blue-50 dark:bg-slate-800/40">
-      <div class="flex-1 w-full min-h-0 px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-16 lg:px-8 max-w-9xl">
+    <main class="flex relative flex-1 w-full min-h-0 mt-0 overflow-hidden bg-blue-50 dark:bg-slate-800/40">
+      <div
+        class="flex-1 w-full min-h-0 px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-16 lg:px-8 max-w-9xl"
+        :class="{ 'blur-sm pointer-events-none select-none': showAdminOnlyModal }"
+      >
         <!-- Show FailedCard instead of normal content when security compliance is required -->
         <FailedCard v-if="shouldBlockContent" />
         <RouterView v-else class="w-full" />
       </div>
+      <!-- Admin-only modal for admin-only routes -->
+      <AdminOnlyModal v-if="showAdminOnlyModal" />
+      <!-- Admin-only modal for billing tab click -->
+      <AdminOnlyModal v-if="showBillingModal" @click="showBillingModal = false" />
     </main>
   </div>
 </template>

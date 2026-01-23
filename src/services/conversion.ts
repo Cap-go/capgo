@@ -26,6 +26,26 @@ export function bytesToGBText(bytes: number) {
   return `${bytesToGb(bytes)} GB`
 }
 
+/**
+ * Formats bytes to a human-readable string with the appropriate unit (B, KB, MB, GB, TB).
+ * Automatically picks the right unit based on the size.
+ */
+export function formatBytes(bytes: number, decimals = 2): string {
+  if (bytes === 0)
+    return '0 B'
+  if (!Number.isFinite(bytes) || bytes < 0)
+    return '0 B'
+
+  const k = 1024
+  const dm = decimals < 0 ? 0 : decimals
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
+
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  const index = Math.min(i, sizes.length - 1)
+
+  return `${Number.parseFloat((bytes / k ** index).toFixed(dm))} ${sizes[index]}`
+}
+
 export function getDaysBetweenDates(date1: string | Date, date2: string | Date) {
   const oneDay = 24 * 60 * 60 * 1000
   const firstDate = new Date(date1)

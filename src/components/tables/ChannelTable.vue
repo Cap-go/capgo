@@ -3,6 +3,7 @@ import type { Ref } from 'vue'
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { FormKit } from '@formkit/vue'
+import { computedAsync } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -11,6 +12,7 @@ import { toast } from 'vue-sonner'
 import IconSettings from '~icons/heroicons/cog-8-tooth'
 import IconTrash from '~icons/heroicons/trash'
 import { formatDate } from '~/services/date'
+import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
@@ -48,6 +50,18 @@ const currentPage = ref(1)
 const versionId = ref<number>()
 const filters = ref()
 const newChannelName = ref('')
+
+const canDeleteChannel = computedAsync(async () => {
+  if (!props.appId)
+    return false
+  return await checkPermissions('channel.delete', { appId: props.appId })
+}, false)
+
+const canCreateChannel = computedAsync(async () => {
+  if (!props.appId)
+    return false
+  return await checkPermissions('app.create_channel', { appId: props.appId })
+}, false)
 
 const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
@@ -269,7 +283,7 @@ columns.value = [
       },
       {
         icon: IconTrash,
-        visible: () => organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['admin', 'super_admin']),
+        visible: () => canDeleteChannel.value,
         onClick: (elem: Element) => deleteOne(elem),
       },
     ],
@@ -286,7 +300,7 @@ async function reload() {
   }
 }
 async function showAddModal() {
-  if (!currentOrganization.value || (!organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['admin', 'super_admin']))) {
+  if (!currentOrganization.value || !canCreateChannel.value) {
     toast.error(t('no-permission'))
     return
   }

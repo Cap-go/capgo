@@ -265,9 +265,9 @@ describe('[DELETE] /apikey/:id operations', () => {
       headers,
     })
 
-    const data = await response.json() as { success: boolean }
+    const data = await response.json() as { status: string }
     expect(response.status).toBe(200)
-    expect(data).toHaveProperty('success', true)
+    expect(data).toHaveProperty('status', 'ok')
 
     // Verify deletion
     const verifyResponse = await fetch(`${BASE_URL}/apikey/${createData.id}`, { headers })

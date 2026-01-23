@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bun serve:local:*)",
+      "Bash(supabase db reset:*)",
+      "Bash(supabase stop:*)",
+      "Bash(supabase start:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nchore\\(seed\\): disable RBAC globally for development\n\nSet use_new_rbac to false in seed data to use legacy org_users\npermission system instead of RBAC role_bindings. This fixes 401\nerrors on /statistics endpoint during local development.\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git checkout:*)",
+      "Bash(git commit:*)",
+      "Bash(psql:*)",
+      "Bash(supabase gen types:*)"
+    ]
+  }
+}

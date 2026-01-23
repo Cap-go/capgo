@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
   APP_NAME,
+  fetchWithRetry,
   getBaseData,
   getEndpointUrl,
   getSupabaseClient,
@@ -42,7 +43,7 @@ describe('expose_metadata feature', () => {
 
   describe('[PUT] /app - expose_metadata field', () => {
     it('should set expose_metadata to true via API', async () => {
-      const response = await fetch(`${getEndpointUrl('/app')}/${APP_NAME_METADATA}`, {
+      const response = await fetchWithRetry(`${getEndpointUrl('/app')}/${APP_NAME_METADATA}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({
@@ -72,9 +73,8 @@ describe('expose_metadata feature', () => {
         .update({ expose_metadata: true })
         .eq('app_id', APP_NAME_METADATA)
 
-      
       // Then set to false via API
-      const response = await fetch(`${getEndpointUrl('/app')}/${APP_NAME_METADATA}`, {
+      const response = await fetchWithRetry(`${getEndpointUrl('/app')}/${APP_NAME_METADATA}`, {
         method: 'PUT',
         headers,
         body: JSON.stringify({
@@ -100,7 +100,7 @@ describe('expose_metadata feature', () => {
     it('should default expose_metadata to false for new apps', async () => {
       const newAppId = `${APP_NAME}.${randomUUID()}`
 
-      const createResponse = await fetch(`${getEndpointUrl('/app')}`, {
+      const createResponse = await fetchWithRetry(`${getEndpointUrl('/app')}`, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -156,17 +156,16 @@ describe('expose_metadata feature', () => {
         throw error ?? new Error('Failed to update version with metadata')
     })
 
-    it('should expose metadata when expose_metadata=true and plugin version >= 7.35.0', async () => {
+    it('should expose metadata when expose_metadata=true and plugin version >= 5.35.0', async () => {
       // Enable expose_metadata
       await supabase
         .from('apps')
         .update({ expose_metadata: true })
         .eq('app_id', APP_NAME_METADATA)
 
-      
       const baseData = getBaseData(APP_NAME_METADATA)
       baseData.version_name = '1.1.0' // Request older version to trigger update
-      baseData.plugin_version = '7.35.0' // Exact minimum version
+      baseData.plugin_version = '5.35.0' // Exact minimum version for v5
 
       const response = await postUpdate(baseData)
       expect(response.status).toBe(200)
@@ -177,17 +176,16 @@ describe('expose_metadata feature', () => {
       expect(json.comment).toBe('This is a test release with new features')
     })
 
-    it('should expose metadata when expose_metadata=true and plugin version > 7.35.0', async () => {
+    it('should expose metadata when expose_metadata=true and plugin version >= 6.35.0', async () => {
       // Ensure expose_metadata is true
       await supabase
         .from('apps')
         .update({ expose_metadata: true })
         .eq('app_id', APP_NAME_METADATA)
 
-      
       const baseData = getBaseData(APP_NAME_METADATA)
       baseData.version_name = '1.1.0'
-      baseData.plugin_version = '7.36.0' // Higher version
+      baseData.plugin_version = '6.35.0' // Minimum version for v6
 
       const response = await postUpdate(baseData)
       expect(response.status).toBe(200)
@@ -198,38 +196,116 @@ describe('expose_metadata feature', () => {
       expect(json.comment).toBe('This is a test release with new features')
     })
 
-    it('should NOT expose metadata when expose_metadata=true but plugin version < 7.35.0', async () => {
+    it('should expose metadata when expose_metadata=true and plugin version >= 7.35.0', async () => {
       // Ensure expose_metadata is true
       await supabase
         .from('apps')
         .update({ expose_metadata: true })
         .eq('app_id', APP_NAME_METADATA)
 
-      
       const baseData = getBaseData(APP_NAME_METADATA)
       baseData.version_name = '1.1.0'
-      baseData.plugin_version = '7.34.9' // Older version
+      baseData.plugin_version = '7.35.0' // Minimum version for v7
 
       const response = await postUpdate(baseData)
       expect(response.status).toBe(200)
 
       const json = await response.json<UpdateRes>()
       expect(json.version).toBe('1.0.0')
-      expect(json.link).toBeUndefined()
-      expect(json.comment).toBeUndefined()
+      expect(json.link).toBe('https://example.com/release-notes')
+      expect(json.comment).toBe('This is a test release with new features')
     })
 
-    it('should NOT expose metadata when expose_metadata=false even with plugin version >= 7.35.0', async () => {
+    it('should expose metadata when expose_metadata=true and plugin version >= 8.35.0', async () => {
+      // Ensure expose_metadata is true
+      await supabase
+        .from('apps')
+        .update({ expose_metadata: true })
+        .eq('app_id', APP_NAME_METADATA)
+
+      const baseData = getBaseData(APP_NAME_METADATA)
+      baseData.version_name = '1.1.0'
+      baseData.plugin_version = '8.35.0' // Minimum version for v8
+
+      const response = await postUpdate(baseData)
+      expect(response.status).toBe(200)
+
+      const json = await response.json<UpdateRes>()
+      expect(json.version).toBe('1.0.0')
+      expect(json.link).toBe('https://example.com/release-notes')
+      expect(json.comment).toBe('This is a test release with new features')
+    })
+
+    it('should NOT expose metadata when expose_metadata=true but plugin version < x.35.0', async () => {
+      // Ensure expose_metadata is true
+      await supabase
+        .from('apps')
+        .update({ expose_metadata: true })
+        .eq('app_id', APP_NAME_METADATA)
+
+      // Test v5.34.9 (below v5 threshold)
+      const baseData5 = getBaseData(APP_NAME_METADATA)
+      baseData5.version_name = '1.1.0'
+      baseData5.plugin_version = '5.34.9'
+
+      const response5 = await postUpdate(baseData5)
+      expect(response5.status).toBe(200)
+
+      const json5 = await response5.json<UpdateRes>()
+      expect(json5.version).toBe('1.0.0')
+      expect(json5.link).toBeUndefined()
+      expect(json5.comment).toBeUndefined()
+
+      // Test v6.34.9 (below v6 threshold)
+      const baseData6 = getBaseData(APP_NAME_METADATA)
+      baseData6.version_name = '1.1.0'
+      baseData6.plugin_version = '6.34.9'
+
+      const response6 = await postUpdate(baseData6)
+      expect(response6.status).toBe(200)
+
+      const json6 = await response6.json<UpdateRes>()
+      expect(json6.version).toBe('1.0.0')
+      expect(json6.link).toBeUndefined()
+      expect(json6.comment).toBeUndefined()
+
+      // Test v7.34.9 (below v7 threshold)
+      const baseData7 = getBaseData(APP_NAME_METADATA)
+      baseData7.version_name = '1.1.0'
+      baseData7.plugin_version = '7.34.9'
+
+      const response7 = await postUpdate(baseData7)
+      expect(response7.status).toBe(200)
+
+      const json7 = await response7.json<UpdateRes>()
+      expect(json7.version).toBe('1.0.0')
+      expect(json7.link).toBeUndefined()
+      expect(json7.comment).toBeUndefined()
+
+      // Test v8.34.9 (below v8 threshold)
+      const baseData8 = getBaseData(APP_NAME_METADATA)
+      baseData8.version_name = '1.1.0'
+      baseData8.plugin_version = '8.34.9'
+
+      const response8 = await postUpdate(baseData8)
+      expect(response8.status).toBe(200)
+
+      const json8 = await response8.json<UpdateRes>()
+      expect(json8.version).toBe('1.0.0')
+      expect(json8.link).toBeUndefined()
+      expect(json8.comment).toBeUndefined()
+    })
+
+    it('should NOT expose metadata when expose_metadata=false even with plugin version >= 5.35.0', async () => {
       // Disable expose_metadata
       await supabase
         .from('apps')
         .update({ expose_metadata: false })
         .eq('app_id', APP_NAME_METADATA)
 
-      
       const baseData = getBaseData(APP_NAME_METADATA)
       baseData.version_name = '1.1.0'
-      baseData.plugin_version = '7.35.0'
+      baseData.plugin_version = '5.35.0'
 
       const response = await postUpdate(baseData)
       expect(response.status).toBe(200)
@@ -240,17 +316,16 @@ describe('expose_metadata feature', () => {
       expect(json.comment).toBeUndefined()
     })
 
-    it('should NOT expose metadata when expose_metadata=false and plugin version < 7.35.0', async () => {
+    it('should NOT expose metadata when expose_metadata=false and plugin version < 5.35.0', async () => {
       // Ensure expose_metadata is false
       await supabase
         .from('apps')
         .update({ expose_metadata: false })
         .eq('app_id', APP_NAME_METADATA)
 
-      
       const baseData = getBaseData(APP_NAME_METADATA)
       baseData.version_name = '1.1.0'
-      baseData.plugin_version = '7.34.0'
+      baseData.plugin_version = '5.34.0'
 
       const response = await postUpdate(baseData)
       expect(response.status).toBe(200)
@@ -300,10 +375,9 @@ describe('expose_metadata feature', () => {
           .update({ expose_metadata: true })
           .eq('app_id', APP_NAME_METADATA)
 
-        
         const baseData = getBaseData(APP_NAME_METADATA)
         baseData.version_name = '1.1.0'
-        baseData.plugin_version = '7.35.0'
+        baseData.plugin_version = '5.35.0'
 
         const response = await postUpdate(baseData)
         expect(response.status).toBe(200)
@@ -327,8 +401,7 @@ describe('expose_metadata feature', () => {
           .from('app_versions')
           .delete()
           .eq('id', newVersion!.id)
-
-              }
+      }
     })
 
     it('should expose metadata with only link when comment is null', async () => {
@@ -348,10 +421,9 @@ describe('expose_metadata feature', () => {
           .update({ expose_metadata: true })
           .eq('app_id', APP_NAME_METADATA)
 
-        
         const baseData = getBaseData(APP_NAME_METADATA)
         baseData.version_name = '1.1.0'
-        baseData.plugin_version = '7.35.0'
+        baseData.plugin_version = '5.35.0'
 
         const response = await postUpdate(baseData)
         expect(response.status).toBe(200)
@@ -373,8 +445,7 @@ describe('expose_metadata feature', () => {
           })
           .eq('app_id', APP_NAME_METADATA)
           .eq('name', '1.0.0')
-
-              }
+      }
     })
 
     it('should expose metadata with only comment when link is null', async () => {
@@ -394,10 +465,9 @@ describe('expose_metadata feature', () => {
           .update({ expose_metadata: true })
           .eq('app_id', APP_NAME_METADATA)
 
-        
         const baseData = getBaseData(APP_NAME_METADATA)
         baseData.version_name = '1.1.0'
-        baseData.plugin_version = '7.35.0'
+        baseData.plugin_version = '5.35.0'
 
         const response = await postUpdate(baseData)
         expect(response.status).toBe(200)
@@ -419,8 +489,7 @@ describe('expose_metadata feature', () => {
           })
           .eq('app_id', APP_NAME_METADATA)
           .eq('name', '1.0.0')
-
-              }
+      }
     })
   })
 
@@ -431,10 +500,9 @@ describe('expose_metadata feature', () => {
         .update({ expose_metadata: true })
         .eq('app_id', APP_NAME_METADATA)
 
-      
       const baseData = getBaseData(APP_NAME_METADATA)
       baseData.version_name = '1.1.0'
-      baseData.plugin_version = '1.0.0' // Very old version
+      baseData.plugin_version = '5.10.0' // Old version below 5.35.0
 
       const response = await postUpdate(baseData)
       expect(response.status).toBe(200)
@@ -453,10 +521,9 @@ describe('expose_metadata feature', () => {
         .update({ expose_metadata: true })
         .eq('app_id', APP_NAME_METADATA)
 
-      
       const baseData = getBaseData(APP_NAME_METADATA)
       baseData.version_name = '1.1.0'
-      baseData.plugin_version = '8.0.0' // Future version
+      baseData.plugin_version = '8.35.0' // Latest version with metadata support
 
       const response = await postUpdate(baseData)
       expect(response.status).toBe(200)

@@ -18,7 +18,7 @@ app.post('/', middlewareAPISecret, triggerValidator('users', 'UPDATE'), async (c
   }
   if (!record.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'No id' })
-    return simpleError('no_id', 'No id', { record })
+    throw simpleError('no_id', 'No id', { record })
   }
   await createApiKey(c, record.id)
   await syncUserPreferenceTags(c, record.email, record, oldRecord?.email)

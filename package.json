@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.91.4",
+  "version": "12.102.1",
   "private": true,
   "license": "GPL-3.0",
   "scripts": {
@@ -197,6 +197,7 @@
     "semver": "^7.7.3",
     "stripe": "^19.3.1",
     "supabase": "^2.58.5",
+    "turndown": "^7.2.2",
     "vite-plugin-devtools-json": "^1.0.0",
     "vue": "3.5.26",
     "vue-chartjs": "^5.3.3",
@@ -225,6 +226,7 @@
     "@types/dompurify": "3.2.0",
     "@types/pg": "^8.15.6",
     "@types/qrcode": "^1.5.6",
+    "@types/turndown": "^5.0.6",
     "@vitejs/plugin-vue": "6.0.3",
     "@vitejs/plugin-vue-jsx": "^5.1.1",
     "@vitest/coverage-v8": "^4.0.8",
@@ -238,7 +240,7 @@
     "eslint": "9.39.2",
     "eslint-plugin-format": "^1.0.2",
     "husky": "^9.1.7",
-    "sass": "1.97.1",
+    "sass": "1.97.2",
     "tailwindcss": "^4.1.17",
     "typescript": "5.9.3",
     "unplugin-auto-import": "^20.2.0",
@@ -247,7 +249,7 @@
     "unplugin-vue-components": "^30.0.0",
     "unplugin-vue-macros": "^2.14.5",
     "unplugin-vue-router": "^0.16.1",
-    "vite": "7.3.0",
+    "vite": "7.3.1",
     "vite-plugin-environment": "1.1.3",
     "vite-plugin-inspect": "^11.3.3",
     "vite-plugin-pwa": "1.1.0",
@@ -256,7 +258,7 @@
     "vite-plugin-webfont-dl": "^3.11.1",
     "vitest": "^4.0.8",
     "vue-tsc": "3.1.8",
-    "wrangler": "^4.56.0"
+    "wrangler": "^4.60.0"
   },
   "husky": {
     "hooks": {

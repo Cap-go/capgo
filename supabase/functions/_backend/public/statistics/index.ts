@@ -5,8 +5,9 @@ import utc from 'dayjs/plugin/utc.js'
 import { z } from 'zod/mini'
 import { honoFactory, quickError, simpleError, useCors } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
-import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
-import { hasAppRight, hasAppRightApikey, hasOrgRight, supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
+import { cloudlog } from '../../utils/logging.ts'
+import { checkPermission } from '../../utils/rbac.ts'
+import { supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
 
 dayjs.extend(utc)
 
@@ -26,16 +27,10 @@ const normalStatsSchema = z.object({
   noAccumulate: z.optional(z.coerce.boolean()), // Default to true for backward compatibility
 })
 
-interface VersionName {
-  id: number
-  name: string
-  created_at: string | null
-}
-
 interface AppUsageByVersion {
   date: string
   app_id: string
-  version_id: number
+  version_name: string
   install: number | null
   uninstall: number | null
 }
@@ -328,49 +323,56 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
 }
 
 async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLatestVersion: boolean, supabase: ReturnType<typeof supabaseClient>) {
-  const { data: dailyVersion, error: dailyVersionError } = await supabase
+  // Query uses version_name column - cast needed because auto-generated types are stale
+  const { data: rawDailyVersion, error: dailyVersionError } = await supabase
     .from('daily_version')
-    .select('date, app_id, version_id, install, uninstall')
+    .select('date, app_id, version_name, install, uninstall')
     .eq('app_id', appId)
     .gte('date', from.toISOString())
     .lte('date', to.toISOString())
+    .not('version_name', 'is', null)
     .order('date', { ascending: true })
   if (dailyVersionError)
     return { data: null, error: dailyVersionError }
 
-  const { data: versionNames, error: versionNamesError } = await supabase
-    .from('app_versions')
-    .select('id, name, created_at')
-    .eq('app_id', appId)
-    .in('id', dailyVersion.map(d => d.version_id))
+  // Cast to our interface - the SQL table has version_name but types are stale
+  const dailyVersion = rawDailyVersion as unknown as AppUsageByVersion[]
 
-  if (versionNamesError)
-    return { data: null, error: versionNamesError }
-
-  // stolen from MobileStats.vue
-  const versions = [...new Set(dailyVersion.map(d => d.version_id))]
+  // Get unique version names from the data
+  const versions = [...new Set(dailyVersion.map(d => d.version_name).filter(Boolean))] as string[]
   const dates = generateDateLabels(from, to)
 
-  // Step 1: Calculate accumulated data
-  const accumulatedData = calculateAccumulatedData(dailyVersion, dates, versions)
+  // Step 1: Calculate accumulated data (now using version_name directly)
+  const accumulatedData = calculateAccumulatedDataByName(dailyVersion, dates, versions)
   // Step 2: Convert to percentages, ensuring total <= 100% per day
-  const percentageData = convertToPercentages(accumulatedData)
+  const percentageData = convertToPercentagesByName(accumulatedData)
   // Step 3: Get active versions (versions with non-zero usage)
-  const activeVersions = getActiveVersions(versions, percentageData)
-  // Step 4: Create datasets for the chart
-  let datasets = createDatasets(activeVersions, dates, percentageData, versionNames)
+  const activeVersions = getActiveVersionsByName(versions, percentageData)
+  // Step 4: Create datasets for the chart (now using version_name directly)
+  let datasets = createDatasetsByName(activeVersions, dates, percentageData)
   datasets = fillMissingDailyData(datasets, dates)
 
   if (shouldGetLatestVersion) {
-    const latestVersion = getLatestVersion(versionNames)
-    const latestVersionPercentage = getLatestVersionPercentage(datasets, latestVersion)
+    // For latest version, we need to query app_versions to get created_at
+    const { data: versionData } = await supabase
+      .from('app_versions')
+      .select('name, created_at')
+      .eq('app_id', appId)
+      .in('name', versions)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
+
+    const latestVersionPercentage = versionData
+      ? getLatestVersionPercentage(datasets, { name: versionData.name })
+      : 0
 
     return {
       data: {
         labels: dates,
         datasets,
         latestVersion: {
-          name: latestVersion?.name,
+          name: versionData?.name,
           percentage: latestVersionPercentage.toFixed(1),
         },
       },
@@ -387,9 +389,9 @@ async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLate
   }
 }
 
-// Calculate cumulative installs for each version over time
-function calculateAccumulatedData(usage: AppUsageByVersion[], dates: string[], versions: number[]) {
-  const accumulated: { [date: string]: { [version: number]: number } } = {}
+// Calculate cumulative installs for each version over time (by version_name)
+function calculateAccumulatedDataByName(usage: AppUsageByVersion[], dates: string[], versions: string[]) {
+  const accumulated: { [date: string]: { [version: string]: number } } = {}
 
   // Initialize with zeros
   dates.forEach((date) => {
@@ -404,8 +406,9 @@ function calculateAccumulatedData(usage: AppUsageByVersion[], dates: string[], v
 
     if (index === 0) {
       // First day: just add installs
-      dailyUsage.forEach(({ version_id, install }) => {
-        accumulated[date][version_id] = install ?? 0
+      dailyUsage.forEach(({ version_name, install }) => {
+        if (version_name)
+          accumulated[date][version_name] = install ?? 0
       })
     }
     else {
@@ -413,7 +416,7 @@ function calculateAccumulatedData(usage: AppUsageByVersion[], dates: string[], v
       const prevTotal = Object.values(accumulated[prevDate]).reduce((sum, val) => sum + val, 0)
 
       versions.forEach((version) => {
-        const change = dailyUsage.find(u => u.version_id === version)
+        const change = dailyUsage.find(u => u.version_name === version)
         const prevValue = accumulated[prevDate][version]
 
         if (change?.install) {
@@ -437,9 +440,9 @@ function calculateAccumulatedData(usage: AppUsageByVersion[], dates: string[], v
   return accumulated
 }
 
-// Convert accumulated data to percentages, ensuring total <= 100% per day
-function convertToPercentages(accumulated: { [date: string]: { [version: number]: number } }) {
-  const percentages: { [date: string]: { [version: number]: number } } = {}
+// Convert accumulated data to percentages (by version_name)
+function convertToPercentagesByName(accumulated: { [date: string]: { [version: string]: number } }) {
+  const percentages: { [date: string]: { [version: string]: number } } = {}
 
   Object.keys(accumulated).forEach((date) => {
     const dayData = accumulated[date]
@@ -448,7 +451,7 @@ function convertToPercentages(accumulated: { [date: string]: { [version: number]
     percentages[date] = {}
     if (total > 0) {
       Object.keys(dayData).forEach((version) => {
-        percentages[date][version as any] = (dayData[version as any] / total) * 100
+        percentages[date][version] = (dayData[version] / total) * 100
       })
     }
   })
@@ -456,22 +459,20 @@ function convertToPercentages(accumulated: { [date: string]: { [version: number]
   return percentages
 }
 
-// Filter out versions with no usage
-function getActiveVersions(versions: number[], percentages: { [date: string]: { [version: number]: number } }) {
+// Filter out versions with no usage (by version_name)
+function getActiveVersionsByName(versions: string[], percentages: { [date: string]: { [version: string]: number } }) {
   return versions.filter(version =>
     Object.values(percentages).some(dayData => (dayData[version] ?? 0) > 0),
   )
 }
 
-// Create datasets for Chart.js
-function createDatasets(versions: number[], dates: string[], percentages: { [date: string]: { [version: number]: number } }, versionNames: VersionName[]) {
+// Create datasets for Chart.js (by version_name - no lookup needed)
+function createDatasetsByName(versions: string[], dates: string[], percentages: { [date: string]: { [version: string]: number } }) {
   return versions.map((version) => {
     const percentageData = dates.map(date => Number((percentages[date][version] ?? 0).toFixed(1)))
-    // const color = colorKeys[(i + SKIP_COLOR) % colorKeys.length]
-    const versionName = versionNames.find(v => v.id === version)?.name ?? String(version)
 
     return {
-      label: versionName,
+      label: version,
       data: percentageData,
     }
   })
@@ -526,12 +527,6 @@ export const bundleUsageTestUtils = {
   fillMissingDailyData,
 }
 
-// Find the latest version based on creation date
-function getLatestVersion(versions: VersionName[]) {
-  return versions.reduce((latest, current) =>
-    new Date(current.created_at ?? '') > new Date(latest.created_at ?? '') ? current : latest, versions[0])
-}
-
 // Get the percentage of the latest version on the last day
 function getLatestVersionPercentage(datasets: any[], latestVersion: { name: string }) {
   const latestVersionDataset = datasets.find(dataset => dataset.label === latestVersion?.name)
@@ -552,15 +547,11 @@ app.get('/app/:app_id', async (c) => {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
-
   const auth = c.get('auth') as AuthInfo
-  if (auth.authType === 'apikey') {
-    if (!await hasAppRightApikey(c, appId, auth.userId, 'read', auth.apikey!.key)) {
-      throw quickError(401, 'no_access_to_app', 'No access to app with this apikey', { data: auth })
-    }
-  }
-  else if (!await hasAppRight(c, appId, auth.userId, 'read')) {
-    throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth.userId })
+
+  // Use unified RBAC permission check
+  if (!await checkPermission(c, 'app.read', { appId })) {
+    throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth?.userId ?? null })
   }
 
   // Use authenticated client - RLS will enforce access
@@ -597,8 +588,9 @@ app.get('/org/:org_id', async (c) => {
   const body = bodyParsed.data
 
   const auth = c.get('auth') as AuthInfo
-  if (!(await hasOrgRight(c, orgId, auth.userId, 'read'))) {
-    throw quickError(401, 'no_access_to_organization', 'No access to organization', { data: auth.userId })
+  // Use unified RBAC permission check
+  if (!(await checkPermission(c, 'org.read', { orgId }))) {
+    throw quickError(401, 'no_access_to_organization', 'No access to organization', { data: auth?.userId ?? null })
   }
   if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
     if (!auth.apikey!.limited_to_orgs.includes(orgId)) {
@@ -636,15 +628,11 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
-
   const auth = c.get('auth') as AuthInfo
-  if (auth.authType === 'apikey') {
-    if (!await hasAppRightApikey(c, appId, auth.userId, 'read', auth.apikey!.key)) {
-      throw quickError(401, 'no_access_to_app', 'No access to app with this apikey', { data: auth.apikey!.key })
-    }
-  }
-  else if (!await hasAppRight(c, appId, auth.userId, 'read')) {
-    throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth.userId })
+
+  // Use unified RBAC permission check
+  if (!await checkPermission(c, 'app.read', { appId })) {
+    throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth?.userId ?? null })
   }
 
   // Use authenticated client - RLS will enforce access
@@ -682,29 +670,25 @@ app.get('/user', async (c) => {
   }
   const body = bodyParsed.data
 
-  const orgsReq = supabase.from('org_users').select('*').eq('user_id', auth.userId)
-  if (auth.authType === 'apikey' && auth.apikey!.limited_to_orgs && auth.apikey!.limited_to_orgs.length > 0) {
-    orgsReq.in('org_id', auth.apikey!.limited_to_orgs)
-  }
-  const orgs = await orgsReq
-  if (orgs.error) {
-    throw quickError(404, 'user_not_found', 'User not found', { error: orgs.error })
+  const { data: orgs, error: orgsError } = await supabase
+    .rpc('get_user_org_ids')
+
+  if (orgsError) {
+    throw quickError(404, 'user_not_found', 'User not found', { error: orgsError })
   }
 
-  cloudlogErr({ requestId: c.get('requestId'), message: 'orgs', data: orgs.data })
+  const orgIds = Array.from(new Set((orgs ?? []).map(org => org.org_id)))
 
-  // Deduplicate organizations by org_id using Set for better performance
-  const uniqueOrgs = Array.from(
-    new Map(orgs.data.map(org => [org.org_id, org])).values(),
-  )
-  if (uniqueOrgs.length === 0) {
-    throw quickError(401, 'no_organizations_found', 'No organizations found', { data: auth.userId })
+  cloudlog({ requestId: c.get('requestId'), message: 'orgs', data: orgIds })
+
+  if (orgIds.length === 0) {
+    throw quickError(401, 'no_organizations_found', 'No organizations found', { data: auth?.userId ?? null })
   }
 
   // Check organization payment status for each organization before returning stats
-  for (const org of uniqueOrgs) {
+  for (const orgId of orgIds) {
     if (auth.authType !== 'jwt')
-      await checkOrganizationAccess(c, org.org_id, supabase)
+      await checkOrganizationAccess(c, orgId, supabase)
   }
 
   let stats: Array<{ data: any, error: any }> = []
@@ -712,7 +696,7 @@ app.get('/user', async (c) => {
     stats = await Promise.all(auth.apikey!.limited_to_apps.map(appId => getNormalStats(c, appId, null, body.from, body.to, supabase, auth.authType === 'jwt', false, body.noAccumulate ?? false)))
   }
   else {
-    stats = await Promise.all(uniqueOrgs.map(org => getNormalStats(c, null, org.org_id, body.from, body.to, supabase, auth.authType === 'jwt', false, body.noAccumulate ?? false)))
+    stats = await Promise.all(orgIds.map(orgId => getNormalStats(c, null, orgId, body.from, body.to, supabase, auth.authType === 'jwt', false, body.noAccumulate ?? false)))
   }
 
   const errors = stats.filter(stat => stat.error).map(stat => stat.error)

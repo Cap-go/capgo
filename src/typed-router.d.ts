@@ -44,9 +44,23 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/admin/dashboard/credits': RouteRecordInfo<
+      '/admin/dashboard/credits',
+      '/admin/dashboard/credits',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/admin/dashboard/performance': RouteRecordInfo<
       '/admin/dashboard/performance',
       '/admin/dashboard/performance',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/admin/dashboard/plugins': RouteRecordInfo<
+      '/admin/dashboard/plugins',
+      '/admin/dashboard/plugins',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -100,6 +114,13 @@ declare module 'vue-router/auto-routes' {
       { package: ParamValue<false> },
       | never
     >,
+    '/app/[package].access': RouteRecordInfo<
+      '/app/[package].access',
+      '/app/:package/access',
+      { package: ParamValue<true> },
+      { package: ParamValue<false> },
+      | never
+    >,
     '/app/[package].builds': RouteRecordInfo<
       '/app/[package].builds',
       '/app/:package/builds',
@@ -124,6 +145,13 @@ declare module 'vue-router/auto-routes' {
     '/app/[package].bundle.[bundle].history': RouteRecordInfo<
       '/app/[package].bundle.[bundle].history',
       '/app/:package/bundle/:bundle/history',
+      { package: ParamValue<true>, bundle: ParamValue<true> },
+      { package: ParamValue<false>, bundle: ParamValue<false> },
+      | never
+    >,
+    '/app/[package].bundle.[bundle].manifest': RouteRecordInfo<
+      '/app/[package].bundle.[bundle].manifest',
+      '/app/:package/bundle/:bundle/manifest',
       { package: ParamValue<true>, bundle: ParamValue<true> },
       { package: ParamValue<false>, bundle: ParamValue<false> },
       | never
@@ -446,9 +474,21 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
+    'src/pages/admin/dashboard/credits.vue': {
+      routes:
+        | '/admin/dashboard/credits'
+      views:
+        | never
+    }
     'src/pages/admin/dashboard/performance.vue': {
       routes:
         | '/admin/dashboard/performance'
+      views:
+        | never
+    }
+    'src/pages/admin/dashboard/plugins.vue': {
+      routes:
+        | '/admin/dashboard/plugins'
       views:
         | never
     }
@@ -494,6 +534,12 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
+    'src/pages/app/[package].access.vue': {
+      routes:
+        | '/app/[package].access'
+      views:
+        | never
+    }
     'src/pages/app/[package].builds.vue': {
       routes:
         | '/app/[package].builds'
@@ -515,6 +561,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/app/[package].bundle.[bundle].history.vue': {
       routes:
         | '/app/[package].bundle.[bundle].history'
+      views:
+        | never
+    }
+    'src/pages/app/[package].bundle.[bundle].manifest.vue': {
+      routes:
+        | '/app/[package].bundle.[bundle].manifest'
       views:
         | never
     }

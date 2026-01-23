@@ -4,11 +4,11 @@ import { z } from 'zod/mini'
 import { getAdminAppsTrend, getAdminBandwidthTrend, getAdminBundlesTrend, getAdminDistributionMetrics, getAdminFailureMetrics, getAdminMauTrend, getAdminOrgMetrics, getAdminPlatformOverview, getAdminStorageTrend, getAdminSuccessRate, getAdminSuccessRateTrend, getAdminUploadMetrics } from '../utils/cloudflare.ts'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { getAdminDeploymentsTrend, getAdminGlobalStatsTrend } from '../utils/pg.ts'
+import { getAdminDeploymentsTrend, getAdminGlobalStatsTrend, getAdminPluginBreakdown } from '../utils/pg.ts'
 import { supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
 const bodySchema = z.object({
-  metric_category: z.enum(['uploads', 'distribution', 'failures', 'success_rate', 'platform_overview', 'org_metrics', 'mau_trend', 'success_rate_trend', 'apps_trend', 'bundles_trend', 'deployments_trend', 'storage_trend', 'bandwidth_trend', 'global_stats_trend']),
+  metric_category: z.enum(['uploads', 'distribution', 'failures', 'success_rate', 'platform_overview', 'org_metrics', 'mau_trend', 'success_rate_trend', 'apps_trend', 'bundles_trend', 'deployments_trend', 'storage_trend', 'bandwidth_trend', 'global_stats_trend', 'plugin_breakdown']),
   start_date: z.string().check(z.minLength(1)),
   end_date: z.string().check(z.minLength(1)),
 })
@@ -30,12 +30,12 @@ app.post('/', middlewareAuth, async (c) => {
   const authToken = c.req.header('authorization')
 
   if (!authToken)
-    return simpleError('not_authorize', 'Not authorize')
+    throw simpleError('not_authorized', 'Not authorized')
 
   const body = await parseBody<AdminStatsBody>(c)
   const parsedBodyResult = bodySchema.safeParse(body)
   if (!parsedBodyResult.success) {
-    return simpleError('invalid_json_body', 'Invalid json body', { body, parsedBodyResult })
+    throw simpleError('invalid_json_body', 'Invalid json body', { body, parsedBodyResult })
   }
 
   // Verify user is admin
@@ -44,12 +44,12 @@ app.post('/', middlewareAuth, async (c) => {
 
   if (adminError) {
     cloudlog({ requestId: c.get('requestId'), message: 'is_admin_error', error: adminError })
-    return simpleError('is_admin_error', 'Is admin error', { adminError })
+    throw simpleError('is_admin_error', 'Is admin error', { adminError })
   }
 
   if (!isAdmin) {
     cloudlog({ requestId: c.get('requestId'), message: 'not_admin', body })
-    return simpleError('not_admin', 'Not admin - only admin users can access platform statistics')
+    throw simpleError('not_admin', 'Not admin - only admin users can access platform statistics')
   }
 
   // Use body directly since it has the full interface type
@@ -125,8 +125,12 @@ app.post('/', middlewareAuth, async (c) => {
         result = await getAdminGlobalStatsTrend(c, start_date, end_date)
         break
 
+      case 'plugin_breakdown':
+        result = await getAdminPluginBreakdown(c, start_date, end_date)
+        break
+
       default:
-        return simpleError('invalid_metric_category', 'Invalid metric category', { metric_category })
+        throw simpleError('invalid_metric_category', 'Invalid metric category', { metric_category })
     }
 
     return c.json({
@@ -141,6 +145,6 @@ app.post('/', middlewareAuth, async (c) => {
   }
   catch (error) {
     cloudlog({ requestId: c.get('requestId'), message: 'admin_stats_error', error })
-    return simpleError('admin_stats_error', 'Error fetching admin statistics', { error })
+    throw simpleError('admin_stats_error', 'Error fetching admin statistics', { error })
   }
 })

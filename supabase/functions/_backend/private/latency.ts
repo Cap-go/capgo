@@ -13,6 +13,6 @@ app.get('/', async (c) => {
 
   await closeClient(c, pgClient)
   if (!res)
-    return simpleError('cannot_get_apps', 'Cannot get apps')
+    throw simpleError('cannot_get_apps', 'Cannot get apps')
   return c.json(BRES)
 })
