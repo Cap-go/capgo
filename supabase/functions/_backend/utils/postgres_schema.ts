@@ -1,4 +1,4 @@
-import { bigint, boolean, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
+import { bigint, boolean, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core'
 
 // do_not_change
 
@@ -256,7 +256,9 @@ export const org_saml_connections = pgTable('org_saml_connections', {
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   created_by: uuid('created_by'),
-})
+}, (table) => ({
+  uniqueOrgEntity: unique().on(table.org_id, table.entity_id),
+}))
 
 export const saml_domain_mappings = pgTable('saml_domain_mappings', {
   id: uuid('id').primaryKey().notNull(),

@@ -513,8 +513,8 @@ DECLARE
   v_org record;
   v_auth_email text;
 BEGIN
-  -- Authorization: allow if user_id matches OR caller has service_role privileges
-  IF p_user_id != auth.uid() AND auth.jwt() ->> 'role' != 'service_role' THEN
+  -- Authorization: allow if user_id matches OR caller has service_role privileges OR called from trigger (auth.uid() is NULL)
+  IF auth.uid() IS NOT NULL AND p_user_id != auth.uid() AND auth.jwt() ->> 'role' != 'service_role' THEN
     RAISE EXCEPTION 'Unauthorized: cannot join other users to orgs (user_id mismatch)';
   END IF;
   

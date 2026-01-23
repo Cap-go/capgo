@@ -63,11 +63,11 @@ const dataArray = computed(() => {
 // Check if we have real data
 const hasRealData = computed(() => {
   const arr = dataArray.value ?? []
-  // Has data if there's at least one defined, non-zero value
-  const hasDefinedData = arr.some(val => val !== undefined && val !== null && val > 0)
+  // Has data if there's at least one defined, non-null value (including zero)
+  const hasDefinedData = arr.some(val => val !== undefined && val !== null)
   // Or has data by app with at least one defined value
   const hasAppData = props.dataByApp && Object.values(props.dataByApp).some((appValues: any) =>
-    appValues.some((val: any) => val !== undefined && val !== null && val > 0),
+    appValues.some((val: any) => val !== undefined && val !== null),
   )
   return hasDefinedData || hasAppData
 })
