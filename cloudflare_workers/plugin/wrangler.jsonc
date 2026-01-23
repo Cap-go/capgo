@@ -21,7 +21,7 @@
         "enabled": true
       },
       "placement": {
-        "mode": "smart"
+        "region": "aws:eu-central-1"
       },
       "routes": [
         {
@@ -141,7 +141,7 @@
         "enabled": true
       },
       "placement": {
-        "mode": "smart"
+        "region": "aws:ap-south-1"
       },
       "routes": [
         {
@@ -227,7 +227,7 @@
         "enabled": true
       },
       "placement": {
-        "mode": "smart"
+        "region": "aws:ap-northeast-1"
       },
       "routes": [
         {
@@ -313,7 +313,7 @@
         "enabled": true
       },
       "placement": {
-        "mode": "smart"
+        "region": "aws:ap-south-1"
       },
       "routes": [
         {
@@ -399,7 +399,7 @@
         "enabled": true
       },
       "placement": {
-        "mode": "smart"
+        "region": "aws:us-east-1"
       },
       "routes": [
         {
@@ -481,7 +481,7 @@
         "ENV_NAME": "capgo_plugin-af-prod"
       },
       "placement": {
-        "mode": "smart"
+        "region": "aws:ap-south-1"
       },
       "observability": {
         "head_sampling_rate": 0.001,
@@ -571,7 +571,7 @@
         "enabled": true
       },
       "placement": {
-        "mode": "smart"
+        "region": "aws:ap-southeast-2"
       },
       "routes": [
         {
@@ -657,7 +657,7 @@
         "enabled": true
       },
       "placement": {
-        "mode": "smart"
+        "region": "aws:sa-east-1"
       },
       "routes": [
         {
@@ -812,7 +812,7 @@
         }
       ],
       "placement": {
-        "mode": "smart"
+        "region": "aws:us-east-1"
       }
     },
     "alpha": {
@@ -898,7 +898,7 @@
         }
       ],
       "placement": {
-        "mode": "smart"
+        "region": "aws:us-east-1"
       }
     },
     "local": {
