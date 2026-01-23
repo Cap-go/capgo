@@ -1,9 +1,25 @@
 import type { Context } from 'hono'
 import { cloudlog } from '../utils/logging.ts'
 import { getEnv } from '../utils/utils.ts'
+import { parseUploadMetadata } from './parse.ts'
 import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, MAX_UPLOAD_LENGTH_BYTES, TUS_VERSION } from './util.ts'
 
 const BUCKET_NAME = 'capgo'
+const SUPABASE_TIMEOUT = 1000 * 60 * 5 // 5 minutes for large uploads
+
+/**
+ * UTF-8 safe base64 encoding
+ * Uses TextEncoder to handle Unicode characters properly
+ */
+function utf8ToBase64(str: string): string {
+  const encoder = new TextEncoder()
+  const bytes = encoder.encode(str)
+  let binary = ''
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte)
+  }
+  return btoa(binary)
+}
 
 /**
  * Build the Supabase Storage TUS endpoint URL
@@ -22,15 +38,25 @@ function buildSupabaseTusUrl(c: Context, uploadId?: string): string {
 
 /**
  * Transform metadata to include Supabase-required bucketName and objectName
- * Input:  filename {base64(path)}
- * Output: bucketName {base64('capgo')},objectName {base64(path)},filename {base64(path)}
+ * Preserves client-provided metadata like filetype for MIME type support
+ * Input:  filename {base64(path)},filetype {base64(mimetype)}
+ * Output: bucketName {base64('capgo')},objectName {base64(path)},filename {base64(path)},filetype {base64(mimetype)}
  */
-function transformMetadataForSupabase(objectName: string): string {
-  const bucketNameB64 = btoa(BUCKET_NAME)
-  const objectNameB64 = btoa(objectName)
-  const filenameB64 = btoa(objectName)
+function transformMetadataForSupabase(c: Context, objectName: string): string {
+  const bucketNameB64 = utf8ToBase64(BUCKET_NAME)
+  const objectNameB64 = utf8ToBase64(objectName)
+  const filenameB64 = utf8ToBase64(objectName)
 
-  return `bucketName ${bucketNameB64},objectName ${objectNameB64},filename ${filenameB64}`
+  let metadata = `bucketName ${bucketNameB64},objectName ${objectNameB64},filename ${filenameB64}`
+
+  // Preserve filetype from original metadata if present
+  const originalMetadata = parseUploadMetadata(c, c.req.raw.headers)
+  if (originalMetadata.filetype) {
+    const filetypeB64 = utf8ToBase64(originalMetadata.filetype)
+    metadata += `,filetype ${filetypeB64}`
+  }
+
+  return metadata
 }
 
 /**
@@ -44,8 +70,24 @@ function transformMetadataForSupabase(objectName: string): string {
 function rewriteLocationHeader(c: Context, supabaseLocation: string): string {
   const requestId = c.get('requestId')
 
-  // Extract uploadId from Supabase URL
-  const uploadId = supabaseLocation.split('/').pop()
+  // Extract uploadId from Supabase URL in a robust way (handle trailing slashes, query, fragment)
+  let uploadId: string | undefined
+  try {
+    const url = new URL(supabaseLocation)
+    const pathSegments = url.pathname.split('/').filter(Boolean)
+    uploadId = pathSegments[pathSegments.length - 1]
+  }
+  catch {
+    // Fallback for non-absolute URLs: strip query/fragment and get last non-empty segment
+    const pathWithoutQuery = supabaseLocation.split('?')[0].split('#')[0]
+    const pathSegments = pathWithoutQuery.split('/').filter(Boolean)
+    uploadId = pathSegments[pathSegments.length - 1]
+  }
+
+  if (!uploadId) {
+    cloudlog({ requestId, message: 'rewriteLocationHeader - failed to extract uploadId', supabaseLocation })
+    throw new Error('Failed to extract uploadId from Supabase Location header')
+  }
 
   // Get SUPABASE_URL to detect environment
   const supabaseUrl = getEnv(c, 'SUPABASE_URL')
@@ -76,6 +118,12 @@ function rewriteLocationHeader(c: Context, supabaseLocation: string): string {
   }
   else {
     // Production self-hosted: SUPABASE_URL should be the external URL
+    // Warning: This may not work correctly if SUPABASE_URL is an internal URL
+    cloudlog({
+      requestId,
+      message: 'rewriteLocationHeader - WARNING: Using SUPABASE_URL as fallback for external URL. This may not work if SUPABASE_URL is an internal URL. Consider setting X-Forwarded-Host header or EXTERNAL_URL env var.',
+      supabaseUrl,
+    })
     baseUrl = supabaseUrl
   }
 
@@ -105,7 +153,21 @@ function buildTusResponseHeaders(): Headers {
  */
 export async function supabaseTusCreateHandler(c: Context): Promise<Response> {
   const requestId = c.get('requestId')
-  const fileId = c.get('fileId') as string
+  const rawFileId = c.get('fileId')
+
+  if (typeof rawFileId !== 'string' || rawFileId.length === 0) {
+    cloudlog({
+      requestId,
+      message: 'supabaseTusCreateHandler missing or invalid fileId in context',
+      fileId: rawFileId,
+    })
+    return new Response(JSON.stringify({ error: 'internal_error', message: 'Internal server error: missing fileId' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
+
+  const fileId = rawFileId
 
   cloudlog({ requestId, message: 'supabaseTusCreateHandler', fileId })
 
@@ -125,18 +187,29 @@ export async function supabaseTusCreateHandler(c: Context): Promise<Response> {
       headers.set(header, value)
   }
 
-  // Transform metadata to include bucket and object name
-  const transformedMetadata = transformMetadataForSupabase(fileId)
+  // Transform metadata to include bucket and object name (preserves filetype)
+  const transformedMetadata = transformMetadataForSupabase(c, fileId)
   headers.set('Upload-Metadata', transformedMetadata)
 
   cloudlog({ requestId, message: 'supabaseTusCreateHandler forwarding to Supabase', supabaseUrl, transformedMetadata })
 
-  // Forward the request to Supabase
-  const response = await fetch(supabaseUrl, {
-    method: 'POST',
-    headers,
-    body: c.req.raw.body,
-  })
+  // Forward the request to Supabase with timeout and error handling
+  let response: Response
+  try {
+    response = await fetch(supabaseUrl, {
+      method: 'POST',
+      headers,
+      body: c.req.raw.body,
+      signal: AbortSignal.timeout(SUPABASE_TIMEOUT),
+    })
+  }
+  catch (error) {
+    cloudlog({ requestId, message: 'supabaseTusCreateHandler fetch error', error: error instanceof Error ? error.message : String(error) })
+    return new Response(JSON.stringify({ error: 'upstream_error', message: 'Failed to communicate with storage backend' }), {
+      status: 502,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
 
   cloudlog({ requestId, message: 'supabaseTusCreateHandler response', status: response.status })
 
@@ -159,7 +232,24 @@ export async function supabaseTusCreateHandler(c: Context): Promise<Response> {
     cloudlog({ requestId, message: 'supabaseTusCreateHandler location rewritten', original: location, rewritten: rewrittenLocation })
   }
 
-  return new Response(null, {
+  // Forward Supabase error body (if any) to the client for 4xx/5xx responses
+  let responseBody: BodyInit | null = null
+  if (response.status >= 400) {
+    try {
+      const textBody = await response.text()
+      if (textBody) {
+        responseBody = textBody
+        const supabaseContentType = response.headers.get('Content-Type')
+        if (supabaseContentType)
+          responseHeaders.set('Content-Type', supabaseContentType)
+      }
+    }
+    catch {
+      // If reading the body fails, fall back to empty body
+    }
+  }
+
+  return new Response(responseBody, {
     status: response.status,
     headers: responseHeaders,
   })
@@ -191,11 +281,23 @@ export async function supabaseTusPatchHandler(c: Context): Promise<Response> {
 
   cloudlog({ requestId, message: 'supabaseTusPatchHandler forwarding to Supabase', supabaseUrl })
 
-  const response = await fetch(supabaseUrl, {
-    method: 'PATCH',
-    headers,
-    body: c.req.raw.body,
-  })
+  // Forward the request to Supabase with timeout and error handling
+  let response: Response
+  try {
+    response = await fetch(supabaseUrl, {
+      method: 'PATCH',
+      headers,
+      body: c.req.raw.body,
+      signal: AbortSignal.timeout(SUPABASE_TIMEOUT),
+    })
+  }
+  catch (error) {
+    cloudlog({ requestId, message: 'supabaseTusPatchHandler fetch error', error: error instanceof Error ? error.message : String(error) })
+    return new Response(JSON.stringify({ error: 'upstream_error', message: 'Failed to communicate with storage backend' }), {
+      status: 502,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
 
   cloudlog({ requestId, message: 'supabaseTusPatchHandler response', status: response.status })
 
@@ -209,7 +311,19 @@ export async function supabaseTusPatchHandler(c: Context): Promise<Response> {
       responseHeaders.set(header, value)
   }
 
-  return new Response(null, {
+  // Forward error body from Supabase for better debugging, keep empty body on success
+  let body: BodyInit | null = null
+  if (!response.ok) {
+    try {
+      const text = await response.text()
+      body = text || null
+    }
+    catch {
+      body = null
+    }
+  }
+
+  return new Response(body, {
     status: response.status,
     headers: responseHeaders,
   })
@@ -233,10 +347,22 @@ export async function supabaseTusHeadHandler(c: Context): Promise<Response> {
 
   cloudlog({ requestId, message: 'supabaseTusHeadHandler forwarding to Supabase', supabaseUrl })
 
-  const response = await fetch(supabaseUrl, {
-    method: 'HEAD',
-    headers,
-  })
+  // Forward the request to Supabase with timeout and error handling
+  let response: Response
+  try {
+    response = await fetch(supabaseUrl, {
+      method: 'HEAD',
+      headers,
+      signal: AbortSignal.timeout(SUPABASE_TIMEOUT),
+    })
+  }
+  catch (error) {
+    cloudlog({ requestId, message: 'supabaseTusHeadHandler fetch error', error: error instanceof Error ? error.message : String(error) })
+    return new Response(JSON.stringify({ error: 'upstream_error', message: 'Failed to communicate with storage backend' }), {
+      status: 502,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }
 
   cloudlog({ requestId, message: 'supabaseTusHeadHandler response', status: response.status })
 
@@ -250,7 +376,22 @@ export async function supabaseTusHeadHandler(c: Context): Promise<Response> {
       responseHeaders.set(header, value)
   }
 
-  return new Response(null, {
+  // For better debugging and error reporting, forward the Supabase error body
+  // while keeping HEAD semantics (no body) for successful responses.
+  let body: string | null = null
+  if (!response.ok) {
+    try {
+      const text = await response.text()
+      if (text)
+        body = text
+    }
+    catch {
+      // If reading the body fails, fall back to null body as before.
+      body = null
+    }
+  }
+
+  return new Response(body, {
     status: response.status,
     headers: responseHeaders,
   })

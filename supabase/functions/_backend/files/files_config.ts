@@ -10,7 +10,7 @@ app.use('/', useCors)
 
 app.get('/', (c) => {
   if (getRuntimeKey() !== 'workerd') {
-    // TUS upload is now supported via Supabase Storage proxy
+    // In Supabase Edge Functions runtime, TUS upload is supported via Supabase Storage proxy
     return c.json({
       partialUpload: false,
       partialUploadForced: false,

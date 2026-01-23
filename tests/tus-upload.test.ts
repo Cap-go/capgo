@@ -1,5 +1,4 @@
 import { randomUUID } from 'node:crypto'
-import { env } from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   APIKEY_TEST_ALL,
@@ -11,10 +10,6 @@ import {
 
 // TUS protocol constants
 const TUS_VERSION = '1.0.0'
-
-// Supabase Storage TUS endpoint (for direct testing)
-const SUPABASE_URL = env.SUPABASE_URL ?? 'http://localhost:54321'
-const SUPABASE_SERVICE_KEY = env.SUPABASE_SERVICE_KEY ?? ''
 
 /**
  * Helper to create a TUS upload via the Capgo API (goes through middleware)
@@ -61,7 +56,7 @@ async function uploadChunk(
       'Upload-Offset': offset.toString(),
       'Content-Type': 'application/offset+octet-stream',
     },
-    body: data,
+    body: new Blob([data]),
   })
 }
 
@@ -101,7 +96,7 @@ function generateTestData(size: number): Uint8Array {
   return data
 }
 
-describe('TUS Upload Protocol Tests', () => {
+describe('tus upload protocol tests', () => {
   const id = randomUUID().substring(0, 8)
   const APPNAME = `com.tus.test.${id}`
 
@@ -113,18 +108,18 @@ describe('TUS Upload Protocol Tests', () => {
     await resetAppData(APPNAME)
   })
 
-  describe('TUS Config Endpoint', () => {
+  describe('tus config endpoint', () => {
     it('should return TUSUpload: true for self-hosted', async () => {
       const response = await fetch(getEndpointUrl('/files/config'))
       expect(response.status).toBe(200)
 
-      const config = await response.json()
+      const config = await response.json() as { TUSUpload: boolean, maxUploadLength: number }
       expect(config.TUSUpload).toBe(true)
       expect(config.maxUploadLength).toBeGreaterThan(0)
     })
   })
 
-  describe('OPTIONS - TUS Discovery', () => {
+  describe('options - tus discovery', () => {
     it('should return TUS capabilities on OPTIONS request', async () => {
       const response = await fetch(getEndpointUrl('/files/upload/attachments'), {
         method: 'OPTIONS',
@@ -137,7 +132,7 @@ describe('TUS Upload Protocol Tests', () => {
     })
   })
 
-  describe('POST - Create Upload', () => {
+  describe('post - create upload', () => {
     it('should create upload with valid metadata', async () => {
       const { response, uploadUrl } = await createTusUploadViaApi(
         APPNAME,
@@ -168,7 +163,7 @@ describe('TUS Upload Protocol Tests', () => {
     })
   })
 
-  describe('PATCH - Upload Chunks', () => {
+  describe('patch - upload chunks', () => {
     it('should upload single chunk successfully', async () => {
       const testData = generateTestData(1024)
 
@@ -210,7 +205,7 @@ describe('TUS Upload Protocol Tests', () => {
     })
   })
 
-  describe('HEAD - Check Progress', () => {
+  describe('head - check progress', () => {
     it('should return current offset after partial upload', async () => {
       const totalSize = 2048
       const firstChunkSize = 1024
@@ -236,7 +231,7 @@ describe('TUS Upload Protocol Tests', () => {
     })
   })
 
-  describe('Resumable Upload Scenarios', () => {
+  describe('resumable upload scenarios', () => {
     it('should resume upload after partial completion', async () => {
       const totalSize = 3072 // 3KB
       const chunkSize = 1024 // 1KB chunks
@@ -276,7 +271,7 @@ describe('TUS Upload Protocol Tests', () => {
     })
   })
 
-  describe('Error Handling', () => {
+  describe('error handling', () => {
     it('should reject upload without Upload-Length header', async () => {
       const filePath = `orgs/${ORG_ID}/apps/${APPNAME}/test.zip`
       const filenameB64 = btoa(filePath)

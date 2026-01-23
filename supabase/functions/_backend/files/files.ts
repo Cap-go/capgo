@@ -289,26 +289,57 @@ async function setKeyFromIdParam(c: Context, next: Next) {
     const decoded = atob(normalizedFileId)
     // If decoded starts with bucket name and contains orgs/, it's a TUS upload ID
     if (decoded.startsWith('capgo/') && decoded.includes('/orgs/')) {
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: 'setKeyFromIdParam - detected Supabase TUS upload ID',
-        decoded,
-      })
-      // Extract file path: remove bucket prefix (capgo/) and UUID suffix
-      // Format: capgo/orgs/xxx/apps/yyy/file.zip/uuid
       const parts = decoded.split('/')
-      // Remove first part (bucket name) and last part (UUID)
-      const pathParts = parts.slice(1, -1)
-      extractedFileId = pathParts.join('/')
-      // Store the original upload ID for the TUS handler
-      c.set('tusUploadId', normalizedFileId)
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: 'setKeyFromIdParam - extracted fileId from TUS ID',
-        extractedFileId,
-        originalParts: parts,
-        pathParts,
-      })
+      // Expected format:
+      // [0]: 'capgo'
+      // [1]: 'orgs'
+      // [2]: orgId
+      // [3]: 'apps'
+      // [4]: appId
+      // [5..n-2]: file path segments
+      // [n-1]: UUID
+      if (
+        parts.length >= 6
+        && parts[0] === 'capgo'
+        && parts[1] === 'orgs'
+        && parts[3] === 'apps'
+      ) {
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'setKeyFromIdParam - detected Supabase TUS upload ID',
+          decoded,
+          parts,
+        })
+        // Extract file path: remove bucket prefix (capgo/) and UUID suffix
+        // Resulting path starts with "orgs/..."
+        const pathParts = parts.slice(1, parts.length - 1)
+        if (pathParts.length > 0) {
+          extractedFileId = pathParts.join('/')
+          cloudlog({
+            requestId: c.get('requestId'),
+            message: 'setKeyFromIdParam - extracted fileId from TUS ID',
+            extractedFileId,
+            originalParts: parts,
+            pathParts,
+          })
+        }
+        else {
+          cloudlog({
+            requestId: c.get('requestId'),
+            message: 'setKeyFromIdParam - TUS ID decoded but pathParts is empty, using normalizedFileId as fileId',
+            decoded,
+            parts,
+          })
+        }
+      }
+      else {
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'setKeyFromIdParam - decoded TUS ID has unexpected structure, using normalizedFileId as fileId',
+          decoded,
+          parts,
+        })
+      }
     }
   }
   catch {
@@ -519,19 +550,28 @@ app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload'
 
 app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, optionsHandler)
 // Combined GET/HEAD handler for TUS uploads - Hono tiny routes HEAD to GET
-app.get(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromIdParam, checkWriteAppAccess, async (c) => {
-  // Detect TUS HEAD request (has TUS header and is HEAD method)
-  const isTusRequest = c.req.header('Tus-Resumable') != null
-  const isHead = c.req.method === 'HEAD'
+app.get(
+  `/upload/${ATTACHMENT_PREFIX}/:id{.+}`,
+  middlewareKey(['all', 'write', 'upload'], true),
+  // Early TUS HEAD detection to avoid unnecessary ID parsing and access checks
+  async (c, next) => {
+    const isTusRequest = c.req.header('Tus-Resumable') != null
+    const isHead = c.req.method === 'HEAD'
 
-  if (isHead && isTusRequest && getRuntimeKey() !== 'workerd') {
-    cloudlog({ requestId: c.get('requestId'), message: 'Routing HEAD TUS request to supabaseTusHeadHandler' })
-    return supabaseTusHeadHandler(c)
-  }
+    if (isHead && isTusRequest && getRuntimeKey() !== 'workerd') {
+      cloudlog({ requestId: c.get('requestId'), message: 'Routing HEAD TUS request to supabaseTusHeadHandler (early)' })
+      return supabaseTusHeadHandler(c)
+    }
 
-  // Normal GET handler
-  return getHandler(c)
-})
+    return next()
+  },
+  setKeyFromIdParam,
+  checkWriteAppAccess,
+  async (c) => {
+    // Normal GET handler
+    return getHandler(c)
+  },
+)
 app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, getHandler)
 app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromIdParam, checkWriteAppAccess, async (c) => {
   if (getRuntimeKey() !== 'workerd') {
