@@ -1,5 +1,8 @@
--- Fix get_orgs_v7 to completely hide orgs where access is denied by 2FA or password policy
--- This restores the expected behavior where denied orgs are filtered out rather than returned with redacted data
+-- Fix get_orgs_v7 to handle 2FA and password policy differently
+-- - 2FA enforcement: Hide orgs completely when user lacks 2FA
+-- - Password policy enforcement: Show orgs with redacted sensitive data when user is non-compliant
+-- This restores the expected behavior where 2FA-denied orgs are filtered out,
+-- but password-policy-denied orgs are visible with redacted fields
 
 CREATE OR REPLACE FUNCTION public.get_orgs_v7(userid uuid)
 RETURNS TABLE (
@@ -212,8 +215,9 @@ BEGIN
   LEFT JOIN public.usage_credit_balances ucb ON ucb.org_id = o.id
   LEFT JOIN paying_orgs_ordered poo ON poo.id = o.id
   LEFT JOIN billing_cycles bc ON bc.org_id = o.id
-  -- CRITICAL FIX: Completely hide orgs where access is denied by 2FA or password policy
-  WHERE NOT (tfa.should_redact_2fa OR ppa.should_redact_password);
+  -- CRITICAL FIX: Only hide orgs where 2FA denies access
+  -- Password policy violations show the org with redacted data, not hidden
+  WHERE NOT tfa.should_redact_2fa;
 END;
 $$;
 
@@ -229,4 +233,4 @@ GRANT EXECUTE ON FUNCTION public.get_orgs_v7 (uuid) TO postgres;
 
 GRANT EXECUTE ON FUNCTION public.get_orgs_v7 (uuid) TO service_role;
 
-COMMENT ON FUNCTION public.get_orgs_v7 (uuid) IS 'Returns organizations accessible to a user with RBAC support. Orgs where access is denied by 2FA or password policy are completely filtered out.';
+COMMENT ON FUNCTION public.get_orgs_v7 (uuid) IS 'Returns organizations accessible to a user with RBAC support. Orgs where 2FA is enforced and user lacks 2FA are completely filtered out. Orgs where password policy is enforced and user is non-compliant show redacted sensitive data.';
