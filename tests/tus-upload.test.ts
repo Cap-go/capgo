@@ -56,7 +56,7 @@ async function uploadChunk(
       'Upload-Offset': offset.toString(),
       'Content-Type': 'application/offset+octet-stream',
     },
-    body: new Blob([data]),
+    body: data.buffer,
   })
 }
 
