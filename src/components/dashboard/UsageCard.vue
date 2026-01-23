@@ -32,7 +32,7 @@ const props = defineProps({
   },
   data: {
     type: Array,
-    default: undefined,
+    default: () => Array.from({ length: getDaysInCurrentMonth() }).fill(undefined) as number[],
   },
   dataByApp: {
     type: Object,
