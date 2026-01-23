@@ -240,6 +240,88 @@ Then in your test file, use ONLY these dedicated resources for modifications.
   inputs carefully—the SDK is susceptible to PostgREST query injection (not SQL
   injection, but filter/modifier injection via crafted parameters).
 
+### PostgreSQL Function Security
+
+**ALWAYS set an empty search path in every PostgreSQL function.**
+
+Every function must set `search_path = ''` and use fully qualified names for all references:
+
+```sql
+-- CORRECT: Empty search_path with fully qualified names
+CREATE OR REPLACE FUNCTION "public"."my_function"()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+    SELECT * FROM "public"."my_table";
+    -- All table/type references must be fully qualified
+END;
+$$;
+
+-- WRONG: Missing search_path - vulnerable to attacks
+CREATE OR REPLACE FUNCTION public.my_function()
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+    SELECT * FROM my_table;
+END;
+$$;
+```
+
+### RLS Policy Optimization Rules
+
+**Rule 1: One policy per table per operation.**
+
+Never create duplicate policies for the same operation on a table. Multiple policies on the same operation create OR conditions that hurt query performance. Merge all conditions into a single policy:
+
+```sql
+-- WRONG: Multiple SELECT policies on the same table
+CREATE POLICY "policy_1" ON public.my_table FOR SELECT USING (condition_1);
+CREATE POLICY "policy_2" ON public.my_table FOR SELECT USING (condition_2);
+
+-- CORRECT: Single merged policy
+CREATE POLICY "Allow select on my_table" ON public.my_table
+FOR SELECT USING (condition_1 OR condition_2);
+```
+
+**Rule 2: Call `auth.uid()` only once using a subquery.**
+
+The `auth.uid()` function should never be called multiple times in a policy. Use a `SELECT *` subquery pattern to call it once and reference the result:
+
+```sql
+-- WRONG: Multiple auth.uid() calls - poor performance
+CREATE POLICY "my_policy" ON public.my_table
+FOR SELECT USING (
+    user_id = auth.uid()
+    OR owner_id = auth.uid()
+    OR created_by = auth.uid()
+);
+
+-- CORRECT: Single auth.uid() call with subquery
+CREATE POLICY "my_policy" ON public.my_table
+FOR SELECT USING (
+    (SELECT * FROM (SELECT auth.uid() AS uid) AS auth_check
+     WHERE user_id = auth_check.uid
+        OR owner_id = auth_check.uid
+        OR created_by = auth_check.uid)
+);
+
+-- ALSO CORRECT: Using a CTE-style approach in the check
+CREATE POLICY "my_policy" ON public.my_table
+FOR SELECT USING (
+    EXISTS (
+        SELECT 1
+        FROM (SELECT auth.uid() AS uid) AS auth_user
+        WHERE my_table.user_id = auth_user.uid
+           OR my_table.owner_id = auth_user.uid
+    )
+);
+```
+
 ## Database RLS Policies
 
 ### Identity Functions for RLS - CRITICAL RULES
