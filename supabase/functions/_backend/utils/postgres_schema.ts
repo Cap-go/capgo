@@ -256,7 +256,7 @@ export const org_saml_connections = pgTable('org_saml_connections', {
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   created_by: uuid('created_by'),
-}, (table) => ({
+}, table => ({
   uniqueOrgEntity: unique().on(table.org_id, table.entity_id),
 }))
 
