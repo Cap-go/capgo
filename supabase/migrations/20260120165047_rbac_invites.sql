@@ -1098,8 +1098,7 @@ BEGIN
   LEFT JOIN app_counts ac ON ac.owner_org = o.id
   LEFT JOIN public.usage_credit_balances ucb ON ucb.org_id = o.id
   LEFT JOIN paying_orgs_ordered poo ON poo.id = o.id
-  LEFT JOIN billing_cycles bc ON bc.org_id = o.id
-  WHERE tfa."2fa_has_access" = true;
+  LEFT JOIN billing_cycles bc ON bc.org_id = o.id;
 END;
 $$;
 
