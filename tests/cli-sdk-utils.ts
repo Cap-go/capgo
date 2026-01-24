@@ -150,7 +150,7 @@ export async function uploadBundleSDK(
     bundle: version,
     channel,
     disableCodeCheck: true, // Skip notifyAppReady check for tests
-    useZip: true, // Use legacy zip upload for local testing
+    // useZip: false uses TUS resumable upload protocol
     ...additionalOptions,
   }
 
