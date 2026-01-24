@@ -142,7 +142,7 @@ async function validateInvite(c: Context, rawBody: any) {
   }
 
   if (!org.name.match(nameRegex)) {
-    return { message: 'Failed to invite user', error: 'Organization name contains invalid characters', status: 400 }
+    return { message: 'Failed to invite user due to invalid organization name', error: 'Organization name contains invalid characters', status: 400 }
   }
 
   const useNewRbac = org.use_new_rbac === true
