@@ -553,22 +553,17 @@ app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, optionsHandler)
 app.get(
   `/upload/${ATTACHMENT_PREFIX}/:id{.+}`,
   middlewareKey(['all', 'write', 'upload'], true),
-  // Early TUS HEAD detection to avoid unnecessary ID parsing and access checks
-  async (c, next) => {
+  setKeyFromIdParam,
+  checkWriteAppAccess,
+  async (c) => {
     const isTusRequest = c.req.header('Tus-Resumable') != null
     const isHead = c.req.method === 'HEAD'
 
     if (isHead && isTusRequest && getRuntimeKey() !== 'workerd') {
-      cloudlog({ requestId: c.get('requestId'), message: 'Routing HEAD TUS request to supabaseTusHeadHandler (early)' })
+      cloudlog({ requestId: c.get('requestId'), message: 'Routing HEAD TUS request to supabaseTusHeadHandler' })
       return supabaseTusHeadHandler(c)
     }
 
-    return next()
-  },
-  setKeyFromIdParam,
-  checkWriteAppAccess,
-  async (c) => {
-    // Normal GET handler
     return getHandler(c)
   },
 )
