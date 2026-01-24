@@ -65,9 +65,9 @@ const hasRealData = computed(() => {
   const arr = dataArray.value ?? []
   // Has data if there's at least one defined, non-null value (including zero)
   const hasDefinedData = arr.some(val => val !== undefined && val !== null)
-  // Or has data by app with at least one defined value
+  // Or has data by app with at least one defined value (guard against non-array entries)
   const hasAppData = props.dataByApp && Object.values(props.dataByApp).some((appValues: any) =>
-    appValues.some((val: any) => val !== undefined && val !== null),
+    Array.isArray(appValues) && appValues.some((val: any) => val !== undefined && val !== null),
   )
   return hasDefinedData || hasAppData
 })
@@ -108,7 +108,8 @@ const effectiveAppNames = computed(() => isDemoMode.value ? DEMO_APP_NAMES : pro
 
 const total = computed(() => {
   const arr = effectiveData.value
-  const hasData = arr.some(val => val !== undefined)
+  // Only consider actual numbers as data (not null/undefined)
+  const hasData = arr.some(val => typeof val === 'number')
   const sumValues = (values: (number | undefined)[]): number => values.reduce<number>((acc, val) => (typeof val === 'number' ? acc + val : acc), 0)
 
   if (hasData) {
@@ -148,7 +149,8 @@ const lastDayEvolution = computed(() => {
 
 const hasChartData = computed(() => {
   const arr = effectiveData.value
-  return arr.some(val => val !== undefined && val !== null && val > 0)
+  // Consider any defined, non-null value (including zero) as valid chart data
+  return arr.some(val => val !== undefined && val !== null)
 })
 </script>
 

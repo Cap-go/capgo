@@ -252,12 +252,13 @@ export const org_saml_connections = pgTable('org_saml_connections', {
   enabled: boolean('enabled').notNull().default(false),
   verified: boolean('verified').notNull().default(false),
   auto_join_enabled: boolean('auto_join_enabled').notNull().default(false),
-  attribute_mapping: text('attribute_mapping').default('{}'),
+  attribute_mapping: jsonb('attribute_mapping').notNull().default({}),
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updated_at: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   created_by: uuid('created_by'),
 }, table => ({
-  uniqueOrgEntity: unique().on(table.org_id, table.entity_id),
+  uniqueOrgId: unique().on(table.org_id),
+  uniqueEntityId: unique().on(table.entity_id),
 }))
 
 export const saml_domain_mappings = pgTable('saml_domain_mappings', {
@@ -270,7 +271,9 @@ export const saml_domain_mappings = pgTable('saml_domain_mappings', {
   verification_code: text('verification_code'),
   verified_at: timestamp('verified_at', { withTimezone: true }),
   created_at: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-})
+}, table => ({
+  uniqueDomainConnection: unique().on(table.domain, table.sso_connection_id),
+}))
 
 export const sso_audit_logs = pgTable('sso_audit_logs', {
   id: uuid('id').primaryKey().notNull(),
@@ -288,5 +291,5 @@ export const sso_audit_logs = pgTable('sso_audit_logs', {
   saml_session_index: text('saml_session_index'),
   error_code: text('error_code'),
   error_message: text('error_message'),
-  metadata: text('metadata').default('{}'),
+  metadata: jsonb('metadata').notNull().default({}),
 })

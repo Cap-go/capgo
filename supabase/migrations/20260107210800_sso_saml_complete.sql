@@ -479,8 +479,8 @@ AS $$
 DECLARE
   v_auth_email text;
 BEGIN
-  -- Authorization: reject calls where p_user_id does not match the authenticated user
-  IF p_user_id != auth.uid() THEN
+  -- Authorization: allow if user_id matches OR caller has service_role privileges OR called from trigger (auth.uid() is NULL)
+  IF auth.uid() IS NOT NULL AND p_user_id != auth.uid() AND auth.jwt() ->> 'role' != 'service_role' THEN
     RAISE EXCEPTION 'Unauthorized: cannot enroll other users (user_id mismatch)';
   END IF;
   
@@ -545,6 +545,7 @@ BEGIN
     INNER JOIN public.org_saml_connections osc ON osc.id = sdm.sso_connection_id
     WHERE sdm.domain = v_domain
       AND sdm.verified = true
+      AND osc.enabled = true
       AND osc.auto_join_enabled = true
       AND NOT EXISTS (
         SELECT 1 FROM public.org_users ou 
