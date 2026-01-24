@@ -6,6 +6,25 @@ import IconLoader from '~icons/lucide/loader-2'
 const route = useRoute()
 const isRedirecting = ref(true)
 const error = ref('')
+
+const allowedHosts = ['capgo.app', 'console.capgo.app']
+
+function isAllowedHost(hostname: string) {
+  if (allowedHosts.includes(hostname))
+    return true
+  return hostname.endsWith('.capgo.app')
+}
+
+function isAllowedConfirmationUrl(urlValue: string) {
+  const url = new URL(urlValue, window.location.origin)
+  if (import.meta.env.DEV) {
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1')
+      return true
+  }
+  if (url.protocol !== 'https:')
+    return false
+  return isAllowedHost(url.hostname)
+}
 onMounted(() => {
   const confirmationUrl = route.query.confirmation_url as string
 
@@ -18,6 +37,11 @@ onMounted(() => {
   try {
     // Decode the URL if needed and redirect immediately
     const decodedUrl = decodeURIComponent(confirmationUrl)
+    if (!isAllowedConfirmationUrl(decodedUrl)) {
+      isRedirecting.value = false
+      error.value = 'Invalid confirmation URL. Please check your email link.'
+      return
+    }
     window.location.href = decodedUrl
   }
   catch {
