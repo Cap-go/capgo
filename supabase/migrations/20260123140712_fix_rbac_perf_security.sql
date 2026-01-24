@@ -37,28 +37,48 @@ $$;
 COMMENT ON FUNCTION public.is_user_org_admin(uuid, uuid) IS
   'Checks whether a user has an admin role in an organization (bypasses RLS to avoid recursion).';
 
--- Fix is_user_app_admin - add search_path for security
+-- Fix is_user_app_admin - add search_path for security and fix org-level role inheritance
 CREATE OR REPLACE FUNCTION public.is_user_app_admin(p_user_id uuid, p_app_id uuid)
 RETURNS boolean
-LANGUAGE sql
+LANGUAGE plpgsql
 SECURITY DEFINER
 STABLE
 SET search_path = ''
 AS $$
-  SELECT EXISTS (
+DECLARE
+  v_org_id uuid;
+BEGIN
+  -- Get the org that owns the app
+  SELECT owner_org INTO v_org_id
+  FROM public.apps
+  WHERE id = p_app_id
+  LIMIT 1;
+
+  IF v_org_id IS NULL THEN
+    RETURN false;
+  END IF;
+
+  -- Check for app-scoped admin roles OR org-scoped admin roles (inheritance)
+  RETURN EXISTS (
     SELECT 1
     FROM public.role_bindings rb
     INNER JOIN public.roles r ON rb.role_id = r.id
     WHERE rb.principal_type = public.rbac_principal_user()
       AND rb.principal_id = p_user_id
-      AND rb.app_id = p_app_id
-      AND rb.scope_type = public.rbac_scope_app()
+      AND (
+        -- App-scoped bindings
+        (rb.scope_type = public.rbac_scope_app() AND rb.app_id = p_app_id)
+        OR
+        -- Org-scoped bindings (inherit org admin to app)
+        (rb.scope_type = public.rbac_scope_org() AND rb.org_id = v_org_id)
+      )
       AND r.name IN (public.rbac_role_app_admin(), public.rbac_role_org_super_admin(), public.rbac_role_org_admin(), public.rbac_role_platform_super_admin())
   );
+END;
 $$;
 
 COMMENT ON FUNCTION public.is_user_app_admin(uuid, uuid) IS
-  'Checks whether a user has an admin role for an app (bypasses RLS to avoid recursion).';
+  'Checks whether a user has an admin role for an app, including inherited org-level admin roles (bypasses RLS to avoid recursion).';
 
 -- =============================================================================
 -- 2. RESTRICT FUNCTION ACCESS: Only authenticated users, not anon/public
@@ -94,15 +114,26 @@ FOR SELECT
 TO authenticated
 USING (
   -- Use (SELECT auth.uid()) to evaluate once per query, not per row
+  -- Org admins can see all bindings in their org
   public.is_user_org_admin((SELECT auth.uid()), org_id)
   OR
+  -- App admins can see app-scoped bindings
   (scope_type = public.rbac_scope_app() AND public.is_user_app_admin((SELECT auth.uid()), app_id))
   OR
+  -- Users with a role in the app can see app-scoped bindings
   (scope_type = public.rbac_scope_app() AND app_id IS NOT NULL AND public.user_has_role_in_app((SELECT auth.uid()), app_id))
+  OR
+  -- Channel-scope bindings: visible to app admins of the parent app
+  (scope_type = public.rbac_scope_channel() AND channel_id IS NOT NULL AND EXISTS (
+    SELECT 1 FROM public.channels c
+    JOIN public.apps a ON a.app_id = c.app_id
+    WHERE c.rbac_id = role_bindings.channel_id
+      AND public.is_user_app_admin((SELECT auth.uid()), a.id)
+  ))
 );
 
 COMMENT ON POLICY "Allow viewing role bindings with permission" ON public.role_bindings IS
-  'Allows viewing role bindings if the user is admin or has a role in the app. Optimized with (SELECT auth.uid()) pattern.';
+  'Allows viewing role bindings if the user is org admin, app admin, or has a role in the app. Includes channel-scope visibility for app admins. Optimized with (SELECT auth.uid()) pattern.';
 
 -- =============================================================================
 -- 4. FIX PERFORMANCE: Optimize RLS policies with (SELECT auth.uid()) pattern
@@ -253,7 +284,7 @@ CREATE POLICY role_bindings_write_scope_admin ON public.role_bindings
       SELECT 1 FROM public.channels
       JOIN public.apps ON apps.app_id = channels.app_id
       WHERE channels.rbac_id = role_bindings.channel_id
-        AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, (SELECT auth.uid()), apps.owner_org, apps.app_id, NULL::bigint)
+        AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, (SELECT auth.uid()), apps.owner_org, channels.app_id, channels.id)
     ))
     OR
     public.is_admin((SELECT auth.uid()))
@@ -273,7 +304,7 @@ CREATE POLICY role_bindings_write_scope_admin ON public.role_bindings
       SELECT 1 FROM public.channels
       JOIN public.apps ON apps.app_id = channels.app_id
       WHERE channels.rbac_id = role_bindings.channel_id
-        AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, (SELECT auth.uid()), apps.owner_org, apps.app_id, NULL::bigint)
+        AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, (SELECT auth.uid()), apps.owner_org, channels.app_id, channels.id)
     ))
     OR
     public.is_admin((SELECT auth.uid()))
@@ -352,6 +383,12 @@ $$;
 COMMENT ON FUNCTION public.user_has_role_in_app(uuid, uuid) IS
   'Checks whether a user has a role in an app (bypasses RLS to avoid recursion). Optimized with SELECT auth.uid() pattern.';
 
+-- Restrict user_has_role_in_app
+REVOKE ALL ON FUNCTION public.user_has_role_in_app(uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.user_has_role_in_app(uuid, uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.user_has_role_in_app(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.user_has_role_in_app(uuid, uuid) TO service_role;
+
 -- =============================================================================
 -- 6. FIX user_has_app_update_user_roles: Use (SELECT auth.uid()) pattern
 -- =============================================================================
@@ -412,13 +449,18 @@ $$;
 COMMENT ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) IS
   'Checks whether a user has app.update_user_roles permission (bypasses RLS to avoid recursion). Optimized with SELECT auth.uid() pattern.';
 
+-- Restrict user_has_app_update_user_roles
+REVOKE ALL ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) TO service_role;
+
 -- =============================================================================
 -- 7. RESTRICT ADMIN-ONLY RBAC FUNCTIONS: Prevent access from anon/public
 -- =============================================================================
 -- These functions are used for RBAC migration and administration.
--- They should ONLY be callable by service_role (admin) or authenticated users
--- with platform admin rights. By default, functions are public, so we must
--- explicitly restrict them.
+-- They should ONLY be callable by service_role. By default, functions
+-- are public, so we explicitly restrict their execution to service_role here.
 
 -- Restrict rbac_migrate_org_users_to_bindings - admin migration function
 REVOKE ALL ON FUNCTION public.rbac_migrate_org_users_to_bindings(uuid, uuid) FROM PUBLIC;
