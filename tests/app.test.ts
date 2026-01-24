@@ -243,10 +243,11 @@ describe('[POST] /app operations with non-owner user', () => {
     expect(responseData).toHaveProperty('error', 'cannot_access_organization')
   })
 
-  it('should allow app creation in an organization where user is not owner but has write access', async () => {
+  it('should allow app creation in an organization where user is not owner but has admin access', async () => {
     const supabase = getSupabaseClient()
+    // org.update_settings permission requires 'admin' legacy right, not 'write'
     const { error: error2 } = await supabase.from('org_users').update({
-      user_right: 'write',
+      user_right: 'admin',
     }).eq('org_id', NON_OWNER_ORG_ID).eq('user_id', USER_ID)
     if (error2)
       throw new Error(`Failed to update user rights for non-owner org: ${JSON.stringify(error2)}`)

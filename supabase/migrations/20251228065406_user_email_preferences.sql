@@ -17,7 +17,9 @@ ADD COLUMN IF NOT EXISTS email_preferences jsonb DEFAULT '{
 }'::jsonb NOT NULL;
 
 -- Index for performance when filtering by preferences
-CREATE INDEX IF NOT EXISTS idx_users_email_preferences ON public.users USING gin (email_preferences);
+CREATE INDEX IF NOT EXISTS idx_users_email_preferences ON public.users USING gin (
+    email_preferences
+);
 
 -- Add comment describing the column
 COMMENT ON COLUMN public.users.email_preferences IS 'Per-user email notification preferences. Keys: usage_limit, credit_usage, onboarding, weekly_stats, monthly_stats, deploy_stats_24h, bundle_created, bundle_deployed, device_error, channel_self_rejected. Values are booleans.';
@@ -40,7 +42,9 @@ ADD COLUMN IF NOT EXISTS email_preferences jsonb NOT NULL DEFAULT '{
 }'::jsonb;
 
 -- Add GIN index for efficient JSONB queries on orgs
-CREATE INDEX IF NOT EXISTS idx_orgs_email_preferences ON public.orgs USING GIN (email_preferences);
+CREATE INDEX IF NOT EXISTS idx_orgs_email_preferences ON public.orgs USING gin (
+    email_preferences
+);
 
 -- Add comment explaining the column
 COMMENT ON COLUMN public.orgs.email_preferences IS 'JSONB object containing email notification preferences for the organization. When enabled, emails are also sent to the management_email if it differs from admin user emails. Keys: usage_limit, credit_usage, onboarding, weekly_stats, monthly_stats, deploy_stats_24h, bundle_created, bundle_deployed, device_error, channel_self_rejected. All default to true.';

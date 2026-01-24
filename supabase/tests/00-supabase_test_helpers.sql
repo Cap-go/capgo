@@ -410,8 +410,7 @@ $$ LANGUAGE plpgsql;
 -- but we dont' want these functions to always exist on the database.
 BEGIN;
 SELECT plan(7);
-SELECT
-    function_returns('tests', 'create_supabase_user', ARRAY['text', 'text', 'text', 'jsonb'], 'uuid');
+SELECT function_returns('tests', 'create_supabase_user', ARRAY['text', 'text', 'text', 'jsonb'], 'uuid');
 SELECT function_returns('tests', 'get_supabase_uid', ARRAY['text'], 'uuid');
 SELECT function_returns('tests', 'get_supabase_user', ARRAY['text'], 'json');
 SELECT function_returns('tests', 'authenticate_as', ARRAY['text'], 'void');

@@ -59,8 +59,8 @@ export function selectOne(pgClient: ReturnType<typeof getPgClient>) {
 
 function fixSupabaseHost(host: string): string {
   if (host.includes('postgres:postgres@supabase_db_')) {
-  // Supabase adds a prefix to the hostname that breaks connection in local docker
-  // e.g. "supabase_db_NAME:5432" -> "db:5432"
+    // Supabase adds a prefix to the hostname that breaks connection in local docker
+    // e.g. "supabase_db_NAME:5432" -> "db:5432"
     const url = URL.parse(host)!
     url.hostname = url.hostname.split('_')[1]
     return url.href
@@ -69,111 +69,50 @@ function fixSupabaseHost(host: string): string {
 }
 
 /**
- * Get the primary database URL for replication lag queries.
- * This always returns the primary (non-replica) database connection.
+ * Query replication lag from the REPLICA database using pg_stat_subscription.
+ * Uses the existing pool - no new connections.
  */
-function getPrimaryDatabaseURL(c: Context): string | null {
-  // Prefer direct EU Hyperdrive (primary)
-  if (c.env.HYPERDRIVE_CAPGO_DIRECT_EU) {
-    return c.env.HYPERDRIVE_CAPGO_DIRECT_EU.connectionString
-  }
-  // Fallback to main Supabase pooler
-  if (existInEnv(c, 'MAIN_SUPABASE_DB_URL')) {
-    return getEnv(c, 'MAIN_SUPABASE_DB_URL')
-  }
-  // Fallback to direct Supabase connection
-  if (existInEnv(c, 'SUPABASE_DB_URL')) {
-    return fixSupabaseHost(getEnv(c, 'SUPABASE_DB_URL'))
-  }
-  return null
-}
-
-/**
- * Query replication lag from the PRIMARY database.
- * Uses Hyperdrive connection pooling (no additional caching needed).
- */
-async function queryReplicationLag(c: Context): Promise<ReplicationLagStatus> {
-  const primaryDbUrl = getPrimaryDatabaseURL(c)
-  if (!primaryDbUrl) {
-    cloudlog({ requestId: c.get('requestId'), message: 'No primary database URL available for replication lag query' })
-    return {
-      status: 'unknown',
-      max_lag_seconds: null,
-    }
-  }
-
-  const pool = new Pool({
-    connectionString: primaryDbUrl,
-    max: 1,
-    idleTimeoutMillis: 5000,
-    connectionTimeoutMillis: 5000,
-  })
-
+async function queryReplicaLag(c: Context, pool: Pool): Promise<ReplicationLagStatus> {
   try {
-    // Query replication slots lag using WAL stats estimation
     const query = `
-      WITH wal_stats AS (
-        SELECT
-          wal_bytes::numeric AS wal_bytes,
-          EXTRACT(EPOCH FROM (now() - stats_reset))::numeric AS seconds_since_reset
-        FROM pg_stat_wal
-      ),
-      slots AS (
-        SELECT
-          slot_name,
-          active,
-          pg_wal_lsn_diff(pg_current_wal_lsn(), confirmed_flush_lsn) AS lag_bytes
-        FROM pg_replication_slots
-        WHERE slot_type = 'logical'
-          AND slot_name !~ '^pg_[0-9]+_sync_[0-9]+_[0-9]+$'
-      )
-      SELECT
-        MAX(CASE
-          WHEN wal_stats.seconds_since_reset > 0
-            AND wal_stats.wal_bytes > 0
-            AND slots.lag_bytes IS NOT NULL
-            THEN (slots.lag_bytes / (wal_stats.wal_bytes / wal_stats.seconds_since_reset))
-          ELSE NULL
-        END) AS max_lag_seconds
-      FROM slots
-      CROSS JOIN wal_stats
+      SELECT EXTRACT(EPOCH FROM (now() - last_msg_receipt_time)) AS lag_seconds
+      FROM pg_stat_subscription
+      WHERE subname LIKE 'planetscale_subscription_%'
+      LIMIT 1
     `
 
     const result = await pool.query(query)
-    const maxLagSeconds = result.rows[0]?.max_lag_seconds
-      ? Number(result.rows[0].max_lag_seconds)
+    const lagSeconds = result.rows[0]?.lag_seconds
+      ? Number(result.rows[0].lag_seconds)
       : null
 
     let status: ReplicationStatus = 'unknown'
-    if (maxLagSeconds !== null) {
-      status = maxLagSeconds > REPLICATION_LAG_THRESHOLD_SECONDS ? 'lagging' : 'ok'
+    if (lagSeconds !== null) {
+      status = lagSeconds > REPLICATION_LAG_THRESHOLD_SECONDS ? 'lagging' : 'ok'
     }
 
-    cloudlog({ requestId: c.get('requestId'), message: 'Replication lag queried', status, maxLagSeconds })
+    cloudlog({ requestId: c.get('requestId'), message: 'Replica lag queried', status, lagSeconds })
 
     return {
       status,
-      max_lag_seconds: maxLagSeconds,
+      max_lag_seconds: lagSeconds,
     }
   }
   catch (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error querying replication lag', error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error querying replica lag', error })
     return {
       status: 'unknown',
       max_lag_seconds: null,
     }
-  }
-  finally {
-    await pool.end()
   }
 }
 
 /**
  * Set replication lag header on the response.
- * Queries the primary database via Hyperdrive for current replication status.
+ * Uses the provided pool to query pg_stat_subscription on the replica.
  */
-export async function setReplicationLagHeader(c: Context): Promise<void> {
-  const status = await queryReplicationLag(c)
+export async function setReplicationLagHeader(c: Context, pool: Pool): Promise<void> {
+  const status = await queryReplicaLag(c, pool)
   c.header('X-Replication-Lag', status.status)
   if (status.max_lag_seconds !== null) {
     c.header('X-Replication-Lag-Seconds', String(Math.round(status.max_lag_seconds)))
@@ -379,6 +318,7 @@ function getSchemaUpdatesAlias(includeMetadata = false) {
     disable_auto_update: channelAlias.disable_auto_update,
     ios: channelAlias.ios,
     android: channelAlias.android,
+    electron: channelAlias.electron,
     allow_device_self_set: channelAlias.allow_device_self_set,
     public: channelAlias.public,
   }
@@ -438,7 +378,7 @@ export function requestInfosChannelPostgres(
   includeMetadata = false,
 ) {
   const { versionSelect, channelAlias, channelSelect, manifestSelect, versionAlias } = getSchemaUpdatesAlias(includeMetadata)
-  const platformQuery = platform === 'android' ? channelAlias.android : channelAlias.ios
+  const platformQuery = platform === 'android' ? channelAlias.android : platform === 'electron' ? channelAlias.electron : channelAlias.ios
   const baseSelect = {
     version: versionSelect,
     channels: channelSelect,
@@ -453,16 +393,17 @@ export function requestInfosChannelPostgres(
   const channelQuery = (includeManifest
     ? baseQuery.leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
     : baseQuery)
-    .where(!defaultChannel
-      ? and(
-          eq(channelAlias.public, true),
-          eq(channelAlias.app_id, app_id),
-          eq(platformQuery, true),
-        )
-      : and(
-          eq(channelAlias.app_id, app_id),
-          eq(channelAlias.name, defaultChannel),
-        ),
+    .where(
+      !defaultChannel
+        ? and(
+            eq(channelAlias.public, true),
+            eq(channelAlias.app_id, app_id),
+            eq(platformQuery, true),
+          )
+        : and(
+            eq(channelAlias.app_id, app_id),
+            eq(channelAlias.name, defaultChannel),
+          ),
     )
     .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
@@ -488,10 +429,11 @@ export function requestInfosPostgres(
 
   const channelDevice = shouldQueryChannelOverride
     ? requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient, shouldFetchManifest, includeMetadata)
-    : Promise.resolve(undefined).then(() => {
-        cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
-        return null
-      })
+    : Promise.resolve(undefined)
+        .then(() => {
+          cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
+          return null
+        })
   const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient, shouldFetchManifest, includeMetadata)
 
   return Promise.all([channelDevice, channel])
@@ -507,7 +449,7 @@ export async function getAppOwnerPostgres(
   appId: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
-): Promise<{ owner_org: string, orgs: { created_by: string, id: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number, expose_metadata: boolean } | null> {
+): Promise<{ owner_org: string, orgs: { created_by: string, id: string, management_email: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number, expose_metadata: boolean } | null> {
   try {
     if (actions.length === 0)
       return null
@@ -524,6 +466,7 @@ export async function getAppOwnerPostgres(
         orgs: {
           created_by: orgAlias.created_by,
           id: orgAlias.id,
+          management_email: orgAlias.management_email,
         },
       })
       .from(schema.apps)
@@ -682,13 +625,14 @@ export async function getMainChannelsPg(
   c: Context,
   appId: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
-): Promise<{ name: string, ios: boolean, android: boolean }[]> {
+): Promise<{ name: string, ios: boolean, android: boolean, electron: boolean }[]> {
   try {
     const channels = await drizzleClient
       .select({
         name: schema.channels.name,
         ios: schema.channels.ios,
         android: schema.channels.android,
+        electron: schema.channels.electron,
       })
       .from(schema.channels)
       .where(and(
@@ -758,7 +702,7 @@ export async function getChannelsPg(
   appId: string,
   condition: { defaultChannel?: string } | { public: boolean },
   drizzleClient: ReturnType<typeof getDrizzleClient>,
-): Promise<{ id: number, name: string, ios: boolean, android: boolean, public: boolean }[]> {
+): Promise<{ id: number, name: string, ios: boolean, android: boolean, electron: boolean, public: boolean }[]> {
   try {
     const whereConditions = [eq(schema.channels.app_id, appId)]
 
@@ -775,6 +719,7 @@ export async function getChannelsPg(
         name: schema.channels.name,
         ios: schema.channels.ios,
         android: schema.channels.android,
+        electron: schema.channels.electron,
         public: schema.channels.public,
       })
       .from(schema.channels)
@@ -817,11 +762,11 @@ export async function getAppByIdPg(
 export async function getCompatibleChannelsPg(
   c: Context,
   appId: string,
-  platform: 'ios' | 'android',
+  platform: 'ios' | 'android' | 'electron',
   isEmulator: boolean,
   isProd: boolean,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
-): Promise<{ id: number, name: string, allow_device_self_set: boolean, allow_emulator: boolean, allow_device: boolean, allow_dev: boolean, allow_prod: boolean, ios: boolean, android: boolean, public: boolean }[]> {
+): Promise<{ id: number, name: string, allow_device_self_set: boolean, allow_emulator: boolean, allow_device: boolean, allow_dev: boolean, allow_prod: boolean, ios: boolean, android: boolean, electron: boolean, public: boolean }[]> {
   try {
     const deviceCondition = isEmulator
       ? eq(schema.channels.allow_emulator, true)
@@ -829,6 +774,7 @@ export async function getCompatibleChannelsPg(
     const buildCondition = isProd
       ? eq(schema.channels.allow_prod, true)
       : eq(schema.channels.allow_dev, true)
+    const platformColumn = platform === 'ios' ? schema.channels.ios : platform === 'electron' ? schema.channels.electron : schema.channels.android
     const channels = await drizzleClient
       .select({
         id: schema.channels.id,
@@ -840,6 +786,7 @@ export async function getCompatibleChannelsPg(
         allow_prod: schema.channels.allow_prod,
         ios: schema.channels.ios,
         android: schema.channels.android,
+        electron: schema.channels.electron,
         public: schema.channels.public,
       })
       .from(schema.channels)
@@ -848,7 +795,7 @@ export async function getCompatibleChannelsPg(
         or(eq(schema.channels.allow_device_self_set, true), eq(schema.channels.public, true)),
         deviceCondition,
         buildCondition,
-        eq(platform === 'ios' ? schema.channels.ios : schema.channels.android, true),
+        eq(platformColumn, true),
       ))
     return channels
   }
@@ -939,6 +886,12 @@ export interface AdminGlobalStatsTrend {
   revenue_maker: number
   revenue_team: number
   revenue_enterprise: number
+  builds_total: number
+  builds_ios: number
+  builds_android: number
+  builds_last_month: number
+  builds_last_month_ios: number
+  builds_last_month_android: number
 }
 
 export async function getAdminGlobalStatsTrend(
@@ -989,7 +942,13 @@ export async function getAdminGlobalStatsTrend(
         revenue_solo::float,
         revenue_maker::float,
         revenue_team::float,
-        revenue_enterprise::float
+        revenue_enterprise::float,
+        COALESCE(builds_total, 0)::int AS builds_total,
+        COALESCE(builds_ios, 0)::int AS builds_ios,
+        COALESCE(builds_android, 0)::int AS builds_android,
+        COALESCE(builds_last_month, 0)::int AS builds_last_month,
+        COALESCE(builds_last_month_ios, 0)::int AS builds_last_month_ios,
+        COALESCE(builds_last_month_android, 0)::int AS builds_last_month_android
       FROM global_stats
       WHERE date_id >= ${startDateOnly}
         AND date_id <= ${endDateOnly}
@@ -1031,6 +990,12 @@ export async function getAdminGlobalStatsTrend(
       revenue_maker: Number(row.revenue_maker) || 0,
       revenue_team: Number(row.revenue_team) || 0,
       revenue_enterprise: Number(row.revenue_enterprise) || 0,
+      builds_total: Number(row.builds_total) || 0,
+      builds_ios: Number(row.builds_ios) || 0,
+      builds_android: Number(row.builds_android) || 0,
+      builds_last_month: Number(row.builds_last_month) || 0,
+      builds_last_month_ios: Number(row.builds_last_month_ios) || 0,
+      builds_last_month_android: Number(row.builds_last_month_android) || 0,
     }))
 
     cloudlog({ requestId: c.get('requestId'), message: 'getAdminGlobalStatsTrend result', resultCount: data.length })
@@ -1040,5 +1005,93 @@ export async function getAdminGlobalStatsTrend(
   catch (e: unknown) {
     logPgError(c, 'getAdminGlobalStatsTrend', e)
     return []
+  }
+}
+
+export interface AdminPluginBreakdown {
+  date: string | null
+  devices_last_month: number
+  devices_last_month_ios: number
+  devices_last_month_android: number
+  version_breakdown: Record<string, number>
+  major_breakdown: Record<string, number>
+}
+
+function parseBreakdownJson(value: unknown): Record<string, number> {
+  if (!value)
+    return {}
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value) as Record<string, number>
+    }
+    catch {
+      return {}
+    }
+  }
+  if (typeof value === 'object')
+    return value as Record<string, number>
+  return {}
+}
+
+export async function getAdminPluginBreakdown(
+  c: Context,
+  start_date: string,
+  end_date: string,
+): Promise<AdminPluginBreakdown> {
+  try {
+    const pgClient = getPgClient(c, true)
+    const drizzleClient = getDrizzleClient(pgClient)
+
+    const startDateOnly = start_date.split('T')[0]
+    const endDateOnly = end_date.split('T')[0]
+
+    const query = sql`
+      SELECT
+        date_id AS date,
+        COALESCE(devices_last_month, 0)::int AS devices_last_month,
+        COALESCE(devices_last_month_ios, 0)::int AS devices_last_month_ios,
+        COALESCE(devices_last_month_android, 0)::int AS devices_last_month_android,
+        plugin_version_breakdown,
+        plugin_major_breakdown
+      FROM global_stats
+      WHERE date_id >= ${startDateOnly}
+        AND date_id <= ${endDateOnly}
+      ORDER BY date_id DESC
+      LIMIT 1
+    `
+
+    const result = await drizzleClient.execute(query)
+    const row = result.rows[0] as any | undefined
+
+    if (!row) {
+      return {
+        date: null,
+        devices_last_month: 0,
+        devices_last_month_ios: 0,
+        devices_last_month_android: 0,
+        version_breakdown: {},
+        major_breakdown: {},
+      }
+    }
+
+    return {
+      date: row.date ?? null,
+      devices_last_month: Number(row.devices_last_month) || 0,
+      devices_last_month_ios: Number(row.devices_last_month_ios) || 0,
+      devices_last_month_android: Number(row.devices_last_month_android) || 0,
+      version_breakdown: parseBreakdownJson(row.plugin_version_breakdown),
+      major_breakdown: parseBreakdownJson(row.plugin_major_breakdown),
+    }
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAdminPluginBreakdown', e)
+    return {
+      date: null,
+      devices_last_month: 0,
+      devices_last_month_ios: 0,
+      devices_last_month_android: 0,
+      version_breakdown: {},
+      major_breakdown: {},
+    }
   }
 }

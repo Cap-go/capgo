@@ -1,4 +1,5 @@
 import { app as accept_invitation } from '../_backend/private/accept_invitation.ts'
+import { app as admin_credits } from '../_backend/private/admin_credits.ts'
 import { app as admin_stats } from '../_backend/private/admin_stats.ts'
 import { app as config } from '../_backend/private/config.ts'
 import { app as create_device } from '../_backend/private/create_device.ts'
@@ -7,12 +8,14 @@ import { app as deleted_failed_version } from '../_backend/private/delete_failed
 import { app as devices_priv } from '../_backend/private/devices.ts'
 import { app as download_link } from '../_backend/private/download_link.ts'
 import { app as events } from '../_backend/private/events.ts'
+import { app as groups } from '../_backend/private/groups.ts'
 import { app as invite_new_user_to_org } from '../_backend/private/invite_new_user_to_org.ts'
 import { app as latency } from '../_backend/private/latency.ts'
 import { app as log_as } from '../_backend/private/log_as.ts'
 // Webapps API
 import { app as plans } from '../_backend/private/plans.ts'
 import { app as publicStats } from '../_backend/private/public_stats.ts'
+import { app as role_bindings } from '../_backend/private/role_bindings.ts'
 import { app as set_org_email } from '../_backend/private/set_org_email.ts'
 // SSO SAML endpoints
 import { app as sso_configure } from '../_backend/private/sso_configure.ts'
@@ -43,6 +46,7 @@ appGlobal.route('/devices', devices_priv)
 appGlobal.route('/create_device', create_device)
 appGlobal.route('/download_link', download_link)
 appGlobal.route('/log_as', log_as)
+appGlobal.route('/admin_credits', admin_credits)
 appGlobal.route('/admin_stats', admin_stats)
 appGlobal.route('/stats', stats_priv)
 appGlobal.route('/stripe_checkout', stripe_checkout)
@@ -52,6 +56,8 @@ appGlobal.route('/delete_failed_version', deleted_failed_version)
 appGlobal.route('/set_org_email', set_org_email)
 appGlobal.route('/latency', latency)
 appGlobal.route('/events', events)
+appGlobal.route('/groups', groups)
+appGlobal.route('/role_bindings', role_bindings)
 appGlobal.route('/invite_new_user_to_org', invite_new_user_to_org)
 appGlobal.route('/accept_invitation', accept_invitation)
 appGlobal.route('/validate_password_compliance', validate_password_compliance)

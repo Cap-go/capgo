@@ -11,7 +11,8 @@ import { simpleError } from '../utils/hono.ts'
 import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
-import { getAppByAppIdPg, getUserIdFromApikey, hasAppRightApikeyPg } from '../utils/pg_files.ts'
+import { getAppByAppIdPg, getUserIdFromApikey } from '../utils/pg_files.ts'
+import { checkPermissionPg } from '../utils/rbac.ts'
 import { createStatsBandwidth } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
@@ -85,12 +86,10 @@ async function getHandler(c: Context): Promise<Response> {
       return c.json({ error: 'not_found', message: 'Not found' }, 404)
     }
     const fileSize = objectInfo.size
-    await saveBandwidthUsage(c, fileSize)
     const rangeMatch = rangeHeaderFromRequest.match(/bytes=(\d+)-(\d*)/)
     if (rangeMatch) {
       const rangeStart = Number.parseInt(rangeMatch[1])
       if (rangeStart >= fileSize) {
-        // Return a 206 Partial Content with an empty body and appropriate Content-Range header for zero-length range
         const emptyHeaders = new Headers()
         emptyHeaders.set('Content-Range', `bytes */${fileSize}`)
         return new Response(new Uint8Array(0), { status: 206, headers: emptyHeaders })
@@ -105,7 +104,8 @@ async function getHandler(c: Context): Promise<Response> {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files object is null' })
     return c.json({ error: 'not_found', message: 'Not found' }, 404)
   }
-  await saveBandwidthUsage(c, object.size)
+  const bytesTransferred = calculateBytesTransferred(object.size, object.range)
+  await saveBandwidthUsage(c, bytesTransferred)
   const headers = objectHeaders(object)
   if (object.range != null && c.req.header('range')) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files range request', range: rangeHeader(object.size, object.range) })
@@ -154,6 +154,23 @@ function rangeHeader(objLen: number, r2Range: R2Range): string {
   return `bytes ${startIndexInclusive}-${endIndexInclusive}/${objLen}`
 }
 
+function calculateBytesTransferred(objLen: number, r2Range: R2Range | undefined): number {
+  if (!r2Range)
+    return objLen
+  let startIndexInclusive = 0
+  let endIndexInclusive = objLen - 1
+  if ('offset' in r2Range && r2Range.offset != null) {
+    startIndexInclusive = r2Range.offset
+  }
+  if ('length' in r2Range && r2Range.length != null) {
+    endIndexInclusive = startIndexInclusive + r2Range.length - 1
+  }
+  if ('suffix' in r2Range) {
+    startIndexInclusive = objLen - r2Range.suffix
+  }
+  return endIndexInclusive - startIndexInclusive + 1
+}
+
 function optionsHandler(c: Context) {
   cloudlog({ requestId: c.get('requestId'), message: 'optionsHandler files optionsHandler' })
   return c.newResponse(null, 204, {
@@ -177,7 +194,7 @@ async function uploadHandler(c: Context) {
 
   if (durableObjNs == null) {
     cloudlog({ requestId: c.get('requestId'), message: 'files durableObjNs is null' })
-    return simpleError('invalid_bucket_configuration', 'Invalid bucket configuration')
+    throw simpleError('invalid_bucket_configuration', 'Invalid bucket configuration')
   }
 
   const handler = durableObjNs.get(durableObjNs.idFromName(normalizedRequestId))
@@ -371,18 +388,17 @@ async function checkWriteAppAccess(c: Context, next: Next) {
 
     cloudlog({
       requestId: c.get('requestId'),
-      message: 'checkWriteAppAccess - checking app permissions via hasAppRightApikeyPg',
+      message: 'checkWriteAppAccess - checking app permissions via checkPermissionPg',
       userId,
       app_id,
     })
 
-    // Use the Postgres version of hasAppRightApikey
-    const requiredRight: Database['public']['Enums']['user_min_right'] = 'read'
-    const hasPermission = await hasAppRightApikeyPg(c, app_id, requiredRight, userId, capgkey, drizzleClient)
+    // Use the new RBAC permission check
+    const hasPermission = await checkPermissionPg(c, 'app.read_bundles', { appId: app_id }, drizzleClient, userId, capgkey)
 
     cloudlog({
       requestId: c.get('requestId'),
-      message: 'checkWriteAppAccess - hasAppRightApikeyPg result',
+      message: 'checkWriteAppAccess - checkPermissionPg result',
       hasPermission,
     })
 
@@ -451,7 +467,7 @@ async function checkWriteAppAccess(c: Context, next: Next) {
   }
   finally {
     // Always close the connection
-    await backgroundTask(c, closeClient(c, pgClient))
+    await closeClient(c, pgClient)
   }
 
   await next()

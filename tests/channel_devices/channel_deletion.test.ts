@@ -1,48 +1,44 @@
-import { getSupabaseClient } from 'tests/test-utils'
-import { describe, expect, it } from 'vitest'
+import { randomUUID } from 'node:crypto'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { getSupabaseClient, ORG_ID, resetAndSeedAppData, resetAppData, USER_ID } from 'tests/test-utils'
+
+const testAppId = `com.test.channel.deletion.${Date.now()}`
+
+beforeAll(async () => {
+  await resetAndSeedAppData(testAppId)
+})
+
+afterAll(async () => {
+  await resetAppData(testAppId)
+})
 
 // Test to ensure that deleting a channel_devices entry doesn't delete the associated channel
 describe('channel Devices Constraint Tests', () => {
   it('should not delete channel when channel_devices entry is deleted', async () => {
-    // Create a test app
-    const testAppId = `test-app-${Date.now()}`
+    // Create a valid UUID for device_id
+    const testDeviceId = randomUUID()
     const supabase = getSupabaseClient()
-    const { error: appError } = await supabase
-      .from('apps')
-      .insert({
-        app_id: testAppId,
-        name: 'Test App',
-        user_id: '00000000-0000-0000-0000-000000000000',
-        owner_org: '00000000-0000-0000-0000-000000000000',
-        icon_url: 'https://example.com/icon.png',
-      })
-      .select()
 
-    expect(appError).toBeNull()
-
-    // Create a test version
-    const { data: versionData, error: versionError } = await supabase
+    // Get an existing version for this app (created by seed)
+    const { data: existingVersion, error: versionQueryError } = await supabase
       .from('app_versions')
-      .insert({
-        app_id: testAppId,
-        name: 'test-version',
-        storage_provider: 'r2',
-        owner_org: '00000000-0000-0000-0000-000000000000',
-      })
-      .select()
+      .select('id')
+      .eq('app_id', testAppId)
+      .limit(1)
+      .single()
 
-    expect(versionError).toBeNull()
-    expect(versionData).not.toBeNull()
+    expect(versionQueryError).toBeNull()
+    expect(existingVersion).not.toBeNull()
 
-    // Create a test channel
+    // Create a test channel using the existing version
     const { data: channelData, error: channelError } = await supabase
       .from('channels')
       .insert({
         app_id: testAppId,
-        name: 'test-channel',
-        version: versionData![0].id,
-        created_by: '00000000-0000-0000-0000-000000000000',
-        owner_org: '00000000-0000-0000-0000-000000000000',
+        name: `test-channel-${Date.now()}`,
+        version: existingVersion!.id,
+        created_by: USER_ID,
+        owner_org: ORG_ID,
       })
       .select()
 
@@ -50,14 +46,13 @@ describe('channel Devices Constraint Tests', () => {
     expect(channelData).not.toBeNull()
 
     // Create a channel_devices entry
-    const testDeviceId = `test-device-${Date.now()}`
     const { error: channelDeviceError } = await supabase
       .from('channel_devices')
       .insert({
         app_id: testAppId,
         device_id: testDeviceId,
         channel_id: channelData![0].id,
-        owner_org: '00000000-0000-0000-0000-000000000000',
+        owner_org: ORG_ID,
       })
 
     expect(channelDeviceError).toBeNull()
@@ -81,9 +76,7 @@ describe('channel Devices Constraint Tests', () => {
     expect(verifyChannelData).not.toBeNull()
     expect(verifyChannelData!.length).toBe(1)
 
-    // Clean up
+    // Clean up channel created in this test
     await supabase.from('channels').delete().eq('id', channelData![0].id)
-    await supabase.from('app_versions').delete().eq('id', versionData![0].id)
-    await supabase.from('apps').delete().eq('app_id', testAppId)
   })
 })

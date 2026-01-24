@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, fetchWithRetry, getSupabaseClient, headers, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 // Test org and webhook IDs
 const WEBHOOK_TEST_ORG_ID = randomUUID()
@@ -50,7 +50,7 @@ afterAll(async () => {
 
 describe('[GET] /webhooks', () => {
   it('list webhooks for organization', async () => {
-    const response = await fetch(`${BASE_URL}/webhooks?orgId=${WEBHOOK_TEST_ORG_ID}`, {
+    const response = await fetchWithRetry(`${BASE_URL}/webhooks?orgId=${WEBHOOK_TEST_ORG_ID}`, {
       headers,
     })
     expect(response.status).toBe(200)
@@ -59,7 +59,7 @@ describe('[GET] /webhooks', () => {
   })
 
   it('list webhooks with missing orgId', async () => {
-    const response = await fetch(`${BASE_URL}/webhooks`, {
+    const response = await fetchWithRetry(`${BASE_URL}/webhooks`, {
       headers,
     })
     expect(response.status).toBe(400)
@@ -69,7 +69,7 @@ describe('[GET] /webhooks', () => {
 
   it('list webhooks with invalid orgId', async () => {
     const invalidOrgId = randomUUID()
-    const response = await fetch(`${BASE_URL}/webhooks?orgId=${invalidOrgId}`, {
+    const response = await fetchWithRetry(`${BASE_URL}/webhooks?orgId=${invalidOrgId}`, {
       headers,
     })
     expect(response.status).toBe(400)
@@ -216,7 +216,7 @@ describe('[GET] /webhooks (single webhook)', () => {
     if (!createdWebhookId)
       throw new Error('Webhook was not created in previous test')
 
-    const response = await fetch(`${BASE_URL}/webhooks?orgId=${WEBHOOK_TEST_ORG_ID}&webhookId=${createdWebhookId}`, {
+    const response = await fetchWithRetry(`${BASE_URL}/webhooks?orgId=${WEBHOOK_TEST_ORG_ID}&webhookId=${createdWebhookId}`, {
       headers,
     })
     expect(response.status).toBe(200)
@@ -228,7 +228,7 @@ describe('[GET] /webhooks (single webhook)', () => {
 
   it('get webhook with invalid webhookId', async () => {
     const invalidWebhookId = randomUUID()
-    const response = await fetch(`${BASE_URL}/webhooks?orgId=${WEBHOOK_TEST_ORG_ID}&webhookId=${invalidWebhookId}`, {
+    const response = await fetchWithRetry(`${BASE_URL}/webhooks?orgId=${WEBHOOK_TEST_ORG_ID}&webhookId=${invalidWebhookId}`, {
       headers,
     })
     expect(response.status).toBe(400)
@@ -449,7 +449,7 @@ describe('[GET] /webhooks/deliveries', () => {
     if (!createdWebhookId)
       throw new Error('Webhook was not created in previous test')
 
-    const response = await fetch(`${BASE_URL}/webhooks/deliveries?orgId=${WEBHOOK_TEST_ORG_ID}&webhookId=${createdWebhookId}`, {
+    const response = await fetchWithRetry(`${BASE_URL}/webhooks/deliveries?orgId=${WEBHOOK_TEST_ORG_ID}&webhookId=${createdWebhookId}`, {
       headers,
     })
     expect(response.status).toBe(200)
@@ -464,7 +464,7 @@ describe('[GET] /webhooks/deliveries', () => {
     if (!createdWebhookId)
       throw new Error('Webhook was not created in previous test')
 
-    const response = await fetch(`${BASE_URL}/webhooks/deliveries?orgId=${WEBHOOK_TEST_ORG_ID}&webhookId=${createdWebhookId}&status=success`, {
+    const response = await fetchWithRetry(`${BASE_URL}/webhooks/deliveries?orgId=${WEBHOOK_TEST_ORG_ID}&webhookId=${createdWebhookId}&status=success`, {
       headers,
     })
     expect(response.status).toBe(200)
@@ -476,7 +476,7 @@ describe('[GET] /webhooks/deliveries', () => {
     if (!createdWebhookId)
       throw new Error('Webhook was not created in previous test')
 
-    const response = await fetch(`${BASE_URL}/webhooks/deliveries?orgId=${WEBHOOK_TEST_ORG_ID}&webhookId=${createdWebhookId}&page=0`, {
+    const response = await fetchWithRetry(`${BASE_URL}/webhooks/deliveries?orgId=${WEBHOOK_TEST_ORG_ID}&webhookId=${createdWebhookId}&page=0`, {
       headers,
     })
     expect(response.status).toBe(200)
@@ -486,7 +486,7 @@ describe('[GET] /webhooks/deliveries', () => {
 
   it('get webhook deliveries with invalid webhookId', async () => {
     const invalidWebhookId = randomUUID()
-    const response = await fetch(`${BASE_URL}/webhooks/deliveries?orgId=${WEBHOOK_TEST_ORG_ID}&webhookId=${invalidWebhookId}`, {
+    const response = await fetchWithRetry(`${BASE_URL}/webhooks/deliveries?orgId=${WEBHOOK_TEST_ORG_ID}&webhookId=${invalidWebhookId}`, {
       headers,
     })
     expect(response.status).toBe(400)
@@ -495,7 +495,7 @@ describe('[GET] /webhooks/deliveries', () => {
   })
 
   it('get webhook deliveries with missing body', async () => {
-    const response = await fetch(`${BASE_URL}/webhooks/deliveries`, {
+    const response = await fetchWithRetry(`${BASE_URL}/webhooks/deliveries`, {
       headers,
     })
     expect(response.status).toBe(400)

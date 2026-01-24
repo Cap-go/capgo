@@ -90,6 +90,19 @@ const router = useRouter()
 // Initialize from URL parameters (default: cumulative=false, billingPeriod=false)
 const showCumulative = ref(route.query.cumulative === 'true') // Switch 1: Daily vs Cumulative (daily by default)
 const useBillingPeriod = ref(route.query.billingPeriod === 'true') // Switch 2: Billing Period vs Last 30 Days (last 30 days by default)
+
+// Handle refresh=true parameter (used after demo app creation to ensure fresh data)
+const needsForceRefresh = ref(route.query.refresh === 'true')
+if (needsForceRefresh.value) {
+  // Clear all caches to ensure fresh data is fetched
+  cacheByOrg.clear()
+  cacheByOrgByApp.clear()
+  // Remove the refresh parameter from URL to prevent re-clearing on back navigation
+  const query = { ...route.query }
+  delete query.refresh
+  router.replace({ query })
+}
+
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const dashboardAppsStore = useDashboardAppsStore()
@@ -565,7 +578,14 @@ watch(dashboard, async (_dashboard) => {
   }
   else {
     loadedAlready.value = true
-    await loadData()
+    // If refresh parameter was present, force a complete reload to fetch fresh data from server
+    if (needsForceRefresh.value) {
+      needsForceRefresh.value = false
+      await reloadAllCharts()
+    }
+    else {
+      await loadData()
+    }
   }
 })
 
@@ -601,14 +621,23 @@ watch(() => route.query, (newQuery) => {
   }
 }, { deep: true })
 
-onMounted(() => {
+onMounted(async () => {
   // If forceDemo is true, load immediately with demo data
   if (props.forceDemo) {
     loadData()
   }
   else if (main.dashboardFetched) {
-    loadData()
+    // If refresh parameter was present, force a complete reload including store refresh
+    if (needsForceRefresh.value) {
+      needsForceRefresh.value = false
+      await reloadAllCharts()
+    }
+    else {
+      loadData()
+    }
   }
+  // If dashboard not fetched yet, the watcher on 'dashboard' will handle loading
+  // and will check needsForceRefresh there
 })
 </script>
 
@@ -730,7 +759,7 @@ onMounted(() => {
     :class="appId ? 'xl:grid-cols-16' : 'xl:grid-cols-12'"
   >
     <UsageCard
-      id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald" :accumulated="useBillingPeriod && showCumulative"
+      id="mau-stat" :limits="allLimits.mau" :colors="colors.cyan" :accumulated="useBillingPeriod && showCumulative"
       :data="mauData" :data-by-app="mauDataByApp" :app-names="appNames" :title="`${t('monthly-active')}`" :unit="t('units-users')"
       :use-billing-period="useBillingPeriod"
       :is-loading="isLoading"

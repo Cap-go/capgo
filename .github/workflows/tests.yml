@@ -47,11 +47,11 @@ jobs:
       #   run: bunx playwright install
       - name: Lint
         run: bun lint && bun lint:backend
-      # TODO: Re-enable after fixing type generation (requires cloud Supabase access)
-      # - name: Typecheck
-      #   run: bun typecheck
-      - name: Lint I18n
-        run: bunx @inlang/cli lint --project project.inlang
+      - name: Typecheck
+        run: bun typecheck
+      # TODO: enable I18n linting when the issue they have with npm not found is fixed
+      # - name: Lint I18n
+      #   run: bunx @inlang/cli lint --project project.inlang
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1
         with:

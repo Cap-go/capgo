@@ -22,6 +22,7 @@ const EMAIL_PREF_DISABLED_TAGS: Record<EmailPreferenceKey, string> = {
   bundle_deployed: 'bundle_deployed_disabled',
   device_error: 'device_error_disabled',
   channel_self_rejected: 'channel_self_rejected_disabled',
+  daily_fail_ratio: 'daily_fail_ratio_disabled',
 }
 
 const ALL_LEGACY_TAGS = [NOTIFICATION_TAG, NEWSLETTER_TAG]

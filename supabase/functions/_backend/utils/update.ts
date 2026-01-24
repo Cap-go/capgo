@@ -12,40 +12,40 @@ import {
 import { getRuntimeKey } from 'hono/adapter'
 import { getAppStatus, setAppStatus } from './appStatus.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
-import { simpleError200 } from './hono.ts'
+import { simpleError200, simpleErrorWithStatus } from './hono.ts'
 import { cloudlog } from './logging.ts'
-import { sendNotifOrg } from './notifications.ts'
+import { sendNotifOrgCached } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres, setReplicationLagHeader } from './pg.ts'
 import { makeDevice } from './plugin_parser.ts'
 import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from './stats.ts'
-import { backgroundTask, BROTLI_MIN_UPDATER_VERSION_V7, fixSemver, isDeprecatedPluginVersion, isInternalVersionName } from './utils.ts'
+import { backgroundTask, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, fixSemver, isDeprecatedPluginVersion, isInternalVersionName } from './utils.ts'
 
 const PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth']
 const PLAN_ERROR = 'Cannot get update, upgrade plan to continue to update'
 
 export function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[], expose_metadata: boolean = false) {
+  const pluginVersion = parse(plugin_version)
   const res: {
     version: string
     url: string
-    session_key?: string
-    checksum?: string | null
+    session_key: string
+    checksum: string | null
     manifest?: ManifestEntry[]
     link?: string | null
     comment?: string | null
   } = {
     version: version.name,
     url: signedURL,
+    // session_key and checksum are always included since v4 is no longer supported
+    session_key: version.session_key ?? '',
+    checksum: version.checksum,
   }
-  const pluginVersion = parse(plugin_version)
-  if (greaterThan(pluginVersion, parse('4.13.0')))
-    res.session_key = version.session_key ?? ''
-  if (greaterThan(pluginVersion, parse('4.4.0')))
-    res.checksum = version.checksum
-  if (greaterThan(pluginVersion, parse('6.8.0')) && manifest.length > 0)
+  // manifest is supported in v5.10.0+, v6.25.0+, v7.0.35+, v8+
+  if (manifest.length > 0 && !isDeprecatedPluginVersion(pluginVersion, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7))
     res.manifest = manifest
-  // Include link and comment for plugin v7.35.0+ (only if expose_metadata is enabled and they have values)
-  if (expose_metadata && greaterOrEqual(pluginVersion, parse('7.35.0'))) {
+  // Include link and comment for plugin v5.35.0+, v6.35.0+, v7.35.0+, v8.35.0+ (only if expose_metadata is enabled and they have values)
+  if (expose_metadata && !isDeprecatedPluginVersion(pluginVersion, '5.35.0', '6.35.0', '7.35.0', '8.35.0')) {
     if (version.link)
       res.link = version.link
     if (version.comment)
@@ -78,7 +78,7 @@ export async function updateWithPG(
   if (cachedStatus === 'cancelled') {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT)
   if (!appOwner) {
@@ -90,12 +90,12 @@ export async function updateWithPG(
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     // Send weekly notification about missing payment (not configurable - payment related)
-    await backgroundTask(c, sendNotifOrg(c, 'org:missing_payment', {
+    await backgroundTask(c, sendNotifOrgCached(c, 'org:missing_payment', {
       app_id,
       device_id,
       app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1')) // Weekly on Monday
-    return simpleError200(c, 'need_plan_upgrade', PLAN_ERROR)
+    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
+    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
   }
   await setAppStatus(c, app_id, 'cloud')
   const channelDeviceCount = appOwner.channel_device_count ?? 0
@@ -121,35 +121,35 @@ export async function updateWithPG(
   const coerce = tryParse(fixSemver(body.version_build))
   if (!coerce) {
     // get app owner with app_id
-    await backgroundTask(c, sendNotifOrg(c, 'user:semver_issue', {
+    await backgroundTask(c, sendNotifOrgCached(c, 'user:semver_issue', {
       app_id,
       device_id,
       version_id: version_build,
       app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1'))
+    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient))
     return simpleError200(c, 'semver_error', `Native version: ${body.version_build} doesn't follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo`)
   }
   // Reject v4 completely - it's no longer supported
   if (pluginVersion.major === 4) {
     cloudlog({ requestId: c.get('requestId'), message: 'Plugin version 4.x is no longer supported', plugin_version, app_id })
-    await backgroundTask(c, sendNotifOrg(c, 'user:plugin_issue', {
+    await backgroundTask(c, sendNotifOrgCached(c, 'user:plugin_issue', {
       app_id,
       device_id,
       version_id: version_build,
       app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1'))
+    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient))
     await sendStatsAndDevice(c, device, [{ action: 'backend_refusal' }])
     return simpleError200(c, 'unsupported_plugin_version', `Plugin version ${plugin_version} (v4) is no longer supported. Please upgrade to v5.10.0 or later.`)
   }
 
   // Check if plugin_version is deprecated and send notification
   if (isDeprecated) {
-    await backgroundTask(c, sendNotifOrg(c, 'user:plugin_issue', {
+    await backgroundTask(c, sendNotifOrgCached(c, 'user:plugin_issue', {
       app_id,
       device_id,
       version_id: version_build,
       app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1'))
+    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient))
   }
   if (!app_id || !device_id || !version_build || !version_name || !platform) {
     return simpleError200(c, 'missing_info', 'Cannot find device_id or app_id')
@@ -159,8 +159,8 @@ export async function updateWithPG(
 
   cloudlog({ requestId: c.get('requestId'), message: 'vals', platform, device })
 
-  // Only query link/comment if plugin supports it (7.35.0+) AND app has expose_metadata enabled
-  const needsMetadata = appOwner.expose_metadata && greaterOrEqual(pluginVersion, parse('7.35.0'))
+  // Only query link/comment if plugin supports it (v5.35.0+, v6.35.0+, v7.35.0+, v8.35.0+) AND app has expose_metadata enabled
+  const needsMetadata = appOwner.expose_metadata && !isDeprecatedPluginVersion(pluginVersion, '5.35.0', '6.35.0', '7.35.0', '8.35.0')
 
   const requestedInto = await requestInfosPostgres(c, platform, app_id, device_id, defaultChannel, drizzleClient, channelDeviceCount, manifestBundleCount, needsMetadata)
   const { channelOverride } = requestedInto
@@ -228,6 +228,14 @@ export async function updateWithPG(
       await sendStatsAndDevice(c, device, [{ action: 'disablePlatformAndroid', versionName: version.name }])
       cloudlog({ requestId: c.get('requestId'), message: 'sendStats', date: new Date().toISOString() })
       return simpleError200(c, 'disabled_platform_android', 'Cannot update, android is disabled', {
+        version: version.name,
+        old: version_name,
+      })
+    }
+    if (!channelData.channels.electron && platform === 'electron') {
+      cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, electron is disabled', id: device_id, date: new Date().toISOString() })
+      await sendStatsAndDevice(c, device, [{ action: 'disablePlatformElectron', versionName: version.name }])
+      return simpleError200(c, 'disabled_platform_electron', 'Cannot update, electron is disabled', {
         version: version.name,
         old: version_name,
       })
@@ -394,7 +402,7 @@ export async function updateWithPG(
   // cloudlog(c.get('requestId'), 'save stats', device_id)
   device.version_name = version.name
   await Promise.all([
-    createStatsVersion(c, version.id, app_id, 'get'),
+    createStatsVersion(c, version.name, app_id, 'get'),
     sendStatsAndDevice(c, device, [{ action: 'get', versionName: version.name }]),
   ])
   cloudlog({ requestId: c.get('requestId'), message: 'New version available', app_id, version: version.name, signedURL, date: new Date().toISOString() })
@@ -410,7 +418,7 @@ export async function update(c: Context, body: AppInfos) {
   const pgClient = getPgClient(c, true)
 
   // Set replication lag header (uses cached status, non-blocking)
-  await setReplicationLagHeader(c)
+  await setReplicationLagHeader(c, pgClient)
 
   const drizzlePg = pgClient ? getDrizzleClient(pgClient) : (null as any)
   // Lazily create D1 client inside updateWithPG when actually used

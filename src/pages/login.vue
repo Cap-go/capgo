@@ -50,7 +50,7 @@ async function checkMfa() {
   const { data: mfaFactors, error: mfaError } = await supabase.auth.mfa.listFactors()
   if (mfaError) {
     setErrors('login-account', ['See browser console'], {})
-    console.error('Cannot getm MFA factors', mfaError)
+    console.error('Cannot get MFA factors', mfaError)
     return
   }
 
@@ -162,7 +162,7 @@ async function submit(form: { email: string, password: string, code: string }) {
     const verify = await supabase.auth.mfa.verify({
       factorId: mfaLoginFactor.value!.id!,
       challengeId: mfaChallengeId.value!,
-      code: form.code.replace(' ', ''),
+      code: form.code.replaceAll(' ', ''),
     })
 
     if (verify.error) {
@@ -188,7 +188,7 @@ async function checkAuthUser() {
     const { data: mfaFactors, error } = await supabase.auth.mfa.listFactors()
     if (error) {
       setErrors('login-account', ['See browser console'], {})
-      console.error('Cannot getm MFA factors', error)
+      console.error('Cannot get MFA factors', error)
       return
     }
 
@@ -304,8 +304,8 @@ async function goback() {
   const { error } = await supabase.auth.signOut()
 
   if (error) {
-    toast.error(t('cannots-sign-off'))
-    console.error('cannot log of', error)
+    toast.error(t('cannot-sign-off'))
+    console.error('cannot log off', error)
     return
   }
 

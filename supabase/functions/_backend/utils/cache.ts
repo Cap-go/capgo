@@ -4,25 +4,46 @@ import { cloudlogErr, serializeError } from './logging.ts'
 
 const CACHE_METHOD = 'GET'
 
-type CacheLike = Cache & { default?: Cache }
+type CacheLike = Cache & { default?: Cache, open?: (cacheName: string) => Promise<Cache> }
 
-function resolveGlobalCache(): Cache | null {
+async function resolveGlobalCache(): Promise<Cache | null> {
   if (typeof caches === 'undefined')
     return null
 
   const cacheStorage = caches as any as CacheLike
+  // Cloudflare Workers uses caches.default
   if (getRuntimeKey() === 'workerd' && cacheStorage.default)
     return cacheStorage.default
-  return cacheStorage
+  // Standard CacheStorage API requires opening a named cache
+  if (typeof cacheStorage.open === 'function') {
+    try {
+      return await cacheStorage.open('capgo-cache')
+    }
+    catch {
+      return null
+    }
+  }
+  return null
 }
 
 export type CacheKeyParams = Record<string, string>
 
 export class CacheHelper {
-  private cache: Cache | null
+  private cache: Cache | null = null
+  private cachePromise: Promise<Cache | null>
 
   constructor(private context: Context) {
-    this.cache = resolveGlobalCache()
+    this.cachePromise = resolveGlobalCache().then((cache) => {
+      this.cache = cache
+      return cache
+    })
+  }
+
+  private async ensureCache(): Promise<Cache | null> {
+    if (this.cache === null) {
+      await this.cachePromise
+    }
+    return this.cache
   }
 
   get available() {
@@ -40,10 +61,11 @@ export class CacheHelper {
   }
 
   async matchJson<T>(key: Request): Promise<T | null> {
-    if (!this.cache)
+    const cache = await this.ensureCache()
+    if (!cache)
       return null
     try {
-      const cachedResponse = await this.cache.match(key)
+      const cachedResponse = await cache.match(key)
       if (!cachedResponse)
         return null
       return await cachedResponse.json<T>()
@@ -55,7 +77,8 @@ export class CacheHelper {
   }
 
   async putJson(key: Request, payload: unknown, ttlSeconds: number) {
-    if (!this.cache)
+    const cache = await this.ensureCache()
+    if (!cache)
       return
     const headers = new Headers({
       'Content-Type': 'application/json',
@@ -63,7 +86,7 @@ export class CacheHelper {
     })
     const response = new Response(JSON.stringify(payload), { headers })
     try {
-      await this.cache.put(key, response.clone())
+      await cache.put(key, response.clone())
     }
     catch (error) {
       this.logCacheError('Error writing cached response', error)

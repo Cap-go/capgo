@@ -1,24 +1,26 @@
 <script setup lang="ts">
-import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
 import { FormKit } from '@formkit/vue'
-import { onClickOutside } from '@vueuse/core'
+import { computedAsync, onClickOutside } from '@vueuse/core'
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import IconCopy from '~icons/heroicons/clipboard-document-check'
+import IconCode from '~icons/heroicons/code-bracket'
 import Settings from '~icons/heroicons/cog-8-tooth'
 import IconInformation from '~icons/heroicons/information-circle'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
+import IconWarning from '~icons/lucide/alert-triangle'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 import { formatDate, formatLocalDate } from '~/services/date'
-import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
+import { checkPermissions } from '~/services/permissions'
+import { checkCompatibilityNativePackages, defaultApiHost, isCompatible, useSupabase } from '~/services/supabase'
 import { isInternalVersionName } from '~/services/versions'
 import { useAppDetailStore } from '~/stores/appDetail'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
-import { useOrganizationStore } from '~/stores/organization'
 
 interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
@@ -34,7 +36,6 @@ const route = useRoute('/app/[package].channel.[channel]')
 const router = useRouter()
 const dialogStore = useDialogV2Store()
 const displayStore = useDisplayStore()
-const organizationStore = useOrganizationStore()
 const appDetailStore = useAppDetailStore()
 const { t } = useI18n()
 const supabase = useSupabase()
@@ -42,7 +43,20 @@ const packageId = ref<string>('')
 const id = ref<number>(0)
 const loading = ref(true)
 const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
-const role = ref<OrganizationRole | null>(null)
+
+const canUpdateChannelSettings = computedAsync(async () => {
+  if (!packageId.value)
+    return false
+  return await checkPermissions('channel.update_settings', { appId: packageId.value })
+}, false)
+
+const canPromoteBundle = computedAsync(async () => {
+  if (!packageId.value)
+    return false
+  return await checkPermissions('channel.promote_bundle', { appId: packageId.value })
+}, false)
+
+const showDebugSection = ref(false)
 
 // Auto update dropdown state
 const autoUpdateDropdown = useTemplateRef('autoUpdateDropdown')
@@ -98,6 +112,7 @@ async function getChannel(force = false) {
           disable_auto_update,
           ios,
           android,
+          electron,
           updated_at
         `)
       .eq('id', id.value)
@@ -122,7 +137,7 @@ async function getChannel(force = false) {
 }
 
 async function saveChannelChange(key: string, val: any) {
-  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin'])) {
+  if (!canUpdateChannelSettings.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -169,10 +184,6 @@ watchEffect(async () => {
     if (!channel.value?.name)
       displayStore.NavTitle = t('channel')
     displayStore.defaultBack = `/app/${route.params.package}/channels`
-
-    // Load role
-    await organizationStore.awaitInitialLoad()
-    role.value = await organizationStore.getCurrentRoleForApp(packageId.value)
   }
 })
 
@@ -253,7 +264,7 @@ async function getUnknownVersion(): Promise<number> {
 async function handleUnlink() {
   if (!channel.value || !main.auth)
     return
-  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin', 'write'])) {
+  if (!canPromoteBundle.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -280,7 +291,7 @@ async function handleUnlink() {
 }
 
 async function handleRevert() {
-  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin', 'write'])) {
+  if (!canPromoteBundle.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -436,7 +447,7 @@ function getAutoUpdateLabel(value: string) {
 }
 
 async function onSelectAutoUpdate(value: Database['public']['Enums']['disable_update']) {
-  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin'])) {
+  if (!canUpdateChannelSettings.value) {
     toast.error(t('no-permission'))
     return false
   }
@@ -469,6 +480,118 @@ function openLink(url?: string): void {
     const win = window.open(url, '_blank')
     if (win)
       win.opener = null
+  }
+}
+
+// Get the platform to use for testing based on channel settings
+function getTestPlatform(): 'ios' | 'android' | 'electron' {
+  if (!channel.value)
+    return 'ios'
+  // Prefer iOS if supported, then Android, then Electron
+  if (channel.value.ios)
+    return 'ios'
+  if (channel.value.android)
+    return 'android'
+  if (channel.value.electron)
+    return 'electron'
+  return 'ios'
+}
+
+// Check if channel can be tested with the fake device data we use
+const canTestChannel = computed(() => {
+  if (!channel.value)
+    return false
+  const platform = getTestPlatform()
+  // Check if channel allows the platform we're testing with
+  const allowsPlatform = platform === 'ios'
+    ? channel.value.ios
+    : platform === 'android'
+      ? channel.value.android
+      : channel.value.electron
+  const allowsProd = channel.value.allow_prod
+  const allowsDevice = channel.value.allow_device
+  // Channel must be public OR allow device self-assignment
+  const isAccessible = channel.value.public || channel.value.allow_device_self_set
+  return allowsPlatform && allowsProd && allowsDevice && isAccessible
+})
+
+// Generate a compatible version_name based on channel's version and update strategy
+function getCompatibleVersionName(): string {
+  if (!channel.value?.version?.name || channel.value.version.name === 'unknown')
+    return '1.0.0'
+
+  const channelVersion = channel.value.version.name
+  const parts = channelVersion.split('.')
+  if (parts.length < 3)
+    return channelVersion
+
+  const [major, minor, patch] = parts
+  const strategy = channel.value.disable_auto_update
+
+  // Generate a version that would trigger an update based on the strategy
+  // We want a version slightly lower than the channel version to simulate a device needing an update
+  switch (strategy) {
+    case 'major':
+      // Same major, device can receive update
+      return `${major}.0.0`
+    case 'minor':
+      // Same major.minor, device can receive update
+      return `${major}.${minor}.0`
+    case 'patch':
+      // Same major.minor.patch, device can receive update
+      return `${major}.${minor}.${patch}`
+    case 'version_number':
+      // Uses min_update_version, return the min_update_version or channel version
+      return channel.value.version.min_update_version || channelVersion
+    case 'none':
+    default:
+      // Any version works, use a lower version to show update available
+      return `${major}.${minor}.0`
+  }
+}
+
+function getChannelCurlCommand() {
+  if (!channel.value)
+    return ''
+
+  const versionName = getCompatibleVersionName()
+  const platform = getTestPlatform()
+  const versionOs = platform === 'ios' ? '18.0' : platform === 'android' ? '14' : '10.0'
+
+  // Generate fake device data that fits the /updates endpoint schema
+  const requestBody: Record<string, unknown> = {
+    app_id: packageId.value,
+    device_id: '00000000-0000-0000-0000-000000000000',
+    version_name: versionName,
+    version_build: versionName,
+    version_os: versionOs,
+    is_emulator: false,
+    is_prod: true,
+    platform,
+    plugin_version: '8.40.6',
+  }
+
+  // Only include defaultChannel if the channel is NOT public (not the default)
+  if (!channel.value.public) {
+    requestBody.defaultChannel = channel.value.name
+  }
+
+  const jsonBody = JSON.stringify(requestBody, null, 2)
+
+  return `curl -X POST '${defaultApiHost}/updates' \\
+  -H 'Content-Type: application/json' \\
+  -d '${jsonBody}'`
+}
+
+async function copyCurlCommand() {
+  try {
+    const curl = getChannelCurlCommand()
+    await navigator.clipboard.writeText(curl)
+    toast.success(t('copy-success'))
+  }
+  catch (error) {
+    console.error('Failed to copy curl command:', error)
+    toast.error(t('copy-fail'))
   }
 }
 </script>
@@ -548,16 +671,14 @@ function openLink(url?: string): void {
                 </div>
               </div>
             </InfoRow>
-            <InfoRow label="iOS">
+            <InfoRow
+              v-for="platform in ['ios', 'android', 'electron'] as const"
+              :key="platform"
+              :label="t(`platform-${platform}`)"
+            >
               <Toggle
-                :value="channel?.ios"
-                @change="saveChannelChange('ios', !channel?.ios)"
-              />
-            </InfoRow>
-            <InfoRow label="Android">
-              <Toggle
-                :value="channel?.android"
-                @change="saveChannelChange('android', !channel?.android)"
+                :value="channel?.[platform]"
+                @change="saveChannelChange(platform, !channel?.[platform])"
               />
             </InfoRow>
             <InfoRow :label="t('disable-auto-downgra')">
@@ -647,6 +768,50 @@ function openLink(url?: string): void {
               />
             </InfoRow>
           </dl>
+
+          <!-- Debug API Section -->
+          <div class="border-t border-slate-300 dark:border-slate-700">
+            <button
+              class="flex items-center justify-between w-full px-6 py-4 transition-colors dark:hover:bg-slate-700/50 hover:bg-slate-50"
+              @click="showDebugSection = !showDebugSection"
+            >
+              <div class="flex items-center gap-2">
+                <IconCode class="w-5 h-5 text-slate-600 dark:text-slate-300" />
+                <span class="font-medium text-slate-700 dark:text-slate-200">{{ t('debug-channel-api-request') }}</span>
+              </div>
+              <IconDown
+                class="w-5 h-5 transition-transform text-slate-600 dark:text-slate-300"
+                :class="{ 'rotate-180': showDebugSection }"
+              />
+            </button>
+
+            <div v-if="showDebugSection" class="px-6 pb-4">
+              <!-- Warning if channel cannot be tested -->
+              <div v-if="!canTestChannel" class="flex items-start gap-3 p-3 mb-4 rounded-lg bg-amber-50 dark:bg-amber-900/20">
+                <IconWarning class="flex-shrink-0 w-5 h-5 mt-0.5 text-amber-600 dark:text-amber-400" />
+                <p class="text-sm text-amber-800 dark:text-amber-200">
+                  {{ t('debug-channel-api-warning') }}
+                </p>
+              </div>
+
+              <div class="relative">
+                <pre class="p-4 overflow-x-auto text-sm rounded-lg bg-slate-900 text-slate-100"><code>{{ getChannelCurlCommand() }}</code></pre>
+                <button
+                  class="absolute p-2 transition-colors rounded top-2 right-2 hover:bg-slate-700"
+                  :title="t('copy-curl')"
+                  @click="copyCurlCommand"
+                >
+                  <IconCopy class="w-4 h-4 text-slate-300" />
+                </button>
+              </div>
+              <p class="mt-2 text-sm text-slate-600 dark:text-slate-400">
+                {{ t('debug-channel-api-description') }}
+              </p>
+              <p class="mt-1 text-xs text-slate-500 dark:text-slate-500 italic">
+                {{ t('debug-channel-api-tip') }}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

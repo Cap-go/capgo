@@ -15,14 +15,14 @@ VALUES
 (
     tests.get_supabase_uid('test_pwd_compliant_v7'),
     'pwd_compliant_v7@test.com',
-    NOW(),
-    NOW()
+    now(),
+    now()
 ),
 (
     tests.get_supabase_uid('test_pwd_noncompliant_v7'),
     'pwd_noncompliant_v7@test.com',
-    NOW(),
-    NOW()
+    now(),
+    now()
 )
 ON CONFLICT (id) DO NOTHING;
 
@@ -431,8 +431,8 @@ SELECT
                 )
             WHERE gid = current_setting('test.org_with_both_policies_v7')::uuid
         ),
-        true,
-        'get_orgs_v7 test - compliant password user has password_has_access=true in org with both policies'
+        NULL::boolean,
+        'get_orgs_v7 test - compliant password user without 2FA does not see org with both policies'
     );
 
 -- Test 21: Compliant password user without 2FA should have 2fa_has_access=false
@@ -446,22 +446,23 @@ SELECT
                 )
             WHERE gid = current_setting('test.org_with_both_policies_v7')::uuid
         ),
-        false,
-        'get_orgs_v7 test - compliant password user without 2FA has 2fa_has_access=false in org with both policies'
+        NULL::boolean,
+        'get_orgs_v7 test - compliant password user without 2FA does not see 2fa_has_access in org with both policies'
     );
 
 -- Test 22: Non-compliant user should have password_has_access=false in org with both policies
 SELECT
-    ok(
+    is(
         (
-            SELECT password_has_access = false
+            SELECT password_has_access
             FROM
                 public.get_orgs_v7(
                     tests.get_supabase_uid('test_pwd_noncompliant_v7')
                 )
             WHERE gid = current_setting('test.org_with_both_policies_v7')::uuid
         ),
-        'get_orgs_v7 test - non-compliant user has password_has_access=false in org with both policies'
+        NULL::boolean,
+        'get_orgs_v7 test - non-compliant user without 2FA does not see org with both policies'
     );
 
 -- ============================================================================

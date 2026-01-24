@@ -1,30 +1,22 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, headers, NON_ACCESS_APP_NAME, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, getSupabaseClient, headers, NON_ACCESS_APP_NAME, ORG_ID, resetAndSeedAppData, resetAppData } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.app.error.${id}`
-let testOrgId: string
+// Use existing ORG_ID which has proper stripe_info setup
+const testOrgId = ORG_ID
 
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
-
-  // Create test organization
-  const { data: orgData, error: orgError } = await getSupabaseClient().from('orgs').insert({
-    id: randomUUID(),
-    name: `Test App Error Org ${id}`,
-    management_email: TEST_EMAIL,
-    created_by: USER_ID,
-  }).select().single()
-
-  if (orgError)
-    throw orgError
-  testOrgId = orgData.id
 })
 
 afterAll(async () => {
   await resetAppData(APPNAME)
-  await getSupabaseClient().from('orgs').delete().eq('id', testOrgId)
+  // Clean up any test apps created during tests
+  await getSupabaseClient().from('apps').delete().eq('app_id', `${APPNAME}.delete`)
+  await getSupabaseClient().from('apps').delete().eq('app_id', `${APPNAME}.put`)
+  await getSupabaseClient().from('apps').delete().eq('app_id', `${APPNAME}.notfound`)
 })
 
 describe('[POST] /app - Error Cases', () => {

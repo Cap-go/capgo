@@ -55,7 +55,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     ])
       .then(([orgResult, appResult]) => {
         if (orgResult.error || !orgResult.data || appResult.error || !appResult.data) {
-          return simpleError('error_fetching_organization_or_app', 'Error fetching organization or app', { org: orgResult.error, app: appResult.error })
+          throw simpleError('error_fetching_organization_or_app', 'Error fetching organization or app', { org: orgResult.error, app: appResult.error })
         }
         return trackBentoEvent(c, orgResult.data.management_email, {
           org_id: orgResult.data.id,
