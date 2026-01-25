@@ -1,4 +1,4 @@
-import { access, mkdir, rm, writeFile } from 'node:fs/promises'
+import { access, mkdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { cwd, env } from 'node:process'
 import { BASE_URL, getEndpointUrl } from './test-utils'
@@ -129,11 +129,21 @@ export async function prepareCli(appId: string, old = false, installDeps = false
     await npmInstallMinimal(appId)
   }
   else {
-    // Create empty node_modules folder to satisfy CLI checks without installing
-    await mkdir(nodeModulesPath, { recursive: true })
+    const rootNodeModulesPath = join(ROOT_DIR, 'node_modules')
 
-    // Create a minimal package.json in node_modules to indicate it's "installed"
-    await writeFile(join(nodeModulesPath, '.package-lock.json'), '{"name": "temp", "lockfileVersion": 1}')
+    try {
+      await access(rootNodeModulesPath)
+      // Replace with symlink to root node_modules so metadata checks can resolve deps.
+      await rm(nodeModulesPath, { recursive: true, force: true })
+      await symlink(rootNodeModulesPath, nodeModulesPath, 'dir')
+    }
+    catch {
+      // Fallback to empty node_modules folder to satisfy CLI checks without installing
+      await mkdir(nodeModulesPath, { recursive: true })
+
+      // Create a minimal package.json in node_modules to indicate it's "installed"
+      await writeFile(join(nodeModulesPath, '.package-lock.json'), '{"name": "temp", "lockfileVersion": 1}')
+    }
   }
 
   preparedApps.add(appId)
