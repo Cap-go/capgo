@@ -75,7 +75,15 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     .eq('id', version.id)
     .single()
   if (errorDelete) {
-    throw simpleError('error_deleting_version', 'Error deleting version', { errorDelete })
+    if (errorDelete.code !== 'PGRST116') {
+      throw simpleError('error_deleting_version', 'Error deleting version', { errorDelete })
+    }
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'delete failed version already deleted',
+      versionId: version.id,
+      errorDelete,
+    })
   }
 
   const LogSnag = logsnag(c)
