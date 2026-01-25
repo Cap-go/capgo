@@ -150,7 +150,9 @@ export async function uploadBundleSDK(
     bundle: version,
     channel,
     disableCodeCheck: true, // Skip notifyAppReady check for tests
-    // useZip: false uses TUS resumable upload protocol
+    // TUS protocol requires custom fileHost support in CLI SDK (not yet available)
+    // Use legacy zip upload for local testing until CLI SDK supports custom TUS endpoints
+    useZip: true,
     ...additionalOptions,
   }
 
