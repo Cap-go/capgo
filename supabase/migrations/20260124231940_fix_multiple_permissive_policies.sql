@@ -13,7 +13,8 @@
 -- read conditions.
 --
 -- Performance: All policies call auth.uid() only once using a subquery pattern
--- as per AGENTS.md guidelines.
+-- as per AGENTS.md guidelines. UPDATE policies omit WITH CHECK when identical
+-- to USING (defaults to USING).
 -- =============================================================================
 
 -- =============================================================================
@@ -45,12 +46,6 @@ CREATE POLICY rbac_settings_update ON public.rbac_settings
   FOR UPDATE
   TO authenticated
   USING (
-    EXISTS (
-      SELECT 1 FROM (SELECT auth.uid() AS uid) AS auth_user
-      WHERE public.is_admin(auth_user.uid)
-    )
-  )
-  WITH CHECK (
     EXISTS (
       SELECT 1 FROM (SELECT auth.uid() AS uid) AS auth_user
       WHERE public.is_admin(auth_user.uid)
@@ -100,12 +95,6 @@ CREATE POLICY roles_update ON public.roles
       SELECT 1 FROM (SELECT auth.uid() AS uid) AS auth_user
       WHERE public.is_admin(auth_user.uid)
     )
-  )
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM (SELECT auth.uid() AS uid) AS auth_user
-      WHERE public.is_admin(auth_user.uid)
-    )
   );
 
 CREATE POLICY roles_delete ON public.roles
@@ -147,12 +136,6 @@ CREATE POLICY permissions_update ON public.permissions
   FOR UPDATE
   TO authenticated
   USING (
-    EXISTS (
-      SELECT 1 FROM (SELECT auth.uid() AS uid) AS auth_user
-      WHERE public.is_admin(auth_user.uid)
-    )
-  )
-  WITH CHECK (
     EXISTS (
       SELECT 1 FROM (SELECT auth.uid() AS uid) AS auth_user
       WHERE public.is_admin(auth_user.uid)
@@ -202,12 +185,6 @@ CREATE POLICY role_permissions_update ON public.role_permissions
       SELECT 1 FROM (SELECT auth.uid() AS uid) AS auth_user
       WHERE public.is_admin(auth_user.uid)
     )
-  )
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM (SELECT auth.uid() AS uid) AS auth_user
-      WHERE public.is_admin(auth_user.uid)
-    )
   );
 
 CREATE POLICY role_permissions_delete ON public.role_permissions
@@ -249,12 +226,6 @@ CREATE POLICY role_hierarchy_update ON public.role_hierarchy
   FOR UPDATE
   TO authenticated
   USING (
-    EXISTS (
-      SELECT 1 FROM (SELECT auth.uid() AS uid) AS auth_user
-      WHERE public.is_admin(auth_user.uid)
-    )
-  )
-  WITH CHECK (
     EXISTS (
       SELECT 1 FROM (SELECT auth.uid() AS uid) AS auth_user
       WHERE public.is_admin(auth_user.uid)
@@ -311,13 +282,6 @@ CREATE POLICY groups_update ON public.groups
   FOR UPDATE
   TO authenticated
   USING (
-    EXISTS (
-      SELECT 1 FROM (SELECT auth.uid() AS uid) AS auth_user
-      WHERE public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth_user.uid, org_id, NULL::varchar, NULL::bigint)
-         OR public.is_admin(auth_user.uid)
-    )
-  )
-  WITH CHECK (
     EXISTS (
       SELECT 1 FROM (SELECT auth.uid() AS uid) AS auth_user
       WHERE public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth_user.uid, org_id, NULL::varchar, NULL::bigint)
@@ -383,19 +347,6 @@ CREATE POLICY group_members_update ON public.group_members
   FOR UPDATE
   TO authenticated
   USING (
-    EXISTS (
-      SELECT 1 FROM (SELECT auth.uid() AS uid) AS auth_user
-      WHERE EXISTS (
-        SELECT 1 FROM public.groups
-        WHERE groups.id = group_members.group_id
-          AND (
-            public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth_user.uid, groups.org_id, NULL::varchar, NULL::bigint)
-            OR public.is_admin(auth_user.uid)
-          )
-      )
-    )
-  )
-  WITH CHECK (
     EXISTS (
       SELECT 1 FROM (SELECT auth.uid() AS uid) AS auth_user
       WHERE EXISTS (
@@ -475,8 +426,6 @@ CREATE POLICY role_bindings_insert ON public.role_bindings
       WHERE
         public.is_admin(auth_user.uid)
         OR
-        (scope_type = public.rbac_scope_platform() AND public.is_admin(auth_user.uid))
-        OR
         (scope_type = public.rbac_scope_org() AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth_user.uid, org_id, NULL::varchar, NULL::bigint))
         OR
         (scope_type = public.rbac_scope_app() AND EXISTS (
@@ -503,32 +452,6 @@ CREATE POLICY role_bindings_update ON public.role_bindings
       SELECT 1 FROM (SELECT auth.uid() AS uid) AS auth_user
       WHERE
         public.is_admin(auth_user.uid)
-        OR
-        (scope_type = public.rbac_scope_platform() AND public.is_admin(auth_user.uid))
-        OR
-        (scope_type = public.rbac_scope_org() AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth_user.uid, org_id, NULL::varchar, NULL::bigint))
-        OR
-        (scope_type = public.rbac_scope_app() AND EXISTS (
-          SELECT 1 FROM public.apps
-          WHERE apps.id = role_bindings.app_id
-            AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth_user.uid, apps.owner_org, apps.app_id, NULL::bigint)
-        ))
-        OR
-        (scope_type = public.rbac_scope_channel() AND EXISTS (
-          SELECT 1 FROM public.channels
-          JOIN public.apps ON apps.app_id = channels.app_id
-          WHERE channels.rbac_id = role_bindings.channel_id
-            AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth_user.uid, apps.owner_org, channels.app_id, channels.id)
-        ))
-    )
-  )
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM (SELECT auth.uid() AS uid) AS auth_user
-      WHERE
-        public.is_admin(auth_user.uid)
-        OR
-        (scope_type = public.rbac_scope_platform() AND public.is_admin(auth_user.uid))
         OR
         (scope_type = public.rbac_scope_org() AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth_user.uid, org_id, NULL::varchar, NULL::bigint))
         OR
