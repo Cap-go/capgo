@@ -278,11 +278,11 @@ async function checkLogin() {
   }
 
   isLoading.value = true
-  const resUser = await supabase.auth.getUser()
-  const user = resUser?.data.user
-  const resSession = await supabase.auth.getSession()!
-  const session = resSession?.data.session
-  if (user) {
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const hasUser = !!claimsData?.claims?.sub
+  const { data: sessionData } = await supabase.auth.getSession()
+  const session = sessionData?.session
+  if (hasUser) {
     await checkAuthUser()
   }
   else if (!session && route.hash) {

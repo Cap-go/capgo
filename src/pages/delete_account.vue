@@ -32,8 +32,9 @@ async function deleteAccount() {
           isLoading.value = true
 
           try {
-            const authUser = await supabase.auth.getUser()
-            if (authUser.error) {
+            const { data: claimsData, error: claimsError } = await supabase.auth.getClaims()
+            const userId = claimsData?.claims?.sub
+            if (claimsError || !userId) {
               isLoading.value = false
               return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
             }
@@ -41,7 +42,7 @@ async function deleteAccount() {
             const { data: user } = await supabaseClient
               .from('users')
               .select()
-              .eq('id', authUser.data.user.id)
+              .eq('id', userId)
               .single()
 
             if (!user) {
