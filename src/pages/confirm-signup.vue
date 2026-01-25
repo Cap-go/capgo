@@ -7,23 +7,31 @@ const route = useRoute()
 const isRedirecting = ref(true)
 const error = ref('')
 
-const allowedHosts = ['capgo.app', 'console.capgo.app']
-
-function isAllowedHost(hostname: string) {
-  if (allowedHosts.includes(hostname))
-    return true
-  return hostname.endsWith('.capgo.app')
-}
+// Get the allowed hostname from VITE_APP_URL
+const allowedHost = (() => {
+  try {
+    return new URL(import.meta.env.VITE_APP_URL).hostname
+  }
+  catch {
+    return ''
+  }
+})()
 
 function isAllowedConfirmationUrl(urlValue: string) {
   const url = new URL(urlValue, window.location.origin)
+
+  // Allow localhost in dev mode
   if (import.meta.env.DEV) {
-    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1')
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '::1')
       return true
   }
+
+  // Only allow https
   if (url.protocol !== 'https:')
     return false
-  return isAllowedHost(url.hostname)
+
+  // Only allow the exact hostname from VITE_APP_URL
+  return url.hostname === allowedHost
 }
 onMounted(() => {
   const confirmationUrl = route.query.confirmation_url as string
