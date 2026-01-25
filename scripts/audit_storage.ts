@@ -18,13 +18,14 @@ const APPS_OUT = `${OUTPUT_DIR}/apps_with_issues.json`
 const SUMMARY_OUT = `${OUTPUT_DIR}/summary.json`
 const STATE_OUT = `${OUTPUT_DIR}/state.json`
 
-const PAGE_SIZE = Number(process.env.PAGE_SIZE || 1000)
-const CONCURRENCY = Number(process.env.CONCURRENCY || 200)
-const USE_LISTING = process.env.USE_LISTING === '1'
-const R2_PREFIX = process.env.R2_PREFIX || ''
-const FILTER_PAID_TRIAL = process.env.FILTER_PAID_TRIAL !== '0'
-const ORG_CHUNK = Number(process.env.ORG_CHUNK || 500)
-const VERSION_ID_CHUNK = Number(process.env.VERSION_ID_CHUNK || 1000)
+const PAGE_SIZE = 1000
+const CONCURRENCY = 20000
+const USE_LISTING = true
+const R2_PREFIX = ''
+const FILTER_PAID_TRIAL = true
+const ORG_CHUNK = 2000
+const VERSION_ID_CHUNK = 1000
+const MANIFEST_COUNT_CHUNK = 1000
 
 function loadEnv(filePath: string) {
   const envText = Bun.file(filePath).text()
@@ -120,7 +121,7 @@ async function main() {
   let r2KeySet: Set<string> | null = null
   if (USE_LISTING) {
     console.log('\nListing R2 keys (this can take a while on very large buckets)...')
-    r2KeySet = await listAllKeys(s3, bucket, R2_PREFIX)
+    r2KeySet = await listAllKeysParallel(s3, bucket, R2_PREFIX)
     console.log(`  Loaded ${r2KeySet.size} keys into memory`)
   }
 
@@ -208,15 +209,17 @@ async function main() {
 
   const versionIds = Array.from(versionMap.keys())
   const versionIdChunks = chunkArray(versionIds, VERSION_ID_CHUNK)
+  const manifestCountChunks = chunkArray(versionIds, MANIFEST_COUNT_CHUNK)
   let totalManifestsToCheck = 0
-  for (const idChunk of versionIdChunks) {
+  for (let i = 0; i < manifestCountChunks.length; i++) {
+    const idChunk = manifestCountChunks[i]
     const { count, error } = await supabase
       .from('manifest')
       .select('id', { count: 'exact', head: true })
       .in('app_version_id', idChunk)
       .not('s3_path', 'is', null)
     if (error) {
-      console.error('Error counting manifest:', error)
+      console.error(`Error counting manifest (chunk ${i + 1}/${manifestCountChunks.length}, size=${idChunk.length}):`, error)
       process.exit(1)
     }
     totalManifestsToCheck += count ?? 0
@@ -389,6 +392,8 @@ async function main() {
 async function listAllKeys(s3: S3Client, bucket: string, prefix: string) {
   let continuationToken: string | undefined
   const keys = new Set<string>()
+  let pages = 0
+  const startedAt = Date.now()
 
   while (true) {
     const response = await s3.send(new ListObjectsV2Command({
@@ -396,6 +401,7 @@ async function listAllKeys(s3: S3Client, bucket: string, prefix: string) {
       Prefix: prefix || undefined,
       ContinuationToken: continuationToken,
     }))
+    pages += 1
 
     if (response.Contents) {
       for (const obj of response.Contents) {
@@ -403,11 +409,57 @@ async function listAllKeys(s3: S3Client, bucket: string, prefix: string) {
       }
     }
 
+    const seconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000))
+    const rate = Math.round(keys.size / seconds)
+    process.stdout.write(`\r  [listing] pages=${pages} keys=${keys.size} rate=${rate}/s elapsed=${seconds}s`)
+
     if (!response.IsTruncated) break
     continuationToken = response.NextContinuationToken
   }
 
+  if (pages >= 1) process.stdout.write('\n')
   return keys
+}
+
+async function listAllKeysParallel(s3: S3Client, bucket: string, prefix: string) {
+  // If we can filter to paid/trial orgs, parallelize listing per org prefix.
+  const envFile = await Bun.file(ENV_FILE).text()
+  const env: Record<string, string> = {}
+  for (const line of envFile.split('\n')) {
+    const trimmed = line.trim()
+    if (trimmed && !trimmed.startsWith('#')) {
+      const eqIndex = trimmed.indexOf('=')
+      if (eqIndex > 0) env[trimmed.substring(0, eqIndex)] = trimmed.substring(eqIndex + 1)
+    }
+  }
+  const supabase = createClient<Database>(
+    env.SUPABASE_URL,
+    env.SUPABASE_SERVICE_ROLE_KEY,
+    { auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false } },
+  )
+
+  if (!FILTER_PAID_TRIAL || prefix) {
+    return listAllKeys(s3, bucket, prefix)
+  }
+
+  const orgIds = await getPaidOrTrialOrgIds(supabase)
+  const prefixes = orgIds.map(id => `orgs/${id}/`)
+  const allKeys = new Set<string>()
+
+  let done = 0
+  const startedAt = Date.now()
+
+  await asyncPool(CONCURRENCY, prefixes, async (pfx) => {
+    const keys = await listAllKeys(s3, bucket, pfx)
+    for (const k of keys) allKeys.add(k)
+    done += 1
+    const seconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000))
+    const rate = Math.round(done / seconds)
+    process.stdout.write(`\r  [listing-parallel] orgs=${done}/${prefixes.length} rate=${rate}/s keys=${allKeys.size}`)
+  })
+
+  process.stdout.write('\n')
+  return allKeys
 }
 
 async function assertExists(s3: S3Client, bucket: string, key: string, keySet: Set<string> | null) {
