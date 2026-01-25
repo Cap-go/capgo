@@ -1048,6 +1048,15 @@ export interface AdminTrialOrganizationsResult {
   total: number
 }
 
+/**
+ * Fetches organizations currently in their trial period for the admin dashboard.
+ * Returns a paginated list of trial organizations ordered by days remaining (ascending),
+ * so organizations expiring soon appear first.
+ *
+ * Trial organizations are those where:
+ * - trial_at date is today or in the future (>= CURRENT_DATE)
+ * - status is NULL (new org, no payment attempted) or not 'succeeded' (no active subscription)
+ */
 export async function getAdminTrialOrganizations(
   c: Context,
   limit: number = 20,
@@ -1058,6 +1067,10 @@ export async function getAdminTrialOrganizations(
     const drizzleClient = getDrizzleClient(pgClient)
 
     // Query to get trial organizations ordered by days remaining (ascending - expiring soon first)
+    // Filter logic:
+    // - trial_at >= CURRENT_DATE: includes trials expiring today (days_remaining = 0)
+    // - status IS NULL: new organizations that haven't attempted payment yet
+    // - status != 'succeeded': organizations without an active paid subscription
     const query = sql`
       SELECT
         o.id AS org_id,
@@ -1068,7 +1081,7 @@ export async function getAdminTrialOrganizations(
         o.created_at
       FROM orgs o
       INNER JOIN stripe_info si ON si.customer_id = o.customer_id
-      WHERE si.trial_at::date > CURRENT_DATE
+      WHERE si.trial_at::date >= CURRENT_DATE
         AND (si.status IS NULL OR si.status != 'succeeded')
       ORDER BY days_remaining ASC, o.created_at DESC
       LIMIT ${limit}
@@ -1080,7 +1093,7 @@ export async function getAdminTrialOrganizations(
       SELECT COUNT(*)::int AS total
       FROM orgs o
       INNER JOIN stripe_info si ON si.customer_id = o.customer_id
-      WHERE si.trial_at::date > CURRENT_DATE
+      WHERE si.trial_at::date >= CURRENT_DATE
         AND (si.status IS NULL OR si.status != 'succeeded')
     `
 

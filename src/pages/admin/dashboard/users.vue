@@ -59,6 +59,14 @@ interface TrialOrganization {
   created_at: string
 }
 
+interface TrialOrganizationsResponse {
+  success: boolean
+  data: {
+    organizations: TrialOrganization[]
+    total: number
+  }
+}
+
 const trialOrganizations = ref<TrialOrganization[]>([])
 const trialOrganizationsTotal = ref(0)
 const trialOrganizationsCurrentPage = ref(1)
@@ -103,6 +111,8 @@ async function loadTrialOrganizations() {
 
     const offset = (trialOrganizationsCurrentPage.value - 1) * TRIAL_PAGE_SIZE
 
+    // Note: start_date and end_date are required by the API schema but not used for trial_organizations
+    // which queries current trial status rather than time-series data
     const response = await fetch(`${defaultApiHost}/private/admin_stats`, {
       method: 'POST',
       headers: {
@@ -119,12 +129,12 @@ async function loadTrialOrganizations() {
     })
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
+      const errorData: unknown = await response.json().catch(() => ({}))
       throw new Error(`API error: ${response.status} - ${JSON.stringify(errorData)}`)
     }
 
-    const data = await response.json()
-    if (!data?.success)
+    const data = await response.json() as TrialOrganizationsResponse
+    if (!data.success)
       throw new Error('Failed to fetch trial organizations')
 
     trialOrganizations.value = data.data.organizations || []
