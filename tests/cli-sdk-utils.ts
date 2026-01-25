@@ -36,6 +36,8 @@ function generateDefaultJsonCliConfig(appId: string) {
     plugins: {
       CapacitorUpdater: {
         autoUpdate: false,
+        // Point TUS uploads to local Supabase instance for testing
+        localApiFiles: `${SUPABASE_URL}/functions/v1/files`,
       },
     },
   }
@@ -150,9 +152,7 @@ export async function uploadBundleSDK(
     bundle: version,
     channel,
     disableCodeCheck: true, // Skip notifyAppReady check for tests
-    // TUS protocol requires custom fileHost support in CLI SDK (not yet available)
-    // Use legacy zip upload for local testing until CLI SDK supports custom TUS endpoints
-    useZip: true,
+    // TUS protocol uses localApiFiles from capacitor.config.json
     ...additionalOptions,
   }
 
