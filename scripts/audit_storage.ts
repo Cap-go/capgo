@@ -103,6 +103,10 @@ async function main() {
   const state = await loadState()
   if (state) {
     console.log(`Resuming from state: ${STATE_OUT}`)
+    if (state.phase === 'versions' && state.versions)
+      console.log(`  versions: orgIndex=${state.versions.orgIndex}, offset=${state.versions.offset}`)
+    if (state.phase === 'manifests' && state.manifests)
+      console.log(`  manifests: chunkIndex=${state.manifests.chunkIndex}, offset=${state.manifests.offset}`)
   }
 
   console.log('=== Storage Audit ===')
@@ -170,10 +174,62 @@ async function main() {
     (await loadJsonArray(MANIFESTS_OUT)) ?? []
   const appIdsWithIssues = new Set<string>(await loadJsonArray(APPS_OUT) ?? [])
 
+  let currentState: AuditState = state ?? {
+    phase: 'versions',
+    versions: { orgIndex: 0, offset: 0 },
+    manifests: { chunkIndex: 0, offset: 0 },
+  }
+
+  const handleExit = async (signal: string) => {
+    console.log(`\nReceived ${signal}, saving progress...`)
+    await saveState(currentState)
+    await persistOutputs(missingVersions, missingManifests, appIdsWithIssues, bucket)
+    process.exit(signal === 'SIGINT' ? 130 : 1)
+  }
+  process.on('SIGINT', () => { void handleExit('SIGINT') })
+  process.on('SIGTERM', () => { void handleExit('SIGTERM') })
+
+  console.log('\nCounting total versions/manifests to check...')
+  let totalVersionsToCheck = 0
+  for (const orgChunk of orgChunks) {
+    let query = supabase
+      .from('app_versions')
+      .select('id', { count: 'exact', head: true })
+      .eq('deleted', false)
+      .not('r2_path', 'is', null)
+    if (orgChunk) query = query.in('owner_org', orgChunk)
+    const { count, error } = await query
+    if (error) {
+      console.error('Error counting app_versions:', error)
+      process.exit(1)
+    }
+    totalVersionsToCheck += count ?? 0
+  }
+
+  const versionIds = Array.from(versionMap.keys())
+  const versionIdChunks = chunkArray(versionIds, VERSION_ID_CHUNK)
+  let totalManifestsToCheck = 0
+  for (const idChunk of versionIdChunks) {
+    const { count, error } = await supabase
+      .from('manifest')
+      .select('id', { count: 'exact', head: true })
+      .in('app_version_id', idChunk)
+      .not('s3_path', 'is', null)
+    if (error) {
+      console.error('Error counting manifest:', error)
+      process.exit(1)
+    }
+    totalManifestsToCheck += count ?? 0
+  }
+  console.log(`Total versions to check: ${totalVersionsToCheck}`)
+  console.log(`Total manifests to check: ${totalManifestsToCheck}`)
+
   console.log('\nChecking app_versions.r2_path...')
   let checkedVersions = 0
   for (let orgIndex = state?.versions?.orgIndex ?? 0; orgIndex < orgChunks.length; orgIndex++) {
     const orgChunk = orgChunks[orgIndex]
+    const orgLabel = orgChunk ? `${orgIndex + 1}/${orgChunks.length}` : 'all'
+    console.log(`\n[versions] Org chunk ${orgLabel} starting at offset ${orgIndex === (state?.versions?.orgIndex ?? 0) ? (state?.versions?.offset ?? 0) : 0}`)
     let from = orgIndex === (state?.versions?.orgIndex ?? 0) ? (state?.versions?.offset ?? 0) : 0
     while (true) {
       const to = from + PAGE_SIZE - 1
@@ -216,26 +272,32 @@ async function main() {
       })
 
       checkedVersions += data.length
-      process.stdout.write(`\r  Checked versions: ${checkedVersions}`)
+      const vPercent = totalVersionsToCheck > 0 ? Math.min(100, Math.round((checkedVersions / totalVersionsToCheck) * 100)) : 100
+      process.stdout.write(`\r  [versions] ${checkedVersions}/${totalVersionsToCheck} (${vPercent}%) missing=${missingVersions.length} orgChunk=${orgLabel} offset=${from}`)
 
       from += PAGE_SIZE
-      await saveState({
+      currentState = {
         phase: 'versions',
         versions: { orgIndex, offset: from },
         manifests: state?.manifests ?? null,
-      })
+      }
+      await saveState(currentState)
       await persistOutputs(missingVersions, missingManifests, appIdsWithIssues, bucket)
       if (data.length < PAGE_SIZE) break
     }
   }
   process.stdout.write('\n')
+  console.log('\n=== Versions Check Summary ===')
+  console.log(`Total versions checked: ${checkedVersions}/${totalVersionsToCheck}`)
+  console.log(`Missing versions: ${missingVersions.length}`)
+  console.log(`Apps with issues so far: ${appIdsWithIssues.size}`)
+  await persistOutputs(missingVersions, missingManifests, appIdsWithIssues, bucket)
 
   console.log('\nChecking manifest.s3_path...')
   let checkedManifests = 0
-  const versionIds = Array.from(versionMap.keys())
-  const versionIdChunks = chunkArray(versionIds, VERSION_ID_CHUNK)
   for (let chunkIndex = state?.manifests?.chunkIndex ?? 0; chunkIndex < versionIdChunks.length; chunkIndex++) {
     const idChunk = versionIdChunks[chunkIndex]
+    console.log(`\n[manifests] Chunk ${chunkIndex + 1}/${versionIdChunks.length} starting at offset ${chunkIndex === (state?.manifests?.chunkIndex ?? 0) ? (state?.manifests?.offset ?? 0) : 0}`)
     let from = chunkIndex === (state?.manifests?.chunkIndex ?? 0) ? (state?.manifests?.offset ?? 0) : 0
     while (true) {
       const to = from + PAGE_SIZE - 1
@@ -276,19 +338,26 @@ async function main() {
       })
 
       checkedManifests += data.length
-      process.stdout.write(`\r  Checked manifests: ${checkedManifests}`)
+      const mPercent = totalManifestsToCheck > 0 ? Math.min(100, Math.round((checkedManifests / totalManifestsToCheck) * 100)) : 100
+      process.stdout.write(`\r  [manifests] ${checkedManifests}/${totalManifestsToCheck} (${mPercent}%) missing=${missingManifests.length} chunk=${chunkIndex + 1}/${versionIdChunks.length} offset=${from}`)
 
       from += PAGE_SIZE
-      await saveState({
+      currentState = {
         phase: 'manifests',
         versions: { orgIndex: orgChunks.length, offset: 0 },
         manifests: { chunkIndex, offset: from },
-      })
+      }
+      await saveState(currentState)
       await persistOutputs(missingVersions, missingManifests, appIdsWithIssues, bucket)
       if (data.length < PAGE_SIZE) break
     }
   }
   process.stdout.write('\n')
+  console.log('\n=== Manifests Check Summary ===')
+  console.log(`Total manifests checked: ${checkedManifests}/${totalManifestsToCheck}`)
+  console.log(`Missing manifests: ${missingManifests.length}`)
+  console.log(`Apps with issues so far: ${appIdsWithIssues.size}`)
+  await persistOutputs(missingVersions, missingManifests, appIdsWithIssues, bucket)
 
   const appsList = Array.from(appIdsWithIssues).sort()
 
