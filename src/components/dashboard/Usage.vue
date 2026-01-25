@@ -80,7 +80,6 @@ const cacheByOrgByApp = new Map<string, {
   bandwidth: { [appId: string]: number[] }
 }>()
 
-
 // View mode selectors for charts
 const route = useRoute()
 const router = useRouter()
@@ -586,7 +585,7 @@ async function loadData() {
 
 // Watch for organization changes - show loading immediately when org switches
 watch(() => effectiveOrganization.value?.gid, (newOrgId, oldOrgId) => {
-  if (newOrgId && newOrgId !== oldOrgId && loadedAlready.value) {
+  if (newOrgId && oldOrgId !== undefined && newOrgId !== oldOrgId && loadedAlready.value) {
     // Show loading state immediately when org changes (before data is fetched)
     isLoading.value = true
     // Increment reload trigger to force all child charts to refetch

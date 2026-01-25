@@ -152,29 +152,6 @@ async function fetchDailyVersionStats(targetAppIds: string[], startDate: string,
   return allRows
 }
 
-function filterSeriesToBillingPeriod(fullData: (number | undefined)[], last30DaysStart: Date, billingStart: Date, today: Date) {
-  const currentDate = new Date(today)
-  currentDate.setHours(0, 0, 0, 0)
-
-  const currentBillingDay = Math.floor((currentDate.getTime() - billingStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
-  const billingData = createUndefinedArray(Math.max(0, currentBillingDay)) as (number | undefined)[]
-
-  for (let i = 0; i < 30; i++) {
-    const dataDate = new Date(last30DaysStart)
-    dataDate.setDate(dataDate.getDate() + i)
-    dataDate.setHours(0, 0, 0, 0)
-
-    if (dataDate >= billingStart && dataDate <= currentDate) {
-      const billingIndex = Math.floor((dataDate.getTime() - billingStart.getTime()) / (1000 * 60 * 60 * 24))
-      if (billingIndex >= 0 && billingIndex < currentBillingDay) {
-        billingData[billingIndex] = fullData[i]
-      }
-    }
-  }
-
-  return billingData
-}
-
 async function calculateStats(forceRefetch = false) {
   const startTime = Date.now()
   isLoading.value = true
@@ -192,22 +169,29 @@ async function calculateStats(forceRefetch = false) {
   const orgChanged = currentCacheOrgId.value !== currentOrgId
   currentCacheOrgId.value = currentOrgId
 
-  // Always work with last 30 days of data
+  const DAY_IN_MS = 1000 * 60 * 60 * 24
+
+  // Always work with full billing period when enabled, otherwise last 30 days
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
   const last30DaysStart = new Date(today)
   last30DaysStart.setDate(last30DaysStart.getDate() - 29)
-  const dayCount = 30
-
-  const startDate = last30DaysStart.toISOString().split('T')[0]
-  const endDate = today.toISOString().split('T')[0]
 
   const billingStart = new Date(effectiveOrganization.value?.subscription_start ?? today)
   billingStart.setHours(0, 0, 0, 0)
+  const safeBillingStart = billingStart > today ? today : billingStart
 
-  // Cache key includes org and billing mode since date range differs
-  const cacheKey = `${currentOrgId ?? 'none'}:${props.appId || 'org'}:${props.useBillingPeriod ? 'billing' : '30days'}`
+  const rangeStart = props.useBillingPeriod ? safeBillingStart : last30DaysStart
+  const dayCount = props.useBillingPeriod
+    ? Math.max(0, Math.floor((today.getTime() - rangeStart.getTime()) / DAY_IN_MS) + 1)
+    : 30
+
+  const startDate = rangeStart.toISOString().split('T')[0]
+  const endDate = today.toISOString().split('T')[0]
+
+  // Cache key includes org, app, and range to avoid stale data between periods
+  const cacheKey = `${currentOrgId ?? 'none'}:${props.appId || 'org'}:${startDate}:${endDate}`
 
   try {
     // Determine target apps
@@ -287,7 +271,7 @@ async function calculateStats(forceRefetch = false) {
           statDate.setHours(0, 0, 0, 0)
 
           // Calculate days since start of range
-          const daysDiff = Math.floor((statDate.getTime() - last30DaysStart.getTime()) / (1000 * 60 * 60 * 24))
+          const daysDiff = Math.floor((statDate.getTime() - rangeStart.getTime()) / DAY_IN_MS)
 
           if (daysDiff >= 0 && daysDiff < dayCount) {
             const installedCount = stat.install || 0
@@ -310,26 +294,11 @@ async function calculateStats(forceRefetch = false) {
           }
         }
       })
-
     }
 
     let finalDailyCounts = dailyCounts
     let finalActionData = actionData
     let finalAppData = appData
-
-    if (props.useBillingPeriod) {
-      finalDailyCounts = filterSeriesToBillingPeriod(dailyCounts, last30DaysStart, billingStart, today)
-      finalActionData = {
-        install: filterSeriesToBillingPeriod(actionData.install, last30DaysStart, billingStart, today),
-        fail: filterSeriesToBillingPeriod(actionData.fail, last30DaysStart, billingStart, today),
-        requested: filterSeriesToBillingPeriod(actionData.requested, last30DaysStart, billingStart, today),
-      }
-      const filteredAppData: { [appId: string]: (number | undefined)[] } = {}
-      Object.keys(appData).forEach((appId) => {
-        filteredAppData[appId] = filterSeriesToBillingPeriod(appData[appId], last30DaysStart, billingStart, today)
-      })
-      finalAppData = filteredAppData
-    }
 
     const sumSeries = (series: (number | undefined)[]) => series.reduce((sum, value) => sum + (value ?? 0), 0)
     installedTotal = sumSeries(finalActionData.install)
@@ -369,7 +338,7 @@ async function calculateStats(forceRefetch = false) {
 
 // Watch for organization changes - use per-org cache (no need to force refetch)
 watch(() => effectiveOrganization.value?.gid, async (newOrgId, oldOrgId) => {
-  if (newOrgId && newOrgId !== oldOrgId) {
+  if (newOrgId && oldOrgId !== undefined && newOrgId !== oldOrgId) {
     // Per-org cache will be checked in calculateStats
     await calculateStats(true)
   }

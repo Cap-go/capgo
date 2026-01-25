@@ -1,13 +1,13 @@
 -- Update read_device_usage to count unique devices once per period (first seen in range)
 -- This aligns MAU with "unique over period" semantics rather than per-day DAU.
 CREATE OR REPLACE FUNCTION "public"."read_device_usage" (
-  "p_app_id" character varying,
-  "p_period_start" timestamp without time zone,
-  "p_period_end" timestamp without time zone
+  "p_app_id" pg_catalog.varchar,
+  "p_period_start" pg_catalog.timestamp,
+  "p_period_end" pg_catalog.timestamp
 ) RETURNS TABLE (
-  "date" "date",
-  "mau" bigint,
-  "app_id" character varying
+  "date" pg_catalog.date,
+  "mau" pg_catalog.int8,
+  "app_id" pg_catalog.varchar
 ) LANGUAGE "plpgsql"
 SET
   search_path = '' AS $$
