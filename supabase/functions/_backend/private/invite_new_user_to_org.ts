@@ -149,16 +149,16 @@ async function validateInvite(c: Context, rawBody: any) {
   const { legacyInviteType, rbacRoleName } = resolveInviteRoles(body.invite_type, useNewRbac)
 
   // Get current user ID from JWT
-  const { data: authData, error: authError } = await supabase.auth.getUser()
-  if (authError || !authData?.user?.id) {
-    return { message: 'Failed to get current user', error: authError?.message, status: 500 }
+  const authContext = c.get('auth')
+  if (!authContext?.userId) {
+    return { message: 'Failed to get current user', error: 'Not authorized', status: 500 }
   }
 
   // Get user details
   const { data: inviteCreatorUser, error: inviteCreatorUserError } = await supabase
     .from('users')
     .select('*')
-    .eq('id', authData.user.id)
+    .eq('id', authContext.userId)
     .single()
 
   if (inviteCreatorUserError) {

@@ -73,8 +73,8 @@ onMounted(async () => {
     isLoading.value = false
   }
 
-  const { data: auth } = await supabase.auth.getUser()
-  if (auth.user) {
+  const { data: claimsData } = await supabase.auth.getClaims()
+  if (claimsData?.claims?.sub) {
     await supabase.auth.signOut()
   }
 })

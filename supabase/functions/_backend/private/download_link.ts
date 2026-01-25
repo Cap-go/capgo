@@ -29,11 +29,11 @@ app.post('/', middlewareAuth, async (c) => {
   const supabase = supabaseClient(c, authorization)
 
   // Get current user ID from JWT
-  const { data: auth, error } = await supabase.auth.getUser()
-  if (error || !auth?.user?.id)
+  const authContext = c.get('auth')
+  if (!authContext?.userId)
     throw simpleError('not_authorized', 'Not authorized')
 
-  const userId = auth.user.id
+  const userId = authContext.userId
 
   // Auth context is already set by middlewareAuth
   if (!(await checkPermission(c, 'app.read_bundles', { appId: body.app_id })))

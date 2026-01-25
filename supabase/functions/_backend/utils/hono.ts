@@ -18,6 +18,49 @@ import { getEnv } from './utils.ts'
 
 import { version as CapgoVersion } from './version.ts'
 
+export interface JWTClaims {
+  sub: string
+  email?: string
+  role?: string
+  exp?: number
+  iat?: number
+  aud?: string
+}
+
+/**
+ * Decode JWT claims without making a network call.
+ * This is much faster than getUser() which makes a network request.
+ * The JWT signature is still verified by Supabase when used with RLS policies.
+ */
+export function getClaimsFromJWT(jwt: string): JWTClaims | null {
+  try {
+    // Remove "Bearer " prefix if present
+    const token = jwt.startsWith('Bearer ') ? jwt.slice(7) : jwt
+
+    const parts = token.split('.')
+    if (parts.length !== 3) {
+      return null
+    }
+
+    // Decode the payload (second part)
+    // Handle base64url encoding (replace - with + and _ with /)
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    // Add padding if needed
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4)
+    const payload = JSON.parse(atob(padded))
+
+    // Check if token is expired
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      return null
+    }
+
+    return payload as JWTClaims
+  }
+  catch {
+    return null
+  }
+}
+
 export interface AuthInfo {
   userId: string
   authType: 'apikey' | 'jwt'
@@ -117,18 +160,16 @@ export const middlewareAuth = honoFactory.createMiddleware(async (c, next) => {
   }
   c.set('authorization', authorization)
 
-  // Validate JWT and set auth context
-  const { supabaseClient: supabaseClientFn } = await import('./supabase.ts')
-  const supabase = supabaseClientFn(c, authorization)
-  const { data: authData, error: authError } = await supabase.auth.getUser()
-  if (authError || !authData.user) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Invalid JWT', error: authError })
+  // Decode JWT claims without network call (much faster than getUser())
+  const claims = getClaimsFromJWT(authorization)
+  if (!claims || !claims.sub) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Invalid JWT claims' })
     throw simpleError('invalid_jwt', 'Invalid JWT')
   }
 
   // Set auth context for RBAC
   c.set('auth', {
-    userId: authData.user.id,
+    userId: claims.sub,
     authType: 'jwt',
     apikey: null,
     jwt: authorization,

@@ -423,9 +423,10 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
 
   try {
     const newApiKey = crypto.randomUUID()
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: claimsData } = await supabase.auth.getClaims()
+    const userId = claimsData?.claims?.sub
 
-    if (!user) {
+    if (!userId) {
       console.log('Not logged in, cannot create API key')
       toast.error('Not logged in')
       return false
@@ -463,7 +464,7 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
       const { data, error } = await supabase
         .from('apikeys')
         .upsert({
-          user_id: user.id,
+          user_id: userId,
           key: newApiKey,
           mode: keyType,
           name: newApiKeyName.value.trim(),
@@ -553,9 +554,10 @@ async function regenrateKey(apikey: Database['public']['Tables']['apikeys']['Row
     return
 
   const newApiKey = crypto.randomUUID()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub
 
-  if (!user) {
+  if (!userId) {
     console.log('Not logged in, cannot regenerate API key')
     return
   }
@@ -610,7 +612,7 @@ async function regenrateKey(apikey: Database['public']['Tables']['apikeys']['Row
     const { error } = await supabase
       .from('apikeys')
       .update({ key: newApiKey })
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('id', apikey.id)
 
     if (error || typeof newApiKey !== 'string')
