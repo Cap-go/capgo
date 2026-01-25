@@ -25,6 +25,27 @@ const adminStore = useAdminDashboardStore()
 const router = useRouter()
 const isLoading = ref(true)
 
+// Onboarding funnel data
+interface OnboardingFunnelData {
+  total_orgs: number
+  orgs_with_app: number
+  orgs_with_channel: number
+  orgs_with_bundle: number
+  app_conversion_rate: number
+  channel_conversion_rate: number
+  bundle_conversion_rate: number
+  trend: Array<{
+    date: string
+    new_orgs: number
+    orgs_created_app: number
+    orgs_created_channel: number
+    orgs_created_bundle: number
+  }>
+}
+
+const onboardingFunnelData = ref<OnboardingFunnelData | null>(null)
+const isLoadingOnboardingFunnel = ref(false)
+
 // Global stats trend data
 const globalStatsTrendData = ref<Array<{
   date: string
@@ -166,6 +187,22 @@ async function loadGlobalStatsTrend() {
   }
 }
 
+async function loadOnboardingFunnel() {
+  isLoadingOnboardingFunnel.value = true
+  try {
+    const data = await adminStore.fetchStats('onboarding_funnel')
+    console.log('[Admin Dashboard Users] Onboarding funnel data:', data)
+    onboardingFunnelData.value = data || null
+  }
+  catch (error) {
+    console.error('[Admin Dashboard Users] Error loading onboarding funnel:', error)
+    onboardingFunnelData.value = null
+  }
+  finally {
+    isLoadingOnboardingFunnel.value = false
+  }
+}
+
 // Computed properties for multi-line charts
 const usersTrendSeries = computed(() => {
   if (globalStatsTrendData.value.length === 0)
@@ -284,13 +321,91 @@ const latestGlobalStats = computed(() => {
   return globalStatsTrendData.value[globalStatsTrendData.value.length - 1]
 })
 
+// Onboarding funnel stages for display
+const onboardingFunnelStages = computed(() => {
+  if (!onboardingFunnelData.value)
+    return []
+
+  const data = onboardingFunnelData.value
+  return [
+    {
+      label: 'Organizations Created',
+      value: data.total_orgs,
+      percentage: 100,
+      color: '#3b82f6', // blue
+    },
+    {
+      label: 'Created an App',
+      value: data.orgs_with_app,
+      percentage: data.app_conversion_rate,
+      color: '#8b5cf6', // purple
+    },
+    {
+      label: 'Created a Channel',
+      value: data.orgs_with_channel,
+      percentage: data.channel_conversion_rate,
+      color: '#f59e0b', // amber
+    },
+    {
+      label: 'Uploaded a Bundle',
+      value: data.orgs_with_bundle,
+      percentage: data.bundle_conversion_rate,
+      color: '#10b981', // green
+    },
+  ]
+})
+
+// Onboarding funnel trend for multi-line chart
+const onboardingFunnelTrendSeries = computed(() => {
+  if (!onboardingFunnelData.value || !onboardingFunnelData.value.trend)
+    return []
+
+  const trend = onboardingFunnelData.value.trend
+  return [
+    {
+      label: 'New Organizations',
+      data: trend.map(item => ({
+        date: item.date,
+        value: item.new_orgs,
+      })),
+      color: '#3b82f6', // blue
+    },
+    {
+      label: 'Created App (within 7 days)',
+      data: trend.map(item => ({
+        date: item.date,
+        value: item.orgs_created_app,
+      })),
+      color: '#8b5cf6', // purple
+    },
+    {
+      label: 'Created Channel (within 7 days)',
+      data: trend.map(item => ({
+        date: item.date,
+        value: item.orgs_created_channel,
+      })),
+      color: '#f59e0b', // amber
+    },
+    {
+      label: 'Uploaded Bundle (within 7 days)',
+      data: trend.map(item => ({
+        date: item.date,
+        value: item.orgs_created_bundle,
+      })),
+      color: '#10b981', // green
+    },
+  ]
+})
+
 watch(() => adminStore.activeDateRange, () => {
   loadGlobalStatsTrend()
+  loadOnboardingFunnel()
 }, { deep: true })
 
 // Watch for refresh button clicks
 watch(() => adminStore.refreshTrigger, () => {
   loadGlobalStatsTrend()
+  loadOnboardingFunnel()
 })
 
 onMounted(async () => {
@@ -301,7 +416,7 @@ onMounted(async () => {
   }
 
   isLoading.value = true
-  await Promise.all([loadGlobalStatsTrend(), loadTrialOrganizations()])
+  await Promise.all([loadGlobalStatsTrend(), loadOnboardingFunnel(), loadTrialOrganizations()])
   isLoading.value = false
 
   displayStore.NavTitle = t('users-and-revenue')
@@ -322,6 +437,85 @@ displayStore.defaultBack = '/dashboard'
         </div>
 
         <div v-else class="space-y-6">
+          <!-- Onboarding Funnel Section -->
+          <div class="p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+            <h3 class="mb-4 text-lg font-semibold">
+              {{ t('onboarding-funnel') }}
+            </h3>
+            <p class="mb-4 text-sm text-slate-600 dark:text-slate-400">
+              {{ t('onboarding-funnel-description') }}
+            </p>
+            <div v-if="isLoadingOnboardingFunnel" class="flex items-center justify-center h-48">
+              <span class="loading loading-spinner loading-lg" />
+            </div>
+            <div v-else-if="onboardingFunnelStages.length > 0" class="space-y-4">
+              <!-- Funnel bars -->
+              <div v-for="(stage, index) in onboardingFunnelStages" :key="stage.label" class="relative">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ stage.label }}</span>
+                  <span class="text-sm font-bold" :style="{ color: stage.color }">
+                    {{ stage.value.toLocaleString() }}
+                    <span v-if="index > 0" class="ml-2 text-xs text-gray-500">
+                      ({{ stage.percentage.toFixed(1) }}% {{ index === 1 ? 'of orgs' : 'of previous' }})
+                    </span>
+                  </span>
+                </div>
+                <div class="w-full h-8 overflow-hidden bg-gray-200 rounded-lg dark:bg-gray-700">
+                  <div
+                    class="h-full transition-all duration-500 rounded-lg"
+                    :style="{
+                      width: `${index === 0 ? 100 : Math.max(5, (stage.value / onboardingFunnelStages[0].value) * 100)}%`,
+                      backgroundColor: stage.color,
+                    }"
+                  />
+                </div>
+              </div>
+
+              <!-- Conversion summary -->
+              <div class="grid grid-cols-3 gap-4 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
+                <div class="text-center">
+                  <p class="text-2xl font-bold text-purple-500">
+                    {{ onboardingFunnelData?.app_conversion_rate?.toFixed(1) || 0 }}%
+                  </p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    Org → App
+                  </p>
+                </div>
+                <div class="text-center">
+                  <p class="text-2xl font-bold text-amber-500">
+                    {{ onboardingFunnelData?.channel_conversion_rate?.toFixed(1) || 0 }}%
+                  </p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    App → Channel
+                  </p>
+                </div>
+                <div class="text-center">
+                  <p class="text-2xl font-bold text-emerald-500">
+                    {{ onboardingFunnelData?.bundle_conversion_rate?.toFixed(1) || 0 }}%
+                  </p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    Channel → Bundle
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div v-else class="flex items-center justify-center h-48 text-slate-400">
+              {{ t('no-data-available') }}
+            </div>
+          </div>
+
+          <!-- Onboarding Trend Chart -->
+          <ChartCard
+            :title="t('onboarding-trend')"
+            :is-loading="isLoadingOnboardingFunnel"
+            :has-data="onboardingFunnelTrendSeries.length > 0"
+          >
+            <AdminMultiLineChart
+              :series="onboardingFunnelTrendSeries"
+              :is-loading="isLoadingOnboardingFunnel"
+            />
+          </ChartCard>
+
           <!-- Organization Metrics Cards -->
           <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
             <!-- Paying Organizations -->
