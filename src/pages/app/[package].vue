@@ -28,6 +28,11 @@ const displayStore = useDisplayStore()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
 const usageComponent = ref()
 const appNotFound = ref(false)
+const appOrganization = computed(() => {
+  if (!id.value)
+    return undefined
+  return organizationStore.getOrgByAppId(id.value) ?? organizationStore.currentOrganization
+})
 
 // Check if user lacks security compliance (2FA or password)
 const lacksSecurityAccess = computed(() => {
@@ -39,6 +44,7 @@ const lacksSecurityAccess = computed(() => {
 
 async function loadAppInfo() {
   try {
+    await organizationStore.awaitInitialLoad()
     const { data: dataApp, error } = await supabase
       .from('apps')
       .select()
@@ -55,8 +61,8 @@ async function loadAppInfo() {
     app.value = dataApp
     const promises = []
     capgoVersion.value = await getCapgoVersion(id.value, app.value?.last_version)
-    updatesNb.value = await main.getTotalStatsByApp(id.value, organizationStore.currentOrganization?.subscription_start)
-    devicesNb.value = await main.getTotalMauByApp(id.value, organizationStore.currentOrganization?.subscription_start)
+    updatesNb.value = await main.getTotalStatsByApp(id.value, appOrganization.value?.subscription_start)
+    devicesNb.value = await main.getTotalMauByApp(id.value, appOrganization.value?.subscription_start)
 
     promises.push(
       supabase

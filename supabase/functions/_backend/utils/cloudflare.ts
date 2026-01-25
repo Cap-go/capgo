@@ -28,7 +28,8 @@ export type Bindings = {
 }
 
 const TRACK_DEVICE_USAGE_CACHE_PATH = '/.track-device-usage-cache'
-const TRACK_DEVICE_USAGE_CACHE_MAX_AGE_SECONDS = 29 * 24 * 60 * 60 // 29 days
+// Cache per device per day to ensure rolling windows still see active devices.
+const TRACK_DEVICE_USAGE_CACHE_MAX_AGE_SECONDS = 2 * 24 * 60 * 60
 
 /**
  * Track device usage (MAU) in Cloudflare Analytics Engine
@@ -39,8 +40,8 @@ const TRACK_DEVICE_USAGE_CACHE_MAX_AGE_SECONDS = 29 * 24 * 60 * 60 // 29 days
  * - Activity detection for organizations with recent MAU stats
  * - Better analytics segmentation by organization
  *
- * Uses caching to only write once per device per 29 days to reduce Analytics Engine costs
- * while maintaining accurate MAU counts.
+ * Uses caching to only write once per device per day to reduce Analytics Engine costs
+ * while maintaining accurate rolling-window MAU counts.
  *
  * @param c - Hono context
  * @param device_id - Unique device identifier
@@ -57,6 +58,7 @@ export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: 
     const usageCacheRequest = usageCache.buildRequest(TRACK_DEVICE_USAGE_CACHE_PATH, {
       app_id,
       device_id,
+      day: dayjs().format('YYYY-MM-DD'),
     })
 
     // Check if device was already tracked within the cache period (29 days)
@@ -317,7 +319,7 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
   if (!c.env.DEVICE_USAGE)
     return [] as DeviceUsageCF[]
   const query = `SELECT
-    formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
+    formatDateTime(toStartOfInterval(min(timestamp), INTERVAL '1' DAY), '%Y-%m-%d') AS date,
     blob1 AS device_id,
     index1 AS app_id,
     blob2 AS org_id
@@ -326,21 +328,13 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
     app_id = '${app_id}'
     AND timestamp >= toDateTime('${formatDateCF(period_start)}')
     AND timestamp < toDateTime('${formatDateCF(period_end)}')
+  GROUP BY device_id, app_id, org_id
   ORDER BY date`
 
   cloudlog({ requestId: c.get('requestId'), message: 'readDeviceUsageCF query', query })
   try {
     const res = await runQueryToCFA<DeviceUsageAllCF>(c, query)
-    // First, filter to keep only the first appearance of each device_id
-    const uniqueDevices = new Map<string, DeviceUsageAllCF>()
-    res.toReversed().forEach((entry) => {
-      uniqueDevices.set(entry.device_id, entry)
-    })
-    const arr = Array.from(uniqueDevices.values())
-    cloudlog({ requestId: c.get('requestId'), message: 'uniqueDevices', arrLength: arr.length })
-
-    // Now calculate MAU based on the unique devices
-    const groupedByDay = arr.reduce((acc, curr) => {
+    const groupedByDay = res.reduce((acc, curr) => {
       const { date, app_id, org_id } = curr
       if (!acc[date]) {
         acc[date] = {
@@ -353,8 +347,7 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
       acc[date].mau++
       return acc
     }, {} as Record<string, DeviceUsageCF>)
-    const result = Object.values(groupedByDay).sort((a, b) => a.date > b.date ? 1 : -1)
-    return result
+    return Object.values(groupedByDay).sort((a, b) => a.date > b.date ? 1 : -1)
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device usage', error: serializeError(e), query })
