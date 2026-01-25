@@ -1033,7 +1033,90 @@ function parseBreakdownJson(value: unknown): Record<string, number> {
   return {}
 }
 
-// Admin Trial Organizations List
+// Admin Cancelled Organizations List
+export interface AdminCancelledOrganizationRow {
+  org_id: string
+  org_name: string
+  management_email: string
+  canceled_at: string
+  customer_id: string
+  subscription_id: string | null
+}
+
+export interface AdminCancelledOrganizationsResult {
+  organizations: AdminCancelledOrganizationRow[]
+  total: number
+}
+
+/**
+ * Fetches organizations that recently canceled, ordered by most recent cancellation.
+ */
+export async function getAdminCancelledOrganizations(
+  c: Context,
+  start_date?: string,
+  end_date?: string,
+  limit: number = 20,
+  offset: number = 0,
+): Promise<AdminCancelledOrganizationsResult> {
+  try {
+    const pgClient = getPgClient(c, true)
+    const drizzleClient = getDrizzleClient(pgClient)
+
+    const dateFilter = start_date && end_date
+      ? sql`AND si.canceled_at >= ${start_date}::timestamp AND si.canceled_at < ${end_date}::timestamp`
+      : sql``
+
+    const query = sql`
+      SELECT
+        o.id AS org_id,
+        o.name AS org_name,
+        o.management_email,
+        si.canceled_at,
+        si.customer_id,
+        si.subscription_id
+      FROM orgs o
+      INNER JOIN stripe_info si ON si.customer_id = o.customer_id
+      WHERE si.canceled_at IS NOT NULL
+        ${dateFilter}
+      ORDER BY si.canceled_at DESC
+      LIMIT ${limit}
+      OFFSET ${offset}
+    `
+
+    const countQuery = sql`
+      SELECT COUNT(*)::int AS total
+      FROM orgs o
+      INNER JOIN stripe_info si ON si.customer_id = o.customer_id
+      WHERE si.canceled_at IS NOT NULL
+        ${dateFilter}
+    `
+
+    const [result, countResult] = await Promise.all([
+      drizzleClient.execute(query),
+      drizzleClient.execute(countQuery),
+    ])
+
+    const organizations: AdminCancelledOrganizationRow[] = result.rows.map((row: any) => ({
+      org_id: row.org_id,
+      org_name: row.org_name,
+      management_email: row.management_email,
+      canceled_at: row.canceled_at instanceof Date ? row.canceled_at.toISOString() : row.canceled_at,
+      customer_id: row.customer_id,
+      subscription_id: row.subscription_id,
+    }))
+
+    const total = Number((countResult.rows[0] as any)?.total) || 0
+
+    cloudlog({ requestId: c.get('requestId'), message: 'getAdminCancelledOrganizations result', resultCount: organizations.length, total })
+
+    return { organizations, total }
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAdminCancelledOrganizations', e)
+    return { organizations: [], total: 0 }
+  }
+}
+
 export interface AdminTrialOrganization {
   org_id: string
   org_name: string
