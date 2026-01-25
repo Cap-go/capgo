@@ -1123,6 +1123,178 @@ export async function getAdminTrialOrganizations(
   }
 }
 
+// Admin Onboarding Funnel
+export interface AdminOnboardingFunnel {
+  total_orgs: number
+  orgs_with_app: number
+  orgs_with_channel: number
+  orgs_with_bundle: number
+  // Conversion rates
+  app_conversion_rate: number
+  channel_conversion_rate: number
+  bundle_conversion_rate: number
+  // Trend data
+  trend: Array<{
+    date: string
+    new_orgs: number
+    orgs_created_app: number
+    orgs_created_channel: number
+    orgs_created_bundle: number
+  }>
+}
+
+export async function getAdminOnboardingFunnel(
+  c: Context,
+  start_date: string,
+  end_date: string,
+): Promise<AdminOnboardingFunnel> {
+  try {
+    const pgClient = getPgClient(c, true) // Read-only query
+    const drizzleClient = getDrizzleClient(pgClient)
+
+    // Get total funnel counts for orgs created in the date range
+    const funnelQuery = sql`
+      WITH orgs_in_range AS (
+        SELECT id, created_at::date as created_date
+        FROM orgs
+        WHERE created_at >= ${start_date}::timestamp
+          AND created_at < ${end_date}::timestamp
+      ),
+      orgs_with_apps AS (
+        SELECT DISTINCT o.id, o.created_date
+        FROM orgs_in_range o
+        INNER JOIN apps a ON a.owner_org = o.id
+      ),
+      orgs_with_channels AS (
+        SELECT DISTINCT o.id, o.created_date
+        FROM orgs_in_range o
+        INNER JOIN apps a ON a.owner_org = o.id
+        INNER JOIN channels c ON c.app_id = a.app_id
+      ),
+      orgs_with_bundles AS (
+        SELECT DISTINCT o.id, o.created_date
+        FROM orgs_in_range o
+        INNER JOIN apps a ON a.owner_org = o.id
+        INNER JOIN channels c ON c.app_id = a.app_id
+        INNER JOIN app_versions av ON av.id = c.version AND av.name != 'builtin'
+      )
+      SELECT
+        (SELECT COUNT(*)::int FROM orgs_in_range) as total_orgs,
+        (SELECT COUNT(*)::int FROM orgs_with_apps) as orgs_with_app,
+        (SELECT COUNT(*)::int FROM orgs_with_channels) as orgs_with_channel,
+        (SELECT COUNT(*)::int FROM orgs_with_bundles) as orgs_with_bundle
+    `
+
+    const funnelResult = await drizzleClient.execute(funnelQuery)
+    const funnelRow = funnelResult.rows[0] as any || {}
+
+    const totalOrgs = Number(funnelRow.total_orgs) || 0
+    const orgsWithApp = Number(funnelRow.orgs_with_app) || 0
+    const orgsWithChannel = Number(funnelRow.orgs_with_channel) || 0
+    const orgsWithBundle = Number(funnelRow.orgs_with_bundle) || 0
+
+    // Get daily trend data
+    const trendQuery = sql`
+      WITH date_series AS (
+        SELECT generate_series(
+          ${start_date}::date,
+          ${end_date}::date - interval '1 day',
+          interval '1 day'
+        )::date as date
+      ),
+      daily_orgs AS (
+        SELECT created_at::date as date, COUNT(*)::int as new_orgs
+        FROM orgs
+        WHERE created_at >= ${start_date}::timestamp
+          AND created_at < ${end_date}::timestamp
+        GROUP BY created_at::date
+      ),
+      daily_apps AS (
+        SELECT o.created_at::date as date, COUNT(DISTINCT o.id)::int as orgs_created_app
+        FROM orgs o
+        INNER JOIN apps a ON a.owner_org = o.id
+        WHERE o.created_at >= ${start_date}::timestamp
+          AND o.created_at < ${end_date}::timestamp
+          AND a.created_at >= o.created_at
+          AND a.created_at < o.created_at + interval '7 days'
+        GROUP BY o.created_at::date
+      ),
+      daily_channels AS (
+        SELECT o.created_at::date as date, COUNT(DISTINCT o.id)::int as orgs_created_channel
+        FROM orgs o
+        INNER JOIN apps a ON a.owner_org = o.id
+        INNER JOIN channels c ON c.app_id = a.app_id
+        WHERE o.created_at >= ${start_date}::timestamp
+          AND o.created_at < ${end_date}::timestamp
+          AND c.created_at >= o.created_at
+          AND c.created_at < o.created_at + interval '7 days'
+        GROUP BY o.created_at::date
+      ),
+      daily_bundles AS (
+        SELECT o.created_at::date as date, COUNT(DISTINCT o.id)::int as orgs_created_bundle
+        FROM orgs o
+        INNER JOIN apps a ON a.owner_org = o.id
+        INNER JOIN channels c ON c.app_id = a.app_id
+        INNER JOIN app_versions av ON av.id = c.version AND av.name != 'builtin'
+        WHERE o.created_at >= ${start_date}::timestamp
+          AND o.created_at < ${end_date}::timestamp
+          AND av.created_at >= o.created_at
+          AND av.created_at < o.created_at + interval '7 days'
+        GROUP BY o.created_at::date
+      )
+      SELECT
+        ds.date,
+        COALESCE(do.new_orgs, 0) as new_orgs,
+        COALESCE(da.orgs_created_app, 0) as orgs_created_app,
+        COALESCE(dc.orgs_created_channel, 0) as orgs_created_channel,
+        COALESCE(db.orgs_created_bundle, 0) as orgs_created_bundle
+      FROM date_series ds
+      LEFT JOIN daily_orgs do ON do.date = ds.date
+      LEFT JOIN daily_apps da ON da.date = ds.date
+      LEFT JOIN daily_channels dc ON dc.date = ds.date
+      LEFT JOIN daily_bundles db ON db.date = ds.date
+      ORDER BY ds.date ASC
+    `
+
+    const trendResult = await drizzleClient.execute(trendQuery)
+    const trend = trendResult.rows.map((row: any) => ({
+      date: row.date instanceof Date ? row.date.toISOString().split('T')[0] : row.date,
+      new_orgs: Number(row.new_orgs) || 0,
+      orgs_created_app: Number(row.orgs_created_app) || 0,
+      orgs_created_channel: Number(row.orgs_created_channel) || 0,
+      orgs_created_bundle: Number(row.orgs_created_bundle) || 0,
+    }))
+
+    const result: AdminOnboardingFunnel = {
+      total_orgs: totalOrgs,
+      orgs_with_app: orgsWithApp,
+      orgs_with_channel: orgsWithChannel,
+      orgs_with_bundle: orgsWithBundle,
+      app_conversion_rate: totalOrgs > 0 ? (orgsWithApp / totalOrgs) * 100 : 0,
+      channel_conversion_rate: orgsWithApp > 0 ? (orgsWithChannel / orgsWithApp) * 100 : 0,
+      bundle_conversion_rate: orgsWithChannel > 0 ? (orgsWithBundle / orgsWithChannel) * 100 : 0,
+      trend,
+    }
+
+    cloudlog({ requestId: c.get('requestId'), message: 'getAdminOnboardingFunnel result', result })
+
+    return result
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAdminOnboardingFunnel', e)
+    return {
+      total_orgs: 0,
+      orgs_with_app: 0,
+      orgs_with_channel: 0,
+      orgs_with_bundle: 0,
+      app_conversion_rate: 0,
+      channel_conversion_rate: 0,
+      bundle_conversion_rate: 0,
+      trend: [],
+    }
+  }
+}
+
 export async function getAdminPluginBreakdown(
   c: Context,
   start_date: string,
