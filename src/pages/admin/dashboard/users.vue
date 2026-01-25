@@ -227,6 +227,7 @@ async function loadCancelledOrganizations() {
 
     const offset = (cancelledOrganizationsCurrentPage.value - 1) * CANCELLED_PAGE_SIZE
 
+    const { start, end } = adminStore.activeDateRange
     const response = await fetch(`${defaultApiHost}/private/admin_stats`, {
       method: 'POST',
       headers: {
@@ -235,8 +236,8 @@ async function loadCancelledOrganizations() {
       },
       body: JSON.stringify({
         metric_category: 'cancelled_users',
-        start_date: new Date().toISOString(),
-        end_date: new Date().toISOString(),
+        start_date: start.toISOString(),
+        end_date: end.toISOString(),
         limit: CANCELLED_PAGE_SIZE,
         offset,
       }),
@@ -493,6 +494,7 @@ const onboardingFunnelTrendSeries = computed(() => {
 watch(() => adminStore.activeDateRange, () => {
   loadGlobalStatsTrend()
   loadOnboardingFunnel()
+  loadCancelledOrganizations()
 }, { deep: true })
 
 // Watch for refresh button clicks

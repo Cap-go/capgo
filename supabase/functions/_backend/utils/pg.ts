@@ -1033,7 +1033,7 @@ function parseBreakdownJson(value: unknown): Record<string, number> {
   return {}
 }
 
-// Admin Trial Organizations List
+// Admin Cancelled Organizations List
 export interface AdminCancelledOrganizationRow {
   org_id: string
   org_name: string
@@ -1053,12 +1053,18 @@ export interface AdminCancelledOrganizationsResult {
  */
 export async function getAdminCancelledOrganizations(
   c: Context,
+  start_date?: string,
+  end_date?: string,
   limit: number = 20,
   offset: number = 0,
 ): Promise<AdminCancelledOrganizationsResult> {
   try {
     const pgClient = getPgClient(c, true)
     const drizzleClient = getDrizzleClient(pgClient)
+
+    const dateFilter = start_date && end_date
+      ? sql`AND si.canceled_at >= ${start_date}::timestamp AND si.canceled_at < ${end_date}::timestamp`
+      : sql``
 
     const query = sql`
       SELECT
@@ -1071,6 +1077,7 @@ export async function getAdminCancelledOrganizations(
       FROM orgs o
       INNER JOIN stripe_info si ON si.customer_id = o.customer_id
       WHERE si.canceled_at IS NOT NULL
+        ${dateFilter}
       ORDER BY si.canceled_at DESC
       LIMIT ${limit}
       OFFSET ${offset}
@@ -1081,6 +1088,7 @@ export async function getAdminCancelledOrganizations(
       FROM orgs o
       INNER JOIN stripe_info si ON si.customer_id = o.customer_id
       WHERE si.canceled_at IS NOT NULL
+        ${dateFilter}
     `
 
     const [result, countResult] = await Promise.all([

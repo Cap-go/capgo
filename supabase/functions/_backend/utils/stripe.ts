@@ -124,6 +124,9 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
   }
 }
 
+/**
+ * Fetches cancellation details for a Stripe subscription, if available.
+ */
 export async function getCancellationDetails(c: Context, subscriptionId: string | null): Promise<Stripe.Subscription.CancellationDetails | null> {
   if (!subscriptionId)
     return null

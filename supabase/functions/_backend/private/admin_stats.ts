@@ -1,3 +1,4 @@
+import type Stripe from 'stripe'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
@@ -5,8 +6,8 @@ import { getAdminAppsTrend, getAdminBandwidthTrend, getAdminBundlesTrend, getAdm
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { getAdminCancelledOrganizations, getAdminDeploymentsTrend, getAdminGlobalStatsTrend, getAdminOnboardingFunnel, getAdminPluginBreakdown, getAdminTrialOrganizations } from '../utils/pg.ts'
-import { supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 import { getCancellationDetails } from '../utils/stripe.ts'
+import { supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
 const bodySchema = z.object({
   metric_category: z.enum(['uploads', 'distribution', 'failures', 'success_rate', 'platform_overview', 'org_metrics', 'mau_trend', 'success_rate_trend', 'apps_trend', 'bundles_trend', 'deployments_trend', 'storage_trend', 'bandwidth_trend', 'global_stats_trend', 'plugin_breakdown', 'trial_organizations', 'onboarding_funnel', 'cancelled_users']),
@@ -24,11 +25,7 @@ interface AdminStatsBody {
   offset?: number
 }
 
-interface CancellationDetails {
-  feedback?: string | null
-  reason?: string | null
-  comment?: string | null
-}
+type CancellationDetails = Stripe.Subscription.CancellationDetails
 
 const cancellationFeedbackLabels: Record<string, string> = {
   customer_service: 'Customer service',
@@ -47,6 +44,9 @@ const cancellationReasonLabels: Record<string, string> = {
   payment_failed: 'Payment failed',
 }
 
+/**
+ * Formats Stripe cancellation details into a short, human-readable label.
+ */
 function formatCancellationReason(details: CancellationDetails | null): string | null {
   if (!details)
     return null
@@ -174,10 +174,20 @@ app.post('/', middlewareAuth, async (c) => {
         break
 
       case 'cancelled_users': {
-        const canceledOrgs = await getAdminCancelledOrganizations(c, limit || 20, offset || 0)
+        const canceledOrgs = await getAdminCancelledOrganizations(c, start_date, end_date, limit || 20, offset || 0)
+        const detailsCache = new Map<string, CancellationDetails | null>()
         const organizations = await Promise.all(
           canceledOrgs.organizations.map(async (org) => {
-            const details = await getCancellationDetails(c, org.subscription_id)
+            let details: CancellationDetails | null = null
+            if (org.subscription_id) {
+              if (detailsCache.has(org.subscription_id)) {
+                details = detailsCache.get(org.subscription_id) ?? null
+              }
+              else {
+                details = await getCancellationDetails(c, org.subscription_id)
+                detailsCache.set(org.subscription_id, details)
+              }
+            }
             return {
               org_id: org.org_id,
               org_name: org.org_name,
