@@ -105,38 +105,20 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
     tooltipEl.style.borderRadius = '8px'
     tooltipEl.style.color = isDark.value ? 'white' : 'black'
     tooltipEl.style.border = isDark.value ? '1px solid rgba(55, 65, 81, 0.6)' : '1px solid rgba(209, 213, 219, 0.8)'
-    // Enable pointer events when we have clickable items
-    tooltipEl.style.pointerEvents = clickHandler?.onAppClick ? 'auto' : 'none'
+    // Default to non-interactive; we'll enable pointer events when needed
+    tooltipEl.style.pointerEvents = 'none'
     tooltipEl.style.transform = 'translate(-50%, 0)'
     tooltipEl.style.transition = 'all .1s ease'
     tooltipEl.style.boxShadow = '0 10px 30px rgba(0, 0, 0, 0.15), 0 4px 10px rgba(0, 0, 0, 0.1)'
     tooltipEl.style.zIndex = '1000'
     tooltipEl.style.fontSize = '12px'
     tooltipEl.style.maxHeight = '60vh'
-    tooltipEl.style.overflowY = 'auto'
+    tooltipEl.style.overflow = 'hidden'
     tooltipEl.style.minWidth = '200px'
     tooltipEl.style.maxWidth = '300px'
     chart.canvas.parentNode?.appendChild(tooltipEl)
 
-    // Track hover state for interactive tooltips
-    if (clickHandler?.onAppClick) {
-      tooltipEl.addEventListener('mouseenter', () => {
-        (tooltipEl as any).isHovered = true
-        // Clear any pending hide timer when entering tooltip
-        if ((tooltipEl as any).hideTimer) {
-          clearTimeout((tooltipEl as any).hideTimer)
-        }
-      })
-      tooltipEl.addEventListener('mouseleave', () => {
-        ;(tooltipEl as any).isHovered = false
-        // Hide tooltip after leaving with a small delay
-        ;(tooltipEl as any).hideTimer = setTimeout(() => {
-          if (!(tooltipEl as any).isHovered) {
-            tooltipEl!.style.opacity = '0'
-          }
-        }, 100)
-      })
-    }
+    // Hover state listeners are attached later when we know we need pointer events
 
     // Add touch event listener for mobile to dismiss tooltip
     if (isMobile) {
@@ -275,7 +257,7 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
     }
 
     // Add body with scrollable content (now sorted)
-    innerHtml += '<div style="max-height: 40vh; overflow-y: auto;">'
+    innerHtml += '<div class="tooltip-body" style="max-height: var(--tooltip-body-max-height, 40vh); overflow-y: auto;">'
     const hasClickHandler = !!clickHandler?.onAppClick
     items.forEach((item) => {
       // Convert color to string if it's not already
@@ -328,6 +310,32 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
 
   // Position tooltip with smart viewport bounds checking
   positionTooltip(tooltipEl, canvas, tooltip)
+
+  // Enable pointer events only when needed (clicks or scrolling)
+  const bodyEl = tooltipEl.querySelector('.tooltip-body') as HTMLElement | null
+  const bodyScrollable = !!bodyEl && bodyEl.scrollHeight > bodyEl.clientHeight
+  const needsInteraction = !!clickHandler?.onAppClick || bodyScrollable
+  tooltipEl.style.pointerEvents = needsInteraction ? 'auto' : 'none'
+
+  if (needsInteraction && !(tooltipEl as any).hoverHandlersAttached) {
+    tooltipEl.addEventListener('mouseenter', () => {
+      (tooltipEl as any).isHovered = true
+      if ((tooltipEl as any).hideTimer) {
+        clearTimeout((tooltipEl as any).hideTimer)
+      }
+    })
+    tooltipEl.addEventListener('mouseleave', () => {
+      ;(tooltipEl as any).isHovered = false
+      ;(tooltipEl as any).hideTimer = setTimeout(() => {
+        if (!(tooltipEl as any).isHovered) {
+          tooltipEl!.style.opacity = '0'
+          chart.setActiveElements([])
+          chart.update('none')
+        }
+      }, 100)
+    })
+    ;(tooltipEl as any).hoverHandlersAttached = true
+  }
 }
 
 /**
@@ -346,29 +354,49 @@ function positionTooltip(tooltipEl: HTMLElement, canvas: HTMLCanvasElement, tool
   const canvasWidth = canvas.offsetWidth
   const canvasHeight = canvas.offsetHeight
 
+  // Constrain tooltip size to the canvas to avoid clipping in dense charts
+  const maxTooltipWidth = Math.max(180, canvasWidth - 20)
+  const maxTooltipHeight = Math.max(160, canvasHeight - 20)
+  tooltipEl.style.maxWidth = `${Math.min(320, maxTooltipWidth)}px`
+  tooltipEl.style.minWidth = `${Math.min(200, maxTooltipWidth)}px`
+  tooltipEl.style.maxHeight = `${maxTooltipHeight}px`
+  // Reserve space for title/total padding so body can scroll without nested scrollbars
+  const bodyMaxHeight = Math.max(120, maxTooltipHeight - 80)
+  tooltipEl.style.setProperty('--tooltip-body-max-height', `${bodyMaxHeight}px`)
+
   // Get tooltip dimensions
   const tooltipRect = tooltipEl.getBoundingClientRect()
   const tooltipWidth = tooltipRect.width
   const tooltipHeight = tooltipRect.height
 
   // Horizontal positioning - keep tooltip within canvas bounds
-  // Center the tooltip on the caret position
-  if (left + tooltipWidth / 2 > canvasWidth - 10) {
-    // Too close to right edge - align right edge with canvas
-    left = canvasWidth - tooltipWidth / 2 - 10
+  // Center the tooltip on the caret position, then clamp within bounds
+  const halfWidth = tooltipWidth / 2
+  const minLeft = halfWidth + 10
+  const maxLeft = canvasWidth - halfWidth - 10
+  if (minLeft > maxLeft) {
+    left = canvasWidth / 2
   }
-  else if (left - tooltipWidth / 2 < 10) {
-    // Too close to left edge - align left edge with padding
-    left = tooltipWidth / 2 + 10
+  else {
+    left = Math.min(Math.max(left, minLeft), maxLeft)
   }
 
   // Always use centered transform
   tooltipEl.style.transform = 'translate(-50%, 0)'
 
-  // Vertical positioning - if tooltip would go below canvas, show above caret
-  if (top + tooltipHeight > canvasHeight - 10) {
+  // Vertical positioning - prefer below caret, then above; clamp to canvas
+  const minTop = 10
+  const maxTop = canvasHeight - tooltipHeight - 10
+  if (tooltipHeight + 20 > canvasHeight) {
+    top = minTop
+  }
+  else if (top + tooltipHeight > canvasHeight - 10) {
     top = tooltip.caretY - tooltipHeight - 10
   }
+  if (top < minTop)
+    top = minTop
+  if (maxTop >= minTop && top > maxTop)
+    top = maxTop
 
   // Apply position
   tooltipEl.style.left = `${left}px`
