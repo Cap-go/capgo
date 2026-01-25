@@ -4,6 +4,7 @@ meta:
 </route>
 
 <script setup lang="ts">
+import type { TableColumn } from '~/components/comp_def'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -11,6 +12,8 @@ import AdminFilterBar from '~/components/admin/AdminFilterBar.vue'
 import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
 import Spinner from '~/components/Spinner.vue'
+import Table from '~/components/Table.vue'
+import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -45,6 +48,107 @@ const globalStatsTrendData = ref<Array<{
 }>>([])
 
 const isLoadingGlobalStatsTrend = ref(false)
+
+// Trial organizations data
+interface TrialOrganization {
+  org_id: string
+  org_name: string
+  management_email: string
+  trial_end_date: string
+  days_remaining: number
+  created_at: string
+}
+
+interface TrialOrganizationsResponse {
+  success: boolean
+  data: {
+    organizations: TrialOrganization[]
+    total: number
+  }
+}
+
+const trialOrganizations = ref<TrialOrganization[]>([])
+const trialOrganizationsTotal = ref(0)
+const trialOrganizationsCurrentPage = ref(1)
+const isLoadingTrialOrganizations = ref(false)
+const TRIAL_PAGE_SIZE = 20
+
+const trialOrganizationsColumns = ref<TableColumn[]>([
+  { label: t('org-name'), key: 'org_name', mobile: true, head: true, sortable: false },
+  { label: t('email'), key: 'management_email', mobile: false, sortable: false },
+  {
+    label: t('days-remaining'),
+    key: 'days_remaining',
+    mobile: true,
+    sortable: false,
+    displayFunction: (item: TrialOrganization) => {
+      if (item.days_remaining === 0)
+        return t('expires-today')
+      if (item.days_remaining === 1)
+        return `1 ${t('day')}`
+      return `${item.days_remaining} ${t('days')}`
+    },
+  },
+  {
+    label: t('trial-end-date'),
+    key: 'trial_end_date',
+    mobile: false,
+    sortable: false,
+    displayFunction: (item: TrialOrganization) => {
+      const date = new Date(item.trial_end_date)
+      return date.toLocaleDateString()
+    },
+  },
+])
+
+async function loadTrialOrganizations() {
+  isLoadingTrialOrganizations.value = true
+  try {
+    const supabase = useSupabase()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session)
+      throw new Error('Not authenticated')
+
+    const offset = (trialOrganizationsCurrentPage.value - 1) * TRIAL_PAGE_SIZE
+
+    // Note: start_date and end_date are required by the API schema but not used for trial_organizations
+    // which queries current trial status rather than time-series data
+    const response = await fetch(`${defaultApiHost}/private/admin_stats`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        metric_category: 'trial_organizations',
+        start_date: new Date().toISOString(),
+        end_date: new Date().toISOString(),
+        limit: TRIAL_PAGE_SIZE,
+        offset,
+      }),
+    })
+
+    if (!response.ok) {
+      const errorData: unknown = await response.json().catch(() => ({}))
+      throw new Error(`API error: ${response.status} - ${JSON.stringify(errorData)}`)
+    }
+
+    const data = await response.json() as TrialOrganizationsResponse
+    if (!data.success)
+      throw new Error('Failed to fetch trial organizations')
+
+    trialOrganizations.value = data.data.organizations || []
+    trialOrganizationsTotal.value = data.data.total || 0
+  }
+  catch (error) {
+    console.error('[Admin Dashboard Users] Error loading trial organizations:', error)
+    trialOrganizations.value = []
+    trialOrganizationsTotal.value = 0
+  }
+  finally {
+    isLoadingTrialOrganizations.value = false
+  }
+}
 
 async function loadGlobalStatsTrend() {
   isLoadingGlobalStatsTrend.value = true
@@ -197,7 +301,7 @@ onMounted(async () => {
   }
 
   isLoading.value = true
-  await loadGlobalStatsTrend()
+  await Promise.all([loadGlobalStatsTrend(), loadTrialOrganizations()])
   isLoading.value = false
 
   displayStore.NavTitle = t('users-and-revenue')
@@ -265,6 +369,24 @@ displayStore.defaultBack = '/dashboard'
                 </p>
               </div>
             </div>
+          </div>
+
+          <!-- Trial Organizations Table -->
+          <div class="p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+            <h3 class="mb-4 text-lg font-semibold">
+              {{ t('trial-organizations-list') }}
+            </h3>
+            <Table
+              :is-loading="isLoadingTrialOrganizations"
+              :total="trialOrganizationsTotal"
+              :current-page="trialOrganizationsCurrentPage"
+              :columns="trialOrganizationsColumns"
+              :element-list="trialOrganizations"
+              :auto-reload="false"
+              @reload="loadTrialOrganizations"
+              @reset="loadTrialOrganizations"
+              @update:current-page="(page: number) => { trialOrganizationsCurrentPage = page; loadTrialOrganizations() }"
+            />
           </div>
 
           <!-- Plan Distribution - Full Width -->

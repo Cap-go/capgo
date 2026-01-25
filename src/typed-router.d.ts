@@ -310,13 +310,6 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
-    '/onboarding/confirm_email': RouteRecordInfo<
-      '/onboarding/confirm_email',
-      '/onboarding/confirm_email',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
     '/onboarding/set_password': RouteRecordInfo<
       '/onboarding/set_password',
       '/onboarding/set_password',
@@ -699,12 +692,6 @@ declare module 'vue-router/auto-routes' {
     'src/pages/login.vue': {
       routes:
         | '/login'
-      views:
-        | never
-    }
-    'src/pages/onboarding/confirm_email.vue': {
-      routes:
-        | '/onboarding/confirm_email'
       views:
         | never
     }
