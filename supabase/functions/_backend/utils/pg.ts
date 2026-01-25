@@ -1149,7 +1149,8 @@ export async function getAdminOnboardingFunnel(
   end_date: string,
 ): Promise<AdminOnboardingFunnel> {
   try {
-    const pgClient = getPgClient(c, true) // Read-only query
+    // Read replicas don't include org/app/channel data, so use primary DB.
+    const pgClient = getPgClient(c)
     const drizzleClient = getDrizzleClient(pgClient)
 
     // Get total funnel counts for orgs created in the date range
@@ -1197,9 +1198,9 @@ export async function getAdminOnboardingFunnel(
     const trendQuery = sql`
       WITH date_series AS (
         SELECT generate_series(
-          ${start_date}::date,
-          ${end_date}::date - interval '1 day',
-          interval '1 day'
+          ${start_date}::timestamptz::date,
+          (${end_date}::timestamptz::date - 1),
+          '1 day'::interval
         )::date as date
       ),
       daily_orgs AS (
@@ -1244,15 +1245,15 @@ export async function getAdminOnboardingFunnel(
       )
       SELECT
         ds.date,
-        COALESCE(do.new_orgs, 0) as new_orgs,
-        COALESCE(da.orgs_created_app, 0) as orgs_created_app,
-        COALESCE(dc.orgs_created_channel, 0) as orgs_created_channel,
-        COALESCE(db.orgs_created_bundle, 0) as orgs_created_bundle
+        COALESCE(dorgs.new_orgs, 0) as new_orgs,
+        COALESCE(dapps.orgs_created_app, 0) as orgs_created_app,
+        COALESCE(dchannels.orgs_created_channel, 0) as orgs_created_channel,
+        COALESCE(dbundles.orgs_created_bundle, 0) as orgs_created_bundle
       FROM date_series ds
-      LEFT JOIN daily_orgs do ON do.date = ds.date
-      LEFT JOIN daily_apps da ON da.date = ds.date
-      LEFT JOIN daily_channels dc ON dc.date = ds.date
-      LEFT JOIN daily_bundles db ON db.date = ds.date
+      LEFT JOIN daily_orgs dorgs ON dorgs.date = ds.date
+      LEFT JOIN daily_apps dapps ON dapps.date = ds.date
+      LEFT JOIN daily_channels dchannels ON dchannels.date = ds.date
+      LEFT JOIN daily_bundles dbundles ON dbundles.date = ds.date
       ORDER BY ds.date ASC
     `
 
