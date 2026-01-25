@@ -317,8 +317,8 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
   if (!c.env.DEVICE_USAGE)
     return [] as DeviceUsageCF[]
   const query = `SELECT
-    formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
-    COUNT(DISTINCT blob1) AS mau,
+    formatDateTime(toStartOfInterval(min(timestamp), INTERVAL '1' DAY), '%Y-%m-%d') AS date,
+    blob1 AS device_id,
     index1 AS app_id,
     blob2 AS org_id
   FROM device_usage
@@ -326,13 +326,26 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
     app_id = '${app_id}'
     AND timestamp >= toDateTime('${formatDateCF(period_start)}')
     AND timestamp < toDateTime('${formatDateCF(period_end)}')
-  GROUP BY date, app_id, org_id
+  GROUP BY device_id, app_id, org_id
   ORDER BY date`
 
   cloudlog({ requestId: c.get('requestId'), message: 'readDeviceUsageCF query', query })
   try {
-    const res = await runQueryToCFA<DeviceUsageCF>(c, query)
-    return res.sort((a, b) => a.date > b.date ? 1 : -1)
+    const res = await runQueryToCFA<DeviceUsageAllCF>(c, query)
+    const groupedByDay = res.reduce((acc, curr) => {
+      const { date, app_id, org_id } = curr
+      if (!acc[date]) {
+        acc[date] = {
+          date,
+          mau: 0,
+          app_id,
+          org_id,
+        }
+      }
+      acc[date].mau++
+      return acc
+    }, {} as Record<string, DeviceUsageCF>)
+    return Object.values(groupedByDay).sort((a, b) => a.date > b.date ? 1 : -1)
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device usage', error: serializeError(e), query })
