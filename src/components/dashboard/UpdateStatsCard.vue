@@ -40,6 +40,11 @@ const props = defineProps({
 
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
+const effectiveOrganization = computed(() => {
+  if (props.appId)
+    return organizationStore.getOrgByAppId(props.appId) ?? organizationStore.currentOrganization
+  return organizationStore.currentOrganization
+})
 
 const totalInstalled = ref(0)
 const totalFailed = ref(0)
@@ -128,7 +133,7 @@ async function calculateStats(forceRefetch = false) {
   updateDataByAction.value = {}
   updateData.value = []
 
-  const currentOrgId = organizationStore.currentOrganization?.gid ?? null
+  const currentOrgId = effectiveOrganization.value?.gid ?? null
   const orgChanged = currentCacheOrgId.value !== currentOrgId
   currentCacheOrgId.value = currentOrgId
 
@@ -141,9 +146,9 @@ async function calculateStats(forceRefetch = false) {
 
   if (props.useBillingPeriod) {
     // Billing period mode: use the full billing period (start to end)
-    rangeStart = new Date(organizationStore.currentOrganization?.subscription_start ?? today)
+    rangeStart = new Date(effectiveOrganization.value?.subscription_start ?? today)
     rangeStart.setHours(0, 0, 0, 0)
-    rangeEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? today)
+    rangeEnd = new Date(effectiveOrganization.value?.subscription_end ?? today)
     rangeEnd.setHours(0, 0, 0, 0)
   }
   else {
@@ -160,7 +165,7 @@ async function calculateStats(forceRefetch = false) {
   const endDate = rangeEnd.toISOString().split('T')[0]
 
   // Cache key includes org and billing mode since date range differs
-  const cacheKey = `${currentOrgId}:${props.useBillingPeriod ? 'billing' : '30days'}`
+  const cacheKey = `${currentOrgId ?? 'none'}:${props.appId || 'org'}:${props.useBillingPeriod ? 'billing' : '30days'}`
 
   try {
     // Determine target apps
@@ -309,10 +314,16 @@ async function calculateStats(forceRefetch = false) {
 }
 
 // Watch for organization changes - use per-org cache (no need to force refetch)
-watch(() => organizationStore.currentOrganization?.gid, async (newOrgId, oldOrgId) => {
-  if (newOrgId && oldOrgId && newOrgId !== oldOrgId) {
+watch(() => effectiveOrganization.value?.gid, async (newOrgId, oldOrgId) => {
+  if (newOrgId && newOrgId !== oldOrgId) {
     // Per-org cache will be checked in calculateStats
-    await calculateStats(false)
+    await calculateStats(true)
+  }
+})
+
+watch(() => props.appId, async (newAppId, oldAppId) => {
+  if (newAppId !== oldAppId) {
+    await calculateStats(true)
   }
 })
 
