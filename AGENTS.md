@@ -239,6 +239,10 @@ Then in your test file, use ONLY these dedicated resources for modifications.
   admin access is unavoidable for a user-facing endpoint, sanitize all user
   inputs carefully—the SDK is susceptible to PostgREST query injection (not SQL
   injection, but filter/modifier injection via crafted parameters).
+- Prefer claim-based auth lookups for performance: use
+  `supabase.auth.getClaims()` (frontend) or auth context from middleware
+  (backend) instead of `getUser()` unless you explicitly need the full user
+  record from the Auth API.
 
 ### PostgreSQL Function Security
 
