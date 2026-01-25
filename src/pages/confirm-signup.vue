@@ -7,12 +7,35 @@ const route = useRoute()
 const isRedirecting = ref(true)
 const error = ref('')
 
-const allowedHosts = ['capgo.app', 'console.capgo.app']
+// Get the base domain from VITE_APP_URL (e.g., 'console.capgo.app' -> 'capgo.app')
+function getBaseDomain(hostname: string): string {
+  if (hostname === 'localhost' || hostname === '127.0.0.1')
+    return hostname
+  const parts = hostname.split('.')
+  // Extract the last 2 parts as the base domain (e.g., capgo.app)
+  if (parts.length >= 2)
+    return parts.slice(-2).join('.')
+  return hostname
+}
+
+function getAppBaseDomain(): string {
+  try {
+    const appUrl = new URL(import.meta.env.VITE_APP_URL || window.location.origin)
+    return getBaseDomain(appUrl.hostname)
+  }
+  catch {
+    return getBaseDomain(window.location.hostname)
+  }
+}
+
+const baseDomain = getAppBaseDomain()
 
 function isAllowedHost(hostname: string) {
-  if (allowedHosts.includes(hostname))
+  // Allow exact base domain match (e.g., 'capgo.app')
+  if (hostname === baseDomain)
     return true
-  return hostname.endsWith('.capgo.app')
+  // Allow any subdomain (e.g., '*.capgo.app')
+  return hostname.endsWith(`.${baseDomain}`)
 }
 
 function isAllowedConfirmationUrl(urlValue: string) {
