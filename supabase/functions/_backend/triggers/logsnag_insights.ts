@@ -554,6 +554,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     plan_solo: plans.Solo,
     plan_maker: plans.Maker,
     plan_team: plans.Team,
+    plan_enterprise: plans.Enterprise || 0,
     // Revenue metrics
     mrr: revenue.mrr,
     total_revenue: revenue.total_revenue,
