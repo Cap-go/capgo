@@ -46,12 +46,12 @@ async function saveBandwidthUsage(c: Context, fileSize: number | null | undefine
 }
 
 async function getHandler(c: Context): Promise<Response> {
-  const requestId = c.get('fileId')
-  cloudlog({ requestId: c.get('requestId'), message: 'getHandler files', fileId: requestId })
+  const fileId = c.get('fileId')
+  cloudlog({ requestId: c.get('requestId'), message: 'getHandler files', fileId })
   if (getRuntimeKey() !== 'workerd') {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files using supabase storage' })
     // serve file from supabase storage using they sdk
-    const { data } = supabaseAdmin(c).storage.from('capgo').getPublicUrl(requestId)
+    const { data } = supabaseAdmin(c).storage.from('capgo').getPublicUrl(fileId)
 
     // cloudlog('publicUrl', data.publicUrl)
     const url = data.publicUrl.replace('http://kong:8000', 'http://localhost:54321')
@@ -75,13 +75,30 @@ async function getHandler(c: Context): Promise<Response> {
   let response = await cache.match(cacheKey)
   if (response != null) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache hit' })
+    // Best-effort restore: if file is cached but missing in R2, write it back.
+    await backgroundTask(c, async () => {
+      try {
+        const head = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).head(fileId)
+        if (head != null)
+          return
+        const cached = response.clone()
+        const data = await cached.arrayBuffer()
+        const contentType = cached.headers.get('content-type') || undefined
+        const httpMetadata = contentType ? { contentType } : undefined
+        await bucket.put(fileId, data, { httpMetadata })
+        cloudlog({ requestId: c.get('requestId'), message: 'Restored cached file to R2', fileId })
+      }
+      catch (err) {
+        cloudlog({ requestId: c.get('requestId'), message: 'Failed to restore cached file to R2', fileId, error: String(err) })
+      }
+    })
     return response
   }
 
   const rangeHeaderFromRequest = c.req.header('range')
   if (rangeHeaderFromRequest) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files range request', range: rangeHeaderFromRequest })
-    const objectInfo = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).head(requestId)
+    const objectInfo = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).head(fileId)
     if (objectInfo == null) {
       cloudlog({ requestId: c.get('requestId'), message: 'getHandler files object is null' })
       return c.json({ error: 'not_found', message: 'Not found' }, 404)
@@ -98,7 +115,7 @@ async function getHandler(c: Context): Promise<Response> {
     }
   }
 
-  const object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(requestId, {
+  const object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(fileId, {
     range: c.req.raw.headers,
   })
   if (object == null) {
@@ -117,7 +134,7 @@ async function getHandler(c: Context): Promise<Response> {
   headers.set('Content-Disposition', `attachment; filename="${object.key}"`)
   response = new Response(object.body, { headers })
   await backgroundTask(c, () => {
-    cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache saved', fileId: requestId })
+    cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache saved', fileId })
     cache.put(cacheKey, response.clone())
   })
   return response
@@ -574,6 +591,7 @@ app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write',
   }
   return uploadHandler(c)
 })
+
 
 app.route('/config', files_config)
 app.route('/download_link', download_link)

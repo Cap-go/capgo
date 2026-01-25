@@ -27,6 +27,16 @@ const ORG_CHUNK = 2000
 const VERSION_ID_CHUNK = 1000
 const MANIFEST_COUNT_CHUNK = 1000
 
+let versionsWithManifestEnabled = 0
+let versionsWithMissingManifest = 0
+let backupZipAvailable = 0
+let missingVersionButManifestOk = 0
+let missingVersionAndManifestMissing = 0
+let brokenVersionCount = 0
+let brokenAppCount = 0
+let totalVersionsToCheck = 0
+let totalManifestsToCheck = 0
+
 function loadEnv(filePath: string) {
   const envText = Bun.file(filePath).text()
   return envText.then((text) => {
@@ -125,7 +135,13 @@ async function main() {
     console.log(`  Loaded ${r2KeySet.size} keys into memory`)
   }
 
-  const versionMap = new Map<string, { app_id: string; owner_org: string | null; deleted: boolean }>()
+  const versionMap = new Map<string, {
+    app_id: string
+    owner_org: string | null
+    deleted: boolean
+    r2_path: string | null
+    manifest_count: number
+  }>()
 
   let allowedOrgIds: string[] | null = null
   if (FILTER_PAID_TRIAL) {
@@ -146,7 +162,7 @@ async function main() {
       const to = from + PAGE_SIZE - 1
       let query = supabase
         .from('app_versions')
-        .select('id, app_id, owner_org, deleted')
+        .select('id, app_id, owner_org, deleted, r2_path, manifest_count')
         .range(from, to)
 
       if (orgChunk) query = query.in('owner_org', orgChunk)
@@ -159,7 +175,13 @@ async function main() {
       if (!data || data.length === 0) break
 
       for (const row of data) {
-        versionMap.set(row.id, { app_id: row.app_id, owner_org: row.owner_org, deleted: row.deleted })
+        versionMap.set(row.id, {
+          app_id: row.app_id,
+          owner_org: row.owner_org,
+          deleted: row.deleted,
+          r2_path: row.r2_path,
+          manifest_count: row.manifest_count ?? 0,
+        })
       }
 
       totalVersionsLoaded += data.length
@@ -191,7 +213,6 @@ async function main() {
   process.on('SIGTERM', () => { void handleExit('SIGTERM') })
 
   console.log('\nCounting total versions/manifests to check...')
-  let totalVersionsToCheck = 0
   for (const orgChunk of orgChunks) {
     let query = supabase
       .from('app_versions')
@@ -210,7 +231,7 @@ async function main() {
   const versionIds = Array.from(versionMap.keys())
   const versionIdChunks = chunkArray(versionIds, VERSION_ID_CHUNK)
   const manifestCountChunks = chunkArray(versionIds, MANIFEST_COUNT_CHUNK)
-  let totalManifestsToCheck = 0
+  totalManifestsToCheck = 0
   for (let i = 0; i < manifestCountChunks.length; i++) {
     const idChunk = manifestCountChunks[i]
     const { count, error } = await supabase
@@ -362,6 +383,67 @@ async function main() {
   console.log(`Apps with issues so far: ${appIdsWithIssues.size}`)
   await persistOutputs(missingVersions, missingManifests, appIdsWithIssues, bucket)
 
+  // Extra manifest/backup stats
+  versionsWithManifestEnabled = Array.from(versionMap.values()).filter(v => (v.manifest_count ?? 0) > 0).length
+  const missingManifestVersionIds = new Set(missingManifests.map(m => m.app_version_id))
+  versionsWithMissingManifest = missingManifestVersionIds.size
+
+  const missingManifestVersions = Array.from(missingManifestVersionIds)
+  await asyncPool(CONCURRENCY, missingManifestVersions, async (versionId) => {
+    const info = versionMap.get(versionId)
+    if (!info?.r2_path) return
+    const key = normalizeKey(info.r2_path)
+    try {
+      await assertExists(s3, bucket, key, r2KeySet)
+      backupZipAvailable += 1
+    }
+    catch {
+      // ignore missing backup zips
+    }
+  })
+
+  console.log('\n=== Manifest Integrity / Backup Stats ===')
+  console.log(`Versions with manifest enabled: ${versionsWithManifestEnabled}`)
+  console.log(`Versions with missing manifest entries: ${versionsWithMissingManifest}`)
+  console.log(`Missing manifest rows (safe to delete from DB): ${missingManifests.length}`)
+  console.log(`Versions with missing manifest but zip still present: ${backupZipAvailable}`)
+
+  const missingVersionIds = new Set(missingVersions.map(v => v.id))
+  for (const versionId of missingVersionIds) {
+    const info = versionMap.get(versionId)
+    const hasManifestEnabled = (info?.manifest_count ?? 0) > 0
+    const hasMissingManifest = missingManifestVersionIds.has(versionId)
+    if (hasManifestEnabled && !hasMissingManifest) {
+      missingVersionButManifestOk += 1
+    }
+    else if (hasMissingManifest) {
+      missingVersionAndManifestMissing += 1
+    }
+  }
+  console.log('\n=== Missing Version Breakdown ===')
+  console.log(`Missing version zip but manifest OK: ${missingVersionButManifestOk}`)
+  console.log(`Missing version zip and manifest missing: ${missingVersionAndManifestMissing}`)
+
+  const brokenVersionIds = new Set<string>()
+  for (const versionId of missingVersionIds) {
+    const info = versionMap.get(versionId)
+    const hasManifestEnabled = (info?.manifest_count ?? 0) > 0
+    const hasMissingManifest = missingManifestVersionIds.has(versionId)
+    if (!hasManifestEnabled || hasMissingManifest) {
+      brokenVersionIds.add(versionId)
+    }
+  }
+  const brokenAppIds = new Set<string>()
+  for (const versionId of brokenVersionIds) {
+    const info = versionMap.get(versionId)
+    if (info?.app_id) brokenAppIds.add(info.app_id)
+  }
+  brokenVersionCount = brokenVersionIds.size
+  brokenAppCount = brokenAppIds.size
+  console.log('\n=== Totally Broken Versions ===')
+  console.log(`Totally broken versions (no usable zip or manifest): ${brokenVersionCount}`)
+  console.log(`Apps with totally broken versions: ${brokenAppCount}`)
+
   const appsList = Array.from(appIdsWithIssues).sort()
 
   const summary = {
@@ -394,6 +476,7 @@ async function listAllKeys(s3: S3Client, bucket: string, prefix: string) {
   const keys = new Set<string>()
   let pages = 0
   const startedAt = Date.now()
+  const label = prefix || 'all'
 
   while (true) {
     const response = await s3.send(new ListObjectsV2Command({
@@ -411,7 +494,7 @@ async function listAllKeys(s3: S3Client, bucket: string, prefix: string) {
 
     const seconds = Math.max(1, Math.round((Date.now() - startedAt) / 1000))
     const rate = Math.round(keys.size / seconds)
-    process.stdout.write(`\r  [listing] pages=${pages} keys=${keys.size} rate=${rate}/s elapsed=${seconds}s`)
+    process.stdout.write(`\r  [listing] prefix=${label} pages=${pages} keys=${keys.size} rate=${rate}/s elapsed=${seconds}s`)
 
     if (!response.IsTruncated) break
     continuationToken = response.NextContinuationToken
@@ -540,6 +623,16 @@ async function persistOutputs(
       missingVersions: missingVersions.length,
       missingManifests: missingManifests.length,
       appsWithIssues: appIdsWithIssues.size,
+      versionsToCheck: totalVersionsToCheck,
+      manifestsToCheck: totalManifestsToCheck,
+      versionsWithManifestEnabled,
+      versionsWithMissingManifest,
+      missingManifestRows: missingManifests.length,
+      versionsWithMissingManifestButZipPresent: backupZipAvailable,
+      missingVersionButManifestOk,
+      missingVersionAndManifestMissing,
+      totallyBrokenVersions: brokenVersionCount,
+      appsWithTotallyBrokenVersions: brokenAppCount,
     },
   }
   await Bun.write(SUMMARY_OUT, JSON.stringify(summary, null, 2))
