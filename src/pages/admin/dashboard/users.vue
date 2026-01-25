@@ -127,7 +127,7 @@ const planDistributionData = computed(() => {
       percentage: total > 0 ? ((latest.plan_team / total) * 100).toFixed(1) : '0',
     },
     {
-      label: 'Pay-as-you-go',
+      label: 'Enterprise',
       value: latest.plan_enterprise,
       percentage: total > 0 ? ((latest.plan_enterprise / total) * 100).toFixed(1) : '0',
     },
@@ -164,7 +164,7 @@ const planDistributionTrendSeries = computed(() => {
       color: '#10b981', // green
     },
     {
-      label: 'Pay-as-you-go',
+      label: 'Enterprise',
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
         value: item.plan_enterprise,
