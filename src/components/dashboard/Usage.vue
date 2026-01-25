@@ -13,7 +13,7 @@ import ChartBarIcon from '~icons/heroicons/chart-bar'
 import InformationInfo from '~icons/heroicons/information-circle'
 import { bytesToGb, getDaysBetweenDates } from '~/services/conversion'
 import { DEMO_APP_NAMES, generateDemoBandwidthData, generateDemoMauData, generateDemoStorageData } from '~/services/demoChartData'
-import { getPlans } from '~/services/supabase'
+import { getPlans, useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
@@ -80,9 +80,6 @@ const cacheByOrgByApp = new Map<string, {
   bandwidth: { [appId: string]: number[] }
 }>()
 
-// Track current org for change detection
-const currentCacheOrgId = ref<string | null>(null)
-
 // View mode selectors for charts
 const route = useRoute()
 const router = useRouter()
@@ -107,23 +104,28 @@ const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const dashboardAppsStore = useDashboardAppsStore()
 const dialogStore = useDialogV2Store()
+const effectiveOrganization = computed(() => {
+  if (props.appId)
+    return organizationStore.getOrgByAppId(props.appId) ?? organizationStore.currentOrganization
+  return organizationStore.currentOrganization
+})
 
 const { dashboard } = storeToRefs(main)
 
 const subscriptionAnchorStart = computed(() => {
-  const start = organizationStore.currentOrganization?.subscription_start
+  const start = effectiveOrganization.value?.subscription_start
   return start ? dayjs(start).format('YYYY/MM/D') : t('unknown')
 })
 const subscriptionAnchorEnd = computed(() => {
-  const end = organizationStore.currentOrganization?.subscription_end
+  const end = effectiveOrganization.value?.subscription_end
   return end ? dayjs(end).format('YYYY/MM/D') : t('unknown')
 })
 const lastRunDisplay = computed(() => {
-  const source = organizationStore.currentOrganization?.stats_updated_at
+  const source = effectiveOrganization.value?.stats_updated_at
   return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
 })
 const nextRunDisplay = computed(() => {
-  const source = organizationStore.currentOrganization?.next_stats_update_at
+  const source = effectiveOrganization.value?.next_stats_update_at
   return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
 })
 
@@ -204,7 +206,7 @@ async function reloadAllCharts() {
   last30DaysStart.setHours(0, 0, 0, 0)
   last30DaysStart.setDate(last30DaysStart.getDate() - 29)
 
-  const orgId = organizationStore.currentOrganization?.gid
+  const orgId = effectiveOrganization.value?.gid
   if (orgId) {
     await main.updateDashboard(orgId, last30DaysStart.toISOString(), last30DaysEnd.toISOString())
   }
@@ -242,10 +244,35 @@ const allLimits = computed(() => {
   })
 })
 
-async function getAppStats() {
+async function getAppStats(rangeStart: Date, rangeEnd: Date) {
   if (props.appId) {
+    const cached = main.filterDashboard(props.appId)
+    if (cached.length > 0) {
+      return {
+        global: cached,
+        byApp: {},
+        appNames: {},
+      }
+    }
+
+    const supabase = useSupabase()
+    const dateRange = `?from=${rangeStart.toISOString()}&to=${rangeEnd.toISOString()}&noAccumulate=true`
+    const response = await supabase.functions.invoke(`statistics/app/${props.appId}/${dateRange}`, {
+      method: 'GET',
+    })
+
+    if (response.error) {
+      console.error('Error fetching app statistics:', response.error)
+      return {
+        global: [],
+        byApp: {},
+        appNames: {},
+      }
+    }
+
+    const global = (response.data ?? []) as any[]
     return {
-      global: main.filterDashboard(props.appId),
+      global: global.sort((a, b) => a.date.localeCompare(b.date)),
       byApp: {},
       appNames: {},
     }
@@ -314,16 +341,16 @@ async function getUsages(forceRefetch = false) {
   last30DaysStart.setDate(last30DaysStart.getDate() - 29)
 
   // Get billing period dates for filtering
-  const billingStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
+  const billingStart = new Date(effectiveOrganization.value?.subscription_start ?? new Date())
   // Reset to start of day to match calculation in store
   billingStart.setHours(0, 0, 0, 0)
 
-  const currentOrgId = organizationStore.currentOrganization?.gid ?? null
-  currentCacheOrgId.value = currentOrgId
+  const currentOrgId = effectiveOrganization.value?.gid ?? null
 
   // Check per-org cache - only use if not forcing refetch
-  const cachedData = currentOrgId ? cacheByOrg.get(currentOrgId) : null
-  const cachedDataByApp = currentOrgId ? cacheByOrgByApp.get(currentOrgId) : null
+  const cacheKey = `${currentOrgId ?? 'none'}:${props.appId ?? 'org'}`
+  const cachedData = cacheByOrg.get(cacheKey) ?? null
+  const cachedDataByApp = cacheByOrgByApp.get(cacheKey) ?? null
 
   if (cachedData && !forceRefetch) {
     // Filter data based on billing period mode
@@ -379,7 +406,7 @@ async function getUsages(forceRefetch = false) {
     return
   }
 
-  const { global: globalStats, byApp: byAppStats, appNames: appNamesMap } = await getAppStats()
+  const { global: globalStats, byApp: byAppStats, appNames: appNamesMap } = await getAppStats(last30DaysStart, last30DaysEnd)
 
   const finalData = globalStats.map((item: any) => {
     const itemDate = new Date(item.date)
@@ -409,9 +436,7 @@ async function getUsages(forceRefetch = false) {
   })
 
   // Store in per-org cache
-  if (currentOrgId) {
-    cacheByOrg.set(currentOrgId, full30DayData)
-  }
+  cacheByOrg.set(cacheKey, full30DayData)
 
   // Process by-app data if available
   appNames.value = appNamesMap
@@ -452,9 +477,7 @@ async function getUsages(forceRefetch = false) {
   }
 
   // Store in per-org cache
-  if (currentOrgId) {
-    cacheByOrgByApp.set(currentOrgId, full30DayDataByApp)
-  }
+  cacheByOrgByApp.set(cacheKey, full30DayDataByApp)
   dataByApp.value = full30DayDataByApp
 
   // Filter data based on billing period mode
@@ -561,11 +584,18 @@ async function loadData() {
 }
 
 // Watch for organization changes - show loading immediately when org switches
-watch(() => organizationStore.currentOrganization?.gid, (newOrgId, oldOrgId) => {
-  if (newOrgId && oldOrgId && newOrgId !== oldOrgId && loadedAlready.value) {
+watch(() => effectiveOrganization.value?.gid, (newOrgId, oldOrgId) => {
+  if (newOrgId && oldOrgId !== undefined && newOrgId !== oldOrgId && loadedAlready.value) {
     // Show loading state immediately when org changes (before data is fetched)
     isLoading.value = true
     // Increment reload trigger to force all child charts to refetch
+    reloadTrigger.value++
+  }
+})
+
+watch(() => props.appId, async (newAppId, oldAppId) => {
+  if (newAppId !== oldAppId && loadedAlready.value) {
+    await getUsages(true)
     reloadTrigger.value++
   }
 })

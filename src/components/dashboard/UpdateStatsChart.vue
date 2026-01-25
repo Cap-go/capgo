@@ -39,11 +39,23 @@ const isDark = useDark()
 const { t } = useI18n()
 const router = useRouter()
 const organizationStore = useOrganizationStore()
-const cycleStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
-const cycleEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? new Date())
-// Reset to start of day for consistent date handling
-cycleStart.setHours(0, 0, 0, 0)
-cycleEnd.setHours(0, 0, 0, 0)
+const effectiveOrganization = computed(() => {
+  if (props.appId)
+    return organizationStore.getOrgByAppId(props.appId) ?? organizationStore.currentOrganization
+  return organizationStore.currentOrganization
+})
+const cycleStart = computed(() => {
+  const start = new Date(effectiveOrganization.value?.subscription_start ?? new Date())
+  start.setHours(0, 0, 0, 0)
+  return start
+})
+const cycleEnd = computed(() => {
+  const end = new Date(effectiveOrganization.value?.subscription_end ?? new Date())
+  end.setHours(0, 0, 0, 0)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return end < today ? today : end
+})
 
 const DAY_IN_MS = 1000 * 60 * 60 * 24
 
@@ -127,11 +139,11 @@ function getTodayLimit(labelCount: number) {
   today.setHours(0, 0, 0, 0)
 
   // If cycle end is today or in the past, show all data
-  if (cycleEnd <= today)
+  if (cycleEnd.value <= today)
     return labelCount - 1
 
   // If cycle end is in the future, only show data up to today
-  const diff = Math.floor((today.getTime() - cycleStart.getTime()) / DAY_IN_MS)
+  const diff = Math.floor((today.getTime() - cycleStart.value.getTime()) / DAY_IN_MS)
 
   if (Number.isNaN(diff) || diff < 0)
     return -1
@@ -166,7 +178,7 @@ function transformSeries(source: number[], accumulated: boolean, labelCount: num
 }
 
 function monthdays() {
-  return generateMonthDays(props.useBillingPeriod, cycleStart, cycleEnd)
+  return generateMonthDays(props.useBillingPeriod, cycleStart.value, cycleEnd.value)
 }
 
 const chartData = computed<ChartData<'bar' | 'line'>>(() => {
@@ -247,7 +259,7 @@ const chartOptions = computed(() => {
       title: {
         display: false,
       },
-      tooltip: createTooltipConfig(true, props.accumulated, props.useBillingPeriod ? cycleStart : false, tooltipClickHandler.value),
+      tooltip: createTooltipConfig(true, props.accumulated, props.useBillingPeriod ? cycleStart.value : false, tooltipClickHandler.value),
       todayLine: todayLineOptions.value,
     },
   }
