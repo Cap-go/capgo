@@ -6,7 +6,7 @@ import { cloudlog } from './logging.ts'
 import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
 import { clearFailedAuth, isAPIKeyRateLimited, isIPRateLimited, recordAPIKeyUsage, recordFailedAuth } from './rate_limit.ts'
-import { checkKey, checkKeyById, supabaseAdmin, supabaseClient } from './supabase.ts'
+import { checkKey, checkKeyById, supabaseAdmin } from './supabase.ts'
 import { backgroundTask } from './utils.ts'
 
 // =============================================================================
