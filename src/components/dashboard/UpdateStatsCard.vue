@@ -296,9 +296,9 @@ async function calculateStats(forceRefetch = false) {
       })
     }
 
-    let finalDailyCounts = dailyCounts
-    let finalActionData = actionData
-    let finalAppData = appData
+    const finalDailyCounts = dailyCounts
+    const finalActionData = actionData
+    const finalAppData = appData
 
     const sumSeries = (series: (number | undefined)[]) => series.reduce((sum, value) => sum + (value ?? 0), 0)
     installedTotal = sumSeries(finalActionData.install)
