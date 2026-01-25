@@ -89,11 +89,33 @@ interface TrialOrganizationsResponse {
   }
 }
 
+interface CancelledOrganization {
+  org_id: string
+  org_name: string
+  management_email: string
+  canceled_at: string
+  cancellation_reason: string | null
+}
+
+interface CancelledOrganizationsResponse {
+  success: boolean
+  data: {
+    organizations: CancelledOrganization[]
+    total: number
+  }
+}
+
 const trialOrganizations = ref<TrialOrganization[]>([])
 const trialOrganizationsTotal = ref(0)
 const trialOrganizationsCurrentPage = ref(1)
 const isLoadingTrialOrganizations = ref(false)
 const TRIAL_PAGE_SIZE = 20
+
+const cancelledOrganizations = ref<CancelledOrganization[]>([])
+const cancelledOrganizationsTotal = ref(0)
+const cancelledOrganizationsCurrentPage = ref(1)
+const isLoadingCancelledOrganizations = ref(false)
+const CANCELLED_PAGE_SIZE = 20
 
 const trialOrganizationsColumns = ref<TableColumn[]>([
   { label: t('org-name'), key: 'org_name', mobile: true, head: true, sortable: false },
@@ -120,6 +142,30 @@ const trialOrganizationsColumns = ref<TableColumn[]>([
       const date = new Date(item.trial_end_date)
       return date.toLocaleDateString()
     },
+  },
+])
+
+const cancelledOrganizationsColumns = ref<TableColumn[]>([
+  { label: t('org-name'), key: 'org_name', mobile: true, head: true, sortable: false },
+  { label: t('email'), key: 'management_email', mobile: false, sortable: false },
+  {
+    label: t('cancellation-date'),
+    key: 'canceled_at',
+    mobile: true,
+    sortable: false,
+    displayFunction: (item: CancelledOrganization) => {
+      if (!item.canceled_at)
+        return t('unknown')
+      const date = new Date(item.canceled_at)
+      return date.toLocaleDateString()
+    },
+  },
+  {
+    label: t('cancellation-reason'),
+    key: 'cancellation_reason',
+    mobile: false,
+    sortable: false,
+    displayFunction: (item: CancelledOrganization) => item.cancellation_reason || t('unknown'),
   },
 ])
 
@@ -169,6 +215,54 @@ async function loadTrialOrganizations() {
   }
   finally {
     isLoadingTrialOrganizations.value = false
+  }
+}
+
+async function loadCancelledOrganizations() {
+  isLoadingCancelledOrganizations.value = true
+  try {
+    const supabase = useSupabase()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session)
+      throw new Error('Not authenticated')
+
+    const offset = (cancelledOrganizationsCurrentPage.value - 1) * CANCELLED_PAGE_SIZE
+
+    const { start, end } = adminStore.activeDateRange
+    const response = await fetch(`${defaultApiHost}/private/admin_stats`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({
+        metric_category: 'cancelled_users',
+        start_date: start.toISOString(),
+        end_date: end.toISOString(),
+        limit: CANCELLED_PAGE_SIZE,
+        offset,
+      }),
+    })
+
+    if (!response.ok) {
+      const errorData: unknown = await response.json().catch(() => ({}))
+      throw new Error(`API error: ${response.status} - ${JSON.stringify(errorData)}`)
+    }
+
+    const data = await response.json() as CancelledOrganizationsResponse
+    if (!data.success)
+      throw new Error('Failed to fetch cancelled organizations')
+
+    cancelledOrganizations.value = data.data.organizations || []
+    cancelledOrganizationsTotal.value = data.data.total || 0
+  }
+  catch (error) {
+    console.error('[Admin Dashboard Users] Error loading cancelled organizations:', error)
+    cancelledOrganizations.value = []
+    cancelledOrganizationsTotal.value = 0
+  }
+  finally {
+    isLoadingCancelledOrganizations.value = false
   }
 }
 
@@ -423,12 +517,15 @@ const onboardingFunnelTrendSeries = computed(() => {
 watch(() => adminStore.activeDateRange, () => {
   loadGlobalStatsTrend()
   loadOnboardingFunnel()
+  loadCancelledOrganizations()
 }, { deep: true })
 
 // Watch for refresh button clicks
 watch(() => adminStore.refreshTrigger, () => {
   loadGlobalStatsTrend()
   loadOnboardingFunnel()
+  loadTrialOrganizations()
+  loadCancelledOrganizations()
 })
 
 onMounted(async () => {
@@ -439,7 +536,7 @@ onMounted(async () => {
   }
 
   isLoading.value = true
-  await Promise.all([loadGlobalStatsTrend(), loadOnboardingFunnel(), loadTrialOrganizations()])
+  await Promise.all([loadGlobalStatsTrend(), loadOnboardingFunnel(), loadTrialOrganizations(), loadCancelledOrganizations()])
   isLoading.value = false
 
   displayStore.NavTitle = t('users-and-revenue')
@@ -585,6 +682,24 @@ displayStore.defaultBack = '/dashboard'
               @reload="loadTrialOrganizations"
               @reset="loadTrialOrganizations"
               @update:current-page="(page: number) => { trialOrganizationsCurrentPage = page; loadTrialOrganizations() }"
+            />
+          </div>
+
+          <!-- Cancelled Organizations Table -->
+          <div class="p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+            <h3 class="mb-4 text-lg font-semibold">
+              {{ t('cancelled-organizations-list') }}
+            </h3>
+            <Table
+              :is-loading="isLoadingCancelledOrganizations"
+              :total="cancelledOrganizationsTotal"
+              :current-page="cancelledOrganizationsCurrentPage"
+              :columns="cancelledOrganizationsColumns"
+              :element-list="cancelledOrganizations"
+              :auto-reload="false"
+              @reload="loadCancelledOrganizations"
+              @reset="loadCancelledOrganizations"
+              @update:current-page="(page: number) => { cancelledOrganizationsCurrentPage = page; loadCancelledOrganizations() }"
             />
           </div>
 
