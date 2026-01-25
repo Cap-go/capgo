@@ -15,6 +15,7 @@ async function exists(path: string): Promise<boolean> {
 }
 
 export const TEMP_DIR_NAME = 'temp_cli_test'
+const ROOT_DIR = cwd()
 export const BASE_PACKAGE_JSON = `{
   "name": "%APPID%",
   "version": "1.0.0",
@@ -40,7 +41,7 @@ export const BASE_DEPENDENCIES_OLD = {
 // Cache for prepared apps to avoid repeated setup
 const preparedApps = new Set<string>()
 
-export const tempFileFolder = (appId: string) => join(cwd(), TEMP_DIR_NAME, appId)
+export const tempFileFolder = (appId: string) => join(ROOT_DIR, TEMP_DIR_NAME, appId)
 
 function generateDefaultJsonCliConfig(appId: string) {
   return {

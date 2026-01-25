@@ -6,8 +6,10 @@ import { CapgoSDK } from '@capgo/cli/sdk'
 import { BASE_DEPENDENCIES, BASE_DEPENDENCIES_OLD, BASE_PACKAGE_JSON, TEMP_DIR_NAME } from './cli-utils'
 import { APIKEY_TEST_ALL } from './test-utils'
 
+const ROOT_DIR = cwd()
+
 // Path to the project's capacitor.config.ts that the SDK modifies during key generation
-const CAPACITOR_CONFIG_PATH = join(cwd(), 'capacitor.config.ts')
+const CAPACITOR_CONFIG_PATH = join(ROOT_DIR, 'capacitor.config.ts')
 
 // Supabase base URL (not including /functions/v1)
 const SUPABASE_URL = env.SUPABASE_URL || 'http://localhost:54321'
@@ -26,7 +28,10 @@ const preparedApps = new Set<string>()
 // This queue ensures they run one at a time
 let keyGenerationQueue = Promise.resolve()
 
-export const tempFileFolder = (appId: string) => join(cwd(), TEMP_DIR_NAME, appId)
+// Serialize SDK operations that temporarily change cwd
+let sdkCwdQueue = Promise.resolve()
+
+export const tempFileFolder = (appId: string) => join(ROOT_DIR, TEMP_DIR_NAME, appId)
 
 function generateDefaultJsonCliConfig(appId: string) {
   return {
@@ -156,7 +161,21 @@ export async function uploadBundleSDK(
     ...additionalOptions,
   }
 
-  return sdk.uploadBundle(options)
+  const previousOperation = sdkCwdQueue
+  let operationComplete: () => void
+  sdkCwdQueue = new Promise(resolve => operationComplete = resolve)
+
+  await previousOperation
+  const originalCwd = cwd()
+
+  try {
+    process.chdir(tempFileFolder(appId))
+    return await sdk.uploadBundle(options)
+  }
+  finally {
+    process.chdir(originalCwd)
+    operationComplete!()
+  }
 }
 
 // Note: Tests should use createTestSDK() directly for channel operations
