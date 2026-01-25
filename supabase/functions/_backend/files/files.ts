@@ -19,6 +19,7 @@ import { backgroundTask } from '../utils/utils.ts'
 import { app as files_config } from './files_config.ts'
 import { parseUploadMetadata } from './parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
+import { supabaseTusCreateHandler, supabaseTusHeadHandler, supabaseTusPatchHandler } from './supabaseTusProxy.ts'
 import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, MAX_UPLOAD_LENGTH_BYTES, toBase64, TUS_VERSION, X_CHECKSUM_SHA256 } from './util.ts'
 
 const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 20 minutes
@@ -278,14 +279,80 @@ async function setKeyFromIdParam(c: Context, next: Next) {
     cloudlog({ requestId: c.get('requestId'), message: 'setKeyFromIdParam - fileId is null' })
     return c.json({ error: 'not_found', message: 'Not found' }, 404)
   }
+
   const normalizedFileId = decodeURIComponent(fileId)
+
+  // Check if this is a Supabase TUS upload ID (base64 encoded)
+  // TUS upload IDs from Supabase are base64-encoded paths like: capgo/orgs/xxx/apps/yyy/file.zip/uuid
+  let extractedFileId = normalizedFileId
+  try {
+    const decoded = atob(normalizedFileId)
+    // If decoded starts with bucket name and contains orgs/, it's a TUS upload ID
+    if (decoded.startsWith('capgo/') && decoded.includes('/orgs/')) {
+      const parts = decoded.split('/')
+      // Expected format:
+      // [0]: 'capgo'
+      // [1]: 'orgs'
+      // [2]: orgId
+      // [3]: 'apps'
+      // [4]: appId
+      // [5..n-2]: file path segments
+      // [n-1]: UUID
+      if (
+        parts.length >= 6
+        && parts[0] === 'capgo'
+        && parts[1] === 'orgs'
+        && parts[3] === 'apps'
+      ) {
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'setKeyFromIdParam - detected Supabase TUS upload ID',
+          decoded,
+          parts,
+        })
+        // Extract file path: remove bucket prefix (capgo/) and UUID suffix
+        // Resulting path starts with "orgs/..."
+        const pathParts = parts.slice(1, parts.length - 1)
+        if (pathParts.length > 0) {
+          extractedFileId = pathParts.join('/')
+          cloudlog({
+            requestId: c.get('requestId'),
+            message: 'setKeyFromIdParam - extracted fileId from TUS ID',
+            extractedFileId,
+            originalParts: parts,
+            pathParts,
+          })
+        }
+        else {
+          cloudlog({
+            requestId: c.get('requestId'),
+            message: 'setKeyFromIdParam - TUS ID decoded but pathParts is empty, using normalizedFileId as fileId',
+            decoded,
+            parts,
+          })
+        }
+      }
+      else {
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'setKeyFromIdParam - decoded TUS ID has unexpected structure, using normalizedFileId as fileId',
+          decoded,
+          parts,
+        })
+      }
+    }
+  }
+  catch {
+    // Not a base64 string, use as-is
+  }
+
   cloudlog({
     requestId: c.get('requestId'),
-    message: 'setKeyFromIdParam - after decodeURIComponent',
+    message: 'setKeyFromIdParam - final fileId',
     originalFileId: fileId,
-    normalizedFileId,
+    extractedFileId,
   })
-  c.set('fileId', normalizedFileId)
+  c.set('fileId', extractedFileId)
   await next()
 }
 
@@ -474,12 +541,39 @@ async function checkWriteAppAccess(c: Context, next: Next) {
 }
 
 app.options(`/upload/${ATTACHMENT_PREFIX}`, optionsHandler)
-app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromMetadata, checkWriteAppAccess, uploadHandler)
+app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromMetadata, checkWriteAppAccess, async (c) => {
+  if (getRuntimeKey() !== 'workerd') {
+    return supabaseTusCreateHandler(c)
+  }
+  return uploadHandler(c)
+})
 
 app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, optionsHandler)
-app.get(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromIdParam, checkWriteAppAccess, getHandler)
+// Combined GET/HEAD handler for TUS uploads - Hono tiny routes HEAD to GET
+app.get(
+  `/upload/${ATTACHMENT_PREFIX}/:id{.+}`,
+  middlewareKey(['all', 'write', 'upload'], true),
+  setKeyFromIdParam,
+  checkWriteAppAccess,
+  async (c) => {
+    const isTusRequest = c.req.header('Tus-Resumable') != null
+    const isHead = c.req.method === 'HEAD'
+
+    if (isHead && isTusRequest && getRuntimeKey() !== 'workerd') {
+      cloudlog({ requestId: c.get('requestId'), message: 'Routing HEAD TUS request to supabaseTusHeadHandler' })
+      return supabaseTusHeadHandler(c)
+    }
+
+    return getHandler(c)
+  },
+)
 app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, getHandler)
-app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromIdParam, checkWriteAppAccess, uploadHandler)
+app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromIdParam, checkWriteAppAccess, async (c) => {
+  if (getRuntimeKey() !== 'workerd') {
+    return supabaseTusPatchHandler(c)
+  }
+  return uploadHandler(c)
+})
 
 app.route('/config', files_config)
 app.route('/download_link', download_link)
