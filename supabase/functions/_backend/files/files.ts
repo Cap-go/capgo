@@ -7,6 +7,7 @@ import { Hono } from 'hono/tiny'
 import { app as download_link } from '../private/download_link.ts'
 import { app as upload_link } from '../private/upload_link.ts'
 import { app as ok } from '../public/ok.ts'
+import { sendDiscordAlert } from '../utils/discord.ts'
 import { simpleError } from '../utils/hono.ts'
 import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
@@ -87,6 +88,9 @@ async function getHandler(c: Context): Promise<Response> {
         const httpMetadata = contentType ? { contentType } : undefined
         await bucket.put(fileId, data, { httpMetadata })
         cloudlog({ requestId: c.get('requestId'), message: 'Restored cached file to R2', fileId })
+        await sendDiscordAlert(c, {
+          content: `🛠️ Restored cached file to R2\nFile: ${fileId}\nRequest ID: ${c.get('requestId') ?? 'unknown'}`,
+        })
       }
       catch (err) {
         cloudlog({ requestId: c.get('requestId'), message: 'Failed to restore cached file to R2', fileId, error: String(err) })
@@ -591,7 +595,6 @@ app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write',
   }
   return uploadHandler(c)
 })
-
 
 app.route('/config', files_config)
 app.route('/download_link', download_link)
