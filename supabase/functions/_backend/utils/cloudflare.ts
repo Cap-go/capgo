@@ -28,7 +28,8 @@ export type Bindings = {
 }
 
 const TRACK_DEVICE_USAGE_CACHE_PATH = '/.track-device-usage-cache'
-const TRACK_DEVICE_USAGE_CACHE_MAX_AGE_SECONDS = 29 * 24 * 60 * 60 // 29 days
+// Cache per device per day to ensure rolling windows still see active devices.
+const TRACK_DEVICE_USAGE_CACHE_MAX_AGE_SECONDS = 2 * 24 * 60 * 60
 
 /**
  * Track device usage (MAU) in Cloudflare Analytics Engine
@@ -39,8 +40,8 @@ const TRACK_DEVICE_USAGE_CACHE_MAX_AGE_SECONDS = 29 * 24 * 60 * 60 // 29 days
  * - Activity detection for organizations with recent MAU stats
  * - Better analytics segmentation by organization
  *
- * Uses caching to only write once per device per 29 days to reduce Analytics Engine costs
- * while maintaining accurate MAU counts.
+ * Uses caching to only write once per device per day to reduce Analytics Engine costs
+ * while maintaining accurate rolling-window MAU counts.
  *
  * @param c - Hono context
  * @param device_id - Unique device identifier
@@ -57,6 +58,7 @@ export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: 
     const usageCacheRequest = usageCache.buildRequest(TRACK_DEVICE_USAGE_CACHE_PATH, {
       app_id,
       device_id,
+      day: dayjs().format('YYYY-MM-DD'),
     })
 
     // Check if device was already tracked within the cache period (29 days)
