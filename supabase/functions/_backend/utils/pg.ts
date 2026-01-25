@@ -1295,6 +1295,96 @@ export async function getAdminOnboardingFunnel(
   }
 }
 
+// Admin Trial Organizations List
+export interface AdminTrialOrganization {
+  org_id: string
+  org_name: string
+  management_email: string
+  trial_end_date: string
+  days_remaining: number
+  created_at: string
+}
+
+export interface AdminTrialOrganizationsResult {
+  organizations: AdminTrialOrganization[]
+  total: number
+}
+
+/**
+ * Fetches organizations currently in their trial period for the admin dashboard.
+ * Returns a paginated list of trial organizations ordered by days remaining (ascending),
+ * so organizations expiring soon appear first.
+ *
+ * Trial organizations are those where:
+ * - trial_at date is today or in the future (>= CURRENT_DATE)
+ * - status is NULL (new org, no payment attempted) or not 'succeeded' (no active subscription)
+ */
+export async function getAdminTrialOrganizations(
+  c: Context,
+  limit: number = 20,
+  offset: number = 0,
+): Promise<AdminTrialOrganizationsResult> {
+  try {
+    const pgClient = getPgClient(c, true) // Read-only query
+    const drizzleClient = getDrizzleClient(pgClient)
+
+    // Query to get trial organizations ordered by days remaining (ascending - expiring soon first)
+    // Filter logic:
+    // - trial_at >= CURRENT_DATE: includes trials expiring today (days_remaining = 0)
+    // - status IS NULL: new organizations that haven't attempted payment yet
+    // - status != 'succeeded': organizations without an active paid subscription
+    const query = sql`
+      SELECT
+        o.id AS org_id,
+        o.name AS org_name,
+        o.management_email,
+        si.trial_at AS trial_end_date,
+        GREATEST(0, (si.trial_at::date - CURRENT_DATE)) AS days_remaining,
+        o.created_at
+      FROM orgs o
+      INNER JOIN stripe_info si ON si.customer_id = o.customer_id
+      WHERE si.trial_at::date >= CURRENT_DATE
+        AND (si.status IS NULL OR si.status != 'succeeded')
+      ORDER BY days_remaining ASC, o.created_at DESC
+      LIMIT ${limit}
+      OFFSET ${offset}
+    `
+
+    // Count query for pagination
+    const countQuery = sql`
+      SELECT COUNT(*)::int AS total
+      FROM orgs o
+      INNER JOIN stripe_info si ON si.customer_id = o.customer_id
+      WHERE si.trial_at::date >= CURRENT_DATE
+        AND (si.status IS NULL OR si.status != 'succeeded')
+    `
+
+    const [result, countResult] = await Promise.all([
+      drizzleClient.execute(query),
+      drizzleClient.execute(countQuery),
+    ])
+
+    const organizations: AdminTrialOrganization[] = result.rows.map((row: any) => ({
+      org_id: row.org_id,
+      org_name: row.org_name,
+      management_email: row.management_email,
+      trial_end_date: row.trial_end_date,
+      days_remaining: Number(row.days_remaining),
+      created_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
+    }))
+
+    const total = Number((countResult.rows[0] as any)?.total) || 0
+
+    cloudlog({ requestId: c.get('requestId'), message: 'getAdminTrialOrganizations result', resultCount: organizations.length, total })
+
+    return { organizations, total }
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAdminTrialOrganizations', e)
+    return { organizations: [], total: 0 }
+  }
+}
+
 export async function getAdminPluginBreakdown(
   c: Context,
   start_date: string,
