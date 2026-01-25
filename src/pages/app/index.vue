@@ -137,14 +137,16 @@ displayStore.defaultBack = '/app'
           <!-- App table - always visible even when payment failed -->
           <div class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
             <AppTable
-              v-model:current-page="currentPage"
-              v-model:search="searchQuery"
+              :current-page="currentPage"
+              :search="searchQuery"
               :apps="apps"
               :total="totalApps"
               :delete-button="!organizationStore.currentOrganizationFailed"
               :server-side-pagination="true"
               :is-loading="isTableLoading"
               @add-app="stepsOpen = !stepsOpen"
+              @update:current-page="(page) => { currentPage = page; getMyApps() }"
+              @update:search="(query) => { searchQuery = query; currentPage = 1; getMyApps() }"
               @reload="getMyApps()"
               @reset="getMyApps()"
             />
