@@ -300,7 +300,8 @@ async function calculateStats(forceRefetch = false) {
     const finalActionData = actionData
     const finalAppData = appData
 
-    const sumSeries = (series: (number | undefined)[]) => series.reduce((sum, value) => sum + (value ?? 0), 0)
+    const sumSeries = (series: (number | undefined)[]) =>
+      series.reduce<number>((sum, value) => sum + (value ?? 0), 0)
     installedTotal = sumSeries(finalActionData.install)
     failedTotal = sumSeries(finalActionData.fail)
     requestedTotal = sumSeries(finalActionData.requested)
