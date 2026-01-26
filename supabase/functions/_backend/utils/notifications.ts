@@ -218,6 +218,7 @@ export async function sendNotifOrgCached(
   managementEmail: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<boolean> {
+  return true
   // Check cache first - if we recently checked and it wasn't sendable, skip DB query
   const cachedSendable = await getNotifCacheStatus(c, orgId, eventName, uniqId)
   if (cachedSendable === false) {
