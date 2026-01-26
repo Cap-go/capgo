@@ -22,19 +22,20 @@ beforeAll(async () => {
   if (stripeError)
     throw stripeError
 
-  const { error } = await getSupabaseClient().from('orgs').insert({
+  const { data: orgData, error } = await getSupabaseClient().from('orgs').insert({
     id: ORG_ID,
     name,
     management_email: TEST_EMAIL,
     created_by: USER_ID,
     customer_id: customerId,
-  })
+  }).select()
   if (error)
-    throw error
+    throw new Error(`Failed to create org: ${error.message}`)
+  if (!orgData || orgData.length === 0)
+    throw new Error(`Org insert returned no data for ORG_ID=${ORG_ID}`)
 
   // Add the test user as super_admin to the org so they can access it via API
-  // Delete any existing org_user entry first (no unique constraint for upsert)
-  await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID).eq('user_id', USER_ID)
+  // Insert org_user entry (org must exist first due to foreign key)
   const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
     org_id: ORG_ID,
     user_id: USER_ID,
