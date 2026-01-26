@@ -32,12 +32,13 @@ beforeAll(async () => {
   if (error)
     throw error
 
-  // Add the test user as super_admin to the org so they can access it via API
-  const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+  // Note: The org trigger already inserts the created_by user into org_users as super_admin
+  // Use upsert with ignoreDuplicates to handle the case where the trigger already created the entry
+  const { error: orgUserError } = await getSupabaseClient().from('org_users').upsert({
     org_id: ORG_ID,
     user_id: USER_ID,
     user_right: 'super_admin',
-  })
+  }, { onConflict: 'user_id,org_id', ignoreDuplicates: true })
   if (orgUserError)
     throw orgUserError
 })
