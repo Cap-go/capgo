@@ -21,7 +21,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   const body = await parseBody<DataUpload>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   const capgkey = c.get('capgkey') as string
-  const { data: userId, error: _errorUserId } = await supabaseApikey(c, capgkey)
+  const { data: _userId, error: _errorUserId } = await supabaseApikey(c, capgkey)
     .rpc('get_user_id', { apikey: capgkey, app_id: body.app_id })
   if (_errorUserId) {
     return quickError(404, 'user_not_found', 'Error User not found', { _errorUserId })
