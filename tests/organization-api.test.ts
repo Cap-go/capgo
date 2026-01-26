@@ -31,10 +31,20 @@ beforeAll(async () => {
   })
   if (error)
     throw error
+
+  // Add the test user as super_admin to the org so they can access it via API
+  const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+    org_id: ORG_ID,
+    user_id: USER_ID,
+    user_right: 'super_admin',
+  })
+  if (orgUserError)
+    throw orgUserError
 })
 
 afterAll(async () => {
-  // Clean up test organization and stripe_info
+  // Clean up test organization, org_users relation, and stripe_info
+  await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID)
   await getSupabaseClient().from('orgs').delete().eq('id', ORG_ID)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
 })
@@ -85,10 +95,12 @@ describe('[GET] /organization/members', () => {
     }))
     const safe = type.safeParse(await response.json())
     expect(safe.success).toBe(true)
-    expect(safe.data?.length).toBe(1)
-    expect(safe.data?.[0].uid).toBe(USER_ID)
-    expect(safe.data?.[0].email).toBe(USER_EMAIL)
-    expect(safe.data?.[0].role).toBe('super_admin')
+    expect(safe.data?.length).toBeGreaterThanOrEqual(1)
+    
+    const testUser = safe.data?.find(m => m.uid === USER_ID)
+    expect(testUser).toBeTruthy()
+    expect(testUser?.email).toBe(USER_EMAIL)
+    expect(testUser?.role).toBe('super_admin')
   })
 
   it('get organization members with missing orgId', async () => {
@@ -239,7 +251,7 @@ describe('[POST] /organization/members', () => {
     })
     const safe = type.safeParse(responseData)
     expect(safe.success).toBe(true)
-    expect(safe.data?.status).toBe('OK')
+    expect(safe.data?.status).toBe('ok')
 
     const { data: userData, error: userError } = await getSupabaseClient().from('users').select().eq('email', USER_ADMIN_EMAIL).single()
     expect(userError).toBeNull()
@@ -251,6 +263,9 @@ describe('[POST] /organization/members', () => {
     expect(data).toBeTruthy()
     expect(data?.org_id).toBe(ORG_ID)
     expect(data?.user_right).toBe('invite_read')
+
+    // Cleanup: Remove the added member to avoid affecting other tests
+    await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID).eq('user_id', userData!.id)
   })
 
   it('add organization member with invalid body', async () => {
@@ -321,7 +336,7 @@ describe('[DELETE] /organization/members', () => {
     })
     const safe = type.safeParse(await response.json())
     expect(safe.success).toBe(true)
-    expect(safe.data?.status).toBe('OK')
+    expect(safe.data?.status).toBe('ok')
 
     const { data, error: orgUserError } = await getSupabaseClient().from('org_users').select().eq('org_id', ORG_ID).eq('user_id', userData!.id).single()
     expect(orgUserError).toBeTruthy()
@@ -371,12 +386,10 @@ describe('[POST] /organization', () => {
     })
     expect(response.status).toBe(200)
     const type = z.object({
-      status: z.string(),
       id: z.uuid(),
     })
     const safe = type.safeParse(await response.json())
     expect(safe.success).toBe(true)
-    expect(safe.data?.status).toBe('Organization created')
     expect(safe.data?.id).toBeDefined()
 
     const { data, error } = await getSupabaseClient().from('orgs').select().eq('id', safe.data!.id).single()
@@ -427,11 +440,12 @@ describe('[PUT] /organization', () => {
     })
     expect(response.status).toBe(200)
     const type = z.object({
-      status: z.string(),
+      id: z.uuid(),
+      data: z.any(),
     })
     const safe = type.safeParse(await response.json())
     expect(safe.success).toBe(true)
-    expect(safe.data?.status).toBe('Organization updated')
+    expect(safe.data?.id).toBe(ORG_ID)
 
     const { data, error } = await getSupabaseClient().from('orgs').select().eq('id', ORG_ID).single()
     expect(error).toBeNull()
@@ -509,7 +523,7 @@ describe('[DELETE] /organization', () => {
     })
     expect(response.status).toBe(200)
     const responseData = await response.json() as { status: string }
-    expect(responseData.status).toBe('Organization deleted')
+    expect(responseData.status).toBe('ok')
 
     const { data: dataOrg2, error: errorOrg2 } = await getSupabaseClient().from('orgs').select().eq('id', id).single()
     expect(errorOrg2).toBeTruthy()
@@ -641,8 +655,8 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
       }),
     })
     expect(response.status).toBe(200)
-    const responseData = await response.json() as { status: string }
-    expect(responseData.status).toBe('Organization updated')
+    const responseData = await response.json() as { id: string, data: any }
+    expect(responseData.id).toBe(ORG_ID)
 
     // Verify the setting was updated
     const { data, error } = await getSupabaseClient().from('orgs').select('enforce_hashed_api_keys').eq('id', ORG_ID).single()
@@ -666,8 +680,8 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
       }),
     })
     expect(response.status).toBe(200)
-    const responseData = await response.json() as { status: string }
-    expect(responseData.status).toBe('Organization updated')
+    const responseData = await response.json() as { id: string, data: any }
+    expect(responseData.id).toBe(ORG_ID)
 
     // Verify the setting was updated
     const { data, error } = await getSupabaseClient().from('orgs').select('enforce_hashed_api_keys').eq('id', ORG_ID).single()

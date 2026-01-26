@@ -370,3 +370,268 @@ describe('[POST] /stats', () => {
     await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
   })
 })
+
+interface BatchStatsRes {
+  status: string
+  results?: Array<{
+    status: 'ok' | 'error'
+    error?: string
+    message?: string
+    index?: number
+  }>
+}
+
+// Test batch operations - concurrent for Supabase, sequential for Cloudflare (due to D1 sync)
+const batchTestDescribe = USE_CLOUDFLARE ? describe : describe.concurrent
+const batchTestIt = USE_CLOUDFLARE ? it : it.concurrent
+
+batchTestDescribe('[POST] /stats batch operations', () => {
+  batchTestIt('should handle batch of events', async () => {
+    const uuid1 = randomUUID().toLowerCase()
+    const uuid2 = randomUUID().toLowerCase()
+
+    const baseData1 = getBaseData(APP_NAME_STATS) as StatsPayload
+    baseData1.device_id = uuid1
+    baseData1.action = 'get'
+    baseData1.version_build = getVersionFromAction('get')
+    const version1 = await createAppVersions(baseData1.version_build, APP_NAME_STATS)
+    baseData1.version_name = version1.name
+
+    const baseData2 = getBaseData(APP_NAME_STATS) as StatsPayload
+    baseData2.device_id = uuid2
+    baseData2.action = 'set'
+    baseData2.version_build = getVersionFromAction('set')
+    const version2 = await createAppVersions(baseData2.version_build, APP_NAME_STATS)
+    baseData2.version_name = version2.name
+
+    // Send batch request
+    const response = await postStats([baseData1, baseData2])
+    expect(response.status).toBe(200)
+
+    const responseData = await response.json<BatchStatsRes>()
+    expect(responseData.status).toBe('ok')
+    expect(responseData.results).toBeDefined()
+    expect(responseData.results).toHaveLength(2)
+    expect(responseData.results![0].status).toBe('ok')
+    expect(responseData.results![0].index).toBe(0)
+    expect(responseData.results![1].status).toBe('ok')
+    expect(responseData.results![1].index).toBe(1)
+
+    // Verify both stats entries were created
+    const { error: statsError1, data: statsData1 } = await getSupabaseClient()
+      .from('stats')
+      .select()
+      .eq('device_id', uuid1)
+      .eq('app_id', APP_NAME_STATS)
+      .eq('action', 'get')
+      .single()
+    expect(statsError1).toBeNull()
+    expect(statsData1).toBeTruthy()
+
+    const { error: statsError2, data: statsData2 } = await getSupabaseClient()
+      .from('stats')
+      .select()
+      .eq('device_id', uuid2)
+      .eq('app_id', APP_NAME_STATS)
+      .eq('action', 'set')
+      .single()
+    expect(statsError2).toBeNull()
+    expect(statsData2).toBeTruthy()
+
+    // Clean up
+    await getSupabaseClient().from('devices').delete().eq('device_id', uuid1).eq('app_id', APP_NAME_STATS)
+    await getSupabaseClient().from('devices').delete().eq('device_id', uuid2).eq('app_id', APP_NAME_STATS)
+  })
+
+  batchTestIt('should handle batch with partial failures', async () => {
+    const uuid1 = randomUUID().toLowerCase()
+    const uuid2 = randomUUID().toLowerCase()
+
+    const baseData1 = getBaseData(APP_NAME_STATS) as StatsPayload
+    baseData1.device_id = uuid1
+    baseData1.action = 'get'
+    baseData1.version_build = getVersionFromAction('get')
+    const version1 = await createAppVersions(baseData1.version_build, APP_NAME_STATS)
+    baseData1.version_name = version1.name
+
+    // Second event has invalid action
+    const baseData2 = getBaseData(APP_NAME_STATS) as StatsPayload
+    baseData2.device_id = uuid2
+    baseData2.action = 'invalid_action_xyz' as StatsAction
+    baseData2.version_build = getVersionFromAction('set')
+
+    // Send batch request
+    const response = await postStats([baseData1, baseData2])
+    expect(response.status).toBe(200)
+
+    const responseData = await response.json<BatchStatsRes>()
+    expect(responseData.status).toBe('ok')
+    expect(responseData.results).toBeDefined()
+    expect(responseData.results).toHaveLength(2)
+
+    // First event should succeed
+    expect(responseData.results![0].status).toBe('ok')
+    expect(responseData.results![0].index).toBe(0)
+
+    // Second event should fail
+    expect(responseData.results![1].status).toBe('error')
+    expect(responseData.results![1].index).toBe(1)
+    expect(responseData.results![1].error).toBeTruthy()
+
+    // Verify first stats entry was created
+    const { error: statsError1, data: statsData1 } = await getSupabaseClient()
+      .from('stats')
+      .select()
+      .eq('device_id', uuid1)
+      .eq('app_id', APP_NAME_STATS)
+      .eq('action', 'get')
+      .single()
+    expect(statsError1).toBeNull()
+    expect(statsData1).toBeTruthy()
+
+    // Clean up
+    await getSupabaseClient().from('devices').delete().eq('device_id', uuid1).eq('app_id', APP_NAME_STATS)
+  })
+
+  batchTestIt('should handle empty batch', async () => {
+    const response = await postStats([])
+    expect(response.status).toBe(200)
+
+    const responseData = await response.json<BatchStatsRes>()
+    expect(responseData.status).toBe('ok')
+    expect(responseData.results).toBeDefined()
+    expect(responseData.results).toHaveLength(0)
+  })
+
+  batchTestIt('single event should still return simple response for backward compatibility', async () => {
+    const uuid = randomUUID().toLowerCase()
+    const baseData = getBaseData(APP_NAME_STATS) as StatsPayload
+    baseData.device_id = uuid
+    baseData.action = 'get'
+    baseData.version_build = getVersionFromAction('get')
+    const version = await createAppVersions(baseData.version_build, APP_NAME_STATS)
+    baseData.version_name = version.name
+
+    // Send single event (not in array)
+    const response = await postStats(baseData)
+    expect(response.status).toBe(200)
+
+    const responseData = await response.json<StatsRes>()
+    // Should return simple { status: 'ok' } not batch format
+    expect(responseData.status).toBe('ok')
+    expect((responseData as BatchStatsRes).results).toBeUndefined()
+
+    // Clean up
+    await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
+  })
+
+  batchTestIt('should handle batch with same device multiple actions', async () => {
+    const uuid = randomUUID().toLowerCase()
+
+    const baseData1 = getBaseData(APP_NAME_STATS) as StatsPayload
+    baseData1.device_id = uuid
+    baseData1.action = 'get'
+    baseData1.version_build = getVersionFromAction('get')
+    const version1 = await createAppVersions(baseData1.version_build, APP_NAME_STATS)
+    baseData1.version_name = version1.name
+
+    const baseData2 = { ...baseData1 }
+    baseData2.action = 'set'
+    baseData2.version_build = getVersionFromAction('set')
+    const version2 = await createAppVersions(baseData2.version_build, APP_NAME_STATS)
+    baseData2.version_name = version2.name
+
+    // Send batch with same device, different actions
+    const response = await postStats([baseData1, baseData2])
+    expect(response.status).toBe(200)
+
+    const responseData = await response.json<BatchStatsRes>()
+    expect(responseData.status).toBe('ok')
+    expect(responseData.results).toHaveLength(2)
+    expect(responseData.results![0].status).toBe('ok')
+    expect(responseData.results![1].status).toBe('ok')
+
+    // Verify both stats entries were created
+    const { error: statsError, data: statsData } = await getSupabaseClient()
+      .from('stats')
+      .select()
+      .eq('device_id', uuid)
+      .eq('app_id', APP_NAME_STATS)
+      .order('created_at', { ascending: true })
+    expect(statsError).toBeNull()
+    expect(statsData).toBeTruthy()
+    expect(statsData).toHaveLength(2)
+    expect(statsData![0].action).toBe('get')
+    expect(statsData![1].action).toBe('set')
+
+    // Clean up
+    await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
+  })
+
+  batchTestIt('should reject batch with mixed app_ids', async () => {
+    const uuid1 = randomUUID().toLowerCase()
+    const uuid2 = randomUUID().toLowerCase()
+
+    const baseData1 = getBaseData(APP_NAME_STATS) as StatsPayload
+    baseData1.device_id = uuid1
+    baseData1.action = 'get'
+    baseData1.version_build = getVersionFromAction('get')
+    const version1 = await createAppVersions(baseData1.version_build, APP_NAME_STATS)
+    baseData1.version_name = version1.name
+
+    // Second event has different app_id
+    const baseData2 = getBaseData(APP_NAME_STATS) as StatsPayload
+    baseData2.device_id = uuid2
+    baseData2.app_id = 'com.different.app'
+    baseData2.action = 'get'
+    baseData2.version_build = getVersionFromAction('get')
+    baseData2.version_name = version1.name
+
+    // Send batch request with mixed app_ids
+    const response = await postStats([baseData1, baseData2])
+    expect(response.status).toBe(200)
+
+    const responseData = await response.json<StatsRes>()
+    expect(responseData.error).toBe('mixed_app_ids')
+    expect(responseData.message).toBe('All events in a batch must have the same app_id')
+  })
+
+  batchTestIt('should return on_premise_app error for batch with non-existent app', async () => {
+    const uuid1 = randomUUID().toLowerCase()
+    const uuid2 = randomUUID().toLowerCase()
+
+    // Use app_id that doesn't exist in the system (triggers onprem detection)
+    const baseData1: StatsPayload = {
+      app_id: 'does.not.exist',
+      device_id: uuid1,
+      platform: 'ios',
+      version_name: '1.0.0',
+      version_os: '14.0',
+      is_emulator: false,
+      is_prod: true,
+      action: 'get',
+      version_build: '1.0.0',
+      plugin_version: '7.0.0',
+    }
+
+    const baseData2: StatsPayload = {
+      ...baseData1,
+      device_id: uuid2,
+    }
+
+    // Send batch request with non-existent app
+    const response = await postStats([baseData1, baseData2])
+    expect(response.status).toBe(200)
+
+    const responseData = await response.json<BatchStatsRes>()
+    expect(responseData.status).toBe('ok')
+    expect(responseData.results).toBeDefined()
+    expect(responseData.results).toHaveLength(2)
+
+    // Both events should return on_premise_app error
+    expect(responseData.results![0].status).toBe('error')
+    expect(responseData.results![0].error).toBe('on_premise_app')
+    expect(responseData.results![1].status).toBe('error')
+    expect(responseData.results![1].error).toBe('on_premise_app')
+  })
+})

@@ -3,7 +3,8 @@ import { Hono } from 'hono/tiny'
 import { getBundleUrl, getManifestUrl } from '../utils/downloadUrl.ts'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { hasAppRight, supabaseClient } from '../utils/supabase.ts'
+import { checkPermission } from '../utils/rbac.ts'
+import { supabaseClient } from '../utils/supabase.ts'
 
 interface DataDownload {
   app_id: string
@@ -22,20 +23,21 @@ app.post('/', middlewareAuth, async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: 'post download link body', body })
   const authorization = c.get('authorization')
   if (!authorization)
-    return simpleError('cannot_find_authorization', 'Cannot find authorization')
+    throw simpleError('cannot_find_authorization', 'Cannot find authorization')
 
   // Use authenticated client - RLS will enforce access based on JWT
   const supabase = supabaseClient(c, authorization)
 
   // Get current user ID from JWT
-  const { data: auth, error } = await supabase.auth.getUser()
-  if (error || !auth?.user?.id)
-    return simpleError('not_authorize', 'Not authorize')
+  const authContext = c.get('auth')
+  if (!authContext?.userId)
+    throw simpleError('not_authorized', 'Not authorized')
 
-  const userId = auth.user.id
+  const userId = authContext.userId
 
-  if (!(await hasAppRight(c, body.app_id, userId, 'read')))
-    return simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.app_id })
+  // Auth context is already set by middlewareAuth
+  if (!(await checkPermission(c, 'app.read_bundles', { appId: body.app_id })))
+    throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.app_id })
 
   const { data: bundle, error: getBundleError } = await supabase
     .from('app_versions')
@@ -47,11 +49,11 @@ app.post('/', middlewareAuth, async (c) => {
   const ownerOrg = bundle?.owner_org?.created_by
 
   if (getBundleError) {
-    return simpleError('cannot_get_bundle', 'Cannot get bundle', { getBundleError })
+    throw simpleError('cannot_get_bundle', 'Cannot get bundle', { getBundleError })
   }
 
   if (!ownerOrg) {
-    return simpleError('cannot_get_owner_org', 'Cannot get owner org', { bundle })
+    throw simpleError('cannot_get_owner_org', 'Cannot get owner org', { bundle })
   }
 
   if (body.isManifest) {
@@ -62,7 +64,7 @@ app.post('/', middlewareAuth, async (c) => {
       .eq('id', body.id)
 
     if (getManifestError) {
-      return simpleError('cannot_get_manifest', 'Cannot get manifest', { getManifestError })
+      throw simpleError('cannot_get_manifest', 'Cannot get manifest', { getManifestError })
     }
     const manifestEntries = getManifestUrl(c, bundle.id, manifest, userId)
     return c.json({ manifest: manifestEntries })
@@ -70,7 +72,7 @@ app.post('/', middlewareAuth, async (c) => {
   else {
     const url = await getBundleUrl(c, bundle.r2_path, userId, bundle.checksum ?? '')
     if (!url)
-      return simpleError('cannot_get_bundle_url', 'Cannot get bundle url')
+      throw simpleError('cannot_get_bundle_url', 'Cannot get bundle url')
 
     return c.json({ url })
   }

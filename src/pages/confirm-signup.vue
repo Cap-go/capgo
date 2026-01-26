@@ -6,6 +6,33 @@ import IconLoader from '~icons/lucide/loader-2'
 const route = useRoute()
 const isRedirecting = ref(true)
 const error = ref('')
+
+// Get the allowed hostname from VITE_APP_URL
+const allowedHost = (() => {
+  try {
+    return new URL(import.meta.env.VITE_APP_URL).hostname
+  }
+  catch {
+    return ''
+  }
+})()
+
+function isAllowedConfirmationUrl(urlValue: string) {
+  const url = new URL(urlValue, window.location.origin)
+
+  // Allow localhost in dev mode
+  if (import.meta.env.DEV) {
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '::1')
+      return true
+  }
+
+  // Only allow https
+  if (url.protocol !== 'https:')
+    return false
+
+  // Only allow the exact hostname from VITE_APP_URL
+  return url.hostname === allowedHost
+}
 onMounted(() => {
   const confirmationUrl = route.query.confirmation_url as string
 
@@ -18,6 +45,11 @@ onMounted(() => {
   try {
     // Decode the URL if needed and redirect immediately
     const decodedUrl = decodeURIComponent(confirmationUrl)
+    if (!isAllowedConfirmationUrl(decodedUrl)) {
+      isRedirecting.value = false
+      error.value = 'Invalid confirmation URL. Please check your email link.'
+      return
+    }
     window.location.href = decodedUrl
   }
   catch {

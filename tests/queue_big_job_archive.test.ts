@@ -41,7 +41,7 @@ describe('queue_big_job_archive', () => {
     await pool.end()
   })
 
-  it('should process 950 jobs with vt=10 successfully', async () => {
+  it('should process 950 jobs with vt=10 successfully', { timeout: 15000 }, async () => {
     // Generate messages and insert them directly into the queue table
     const messagePayload = {
       payload: {

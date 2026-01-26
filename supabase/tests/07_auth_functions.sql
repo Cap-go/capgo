@@ -136,14 +136,14 @@ SELECT
 SELECT
     is(
         get_user_id('expired-hashed-key-for-test'),
-        NULL,
+        null,
         'get_user_id test - expired hashed key returns null'
     );
 
 SELECT
     is(
         get_user_id('expired-plain-key-for-test'),
-        NULL,
+        null,
         'get_user_id test - expired plain key returns null'
     );
 

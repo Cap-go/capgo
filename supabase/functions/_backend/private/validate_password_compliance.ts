@@ -59,7 +59,7 @@ app.post('/', async (c) => {
   // Validate request body
   const validationResult = bodySchema.safeParse(rawBody)
   if (!validationResult.success) {
-    return simpleError('invalid_body', 'Invalid request body', { errors: z.prettifyError(validationResult.error) })
+    throw simpleError('invalid_body', 'Invalid request body', { errors: z.prettifyError(validationResult.error) })
   }
 
   const body = validationResult.data
@@ -104,15 +104,17 @@ app.post('/', async (c) => {
 
   const userId = signInData.user.id
 
-  // Verify user is a member of this organization
-  const { data: membership, error: memberError } = await supabaseAdmin
-    .from('org_users')
-    .select('user_id')
-    .eq('org_id', body.org_id)
-    .eq('user_id', userId)
-    .single()
+  // Use authenticated client for subsequent queries - RLS will enforce access
+  const supabase = supabaseClient(c, `Bearer ${signInData.session.access_token}`)
 
-  if (memberError || !membership) {
+  // Verify user has access to this organization (RBAC + legacy compatible)
+  const { data: hasOrgAccess, error: accessError } = await supabase
+    .rpc('rbac_check_permission', {
+      p_permission_key: 'org.read',
+      p_org_id: body.org_id,
+    })
+
+  if (accessError || !hasOrgAccess) {
     return quickError(403, 'not_member', 'You are not a member of this organization')
   }
 
@@ -120,7 +122,7 @@ app.post('/', async (c) => {
   const policyCheck = passwordMeetsPolicy(body.password, policy)
 
   if (!policyCheck.valid) {
-    return simpleError('password_does_not_meet_policy', 'Your current password does not meet the organization requirements', {
+    throw simpleError('password_does_not_meet_policy', 'Your current password does not meet the organization requirements', {
       errors: policyCheck.errors,
       policy: {
         min_length: policy.min_length,

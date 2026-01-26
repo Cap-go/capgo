@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { EmailPreferences } from '../supabase/functions/_backend/utils/org_email_notifications.ts'
-import { APP_NAME, BASE_URL, getSupabaseClient, ORG_ID, resetAndSeedAppData, resetAppData, USER_EMAIL, USER_ID } from './test-utils.ts'
+import { APP_NAME, BASE_URL, getSupabaseClient, ORG_ID_EMAIL_PREFS, resetAndSeedAppData, resetAppData, STRIPE_CUSTOMER_ID_EMAIL_PREFS, USER_EMAIL_EMAIL_PREFS, USER_ID_EMAIL_PREFS } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME_PREFS = `${APP_NAME}.ep.${id}`
@@ -12,7 +12,11 @@ const triggerHeaders = {
 }
 
 beforeAll(async () => {
-  await resetAndSeedAppData(APPNAME_PREFS)
+  await resetAndSeedAppData(APPNAME_PREFS, {
+    orgId: ORG_ID_EMAIL_PREFS,
+    userId: USER_ID_EMAIL_PREFS,
+    stripeCustomerId: STRIPE_CUSTOMER_ID_EMAIL_PREFS,
+  })
 })
 
 afterAll(async () => {
@@ -32,7 +36,7 @@ afterAll(async () => {
       device_error: true,
       channel_self_rejected: true,
     },
-  } as any).eq('id', USER_ID)
+  } as any).eq('id', USER_ID_EMAIL_PREFS)
 })
 
 // Helper to check if migration has been applied
@@ -59,7 +63,7 @@ describe('[Database] Email Preferences Column', () => {
     const { data, error } = await supabase
       .from('users')
       .select('email_preferences')
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
       .single()
 
     expect(error).toBeNull()
@@ -91,7 +95,7 @@ describe('[Database] Email Preferences Column', () => {
     const { data: currentData } = await supabase
       .from('users')
       .select('email_preferences')
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
       .single()
 
     const currentPrefs = ((currentData as any)?.email_preferences ?? {}) as EmailPreferences
@@ -101,7 +105,7 @@ describe('[Database] Email Preferences Column', () => {
     const { error: updateError } = await supabase
       .from('users')
       .update({ email_preferences: updatedPrefs } as any)
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
 
     expect(updateError).toBeNull()
 
@@ -109,7 +113,7 @@ describe('[Database] Email Preferences Column', () => {
     const { data: verifyData, error: verifyError } = await supabase
       .from('users')
       .select('email_preferences')
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
       .single()
 
     expect(verifyError).toBeNull()
@@ -132,7 +136,7 @@ describe('[Database] Email Preferences Column', () => {
     const { data: currentData } = await supabase
       .from('users')
       .select('email_preferences')
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
       .single()
 
     const currentPrefs = ((currentData as any)?.email_preferences ?? {}) as EmailPreferences
@@ -142,7 +146,7 @@ describe('[Database] Email Preferences Column', () => {
     const { error: updateError } = await supabase
       .from('users')
       .update({ email_preferences: updatedPrefs } as any)
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
 
     expect(updateError).toBeNull()
 
@@ -150,7 +154,7 @@ describe('[Database] Email Preferences Column', () => {
     const { data: verifyData } = await supabase
       .from('users')
       .select('email_preferences')
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
       .single()
 
     const prefs = (verifyData as any)?.email_preferences as EmailPreferences
@@ -172,7 +176,7 @@ describe('[POST] /triggers/cron_email - Email Preference Filtering', () => {
     const { data: currentData } = await supabase
       .from('users')
       .select('email_preferences')
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
       .single()
 
     const currentPrefs = ((currentData as any)?.email_preferences ?? {}) as EmailPreferences
@@ -181,14 +185,14 @@ describe('[POST] /triggers/cron_email - Email Preference Filtering', () => {
     await supabase
       .from('users')
       .update({ email_preferences: { ...currentPrefs, weekly_stats: false } } as any)
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
 
     // Send request for weekly stats
     const response = await fetch(`${BASE_URL}/triggers/cron_email`, {
       method: 'POST',
       headers: triggerHeaders,
       body: JSON.stringify({
-        email: USER_EMAIL,
+        email: USER_EMAIL_EMAIL_PREFS,
         appId: APPNAME_PREFS,
         type: 'weekly_install_stats',
       }),
@@ -202,7 +206,7 @@ describe('[POST] /triggers/cron_email - Email Preference Filtering', () => {
     await supabase
       .from('users')
       .update({ email_preferences: { ...currentPrefs, weekly_stats: true } } as any)
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
   })
 
   it('should skip monthly stats email when monthly_stats preference is disabled', async () => {
@@ -218,7 +222,7 @@ describe('[POST] /triggers/cron_email - Email Preference Filtering', () => {
     const { data: currentData } = await supabase
       .from('users')
       .select('email_preferences')
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
       .single()
 
     const currentPrefs = ((currentData as any)?.email_preferences ?? {}) as EmailPreferences
@@ -227,14 +231,14 @@ describe('[POST] /triggers/cron_email - Email Preference Filtering', () => {
     await supabase
       .from('users')
       .update({ email_preferences: { ...currentPrefs, monthly_stats: false } } as any)
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
 
     // Send request for monthly stats
     const response = await fetch(`${BASE_URL}/triggers/cron_email`, {
       method: 'POST',
       headers: triggerHeaders,
       body: JSON.stringify({
-        email: USER_EMAIL,
+        email: USER_EMAIL_EMAIL_PREFS,
         appId: APPNAME_PREFS,
         type: 'monthly_create_stats',
       }),
@@ -248,7 +252,7 @@ describe('[POST] /triggers/cron_email - Email Preference Filtering', () => {
     await supabase
       .from('users')
       .update({ email_preferences: { ...currentPrefs, monthly_stats: true } } as any)
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
   })
 
   it('should allow weekly stats email when weekly_stats preference is enabled', async () => {
@@ -264,21 +268,21 @@ describe('[POST] /triggers/cron_email - Email Preference Filtering', () => {
     const { data: currentData } = await supabase
       .from('users')
       .select('email_preferences')
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
       .single()
 
     const currentPrefs = ((currentData as any)?.email_preferences ?? {}) as EmailPreferences
     await supabase
       .from('users')
       .update({ email_preferences: { ...currentPrefs, weekly_stats: true } } as any)
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
 
     // Send request for weekly stats
     const response = await fetch(`${BASE_URL}/triggers/cron_email`, {
       method: 'POST',
       headers: triggerHeaders,
       body: JSON.stringify({
-        email: USER_EMAIL,
+        email: USER_EMAIL_EMAIL_PREFS,
         appId: APPNAME_PREFS,
         type: 'weekly_install_stats',
       }),
@@ -304,21 +308,21 @@ describe('[POST] /triggers/cron_email - Email Preference Filtering', () => {
     const { data: currentData } = await supabase
       .from('users')
       .select('email_preferences')
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
       .single()
 
     const currentPrefs = ((currentData as any)?.email_preferences ?? {}) as EmailPreferences
     await supabase
       .from('users')
       .update({ email_preferences: { ...currentPrefs, monthly_stats: true } } as any)
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
 
     // Send request for monthly stats
     const response = await fetch(`${BASE_URL}/triggers/cron_email`, {
       method: 'POST',
       headers: triggerHeaders,
       body: JSON.stringify({
-        email: USER_EMAIL,
+        email: USER_EMAIL_EMAIL_PREFS,
         appId: APPNAME_PREFS,
         type: 'monthly_create_stats',
       }),
@@ -345,7 +349,7 @@ describe('[POST] /triggers/cron_email - Deploy Install Stats Preference', () => 
     const { data: currentData } = await supabase
       .from('users')
       .select('email_preferences')
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
       .single()
 
     const currentPrefs = ((currentData as any)?.email_preferences ?? {}) as EmailPreferences
@@ -354,14 +358,14 @@ describe('[POST] /triggers/cron_email - Deploy Install Stats Preference', () => 
     await supabase
       .from('users')
       .update({ email_preferences: { ...currentPrefs, deploy_stats_24h: false } } as any)
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
 
     // Send request for deploy install stats (will fail due to missing versionId, but preference check happens first)
     const response = await fetch(`${BASE_URL}/triggers/cron_email`, {
       method: 'POST',
       headers: triggerHeaders,
       body: JSON.stringify({
-        email: USER_EMAIL,
+        email: USER_EMAIL_EMAIL_PREFS,
         appId: APPNAME_PREFS,
         type: 'deploy_install_stats',
         versionId: 999999, // Non-existent version
@@ -376,7 +380,7 @@ describe('[POST] /triggers/cron_email - Deploy Install Stats Preference', () => 
     await supabase
       .from('users')
       .update({ email_preferences: { ...currentPrefs, deploy_stats_24h: true } } as any)
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
   })
 })
 
@@ -394,7 +398,7 @@ describe('[Database] Email Preferences - Multi-preference Update', () => {
     const { data: currentData } = await supabase
       .from('users')
       .select('email_preferences')
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
       .single()
 
     const currentPrefs = ((currentData as any)?.email_preferences ?? {}) as EmailPreferences
@@ -410,13 +414,13 @@ describe('[Database] Email Preferences - Multi-preference Update', () => {
     await supabase
       .from('users')
       .update({ email_preferences: updatedPrefs } as any)
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
 
     // Verify the updates
     const { data: verifyData } = await supabase
       .from('users')
       .select('email_preferences')
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
       .single()
 
     const prefs = (verifyData as any)?.email_preferences as EmailPreferences
@@ -443,7 +447,7 @@ describe('[Database] Email Preferences - Multi-preference Update', () => {
           device_error: true,
         },
       } as any)
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
   })
 })
 
@@ -461,14 +465,14 @@ describe('[Database] Email Preferences - Query by Preference', () => {
     const { data: currentData } = await supabase
       .from('users')
       .select('email_preferences')
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
       .single()
 
     const currentPrefs = ((currentData as any)?.email_preferences ?? {}) as EmailPreferences
     await supabase
       .from('users')
       .update({ email_preferences: { ...currentPrefs, bundle_deployed: false } } as any)
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
 
     // Query users with bundle_deployed disabled using raw query
     // Note: Supabase JS client doesn't support JSONB containment directly,
@@ -476,7 +480,7 @@ describe('[Database] Email Preferences - Query by Preference', () => {
     const { data: usersData } = await supabase
       .from('users')
       .select('id, email_preferences')
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
       .single()
 
     const prefs = (usersData as any)?.email_preferences as EmailPreferences
@@ -486,7 +490,7 @@ describe('[Database] Email Preferences - Query by Preference', () => {
     await supabase
       .from('users')
       .update({ email_preferences: { ...currentPrefs, bundle_deployed: true } } as any)
-      .eq('id', USER_ID)
+      .eq('id', USER_ID_EMAIL_PREFS)
   })
 })
 
@@ -498,8 +502,8 @@ describe('[Integration] Org Email Notifications with Preferences', () => {
     const { data: orgUserData } = await supabase
       .from('org_users')
       .select('user_right')
-      .eq('org_id', ORG_ID)
-      .eq('user_id', USER_ID)
+      .eq('org_id', ORG_ID_EMAIL_PREFS)
+      .eq('user_id', USER_ID_EMAIL_PREFS)
       .single()
 
     // User should be admin or super_admin to receive operational emails

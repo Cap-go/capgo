@@ -2,7 +2,8 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
-import { hasAppRightApikey, supabaseApikey } from '../../utils/supabase.ts'
+import { checkPermission } from '../../utils/rbac.ts'
+import { supabaseApikey } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
 
 interface BuilderStartResponse {
@@ -59,8 +60,20 @@ export async function startBuild(
       user_id: apikey.user_id,
     })
 
-    // Security: Check if user has write access to this app
-    if (!(await hasAppRightApikey(c, appId, apikey.user_id, 'write', apikeyKey))) {
+    if (!apikeyKey) {
+      const errorMsg = 'No API key available to start build'
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'Missing API key for start build',
+        job_id: jobId,
+        app_id: appId,
+        user_id: apikey.user_id,
+      })
+      throw simpleError('not_authorized', errorMsg)
+    }
+
+    // Security: Check if user has permission to manage builds (auth context set by middlewareKey)
+    if (!(await checkPermission(c, 'app.build_native', { appId }))) {
       const errorMsg = 'You do not have permission to start builds for this app'
       cloudlogErr({
         requestId: c.get('requestId'),
@@ -135,7 +148,7 @@ export async function startBuild(
   }
   catch (error) {
     // Mark build as failed for any unexpected error (but only if not already marked)
-    if (!alreadyMarkedAsFailed) {
+    if (!alreadyMarkedAsFailed && apikeyKey) {
       const errorMsg = error instanceof Error ? error.message : String(error)
       await markBuildAsFailed(c, jobId, errorMsg, apikeyKey)
     }

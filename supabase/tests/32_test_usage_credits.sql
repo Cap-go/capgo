@@ -66,8 +66,8 @@ user_insert AS (
     SELECT
         tests.get_supabase_uid('usage_credits_user'),
         'credits-test@example.com',
-        NOW(),
-        NOW()
+        now(),
+        now()
     RETURNING id
 ),
 
@@ -113,8 +113,8 @@ grant_insert AS (
         org_insert.id,
         20,
         0,
-        NOW(),
-        NOW() + interval '1 year',
+        now(),
+        now() + interval '1 year',
         'manual'
     FROM org_insert
     RETURNING
@@ -184,8 +184,8 @@ SELECT
                 (SELECT org_id FROM test_credit_context),
                 'mau',
                 10,
-                NOW(),
-                NOW() + interval '1 month',
+                now(),
+                now() + interval '1 month',
                 '{}'::jsonb
             )
         ),
@@ -201,8 +201,8 @@ SELECT
                 (SELECT org_id FROM test_credit_context),
                 'mau',
                 10,
-                NOW(),
-                NOW() + interval '1 month',
+                now(),
+                now() + interval '1 month',
                 '{}'::jsonb
             )
         ),
@@ -229,7 +229,7 @@ SELECT
 
 UPDATE public.usage_credit_grants
 SET
-    expires_at = NOW() - interval '1 day'
+    expires_at = now() - interval '1 day'
 WHERE
     id = (
         SELECT grant_id
@@ -434,8 +434,8 @@ alert_grant AS (
         id,
         100,
         0,
-        NOW(),
-        NOW() + interval '1 year',
+        now(),
+        now() + interval '1 year',
         'manual'
     FROM alert_org
     RETURNING
@@ -595,8 +595,8 @@ grant_one AS (
         org_id,
         50,
         0,
-        NOW(),
-        NOW() + interval '1 year',
+        now(),
+        now() + interval '1 year',
         'manual'
     FROM context_insert
     RETURNING
@@ -617,8 +617,8 @@ grant_two AS (
         org_id,
         25,
         0,
-        NOW(),
-        NOW() + interval '1 year',
+        now(),
+        now() + interval '1 year',
         'manual'
     FROM context_insert
     RETURNING
@@ -667,7 +667,7 @@ consumptions AS (
         o.id,
         'mau'::public.credit_metric_type,
         6,
-        NOW()
+        now()
     FROM grant_one AS g,
         overage AS o
     UNION ALL
@@ -677,7 +677,7 @@ consumptions AS (
         o.id,
         'mau'::public.credit_metric_type,
         4,
-        NOW()
+        now()
     FROM grant_two AS g,
         overage AS o
 ),
@@ -699,7 +699,7 @@ deductions AS (
         'deduction'::public.credit_transaction_type,
         -6,
         94,
-        NOW() - interval '2 minutes',
+        now() - interval '2 minutes',
         'Overage deduction portion 1',
         jsonb_build_object('overage_event_id', o.id, 'metric', 'mau')
     FROM overage AS o,
@@ -711,7 +711,7 @@ deductions AS (
         'deduction'::public.credit_transaction_type,
         -4,
         90,
-        NOW() - interval '1 minute',
+        now() - interval '1 minute',
         'Overage deduction portion 2',
         jsonb_build_object('overage_event_id', o.id, 'metric', 'mau')
     FROM overage AS o,

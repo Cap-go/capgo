@@ -2,12 +2,13 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
-import { hasAppRightApikey, supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
+import { checkPermission } from '../../utils/rbac.ts'
+import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
 
 export interface RequestBuildBody {
   app_id: string
-  platform: 'ios' | 'android' | 'both'
+  platform: 'ios' | 'android'
   build_mode?: 'release' | 'debug'
   build_config?: Record<string, any>
   credentials?: Record<string, string>
@@ -61,7 +62,7 @@ export async function requestBuild(
     throw simpleError('missing_parameter', 'platform is required')
   }
 
-  if (!['ios', 'android', 'both'].includes(platform)) {
+  if (!['ios', 'android'].includes(platform)) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid platform', platform })
     throw simpleError('invalid_parameter', 'platform must be ios or android')
   }
@@ -76,8 +77,8 @@ export async function requestBuild(
     throw simpleError('invalid_parameter', 'build_config must be an object')
   }
 
-  // Check if the user has write access to this app
-  if (!(await hasAppRightApikey(c, app_id, apikey.user_id, 'write', apikey.key))) {
+  // Check if the user has permission to request builds (auth context set by middlewareKey)
+  if (!(await checkPermission(c, 'app.build_native', { appId: app_id }))) {
     cloudlogErr({
       requestId: c.get('requestId'),
       message: 'Unauthorized build request',

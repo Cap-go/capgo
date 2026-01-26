@@ -35,19 +35,19 @@ export function makeDevice(devBody: AppInfos | DeviceLink | AppStats): DeviceWit
 
 export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: Context, body: T, schema: ZodMiniObject, requireDevice = true) {
   if (Object.keys(body ?? {}).length === 0) {
-    return simpleError(getInvalidCode(c), 'Cannot parse body', { body })
+    throw simpleError(getInvalidCode(c), 'Cannot parse body', { body })
   }
   if (requireDevice && !body.device_id) {
-    return simpleError('missing_device_id', 'Cannot find device_id', { body })
+    throw simpleError('missing_device_id', 'Cannot find device_id', { body })
   }
   if (!body.app_id) {
-    return simpleError('missing_app_id', 'Cannot find app_id', { body })
+    throw simpleError('missing_app_id', 'Cannot find app_id', { body })
   }
   // Only validate version_build if it's provided (not required for GET /channel_self)
   if (body.version_build) {
     const coerce = tryParse(fixSemver(body.version_build))
     if (!coerce) {
-      return simpleError('semver_error', `Native version: ${body.version_build} doesn't follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo`, { version_build: body.version_build })
+      throw simpleError('semver_error', `Native version: ${body.version_build} doesn't follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo`, { version_build: body.version_build })
     }
     body.version_build = format(coerce)
   }
@@ -59,7 +59,7 @@ export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: C
   }
   const parseResult = schema.safeParse(body)
   if (!parseResult.success) {
-    return simpleError(getInvalidCode(c), 'Cannot parse body', { parseResult })
+    throw simpleError(getInvalidCode(c), 'Cannot parse body', { parseResult })
   }
   return body
 }

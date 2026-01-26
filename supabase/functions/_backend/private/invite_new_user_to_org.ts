@@ -5,9 +5,10 @@ import dayjs from 'dayjs'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { trackBentoEvent } from '../utils/bento.ts'
-import { middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { BRES, middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { supabaseClient } from '../utils/supabase.ts'
+import { checkPermission } from '../utils/rbac.ts'
+import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
 // Validate name to prevent HTML/script injection
@@ -19,7 +20,17 @@ const nameRegex = /^[\p{L}\s'-]+$/u
 const inviteUserSchema = z.object({
   email: z.email(),
   org_id: z.string().check(z.minLength(1)),
-  invite_type: z.enum(['read', 'upload', 'write', 'admin', 'super_admin']),
+  invite_type: z.enum([
+    'read',
+    'upload',
+    'write',
+    'admin',
+    'super_admin',
+    'org_member',
+    'org_billing_admin',
+    'org_admin',
+    'org_super_admin',
+  ]),
   captcha_token: z.string().check(z.minLength(1)),
   first_name: z.string().check(z.minLength(1), z.regex(nameRegex, 'First name contains invalid characters')),
   last_name: z.string().check(z.minLength(1), z.regex(nameRegex, 'Last name contains invalid characters')),
@@ -29,6 +40,49 @@ const captchaSchema = z.object({
   success: z.boolean(),
 })
 
+const legacyInviteRoles = ['read', 'upload', 'write', 'admin', 'super_admin'] as const
+const rbacInviteRoles = ['org_member', 'org_billing_admin', 'org_admin', 'org_super_admin'] as const
+
+type LegacyInviteRole = (typeof legacyInviteRoles)[number]
+type RbacInviteRole = (typeof rbacInviteRoles)[number]
+
+const rbacRoleToLegacy: Record<RbacInviteRole, Database['public']['Enums']['user_min_right']> = {
+  org_member: 'read',
+  org_billing_admin: 'read',
+  org_admin: 'admin',
+  org_super_admin: 'super_admin',
+}
+
+const legacyRoleToRbac: Partial<Record<LegacyInviteRole, RbacInviteRole>> = {
+  read: 'org_member',
+  upload: 'org_member',
+  write: 'org_member',
+  admin: 'org_admin',
+  super_admin: 'org_super_admin',
+}
+
+function resolveInviteRoles(inviteType: string, useNewRbac: boolean) {
+  if (!useNewRbac) {
+    if (rbacInviteRoles.includes(inviteType as RbacInviteRole)) {
+      throw simpleError('invalid_request', 'Invalid invite type')
+    }
+    return { legacyInviteType: inviteType as Database['public']['Enums']['user_min_right'], rbacRoleName: null }
+  }
+
+  if (rbacInviteRoles.includes(inviteType as RbacInviteRole)) {
+    const rbacRoleName = inviteType as RbacInviteRole
+    return { legacyInviteType: rbacRoleToLegacy[rbacRoleName], rbacRoleName }
+  }
+
+  if (legacyInviteRoles.includes(inviteType as LegacyInviteRole)) {
+    const legacyInviteType = inviteType as Database['public']['Enums']['user_min_right']
+    const rbacRoleName = legacyRoleToRbac[inviteType as LegacyInviteRole] ?? null
+    return { legacyInviteType, rbacRoleName }
+  }
+
+  throw simpleError('invalid_request', 'Invalid invite type')
+}
+
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
@@ -37,7 +91,7 @@ async function validateInvite(c: Context, rawBody: any) {
   // Validate the request body using Zod
   const validationResult = inviteUserSchema.safeParse(rawBody)
   if (!validationResult.success) {
-    return simpleError('invalid_request', 'Invalid request', { errors: z.prettifyError(validationResult.error) })
+    throw simpleError('invalid_request', 'Invalid request', { errors: z.prettifyError(validationResult.error) })
   }
 
   const body = validationResult.data
@@ -45,7 +99,18 @@ async function validateInvite(c: Context, rawBody: any) {
 
   const authorization = c.get('authorization')
   if (!authorization)
-    return { message: 'not authorized', status: 401 }
+    return quickError(401, 'not_authorized', 'Not authorized')
+
+  // Verify the user has permission to invite
+  // inviting super_admin requires org.update_user_roles, other roles require org.invite_user
+  const isSuperAdminInvite = body.invite_type === 'super_admin' || body.invite_type === 'org_super_admin'
+  const requiredPermission = isSuperAdminInvite ? 'org.update_user_roles' : 'org.invite_user'
+  if (!await checkPermission(c, requiredPermission, { orgId: body.org_id })) {
+    return quickError(403, 'not_authorized', 'Not authorized', {
+      requiredPermission,
+      orgId: body.org_id,
+    })
+  }
 
   // Verify captcha token with Cloudflare Turnstile
   await verifyCaptchaToken(c, body.captcha_token)
@@ -76,23 +141,30 @@ async function validateInvite(c: Context, rawBody: any) {
     return { message: 'Failed to invite user', error: orgError?.message ?? 'Organization not found', status: 500 }
   }
 
+  if (!org.name.match(nameRegex)) {
+    return { message: 'Failed to invite user due to invalid organization name', error: 'Organization name contains invalid characters', status: 400 }
+  }
+
+  const useNewRbac = org.use_new_rbac === true
+  const { legacyInviteType, rbacRoleName } = resolveInviteRoles(body.invite_type, useNewRbac)
+
   // Get current user ID from JWT
-  const { data: authData, error: authError } = await supabase.auth.getUser()
-  if (authError || !authData?.user?.id) {
-    return { message: 'Failed to get current user', error: authError?.message, status: 500 }
+  const authContext = c.get('auth')
+  if (!authContext?.userId) {
+    return { message: 'Failed to get current user', error: 'Not authorized', status: 500 }
   }
 
   // Get user details
   const { data: inviteCreatorUser, error: inviteCreatorUserError } = await supabase
     .from('users')
     .select('*')
-    .eq('id', authData.user.id)
+    .eq('id', authContext.userId)
     .single()
 
   if (inviteCreatorUserError) {
     return { message: 'Failed to invite user', error: inviteCreatorUserError.message, status: 500 }
   }
-  return { inviteCreatorUser, org, body, authorization }
+  return { inviteCreatorUser, org, body, authorization, legacyInviteType, rbacRoleName }
 }
 
 app.post('/', middlewareAuth, async (c) => {
@@ -101,7 +173,7 @@ app.post('/', middlewareAuth, async (c) => {
 
   const res = await validateInvite(c, rawBody)
   if (!res.inviteCreatorUser) {
-    return simpleError('failed_to_invite_user', 'Failed to invite user', { }, res.error ?? 'Failed to invite user')
+    throw simpleError('failed_to_invite_user', 'Failed to invite user', {}, res.error ?? 'Failed to invite user')
   }
   if (!res.org) {
     return quickError(404, 'organization_not_found', 'Organization not found')
@@ -110,13 +182,15 @@ app.post('/', middlewareAuth, async (c) => {
     return quickError(400, 'invalid_body', 'Invalid request body')
   }
   const body = res.body
+  const legacyInviteType = res.legacyInviteType
+  const rbacRoleName = res.rbacRoleName
   const inviteCreatorUser = res.inviteCreatorUser
   const org = res.org
 
-  // Use authenticated client for data queries - RLS will enforce access
-  const supabase = supabaseClient(c, res.authorization!)
+  // Use admin client for tmp_users operations since RLS blocks all access on that table
+  const supabaseAdminClient = supabaseAdmin(c)
 
-  const { data: existingInvitation } = await supabase
+  const { data: existingInvitation } = await supabaseAdminClient
     .from('tmp_users')
     .select('*')
     .eq('email', body.email)
@@ -127,15 +201,17 @@ app.post('/', middlewareAuth, async (c) => {
   if (existingInvitation) {
     const nowMinusThreeHours = dayjs().subtract(3, 'hours')
     if (!dayjs(nowMinusThreeHours).isAfter(dayjs(existingInvitation.cancelled_at))) {
-      return simpleError('user_already_invited', 'User already invited and it hasnt been 3 hours since the last invitation was cancelled')
+      throw simpleError('user_already_invited', 'User already invited and it hasnt been 3 hours since the last invitation was cancelled')
     }
 
-    const { error: updateInvitationError, data: updatedInvitationData } = await supabase
+    const { error: updateInvitationError, data: updatedInvitationData } = await supabaseAdminClient
       .from('tmp_users')
       .update({
         cancelled_at: null,
         first_name: body.first_name,
         last_name: body.last_name,
+        role: legacyInviteType,
+        rbac_role_name: rbacRoleName,
       })
       .eq('email', body.email)
       .eq('org_id', body.org_id)
@@ -143,22 +219,23 @@ app.post('/', middlewareAuth, async (c) => {
       .single()
 
     if (updateInvitationError) {
-      return simpleError('failed_to_invite_user', 'Failed to invite user', { }, updateInvitationError.message)
+      throw simpleError('failed_to_invite_user', 'Failed to invite user', {}, updateInvitationError.message)
     }
 
     newInvitation = updatedInvitationData
   }
   else {
-    const { error: createUserError, data: newInvitationData } = await supabase.from('tmp_users').insert({
+    const { error: createUserError, data: newInvitationData } = await supabaseAdminClient.from('tmp_users').insert({
       email: body.email,
       org_id: body.org_id,
-      role: body.invite_type,
+      role: legacyInviteType,
+      rbac_role_name: rbacRoleName,
       first_name: body.first_name,
       last_name: body.last_name,
     }).select('*').single()
 
     if (createUserError) {
-      return simpleError('failed_to_invite_user', 'Failed to invite user', { }, createUserError.message)
+      throw simpleError('failed_to_invite_user', 'Failed to invite user', {}, createUserError.message)
     }
 
     newInvitation = newInvitationData
@@ -172,16 +249,16 @@ app.post('/', middlewareAuth, async (c) => {
     invited_last_name: `${body.last_name}`,
   }, 'org:invite_new_capgo_user_to_org')
   if (!bentoEvent) {
-    return simpleError('failed_to_invite_user', 'Failed to invite user', { }, 'Failed to track bento event')
+    throw simpleError('failed_to_invite_user', 'Failed to invite user', {}, 'Failed to track bento event')
   }
-  return c.json({ status: 'User invited successfully' })
+  return c.json(BRES)
 })
 
 // Function to verify Cloudflare Turnstile token
 async function verifyCaptchaToken(c: Context, token: string) {
   const captchaSecret = getEnv(c, 'CAPTCHA_SECRET_KEY')
   if (!captchaSecret) {
-    return simpleError('captcha_secret_key_not_set', 'CAPTCHA_SECRET_KEY not set')
+    throw simpleError('captcha_secret_key_not_set', 'CAPTCHA_SECRET_KEY not set')
   }
 
   // "/siteverify" API endpoint.
@@ -200,10 +277,10 @@ async function verifyCaptchaToken(c: Context, token: string) {
   const captchaResult = await result.json()
   const captchaResultData = captchaSchema.safeParse(captchaResult)
   if (!captchaResultData.success) {
-    return simpleError('invalid_captcha', 'Invalid captcha result')
+    throw simpleError('invalid_captcha', 'Invalid captcha result')
   }
   cloudlog({ requestId: c.get('requestId'), context: 'captcha_result', captchaResultData })
   if (captchaResultData.data.success !== true) {
-    return simpleError('invalid_captcha', 'Invalid captcha result')
+    throw simpleError('invalid_captcha', 'Invalid captcha result')
   }
 }

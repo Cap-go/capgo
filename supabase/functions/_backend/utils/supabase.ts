@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
-import type { DeviceWithoutCreatedAt, Order, ReadDevicesParams, ReadStatsParams } from './types.ts'
+import type { DeviceWithoutCreatedAt, Order, ReadDevicesParams, ReadStatsParams, VersionUsage } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
 import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged } from './deviceComparison.ts'
 import { simpleError } from './hono.ts'
@@ -56,7 +56,7 @@ export function supabaseWithAuth(c: Context, auth: AuthInfo) {
     return supabaseApikey(c, auth.apikey.key)
   }
   else {
-    return simpleError('not_authorized', 'Not authorized')
+    throw simpleError('not_authorized', 'Not authorized')
   }
 }
 
@@ -722,7 +722,6 @@ export async function getDefaultPlan(c: Context) {
 
 export async function createStripeCustomer(c: Context, org: Database['public']['Tables']['orgs']['Row']) {
   const customer = await createCustomer(c, org.management_email, org.created_by, org.id, org.name)
-  // create date + 15 days
   const trial_at = new Date()
   trial_at.setDate(trial_at.getDate() + 15)
   const soloPlan = await getDefaultPlan(c)
@@ -752,6 +751,34 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
   cloudlog({ requestId: c.get('requestId'), message: 'stripe_info done' })
 }
 
+export async function finalizePendingStripeCustomer(c: Context, org: Database['public']['Tables']['orgs']['Row']) {
+  const pendingCustomerId = org.customer_id
+  if (!pendingCustomerId?.startsWith('pending_')) {
+    cloudlog({ requestId: c.get('requestId'), message: 'finalizePendingStripeCustomer: not a pending customer_id', pendingCustomerId })
+    return
+  }
+
+  await createStripeCustomer(c, { ...org, customer_id: null })
+
+  const { data: updatedOrg } = await supabaseAdmin(c)
+    .from('orgs')
+    .select('customer_id')
+    .eq('id', org.id)
+    .single()
+
+  if (!updatedOrg?.customer_id || updatedOrg.customer_id.startsWith('pending_')) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'finalizePendingStripeCustomer: org still has pending customer_id, skipping delete' })
+    return
+  }
+
+  const { error: deleteError } = await supabaseAdmin(c)
+    .from('stripe_info')
+    .delete()
+    .eq('customer_id', pendingCustomerId)
+  if (deleteError)
+    cloudlogErr({ requestId: c.get('requestId'), message: 'finalizePendingStripeCustomer: orphan pending stripe_info', deleteError })
+}
+
 export function trackBandwidthUsageSB(
   c: Context,
   deviceId: string,
@@ -771,18 +798,19 @@ export function trackBandwidthUsageSB(
 
 export function trackVersionUsageSB(
   c: Context,
-  versionId: number,
+  versionName: string,
   appId: string,
   action: Database['public']['Enums']['version_action'],
 ) {
+  // Type cast needed: version_usage table now has version_name but auto-generated types are stale
   return supabaseAdmin(c)
     .from('version_usage')
     .insert([
       {
-        version_id: versionId,
+        version_name: versionName,
         app_id: appId,
         action,
-      },
+      } as unknown as { version_id: number, app_id: string, action: typeof action },
     ])
 }
 
@@ -895,10 +923,11 @@ export async function readStatsStorageSB(c: Context, app_id: string, period_star
   return data ?? []
 }
 
-export async function readStatsVersionSB(c: Context, app_id: string, period_start: string, period_end: string) {
+export async function readStatsVersionSB(c: Context, app_id: string, period_start: string, period_end: string): Promise<VersionUsage[]> {
   const { data } = await supabaseAdmin(c)
     .rpc('read_version_usage', { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
-  return data ?? []
+  // Cast to VersionUsage[] - the SQL function returns version_name but auto-generated types are stale
+  return (data ?? []) as unknown as VersionUsage[]
 }
 
 export async function readStatsSB(c: Context, params: ReadStatsParams) {

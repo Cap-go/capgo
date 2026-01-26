@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
 import { Camera } from '@capacitor/camera'
 import { FormKit, FormKitMessages } from '@formkit/vue'
+import { computedAsync } from '@vueuse/core'
 import mime from 'mime'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
@@ -13,6 +13,7 @@ import transfer from '~icons/mingcute/transfer-horizontal-line?raw&width=36&heig
 import gearSix from '~icons/ph/gear-six?raw'
 import iconName from '~icons/ph/user?raw'
 import Toggle from '~/components/Toggle.vue'
+import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
@@ -24,20 +25,73 @@ const supabase = useSupabase()
 const appRef = ref<Database['public']['Tables']['apps']['Row'] & { owner_org: Database['public']['Tables']['orgs']['Row'] } | null>(null)
 const { t } = useI18n()
 const dialogStore = useDialogV2Store()
-const role = ref<OrganizationRole | null>(null)
 const forceBump = ref(0)
 const forceDownloadBump = ref(0)
 const organizationStore = useOrganizationStore()
 const transferAppIdInput = ref('')
 const selectedChannel = ref('')
 const uploadSearch = ref('')
-const channels = ref<Array<{ id: number, name: string, ios: boolean, android: boolean, public: boolean }>>([])
+const channels = ref<Array<{ id: number, name: string, ios: boolean, android: boolean, electron: boolean, public: boolean }>>([])
 const selectedDownloadChannels = ref<{ ios: string, android: string }>({ ios: '', android: '' })
 const splitDownloadDefaults = ref(false)
 const selectedCombinedChannel = ref('')
 const combinedSearch = ref('')
 const iosSearch = ref('')
 const androidSearch = ref('')
+
+const canUpdateSettings = computedAsync(async () => {
+  if (!appRef.value)
+    return false
+  return await checkPermissions('app.update_settings', { appId: props.appId })
+}, false)
+
+const canDeleteApp = computedAsync(async () => {
+  if (!appRef.value)
+    return false
+  return await checkPermissions('app.delete', { appId: props.appId })
+}, false)
+
+// Retention presets (value in seconds)
+const RETENTION_PRESETS = [
+  { value: 0, labelKey: 'retention-immediate' },
+  { value: 604800, labelKey: 'retention-7-days' },
+  { value: 2592000, labelKey: 'retention-30-days' },
+  { value: 7776000, labelKey: 'retention-90-days' },
+  { value: 15552000, labelKey: 'retention-6-months' },
+  { value: 31536000, labelKey: 'retention-1-year' },
+  { value: 63113904, labelKey: 'retention-never' },
+  { value: -1, labelKey: 'retention-custom' },
+]
+
+const selectedRetentionPreset = ref<number>(2592000)
+const customRetentionValue = ref<number>(0)
+
+const isCustomRetention = computed(() => selectedRetentionPreset.value === -1)
+
+const retentionOptions = computed(() => {
+  return RETENTION_PRESETS.map(preset => ({
+    label: t(preset.labelKey),
+    value: preset.value,
+  }))
+})
+
+const effectiveRetentionValue = computed(() => {
+  return selectedRetentionPreset.value === -1
+    ? customRetentionValue.value
+    : selectedRetentionPreset.value
+})
+
+function initializeRetentionPreset() {
+  const current = appRef.value?.retention ?? 2592000
+  const preset = RETENTION_PRESETS.find(p => p.value !== -1 && p.value === current)
+  if (preset) {
+    selectedRetentionPreset.value = preset.value
+  }
+  else {
+    selectedRetentionPreset.value = -1
+    customRetentionValue.value = current
+  }
+}
 
 onMounted(async () => {
   isLoading.value = true
@@ -56,8 +110,8 @@ onMounted(async () => {
   }
 
   await organizationStore.awaitInitialLoad()
-  role.value = organizationStore.getCurrentRoleForApp(props.appId)
   appRef.value = data as any
+  initializeRetentionPreset()
   await loadChannels()
   isLoading.value = false
   isFirstLoading.value = false
@@ -94,6 +148,11 @@ async function deleteApp() {
   if (await didCancel(t('app')))
     return
 
+  if (!canDeleteApp.value) {
+    toast.error(t('no-permission'))
+    return
+  }
+
   try {
     const org = organizationStore.getOrgByAppId(props.appId)
     const { error: errorIcon } = await supabase.storage
@@ -121,9 +180,9 @@ async function deleteApp() {
   }
 }
 
-async function submit(form: { app_name: string, retention: number, expose_metadata: boolean, allow_preview: boolean }) {
+async function submit(form: { app_name: string, expose_metadata: boolean, allow_preview: boolean }) {
   isLoading.value = true
-  if (role.value && !organizationStore.hasPermissionsInRole(role.value, ['super_admin'])) {
+  if (!canUpdateSettings.value) {
     toast.error(t('no-permission'))
     isLoading.value = false
     return
@@ -137,7 +196,7 @@ async function submit(form: { app_name: string, retention: number, expose_metada
   }
 
   try {
-    await updateAppRetention(form.retention)
+    await updateAppRetention(effectiveRetentionValue.value)
   }
   catch (error) {
     toast.error(error as string)
@@ -191,7 +250,7 @@ async function updateAppRetention(newRetention: number) {
     return Promise.reject(t('retention-cannot-be-negative'))
   }
 
-  if (newRetention >= 63113904) {
+  if (newRetention > 63113904) {
     return Promise.reject(t('retention-to-big'))
   }
 
@@ -235,7 +294,7 @@ async function updateAllowPreview(newAllowPreview: boolean) {
 async function loadChannels() {
   const { data, error } = await supabase
     .from('channels')
-    .select('id, name, ios, android, public')
+    .select('id, name, ios, android, electron, public')
     .eq('app_id', props.appId)
 
   if (error) {
@@ -283,7 +342,7 @@ const visibleUploadChannels = computed(() => {
 const uploadHasHidden = computed(() => !uploadSearch.value.trim() && filteredUploadChannels.value.length > 3)
 
 async function setDefaultChannel() {
-  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin'])) {
+  if (!canUpdateSettings.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -412,7 +471,7 @@ const downloadChannelLabel = computed(() => {
 })
 
 async function openDefaultDownloadChannelDialog() {
-  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin'])) {
+  if (!canUpdateSettings.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -569,6 +628,7 @@ async function openDefaultDownloadChannelDialog() {
             .eq('app_id', props.appId)
             .eq('ios', false)
             .eq('android', false)
+            .eq('electron', false)
 
           if (hiddenError) {
             toast.error(t('cannot-change-default-download-channel'))
@@ -617,15 +677,8 @@ function setUnifiedDownloadMode(unified: boolean) {
   }
 }
 
-const isSuperAdmin = computed(() => {
-  // TODO: check if that is smart to not let admins delete apps
-  if (!role.value)
-    return false
-  return organizationStore.hasPermissionsInRole(role.value as any, ['super_admin'])
-})
-
 async function editPhoto() {
-  if (role.value && !organizationStore.hasPermissionsInRole(role.value, ['super_admin'])) {
+  if (!canUpdateSettings.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -780,9 +833,7 @@ function confirmTransferAppOwnership(org: Organization) {
 }
 
 async function transferAppOwnership() {
-  const transferHistory: { transferred_at: string }[] = (appRef.value as any) ?? []
-  if (!transferHistory || transferHistory.length === 0)
-    return
+  const transferHistory: { transferred_at: string }[] = ((appRef.value as any)?.transfer_history as any) ?? []
   const lastTransfer = transferHistory.length > 0
     ? transferHistory.sort((a, b) =>
       new Date(b.transferred_at).getTime() - new Date(a.transferred_at).getTime(),
@@ -790,6 +841,13 @@ async function transferAppOwnership() {
     : null
   if (lastTransfer && new Date(lastTransfer.transferred_at).getTime() + 32 * 24 * 60 * 60 * 1000 > Date.now()) {
     toast.error(t('transfer-app-ownership-too-soon'))
+    return
+  }
+
+  // Check if user has permission to transfer this app
+  const canTransfer = await checkPermissions('app.transfer', { appId: props.appId })
+  if (!canTransfer) {
+    toast.error(t('no-permission'))
     return
   }
 
@@ -812,9 +870,17 @@ async function transferAppOwnership() {
   if (await dialogStore.onDialogDismiss())
     return
 
-  // Step 2: Organization selection
-  const superAdminOrganizations = organizationStore.organizations.filter(org => org.role === 'super_admin' && org.gid !== appRef.value?.owner_org.id)
-  if (superAdminOrganizations.length === 0) {
+  // Step 2: Organization selection - filter orgs where user has transfer permission
+  const destinationOrgs = await Promise.all(
+    organizationStore.organizations
+      .filter(org => org.gid !== appRef.value?.owner_org.id)
+      .map(async (org) => {
+        const hasTransferPermission = await checkPermissions('app.transfer', { orgId: org.gid })
+        return hasTransferPermission ? org : null
+      }),
+  ).then(results => results.filter((org): org is NonNullable<typeof org> => org !== null))
+
+  if (destinationOrgs.length === 0) {
     toast.error(t('no-super-admin-organizations'))
     return
   }
@@ -825,10 +891,11 @@ async function transferAppOwnership() {
     size: 'xl',
     preventAccidentalClose: true,
     buttons: [
-      ...superAdminOrganizations.map(org => ({
+      ...destinationOrgs.map(org => ({
         text: org.name,
         role: 'secondary' as const,
-        handler: async () => {
+        preventClose: true,
+        handler: () => {
           confirmTransferAppOwnership(org)
         },
       })),
@@ -981,14 +1048,34 @@ async function transferAppOwnership() {
                   </template>
                 </FormKit>
               </div>
+              <!-- Bundle Retention Setting -->
               <FormKit
-                type="number"
-                number="integer"
-                name="retention"
+                v-model="selectedRetentionPreset"
+                type="select"
+                name="retention_preset"
                 :prefix-icon="gearSix"
-                :value="appRef?.retention ?? 0"
-                :label="t('retention')"
+                :label="t('retention-label')"
+                :options="retentionOptions"
               />
+              <div v-if="isCustomRetention">
+                <FormKit
+                  v-model="customRetentionValue"
+                  type="number"
+                  number="integer"
+                  name="custom_retention"
+                  :prefix-icon="gearSix"
+                  :label="t('retention-custom-value')"
+                  :help="t('retention-custom-help')"
+                  :min="0"
+                  :max="63113903"
+                />
+              </div>
+              <p v-if="effectiveRetentionValue === 0" class="text-xs font-medium text-amber-600 dark:text-amber-400">
+                {{ t('retention-immediate-warning') }}
+              </p>
+              <p v-if="effectiveRetentionValue >= 63113904" class="text-xs font-medium text-blue-600 dark:text-blue-400">
+                {{ t('retention-never-info') }}
+              </p>
               <FormKit
                 type="checkbox"
                 name="expose_metadata"
@@ -1042,7 +1129,7 @@ async function transferAppOwnership() {
       <footer>
         <div class="flex flex-col py-5 px-6 border-t dark:border-slate-600">
           <div class="flex self-end">
-            <button v-if="isSuperAdmin" type="button" class="p-2 text-red-600 rounded-lg border border-red-400 hover:text-white hover:bg-red-600" @click="deleteApp()">
+            <button v-if="canDeleteApp" type="button" class="p-2 text-red-600 rounded-lg border border-red-400 hover:text-white hover:bg-red-600" @click="deleteApp()">
               {{ t('delete-app') }}
             </button>
             <button

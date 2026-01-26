@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, ORG_ID, getSupabaseClient, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { BASE_URL, ORG_ID_CRON_APP, STRIPE_CUSTOMER_ID_CRON_APP, getSupabaseClient, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const appId = `com.cron.${randomUUID().slice(0, 8)}`
 
@@ -11,14 +11,17 @@ const triggerHeaders = {
 
 describe('[POST] /triggers/cron_stat_app', () => {
   beforeAll(async () => {
-    await resetAndSeedAppData(appId)
+    await resetAndSeedAppData(appId, {
+      orgId: ORG_ID_CRON_APP,
+      stripeCustomerId: STRIPE_CUSTOMER_ID_CRON_APP,
+    })
     await resetAndSeedAppDataStats(appId)
 
     const supabase = getSupabaseClient()
     const { error } = await supabase
       .from('orgs')
       .update({ stats_updated_at: null })
-      .eq('id', ORG_ID)
+      .eq('id', ORG_ID_CRON_APP)
     if (error)
       throw error
   })
@@ -34,7 +37,7 @@ describe('[POST] /triggers/cron_stat_app', () => {
       headers: triggerHeaders,
       body: JSON.stringify({
         appId,
-        orgId: ORG_ID,
+        orgId: ORG_ID_CRON_APP,
       }),
     })
 
@@ -46,7 +49,7 @@ describe('[POST] /triggers/cron_stat_app', () => {
     const { data: org, error } = await supabase
       .from('orgs')
       .select('stats_updated_at')
-      .eq('id', ORG_ID)
+      .eq('id', ORG_ID_CRON_APP)
       .single()
 
     expect(error).toBeNull()
@@ -69,7 +72,7 @@ describe('[POST] /triggers/cron_stat_app', () => {
     await supabase
       .from('stripe_info')
       .update({ plan_calculated_at: null })
-      .eq('customer_id', 'cus_Pa0k8TO6HVln6A') // From seed data
+      .eq('customer_id', STRIPE_CUSTOMER_ID_CRON_APP)
       .throwOnError()
 
     const response = await fetch(`${BASE_URL}/triggers/cron_stat_app`, {
@@ -77,7 +80,7 @@ describe('[POST] /triggers/cron_stat_app', () => {
       headers: triggerHeaders,
       body: JSON.stringify({
         appId,
-        orgId: ORG_ID,
+        orgId: ORG_ID_CRON_APP,
       }),
     })
 
@@ -88,8 +91,8 @@ describe('[POST] /triggers/cron_stat_app', () => {
     // Verify that the queue function can be called (indicates plan processing was queued)
     // We can't easily check queue contents, but we can verify the function works
     const { error: queueError } = await supabase.rpc('queue_cron_stat_org_for_org', {
-      org_id: ORG_ID,
-      customer_id: 'cus_Pa0k8TO6HVln6A'
+      org_id: ORG_ID_CRON_APP,
+      customer_id: STRIPE_CUSTOMER_ID_CRON_APP,
     })
 
     expect(queueError).toBeNull()

@@ -3,7 +3,7 @@ import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 import { Pool } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { ORG_ID, POSTGRES_URL } from './test-utils'
+import { ORG_ID_OVERAGE, POSTGRES_URL } from './test-utils'
 
 const supabaseUrl = env.SUPABASE_URL as string
 const supabaseServiceKey = env.SUPABASE_SERVICE_KEY as string
@@ -33,10 +33,10 @@ describe('overage Tracking - Duplicate Prevention', () => {
     pgPool = new Pool({ connectionString: POSTGRES_URL })
 
     // Clean up any existing overage events for our test org
-    await pgPool.query('DELETE FROM usage_overage_events WHERE org_id = $1', [ORG_ID])
-    await pgPool.query('DELETE FROM usage_credit_transactions WHERE org_id = $1', [ORG_ID])
-    await pgPool.query('DELETE FROM usage_credit_consumptions WHERE org_id = $1', [ORG_ID])
-    await pgPool.query('DELETE FROM usage_credit_grants WHERE org_id = $1', [ORG_ID])
+    await pgPool.query('DELETE FROM usage_overage_events WHERE org_id = $1', [ORG_ID_OVERAGE])
+    await pgPool.query('DELETE FROM usage_credit_transactions WHERE org_id = $1', [ORG_ID_OVERAGE])
+    await pgPool.query('DELETE FROM usage_credit_consumptions WHERE org_id = $1', [ORG_ID_OVERAGE])
+    await pgPool.query('DELETE FROM usage_credit_grants WHERE org_id = $1', [ORG_ID_OVERAGE])
   })
 
   afterAll(async () => {
@@ -53,7 +53,7 @@ describe('overage Tracking - Duplicate Prevention', () => {
     // Call apply_usage_overage 5 times with identical parameters
     for (let i = 0; i < 5; i++) {
       const { data, error } = await retryRpc(() => supabase.rpc('apply_usage_overage', {
-        p_org_id: ORG_ID,
+        p_org_id: ORG_ID_OVERAGE,
         p_metric: testMetric,
         p_overage_amount: overageAmount,
         p_billing_cycle_start: billingStart.toISOString(),
@@ -71,7 +71,7 @@ describe('overage Tracking - Duplicate Prevention', () => {
        WHERE org_id = $1 AND metric = $2
          AND billing_cycle_start = $3::date
          AND billing_cycle_end = $4::date`,
-      [ORG_ID, testMetric, billingStart.toISOString(), billingEnd.toISOString()],
+      [ORG_ID_OVERAGE, testMetric, billingStart.toISOString(), billingEnd.toISOString()],
     )
 
     const recordCount = Number.parseInt(result.rows[0].count)
@@ -87,7 +87,7 @@ describe('overage Tracking - Duplicate Prevention', () => {
 
     // First call with initial overage
     await retryRpc(() => supabase.rpc('apply_usage_overage', {
-      p_org_id: ORG_ID,
+      p_org_id: ORG_ID_OVERAGE,
       p_metric: testMetric,
       p_overage_amount: 1000000,
       p_billing_cycle_start: billingStart.toISOString(),
@@ -97,7 +97,7 @@ describe('overage Tracking - Duplicate Prevention', () => {
 
     // Second call with significantly higher overage (>1% increase)
     await retryRpc(() => supabase.rpc('apply_usage_overage', {
-      p_org_id: ORG_ID,
+      p_org_id: ORG_ID_OVERAGE,
       p_metric: testMetric,
       p_overage_amount: 2000000, // 100% increase
       p_billing_cycle_start: billingStart.toISOString(),
@@ -111,7 +111,7 @@ describe('overage Tracking - Duplicate Prevention', () => {
        WHERE org_id = $1 AND metric = $2
          AND billing_cycle_start = $3::date
          AND billing_cycle_end = $4::date`,
-      [ORG_ID, testMetric, billingStart.toISOString(), billingEnd.toISOString()],
+      [ORG_ID_OVERAGE, testMetric, billingStart.toISOString(), billingEnd.toISOString()],
     )
 
     expect(Number.parseInt(result.rows[0].count)).toBe(2)
@@ -127,12 +127,12 @@ describe('overage Tracking - Duplicate Prevention', () => {
     await pgPool.query(
       `INSERT INTO usage_credit_grants (org_id, credits_total, credits_consumed, granted_at, expires_at, source, source_ref)
        VALUES ($1, 100, 0, NOW(), NOW() + INTERVAL '30 days', 'manual', '{"test": true}')`,
-      [ORG_ID],
+      [ORG_ID_OVERAGE],
     )
 
     // Call with credits available - should apply them
     const { data: firstCall, error: firstError } = await retryRpc(() => supabase.rpc('apply_usage_overage', {
-      p_org_id: ORG_ID,
+      p_org_id: ORG_ID_OVERAGE,
       p_metric: testMetric,
       p_overage_amount: overageAmount,
       p_billing_cycle_start: billingStart.toISOString(),
@@ -147,7 +147,7 @@ describe('overage Tracking - Duplicate Prevention', () => {
 
     // Second call with same params - should NOT create new record (no new credits, same overage)
     const { error: secondError } = await retryRpc(() => supabase.rpc('apply_usage_overage', {
-      p_org_id: ORG_ID,
+      p_org_id: ORG_ID_OVERAGE,
       p_metric: testMetric,
       p_overage_amount: overageAmount,
       p_billing_cycle_start: billingStart.toISOString(),
@@ -163,7 +163,7 @@ describe('overage Tracking - Duplicate Prevention', () => {
        WHERE org_id = $1 AND metric = $2
          AND billing_cycle_start = $3::date
          AND billing_cycle_end = $4::date`,
-      [ORG_ID, testMetric, billingStart.toISOString(), billingEnd.toISOString()],
+      [ORG_ID_OVERAGE, testMetric, billingStart.toISOString(), billingEnd.toISOString()],
     )
 
     expect(Number.parseInt(result.rows[0].count)).toBe(1)
@@ -176,7 +176,7 @@ describe('overage Tracking - Duplicate Prevention', () => {
 
     // First call
     await retryRpc(() => supabase.rpc('apply_usage_overage', {
-      p_org_id: ORG_ID,
+      p_org_id: ORG_ID_OVERAGE,
       p_metric: testMetric,
       p_overage_amount: 100000,
       p_billing_cycle_start: billingStart.toISOString(),
@@ -186,7 +186,7 @@ describe('overage Tracking - Duplicate Prevention', () => {
 
     // Second call with tiny increase (0.5%)
     await retryRpc(() => supabase.rpc('apply_usage_overage', {
-      p_org_id: ORG_ID,
+      p_org_id: ORG_ID_OVERAGE,
       p_metric: testMetric,
       p_overage_amount: 100500, // Only 0.5% increase
       p_billing_cycle_start: billingStart.toISOString(),
@@ -200,7 +200,7 @@ describe('overage Tracking - Duplicate Prevention', () => {
        WHERE org_id = $1 AND metric = $2
          AND billing_cycle_start = $3::date
          AND billing_cycle_end = $4::date`,
-      [ORG_ID, testMetric, billingStart.toISOString(), billingEnd.toISOString()],
+      [ORG_ID_OVERAGE, testMetric, billingStart.toISOString(), billingEnd.toISOString()],
     )
 
     expect(Number.parseInt(result.rows[0].count)).toBe(1)

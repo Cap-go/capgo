@@ -5,8 +5,9 @@ import { parseBody, quickError, simpleError } from '../utils/hono.ts'
 import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
+import { checkPermission } from '../utils/rbac.ts'
 import { s3 } from '../utils/s3.ts'
-import { hasAppRightApikey, supabaseApikey } from '../utils/supabase.ts'
+import { supabaseApikey } from '../utils/supabase.ts'
 
 interface DataUpload {
   name: string
@@ -26,15 +27,16 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     return quickError(404, 'user_not_found', 'Error User not found', { _errorUserId })
   }
 
-  if (!(await hasAppRightApikey(c, body.app_id, userId, 'read', capgkey))) {
-    return simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.app_id })
+  // Auth context is already set by middlewareKey
+  if (!(await checkPermission(c, 'app.upload_bundle', { appId: body.app_id }))) {
+    throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.app_id })
   }
 
   const { data: app, error: errorApp } = await supabaseApikey(c, capgkey)
     .from('apps')
     .select('app_id, owner_org')
     .eq('app_id', body.app_id)
-  // .eq('user_id', userId)
+    // .eq('user_id', userId)
     .single()
   if (errorApp) {
     return quickError(404, 'error_app_not_found', 'Error App not found', { errorApp })
@@ -62,12 +64,12 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   // check if object exist in r2
   const exist = await s3.checkIfExist(c, filePath)
   if (exist) {
-    return simpleError('error_already_exist', 'Error already exist', { exist })
+    throw simpleError('error_already_exist', 'Error already exist', { exist })
   }
 
   const url = await s3.getUploadUrl(c, filePath)
   if (!url) {
-    return simpleError('cannot_get_upload_link', 'Cannot get upload link', { url })
+    throw simpleError('cannot_get_upload_link', 'Cannot get upload link', { url })
   }
 
   const LogSnag = logsnag(c)
@@ -88,7 +90,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     .eq('id', version.id)
 
   if (changeError) {
-    return simpleError('cannot_update_supabase', 'Cannot update supabase', { changeError })
+    throw simpleError('cannot_update_supabase', 'Cannot update supabase', { changeError })
   }
 
   return c.json(response)

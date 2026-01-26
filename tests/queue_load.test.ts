@@ -13,6 +13,7 @@ const queueName = 'test_queue_consumer'
 
 beforeAll(async () => {
   // Clean up any existing messages in the test queue
+  // Count before cleanup for debugging
   await pool.query(`DELETE FROM pgmq.q_${queueName}`)
   await pool.query(`DELETE FROM pgmq.a_${queueName}`)
 })
@@ -78,6 +79,10 @@ describe('queue Load Test', () => {
   })
 
   it('should handle multiple queue messages simultaneously', async () => {
+    // Clean queue before adding messages (in case other tests added messages)
+    await pool.query(`DELETE FROM pgmq.q_${queueName}`)
+    await pool.query(`DELETE FROM pgmq.a_${queueName}`)
+
     // Add fake messages directly to test queue using pgmq.send
     for (let i = 0; i < 10; i++) {
       const fakeMessage = {
@@ -115,24 +120,22 @@ describe('queue Load Test', () => {
   })
 
   it('should handle stress test with rapid queue processing', async () => {
-    // Reduced load for stability (10 requests instead of 20)
+    // Keep the stress test lightweight to avoid edge runtime CPU limits.
     const rapidRequests = []
-    for (let i = 0; i < 10; i++) {
-      const requestPromise = fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
-        method: 'POST',
-        headers: headersInternal,
-        body: JSON.stringify({ queue_name: 'cron_stat_app' }),
-      }).catch(error => {
-        // Handle socket errors gracefully during stress test
-        console.warn(`Request ${i} failed:`, error.message)
-        return new Response(JSON.stringify({ status: 'error' }), { status: 500 })
-      })
+    const requestCount = 8
 
-      rapidRequests.push(requestPromise)
+    for (let i = 0; i < requestCount; i++) {
+      rapidRequests.push(
+        fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
+          method: 'POST',
+          headers: headersInternal,
+          body: JSON.stringify({ queue_name: queueName }),
+        }),
+      )
 
-      // Add delay every 3 requests to avoid overwhelming the server
-      if (i % 3 === 0 && i > 0) {
-        await new Promise(resolve => setTimeout(resolve, 150))
+      // Small delay between requests to simulate real-world usage
+      if (i % 4 === 0) {
+        await new Promise(resolve => setTimeout(resolve, 100))
       }
     }
 

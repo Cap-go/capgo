@@ -10,47 +10,47 @@ SELECT plan(22);
 SELECT
     is(
         is_apikey_expired(NULL),
-        false,
+        FALSE,
         'is_apikey_expired: NULL expires_at returns false (never expires)'
     );
 
 -- Test 2: Future expiration should return false
 SELECT
     is(
-        is_apikey_expired(NOW() + interval '1 day'),
-        false,
+        is_apikey_expired(now() + interval '1 day'),
+        FALSE,
         'is_apikey_expired: Future date returns false (not expired)'
     );
 
 -- Test 3: Past expiration should return true
 SELECT
     is(
-        is_apikey_expired(NOW() - interval '1 day'),
-        true,
+        is_apikey_expired(now() - interval '1 day'),
+        TRUE,
         'is_apikey_expired: Past date returns true (expired)'
     );
 
 -- Test 4: Expiration exactly at now should return false (not yet expired)
 SELECT
     is(
-        is_apikey_expired(NOW()),
-        false,
+        is_apikey_expired(now()),
+        FALSE,
         'is_apikey_expired: Current time returns false (boundary case)'
     );
 
 -- Test 5: Far future expiration
 SELECT
     is(
-        is_apikey_expired(NOW() + interval '1 year'),
-        false,
+        is_apikey_expired(now() + interval '1 year'),
+        FALSE,
         'is_apikey_expired: 1 year in future returns false'
     );
 
 -- Test 6: Just expired (1 second ago)
 SELECT
     is(
-        is_apikey_expired(NOW() - interval '1 second'),
-        true,
+        is_apikey_expired(now() - interval '1 second'),
+        TRUE,
         'is_apikey_expired: 1 second ago returns true (just expired)'
     );
 
@@ -61,23 +61,68 @@ SELECT
 -- Create test API keys with different expiration dates
 INSERT INTO apikeys (id, user_id, key, mode, name, expires_at)
 VALUES
-    -- Key expired 31 days ago (should be deleted)
-    (99901, '6aa76066-55ef-4238-ade6-0b32334a4097', 'test-key-expired-31d', 'all', 'Test Expired 31 days', NOW() - interval '31 days'),
-    -- Key expired 35 days ago (should be deleted)
-    (99902, '6aa76066-55ef-4238-ade6-0b32334a4097', 'test-key-expired-35d', 'all', 'Test Expired 35 days', NOW() - interval '35 days'),
-    -- Key expired 29 days ago (should NOT be deleted - within grace period)
-    (99903, '6aa76066-55ef-4238-ade6-0b32334a4097', 'test-key-expired-29d', 'all', 'Test Expired 29 days', NOW() - interval '29 days'),
-    -- Key expired 1 day ago (should NOT be deleted - within grace period)
-    (99904, '6aa76066-55ef-4238-ade6-0b32334a4097', 'test-key-expired-1d', 'all', 'Test Expired 1 day', NOW() - interval '1 day'),
-    -- Key not expired yet (should NOT be deleted)
-    (99905, '6aa76066-55ef-4238-ade6-0b32334a4097', 'test-key-not-expired', 'all', 'Test Not Expired', NOW() + interval '30 days'),
-    -- Key with no expiration (should NOT be deleted)
-    (99906, '6aa76066-55ef-4238-ade6-0b32334a4097', 'test-key-no-expiry', 'all', 'Test No Expiry', NULL);
+-- Key expired 31 days ago (should be deleted)
+(
+    99901,
+    '6aa76066-55ef-4238-ade6-0b32334a4097',
+    'test-key-expired-31d',
+    'all',
+    'Test Expired 31 days',
+    now() - interval '31 days'
+),
+-- Key expired 35 days ago (should be deleted)
+(
+    99902,
+    '6aa76066-55ef-4238-ade6-0b32334a4097',
+    'test-key-expired-35d',
+    'all',
+    'Test Expired 35 days',
+    now() - interval '35 days'
+),
+-- Key expired 29 days ago (should NOT be deleted - within grace period)
+(
+    99903,
+    '6aa76066-55ef-4238-ade6-0b32334a4097',
+    'test-key-expired-29d',
+    'all',
+    'Test Expired 29 days',
+    now() - interval '29 days'
+),
+-- Key expired 1 day ago (should NOT be deleted - within grace period)
+(
+    99904,
+    '6aa76066-55ef-4238-ade6-0b32334a4097',
+    'test-key-expired-1d',
+    'all',
+    'Test Expired 1 day',
+    now() - interval '1 day'
+),
+-- Key not expired yet (should NOT be deleted)
+(
+    99905,
+    '6aa76066-55ef-4238-ade6-0b32334a4097',
+    'test-key-not-expired',
+    'all',
+    'Test Not Expired',
+    now() + interval '30 days'
+),
+-- Key with no expiration (should NOT be deleted)
+(
+    99906,
+    '6aa76066-55ef-4238-ade6-0b32334a4097',
+    'test-key-no-expiry',
+    'all',
+    'Test No Expiry',
+    NULL
+);
 
 -- Test 7: Verify test keys exist before cleanup
 SELECT
     is(
-        (SELECT COUNT(*) FROM apikeys WHERE id IN (99901, 99902, 99903, 99904, 99905, 99906))::integer,
+        (
+            SELECT count(*) FROM apikeys
+            WHERE id IN (99901, 99902, 99903, 99904, 99905, 99906)
+        )::integer,
         6,
         'cleanup_expired_apikeys: All 6 test keys exist before cleanup'
     );
@@ -88,7 +133,10 @@ SELECT cleanup_expired_apikeys();
 -- Test 8: Keys expired > 30 days ago should be deleted
 SELECT
     is(
-        (SELECT COUNT(*) FROM apikeys WHERE id = 99901)::integer,
+        (
+            SELECT count(*) FROM apikeys
+            WHERE id = 99901
+        )::integer,
         0,
         'cleanup_expired_apikeys: Key expired 31 days ago was deleted'
     );
@@ -96,7 +144,10 @@ SELECT
 -- Test 9: Keys expired > 30 days ago should be deleted
 SELECT
     is(
-        (SELECT COUNT(*) FROM apikeys WHERE id = 99902)::integer,
+        (
+            SELECT count(*) FROM apikeys
+            WHERE id = 99902
+        )::integer,
         0,
         'cleanup_expired_apikeys: Key expired 35 days ago was deleted'
     );
@@ -104,7 +155,10 @@ SELECT
 -- Test 10: Keys expired within 30 days should NOT be deleted
 SELECT
     is(
-        (SELECT COUNT(*) FROM apikeys WHERE id = 99903)::integer,
+        (
+            SELECT count(*) FROM apikeys
+            WHERE id = 99903
+        )::integer,
         1,
         'cleanup_expired_apikeys: Key expired 29 days ago was NOT deleted (grace period)'
     );
@@ -112,7 +166,10 @@ SELECT
 -- Test 11: Keys expired within 30 days should NOT be deleted
 SELECT
     is(
-        (SELECT COUNT(*) FROM apikeys WHERE id = 99904)::integer,
+        (
+            SELECT count(*) FROM apikeys
+            WHERE id = 99904
+        )::integer,
         1,
         'cleanup_expired_apikeys: Key expired 1 day ago was NOT deleted (grace period)'
     );
@@ -120,7 +177,10 @@ SELECT
 -- Test 12: Keys not expired should NOT be deleted
 SELECT
     is(
-        (SELECT COUNT(*) FROM apikeys WHERE id = 99905)::integer,
+        (
+            SELECT count(*) FROM apikeys
+            WHERE id = 99905
+        )::integer,
         1,
         'cleanup_expired_apikeys: Key not expired was NOT deleted'
     );
@@ -128,7 +188,10 @@ SELECT
 -- Test 13: Keys with no expiration should NOT be deleted
 SELECT
     is(
-        (SELECT COUNT(*) FROM apikeys WHERE id = 99906)::integer,
+        (
+            SELECT count(*) FROM apikeys
+            WHERE id = 99906
+        )::integer,
         1,
         'cleanup_expired_apikeys: Key with no expiry was NOT deleted'
     );
@@ -140,12 +203,26 @@ SELECT
 -- Create a test expired API key
 INSERT INTO apikeys (id, user_id, key, mode, name, expires_at)
 VALUES
-    (99907, '6aa76066-55ef-4238-ade6-0b32334a4097', 'test-key-for-identity-expired', 'all', 'Test Identity Expired', NOW() - interval '1 day');
+(
+    99907,
+    '6aa76066-55ef-4238-ade6-0b32334a4097',
+    'test-key-for-identity-expired',
+    'all',
+    'Test Identity Expired',
+    now() - interval '1 day'
+);
 
 -- Create a test valid API key
 INSERT INTO apikeys (id, user_id, key, mode, name, expires_at)
 VALUES
-    (99908, '6aa76066-55ef-4238-ade6-0b32334a4097', 'test-key-for-identity-valid', 'all', 'Test Identity Valid', NOW() + interval '30 days');
+(
+    99908,
+    '6aa76066-55ef-4238-ade6-0b32334a4097',
+    'test-key-for-identity-valid',
+    'all',
+    'Test Identity Valid',
+    now() + interval '30 days'
+);
 
 -- Set up request headers with expired key
 DO $$
@@ -204,8 +281,22 @@ END $$;
 -- Create test API keys for get_orgs_v6 tests
 INSERT INTO apikeys (id, user_id, key, mode, name, expires_at)
 VALUES
-    (99909, '6aa76066-55ef-4238-ade6-0b32334a4097', 'test-key-orgs-expired', 'all', 'Test Orgs Expired', NOW() - interval '1 day'),
-    (99910, '6aa76066-55ef-4238-ade6-0b32334a4097', 'test-key-orgs-valid', 'all', 'Test Orgs Valid', NOW() + interval '30 days');
+(
+    99909,
+    '6aa76066-55ef-4238-ade6-0b32334a4097',
+    'test-key-orgs-expired',
+    'all',
+    'Test Orgs Expired',
+    now() - interval '1 day'
+),
+(
+    99910,
+    '6aa76066-55ef-4238-ade6-0b32334a4097',
+    'test-key-orgs-valid',
+    'all',
+    'Test Orgs Valid',
+    now() + interval '30 days'
+);
 
 -- Set up request headers with expired key
 DO $$
@@ -231,14 +322,21 @@ END $$;
 -- Test 19: get_orgs_v6 should return results for valid key
 SELECT
     ok(
-        (SELECT COUNT(*) > 0 FROM get_orgs_v6()),
+        (SELECT count(*) > 0 FROM get_orgs_v6()),
         'get_orgs_v6: Returns results for valid (not expired) API key'
     );
 
 -- Test 20: get_orgs_v6 with no expiration key should work
 INSERT INTO apikeys (id, user_id, key, mode, name, expires_at)
 VALUES
-    (99911, '6aa76066-55ef-4238-ade6-0b32334a4097', 'test-key-orgs-no-expiry', 'all', 'Test Orgs No Expiry', NULL);
+(
+    99911,
+    '6aa76066-55ef-4238-ade6-0b32334a4097',
+    'test-key-orgs-no-expiry',
+    'all',
+    'Test Orgs No Expiry',
+    NULL
+);
 
 DO $$
 BEGIN
@@ -247,7 +345,7 @@ END $$;
 
 SELECT
     ok(
-        (SELECT COUNT(*) > 0 FROM get_orgs_v6()),
+        (SELECT count(*) > 0 FROM get_orgs_v6()),
         'get_orgs_v6: Returns results for API key with no expiration (NULL)'
     );
 
@@ -264,7 +362,15 @@ END $$;
 -- Test 21: get_orgs_v6 with expired key AND limited_to_orgs should also reject
 INSERT INTO apikeys (id, user_id, key, mode, name, expires_at, limited_to_orgs)
 VALUES
-    (99912, '6aa76066-55ef-4238-ade6-0b32334a4097', 'test-key-orgs-expired-limited', 'all', 'Test Orgs Expired Limited', NOW() - interval '1 day', '{046a36ac-e03c-4590-9257-bd6c9dba9ee8}');
+(
+    99912,
+    '6aa76066-55ef-4238-ade6-0b32334a4097',
+    'test-key-orgs-expired-limited',
+    'all',
+    'Test Orgs Expired Limited',
+    now() - interval '1 day',
+    '{046a36ac-e03c-4590-9257-bd6c9dba9ee8}'
+);
 
 DO $$
 BEGIN
@@ -288,8 +394,13 @@ END $$;
 -- Test 22: Verify org policy columns exist and have correct defaults
 SELECT
     ok(
-        (SELECT require_apikey_expiration = false AND max_apikey_expiration_days IS NULL
-         FROM orgs WHERE id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'),
+        (
+            SELECT
+                require_apikey_expiration = FALSE
+                AND max_apikey_expiration_days IS NULL
+            FROM orgs
+            WHERE id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'
+        ),
         'Org policy columns have correct defaults (require_apikey_expiration=false, max_apikey_expiration_days=NULL)'
     );
 

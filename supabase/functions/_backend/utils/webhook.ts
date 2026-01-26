@@ -345,7 +345,7 @@ export async function markDeliveryFailed(
 }
 
 /**
- * Get a webhook by ID
+ * Get a webhook by ID with org management_email
  */
 export async function getWebhookById(
   c: Context,
@@ -353,7 +353,7 @@ export async function getWebhookById(
 ) {
   const { data, error } = await supabaseAdmin(c)
     .from('webhooks')
-    .select('*')
+    .select('*, orgs!inner(management_email)')
     .eq('id', webhookId)
     .single()
 

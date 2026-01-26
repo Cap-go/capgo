@@ -73,8 +73,8 @@ onMounted(async () => {
     isLoading.value = false
   }
 
-  const { data: auth } = await supabase.auth.getUser()
-  if (auth.user) {
+  const { data: claimsData } = await supabase.auth.getClaims()
+  if (claimsData?.claims?.sub) {
     await supabase.auth.signOut()
   }
 })
@@ -221,7 +221,7 @@ function openPrivacy() {
                       <ul class="space-y-2 text-sm">
                         <li class="flex items-center" :class="hasMinLength ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
                           <span class="mr-2">{{ hasMinLength ? '✓' : '✗' }}</span>
-                          {{ t('at-least-12-characters') }}
+                          {{ t('at-least-6-characters') }}
                         </li>
                         <li class="flex items-center" :class="hasUppercase ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
                           <span class="mr-2">{{ hasUppercase ? '✓' : '✗' }}</span>
@@ -233,7 +233,7 @@ function openPrivacy() {
                         </li>
                         <li class="flex items-center" :class="hasSymbols ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
                           <span class="mr-2">{{ hasSymbols ? '✓' : '✗' }}</span>
-                          {{ t('at-least-two-special-characters') }}
+                          {{ t('at-least-one-special-character') }}
                         </li>
                       </ul>
                     </div>

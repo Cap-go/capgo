@@ -16,8 +16,8 @@ CREATE TABLE IF NOT EXISTS public.webhooks (
     enabled BOOLEAN DEFAULT true NOT NULL,
     -- ['apps', 'app_versions', 'channels', 'org_users', 'orgs']
     events TEXT [] NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
-    updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
+    updated_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     created_by UUID,
     CONSTRAINT webhooks_pkey PRIMARY KEY (id),
     CONSTRAINT webhooks_org_id_fkey FOREIGN KEY (
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS public.webhook_deliveries (
     attempt_count INTEGER DEFAULT 0 NOT NULL,
     max_attempts INTEGER DEFAULT 3 NOT NULL,
     next_retry_at TIMESTAMPTZ,
-    created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now() NOT NULL,
     completed_at TIMESTAMPTZ,
     duration_ms INTEGER,
     CONSTRAINT webhook_deliveries_pkey PRIMARY KEY (id),
@@ -101,7 +101,7 @@ FOR SELECT
 TO authenticated
 USING (
     public.check_min_rights(
-        'read'::public.user_min_right,
+        'read'::public.USER_MIN_RIGHT,
         (SELECT public.get_identity()),
         org_id,
         null::CHARACTER VARYING,
@@ -116,7 +116,7 @@ FOR INSERT
 TO authenticated
 WITH CHECK (
     public.check_min_rights(
-        'admin'::public.user_min_right,
+        'admin'::public.USER_MIN_RIGHT,
         (SELECT public.get_identity()),
         org_id,
         null::CHARACTER VARYING,
@@ -131,7 +131,7 @@ FOR UPDATE
 TO authenticated
 USING (
     public.check_min_rights(
-        'admin'::public.user_min_right,
+        'admin'::public.USER_MIN_RIGHT,
         (SELECT public.get_identity()),
         org_id,
         null::CHARACTER VARYING,
@@ -140,7 +140,7 @@ USING (
 )
 WITH CHECK (
     public.check_min_rights(
-        'admin'::public.user_min_right,
+        'admin'::public.USER_MIN_RIGHT,
         (SELECT public.get_identity()),
         org_id,
         null::CHARACTER VARYING,
@@ -155,7 +155,7 @@ FOR DELETE
 TO authenticated
 USING (
     public.check_min_rights(
-        'admin'::public.user_min_right,
+        'admin'::public.USER_MIN_RIGHT,
         (SELECT public.get_identity()),
         org_id,
         null::CHARACTER VARYING,
@@ -174,7 +174,7 @@ FOR SELECT
 TO authenticated
 USING (
     public.check_min_rights(
-        'read'::public.user_min_right,
+        'read'::public.USER_MIN_RIGHT,
         (SELECT public.get_identity()),
         org_id,
         null::CHARACTER VARYING,
@@ -189,7 +189,7 @@ FOR INSERT
 TO authenticated
 WITH CHECK (
     public.check_min_rights(
-        'admin'::public.user_min_right,
+        'admin'::public.USER_MIN_RIGHT,
         (SELECT public.get_identity()),
         org_id,
         null::CHARACTER VARYING,
@@ -204,7 +204,7 @@ FOR UPDATE
 TO authenticated
 USING (
     public.check_min_rights(
-        'admin'::public.user_min_right,
+        'admin'::public.USER_MIN_RIGHT,
         (SELECT public.get_identity()),
         org_id,
         null::CHARACTER VARYING,

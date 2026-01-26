@@ -28,6 +28,11 @@ const displayStore = useDisplayStore()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
 const usageComponent = ref()
 const appNotFound = ref(false)
+const appOrganization = computed(() => {
+  if (!id.value)
+    return undefined
+  return organizationStore.getOrgByAppId(id.value) ?? organizationStore.currentOrganization
+})
 
 // Check if user lacks security compliance (2FA or password)
 const lacksSecurityAccess = computed(() => {
@@ -37,16 +42,9 @@ const lacksSecurityAccess = computed(() => {
   return lacks2FA || lacksPassword
 })
 
-// Payment failed state (subscription required)
-const paymentFailed = computed(() => {
-  return organizationStore.currentOrganizationFailed && !lacksSecurityAccess.value
-})
-
-// Should show blurred content with modal (either payment failed or app not found)
-const shouldBlurContent = computed(() => paymentFailed.value || appNotFound.value)
-
 async function loadAppInfo() {
   try {
+    await organizationStore.awaitInitialLoad()
     const { data: dataApp, error } = await supabase
       .from('apps')
       .select()
@@ -63,8 +61,8 @@ async function loadAppInfo() {
     app.value = dataApp
     const promises = []
     capgoVersion.value = await getCapgoVersion(id.value, app.value?.last_version)
-    updatesNb.value = await main.getTotalStatsByApp(id.value, organizationStore.currentOrganization?.subscription_start)
-    devicesNb.value = await main.getTotalMauByApp(id.value, organizationStore.currentOrganization?.subscription_start)
+    updatesNb.value = await main.getTotalStatsByApp(id.value, appOrganization.value?.subscription_start)
+    devicesNb.value = await main.getTotalMauByApp(id.value, appOrganization.value?.subscription_start)
 
     promises.push(
       supabase
@@ -128,10 +126,10 @@ watchEffect(async () => {
         <!-- Only show FailedCard for security access issues (2FA/password) -->
         <FailedCard v-if="lacksSecurityAccess" />
 
-        <!-- Content - blurred when payment failed or app not found -->
-        <div :class="{ 'blur-sm pointer-events-none select-none': shouldBlurContent }">
-          <DeploymentBanner v-if="!shouldBlurContent" :app-id="id" @deployed="refreshData" />
-          <Usage v-if="!lacksSecurityAccess" ref="usageComponent" :app-id="id" :force-demo="shouldBlurContent" />
+        <!-- Content - blurred when app not found -->
+        <div :class="{ 'blur-sm pointer-events-none select-none': appNotFound }">
+          <DeploymentBanner v-if="!appNotFound" :app-id="id" @deployed="refreshData" />
+          <Usage v-if="!lacksSecurityAccess" ref="usageComponent" :app-id="id" :force-demo="appNotFound" />
 
           <!-- Charts section -->
           <div class="grid grid-cols-1 gap-6 mb-6 sm:grid-cols-12 xl:grid-cols-12">
@@ -139,31 +137,28 @@ watchEffect(async () => {
               :app-id="id"
               :use-billing-period="usageComponent?.useBillingPeriod ?? true"
               :accumulated="(usageComponent?.useBillingPeriod ?? true) && (usageComponent?.showCumulative ?? false)"
-              :force-demo="shouldBlurContent"
+              :force-demo="appNotFound"
               class="col-span-full sm:col-span-6 xl:col-span-4"
             />
             <UpdateStatsCard
               :app-id="id"
               :use-billing-period="usageComponent?.useBillingPeriod ?? true"
               :accumulated="(usageComponent?.useBillingPeriod ?? true) && (usageComponent?.showCumulative ?? false)"
-              :force-demo="shouldBlurContent"
+              :force-demo="appNotFound"
               class="col-span-full sm:col-span-6 xl:col-span-4"
             />
             <DeploymentStatsCard
               :app-id="id"
               :use-billing-period="usageComponent?.useBillingPeriod ?? true"
               :accumulated="(usageComponent?.useBillingPeriod ?? true) && (usageComponent?.showCumulative ?? false)"
-              :force-demo="shouldBlurContent"
+              :force-demo="appNotFound"
               class="col-span-full sm:col-span-6 xl:col-span-4"
             />
           </div>
         </div>
 
-        <!-- Payment required overlay -->
-        <PaymentRequiredModal v-if="paymentFailed" />
-
         <!-- App not found overlay -->
-        <AppNotFoundModal v-if="appNotFound && !paymentFailed" />
+        <AppNotFoundModal v-if="appNotFound" />
       </div>
     </div>
   </div>
