@@ -113,11 +113,8 @@ async function validateInvite(c: Context, rawBody: any) {
   }
 
   // Verify captcha token with Cloudflare Turnstile
-  const captchaResult = await verifyCaptchaToken(c, body.captcha_token)
-  if (captchaResult) {
-    // verifyCaptchaToken returns an error response on failure
-    return captchaResult
-  }
+  // verifyCaptchaToken throws on failure
+  await verifyCaptchaToken(c, body.captcha_token)
 
   // Use authenticated client - RLS will enforce access based on JWT
   const supabase = supabaseClient(c, authorization)

@@ -27,7 +27,8 @@ const isDark = useDark()
 
 Chart.register(FunnelController, TrapezoidElement, CategoryScale, LinearScale, Tooltip)
 
-const chartData = computed<ChartData<'funnel'>>(() => {
+// Using 'any' because chartjs-chart-funnel doesn't provide TypeScript declarations
+const chartData = computed<ChartData<any>>(() => {
   if (props.stages.length === 0) {
     return {
       labels: [],
@@ -49,7 +50,7 @@ const chartData = computed<ChartData<'funnel'>>(() => {
   }
 })
 
-const chartOptions = computed<ChartOptions<'funnel'>>(() => ({
+const chartOptions = computed<ChartOptions<any>>(() => ({
   responsive: true,
   maintainAspectRatio: false,
   align: 'left',
@@ -73,7 +74,7 @@ const chartOptions = computed<ChartOptions<'funnel'>>(() => ({
       borderWidth: 1,
       padding: 12,
       callbacks: {
-        label: (context) => {
+        label: (context: any) => {
           const rawValue = typeof context.parsed.y === 'number' ? context.parsed.y : context.parsed.x
           const value = Number(rawValue || 0)
           const baseline = props.stages[0]?.value || 0
@@ -111,6 +112,7 @@ const chartOptions = computed<ChartOptions<'funnel'>>(() => ({
       <span class="loading loading-spinner loading-lg text-primary" />
     </div>
     <div v-else class="w-full h-full">
+      <!-- @vue-ignore - chartjs-chart-funnel doesn't provide TypeScript declarations -->
       <ChartComponent type="funnel" :data="chartData" :options="chartOptions" />
     </div>
   </div>

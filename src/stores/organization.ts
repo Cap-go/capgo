@@ -33,8 +33,6 @@ export type OrganizationRole
 export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number | string }>>
 export type ExtendedOrganizationMembers = ExtendedOrganizationMember[]
 
-type LegacyMinRight = Database['public']['Enums']['user_min_right'] | 'owner'
-
 // Mapping des rôles RBAC d'organisation vers leurs clés de traduction i18n
 export const RBAC_ORG_ROLE_I18N_KEYS: Record<string, string> = {
   org_super_admin: 'role-org-super-admin',
@@ -403,7 +401,7 @@ export const useOrganizationStore = defineStore('organization', () => {
   }
 
   const hasPermissionsInRole = (
-    minRight: LegacyMinRight,
+    minRight: OrganizationRole,
     requiredRoles: string[] = [],
     orgId?: string,
     appId?: string,

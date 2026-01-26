@@ -124,6 +124,8 @@ const capgoMetadata = computed(() => {
 })
 
 const hasSuperAdminPermission = computed(() => {
+  if (!organizationStore.currentRole)
+    return false
   return organizationStore.hasPermissionsInRole(organizationStore.currentRole, ['super_admin'])
 })
 
