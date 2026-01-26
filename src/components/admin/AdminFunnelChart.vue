@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import type { ChartData, ChartOptions } from 'chart.js'
 import { useDark } from '@vueuse/core'
 import { CategoryScale, Chart, LinearScale, Tooltip } from 'chart.js'
 import { FunnelController, TrapezoidElement } from 'chartjs-chart-funnel'
@@ -27,7 +26,8 @@ const isDark = useDark()
 
 Chart.register(FunnelController, TrapezoidElement, CategoryScale, LinearScale, Tooltip)
 
-const chartData = computed<ChartData<'funnel'>>(() => {
+// Funnel chart data - use 'any' to avoid complex type issues with chartjs-chart-funnel plugin
+const chartData = computed(() => {
   if (props.stages.length === 0) {
     return {
       labels: [],
@@ -49,7 +49,8 @@ const chartData = computed<ChartData<'funnel'>>(() => {
   }
 })
 
-const chartOptions = computed<ChartOptions<'funnel'>>(() => ({
+// Funnel chart options - use 'any' to avoid complex type issues with chartjs-chart-funnel plugin
+const chartOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
   align: 'left',
@@ -73,7 +74,7 @@ const chartOptions = computed<ChartOptions<'funnel'>>(() => ({
       borderWidth: 1,
       padding: 12,
       callbacks: {
-        label: (context) => {
+        label: (context: any) => {
           const rawValue = typeof context.parsed.y === 'number' ? context.parsed.y : context.parsed.x
           const value = Number(rawValue || 0)
           const baseline = props.stages[0]?.value || 0
@@ -111,7 +112,7 @@ const chartOptions = computed<ChartOptions<'funnel'>>(() => ({
       <span class="loading loading-spinner loading-lg text-primary" />
     </div>
     <div v-else class="w-full h-full">
-      <ChartComponent type="funnel" :data="chartData" :options="chartOptions" />
+      <ChartComponent type="funnel" :data="chartData as any" :options="chartOptions as any" />
     </div>
   </div>
 </template>
