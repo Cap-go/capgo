@@ -10,8 +10,13 @@ interface BuilderStartResponse {
   status: string
 }
 
-async function markBuildAsFailed(c: Context, jobId: string, errorMessage: string, apikeyKey: string | null): Promise<void> {
-  // Use authenticated client - RLS will enforce access (supabaseApikey falls back to c.get('capgkey') for null/hashed keys)
+async function markBuildAsFailed(
+  c: Context,
+  jobId: string,
+  errorMessage: string,
+  apikeyKey: string,
+): Promise<void> {
+  // Use authenticated client - RLS will enforce access
   const supabase = supabaseApikey(c, apikeyKey)
   const { error: updateError } = await supabase
     .from('build_requests')
@@ -47,9 +52,7 @@ export async function startBuild(
   apikey: Database['public']['Tables']['apikeys']['Row'],
 ): Promise<Response> {
   let alreadyMarkedAsFailed = false
-  // Use apikey.key directly - utilities like supabaseApikey() and hasAppRightApikey()
-  // have internal fallback logic to handle null/hashed keys
-  const apikeyKey = apikey.key
+  const apikeyKey = apikey.key ?? c.get('capgkey') ?? apikey.key_hash ?? null
 
   try {
     cloudlog({
