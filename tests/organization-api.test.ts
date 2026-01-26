@@ -33,11 +33,13 @@ beforeAll(async () => {
     throw error
 
   // Add the test user as super_admin to the org so they can access it via API
-  const { error: orgUserError } = await getSupabaseClient().from('org_users').upsert({
+  // Delete any existing org_user entry first (no unique constraint for upsert)
+  await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID).eq('user_id', USER_ID)
+  const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
     org_id: ORG_ID,
     user_id: USER_ID,
     user_right: 'super_admin',
-  }, { onConflict: 'org_id,user_id', ignoreDuplicates: true })
+  })
   if (orgUserError)
     throw orgUserError
 })
