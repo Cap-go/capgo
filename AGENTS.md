@@ -33,6 +33,8 @@ when working with code in this repository.
 - `./scripts/start-cloudflare-workers.sh` - Start local Cloudflare Workers for
   testing
 
+Note: Cloudflare test suite is currently unstable and may not pass reliably.
+
 See [CLOUDFLARE_TESTING.md](CLOUDFLARE_TESTING.md) for detailed information on
 testing against Cloudflare Workers.
 
@@ -78,6 +80,14 @@ testing against Cloudflare Workers.
   - `public/` - Public API endpoints (app, bundle, device management)
   - `triggers/` - Database triggers and CRON functions
   - `utils/` - Shared utilities and database schemas
+
+### AI Workflow Notes
+
+- For understanding the **current DB schema**, prefer
+  `supabase/schemas/prod.sql` (schema dump) instead of scanning all migrations.
+- For **schema changes**, always edit or add files under
+  `supabase/migrations/` and treat `supabase/schemas/prod.sql` as read-only
+  reference.
 
 ### HTTP Response Conventions
 
