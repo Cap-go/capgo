@@ -33,6 +33,27 @@ const TEST_METADATA_XML = `<?xml version="1.0"?>
 // Mock Deno.Command to prevent actual CLI execution
 const originalDenoCommand = (globalThis as any).Deno?.Command
 
+// Helper to ensure user is in org_users (insert if not exists)
+// The org_users table doesn't have a unique constraint on (user_id, org_id), so we can't use upsert
+async function ensureOrgUser(userId: string, orgId: string, userRight: 'super_admin' | 'admin' | 'write' | 'upload' | 'read' = 'super_admin'): Promise<void> {
+  const { data: existing } = await getSupabaseClient()
+    .from('org_users')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (!existing) {
+    const { error } = await getSupabaseClient().from('org_users').insert({
+      user_id: userId,
+      org_id: orgId,
+      user_right: userRight,
+    })
+    if (error)
+      throw new Error(`Failed to insert org_user: ${error.message}`)
+  }
+}
+
 // Helper function to get or create test auth user with metadata
 async function getOrCreateTestAuthUser(email: string, metadata?: { sso_provider_id?: string }): Promise<string | null> {
   try {
@@ -148,25 +169,8 @@ beforeAll(async () => {
   if (error)
     throw error
 
-  // Make test user super_admin of the org (idempotent - only insert if not exists)
-  const { data: existingOrgUser } = await getSupabaseClient()
-    .from('org_users')
-    .select('*')
-    .eq('user_id', USER_ID)
-    .eq('org_id', TEST_SSO_ORG_ID)
-    .maybeSingle()
-
-  if (!existingOrgUser) {
-    const { error: orgUserError } = await getSupabaseClient().from('org_users').upsert({
-      user_id: USER_ID,
-      org_id: TEST_SSO_ORG_ID,
-      user_right: 'super_admin',
-    }, {
-      onConflict: 'user_id,org_id',
-    })
-    if (orgUserError)
-      throw orgUserError
-  }
+  // Make test user super_admin of the org
+  await ensureOrgUser(USER_ID, TEST_SSO_ORG_ID, 'super_admin')
 }, 120000)
 
 afterAll(async () => {
@@ -236,17 +240,19 @@ describe('auto-join integration', () => {
         throw new Error(`orgs insert failed: ${orgsError.message}`)
       }
 
-      const { error: orgUsersError } = await getSupabaseClient().from('org_users').upsert({
-        user_id: USER_ID,
-        org_id: orgId,
-        user_right: 'super_admin',
-      }, {
-        onConflict: 'user_id,org_id',
-      })
+      // Check if org_user already exists
+      const { data: existingOrgUser } = await getSupabaseClient().from('org_users').select('id').eq('user_id', USER_ID).eq('org_id', orgId).maybeSingle()
 
-      // Ignore duplicate key errors on retry
-      if (orgUsersError && !orgUsersError.message?.includes('duplicate') && orgUsersError.code !== '23505') {
-        throw new Error(`org_users insert failed: ${orgUsersError.message}`)
+      if (!existingOrgUser) {
+        const { error: orgUsersError } = await getSupabaseClient().from('org_users').insert({
+          user_id: USER_ID,
+          org_id: orgId,
+          user_right: 'super_admin',
+        })
+
+        if (orgUsersError && !orgUsersError.message?.includes('duplicate') && orgUsersError.code !== '23505') {
+          throw new Error(`org_users insert failed: ${orgUsersError.message}`)
+        }
       }
 
       // Manually create SSO connection (bypass edge function to avoid timeouts)
@@ -302,25 +308,7 @@ describe('auto-join integration', () => {
 
       // Manually enroll user (simulates what auto_enroll_sso_user does)
       // In production, auth.users trigger would call auto_enroll_sso_user automatically
-      // Use upsert to handle retry scenario
-      const { error: enrollError } = await getSupabaseClient().from('org_users').upsert({
-        user_id: actualUserId,
-        org_id: orgId,
-        user_right: 'read',
-      }, {
-        onConflict: 'user_id,org_id',
-      })
-
-      // Ignore "duplicate key" type errors on retry, also check for code 23505 (unique violation)
-      const isDuplicateError = enrollError && (
-        enrollError.message?.includes('duplicate')
-        || enrollError.code === '23505'
-        || enrollError.details?.includes('duplicate')
-      )
-
-      if (enrollError && !isDuplicateError) {
-        throw new Error(`Manual enrollment failed: ${enrollError.message}`)
-      }
+      await ensureOrgUser(actualUserId, orgId, 'read')
 
       // Check if user was enrolled - use limit(1) then maybeSingle() to avoid error when no rows exist
       const { data: membership, error: membershipError } = await getSupabaseClient()
@@ -517,13 +505,7 @@ describe.skip('domain verification (mocked metadata fetch)', () => {
       customer_id: customerId,
     })
 
-    await getSupabaseClient().from('org_users').upsert({
-      user_id: USER_ID,
-      org_id: orgId,
-      user_right: 'super_admin',
-    }, {
-      onConflict: 'user_id,org_id',
-    })
+    await ensureOrgUser(USER_ID, orgId, 'super_admin')
 
     // Wait for database to commit all the org setup
     await new Promise(resolve => setTimeout(resolve, 300))
@@ -591,13 +573,7 @@ describe.skip('domain verification (mocked metadata fetch)', () => {
       customer_id: customerId,
     })
 
-    await getSupabaseClient().from('org_users').upsert({
-      user_id: USER_ID,
-      org_id: orgId,
-      user_right: 'super_admin',
-    }, {
-      onConflict: 'user_id,org_id',
-    })
+    await ensureOrgUser(USER_ID, orgId, 'super_admin')
 
     // Wait for database to commit all the org setup
     await new Promise(resolve => setTimeout(resolve, 300))
@@ -675,13 +651,7 @@ describe.skip('domain verification', () => {
       customer_id: customerId,
     })
 
-    await getSupabaseClient().from('org_users').upsert({
-      user_id: USER_ID,
-      org_id: orgId,
-      user_right: 'super_admin',
-    }, {
-      onConflict: 'user_id,org_id',
-    })
+    await ensureOrgUser(USER_ID, orgId, 'super_admin')
 
     await fetch(getEndpointUrl('/private/sso/configure'), {
       method: 'POST',
@@ -729,13 +699,7 @@ describe.skip('domain verification', () => {
       customer_id: customerId,
     })
 
-    await getSupabaseClient().from('org_users').upsert({
-      user_id: USER_ID,
-      org_id: orgId,
-      user_right: 'super_admin',
-    }, {
-      onConflict: 'user_id,org_id',
-    })
+    await ensureOrgUser(USER_ID, orgId, 'super_admin')
 
     await fetch(getEndpointUrl('/private/sso/configure'), {
       method: 'POST',
@@ -791,13 +755,7 @@ describe.skip('domain verification', () => {
       customer_id: customerId,
     })
 
-    await getSupabaseClient().from('org_users').upsert({
-      user_id: USER_ID,
-      org_id: orgId,
-      user_right: 'super_admin',
-    }, {
-      onConflict: 'user_id,org_id',
-    })
+    await ensureOrgUser(USER_ID, orgId, 'super_admin')
 
     await fetch(getEndpointUrl('/private/sso/configure'), {
       method: 'POST',
@@ -860,13 +818,7 @@ describe.skip('domain verification', () => {
       customer_id: customerId,
     })
 
-    await getSupabaseClient().from('org_users').upsert({
-      user_id: USER_ID,
-      org_id: orgId,
-      user_right: 'super_admin',
-    }, {
-      onConflict: 'user_id,org_id',
-    })
+    await ensureOrgUser(USER_ID, orgId, 'super_admin')
 
     await fetch(getEndpointUrl('/private/sso/configure'), {
       method: 'POST',
