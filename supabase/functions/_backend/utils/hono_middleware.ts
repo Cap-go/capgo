@@ -130,17 +130,6 @@ export function middlewareRbacContext(options?: RbacContextOptions) {
   })
 }
 
-// Redact sensitive keys for logging (show first 8 chars only)
-function redactKey(key: string | undefined | null): string {
-  if (!key)
-    return '[none]'
-
-  if (key.length <= 8)
-    return '[redacted]'
-
-  return `${key.substring(0, 8)}...`
-}
-
 // TODO: make universal middleware who
 //  Accept authorization header (JWT)
 //  Accept capgkey header (legacy apikey header name for CLI)
