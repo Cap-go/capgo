@@ -3,7 +3,7 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
+import { supabaseAdmin as useSupabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 
 interface ValidatePasswordCompliance {
   email: string
