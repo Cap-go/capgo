@@ -49,6 +49,11 @@ BEGIN
     INSERT INTO public.orgs (id, created_by, name, management_email, enforcing_2fa)
     VALUES (org_without_2fa_enforcement_id, test_2fa_user_id, 'No 2FA Org App', 'no2fa_app@org.com', false);
 
+    -- Clean up any pre-existing org_users memberships to prevent duplicate key errors
+    DELETE FROM public.org_users 
+    WHERE (org_id = org_with_2fa_enforcement_id AND user_id IN (test_2fa_user_id, test_no_2fa_user_id))
+       OR (org_id = org_without_2fa_enforcement_id AND user_id IN (test_2fa_user_id, test_no_2fa_user_id));
+
     -- Add members to org WITH 2FA enforcement
     INSERT INTO public.org_users (org_id, user_id, user_right)
     VALUES 
