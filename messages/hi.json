@@ -216,6 +216,7 @@
   "back-to-bundles": "बंडलों पर वापस",
   "back-to-channels": "चैनल्स पर वापस",
   "back-to-devices": "उपकरणों पर वापस",
+  "back-to-login": "लॉगिन पर वापस जाएं",
   "back-to-login-page": "लॉगिन पेज पर वापस जाएं",
   "bandwidth-usage": "बैंडविड्थ उपयोग:",
   "base": "आधार",
@@ -1217,6 +1218,11 @@
   "signing-secret-hint": "वेबहुक सिग्नेचर को सत्यापित करने के लिए इस सीक्रेट का उपयोग करें। सिग्नेचर X-Capgo-Signature हेडर में भेजा जाता है।",
   "size": "आकार",
   "size-not-found": "नहीं मिला",
+  "sso-info": "आपको अपने संगठन के लॉगिन पेज पर रिडायरेक्ट किया जाएगा।",
+  "sso-login-failed": "SSO लॉगिन विफल",
+  "sso-login-subtitle": "अपने संगठन खाते से लॉगिन करें",
+  "sso-login-title": "सिंगल साइन-ऑन",
+  "sso-not-configured": "इस ईमेल डोमेन के लिए SSO कॉन्फ़िगर नहीं है। कृपया अपने व्यवस्थापक से संपर्क करें।",
   "something-went-wrong-try-again-later": "कुछ गलत हो गया! बाद में पुन: प्रयास करें।",
   "start-using-capgo": "उपयोग शुरू करें:",
   "start-your-first-build": "अपना पहला मूल निर्माण शुरू करें",
@@ -1370,5 +1376,6 @@
   "role-org-super-admin": "सुपर व्यवस्थापक",
   "role-org-admin": "व्यवस्थापक",
   "role-org-billing-admin": "बिलिंग प्रबंधक",
-  "role-org-member": "सदस्य"
+  "role-org-member": "सदस्य",
+  "work-email": "कार्य ईमेल"
 }

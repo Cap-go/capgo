@@ -216,6 +216,7 @@
   "back-to-bundles": "De vuelta a los paquetes",
   "back-to-channels": "De vuelta a los canales",
   "back-to-devices": "De vuelta a los dispositivos",
+  "back-to-login": "Volver al inicio de sesión",
   "back-to-login-page": "Regresar a la página de inicio de sesión",
   "bandwidth-usage": "Uso de ancho de banda:",
   "base": "Base",
@@ -1217,6 +1218,11 @@
   "signing-secret-hint": "Usa este secreto para verificar las firmas de los webhooks. La firma se envía en el encabezado X-Capgo-Signature.",
   "size": "Tamaño",
   "size-not-found": "No encontrado",
+  "sso-info": "Serás redirigido a la página de inicio de sesión de tu organización.",
+  "sso-login-failed": "Error al iniciar sesión con SSO",
+  "sso-login-subtitle": "Inicia sesión con tu cuenta de organización",
+  "sso-login-title": "Inicio de Sesión Único",
+  "sso-not-configured": "SSO no está configurado para este dominio de correo. Contacta a tu administrador.",
   "something-went-wrong-try-again-later": "¡Algo salió mal! Inténtalo de nuevo más tarde.",
   "start-using-capgo": "Comienza a usar:",
   "start-your-first-build": "Inicia tu primera compilación nativa",
@@ -1370,5 +1376,6 @@
   "role-org-super-admin": "Super Administrador",
   "role-org-admin": "Administrador",
   "role-org-billing-admin": "Gestor de facturación",
-  "role-org-member": "Miembro"
+  "role-org-member": "Miembro",
+  "work-email": "Correo de trabajo"
 }

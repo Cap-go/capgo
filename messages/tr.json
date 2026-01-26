@@ -216,6 +216,7 @@
   "back-to-bundles": "Paketlere geri dön",
   "back-to-channels": "Kanallara geri dön",
   "back-to-devices": "Cihazlara geri dön",
+  "back-to-login": "Girişe geri dön",
   "back-to-login-page": "Giriş sayfasına geri dön",
   "bandwidth-usage": "Bant genişliği kullanımı:",
   "base": "Taban",
@@ -1217,6 +1218,11 @@
   "signing-secret-hint": "Webhook imzalarını doğrulamak için bu gizli anahtarı kullanın. İmza X-Capgo-Signature başlığında gönderilir.",
   "size": "Boyut",
   "size-not-found": "Bulunamadı",
+  "sso-info": "Kuruluşunuzun giriş sayfasına yönlendirileceksiniz.",
+  "sso-login-failed": "SSO girişi başarısız oldu",
+  "sso-login-subtitle": "Kuruluş hesabınızla giriş yapın",
+  "sso-login-title": "Tek Oturum Açma",
+  "sso-not-configured": "Bu e-posta alanı için SSO yapılandırılmamış. Lütfen yöneticinize başvurun.",
   "something-went-wrong-try-again-later": "Bir şeyler yanlış gitti! Daha sonra tekrar deneyin.",
   "start-using-capgo": "Kullanmaya başla:",
   "start-your-first-build": "İlk yerel yapınızı başlatın",
@@ -1370,5 +1376,6 @@
   "role-org-super-admin": "Süper Yönetici",
   "role-org-admin": "Yönetici",
   "role-org-billing-admin": "Faturalama Yöneticisi",
-  "role-org-member": "Üye"
+  "role-org-member": "Üye",
+  "work-email": "İş E-postası"
 }

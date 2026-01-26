@@ -216,6 +216,7 @@
   "back-to-bundles": "返回套餐",
   "back-to-channels": "返回频道",
   "back-to-devices": "返回设备",
+  "back-to-login": "返回登录",
   "back-to-login-page": "返回登录页面",
   "bandwidth-usage": "带宽使用情况：",
   "base": "根据",
@@ -1217,6 +1218,11 @@
   "signing-secret-hint": "使用此密钥验证webhook签名。签名通过X-Capgo-Signature头发送。",
   "size": "尺寸",
   "size-not-found": "未找到",
+  "sso-info": "您将被重定向到您组织的登录页面。",
+  "sso-login-failed": "SSO登录失败",
+  "sso-login-subtitle": "使用您的组织账户登录",
+  "sso-login-title": "单点登录",
+  "sso-not-configured": "此电子邮件域未配置SSO。请联系您的管理员。",
   "something-went-wrong-try-again-later": "出了些问题！\n稍后再试。",
   "start-using-capgo": "开始使用：",
   "start-your-first-build": "开始你的第一个本地构建",
@@ -1370,5 +1376,6 @@
   "role-org-super-admin": "超级管理员",
   "role-org-admin": "管理员",
   "role-org-billing-admin": "计费经理",
-  "role-org-member": "成员"
+  "role-org-member": "成员",
+  "work-email": "工作邮箱"
 }

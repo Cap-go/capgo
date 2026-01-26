@@ -250,6 +250,7 @@
   "back-to-bundles": "Back to bundles",
   "back-to-channels": "Back to channels",
   "back-to-devices": "Back to devices",
+  "back-to-login": "Back to login",
   "back-to-login-page": "Back to login page",
   "bandwidth-usage": "Bandwidth usage: ",
   "base": "Base",
@@ -1108,6 +1109,11 @@
   "sign-out": "Sign Out",
   "size": "Size",
   "size-not-found": "Not found",
+  "sso-info": "You will be redirected to your organization's login page to authenticate.",
+  "sso-login-failed": "Failed to initiate SSO login",
+  "sso-login-subtitle": "Sign in with your organization account",
+  "sso-login-title": "Single Sign-On",
+  "sso-not-configured": "SSO is not configured for this email domain. Please contact your administrator.",
   "something-went-wrong-try-again-later": "Something went wrong! Try again later.",
   "start-using-capgo": "Start using:",
   "start-your-first-build": "Start your first native build",
@@ -1410,5 +1416,6 @@
   "role-org-super-admin": "Super Admin",
   "role-org-admin": "Admin",
   "role-org-billing-admin": "Billing Manager",
-  "role-org-member": "Member"
+  "role-org-member": "Member",
+  "work-email": "Work Email"
 }

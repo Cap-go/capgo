@@ -216,6 +216,7 @@
   "back-to-bundles": "バンドルに戻る",
   "back-to-channels": "チャンネルに戻る",
   "back-to-devices": "デバイスに戻る",
+  "back-to-login": "ログインに戻る",
   "back-to-login-page": "ログインページに戻る",
   "bandwidth-usage": "帯域幅の使用量:",
   "base": "ベース",
@@ -1217,6 +1218,11 @@
   "signing-secret-hint": "このシークレットを使用してWebhook署名を検証します。署名はX-Capgo-Signatureヘッダーで送信されます。",
   "size": "サイズ",
   "size-not-found": "見つかりません",
+  "sso-info": "組織のログインページにリダイレクトされます。",
+  "sso-login-failed": "SSOログインに失敗しました",
+  "sso-login-subtitle": "組織アカウントでログイン",
+  "sso-login-title": "シングルサインオン",
+  "sso-not-configured": "このメールドメインにSSOが設定されていません。管理者に連絡してください。",
   "something-went-wrong-try-again-later": "何かが間違っていました！後で再試行してください。",
   "start-using-capgo": "使用を開始する：",
   "start-your-first-build": "あなたの最初のネイティブビルドを開始してください",
@@ -1370,5 +1376,6 @@
   "role-org-super-admin": "スーパー管理者",
   "role-org-admin": "管理者",
   "role-org-billing-admin": "請求マネージャー",
-  "role-org-member": "メンバー"
+  "role-org-member": "メンバー",
+  "work-email": "仕事用メール"
 }

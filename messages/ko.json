@@ -216,6 +216,7 @@
   "back-to-bundles": "번들로 돌아가기",
   "back-to-channels": "채널로 돌아가기",
   "back-to-devices": "장치로 돌아가기",
+  "back-to-login": "로그인으로 돌아가기",
   "back-to-login-page": "로그인 페이지로 돌아가기",
   "bandwidth-usage": "대역폭 사용량:",
   "base": "기지",
@@ -1217,6 +1218,11 @@
   "signing-secret-hint": "이 시크릿을 사용하여 웹훅 서명을 확인합니다. 서명은 X-Capgo-Signature 헤더로 전송됩니다.",
   "size": "크기",
   "size-not-found": "찾을 수 없음",
+  "sso-info": "조직의 로그인 페이지로 이동합니다.",
+  "sso-login-failed": "SSO 로그인 실패",
+  "sso-login-subtitle": "조직 계정으로 로그인",
+  "sso-login-title": "싱글 사인온",
+  "sso-not-configured": "이 이메일 도메인에 SSO가 구성되지 않았습니다. 관리자에게 문의하세요.",
   "something-went-wrong-try-again-later": "무언가 잘못되었습니다! 나중에 다시 시도해보세요.",
   "start-using-capgo": "사용 시작:",
   "start-your-first-build": "첫 번째 네이티브 빌드를 시작하세요.",
@@ -1370,5 +1376,6 @@
   "role-org-super-admin": "슈퍼 관리자",
   "role-org-admin": "관리자",
   "role-org-billing-admin": "청구 관리자",
-  "role-org-member": "회원"
+  "role-org-member": "회원",
+  "work-email": "업무용 이메일"
 }

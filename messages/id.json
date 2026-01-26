@@ -216,6 +216,7 @@
   "back-to-bundles": "Kembali ke bundel",
   "back-to-channels": "Kembali ke saluran",
   "back-to-devices": "Kembali ke perangkat",
+  "back-to-login": "Kembali ke login",
   "back-to-login-page": "Kembali ke halaman login",
   "bandwidth-usage": "Penggunaan bandwidth:",
   "base": "Basis",
@@ -1217,6 +1218,11 @@
   "signing-secret-hint": "Gunakan rahasia ini untuk memverifikasi tanda tangan webhook. Tanda tangan dikirim dalam header X-Capgo-Signature.",
   "size": "Ukuran",
   "size-not-found": "Tidak ditemukan",
+  "sso-info": "Anda akan dialihkan ke halaman login organisasi Anda.",
+  "sso-login-failed": "Login SSO gagal",
+  "sso-login-subtitle": "Masuk dengan akun organisasi Anda",
+  "sso-login-title": "Single Sign-On",
+  "sso-not-configured": "SSO tidak dikonfigurasi untuk domain email ini. Silakan hubungi administrator Anda.",
   "something-went-wrong-try-again-later": "Ada yang salah! Coba lagi nanti.",
   "start-using-capgo": "Mulai menggunakan:",
   "start-your-first-build": "Mulai bangunan asli pertama Anda",
@@ -1370,5 +1376,6 @@
   "role-org-super-admin": "Super Admin",
   "role-org-admin": "Admin",
   "role-org-billing-admin": "Manajer Penagihan",
-  "role-org-member": "Anggota"
+  "role-org-member": "Anggota",
+  "work-email": "Email Kerja"
 }

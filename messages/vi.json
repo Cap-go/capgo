@@ -216,6 +216,7 @@
   "back-to-bundles": "Quay lại gói hàng",
   "back-to-channels": "Quay lại kênh",
   "back-to-devices": "Quay lại thiết bị",
+  "back-to-login": "Quay lại đăng nhập",
   "back-to-login-page": "Quay lại trang đăng nhập",
   "bandwidth-usage": "Sử dụng băng thông:",
   "base": "Cơ sở",
@@ -1217,6 +1218,11 @@
   "signing-secret-hint": "Sử dụng khóa bí mật này để xác minh chữ ký webhook. Chữ ký được gửi trong header X-Capgo-Signature.",
   "size": "Kích thước",
   "size-not-found": "Không tìm thấy",
+  "sso-info": "Bạn sẽ được chuyển hướng đến trang đăng nhập của tổ chức.",
+  "sso-login-failed": "Đăng nhập SSO thất bại",
+  "sso-login-subtitle": "Đăng nhập bằng tài khoản tổ chức",
+  "sso-login-title": "Đăng nhập một lần",
+  "sso-not-configured": "SSO chưa được cấu hình cho tên miền email này. Vui lòng liên hệ quản trị viên.",
   "something-went-wrong-try-again-later": "Đã xảy ra lỗi! Hãy thử lại sau.",
   "start-using-capgo": "Bắt đầu sử dụng:",
   "start-your-first-build": "Bắt đầu xây dựng bản địa đầu tiên của bạn",
@@ -1370,5 +1376,6 @@
   "role-org-super-admin": "Quản trị viên cấp cao",
   "role-org-admin": "Quản trị viên",
   "role-org-billing-admin": "Quản lý thanh toán",
-  "role-org-member": "Thành viên"
+  "role-org-member": "Thành viên",
+  "work-email": "Email công việc"
 }

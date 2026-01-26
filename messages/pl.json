@@ -216,6 +216,7 @@
   "back-to-bundles": "Powrót do pakietów",
   "back-to-channels": "Powrót do kanałów",
   "back-to-devices": "Powrót do urządzeń",
+  "back-to-login": "Powrót do logowania",
   "back-to-login-page": "Powrót do strony logowania",
   "bandwidth-usage": "Wykorzystanie przepustowości:",
   "base": "Baza",
@@ -1217,6 +1218,11 @@
   "signing-secret-hint": "Użyj tego sekretu do weryfikacji podpisów webhooków. Podpis jest wysyłany w nagłówku X-Capgo-Signature.",
   "size": "Rozmiar",
   "size-not-found": "Nie znaleziono",
+  "sso-info": "Zostaniesz przekierowany na stronę logowania Twojej organizacji.",
+  "sso-login-failed": "Logowanie SSO nie powiodło się",
+  "sso-login-subtitle": "Zaloguj się kontem organizacji",
+  "sso-login-title": "Single Sign-On",
+  "sso-not-configured": "SSO nie jest skonfigurowane dla tej domeny e-mail. Skontaktuj się z administratorem.",
   "something-went-wrong-try-again-later": "Coś poszło nie tak! Spróbuj ponownie później.",
   "start-using-capgo": "Zacznij używać:",
   "start-your-first-build": "Rozpocznij swoją pierwszą natywną kompilację",
@@ -1370,5 +1376,6 @@
   "role-org-super-admin": "Super Administrator",
   "role-org-admin": "Administrator",
   "role-org-billing-admin": "Menedżer Rozliczeń",
-  "role-org-member": "Członek"
+  "role-org-member": "Członek",
+  "work-email": "E-mail służbowy"
 }
