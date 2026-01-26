@@ -29,6 +29,8 @@ fastlane/metadata/review_information/demo_user.txt
 fastlane/metadata/review_information/phone_number.txt
 .capgo_key
 .capgo_key.pub
+.capgo_key_v2
+.capgo_key_v2.pub
 .wrangler
 
 
