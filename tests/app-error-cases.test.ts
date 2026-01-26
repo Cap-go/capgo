@@ -99,6 +99,12 @@ describe('[GET] /app - Error Cases', () => {
         owner_org: testOrgId,
       }),
     })
+
+    // Log error details if creation fails for debugging CI issues
+    if (createResponse.status !== 200) {
+      const errorBody = await createResponse.text()
+      console.error(`App creation failed with status ${createResponse.status}: ${errorBody}`)
+    }
     expect(createResponse.status).toBe(200)
 
     // Delete the app from database directly
@@ -139,6 +145,12 @@ describe('[PUT] /app - Error Cases', () => {
         owner_org: testOrgId,
       }),
     })
+
+    // Log error details if creation fails for debugging CI issues
+    if (createResponse.status !== 200) {
+      const errorBody = await createResponse.text()
+      console.error(`PUT test app creation failed with status ${createResponse.status}: ${errorBody}`)
+    }
     expect(createResponse.status).toBe(200)
   })
 
@@ -202,6 +214,12 @@ describe('[DELETE] /app - Error Cases', () => {
         owner_org: testOrgId,
       }),
     })
+
+    // Log error details if creation fails for debugging CI issues
+    if (createResponse.status !== 200) {
+      const errorBody = await createResponse.text()
+      console.error(`DELETE test app creation failed with status ${createResponse.status}: ${errorBody}`)
+    }
     expect(createResponse.status).toBe(200)
 
     // Try to delete the app (this should work)
