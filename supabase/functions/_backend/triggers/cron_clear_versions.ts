@@ -17,7 +17,7 @@ app.post('/', middlewareAPISecret, async (c) => {
 
   const version = body.version
   if (!version)
-    return simpleError('no_version', 'No version', { body })
+    throw simpleError('no_version', 'No version', { body })
   if (version.user_id === null) {
     // find the user_id from the app_id
     const { data: app, error: errorApp } = await supabaseAdmin(c)
@@ -26,9 +26,9 @@ app.post('/', middlewareAPISecret, async (c) => {
       .eq('app_id', version.app_id)
       .single()
     if (errorApp)
-      return simpleError('cannot_find_user_id', 'Cannot find user_id for app_id', { error: errorApp })
+      throw simpleError('cannot_find_user_id', 'Cannot find user_id for app_id', { error: errorApp })
     if (!app)
-      return simpleError('cannot_find_user_id', 'Cannot find user_id for app_id', { error: 'no app found' })
+      throw simpleError('cannot_find_user_id', 'Cannot find user_id for app_id', { error: 'no app found' })
     version.user_id = app.user_id
   }
 
@@ -60,7 +60,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       cloudlog({ requestId: c.get('requestId'), message: `No size for ${v2Path}, ${size}` })
       // throw error to trigger the deletion
       notFound = true
-      return simpleError('no_size', 'No size', { versionId: version.id, v2Path })
+      throw simpleError('no_size', 'No size', { versionId: version.id, v2Path })
     }
     // get checksum from table app_versions
     const { data: appVersion, error: errorAppVersion } = await supabaseAdmin(c)
@@ -69,9 +69,9 @@ app.post('/', middlewareAPISecret, async (c) => {
       .eq('id', version.id)
       .single()
     if (errorAppVersion)
-      return simpleError('cannot_find_checksum', 'Cannot find checksum for app_versions id', { error: errorAppVersion })
+      throw simpleError('cannot_find_checksum', 'Cannot find checksum for app_versions id', { error: errorAppVersion })
     if (!appVersion)
-      return simpleError('cannot_find_checksum', 'Cannot find checksum for app_versions id', { error: 'no app_versions found' })
+      throw simpleError('cannot_find_checksum', 'Cannot find checksum for app_versions id', { error: 'no app_versions found' })
     const checksum = appVersion.checksum
     if (!checksum) {
       cloudlog({ requestId: c.get('requestId'), message: `No checksum for ${v2Path}, ${checksum}` })
@@ -100,7 +100,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       .eq('version', version.id)
 
     if (error)
-      return simpleError('cannot_check_channel_count', 'Cannot check channel count', { error })
+      throw simpleError('cannot_check_channel_count', 'Cannot check channel count', { error })
 
     if ((count ?? 0) > 0) {
       if (notFound) {
@@ -112,15 +112,15 @@ app.post('/', middlewareAPISecret, async (c) => {
           .eq('name', 'unknown')
           .single()
         if (errorUnknownVersion)
-          return simpleError('cannot_find_unknown_version', 'Cannot find unknown version for app_id', { error: errorUnknownVersion })
+          throw simpleError('cannot_find_unknown_version', 'Cannot find unknown version for app_id', { error: errorUnknownVersion })
         if (!unknownVersion)
-          return simpleError('cannot_find_unknown_version', 'Cannot find unknown version for app_id', { error: 'no unknown version found' })
+          throw simpleError('cannot_find_unknown_version', 'Cannot find unknown version for app_id', { error: 'no unknown version found' })
         await supabase.from('channels')
           .update({ version: unknownVersion.id })
           .eq('version', version.id)
       }
       else {
-        return simpleError('cannot_delete_failed_version', 'Cannot delete failed version', { error: `linked in some channels (${data.map(d => d.id).join(', ')})` })
+        throw simpleError('cannot_delete_failed_version', 'Cannot delete failed version', { error: `linked in some channels (${data.map(d => d.id).join(', ')})` })
       }
     }
 
@@ -129,7 +129,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       .eq('id', version.id)
 
     if (error1)
-      return simpleError('cannot_delete_version', 'Cannot delete version', { error: error1 })
+      throw simpleError('cannot_delete_version', 'Cannot delete version', { error: error1 })
   }
   return c.json(BRES)
 })

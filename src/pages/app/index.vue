@@ -35,7 +35,10 @@ const lacksSecurityAccess = computed(() => {
 
 async function NextStep(appId: string) {
   console.log('Navigating to app with ID:', appId)
-  router.push(`/app/${appId}`)
+  // Small delay to ensure database writes are committed before fetching dashboard data
+  await new Promise(resolve => setTimeout(resolve, 500))
+  // Add refresh=true to force dashboard to fetch fresh data (skip cache)
+  router.push(`/app/${appId}?refresh=true`)
 }
 async function getMyApps() {
   isTableLoading.value = true
@@ -127,19 +130,23 @@ displayStore.defaultBack = '/app'
       <FailedCard />
     </div>
     <div v-else-if="!isLoading">
+      <!-- Show onboarding steps when no apps -->
       <StepsApp v-if="stepsOpen" :onboarding="!apps.length" @done="NextStep" @close-step="stepsOpen = !stepsOpen" />
-      <div v-else class="overflow-hidden pb-4 h-full">
+      <div v-else class="relative overflow-hidden pb-4 h-full">
         <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+          <!-- App table - always visible even when payment failed -->
           <div class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
             <AppTable
-              v-model:current-page="currentPage"
-              v-model:search="searchQuery"
+              :current-page="currentPage"
+              :search="searchQuery"
               :apps="apps"
               :total="totalApps"
-              :delete-button="true"
+              :delete-button="!organizationStore.currentOrganizationFailed"
               :server-side-pagination="true"
               :is-loading="isTableLoading"
               @add-app="stepsOpen = !stepsOpen"
+              @update:current-page="(page) => { currentPage = page; getMyApps() }"
+              @update:search="(query) => { searchQuery = query; currentPage = 1; getMyApps() }"
               @reload="getMyApps()"
               @reset="getMyApps()"
             />

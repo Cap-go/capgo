@@ -142,13 +142,13 @@ $$;
 ALTER FUNCTION public.get_orgs_v6(uuid) OWNER TO "postgres";
 
 -- Revoke from public roles (security: prevents users from querying other users' orgs)
-REVOKE ALL ON FUNCTION public.get_orgs_v6(uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.get_orgs_v6(uuid) FROM "anon";
-REVOKE ALL ON FUNCTION public.get_orgs_v6(uuid) FROM "authenticated";
+REVOKE ALL ON FUNCTION public.get_orgs_v6(uuid) FROM public;
+REVOKE ALL ON FUNCTION public.get_orgs_v6(uuid) FROM anon;
+REVOKE ALL ON FUNCTION public.get_orgs_v6(uuid) FROM authenticated;
 
 -- Grant only to postgres and service_role (private function)
-GRANT EXECUTE ON FUNCTION public.get_orgs_v6(uuid) TO "postgres";
-GRANT EXECUTE ON FUNCTION public.get_orgs_v6(uuid) TO "service_role";
+GRANT EXECUTE ON FUNCTION public.get_orgs_v6(uuid) TO postgres;
+GRANT EXECUTE ON FUNCTION public.get_orgs_v6(uuid) TO service_role;
 
 -- Create the wrapper function (no parameters) that calls get_orgs_v6(userid)
 CREATE OR REPLACE FUNCTION public.get_orgs_v6()

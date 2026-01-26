@@ -1,10 +1,12 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
+import { isAppDemo } from '../utils/demo.ts'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { sendEmailToOrgMembers } from '../utils/org_email_notifications.ts'
+import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
@@ -16,7 +18,7 @@ app.post('/', middlewareAPISecret, triggerValidator('deploy_history', 'INSERT'),
 
   if (!record.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'No id' })
-    return simpleError('no_id', 'No id', { record })
+    throw simpleError('no_id', 'No id', { record })
   }
 
   // Check if the channel is public
@@ -45,6 +47,12 @@ app.post('/', middlewareAPISecret, triggerValidator('deploy_history', 'INSERT'),
       return c.json(BRES)
     }
 
+    // Check if this is a demo app (identified by com.capdemo. prefix) - skip notifications
+    if (isAppDemo(record.app_id)) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Demo app detected, skipping deploy notifications' })
+      return c.json(BRES)
+    }
+
     const LogSnag = logsnag(c)
     await backgroundTask(c, LogSnag.track({
       channel: 'bundle-deployed',
@@ -59,12 +67,19 @@ app.post('/', middlewareAPISecret, triggerValidator('deploy_history', 'INSERT'),
       notify: false,
     }))
 
-    await backgroundTask(c, sendEmailToOrgMembers(c, 'bundle:deployed', 'bundle_deployed', {
-      org_id: version.owner_org,
-      app_id: record.app_id,
-      bundle_name: version.name,
-      channel_id: record.channel_id,
-    }, version.owner_org))
+    const pgClient = getPgClient(c, true)
+    const drizzleClient = getDrizzleClient(pgClient)
+    try {
+      await backgroundTask(c, sendEmailToOrgMembers(c, 'bundle:deployed', 'bundle_deployed', {
+        org_id: version.owner_org,
+        app_id: record.app_id,
+        bundle_name: version.name,
+        channel_id: record.channel_id,
+      }, version.owner_org, drizzleClient))
+    }
+    finally {
+      closeClient(c, pgClient)
+    }
   }
 
   return c.json(BRES)

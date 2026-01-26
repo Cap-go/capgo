@@ -12,7 +12,8 @@ import CalendarDaysIcon from '~icons/heroicons/calendar-days'
 import ChartBarIcon from '~icons/heroicons/chart-bar'
 import InformationInfo from '~icons/heroicons/information-circle'
 import { bytesToGb, getDaysBetweenDates } from '~/services/conversion'
-import { getPlans } from '~/services/supabase'
+import { DEMO_APP_NAMES, generateDemoBandwidthData, generateDemoMauData, generateDemoStorageData } from '~/services/demoChartData'
+import { getPlans, useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
@@ -23,6 +24,7 @@ import UsageCard from './UsageCard.vue'
 
 const props = defineProps<{
   appId?: string
+  forceDemo?: boolean
 }>()
 
 const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
@@ -78,9 +80,6 @@ const cacheByOrgByApp = new Map<string, {
   bandwidth: { [appId: string]: number[] }
 }>()
 
-// Track current org for change detection
-const currentCacheOrgId = ref<string | null>(null)
-
 // View mode selectors for charts
 const route = useRoute()
 const router = useRouter()
@@ -88,27 +87,45 @@ const router = useRouter()
 // Initialize from URL parameters (default: cumulative=false, billingPeriod=false)
 const showCumulative = ref(route.query.cumulative === 'true') // Switch 1: Daily vs Cumulative (daily by default)
 const useBillingPeriod = ref(route.query.billingPeriod === 'true') // Switch 2: Billing Period vs Last 30 Days (last 30 days by default)
+
+// Handle refresh=true parameter (used after demo app creation to ensure fresh data)
+const needsForceRefresh = ref(route.query.refresh === 'true')
+if (needsForceRefresh.value) {
+  // Clear all caches to ensure fresh data is fetched
+  cacheByOrg.clear()
+  cacheByOrgByApp.clear()
+  // Remove the refresh parameter from URL to prevent re-clearing on back navigation
+  const query = { ...route.query }
+  delete query.refresh
+  router.replace({ query })
+}
+
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const dashboardAppsStore = useDashboardAppsStore()
 const dialogStore = useDialogV2Store()
+const effectiveOrganization = computed(() => {
+  if (props.appId)
+    return organizationStore.getOrgByAppId(props.appId) ?? organizationStore.currentOrganization
+  return organizationStore.currentOrganization
+})
 
 const { dashboard } = storeToRefs(main)
 
 const subscriptionAnchorStart = computed(() => {
-  const start = organizationStore.currentOrganization?.subscription_start
+  const start = effectiveOrganization.value?.subscription_start
   return start ? dayjs(start).format('YYYY/MM/D') : t('unknown')
 })
 const subscriptionAnchorEnd = computed(() => {
-  const end = organizationStore.currentOrganization?.subscription_end
+  const end = effectiveOrganization.value?.subscription_end
   return end ? dayjs(end).format('YYYY/MM/D') : t('unknown')
 })
 const lastRunDisplay = computed(() => {
-  const source = organizationStore.currentOrganization?.stats_updated_at
+  const source = effectiveOrganization.value?.stats_updated_at
   return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
 })
 const nextRunDisplay = computed(() => {
-  const source = organizationStore.currentOrganization?.next_stats_update_at
+  const source = effectiveOrganization.value?.next_stats_update_at
   return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
 })
 
@@ -180,11 +197,16 @@ function clearDashboardParams() {
 // Function to reload all chart data
 async function reloadAllCharts() {
   // Force reload of main dashboard data
+  // End date should be tomorrow at midnight to include all of today's data
   const last30DaysEnd = new Date()
+  last30DaysEnd.setHours(0, 0, 0, 0)
+  last30DaysEnd.setDate(last30DaysEnd.getDate() + 1) // Tomorrow midnight
+  // Start date should be 29 days ago at midnight (to get 30 days total including today)
   const last30DaysStart = new Date()
-  last30DaysStart.setDate(last30DaysStart.getDate() - 29) // 30 days including today
+  last30DaysStart.setHours(0, 0, 0, 0)
+  last30DaysStart.setDate(last30DaysStart.getDate() - 29)
 
-  const orgId = organizationStore.currentOrganization?.gid
+  const orgId = effectiveOrganization.value?.gid
   if (orgId) {
     await main.updateDashboard(orgId, last30DaysStart.toISOString(), last30DaysEnd.toISOString())
   }
@@ -222,10 +244,35 @@ const allLimits = computed(() => {
   })
 })
 
-async function getAppStats() {
+async function getAppStats(rangeStart: Date, rangeEnd: Date) {
   if (props.appId) {
+    const cached = main.filterDashboard(props.appId)
+    if (cached.length > 0) {
+      return {
+        global: cached,
+        byApp: {},
+        appNames: {},
+      }
+    }
+
+    const supabase = useSupabase()
+    const dateRange = `?from=${rangeStart.toISOString()}&to=${rangeEnd.toISOString()}&noAccumulate=true`
+    const response = await supabase.functions.invoke(`statistics/app/${props.appId}/${dateRange}`, {
+      method: 'GET',
+    })
+
+    if (response.error) {
+      console.error('Error fetching app statistics:', response.error)
+      return {
+        global: [],
+        byApp: {},
+        appNames: {},
+      }
+    }
+
+    const global = (response.data ?? []) as any[]
     return {
-      global: main.filterDashboard(props.appId),
+      global: global.sort((a, b) => a.date.localeCompare(b.date)),
       byApp: {},
       appNames: {},
     }
@@ -283,23 +330,27 @@ function filterToBillingPeriod(fullData: { mau: number[], storage: number[], ban
 }
 
 async function getUsages(forceRefetch = false) {
-  // Always work with last 30 days of data - normalize first for consistency
+  // Always work with last 30 days of data
+  // End date should be tomorrow at midnight to include all of today's data
   const last30DaysEnd = new Date()
   last30DaysEnd.setHours(0, 0, 0, 0)
-  const last30DaysStart = new Date(last30DaysEnd)
-  last30DaysStart.setDate(last30DaysStart.getDate() - 29) // 30 days including today
+  last30DaysEnd.setDate(last30DaysEnd.getDate() + 1) // Tomorrow midnight
+  // Start date should be 29 days ago at midnight (to get 30 days total including today)
+  const last30DaysStart = new Date()
+  last30DaysStart.setHours(0, 0, 0, 0)
+  last30DaysStart.setDate(last30DaysStart.getDate() - 29)
 
   // Get billing period dates for filtering
-  const billingStart = new Date(organizationStore.currentOrganization?.subscription_start ?? new Date())
+  const billingStart = new Date(effectiveOrganization.value?.subscription_start ?? new Date())
   // Reset to start of day to match calculation in store
   billingStart.setHours(0, 0, 0, 0)
 
-  const currentOrgId = organizationStore.currentOrganization?.gid ?? null
-  currentCacheOrgId.value = currentOrgId
+  const currentOrgId = effectiveOrganization.value?.gid ?? null
 
   // Check per-org cache - only use if not forcing refetch
-  const cachedData = currentOrgId ? cacheByOrg.get(currentOrgId) : null
-  const cachedDataByApp = currentOrgId ? cacheByOrgByApp.get(currentOrgId) : null
+  const cacheKey = `${currentOrgId ?? 'none'}:${props.appId ?? 'org'}`
+  const cachedData = cacheByOrg.get(cacheKey) ?? null
+  const cachedDataByApp = cacheByOrgByApp.get(cacheKey) ?? null
 
   if (cachedData && !forceRefetch) {
     // Filter data based on billing period mode
@@ -355,7 +406,7 @@ async function getUsages(forceRefetch = false) {
     return
   }
 
-  const { global: globalStats, byApp: byAppStats, appNames: appNamesMap } = await getAppStats()
+  const { global: globalStats, byApp: byAppStats, appNames: appNamesMap } = await getAppStats(last30DaysStart, last30DaysEnd)
 
   const finalData = globalStats.map((item: any) => {
     const itemDate = new Date(item.date)
@@ -385,9 +436,7 @@ async function getUsages(forceRefetch = false) {
   })
 
   // Store in per-org cache
-  if (currentOrgId) {
-    cacheByOrg.set(currentOrgId, full30DayData)
-  }
+  cacheByOrg.set(cacheKey, full30DayData)
 
   // Process by-app data if available
   appNames.value = appNamesMap
@@ -428,9 +477,7 @@ async function getUsages(forceRefetch = false) {
   }
 
   // Store in per-org cache
-  if (currentOrgId) {
-    cacheByOrgByApp.set(currentOrgId, full30DayDataByApp)
-  }
+  cacheByOrgByApp.set(cacheKey, full30DayDataByApp)
   dataByApp.value = full30DayDataByApp
 
   // Filter data based on billing period mode
@@ -466,6 +513,36 @@ async function getUsages(forceRefetch = false) {
   }
 }
 
+async function loadDemoData() {
+  // Generate demo data for payment failed state
+  const demoMau = generateDemoMauData(30)
+  const demoStorage = generateDemoStorageData(30).map(v => v / 1000) // Convert MB to GB
+  const demoBandwidth = generateDemoBandwidthData(30)
+
+  data.value = {
+    mau: demoMau,
+    storage: demoStorage,
+    bandwidth: demoBandwidth,
+  }
+
+  // Generate by-app breakdown for demo
+  dataByApp.value = {
+    mau: {
+      'demo-app-1': generateDemoMauData(30).map(v => Math.round(v * 0.6)),
+      'demo-app-2': generateDemoMauData(30).map(v => Math.round(v * 0.4)),
+    },
+    storage: {
+      'demo-app-1': generateDemoStorageData(30).map(v => v / 1000 * 0.6),
+      'demo-app-2': generateDemoStorageData(30).map(v => v / 1000 * 0.4),
+    },
+    bandwidth: {
+      'demo-app-1': generateDemoBandwidthData(30).map(v => v * 0.6),
+      'demo-app-2': generateDemoBandwidthData(30).map(v => v * 0.4),
+    },
+  }
+  appNames.value = DEMO_APP_NAMES
+}
+
 async function loadData() {
   const startTime = Date.now()
   isLoading.value = true
@@ -474,7 +551,14 @@ async function loadData() {
     plans.value.length = 0
     plans.value.push(...pls)
   })
-  await getUsages(true) // Initial load - force fetch
+
+  // If forceDemo is true, use demo data instead of fetching real data
+  if (props.forceDemo) {
+    await loadDemoData()
+  }
+  else {
+    await getUsages(true) // Initial load - force fetch
+  }
 
   // Ensure spinner shows for at least 300ms for better UX
   const elapsed = Date.now() - startTime
@@ -500,11 +584,18 @@ async function loadData() {
 }
 
 // Watch for organization changes - show loading immediately when org switches
-watch(() => organizationStore.currentOrganization?.gid, (newOrgId, oldOrgId) => {
-  if (newOrgId && oldOrgId && newOrgId !== oldOrgId && loadedAlready.value) {
+watch(() => effectiveOrganization.value?.gid, (newOrgId, oldOrgId) => {
+  if (newOrgId && oldOrgId !== undefined && newOrgId !== oldOrgId && loadedAlready.value) {
     // Show loading state immediately when org changes (before data is fetched)
     isLoading.value = true
     // Increment reload trigger to force all child charts to refetch
+    reloadTrigger.value++
+  }
+})
+
+watch(() => props.appId, async (newAppId, oldAppId) => {
+  if (newAppId !== oldAppId && loadedAlready.value) {
+    await getUsages(true)
     reloadTrigger.value++
   }
 })
@@ -517,7 +608,14 @@ watch(dashboard, async (_dashboard) => {
   }
   else {
     loadedAlready.value = true
-    await loadData()
+    // If refresh parameter was present, force a complete reload to fetch fresh data from server
+    if (needsForceRefresh.value) {
+      needsForceRefresh.value = false
+      await reloadAllCharts()
+    }
+    else {
+      await loadData()
+    }
   }
 })
 
@@ -553,10 +651,23 @@ watch(() => route.query, (newQuery) => {
   }
 }, { deep: true })
 
-onMounted(() => {
-  if (main.dashboardFetched) {
+onMounted(async () => {
+  // If forceDemo is true, load immediately with demo data
+  if (props.forceDemo) {
     loadData()
   }
+  else if (main.dashboardFetched) {
+    // If refresh parameter was present, force a complete reload including store refresh
+    if (needsForceRefresh.value) {
+      needsForceRefresh.value = false
+      await reloadAllCharts()
+    }
+    else {
+      loadData()
+    }
+  }
+  // If dashboard not fetched yet, the watcher on 'dashboard' will handle loading
+  // and will check needsForceRefresh there
 })
 </script>
 
@@ -678,10 +789,11 @@ onMounted(() => {
     :class="appId ? 'xl:grid-cols-16' : 'xl:grid-cols-12'"
   >
     <UsageCard
-      id="mau-stat" :limits="allLimits.mau" :colors="colors.emerald" :accumulated="useBillingPeriod && showCumulative"
+      id="mau-stat" :limits="allLimits.mau" :colors="colors.cyan" :accumulated="useBillingPeriod && showCumulative"
       :data="mauData" :data-by-app="mauDataByApp" :app-names="appNames" :title="`${t('monthly-active')}`" :unit="t('units-users')"
       :use-billing-period="useBillingPeriod"
       :is-loading="isLoading"
+      :force-demo="forceDemo"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
     <UsageCard
@@ -689,6 +801,7 @@ onMounted(() => {
       :title="t('Storage')" :unit="storageUnit"
       :use-billing-period="useBillingPeriod"
       :is-loading="isLoading"
+      :force-demo="forceDemo"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
     <UsageCard
@@ -696,11 +809,12 @@ onMounted(() => {
       :title="t('Bandwidth')" :unit="t('units-gb')"
       :use-billing-period="useBillingPeriod"
       :is-loading="isLoading"
+      :force-demo="forceDemo"
       class="col-span-full sm:col-span-6 xl:col-span-4"
     />
-    <DevicesStats v-show="appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" class="col-span-full sm:col-span-6 xl:col-span-4" />
-    <BundleUploadsCard v-show="!appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" class="col-span-full sm:col-span-6 xl:col-span-4" />
-    <UpdateStatsCard v-show="!appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" class="col-span-full sm:col-span-6 xl:col-span-4" />
-    <DeploymentStatsCard v-show="!appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <DevicesStats v-show="appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" :force-demo="forceDemo" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <BundleUploadsCard v-show="!appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" :force-demo="forceDemo" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <UpdateStatsCard v-show="!appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" :force-demo="forceDemo" class="col-span-full sm:col-span-6 xl:col-span-4" />
+    <DeploymentStatsCard v-show="!appId" :use-billing-period="useBillingPeriod" :accumulated="useBillingPeriod && showCumulative" :reload-trigger="reloadTrigger" :force-demo="forceDemo" class="col-span-full sm:col-span-6 xl:col-span-4" />
   </div>
 </template>

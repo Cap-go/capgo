@@ -5,14 +5,20 @@
 -- Add billing_period_stats preference to existing email_preferences
 -- Set it to true by default for all existing users and orgs
 UPDATE public.users
-SET email_preferences = email_preferences || '{"billing_period_stats": true}'::jsonb
-WHERE email_preferences IS NOT NULL
-  AND NOT (email_preferences ? 'billing_period_stats');
+SET
+    email_preferences
+    = email_preferences || '{"billing_period_stats": true}'::jsonb
+WHERE
+    email_preferences IS NOT NULL
+    AND NOT (email_preferences ? 'billing_period_stats');
 
 UPDATE public.orgs
-SET email_preferences = email_preferences || '{"billing_period_stats": true}'::jsonb
-WHERE email_preferences IS NOT NULL
-  AND NOT (email_preferences ? 'billing_period_stats');
+SET
+    email_preferences
+    = email_preferences || '{"billing_period_stats": true}'::jsonb
+WHERE
+    email_preferences IS NOT NULL
+    AND NOT (email_preferences ? 'billing_period_stats');
 
 -- Update the default value for email_preferences on users table
 ALTER TABLE public.users

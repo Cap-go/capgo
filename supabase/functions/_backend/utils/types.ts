@@ -46,6 +46,17 @@ export interface ReadStatsParams {
   actions?: string[]
 }
 
+// Unified version usage statistics interface (returned by both Cloudflare and Supabase)
+export interface VersionUsage {
+  date: string
+  app_id: string
+  version_name: string
+  get: number
+  fail: number
+  install: number
+  uninstall: number
+}
+
 export interface ReadDevicesParams {
   app_id: string
   version_name?: string | undefined

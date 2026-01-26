@@ -51,7 +51,7 @@
         // Wildcard subdomain for bundle preview - serves files from root so assets work
         // Format: {app_id}-{version_id}.preview.capgo.app
         {
-          "pattern": "*.preview.capgo.app",
+          "pattern": "*.preview.capgo.app/*",
           "zone_name": "capgo.app"
         },
         // No special domain to ease clients who allow specific domains only
@@ -147,7 +147,7 @@
       ],
       "routes": [
         {
-          "pattern": "*.preview.preprod.capgo.app",
+          "pattern": "*.preview.preprod.capgo.app/*",
           "zone_name": "capgo.app"
         },
         {
@@ -199,7 +199,7 @@
       },
       "routes": [
         {
-          "pattern": "*.preview.dev.capgo.app",
+          "pattern": "*.preview.dev.capgo.app/*",
           "zone_name": "capgo.app"
         },
         {

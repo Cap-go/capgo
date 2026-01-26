@@ -44,7 +44,7 @@ const jsonRequestSchema = z.object({
   is_emulator: z.boolean(),
   defaultChannel: z.optional(z.string()),
   is_prod: z.boolean(),
-  platform: z.literal(['android', 'ios'], {
+  platform: z.literal(['android', 'ios', 'electron'], {
     error: issue => issue.input === undefined ? MISSING_STRING_PLATFORM : INVALID_STRING_PLATFORM,
   }),
   plugin_version: z.string({

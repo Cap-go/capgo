@@ -17,14 +17,14 @@ VALUES
 (
     tests.get_supabase_uid('test_2fa_user_app'),
     '2fa_app@test.com',
-    NOW(),
-    NOW()
+    now(),
+    now()
 ),
 (
     tests.get_supabase_uid('test_no_2fa_user_app'),
     'no2fa_app@test.com',
-    NOW(),
-    NOW()
+    now(),
+    now()
 )
 ON CONFLICT (id) DO NOTHING;
 
@@ -75,9 +75,10 @@ BEGIN
     PERFORM set_config('test.app_with_2fa', 'com.test.2fa.enforced.app', false);
     PERFORM set_config('test.app_without_2fa', 'com.test.no2fa.app', false);
 
-    -- Create API key for test_2fa_user_app
-    INSERT INTO public.apikeys (user_id, key, mode, name)
+    -- Create API key for test_2fa_user_app (use high IDs to avoid conflicts)
+    INSERT INTO public.apikeys (id, user_id, key, mode, name)
     VALUES (
+        9001,
         test_2fa_user_id,
         'test-2fa-apikey-for-app',
         'all'::public.key_mode,
@@ -85,8 +86,9 @@ BEGIN
     );
 
     -- Create API key for test_no_2fa_user_app
-    INSERT INTO public.apikeys (user_id, key, mode, name)
+    INSERT INTO public.apikeys (id, user_id, key, mode, name)
     VALUES (
+        9002,
         test_no_2fa_user_id,
         'test-no2fa-apikey-for-app',
         'all'::public.key_mode,

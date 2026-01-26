@@ -44,9 +44,11 @@ const thresholds = {
   ],
   // Percentage in decimal form (0.9 ==== 90%)
   failRate: [
-    0.80,
-    0.90,
-    0.95,
+    // Failure rate bands (0 = 0% failures, 0.3 = 30% failures)
+    0,
+    0.10,
+    0.20,
+    0.30,
   ],
   // Number of app opens in plain number
   appOpen: [
@@ -63,9 +65,10 @@ const funComparisons = {
     'a burger to everyone in a big city!',
   ],
   failRate: [
-    'Even cats don\'t land on their feet that often!',
-    'That\'s a success rate higher than the average pass rate of a tough university exam!',
-    'That\'s a success rate that even the best basketball players would envy!',
+    'Flawless streak—no failed updates this week! 🏅',
+    'Roughly one in ten updates failed; a quick health check could help.',
+    'About one in five updates failed; let\'s squash those errors.',
+    'Heads up: nearly a third of updates are failing—worth a closer look.',
   ],
   appOpen: [
     'Your app was opened more times than a popular local bakery\'s door!',
@@ -77,17 +80,21 @@ const funComparisons = {
 // Check what threshold does the stat qualify for and return the fun comparison
 function getFunComparison(comparison: keyof typeof funComparisons, stat: number): string {
   const thresholdsForComparisons = thresholds[comparison]
-  const index = thresholdsForComparisons.findIndex((threshold, index) => {
-    const thresholdGreaterThenStat = threshold >= stat
-    const lastIndexAndStatGreaterOrEqualThreshold = index === 2 && stat >= threshold
+  // Choose the highest threshold that is <= stat so that bigger stats map to
+  // the more impressive comparison string (including 100% success rate).
+  let chosenIndex = 0
+  for (let i = thresholdsForComparisons.length - 1; i >= 0; i -= 1) {
+    if (stat >= thresholdsForComparisons[i]) {
+      chosenIndex = i
+      break
+    }
+  }
 
-    return thresholdGreaterThenStat ?? lastIndexAndStatGreaterOrEqualThreshold
-  })
+  const comparisonStrings = funComparisons[comparison]
+  if (!comparisonStrings[chosenIndex])
+    throw new Error(`Cannot find index for fun comparison, ${chosenIndex}`)
 
-  if (index === -1 || index >= 3)
-    throw new Error(`Cannot find index for fun comparison, ${index}`)
-
-  return funComparisons[comparison][index]
+  return comparisonStrings[chosenIndex]
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -108,6 +115,10 @@ app.post('/', middlewareAPISecret, async (c) => {
     deployedAt,
     cycleStart,
     cycleEnd,
+    totalInstalls,
+    totalFails,
+    failPercentage,
+    reportDate,
   } = await parseBody<{
     email: string
     appId?: string
@@ -123,23 +134,45 @@ app.post('/', middlewareAPISecret, async (c) => {
     deployedAt?: string
     cycleStart?: string
     cycleEnd?: string
+    totalInstalls?: number
+    totalFails?: number
+    failPercentage?: number
+    reportDate?: string
   }>(c)
 
   if (!email || !type) {
-    return simpleError('missing_email_type', 'Missing email or type', { email, type })
+    throw simpleError('missing_email_type', 'Missing email or type', { email, type })
   }
 
   // billing_period_stats uses orgId instead of appId
   if (type === 'billing_period_stats') {
     if (!orgId) {
-      return simpleError('missing_orgId', 'Missing orgId for billing_period_stats', { email, type })
+      throw simpleError('missing_orgId', 'Missing orgId for billing_period_stats', { email, type })
     }
     return await handleBillingPeriodStats(c, email, orgId, cycleStart, cycleEnd)
   }
 
+  // daily_fail_ratio sends to management_email which may not be a registered user
+  // Handle before user existence check (similar to billing_period_stats)
+  if (type === 'daily_fail_ratio') {
+    if (!appId) {
+      throw simpleError('missing_appId', 'Missing appId for daily_fail_ratio', { email, type })
+    }
+    return await handleDailyFailRatio(c, {
+      email,
+      appId,
+      orgId,
+      appName,
+      totalInstalls,
+      totalFails,
+      failPercentage,
+      reportDate,
+    })
+  }
+
   // All other types require appId
   if (!appId) {
-    return simpleError('missing_appId', 'Missing appId', { email, type })
+    throw simpleError('missing_appId', 'Missing appId', { email, type })
   }
 
   // check if email exists
@@ -149,7 +182,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     .eq('email', email)
     .single()
   if (userError || !user)
-    return simpleError('user_not_found', 'User not found', { email, userError })
+    throw simpleError('user_not_found', 'User not found', { email, userError })
 
   if (type === 'weekly_install_stats') {
     return await handleWeeklyInstallStats(c, email, appId)
@@ -172,7 +205,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     })
   }
   else {
-    return simpleError('invalid_stats_type', 'Invalid stats type', { email, appId, type })
+    throw simpleError('invalid_stats_type', 'Invalid stats type', { email, appId, type })
   }
 })
 
@@ -191,7 +224,7 @@ async function handleWeeklyInstallStats(c: Context, email: string, appId: string
   }).single()
 
   if (!weeklyStats || generateStatsError) {
-    return simpleError('cannot_generate_stats', 'Cannot generate stats', { error: generateStatsError })
+    throw simpleError('cannot_generate_stats', 'Cannot generate stats', { error: generateStatsError })
   }
 
   if (weeklyStats.all_updates === 0) {
@@ -206,6 +239,7 @@ async function handleWeeklyInstallStats(c: Context, email: string, appId: string
   }
 
   const successPercentage = Math.round((successUpdates / weeklyStats.all_updates) * 10_000) / 10_000
+  const failureRate = Math.round((weeklyStats.failed_updates / weeklyStats.all_updates) * 10_000) / 10_000
 
   // Calculate week number and month name for the reported period
   const now = new Date()
@@ -223,7 +257,7 @@ async function handleWeeklyInstallStats(c: Context, email: string, appId: string
     fun_comparison: getFunComparison('updates', weeklyStats.all_updates),
     weekly_install: successUpdates.toString(),
     weekly_install_success: (successPercentage * 100).toString(),
-    fun_comparison_2: getFunComparison('failRate', successPercentage),
+    fun_comparison_2: getFunComparison('failRate', failureRate),
     weekly_fail: (weeklyStats.failed_updates).toString(),
     weekly_open: (weeklyStats.open_app).toString(),
     fun_comparison_3: getFunComparison('appOpen', weeklyStats.open_app),
@@ -320,7 +354,7 @@ async function handleDeployInstallStats(
   }
 
   if (!versionId) {
-    return simpleError('missing_version_id', 'Missing versionId', { appId, deployId })
+    throw simpleError('missing_version_id', 'Missing versionId', { appId, deployId })
   }
 
   let deployTime = deployedAt ? new Date(deployedAt) : null
@@ -332,20 +366,23 @@ async function handleDeployInstallStats(
         .eq('id', deployId)
         .single()
       if (deployError || !deploy?.deployed_at) {
-        return simpleError('missing_deployed_at', 'Missing deployedAt', { appId, deployId, deployError })
+        throw simpleError('missing_deployed_at', 'Missing deployedAt', { appId, deployId, deployError })
       }
       deployTime = new Date(deploy.deployed_at)
     }
     else {
-      return simpleError('missing_deployed_at', 'Missing deployedAt', { appId, deployId, versionId })
+      throw simpleError('missing_deployed_at', 'Missing deployedAt', { appId, deployId, versionId })
     }
   }
 
   const windowStart = deployTime.toISOString()
   const windowEnd = new Date(deployTime.getTime() + 24 * 60 * 60 * 1000).toISOString()
   const versionStats = await readStatsVersion(c, appId, windowStart, windowEnd)
+  // Filter by version_name (new format) OR version_id as string (old Cloudflare format)
+  // This handles backwards compatibility during the transition period
+  const versionIdStr = versionId ? String(versionId) : null
   const installs = versionStats
-    .filter(row => Number(row.version_id) === Number(versionId))
+    .filter(row => row.version_name === versionName || (versionIdStr && row.version_name === versionIdStr))
     .reduce((sum, row) => sum + (row.install ?? 0), 0)
 
   const metadata = {
@@ -406,7 +443,7 @@ async function handleBillingPeriodStats(c: Context, email: string, orgId: string
     .single()
 
   if (orgError || !org) {
-    return simpleError('org_not_found', 'Organization not found', { orgId, orgError })
+    throw simpleError('org_not_found', 'Organization not found', { orgId, orgError })
   }
 
   // Use cycle dates passed from the SQL function if available,
@@ -427,7 +464,7 @@ async function handleBillingPeriodStats(c: Context, email: string, orgId: string
 
     if (cycleError || !cycleInfo) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get cycle info', error: cycleError, metadata: { orgId, email } })
-      return simpleError('cannot_get_cycle_info', 'Cannot get cycle info', { error: cycleError })
+      throw simpleError('cannot_get_cycle_info', 'Cannot get cycle info', { error: cycleError })
     }
 
     startDate = new Date(cycleInfo.subscription_anchor_start).toISOString().split('T')[0]
@@ -445,7 +482,7 @@ async function handleBillingPeriodStats(c: Context, email: string, orgId: string
 
   if (metricsError) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get total metrics', error: metricsError, metadata: { orgId, email } })
-    return simpleError('cannot_get_metrics', 'Cannot get metrics', { error: metricsError })
+    throw simpleError('cannot_get_metrics', 'Cannot get metrics', { error: metricsError })
   }
 
   // Get credits used in the billing period
@@ -568,6 +605,71 @@ async function handleBillingPeriodStats(c: Context, email: string, orgId: string
   }
 
   await trackBentoEvent(c, email, metadata, 'org:billing_period_stats')
+
+  return c.json(BRES)
+}
+
+async function handleDailyFailRatio(
+  c: Context,
+  payload: {
+    email: string
+    appId?: string
+    orgId?: string
+    appName?: string
+    totalInstalls?: number
+    totalFails?: number
+    failPercentage?: number
+    reportDate?: string
+  },
+) {
+  const {
+    email,
+    appId,
+    orgId,
+    appName,
+    totalInstalls,
+    totalFails,
+    failPercentage,
+    reportDate,
+  } = payload
+
+  if (!appId) {
+    throw simpleError('missing_app_id', 'Missing appId for daily_fail_ratio', { email })
+  }
+
+  // Check if user has daily_fail_ratio preference enabled
+  const isEnabled = await isEmailPreferenceEnabled(c, email, 'daily_fail_ratio')
+  if (!isEnabled) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Daily fail ratio email disabled for user', email, appId })
+    return c.json({ status: 'Email preference disabled' }, 200)
+  }
+
+  // Safely handle numeric values and clamp percentages to valid range
+  const safeFailPercentage = typeof failPercentage === 'number' && Number.isFinite(failPercentage)
+    ? Math.min(Math.max(failPercentage, 0), 100)
+    : 0
+  const safeSuccessPercentage = Math.max(100 - safeFailPercentage, 0)
+
+  const metadata = {
+    app_id: appId,
+    org_id: orgId ?? '',
+    app_name: appName ?? '',
+    total_installs: (totalInstalls ?? 0).toString(),
+    total_fails: (totalFails ?? 0).toString(),
+    fail_percentage: safeFailPercentage.toFixed(2),
+    report_date: reportDate ?? '',
+    success_percentage: safeSuccessPercentage.toFixed(2),
+  }
+
+  await trackBentoEvent(c, email, metadata, 'app:daily_fail_ratio')
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Daily fail ratio email sent',
+    email,
+    appId,
+    failPercentage,
+  })
 
   return c.json(BRES)
 }

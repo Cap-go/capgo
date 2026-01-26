@@ -72,7 +72,7 @@ async function checkOrganizationImpact() {
   ])
 
   // Get all organizations where user is super_admin
-  const superAdminOrgs = organizationStore.organizations.filter(org => org.role === 'super_admin')
+  const superAdminOrgs = organizationStore.organizations.filter(org => org.role === 'super_admin' || org.role === 'org_super_admin')
 
   if (superAdminOrgs.length === 0) {
     return { orgsToBeDeleted: [], paidOrgsToBeDeleted: [], canProceed: true }
@@ -84,18 +84,36 @@ async function checkOrganizationImpact() {
   // Check each organization to see if user is the only super_admin
   for (const org of superAdminOrgs) {
     try {
-      const { data: members, error } = await supabase
-        .rpc('get_org_members', { guild_id: org.gid })
+      const useNewRbac = org.use_new_rbac === true
+      let superAdminCount = 0
 
-      if (error) {
-        console.error('Error getting org members:', error)
-        continue
+      if (useNewRbac) {
+        const { data: members, error } = await supabase
+          .rpc('get_org_members_rbac', { p_org_id: org.gid })
+
+        if (error) {
+          console.error('Error getting RBAC org members:', error)
+          continue
+        }
+
+        superAdminCount = members.filter(member =>
+          !member.is_invite && !member.is_tmp && member.role_name === 'org_super_admin',
+        ).length
       }
+      else {
+        const { data: members, error } = await supabase
+          .rpc('get_org_members', { guild_id: org.gid })
 
-      // Count super_admins (excluding temporary users)
-      const superAdminCount = members.filter(member =>
-        member.role === 'super_admin' && !member.is_tmp,
-      ).length
+        if (error) {
+          console.error('Error getting org members:', error)
+          continue
+        }
+
+        // Count super_admins (excluding temporary users)
+        superAdminCount = members.filter(member =>
+          member.role === 'super_admin' && !member.is_tmp,
+        ).length
+      }
 
       // If user is the only super_admin, this org will be deleted
       if (superAdminCount === 1) {
@@ -232,15 +250,16 @@ async function performAccountDeletion() {
     return
   const supabaseClient = useSupabase()
 
-  const authUser = await supabase.auth.getUser()
-  if (authUser.error)
+  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub
+  if (claimsError || !userId)
     return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
 
   try {
     const { data: user } = await supabaseClient
       .from('users')
       .select()
-      .eq('id', authUser.data.user.id)
+      .eq('id', userId)
       .single()
     if (!user)
       return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
@@ -490,7 +509,7 @@ async function handleMfa() {
         id: 'verify',
         handler: async () => {
           // User has clicked the "verify button - let's check"
-          const verifyCode = mfaVerificationCode.value.replace(' ', '')
+          const verifyCode = mfaVerificationCode.value.replaceAll(' ', '')
 
           const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: data.id })
 
@@ -527,7 +546,7 @@ async function handleMfa() {
 onMounted(async () => {
   const { data: mfaFactors, error } = await supabase.auth.mfa.listFactors()
   if (error) {
-    console.error('Cannot getm MFA factors', error)
+    console.error('Cannot get MFA factors', error)
     return
   }
 

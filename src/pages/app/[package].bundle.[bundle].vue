@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { OrganizationRole } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
 import { FormKit } from '@formkit/vue'
 import { parse } from '@std/semver'
+import { computedAsync } from '@vueuse/core'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -14,21 +14,20 @@ import IconDocumentDuplicate from '~icons/heroicons/document-duplicate'
 import IconTrash from '~icons/heroicons/trash'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
-import { bytesToMbText } from '~/services/conversion'
+import { formatBytes, getChecksumInfo } from '~/services/conversion'
 import { formatDate, formatLocalDate } from '~/services/date'
+import { checkPermissions } from '~/services/permissions'
 import { checkCompatibilityNativePackages, isCompatible, useSupabase } from '~/services/supabase'
 import { openVersion } from '~/services/versions'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
-import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
 const route = useRoute('/app/[package].bundle.[bundle]')
 const router = useRouter()
 const dialogStore = useDialogV2Store()
 const displayStore = useDisplayStore()
-const organizationStore = useOrganizationStore()
 const main = useMainStore()
 const supabase = useSupabase()
 const packageId = ref<string>('')
@@ -40,7 +39,7 @@ const channel = ref<(Database['public']['Tables']['channels']['Row'])>()
 const version_meta = ref<Database['public']['Tables']['app_versions_meta']['Row']>()
 const showBundleMetadataInput = ref<boolean>(false)
 const hasManifest = ref<boolean>(false)
-const manifestSize = ref<number | null>(null)
+const showChecksumTooltip = ref(false)
 
 // Channel chooser state
 const selectedChannelForLink = ref<Database['public']['Tables']['channels']['Row'] | null>(null)
@@ -72,17 +71,17 @@ watch(() => channels.value, () => {
   }
 }, { immediate: true })
 
-const role = ref<OrganizationRole | null>(null)
-watch(version, async (version) => {
-  if (!version) {
-    role.value = null
-    return
-  }
+const canPromoteBundle = computedAsync(async () => {
+  if (!version.value?.app_id)
+    return false
+  return await checkPermissions('channel.promote_bundle', { appId: version.value.app_id })
+}, false)
 
-  await organizationStore.awaitInitialLoad()
-  role.value = await organizationStore.getCurrentRoleForApp(version.app_id)
-  console.log(role.value)
-})
+const canDeleteBundle = computedAsync(async () => {
+  if (!version.value?.app_id)
+    return false
+  return await checkPermissions('bundle.delete', { appId: version.value.app_id })
+}, false)
 
 // Function to open link in a new tab
 function openLink(url?: string): void {
@@ -144,16 +143,14 @@ const hasZip = computed(() => {
 
 const zipSizeLabel = computed(() => {
   if (version_meta.value?.size)
-    return bytesToMbText(version_meta.value.size)
+    return formatBytes(version_meta.value.size)
   if (version.value?.external_url)
     return t('stored-externally')
   return t('metadata-not-found')
 })
 
-const manifestSizeLabel = computed(() => {
-  if (manifestSize.value !== null)
-    return bytesToMbText(manifestSize.value)
-  return t('metadata-not-found')
+const checksumInfo = computed(() => {
+  return getChecksumInfo(version.value?.checksum)
 })
 
 async function getUnknownBundleId() {
@@ -186,7 +183,7 @@ async function setChannel(channel: Database['public']['Tables']['channels']['Row
 async function ASChannelChooser() {
   if (!version.value)
     return
-  if (role.value && !(role.value === 'admin' || role.value === 'super_admin' || role.value === 'write')) {
+  if (!canPromoteBundle.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -384,7 +381,6 @@ async function getVersion() {
   if (!id.value)
     return
   try {
-    manifestSize.value = null
     const { data } = await supabase
       .from('app_versions')
       .select()
@@ -404,23 +400,6 @@ async function getVersion() {
       version_meta.value = dataVersionsMeta
 
     hasManifest.value = data.manifest_count > 0
-    if (hasManifest.value) {
-      const { data: manifestEntries } = await supabase
-        .from('manifest')
-        .select('file_size')
-        .eq('app_version_id', data.id)
-      if (manifestEntries && manifestEntries.length > 0) {
-        let total = 0
-        let hasSize = false
-        for (const entry of manifestEntries) {
-          if (typeof entry.file_size === 'number' && entry.file_size > 0) {
-            total += entry.file_size
-            hasSize = true
-          }
-        }
-        manifestSize.value = hasSize ? total : null
-      }
-    }
     version.value = data
     if (version.value?.name)
       displayStore.setBundleName(String(version.value.id), version.value.name)
@@ -493,7 +472,7 @@ async function saveCustomId(input: string) {
 }
 
 function guardMinAutoUpdate(event: Event) {
-  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin', 'write'])) {
+  if (!canPromoteBundle.value) {
     toast.error(t('no-permission'))
     event.preventDefault()
     return false
@@ -501,7 +480,7 @@ function guardMinAutoUpdate(event: Event) {
 }
 
 function preventInputChangePerm(event: Event) {
-  if (!organizationStore.hasPermissionsInRole(role.value, ['admin', 'super_admin', 'write'])) {
+  if (!canPromoteBundle.value) {
     event.preventDefault()
     return false
   }
@@ -526,7 +505,7 @@ async function didCancel(name: string, askForMethod = true): Promise<boolean | '
           text: t('unsafe'),
           role: 'danger',
           handler: async () => {
-            if (!organizationStore.hasPermissionsInRole(await organizationStore.getCurrentRoleForApp(packageId.value), ['super_admin'])) {
+            if (!canDeleteBundle.value) {
               toast.error(t('no-permission-ask-super-admin'))
               return false
             }
@@ -610,7 +589,7 @@ async function deleteBundle() {
   if (!version.value)
     return
 
-  if (role.value && !organizationStore.hasPermissionsInRole(role.value, ['admin', 'write', 'super_admin'])) {
+  if (!canDeleteBundle.value) {
     toast.error(t('no-permission'))
     return
   }
@@ -734,6 +713,35 @@ async function deleteBundle() {
               >
                 <span class="flex items-center gap-2">
                   {{ hideString(version.checksum) }}
+                  <!-- Checksum type badge with tooltip -->
+                  <div class="relative">
+                    <button
+                      type="button"
+                      class="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full cursor-help"
+                      :class="{
+                        'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200': checksumInfo.type === 'sha256',
+                        'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200': checksumInfo.type === 'crc32',
+                        'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200': checksumInfo.type === 'unknown',
+                      }"
+                      @click="showChecksumTooltip = !showChecksumTooltip"
+                      @mouseenter="showChecksumTooltip = true"
+                      @mouseleave="showChecksumTooltip = false"
+                    >
+                      {{ checksumInfo.label }}
+                    </button>
+                    <!-- Tooltip -->
+                    <div
+                      v-show="showChecksumTooltip"
+                      class="absolute right-0 bottom-full mb-2 px-3 py-2 text-xs bg-gray-900 dark:bg-gray-700 text-white rounded-lg shadow-lg z-50 min-w-max"
+                    >
+                      <div class="font-medium mb-1">{{ t('checksum-type-info') }}</div>
+                      <div>{{ t('min-plugin-version') }}: {{ checksumInfo.minPluginVersion }}</div>
+                      <div v-if="checksumInfo.type === 'sha256'" class="text-blue-300 mt-1">{{ t('checksum-sha256-desc') }}</div>
+                      <div v-else-if="checksumInfo.type === 'crc32'" class="text-green-300 mt-1">{{ t('checksum-crc32-desc') }}</div>
+                      <!-- Tooltip arrow -->
+                      <div class="absolute right-4 top-full -mt-px border-4 border-transparent border-t-gray-900 dark:border-t-gray-700" />
+                    </div>
+                  </div>
                   <button
                     class="p-1 transition-colors border border-gray-200 rounded-md dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800"
                     @click="copyToast(version?.checksum ?? '')"
@@ -746,7 +754,7 @@ async function deleteBundle() {
               <InfoRow
                 v-if="showBundleMetadataInput" id="metadata-bundle"
                 :label="t('min-update-version')" editable
-                :readonly="organizationStore.hasPermissionsInRole(role, ['admin', 'super_admin', 'write']) === false"
+                :readonly="!canPromoteBundle"
                 @click="guardMinAutoUpdate" @update:value="(saveCustomId as any)" @keydown="preventInputChangePerm"
               >
                 {{ version.min_update_version }}
@@ -844,10 +852,10 @@ async function deleteBundle() {
                 </span>
               </InfoRow>
               <!-- manifest -->
-              <InfoRow :label="t('manifest')" :is-link="false">
+              <InfoRow :label="t('manifest')" :is-link="hasManifest" @click="hasManifest ? router.push(`/app/${packageId}/bundle/${version?.id}/manifest`) : null">
                 <span class="flex items-center gap-2">
                   <template v-if="hasManifest">
-                    {{ manifestSizeLabel }}
+                    {{ t('open') }}
                   </template>
                   <template v-else>
                     {{ t('no-manifest-bundle') }}
@@ -860,7 +868,7 @@ async function deleteBundle() {
                 v-if="!version.deleted"
                 :label="t('status')"
                 :icon="IconTrash"
-                :disabled="!organizationStore.hasPermissionsInRole(role, ['admin', 'write', 'super_admin'])"
+                :disabled="!canDeleteBundle"
               >
                 <span class="flex items-center gap-2">
                   {{ t('bundle-active') }}
@@ -1073,7 +1081,7 @@ async function deleteBundle() {
         <div class="space-y-3">
           <!-- Set Bundle (if user has permissions) -->
           <div
-            v-if="role && (role === 'admin' || role === 'super_admin' || role === 'write')"
+            v-if="canPromoteBundle"
             class="p-3 border border-gray-300 rounded-lg cursor-pointer dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
             @click="handleChannelAction('set')"
           >
@@ -1094,7 +1102,7 @@ async function deleteBundle() {
 
           <!-- Unlink Channel (if user has permissions) -->
           <div
-            v-if="role && (role === 'admin' || role === 'super_admin' || role === 'write')"
+            v-if="canPromoteBundle"
             class="p-3 border border-red-300 rounded-lg cursor-pointer dark:border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
             @click="handleChannelAction('unlink')"
           >

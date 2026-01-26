@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { cleanupPostgresClient, getCronPlanQueueCount, getLatestCronPlanMessage, getSupabaseClient, ORG_ID } from './test-utils.ts'
+import { ORG_ID_CRON_QUEUE, cleanupPostgresClient, getCronPlanQueueCount, getLatestCronPlanMessage, getSupabaseClient } from './test-utils.ts'
 
 describe('[Function] queue_cron_stat_org_for_org', () => {
   let testCustomerId: string | null = null
@@ -11,7 +11,7 @@ describe('[Function] queue_cron_stat_org_for_org', () => {
     const { data: orgData } = await supabase
       .from('orgs')
       .select('customer_id')
-      .eq('id', ORG_ID)
+      .eq('id', ORG_ID_CRON_QUEUE)
       .single()
 
     if (orgData?.customer_id) {
@@ -54,7 +54,7 @@ describe('[Function] queue_cron_stat_org_for_org', () => {
 
     // Call the function
     const { error } = await supabase.rpc('queue_cron_stat_org_for_org', {
-      org_id: ORG_ID,
+      org_id: ORG_ID_CRON_QUEUE,
       customer_id: testCustomerId,
     })
 
@@ -70,7 +70,7 @@ describe('[Function] queue_cron_stat_org_for_org', () => {
       function_name: 'cron_stat_org',
       function_type: 'cloudflare',
       payload: {
-        orgId: ORG_ID,
+        orgId: ORG_ID_CRON_QUEUE,
         customerId: testCustomerId,
       },
     })
@@ -144,7 +144,7 @@ describe('[Function] queue_cron_stat_org_for_org', () => {
 
     // Call the function
     const { error } = await supabase.rpc('queue_cron_stat_org_for_org', {
-      org_id: ORG_ID,
+      org_id: ORG_ID_CRON_QUEUE,
       customer_id: testCustomerId,
     })
 
@@ -160,7 +160,7 @@ describe('[Function] queue_cron_stat_org_for_org', () => {
       function_name: 'cron_stat_org',
       function_type: 'cloudflare',
       payload: {
-        orgId: ORG_ID,
+        orgId: ORG_ID_CRON_QUEUE,
         customerId: testCustomerId,
       },
     })
@@ -171,7 +171,7 @@ describe('[Function] queue_cron_stat_org_for_org', () => {
 
     // Call with non-existent customer_id
     const { error } = await supabase.rpc('queue_cron_stat_org_for_org', {
-      org_id: ORG_ID,
+      org_id: ORG_ID_CRON_QUEUE,
       customer_id: 'non_existent_customer',
     })
 
@@ -190,7 +190,7 @@ describe('[Function] queue_cron_stat_org_for_org', () => {
     const supabase = getSupabaseClient()
 
     const { error } = await supabase.rpc('queue_cron_stat_org_for_org', {
-      org_id: ORG_ID,
+      org_id: ORG_ID_CRON_QUEUE,
       customer_id: testCustomerId,
     })
 

@@ -42,8 +42,16 @@ const globalStatsTrendData = ref<Array<{
   plan_enterprise: number
   registers_today: number
   devices_last_month: number
+  devices_last_month_ios: number
+  devices_last_month_android: number
   stars: number
   need_upgrade: number
+  builds_total: number
+  builds_ios: number
+  builds_android: number
+  builds_last_month: number
+  builds_last_month_ios: number
+  builds_last_month_android: number
 }>>([])
 
 const isLoadingGlobalStatsTrend = ref(false)
@@ -157,6 +165,94 @@ const needUpgradeTrendSeries = computed(() => {
         value: item.need_upgrade,
       })),
       color: '#ef4444', // red
+    },
+  ]
+})
+
+const devicePlatformTrendSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'iOS Devices',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.devices_last_month_ios || 0,
+      })),
+      color: '#000000', // black (Apple)
+    },
+    {
+      label: 'Android Devices',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.devices_last_month_android || 0,
+      })),
+      color: '#3ddc84', // Android green
+    },
+  ]
+})
+
+const buildsTrendSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Total Builds',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.builds_total || 0,
+      })),
+      color: '#8b5cf6', // purple
+    },
+    {
+      label: 'iOS Builds',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.builds_ios || 0,
+      })),
+      color: '#000000', // black (Apple)
+    },
+    {
+      label: 'Android Builds',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.builds_android || 0,
+      })),
+      color: '#3ddc84', // Android green
+    },
+  ]
+})
+
+const buildsLastMonthTrendSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Last Month Total',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.builds_last_month || 0,
+      })),
+      color: '#8b5cf6', // purple
+    },
+    {
+      label: 'Last Month iOS',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.builds_last_month_ios || 0,
+      })),
+      color: '#000000', // black (Apple)
+    },
+    {
+      label: 'Last Month Android',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.builds_last_month_android || 0,
+      })),
+      color: '#3ddc84', // Android green
     },
   ]
 })
@@ -355,6 +451,278 @@ displayStore.defaultBack = '/dashboard'
             >
               <AdminMultiLineChart
                 :series="bundleStorageTrendSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+          </div>
+
+          <!-- Device Platform Distribution -->
+          <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <!-- iOS Devices Card -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-gray-900/10 dark:bg-gray-100/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 text-gray-900 dark:text-gray-100">
+                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
+                  </svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  iOS Devices (30d)
+                </p>
+                <div v-if="isLoadingGlobalStatsTrend" class="my-2">
+                  <span class="loading loading-spinner loading-lg text-gray-900 dark:text-gray-100" />
+                </div>
+                <p v-else-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
+                  {{ (latestGlobalStats.devices_last_month_ios || 0).toLocaleString() }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
+                  0
+                </p>
+                <p v-if="latestGlobalStats && latestGlobalStats.devices_last_month" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ ((latestGlobalStats.devices_last_month_ios || 0) / latestGlobalStats.devices_last_month * 100).toFixed(1) }}% of total
+                </p>
+              </div>
+            </div>
+
+            <!-- Android Devices Card -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-green-500/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 text-green-500">
+                    <path d="M17.523 2.477a.75.75 0 0 0-1.06 1.06l1.47 1.47A6.472 6.472 0 0 0 12 3.5a6.472 6.472 0 0 0-5.933 1.507l1.47-1.47a.75.75 0 0 0-1.06-1.06L4.537 4.417a.75.75 0 0 0 0 1.06l1.94 1.94A6.5 6.5 0 0 0 5.5 11v5.5a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V11a6.5 6.5 0 0 0-.977-3.583l1.94-1.94a.75.75 0 0 0 0-1.06l-1.94-1.94zM9 10a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm6 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2z" />
+                  </svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  Android Devices (30d)
+                </p>
+                <div v-if="isLoadingGlobalStatsTrend" class="my-2">
+                  <span class="loading loading-spinner loading-lg text-green-500" />
+                </div>
+                <p v-else-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-green-500">
+                  {{ (latestGlobalStats.devices_last_month_android || 0).toLocaleString() }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-green-500">
+                  0
+                </p>
+                <p v-if="latestGlobalStats && latestGlobalStats.devices_last_month" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ ((latestGlobalStats.devices_last_month_android || 0) / latestGlobalStats.devices_last_month * 100).toFixed(1) }}% of total
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Device Platform Trend Chart -->
+          <div class="grid grid-cols-1 gap-6">
+            <ChartCard
+              :title="t('device-platform-trend')"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="devicePlatformTrendSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="devicePlatformTrendSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+          </div>
+
+          <!-- Build Statistics Section - All Time -->
+          <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+            <!-- Total Builds Card -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-purple-500/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-purple-500">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
+                  </svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  Total Builds (All Time)
+                </p>
+                <div v-if="isLoadingGlobalStatsTrend" class="my-2">
+                  <span class="loading loading-spinner loading-lg text-purple-500" />
+                </div>
+                <p v-else-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-purple-500">
+                  {{ (latestGlobalStats.builds_total || 0).toLocaleString() }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-purple-500">
+                  0
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Native builds recorded
+                </p>
+              </div>
+            </div>
+
+            <!-- iOS Builds Card -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-gray-900/10 dark:bg-gray-100/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 text-gray-900 dark:text-gray-100">
+                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
+                  </svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  iOS Builds (All Time)
+                </p>
+                <div v-if="isLoadingGlobalStatsTrend" class="my-2">
+                  <span class="loading loading-spinner loading-lg text-gray-900 dark:text-gray-100" />
+                </div>
+                <p v-else-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
+                  {{ (latestGlobalStats.builds_ios || 0).toLocaleString() }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
+                  0
+                </p>
+                <p v-if="latestGlobalStats && latestGlobalStats.builds_total" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ latestGlobalStats.builds_total > 0 ? ((latestGlobalStats.builds_ios || 0) / latestGlobalStats.builds_total * 100).toFixed(1) : '0.0' }}% of total
+                </p>
+              </div>
+            </div>
+
+            <!-- Android Builds Card -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-green-500/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 text-green-500">
+                    <path d="M17.523 2.477a.75.75 0 0 0-1.06 1.06l1.47 1.47A6.472 6.472 0 0 0 12 3.5a6.472 6.472 0 0 0-5.933 1.507l1.47-1.47a.75.75 0 0 0-1.06-1.06L4.537 4.417a.75.75 0 0 0 0 1.06l1.94 1.94A6.5 6.5 0 0 0 5.5 11v5.5a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V11a6.5 6.5 0 0 0-.977-3.583l1.94-1.94a.75.75 0 0 0 0-1.06l-1.94-1.94zM9 10a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm6 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2z" />
+                  </svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  Android Builds (All Time)
+                </p>
+                <div v-if="isLoadingGlobalStatsTrend" class="my-2">
+                  <span class="loading loading-spinner loading-lg text-green-500" />
+                </div>
+                <p v-else-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-green-500">
+                  {{ (latestGlobalStats.builds_android || 0).toLocaleString() }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-green-500">
+                  0
+                </p>
+                <p v-if="latestGlobalStats && latestGlobalStats.builds_total" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ latestGlobalStats.builds_total > 0 ? ((latestGlobalStats.builds_android || 0) / latestGlobalStats.builds_total * 100).toFixed(1) : '0.0' }}% of total
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Build Statistics Section - Last 30 Days -->
+          <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+            <!-- Total Builds Last Month Card -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-purple-500/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-purple-500">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
+                  </svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  Total Builds (30d)
+                </p>
+                <div v-if="isLoadingGlobalStatsTrend" class="my-2">
+                  <span class="loading loading-spinner loading-lg text-purple-500" />
+                </div>
+                <p v-else-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-purple-500">
+                  {{ (latestGlobalStats.builds_last_month || 0).toLocaleString() }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-purple-500">
+                  0
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Builds in last 30 days
+                </p>
+              </div>
+            </div>
+
+            <!-- iOS Builds Last Month Card -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-gray-900/10 dark:bg-gray-100/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 text-gray-900 dark:text-gray-100">
+                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
+                  </svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  iOS Builds (30d)
+                </p>
+                <div v-if="isLoadingGlobalStatsTrend" class="my-2">
+                  <span class="loading loading-spinner loading-lg text-gray-900 dark:text-gray-100" />
+                </div>
+                <p v-else-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
+                  {{ (latestGlobalStats.builds_last_month_ios || 0).toLocaleString() }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
+                  0
+                </p>
+                <p v-if="latestGlobalStats && latestGlobalStats.builds_last_month" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ latestGlobalStats.builds_last_month > 0 ? ((latestGlobalStats.builds_last_month_ios || 0) / latestGlobalStats.builds_last_month * 100).toFixed(1) : '0.0' }}% of last month
+                </p>
+              </div>
+            </div>
+
+            <!-- Android Builds Last Month Card -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-green-500/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 text-green-500">
+                    <path d="M17.523 2.477a.75.75 0 0 0-1.06 1.06l1.47 1.47A6.472 6.472 0 0 0 12 3.5a6.472 6.472 0 0 0-5.933 1.507l1.47-1.47a.75.75 0 0 0-1.06-1.06L4.537 4.417a.75.75 0 0 0 0 1.06l1.94 1.94A6.5 6.5 0 0 0 5.5 11v5.5a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V11a6.5 6.5 0 0 0-.977-3.583l1.94-1.94a.75.75 0 0 0 0-1.06l-1.94-1.94zM9 10a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm6 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2z" />
+                  </svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  Android Builds (30d)
+                </p>
+                <div v-if="isLoadingGlobalStatsTrend" class="my-2">
+                  <span class="loading loading-spinner loading-lg text-green-500" />
+                </div>
+                <p v-else-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-green-500">
+                  {{ (latestGlobalStats.builds_last_month_android || 0).toLocaleString() }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-green-500">
+                  0
+                </p>
+                <p v-if="latestGlobalStats && latestGlobalStats.builds_last_month" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ latestGlobalStats.builds_last_month > 0 ? ((latestGlobalStats.builds_last_month_android || 0) / latestGlobalStats.builds_last_month * 100).toFixed(1) : '0.0' }}% of last month
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Builds Trend Charts -->
+          <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <ChartCard
+              :title="t('builds-trend')"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="buildsTrendSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="buildsTrendSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+
+            <ChartCard
+              :title="t('builds-last-month-trend')"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="buildsLastMonthTrendSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="buildsLastMonthTrendSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
               />
             </ChartCard>

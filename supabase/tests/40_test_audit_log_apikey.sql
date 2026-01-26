@@ -91,8 +91,7 @@ BEGIN
   RAISE NOTICE 'Audit log created for app_version UPDATE';
 END $$;
 
-SELECT
-    ok(TRUE, 'app_version UPDATE with API key creates audit log with changed_fields');
+SELECT ok(TRUE, 'app_version UPDATE with API key creates audit log with changed_fields');
 
 -- Test 5: Delete app_version with API key context and verify audit log is created
 DO $$

@@ -17,7 +17,7 @@ app.get('/', async (c) => {
   const totalCategory = countTotal ?? 0
 
   if (!data) {
-    return simpleError('error_unknown', 'Error unknown')
+    throw simpleError('error_unknown', 'Error unknown')
   }
   return c.json({
     apps: data ?? [],

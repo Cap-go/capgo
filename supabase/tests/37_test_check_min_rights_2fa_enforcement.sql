@@ -13,13 +13,13 @@ END $$;
 -- Create entries in public.users for the test members
 INSERT INTO public.users (id, email, created_at, updated_at)
 VALUES
-(tests.get_supabase_uid('test_2fa_user'), '2fa@test.com', NOW(), NOW()),
-(tests.get_supabase_uid('test_no_2fa_user'), 'no2fa@test.com', NOW(), NOW()),
+(tests.get_supabase_uid('test_2fa_user'), '2fa@test.com', now(), now()),
+(tests.get_supabase_uid('test_no_2fa_user'), 'no2fa@test.com', now(), now()),
 (
     tests.get_supabase_uid('test_unverified_2fa_user'),
     'unverified2fa@test.com',
-    NOW(),
-    NOW()
+    now(),
+    now()
 )
 ON CONFLICT (id) DO NOTHING;
 

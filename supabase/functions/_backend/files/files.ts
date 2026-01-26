@@ -7,17 +7,20 @@ import { Hono } from 'hono/tiny'
 import { app as download_link } from '../private/download_link.ts'
 import { app as upload_link } from '../private/upload_link.ts'
 import { app as ok } from '../public/ok.ts'
+import { sendDiscordAlert } from '../utils/discord.ts'
 import { simpleError } from '../utils/hono.ts'
 import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
-import { getAppByAppIdPg, getUserIdFromApikey, hasAppRightApikeyPg } from '../utils/pg_files.ts'
+import { getAppByAppIdPg, getUserIdFromApikey } from '../utils/pg_files.ts'
+import { checkPermissionPg } from '../utils/rbac.ts'
 import { createStatsBandwidth } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 import { app as files_config } from './files_config.ts'
 import { parseUploadMetadata } from './parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
+import { supabaseTusCreateHandler, supabaseTusHeadHandler, supabaseTusPatchHandler } from './supabaseTusProxy.ts'
 import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, MAX_UPLOAD_LENGTH_BYTES, toBase64, TUS_VERSION, X_CHECKSUM_SHA256 } from './util.ts'
 
 const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 20 minutes
@@ -44,12 +47,12 @@ async function saveBandwidthUsage(c: Context, fileSize: number | null | undefine
 }
 
 async function getHandler(c: Context): Promise<Response> {
-  const requestId = c.get('fileId')
-  cloudlog({ requestId: c.get('requestId'), message: 'getHandler files', fileId: requestId })
+  const fileId = c.get('fileId')
+  cloudlog({ requestId: c.get('requestId'), message: 'getHandler files', fileId })
   if (getRuntimeKey() !== 'workerd') {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files using supabase storage' })
     // serve file from supabase storage using they sdk
-    const { data } = supabaseAdmin(c).storage.from('capgo').getPublicUrl(requestId)
+    const { data } = supabaseAdmin(c).storage.from('capgo').getPublicUrl(fileId)
 
     // cloudlog('publicUrl', data.publicUrl)
     const url = data.publicUrl.replace('http://kong:8000', 'http://localhost:54321')
@@ -73,24 +76,42 @@ async function getHandler(c: Context): Promise<Response> {
   let response = await cache.match(cacheKey)
   if (response != null) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache hit' })
+    // Best-effort restore: if file is cached but missing in R2, write it back.
+    await backgroundTask(c, async () => {
+      try {
+        const head = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).head(fileId)
+        if (head != null)
+          return
+        const cached = response.clone()
+        const data = await cached.arrayBuffer()
+        const contentType = cached.headers.get('content-type') || undefined
+        const httpMetadata = contentType ? { contentType } : undefined
+        await bucket.put(fileId, data, { httpMetadata })
+        cloudlog({ requestId: c.get('requestId'), message: 'Restored cached file to R2', fileId })
+        await sendDiscordAlert(c, {
+          content: `🛠️ Restored cached file to R2\nFile: ${fileId}\nRequest ID: ${c.get('requestId') ?? 'unknown'}`,
+        })
+      }
+      catch (err) {
+        cloudlog({ requestId: c.get('requestId'), message: 'Failed to restore cached file to R2', fileId, error: String(err) })
+      }
+    })
     return response
   }
 
   const rangeHeaderFromRequest = c.req.header('range')
   if (rangeHeaderFromRequest) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files range request', range: rangeHeaderFromRequest })
-    const objectInfo = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).head(requestId)
+    const objectInfo = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).head(fileId)
     if (objectInfo == null) {
       cloudlog({ requestId: c.get('requestId'), message: 'getHandler files object is null' })
       return c.json({ error: 'not_found', message: 'Not found' }, 404)
     }
     const fileSize = objectInfo.size
-    await saveBandwidthUsage(c, fileSize)
     const rangeMatch = rangeHeaderFromRequest.match(/bytes=(\d+)-(\d*)/)
     if (rangeMatch) {
       const rangeStart = Number.parseInt(rangeMatch[1])
       if (rangeStart >= fileSize) {
-        // Return a 206 Partial Content with an empty body and appropriate Content-Range header for zero-length range
         const emptyHeaders = new Headers()
         emptyHeaders.set('Content-Range', `bytes */${fileSize}`)
         return new Response(new Uint8Array(0), { status: 206, headers: emptyHeaders })
@@ -98,14 +119,15 @@ async function getHandler(c: Context): Promise<Response> {
     }
   }
 
-  const object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(requestId, {
+  const object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(fileId, {
     range: c.req.raw.headers,
   })
   if (object == null) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files object is null' })
     return c.json({ error: 'not_found', message: 'Not found' }, 404)
   }
-  await saveBandwidthUsage(c, object.size)
+  const bytesTransferred = calculateBytesTransferred(object.size, object.range)
+  await saveBandwidthUsage(c, bytesTransferred)
   const headers = objectHeaders(object)
   if (object.range != null && c.req.header('range')) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files range request', range: rangeHeader(object.size, object.range) })
@@ -116,7 +138,7 @@ async function getHandler(c: Context): Promise<Response> {
   headers.set('Content-Disposition', `attachment; filename="${object.key}"`)
   response = new Response(object.body, { headers })
   await backgroundTask(c, () => {
-    cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache saved', fileId: requestId })
+    cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache saved', fileId })
     cache.put(cacheKey, response.clone())
   })
   return response
@@ -154,6 +176,23 @@ function rangeHeader(objLen: number, r2Range: R2Range): string {
   return `bytes ${startIndexInclusive}-${endIndexInclusive}/${objLen}`
 }
 
+function calculateBytesTransferred(objLen: number, r2Range: R2Range | undefined): number {
+  if (!r2Range)
+    return objLen
+  let startIndexInclusive = 0
+  let endIndexInclusive = objLen - 1
+  if ('offset' in r2Range && r2Range.offset != null) {
+    startIndexInclusive = r2Range.offset
+  }
+  if ('length' in r2Range && r2Range.length != null) {
+    endIndexInclusive = startIndexInclusive + r2Range.length - 1
+  }
+  if ('suffix' in r2Range) {
+    startIndexInclusive = objLen - r2Range.suffix
+  }
+  return endIndexInclusive - startIndexInclusive + 1
+}
+
 function optionsHandler(c: Context) {
   cloudlog({ requestId: c.get('requestId'), message: 'optionsHandler files optionsHandler' })
   return c.newResponse(null, 204, {
@@ -177,7 +216,7 @@ async function uploadHandler(c: Context) {
 
   if (durableObjNs == null) {
     cloudlog({ requestId: c.get('requestId'), message: 'files durableObjNs is null' })
-    return simpleError('invalid_bucket_configuration', 'Invalid bucket configuration')
+    throw simpleError('invalid_bucket_configuration', 'Invalid bucket configuration')
   }
 
   const handler = durableObjNs.get(durableObjNs.idFromName(normalizedRequestId))
@@ -261,14 +300,80 @@ async function setKeyFromIdParam(c: Context, next: Next) {
     cloudlog({ requestId: c.get('requestId'), message: 'setKeyFromIdParam - fileId is null' })
     return c.json({ error: 'not_found', message: 'Not found' }, 404)
   }
+
   const normalizedFileId = decodeURIComponent(fileId)
+
+  // Check if this is a Supabase TUS upload ID (base64 encoded)
+  // TUS upload IDs from Supabase are base64-encoded paths like: capgo/orgs/xxx/apps/yyy/file.zip/uuid
+  let extractedFileId = normalizedFileId
+  try {
+    const decoded = atob(normalizedFileId)
+    // If decoded starts with bucket name and contains orgs/, it's a TUS upload ID
+    if (decoded.startsWith('capgo/') && decoded.includes('/orgs/')) {
+      const parts = decoded.split('/')
+      // Expected format:
+      // [0]: 'capgo'
+      // [1]: 'orgs'
+      // [2]: orgId
+      // [3]: 'apps'
+      // [4]: appId
+      // [5..n-2]: file path segments
+      // [n-1]: UUID
+      if (
+        parts.length >= 6
+        && parts[0] === 'capgo'
+        && parts[1] === 'orgs'
+        && parts[3] === 'apps'
+      ) {
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'setKeyFromIdParam - detected Supabase TUS upload ID',
+          decoded,
+          parts,
+        })
+        // Extract file path: remove bucket prefix (capgo/) and UUID suffix
+        // Resulting path starts with "orgs/..."
+        const pathParts = parts.slice(1, parts.length - 1)
+        if (pathParts.length > 0) {
+          extractedFileId = pathParts.join('/')
+          cloudlog({
+            requestId: c.get('requestId'),
+            message: 'setKeyFromIdParam - extracted fileId from TUS ID',
+            extractedFileId,
+            originalParts: parts,
+            pathParts,
+          })
+        }
+        else {
+          cloudlog({
+            requestId: c.get('requestId'),
+            message: 'setKeyFromIdParam - TUS ID decoded but pathParts is empty, using normalizedFileId as fileId',
+            decoded,
+            parts,
+          })
+        }
+      }
+      else {
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'setKeyFromIdParam - decoded TUS ID has unexpected structure, using normalizedFileId as fileId',
+          decoded,
+          parts,
+        })
+      }
+    }
+  }
+  catch {
+    // Not a base64 string, use as-is
+  }
+
   cloudlog({
     requestId: c.get('requestId'),
-    message: 'setKeyFromIdParam - after decodeURIComponent',
+    message: 'setKeyFromIdParam - final fileId',
     originalFileId: fileId,
-    normalizedFileId,
+    extractedFileId,
   })
-  c.set('fileId', normalizedFileId)
+  c.set('fileId', extractedFileId)
   await next()
 }
 
@@ -371,18 +476,17 @@ async function checkWriteAppAccess(c: Context, next: Next) {
 
     cloudlog({
       requestId: c.get('requestId'),
-      message: 'checkWriteAppAccess - checking app permissions via hasAppRightApikeyPg',
+      message: 'checkWriteAppAccess - checking app permissions via checkPermissionPg',
       userId,
       app_id,
     })
 
-    // Use the Postgres version of hasAppRightApikey
-    const requiredRight: Database['public']['Enums']['user_min_right'] = 'read'
-    const hasPermission = await hasAppRightApikeyPg(c, app_id, requiredRight, userId, capgkey, drizzleClient)
+    // Use the new RBAC permission check
+    const hasPermission = await checkPermissionPg(c, 'app.read_bundles', { appId: app_id }, drizzleClient, userId, capgkey)
 
     cloudlog({
       requestId: c.get('requestId'),
-      message: 'checkWriteAppAccess - hasAppRightApikeyPg result',
+      message: 'checkWriteAppAccess - checkPermissionPg result',
       hasPermission,
     })
 
@@ -451,19 +555,46 @@ async function checkWriteAppAccess(c: Context, next: Next) {
   }
   finally {
     // Always close the connection
-    await backgroundTask(c, closeClient(c, pgClient))
+    await closeClient(c, pgClient)
   }
 
   await next()
 }
 
 app.options(`/upload/${ATTACHMENT_PREFIX}`, optionsHandler)
-app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromMetadata, checkWriteAppAccess, uploadHandler)
+app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromMetadata, checkWriteAppAccess, async (c) => {
+  if (getRuntimeKey() !== 'workerd') {
+    return supabaseTusCreateHandler(c)
+  }
+  return uploadHandler(c)
+})
 
 app.options(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, optionsHandler)
-app.get(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromIdParam, checkWriteAppAccess, getHandler)
+// Combined GET/HEAD handler for TUS uploads - Hono tiny routes HEAD to GET
+app.get(
+  `/upload/${ATTACHMENT_PREFIX}/:id{.+}`,
+  middlewareKey(['all', 'write', 'upload'], true),
+  setKeyFromIdParam,
+  checkWriteAppAccess,
+  async (c) => {
+    const isTusRequest = c.req.header('Tus-Resumable') != null
+    const isHead = c.req.method === 'HEAD'
+
+    if (isHead && isTusRequest && getRuntimeKey() !== 'workerd') {
+      cloudlog({ requestId: c.get('requestId'), message: 'Routing HEAD TUS request to supabaseTusHeadHandler' })
+      return supabaseTusHeadHandler(c)
+    }
+
+    return getHandler(c)
+  },
+)
 app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, getHandler)
-app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromIdParam, checkWriteAppAccess, uploadHandler)
+app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromIdParam, checkWriteAppAccess, async (c) => {
+  if (getRuntimeKey() !== 'workerd') {
+    return supabaseTusPatchHandler(c)
+  }
+  return uploadHandler(c)
+})
 
 app.route('/config', files_config)
 app.route('/download_link', download_link)

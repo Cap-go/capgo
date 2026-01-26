@@ -5,7 +5,9 @@ import { storeToRefs } from 'pinia'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import AdminOnlyModal from '~/components/AdminOnlyModal.vue'
 import CreditsCta from '~/components/CreditsCta.vue'
+import { checkPermissions } from '~/services/permissions'
 import { openCheckout } from '~/services/stripe'
 import { getCreditUnitPricing, getCurrentPlanNameOrg } from '~/services/supabase'
 import { openSupport } from '~/services/support'
@@ -32,9 +34,17 @@ const organizationStore = useOrganizationStore()
 const dialogStore = useDialogV2Store()
 const isMobile = Capacitor.isNativePlatform()
 
+// Check if user is super_admin
+const isSuperAdmin = computed(() => {
+  const orgId = organizationStore.currentOrganization?.gid
+  return organizationStore.hasPermissionsInRole('super_admin', ['org_super_admin'], orgId)
+})
+
+// Modal state for non-admin access
+const showAdminModal = ref(false)
+
 const { currentOrganization } = storeToRefs(organizationStore)
 const creditUnitPrices = ref<Partial<Record<Database['public']['Enums']['credit_metric_type'], number>>>({})
-
 function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
   // Convert build time from seconds to hours or minutes for display
   const buildTimeSeconds = plan.build_time_unit || 0
@@ -95,28 +105,77 @@ watch(() => main.bestPlan, (newBestPlan) => {
 const isTrial = computed(() => currentOrganization?.value ? (!currentOrganization?.value.paying && (currentOrganization?.value.trial_left ?? 0) > 0) : false)
 
 async function openChangePlan(plan: Database['public']['Tables']['plans']['Row'], index: number) {
+  // Show admin modal for non-admins instead of blocking
+  if (!isSuperAdmin.value) {
+    showAdminModal.value = true
+    return
+  }
+
   // Check if user has apps in this organization
   if (currentOrganization.value?.app_count === 0) {
+    // Get other organizations where user is admin and has apps
+    const orgsMap = organizationStore.getAllOrgs()
+    const otherOrgsWithApps = [...orgsMap]
+      .map(([_, org]) => org)
+      .filter(org =>
+        org.gid !== currentOrganization.value?.gid
+        && org.app_count > 0
+        && org.role.includes('super_admin'),
+      )
+      .sort((a, b) => b.app_count - a.app_count)
+
+    // Build the description with list of other orgs if any
+    let description = t('no-apps-confirm-subscription')
+    if (otherOrgsWithApps.length > 0) {
+      description += `\n\n${t('other-orgs-with-apps')}:`
+      otherOrgsWithApps.slice(0, 5).forEach((org) => {
+        description += `\n• ${org.name} (${org.app_count} ${org.app_count === 1 ? t('app') : t('apps')})`
+      })
+    }
+
+    // Build buttons dynamically - start with cancel button
+    const buttons = [
+      {
+        text: t('cancel'),
+        role: 'cancel' as const,
+      },
+      // Add switch buttons for other orgs with apps (max 3)
+      ...otherOrgsWithApps.slice(0, 3).map(org => ({
+        text: `${t('switch-to')} ${org.name}`,
+        id: `switch-${org.gid}`,
+        handler: () => {
+          organizationStore.setCurrentOrganization(org.gid)
+          return true
+        },
+      })),
+      // Add the "Add app" button
+      {
+        text: t('add-another-app'),
+        id: 'add-app-button',
+        handler: () => {
+          router.push('/app')
+          return true
+        },
+      },
+      // Add "Proceed anyway" button at the end
+      {
+        text: t('proceed-anyway'),
+        id: 'proceed-anyway-button',
+        role: 'primary' as const,
+        handler: () => true,
+      },
+    ]
+
     dialogStore.openDialog({
-      title: t('no-apps-found'),
-      description: t('add-app-first-to-change-plan'),
-      buttons: [
-        {
-          text: t('cancel'),
-          role: 'cancel',
-        },
-        {
-          text: t('add-another-app'),
-          id: 'add-app-button',
-          handler: () => {
-            router.push('/app')
-            return true
-          },
-        },
-      ],
+      title: t('no-apps-in-org'),
+      description,
+      buttons,
     })
+
     await dialogStore.onDialogDismiss()
-    return
+    // Only proceed if user clicked "Proceed anyway"
+    if (dialogStore.lastButtonRole !== 'proceed-anyway-button')
+      return
   }
 
   // get the current url
@@ -166,34 +225,40 @@ async function loadData(initial: boolean) {
 }
 
 watch(currentOrganization, async (newOrg, prevOrg) => {
-  if (!organizationStore.hasPermissionsInRole(await organizationStore.getCurrentRole(newOrg?.created_by ?? ''), ['super_admin'])) {
-    if (!initialLoad.value) {
-      const orgsMap = organizationStore.getAllOrgs()
-      const newOrg = [...orgsMap]
-        .map(([_, a]) => a)
-        .filter(org => org.role.includes('super_admin'))
-        .sort((a, b) => b.app_count - a.app_count)[0]
+  if (newOrg) {
+    // Check permission directly instead of relying on computedAsync default
+    const hasUpdateBillingPermission = await checkPermissions('org.update_billing', { orgId: newOrg.gid })
 
-      if (newOrg) {
-        organizationStore.setCurrentOrganization(newOrg.gid)
-        return
+    if (!hasUpdateBillingPermission) {
+      if (!initialLoad.value) {
+        const orgsMap = organizationStore.getAllOrgs()
+        const newOrg = [...orgsMap]
+          .map(([_, a]) => a)
+          .filter(org => org.role.includes('super_admin'))
+          .sort((a, b) => b.app_count - a.app_count)[0]
+
+        if (newOrg) {
+          organizationStore.setCurrentOrganization(newOrg.gid)
+          return
+        }
       }
-    }
 
-    dialogStore.openDialog({
-      title: t('cannot-view-plans'),
-      description: `${t('plans-super-only')}`,
-      buttons: [
-        {
-          text: t('ok'),
-        },
-      ],
-    })
-    await dialogStore.onDialogDismiss()
-    if (!prevOrg)
-      router.push('/app')
-    else
-      organizationStore.setCurrentOrganization(prevOrg.gid)
+      dialogStore.openDialog({
+        title: t('cannot-view-plans'),
+        description: `${t('plans-super-only')}`,
+        buttons: [
+          {
+            text: t('ok'),
+          },
+        ],
+      })
+      await dialogStore.onDialogDismiss()
+      if (!prevOrg)
+        router.push('/app')
+      else
+        organizationStore.setCurrentOrganization(prevOrg.gid)
+      return
+    }
   }
 
   await loadData(false)
@@ -213,6 +278,37 @@ watchEffect(async () => {
       if (route.query.oid && typeof route.query.oid === 'string') {
         await organizationStore.awaitInitialLoad()
         organizationStore.setCurrentOrganization(route.query.oid)
+      }
+
+      // Check permission on initial load
+      if (currentOrganization.value) {
+        const hasUpdateBillingPermission = await checkPermissions('org.update_billing', { orgId: currentOrganization.value.gid })
+
+        if (!hasUpdateBillingPermission) {
+          const orgsMap = organizationStore.getAllOrgs()
+          const newOrg = [...orgsMap]
+            .map(([_, a]) => a)
+            .filter(org => org.role.includes('super_admin'))
+            .sort((a, b) => b.app_count - a.app_count)[0]
+
+          if (newOrg) {
+            organizationStore.setCurrentOrganization(newOrg.gid)
+            return
+          }
+
+          dialogStore.openDialog({
+            title: t('cannot-view-plans'),
+            description: `${t('plans-super-only')}`,
+            buttons: [
+              {
+                text: t('ok'),
+              },
+            ],
+          })
+          await dialogStore.onDialogDismiss()
+          router.push('/app')
+          return
+        }
       }
 
       loadData(true)
@@ -240,6 +336,7 @@ function buttonName(p: Database['public']['Tables']['plans']['Row']) {
 }
 
 function isDisabled(plan: Database['public']['Tables']['plans']['Row']) {
+  // Disabled if: current plan (already subscribed) or mobile
   return (currentPlan.value?.name === plan.name && currentOrganization.value?.paying && currentOrganization.value?.is_yearly === isYearly.value) || isMobile
 }
 
@@ -251,9 +348,9 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
     return 'cursor-not-allowed bg-gray-500 dark:bg-gray-400 text-white'
   }
   if (isRecommended(p)) {
-    return 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-700 text-white'
+    return 'cursor-pointer bg-blue-600 hover:bg-blue-700 focus:ring-blue-700 text-white'
   }
-  return 'bg-black dark:bg-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200 text-white dark:text-black'
+  return 'cursor-pointer bg-black dark:bg-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200 text-white dark:text-black'
 }
 </script>
 
@@ -403,6 +500,9 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
         </router-link>
       </div>
     </div>
+
+    <!-- Admin-only modal for non-admin users -->
+    <AdminOnlyModal v-if="showAdminModal" @click="showAdminModal = false" />
   </div>
 </template>
 

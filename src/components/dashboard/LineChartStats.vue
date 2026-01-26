@@ -211,17 +211,43 @@ const generateAnnotations = computed(() => {
   return annotations
 })
 
-// Generate infinite distinct pastel colors starting with blue
+// Check if a hue is in the red or green range (reserved for UpdateStats)
+function isReservedHue(hue: number): boolean {
+  // Red range: 0-30 and 330-360
+  // Green range: 90-160
+  return (hue >= 0 && hue <= 30) || (hue >= 330 && hue <= 360) || (hue >= 90 && hue <= 160)
+}
+
+// Get the nth safe hue that skips red/green colors
+function getSafeHue(targetIndex: number): number {
+  let i = 0
+  let safeCount = 0
+
+  while (safeCount <= targetIndex && i < targetIndex * 3 + 10) {
+    const hue = (210 + i * 137.508) % 360
+    i++
+
+    if (!isReservedHue(hue)) {
+      if (safeCount === targetIndex)
+        return hue
+      safeCount++
+    }
+  }
+
+  // Fallback to blue if we somehow can't find enough safe hues
+  return 210
+}
+
+// Generate infinite distinct pastel colors starting with blue, skipping red/green
 function generateAppColors(appCount: number) {
   const colors = []
 
-  for (let i = 0; i < appCount; i++) {
-    // Start with blue (210°) and use golden ratio for distribution
-    const hue = (210 + i * 137.508) % 360 // Start at blue, then golden angle
+  for (let colorIndex = 0; colorIndex < appCount; colorIndex++) {
+    const hue = getSafeHue(colorIndex)
 
     // Use pastel-friendly saturation and lightness values
-    const saturation = 50 + (i % 3) * 8 // 50%, 58%, 66% - softer colors
-    const lightness = 60 + (i % 4) * 5 // 60%, 65%, 70%, 75% - lighter, more pastel
+    const saturation = 50 + (colorIndex % 3) * 8 // 50%, 58%, 66% - softer colors
+    const lightness = 60 + (colorIndex % 4) * 5 // 60%, 65%, 70%, 75% - lighter, more pastel
 
     const borderColor = `hsl(${hue}, ${saturation + 15}%, ${lightness - 15}%)`
     const backgroundColor = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.6)`
@@ -268,8 +294,8 @@ const chartData = computed<ChartData<'line' | 'bar'>>(() => {
           borderColor = appColors[index].border
         }
         else {
-          // Use existing bar chart colors for bar mode
-          const hue = (210 + index * 137.508) % 360
+          // Use safe hue that skips red/green (reserved for UpdateStats)
+          const hue = getSafeHue(index)
           const saturation = 50 + (index % 3) * 8
           const lightness = 60 + (index % 4) * 5
           backgroundColor = `hsla(${hue}, ${saturation}%, ${lightness}%, 0.8)`
@@ -383,12 +409,46 @@ const todayLineOptions = computed(() => {
   }
 })
 
+// Calculate appropriate Y-axis max based on actual data values
+const dataMax = computed(() => {
+  const allValues: number[] = []
+
+  // Collect values from main data
+  const mainData = accumulateData.value.filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+  allValues.push(...mainData)
+
+  // Collect values from per-app data
+  Object.values(props.dataByApp || {}).forEach((appData: any) => {
+    if (Array.isArray(appData)) {
+      const filtered = appData.filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
+      allValues.push(...filtered)
+    }
+  })
+
+  if (allValues.length === 0)
+    return undefined
+
+  const max = Math.max(...allValues)
+  // Add 20% padding to the max so the line isn't at the very top
+  // Also ensure a minimum visible range
+  if (max <= 0)
+    return undefined
+
+  return max * 1.2
+})
+
 const chartOptions = computed<ChartOptions & { plugins: { inlineAnnotationPlugin: AnnotationOptions, todayLine?: any } }>(() => {
   const hasAppData = Object.keys(props.dataByApp || {}).length > 0
+  const scales = createStackedChartScales(isDark.value, hasAppData)
+
+  // If we have a calculated max, use it to ensure small values are visible
+  if (dataMax.value !== undefined) {
+    (scales.y as any).suggestedMax = dataMax.value
+  }
 
   return {
     maintainAspectRatio: false,
-    scales: createStackedChartScales(isDark.value, hasAppData),
+    scales,
     plugins: {
       inlineAnnotationPlugin: generateAnnotations.value,
       legend: createLegendConfig(isDark.value, hasAppData),

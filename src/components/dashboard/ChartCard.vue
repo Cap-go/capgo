@@ -36,6 +36,10 @@ const props = defineProps({
     type: String,
     default: undefined,
   },
+  isDemoData: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 const { t } = useI18n()
@@ -60,7 +64,7 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
         <div
           v-if="showEvolutionBadge"
           class="inline-flex justify-center items-center py-1 px-2 text-xs font-bold text-white whitespace-nowrap rounded-full shadow-lg"
-          :class="{ 'bg-emerald-500': (lastDayEvolution ?? 0) >= 0, 'bg-yellow-500': (lastDayEvolution ?? 0) < 0 }"
+          :class="{ 'bg-cyan-500': (lastDayEvolution ?? 0) >= 0, 'bg-yellow-500': (lastDayEvolution ?? 0) < 0 }"
         >
           {{ (lastDayEvolution ?? 0) < 0 ? '-' : '+' }}{{ Math.abs(lastDayEvolution ?? 0).toFixed(2) }}%
         </div>
@@ -74,7 +78,7 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
     </div>
 
     <!-- Chart content area -->
-    <div class="p-6 pt-2 w-full h-full">
+    <div class="relative p-6 pt-2 w-full h-full">
       <!-- Loading state -->
       <div v-if="isLoading" class="flex justify-center items-center h-full">
         <Spinner size="w-24 h-24" />
@@ -88,16 +92,27 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
         {{ errorMessage }}
       </div>
 
-      <!-- No data message -->
+      <!-- Chart slot (renders for both real data and demo data) -->
+      <template v-else-if="hasData || isDemoData">
+        <slot />
+        <!-- Demo data overlay indicator -->
+        <div
+          v-if="isDemoData"
+          class="flex absolute inset-0 flex-col gap-2 justify-center items-center pointer-events-none"
+        >
+          <div class="py-2 px-4 text-sm font-medium rounded-lg border shadow-lg backdrop-blur-sm bg-white/90 dark:bg-gray-800/90 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-700">
+            {{ t('demo-data-indicator') }}
+          </div>
+        </div>
+      </template>
+
+      <!-- No data message (only when no real data AND not showing demo) -->
       <div
-        v-else-if="!hasData"
+        v-else
         class="flex justify-center items-center h-full text-sm text-slate-500 dark:text-slate-300"
       >
         {{ displayNoDataMessage }}
       </div>
-
-      <!-- Chart slot -->
-      <slot v-else />
     </div>
   </div>
 </template>

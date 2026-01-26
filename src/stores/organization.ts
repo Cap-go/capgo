@@ -25,9 +25,107 @@ type RawOrganization = ArrayElement<GetOrgsV7Returns>
 export type Organization = Omit<RawOrganization, 'password_policy_config'> & {
   password_policy_config: PasswordPolicyConfig | null
 }
-export type OrganizationRole = Database['public']['Enums']['user_min_right'] | 'owner'
-export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number }>>
+export type OrganizationRole
+  = Database['public']['Enums']['user_min_right']
+    | 'owner'
+    | 'org_member'
+    | 'org_billing_admin'
+    | 'org_admin'
+    | 'org_super_admin'
+export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number | string }>>
 export type ExtendedOrganizationMembers = ExtendedOrganizationMember[]
+
+type LegacyMinRight = Database['public']['Enums']['user_min_right'] | 'owner'
+
+// Mapping des rôles RBAC d'organisation vers leurs clés de traduction i18n
+export const RBAC_ORG_ROLE_I18N_KEYS: Record<string, string> = {
+  org_super_admin: 'role-org-super-admin',
+  org_admin: 'role-org-admin',
+  org_billing_admin: 'role-org-billing-admin',
+  org_member: 'role-org-member',
+  app_admin: 'role-app-admin',
+  app_developer: 'role-app-developer',
+  app_uploader: 'role-app-uploader',
+  app_reader: 'role-app-reader',
+}
+
+/**
+ * Obtient la clé i18n pour un rôle RBAC d'organisation
+ * @param role Le nom technique du rôle
+ * @returns La clé de traduction i18n, ou undefined si non mappé
+ */
+export function getRbacRoleI18nKey(role: string): string | undefined {
+  return RBAC_ORG_ROLE_I18N_KEYS[role]
+}
+
+const LEGACY_ROLE_RANK: Record<string, number> = {
+  read: 1,
+  upload: 2,
+  write: 3,
+  admin: 4,
+  super_admin: 5,
+}
+
+const LEGACY_ROLE_ALIASES: Record<string, string> = {
+  owner: 'super_admin',
+  org_super_admin: 'super_admin',
+  org_admin: 'admin',
+  org_billing_admin: 'read',
+  org_member: 'read',
+  app_admin: 'admin',
+  app_developer: 'write',
+  app_uploader: 'upload',
+  app_reader: 'read',
+}
+
+const LEGACY_TO_RBAC_ORG: Record<string, string> = {
+  super_admin: 'org_super_admin',
+  admin: 'org_admin',
+  write: 'org_member',
+  upload: 'org_member',
+  read: 'org_member',
+}
+
+const LEGACY_TO_RBAC_APP: Record<string, string> = {
+  super_admin: 'app_admin',
+  admin: 'app_admin',
+  write: 'app_developer',
+  upload: 'app_uploader',
+  read: 'app_reader',
+}
+
+function normalizeLegacyRole(role?: string | null) {
+  if (!role)
+    return null
+  const trimmed = role.startsWith('invite_') ? role.slice('invite_'.length) : role
+  return LEGACY_ROLE_ALIASES[trimmed] ?? trimmed
+}
+
+function legacyRoleRank(role?: string | null) {
+  const normalized = normalizeLegacyRole(role)
+  if (!normalized)
+    return null
+  return LEGACY_ROLE_RANK[normalized] ?? null
+}
+
+function normalizeRbacRole(role: string, scope: 'org' | 'app') {
+  const legacy = normalizeLegacyRole(role)
+  if (!legacy)
+    return role
+  if (scope === 'org')
+    return LEGACY_TO_RBAC_ORG[legacy] ?? role
+  return LEGACY_TO_RBAC_APP[legacy] ?? role
+}
+
+function matchesRbacRole(role: string, requiredRole: string) {
+  if (role === requiredRole)
+    return true
+  if (requiredRole.startsWith('org_'))
+    return normalizeRbacRole(role, 'org') === requiredRole
+  if (requiredRole.startsWith('app_'))
+    return normalizeRbacRole(role, 'app') === requiredRole
+  return normalizeLegacyRole(role) === normalizeLegacyRole(requiredRole)
+}
 
 const supabase = useSupabase()
 const main = useMainStore()
@@ -108,8 +206,12 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
 
     // Always fetch last 30 days of data and filter client-side for billing period
+    // End date should be tomorrow at midnight to include all of today's data
     const last30DaysEnd = new Date()
+    last30DaysEnd.setHours(0, 0, 0, 0)
+    last30DaysEnd.setDate(last30DaysEnd.getDate() + 1) // Tomorrow midnight
     const last30DaysStart = new Date()
+    last30DaysStart.setHours(0, 0, 0, 0)
     last30DaysStart.setDate(last30DaysStart.getDate() - 29) // 30 days including today
     try {
       await main.updateDashboard(currentOrganizationRaw.gid, last30DaysStart.toISOString(), last30DaysEnd.toISOString())
@@ -179,10 +281,6 @@ export const useOrganizationStore = defineStore('organization', () => {
       throw new Error(`Cannot find app ${appId} in the app_id -> org map`)
 
     return org.role as OrganizationRole
-  }
-
-  const hasPermissionsInRole = (perm: OrganizationRole | null, perms: OrganizationRole[]): boolean => {
-    return (perm && perms.includes(perm)) ?? false
   }
 
   const setCurrentOrganization = (id: string) => {
@@ -306,6 +404,30 @@ export const useOrganizationStore = defineStore('organization', () => {
     return _organizations.value
   }
 
+  const hasPermissionsInRole = (
+    minRight: LegacyMinRight,
+    requiredRoles: string[] = [],
+    orgId?: string,
+    appId?: string,
+  ) => {
+    const orgFromApp = appId ? getOrgByAppId(appId) : undefined
+    const org = orgId ? _organizations.value.get(orgId) : (orgFromApp ?? currentOrganization.value)
+    const role = org?.role ?? currentRole.value
+    if (!role)
+      return false
+
+    if (org?.use_new_rbac && requiredRoles.length > 0) {
+      if (requiredRoles.some(required => matchesRbacRole(role, required)))
+        return true
+    }
+
+    const roleRank = legacyRoleRank(role)
+    const requiredRank = legacyRoleRank(minRight)
+    if (roleRank === null || requiredRank === null)
+      return false
+    return roleRank >= requiredRank
+  }
+
   // Check password policy compliance for all org members (for super_admin preview)
   const checkPasswordPolicyImpact = async (orgId: string) => {
     const { data, error } = await supabase.rpc('check_org_members_password_policy', {
@@ -321,17 +443,6 @@ export const useOrganizationStore = defineStore('organization', () => {
       totalUsers: data.length,
       compliantUsers: data.filter((u: any) => u.password_policy_compliant),
       nonCompliantUsers: data.filter((u: any) => !u.password_policy_compliant),
-    }
-  }
-
-  // Get current org's password policy status
-  const getPasswordPolicyStatus = () => {
-    if (!currentOrganization.value)
-      return null
-    return {
-      hasPolicy: !!currentOrganization.value.password_policy_config?.enabled,
-      isCompliant: currentOrganization.value.password_has_access ?? true,
-      config: currentOrganization.value.password_policy_config,
     }
   }
 
@@ -377,7 +488,6 @@ export const useOrganizationStore = defineStore('organization', () => {
     setCurrentOrganizationToFirst,
     getMembers,
     getCurrentRoleForApp,
-    getCurrentRole,
     getAllOrgs,
     hasPermissionsInRole,
     fetchOrganizations,
@@ -386,6 +496,5 @@ export const useOrganizationStore = defineStore('organization', () => {
     awaitInitialLoad,
     deleteOrganization,
     checkPasswordPolicyImpact,
-    getPasswordPolicyStatus,
   }
 })

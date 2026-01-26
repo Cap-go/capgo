@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import colors from 'tailwindcss/colors'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ArrowDownOnSquareIcon from '~icons/heroicons/arrow-down-on-square'
 import GlobeAltIcon from '~icons/heroicons/globe-alt'
 import XCircleIcon from '~icons/heroicons/x-circle'
 import UpdateStatsChart from '~/components/dashboard/UpdateStatsChart.vue'
+import { calculateDemoEvolution, calculateDemoTotal, generateDemoUpdateStatsData } from '~/services/demoChartData'
 import { useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useOrganizationStore } from '~/stores/organization'
@@ -29,12 +30,21 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  forceDemo: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 // Removed filterToBillingPeriod - no longer needed as we work with correct date range from the start
 
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
+const effectiveOrganization = computed(() => {
+  if (props.appId)
+    return organizationStore.getOrgByAppId(props.appId) ?? organizationStore.currentOrganization
+  return organizationStore.currentOrganization
+})
 
 const totalInstalled = ref(0)
 const totalFailed = ref(0)
@@ -47,7 +57,8 @@ const appNames = ref<{ [appId: string]: string }>({})
 const isLoading = ref(true)
 
 // Per-org cache for raw API data, keyed by "orgId:billingMode"
-const cacheByOrgAndMode = new Map<string, any[]>()
+// Using shallowRef for Vue reactivity - cache invalidates properly on org changes
+const cacheByOrgAndMode = shallowRef(new Map<string, any[]>())
 // Track current org for change detection
 const currentCacheOrgId = ref<string | null>(null)
 
@@ -74,8 +85,72 @@ const actionDisplayNames = computed(() => ({
   fail: capitalize(t('failed')),
 }))
 
-const totalUpdates = computed(() => totalInstalled.value + totalFailed.value + totalRequested.value)
-const hasData = computed(() => chartUpdateData.value?.length > 0)
+// Generate demo data when forceDemo is true
+const demoStats = computed(() => generateDemoUpdateStatsData(30))
+
+// Demo mode: show demo data only when forceDemo is true OR user has no apps
+// If user has apps, ALWAYS show real data (even if empty)
+const isDemoMode = computed(() => {
+  if (props.forceDemo)
+    return true
+  // If user has apps, never show demo data
+  if (dashboardAppsStore.apps.length > 0)
+    return false
+  // No apps and store is loaded = show demo
+  return dashboardAppsStore.isLoaded
+})
+
+// Effective values for display
+const effectiveChartData = computed(() => isDemoMode.value ? demoStats.value.total : chartUpdateData.value)
+const effectiveChartDataByAction = computed(() => {
+  if (isDemoMode.value) {
+    return {
+      requested: demoStats.value.byAction.requested,
+      install: demoStats.value.byAction.install,
+      fail: demoStats.value.byAction.fail,
+    }
+  }
+  return chartUpdateDataByAction.value
+})
+const effectiveTotalInstalled = computed(() => isDemoMode.value ? calculateDemoTotal(demoStats.value.byAction.install) : totalInstalled.value)
+const effectiveTotalFailed = computed(() => isDemoMode.value ? calculateDemoTotal(demoStats.value.byAction.fail) : totalFailed.value)
+const effectiveTotalRequested = computed(() => isDemoMode.value ? calculateDemoTotal(demoStats.value.byAction.requested) : totalRequested.value)
+const effectiveTotalUpdates = computed(() => effectiveTotalInstalled.value + effectiveTotalFailed.value + effectiveTotalRequested.value)
+const effectiveLastDayEvolution = computed(() => isDemoMode.value ? calculateDemoEvolution(demoStats.value.total) : lastDayEvolution.value)
+
+const hasData = computed(() => effectiveTotalUpdates.value > 0 || isDemoMode.value)
+
+const PAGE_SIZE = 1000
+
+async function fetchDailyVersionStats(targetAppIds: string[], startDate: string, endDate: string) {
+  const supabase = useSupabase()
+  const allRows: any[] = []
+  let offset = 0
+
+  while (true) {
+    const { data, error } = await supabase
+      .from('daily_version')
+      .select('date, app_id, install, fail, get')
+      .in('app_id', targetAppIds)
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .order('date', { ascending: true })
+      .range(offset, offset + PAGE_SIZE - 1)
+
+    if (error)
+      throw error
+
+    if (data && data.length > 0)
+      allRows.push(...data)
+
+    if (!data || data.length < PAGE_SIZE)
+      break
+
+    offset += PAGE_SIZE
+  }
+
+  return allRows
+}
 
 async function calculateStats(forceRefetch = false) {
   const startTime = Date.now()
@@ -90,39 +165,33 @@ async function calculateStats(forceRefetch = false) {
   updateDataByAction.value = {}
   updateData.value = []
 
-  const currentOrgId = organizationStore.currentOrganization?.gid ?? null
+  const currentOrgId = effectiveOrganization.value?.gid ?? null
   const orgChanged = currentCacheOrgId.value !== currentOrgId
   currentCacheOrgId.value = currentOrgId
 
-  // Determine the date range based on mode
+  const DAY_IN_MS = 1000 * 60 * 60 * 24
+
+  // Always work with full billing period when enabled, otherwise last 30 days
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
-  let rangeStart: Date
-  let rangeEnd: Date
+  const last30DaysStart = new Date(today)
+  last30DaysStart.setDate(last30DaysStart.getDate() - 29)
 
-  if (props.useBillingPeriod) {
-    // Billing period mode: use the full billing period (start to end)
-    rangeStart = new Date(organizationStore.currentOrganization?.subscription_start ?? today)
-    rangeStart.setHours(0, 0, 0, 0)
-    rangeEnd = new Date(organizationStore.currentOrganization?.subscription_end ?? today)
-    rangeEnd.setHours(0, 0, 0, 0)
-  }
-  else {
-    // Last 30 days mode: from 29 days ago to today
-    rangeEnd = new Date(today)
-    rangeStart = new Date(today)
-    rangeStart.setDate(rangeStart.getDate() - 29)
-  }
+  const billingStart = new Date(effectiveOrganization.value?.subscription_start ?? today)
+  billingStart.setHours(0, 0, 0, 0)
+  const safeBillingStart = billingStart > today ? today : billingStart
 
-  // Calculate number of days in range
-  const dayCount = Math.floor((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1
+  const rangeStart = props.useBillingPeriod ? safeBillingStart : last30DaysStart
+  const dayCount = props.useBillingPeriod
+    ? Math.max(0, Math.floor((today.getTime() - rangeStart.getTime()) / DAY_IN_MS) + 1)
+    : 30
 
   const startDate = rangeStart.toISOString().split('T')[0]
-  const endDate = rangeEnd.toISOString().split('T')[0]
+  const endDate = today.toISOString().split('T')[0]
 
-  // Cache key includes org and billing mode since date range differs
-  const cacheKey = `${currentOrgId}:${props.useBillingPeriod ? 'billing' : '30days'}`
+  // Cache key includes org, app, and range to avoid stale data between periods
+  const cacheKey = `${currentOrgId ?? 'none'}:${props.appId || 'org'}:${startDate}:${endDate}`
 
   try {
     // Determine target apps
@@ -162,25 +231,18 @@ async function calculateStats(forceRefetch = false) {
 
     // Check per-org cache - only use if not forcing refetch
     let data: any[] | null = null
-    const cachedData = cacheByOrgAndMode.get(cacheKey)
+    const cachedData = cacheByOrgAndMode.value.get(cacheKey)
 
     if (cachedData && !forceRefetch) {
       data = cachedData
     }
     else {
-      // Get update stats from daily_version table
-      const result = await useSupabase()
-        .from('daily_version')
-        .select('date, app_id, install, fail, get')
-        .in('app_id', targetAppIds)
-        .gte('date', startDate)
-        .lte('date', endDate)
-        .order('date')
-      data = result.data
+      // Get update stats from daily_version table (paginate to avoid PostgREST 1000-row limit)
+      data = await fetchDailyVersionStats(targetAppIds, startDate, endDate)
 
-      // Store in per-org cache
+      // Store in per-org cache (immutable update for reactivity)
       if (data) {
-        cacheByOrgAndMode.set(cacheKey, data)
+        cacheByOrgAndMode.value = new Map([...cacheByOrgAndMode.value, [cacheKey, data]])
       }
     }
 
@@ -209,7 +271,7 @@ async function calculateStats(forceRefetch = false) {
           statDate.setHours(0, 0, 0, 0)
 
           // Calculate days since start of range
-          const daysDiff = Math.floor((statDate.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24))
+          const daysDiff = Math.floor((statDate.getTime() - rangeStart.getTime()) / DAY_IN_MS)
 
           if (daysDiff >= 0 && daysDiff < dayCount) {
             const installedCount = stat.install || 0
@@ -219,10 +281,6 @@ async function calculateStats(forceRefetch = false) {
 
             // Increment arrays
             incrementArrayValue(dailyCounts, daysDiff, totalForDay)
-
-            installedTotal += installedCount
-            failedTotal += failedCount
-            requestedTotal += requestedCount
 
             // Track by action type
             incrementArrayValue(actionData.install, daysDiff, installedCount)
@@ -236,22 +294,31 @@ async function calculateStats(forceRefetch = false) {
           }
         }
       })
+    }
 
-      // Calculate evolution (compare last two days with data)
-      const nonZeroDays = dailyCounts.filter(count => (count || 0) > 0)
-      if (nonZeroDays.length >= 2) {
-        const lastDayCount = nonZeroDays[nonZeroDays.length - 1] || 0
-        const previousDayCount = nonZeroDays[nonZeroDays.length - 2] || 0
-        if (previousDayCount > 0) {
-          lastDayEvolution.value = ((lastDayCount - previousDayCount) / previousDayCount) * 100
-        }
+    const finalDailyCounts = dailyCounts
+    const finalActionData = actionData
+    const finalAppData = appData
+
+    const sumSeries = (series: (number | undefined)[]) =>
+      series.reduce<number>((sum, value) => sum + (value ?? 0), 0)
+    installedTotal = sumSeries(finalActionData.install)
+    failedTotal = sumSeries(finalActionData.fail)
+    requestedTotal = sumSeries(finalActionData.requested)
+
+    const nonZeroDays = finalDailyCounts.filter(count => (count || 0) > 0)
+    if (nonZeroDays.length >= 2) {
+      const lastDayCount = nonZeroDays[nonZeroDays.length - 1] || 0
+      const previousDayCount = nonZeroDays[nonZeroDays.length - 2] || 0
+      if (previousDayCount > 0) {
+        lastDayEvolution.value = ((lastDayCount - previousDayCount) / previousDayCount) * 100
       }
     }
 
     // Set all display values at once
-    updateData.value = dailyCounts
-    updateDataByAction.value = actionData
-    updateDataByApp.value = appData
+    updateData.value = finalDailyCounts
+    updateDataByAction.value = finalActionData
+    updateDataByApp.value = finalAppData
     totalInstalled.value = installedTotal
     totalFailed.value = failedTotal
     totalRequested.value = requestedTotal
@@ -271,10 +338,16 @@ async function calculateStats(forceRefetch = false) {
 }
 
 // Watch for organization changes - use per-org cache (no need to force refetch)
-watch(() => organizationStore.currentOrganization?.gid, async (newOrgId, oldOrgId) => {
-  if (newOrgId && oldOrgId && newOrgId !== oldOrgId) {
+watch(() => effectiveOrganization.value?.gid, async (newOrgId, oldOrgId) => {
+  if (newOrgId && oldOrgId !== undefined && newOrgId !== oldOrgId) {
     // Per-org cache will be checked in calculateStats
-    await calculateStats(false)
+    await calculateStats(true)
+  }
+})
+
+watch(() => props.appId, async (newAppId, oldAppId) => {
+  if (newAppId !== oldAppId) {
+    await calculateStats(true)
   }
 })
 
@@ -303,10 +376,11 @@ onMounted(async () => {
 <template>
   <ChartCard
     :title="t('update_statistics')"
-    :total="totalUpdates"
-    :last-day-evolution="lastDayEvolution"
+    :total="effectiveTotalUpdates"
+    :last-day-evolution="effectiveLastDayEvolution"
     :is-loading="isLoading"
     :has-data="hasData"
+    :is-demo-data="isDemoMode"
   >
     <template #header>
       <div class="flex flex-col gap-2 justify-between items-start">
@@ -318,30 +392,30 @@ onMounted(async () => {
             <div class="w-3 h-3 rounded-full" style="background-color: hsl(210, 65%, 55%)" />
             <div
               class="flex gap-1 items-center text-sm text-slate-600 dark:text-slate-300"
-              :aria-label="`${actionDisplayNames.requested}: ${totalRequested.toLocaleString()}`"
+              :aria-label="`${actionDisplayNames.requested}: ${effectiveTotalRequested.toLocaleString()}`"
             >
               <GlobeAltIcon class="w-4 h-4" aria-hidden="true" />
-              <span>{{ totalRequested.toLocaleString() }}</span>
+              <span>{{ effectiveTotalRequested.toLocaleString() }}</span>
             </div>
           </div>
           <div class="flex gap-2 items-center">
             <div class="w-3 h-3 rounded-full" style="background-color: hsl(135, 55%, 50%)" />
             <div
               class="flex gap-1 items-center text-sm text-slate-600 dark:text-slate-300"
-              :aria-label="`${actionDisplayNames.install}: ${totalInstalled.toLocaleString()}`"
+              :aria-label="`${actionDisplayNames.install}: ${effectiveTotalInstalled.toLocaleString()}`"
             >
               <ArrowDownOnSquareIcon class="w-4 h-4" aria-hidden="true" />
-              <span>{{ totalInstalled.toLocaleString() }}</span>
+              <span>{{ effectiveTotalInstalled.toLocaleString() }}</span>
             </div>
           </div>
           <div class="flex gap-2 items-center">
             <div class="w-3 h-3 rounded-full" style="background-color: hsl(0, 50%, 60%)" />
             <div
               class="flex gap-1 items-center text-sm text-slate-600 dark:text-slate-300"
-              :aria-label="`${actionDisplayNames.fail}: ${totalFailed.toLocaleString()}`"
+              :aria-label="`${actionDisplayNames.fail}: ${effectiveTotalFailed.toLocaleString()}`"
             >
               <XCircleIcon class="w-4 h-4" aria-hidden="true" />
-              <span>{{ totalFailed.toLocaleString() }}</span>
+              <span>{{ effectiveTotalFailed.toLocaleString() }}</span>
             </div>
           </div>
         </div>
@@ -349,13 +423,13 @@ onMounted(async () => {
     </template>
 
     <UpdateStatsChart
-      :key="JSON.stringify(chartUpdateDataByAction)"
+      :key="JSON.stringify(effectiveChartDataByAction)"
       :title="t('update_statistics')"
       :colors="colors.blue"
-      :data="chartUpdateData"
+      :data="effectiveChartData"
       :use-billing-period="useBillingPeriod"
       :accumulated="accumulated"
-      :data-by-app="chartUpdateDataByAction"
+      :data-by-app="effectiveChartDataByAction"
       :app-names="actionDisplayNames"
       :app-id="appId"
     />

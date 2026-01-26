@@ -4,6 +4,7 @@ import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { sendNotifToOrgMembers } from '../utils/org_email_notifications.ts'
+import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 
 interface CreditUsageAlertPayload {
   org_id: string
@@ -30,11 +31,11 @@ app.post('/', middlewareAPISecret, async (c) => {
   const orgId = payload.org_id
 
   if (!orgId || Number.isNaN(threshold))
-    return simpleError('invalid_payload', 'Missing orgId or threshold in alert payload', { payload })
+    throw simpleError('invalid_payload', 'Missing orgId or threshold in alert payload', { payload })
 
   const eventName = EVENT_BY_THRESHOLD[threshold]
   if (!eventName)
-    return simpleError('unsupported_threshold', 'Threshold not supported', { threshold, payload })
+    throw simpleError('unsupported_threshold', 'Threshold not supported', { threshold, payload })
 
   const percentUsed = Math.min(
     100,
@@ -54,34 +55,43 @@ app.post('/', middlewareAPISecret, async (c) => {
     threshold,
   }
 
-  const sent = await sendNotifToOrgMembers(
-    c,
-    eventName,
-    'credit_usage',
-    metadata,
-    orgId,
-    uniqId,
-    '0 0 1 * *',
-  )
+  const pgClient = getPgClient(c, true)
+  const drizzleClient = getDrizzleClient(pgClient)
 
-  if (sent) {
-    cloudlog({ requestId: c.get('requestId'), message: 'credit usage alert sent', eventName, orgId, metadata })
-    await logsnag(c).track({
-      channel: 'usage',
-      event: `Credit usage ${threshold}%+`,
-      icon: '⚡️',
-      user_id: orgId,
-      notify: threshold >= 100,
-      tags: {
-        alert_cycle: alertCycle.toString(),
-        percent_used: percentUsed.toFixed(2),
-        threshold: threshold.toString(),
-      },
-    }).catch()
-  }
-  else {
-    cloudlog({ requestId: c.get('requestId'), message: 'credit usage alert skipped', eventName, orgId, metadata })
-  }
+  try {
+    const sent = await sendNotifToOrgMembers(
+      c,
+      eventName,
+      'credit_usage',
+      metadata,
+      orgId,
+      uniqId,
+      '0 0 1 * *',
+      drizzleClient,
+    )
 
-  return c.json(BRES)
+    if (sent) {
+      cloudlog({ requestId: c.get('requestId'), message: 'credit usage alert sent', eventName, orgId, metadata })
+      await logsnag(c).track({
+        channel: 'usage',
+        event: `Credit usage ${threshold}%+`,
+        icon: '⚡️',
+        user_id: orgId,
+        notify: threshold >= 100,
+        tags: {
+          alert_cycle: alertCycle.toString(),
+          percent_used: percentUsed.toFixed(2),
+          threshold: threshold.toString(),
+        },
+      }).catch()
+    }
+    else {
+      cloudlog({ requestId: c.get('requestId'), message: 'credit usage alert skipped', eventName, orgId, metadata })
+    }
+
+    return c.json(BRES)
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
 })

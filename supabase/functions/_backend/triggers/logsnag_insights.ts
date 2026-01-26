@@ -1,8 +1,9 @@
 import type { Context } from 'hono'
+import type { DevicesByPlatform, PluginBreakdownResult } from '../utils/cloudflare.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
-import { readActiveAppsCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
+import { getPluginBreakdownCF, readActiveAppsCF, readLastMonthDevicesByPlatformCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { logsnag, logsnagInsights } from '../utils/logsnag.ts'
@@ -12,6 +13,14 @@ import { supabaseAdmin } from '../utils/supabase.ts'
 interface PlanTotal { [key: string]: number }
 interface Actives { users: number, apps: number }
 interface CustomerCount { total: number, yearly: number, monthly: number }
+interface BuildStats {
+  total: number
+  ios: number
+  android: number
+  last_month: number
+  last_month_ios: number
+  last_month_android: number
+}
 interface PlanRevenue {
   mrr: number
   total_revenue: number
@@ -43,6 +52,7 @@ interface GlobalStats {
   plans: PromiseLike<PlanTotal>
   actives: Promise<Actives>
   devices_last_month: PromiseLike<number>
+  devices_by_platform: PromiseLike<DevicesByPlatform>
   registers_today: PromiseLike<number>
   bundle_storage_gb: PromiseLike<number>
   revenue: PromiseLike<PlanRevenue>
@@ -50,6 +60,8 @@ interface GlobalStats {
   canceled_orgs: PromiseLike<number>
   credits_bought: PromiseLike<number>
   credits_consumed: PromiseLike<number>
+  plugin_breakdown: PromiseLike<PluginBreakdownResult>
+  build_stats: PromiseLike<BuildStats>
 }
 
 function getTodayDateId(): string {
@@ -247,6 +259,63 @@ async function getGithubStars(): Promise<number> {
   }
 }
 
+async function getBuildStats(c: Context): Promise<BuildStats> {
+  const supabase = supabaseAdmin(c)
+  const last30days = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
+  try {
+    // Run all count queries in parallel for better performance
+    const [
+      totalResult,
+      iosResult,
+      androidResult,
+      lastMonthTotalResult,
+      lastMonthIosResult,
+      lastMonthAndroidResult,
+    ] = await Promise.all([
+      // Count total builds (all time)
+      supabase.from('build_logs').select('*', { count: 'exact', head: true }),
+      // Count iOS builds (all time)
+      supabase.from('build_logs').select('*', { count: 'exact', head: true }).eq('platform', 'ios'),
+      // Count Android builds (all time)
+      supabase.from('build_logs').select('*', { count: 'exact', head: true }).eq('platform', 'android'),
+      // Count total builds (last 30 days)
+      supabase.from('build_logs').select('*', { count: 'exact', head: true }).gte('created_at', last30days),
+      // Count iOS builds (last 30 days)
+      supabase.from('build_logs').select('*', { count: 'exact', head: true }).eq('platform', 'ios').gte('created_at', last30days),
+      // Count Android builds (last 30 days)
+      supabase.from('build_logs').select('*', { count: 'exact', head: true }).eq('platform', 'android').gte('created_at', last30days),
+    ])
+
+    // Log any errors
+    if (totalResult.error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats total error', error: totalResult.error })
+    if (iosResult.error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats iOS error', error: iosResult.error })
+    if (androidResult.error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats Android error', error: androidResult.error })
+    if (lastMonthTotalResult.error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats lastMonthTotal error', error: lastMonthTotalResult.error })
+    if (lastMonthIosResult.error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats lastMonthIos error', error: lastMonthIosResult.error })
+    if (lastMonthAndroidResult.error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats lastMonthAndroid error', error: lastMonthAndroidResult.error })
+
+    return {
+      total: totalResult.count ?? 0,
+      ios: iosResult.count ?? 0,
+      android: androidResult.count ?? 0,
+      last_month: lastMonthTotalResult.count ?? 0,
+      last_month_ios: lastMonthIosResult.count ?? 0,
+      last_month_android: lastMonthAndroidResult.count ?? 0,
+    }
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats error', error: e })
+    return { total: 0, ios: 0, android: 0, last_month: 0, last_month_ios: 0, last_month_android: 0 }
+  }
+}
+
 function getStats(c: Context): GlobalStats {
   const supabase = supabaseAdmin(c)
   const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
@@ -305,6 +374,7 @@ function getStats(c: Context): GlobalStats {
     }),
     updates_last_month: readLastMonthUpdatesCF(c),
     devices_last_month: readLastMonthDevicesCF(c),
+    devices_by_platform: readLastMonthDevicesByPlatformCF(c),
     registers_today: supabase
       .from('users')
       .select('id', { count: 'exact', head: true })
@@ -377,6 +447,8 @@ function getStats(c: Context): GlobalStats {
         }
         return (res.data || []).reduce((sum, row) => sum + (Number(row.credits_used) || 0), 0)
       }),
+    plugin_breakdown: getPluginBreakdownCF(c),
+    build_stats: getBuildStats(c),
   }
 }
 
@@ -398,6 +470,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     actives,
     updates_last_month,
     devices_last_month,
+    devices_by_platform,
     registers_today,
     bundle_storage_gb,
     success_rate,
@@ -406,6 +479,8 @@ app.post('/', middlewareAPISecret, async (c) => {
     canceled_orgs,
     credits_bought,
     credits_consumed,
+    plugin_breakdown,
+    build_stats,
   ] = await Promise.all([
     res.apps,
     res.updates,
@@ -420,6 +495,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     res.actives,
     res.updates_last_month,
     res.devices_last_month,
+    res.devices_by_platform,
     res.registers_today,
     res.bundle_storage_gb,
     res.success_rate,
@@ -428,6 +504,8 @@ app.post('/', middlewareAPISecret, async (c) => {
     res.canceled_orgs,
     res.credits_bought,
     res.credits_consumed,
+    res.plugin_breakdown,
+    res.build_stats,
   ])
   const not_paying = users - customers.total - plans.Trial
   cloudlog({
@@ -468,6 +546,8 @@ app.post('/', middlewareAPISecret, async (c) => {
     not_paying,
     updates_last_month,
     devices_last_month,
+    devices_last_month_ios: devices_by_platform.ios,
+    devices_last_month_android: devices_by_platform.android,
     registers_today,
     bundle_storage_gb,
     success_rate,
@@ -496,6 +576,17 @@ app.post('/', middlewareAPISecret, async (c) => {
     // Credits tracking (round to integers for bigint column)
     credits_bought: Math.round(credits_bought),
     credits_consumed: Math.round(credits_consumed),
+    // Plugin version breakdown (percentage per version)
+    plugin_version_breakdown: plugin_breakdown.version_breakdown,
+    plugin_major_breakdown: plugin_breakdown.major_breakdown,
+    // Build statistics (all time)
+    builds_total: build_stats.total,
+    builds_ios: build_stats.ios,
+    builds_android: build_stats.android,
+    // Build statistics (last 30 days)
+    builds_last_month: build_stats.last_month,
+    builds_last_month_ios: build_stats.last_month_ios,
+    builds_last_month_android: build_stats.last_month_android,
   }
   cloudlog({ requestId: c.get('requestId'), message: 'newData', newData })
   const { error } = await supabaseAdmin(c)
@@ -622,6 +713,46 @@ app.post('/', middlewareAPISecret, async (c) => {
       title: 'Orgs Enterprise Plan',
       value: `${((plans.Enterprise || 0) * 100 / customers.total).toFixed(0)}% - ${plans.Enterprise || 0}`,
       icon: '📈',
+    },
+    {
+      title: 'Devices iOS (30d)',
+      value: devices_by_platform.ios,
+      icon: '🍎',
+    },
+    {
+      title: 'Devices Android (30d)',
+      value: devices_by_platform.android,
+      icon: '🤖',
+    },
+    {
+      title: 'Total Builds',
+      value: build_stats.total,
+      icon: '🔨',
+    },
+    {
+      title: 'iOS Builds',
+      value: build_stats.ios,
+      icon: '🍏',
+    },
+    {
+      title: 'Android Builds',
+      value: build_stats.android,
+      icon: '🤖',
+    },
+    {
+      title: 'Builds (30d)',
+      value: build_stats.last_month,
+      icon: '🔨',
+    },
+    {
+      title: 'iOS Builds (30d)',
+      value: build_stats.last_month_ios,
+      icon: '🍏',
+    },
+    {
+      title: 'Android Builds (30d)',
+      value: build_stats.last_month_android,
+      icon: '🤖',
     },
   ]).catch((e) => {
     cloudlogErr({ requestId: c.get('requestId'), message: 'insights error', e })
