@@ -39,19 +39,21 @@ DECLARE
     org_without_2fa_enforcement_id uuid;
     test_2fa_user_id uuid;
     test_no_2fa_user_id uuid;
+    test_admin_id uuid;
 BEGIN
     org_with_2fa_enforcement_id := gen_random_uuid();
     org_without_2fa_enforcement_id := gen_random_uuid();
     test_2fa_user_id := tests.get_supabase_uid('test_2fa_user_org');
     test_no_2fa_user_id := tests.get_supabase_uid('test_no_2fa_user_org');
+    test_admin_id := tests.get_supabase_uid('test_admin');
 
     -- Create org WITH 2FA enforcement
     INSERT INTO public.orgs (id, created_by, name, management_email, enforcing_2fa)
-    VALUES (org_with_2fa_enforcement_id, test_2fa_user_id, '2FA Enforced Org Direct', '2fa_org_direct@org.com', true);
+    VALUES (org_with_2fa_enforcement_id, test_admin_id, '2FA Enforced Org Direct', '2fa_org_direct@org.com', true);
 
     -- Create org WITHOUT 2FA enforcement
     INSERT INTO public.orgs (id, created_by, name, management_email, enforcing_2fa)
-    VALUES (org_without_2fa_enforcement_id, test_2fa_user_id, 'No 2FA Org Direct', 'no2fa_org_direct@org.com', false);
+    VALUES (org_without_2fa_enforcement_id, test_admin_id, 'No 2FA Org Direct', 'no2fa_org_direct@org.com', false);
 
     -- Clean up any pre-existing org_users memberships to prevent duplicate key errors
     DELETE FROM public.org_users 
