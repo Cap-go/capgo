@@ -84,14 +84,17 @@ async function guard(
   from: RouteLocationNormalized,
 ) {
   const supabase = useSupabase()
-  const { data: auth } = await supabase.auth.getUser()
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const { data: sessionData } = await supabase.auth.getSession()
+  const sessionUser = sessionData?.session?.user ?? null
+  const hasAuth = !!claimsData?.claims?.sub && !!sessionUser
 
   const main = useMainStore()
 
   // TOTP means the user was force logged using the "email" tactic
   // In practice this means the user is being spoofed by an admin
   const isAdminForced
-    = !!auth.user?.factors?.find(f => f.factor_type === 'totp') || false
+    = !!sessionUser?.factors?.find(f => f.factor_type === 'totp') || false
 
   const { data: mfaData, error: mfaError }
     = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
@@ -108,13 +111,13 @@ async function guard(
     return next(`/login?to=${to.path}`)
   }
 
-  if (auth.user && !main.auth) {
-    main.auth = auth.user
+  if (hasAuth && sessionUser && !main.auth) {
+    main.auth = sessionUser
 
     // Check if account is disabled (marked for deletion)
     try {
       const { data: isDisabled, error: disabledError } = await supabase
-        .rpc('is_account_disabled', { user_id: auth.user.id })
+        .rpc('is_account_disabled', { user_id: sessionUser.id })
 
       if (disabledError) {
         console.error('Error checking account status:', disabledError)
@@ -151,17 +154,17 @@ async function guard(
     next()
     hideLoader()
   }
-  else if (from.path !== 'login' && !auth.user) {
+  else if (from.path !== 'login' && !hasAuth) {
     main.auth = undefined
     next(`/login?to=${to.path}`)
   }
-  else if (auth.user && main.auth) {
+  else if (hasAuth && main.auth) {
     // User is already authenticated, but check if account got disabled
     // (only if not already on account disabled page)
     if (to.path !== '/accountDisabled') {
       try {
         const { data: isDisabled, error: disabledError } = await supabase
-          .rpc('is_account_disabled', { user_id: auth.user.id })
+          .rpc('is_account_disabled', { user_id: main.auth.id })
 
         if (disabledError) {
           console.error('Error checking account status:', disabledError)

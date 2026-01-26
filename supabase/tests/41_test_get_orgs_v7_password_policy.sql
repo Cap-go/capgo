@@ -15,14 +15,14 @@ VALUES
 (
     tests.get_supabase_uid('test_pwd_compliant_v7'),
     'pwd_compliant_v7@test.com',
-    NOW(),
-    NOW()
+    now(),
+    now()
 ),
 (
     tests.get_supabase_uid('test_pwd_noncompliant_v7'),
     'pwd_noncompliant_v7@test.com',
-    NOW(),
-    NOW()
+    now(),
+    now()
 )
 ON CONFLICT (id) DO NOTHING;
 
@@ -421,6 +421,7 @@ SELECT
 
 -- Test 20: In org with both policies, user needs both 2FA and compliant password
 -- Compliant password user without 2FA should have password_has_access=true but 2fa_has_access=false
+-- Org is visible but with redacted fields due to missing 2FA
 SELECT
     is(
         (
@@ -432,10 +433,11 @@ SELECT
             WHERE gid = current_setting('test.org_with_both_policies_v7')::uuid
         ),
         true,
-        'get_orgs_v7 test - compliant password user has password_has_access=true in org with both policies'
+        'get_orgs_v7 test - compliant password user without 2FA sees org with password_has_access=true'
     );
 
 -- Test 21: Compliant password user without 2FA should have 2fa_has_access=false
+-- Org is visible but fields are redacted due to missing 2FA
 SELECT
     is(
         (
@@ -451,17 +453,19 @@ SELECT
     );
 
 -- Test 22: Non-compliant user should have password_has_access=false in org with both policies
+-- Org is visible but fields are redacted due to missing 2FA and non-compliant password
 SELECT
-    ok(
+    is(
         (
-            SELECT password_has_access = false
+            SELECT password_has_access
             FROM
                 public.get_orgs_v7(
                     tests.get_supabase_uid('test_pwd_noncompliant_v7')
                 )
             WHERE gid = current_setting('test.org_with_both_policies_v7')::uuid
         ),
-        'get_orgs_v7 test - non-compliant user has password_has_access=false in org with both policies'
+        false,
+        'get_orgs_v7 test - non-compliant user without 2FA has password_has_access=false in org with both policies'
     );
 
 -- ============================================================================

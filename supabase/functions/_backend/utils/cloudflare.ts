@@ -2,7 +2,7 @@ import type { AnalyticsEngineDataPoint, D1Database, Hyperdrive } from '@cloudfla
 import type { Context } from 'hono'
 import type { DeviceComparable } from './deviceComparison.ts'
 import type { Database } from './supabase.types.ts'
-import type { DeviceRes, DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams } from './types.ts'
+import type { DeviceRes, DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams, VersionUsage } from './types.ts'
 import dayjs from 'dayjs'
 import { CacheHelper } from './cache.ts'
 import { hasComparableDeviceChanged, toComparableDevice } from './deviceComparison.ts'
@@ -28,7 +28,8 @@ export type Bindings = {
 }
 
 const TRACK_DEVICE_USAGE_CACHE_PATH = '/.track-device-usage-cache'
-const TRACK_DEVICE_USAGE_CACHE_MAX_AGE_SECONDS = 29 * 24 * 60 * 60 // 29 days
+// Cache per device per day to ensure rolling windows still see active devices.
+const TRACK_DEVICE_USAGE_CACHE_MAX_AGE_SECONDS = 2 * 24 * 60 * 60
 
 /**
  * Track device usage (MAU) in Cloudflare Analytics Engine
@@ -39,8 +40,8 @@ const TRACK_DEVICE_USAGE_CACHE_MAX_AGE_SECONDS = 29 * 24 * 60 * 60 // 29 days
  * - Activity detection for organizations with recent MAU stats
  * - Better analytics segmentation by organization
  *
- * Uses caching to only write once per device per 29 days to reduce Analytics Engine costs
- * while maintaining accurate MAU counts.
+ * Uses caching to only write once per device per day to reduce Analytics Engine costs
+ * while maintaining accurate rolling-window MAU counts.
  *
  * @param c - Hono context
  * @param device_id - Unique device identifier
@@ -57,6 +58,7 @@ export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: 
     const usageCacheRequest = usageCache.buildRequest(TRACK_DEVICE_USAGE_CACHE_PATH, {
       app_id,
       device_id,
+      day: dayjs().format('YYYY-MM-DD'),
     })
 
     // Check if device was already tracked within the cache period (29 days)
@@ -108,12 +110,12 @@ export function trackBandwidthUsageCF(c: Context, device_id: string, app_id: str
   return Promise.resolve()
 }
 
-export function trackVersionUsageCF(c: Context, version_id: number, app_id: string, action: string) {
+export function trackVersionUsageCF(c: Context, version_name: string, app_id: string, action: string) {
   if (!c.env.VERSION_USAGE)
     return Promise.resolve()
 
   c.env.VERSION_USAGE.writeDataPoint({
-    blobs: [app_id, version_id, action],
+    blobs: [app_id, version_name, action],
     indexes: [app_id],
   })
 
@@ -196,8 +198,9 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
 
     // Write to Analytics Engine - this is the primary store now
     cloudlog({ requestId: c.get('requestId'), message: 'Writing to Analytics Engine DEVICE_INFO' })
-    // Platform: 0 = android, 1 = ios
-    const platformValue = comparableDevice.platform?.toLowerCase() === 'ios' ? 1 : 0
+    // Platform: 0 = android, 1 = ios, 2 = electron
+    const platformLower = comparableDevice.platform?.toLowerCase()
+    const platformValue = platformLower === 'ios' ? 1 : platformLower === 'electron' ? 2 : 0
     c.env.DEVICE_INFO.writeDataPoint({
       blobs: [
         device.device_id,
@@ -316,7 +319,7 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
   if (!c.env.DEVICE_USAGE)
     return [] as DeviceUsageCF[]
   const query = `SELECT
-    formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
+    formatDateTime(toStartOfInterval(min(timestamp), INTERVAL '1' DAY), '%Y-%m-%d') AS date,
     blob1 AS device_id,
     index1 AS app_id,
     blob2 AS org_id
@@ -325,21 +328,13 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
     app_id = '${app_id}'
     AND timestamp >= toDateTime('${formatDateCF(period_start)}')
     AND timestamp < toDateTime('${formatDateCF(period_end)}')
+  GROUP BY device_id, app_id, org_id
   ORDER BY date`
 
   cloudlog({ requestId: c.get('requestId'), message: 'readDeviceUsageCF query', query })
   try {
     const res = await runQueryToCFA<DeviceUsageAllCF>(c, query)
-    // First, filter to keep only the first appearance of each device_id
-    const uniqueDevices = new Map<string, DeviceUsageAllCF>()
-    res.toReversed().forEach((entry) => {
-      uniqueDevices.set(entry.device_id, entry)
-    })
-    const arr = Array.from(uniqueDevices.values())
-    cloudlog({ requestId: c.get('requestId'), message: 'uniqueDevices', arrLength: arr.length })
-
-    // Now calculate MAU based on the unique devices
-    const groupedByDay = arr.reduce((acc, curr) => {
+    const groupedByDay = res.reduce((acc, curr) => {
       const { date, app_id, org_id } = curr
       if (!acc[date]) {
         acc[date] = {
@@ -352,8 +347,7 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
       acc[date].mau++
       return acc
     }, {} as Record<string, DeviceUsageCF>)
-    const result = Object.values(groupedByDay).sort((a, b) => a.date > b.date ? 1 : -1)
-    return result
+    return Object.values(groupedByDay).sort((a, b) => a.date > b.date ? 1 : -1)
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device usage', error: serializeError(e), query })
@@ -436,22 +430,14 @@ interface StoreApp {
   developer_id?: string // Optional as it's not NOT NULL
 }
 
-interface VersionUsageCF {
-  date: string
-  app_id: string
-  version_id: number
-  get: number
-  fail: number
-  install: number
-  uninstall: number
-}
-
-export async function readStatsVersionCF(c: Context, app_id: string, period_start: string, period_end: string) {
+export async function readStatsVersionCF(c: Context, app_id: string, period_start: string, period_end: string): Promise<VersionUsage[]> {
   if (!c.env.VERSION_USAGE)
-    return [] as VersionUsageCF[]
+    return []
+  // Note: blob2 contains version_name for new data and version_id (numeric) for old data
+  // The cron job handles backwards compatibility by detecting numeric values
   const query = `SELECT
   blob1 as app_id,
-  blob2 as version_id,
+  blob2 as version_name,
   formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
   sum(if(blob3 = 'get', 1, 0)) AS get,
   sum(if(blob3 = 'fail', 1, 0)) AS fail,
@@ -462,17 +448,17 @@ WHERE
   app_id = '${app_id}'
   AND timestamp >= toDateTime('${formatDateCF(period_start)}')
   AND timestamp < toDateTime('${formatDateCF(period_end)}')
-GROUP BY date, app_id, version_id
+GROUP BY date, app_id, version_name
 ORDER BY date`
 
   cloudlog({ requestId: c.get('requestId'), message: 'readStatsVersionCF query', query })
   try {
-    return await runQueryToCFA<VersionUsageCF>(c, query)
+    return await runQueryToCFA<VersionUsage>(c, query)
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading version usage', error: serializeError(e), query })
   }
-  return [] as VersionUsageCF[]
+  return []
 }
 
 export async function countDevicesCF(c: Context, app_id: string, customIdMode: boolean) {
@@ -590,7 +576,7 @@ LIMIT ${limit + 1}`
       device_id: row.device_id,
       version: null, // version ID not stored in Analytics Engine
       version_name: row.version_name || null,
-      platform: row.platform === 1 ? 'ios' : 'android',
+      platform: row.platform === 1 ? 'ios' : row.platform === 2 ? 'electron' : 'android',
       plugin_version: row.plugin_version,
       os_version: row.os_version,
       version_build: row.version_build,
@@ -798,12 +784,18 @@ export async function readLastMonthUpdatesCF(c: Context) {
 export async function readLastMonthDevicesCF(c: Context): Promise<number> {
   if (!c.env.DEVICE_USAGE)
     return 0
-  const query = `SELECT COUNT(DISTINCT blob1) AS total FROM device_usage WHERE timestamp >= toDateTime('${formatDateCF(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))}') AND timestamp < now()`
+  const query = `SELECT
+    index1 AS app_id,
+    COUNT(DISTINCT blob1) AS total
+  FROM device_usage
+  WHERE timestamp >= toDateTime('${formatDateCF(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))}')
+    AND timestamp < now()
+  GROUP BY index1`
 
   cloudlog({ requestId: c.get('requestId'), message: 'readLastMonthDevicesCF query', query })
   try {
-    const res = await runQueryToCFA<{ total: number }>(c, query)
-    return res[0].total
+    const res = await runQueryToCFA<{ app_id: string, total: number }>(c, query)
+    return res.reduce((sum, row) => sum + (row.total || 0), 0)
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading last month devices', error: serializeError(e) })
@@ -824,21 +816,30 @@ export async function readLastMonthDevicesByPlatformCF(c: Context): Promise<Devi
 
   const oneMonthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
   // Platform: double1 = 0 for android, 1 for ios
-  const query = `SELECT
-    COUNT(DISTINCT blob1) AS total,
-    COUNT(DISTINCT CASE WHEN double1 = 1 THEN blob1 END) AS ios,
-    COUNT(DISTINCT CASE WHEN double1 = 0 THEN blob1 END) AS android
-  FROM device_usage
-  WHERE timestamp >= toDateTime('${formatDateCF(oneMonthAgo)}')
-    AND timestamp < now()`
+  const baseWhere = `timestamp >= toDateTime('${formatDateCF(oneMonthAgo)}') AND timestamp < now()`
+  const totalQuery = `SELECT index1 AS app_id, COUNT(DISTINCT blob1) AS total FROM device_usage WHERE ${baseWhere} GROUP BY index1`
+  const platformQuery = `SELECT index1 AS app_id, double1 AS platform, COUNT(DISTINCT blob1) AS total FROM device_usage WHERE ${baseWhere} GROUP BY index1, double1`
 
-  cloudlog({ requestId: c.get('requestId'), message: 'readLastMonthDevicesByPlatformCF query', query })
+  cloudlog({ requestId: c.get('requestId'), message: 'readLastMonthDevicesByPlatformCF queries', totalQuery, platformQuery })
   try {
-    const res = await runQueryToCFA<{ total: number, ios: number, android: number }>(c, query)
+    const [totalRes, platformRes] = await Promise.all([
+      runQueryToCFA<{ app_id: string, total: number }>(c, totalQuery),
+      runQueryToCFA<{ app_id: string, platform: number, total: number }>(c, platformQuery),
+    ])
+
+    const total = totalRes.reduce((sum, row) => sum + (row.total || 0), 0)
+    let ios = 0
+    let android = 0
+    platformRes.forEach((row) => {
+      if (row.platform === 1)
+        ios += row.total || 0
+      else if (row.platform === 0)
+        android += row.total || 0
+    })
     return {
-      total: res[0]?.total || 0,
-      ios: res[0]?.ios || 0,
-      android: res[0]?.android || 0,
+      total,
+      ios,
+      android,
     }
   }
   catch (e) {
@@ -1194,6 +1195,7 @@ export interface AdminPlatformOverview {
   total_bandwidth: number
   android_devices: number
   ios_devices: number
+  electron_devices: number
   total_devices: number
   period_start: string
   period_end: string
@@ -1417,6 +1419,7 @@ export async function getAdminPlatformOverview(
     const platformQuery = `SELECT
         sum(if(double1 = 0, 1, 0)) AS android_devices,
         sum(if(double1 = 1, 1, 0)) AS ios_devices,
+        sum(if(double1 = 2, 1, 0)) AS electron_devices,
         COUNT(DISTINCT blob1) AS total_devices
       FROM device_info
       WHERE timestamp >= toDateTime('${formatDateCF(start_date)}')
@@ -1441,7 +1444,7 @@ export async function getAdminPlatformOverview(
       c.env.DEVICE_USAGE ? runQueryToCFA<{ mau: number }>(c, mauQuery) : Promise.resolve([{ mau: 0 }]),
       c.env.APP_LOG ? runQueryToCFA<{ active_apps: number }>(c, appsQuery) : Promise.resolve([{ active_apps: 0 }]),
       c.env.BANDWIDTH_USAGE ? runQueryToCFA<{ total_bandwidth: number }>(c, bandwidthQuery) : Promise.resolve([{ total_bandwidth: 0 }]),
-      c.env.DEVICE_INFO ? runQueryToCFA<{ android_devices: number, ios_devices: number, total_devices: number }>(c, platformQuery) : Promise.resolve([{ android_devices: 0, ios_devices: 0, total_devices: 0 }]),
+      c.env.DEVICE_INFO ? runQueryToCFA<{ android_devices: number, ios_devices: number, electron_devices: number, total_devices: number }>(c, platformQuery) : Promise.resolve([{ android_devices: 0, ios_devices: 0, electron_devices: 0, total_devices: 0 }]),
       c.env.DEVICE_USAGE ? runQueryToCFA<{ active_orgs: number }>(c, orgsQuery) : Promise.resolve([{ active_orgs: 0 }]),
       c.env.VERSION_USAGE ? runQueryToCFA<{ installs: number, fails: number }>(c, successRateQuery) : Promise.resolve([{ installs: 0, fails: 0 }]),
     ])
@@ -1474,6 +1477,7 @@ export async function getAdminPlatformOverview(
       total_bandwidth: bandwidthResult[0]?.total_bandwidth || 0,
       android_devices: platformResult[0]?.android_devices || 0,
       ios_devices: platformResult[0]?.ios_devices || 0,
+      electron_devices: platformResult[0]?.electron_devices || 0,
       total_devices: platformResult[0]?.total_devices || 0,
       period_start: start_date,
       period_end: end_date,
@@ -1791,5 +1795,97 @@ ORDER BY date ASC`
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error in getAdminBandwidthTrend', error: serializeError(e) })
     return []
+  }
+}
+
+// Plugin Version Breakdown
+export interface PluginVersionBreakdown {
+  [version: string]: number // percentage (0-100)
+}
+
+export interface PluginBreakdownResult {
+  version_breakdown: PluginVersionBreakdown // Full version breakdown (e.g., {"6.2.5": 45.2})
+  major_breakdown: PluginVersionBreakdown // Major version breakdown (e.g., {"6": 75.3})
+}
+
+/**
+ * Get plugin version breakdown for global stats
+ * Returns percentage breakdown of plugin versions installed on devices (last 30 days)
+ */
+export async function getPluginBreakdownCF(c: Context): Promise<PluginBreakdownResult> {
+  if (!c.env.DEVICE_INFO)
+    return { version_breakdown: {}, major_breakdown: {} }
+
+  const last30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+
+  // Query latest plugin_version per device, then aggregate counts by version
+  // Using a subquery keeps the result set small (one row per version).
+  const query = `SELECT
+    plugin_version,
+    count() AS device_count
+  FROM (
+    SELECT
+      argMax(blob3, timestamp) AS plugin_version,
+      blob1 AS device_id
+    FROM device_info
+    WHERE timestamp >= toDateTime('${formatDateCF(last30d)}')
+      AND timestamp < now()
+      AND blob3 != ''
+    GROUP BY blob1
+  )
+  WHERE plugin_version != ''
+  GROUP BY plugin_version`
+
+  cloudlog({ requestId: c.get('requestId'), message: 'getPluginBreakdownCF query', query })
+
+  try {
+    const result = await runQueryToCFA<{ plugin_version: string, device_count: number }>(c, query)
+
+    if (result.length === 0)
+      return { version_breakdown: {}, major_breakdown: {} }
+
+    // Aggregate by full version
+    const versionCounts = new Map<string, number>()
+    for (const row of result) {
+      const version = row.plugin_version
+      versionCounts.set(version, (versionCounts.get(version) || 0) + row.device_count)
+    }
+
+    // Calculate total devices
+    const total = Array.from(versionCounts.values()).reduce((sum, count) => sum + count, 0)
+
+    if (total === 0)
+      return { version_breakdown: {}, major_breakdown: {} }
+
+    // Calculate full version breakdown
+    const version_breakdown: PluginVersionBreakdown = {}
+    const majorCounts = new Map<string, number>()
+
+    for (const [version, count] of versionCounts) {
+      const percentage = Number(((count / total) * 100).toFixed(2))
+      if (percentage > 0) {
+        version_breakdown[version] = percentage
+      }
+
+      // Extract major version (first number before first dot)
+      const major = version.split('.')[0]
+      if (major) {
+        majorCounts.set(major, (majorCounts.get(major) || 0) + count)
+      }
+    }
+
+    // Calculate major version breakdown
+    const major_breakdown: PluginVersionBreakdown = {}
+    for (const [major, count] of majorCounts) {
+      const percentage = Number(((count / total) * 100).toFixed(2))
+      if (percentage > 0)
+        major_breakdown[major] = percentage
+    }
+
+    return { version_breakdown, major_breakdown }
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error in getPluginBreakdownCF', error: serializeError(e) })
+    return { version_breakdown: {}, major_breakdown: {} }
   }
 }

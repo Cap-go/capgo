@@ -1,15 +1,61 @@
 <script setup lang="ts">
 import type { Tab } from '~/components/comp_def'
-import { computed } from 'vue'
+import type { Organization } from '~/stores/organization'
+import { computed, ref, watchEffect } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import PaymentRequiredModal from '~/components/PaymentRequiredModal.vue'
 import Tabs from '~/components/Tabs.vue'
-import { appTabs } from '~/constants/appTabs'
+import { appTabs as baseAppTabs } from '~/constants/appTabs'
 import { bundleTabs } from '~/constants/bundleTabs'
 import { channelTabs } from '~/constants/channelTabs'
 import { deviceTabs } from '~/constants/deviceTabs'
+import { useOrganizationStore } from '~/stores/organization'
 
 const router = useRouter()
 const route = useRoute()
+const organizationStore = useOrganizationStore()
+
+// Get the app ID from the route
+const appId = computed(() => {
+  const match = route.path.match(/^\/app\/([^/]+)/)
+  return match ? match[1] : ''
+})
+
+// Get organization for the current app (not currentOrganization which may be wrong in app context)
+const appOrganization = ref<Organization | null>(null)
+
+watchEffect(async () => {
+  if (appId.value) {
+    await organizationStore.awaitInitialLoad()
+    appOrganization.value = organizationStore.getOrgByAppId(appId.value) ?? null
+  }
+})
+
+// Compute tabs dynamically based on RBAC settings
+const appTabs = computed<Tab[]>(() => {
+  const useNewRbac = appOrganization.value?.use_new_rbac
+
+  if (useNewRbac) {
+    return baseAppTabs
+  }
+
+  return baseAppTabs.filter(t => t.label !== 'access')
+})
+
+// Check if org payment has failed - only show info tab in this case
+const isOrgUnpaid = computed(() => {
+  return organizationStore.currentOrganizationFailed
+})
+
+// Check if we're on the info page (which should not show the payment modal)
+const isOnInfoPage = computed(() => {
+  return route.path.endsWith('/info')
+})
+
+// Show payment overlay only when org is unpaid AND not on info page
+const showPaymentOverlay = computed(() => {
+  return isOrgUnpaid.value && !isOnInfoPage.value
+})
 
 // Detect resource type from route (channel, device, or bundle)
 const resourceType = computed(() => {
@@ -22,12 +68,6 @@ const resourceType = computed(() => {
   return null
 })
 
-// Get the app ID and resource ID from the route
-const appId = computed(() => {
-  const match = route.path.match(/^\/app\/([^/]+)/)
-  return match ? match[1] : ''
-})
-
 const resourceId = computed(() => {
   if (!resourceType.value)
     return ''
@@ -38,9 +78,14 @@ const resourceId = computed(() => {
 // Generate tabs with full paths for the current app
 const tabs = computed<Tab[]>(() => {
   if (!appId.value)
-    return appTabs
+    return appTabs.value
 
-  return appTabs.map(tab => ({
+  // Filter tabs when org is unpaid - only show info tab
+  const availableTabs = isOrgUnpaid.value
+    ? appTabs.value.filter(tab => tab.key === '/info')
+    : appTabs.value
+
+  return availableTabs.map(tab => ({
     ...tab,
     key: tab.key ? `/app/${appId.value}${tab.key}` : `/app/${appId.value}`,
   }))
@@ -128,10 +173,14 @@ function handleSecondaryTab(key: string) {
       @update:active-tab="handleTab"
       @update:secondary-active-tab="handleSecondaryTab"
     />
-    <main class="flex flex-1 w-full min-h-0 mt-0 overflow-hidden bg-blue-50 dark:bg-slate-800/40">
-      <div class="flex-1 w-full min-h-0 mx-auto overflow-y-auto">
+    <main class="relative flex flex-1 w-full min-h-0 mt-0 overflow-hidden bg-blue-50 dark:bg-slate-800/40">
+      <div
+        class="flex-1 w-full min-h-0 mx-auto overflow-y-auto"
+        :class="{ 'blur-sm pointer-events-none select-none': showPaymentOverlay }"
+      >
         <RouterView class="w-full" />
       </div>
+      <PaymentRequiredModal v-if="showPaymentOverlay" />
     </main>
   </div>
 </template>

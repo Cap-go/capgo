@@ -10,14 +10,14 @@ app.use('/', useCors)
 
 app.get('/', (c) => {
   if (getRuntimeKey() !== 'workerd') {
-    // Partial and TUS upload are only available on workerd
+    // In Supabase Edge Functions runtime, TUS upload is supported via Supabase Storage proxy
     return c.json({
       partialUpload: false,
       partialUploadForced: false,
       maxUploadLength: MAX_UPLOAD_LENGTH_BYTES,
       maxChunkSize: MAX_CHUNK_SIZE_BYTES,
       alertUploadSize: ALERT_UPLOAD_SIZE_BYTES,
-      TUSUpload: false,
+      TUSUpload: true,
       TUSUploadForced: false,
     })
   }

@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Buffer } from 'node:buffer'
+import { brotliDecompressSync } from 'node:zlib'
 import { getRuntimeKey } from 'hono/adapter'
 import { CacheHelper } from '../utils/cache.ts'
 import { simpleError } from '../utils/hono.ts'
@@ -8,7 +9,6 @@ import { cloudlog } from '../utils/logging.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
-
 // Cache settings
 const PREVIEW_AUTH_CACHE_PATH = '/.preview-auth'
 const PREVIEW_AUTH_CACHE_TTL_SECONDS = 60
@@ -152,7 +152,7 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
 
   if (!parsed) {
     cloudlog({ requestId: c.get('requestId'), message: 'invalid preview subdomain', hostname })
-    return simpleError('invalid_subdomain', 'Invalid preview subdomain format. Expected: {app_id}-{version_id}.preview.capgo.app')
+    throw simpleError('invalid_subdomain', 'Invalid preview subdomain format. Expected: {app_id}-{version_id}.preview.capgo.app')
   }
 
   const { appId, versionId } = parsed
@@ -172,7 +172,7 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
 
   if (cachedAuth) {
     if (!cachedAuth.allowPreview) {
-      return simpleError('preview_disabled', 'Preview is disabled for this app')
+      throw simpleError('preview_disabled', 'Preview is disabled for this app')
     }
     actualAppId = cachedAuth.actualAppId
   }
@@ -188,7 +188,7 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
       .single()
 
     if (appError || !appData) {
-      return simpleError('app_not_found', 'App not found', { appId })
+      throw simpleError('app_not_found', 'App not found', { appId })
     }
 
     // Cache the app auth result
@@ -198,7 +198,7 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
     })
 
     if (!appData.allow_preview) {
-      return simpleError('preview_disabled', 'Preview is disabled for this app')
+      throw simpleError('preview_disabled', 'Preview is disabled for this app')
     }
 
     actualAppId = appData.app_id
@@ -219,7 +219,7 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
       .single()
 
     if (bundleError || !bundle) {
-      return simpleError('bundle_not_found', 'Bundle not found', { versionId })
+      throw simpleError('bundle_not_found', 'Bundle not found', { versionId })
     }
 
     bundleInfo = {
@@ -233,24 +233,24 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
 
   // Check if bundle is encrypted
   if (bundleInfo.isEncrypted) {
-    return simpleError('bundle_encrypted', 'Encrypted bundles cannot be previewed')
+    throw simpleError('bundle_encrypted', 'Encrypted bundles cannot be previewed')
   }
 
   // Check if bundle has manifest
   if (!bundleInfo.hasManifest) {
-    return simpleError('no_manifest', 'Bundle has no manifest and cannot be previewed')
+    throw simpleError('no_manifest', 'Bundle has no manifest and cannot be previewed')
   }
 
   // Preview only works on Cloudflare Workers where the R2 bucket is available.
   if (getRuntimeKey() !== 'workerd') {
     cloudlog({ requestId: c.get('requestId'), message: 'preview not supported on Supabase Edge Functions' })
-    return simpleError('preview_not_supported', 'Preview is not supported on Supabase Edge Functions. This feature requires Cloudflare Workers with R2 bucket access.')
+    throw simpleError('preview_not_supported', 'Preview is not supported on Supabase Edge Functions. This feature requires Cloudflare Workers with R2 bucket access.')
   }
 
   const bucket = c.env.ATTACHMENT_BUCKET
   if (!bucket) {
     cloudlog({ requestId: c.get('requestId'), message: 'preview bucket is null' })
-    return simpleError('bucket_not_configured', 'Storage bucket not configured')
+    throw simpleError('bucket_not_configured', 'Storage bucket not configured')
   }
 
   // Look up file in manifest using a single query with OR conditions for all possible paths
@@ -278,7 +278,7 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
 
   if (manifestError || !manifestEntries || manifestEntries.length === 0) {
     cloudlog({ requestId: c.get('requestId'), message: 'file not found in manifest', filePath, versionId, possiblePaths })
-    return simpleError('file_not_found', 'File not found in bundle', { filePath })
+    throw simpleError('file_not_found', 'File not found in bundle', { filePath })
   }
 
   const manifestEntry = manifestEntries[0]
@@ -294,7 +294,7 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
     const object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(manifestEntry.s3_path)
     if (!object) {
       cloudlog({ requestId: c.get('requestId'), message: 'file not found in R2', s3_path: manifestEntry.s3_path })
-      return simpleError('file_not_found', 'File not found in storage', { filePath })
+      throw simpleError('file_not_found', 'File not found in storage', { filePath })
     }
 
     // Use our own MIME type detection - R2 rewrites text/html to text/plain without custom domains
@@ -311,7 +311,6 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
     // CLI compresses with node:zlib createBrotliCompress(), we decompress with brotliDecompressSync
     // Cloudflare Workers strip Content-Encoding: br header so we must decompress server-side
     if (isBrotli && object.body) {
-      const { brotliDecompressSync } = await import('node:zlib')
       const compressedData = await object.arrayBuffer()
       const decompressed = brotliDecompressSync(Buffer.from(compressedData))
       return new Response(decompressed, { headers })
@@ -321,7 +320,7 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
   }
   catch (error) {
     cloudlog({ requestId: c.get('requestId'), message: 'failed to serve preview file', error, s3_path: manifestEntry.s3_path })
-    return simpleError('preview_failed', 'Failed to serve preview file')
+    throw simpleError('preview_failed', 'Failed to serve preview file')
   }
 }
 

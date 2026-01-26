@@ -17,14 +17,14 @@ VALUES
 (
     tests.get_supabase_uid('test_2fa_user_org'),
     '2fa_org@test.com',
-    NOW(),
-    NOW()
+    now(),
+    now()
 ),
 (
     tests.get_supabase_uid('test_no_2fa_user_org'),
     'no2fa_org@test.com',
-    NOW(),
-    NOW()
+    now(),
+    now()
 )
 ON CONFLICT (id) DO NOTHING;
 
@@ -65,9 +65,10 @@ BEGIN
     PERFORM set_config('test.org_with_2fa_direct', org_with_2fa_enforcement_id::text, false);
     PERFORM set_config('test.org_without_2fa_direct', org_without_2fa_enforcement_id::text, false);
 
-    -- Create API key for test_2fa_user_org
-    INSERT INTO public.apikeys (user_id, key, mode, name)
+    -- Create API key for test_2fa_user_org (use high IDs to avoid conflicts)
+    INSERT INTO public.apikeys (id, user_id, key, mode, name)
     VALUES (
+        9003,
         test_2fa_user_id,
         'test-2fa-apikey-for-org',
         'all'::public.key_mode,
@@ -75,8 +76,9 @@ BEGIN
     );
 
     -- Create API key for test_no_2fa_user_org
-    INSERT INTO public.apikeys (user_id, key, mode, name)
+    INSERT INTO public.apikeys (id, user_id, key, mode, name)
     VALUES (
+        9004,
         test_no_2fa_user_id,
         'test-no2fa-apikey-for-org',
         'all'::public.key_mode,
@@ -84,8 +86,9 @@ BEGIN
     );
 
     -- Create org-limited API key for test_2fa_user_org (limited to org_without_2fa_enforcement only)
-    INSERT INTO public.apikeys (user_id, key, mode, name, limited_to_orgs)
+    INSERT INTO public.apikeys (id, user_id, key, mode, name, limited_to_orgs)
     VALUES (
+        9005,
         test_2fa_user_id,
         'test-2fa-apikey-org-limited',
         'all'::public.key_mode,
@@ -122,7 +125,9 @@ END $$;
 SELECT tests.authenticate_as('test_2fa_user_org');
 SELECT
     is(
-        reject_access_due_to_2fa_for_org(current_setting('test.org_with_2fa_direct')::uuid),
+        reject_access_due_to_2fa_for_org(
+            current_setting('test.org_with_2fa_direct')::uuid
+        ),
         false,
         'reject_access_due_to_2fa_for_org test - user with 2FA accessing org with 2FA enforcement returns false'
     );
@@ -132,7 +137,9 @@ SELECT tests.clear_authentication();
 SELECT tests.authenticate_as('test_no_2fa_user_org');
 SELECT
     is(
-        reject_access_due_to_2fa_for_org(current_setting('test.org_with_2fa_direct')::uuid),
+        reject_access_due_to_2fa_for_org(
+            current_setting('test.org_with_2fa_direct')::uuid
+        ),
         true,
         'reject_access_due_to_2fa_for_org test - user without 2FA accessing org with 2FA enforcement returns true'
     );
@@ -179,7 +186,9 @@ BEGIN
 END $$;
 SELECT
     is(
-        reject_access_due_to_2fa_for_org(current_setting('test.org_with_2fa_direct')::uuid),
+        reject_access_due_to_2fa_for_org(
+            current_setting('test.org_with_2fa_direct')::uuid
+        ),
         false,
         'reject_access_due_to_2fa_for_org test - user with 2FA via API key accessing org with 2FA enforcement returns false'
     );
@@ -195,7 +204,9 @@ BEGIN
 END $$;
 SELECT
     is(
-        reject_access_due_to_2fa_for_org(current_setting('test.org_with_2fa_direct')::uuid),
+        reject_access_due_to_2fa_for_org(
+            current_setting('test.org_with_2fa_direct')::uuid
+        ),
         true,
         'reject_access_due_to_2fa_for_org test - user without 2FA via API key accessing org with 2FA enforcement returns true'
     );
@@ -231,7 +242,9 @@ BEGIN
 END $$;
 SELECT
     is(
-        reject_access_due_to_2fa_for_org(current_setting('test.org_with_2fa_direct')::uuid),
+        reject_access_due_to_2fa_for_org(
+            current_setting('test.org_with_2fa_direct')::uuid
+        ),
         true,
         'reject_access_due_to_2fa_for_org test - anonymous user returns true (no user identity)'
     );
@@ -260,7 +273,9 @@ SELECT tests.clear_authentication();
 SELECT tests.authenticate_as('test_2fa_user_org');
 SELECT
     is(
-        reject_access_due_to_2fa_for_org(current_setting('test.org_with_2fa_direct')::uuid),
+        reject_access_due_to_2fa_for_org(
+            current_setting('test.org_with_2fa_direct')::uuid
+        ),
         false,
         'reject_access_due_to_2fa_for_org test - user with 2FA accessing org returns false (consistency check)'
     );
@@ -273,7 +288,9 @@ BEGIN
 END $$;
 SELECT
     is(
-        reject_access_due_to_2fa_for_org(current_setting('test.org_without_2fa_direct')::uuid),
+        reject_access_due_to_2fa_for_org(
+            current_setting('test.org_without_2fa_direct')::uuid
+        ),
         false,
         'reject_access_due_to_2fa_for_org test - org-limited API key accessing allowed org returns false'
     );
@@ -289,7 +306,9 @@ BEGIN
 END $$;
 SELECT
     is(
-        reject_access_due_to_2fa_for_org(current_setting('test.org_with_2fa_direct')::uuid),
+        reject_access_due_to_2fa_for_org(
+            current_setting('test.org_with_2fa_direct')::uuid
+        ),
         true,
         'reject_access_due_to_2fa_for_org test - org-limited API key accessing disallowed org returns true'
     );
