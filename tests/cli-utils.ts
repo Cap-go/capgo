@@ -114,10 +114,14 @@ export async function prepareCli(appId: string, old = false, installDeps = false
   // Create directories
   await mkdir(distPath, { recursive: true })
 
+  // Make bundle content unique per app to avoid checksum collisions in parallel tests
+  // Include appId, timestamp, and random value to ensure uniqueness across test runs
+  const uniqueContent = `import { CapacitorUpdater } from '@capgo/capacitor-updater';\nconsole.log("Hello world from ${appId} at ${Date.now()}_${Math.random().toString(36).substring(7)}");\nCapacitorUpdater.notifyAppReady();`
+
   // Write all files in parallel
   await Promise.all([
     writeFile(capacitorConfigPath, defaultConfig),
-    writeFile(join(distPath, 'index.js'), 'import { CapacitorUpdater } from \'@capgo/capacitor-updater\';\nconsole.log("Hello world!!!");\nCapacitorUpdater.notifyAppReady();'),
+    writeFile(join(distPath, 'index.js'), uniqueContent),
     writeFile(join(distPath, 'index.html'), ''),
   ])
 
