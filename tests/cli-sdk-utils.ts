@@ -71,12 +71,15 @@ async function createPackageJson(appId: string, folderPath: string, dependencies
 
 /**
  * Create dist folder with a simple index.html
+ * Content includes appId to ensure unique checksums for parallel tests
  */
-async function createDistFolder(folderPath: string) {
+async function createDistFolder(folderPath: string, appId: string) {
   const distPath = join(folderPath, 'dist')
   await mkdir(distPath, { recursive: true })
 
   const indexHtmlPath = join(distPath, 'index.html')
+  // Include appId and timestamp to ensure unique content for each test
+  const uniqueId = `${appId}-${Date.now()}`
   const indexHtmlContent = `<!DOCTYPE html>
 <html>
 <head>
@@ -85,6 +88,7 @@ async function createDistFolder(folderPath: string) {
 </head>
 <body>
   <h1>Test App v1.0.0</h1>
+  <!-- Unique ID for parallel test isolation: ${uniqueId} -->
   <script>
     // Call notifyAppReady() as required by Capgo
     if (window.CapacitorUpdater) {
@@ -114,7 +118,7 @@ export async function prepareCli(appId: string, dependencies?: Record<string, st
   // Create necessary files
   await createCapacitorConfig(appId, folderPath)
   await createPackageJson(appId, folderPath, dependencies)
-  await createDistFolder(folderPath)
+  await createDistFolder(folderPath, appId)
 
   preparedApps.add(appId)
 }
