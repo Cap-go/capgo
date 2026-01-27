@@ -14,7 +14,6 @@ import gearSix from '~icons/ph/gear-six?raw'
 import iconName from '~icons/ph/user?raw'
 import Toggle from '~/components/Toggle.vue'
 import { checkPermissions } from '~/services/permissions'
-import { sanitizeText } from '~/services/sanitize'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
@@ -221,16 +220,15 @@ async function submit(form: { app_name: string, expose_metadata: boolean, allow_
 }
 
 async function updateAppName(newName: string) {
-  const sanitizedName = sanitizeText(newName)
-  if (sanitizedName === (appRef.value?.name ?? '')) {
+  if (newName === (appRef.value?.name ?? '')) {
     return Promise.resolve()
   }
-  if (sanitizedName.length > 32) {
+  if (newName.length > 32) {
     toast.error(t('new-name-to-long'))
     return Promise.reject(t('new-name-to-long'))
   }
 
-  const { error } = await supabase.from('apps').update({ name: sanitizedName }).eq('app_id', props.appId)
+  const { error } = await supabase.from('apps').update({ name: newName }).eq('app_id', props.appId)
   if (error) {
     toast.error(t('cannot-change-name'))
     console.error(error)
@@ -238,7 +236,7 @@ async function updateAppName(newName: string) {
   }
 
   if (appRef.value)
-    appRef.value.name = sanitizedName
+    appRef.value.name = newName
 
   toast.success(t('changed-app-name'))
 }

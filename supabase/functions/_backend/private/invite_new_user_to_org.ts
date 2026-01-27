@@ -8,9 +8,13 @@ import { trackBentoEvent } from '../utils/bento.ts'
 import { BRES, middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { checkPermission } from '../utils/rbac.ts'
-import { sanitizeText } from '../utils/sanitize.ts'
 import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
+
+// Validate name to prevent HTML/script injection
+// Allow Unicode letters from all languages, spaces, hyphens, and apostrophes
+// Rejects numbers, URLs, and most special characters while supporting international names
+const nameRegex = /^[\p{L}\s'-]+$/u
 
 // Define the schema for the invite user request
 const inviteUserSchema = z.object({
@@ -28,8 +32,8 @@ const inviteUserSchema = z.object({
     'org_super_admin',
   ]),
   captcha_token: z.string().check(z.minLength(1)),
-  first_name: z.string().check(z.minLength(1)),
-  last_name: z.string().check(z.minLength(1)),
+  first_name: z.string().check(z.minLength(1), z.regex(nameRegex, 'First name contains invalid characters')),
+  last_name: z.string().check(z.minLength(1), z.regex(nameRegex, 'Last name contains invalid characters')),
 })
 
 const captchaSchema = z.object({
@@ -137,6 +141,10 @@ async function validateInvite(c: Context, rawBody: any) {
     return { message: 'Failed to invite user', error: orgError?.message ?? 'Organization not found', status: 500 }
   }
 
+  if (!org.name.match(nameRegex)) {
+    return { message: 'Failed to invite user due to invalid organization name', error: 'Organization name contains invalid characters', status: 400 }
+  }
+
   const useNewRbac = org.use_new_rbac === true
   const { legacyInviteType, rbacRoleName } = resolveInviteRoles(body.invite_type, useNewRbac)
 
@@ -175,8 +183,6 @@ app.post('/', middlewareAuth, async (c) => {
   const rbacRoleName = res.rbacRoleName
   const inviteCreatorUser = res.inviteCreatorUser
   const org = res.org
-  const sanitizedFirstName = sanitizeText(body.first_name)
-  const sanitizedLastName = sanitizeText(body.last_name)
 
   // Use admin client for tmp_users operations since RLS blocks all access on that table
   const supabaseAdminClient = supabaseAdmin(c)
@@ -199,8 +205,8 @@ app.post('/', middlewareAuth, async (c) => {
       .from('tmp_users')
       .update({
         cancelled_at: null,
-        first_name: sanitizedFirstName,
-        last_name: sanitizedLastName,
+        first_name: body.first_name,
+        last_name: body.last_name,
         role: legacyInviteType,
         rbac_role_name: rbacRoleName,
       })
@@ -221,8 +227,8 @@ app.post('/', middlewareAuth, async (c) => {
       org_id: body.org_id,
       role: legacyInviteType,
       rbac_role_name: rbacRoleName,
-      first_name: sanitizedFirstName,
-      last_name: sanitizedLastName,
+      first_name: body.first_name,
+      last_name: body.last_name,
     }).select('*').single()
 
     if (createUserError) {
@@ -236,8 +242,8 @@ app.post('/', middlewareAuth, async (c) => {
     org_admin_name: `${inviteCreatorUser.first_name} ${inviteCreatorUser.last_name}`,
     org_name: org.name,
     invite_link: `${getEnv(c, 'WEBAPP_URL')}/invitation?invite_magic_string=${newInvitation?.invite_magic_string}`,
-    invited_first_name: `${sanitizedFirstName}`,
-    invited_last_name: `${sanitizedLastName}`,
+    invited_first_name: `${body.first_name}`,
+    invited_last_name: `${body.last_name}`,
   }, 'org:invite_new_capgo_user_to_org')
   if (!bentoEvent) {
     throw simpleError('failed_to_invite_user', 'Failed to invite user', {}, 'Failed to track bento event')
