@@ -126,6 +126,12 @@ SOURCE_DB_URL="postgresql://${SOURCE_USER}:${SOURCE_PASSWORD}@${SOURCE_HOST}:${S
 PUBLICATION_NAME='planetscale_replicate'
 SUBSCRIPTION_NAME="planetscale_subscription_${REGION}"
 
+# Safety guard: never allow empty names that could match other subscriptions/slots
+if [[ -z "${SUBSCRIPTION_NAME}" || "${SUBSCRIPTION_NAME}" == "planetscale_subscription_" ]]; then
+  echo "Error: SUBSCRIPTION_NAME is empty or unsafe. Aborting to protect other replicas."
+  exit 1
+fi
+
 # Tables to sync in order (priority first, large tables last)
 # Phase 1: Core tables needed for queries (small/medium size)
 PRIORITY_TABLES=(
@@ -146,7 +152,9 @@ DEFERRED_TABLES=(
 # ========================================================================
 # CLEANUP: Drop only the subscription for the selected region
 # ========================================================================
-echo "==> Dropping existing subscription for region ${REGION}..."
+echo "==> SAFETY: Only the subscription/slot named '${SUBSCRIPTION_NAME}' will be touched."
+echo "==> It will NOT touch any other read replicas or subscriptions."
+echo "==> Dropping existing subscription for region ${REGION} (target only)..."
 psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=0 <<SQL
 DO \$\$
 BEGIN
@@ -172,7 +180,7 @@ BEGIN
       RAISE NOTICE '  Could not detach from slot: %', SQLERRM;
     END;
 
-    -- Drop subscription
+    -- Drop subscription (only this one)
     BEGIN
       EXECUTE 'DROP SUBSCRIPTION ${SUBSCRIPTION_NAME}';
       RAISE NOTICE '  Dropped subscription';
@@ -186,7 +194,7 @@ END
 \$\$;
 SQL
 
-# Show remaining subscriptions
+# Show remaining subscriptions (sanity check)
 psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=0 -c "SELECT subname FROM pg_subscription;" || true
 
 if [[ "$SUBSCRIPTION_ONLY" == "true" ]]; then
@@ -196,7 +204,7 @@ else
   # FULL RESET: Drop everything and start fresh
   # ========================================================================
 
-  echo "==> Dropping replication slot for ${SUBSCRIPTION_NAME} on SOURCE (Supabase)..."
+  echo "==> Dropping replication slot for ${SUBSCRIPTION_NAME} on SOURCE (Supabase) if present..."
   psql-17 "$SOURCE_DB_URL" -v ON_ERROR_STOP=0 <<SQL
 DO \$\$
 DECLARE
@@ -302,7 +310,9 @@ wait_for_sync() {
 }
 
 if [[ "$SUBSCRIPTION_ONLY" == "true" ]]; then
-  echo "==> Dropping replication slot for ${SUBSCRIPTION_NAME} on SOURCE (Supabase)..."
+  echo "==> Subscription-only: disconnecting ONLY ${SUBSCRIPTION_NAME} (target + source), then reconnecting."
+  echo "==> It will NOT touch any other read replicas or slots."
+  echo "==> Dropping replication slot for ${SUBSCRIPTION_NAME} on SOURCE (Supabase) if present..."
   psql-17 "$SOURCE_DB_URL" -v ON_ERROR_STOP=0 <<SQL
 DO \$\$
 DECLARE
@@ -448,23 +458,6 @@ else
   echo "==> Phase 1 complete! All priority tables copied."
 
   # ========================================================================
-  # Create subscription to start streaming changes
-  # ========================================================================
-  echo "==> Creating subscription for ongoing replication (no copy_data)..."
-  psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<SQL
-CREATE SUBSCRIPTION ${SUBSCRIPTION_NAME}
-CONNECTION '${CONNECTION_STRING}'
-PUBLICATION ${PUBLICATION_NAME}
-WITH (
-  copy_data = false,
-  create_slot = true,
-  enabled = true,
-  disable_on_error = false
-);
-SQL
-  echo "==> Subscription created. Streaming changes now active."
-
-  # ========================================================================
   # PHASE 2: Wait for deferred dumps to complete, then restore them
   # ========================================================================
   echo "==> Phase 2: Waiting for deferred table dumps to complete..."
@@ -478,6 +471,55 @@ SQL
     restore_table "$table"
   done
   echo "==> Phase 2 complete! All tables copied."
+
+  # ========================================================================
+  # Create subscription LAST to start streaming changes
+  # ========================================================================
+  echo "==> IMPORTANT: Subscription is created LAST by design (after all table copies)."
+  echo "==> Creating subscription for ongoing replication (no copy_data)..."
+  psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<SQL
+CREATE SUBSCRIPTION ${SUBSCRIPTION_NAME}
+CONNECTION '${CONNECTION_STRING}'
+PUBLICATION ${PUBLICATION_NAME}
+WITH (
+  copy_data = false,
+  create_slot = true,
+  enabled = true,
+  disable_on_error = false
+);
+SQL
+  echo "==> Subscription created. Streaming changes now active."
+fi
+
+# ========================================================================
+# HEALTH CHECK: Ensure subscription is connected and healthy
+# ========================================================================
+echo "==> Verifying subscription health for ${SUBSCRIPTION_NAME}..."
+HEALTHY=false
+for i in {1..12}; do
+  STATUS_ROW=$(psql-17 "$TARGET_DB_URL" -t -A -c "
+    SELECT pid, received_lsn, last_msg_receipt_time
+    FROM pg_stat_subscription
+    WHERE subname = '${SUBSCRIPTION_NAME}';
+  ")
+  if [[ -n "$STATUS_ROW" ]]; then
+    PID=$(echo "$STATUS_ROW" | cut -d'|' -f1)
+    LAST_MSG=$(echo "$STATUS_ROW" | cut -d'|' -f3)
+    if [[ -n "$PID" && "$PID" != "0" && -n "$LAST_MSG" ]]; then
+      echo "==> Subscription healthy: pid=${PID}, last_msg_receipt_time=${LAST_MSG}"
+      HEALTHY=true
+      break
+    fi
+  fi
+  echo "==> Waiting for subscription to become healthy... (${i}/12)"
+  sleep 5
+done
+
+if [[ "$HEALTHY" != "true" ]]; then
+  echo "Error: subscription did not reach healthy state within timeout."
+  echo "Check status with:"
+  echo "psql-17 \"$TARGET_DB_URL\" -c \"SELECT subname, status, received_lsn, last_msg_receipt_time FROM pg_stat_subscription;\""
+  exit 1
 fi
 
 echo "==> Done."
