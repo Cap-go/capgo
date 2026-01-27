@@ -15,6 +15,8 @@ export function formatLocalDate(date: Date | string | undefined | null): string 
   if (!date)
     return ''
   const d = typeof date === 'string' ? new Date(date) : date
+  if (Number.isNaN(d.getTime()))
+    return ''
   return d.toLocaleDateString(getAppLocale())
 }
 
@@ -25,7 +27,21 @@ export function formatLocalDateLong(date: Date | string | undefined | null): str
   if (!date)
     return ''
   const d = typeof date === 'string' ? new Date(date) : date
+  if (Number.isNaN(d.getTime()))
+    return ''
   return d.toLocaleDateString(getAppLocale(), { month: 'long', day: 'numeric' })
+}
+
+/**
+ * Format a date/time using the app's locale (e.g., "Dec 15, 2025, 3:45 PM" in English)
+ */
+export function formatLocalDateTime(date: Date | string | undefined | null): string {
+  if (!date)
+    return ''
+  const d = typeof date === 'string' ? new Date(date) : date
+  if (Number.isNaN(d.getTime()))
+    return ''
+  return d.toLocaleString(getAppLocale(), { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 export function formatDate(date: string | undefined) {
