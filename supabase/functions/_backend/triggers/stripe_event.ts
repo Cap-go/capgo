@@ -6,6 +6,7 @@ import type { Database } from '../utils/supabase.types.ts'
 import { eq } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { addTagBento, trackBentoEvent } from '../utils/bento.ts'
+import { purgePlanCacheForOrg } from '../utils/cloudflare_cache_purge.ts'
 import { BRES, quickError, simpleError } from '../utils/hono.ts'
 import { middlewareStripeWebhook } from '../utils/hono_middleware_stripe.ts'
 import { cloudlog } from '../utils/logging.ts'
@@ -14,6 +15,7 @@ import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import * as schema from '../utils/postgres_schema.ts'
 import { ensureCustomerMetadata, getStripe } from '../utils/stripe.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
+import { backgroundTask } from '../utils/utils.ts'
 
 export const app = new Hono<MiddlewareKeyVariablesStripe>()
 
@@ -327,10 +329,16 @@ async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, Lo
         plan_name: plan.name,
       },
     }).catch()
+
+    // Purge plan cache for all apps in this org to clear any stale need_plan_upgrade responses
+    await backgroundTask(c, purgePlanCacheForOrg(c, org.id))
   }
   else {
     const segment = await customerToSegmentOrg(c, org.id, stripeData.data.price_id)
     await addTagBento(c, org.management_email, segment)
+
+    // Purge plan cache even if no plan found (customer may have apps)
+    await backgroundTask(c, purgePlanCacheForOrg(c, org.id))
   }
 }
 

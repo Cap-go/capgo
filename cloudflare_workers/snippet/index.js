@@ -161,7 +161,7 @@ async function getStoredTtl(hostname, appId) {
 async function setOnPremCache(hostname, appId, endpoint, method, responseBody, status) {
   try {
     const cache = caches.default
-    const cacheTags = `app:${appId},endpoint:${endpoint}`
+    const cacheTags = `app-onprem:${appId}`
     // Get the previous TTL to determine the new one (doubles each time, up to max)
     const previousTtl = await getStoredTtl(hostname, appId)
     const newTtl = previousTtl
@@ -220,7 +220,7 @@ function isPlanUpgradeResponse(status, responseBody) {
 async function setPlanUpgradeCache(hostname, appId, endpoint, method, responseBody, status) {
   try {
     const cache = caches.default
-    const cacheTags = `app:${appId},endpoint:${endpoint}`
+    const cacheTags = `app-plan:${appId}`
     const key = getPlanUpgradeCacheKey(hostname, appId, endpoint, method)
     const response = new Response(JSON.stringify(responseBody), {
       status,

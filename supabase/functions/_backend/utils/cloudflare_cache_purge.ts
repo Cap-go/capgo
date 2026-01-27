@@ -1,8 +1,8 @@
 import type { Context } from 'hono'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
+import { supabaseAdmin } from './supabase.ts'
 import { getEnv } from './utils.ts'
 
-const CACHE_TAG_PREFIX = 'app:'
 const CLOUDFLARE_API_BASE = 'https://api.cloudflare.com/client/v4'
 
 function parseZoneIds(raw: string): string[] {
@@ -12,11 +12,15 @@ function parseZoneIds(raw: string): string[] {
     .filter(Boolean)
 }
 
-export function buildAppCacheTag(appId: string) {
-  return `${CACHE_TAG_PREFIX}${appId}`
+export function buildOnPremCacheTag(appId: string) {
+  return `app-onprem:${appId}`
 }
 
-export async function purgeAppCacheTags(c: Context, appId: string) {
+export function buildPlanCacheTag(appId: string) {
+  return `app-plan:${appId}`
+}
+
+async function purgeByTags(c: Context, tags: string[]) {
   const token = getEnv(c, 'CF_CACHE_PURGE_TOKEN')
   const zoneIdsRaw = getEnv(c, 'CF_CACHE_PURGE_ZONE_IDS')
 
@@ -31,7 +35,6 @@ export async function purgeAppCacheTags(c: Context, appId: string) {
     return
   }
 
-  const tags = [buildAppCacheTag(appId)]
   const body = JSON.stringify({ tags })
   const headers = {
     'Authorization': `Bearer ${token}`,
@@ -65,4 +68,49 @@ export async function purgeAppCacheTags(c: Context, appId: string) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Cloudflare cache purge error', zoneId, error: serializeError(error) })
     }
   }))
+}
+
+/**
+ * Purge on-prem cache for an app.
+ * Call this when an app is created to clear any stale on_premise_app responses.
+ */
+export async function purgeOnPremCache(c: Context, appId: string) {
+  const tags = [buildOnPremCacheTag(appId)]
+  await purgeByTags(c, tags)
+}
+
+/**
+ * Purge plan-upgrade cache for an app.
+ * Call this when payment succeeds to clear any stale need_plan_upgrade responses.
+ */
+export async function purgePlanCache(c: Context, appId: string) {
+  const tags = [buildPlanCacheTag(appId)]
+  await purgeByTags(c, tags)
+}
+
+/**
+ * Purge plan-upgrade cache for all apps in an organization.
+ * Call this when a subscription payment succeeds.
+ */
+export async function purgePlanCacheForOrg(c: Context, orgId: string) {
+  // Get all app_ids for this org
+  const { data: apps, error } = await supabaseAdmin(c)
+    .from('apps')
+    .select('app_id')
+    .eq('owner_org', orgId)
+
+  if (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to fetch apps for org cache purge', orgId, error })
+    return
+  }
+
+  if (!apps || apps.length === 0) {
+    cloudlog({ requestId: c.get('requestId'), message: 'No apps found for org cache purge', orgId })
+    return
+  }
+
+  // Build tags for all apps in the org
+  const tags = apps.map(app => buildPlanCacheTag(app.app_id))
+  cloudlog({ requestId: c.get('requestId'), message: 'Purging plan cache for org apps', orgId, appCount: apps.length })
+  await purgeByTags(c, tags)
 }
