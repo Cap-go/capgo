@@ -3,6 +3,7 @@ import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { createIfNotExistStoreInfo } from '../utils/cloudflare.ts'
+import { purgeOnPremCache } from '../utils/cloudflare_cache_purge.ts'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
@@ -38,6 +39,9 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
     },
     notify: false,
   }))
+
+  // Purge on-prem cache for this app to clear any stale responses
+  await backgroundTask(c, purgeOnPremCache(c, record.app_id))
   const supabase = supabaseAdmin(c)
   const { error: dbVersionError } = await supabase
     .from('app_versions')

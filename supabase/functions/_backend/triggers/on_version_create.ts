@@ -1,6 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
+import { purgeOnPremCache } from '../utils/cloudflare_cache_purge.ts'
 import { isAppDemo } from '../utils/demo.ts'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
@@ -42,6 +43,8 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), a
     .eq('owner_org', record.owner_org)
   if (errorUpdate)
     cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', errorUpdate })
+
+  await backgroundTask(c, purgeOnPremCache(c, record.app_id))
 
   if (!shouldSkipNotifications) {
     const LogSnag = logsnag(c)
