@@ -20,6 +20,7 @@ const supabase = useSupabase()
 const organizationStore = useOrganizationStore()
 const mainStore = useMainStore()
 const mfaCode = ref('')
+const needsReauthentication = ref(false)
 const { t } = useI18n()
 displayStore.NavTitle = t('password')
 
@@ -135,11 +136,38 @@ async function verifyPassword(form: { current_password: string }) {
   }
 }
 
-async function submit(form: { password: string, password_confirm: string }) {
-  console.log('submitting', form)
+async function verifyCurrentPassword(currentPassword: string) {
+  const user = mainStore.user
+  if (!user?.email) {
+    setErrors('change-pass', [t('user-not-found')], {})
+    return false
+  }
+
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: user.email,
+    password: currentPassword,
+  })
+
+  if (signInError) {
+    setErrors('change-pass', [t('invalid-password')], {})
+    return false
+  }
+
+  return true
+}
+
+async function submit(form: { current_password?: string, password: string, password_confirm: string }) {
   if (isLoading.value)
     return
   isLoading.value = true
+
+  if (needsReauthentication.value) {
+    const currentPasswordValid = await verifyCurrentPassword(form.current_password ?? '')
+    if (!currentPasswordValid) {
+      isLoading.value = false
+      return
+    }
+  }
 
   const aal = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
   const { currentLevel, nextLevel } = aal.data!
@@ -193,9 +221,15 @@ async function submit(form: { password: string, password_confirm: string }) {
 
   isLoading.value = false
   if (updateError) {
+    if (updateError.code === 'reauthentication_needed' || updateError.code === 'reauthentication_not_valid') {
+      needsReauthentication.value = true
+      isLoading.value = false
+      return
+    }
     setErrors('change-pass', [t('account-password-error')], {})
   }
   else {
+    needsReauthentication.value = false
     toast.success(t('changed-password-suc'))
 
     // If user was locked out due to password policy, refresh org data to regain access
@@ -203,8 +237,11 @@ async function submit(form: { password: string, password_confirm: string }) {
       await organizationStore.fetchOrganizations()
     }
   }
-  form.password = ''
-  form.password_confirm = ''
+  if (!updateError) {
+    form.password = ''
+    form.password_confirm = ''
+    form.current_password = ''
+  }
 }
 </script>
 
@@ -309,7 +346,18 @@ async function submit(form: { password: string, password_confirm: string }) {
           </h2>
           <!-- Personal Info -->
           <section>
-            <div class="mt-5 space-y-4 sm:flex sm:items-stretch sm:space-y-0 sm:space-x-4">
+            <div class="mt-5 flex flex-col gap-4 sm:flex-row sm:flex-wrap">
+              <FormKit
+                v-if="needsReauthentication"
+                type="password"
+                name="current_password"
+                :prefix-icon="iconPassword"
+                autocomplete="current-password"
+                outer-class="sm:w-full"
+                :label="t('current-password')"
+                validation="required"
+                validation-visibility="live"
+              />
               <FormKit
                 type="password"
                 name="password"
