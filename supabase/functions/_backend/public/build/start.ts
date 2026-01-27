@@ -25,10 +25,12 @@ async function generateLogStreamToken(
 
   return await new SignJWT({
     job_id: jobId,
-    user_id: userId,
     app_id: appId,
   })
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setIssuer('capgo')
+    .setAudience('build-logs')
+    .setSubject(userId)
     .setIssuedAt()
     .setExpirationTime('4h')
     .sign(secret)
