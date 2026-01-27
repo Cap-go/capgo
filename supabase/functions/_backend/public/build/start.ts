@@ -9,6 +9,8 @@ import { getEnv } from '../../utils/utils.ts'
 
 interface BuilderStartResponse {
   status: string
+  logs_url?: string
+  logs_token?: string
 }
 
 /**
