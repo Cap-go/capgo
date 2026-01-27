@@ -302,6 +302,38 @@ wait_for_sync() {
 }
 
 if [[ "$SUBSCRIPTION_ONLY" == "true" ]]; then
+  echo "==> Dropping replication slot for ${SUBSCRIPTION_NAME} on SOURCE (Supabase)..."
+  psql-17 "$SOURCE_DB_URL" -v ON_ERROR_STOP=0 <<SQL
+DO \$\$
+DECLARE
+  slot record;
+BEGIN
+  SELECT slot_name, active, active_pid INTO slot
+  FROM pg_replication_slots
+  WHERE slot_name = '${SUBSCRIPTION_NAME}';
+
+  IF slot.slot_name IS NOT NULL THEN
+    RAISE NOTICE 'Found replication slot: % (active: %)', slot.slot_name, slot.active;
+
+    IF slot.active AND slot.active_pid IS NOT NULL THEN
+      RAISE NOTICE '  Terminating connection using slot...';
+      PERFORM pg_terminate_backend(slot.active_pid);
+      PERFORM pg_sleep(2);
+    END IF;
+
+    BEGIN
+      PERFORM pg_drop_replication_slot(slot.slot_name);
+      RAISE NOTICE '  Dropped slot: %', slot.slot_name;
+    EXCEPTION WHEN OTHERS THEN
+      RAISE NOTICE '  Could not drop slot: %', SQLERRM;
+    END;
+  ELSE
+    RAISE NOTICE 'No replication slot found for ${SUBSCRIPTION_NAME}';
+  END IF;
+END
+\$\$;
+SQL
+
   echo "==> SUBSCRIPTION_ONLY mode: creating subscription without copy_data..."
   psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<SQL
 CREATE SUBSCRIPTION ${SUBSCRIPTION_NAME}
