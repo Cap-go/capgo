@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict sGMrEa3Y2uQg0PXZQIRLlFJahWqTVPyfalbMvYKbc1xjIs1XsbsK49Ah6g9YPEk
+\restrict 8CyWvzR9ov0rYZVjUJ71m5caBDRa0DVtT7xPLLamXeAIm9lgGQUuiLGKsLLlqi7
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.7 (Homebrew)
@@ -82,13 +82,13 @@ $$;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict sGMrEa3Y2uQg0PXZQIRLlFJahWqTVPyfalbMvYKbc1xjIs1XsbsK49Ah6g9YPEk
+\unrestrict 8CyWvzR9ov0rYZVjUJ71m5caBDRa0DVtT7xPLLamXeAIm9lgGQUuiLGKsLLlqi7
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict HJ0skzrucaT4Yi5cWMdJlGfJOI6wdHH1XXW9Bjyzr9xf3nSB39UXR4PhAIv8uCX
+\restrict Z2cGVhjpgMgehVSpKMpZvLhy6AMojMI78KLKpnJEqagrOmYSpu9SQVMMPJ9DOp4
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.7 (Homebrew)
@@ -222,7 +222,8 @@ CREATE TABLE public.channels (
     created_by uuid NOT NULL,
     allow_device boolean DEFAULT true NOT NULL,
     allow_prod boolean DEFAULT true NOT NULL,
-    electron boolean DEFAULT true NOT NULL
+    electron boolean DEFAULT true NOT NULL,
+    rbac_id uuid DEFAULT gen_random_uuid() NOT NULL
 );
 
 ALTER TABLE ONLY public.channels REPLICA IDENTITY FULL;
@@ -306,7 +307,8 @@ CREATE TABLE public.org_users (
     org_id uuid NOT NULL,
     app_id character varying,
     channel_id bigint,
-    user_right public.user_min_right
+    user_right public.user_min_right,
+    rbac_role_name text
 );
 
 
@@ -346,7 +348,8 @@ CREATE TABLE public.orgs (
     require_apikey_expiration boolean DEFAULT false NOT NULL,
     max_apikey_expiration_days integer,
     enforce_encrypted_bundles boolean DEFAULT false NOT NULL,
-    required_encryption_key character varying(21) DEFAULT NULL::character varying
+    required_encryption_key character varying(21) DEFAULT NULL::character varying,
+    use_new_rbac boolean DEFAULT false NOT NULL
 );
 
 ALTER TABLE ONLY public.orgs REPLICA IDENTITY FULL;
@@ -432,6 +435,14 @@ ALTER TABLE ONLY public.app_versions
 
 
 --
+-- Name: apps apps_id_unique; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.apps
+    ADD CONSTRAINT apps_id_unique UNIQUE (id);
+
+
+--
 -- Name: apps apps_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -461,6 +472,14 @@ ALTER TABLE ONLY public.channel_devices
 
 ALTER TABLE ONLY public.channels
     ADD CONSTRAINT channel_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: channels channels_rbac_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.channels
+    ADD CONSTRAINT channels_rbac_id_key UNIQUE (rbac_id);
 
 
 --
@@ -812,5 +831,5 @@ CREATE INDEX si_customer_status_trial_idx ON public.stripe_info USING btree (cus
 -- PostgreSQL database dump complete
 --
 
-\unrestrict HJ0skzrucaT4Yi5cWMdJlGfJOI6wdHH1XXW9Bjyzr9xf3nSB39UXR4PhAIv8uCX
+\unrestrict Z2cGVhjpgMgehVSpKMpZvLhy6AMojMI78KLKpnJEqagrOmYSpu9SQVMMPJ9DOp4
 

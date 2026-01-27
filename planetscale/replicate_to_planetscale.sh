@@ -144,20 +144,18 @@ DEFERRED_TABLES=(
 )
 
 # ========================================================================
-# CLEANUP: Always drop ALL subscriptions on PlanetScale to start fresh
+# CLEANUP: Drop only the subscription for the selected region
 # ========================================================================
-echo "==> Dropping ALL existing subscriptions on PlanetScale..."
-psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=0 <<'SQL'
-DO $$
-DECLARE
-  sub record;
+echo "==> Dropping existing subscription for region ${REGION}..."
+psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=0 <<SQL
+DO \$\$
 BEGIN
-  FOR sub IN SELECT subname FROM pg_subscription LOOP
-    RAISE NOTICE 'Cleaning up subscription: %', sub.subname;
+  IF EXISTS (SELECT 1 FROM pg_subscription WHERE subname = '${SUBSCRIPTION_NAME}') THEN
+    RAISE NOTICE 'Cleaning up subscription: ${SUBSCRIPTION_NAME}';
 
     -- Disable subscription
     BEGIN
-      EXECUTE format('ALTER SUBSCRIPTION %I DISABLE', sub.subname);
+      EXECUTE 'ALTER SUBSCRIPTION ${SUBSCRIPTION_NAME} DISABLE';
       RAISE NOTICE '  Disabled subscription';
     EXCEPTION WHEN OTHERS THEN
       RAISE NOTICE '  Could not disable: %', SQLERRM;
@@ -168,7 +166,7 @@ BEGIN
 
     -- Detach from slot
     BEGIN
-      EXECUTE format('ALTER SUBSCRIPTION %I SET (slot_name = NONE)', sub.subname);
+      EXECUTE 'ALTER SUBSCRIPTION ${SUBSCRIPTION_NAME} SET (slot_name = NONE)';
       RAISE NOTICE '  Detached from slot';
     EXCEPTION WHEN OTHERS THEN
       RAISE NOTICE '  Could not detach from slot: %', SQLERRM;
@@ -176,17 +174,19 @@ BEGIN
 
     -- Drop subscription
     BEGIN
-      EXECUTE format('DROP SUBSCRIPTION %I', sub.subname);
+      EXECUTE 'DROP SUBSCRIPTION ${SUBSCRIPTION_NAME}';
       RAISE NOTICE '  Dropped subscription';
     EXCEPTION WHEN OTHERS THEN
       RAISE NOTICE '  Could not drop subscription: %', SQLERRM;
     END;
-  END LOOP;
+  ELSE
+    RAISE NOTICE 'No existing subscription found for ${SUBSCRIPTION_NAME}';
+  END IF;
 END
-$$;
+\$\$;
 SQL
 
-# Double-check all subscriptions are gone
+# Show remaining subscriptions
 psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=0 -c "SELECT subname FROM pg_subscription;" || true
 
 if [[ "$SUBSCRIPTION_ONLY" == "true" ]]; then
@@ -196,13 +196,18 @@ else
   # FULL RESET: Drop everything and start fresh
   # ========================================================================
 
-  echo "==> Dropping existing replication slots on SOURCE (Supabase)..."
+  echo "==> Dropping replication slot for ${SUBSCRIPTION_NAME} on SOURCE (Supabase)..."
   psql-17 "$SOURCE_DB_URL" -v ON_ERROR_STOP=0 <<SQL
 DO \$\$
 DECLARE
   slot record;
 BEGIN
-  FOR slot IN SELECT slot_name, active, active_pid FROM pg_replication_slots WHERE slot_name LIKE 'planetscale_%' LOOP
+  -- Only drop the slot for the selected region
+  SELECT slot_name, active, active_pid INTO slot
+  FROM pg_replication_slots
+  WHERE slot_name = '${SUBSCRIPTION_NAME}';
+
+  IF slot.slot_name IS NOT NULL THEN
     RAISE NOTICE 'Found replication slot: % (active: %)', slot.slot_name, slot.active;
 
     IF slot.active AND slot.active_pid IS NOT NULL THEN
@@ -217,7 +222,9 @@ BEGIN
     EXCEPTION WHEN OTHERS THEN
       RAISE NOTICE '  Could not drop slot: %', SQLERRM;
     END;
-  END LOOP;
+  ELSE
+    RAISE NOTICE 'No replication slot found for ${SUBSCRIPTION_NAME}';
+  END IF;
 END
 \$\$;
 SQL
