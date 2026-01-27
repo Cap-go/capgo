@@ -7,7 +7,6 @@ import { purgeOnPremCache } from '../utils/cloudflare_cache_purge.ts'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
-import { sanitizeOptionalText, sanitizeText } from '../utils/sanitize.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
@@ -20,24 +19,6 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
   if (!record.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'No id' })
     throw simpleError('no_id', 'No id', { record })
-  }
-
-  const sanitizedName = sanitizeText(record.name)
-  const sanitizedIconUrl = sanitizeOptionalText(record.icon_url)
-  const updateFields: Partial<Database['public']['Tables']['apps']['Update']> = {}
-  if (sanitizedName !== record.name)
-    updateFields.name = sanitizedName
-  if (sanitizedIconUrl !== record.icon_url)
-    updateFields.icon_url = sanitizedIconUrl
-
-  if (Object.keys(updateFields).length > 0) {
-    const { error: updateError } = await supabaseAdmin(c)
-      .from('apps')
-      .update(updateFields)
-      .eq('app_id', record.app_id)
-    if (updateError) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Failed to sanitize app fields', updateError })
-    }
   }
 
   // Check if this is a demo app - skip onboarding emails and store info for demo apps
@@ -95,12 +76,10 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
         if (error || !data) {
           throw simpleError('error_fetching_organization', 'Error fetching organization', { error })
         }
-        const sanitizedManagementEmail = sanitizeText(data.management_email)
-        const sanitizedOrgName = sanitizeText(data.name)
-        return trackBentoEvent(c, sanitizedManagementEmail, {
+        return trackBentoEvent(c, data.management_email, {
           org_id: record.owner_org,
-          org_name: sanitizedOrgName,
-          app_name: sanitizedName,
+          org_name: data.name,
+          app_name: record.name,
         }, 'app:created')
       }))
     await backgroundTask(c, createIfNotExistStoreInfo(c, {
