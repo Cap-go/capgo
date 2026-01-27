@@ -30,6 +30,8 @@ const main = useMainStore()
 const dialogStore = useDialogV2Store()
 const organizationStore = useOrganizationStore()
 const isLoading = ref(false)
+const isDeletingAccount = ref(false)
+const deleteAccountPassword = ref('')
 // mfa = 2fa
 const mfaEnabled = ref(false)
 const mfaFactorId = ref('')
@@ -199,6 +201,7 @@ async function deleteAccount() {
   }
 
   // Show final confirmation
+  deleteAccountPassword.value = ''
   dialogStore.openDialog({
     id: 'delete-account-confirm',
     title: t('delete-account'),
@@ -211,33 +214,63 @@ async function deleteAccount() {
       {
         text: t('i-am-sure'),
         role: 'danger',
+        preventClose: true,
         handler: async () => {
-          await performAccountDeletion()
+          const success = await performAccountDeletion(deleteAccountPassword.value)
+          if (success) {
+            deleteAccountPassword.value = ''
+            dialogStore.closeDialog({ text: t('i-am-sure'), role: 'danger' })
+          }
+          return success
         },
       },
     ],
   })
-  return dialogStore.onDialogDismiss()
+  const dismissed = await dialogStore.onDialogDismiss()
+  deleteAccountPassword.value = ''
+  return dismissed
 }
 
-async function performAccountDeletion() {
+async function performAccountDeletion(password: string) {
   if (!main.auth || main.auth?.email == null)
-    return
+    return false
   const supabaseClient = useSupabase()
 
-  const { data: claimsData, error: claimsError } = await supabase.auth.getClaims()
-  const userId = claimsData?.claims?.sub
-  if (claimsError || !userId)
-    return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+  if (!password) {
+    toast.error(t('password-placeholder'))
+    return false
+  }
 
+  if (isDeletingAccount.value)
+    return false
+
+  isDeletingAccount.value = true
   try {
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: main.auth.email,
+      password,
+    })
+    if (signInError) {
+      toast.error(t('invalid-auth'))
+      return false
+    }
+
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims()
+    const userId = claimsData?.claims?.sub
+    if (claimsError || !userId) {
+      toast.error(t('something-went-wrong-try-again-later'))
+      return false
+    }
+
     const { data: user } = await supabaseClient
       .from('users')
       .select()
       .eq('id', userId)
       .single()
-    if (!user)
-      return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+    if (!user) {
+      toast.error(t('something-went-wrong-try-again-later'))
+      return false
+    }
 
     if (user.email.endsWith('review@capgo.app') && Capacitor.isNativePlatform()) {
       const { error: banErr } = await supabase
@@ -247,12 +280,13 @@ async function performAccountDeletion() {
 
       if (banErr) {
         console.error('Cannot set ban duration', banErr)
-        return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+        toast.error(t('something-went-wrong-try-again-later'))
+        return false
       }
 
       await main.logout()
       router.replace('/login')
-      return
+      return true
     }
 
     // Delete user using RPC function
@@ -260,15 +294,21 @@ async function performAccountDeletion() {
 
     if (deleteError) {
       console.error('Delete error:', deleteError)
-      return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+      toast.error(t('something-went-wrong-try-again-later'))
+      return false
     }
 
     // Reload the web page after successful account deletion
     window.location.reload()
+    return true
   }
   catch (error) {
     console.error(error)
-    return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+    toast.error(t('something-went-wrong-try-again-later'))
+    return false
+  }
+  finally {
+    isDeletingAccount.value = false
   }
 }
 
@@ -781,6 +821,19 @@ onMounted(async () => {
         <p class="font-medium text-gray-700 dark:text-gray-300">
           Your account will be deleted after 30 days
         </p>
+        <div class="mt-6">
+          <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('current-password') }}
+          </label>
+          <input
+            v-model="deleteAccountPassword"
+            type="password"
+            :placeholder="t('password-placeholder')"
+            class="w-full p-3 border border-gray-300 rounded-lg dark:text-white dark:bg-gray-800 dark:border-gray-600"
+            autocomplete="current-password"
+            @keydown.enter="$event.preventDefault()"
+          >
+        </div>
       </div>
     </Teleport>
   </div>

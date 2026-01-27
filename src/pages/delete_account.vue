@@ -14,6 +14,8 @@ import { useDialogV2Store } from '~/stores/dialogv2'
 const supabase = useSupabase()
 const dialogStore = useDialogV2Store()
 const isLoading = ref(false)
+const pendingEmail = ref('')
+const pendingPassword = ref('')
 const { t } = useI18n()
 const router = useRouter()
 
@@ -32,6 +34,20 @@ async function deleteAccount() {
           isLoading.value = true
 
           try {
+            if (!pendingEmail.value || !pendingPassword.value) {
+              isLoading.value = false
+              return setErrors('delete-account', [t('invalid-auth')], {})
+            }
+
+            const { error: reauthError } = await supabase.auth.signInWithPassword({
+              email: pendingEmail.value,
+              password: pendingPassword.value,
+            })
+            if (reauthError) {
+              isLoading.value = false
+              return setErrors('delete-account', [t('invalid-auth')], {})
+            }
+
             const { data: claimsData, error: claimsError } = await supabase.auth.getClaims()
             const userId = claimsData?.claims?.sub
             if (claimsError || !userId) {
@@ -55,6 +71,10 @@ async function deleteAccount() {
 
             if (deleteError) {
               console.error('Delete error:', deleteError)
+              if (deleteError.message?.includes('reauth_required')) {
+                isLoading.value = false
+                return setErrors('delete-account', [t('invalid-auth')], {})
+              }
               isLoading.value = false
               return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
             }
@@ -71,6 +91,8 @@ async function deleteAccount() {
           }
           finally {
             isLoading.value = false
+            pendingEmail.value = ''
+            pendingPassword.value = ''
           }
         },
       },
@@ -83,7 +105,12 @@ async function deleteAccount() {
       },
     ],
   })
-  return dialogStore.onDialogDismiss()
+  const dismissed = await dialogStore.onDialogDismiss()
+  if (dismissed) {
+    pendingEmail.value = ''
+    pendingPassword.value = ''
+  }
+  return dismissed
 }
 
 async function submit(form: { email: string, password: string }) {
@@ -99,6 +126,8 @@ async function submit(form: { email: string, password: string }) {
     toast.error(t('invalid-auth'))
   }
   else {
+    pendingEmail.value = form.email
+    pendingPassword.value = form.password
     // delete account
     deleteAccount()
   }
