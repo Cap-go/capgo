@@ -148,11 +148,71 @@ async function verifyCurrentPassword(currentPassword: string) {
     password: currentPassword,
   })
 
+  if (signInError?.code === 'mfa_required') {
+    return await runMfaChallenge()
+  }
+
   if (signInError) {
     setErrors('change-pass', [t('invalid-password')], {})
     return false
   }
 
+  return true
+}
+
+async function runMfaChallenge() {
+  const { data: mfaFactors, error: mfaError } = await supabase.auth.mfa.listFactors()
+  if (mfaError) {
+    setErrors('forgot-password', [mfaError.message], {})
+    console.error('Cannot get MFA factors', mfaError)
+    return false
+  }
+  const factor = mfaFactors.all.find(factor => factor.status === 'verified')
+  if (!factor) {
+    setErrors('forgot-password', ['Cannot find MFA factor'], {})
+    console.error('Cannot find MFA factors', mfaError)
+    return false
+  }
+
+  const { data: challenge, error: errorChallenge } = await supabase.auth.mfa.challenge({ factorId: factor.id })
+  if (errorChallenge) {
+    setErrors('forgot-password', [errorChallenge.message], {})
+    console.error('Cannot challenge MFA factor', errorChallenge)
+    return false
+  }
+
+  mfaCode.value = ''
+  dialogStore.openDialog({
+    title: t('alert-2fa-required'),
+    description: t('alert-2fa-required-message'),
+    preventAccidentalClose: true,
+    buttons: [
+      {
+        text: t('button-confirm'),
+        role: 'primary',
+        handler: async () => {
+          const { data: _verify, error: errorVerify } = await supabase.auth.mfa.verify({
+            factorId: factor.id,
+            challengeId: challenge.id,
+            code: mfaCode.value.replaceAll(' ', ''),
+          })
+          if (errorVerify) {
+            toast.error(t('invalid-mfa-code'))
+            return false // Prevent dialog from closing
+          }
+        },
+      },
+    ],
+  })
+  await dialogStore.onDialogDismiss()
+  return true
+}
+
+async function ensureMfaIfNeeded() {
+  const aal = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
+  const { currentLevel, nextLevel } = aal.data!
+  if (nextLevel !== currentLevel)
+    return await runMfaChallenge()
   return true
 }
 
@@ -169,53 +229,10 @@ async function submit(form: { current_password?: string, password: string, passw
     }
   }
 
-  const aal = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
-  const { currentLevel, nextLevel } = aal.data!
-  if (nextLevel !== currentLevel) {
-    const { data: mfaFactors, error: mfaError } = await supabase.auth.mfa.listFactors()
-    if (mfaError) {
-      setErrors('forgot-password', [mfaError.message], {})
-      console.error('Cannot get MFA factors', mfaError)
-      return
-    }
-    const factor = mfaFactors.all.find(factor => factor.status === 'verified')
-    if (!factor) {
-      setErrors('forgot-password', ['Cannot find MFA factor'], {})
-      console.error('Cannot get MFA factors', mfaError)
-      return
-    }
-
-    const { data: challenge, error: errorChallenge } = await supabase.auth.mfa.challenge({ factorId: factor.id })
-    if (errorChallenge) {
-      setErrors('forgot-password', [errorChallenge.message], {})
-      console.error('Cannot challenge MFA factor', errorChallenge)
-      return
-    }
-
-    mfaCode.value = ''
-    dialogStore.openDialog({
-      title: t('alert-2fa-required'),
-      description: t('alert-2fa-required-message'),
-      preventAccidentalClose: true,
-      buttons: [
-        {
-          text: t('button-confirm'),
-          role: 'primary',
-          handler: async () => {
-            const { data: _verify, error: errorVerify } = await supabase.auth.mfa.verify({
-              factorId: factor.id,
-              challengeId: challenge.id,
-              code: mfaCode.value.replaceAll(' ', ''),
-            })
-            if (errorVerify) {
-              toast.error(t('invalid-mfa-code'))
-              return false // Prevent dialog from closing
-            }
-          },
-        },
-      ],
-    })
-    await dialogStore.onDialogDismiss()
+  const mfaOk = await ensureMfaIfNeeded()
+  if (!mfaOk) {
+    isLoading.value = false
+    return
   }
   const { error: updateError } = await supabase.auth.updateUser({ password: form.password })
 
