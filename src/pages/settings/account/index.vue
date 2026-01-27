@@ -13,7 +13,6 @@ import iconEmail from '~icons/heroicons/envelope?raw'
 import iconFlag from '~icons/heroicons/flag?raw'
 import iconName from '~icons/heroicons/user?raw'
 import { pickPhoto, takePhoto } from '~/services/photos'
-import { sanitizeText } from '~/services/sanitize'
 import { getCurrentPlanNameOrg, isPayingOrg, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
@@ -39,6 +38,31 @@ const mfaQRCode = ref('')
 const organizationsToDelete = ref<string[]>([])
 const paidOrganizationsToDelete = ref<Array<{ name: string, planName: string }>>([])
 displayStore.NavTitle = t('account')
+
+// Validation function to prevent URLs and malicious content in names
+// Allow Unicode letters from all languages, spaces, hyphens, and apostrophes
+// Rejects numbers, URLs, and most special characters while supporting international names
+function validateName(node: any): boolean {
+  const value = node.value
+  if (!value)
+    return true // Let required validation handle empty values
+
+  // Remove extra whitespace and trim
+  const trimmedValue = String(value).trim()
+
+  // Check if name is not empty after trimming
+  if (trimmedValue.length === 0)
+    return false
+
+  // Limit length to reasonable values
+  if (trimmedValue.length > 50)
+    return false
+
+  // Allow Unicode letters from all languages, spaces, hyphens, and apostrophes
+  // This rejects numbers, URLs, email addresses, and special characters
+  const nameRegex = /^[\p{L}\s'-]+$/u
+  return nameRegex.test(trimmedValue)
+}
 
 async function checkOrganizationImpact() {
   // Wait for organizations and main store to load
@@ -340,24 +364,20 @@ async function presentActionSheet() {
 async function submit(form: { first_name: string, last_name: string, email: string, country: string }) {
   if (isLoading.value || !main.user?.id)
     return
-  const sanitizedFirstName = sanitizeText(form.first_name)
-  const sanitizedLastName = sanitizeText(form.last_name)
-  const sanitizedCountry = sanitizeText(form.country)
-
-  if (sanitizedFirstName === main.user?.first_name
-    && sanitizedLastName === main.user?.last_name
+  if (form.first_name === main.user?.first_name
+    && form.last_name === main.user?.last_name
     && form.email === main.user?.email
-    && sanitizedCountry === main.user?.country) {
+    && form.country === main.user?.country) {
     return
   }
   isLoading.value = true
 
   const updateData: Database['public']['Tables']['users']['Insert'] = {
     id: main.user?.id,
-    first_name: sanitizedFirstName,
-    last_name: sanitizedLastName,
+    first_name: form.first_name,
+    last_name: form.last_name,
     email: main.user.email,
-    country: sanitizedCountry,
+    country: form.country,
   }
 
   if (main.user?.email !== form.email) {
@@ -598,7 +618,11 @@ onMounted(async () => {
                   :prefix-icon="iconName"
                   :disabled="isLoading"
                   :value="main.user?.first_name ?? ''"
-                  validation="required:trim"
+                  :validation-rules="{ validName: validateName }"
+                  :validation-messages="{
+                    validName: t('name-contains-invalid-characters'),
+                  }"
+                  validation="required:trim|validName"
                   enterkeyhint="next"
                   autofocus
                   :label="t('first-name')"
@@ -613,7 +637,11 @@ onMounted(async () => {
                   :disabled="isLoading"
                   enterkeyhint="next"
                   :value="main.user?.last_name ?? ''"
-                  validation="required:trim"
+                  :validation-rules="{ validName: validateName }"
+                  :validation-messages="{
+                    validName: t('name-contains-invalid-characters'),
+                  }"
+                  validation="required:trim|validName"
                   :label="t('last-name')"
                 />
               </div>

@@ -3,7 +3,6 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
-import { sanitizeText } from '../utils/sanitize.ts'
 import { emptySupabase, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 import { syncUserPreferenceTags } from '../utils/user_preferences.ts'
 
@@ -136,13 +135,9 @@ app.post('/', async (c) => {
   const { password: _pwd, ...bodyWithoutPassword } = body
   cloudlog({ requestId: c.get('requestId'), context: 'accept_invitation validated body', body: bodyWithoutPassword })
 
-  const sanitizedEmail = sanitizeText(invitation.email)
-  const sanitizedFirstName = sanitizeText(invitation.first_name)
-  const sanitizedLastName = sanitizeText(invitation.last_name)
-
   // here the real magic happens
   const { data: user, error: userError } = await supabaseAdmin.auth.admin.createUser({
-    email: sanitizedEmail,
+    email: invitation.email,
     password: body.password,
     email_confirm: true,
     id: invitation.future_uuid,
@@ -155,9 +150,9 @@ app.post('/', async (c) => {
   // TODO: improve error handling
   const { error: userNormalTableError, data } = await supabaseAdmin.from('users').insert({
     id: user.user.id,
-    email: sanitizedEmail,
-    first_name: sanitizedFirstName,
-    last_name: sanitizedLastName,
+    email: invitation.email,
+    first_name: invitation.first_name,
+    last_name: invitation.last_name,
     enable_notifications: true,
     opt_for_newsletters: body.opt_for_newsletters,
   }).select().single()
@@ -166,13 +161,13 @@ app.post('/', async (c) => {
     return quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation insert', { error: userNormalTableError.message })
   }
 
-  await syncUserPreferenceTags(c, sanitizedEmail, data)
+  await syncUserPreferenceTags(c, invitation.email, data)
 
   // let's now login the user in. The rough idea is that we will create a session and then return the session to the client
   // then the client will use the session to redirect to login page.
   const userSupabase = emptySupabase(c)
   const { data: session, error: sessionError } = await userSupabase.auth.signInWithPassword({
-    email: sanitizedEmail,
+    email: invitation.email,
     password: body.password,
     options: {
       captchaToken: body.captchaToken,

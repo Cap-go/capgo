@@ -2,7 +2,6 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../utils/hono.ts'
-import { sanitizeOptionalText, sanitizeText } from '../../utils/sanitize.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
@@ -16,18 +15,13 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
-  const sanitizedName = sanitizeText(body.name)
-  if (sanitizedName.length < 3) {
-    throw simpleError('invalid_body', 'Invalid body', { error: 'Organization name is too short after sanitization' })
-  }
-  const sanitizedEmail = sanitizeOptionalText(body.email)
 
   const supabase = supabaseApikey(c, apikey.key)
   const { data: self, error: userErr } = await supabase.from('users').select('email').eq('id', apikey.user_id).single()
   if (userErr || !self?.email) {
     throw simpleError('cannot_get_user', 'Cannot get user', { error: userErr?.message })
   }
-  const newOrg = { name: sanitizedName, created_by: apikey.user_id, management_email: sanitizedEmail ?? self.email ?? '' }
+  const newOrg = { name: body.name, created_by: apikey.user_id, management_email: body.email ?? self.email ?? '' }
   const { error: errorOrg } = await supabase
     .from('orgs')
     .insert(newOrg)
@@ -40,7 +34,7 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
     .from('orgs')
     .select('id')
     .eq('created_by', apikey.user_id)
-    .eq('name', sanitizedName)
+    .eq('name', body.name)
     .single()
   if (errorOrg2 || !dataOrg) {
     throw simpleError('cannot_get_org', 'Cannot get created org', { error: errorOrg2?.message })

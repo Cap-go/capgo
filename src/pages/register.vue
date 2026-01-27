@@ -8,7 +8,6 @@ import VueTurnstile from 'vue-turnstile'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import iconName from '~icons/ph/user?raw'
-import { sanitizeText } from '~/services/sanitize'
 import { hashEmail, useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 
@@ -58,15 +57,13 @@ async function submit(form: { first_name: string, last_name: string, password: s
 
   const newUser = user.user
   if (newUser) {
-    const sanitizedFirstName = sanitizeText(form.first_name)
-    const sanitizedLastName = sanitizeText(form.last_name)
     const { error: profileError } = await supabase
       .from('users')
       .upsert({
         id: newUser.id,
         email: newUser.email ?? form.email,
-        first_name: sanitizedFirstName,
-        last_name: sanitizedLastName,
+        first_name: form.first_name,
+        last_name: form.last_name,
         enable_notifications: true,
         opt_for_newsletters: true,
       }, { onConflict: 'id' })
