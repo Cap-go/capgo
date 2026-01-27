@@ -161,6 +161,7 @@ async function getStoredTtl(hostname, appId) {
 async function setOnPremCache(hostname, appId, endpoint, method, responseBody, status) {
   try {
     const cache = caches.default
+    const cacheTags = `app:${appId},endpoint:${endpoint}`
     // Get the previous TTL to determine the new one (doubles each time, up to max)
     const previousTtl = await getStoredTtl(hostname, appId)
     const newTtl = previousTtl
@@ -174,6 +175,7 @@ async function setOnPremCache(hostname, appId, endpoint, method, responseBody, s
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': `max-age=${newTtl}`,
+        'Cache-Tag': cacheTags,
         'X-Onprem-Cached': 'true',
         'X-Onprem-App-Id': appId,
         'X-Onprem-Ttl': String(newTtl),
@@ -189,6 +191,7 @@ async function setOnPremCache(hostname, appId, endpoint, method, responseBody, s
         'Content-Type': 'application/json',
         // TTL metadata expires after 30 days of no activity - resets progression if app goes inactive
         'Cache-Control': `max-age=${30 * 24 * 60 * 60}`,
+        'Cache-Tag': cacheTags,
       },
     })
     await cache.put(ttlKey, ttlResponse)
@@ -217,12 +220,14 @@ function isPlanUpgradeResponse(status, responseBody) {
 async function setPlanUpgradeCache(hostname, appId, endpoint, method, responseBody, status) {
   try {
     const cache = caches.default
+    const cacheTags = `app:${appId},endpoint:${endpoint}`
     const key = getPlanUpgradeCacheKey(hostname, appId, endpoint, method)
     const response = new Response(JSON.stringify(responseBody), {
       status,
       headers: {
         'Content-Type': 'application/json',
         'Cache-Control': `max-age=${PLAN_UPGRADE_CACHE_TTL_SECONDS}`,
+        'Cache-Tag': cacheTags,
         'X-Plan-Upgrade-Cached': 'true',
         'X-Plan-Upgrade-App-Id': appId,
         'X-Plan-Upgrade-Ttl': String(PLAN_UPGRADE_CACHE_TTL_SECONDS),

@@ -9,6 +9,7 @@ import { sendEmailToOrgMembers } from '../utils/org_email_notifications.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
+import { purgeAppCacheTags } from '../utils/cloudflare_cache_purge.ts'
 
 // Special bundle names that should not trigger email notifications
 const SKIP_EMAIL_BUNDLE_NAMES = ['unknown', 'builtin']
@@ -42,6 +43,8 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), a
     .eq('owner_org', record.owner_org)
   if (errorUpdate)
     cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', errorUpdate })
+
+  await backgroundTask(c, purgeAppCacheTags(c, record.app_id))
 
   if (!shouldSkipNotifications) {
     const LogSnag = logsnag(c)
