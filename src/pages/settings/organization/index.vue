@@ -10,6 +10,7 @@ import iconEmail from '~icons/heroicons/envelope?raw'
 import iconName from '~icons/heroicons/user?raw'
 import { checkPermissions } from '~/services/permissions'
 import { pickPhoto, takePhoto } from '~/services/photos'
+import { sanitizeText } from '~/services/sanitize'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
@@ -127,6 +128,7 @@ async function saveChanges(form: { orgName: string, email: string }) {
   }
 
   const gid = currentOrganization.value.gid
+  const sanitizedOrgName = sanitizeText(form.orgName)
 
   if (!gid) {
     console.error('No current org id')
@@ -136,7 +138,7 @@ async function saveChanges(form: { orgName: string, email: string }) {
   const orgCopy = { ...currentOrganization.value }
 
   // Optimistic update
-  currentOrganization.value.name = form.orgName
+  currentOrganization.value.name = sanitizedOrgName
   currentOrganization.value.management_email = form.email
   isLoading.value = true
 
@@ -144,7 +146,7 @@ async function saveChanges(form: { orgName: string, email: string }) {
   const { error } = await supabase
     .from('orgs')
     .update({
-      name: form.orgName,
+      name: sanitizedOrgName,
     })
     .eq('id', gid)
 

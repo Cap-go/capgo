@@ -3,6 +3,7 @@ import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
+import { sanitizeOptionalText, sanitizeText } from '../../utils/sanitize.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
 import { isValidAppId } from '../../utils/utils.ts'
 
@@ -20,7 +21,8 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: CreateApp, 
   if (!isValidAppId(body.app_id)) {
     throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
   }
-  if (!body.name) {
+  const sanitizedName = sanitizeText(body.name)
+  if (!sanitizedName) {
     throw simpleError('missing_name', 'Missing name', { body })
   }
 
@@ -32,8 +34,8 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: CreateApp, 
   const dataInsert = {
     owner_org: body.owner_org,
     app_id: body.app_id,
-    icon_url: body.icon ?? '',
-    name: body.name,
+    icon_url: sanitizeOptionalText(body.icon) ?? '',
+    name: sanitizedName,
     retention: 2592000,
     default_upload_channel: 'dev',
   }

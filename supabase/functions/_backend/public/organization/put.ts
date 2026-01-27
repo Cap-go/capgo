@@ -4,6 +4,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
+import { sanitizeOptionalText } from '../../utils/sanitize.ts'
 import { apikeyHasOrgRightWithPolicy, supabaseApikey } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
@@ -56,11 +57,11 @@ function validateMaxExpirationDays(maxDays?: number | null) {
 function buildUpdateFields(body: z.infer<typeof bodySchema>) {
   const updateFields: Partial<Database['public']['Tables']['orgs']['Update']> = {}
   if (body.name !== undefined)
-    updateFields.name = body.name
+    updateFields.name = sanitizeOptionalText(body.name)
   if (body.logo !== undefined)
-    updateFields.logo = body.logo
+    updateFields.logo = sanitizeOptionalText(body.logo)
   if (body.management_email !== undefined)
-    updateFields.management_email = body.management_email
+    updateFields.management_email = sanitizeOptionalText(body.management_email)
   if (body.require_apikey_expiration !== undefined)
     updateFields.require_apikey_expiration = body.require_apikey_expiration
   if (body.max_apikey_expiration_days !== undefined)
