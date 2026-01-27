@@ -11,11 +11,6 @@ import { checkPermission } from '../utils/rbac.ts'
 import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
-// Validate name to prevent HTML/script injection
-// Allow Unicode letters from all languages, spaces, hyphens, and apostrophes
-// Rejects numbers, URLs, and most special characters while supporting international names
-const nameRegex = /^[\p{L}\s'-]+$/u
-
 // Define the schema for the invite user request
 const inviteUserSchema = z.object({
   email: z.email(),
@@ -32,8 +27,8 @@ const inviteUserSchema = z.object({
     'org_super_admin',
   ]),
   captcha_token: z.string().check(z.minLength(1)),
-  first_name: z.string().check(z.minLength(1), z.regex(nameRegex, 'First name contains invalid characters')),
-  last_name: z.string().check(z.minLength(1), z.regex(nameRegex, 'Last name contains invalid characters')),
+  first_name: z.string().check(z.minLength(1)),
+  last_name: z.string().check(z.minLength(1)),
 })
 
 const captchaSchema = z.object({
@@ -139,10 +134,6 @@ async function validateInvite(c: Context, rawBody: any) {
 
   if (orgError || !org) {
     return { message: 'Failed to invite user', error: orgError?.message ?? 'Organization not found', status: 500 }
-  }
-
-  if (!org.name.match(nameRegex)) {
-    return { message: 'Failed to invite user due to invalid organization name', error: 'Organization name contains invalid characters', status: 400 }
   }
 
   const useNewRbac = org.use_new_rbac === true
