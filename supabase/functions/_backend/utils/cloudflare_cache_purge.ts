@@ -56,8 +56,8 @@ async function purgeByTags(c: Context, tags: string[]) {
         return
       }
 
-      const result = await response.json().catch(() => null)
-      if (result && result.success === false) {
+      const result = await response.json().catch(() => null) as { success?: boolean } | null
+      if (result?.success === false) {
         cloudlogErr({ requestId: c.get('requestId'), message: 'Cloudflare cache purge returned error', zoneId, result })
         return
       }
