@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import { getRuntimeKey } from 'hono/adapter'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { getEnv } from './utils.ts'
@@ -21,6 +22,12 @@ export function buildPlanCacheTag(appId: string) {
 }
 
 async function purgeByTags(c: Context, tags: string[]) {
+  // Only run on Cloudflare Workers runtime
+  if (getRuntimeKey() !== 'workerd') {
+    cloudlog({ requestId: c.get('requestId'), message: 'Cloudflare cache purge skipped (not running on Cloudflare Workers)' })
+    return
+  }
+
   const token = getEnv(c, 'CF_CACHE_PURGE_TOKEN')
   const zoneIdsRaw = getEnv(c, 'CF_CACHE_PURGE_ZONE_IDS')
 
