@@ -181,6 +181,13 @@ export async function startBuild(
 
     if (jwtSecret) {
       try {
+        // NOTE: The `/build_logs_direct/:jobId` endpoint is **not** implemented in this
+        // backend. It is provided by the external Capgo Builder worker/service.
+        // The JWT generated here is consumed and verified by that external service
+        // (using a shared secret compatible with `JWT_SECRET`) to:
+        //   - Authorize access to live build logs for the given jobId/appId/user
+        //   - Stream logs directly to the CLI without going through this API as a proxy
+        // If the direct URL and token are not provided, the CLI fails to get the logs of the build.
         logsToken = await generateLogStreamToken(jobId, apikey.user_id, appId, jwtSecret)
         logsUrl = `${publicUrl}/build_logs_direct/${jobId}`
 
