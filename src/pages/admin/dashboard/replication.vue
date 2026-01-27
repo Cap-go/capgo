@@ -9,6 +9,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
 import Spinner from '~/components/Spinner.vue'
+import { formatLocalDateTime } from '~/services/date'
 import { defaultApiHost } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -93,7 +94,7 @@ const maxLagMinutes = computed(() => {
 const checkedAt = computed(() => {
   if (!data.value?.checked_at)
     return '-'
-  return new Date(data.value.checked_at).toLocaleString()
+  return formatLocalDateTime(data.value.checked_at)
 })
 
 async function loadReplicationStatus() {

@@ -13,6 +13,7 @@ import { toast } from 'vue-sonner'
 import MagnifyingGlassIcon from '~icons/heroicons/magnifying-glass'
 import XMarkIcon from '~icons/heroicons/x-mark'
 import Spinner from '~/components/Spinner.vue'
+import { formatLocalDateTime } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -90,10 +91,6 @@ function getExpiresAt() {
 
 function formatCredits(value: number) {
   return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
-}
-
-function formatDate(date: string) {
-  return dayjs(date).format('MMM D, YYYY HH:mm')
 }
 
 async function searchOrgs(query: string) {
@@ -385,7 +382,7 @@ onMounted(async () => {
                   <span class="text-sm font-normal text-gray-500">/ {{ formatCredits(orgBalance.total_credits) }}</span>
                 </div>
                 <div v-if="orgBalance.next_expiration" class="text-sm text-gray-500 dark:text-gray-400">
-                  {{ t('admin-credits-expires') }}: {{ formatDate(orgBalance.next_expiration) }}
+                  {{ t('admin-credits-expires') }}: {{ formatLocalDateTime(orgBalance.next_expiration) }}
                 </div>
               </div>
               <div v-else class="mt-2 text-gray-500 dark:text-gray-400">
@@ -495,10 +492,10 @@ onMounted(async () => {
                     {{ grant.notes || '-' }}
                   </td>
                   <td class="px-4 py-3 text-gray-700 dark:text-gray-300">
-                    {{ formatDate(grant.granted_at) }}
+                    {{ formatLocalDateTime(grant.granted_at) }}
                   </td>
                   <td class="px-4 py-3 text-gray-700 dark:text-gray-300">
-                    {{ formatDate(grant.expires_at) }}
+                    {{ formatLocalDateTime(grant.expires_at) }}
                   </td>
                 </tr>
               </tbody>
