@@ -442,7 +442,7 @@ export default {
       HAN: ZONE.HONG_KONG, // Hanoi, Vietnam
       HBA: ZONE.OCEANIA, // Hobart, Australia
       HEL: ZONE.EUROPE, // Helsinki, Finland
-      HFA: ZONE.EUROPE, // Haifa, Israel
+      HFA: ZONE.MIDDLE_EAST, // Haifa, Israel
       HGH: ZONE.HONG_KONG, // Shaoxing (Hangzhou), China
       HKG: ZONE.HONG_KONG, // Hong Kong
       HNL: ZONE.NORTH_AMERICA, // Honolulu, USA
@@ -601,7 +601,7 @@ export default {
       TIA: ZONE.EUROPE, // Tirana, Albania
       TLH: ZONE.NORTH_AMERICA, // Tallahassee, USA
       TLL: ZONE.EUROPE, // Tallinn, Estonia
-      TLV: ZONE.EUROPE, // Tel Aviv, Israel
+      TLV: ZONE.MIDDLE_EAST, // Tel Aviv, Israel
       TNA: ZONE.HONG_KONG, // Zibo (Jinan), China
       TNR: ZONE.AFRICA, // Antananarivo, Madagascar
       TPA: ZONE.NORTH_AMERICA, // Tampa, USA
