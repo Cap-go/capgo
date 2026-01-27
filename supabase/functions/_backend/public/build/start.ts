@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
+import { SignJWT } from 'npm:jose'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
@@ -20,62 +21,17 @@ async function generateLogStreamToken(
   appId: string,
   jwtSecret: string,
 ): Promise<string> {
-  const encoder = new TextEncoder()
+  const secret = new TextEncoder().encode(jwtSecret)
 
-  // Header
-  const header = {
-    alg: 'HS256',
-    typ: 'JWT',
-  }
-
-  // Payload with 4 hour expiration (longer than max build time)
-  const now = Math.floor(Date.now() / 1000)
-  const payload = {
+  return await new SignJWT({
     job_id: jobId,
     user_id: userId,
     app_id: appId,
-    iat: now,
-    exp: now + (4 * 60 * 60), // 4 hours
-  }
-
-  // Base64url encode header and payload
-  const headerB64 = btoa(JSON.stringify(header))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '')
-  const payloadB64 = btoa(JSON.stringify(payload))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '')
-
-  // Create signature using Web Crypto API
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(jwtSecret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign'],
-  )
-
-  const dataToSign = `${headerB64}.${payloadB64}`
-  const signatureBuffer = await crypto.subtle.sign(
-    'HMAC',
-    key,
-    encoder.encode(dataToSign),
-  )
-
-  // Convert signature to base64url
-  const signatureArray = new Uint8Array(signatureBuffer)
-  let signatureB64 = ''
-  for (const byte of signatureArray) {
-    signatureB64 += String.fromCharCode(byte)
-  }
-  signatureB64 = btoa(signatureB64)
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '')
-
-  return `${headerB64}.${payloadB64}.${signatureB64}`
+  })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setIssuedAt()
+    .setExpirationTime('4h')
+    .sign(secret)
 }
 
 async function markBuildAsFailed(
