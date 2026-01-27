@@ -1,12 +1,14 @@
+import { decode } from 'entities'
 import sanitizeHtml from 'sanitize-html'
 
 export function sanitizeText(value: string) {
-  return sanitizeHtml(value, {
+  const sanitized = sanitizeHtml(value, {
     allowedTags: [],
     allowedAttributes: {},
     disallowedTagsMode: 'discard',
     parser: { decodeEntities: true },
-  }).trim()
+  })
+  return decode(sanitized).trim()
 }
 
 export function sanitizeOptionalText(value?: string | null) {
