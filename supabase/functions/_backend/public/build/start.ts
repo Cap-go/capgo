@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { SignJWT } from 'npm:jose'
+import { SignJWT } from 'jose'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'

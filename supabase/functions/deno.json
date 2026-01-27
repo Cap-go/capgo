@@ -18,6 +18,7 @@
     "crypto-random-string": "npm:crypto-random-string@5.0.0",
     "@std/semver": "jsr:@std/semver@1.0.6",
     "@bradenmacdonald/s3-lite-client": "jsr:@bradenmacdonald/s3-lite-client@0.9.4",
-    "discord-api-types/": "npm:/discord-api-types@^0.38.28/"
+    "discord-api-types/": "npm:/discord-api-types@^0.38.28/",
+    "jose": "npm:jose@^6.1.3"
   }
 }
