@@ -3,6 +3,7 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { BRES, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
+import { sanitizeText } from '../utils/sanitize.ts'
 import { updateCustomerEmail } from '../utils/stripe.ts'
 import { supabaseWithAuth } from '../utils/supabase.ts'
 
@@ -25,6 +26,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   }
 
   const safeBody = parsedBodyResult.data
+  const sanitizedEmail = sanitizeText(safeBody.email)
 
   // Use authenticated client for data queries - RLS will enforce access
   const supabase = supabaseWithAuth(c, auth)
@@ -62,11 +64,11 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
     return quickError(401, 'not_authorized', 'Not authorized', { userId: auth.userId, orgId: safeBody.org_id })
   }
 
-  await updateCustomerEmail(c, organization.customer_id, safeBody.email)
+  await updateCustomerEmail(c, organization.customer_id, sanitizedEmail)
 
   // Update supabase
   const { error: updateOrgErr } = await supabase.from('orgs')
-    .update({ management_email: safeBody.email })
+    .update({ management_email: sanitizedEmail })
     .eq('id', safeBody.org_id)
 
   if (updateOrgErr) {

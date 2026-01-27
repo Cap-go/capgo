@@ -196,6 +196,7 @@
     "plausible-tracker": "^0.3.9",
     "qrcode": "^1.5.4",
     "semver": "^7.7.3",
+    "sanitize-html": "^2.16.0",
     "stripe": "^19.3.1",
     "supabase": "^2.58.5",
     "turndown": "^7.2.2",

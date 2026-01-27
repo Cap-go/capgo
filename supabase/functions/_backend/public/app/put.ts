@@ -3,6 +3,7 @@ import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
+import { sanitizeOptionalText } from '../../utils/sanitize.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
 import { isValidAppId } from '../../utils/utils.ts'
 
@@ -35,8 +36,8 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
   const { data, error: dbError } = await supabaseApikey(c, apikey.key)
     .from('apps')
     .update({
-      name: body.name,
-      icon_url: body.icon,
+      name: sanitizeOptionalText(body.name),
+      icon_url: sanitizeOptionalText(body.icon),
       retention: body.retention,
       expose_metadata: body.expose_metadata,
     })

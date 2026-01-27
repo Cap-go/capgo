@@ -1,6 +1,21 @@
 import type { Context } from 'hono'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
+import { sanitizeText } from './sanitize.ts'
 import { getEnv } from './utils.ts'
+
+function sanitizeDetails(value: any): any {
+  if (typeof value === 'string')
+    return sanitizeText(value)
+  if (value instanceof Date)
+    return value.toISOString()
+  if (Array.isArray(value))
+    return value.map(item => sanitizeDetails(item))
+  if (value && typeof value === 'object') {
+    const entries = Object.entries(value).map(([key, item]) => [key, sanitizeDetails(item)])
+    return Object.fromEntries(entries)
+  }
+  return value
+}
 
 function hasBento(c: Context) {
   return getEnv(c, 'BENTO_PUBLISHABLE_KEY').length > 0 && getEnv(c, 'BENTO_SECRET_KEY').length > 0 && getEnv(c, 'BENTO_SITE_UUID').length > 0
@@ -52,12 +67,13 @@ export async function trackBentoEvent(c: Context, email: string, data: any, even
 
   try {
     const siteUuid = getEnv(c, 'BENTO_SITE_UUID')
+    const sanitizedData = sanitizeDetails(data)
 
     const payload = {
       events: [{
         type: event,
         email,
-        details: data,
+        details: sanitizedData,
       }],
     }
 

@@ -3,6 +3,7 @@ import type { NavigationGuardNext, RouteLocationNormalized } from 'vue-router'
 import type { UserModule } from '~/types'
 import { hideLoader } from '~/services/loader'
 import { setUser } from '~/services/posthog'
+import { sanitizeText } from '~/services/sanitize'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
@@ -27,13 +28,15 @@ async function updateUser(
       console.error('Failed to fetch public user profile', error)
 
     if (!userRecord && main.auth) {
+      const sanitizedFirstName = sanitizeText(main.auth.user_metadata?.first_name ?? '')
+      const sanitizedLastName = sanitizeText(main.auth.user_metadata?.last_name ?? '')
       const { data: inserted, error: insertError } = await supabase
         .from('users')
         .insert({
           id: main.auth.id,
           email: main.auth.email ?? '',
-          first_name: main.auth.user_metadata?.first_name ?? '',
-          last_name: main.auth.user_metadata?.last_name ?? '',
+          first_name: sanitizedFirstName,
+          last_name: sanitizedLastName,
           country: null,
           enable_notifications: true,
           opt_for_newsletters: true,
