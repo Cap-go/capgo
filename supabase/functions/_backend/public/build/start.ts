@@ -10,6 +10,74 @@ interface BuilderStartResponse {
   status: string
 }
 
+/**
+ * Generate a JWT token for direct log stream access
+ * Uses HMAC-SHA256 for signing
+ */
+async function generateLogStreamToken(
+  jobId: string,
+  userId: string,
+  appId: string,
+  jwtSecret: string,
+): Promise<string> {
+  const encoder = new TextEncoder()
+
+  // Header
+  const header = {
+    alg: 'HS256',
+    typ: 'JWT',
+  }
+
+  // Payload with 4 hour expiration (longer than max build time)
+  const now = Math.floor(Date.now() / 1000)
+  const payload = {
+    job_id: jobId,
+    user_id: userId,
+    app_id: appId,
+    iat: now,
+    exp: now + (4 * 60 * 60), // 4 hours
+  }
+
+  // Base64url encode header and payload
+  const headerB64 = btoa(JSON.stringify(header))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+  const payloadB64 = btoa(JSON.stringify(payload))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+
+  // Create signature using Web Crypto API
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(jwtSecret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  )
+
+  const dataToSign = `${headerB64}.${payloadB64}`
+  const signatureBuffer = await crypto.subtle.sign(
+    'HMAC',
+    key,
+    encoder.encode(dataToSign),
+  )
+
+  // Convert signature to base64url
+  const signatureArray = new Uint8Array(signatureBuffer)
+  let signatureB64 = ''
+  for (const byte of signatureArray) {
+    signatureB64 += String.fromCharCode(byte)
+  }
+  signatureB64 = btoa(signatureB64)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+
+  return `${headerB64}.${payloadB64}.${signatureB64}`
+}
+
 async function markBuildAsFailed(
   c: Context,
   jobId: string,
@@ -144,9 +212,47 @@ export async function startBuild(
       })
     }
 
+    // Generate JWT token for direct log stream access
+    const jwtSecret = getEnv(c, 'JWT_SECRET')
+    const publicUrl = getEnv(c, 'PUBLIC_URL') || 'https://api.capgo.app'
+
+    let logsUrl: string | undefined
+    let logsToken: string | undefined
+
+    if (jwtSecret) {
+      try {
+        logsToken = await generateLogStreamToken(jobId, apikey.user_id, appId, jwtSecret)
+        logsUrl = `${publicUrl}/build_logs_direct/${jobId}`
+
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'Generated log stream token for direct access',
+          job_id: jobId,
+          logs_url: logsUrl,
+        })
+      }
+      catch (tokenError) {
+        // Log error but don't fail the request - CLI can fall back to proxy
+        cloudlogErr({
+          requestId: c.get('requestId'),
+          message: 'Failed to generate log stream token',
+          job_id: jobId,
+          error: tokenError instanceof Error ? tokenError.message : String(tokenError),
+        })
+      }
+    }
+    else {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'JWT_SECRET not configured, skipping direct log stream token',
+        job_id: jobId,
+      })
+    }
+
     return c.json({
       job_id: jobId,
       status: builderJob.status || 'running',
+      ...(logsUrl && logsToken ? { logs_url: logsUrl, logs_token: logsToken } : {}),
     }, 200)
   }
   catch (error) {
