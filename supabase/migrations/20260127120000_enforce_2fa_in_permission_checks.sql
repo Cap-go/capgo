@@ -19,13 +19,14 @@ DECLARE
   v_use_rbac boolean;
   v_effective_org_id uuid := org_id;
   v_org_enforcing_2fa boolean;
+  v_password_policy_ok boolean;
 BEGIN
   -- Derive org from app/channel when not provided to honor org-level flag and scoping.
   IF v_effective_org_id IS NULL AND app_id IS NOT NULL THEN
-    SELECT owner_org INTO v_effective_org_id FROM public.apps WHERE app_id = check_min_rights.app_id LIMIT 1;
+    SELECT owner_org INTO v_effective_org_id FROM public.apps WHERE public.apps.app_id = check_min_rights.app_id LIMIT 1;
   END IF;
   IF v_effective_org_id IS NULL AND channel_id IS NOT NULL THEN
-    SELECT owner_org INTO v_effective_org_id FROM public.channels WHERE id = channel_id LIMIT 1;
+    SELECT owner_org INTO v_effective_org_id FROM public.channels WHERE public.channels.id = channel_id LIMIT 1;
   END IF;
 
   -- Enforce 2FA if the org requires it.
@@ -33,6 +34,21 @@ BEGIN
     SELECT enforcing_2fa INTO v_org_enforcing_2fa FROM public.orgs WHERE id = v_effective_org_id;
     IF v_org_enforcing_2fa = true AND (user_id IS NULL OR NOT public.has_2fa_enabled(user_id)) THEN
       PERFORM public.pg_log('deny: CHECK_MIN_RIGHTS_2FA_ENFORCEMENT', jsonb_build_object(
+        'org_id', COALESCE(org_id, v_effective_org_id),
+        'app_id', app_id,
+        'channel_id', channel_id,
+        'min_right', min_right::text,
+        'user_id', user_id
+      ));
+      RETURN false;
+    END IF;
+  END IF;
+
+  -- Enforce password policy if enabled for the org.
+  IF v_effective_org_id IS NOT NULL THEN
+    v_password_policy_ok := public.user_meets_password_policy(user_id, v_effective_org_id);
+    IF v_password_policy_ok = false THEN
+      PERFORM public.pg_log('deny: CHECK_MIN_RIGHTS_PASSWORD_POLICY_ENFORCEMENT', jsonb_build_object(
         'org_id', COALESCE(org_id, v_effective_org_id),
         'app_id', app_id,
         'channel_id', channel_id,
@@ -94,6 +110,7 @@ SET search_path = '' AS $$
 DECLARE
   user_right_record RECORD;
   v_org_enforcing_2fa boolean;
+  v_password_policy_ok boolean;
 BEGIN
   IF user_id IS NULL THEN
     PERFORM public.pg_log('deny: CHECK_MIN_RIGHTS_NO_UID', jsonb_build_object('org_id', org_id, 'app_id', app_id, 'channel_id', channel_id, 'min_right', min_right::text));
@@ -105,6 +122,21 @@ BEGIN
     SELECT enforcing_2fa INTO v_org_enforcing_2fa FROM public.orgs WHERE id = org_id;
     IF v_org_enforcing_2fa = true AND NOT public.has_2fa_enabled(user_id) THEN
       PERFORM public.pg_log('deny: CHECK_MIN_RIGHTS_2FA_ENFORCEMENT', jsonb_build_object(
+        'org_id', org_id,
+        'app_id', app_id,
+        'channel_id', channel_id,
+        'min_right', min_right::text,
+        'user_id', user_id
+      ));
+      RETURN false;
+    END IF;
+  END IF;
+
+  -- Enforce password policy if enabled for the org.
+  IF org_id IS NOT NULL THEN
+    v_password_policy_ok := public.user_meets_password_policy(user_id, org_id);
+    IF v_password_policy_ok = false THEN
+      PERFORM public.pg_log('deny: CHECK_MIN_RIGHTS_PASSWORD_POLICY_ENFORCEMENT', jsonb_build_object(
         'org_id', org_id,
         'app_id', app_id,
         'channel_id', channel_id,
@@ -152,6 +184,7 @@ DECLARE
   v_apikey_principal uuid;
   v_org_enforcing_2fa boolean;
   v_effective_user_id uuid := p_user_id;
+  v_password_policy_ok boolean;
 BEGIN
   -- Validate permission key
   IF p_permission_key IS NULL OR p_permission_key = '' THEN
@@ -189,6 +222,22 @@ BEGIN
 
     IF v_org_enforcing_2fa = true AND (v_effective_user_id IS NULL OR NOT public.has_2fa_enabled(v_effective_user_id)) THEN
       PERFORM public.pg_log('deny: RBAC_CHECK_PERM_2FA_ENFORCEMENT', jsonb_build_object(
+        'permission', p_permission_key,
+        'org_id', v_effective_org_id,
+        'app_id', p_app_id,
+        'channel_id', p_channel_id,
+        'user_id', v_effective_user_id,
+        'has_apikey', p_apikey IS NOT NULL
+      ));
+      RETURN false;
+    END IF;
+  END IF;
+
+  -- Enforce password policy if enabled for the org.
+  IF v_effective_org_id IS NOT NULL THEN
+    v_password_policy_ok := public.user_meets_password_policy(v_effective_user_id, v_effective_org_id);
+    IF v_password_policy_ok = false THEN
+      PERFORM public.pg_log('deny: RBAC_CHECK_PERM_PASSWORD_POLICY_ENFORCEMENT', jsonb_build_object(
         'permission', p_permission_key,
         'org_id', v_effective_org_id,
         'app_id', p_app_id,
