@@ -14,11 +14,11 @@ function parseZoneIds(raw: string): string[] {
 }
 
 export function buildOnPremCacheTag(appId: string) {
-  return `app-onprem:${appId}`
+  return `app-onprem-v2:${appId}`
 }
 
 export function buildPlanCacheTag(appId: string) {
-  return `app-plan:${appId}`
+  return `app-plan-v2:${appId}`
 }
 
 async function purgeByTags(c: Context, tags: string[]) {
