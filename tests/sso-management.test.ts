@@ -461,7 +461,7 @@ describe('auto-join integration', () => {
         .eq('org_id', TEST_SSO_ORG_ID)
         .eq('user_id', testUserId)
         .eq('event_type', 'auto_join_success')
-        .order('created_at', { ascending: false })
+        .order('timestamp', { ascending: false })
         .limit(1)
 
       expect(auditLogs).toBeTruthy()
