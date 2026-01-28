@@ -47,7 +47,7 @@ const steps = ref<Step[]>([
   {
     title: t('init-capgo-in-your-a'),
     command: `npx @capgo/cli@latest i [APIKEY]${localCommand}`,
-    subtitle: '',
+    subtitle: t('onboarding-cli-where-why'),
   },
   {
     title: t('discover-your-dashbo'),

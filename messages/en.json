@@ -697,6 +697,7 @@
   "incorrect-app-id": "You wrote the wrong app id.",
   "info": "Information",
   "init-capgo-in-your-a": "Install Capgo in your Capacitor app",
+  "onboarding-cli-where-why": "Open a terminal in your Capacitor project (the folder with package.json) and run this command. It links your app to Capgo so it appears here.",
   "onboarding-prerequisites-title": "Prerequisites",
   "onboarding-prerequisites-cli-desc": "This command will configure your Capacitor app to receive live updates from Capgo.",
   "onboarding-prerequisites-runtime": "Node.js 22+ or Bun installed",

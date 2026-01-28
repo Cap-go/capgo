@@ -748,6 +748,7 @@
   "incorrect-app-id": "Anda menulis id aplikasi yang salah.",
   "info": "Informasi",
   "init-capgo-in-your-a": "Pasang Capgo di aplikasi Capacitor Anda",
+  "onboarding-cli-where-why": "Buka terminal di proyek Capacitor Anda (folder yang berisi package.json) lalu jalankan perintah ini. Ini menghubungkan aplikasi Anda ke Capgo agar muncul di sini.",
   "insert-invite-email": "Masukkan email pengguna yang ingin Anda undang",
   "install": "Terpasang",
   "installed": "terpasang",
