@@ -12,12 +12,7 @@
 const TIMEOUT_MS = 3000 // 3 seconds - matches plugin timeout
 const CIRCUIT_RESET_MS = 5 * 60 * 1000 // 5 minutes before retrying unhealthy worker
 
-// On-prem caching configuration with adaptive TTL
-// TTL doubles with each confirmed on-prem response, up to max
-const ONPREM_CACHE_TTL_MIN_SECONDS = 60 // Start at 1 minute
-const ONPREM_CACHE_TTL_MAX_SECONDS = 7 * 24 * 60 * 60 // Max 7 days
-// Plan-upgrade caching configuration (fixed short TTL)
-const PLAN_UPGRADE_CACHE_TTL_SECONDS = 5 * 60 // 5 minutes
+// On-prem and plan-upgrade caching rely on worker-provided Cache-Control headers
 
 // Helper to build cache keys using actual hostname to avoid DNS lookups on fake .internal domains
 function getCircuitBreakerCacheKey(hostname, colo, workerUrl) {
@@ -26,11 +21,6 @@ function getCircuitBreakerCacheKey(hostname, colo, workerUrl) {
 
 function getOnPremCacheKey(hostname, appId, endpoint, method) {
   return `https://${hostname}/__internal__/onprem-cache/${encodeURIComponent(appId)}/${endpoint}/${method}`
-}
-
-function getOnPremTtlKey(hostname, appId) {
-  // Separate key to track TTL progression - survives cache expiration
-  return `https://${hostname}/__internal__/onprem-ttl/${encodeURIComponent(appId)}`
 }
 
 function getPlanUpgradeCacheKey(hostname, appId, endpoint, method) {
@@ -115,8 +105,9 @@ async function getOnPremCache(hostname, appId, endpoint, method) {
     const key = getOnPremCacheKey(hostname, appId, endpoint, method)
     const cached = await cache.match(key)
     if (cached) {
-      const currentTtl = Number.parseInt(cached.headers.get('X-Onprem-Ttl') || String(ONPREM_CACHE_TTL_MIN_SECONDS), 10)
-      console.log(`On-prem cache HIT for ${appId}/${endpoint}/${method} (TTL ${currentTtl}s)`)
+      const currentTtl = Number.parseInt(cached.headers.get('X-Onprem-Ttl') || '0', 10)
+      const ttlLog = Number.isFinite(currentTtl) && currentTtl > 0 ? ` (TTL ${currentTtl}s)` : ''
+      console.log(`On-prem cache HIT for ${appId}/${endpoint}/${method}${ttlLog}`)
       return cached.clone()
     }
     return null
@@ -142,67 +133,57 @@ async function getPlanUpgradeCache(hostname, appId, endpoint, method) {
   }
 }
 
-async function getStoredTtl(hostname, appId) {
-  try {
-    const cache = caches.default
-    const key = getOnPremTtlKey(hostname, appId)
-    const cached = await cache.match(key)
-    if (cached) {
-      const data = await cached.json()
-      return data.ttl
-    }
+function getCacheTtlSeconds(headers) {
+  const cacheControl = headers.get('Cache-Control') || headers.get('cache-control')
+  if (!cacheControl)
     return null
-  }
-  catch {
+
+  const directives = cacheControl.split(',').map(part => part.trim().toLowerCase())
+  if (directives.includes('no-store'))
     return null
+
+  const sMaxAge = directives.find(part => part.startsWith('s-maxage='))
+  if (sMaxAge) {
+    const seconds = Number.parseInt(sMaxAge.split('=')[1] || '', 10)
+    if (Number.isFinite(seconds) && seconds > 0)
+      return seconds
   }
+
+  const maxAge = directives.find(part => part.startsWith('max-age='))
+  if (maxAge) {
+    const seconds = Number.parseInt(maxAge.split('=')[1] || '', 10)
+    if (Number.isFinite(seconds) && seconds > 0)
+      return seconds
+  }
+
+  return null
 }
 
-async function setOnPremCache(hostname, appId, endpoint, method, responseBody, status) {
+async function setOnPremCache(hostname, appId, endpoint, method, responseBody, status, responseHeaders) {
   try {
+    const cacheTtl = getCacheTtlSeconds(responseHeaders)
+    if (!cacheTtl) {
+      console.log(`On-prem cache SKIP for ${appId}/${endpoint}/${method} (missing cache TTL)`)
+      return
+    }
+
     const cache = caches.default
     const cacheTags = `app-onprem:${appId}`
-    // Get the previous TTL to determine the new one (doubles each time, up to max)
-    const previousTtl = await getStoredTtl(hostname, appId)
-    const newTtl = previousTtl
-      ? Math.min(previousTtl * 2, ONPREM_CACHE_TTL_MAX_SECONDS)
-      : ONPREM_CACHE_TTL_MIN_SECONDS
-
-    const resetAt = Date.now() + newTtl * 1000
-    const resetAtSeconds = Math.ceil(resetAt / 1000)
-    const retryAfter = new Date(resetAt).toUTCString()
+    const headers = new Headers(responseHeaders)
+    headers.set('Content-Type', 'application/json')
+    headers.set('Cache-Tag', cacheTags)
+    headers.set('X-Onprem-Cached', 'true')
+    headers.set('X-Onprem-App-Id', appId)
+    headers.set('X-Onprem-Ttl', String(cacheTtl))
 
     // Store the response cache
     const key = getOnPremCacheKey(hostname, appId, endpoint, method)
     const response = new Response(JSON.stringify(responseBody), {
       status,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': `max-age=${newTtl}`,
-        'Cache-Tag': cacheTags,
-        'X-Onprem-Cached': 'true',
-        'X-Onprem-App-Id': appId,
-        'X-Onprem-Ttl': String(newTtl),
-        'X-RateLimit-Reset': String(resetAtSeconds),
-        'Retry-After': retryAfter,
-      },
+      headers,
     })
     await cache.put(key, response)
-
-    // Store the TTL metadata separately (with longer expiry so it survives cache expiration)
-    // This allows us to remember the TTL progression even after the response cache expires
-    const ttlKey = getOnPremTtlKey(hostname, appId)
-    const ttlResponse = new Response(JSON.stringify({ ttl: newTtl, updatedAt: Date.now() }), {
-      headers: {
-        'Content-Type': 'application/json',
-        // TTL metadata expires after 30 days of no activity - resets progression if app goes inactive
-        'Cache-Control': `max-age=${30 * 24 * 60 * 60}`,
-        'Cache-Tag': cacheTags,
-      },
-    })
-    await cache.put(ttlKey, ttlResponse)
-
-    console.log(`On-prem cache SET for ${appId}/${endpoint}/${method} (${newTtl}s TTL${previousTtl ? `, was ${previousTtl}s` : ', initial'})`)
+    console.log(`On-prem cache SET for ${appId}/${endpoint}/${method} (${cacheTtl}s TTL)`)
   }
   catch (e) {
     console.log(`Failed to cache on-prem response: ${e.message}`)
@@ -223,29 +204,29 @@ function isPlanUpgradeResponse(status, responseBody) {
   return status === 429 && responseBody && responseBody.error === 'need_plan_upgrade'
 }
 
-async function setPlanUpgradeCache(hostname, appId, endpoint, method, responseBody, status) {
+async function setPlanUpgradeCache(hostname, appId, endpoint, method, responseBody, status, responseHeaders) {
   try {
+    const cacheTtl = getCacheTtlSeconds(responseHeaders)
+    if (!cacheTtl) {
+      console.log(`Plan-upgrade cache SKIP for ${appId}/${endpoint}/${method} (missing cache TTL)`)
+      return
+    }
+
     const cache = caches.default
     const cacheTags = `app-plan:${appId}`
     const key = getPlanUpgradeCacheKey(hostname, appId, endpoint, method)
-    const resetAt = Date.now() + PLAN_UPGRADE_CACHE_TTL_SECONDS * 1000
-    const resetAtSeconds = Math.ceil(resetAt / 1000)
-    const retryAfter = new Date(resetAt).toUTCString()
+    const headers = new Headers(responseHeaders)
+    headers.set('Content-Type', 'application/json')
+    headers.set('Cache-Tag', cacheTags)
+    headers.set('X-Plan-Upgrade-Cached', 'true')
+    headers.set('X-Plan-Upgrade-App-Id', appId)
+    headers.set('X-Plan-Upgrade-Ttl', String(cacheTtl))
     const response = new Response(JSON.stringify(responseBody), {
       status,
-      headers: {
-        'Content-Type': 'application/json',
-        'Cache-Control': `max-age=${PLAN_UPGRADE_CACHE_TTL_SECONDS}`,
-        'Cache-Tag': cacheTags,
-        'X-Plan-Upgrade-Cached': 'true',
-        'X-Plan-Upgrade-App-Id': appId,
-        'X-Plan-Upgrade-Ttl': String(PLAN_UPGRADE_CACHE_TTL_SECONDS),
-        'X-RateLimit-Reset': String(resetAtSeconds),
-        'Retry-After': retryAfter,
-      },
+      headers,
     })
     await cache.put(key, response)
-    console.log(`Plan-upgrade cache SET for ${appId}/${endpoint}/${method} (${PLAN_UPGRADE_CACHE_TTL_SECONDS}s TTL)`)
+    console.log(`Plan-upgrade cache SET for ${appId}/${endpoint}/${method} (${cacheTtl}s TTL)`)
   }
   catch (e) {
     console.log(`Failed to cache plan-upgrade response: ${e.message}`)
@@ -715,7 +696,7 @@ export default {
 
             if (isOnPremResponse(response.status, responseBody)) {
               // Cache the on-prem response (fire-and-forget, errors handled internally)
-              setOnPremCache(hostname, appId, endpoint, method, responseBody, response.status)
+              setOnPremCache(hostname, appId, endpoint, method, responseBody, response.status, response.headers)
 
               // Return a new response, preserving original headers and adding on-prem headers
               const newHeaders = new Headers(response.headers)
@@ -731,7 +712,7 @@ export default {
 
             if (isPlanUpgradeResponse(response.status, responseBody)) {
               // Cache plan-upgrade responses for a short TTL to reduce burst traffic
-              setPlanUpgradeCache(hostname, appId, endpoint, method, responseBody, response.status)
+              setPlanUpgradeCache(hostname, appId, endpoint, method, responseBody, response.status, response.headers)
 
               const newHeaders = new Headers(response.headers)
               newHeaders.set('Content-Type', 'application/json')
