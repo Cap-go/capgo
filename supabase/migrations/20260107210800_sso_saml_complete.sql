@@ -969,16 +969,18 @@ CREATE POLICY "Allow SELECT on sso_audit_logs"
   FOR SELECT
   TO authenticated, anon
   USING (
-    (SELECT * FROM (SELECT auth.uid() AS uid) AS auth_check
-     WHERE user_id = auth_check.uid
-        OR (org_id IS NOT NULL
-            AND public.check_min_rights(
-              'admin'::public.user_min_right,
-              public.get_identity_org_allowed('{read,write,all}'::public.key_mode[], org_id),
-              org_id,
-              NULL::character varying,
-              NULL::bigint
-            )))
+    EXISTS (
+      SELECT 1 FROM (SELECT auth.uid() AS uid) AS auth_check
+      WHERE user_id = auth_check.uid
+         OR (org_id IS NOT NULL
+             AND public.check_min_rights(
+               'admin'::public.user_min_right,
+               public.get_identity_org_allowed('{read,write,all}'::public.key_mode[], org_id),
+               org_id,
+               NULL::character varying,
+               NULL::bigint
+             ))
+    )
   );
 
 -- System can insert audit logs (SECURITY DEFINER functions)
