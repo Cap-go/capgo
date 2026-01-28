@@ -20,11 +20,11 @@ function getCircuitBreakerCacheKey(hostname, colo, workerUrl) {
 }
 
 function getOnPremCacheKey(hostname, appId, endpoint, method) {
-  return `https://${hostname}/__internal__/onprem-cache/${encodeURIComponent(appId)}/${endpoint}/${method}`
+  return `https://${hostname}/__internal__/onprem-cache-v2/${encodeURIComponent(appId)}/${endpoint}/${method}`
 }
 
 function getPlanUpgradeCacheKey(hostname, appId, endpoint, method) {
-  return `https://${hostname}/__internal__/plan-upgrade-cache/${encodeURIComponent(appId)}/${endpoint}/${method}`
+  return `https://${hostname}/__internal__/plan-upgrade-cache-v2/${encodeURIComponent(appId)}/${endpoint}/${method}`
 }
 
 // Endpoints that should be checked for on-prem caching
@@ -168,7 +168,7 @@ async function setOnPremCache(hostname, appId, endpoint, method, responseBody, s
     }
 
     const cache = caches.default
-    const cacheTags = `app-onprem:${appId}`
+    const cacheTags = `app-onprem-v2:${appId}`
     const headers = new Headers(responseHeaders)
     headers.set('Content-Type', 'application/json')
     headers.set('Cache-Tag', cacheTags)
@@ -213,7 +213,7 @@ async function setPlanUpgradeCache(hostname, appId, endpoint, method, responseBo
     }
 
     const cache = caches.default
-    const cacheTags = `app-plan:${appId}`
+    const cacheTags = `app-plan-v2:${appId}`
     const key = getPlanUpgradeCacheKey(hostname, appId, endpoint, method)
     const headers = new Headers(responseHeaders)
     headers.set('Content-Type', 'application/json')
