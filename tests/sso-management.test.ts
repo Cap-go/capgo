@@ -264,6 +264,7 @@ describe('auto-join integration', () => {
         metadata_xml: generateTestMetadataXml(testEntityId),
         enabled: true,
         verified: true,
+        auto_join_enabled: true, // Required for auto-enrollment to work
       })
 
       // Ignore duplicate key errors on retry
@@ -306,9 +307,17 @@ describe('auto-join integration', () => {
         }
       }
 
-      // Manually enroll user (simulates what auto_enroll_sso_user does)
-      // In production, auth.users trigger would call auto_enroll_sso_user automatically
-      await ensureOrgUser(actualUserId, orgId, 'read')
+      // Use real RPC handler to test production enrollment logic
+      // This exercises the auto_enroll_sso_user function that would be triggered by auth.users events
+      const { error: enrollError } = await getSupabaseClient().rpc('auto_enroll_sso_user', {
+        p_user_id: actualUserId,
+        p_email: testUserEmail,
+        p_sso_provider_id: ssoProviderId,
+      })
+
+      if (enrollError) {
+        throw new Error(`Failed to auto-enroll user: ${enrollError.message}`)
+      }
 
       // Check if user was enrolled - use limit(1) then maybeSingle() to avoid error when no rows exist
       const { data: membership, error: membershipError } = await getSupabaseClient()
