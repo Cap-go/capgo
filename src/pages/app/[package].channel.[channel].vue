@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
 import { FormKit } from '@formkit/vue'
+import { greaterOrEqual, parse } from '@std/semver'
 import { computedAsync, onClickOutside } from '@vueuse/core'
 import { ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -517,37 +518,77 @@ const canTestChannel = computed(() => {
 
 // Generate a compatible version_name based on channel's version and update strategy
 function getCompatibleVersionName(): string {
-  if (!channel.value?.version?.name || channel.value.version.name === 'unknown')
+  if (!channel.value?.version?.name || isInternalVersionName(channel.value.version.name))
     return '1.0.0'
 
   const channelVersion = channel.value.version.name
-  const parts = channelVersion.split('.')
-  if (parts.length < 3)
-    return channelVersion
+  let channelSemver
+  try {
+    channelSemver = parse(channelVersion)
+  }
+  catch {
+    return '1.0.0'
+  }
 
-  const [major, minor, patch] = parts
+  const { major, minor, patch } = channelSemver
   const strategy = channel.value.disable_auto_update
 
   // Generate a version that would trigger an update based on the strategy
   // We want a version slightly lower than the channel version to simulate a device needing an update
+  let candidate = channelVersion
   switch (strategy) {
     case 'major':
       // Same major, device can receive update
-      return `${major}.0.0`
+      candidate = `${major}.0.0`
+      break
     case 'minor':
       // Same major.minor, device can receive update
-      return `${major}.${minor}.0`
+      candidate = `${major}.${minor}.0`
+      break
     case 'patch':
       // Same major.minor.patch, device can receive update
-      return `${major}.${minor}.${patch}`
+      candidate = channelVersion
+      break
     case 'version_number':
       // Uses min_update_version, return the min_update_version or channel version
-      return channel.value.version.min_update_version || channelVersion
+      candidate = channel.value.version.min_update_version || channelVersion
+      break
     case 'none':
     default:
       // Any version works, use a lower version to show update available
-      return `${major}.${minor}.0`
+      candidate = `${major}.${minor}.0`
+      break
   }
+
+  const lowerFallback = () => {
+    let fallback = '0.0.0-0'
+    if (patch > 0)
+      fallback = `${major}.${minor}.${patch - 1}`
+    else if (minor > 0)
+      fallback = `${major}.${minor - 1}.0`
+    else if (major > 0)
+      fallback = `${major - 1}.0.0`
+
+    try {
+      if (greaterOrEqual(parse(fallback), channelSemver))
+        return '0.0.0-0'
+    }
+    catch {
+      return '0.0.0-0'
+    }
+
+    return fallback
+  }
+
+  try {
+    if (greaterOrEqual(parse(candidate), channelSemver))
+      return lowerFallback()
+  }
+  catch {
+    return lowerFallback()
+  }
+
+  return candidate
 }
 
 function getChannelCurlCommand() {
