@@ -167,6 +167,10 @@ async function setOnPremCache(hostname, appId, endpoint, method, responseBody, s
       ? Math.min(previousTtl * 2, ONPREM_CACHE_TTL_MAX_SECONDS)
       : ONPREM_CACHE_TTL_MIN_SECONDS
 
+    const resetAt = Date.now() + newTtl * 1000
+    const resetAtSeconds = Math.ceil(resetAt / 1000)
+    const retryAfter = new Date(resetAt).toUTCString()
+
     // Store the response cache
     const key = getOnPremCacheKey(hostname, appId, endpoint, method)
     const response = new Response(JSON.stringify(responseBody), {
@@ -177,6 +181,8 @@ async function setOnPremCache(hostname, appId, endpoint, method, responseBody, s
         'X-Onprem-Cached': 'true',
         'X-Onprem-App-Id': appId,
         'X-Onprem-Ttl': String(newTtl),
+        'X-RateLimit-Reset': String(resetAtSeconds),
+        'Retry-After': retryAfter,
       },
     })
     await cache.put(key, response)
@@ -218,6 +224,9 @@ async function setPlanUpgradeCache(hostname, appId, endpoint, method, responseBo
   try {
     const cache = caches.default
     const key = getPlanUpgradeCacheKey(hostname, appId, endpoint, method)
+    const resetAt = Date.now() + PLAN_UPGRADE_CACHE_TTL_SECONDS * 1000
+    const resetAtSeconds = Math.ceil(resetAt / 1000)
+    const retryAfter = new Date(resetAt).toUTCString()
     const response = new Response(JSON.stringify(responseBody), {
       status,
       headers: {
@@ -226,6 +235,8 @@ async function setPlanUpgradeCache(hostname, appId, endpoint, method, responseBo
         'X-Plan-Upgrade-Cached': 'true',
         'X-Plan-Upgrade-App-Id': appId,
         'X-Plan-Upgrade-Ttl': String(PLAN_UPGRADE_CACHE_TTL_SECONDS),
+        'X-RateLimit-Reset': String(resetAtSeconds),
+        'Retry-After': retryAfter,
       },
     })
     await cache.put(key, response)
