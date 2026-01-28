@@ -233,8 +233,8 @@ app.post('/', middlewareAuth, async (c) => {
     org_admin_name: `${inviteCreatorUser.first_name} ${inviteCreatorUser.last_name}`,
     org_name: org.name,
     invite_link: `${getEnv(c, 'WEBAPP_URL')}/invitation?invite_magic_string=${newInvitation?.invite_magic_string}`,
-    invited_first_name: `${body.first_name}`,
-    invited_last_name: `${body.last_name}`,
+    invited_first_name: `${newInvitation?.first_name ?? body.first_name}`,
+    invited_last_name: `${newInvitation?.last_name ?? body.last_name}`,
   }, 'org:invite_new_capgo_user_to_org')
   if (!bentoEvent) {
     throw simpleError('failed_to_invite_user', 'Failed to invite user', {}, 'Failed to track bento event')
