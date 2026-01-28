@@ -6,7 +6,7 @@ DECLARE
   user_id_fn uuid;
   user_email text;
   old_record_json jsonb;
-  last_sign_in_at timestamptz;
+  last_sign_in_at_ts timestamptz;
 BEGIN
   -- Get the current user ID and email
   SELECT "auth"."uid"() INTO user_id_fn;
@@ -14,12 +14,12 @@ BEGIN
     RAISE EXCEPTION 'not_authenticated' USING ERRCODE = '42501';
   END IF;
 
-  SELECT "email", "last_sign_in_at" INTO user_email, last_sign_in_at
+  SELECT "email", "last_sign_in_at" INTO user_email, last_sign_in_at_ts
   FROM "auth"."users"
   WHERE "id" = user_id_fn;
 
   -- Require a fresh reauthentication (password confirmation)
-  IF last_sign_in_at IS NULL OR last_sign_in_at < NOW() - INTERVAL '5 minutes' THEN
+  IF last_sign_in_at_ts IS NULL OR last_sign_in_at_ts < NOW() - INTERVAL '5 minutes' THEN
     RAISE EXCEPTION 'reauth_required' USING ERRCODE = 'P0001';
   END IF;
 
