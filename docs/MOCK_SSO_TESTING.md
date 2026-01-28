@@ -5,6 +5,7 @@ This mock SSO endpoint simulates Okta's SAML authentication flow for local devel
 ## How It Works
 
 ### Production SAML Flow (with Okta)
+
 1. User enters email → Frontend checks if SSO is configured
 2. User clicks "Continue with SSO" → Redirects to Okta login page
 3. User authenticates at Okta → Okta generates SAML assertion
@@ -12,6 +13,7 @@ This mock SSO endpoint simulates Okta's SAML authentication flow for local devel
 5. Supabase validates SAML, creates session, redirects back to app with tokens
 
 ### Local Mock Flow (simulated)
+
 1. User enters email → Frontend checks if SSO is configured ✅ (uses real database)
 2. User clicks "Continue with SSO" → Redirects to **mock endpoint** instead of Okta
 3. Mock endpoint validates SSO config ✅ (queries real database)
@@ -23,11 +25,13 @@ This mock SSO endpoint simulates Okta's SAML authentication flow for local devel
 ## Prerequisites
 
 1. **Supabase running locally:**
+
    ```bash
    supabase start
    ```
 
 2. **Database seeded with SSO configuration:**
+
    ```bash
    supabase db reset
    ```
@@ -41,29 +45,38 @@ This mock SSO endpoint simulates Okta's SAML authentication flow for local devel
 ## Testing Steps
 
 ### 1. Start the Frontend
+
 ```bash
 bun serve:local
 ```
 
 ### 2. Navigate to SSO Login
-Go to: http://localhost:5173/sso-login
+
+Go to: <http://localhost:5173/sso-login>
 
 ### 3. Enter a Test Email
+
 Use an email with a domain that has SSO configured:
-```
+
+```text
 nathank@congocmc.com
 ```
 
 ### 4. Click "Continue"
+
 The page will:
+
 - Detect it's running locally
-- Redirect to the mock endpoint: 
-  ```
+- Redirect to the mock endpoint:
+
+  ```text
   http://localhost:54321/functions/v1/mock-sso-callback?email=nathank@congocmc.com&RelayState=/dashboard
   ```
 
 ### 5. Mock Endpoint Processes
+
 The mock endpoint will:
+
 1. ✅ Validate SSO is configured for `congocmc.com` domain
 2. ✅ Check if user `nathank@congocmc.com` exists (creates if not)
 3. ✅ Generate access & refresh tokens via Supabase admin API
@@ -71,13 +84,16 @@ The mock endpoint will:
 5. ✅ Redirect to app with tokens in URL hash
 
 ### 6. Auto-Join Triggers Execute
+
 After redirect, the auth trigger automatically:
+
 - ✅ Checks if user's email domain has `allow_all_subdomains` enabled
 - ✅ Finds "Admin org" with `allow_all_subdomains: true` for `congocmc.com`
 - ✅ Adds user to "Admin org" with role from `default_role`
 - ✅ User is logged in and org membership is automatic
 
 ### 7. Verify Success
+
 - User is logged in ✅
 - Dashboard loads ✅
 - User has access to "Admin org" ✅
@@ -85,61 +101,76 @@ After redirect, the auth trigger automatically:
 ## Test Scenarios
 
 ### Test 1: First-Time SSO User
-```
+
+```text
 Email: newuser@congocmc.com
-Expected: 
-  - User created automatically
-  - Logged in successfully  
-  - Added to "Admin org"
 ```
+
+Expected:
+
+- User created automatically
+- Logged in successfully
+- Added to "Admin org"
 
 ### Test 2: Existing SSO User
-```
+
+```text
 Email: nathank@congocmc.com (if already created)
-Expected:
-  - User authenticated
-  - Logged in successfully
-  - Existing org membership preserved
 ```
+
+Expected:
+
+- User authenticated
+- Logged in successfully
+- Existing org membership preserved
 
 ### Test 3: Non-SSO Domain
-```
+
+```text
 Email: test@gmail.com
-Expected:
-  - SSO detection fails
-  - Error: "SSO is not configured for this email domain"
 ```
 
+Expected:
+
+- SSO detection fails
+- Error: "SSO is not configured for this email domain"
+
 ### Test 4: Unverified Domain
+
 Modify database to set `verified = false`:
+
 ```sql
 UPDATE saml_domain_mappings SET verified = false WHERE domain = 'congocmc.com';
 ```
+
 Expected:
-  - Mock returns error
-  - Error: "SSO is not configured for domain: congocmc.com"
+
+- Mock returns error
+- Error: "SSO is not configured for domain: congocmc.com"
 
 ## Debugging
 
 ### Check Mock Endpoint Logs
+
 ```bash
 docker logs -f supabase_edge_runtime_capgo-app
 ```
 
 ### Check Database State
+
 ```bash
 # Check SSO configuration
 docker exec -it supabase_db_capgo-app psql -U postgres -d postgres -c "
-  SELECT d.domain, d.verified, c.enabled, c.provider_id 
-  FROM saml_domain_mappings d 
-  JOIN org_saml_connections c ON d.connection_id = c.id 
+  SELECT d.domain, d.verified, c.enabled, c.provider_id
+  FROM saml_domain_mappings d
+  JOIN org_saml_connections c ON d.connection_id = c.id
   WHERE d.domain = 'congocmc.com';
 "
 
 # Check user was created/authenticated
 docker exec -it supabase_db_capgo-app psql -U postgres -d postgres -c "
   SELECT id, email, created_at, raw_user_meta_data->>'sso_provider' as sso_provider
-  FROM auth.users 
+  FROM auth.users
   WHERE email LIKE '%@congocmc.com';
 "
 
@@ -157,28 +188,31 @@ docker exec -it supabase_db_capgo-app psql -U postgres -d postgres -c "
 ### Common Issues
 
 **Issue:** "SSO is not configured for domain"
+
 - **Fix:** Verify domain is in `saml_domain_mappings` with `verified = true`
 - **Check:** Connection is `enabled = true` in `org_saml_connections`
 
 **Issue:** User created but not added to org
+
 - **Fix:** Check `allow_all_subdomains = true` in org settings
 - **Verify:** Trigger `auto_join_user_to_orgs_on_create` exists and is enabled
 
 **Issue:** Mock endpoint returns 500
+
 - **Fix:** Check Supabase logs for detailed error
 - **Verify:** Service role key is configured correctly
 
 ## Production vs Mock Comparison
 
-| Aspect | Production (Okta) | Mock (Local) |
-|--------|-------------------|--------------|
-| SSO detection | ✅ Real DB | ✅ Real DB |
-| User authentication | Okta SAML page | Simulated success |
-| User creation | Supabase auto | ✅ Same (admin API) |
-| Token generation | Supabase | ✅ Same (magic link) |
-| Auto-join trigger | ✅ Executed | ✅ Executed |
-| Session management | ✅ Real | ✅ Real |
-| Redirect with tokens | ✅ Real | ✅ Real |
+| Aspect               | Production (Okta) | Mock (Local)         |
+| -------------------- | ----------------- | -------------------- |
+| SSO detection        | ✅ Real DB        | ✅ Real DB           |
+| User authentication  | Okta SAML page    | Simulated success    |
+| User creation        | Supabase auto     | ✅ Same (admin API)  |
+| Token generation     | Supabase          | ✅ Same (magic link) |
+| Auto-join trigger    | ✅ Executed       | ✅ Executed          |
+| Session management   | ✅ Real           | ✅ Real              |
+| Redirect with tokens | ✅ Real           | ✅ Real              |
 
 **What's mocked:** Only the Okta authentication page (user typing password)
 **What's real:** Everything else - database, triggers, Supabase auth, session management

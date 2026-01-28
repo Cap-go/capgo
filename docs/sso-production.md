@@ -8,7 +8,7 @@ Before deploying SSO to production, ensure all requirements are met:
 
 - [ ] **Plan Upgrade**: Upgrade from Free to Pro plan
   - Cost: $25/month base + $0.015 per SSO MAU
-  - Upgrade at: https://supabase.com/dashboard/project/_/settings/billing
+  - Upgrade at: <https://supabase.com/dashboard/project/_/settings/billing>
 - [ ] **Billing Configured**: Valid payment method on file
 - [ ] **Pro Features Enabled**: Verify Pro badge in dashboard
 
@@ -34,24 +34,26 @@ SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
 ### ✅ Database Migrations
 
 - [ ] **Migrations Applied**: All SSO migrations deployed to production
+
   ```bash
   # Apply migrations to production
   supabase db push --linked
   ```
 
 - [ ] **Verify Tables Created**:
+
   ```sql
   -- Verify SSO tables exist
-  SELECT table_name FROM information_schema.tables 
-  WHERE table_schema = 'public' 
+  SELECT table_name FROM information_schema.tables
+  WHERE table_schema = 'public'
   AND table_name IN ('org_saml_connections', 'saml_domain_mappings', 'sso_audit_logs');
   ```
 
 - [ ] **RLS Policies Active**:
   ```sql
   -- Check RLS is enabled
-  SELECT tablename, rowsecurity FROM pg_tables 
-  WHERE schemaname = 'public' 
+  SELECT tablename, rowsecurity FROM pg_tables
+  WHERE schemaname = 'public'
   AND tablename IN ('org_saml_connections', 'saml_domain_mappings', 'sso_audit_logs');
   ```
 
@@ -62,6 +64,7 @@ SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
   - Supabase Functions: `bun deploy:supabase:prod`
 
 - [ ] **Verify Endpoints Accessible**:
+
   ```bash
   # Test SSO status endpoint
   curl -H "apisecret: YOUR_API_SECRET" \
@@ -93,12 +96,13 @@ supabase sso list --project-ref YOUR_PROJECT_ID
 
 ### Step 1: Upgrade Supabase Plan
 
-1. Go to https://supabase.com/dashboard/project/_/settings/billing
+1. Go to <https://supabase.com/dashboard/project/_/settings/billing>
 2. Click **Upgrade to Pro**
 3. Add payment method
 4. Confirm upgrade
 
 **Expected Changes:**
+
 - Pro badge appears in dashboard
 - SSO menu item appears in Auth settings
 - Service role key gains SSO permissions
@@ -199,7 +203,7 @@ Create monitoring for these metrics:
 
 ```sql
 -- Daily SSO authentication count
-SELECT 
+SELECT
   DATE(created_at) as date,
   COUNT(*) as sso_logins
 FROM sso_audit_logs
@@ -224,12 +228,12 @@ WHERE created_at > NOW() - INTERVAL '30 days';
 
 Set up alerts for:
 
-| Metric | Threshold | Action |
-|--------|-----------|--------|
-| Failed SSO logins | > 10/hour | Investigate IdP issues |
-| Certificate expiration | < 30 days | Renew certificate |
-| SSO MAU | > 80% of budget | Review costs, optimize |
-| Service role key usage | > 1000/hour | Check for abuse |
+| Metric                 | Threshold       | Action                 |
+| ---------------------- | --------------- | ---------------------- |
+| Failed SSO logins      | > 10/hour       | Investigate IdP issues |
+| Certificate expiration | < 30 days       | Renew certificate      |
+| SSO MAU                | > 80% of budget | Review costs, optimize |
+| Service role key usage | > 1000/hour     | Check for abuse        |
 
 ### Log Aggregation
 
@@ -240,21 +244,21 @@ Forward SSO audit logs to monitoring service:
 export default {
   async fetch(request, env) {
     // ... SSO logic ...
-    
+
     // Send to logging service
-    await fetch('https://logs.yourcompany.com/ingest', {
-      method: 'POST',
+    await fetch("https://logs.yourcompany.com/ingest", {
+      method: "POST",
       body: JSON.stringify({
-        event: 'sso_audit',
+        event: "sso_audit",
         timestamp: new Date().toISOString(),
         org_id: orgId,
         event_type: eventType,
-        ip_address: request.headers.get('cf-connecting-ip'),
-        user_agent: request.headers.get('user-agent')
-      })
-    })
-  }
-}
+        ip_address: request.headers.get("cf-connecting-ip"),
+        user_agent: request.headers.get("user-agent"),
+      }),
+    });
+  },
+};
 ```
 
 ---
@@ -263,24 +267,24 @@ export default {
 
 ### Baseline Costs
 
-| Component | Cost | Frequency |
-|-----------|------|-----------|
-| Supabase Pro Plan | $25 | Monthly |
-| SSO MAU (first 100,000) | $0 | Included |
-| SSO MAU (additional) | $0.015 | Per user/month |
+| Component               | Cost   | Frequency      |
+| ----------------------- | ------ | -------------- |
+| Supabase Pro Plan       | $25    | Monthly        |
+| SSO MAU (first 100,000) | $0     | Included       |
+| SSO MAU (additional)    | $0.015 | Per user/month |
 
 ### Cost Estimation
 
 **Formula**: `$25 + (SSO_MAU * $0.015)`
 
 | SSO Users | Monthly Cost | Annual Cost |
-|-----------|--------------|-------------|
-| 50 | $25.75 | $309 |
-| 100 | $26.50 | $318 |
-| 250 | $28.75 | $345 |
-| 500 | $32.50 | $390 |
-| 1,000 | $40.00 | $480 |
-| 5,000 | $100.00 | $1,200 |
+| --------- | ------------ | ----------- |
+| 50        | $25.75       | $309        |
+| 100       | $26.50       | $318        |
+| 250       | $28.75       | $345        |
+| 500       | $32.50       | $390        |
+| 1,000     | $40.00       | $480        |
+| 5,000     | $100.00      | $1,200      |
 
 ### Cost Optimization Strategies
 
@@ -302,7 +306,7 @@ export default {
 4. **Monitoring**:
    ```sql
    -- Track SSO vs password usage
-   SELECT 
+   SELECT
      provider,
      COUNT(*) as login_count
    FROM auth.sessions
@@ -317,6 +321,7 @@ export default {
 ### Backup Strategy
 
 1. **Database Backups**:
+
    ```bash
    # Backup SSO configuration
    pg_dump $DATABASE_URL \
@@ -327,6 +332,7 @@ export default {
    ```
 
 2. **Configuration Backup**:
+
    ```bash
    # Export SSO providers via CLI
    supabase sso list --project-ref YOUR_PROJECT_ID --format json \
@@ -390,9 +396,10 @@ If SSO causes issues in production:
 ### Immediate Actions
 
 1. **Disable SSO for Organization**:
+
    ```sql
-   UPDATE org_saml_connections 
-   SET enabled = false 
+   UPDATE org_saml_connections
+   SET enabled = false
    WHERE org_id = 'AFFECTED_ORG_ID';
    ```
 
@@ -450,14 +457,15 @@ bun deploy:cloudflare:api:prod
 
 ```sql
 -- Export user's SSO audit history
-SELECT * FROM sso_audit_logs 
-WHERE user_id = 'USER_ID' 
+SELECT * FROM sso_audit_logs
+WHERE user_id = 'USER_ID'
 OR email = 'user@example.com';
 ```
 
 ### SOC 2 / ISO 27001
 
 SSO audit logging supports compliance with:
+
 - Access control monitoring
 - Authentication event tracking
 - Change management (config updates)
@@ -466,6 +474,7 @@ SSO audit logging supports compliance with:
 ### Data Processing Agreement
 
 Ensure DPA with Supabase covers:
+
 - SSO authentication data
 - SAML assertions processing
 - Audit log storage
@@ -513,6 +522,7 @@ Ensure DPA with Supabase covers:
 ### L1 Support (First Response)
 
 Common issues users can resolve:
+
 - Clear browser cache
 - Try different browser
 - Verify email domain
@@ -521,6 +531,7 @@ Common issues users can resolve:
 ### L2 Support (Technical)
 
 Requires access to audit logs:
+
 - Check `sso_audit_logs` for error details
 - Verify IdP metadata still valid
 - Test SSO connection manually
@@ -529,6 +540,7 @@ Requires access to audit logs:
 ### L3 Support (Engineering)
 
 Requires database access:
+
 - Fix RLS policy issues
 - Update SSO configuration directly
 - Rotate compromised keys
@@ -536,11 +548,11 @@ Requires database access:
 
 ### Contact Points
 
-| Level | Contact | SLA |
-|-------|---------|-----|
-| L1 | support@capgo.app | 24h |
-| L2 | tech@capgo.app | 8h |
-| L3 | eng@capgo.app | 4h critical |
+| Level | Contact           | SLA         |
+| ----- | ----------------- | ----------- |
+| L1    | support@capgo.app | 24h         |
+| L2    | tech@capgo.app    | 8h          |
+| L3    | eng@capgo.app     | 4h critical |
 
 ---
 

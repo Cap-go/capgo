@@ -1,4 +1,6 @@
 #!/bin/bash
+# ⚠️  DEVELOPMENT/TESTING ONLY - Contains hardcoded credentials
+# DO NOT use in production environments
 set -e
 
 # Stop and remove existing auth container
@@ -12,6 +14,9 @@ cat /tmp/saml-cert.pem | base64 | tr -d '\n' > /tmp/saml-cert-b64.txt
 # Read into variables
 SAML_KEY_B64=$(cat /tmp/saml-key-b64.txt)
 SAML_CERT_B64=$(cat /tmp/saml-cert-b64.txt)
+
+# Clean up temporary base64 files immediately after reading
+rm -f /tmp/saml-key-b64.txt /tmp/saml-cert-b64.txt
 
 echo "Starting auth container with SAML..."
 echo "Key length: ${#SAML_KEY_B64}"

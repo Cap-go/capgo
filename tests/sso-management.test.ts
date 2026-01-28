@@ -5,7 +5,7 @@ import { getEndpointUrl, getSupabaseClient, headersInternal, USER_ADMIN_EMAIL, U
 const TEST_SSO_ORG_ID = randomUUID()
 const TEST_SSO_ORG_NAME = `SSO Test Org ${randomUUID()}`
 const TEST_CUSTOMER_ID = `cus_sso_${randomUUID()}`
-const TEST_DOMAIN = 'ssotest.com'
+const TEST_DOMAIN = `ssotest-${randomUUID().slice(0, 8)}.com` // Unique per run for parallel test safety
 
 // Helper functions to generate unique entity IDs (required since migration 20260104064028 enforces uniqueness)
 function generateTestEntityId(): string {
@@ -199,7 +199,7 @@ afterAll(async () => {
 })
 
 describe('auto-join integration', () => {
-  it('should auto-enroll new users with verified SSO domain on signup', async () => {
+  it.concurrent('should auto-enroll new users with verified SSO domain on signup', async () => {
     // NOTE: Manually triggers auto-enrollment via RPC since test database doesn't have auth.users trigger active
     let orgId: string | undefined
     let customerId: string | undefined
@@ -350,7 +350,7 @@ describe('auto-join integration', () => {
     }
   }, 120000)
 
-  it('should auto-enroll existing users on first SSO login', async () => {
+  it.concurrent('should auto-enroll existing users on first SSO login', async () => {
     // Create a test user for auto-enrollment testing
     const testUserEmail = `sso-test-${randomUUID()}@${TEST_DOMAIN}`
     const ssoProviderId = randomUUID()
@@ -486,7 +486,7 @@ describe('auto-join integration', () => {
 })
 
 describe.skip('domain verification (mocked metadata fetch)', () => {
-  it('should mark domains as verified when added via SSO config (mocked)', async () => {
+  it.concurrent('should mark domains as verified when added via SSO config (mocked)', async () => {
     const orgId = randomUUID()
     const customerId = `cus_verify_${randomUUID()}`
     const domain = `verify${randomUUID().slice(0, 8)}.com`
@@ -554,7 +554,7 @@ describe.skip('domain verification (mocked metadata fetch)', () => {
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
   })
 
-  it('should create domain mappings with correct SSO provider reference (mocked)', async () => {
+  it.concurrent('should create domain mappings with correct SSO provider reference (mocked)', async () => {
     const orgId = randomUUID()
     const customerId = `cus_mapping_${randomUUID()}`
     const domain = `mapping${randomUUID().slice(0, 8)}.com`
@@ -632,7 +632,7 @@ describe.skip('domain verification (mocked metadata fetch)', () => {
 })
 
 describe.skip('domain verification', () => {
-  it('should mark domains as verified when added via SSO config', async () => {
+  it.concurrent('should mark domains as verified when added via SSO config', async () => {
     const orgId = randomUUID()
     const customerId = `cus_verify_${randomUUID()}`
     const domain = `verify${randomUUID().slice(0, 8)}.com`
@@ -680,7 +680,7 @@ describe.skip('domain verification', () => {
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
   })
 
-  it('should create domain mappings with correct SSO provider reference', async () => {
+  it.concurrent('should create domain mappings with correct SSO provider reference', async () => {
     const orgId = randomUUID()
     const customerId = `cus_mapping_${randomUUID()}`
     const domain = `mapping${randomUUID().slice(0, 8)}.com`
@@ -736,7 +736,7 @@ describe.skip('domain verification', () => {
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
   })
 
-  it('should allow lookup_sso_provider_by_domain to find provider', async () => {
+  it.concurrent('should allow lookup_sso_provider_by_domain to find provider', async () => {
     const orgId = randomUUID()
     const customerId = `cus_lookup_${randomUUID()}`
     const domain = `lookup${randomUUID().slice(0, 8)}.com`
@@ -798,7 +798,7 @@ describe.skip('domain verification', () => {
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
   })
 
-  it('should include verified domains in SSO status response', async () => {
+  it.concurrent('should include verified domains in SSO status response', async () => {
     const orgId = randomUUID()
     const customerId = `cus_status_${randomUUID()}`
     const domain1 = `status1${randomUUID().slice(0, 8)}.com`

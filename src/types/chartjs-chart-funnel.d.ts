@@ -20,18 +20,18 @@ declare module 'chartjs-chart-funnel' {
   export class TrapezoidElement {
     static readonly id: string
   }
+}
 
-  // Extend Chart.js type registry
-  module 'chart.js' {
-    interface ChartTypeRegistry {
-      funnel: {
-        chartOptions: FunnelControllerChartOptions
-        datasetOptions: FunnelControllerDatasetOptions
-        defaultDataPoint: number
-        metaExtensions: object
-        parsedDataType: { x: number, y: number }
-        scales: never
-      }
+// Extend Chart.js type registry (must be at top-level for proper augmentation)
+declare module 'chart.js' {
+  interface ChartTypeRegistry {
+    funnel: {
+      chartOptions: import('chartjs-chart-funnel').FunnelControllerChartOptions
+      datasetOptions: import('chartjs-chart-funnel').FunnelControllerDatasetOptions
+      defaultDataPoint: number
+      metaExtensions: object
+      parsedDataType: { x: number, y: number }
+      scales: never
     }
   }
 }
