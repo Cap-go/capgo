@@ -17,6 +17,17 @@ interface RbacContextOptions {
   orgIdResolver?: (c: Context) => string | null | Promise<string | null>
 }
 
+function buildRateLimitInfo(resetAt?: number) {
+  if (typeof resetAt !== 'number' || !Number.isFinite(resetAt)) {
+    return {}
+  }
+  const retryAfterSeconds = Math.max(0, Math.ceil((resetAt! - Date.now()) / 1000))
+  return {
+    rateLimitResetAt: resetAt,
+    retryAfterSeconds,
+  }
+}
+
 async function getAppIdFromRequest(c: Context) {
   const queryAppId = c.req.query('app_id')
   if (queryAppId) {
@@ -425,8 +436,8 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
 
   // Check if API key is rate limited after recording usage
   const apiKeyRateLimited = await isAPIKeyRateLimited(c, apikey.id)
-  if (apiKeyRateLimited) {
-    return simpleRateLimit({ reason: 'api_key_rate_limit_exceeded', apikey_id: apikey.id })
+  if (apiKeyRateLimited.limited) {
+    return simpleRateLimit({ reason: 'api_key_rate_limit_exceeded', apikey_id: apikey.id, ...buildRateLimitInfo(apiKeyRateLimited.resetAt) })
   }
 
   // Store the original key string for hashed key authentication
@@ -484,8 +495,8 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
   return honoFactory.createMiddleware(async (c, next) => {
     // Check if IP is rate limited due to failed auth attempts
     const ipRateLimited = await isIPRateLimited(c)
-    if (ipRateLimited) {
-      return simpleRateLimit({ reason: 'too_many_failed_auth_attempts' })
+    if (ipRateLimited.limited) {
+      return simpleRateLimit({ reason: 'too_many_failed_auth_attempts', ...buildRateLimitInfo(ipRateLimited.resetAt) })
     }
 
     const { jwt, capgkey } = resolveAuthHeaders(c)
@@ -515,8 +526,8 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
   const subMiddlewareKey = honoFactory.createMiddleware(async (c, next) => {
     // Check if IP is rate limited due to failed auth attempts
     const ipRateLimited = await isIPRateLimited(c)
-    if (ipRateLimited) {
-      return simpleRateLimit({ reason: 'too_many_failed_auth_attempts' })
+    if (ipRateLimited.limited) {
+      return simpleRateLimit({ reason: 'too_many_failed_auth_attempts', ...buildRateLimitInfo(ipRateLimited.resetAt) })
     }
 
     const { capgkeyString, apikeyString, key } = resolveKeyHeaders(c)
@@ -556,8 +567,8 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
 
     // Check if API key is rate limited after recording usage
     const apiKeyRateLimited = await isAPIKeyRateLimited(c, apikey.id)
-    if (apiKeyRateLimited) {
-      return simpleRateLimit({ reason: 'api_key_rate_limit_exceeded', apikey_id: apikey.id })
+    if (apiKeyRateLimited.limited) {
+      return simpleRateLimit({ reason: 'api_key_rate_limit_exceeded', apikey_id: apikey.id, ...buildRateLimitInfo(apiKeyRateLimited.resetAt) })
     }
 
     // Set auth context for RBAC (can be overridden by subkey below)

@@ -13,6 +13,12 @@ const DEFAULT_API_KEY_RATE_LIMIT = 2000 // 2000 requests per minute per API key 
 
 interface RateLimitData {
   count: number
+  resetAt?: number
+}
+
+export interface RateLimitStatus {
+  limited: boolean
+  resetAt?: number
 }
 
 /**
@@ -48,7 +54,7 @@ export function getClientIP(c: Context): string {
  * Returns true if the IP should be blocked.
  * Note: If cache is unavailable, rate limiting fails open (returns false) to avoid blocking legitimate traffic.
  */
-export async function isIPRateLimited(c: Context): Promise<boolean> {
+export async function isIPRateLimited(c: Context): Promise<RateLimitStatus> {
   const ip = getClientIP(c)
   if (ip === 'unknown') {
     // Log warning but don't block - in production behind Cloudflare this shouldn't happen
@@ -56,7 +62,7 @@ export async function isIPRateLimited(c: Context): Promise<boolean> {
       requestId: c.get('requestId'),
       message: 'Rate limit check skipped: unknown IP (missing cf-connecting-ip header)',
     })
-    return false
+    return { limited: false }
   }
 
   const cacheHelper = new CacheHelper(c)
@@ -65,7 +71,7 @@ export async function isIPRateLimited(c: Context): Promise<boolean> {
 
   // If no data or cache unavailable, fail open (don't block)
   if (!data)
-    return false
+    return { limited: false }
 
   const limit = getFailedAuthLimit(c)
   const isLimited = data.count >= limit
@@ -80,7 +86,7 @@ export async function isIPRateLimited(c: Context): Promise<boolean> {
     })
   }
 
-  return isLimited
+  return { limited: isLimited, resetAt: data.resetAt }
 }
 
 /**
@@ -104,6 +110,7 @@ export async function recordFailedAuth(c: Context): Promise<void> {
 
   const newData: RateLimitData = {
     count: (existingData?.count ?? 0) + 1,
+    resetAt: Date.now() + FAILED_AUTH_TTL * 1000,
   }
 
   await cacheHelper.putJson(cacheKey, newData, FAILED_AUTH_TTL)
@@ -138,14 +145,14 @@ export async function clearFailedAuth(c: Context): Promise<void> {
  * Returns true if the API key has exceeded its configured rate limit.
  * Note: If cache is unavailable, rate limiting fails open (returns false).
  */
-export async function isAPIKeyRateLimited(c: Context, apiKeyId: number): Promise<boolean> {
+export async function isAPIKeyRateLimited(c: Context, apiKeyId: number): Promise<RateLimitStatus> {
   const cacheHelper = new CacheHelper(c)
   const cacheKey = cacheHelper.buildRequest('/rate-limit/apikey', { id: String(apiKeyId) })
   const data = await cacheHelper.matchJson<RateLimitData>(cacheKey)
 
   // If no data or cache unavailable, fail open (don't block)
   if (!data)
-    return false
+    return { limited: false }
 
   const limit = getAPIKeyRateLimit(c)
   const isLimited = data.count >= limit
@@ -160,7 +167,7 @@ export async function isAPIKeyRateLimited(c: Context, apiKeyId: number): Promise
     })
   }
 
-  return isLimited
+  return { limited: isLimited, resetAt: data.resetAt }
 }
 
 /**
@@ -175,6 +182,7 @@ export async function recordAPIKeyUsage(c: Context, apiKeyId: number): Promise<v
 
   const newData: RateLimitData = {
     count: (existingData?.count ?? 0) + 1,
+    resetAt: Date.now() + API_KEY_RATE_LIMIT_TTL * 1000,
   }
 
   await cacheHelper.putJson(cacheKey, newData, API_KEY_RATE_LIMIT_TTL)

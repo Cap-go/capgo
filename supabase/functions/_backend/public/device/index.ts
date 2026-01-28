@@ -9,6 +9,17 @@ import { deleteOverride } from './delete.ts'
 import { get } from './get.ts'
 import { post } from './post.ts'
 
+function buildRateLimitInfo(resetAt?: number) {
+  if (typeof resetAt !== 'number' || !Number.isFinite(resetAt)) {
+    return {}
+  }
+  const retryAfterSeconds = Math.max(0, Math.ceil((resetAt - Date.now()) / 1000))
+  return {
+    rateLimitResetAt: resetAt,
+    retryAfterSeconds,
+  }
+}
+
 export const app = honoFactory.createApp()
 
 app.post('/', middlewareKey(['all', 'write']), async (c) => {
@@ -21,10 +32,10 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
   // Rate limit: max 1 set per second per device+app, and same channel set max once per 60 seconds
   // Note: We check device_id && app_id only (not channel) so op-level rate limiting applies even for invalid requests
   if (body.device_id && body.app_id) {
-    const isRateLimited = await isChannelSelfRateLimited(c, body.app_id, body.device_id, 'set', body.channel)
-    if (isRateLimited) {
+    const rateLimitStatus = await isChannelSelfRateLimited(c, body.app_id, body.device_id, 'set', body.channel)
+    if (rateLimitStatus.limited) {
       cloudlog({ requestId: c.get('requestId'), message: 'Device API set rate limited', app_id: body.app_id, device_id: body.device_id, channel: body.channel })
-      return simpleRateLimit({ app_id: body.app_id, device_id: body.device_id })
+      return simpleRateLimit({ app_id: body.app_id, device_id: body.device_id, ...buildRateLimitInfo(rateLimitStatus.resetAt) })
     }
   }
 
@@ -46,10 +57,10 @@ app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
 
   // Rate limit: max 1 get per second per device+app
   if (body.device_id && body.app_id) {
-    const isRateLimited = await isChannelSelfRateLimited(c, body.app_id, body.device_id, 'get')
-    if (isRateLimited) {
+    const rateLimitStatus = await isChannelSelfRateLimited(c, body.app_id, body.device_id, 'get')
+    if (rateLimitStatus.limited) {
       cloudlog({ requestId: c.get('requestId'), message: 'Device API get rate limited', app_id: body.app_id, device_id: body.device_id })
-      return simpleRateLimit({ app_id: body.app_id, device_id: body.device_id })
+      return simpleRateLimit({ app_id: body.app_id, device_id: body.device_id, ...buildRateLimitInfo(rateLimitStatus.resetAt) })
     }
   }
 
@@ -71,10 +82,10 @@ app.delete('/', middlewareKey(['all', 'write']), async (c) => {
 
   // Rate limit: max 1 delete per second per device+app
   if (body.device_id && body.app_id) {
-    const isRateLimited = await isChannelSelfRateLimited(c, body.app_id, body.device_id, 'delete')
-    if (isRateLimited) {
+    const rateLimitStatus = await isChannelSelfRateLimited(c, body.app_id, body.device_id, 'delete')
+    if (rateLimitStatus.limited) {
       cloudlog({ requestId: c.get('requestId'), message: 'Device API delete rate limited', app_id: body.app_id, device_id: body.device_id })
-      return simpleRateLimit({ app_id: body.app_id, device_id: body.device_id })
+      return simpleRateLimit({ app_id: body.app_id, device_id: body.device_id, ...buildRateLimitInfo(rateLimitStatus.resetAt) })
     }
   }
 
