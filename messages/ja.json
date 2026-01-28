@@ -748,6 +748,7 @@
   "incorrect-app-id": "あなたは間違ったアプリIDを書きました。",
   "info": "情報",
   "init-capgo-in-your-a": "あなたのCapacitorアプリにCapgoをインストールしてください。",
+  "onboarding-cli-where-why": "Capacitor プロジェクト（package.json があるフォルダ）でターミナルを開き、このコマンドを実行してください。これによりアプリが Capgo に紐づき、ここに表示されます。",
   "insert-invite-email": "あなたが招待したいユーザーのメールを入力してください",
   "install": "インストールされました",
   "installed": "インストールされました",
