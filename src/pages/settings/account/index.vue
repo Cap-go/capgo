@@ -8,6 +8,7 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import VueTurnstile from 'vue-turnstile'
 import IconVersion from '~icons/heroicons/arrow-path'
 import iconEmail from '~icons/heroicons/envelope?raw'
 import iconFlag from '~icons/heroicons/flag?raw'
@@ -32,6 +33,9 @@ const organizationStore = useOrganizationStore()
 const isLoading = ref(false)
 const isDeletingAccount = ref(false)
 const deleteAccountPassword = ref('')
+const deleteAccountCaptchaToken = ref('')
+const deleteAccountCaptchaRef = ref<InstanceType<typeof VueTurnstile> | null>(null)
+const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 // mfa = 2fa
 const mfaEnabled = ref(false)
 const mfaFactorId = ref('')
@@ -202,6 +206,8 @@ async function deleteAccount() {
 
   // Show final confirmation
   deleteAccountPassword.value = ''
+  deleteAccountCaptchaToken.value = ''
+  deleteAccountCaptchaRef.value?.reset()
   dialogStore.openDialog({
     id: 'delete-account-confirm',
     title: t('delete-account'),
@@ -228,6 +234,8 @@ async function deleteAccount() {
   })
   const dismissed = await dialogStore.onDialogDismiss()
   deleteAccountPassword.value = ''
+  deleteAccountCaptchaToken.value = ''
+  deleteAccountCaptchaRef.value?.reset()
   return dismissed
 }
 
@@ -241,6 +249,11 @@ async function performAccountDeletion(password: string) {
     return false
   }
 
+  if (captchaKey.value && !deleteAccountCaptchaToken.value) {
+    toast.error(t('captcha-required', 'Captcha verification is required'))
+    return false
+  }
+
   if (isDeletingAccount.value)
     return false
 
@@ -249,8 +262,15 @@ async function performAccountDeletion(password: string) {
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email: main.auth.email,
       password,
+      options: captchaKey.value ? { captchaToken: deleteAccountCaptchaToken.value } : undefined,
     })
     if (signInError) {
+      deleteAccountCaptchaToken.value = ''
+      deleteAccountCaptchaRef.value?.reset()
+      if (signInError.message.includes('captcha')) {
+        toast.error(t('captcha-fail'))
+        return false
+      }
       toast.error(t('invalid-auth'))
       return false
     }
@@ -294,6 +314,12 @@ async function performAccountDeletion(password: string) {
 
     if (deleteError) {
       console.error('Delete error:', deleteError)
+      if (deleteError.message?.includes('reauth_required')) {
+        deleteAccountCaptchaToken.value = ''
+        deleteAccountCaptchaRef.value?.reset()
+        toast.error(t('invalid-auth'))
+        return false
+      }
       toast.error(t('something-went-wrong-try-again-later'))
       return false
     }
@@ -833,6 +859,17 @@ onMounted(async () => {
             autocomplete="current-password"
             @keydown.enter="$event.preventDefault()"
           >
+        </div>
+        <div v-if="captchaKey" class="mt-4">
+          <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('captcha', 'Captcha') }}
+          </label>
+          <VueTurnstile
+            ref="deleteAccountCaptchaRef"
+            v-model="deleteAccountCaptchaToken"
+            size="flexible"
+            :site-key="captchaKey"
+          />
         </div>
       </div>
     </Teleport>

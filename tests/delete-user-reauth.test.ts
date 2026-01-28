@@ -115,6 +115,7 @@ describe('delete_user reauthentication guard', () => {
       .single()
     expect(error).toBeNull()
     expect(data?.account_id).toBe(USER_ID_DELETE_USER_FRESH)
-    expect(data?.removed_data?.email).toBe(USER_EMAIL_DELETE_USER_FRESH)
+    const removedData = data?.removed_data as { email?: string } | null
+    expect(removedData?.email).toBe(USER_EMAIL_DELETE_USER_FRESH)
   })
 })

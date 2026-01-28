@@ -27,9 +27,13 @@ BEGIN
   SELECT row_to_json(u)::jsonb INTO old_record_json
   FROM (
     SELECT *
-    FROM public.users
+    FROM "public"."users"
     WHERE id = user_id_fn
   ) AS u;
+
+  IF old_record_json IS NULL THEN
+    RAISE EXCEPTION 'user_not_found' USING ERRCODE = 'P0002';
+  END IF;
 
   -- Trigger the queue-based deletion process
   -- This cancels the subscriptions of the user's organizations
@@ -54,10 +58,14 @@ BEGIN
   (
     user_id_fn,
     NOW() + INTERVAL '30 days',
-    "jsonb_build_object"('email', user_email, 'apikeys', (SELECT "jsonb_agg"("to_jsonb"(a.*)) FROM "public"."apikeys" a WHERE a."user_id" = user_id_fn))
+    "jsonb_build_object"('email', user_email, 'apikeys', COALESCE((SELECT "jsonb_agg"("to_jsonb"(a.*)) FROM "public"."apikeys" a WHERE a."user_id" = user_id_fn), '[]'::jsonb))
   );
 
   -- Delete the API keys
   DELETE FROM "public"."apikeys" WHERE "public"."apikeys"."user_id" = user_id_fn;
 END;
 $$;
+
+GRANT EXECUTE ON FUNCTION "public"."delete_user"() TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."delete_user"() TO "anon";
+GRANT EXECUTE ON FUNCTION "public"."delete_user"() TO "service_role";
