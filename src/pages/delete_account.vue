@@ -5,6 +5,7 @@ import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import VueTurnstile from 'vue-turnstile'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import { hideLoader } from '~/services/loader'
@@ -14,6 +15,13 @@ import { useDialogV2Store } from '~/stores/dialogv2'
 const supabase = useSupabase()
 const dialogStore = useDialogV2Store()
 const isLoading = ref(false)
+const pendingEmail = ref('')
+const pendingPassword = ref('')
+const turnstileToken = ref('')
+const confirmCaptchaToken = ref('')
+const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
+const captchaComponent = ref<InstanceType<typeof VueTurnstile> | null>(null)
+const confirmCaptchaComponent = ref<InstanceType<typeof VueTurnstile> | null>(null)
 const { t } = useI18n()
 const router = useRouter()
 
@@ -22,6 +30,7 @@ const registerUrl = window.location.host === 'console.capgo.app' ? 'https://capg
 
 async function deleteAccount() {
   dialogStore.openDialog({
+    id: 'delete-account-confirm',
     title: t('are-u-sure'),
     buttons: [
       {
@@ -32,6 +41,30 @@ async function deleteAccount() {
           isLoading.value = true
 
           try {
+            if (!pendingEmail.value || !pendingPassword.value) {
+              isLoading.value = false
+              return setErrors('delete-account', [t('invalid-auth')], {})
+            }
+
+            if (captchaKey.value && !confirmCaptchaToken.value) {
+              isLoading.value = false
+              return setErrors('delete-account', [t('captcha-required', 'Captcha verification is required')], {})
+            }
+
+            const { error: reauthError } = await supabase.auth.signInWithPassword({
+              email: pendingEmail.value,
+              password: pendingPassword.value,
+              options: captchaKey.value ? { captchaToken: confirmCaptchaToken.value } : undefined,
+            })
+            if (reauthError) {
+              confirmCaptchaToken.value = ''
+              confirmCaptchaComponent.value?.reset()
+              isLoading.value = false
+              if (reauthError.message.includes('captcha'))
+                toast.error(t('captcha-fail'))
+              return setErrors('delete-account', [t('invalid-auth')], {})
+            }
+
             const { data: claimsData, error: claimsError } = await supabase.auth.getClaims()
             const userId = claimsData?.claims?.sub
             if (claimsError || !userId) {
@@ -55,6 +88,10 @@ async function deleteAccount() {
 
             if (deleteError) {
               console.error('Delete error:', deleteError)
+              if (deleteError.message?.includes('reauth_required')) {
+                isLoading.value = false
+                return setErrors('delete-account', [t('invalid-auth')], {})
+              }
               isLoading.value = false
               return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
             }
@@ -71,6 +108,10 @@ async function deleteAccount() {
           }
           finally {
             isLoading.value = false
+            pendingEmail.value = ''
+            pendingPassword.value = ''
+            confirmCaptchaToken.value = ''
+            confirmCaptchaComponent.value?.reset()
           }
         },
       },
@@ -83,22 +124,44 @@ async function deleteAccount() {
       },
     ],
   })
-  return dialogStore.onDialogDismiss()
+  const dismissed = await dialogStore.onDialogDismiss()
+  if (dismissed) {
+    pendingEmail.value = ''
+    pendingPassword.value = ''
+    confirmCaptchaToken.value = ''
+    confirmCaptchaComponent.value?.reset()
+  }
+  return dismissed
 }
 
 async function submit(form: { email: string, password: string }) {
   isLoading.value = true
+  if (captchaKey.value && !turnstileToken.value) {
+    isLoading.value = false
+    setErrors('delete-account', [t('captcha-required', 'Captcha verification is required')], {})
+    return
+  }
   const { error } = await supabase.auth.signInWithPassword({
     email: form.email,
     password: form.password,
+    options: captchaKey.value ? { captchaToken: turnstileToken.value } : undefined,
   })
   isLoading.value = false
   if (error) {
     console.error('error', error)
     setErrors('login-account', [error.message], {})
+    if (error.message.includes('captcha')) {
+      captchaComponent.value?.reset()
+      toast.error(t('captcha-fail'))
+      return
+    }
     toast.error(t('invalid-auth'))
   }
   else {
+    pendingEmail.value = form.email
+    pendingPassword.value = form.password
+    turnstileToken.value = ''
+    captchaComponent.value?.reset()
     // delete account
     deleteAccount()
   }
@@ -151,6 +214,12 @@ onMounted (() => {
                     validation="required:trim" enterkeyhint="send" autocomplete="current-password"
                   />
                 </div>
+                <div v-if="captchaKey">
+                  <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {{ t('captcha', 'Captcha') }}
+                  </label>
+                  <VueTurnstile ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
+                </div>
                 <FormKitMessages />
                 <div>
                   <div class="inline-flex justify-center items-center w-full">
@@ -191,6 +260,20 @@ onMounted (() => {
           </div>
         </div>
       </div>
+
+      <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.id === 'delete-account-confirm'" to="#dialog-v2-content" defer>
+        <div v-if="captchaKey" class="mt-4">
+          <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('captcha', 'Captcha') }}
+          </label>
+          <VueTurnstile
+            ref="confirmCaptchaComponent"
+            v-model="confirmCaptchaToken"
+            size="flexible"
+            :site-key="captchaKey"
+          />
+        </div>
+      </Teleport>
     </div>
   </section>
 </template>

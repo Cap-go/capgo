@@ -748,6 +748,7 @@
   "incorrect-app-id": "Yanlış uygulama kimliğini yazdınız.",
   "info": "Bilgi",
   "init-capgo-in-your-a": "Capacitor uygulamanıza Capgo'yu yükleyin",
+  "onboarding-cli-where-why": "Capacitor projenizde (package.json olan klasörde) bir terminal açın ve bu komutu çalıştırın. Bu, uygulamanızı Capgo'ya bağlar ve burada görünmesini sağlar.",
   "insert-invite-email": "Davet etmek istediğiniz kullanıcının e-postasını girin",
   "install": "Yüklendi",
   "installed": "kurulmuş",

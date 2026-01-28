@@ -748,6 +748,7 @@
   "incorrect-app-id": "Você escreveu o id do aplicativo errado.",
   "info": "Informação",
   "init-capgo-in-your-a": "Instale o Capgo no seu aplicativo Capacitor",
+  "onboarding-cli-where-why": "Abra um terminal no seu projeto Capacitor (a pasta com package.json) e execute este comando. Isso vincula seu app ao Capgo para que ele apareça aqui.",
   "insert-invite-email": "Insira o email do usuário que você deseja convidar",
   "install": "Instalado",
   "installed": "instalado",

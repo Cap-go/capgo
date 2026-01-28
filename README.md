@@ -63,6 +63,86 @@ for internal tasks such as CRON jobs that call functions.
 
 When self-hosted, installing only Supabase is sufficient.
 
+## Why Cloudflare Workers + Supabase
+
+We support both deployments for practical reasons:
+
+- **Supabase** is the legacy backend and the only required piece for
+  self-hosting.
+- **Cloudflare Workers** runs the same backend code (via the Hono adapter) but is
+  much cheaper at Capgo scale. With ~50M devices, Supabase Edge Functions are
+  cost-prohibitive because they follow AWS pricing. Cloudflare is ~10x cheaper
+  for our traffic profile.
+
+In production, we route most traffic through Cloudflare Workers for cost and
+scale, while Supabase remains the reference backend and the default for
+self-hosted deployments. Private endpoints and trigger/CRON workloads still run
+on Supabase in production.
+
+## Project structure (self-hosting map)
+
+If you're self-hosting, the key pieces live in a few top-level directories:
+
+- `supabase/` - **Primary backend for self-hosting**
+  - `supabase/functions/` - Edge functions (Deno) that power the API
+    - `_backend/` - Core implementation used by both Supabase and Cloudflare
+    - `public/` - Public API routes used by customers and apps
+    - `private/` - Internal API routes for the console and ops tooling
+    - `plugins/` - Plugin endpoints (updates, stats, channel_self, etc.)
+    - `triggers/` - Database triggers and CRON functions
+  - `supabase/migrations/` - Database schema and RLS policies
+  - `supabase/seed.sql` - Local seed data for tests/dev
+- `supabase/schemas/prod.sql` - Production schema dump (reference only)
+- `cloudflare_workers/` - **Optional** Cloudflare Workers deployment (prod traffic)
+  - `cloudflare_workers/snippet/` - Geo routing for replicas
+  - Worker entry points and deploy config live here
+- `src/` - Frontend Vue 3 web console (Vite + Tailwind + DaisyUI)
+  - `src/pages/` - File-based routes
+  - `src/components/` - Reusable UI components
+  - `src/services/` - API clients and integrations
+  - `src/stores/` - Pinia stores
+- `sql/` - Raw SQL helpers and maintenance scripts
+- `scripts/` - Dev/build scripts used by CI and local tooling
+- `tests/` - Backend Vitest tests (run in parallel)
+- `playwright/` - Frontend E2E tests
+- `docs/` - Extra documentation and guides
+- `android/`, `ios/` - Capacitor native projects (mobile builds)
+
+Quick self-hosting path:
+
+1. `supabase/` is enough to run the backend locally.
+2. `src/` is the web console you point to your own backend.
+3. `cloudflare_workers/` is only needed if you want to run the Workers layer
+   instead of (or in front of) Supabase.
+
+## Backend endpoints (what lives where)
+
+The backend is split by responsibility to keep routes clear and access scoped:
+
+- `supabase/functions/_backend/public/` - **Public API** exposed to customers.
+  This is the documented API on the website for customers that want to interact
+  with Capgo programmatically (apps, channels, bundles, devices, etc.).
+- `supabase/functions/_backend/private/` - **Private API** used internally.
+  The console (web UI) uses this heavily for admin/ops workflows. It is not
+  publicly accessible. Some UI flows still use the public API where appropriate.
+- `supabase/functions/_backend/plugins/` - **Plugin API** used by the
+  `@capgo/capacitor-updater` plugin running inside apps:
+  - `updates` - device update checks and bundle download flow
+  - `stats` - upload usage stats from devices
+  - `channel_self` - allow a device to opt into a channel (QA/debug)
+- `supabase/functions/_backend/triggers/` - **Triggers & CRON** for automated
+  backend jobs (queue consumers, scheduled tasks, DB-triggered flows).
+
+When self-hosting, you generally expose `public` + `plugins`. `private` should
+stay internal and locked down. `triggers` runs automatically.
+
+## Production schema (prod.sql)
+
+`supabase/schemas/prod.sql` is a schema dump of the production database. It is
+generated via `bun run schemas` (or `bun run schemas:local`) and is meant for
+reference/diffing, not as a source of truth. All actual schema changes live in
+`supabase/migrations/`.
+
 ## Documentation
 
 https://github.com/Cap-go/capacitor-updater/wiki/Capgo-Sandbox-App
@@ -131,6 +211,51 @@ All the following official plugins are already installed and pre-configured:
 - [Toast](https://github.com/ionic-team/capacitor-plugins/tree/main/toast) -
   Provides a notification pop up for displaying important information to a user.
   Just like real toast!
+
+## Tests
+
+Tests are split by backend (API/plugin), CLI, database SQL, and frontend:
+
+- `tests/` - Backend Vitest tests (API + plugin + CLI)
+- `playwright/e2e/` - Frontend Playwright tests
+- `supabase/tests/` - SQL tests for functions, RLS, and DB logic
+
+Backend test groups (Vitest):
+
+- API tests: public/private endpoints and general backend behavior
+- Plugin tests: `tests/updates*.test.ts`, `tests/stats*.test.ts`,
+  `tests/channel_self*.test.ts`
+- CLI tests: `tests/cli*.test.ts` (CLI auth, upload, metadata, etc.)
+
+Run tests:
+
+```bash
+# Supabase Edge Functions (default)
+bun test:all
+bun test:backend
+bun test:cli
+bun test:local
+bun test:front
+
+# Database SQL tests (Supabase CLI)
+supabase test db
+
+# Cloudflare Workers
+bun test:cloudflare:all
+bun test:cloudflare:backend
+bun test:cloudflare:updates
+
+# Local Cloudflare Workers (required for cloudflare tests)
+./scripts/start-cloudflare-workers.sh
+```
+
+Notes:
+
+- Tests run in parallel across files. If a test mutates shared data, add
+  dedicated seed data in `supabase/seed.sql`.
+- `LOCAL_CLI_PATH=true bun test:all:local` uses a local CLI build.
+- SQL tests in `supabase/tests/` are run by the Supabase CLI test runner.
+- Run `supabase start` first so the local DB is available.
 
 ## Dev contribution
 

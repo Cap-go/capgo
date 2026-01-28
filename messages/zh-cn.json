@@ -748,6 +748,7 @@
   "incorrect-app-id": "你写错了应用程序 ID。",
   "info": "信息",
   "init-capgo-in-your-a": "在您的应用中初始化 Capgo",
+  "onboarding-cli-where-why": "在你的 Capacitor 项目中（包含 package.json 的文件夹）打开终端并运行此命令。它会将你的应用连接到 Capgo，从而在此显示。",
   "insert-invite-email": "插入您要邀请的用户的电子邮件",
   "install": "已安装",
   "installed": "已安装",

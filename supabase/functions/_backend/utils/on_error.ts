@@ -80,6 +80,17 @@ export function onError(functionName: string) {
         stack: serializeError(e)?.stack ?? 'N/A',
       })
       if (e.status === 429) {
+        const rateLimitResetAt = typeof res.moreInfo?.rateLimitResetAt === 'number' ? res.moreInfo.rateLimitResetAt : undefined
+        let retryAfterSeconds = typeof res.moreInfo?.retryAfterSeconds === 'number' ? res.moreInfo.retryAfterSeconds : undefined
+        if (typeof rateLimitResetAt === 'number' && Number.isFinite(rateLimitResetAt) && !(typeof retryAfterSeconds === 'number' && Number.isFinite(retryAfterSeconds))) {
+          retryAfterSeconds = Math.max(0, Math.ceil((rateLimitResetAt - Date.now()) / 1000))
+        }
+        if (typeof rateLimitResetAt === 'number' && Number.isFinite(rateLimitResetAt)) {
+          c.header('X-RateLimit-Reset', String(Math.ceil(rateLimitResetAt / 1000)))
+        }
+        if (typeof retryAfterSeconds === 'number' && Number.isFinite(retryAfterSeconds)) {
+          c.header('Retry-After', String(Math.max(0, Math.floor(retryAfterSeconds))))
+        }
         return c.json({ error: 'too_many_requests', message: 'You are being rate limited' }, e.status)
       }
       if (e.status >= 500) {
