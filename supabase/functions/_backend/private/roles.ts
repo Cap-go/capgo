@@ -5,7 +5,7 @@ import { Hono } from 'hono/tiny'
 import { middlewareAuth, useCors } from '../utils/hono.ts'
 import { cloudlogErr } from '../utils/logging.ts'
 import { getDrizzleClient, getPgClient } from '../utils/pg.ts'
-import { schema } from '../utils/postgres_schema.ts'
+import * as schema from '../utils/postgres_schema.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 

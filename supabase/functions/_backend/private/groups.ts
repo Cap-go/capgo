@@ -4,7 +4,7 @@ import { and, eq } from 'drizzle-orm'
 import { createHono, middlewareAuth, useCors } from '../utils/hono.ts'
 import { cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
-import { schema } from '../utils/postgres_schema.ts'
+import * as schema from '../utils/postgres_schema.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { version } from '../utils/version.ts'
 
