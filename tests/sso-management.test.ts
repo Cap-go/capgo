@@ -1,11 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { getEndpointUrl, getSupabaseClient, headersInternal, SSO_TEST_CUSTOMER_ID, SSO_TEST_ORG_ID, SSO_TEST_ORG_NAME, USER_ADMIN_EMAIL, USER_ID } from './test-utils.ts'
+import { getEndpointUrl, getSupabaseClient, headersInternal, SSO_TEST_ORG_ID, USER_ADMIN_EMAIL, USER_ID } from './test-utils.ts'
 
 // Use seeded SSO test data - these are pre-created in seed.sql for parallel test safety
 const TEST_SSO_ORG_ID = SSO_TEST_ORG_ID
-const TEST_SSO_ORG_NAME = SSO_TEST_ORG_NAME
-const TEST_CUSTOMER_ID = SSO_TEST_CUSTOMER_ID
 // Generate run-unique domain to avoid saml_domain_mappings collisions in parallel tests
 // This is stable for the file's lifetime but unique per test run
 const TEST_DOMAIN = `ssotest-${randomUUID().slice(0, 8)}.example.com`
