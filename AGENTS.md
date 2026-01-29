@@ -155,32 +155,38 @@ Do NOT use `c.body(null, 204)` for success responses. Always return JSON for con
 When creating tests that interact with shared resources (users, apps, orgs, devices, channels, bundles, etc.), follow these rules:
 
 **You CAN reuse existing seed data IF:**
+
 - You only READ the data, not modify it
 - You create your OWN child resources under it (e.g., reuse a user but create your own app/org for that user)
 - The parent resource is not modified by your test or other tests
 
 **You MUST create dedicated seed data IF:**
+
 - Your test MODIFIES the resource (update, delete, change settings)
 - Other tests also modify that same resource
 - The resource state matters for your test assertions
 
 **Guidelines:**
+
 1. **Create dedicated seed data when needed** - Add new test-specific entries in `supabase/seed.sql` with unique identifiers
 2. **Use unique naming conventions** - Prefix test data with the test file name or feature being tested (e.g., `test_my_feature_user@capgo.app`, `com.test.myfeature.app`)
 3. **Clean up is NOT enough** - Even with cleanup, parallel test files might try to use the data simultaneously
 
 **Examples of what breaks parallel test files:**
+
 - Modifying the default `test@capgo.app` user's settings
 - Deleting or updating the default app `com.demo.app`
 - Changing org settings on the shared test org
 - Using hardcoded IDs that other test files also modify
 
 **Examples of safe reuse:**
+
 - Using `test@capgo.app` to create a NEW app specific to your test (user is not modified)
 - Reading from shared orgs without modifying them
 - Creating new channels/bundles under your own dedicated app
 
 **When you need isolation, create dedicated seed data:**
+
 ```sql
 -- In seed.sql, add dedicated test data for your test file:
 INSERT INTO auth.users (id, email, ...) VALUES
