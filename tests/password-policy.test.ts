@@ -242,44 +242,45 @@ describe('[POST] /private/validate_password_compliance', () => {
   })
 
   it('reject request for org without password policy', async () => {
-    // Create a temp org without password policy
-    const tempOrgId = randomUUID()
-    const tempCustomerId = `cus_temp_${tempOrgId}`
+    const policyConfig = {
+      enabled: true,
+      min_length: 10,
+      require_uppercase: true,
+      require_number: true,
+      require_special: true,
+    }
 
-    await getSupabaseClient().from('stripe_info').insert({
-      customer_id: tempCustomerId,
-      status: 'succeeded',
-      product_id: 'prod_LQIregjtNduh4q',
-      subscription_id: `sub_temp_${tempOrgId}`,
-      is_good_plan: true,
-    })
+    // Temporarily disable policy on existing org to avoid DB mismatch across runtimes
+    const { error: disableError } = await getSupabaseClient()
+      .from('orgs')
+      .update({ password_policy_config: null })
+      .eq('id', ORG_ID)
+    if (disableError)
+      throw disableError
 
-    await getSupabaseClient().from('orgs').insert({
-      id: tempOrgId,
-      name: 'Temp No Policy Org',
-      management_email: TEST_EMAIL,
-      created_by: USER_ID,
-      customer_id: tempCustomerId,
-      password_policy_config: null,
-    })
+    try {
+      const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
+        headers,
+        method: 'POST',
+        body: JSON.stringify({
+          email: TEST_EMAIL,
+          password: 'TestPassword123!',
+          org_id: ORG_ID,
+        }),
+      })
+      expect(response.status).toBe(400)
 
-    const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
-      headers,
-      method: 'POST',
-      body: JSON.stringify({
-        email: TEST_EMAIL,
-        password: 'TestPassword123!',
-        org_id: tempOrgId,
-      }),
-    })
-    expect(response.status).toBe(400)
-
-    const responseData = await response.json() as { error: string }
-    expect(responseData.error).toBe('no_policy')
-
-    // Clean up
-    await getSupabaseClient().from('orgs').delete().eq('id', tempOrgId)
-    await getSupabaseClient().from('stripe_info').delete().eq('customer_id', tempCustomerId)
+      const responseData = await response.json() as { error: string }
+      expect(responseData.error).toBe('no_policy')
+    }
+    finally {
+      const { error: restoreError } = await getSupabaseClient()
+        .from('orgs')
+        .update({ password_policy_config: policyConfig })
+        .eq('id', ORG_ID)
+      if (restoreError)
+        throw restoreError
+    }
   })
 
   it('reject request with invalid credentials', async () => {

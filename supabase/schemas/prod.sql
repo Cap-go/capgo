@@ -5286,8 +5286,8 @@ CREATE OR REPLACE FUNCTION "public"."is_bundle_encrypted"("session_key" "text") 
     SET "search_path" TO ''
     AS $$
 BEGIN
-  -- A bundle is considered encrypted if it has a non-empty session_key
-  RETURN session_key IS NOT NULL;
+  -- A bundle is considered encrypted if session_key is non-null and non-empty
+  RETURN session_key IS NOT NULL AND length(btrim(session_key)) > 0;
 END;
 $$;
 
@@ -8321,18 +8321,18 @@ BEGIN
     FROM public.apps
     WHERE public.apps.app_id = reject_access_due_to_2fa_for_app.app_id;
 
-    -- If app not found or no owner_org, reject access
+    -- If app not found or no owner_org, allow (no 2FA enforcement can apply)
     IF v_owner_org IS NULL THEN
-        RETURN true;
+        RETURN false;
     END IF;
 
     -- Get the current user identity (works for both JWT auth and API key)
-    -- Using get_identity with key_mode array to support CLI API key authentication
-    v_user_id := public.get_identity('{read,upload,write,all}'::public.key_mode[]);
+    -- Use get_identity_org_appid to ensure org/app scoping is respected
+    v_user_id := public.get_identity_org_appid('{read,upload,write,all}'::public.key_mode[], v_owner_org, reject_access_due_to_2fa_for_app.app_id);
 
-    -- If no user identity found, reject access
+    -- If no user identity found, allow (auth failure should be handled elsewhere)
     IF v_user_id IS NULL THEN
-        RETURN true;
+        RETURN false;
     END IF;
 
     -- Check if org has 2FA enforcement enabled
@@ -8340,9 +8340,9 @@ BEGIN
     FROM public.orgs
     WHERE public.orgs.id = v_owner_org;
 
-    -- If org not found, reject access
+    -- If org not found, allow (no 2FA enforcement can apply)
     IF v_org_enforcing_2fa IS NULL THEN
-        RETURN true;
+        RETURN false;
     END IF;
 
     -- If org does not enforce 2FA, allow access
@@ -16165,9 +16165,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INS
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "service_role";
-
-
-
 
 
 
