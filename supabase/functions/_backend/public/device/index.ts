@@ -27,7 +27,13 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
 
   cloudlog({ requestId: c.get('requestId'), message: 'body', body })
-  cloudlog({ requestId: c.get('requestId'), message: 'apikey', apikey })
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'apikey context',
+    apikeyId: apikey.id,
+    userId: apikey.user_id,
+    mode: apikey.mode,
+  })
 
   // Rate limit: max 1 set per second per device+app, and same channel set max once per 60 seconds
   // Note: We check device_id && app_id only (not channel) so op-level rate limiting applies even for invalid requests
@@ -53,7 +59,13 @@ app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
   const body = await getBodyOrQuery<DeviceLink>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   cloudlog({ requestId: c.get('requestId'), message: 'body', body })
-  cloudlog({ requestId: c.get('requestId'), message: 'apikey', apikey })
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'apikey context',
+    apikeyId: apikey.id,
+    userId: apikey.user_id,
+    mode: apikey.mode,
+  })
 
   // Rate limit: max 1 get per second per device+app
   if (body.device_id && body.app_id) {
@@ -78,7 +90,13 @@ app.delete('/', middlewareKey(['all', 'write']), async (c) => {
   const body = await getBodyOrQuery<DeviceLink>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   cloudlog({ requestId: c.get('requestId'), message: 'body', body })
-  cloudlog({ requestId: c.get('requestId'), message: 'apikey', apikey })
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'apikey context',
+    apikeyId: apikey.id,
+    userId: apikey.user_id,
+    mode: apikey.mode,
+  })
 
   // Rate limit: max 1 delete per second per device+app
   if (body.device_id && body.app_id) {
