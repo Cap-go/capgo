@@ -17,6 +17,12 @@ import { app as plans } from '../_backend/private/plans.ts'
 import { app as publicStats } from '../_backend/private/public_stats.ts'
 import { app as role_bindings } from '../_backend/private/role_bindings.ts'
 import { app as set_org_email } from '../_backend/private/set_org_email.ts'
+// SSO SAML endpoints
+import { app as sso_configure } from '../_backend/private/sso_configure.ts'
+import { app as sso_remove } from '../_backend/private/sso_remove.ts'
+import { app as sso_status } from '../_backend/private/sso_status.ts'
+import { app as sso_test } from '../_backend/private/sso_test.ts'
+import { app as sso_update } from '../_backend/private/sso_update.ts'
 import { app as stats_priv } from '../_backend/private/stats.ts'
 import { app as storeTop } from '../_backend/private/store_top.ts'
 import { app as stripe_checkout } from '../_backend/private/stripe_checkout.ts'
@@ -55,6 +61,13 @@ appGlobal.route('/role_bindings', role_bindings)
 appGlobal.route('/invite_new_user_to_org', invite_new_user_to_org)
 appGlobal.route('/accept_invitation', accept_invitation)
 appGlobal.route('/validate_password_compliance', validate_password_compliance)
+
+// SSO SAML routes
+appGlobal.route('/sso/configure', sso_configure)
+appGlobal.route('/sso/update', sso_update)
+appGlobal.route('/sso/remove', sso_remove)
+appGlobal.route('/sso/test', sso_test)
+appGlobal.route('/sso/status', sso_status)
 
 createAllCatch(appGlobal, functionName)
 Deno.serve(appGlobal.fetch)
