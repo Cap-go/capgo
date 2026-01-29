@@ -514,7 +514,7 @@ const isAdding = computed(() => props.isLoading || pendingAdd.value)
         class="inline-flex items-center self-end py-1.5 px-3 mr-2 text-sm font-medium text-gray-500 bg-white rounded-lg border border-gray-300 cursor-pointer dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
         type="button" @click="emit('massDelete')"
       >
-        <IconTrash class="text-red-500 h-[24px]" />
+        <IconTrash class="h-6 text-red-500" />
       </button>
       <div class="flex overflow-hidden md:w-auto">
         <FormKit
