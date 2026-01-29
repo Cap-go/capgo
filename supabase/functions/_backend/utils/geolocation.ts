@@ -13,7 +13,11 @@ export function getContinentCF(c: Context): ContinentsCFWorker | undefined {
   // const cfData = (c.req.raw as Request & { cf?: { continent?: string } })?.cf
   // return cfData?.continent
   // capgo_plugin-eu-prod-12.46.2
-  const nameContinent = (getEnv(c, 'ENV_NAME')?.split('-')[1]).toUpperCase()
+  const nameList = getEnv(c, 'ENV_NAME')?.split('-') ?? []
+  if (nameList.length < 2) {
+    return undefined
+  }
+  const nameContinent = nameList[1].toUpperCase()
   return nameContinent as ContinentsCFWorker
 }
 

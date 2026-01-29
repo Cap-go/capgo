@@ -39,7 +39,7 @@ SET "search_path" TO ''
 AS $$
 BEGIN
   -- A bundle is considered encrypted if it has a non-empty session_key
-  RETURN session_key IS NOT NULL AND session_key <> '';
+  RETURN session_key IS NOT NULL;
 END;
 $$;
 
