@@ -419,6 +419,8 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           <a
             class="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold text-white bg-amber-600 rounded-full hover:bg-amber-700"
             href="https://capgo.app/premium-support/"
+            rel="noopener noreferrer"
+            target="_blank"
           >
             {{ t('expert-service-cta') }}
           </a>
