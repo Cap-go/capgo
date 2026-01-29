@@ -3,9 +3,9 @@ import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
 import { quickError, simpleError } from '../../utils/hono.ts'
+import { checkPermission } from '../../utils/rbac.ts'
 import { createSignedImageUrl } from '../../utils/storage.ts'
 import { apikeyHasOrgRightWithPolicy, supabaseApikey } from '../../utils/supabase.ts'
-import { checkPermission } from '../../utils/rbac.ts'
 import { fetchLimit } from '../../utils/utils.ts'
 
 const bodySchema = z.object({

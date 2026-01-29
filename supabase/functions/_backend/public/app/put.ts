@@ -2,9 +2,9 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
+import { checkPermission } from '../../utils/rbac.ts'
 import { createSignedImageUrl, normalizeImagePath } from '../../utils/storage.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
-import { checkPermission } from '../../utils/rbac.ts'
 import { isValidAppId } from '../../utils/utils.ts'
 
 interface UpdateApp {

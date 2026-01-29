@@ -4,9 +4,9 @@ import type { Database } from '../../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../../utils/hono.ts'
 import { cloudlog } from '../../../utils/logging.ts'
+import { checkPermission } from '../../../utils/rbac.ts'
 import { createSignedImageUrl } from '../../../utils/storage.ts'
 import { supabaseApikey } from '../../../utils/supabase.ts'
-import { checkPermission } from '../../../utils/rbac.ts'
 
 const bodySchema = z.object({
   orgId: z.string(),
