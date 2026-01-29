@@ -108,6 +108,7 @@ async function validateInvite(c: Context, rawBody: any) {
   }
 
   // Verify captcha token with Cloudflare Turnstile
+  // verifyCaptchaToken throws on failure
   await verifyCaptchaToken(c, body.captcha_token)
 
   // Use authenticated client - RLS will enforce access based on JWT

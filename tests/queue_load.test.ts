@@ -8,6 +8,7 @@ const pool = new Pool({
   connectionString: POSTGRES_URL,
   max: 1,
   idleTimeoutMillis: 2000,
+  connectionTimeoutMillis: 5000,
 })
 const queueName = 'test_queue_consumer'
 
@@ -17,11 +18,14 @@ beforeAll(async () => {
   await pool.query(`DELETE FROM pgmq.q_${queueName}`)
   await pool.query(`DELETE FROM pgmq.a_${queueName}`)
 })
+
+// Module-level afterAll to ensure pool is always closed, even if tests fail
+afterAll(async () => {
+  // Close postgres connection
+  await pool.end()
+})
+
 describe('queue Load Test', () => {
-  afterAll(async () => {
-    // Close postgres connection
-    await pool.end()
-  })
   it('should handle queue consumer health check', async () => {
     const healthResponse = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/health`, {
       headers: headersInternal,

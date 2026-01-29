@@ -39,16 +39,19 @@ beforeAll(async () => {
   if (stripeError)
     throw stripeError
 
-  const { error: orgError } = await supabase.from('orgs').insert({
+  const { data: orgData, error: orgError } = await supabase.from('orgs').insert({
     id: ORG_ID,
     customer_id: STRIPE_CUSTOMER_ID,
     name: `Build Time Test Org ${testRunId.slice(0, 8)}`,
     created_by: USER_ID,
     management_email: TEST_EMAIL,
-  })
+  }).select()
   if (orgError)
-    throw orgError
+    throw new Error(`Failed to create org: ${orgError.message}`)
+  if (!orgData || orgData.length === 0)
+    throw new Error(`Org insert returned no data for ORG_ID=${ORG_ID}`)
 
+  // Insert org_user entry (org must exist first due to foreign key)
   const { error: orgUserError } = await supabase.from('org_users').insert({
     org_id: ORG_ID,
     user_id: USER_ID,
