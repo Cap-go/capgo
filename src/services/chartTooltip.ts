@@ -246,41 +246,78 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
 
     const titleColor = isDark.value ? '#e5e7eb' : '#374151'
     const totalColor = isDark.value ? '#60a5fa' : '#2563eb'
-    let innerHtml = '<div style="padding: 12px;">'
+    const container = document.createElement('div')
+    container.style.padding = '12px'
 
     // Add title with formatted date
-    innerHtml += `<div style="font-weight: 600; margin-bottom: 4px; color: ${titleColor};">${formattedTitle}</div>`
+    const titleEl = document.createElement('div')
+    titleEl.style.fontWeight = '600'
+    titleEl.style.marginBottom = '4px'
+    titleEl.style.color = titleColor
+    titleEl.textContent = formattedTitle
+    container.appendChild(titleEl)
 
     // Add total value
     if (items.length > 1) {
-      innerHtml += `<div style="font-weight: 600; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid ${isDark.value ? 'rgba(75, 85, 99, 0.3)' : 'rgba(209, 213, 219, 0.3)'}; color: ${totalColor};">Total: ${formatTooltipValue(totalValue)}</div>`
+      const totalEl = document.createElement('div')
+      totalEl.style.fontWeight = '600'
+      totalEl.style.marginBottom = '8px'
+      totalEl.style.paddingBottom = '8px'
+      totalEl.style.borderBottom = `1px solid ${isDark.value ? 'rgba(75, 85, 99, 0.3)' : 'rgba(209, 213, 219, 0.3)'}`
+      totalEl.style.color = totalColor
+      totalEl.textContent = `Total: ${formatTooltipValue(totalValue)}`
+      container.appendChild(totalEl)
     }
 
     // Add body with scrollable content (now sorted)
-    innerHtml += '<div class="tooltip-body" style="max-height: var(--tooltip-body-max-height, 40vh); overflow-y: auto;">'
+    const bodyEl = document.createElement('div')
+    bodyEl.className = 'tooltip-body'
+    bodyEl.style.maxHeight = 'var(--tooltip-body-max-height, 40vh)'
+    bodyEl.style.overflowY = 'auto'
     const hasClickHandler = !!clickHandler?.onAppClick
     items.forEach((item) => {
       // Convert color to string if it's not already
       const bgColor = typeof item.colors.backgroundColor === 'string' ? item.colors.backgroundColor : '#666'
       const borderColor = typeof item.colors.borderColor === 'string' ? item.colors.borderColor : '#999'
 
-      const colorIndicator = `<div style="width: 12px; height: 12px; background-color: ${bgColor}; border: 1px solid ${borderColor}; border-radius: 2px; margin-right: 8px; flex-shrink: 0;"></div>`
+      const colorIndicator = document.createElement('div')
+      colorIndicator.style.width = '12px'
+      colorIndicator.style.height = '12px'
+      colorIndicator.style.backgroundColor = bgColor
+      colorIndicator.style.border = `1px solid ${borderColor}`
+      colorIndicator.style.borderRadius = '2px'
+      colorIndicator.style.marginRight = '8px'
+      colorIndicator.style.flexShrink = '0'
 
       // Make item clickable if we have a click handler and app ID
       const isClickable = hasClickHandler && item.appId
-      const hoverStyles = isClickable
-        ? `cursor: pointer; transition: background-color 0.15s ease;`
-        : ''
-      const dataAttr = isClickable ? `data-app-id="${item.appId}"` : ''
-      const hoverClass = isClickable ? 'tooltip-app-item' : ''
+      const rowEl = document.createElement('div')
+      rowEl.style.display = 'flex'
+      rowEl.style.alignItems = 'center'
+      rowEl.style.marginBottom = '4px'
+      rowEl.style.padding = '4px 6px'
+      rowEl.style.marginLeft = '-6px'
+      rowEl.style.marginRight = '-6px'
+      rowEl.style.borderRadius = '4px'
 
-      const textContent = `<span style="font-size: 11px;">${item.body.join(' ')}</span>`
+      if (isClickable) {
+        rowEl.classList.add('tooltip-app-item')
+        rowEl.style.cursor = 'pointer'
+        rowEl.style.transition = 'background-color 0.15s ease'
+        rowEl.dataset.appId = String(item.appId)
+      }
 
-      innerHtml += `<div class="${hoverClass}" ${dataAttr} style="display: flex; align-items: center; margin-bottom: 4px; padding: 4px 6px; margin-left: -6px; margin-right: -6px; border-radius: 4px; ${hoverStyles}">${colorIndicator}${textContent}</div>`
+      const textContent = document.createElement('span')
+      textContent.style.fontSize = '11px'
+      textContent.textContent = item.body.join(' ')
+
+      rowEl.appendChild(colorIndicator)
+      rowEl.appendChild(textContent)
+      bodyEl.appendChild(rowEl)
     })
-    innerHtml += '</div></div>'
 
-    tooltipEl.innerHTML = innerHtml
+    container.appendChild(bodyEl)
+    tooltipEl.replaceChildren(container)
 
     // Add click handlers to clickable items
     if (hasClickHandler) {
