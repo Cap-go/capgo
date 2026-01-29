@@ -235,7 +235,7 @@ export async function hasAppRightApikey(c: Context<MiddlewareKeyVariables, any, 
     return false
   }
 
-  cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - calling RPC', appId, userid, right, apikeyPrefix: effectiveApikey?.substring(0, 15) })
+  cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - calling RPC', appId, right, apikeyPrefix: effectiveApikey?.substring(0, 15) })
 
   const { data, error } = await supabaseAdmin(c)
     .rpc('has_app_right_apikey', { appid: appId, right, userid, apikey: effectiveApikey })
@@ -243,12 +243,13 @@ export async function hasAppRightApikey(c: Context<MiddlewareKeyVariables, any, 
   cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - RPC result', data, hasError: !!error, error })
 
   if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'has_app_right_apikey error', error, appId, userid, right })
+    // Don't log userid directly to avoid potential sensitive data leakage
+    cloudlogErr({ requestId: c.get('requestId'), message: 'has_app_right_apikey error', error, appId, right })
     return false
   }
 
   if (!data) {
-    cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - permission denied', appId, userid, right, apikeyPrefix: effectiveApikey?.substring(0, 15) })
+    cloudlog({ requestId: c.get('requestId'), message: 'hasAppRightApikey - permission denied', appId, right, apikeyPrefix: effectiveApikey?.substring(0, 15) })
   }
 
   return data

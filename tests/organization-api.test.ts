@@ -32,12 +32,13 @@ beforeAll(async () => {
   if (error)
     throw error
 
-  // Add the test user as super_admin to the org so they can access it via API
-  const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+  // Note: The org trigger already inserts the created_by user into org_users as super_admin
+  // Use upsert with ignoreDuplicates to handle the case where the trigger already created the entry
+  const { error: orgUserError } = await getSupabaseClient().from('org_users').upsert({
     org_id: ORG_ID,
     user_id: USER_ID,
     user_right: 'super_admin',
-  })
+  }, { onConflict: 'user_id,org_id', ignoreDuplicates: true })
   if (orgUserError)
     throw orgUserError
 })
@@ -317,10 +318,12 @@ describe('[DELETE] /organization/members', () => {
     expect(userData).toBeTruthy()
     expect(userData?.email).toBe(USER_ADMIN_EMAIL)
 
-    const { error } = await getSupabaseClient().from('org_users').insert({
+    const { error } = await getSupabaseClient().from('org_users').upsert({
       org_id: ORG_ID,
       user_id: userData!.id,
       user_right: 'invite_read',
+    }, {
+      onConflict: 'user_id,org_id',
     })
     expect(error).toBeNull()
 
@@ -607,10 +610,12 @@ describe('[DELETE] /organization', () => {
     }
 
     // Add test user as a member but not owner
-    const { error: memberError } = await getSupabaseClient().from('org_users').insert({
+    const { error: memberError } = await getSupabaseClient().from('org_users').upsert({
       org_id: id,
       user_id: USER_ID,
       user_right: 'admin', // Even with admin rights, shouldn't be able to delete
+    }, {
+      onConflict: 'user_id,org_id',
     })
     expect(memberError).toBeNull()
 

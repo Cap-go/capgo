@@ -169,6 +169,9 @@ app.post('/', middlewareAuth, async (c) => {
   if (!res.org) {
     return quickError(404, 'organization_not_found', 'Organization not found')
   }
+  if (!res.body) {
+    return quickError(400, 'invalid_body', 'Invalid request body')
+  }
   const body = res.body
   const legacyInviteType = res.legacyInviteType
   const rbacRoleName = res.rbacRoleName
