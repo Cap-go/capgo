@@ -1,22 +1,42 @@
 #!/bin/bash
-# ⚠️  DEVELOPMENT/TESTING ONLY - Contains hardcoded credentials
-# DO NOT use in production environments
+#
+# ╔════════════════════════════════════════════════════════════════════════════╗
+# ║                    ⚠️  DEVELOPMENT/TESTING ONLY ⚠️                          ║
+# ║                                                                            ║
+# ║  This script contains development-only defaults for local Supabase auth.  ║
+# ║  DO NOT use in production environments. The default credentials below     ║
+# ║  are for local Docker development only and are publicly known.            ║
+# ║                                                                            ║
+# ║  For production, set these environment variables before running:          ║
+# ║    - GOTRUE_DB_DATABASE_URL                                               ║
+# ║    - GOTRUE_JWT_SECRET                                                    ║
+# ╚════════════════════════════════════════════════════════════════════════════╝
+#
 set -e
+
+# Development-only defaults (DO NOT use in production)
+DEV_DB_URL="postgresql://supabase_auth_admin:postgres@supabase_db_capgo-app:5432/postgres"
+DEV_JWT_SECRET="super-secret-jwt-token-with-at-least-32-characters-long"
+
+# Use environment variables with dev fallbacks
+DB_URL="${GOTRUE_DB_DATABASE_URL:-$DEV_DB_URL}"
+JWT_SECRET="${GOTRUE_JWT_SECRET:-$DEV_JWT_SECRET}"
 
 # Stop and remove existing auth container
 docker stop supabase_auth_capgo-app 2>/dev/null || true
 docker rm supabase_auth_capgo-app 2>/dev/null || true
 
-# Create base64 single-line encoded keys
-cat /tmp/saml-key-pkcs1.pem | base64 | tr -d '\n' > /tmp/saml-key-b64.txt
-cat /tmp/saml-cert.pem | base64 | tr -d '\n' > /tmp/saml-cert-b64.txt
+# Cleanup function for sensitive temp files
+cleanup_temp_files() {
+  rm -f /tmp/saml-key-b64.txt /tmp/saml-cert-b64.txt 2>/dev/null || true
+}
 
-# Read into variables
-SAML_KEY_B64=$(cat /tmp/saml-key-b64.txt)
-SAML_CERT_B64=$(cat /tmp/saml-cert-b64.txt)
+# Register cleanup trap to ensure temp files are removed on exit
+trap cleanup_temp_files EXIT
 
-# Clean up temporary base64 files immediately after reading
-rm -f /tmp/saml-key-b64.txt /tmp/saml-cert-b64.txt
+# Create base64 single-line encoded keys directly into variables (no intermediate files)
+SAML_KEY_B64=$(cat /tmp/saml-key-pkcs1.pem | base64 | tr -d '\n')
+SAML_CERT_B64=$(cat /tmp/saml-cert.pem | base64 | tr -d '\n')
 
 echo "Starting auth container with SAML..."
 echo "Key length: ${#SAML_KEY_B64}"
@@ -30,7 +50,7 @@ docker run -d \
   -e GOTRUE_API_HOST=0.0.0.0 \
   -e GOTRUE_API_PORT=9999 \
   -e GOTRUE_DB_DRIVER=postgres \
-  -e "GOTRUE_DB_DATABASE_URL=postgresql://supabase_auth_admin:postgres@supabase_db_capgo-app:5432/postgres" \
+  -e "GOTRUE_DB_DATABASE_URL=${DB_URL}" \
   -e GOTRUE_SITE_URL=http://127.0.0.1:3000 \
   -e GOTRUE_URI_ALLOW_LIST=https://127.0.0.1:3000 \
   -e GOTRUE_DISABLE_SIGNUP=false \
@@ -38,7 +58,7 @@ docker run -d \
   -e GOTRUE_JWT_AUD=authenticated \
   -e GOTRUE_JWT_DEFAULT_GROUP_NAME=authenticated \
   -e GOTRUE_JWT_EXP=3600 \
-  -e GOTRUE_JWT_SECRET=super-secret-jwt-token-with-at-least-32-characters-long \
+  -e "GOTRUE_JWT_SECRET=${JWT_SECRET}" \
   -e GOTRUE_JWT_ISSUER=http://127.0.0.1:54321/auth/v1 \
   -e GOTRUE_EXTERNAL_EMAIL_ENABLED=true \
   -e GOTRUE_MAILER_SECURE_EMAIL_CHANGE_ENABLED=true \

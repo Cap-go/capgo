@@ -1,11 +1,14 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { getEndpointUrl, getSupabaseClient, headersInternal, USER_ADMIN_EMAIL, USER_ID } from './test-utils.ts'
+import { getEndpointUrl, getSupabaseClient, headersInternal, SSO_TEST_CUSTOMER_ID, SSO_TEST_ORG_ID, SSO_TEST_ORG_NAME, USER_ADMIN_EMAIL, USER_ID } from './test-utils.ts'
 
-const TEST_SSO_ORG_ID = randomUUID()
-const TEST_SSO_ORG_NAME = `SSO Test Org ${randomUUID()}`
-const TEST_CUSTOMER_ID = `cus_sso_${randomUUID()}`
-const TEST_DOMAIN = `ssotest-${randomUUID().slice(0, 8)}.com` // Unique per run for parallel test safety
+// Use seeded SSO test data - these are pre-created in seed.sql for parallel test safety
+const TEST_SSO_ORG_ID = SSO_TEST_ORG_ID
+const TEST_SSO_ORG_NAME = SSO_TEST_ORG_NAME
+const TEST_CUSTOMER_ID = SSO_TEST_CUSTOMER_ID
+// Generate run-unique domain to avoid saml_domain_mappings collisions in parallel tests
+// This is stable for the file's lifetime but unique per test run
+const TEST_DOMAIN = `ssotest-${randomUUID().slice(0, 8)}.example.com`
 
 // Helper functions to generate unique entity IDs (required since migration 20260104064028 enforces uniqueness)
 function generateTestEntityId(): string {
@@ -122,12 +125,9 @@ async function getOrCreateTestAuthUser(email: string, metadata?: { sso_provider_
 }
 
 beforeAll(async () => {
-  // Clean up any existing test data from previous runs (idempotent)
+  // Clean up any leftover SSO connections from previous test runs (seeded org/user data remains)
   await getSupabaseClient().from('saml_domain_mappings').delete().eq('domain', TEST_DOMAIN)
   await getSupabaseClient().from('org_saml_connections').delete().eq('org_id', TEST_SSO_ORG_ID)
-  await getSupabaseClient().from('org_users').delete().eq('org_id', TEST_SSO_ORG_ID)
-  await getSupabaseClient().from('orgs').delete().eq('id', TEST_SSO_ORG_ID)
-  await getSupabaseClient().from('stripe_info').delete().eq('customer_id', TEST_CUSTOMER_ID)
 
   // Mock Deno.Command if running in Deno environment
   if ((globalThis as any).Deno) {
@@ -147,30 +147,17 @@ beforeAll(async () => {
     })
   }
 
-  // Create stripe_info for test org
-  const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
-    customer_id: TEST_CUSTOMER_ID,
-    status: 'succeeded',
-    product_id: 'prod_LQIregjtNduh4q',
-    trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-    is_good_plan: true,
-  })
-  if (stripeError)
-    throw stripeError
+  // The org, stripe_info, and org_users records are seeded in seed.sql
+  // No runtime inserts needed - we just verify the seeded data exists
+  const { data: org, error: orgError } = await getSupabaseClient()
+    .from('orgs')
+    .select('id, name')
+    .eq('id', TEST_SSO_ORG_ID)
+    .single()
 
-  // Create test org
-  const { error } = await getSupabaseClient().from('orgs').insert({
-    id: TEST_SSO_ORG_ID,
-    name: TEST_SSO_ORG_NAME,
-    management_email: USER_ADMIN_EMAIL,
-    created_by: USER_ID,
-    customer_id: TEST_CUSTOMER_ID,
-  })
-  if (error)
-    throw error
-
-  // Make test user super_admin of the org
-  await ensureOrgUser(USER_ID, TEST_SSO_ORG_ID, 'super_admin')
+  if (orgError || !org) {
+    throw new Error(`SSO test org not found in seed data: ${orgError?.message}. Run 'supabase db reset' to seed test data.`)
+  }
 }, 120000)
 
 afterAll(async () => {
@@ -179,7 +166,7 @@ afterAll(async () => {
     (globalThis as any).Deno.Command = originalDenoCommand
   }
 
-  // Clean up SSO data
+  // Clean up SSO connection data created during tests (not seeded data)
   const ssoConnections = await getSupabaseClient()
     .from('org_saml_connections')
     .select('id')
@@ -193,9 +180,7 @@ afterAll(async () => {
 
   await getSupabaseClient().from('org_saml_connections').delete().eq('org_id', TEST_SSO_ORG_ID)
   await getSupabaseClient().from('sso_audit_logs').delete().eq('org_id', TEST_SSO_ORG_ID)
-  await getSupabaseClient().from('org_users').delete().eq('org_id', TEST_SSO_ORG_ID)
-  await getSupabaseClient().from('orgs').delete().eq('id', TEST_SSO_ORG_ID)
-  await getSupabaseClient().from('stripe_info').delete().eq('customer_id', TEST_CUSTOMER_ID)
+  // Note: org, org_users, and stripe_info are seeded data - do NOT delete them
 })
 
 describe('auto-join integration', () => {
@@ -494,6 +479,8 @@ describe('auto-join integration', () => {
   }, 120000)
 })
 
+// SKIPPED: These tests are ready but require /private/sso/configure endpoint implementation
+// They manually insert SSO connections and domain mappings to test database logic
 describe.skip('domain verification (mocked metadata fetch)', () => {
   it.concurrent('should mark domains as verified when added via SSO config (mocked)', async () => {
     const orgId = randomUUID()
@@ -640,6 +627,9 @@ describe.skip('domain verification (mocked metadata fetch)', () => {
   })
 })
 
+// SKIPPED: These tests require /private/sso/configure endpoint to be implemented
+// The endpoint should handle SAML metadata XML parsing, SSO provider creation,
+// and domain mapping verification. Tests will work once the endpoint is added.
 describe.skip('domain verification', () => {
   it.concurrent('should mark domains as verified when added via SSO config', async () => {
     const orgId = randomUUID()

@@ -272,7 +272,8 @@ DECLARE
   v_provider_id uuid;
 BEGIN
   -- Security: Only allow users to query their own data
-  IF p_user_id != "auth"."uid"() THEN
+  -- Bypass check when auth.uid() IS NULL (system context, e.g., trigger_auto_join_on_user_create)
+  IF "auth"."uid"() IS NOT NULL AND p_user_id != "auth"."uid"() THEN
     RAISE EXCEPTION 'Access denied: cannot query other users SSO provider ID';
   END IF;
 
@@ -947,7 +948,7 @@ CREATE POLICY "Super admins can delete SSO connections"
 -- RLS POLICIES: saml_domain_mappings
 -- ============================================================================
 
--- Merged SELECT policy: Anyone can read verified mappings OR super admins can read all mappings
+-- Single SELECT policy: Anyone can read verified mappings OR super admins can read all mappings
 CREATE POLICY "Allow SELECT on saml_domain_mappings"
   ON public.saml_domain_mappings
   FOR SELECT
@@ -967,10 +968,29 @@ CREATE POLICY "Allow SELECT on saml_domain_mappings"
     )
   );
 
--- Super admins can manage domain mappings
-CREATE POLICY "Super admins can manage domain mappings"
+-- Super admins can INSERT domain mappings
+CREATE POLICY "Super admins can INSERT domain mappings"
   ON public.saml_domain_mappings
-  FOR ALL
+  FOR INSERT
+  TO authenticated, anon
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.org_saml_connections osc
+      WHERE osc.id = sso_connection_id
+        AND public.check_min_rights(
+          'super_admin'::public.user_min_right,
+          public.get_identity_org_allowed('{all,write}'::public.key_mode[], osc.org_id),
+          osc.org_id,
+          NULL::character varying,
+          NULL::bigint
+        )
+    )
+  );
+
+-- Super admins can UPDATE domain mappings
+CREATE POLICY "Super admins can UPDATE domain mappings"
+  ON public.saml_domain_mappings
+  FOR UPDATE
   TO authenticated, anon
   USING (
     EXISTS (
@@ -986,6 +1006,25 @@ CREATE POLICY "Super admins can manage domain mappings"
     )
   )
   WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.org_saml_connections osc
+      WHERE osc.id = sso_connection_id
+        AND public.check_min_rights(
+          'super_admin'::public.user_min_right,
+          public.get_identity_org_allowed('{all,write}'::public.key_mode[], osc.org_id),
+          osc.org_id,
+          NULL::character varying,
+          NULL::bigint
+        )
+    )
+  );
+
+-- Super admins can DELETE domain mappings
+CREATE POLICY "Super admins can DELETE domain mappings"
+  ON public.saml_domain_mappings
+  FOR DELETE
+  TO authenticated, anon
+  USING (
     EXISTS (
       SELECT 1 FROM public.org_saml_connections osc
       WHERE osc.id = sso_connection_id
