@@ -22,8 +22,6 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: 'post upload link body', body })
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   const capgkey = c.get('capgkey') as string
-  cloudlog({ requestId: c.get('requestId'), message: 'apikey', apikey })
-  cloudlog({ requestId: c.get('requestId'), message: 'capgkey', capgkey })
   const { data: _userId, error: _errorUserId } = await supabaseApikey(c, capgkey)
     .rpc('get_user_id', { apikey: capgkey, app_id: body.app_id })
   if (_errorUserId) {
@@ -72,7 +70,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
 
   const url = await s3.getUploadUrl(c, filePath)
   if (!url) {
-    throw simpleError('cannot_get_upload_link', 'Cannot get upload link', { url })
+    throw simpleError('cannot_get_upload_link', 'Cannot get upload link')
   }
 
   const LogSnag = logsnag(c)
@@ -84,7 +82,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     notify: false,
   })
 
-  cloudlog({ requestId: c.get('requestId'), message: 'url', filePath, url })
+  cloudlog({ requestId: c.get('requestId'), message: 'upload link generated', filePath })
   const response = { url }
 
   const { error: changeError } = await supabaseApikey(c, capgkey)
