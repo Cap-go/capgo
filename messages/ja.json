@@ -1371,5 +1371,8 @@
   "role-org-super-admin": "スーパー管理者",
   "role-org-admin": "管理者",
   "role-org-billing-admin": "請求マネージャー",
-  "role-org-member": "メンバー"
+  "role-org-member": "メンバー",
+  "expert-service-title": "Expert as a Service",
+  "expert-service-desc": "Get hands-on help from Capgo experts for $250/hour.",
+  "expert-service-cta": "Book expert support"
 }

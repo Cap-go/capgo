@@ -1371,5 +1371,8 @@
   "role-org-super-admin": "Суперадминистратор",
   "role-org-admin": "Администратор",
   "role-org-billing-admin": "Менеджер по выставлению счетов",
-  "role-org-member": "Участник"
+  "role-org-member": "Участник",
+  "expert-service-title": "Expert as a Service",
+  "expert-service-desc": "Get hands-on help from Capgo experts for $250/hour.",
+  "expert-service-cta": "Book expert support"
 }
