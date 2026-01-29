@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { createSignedImageUrl } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
@@ -92,7 +93,15 @@ async function getMyApps() {
       .order('updated_at', { ascending: false })
 
     if (data && data.length) {
-      apps.value = data
+      const signedApps = await Promise.all(
+        data.map(async (app) => {
+          return {
+            ...app,
+            icon_url: await createSignedImageUrl(app.icon_url),
+          }
+        }),
+      )
+      apps.value = signedApps
       stepsOpen.value = false
     }
     else {

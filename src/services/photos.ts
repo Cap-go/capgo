@@ -6,33 +6,39 @@ import { decode } from 'base64-arraybuffer'
 import mime from 'mime'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
+import { createSignedImageUrl } from './storage'
 import { useSupabase } from './supabase'
 
 const supabase = useSupabase()
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
 
-async function uploadPhotoShared(data: string, fileName: string, contentType: string, isLoading: Ref<boolean>, callback: (success: boolean, url: string) => Promise<void>) {
+async function uploadPhotoShared(
+  data: string,
+  fileName: string,
+  contentType: string,
+  isLoading: Ref<boolean>,
+  callback: (success: boolean, storagePath: string, signedUrl: string) => Promise<void>,
+) {
+  const storagePath = `${main.user?.id}/${fileName}`
   const { error } = await supabase.storage
     .from('images')
-    .upload(`${main.user?.id}/${fileName}`, decode(data), {
+    .upload(storagePath, decode(data), {
       contentType,
     })
 
-  const { data: res } = supabase.storage
-    .from('images')
-    .getPublicUrl(`${main.user?.id}/${fileName}`)
+  const signedUrl = error ? '' : await createSignedImageUrl(storagePath)
 
   isLoading.value = false
 
-  if (error || !res.publicUrl)
-    await callback(false, '')
+  if (error || !signedUrl)
+    await callback(false, '', '')
   else
-    await callback(true, res.publicUrl)
+    await callback(true, storagePath, signedUrl)
 }
 
 async function uploadPhotoUser(formId: string, data: string, fileName: string, contentType: string, isLoading: Ref<boolean>, wentWrong: string) {
-  async function userCallback(success: boolean, url: string) {
+  async function userCallback(success: boolean, storagePath: string, signedUrl: string) {
     if (!success) {
       setErrors(formId, [wentWrong], {})
       return
@@ -48,7 +54,7 @@ async function uploadPhotoUser(formId: string, data: string, fileName: string, c
 
     const { data: usr, error: dbError } = await supabase
       .from('users')
-      .update({ image_url: url })
+      .update({ image_url: storagePath })
       .eq('id', userId)
       .select()
       .single()
@@ -58,6 +64,7 @@ async function uploadPhotoUser(formId: string, data: string, fileName: string, c
       console.error('upload error', dbError)
       return
     }
+    usr.image_url = signedUrl
     main.user = usr
   }
 
@@ -65,7 +72,7 @@ async function uploadPhotoUser(formId: string, data: string, fileName: string, c
 }
 
 async function uploadPhotoOrg(formId: string, data: string, fileName: string, contentType: string, isLoading: Ref<boolean>, wentWrong: string) {
-  async function orgCallback(success: boolean, url: string) {
+  async function orgCallback(success: boolean, storagePath: string, _signedUrl: string) {
     if (!success) {
       setErrors(formId, [wentWrong], {})
       return
@@ -81,7 +88,7 @@ async function uploadPhotoOrg(formId: string, data: string, fileName: string, co
 
     const { data: usr, error: dbError } = await supabase
       .from('orgs')
-      .update({ logo: url })
+      .update({ logo: storagePath })
       .eq('id', gid)
       .select('id')
       .single()

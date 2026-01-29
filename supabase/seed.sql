@@ -219,7 +219,7 @@ BEGIN
     INSERT INTO "storage"."buckets" ("id", "name", "owner", "created_at", "updated_at", "public") VALUES
     ('capgo', 'capgo', NULL, NOW(), NOW(), 't'),
     ('apps', 'apps', NULL, NOW(), NOW(), 'f'),
-    ('images', 'images', NULL, NOW(), NOW(), 't');
+    ('images', 'images', NULL, NOW(), NOW(), 'f');
 
     INSERT INTO "public"."stripe_info" (
       "created_at",

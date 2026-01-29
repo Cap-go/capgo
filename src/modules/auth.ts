@@ -3,6 +3,7 @@ import type { NavigationGuardNext, RouteLocationNormalized } from 'vue-router'
 import type { UserModule } from '~/types'
 import { hideLoader } from '~/services/loader'
 import { setUser } from '~/services/posthog'
+import { createSignedImageUrl } from '~/services/storage'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
@@ -62,6 +63,8 @@ async function updateUser(
       userRecord.email = main.auth?.email
     }
 
+    if (userRecord.image_url)
+      userRecord.image_url = await createSignedImageUrl(userRecord.image_url) || null
     main.user = userRecord
     setUser(
       main.auth?.id ?? '',

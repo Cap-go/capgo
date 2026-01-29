@@ -14,6 +14,7 @@ import gearSix from '~icons/ph/gear-six?raw'
 import iconName from '~icons/ph/user?raw'
 import Toggle from '~/components/Toggle.vue'
 import { checkPermissions } from '~/services/permissions'
+import { createSignedImageUrl } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
@@ -111,6 +112,8 @@ onMounted(async () => {
 
   await organizationStore.awaitInitialLoad()
   appRef.value = data as any
+  if (appRef.value?.icon_url)
+    appRef.value.icon_url = await createSignedImageUrl(appRef.value.icon_url)
   initializeRetentionPreset()
   await loadChannels()
   isLoading.value = false
@@ -718,6 +721,7 @@ async function editPhoto() {
             return false
           }
 
+          const iconPath = `org/${appRef.value?.owner_org.id}/${props.appId}/icon`
           const { error } = await supabase.storage
             .from(`images/org/${appRef.value?.owner_org.id}/${props.appId}`)
             .upload('icon', blob, {
@@ -730,13 +734,8 @@ async function editPhoto() {
             return false
           }
 
-          const { data: signedURLData } = await supabase
-            .storage
-            .from(`images/org/${appRef.value?.owner_org.id}/${props.appId}`)
-            .getPublicUrl('icon')
-
           const { error: appUpdateErr } = await supabase.from('apps')
-            .update({ icon_url: signedURLData.publicUrl })
+            .update({ icon_url: iconPath })
             .eq('app_id', props.appId)
 
           if (appUpdateErr) {
@@ -746,7 +745,7 @@ async function editPhoto() {
           }
 
           if (appRef.value)
-            appRef.value.icon_url = signedURLData.publicUrl
+            appRef.value.icon_url = await createSignedImageUrl(iconPath)
 
           toast.success(t('picture-uploaded'))
         },

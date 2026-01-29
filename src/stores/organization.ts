@@ -3,6 +3,7 @@ import type { ArrayElement, Concrete, Merge } from '~/services/types'
 import type { Database } from '~/types/supabase.types'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
+import { createSignedImageUrl } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from './dashboardApps'
 import { useDisplayStore } from './display'
@@ -314,11 +315,16 @@ export const useOrganizationStore = defineStore('organization', () => {
       return []
     }
 
-    return data.map(
-      (item, id) => {
-        return { id, ...item }
+    return Promise.all(data.map(
+      async (item, id) => {
+        const resolvedImage = item.image_url ? await createSignedImageUrl(item.image_url) : ''
+        return {
+          id,
+          ...item,
+          image_url: resolvedImage || '',
+        }
       },
-    )
+    ))
   }
 
   const fetchOrganizations = async () => {
@@ -360,13 +366,15 @@ export const useOrganizationStore = defineStore('organization', () => {
       throw error
     }
 
-    const mappedData = data.map((item, id) => {
+    const mappedData = await Promise.all(data.map(async (item, id) => {
+      const resolvedLogo = item.logo ? await createSignedImageUrl(item.logo) : ''
       return {
         id,
         ...item,
+        logo: resolvedLogo || null,
         password_policy_config: item.password_policy_config as PasswordPolicyConfig | null,
       } as Organization & { id: number }
-    })
+    }))
 
     _organizations.value = new Map(mappedData.map(item => [item.gid, item as Organization]))
 
