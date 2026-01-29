@@ -22,6 +22,13 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: 'post upload link body', body })
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   const capgkey = c.get('capgkey') as string
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'apikey context',
+    apikeyId: apikey.id,
+    userId: apikey.user_id,
+    mode: apikey.mode,
+  })
   const { data: _userId, error: _errorUserId } = await supabaseApikey(c, capgkey)
     .rpc('get_user_id', { apikey: capgkey, app_id: body.app_id })
   if (_errorUserId) {
