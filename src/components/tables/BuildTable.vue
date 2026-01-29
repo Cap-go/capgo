@@ -158,7 +158,10 @@ function showErrorDetails(errorMessage: string | null) {
   setTimeout(() => {
     const contentDiv = document.getElementById('dialog-v2-content')
     if (contentDiv) {
-      contentDiv.innerHTML = `<pre class="p-4 overflow-x-auto font-mono text-sm break-words whitespace-pre-wrap bg-gray-100 rounded-md dark:bg-gray-800">${errorMessage}</pre>`
+      const pre = document.createElement('pre')
+      pre.className = 'p-4 overflow-x-auto font-mono text-sm break-words whitespace-pre-wrap bg-gray-100 rounded-md dark:bg-gray-800'
+      pre.textContent = errorMessage
+      contentDiv.replaceChildren(pre)
     }
   }, 0)
 }
