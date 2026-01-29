@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onUnmounted, ref, watchEffect } from 'vue'
+import { computed, onUnmounted, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
@@ -43,10 +43,13 @@ interface Step {
 const config = getLocalConfig()
 
 const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ``
-const steps = ref<Step[]>([
+const apiKey = ref<string | null>(null)
+const commandTemplate = `npx @capgo/cli@latest i [APIKEY]${localCommand}`
+const stepCommand = computed(() => commandTemplate.replace('[APIKEY]', apiKey.value ?? '[APIKEY]'))
+const steps = computed<Step[]>(() => [
   {
     title: t('init-capgo-in-your-a'),
-    command: `npx @capgo/cli@latest i [APIKEY]${localCommand}`,
+    command: stepCommand.value,
     subtitle: t('onboarding-cli-where-why'),
   },
   {
@@ -56,7 +59,9 @@ const steps = ref<Step[]>([
   },
 ])
 const inviteModalRef = ref<InstanceType<typeof InviteTeammateModal> | null>(null)
-const prerequisitesOpen = ref(false)
+const prerequisitesOpen = ref(true)
+const isWaiting = computed(() => props.onboarding && step.value === 1)
+const shouldDimStep = (index: number) => step.value !== index && !(isWaiting.value && index === 0)
 
 function togglePrerequisites() {
   prerequisitesOpen.value = !prerequisitesOpen.value
@@ -205,7 +210,7 @@ async function copyToast(allowed: boolean, _id: string, text?: string) {
   }
   clicked.value += 1
   if (!realtimeListener.value || clicked.value === 3) {
-    goToNextStep('step_card_1')
+    goToNextStep()
   }
 }
 
@@ -242,7 +247,7 @@ async function getKey(retry = true): Promise<void> {
       await addNewApiKey()
       return getKey(false)
     }
-    steps.value[0].command = steps.value[0].command?.replace('[APIKEY]', data[0].key ?? '')
+    apiKey.value = data[0]?.key ?? null
   }
   else if (retry && main?.user?.id) {
     return getKey(false)
@@ -393,9 +398,17 @@ onUnmounted(() => {
 
       <div class="max-w-6xl mx-auto sm:px-10" :class="[props.onboarding && step === 0 ? 'mt-6' : 'mt-12']">
         <template v-for="(s, i) in steps" :key="i">
-          <div v-if="i > 0" class="w-1 h-10 mx-auto bg-gray-200" :class="[step !== i ? 'opacity-30' : '']" />
+          <div
+            v-if="i > 0"
+            class="w-1 h-10 mx-auto bg-gray-200"
+            :class="[shouldDimStep(i) ? 'opacity-30' : '']"
+          />
 
-          <div :id="`step_card_${i}`" :class="[step !== i ? 'opacity-30' : '']" class="relative p-5 overflow-hidden bg-white border border-gray-200 rounded-2xl">
+          <div
+            :id="`step_card_${i}`"
+            :class="[shouldDimStep(i) ? 'opacity-30' : '']"
+            class="relative p-5 overflow-hidden bg-white border border-gray-200 rounded-2xl"
+          >
             <div class="flex items-start gap-6">
               <div class="inline-flex items-center justify-center text-xl font-bold text-white w-14 h-14 rounded-xl shrink-0 font-pj bg-muted-blue-800">
                 <template v-if="i + 1 !== steps.length">
