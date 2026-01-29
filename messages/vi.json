@@ -1371,5 +1371,8 @@
   "role-org-super-admin": "Quản trị viên cấp cao",
   "role-org-admin": "Quản trị viên",
   "role-org-billing-admin": "Quản lý thanh toán",
-  "role-org-member": "Thành viên"
+  "role-org-member": "Thành viên",
+  "expert-service-title": "Expert as a Service",
+  "expert-service-desc": "Get hands-on help from Capgo experts for $250/hour.",
+  "expert-service-cta": "Book expert support"
 }
