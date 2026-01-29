@@ -1371,5 +1371,8 @@
   "role-org-super-admin": "सुपर व्यवस्थापक",
   "role-org-admin": "व्यवस्थापक",
   "role-org-billing-admin": "बिलिंग प्रबंधक",
-  "role-org-member": "सदस्य"
+  "role-org-member": "सदस्य",
+  "expert-service-title": "Expert as a Service",
+  "expert-service-desc": "Get hands-on help from Capgo experts for $250/hour.",
+  "expert-service-cta": "Book expert support"
 }

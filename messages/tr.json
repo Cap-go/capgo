@@ -1371,5 +1371,8 @@
   "role-org-super-admin": "Süper Yönetici",
   "role-org-admin": "Yönetici",
   "role-org-billing-admin": "Faturalama Yöneticisi",
-  "role-org-member": "Üye"
+  "role-org-member": "Üye",
+  "expert-service-title": "Expert as a Service",
+  "expert-service-desc": "Get hands-on help from Capgo experts for $250/hour.",
+  "expert-service-cta": "Book expert support"
 }

@@ -1371,5 +1371,8 @@
   "role-org-super-admin": "超级管理员",
   "role-org-admin": "管理员",
   "role-org-billing-admin": "计费经理",
-  "role-org-member": "成员"
+  "role-org-member": "成员",
+  "expert-service-title": "Expert as a Service",
+  "expert-service-desc": "Get hands-on help from Capgo experts for $250/hour.",
+  "expert-service-cta": "Book expert support"
 }

@@ -1371,5 +1371,8 @@
   "role-org-super-admin": "Super-Admin",
   "role-org-admin": "Administrator",
   "role-org-billing-admin": "Abrechnungsmanager",
-  "role-org-member": "Mitglied"
+  "role-org-member": "Mitglied",
+  "expert-service-title": "Expert as a Service",
+  "expert-service-desc": "Get hands-on help from Capgo experts for $250/hour.",
+  "expert-service-cta": "Book expert support"
 }

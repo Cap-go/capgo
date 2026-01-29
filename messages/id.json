@@ -1371,5 +1371,8 @@
   "role-org-super-admin": "Super Admin",
   "role-org-admin": "Admin",
   "role-org-billing-admin": "Manajer Penagihan",
-  "role-org-member": "Anggota"
+  "role-org-member": "Anggota",
+  "expert-service-title": "Expert as a Service",
+  "expert-service-desc": "Get hands-on help from Capgo experts for $250/hour.",
+  "expert-service-cta": "Book expert support"
 }
