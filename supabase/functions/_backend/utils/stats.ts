@@ -8,7 +8,7 @@ import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
 import { DEFAULT_LIMIT } from './types.ts'
-import { backgroundTask } from './utils.ts'
+import { backgroundTask, isInternalVersionName } from './utils.ts'
 
 export function createStatsMau(c: Context, device_id: string, app_id: string, org_id: string, platform: string) {
   const lowerDeviceId = device_id
@@ -53,6 +53,8 @@ export function createStatsBandwidth(c: Context, device_id: string, app_id: stri
 
 export type VersionAction = 'get' | 'fail' | 'install' | 'uninstall'
 export function createStatsVersion(c: Context, version_name: string, app_id: string, action: VersionAction) {
+  if (isInternalVersionName(version_name))
+    return Promise.resolve()
   if (!c.env.VERSION_USAGE)
     return backgroundTask(c, trackVersionUsageSB(c, version_name, app_id, action))
   return trackVersionUsageCF(c, version_name, app_id, action)
