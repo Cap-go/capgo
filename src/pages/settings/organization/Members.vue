@@ -13,7 +13,6 @@ import IconInformation from '~icons/heroicons/information-circle'
 import IconSearch from '~icons/heroicons/magnifying-glass'
 import IconTrash from '~icons/heroicons/trash'
 import IconWrench from '~icons/heroicons/wrench'
-import Table from '~/components/Table.vue'
 import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -1131,7 +1130,7 @@ async function handleInviteNewUserSubmit() {
           {{ t('members') }}
         </h2>
       </div>
-      <div v-if="rbacSystemEnabled && useNewRbac" class="mb-4 d-alert d-alert-info gap-3 items-start">
+      <div v-if="rbacSystemEnabled && useNewRbac" class="items-start gap-3 mb-4 d-alert d-alert-info">
         <IconInformation class="w-6 h-6 text-sky-400 shrink-0" />
         <div class="text-sm text-slate-100">
           <p class="font-semibold">

@@ -13,7 +13,6 @@ import IconCalendar from '~icons/heroicons/calendar'
 import IconClipboard from '~icons/heroicons/clipboard-document'
 import IconPencil from '~icons/heroicons/pencil'
 import IconTrash from '~icons/heroicons/trash'
-import Table from '~/components/Table.vue'
 import { formatLocalDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -825,10 +824,10 @@ getKeys()
 
 <template>
   <div>
-    <div class="overflow-hidden pb-4 h-full">
-      <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+    <div class="h-full pb-4 overflow-hidden">
+      <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
         <div class="flex flex-col">
-          <div class="flex overflow-hidden overflow-y-auto flex-col bg-white md:mt-5 md:rounded-lg md:border md:shadow-lg border-slate-300 dark:border-slate-900 dark:bg-slate-800">
+          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white md:mt-5 md:rounded-lg md:border md:shadow-lg border-slate-300 dark:border-slate-900 dark:bg-slate-800">
             <DataTable
               v-model:current-page="currentPage"
               show-add
@@ -857,7 +856,7 @@ getKeys()
               :aria-label="`${t('cli-doc')} (opens in new tab)`"
             >
               {{ t('cli-doc') }}
-              <svg class="ml-1 w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <svg class="w-3 h-3 ml-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z" clip-rule="evenodd" />
                 <path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z" clip-rule="evenodd" />
               </svg>
@@ -870,7 +869,7 @@ getKeys()
               :aria-label="`${t('api-doc')} (opens in new tab)`"
             >
               {{ t('api-doc') }}
-              <svg class="ml-1 w-3 h-3" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+              <svg class="w-3 h-3 ml-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <path fill-rule="evenodd" d="M4.25 5.5a.75.75 0 00-.75.75v8.5c0 .414.336.75.75.75h8.5a.75.75 0 00.75-.75v-4a.75.75 0 011.5 0v4A2.25 2.25 0 0112.75 17h-8.5A2.25 2.25 0 012 14.75v-8.5A2.25 2.25 0 014.25 4h5a.75.75 0 010 1.5h-5z" clip-rule="evenodd" />
                 <path fill-rule="evenodd" d="M6.194 12.753a.75.75 0 001.06.053L16.5 4.44v2.81a.75.75 0 001.5 0v-4.5a.75.75 0 00-.75-.75h-4.5a.75.75 0 000 1.5h2.553l-9.056 8.194a.75.75 0 00-.053 1.06z" clip-rule="evenodd" />
               </svg>
@@ -899,10 +898,10 @@ getKeys()
 
         <!-- API Key Type Selection -->
         <div>
-          <div class="p-4 rounded-lg border dark:border-gray-600">
+          <div class="p-4 border rounded-lg dark:border-gray-600">
             <div class="space-y-3">
               <div class="form-control">
-                <label class="gap-3 justify-start p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
+                <label class="justify-start gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
                   <input
                     v-model="selectedKeyType"
                     type="radio"
@@ -914,7 +913,7 @@ getKeys()
                 </label>
               </div>
               <div class="form-control">
-                <label class="gap-3 justify-start p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
+                <label class="justify-start gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
                   <input
                     v-model="selectedKeyType"
                     type="radio"
@@ -926,7 +925,7 @@ getKeys()
                 </label>
               </div>
               <div class="form-control">
-                <label class="gap-3 justify-start p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
+                <label class="justify-start gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
                   <input
                     v-model="selectedKeyType"
                     type="radio"
@@ -938,7 +937,7 @@ getKeys()
                 </label>
               </div>
               <div class="form-control">
-                <label class="gap-3 justify-start p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
+                <label class="justify-start gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
                   <input
                     v-model="selectedKeyType"
                     type="radio"
@@ -954,8 +953,8 @@ getKeys()
         </div>
 
         <!-- Create as Secure (Hashed) Key -->
-        <div class="p-4 rounded-lg border bg-blue-50 dark:bg-blue-900/20 dark:border-blue-700 border-blue-200">
-          <div class="flex gap-3 items-start">
+        <div class="p-4 border border-blue-200 rounded-lg bg-blue-50 dark:bg-blue-900/20 dark:border-blue-700">
+          <div class="flex items-start gap-3">
             <input
               id="create-as-hashed"
               v-model="createAsHashed"
@@ -974,7 +973,7 @@ getKeys()
         </div>
 
         <!-- Limit to Organizations -->
-        <div class="flex gap-2 items-center">
+        <div class="flex items-center gap-2">
           <input
             id="limit-to-org"
             v-model="limitToOrgCheckbox"
@@ -986,8 +985,8 @@ getKeys()
           </label>
         </div>
         <div v-if="limitToOrgCheckbox" class="pl-6">
-          <div class="overflow-y-auto p-2 space-y-2 max-h-32 rounded-lg border">
-            <div v-for="org in organizationStore.organizations" :key="org.gid" class="flex gap-2 items-center">
+          <div class="p-2 space-y-2 overflow-y-auto border rounded-lg max-h-32">
+            <div v-for="org in organizationStore.organizations" :key="org.gid" class="flex items-center gap-2">
               <input
                 :id="`org-${org.gid}`"
                 :value="org.gid"
@@ -1003,7 +1002,7 @@ getKeys()
         </div>
 
         <!-- Limit to Apps (only show if orgs are selected) -->
-        <div v-if="limitToOrgCheckbox && displayStore.selectedOrganizations.length > 0" class="flex gap-2 items-center">
+        <div v-if="limitToOrgCheckbox && displayStore.selectedOrganizations.length > 0" class="flex items-center gap-2">
           <input
             id="limit-to-app"
             v-model="limitToAppCheckbox"
@@ -1015,8 +1014,8 @@ getKeys()
           </label>
         </div>
         <div v-if="limitToAppCheckbox && displayStore.selectedOrganizations.length > 0" class="pl-6">
-          <div class="overflow-y-auto p-2 space-y-2 max-h-32 rounded-lg border">
-            <div v-for="app in filteredAppsForSelectedOrgs" :key="app.app_id" class="flex gap-2 items-center">
+          <div class="p-2 space-y-2 overflow-y-auto border rounded-lg max-h-32">
+            <div v-for="app in filteredAppsForSelectedOrgs" :key="app.app_id" class="flex items-center gap-2">
               <input
                 :id="`app-${app.app_id}`"
                 :value="app"
@@ -1032,7 +1031,7 @@ getKeys()
         </div>
 
         <!-- Set Expiration Date -->
-        <div class="flex gap-2 items-center">
+        <div class="flex items-center gap-2">
           <input
             id="set-expiration"
             v-model="setExpirationCheckbox"
@@ -1065,7 +1064,7 @@ getKeys()
             <template #trigger>
               <button
                 type="button"
-                class="flex gap-2 items-center py-2 px-3 w-full text-sm text-left bg-white rounded-md border transition-colors border-gray-300 dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-primary-500 focus:outline-none"
+                class="flex items-center w-full gap-2 px-3 py-2 text-sm text-left transition-colors bg-white border border-gray-300 rounded-md dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-primary-500 focus:outline-none"
               >
                 <IconCalendar class="w-4 h-4 text-gray-500 dark:text-gray-400" />
                 <span :class="expirationDate ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'">
@@ -1098,8 +1097,8 @@ getKeys()
     <!-- Teleport Content for Organization Selection Modal -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-confirm-org-limit')" defer to="#dialog-v2-content">
       <div class="space-y-4">
-        <div class="overflow-y-auto p-2 max-h-64 rounded-lg border">
-          <div v-for="org in organizationStore.organizations" :key="org.gid" class="flex gap-2 items-center p-2">
+        <div class="p-2 overflow-y-auto border rounded-lg max-h-64">
+          <div v-for="org in organizationStore.organizations" :key="org.gid" class="flex items-center gap-2 p-2">
             <input
               :id="`org-select-${org.gid}`"
               :value="org.gid"
@@ -1112,7 +1111,7 @@ getKeys()
             </label>
           </div>
         </div>
-        <div class="flex gap-2 items-center mt-4">
+        <div class="flex items-center gap-2 mt-4">
           <input
             id="limit-to-app-org"
             v-model="limitToOrgCheckbox"
@@ -1129,8 +1128,8 @@ getKeys()
     <!-- Teleport Content for App Selection Modal -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-confirm-appid-limit')" defer to="#dialog-v2-content">
       <div class="space-y-4">
-        <div class="overflow-y-auto p-2 max-h-64 rounded-lg border">
-          <div v-for="app in availableApps" :key="app.app_id" class="flex gap-2 items-center p-2">
+        <div class="p-2 overflow-y-auto border rounded-lg max-h-64">
+          <div v-for="app in availableApps" :key="app.app_id" class="flex items-center gap-2 p-2">
             <input
               :id="`app-${app.app_id}`"
               :value="app"
