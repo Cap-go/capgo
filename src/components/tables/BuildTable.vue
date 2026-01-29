@@ -239,7 +239,7 @@ watch(showSteps, (newValue) => {
 <template>
   <div>
     <div v-if="!showSteps" class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
-      <Table
+      <DataTable
         v-model:filters="filters"
         v-model:search="search"
         v-model:current-page="currentPage"
@@ -292,7 +292,7 @@ watch(showSteps, (newValue) => {
             </p>
           </div>
         </template>
-      </Table>
+      </DataTable>
     </div>
 
     <StepsBuild v-else :onboarding="(totalAllBuilds ?? 0) === 0" :app-id="props.appId" @done="onboardingDone" @close-step="closeSteps()" />

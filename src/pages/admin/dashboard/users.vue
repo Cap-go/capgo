@@ -671,7 +671,7 @@ displayStore.defaultBack = '/dashboard'
             <h3 class="mb-4 text-lg font-semibold">
               {{ t('trial-organizations-list') }}
             </h3>
-            <Table
+            <DataTable
               :is-loading="isLoadingTrialOrganizations"
               :total="trialOrganizationsTotal"
               :current-page="trialOrganizationsCurrentPage"
@@ -689,7 +689,7 @@ displayStore.defaultBack = '/dashboard'
             <h3 class="mb-4 text-lg font-semibold">
               {{ t('cancelled-organizations-list') }}
             </h3>
-            <Table
+            <DataTable
               :is-loading="isLoadingCancelledOrganizations"
               :total="cancelledOrganizationsTotal"
               :current-page="cancelledOrganizationsCurrentPage"

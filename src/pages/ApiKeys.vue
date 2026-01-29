@@ -829,7 +829,7 @@ getKeys()
       <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
         <div class="flex flex-col">
           <div class="flex overflow-hidden overflow-y-auto flex-col bg-white md:mt-5 md:rounded-lg md:border md:shadow-lg border-slate-300 dark:border-slate-900 dark:bg-slate-800">
-            <Table
+            <DataTable
               v-model:current-page="currentPage"
               show-add
               :auto-reload="false"

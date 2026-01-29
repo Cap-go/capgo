@@ -1142,7 +1142,7 @@ async function handleInviteNewUserSubmit() {
           </p>
         </div>
       </div>
-      <Table
+      <DataTable
         v-model:columns="columns"
         v-model:current-page="currentPage"
         v-model:search="search"

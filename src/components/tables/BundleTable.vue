@@ -618,7 +618,7 @@ watch(showSteps, (newValue) => {
 <template>
   <div>
     <div v-if="!showSteps" class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
-      <Table
+      <DataTable
         v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
         :total="total"
         :show-add="!isMobile"

@@ -97,7 +97,7 @@ function openExternal() {
   <div class="relative w-full h-full p-4 md:p-8">
     <!-- Open in external button -->
     <button
-      class="absolute top-4 right-4 z-10 p-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+      class="absolute z-10 p-2 transition-colors bg-white rounded-lg shadow-lg top-4 right-4 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700"
       :title="t('open-in-external')"
       @click="openExternal"
     >
@@ -105,13 +105,13 @@ function openExternal() {
     </button>
 
     <!-- Main content container -->
-    <div class="flex items-center justify-center gap-8 h-full">
+    <div class="flex items-center justify-center h-full gap-8">
       <!-- Device frame -->
       <div class="flex flex-col items-center">
         <!-- Device selector -->
-        <div class="mb-4 flex items-center gap-2">
+        <div class="flex items-center gap-2 mb-4">
           <button
-            class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg border transition-colors"
+            class="flex items-center gap-2 px-3 py-2 text-sm transition-colors border rounded-lg"
             :class="selectedDevice === 'iphone'
               ? 'bg-blue-500 text-white border-blue-500'
               : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'"
@@ -121,7 +121,7 @@ function openExternal() {
             {{ t('device-iphone') }}
           </button>
           <button
-            class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg border transition-colors"
+            class="flex items-center gap-2 px-3 py-2 text-sm transition-colors border rounded-lg"
             :class="selectedDevice === 'pixel'
               ? 'bg-blue-500 text-white border-blue-500'
               : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700'"
@@ -134,7 +134,7 @@ function openExternal() {
 
         <!-- Phone frame -->
         <div
-          class="relative bg-gray-900 p-3 shadow-2xl"
+          class="relative p-3 bg-gray-900 shadow-2xl"
           :class="currentDevice.frameClass"
           :style="{
             width: `${currentDevice.width + 24}px`,
@@ -144,15 +144,16 @@ function openExternal() {
           <!-- Notch (for iPhone) -->
           <div
             v-if="selectedDevice === 'iphone'"
-            class="absolute top-3 left-1/2 transform -translate-x-1/2 w-32 h-7 bg-gray-900 rounded-b-2xl z-10"
+            class="absolute z-10 w-32 transform -translate-x-1/2 bg-gray-900 top-3 left-1/2 h-7 rounded-b-2xl"
           />
 
           <!-- Screen -->
           <div
-            class="w-full h-full bg-white overflow-hidden"
+            class="w-full h-full overflow-hidden bg-white"
             :class="currentDevice.frameClass.replace('40', '35').replace('30', '25')"
           >
             <iframe
+              title="Preview App"
               :src="previewUrl"
               class="w-full h-full border-0"
               :style="{
@@ -169,14 +170,14 @@ function openExternal() {
       <!-- QR Code section (desktop only) -->
       <div
         v-if="!isMobile && qrCodeDataUrl"
-        class="flex flex-col items-center p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg"
+        class="flex flex-col items-center p-6 bg-white shadow-lg dark:bg-gray-800 rounded-xl"
       >
         <img
           :src="qrCodeDataUrl"
           alt="QR Code to preview on phone"
-          class="w-36 h-36 mb-3"
+          class="mb-3 w-36 h-36"
         >
-        <p class="text-sm text-gray-600 dark:text-gray-400 text-center max-w-40">
+        <p class="text-sm text-center text-gray-600 dark:text-gray-400 max-w-40">
           {{ t('scan-qr-to-preview') }}
         </p>
       </div>

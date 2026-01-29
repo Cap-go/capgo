@@ -531,7 +531,7 @@ watchEffect(async () => {
             </div>
 
             <div class="px-2 pb-2 relative">
-              <Table
+              <DataTable
                 v-model:search="search" v-model:current-page="currentPage" v-model:columns="columns"
                 :total="total" :element-list="displayEntries"
                 :is-loading="tableLoading"
