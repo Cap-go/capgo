@@ -66,7 +66,6 @@ function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
     `${plan.storage.toLocaleString()} ${t('plan-storage')}`,
     `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')}`,
     buildTimeDisplay, // Will be empty string if 0, filtered out below
-    t('priority-support'),
   ]
 
   if (creditUnitPrices.value.mau)
@@ -81,9 +80,25 @@ function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
   if (creditUnitPrices.value.build_time)
     features[3] += ` included, then $${creditUnitPrices.value.build_time} per minute`
 
-  features.push('Dedicated support')
-  features.push('Custom Domain')
-  features.push('SOC II')
+  const planName = plan.name?.toLowerCase() ?? ''
+  if (planName === 'solo') {
+    features.push('Community support (Discord)')
+  }
+  else if (planName === 'maker') {
+    features.push('Priority bug fixes on plugins')
+  }
+  else if (planName === 'team') {
+    features.push('Priority bug fixes on plugins')
+    features.push('Priority support by email')
+  }
+  else if (planName === 'enterprise') {
+    features.push('Priority bug fixes on plugins')
+    features.push('Priority support by email')
+    features.push('Custom domain')
+    features.push('Direct chat support')
+    features.push('Service SLA agreement')
+    features.push('SOC 2 certified')
+  }
 
   return features.filter(Boolean)
 }
