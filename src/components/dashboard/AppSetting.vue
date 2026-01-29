@@ -723,8 +723,8 @@ async function editPhoto() {
 
           const iconPath = `org/${appRef.value?.owner_org.id}/${props.appId}/icon`
           const { error } = await supabase.storage
-            .from(`images/org/${appRef.value?.owner_org.id}/${props.appId}`)
-            .upload('icon', blob, {
+            .from('images')
+            .upload(iconPath, blob, {
               contentType: mimeType,
             })
 

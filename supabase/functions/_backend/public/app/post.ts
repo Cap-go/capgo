@@ -4,6 +4,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
+import { createSignedImageUrl, normalizeImagePath } from '../../utils/storage.ts'
 import { isValidAppId } from '../../utils/utils.ts'
 
 export interface CreateApp {
@@ -29,10 +30,11 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: CreateApp, 
     throw quickError(403, 'cannot_access_organization', 'You can\'t access this organization', { org_id: body.owner_org })
   }
 
+  const normalizedIcon = normalizeImagePath(body.icon ?? '')
   const dataInsert = {
     owner_org: body.owner_org,
     app_id: body.app_id,
-    icon_url: body.icon ?? '',
+    icon_url: normalizedIcon ?? '',
     name: body.name,
     retention: 2592000,
     default_upload_channel: 'dev',
@@ -46,6 +48,11 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: CreateApp, 
 
   if (dbError) {
     throw simpleError('cannot_create_app', 'Cannot create app', { supabaseError: dbError })
+  }
+
+  if (data.icon_url) {
+    const signedIcon = await createSignedImageUrl(c, data.icon_url)
+    data.icon_url = signedIcon ?? ''
   }
 
   return c.json(data)

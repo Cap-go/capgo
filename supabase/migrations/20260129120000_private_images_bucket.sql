@@ -33,58 +33,35 @@ USING (
   AND (
     -- App icons: org/{org_id}/{app_id}/...
     CASE
-      WHEN (storage.foldername(name))[0] = 'org' THEN
+      WHEN (storage.foldername(name))[1] = 'org' THEN
         public.check_min_rights(
           'read'::public.user_min_right,
           public.get_identity_org_appid(
             '{read,upload,write,all}'::public.key_mode[],
-            ((storage.foldername(name))[1])::uuid,
-            (storage.foldername(name))[2]
+            ((storage.foldername(name))[2])::uuid,
+            (storage.foldername(name))[3]
           ),
-          ((storage.foldername(name))[1])::uuid,
-          (storage.foldername(name))[2],
+          ((storage.foldername(name))[2])::uuid,
+          (storage.foldername(name))[3],
           NULL::bigint
         )
       ELSE false
     END
     OR (
       -- User avatars stored under user_id/* (allow same org members)
-      (storage.foldername(name))[0] <> 'org'
+      (storage.foldername(name))[1] <> 'org'
       AND EXISTS (
         SELECT 1
-        FROM (SELECT auth.uid() AS uid) AS auth_user
-        WHERE auth_user.uid IS NOT NULL
-          AND (
-            auth_user.uid::text = (storage.foldername(name))[0]
-            OR EXISTS (
-              SELECT 1
-              FROM public.org_users ou_self
-              JOIN public.org_users ou_target ON ou_self.org_id = ou_target.org_id
-              WHERE ou_self.user_id = auth_user.uid
-                AND ou_target.user_id::text = (storage.foldername(name))[0]
-            )
-            OR EXISTS (
-              SELECT 1
-              FROM public.orgs o
-              JOIN public.org_users ou_self ON ou_self.org_id = o.id
-              WHERE ou_self.user_id = auth_user.uid
-                AND regexp_replace(o.logo, '^.*/storage/v1/object/(public/|sign/)?[^/]+/', '') = name
-            )
+        FROM public.org_users ou
+        WHERE ou.user_id::text = (storage.foldername(name))[1]
+          AND public.check_min_rights(
+            'read'::public.user_min_right,
+            public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], ou.org_id),
+            ou.org_id,
+            NULL::character varying,
+            NULL::bigint
           )
       )
-    )
-    OR EXISTS (
-      -- Org logo access for API keys (logo stored as path or public URL)
-      SELECT 1
-      FROM public.orgs o
-      WHERE regexp_replace(o.logo, '^.*/storage/v1/object/(public/|sign/)?[^/]+/', '') = name
-        AND public.check_min_rights(
-          'read'::public.user_min_right,
-          public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], o.id),
-          o.id,
-          NULL::character varying,
-          NULL::bigint
-        )
     )
   )
 );
@@ -99,16 +76,16 @@ WITH CHECK (
   AND (
     -- App icons: org/{org_id}/{app_id}/...
     CASE
-      WHEN (storage.foldername(name))[0] = 'org' THEN
+      WHEN (storage.foldername(name))[1] = 'org' THEN
         public.check_min_rights(
           'write'::public.user_min_right,
           public.get_identity_org_appid(
             '{write,all}'::public.key_mode[],
-            ((storage.foldername(name))[1])::uuid,
-            (storage.foldername(name))[2]
+            ((storage.foldername(name))[2])::uuid,
+            (storage.foldername(name))[3]
           ),
-          ((storage.foldername(name))[1])::uuid,
-          (storage.foldername(name))[2],
+          ((storage.foldername(name))[2])::uuid,
+          (storage.foldername(name))[3],
           NULL::bigint
         )
       ELSE false
@@ -118,7 +95,7 @@ WITH CHECK (
       SELECT 1
       FROM (SELECT auth.uid() AS uid) AS auth_user
       WHERE auth_user.uid IS NOT NULL
-        AND auth_user.uid::text = (storage.foldername(name))[0]
+        AND auth_user.uid::text = (storage.foldername(name))[1]
     )
   )
 );
@@ -132,16 +109,16 @@ USING (
   bucket_id = 'images'
   AND (
     CASE
-      WHEN (storage.foldername(name))[0] = 'org' THEN
+      WHEN (storage.foldername(name))[1] = 'org' THEN
         public.check_min_rights(
           'write'::public.user_min_right,
           public.get_identity_org_appid(
             '{write,all}'::public.key_mode[],
-            ((storage.foldername(name))[1])::uuid,
-            (storage.foldername(name))[2]
+            ((storage.foldername(name))[2])::uuid,
+            (storage.foldername(name))[3]
           ),
-          ((storage.foldername(name))[1])::uuid,
-          (storage.foldername(name))[2],
+          ((storage.foldername(name))[2])::uuid,
+          (storage.foldername(name))[3],
           NULL::bigint
         )
       ELSE false
@@ -150,7 +127,7 @@ USING (
       SELECT 1
       FROM (SELECT auth.uid() AS uid) AS auth_user
       WHERE auth_user.uid IS NOT NULL
-        AND auth_user.uid::text = (storage.foldername(name))[0]
+        AND auth_user.uid::text = (storage.foldername(name))[1]
     )
   )
 )
@@ -158,16 +135,16 @@ WITH CHECK (
   bucket_id = 'images'
   AND (
     CASE
-      WHEN (storage.foldername(name))[0] = 'org' THEN
+      WHEN (storage.foldername(name))[1] = 'org' THEN
         public.check_min_rights(
           'write'::public.user_min_right,
           public.get_identity_org_appid(
             '{write,all}'::public.key_mode[],
-            ((storage.foldername(name))[1])::uuid,
-            (storage.foldername(name))[2]
+            ((storage.foldername(name))[2])::uuid,
+            (storage.foldername(name))[3]
           ),
-          ((storage.foldername(name))[1])::uuid,
-          (storage.foldername(name))[2],
+          ((storage.foldername(name))[2])::uuid,
+          (storage.foldername(name))[3],
           NULL::bigint
         )
       ELSE false
@@ -176,7 +153,7 @@ WITH CHECK (
       SELECT 1
       FROM (SELECT auth.uid() AS uid) AS auth_user
       WHERE auth_user.uid IS NOT NULL
-        AND auth_user.uid::text = (storage.foldername(name))[0]
+        AND auth_user.uid::text = (storage.foldername(name))[1]
     )
   )
 );
@@ -190,16 +167,16 @@ USING (
   bucket_id = 'images'
   AND (
     CASE
-      WHEN (storage.foldername(name))[0] = 'org' THEN
+      WHEN (storage.foldername(name))[1] = 'org' THEN
         public.check_min_rights(
           'write'::public.user_min_right,
           public.get_identity_org_appid(
             '{write,all}'::public.key_mode[],
-            ((storage.foldername(name))[1])::uuid,
-            (storage.foldername(name))[2]
+            ((storage.foldername(name))[2])::uuid,
+            (storage.foldername(name))[3]
           ),
-          ((storage.foldername(name))[1])::uuid,
-          (storage.foldername(name))[2],
+          ((storage.foldername(name))[2])::uuid,
+          (storage.foldername(name))[3],
           NULL::bigint
         )
       ELSE false
@@ -208,7 +185,7 @@ USING (
       SELECT 1
       FROM (SELECT auth.uid() AS uid) AS auth_user
       WHERE auth_user.uid IS NOT NULL
-        AND auth_user.uid::text = (storage.foldername(name))[0]
+        AND auth_user.uid::text = (storage.foldername(name))[1]
     )
   )
 );
