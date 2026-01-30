@@ -3,8 +3,6 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconCheckCircle from '~icons/lucide/check-circle'
-import IconClock from '~icons/lucide/clock'
-import IconPackage from '~icons/lucide/package'
 import IconTrendingUp from '~icons/lucide/trending-up'
 import { formatDistanceToNow } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -25,36 +23,6 @@ const lastReleaseDate = ref<string | null>(null)
 const defaultChannelId = ref<number | null>(null)
 
 const HOURS_48_IN_DAYS = 2
-
-const status = computed(() => {
-  if (isLoading.value)
-    return 'loading'
-  if (!lastReleaseDate.value)
-    return 'empty'
-
-  const releaseDate = new Date(lastReleaseDate.value)
-  const now = new Date()
-  const daysSinceRelease = (now.getTime() - releaseDate.getTime()) / (1000 * 60 * 60 * 24)
-
-  if (daysSinceRelease <= HOURS_48_IN_DAYS)
-    return 'recent'
-  return 'old'
-})
-
-const statusTitle = computed(() => {
-  switch (status.value) {
-    case 'loading':
-      return t('checking-releases')
-    case 'empty':
-      return t('no-releases-yet')
-    case 'recent':
-      return t('recent-releases-active')
-    case 'old':
-      return t('no-recent-releases')
-    default:
-      return ''
-  }
-})
 
 const lastReleaseDisplay = computed(() => {
   if (!lastReleaseDate.value)
