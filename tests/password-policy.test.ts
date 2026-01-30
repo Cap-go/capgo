@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_EMAIL, USER_ID, USER_ID_2 } from './test-utils.ts'
+import { BASE_URL, executeSQL, getSupabaseClient, headers, TEST_EMAIL, USER_EMAIL, USER_ID, USER_ID_2 } from './test-utils.ts'
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
@@ -132,7 +132,20 @@ describe('Password Policy Configuration via SDK', () => {
 })
 
 describe('[POST] /private/validate_password_compliance', () => {
+  let originalEncryptedPassword: string | null = null
+
   beforeAll(async () => {
+    const passwordRows = await executeSQL('SELECT encrypted_password FROM auth.users WHERE id = $1', [USER_ID])
+    if (!passwordRows[0]?.encrypted_password)
+      throw new Error('Missing seeded auth user password')
+
+    originalEncryptedPassword = passwordRows[0].encrypted_password
+
+    await executeSQL('UPDATE auth.users SET encrypted_password = crypt($1, gen_salt(\'bf\')) WHERE id = $2', [
+      TEST_PASSWORD,
+      USER_ID,
+    ])
+
     // Enable password policy for testing
     await getSupabaseClient()
       .from('orgs')
@@ -146,6 +159,15 @@ describe('[POST] /private/validate_password_compliance', () => {
         },
       })
       .eq('id', ORG_ID)
+  })
+
+  afterAll(async () => {
+    if (originalEncryptedPassword) {
+      await executeSQL('UPDATE auth.users SET encrypted_password = $1 WHERE id = $2', [
+        originalEncryptedPassword,
+        USER_ID,
+      ])
+    }
   })
 
   it('reject request with missing email', async () => {
