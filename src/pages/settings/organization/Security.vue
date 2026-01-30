@@ -3,6 +3,7 @@ import { computedAsync } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconCheck from '~icons/heroicons/check-circle'
 import IconWarning from '~icons/heroicons/exclamation-triangle'
@@ -12,6 +13,7 @@ import IconLock from '~icons/heroicons/lock-closed'
 import IconShield from '~icons/heroicons/shield-check'
 import IconUser from '~icons/heroicons/user'
 import { checkPermissions } from '~/services/permissions'
+import { createSignedImageUrl } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
@@ -41,6 +43,7 @@ const { t } = useI18n()
 const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
 const dialogStore = useDialogV2Store()
+const router = useRouter()
 const supabase = useSupabase()
 const isLoading = ref(true)
 const isSaving = ref(false)
@@ -160,6 +163,12 @@ function loadApikeyPolicyFromOrg() {
   maxApikeyExpirationDays.value = currentOrganization.value?.max_apikey_expiration_days ?? null
 }
 
+async function goToMembersPage(closeDialog = false) {
+  if (closeDialog)
+    await dialogStore.closeDialog()
+  await router.push('/settings/organization/members')
+}
+
 async function loadData() {
   if (!currentOrganization.value?.gid)
     return
@@ -242,13 +251,16 @@ async function loadMembersWithMfaStatus() {
     }
 
     // Merge members with MFA status
-    membersWithMfaStatus.value = (members || []).map(member => ({
-      uid: member.uid,
-      email: member.email,
-      image_url: member.image_url || '',
-      role: member.role,
-      is_tmp: member.is_tmp,
-      has_2fa: mfaMap.get(member.uid) ?? false,
+    membersWithMfaStatus.value = await Promise.all((members || []).map(async (member) => {
+      const signedImage = member.image_url ? await createSignedImageUrl(member.image_url) : ''
+      return {
+        uid: member.uid,
+        email: member.email,
+        image_url: signedImage || '',
+        role: member.role,
+        is_tmp: member.is_tmp,
+        has_2fa: mfaMap.get(member.uid) ?? false,
+      }
     }))
 
     // Calculate impacted members (those without 2FA, excluding pending invites)
@@ -304,19 +316,20 @@ async function loadMembersWithPasswordPolicyStatus() {
     }
 
     // Merge members with password policy compliance status
-    membersWithPasswordPolicyStatus.value = (members || []).map((member) => {
+    membersWithPasswordPolicyStatus.value = await Promise.all((members || []).map(async (member) => {
       const compliance = complianceMap.get(member.uid)
+      const signedImage = member.image_url ? await createSignedImageUrl(member.image_url) : ''
       return {
         uid: member.uid,
         email: member.email,
         first_name: compliance?.first_name || null,
         last_name: compliance?.last_name || null,
-        image_url: member.image_url || '',
+        image_url: signedImage || '',
         role: member.role,
         is_tmp: member.is_tmp,
         password_policy_compliant: compliance?.compliant ?? false,
       }
-    })
+    }))
 
     // Calculate non-compliant members (excluding pending invites)
     nonCompliantPasswordMembers.value = membersWithPasswordPolicyStatus.value.filter(m => !m.password_policy_compliant && !m.is_tmp)
@@ -951,13 +964,22 @@ onMounted(async () => {
                       {{ t('2fa-impacted-members-title') }}
                     </h4>
                   </div>
-                  <button
-                    type="button"
-                    class="px-3 py-2 text-xs font-medium text-center border rounded-lg cursor-pointer text-amber-700 dark:text-amber-300 hover:bg-amber-100 focus:ring-4 focus:ring-amber-300 border-amber-400 dark:border-amber-600 dark:hover:bg-amber-800/30 dark:focus:ring-amber-800 focus:outline-hidden"
-                    @click="copyEmailList"
-                  >
-                    {{ t('copy-email-list') }}
-                  </button>
+                  <div class="flex items-center gap-2">
+                    <button
+                      type="button"
+                      class="px-3 py-2 text-xs font-medium text-center border rounded-lg cursor-pointer text-amber-700 dark:text-amber-300 hover:bg-amber-100 focus:ring-4 focus:ring-amber-300 border-amber-400 dark:border-amber-600 dark:hover:bg-amber-800/30 dark:focus:ring-amber-800 focus:outline-hidden"
+                      @click="goToMembersPage()"
+                    >
+                      {{ t('view') }} {{ t('members') }}
+                    </button>
+                    <button
+                      type="button"
+                      class="px-3 py-2 text-xs font-medium text-center border rounded-lg cursor-pointer text-amber-700 dark:text-amber-300 hover:bg-amber-100 focus:ring-4 focus:ring-amber-300 border-amber-400 dark:border-amber-600 dark:hover:bg-amber-800/30 dark:focus:ring-amber-800 focus:outline-hidden"
+                      @click="copyEmailList"
+                    >
+                      {{ t('copy-email-list') }}
+                    </button>
+                  </div>
                 </div>
                 <p class="mb-4 text-sm text-amber-700 dark:text-amber-300">
                   {{ t('2fa-impacted-members-description') }}
@@ -1229,13 +1251,22 @@ onMounted(async () => {
                     {{ t('password-policy-impacted-members-title') }}
                   </h4>
                 </div>
-                <button
-                  type="button"
-                  class="px-3 py-2 text-xs font-medium text-center border rounded-lg cursor-pointer text-amber-700 dark:text-amber-300 hover:bg-amber-100 focus:ring-4 focus:ring-amber-300 border-amber-400 dark:border-amber-600 dark:hover:bg-amber-800/30 dark:focus:ring-amber-800 focus:outline-hidden"
-                  @click="copyPasswordPolicyEmailList"
-                >
-                  {{ t('copy-email-list') }}
-                </button>
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    class="px-3 py-2 text-xs font-medium text-center border rounded-lg cursor-pointer text-amber-700 dark:text-amber-300 hover:bg-amber-100 focus:ring-4 focus:ring-amber-300 border-amber-400 dark:border-amber-600 dark:hover:bg-amber-800/30 dark:focus:ring-amber-800 focus:outline-hidden"
+                    @click="goToMembersPage()"
+                  >
+                    {{ t('view') }} {{ t('members') }}
+                  </button>
+                  <button
+                    type="button"
+                    class="px-3 py-2 text-xs font-medium text-center border rounded-lg cursor-pointer text-amber-700 dark:text-amber-300 hover:bg-amber-100 focus:ring-4 focus:ring-amber-300 border-amber-400 dark:border-amber-600 dark:hover:bg-amber-800/30 dark:focus:ring-amber-800 focus:outline-hidden"
+                    @click="copyPasswordPolicyEmailList"
+                  >
+                    {{ t('copy-email-list') }}
+                  </button>
+                </div>
               </div>
               <p class="mb-4 text-sm text-amber-700 dark:text-amber-300">
                 {{ t('password-policy-impacted-members-description') }}
@@ -1389,13 +1420,22 @@ onMounted(async () => {
             <span class="text-xs text-amber-600 dark:text-amber-400">({{ member.role.replace('_', ' ') }})</span>
           </li>
         </ul>
-        <button
-          type="button"
-          class="px-3 py-2 text-xs font-medium text-center border rounded-lg cursor-pointer text-amber-700 dark:text-amber-300 hover:bg-amber-100 focus:ring-4 focus:ring-amber-300 border-amber-400 dark:border-amber-600 dark:hover:bg-amber-800/30 dark:focus:ring-amber-800 focus:outline-hidden"
-          @click="copyEmailList"
-        >
-          {{ t('copy-email-list') }}
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            type="button"
+            class="px-3 py-2 text-xs font-medium text-center border rounded-lg cursor-pointer text-amber-700 dark:text-amber-300 hover:bg-amber-100 focus:ring-4 focus:ring-amber-300 border-amber-400 dark:border-amber-600 dark:hover:bg-amber-800/30 dark:focus:ring-amber-800 focus:outline-hidden"
+            @click="goToMembersPage(true)"
+          >
+            {{ t('view') }} {{ t('members') }}
+          </button>
+          <button
+            type="button"
+            class="px-3 py-2 text-xs font-medium text-center border rounded-lg cursor-pointer text-amber-700 dark:text-amber-300 hover:bg-amber-100 focus:ring-4 focus:ring-amber-300 border-amber-400 dark:border-amber-600 dark:hover:bg-amber-800/30 dark:focus:ring-amber-800 focus:outline-hidden"
+            @click="copyEmailList"
+          >
+            {{ t('copy-email-list') }}
+          </button>
+        </div>
       </div>
     </Teleport>
 
@@ -1416,6 +1456,13 @@ onMounted(async () => {
             </div>
           </li>
         </ul>
+        <button
+          type="button"
+          class="px-3 py-2 mt-4 text-xs font-medium text-center border rounded-lg cursor-pointer text-red-700 dark:text-red-300 hover:bg-red-100 focus:ring-4 focus:ring-red-200 border-red-300 dark:border-red-600 dark:hover:bg-red-900/30 dark:focus:ring-red-900 focus:outline-hidden"
+          @click="goToMembersPage(true)"
+        >
+          {{ t('view') }} {{ t('members') }}
+        </button>
         <p class="mt-3 text-sm text-red-600 dark:text-red-400">
           {{ t('users-must-change-password') }}
         </p>

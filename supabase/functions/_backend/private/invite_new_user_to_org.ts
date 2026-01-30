@@ -26,7 +26,7 @@ const inviteUserSchema = z.object({
     'org_admin',
     'org_super_admin',
   ]),
-  captcha_token: z.string().check(z.minLength(1)),
+  captcha_token: z.optional(z.string().check(z.minLength(1))),
   first_name: z.string().check(z.minLength(1)),
   last_name: z.string().check(z.minLength(1)),
 })
@@ -116,7 +116,13 @@ async function validateInvite(c: Context, rawBody: any) {
   }
 
   // Verify captcha token with Cloudflare Turnstile
-  await verifyCaptchaToken(c, body.captcha_token)
+  const captchaSecret = getEnv(c, 'CAPTCHA_SECRET_KEY')
+  if (captchaSecret.length > 0) {
+    if (!body.captcha_token) {
+      throw simpleError('invalid_request', 'Captcha token is required')
+    }
+    await verifyCaptchaToken(c, body.captcha_token, captchaSecret)
+  }
 
   // Use authenticated client - RLS will enforce access based on JWT
   const supabase = supabaseClient(c, authorization)
@@ -259,29 +265,24 @@ app.post('/', middlewareAuth, async (c) => {
     invited_first_name: `${newInvitation?.first_name ?? body.first_name}`,
     invited_last_name: `${newInvitation?.last_name ?? body.last_name}`,
   }, 'org:invite_new_capgo_user_to_org')
-  if (!bentoEvent) {
-    throw simpleError('failed_to_invite_user', 'Failed to invite user', {}, 'Failed to track bento event')
+  if (bentoEvent === false) {
+    cloudlog({ requestId: c.get('requestId'), context: 'invite_new_user_to_org bento', message: 'Failed to track bento event' })
   }
   return c.json(BRES)
 })
 
 // Function to verify Cloudflare Turnstile token
-async function verifyCaptchaToken(c: Context, token: string) {
-  const captchaSecret = getEnv(c, 'CAPTCHA_SECRET_KEY')
-  if (!captchaSecret) {
-    throw simpleError('captcha_secret_key_not_set', 'CAPTCHA_SECRET_KEY not set')
-  }
-
+async function verifyCaptchaToken(c: Context, token: string, captchaSecret: string) {
   // "/siteverify" API endpoint.
   const url = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
   const result = await fetch(url, {
-    body: JSON.stringify({
+    body: new URLSearchParams({
       secret: captchaSecret,
       response: token,
     }),
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
     },
   })
 

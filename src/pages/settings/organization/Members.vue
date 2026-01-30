@@ -124,6 +124,14 @@ async function checkRbacEnabled() {
 
 const isInviteNewUserDialogOpen = ref(false)
 
+function resetInviteCaptcha() {
+  if (captchaElement.value) {
+    captchaElement.value.reset()
+  }
+  captchaToken.value = ''
+  updateInviteNewUserButton()
+}
+
 function updateInviteNewUserButton() {
   const buttons = dialogStore.dialogOptions?.buttons
   if (!buttons)
@@ -1033,9 +1041,7 @@ async function showInviteNewUserDialog(email: string, roleType: Database['public
   isInviteNewUserDialogOpen.value = true
 
   // Reset captcha if available
-  if (captchaElement.value) {
-    captchaElement.value.reset()
-  }
+  resetInviteCaptcha()
 
   dialogStore.openDialog({
     title: t('invite-new-user-dialog-header', 'Invite New User'),
@@ -1103,6 +1109,7 @@ async function handleInviteNewUserSubmit() {
       console.error('Invitation failed:', error)
       const errorMessage = await resolveInviteNewUserErrorMessage(error, t)
       toast.error(errorMessage ?? t('invitation-failed', 'Invitation failed'))
+      resetInviteCaptcha()
       return false
     }
 
@@ -1119,6 +1126,7 @@ async function handleInviteNewUserSubmit() {
     console.error('Invitation failed:', error)
     const errorMessage = await resolveInviteNewUserErrorMessage(error, t)
     toast.error(errorMessage ?? t('invitation-failed', 'Invitation failed'))
+    resetInviteCaptcha()
     return false
   }
   finally {
