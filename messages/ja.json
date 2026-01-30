@@ -322,7 +322,7 @@
   "change-encryption-key-warning-description": "必要な暗号化キーを変更すると、他のキーで暗号化されたバンドルは削除済みとマークされます。",
   "change-encryption-key-warning-title": "警告：バンドルは削除されます",
   "change-password": "パスワードを変更する",
-  "change-org-picture": "組織の画像をアップロード",
+  "change-org-picture": "組織のロゴをアップロード",
   "change-your-picture": "あなたの写真を変更してください",
   "changed-allow-preview": "プレビュー設定の変更に成功しました",
   "changed-app-name": "アプリ名の変更に成功しました",

@@ -322,7 +322,7 @@
   "change-encryption-key-warning-description": "필요한 암호화 키를 변경하면 다른 키로 암호화된 번들이 삭제된 것으로 표시됩니다.",
   "change-encryption-key-warning-title": "경고: 번들이 삭제됩니다",
   "change-password": "비밀번호 변경",
-  "change-org-picture": "조직 사진 업로드",
+  "change-org-picture": "조직 로고 업로드",
   "change-your-picture": "당신의 사진을 변경하세요",
   "changed-allow-preview": "미리보기 설정 변경에 성공했습니다.",
   "changed-app-name": "앱 이름 변경에 성공했습니다.",
