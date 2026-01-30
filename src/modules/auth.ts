@@ -7,6 +7,7 @@ import { createSignedImageUrl } from '~/services/storage'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
+import { useRealtimeEventsStore } from '~/stores/realtimeEvents'
 import { getPlans, isAdmin } from './../services/supabase'
 
 async function updateUser(
@@ -153,6 +154,10 @@ async function guard(
       user_id: main.auth?.id,
       notify: false,
     }).catch()
+
+    // Subscribe to realtime navigation events
+    const realtimeEventsStore = useRealtimeEventsStore()
+    realtimeEventsStore.subscribe()
 
     next()
     hideLoader()

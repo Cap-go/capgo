@@ -57,6 +57,14 @@ export const useMainStore = defineStore('main', () => {
           user.value = undefined
           reset(config.supaHost)
           unspoofUser()
+          
+          // Unsubscribe from realtime events
+          // Import dynamically to avoid circular dependency
+          import('./realtimeEvents').then((module) => {
+            const realtimeEventsStore = module.useRealtimeEventsStore()
+            realtimeEventsStore.unsubscribe()
+          })
+          
           resolve()
         }
       })
