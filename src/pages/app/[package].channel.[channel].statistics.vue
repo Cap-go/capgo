@@ -511,10 +511,10 @@ watchEffect(async () => {
                 :class="[
                   index === 0 ? 'bg-emerald-500'
                   : index === 1 ? 'bg-orange-400'
-                  : index === 2 ? 'bg-rose-400'
-                  : index === 3 ? 'bg-blue-500'
-                  : index === 4 ? 'bg-purple-500'
-                  : 'bg-teal-500',
+                    : index === 2 ? 'bg-rose-400'
+                      : index === 3 ? 'bg-blue-500'
+                        : index === 4 ? 'bg-purple-500'
+                          : 'bg-teal-500',
                 ]"
               />
               <span class="text-slate-700 dark:text-slate-300">
