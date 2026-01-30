@@ -207,6 +207,7 @@ describe('[GET] /organization/members', () => {
       first_name: 'Expired',
       last_name: 'User',
       created_at: expiredDate.toISOString(),
+      updated_at: expiredDate.toISOString(),
     })
     expect(insertError).toBeNull()
 

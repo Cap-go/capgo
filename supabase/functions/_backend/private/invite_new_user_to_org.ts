@@ -56,6 +56,14 @@ const legacyRoleToRbac: Partial<Record<LegacyInviteRole, RbacInviteRole>> = {
   super_admin: 'org_super_admin',
 }
 
+const INVITE_RESEND_COOLDOWN_MINUTES = 5
+
+function generateInviteMagicString() {
+  const bytes = new Uint8Array(128)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
 function resolveInviteRoles(inviteType: string, useNewRbac: boolean) {
   if (!useNewRbac) {
     if (rbacInviteRoles.includes(inviteType as RbacInviteRole)) {
@@ -194,8 +202,22 @@ app.post('/', middlewareAuth, async (c) => {
   let newInvitation: Database['public']['Tables']['tmp_users']['Row'] | null = null
   if (existingInvitation) {
     const nowMinusThreeHours = dayjs().subtract(3, 'hours')
-    if (!dayjs(nowMinusThreeHours).isAfter(dayjs(existingInvitation.cancelled_at))) {
-      throw simpleError('user_already_invited', 'User already invited and it hasnt been 3 hours since the last invitation was cancelled')
+    if (existingInvitation.cancelled_at && !dayjs(nowMinusThreeHours).isAfter(dayjs(existingInvitation.cancelled_at))) {
+      throw simpleError('user_already_invited', 'User already invited and it hasn\'t been 3 hours since the last invitation was cancelled', {
+        reason: 'invite_cancelled_recently',
+        cooldown_minutes: 180,
+      })
+    }
+
+    const lastInviteAt = existingInvitation.updated_at ?? existingInvitation.created_at
+    if (!existingInvitation.cancelled_at && lastInviteAt) {
+      const minutesSinceLastInvite = dayjs().diff(dayjs(lastInviteAt), 'minute')
+      if (minutesSinceLastInvite < INVITE_RESEND_COOLDOWN_MINUTES) {
+        throw simpleError('user_already_invited', 'User already invited recently. Please wait before resending.', {
+          reason: 'invite_recently_sent',
+          cooldown_minutes: INVITE_RESEND_COOLDOWN_MINUTES,
+        })
+      }
     }
 
     const { error: updateInvitationError, data: updatedInvitationData } = await supabaseAdminClient
@@ -206,6 +228,7 @@ app.post('/', middlewareAuth, async (c) => {
         last_name: body.last_name,
         role: legacyInviteType,
         rbac_role_name: rbacRoleName,
+        invite_magic_string: generateInviteMagicString(),
       })
       .eq('email', body.email)
       .eq('org_id', body.org_id)

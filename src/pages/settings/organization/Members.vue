@@ -19,6 +19,7 @@ import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { getRbacRoleI18nKey, useOrganizationStore } from '~/stores/organization'
+import { resolveInviteNewUserErrorMessage } from '~/utils/invites'
 import DeleteOrgDialog from './DeleteOrgDialog.vue'
 
 const { t } = useI18n()
@@ -1106,7 +1107,8 @@ async function handleInviteNewUserSubmit() {
 
     if (error) {
       console.error('Invitation failed:', error)
-      toast.error(t('invitation-failed', 'Invitation failed'))
+      const errorMessage = await resolveInviteNewUserErrorMessage(error, t)
+      toast.error(errorMessage ?? t('invitation-failed', 'Invitation failed'))
       resetInviteCaptcha()
       return false
     }
@@ -1122,7 +1124,8 @@ async function handleInviteNewUserSubmit() {
   }
   catch (error) {
     console.error('Invitation failed:', error)
-    toast.error(t('invitation-failed', 'Invitation failed'))
+    const errorMessage = await resolveInviteNewUserErrorMessage(error, t)
+    toast.error(errorMessage ?? t('invitation-failed', 'Invitation failed'))
     resetInviteCaptcha()
     return false
   }

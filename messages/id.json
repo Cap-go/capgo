@@ -763,6 +763,7 @@
   "invitation-page": "Sepertinya ada yang mengundang Anda untuk bergabung dengan organisasi mereka di Capgo.",
   "invitation-page-description": "Berikut adalah detail undangan",
   "invitation-page-not-found": "Ups, tampaknya undangan tidak valid. Mungkin sudah dibatalkan atau kadaluarsa.",
+  "invitation-resend-wait": "Harap tunggu {minutes} menit sebelum mengirim ulang undangan.",
   "invitation-rescinded": "Undangan berhasil dicabut!",
   "invite-accepted": "Berhasil menerima undangan organisasi",
   "invite-new-user-dialog-header": "Undang Pengguna Baru",

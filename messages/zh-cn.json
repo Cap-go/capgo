@@ -763,6 +763,7 @@
   "invitation-page": "看来有些人邀请您加入他们在Capgo的组织。",
   "invitation-page-description": "这是邀请细节",
   "invitation-page-not-found": "糟糕，邀请似乎无效。\n也许它被取消或过期。",
+  "invitation-resend-wait": "请等待 {minutes} 分钟后再重新发送邀请。",
   "invitation-rescinded": "邀请成功取消了！",
   "invite-accepted": "成功接受组织邀请",
   "invite-new-user-dialog-header": "邀请新用户",
