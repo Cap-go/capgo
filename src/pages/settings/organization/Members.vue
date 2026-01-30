@@ -123,6 +123,14 @@ async function checkRbacEnabled() {
 
 const isInviteNewUserDialogOpen = ref(false)
 
+function resetInviteCaptcha() {
+  if (captchaElement.value) {
+    captchaElement.value.reset()
+  }
+  captchaToken.value = ''
+  updateInviteNewUserButton()
+}
+
 function updateInviteNewUserButton() {
   const buttons = dialogStore.dialogOptions?.buttons
   if (!buttons)
@@ -1032,9 +1040,7 @@ async function showInviteNewUserDialog(email: string, roleType: Database['public
   isInviteNewUserDialogOpen.value = true
 
   // Reset captcha if available
-  if (captchaElement.value) {
-    captchaElement.value.reset()
-  }
+  resetInviteCaptcha()
 
   dialogStore.openDialog({
     title: t('invite-new-user-dialog-header', 'Invite New User'),
@@ -1065,14 +1071,6 @@ async function showInviteNewUserDialog(email: string, roleType: Database['public
 async function handleInviteNewUserSubmit() {
   if (isSubmittingInvite.value)
     return false
-
-  function resetInviteCaptcha() {
-    if (captchaElement.value) {
-      captchaElement.value.reset()
-    }
-    captchaToken.value = ''
-    updateInviteNewUserButton()
-  }
 
   if (!inviteUserFirstName.value.trim()) {
     toast.error(t('first-name-required', 'First name is required'))
