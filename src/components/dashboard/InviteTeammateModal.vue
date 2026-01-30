@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
@@ -29,6 +30,25 @@ const inviteRole = computed(() => (useRbacInvites.value ? 'org_admin' : 'admin')
 // Dialog state tracking
 const isEmailDialogOpen = ref(false)
 const isFullDetailsDialogOpen = ref(false)
+
+async function resolveInviteNewUserErrorMessage(error: unknown): Promise<string | null> {
+  if (error instanceof FunctionsHttpError && error.context instanceof Response) {
+    try {
+      const json = await error.context.clone().json() as { error?: string, moreInfo?: { reason?: string, cooldown_minutes?: number } }
+      if (json?.error === 'user_already_invited') {
+        if (json?.moreInfo?.reason === 'invite_cancelled_recently')
+          return t('too-recent-invitation-cancelation', 'An invitation was cancelled recently. Please wait a bit longer.')
+
+        const cooldownMinutes = Number(json?.moreInfo?.cooldown_minutes ?? 5)
+        return t('invitation-resend-wait', { minutes: Number.isFinite(cooldownMinutes) ? cooldownMinutes : 5 })
+      }
+    }
+    catch {
+      return null
+    }
+  }
+  return null
+}
 
 function openDialog() {
   resetInviteForm()
@@ -304,7 +324,8 @@ async function handleFullDetailsSubmit() {
 
     if (error) {
       console.error('Invite new user failed', error)
-      toast.error(t('invitation-failed', 'Invitation failed'))
+      const errorMessage = await resolveInviteNewUserErrorMessage(error)
+      toast.error(errorMessage ?? t('invitation-failed', 'Invitation failed'))
       return
     }
 

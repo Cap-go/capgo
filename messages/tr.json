@@ -763,6 +763,7 @@
   "invitation-page": "Görünüşe göre birisi sizi Capgo'daki organizasyonlarına katılmaya davet etmiş.",
   "invitation-page-description": "İşte davet detayları",
   "invitation-page-not-found": "Hata, davetin geçerli olmadığı görünüyor. Belki iptal edildi veya süresi doldu.",
+  "invitation-resend-wait": "Please wait {minutes} minutes before resending the invitation.",
   "invitation-rescinded": "Davetiye başarıyla geri çekildi!",
   "invite-accepted": "Başarıyla kuruluş daveti kabul edildi",
   "invite-new-user-dialog-header": "Yeni Kullanıcı Davet Et",
