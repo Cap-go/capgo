@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { BASE_URL, USER_EMAIL, getSupabaseClient, headers, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_EMAIL, USER_ID, USER_ID_2 } from './test-utils.ts'
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
@@ -351,6 +351,61 @@ describe('[POST] /private/validate_password_compliance', () => {
 
     expect(meetsError).toBeNull()
     expect(meetsPolicy).toBe(true)
+  })
+
+  it('rejects request when user is not a member of the org', async () => {
+    const nonMemberOrgId = randomUUID()
+    const nonMemberCustomerId = `cus_pwd_non_member_${nonMemberOrgId}`
+
+    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
+      customer_id: nonMemberCustomerId,
+      status: 'succeeded',
+      product_id: 'prod_LQIregjtNduh4q',
+      subscription_id: `sub_non_member_${nonMemberOrgId}`,
+      trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+      is_good_plan: true,
+    })
+    if (stripeError)
+      throw stripeError
+
+    const { error: orgError } = await getSupabaseClient().from('orgs').insert({
+      id: nonMemberOrgId,
+      name: `Non-member org ${nonMemberOrgId}`,
+      management_email: TEST_EMAIL,
+      created_by: USER_ID_2,
+      customer_id: nonMemberCustomerId,
+      password_policy_config: {
+        enabled: true,
+        min_length: 6,
+        require_uppercase: false,
+        require_number: false,
+        require_special: false,
+      },
+    })
+    if (orgError)
+      throw orgError
+
+    try {
+      const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
+        headers,
+        method: 'POST',
+        body: JSON.stringify({
+          email: USER_EMAIL,
+          password: 'testtest',
+          org_id: nonMemberOrgId,
+        }),
+      })
+
+      expect(response.status).toBe(403)
+      const responseData = await response.json() as { error?: string }
+      expect(responseData.error).toBe('not_member')
+    }
+    finally {
+      await getSupabaseClient().from('user_password_compliance').delete().eq('org_id', nonMemberOrgId)
+      await getSupabaseClient().from('org_users').delete().eq('org_id', nonMemberOrgId)
+      await getSupabaseClient().from('orgs').delete().eq('id', nonMemberOrgId)
+      await getSupabaseClient().from('stripe_info').delete().eq('customer_id', nonMemberCustomerId)
+    }
   })
 })
 
