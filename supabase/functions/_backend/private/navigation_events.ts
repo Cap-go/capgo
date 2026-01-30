@@ -74,20 +74,37 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   const channelName = `navigation:${app.owner_org}`
   
   try {
-    const { error: broadcastError } = await supabase
-      .channel(channelName)
-      .send({
-        type: 'broadcast',
-        event: 'navigation',
-        payload: {
-          type: body.type,
-          data: body.data,
-        },
+    // Create a channel and subscribe before broadcasting
+    const channel = supabase.channel(channelName)
+    
+    // Subscribe to the channel (required before sending)
+    await new Promise<void>((resolve, reject) => {
+      channel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          resolve()
+        }
+        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          reject(new Error(`Channel subscription failed: ${status}`))
+        }
       })
+    })
 
-    if (broadcastError) {
-      cloudlog({ requestId, message: 'broadcast_error', error: broadcastError })
-      return simpleError('broadcast_failed', 'Failed to broadcast navigation event', { error: broadcastError })
+    // Broadcast the message
+    const sendResult = await channel.send({
+      type: 'broadcast',
+      event: 'navigation',
+      payload: {
+        type: body.type,
+        data: body.data,
+      },
+    })
+
+    // Unsubscribe from the channel after sending
+    await supabase.removeChannel(channel)
+
+    if (sendResult !== 'ok') {
+      cloudlog({ requestId, message: 'broadcast_send_failed', result: sendResult })
+      return simpleError('broadcast_failed', 'Failed to broadcast navigation event')
     }
 
     cloudlog({ requestId, message: 'navigation_event_broadcasted', channel: channelName, type: body.type })
