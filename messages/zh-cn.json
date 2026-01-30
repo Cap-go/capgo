@@ -322,6 +322,7 @@
   "change-encryption-key-warning-description": "更改所需的加密密钥将会把用其他密钥加密的包标记为已删除。",
   "change-encryption-key-warning-title": "警告：包将被删除",
   "change-password": "更改密码",
+  "change-org-picture": "上传组织图片",
   "change-your-picture": "改变你的图片",
   "changed-allow-preview": "成功更改了预览设置",
   "changed-app-name": "更改应用名称成功",

@@ -322,6 +322,7 @@
   "change-encryption-key-warning-description": "Cambiare la chiave di crittografia richiesta contrassegnerà i pacchetti criptati con altre chiavi come eliminati.",
   "change-encryption-key-warning-title": "Attenzione: I pacchetti saranno eliminati",
   "change-password": "Cambia password",
+  "change-org-picture": "Carica l'immagine dell'organizzazione",
   "change-your-picture": "Cambia la tua immagine",
   "changed-allow-preview": "Impostazione dell'anteprima consentita modificata con successo",
   "changed-app-name": "Nome dell'app modificato con successo",

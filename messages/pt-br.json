@@ -322,6 +322,7 @@
   "change-encryption-key-warning-description": "Alterar a chave de criptografia necessária marcará os pacotes criptografados com outras chaves como excluídos.",
   "change-encryption-key-warning-title": "Aviso: Pacotes Serão Excluídos",
   "change-password": "Alterar senha",
+  "change-org-picture": "Envie a imagem da organização",
   "change-your-picture": "Mude sua foto",
   "changed-allow-preview": "Configuração de permissão de visualização alterada com sucesso",
   "changed-app-name": "Nome do aplicativo alterado com sucesso",

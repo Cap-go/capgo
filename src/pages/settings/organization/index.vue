@@ -53,7 +53,7 @@ async function presentActionSheet() {
   }
 
   dialogStore.openDialog({
-    title: t('change-your-picture'),
+    title: t('change-org-picture'),
     buttons: [
       {
         text: t('button-cancel'),
