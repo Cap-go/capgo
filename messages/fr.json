@@ -763,7 +763,7 @@
   "invitation-page": "Il semble que quelqu'un vous ait invité à rejoindre leur organisation à Capgo.",
   "invitation-page-description": "Voici les détails de l'invitation",
   "invitation-page-not-found": "Oups, il semble que l'invitation ne soit pas valide. Peut-être a-t-elle été annulée ou a-t-elle expiré.",
-  "invitation-resend-wait": "Please wait {minutes} minutes before resending the invitation.",
+  "invitation-resend-wait": "Veuillez attendre {minutes} minutes avant de renvoyer l'invitation.",
   "invitation-rescinded": "Invitation révoquée avec succès !",
   "invite-accepted": "Invitation à l'organisation acceptée avec succès",
   "invite-new-user-dialog-header": "Inviter un nouvel utilisateur",

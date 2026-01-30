@@ -3,7 +3,6 @@ import type { TableColumn } from '~/components/comp_def'
 import type { ExtendedOrganizationMember } from '~/stores/organization'
 import type { Database } from '~/types/supabase.types'
 
-import { FunctionsHttpError } from '@supabase/supabase-js'
 import { computedAsync } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { computed, h, onMounted, ref, watch } from 'vue'
@@ -20,6 +19,7 @@ import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { getRbacRoleI18nKey, useOrganizationStore } from '~/stores/organization'
+import { resolveInviteNewUserErrorMessage } from '~/utils/invites'
 import DeleteOrgDialog from './DeleteOrgDialog.vue'
 
 const { t } = useI18n()
@@ -77,24 +77,6 @@ const searchUserForAdminDelegation = ref('')
 
 const members = ref([] as OrganizationMemberRows)
 
-async function resolveInviteNewUserErrorMessage(error: unknown): Promise<string | null> {
-  if (error instanceof FunctionsHttpError && error.context instanceof Response) {
-    try {
-      const json = await error.context.clone().json() as { error?: string, moreInfo?: { reason?: string, cooldown_minutes?: number } }
-      if (json?.error === 'user_already_invited') {
-        if (json?.moreInfo?.reason === 'invite_cancelled_recently')
-          return t('too-recent-invitation-cancelation')
-
-        const cooldownMinutes = Number(json?.moreInfo?.cooldown_minutes ?? 5)
-        return t('invitation-resend-wait', { minutes: Number.isFinite(cooldownMinutes) ? cooldownMinutes : 5 })
-      }
-    }
-    catch {
-      return null
-    }
-  }
-  return null
-}
 
 const isInviteFormValid = computed(() => {
   return inviteUserFirstName.value.trim() !== ''
@@ -1120,7 +1102,7 @@ async function handleInviteNewUserSubmit() {
 
     if (error) {
       console.error('Invitation failed:', error)
-      const errorMessage = await resolveInviteNewUserErrorMessage(error)
+      const errorMessage = await resolveInviteNewUserErrorMessage(error, t)
       toast.error(errorMessage ?? t('invitation-failed', 'Invitation failed'))
       return false
     }
@@ -1136,7 +1118,7 @@ async function handleInviteNewUserSubmit() {
   }
   catch (error) {
     console.error('Invitation failed:', error)
-    const errorMessage = await resolveInviteNewUserErrorMessage(error)
+    const errorMessage = await resolveInviteNewUserErrorMessage(error, t)
     toast.error(errorMessage ?? t('invitation-failed', 'Invitation failed'))
     return false
   }

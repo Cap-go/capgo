@@ -197,7 +197,7 @@ app.post('/', middlewareAuth, async (c) => {
   if (existingInvitation) {
     const nowMinusThreeHours = dayjs().subtract(3, 'hours')
     if (existingInvitation.cancelled_at && !dayjs(nowMinusThreeHours).isAfter(dayjs(existingInvitation.cancelled_at))) {
-      throw simpleError('user_already_invited', 'User already invited and it hasnt been 3 hours since the last invitation was cancelled', {
+      throw simpleError('user_already_invited', 'User already invited and it hasn\'t been 3 hours since the last invitation was cancelled', {
         reason: 'invite_cancelled_recently',
         cooldown_minutes: 180,
       })
@@ -223,7 +223,6 @@ app.post('/', middlewareAuth, async (c) => {
         role: legacyInviteType,
         rbac_role_name: rbacRoleName,
         invite_magic_string: generateInviteMagicString(),
-        created_at: new Date().toISOString(),
       })
       .eq('email', body.email)
       .eq('org_id', body.org_id)

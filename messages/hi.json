@@ -763,7 +763,7 @@
   "invitation-page": "ऐसा लगता है कि किसी ने आपको Capgo में उनके संगठन में शामिल होने के लिए आमंत्रित किया है।",
   "invitation-page-description": "यहां निमंत्रण का विवरण है",
   "invitation-page-not-found": "उफ, ऐसा लगता है कि निमंत्रण मान्य नहीं है। शायद इसे रद्द कर दिया गया हो या समाप्त हो चुका हो।",
-  "invitation-resend-wait": "Please wait {minutes} minutes before resending the invitation.",
+  "invitation-resend-wait": "कृपया निमंत्रण दोबारा भेजने से पहले {minutes} मिनट प्रतीक्षा करें।",
   "invitation-rescinded": "निमंत्रण सफलतापूर्वक रद्द कर दिया गया!",
   "invite-accepted": "संगठन के निमंत्रण को सफलतापूर्वक स्वीकार किया गया",
   "invite-new-user-dialog-header": "नया उपयोगकर्ता आमंत्रित करें",

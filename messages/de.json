@@ -763,7 +763,7 @@
   "invitation-page": "Es sieht so aus, als hätte jemand Sie eingeladen, seiner Organisation in Capgo beizutreten.",
   "invitation-page-description": "Hier sind die Einladungsdetails",
   "invitation-page-not-found": "Hoppla, es sieht so aus, als ob die Einladung nicht gültig ist. Vielleicht wurde sie abgesagt oder ist abgelaufen.",
-  "invitation-resend-wait": "Please wait {minutes} minutes before resending the invitation.",
+  "invitation-resend-wait": "Bitte warten Sie {minutes} Minuten, bevor Sie die Einladung erneut senden.",
   "invitation-rescinded": "Einladung erfolgreich zurückgezogen!",
   "invite-accepted": "Erfolgreich angenommene Organisationseinladung",
   "invite-new-user-dialog-header": "Neuen Benutzer einladen",

@@ -763,7 +763,7 @@
   "invitation-page": "どうやらあなたがCapgoの組織に参加するように誰かから招待されているようです。",
   "invitation-page-description": "こちらが招待状の詳細です",
   "invitation-page-not-found": "おっと、招待が無効のようです。キャンセルされたか、期限切れになった可能性があります。",
-  "invitation-resend-wait": "Please wait {minutes} minutes before resending the invitation.",
+  "invitation-resend-wait": "招待を再送信する前に{minutes}分お待ちください。",
   "invitation-rescinded": "正常に招待を取り消しました！",
   "invite-accepted": "組織の招待を成功裏に受け入れました",
   "invite-new-user-dialog-header": "新規ユーザーを招待する",

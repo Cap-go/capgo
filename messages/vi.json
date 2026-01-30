@@ -763,7 +763,7 @@
   "invitation-page": "Có vẻ như ai đó đã mời bạn tham gia tổ chức của họ tại Capgo.",
   "invitation-page-description": "Đây là chi tiết lời mời",
   "invitation-page-not-found": "Ồ, có vẻ như lời mời không hợp lệ. Có thể nó đã bị hủy hoặc hết hạn.",
-  "invitation-resend-wait": "Please wait {minutes} minutes before resending the invitation.",
+  "invitation-resend-wait": "Vui lòng đợi {minutes} phút trước khi gửi lại lời mời.",
   "invitation-rescinded": "Lời mời đã được rút lại thành công!",
   "invite-accepted": "Đã chấp nhận thành công lời mời từ tổ chức",
   "invite-new-user-dialog-header": "Mời Người Dùng Mới",

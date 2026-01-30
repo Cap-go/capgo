@@ -763,7 +763,7 @@
   "invitation-page": "Wygląda na to, że ktoś zaprosił cię do swojej organizacji w Capgo.",
   "invitation-page-description": "Oto szczegóły zaproszenia",
   "invitation-page-not-found": "Ups, wygląda na to, że zaproszenie jest nieważne. Być może zostało anulowane lub wygasło.",
-  "invitation-resend-wait": "Please wait {minutes} minutes before resending the invitation.",
+  "invitation-resend-wait": "Poczekaj {minutes} minut przed ponownym wysłaniem zaproszenia.",
   "invitation-rescinded": "Zaproszenie pomyślnie wycofane!",
   "invite-accepted": "Pomyślnie zaakceptowano zaproszenie do organizacji",
   "invite-new-user-dialog-header": "Zaproś Nowego Użytkownika",
