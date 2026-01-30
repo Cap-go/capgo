@@ -62,7 +62,11 @@ export const useMainStore = defineStore('main', () => {
           // Import dynamically to avoid circular dependency
           import('./realtimeEvents').then((module) => {
             const realtimeEventsStore = module.useRealtimeEventsStore()
-            realtimeEventsStore.unsubscribe()
+            realtimeEventsStore.unsubscribe().catch((error) => {
+              console.error('Error unsubscribing from realtime events:', error)
+            })
+          }).catch((error) => {
+            console.error('Error loading realtimeEvents module:', error)
           })
           
           resolve()

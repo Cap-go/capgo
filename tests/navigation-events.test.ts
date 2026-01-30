@@ -171,7 +171,7 @@ describe('[POST] /private/navigation_events operations', () => {
       }),
     })
 
-    expect(response.status).toBe(400)
+    expect(response.status).toBe(404)
   })
 
   it('should reject malformed body', async () => {

@@ -50,7 +50,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
 
   if (appError || !app) {
     cloudlog({ requestId, message: 'app_not_found_for_navigation_event', appId: body.data.appId, error: appError })
-    return simpleError('app_not_found', 'App not found')
+    return c.json({ error: 'app_not_found', message: 'App not found' }, 404)
   }
 
   // Verify the authenticated user has access to this app's org
@@ -67,7 +67,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
 
   if (!userOrgId || userOrgId !== app.owner_org) {
     cloudlog({ requestId, message: 'unauthorized_navigation_event', userOrgId, appOwnerOrg: app.owner_org })
-    return simpleError('unauthorized', 'Not authorized to send events for this app')
+    return c.json({ error: 'unauthorized', message: 'Not authorized to send events for this app' }, 403)
   }
 
   // Broadcast the event to the org's navigation channel
@@ -79,11 +79,17 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     
     // Subscribe to the channel (required before sending)
     await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Channel subscription timeout'))
+      }, 5000) // 5 second timeout
+
       channel.subscribe((status) => {
         if (status === 'SUBSCRIBED') {
+          clearTimeout(timeout)
           resolve()
         }
-        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+        else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          clearTimeout(timeout)
           reject(new Error(`Channel subscription failed: ${status}`))
         }
       })
@@ -99,7 +105,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
       },
     })
 
-    // Unsubscribe from the channel after sending
+    // Unsubscribe from the channel after sending (cleanup)
     await supabase.removeChannel(channel)
 
     if (sendResult !== 'ok') {
