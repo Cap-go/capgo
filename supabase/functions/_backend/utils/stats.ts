@@ -2,11 +2,11 @@ import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import type { DeviceRes, DeviceWithoutCreatedAt, ReadDevicesParams, ReadDevicesResponse, ReadStatsParams, StatsActions, VersionUsage } from './types.ts'
 import { getRuntimeKey } from 'hono/adapter'
-import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
+import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDeviceVersionCountsCF, readDevicesCF, readDeviceUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
 import { isAppDemo } from './demo.ts'
 import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
-import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
+import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDeviceVersionCountsSB, readDevicesSB, readDeviceUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
 import { DEFAULT_LIMIT } from './types.ts'
 import { backgroundTask } from './utils.ts'
 
@@ -124,6 +124,12 @@ export function readStatsVersion(c: Context, app_id: string, start_date: string,
   if (!c.env.VERSION_USAGE)
     return readStatsVersionSB(c, app_id, start_date, end_date)
   return readStatsVersionCF(c, app_id, start_date, end_date)
+}
+
+export function readDeviceVersionCounts(c: Context, app_id: string, channelName?: string): Promise<Record<string, number>> {
+  if (!c.env.DEVICE_INFO)
+    return readDeviceVersionCountsSB(c, app_id, channelName)
+  return readDeviceVersionCountsCF(c, app_id, channelName)
 }
 
 /**

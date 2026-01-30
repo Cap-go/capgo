@@ -6,6 +6,7 @@ import AppNotFoundModal from '~/components/AppNotFoundModal.vue'
 import BundleUploadsCard from '~/components/dashboard/BundleUploadsCard.vue'
 import DeploymentBanner from '~/components/dashboard/DeploymentBanner.vue'
 import DeploymentStatsCard from '~/components/dashboard/DeploymentStatsCard.vue'
+import ReleaseBanner from '~/components/dashboard/ReleaseBanner.vue'
 import UpdateStatsCard from '~/components/dashboard/UpdateStatsCard.vue'
 import { getCapgoVersion, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
@@ -129,6 +130,7 @@ watchEffect(async () => {
         <!-- Content - blurred when app not found -->
         <div :class="{ 'blur-sm pointer-events-none select-none': appNotFound }">
           <DeploymentBanner v-if="!appNotFound" :app-id="id" @deployed="refreshData" />
+          <ReleaseBanner v-if="!appNotFound" :app-id="id" />
           <Usage v-if="!lacksSecurityAccess" ref="usageComponent" :app-id="id" :force-demo="appNotFound" />
 
           <!-- Charts section -->

@@ -461,6 +461,42 @@ ORDER BY date`
   return []
 }
 
+export async function readDeviceVersionCountsCF(c: Context, app_id: string, channelName?: string): Promise<Record<string, number>> {
+  if (!c.env.DEVICE_INFO)
+    return {}
+
+  const safeChannel = channelName ? channelName.replace(/'/g, `''`) : ''
+  const channelFilter = safeChannel ? `AND default_channel = '${safeChannel}'` : ''
+
+  const query = `SELECT
+  version_name,
+  count() AS device_count
+FROM (
+  SELECT
+    argMax(blob2, timestamp) AS version_name,
+    argMax(blob7, timestamp) AS default_channel,
+    blob1 AS device_id
+  FROM device_info
+  WHERE index1 = '${app_id}'
+  GROUP BY blob1
+)
+WHERE version_name != '' ${channelFilter}
+GROUP BY version_name`
+
+  cloudlog({ requestId: c.get('requestId'), message: 'readDeviceVersionCountsCF query', query })
+  try {
+    const result = await runQueryToCFA<{ version_name: string, device_count: number }>(c, query)
+    return result.reduce<Record<string, number>>((acc, row) => {
+      acc[row.version_name] = row.device_count
+      return acc
+    }, {})
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device version counts from Analytics Engine', error: serializeError(e), query })
+  }
+  return {}
+}
+
 export async function countDevicesCF(c: Context, app_id: string, customIdMode: boolean) {
   // Use Analytics Engine DEVICE_INFO for counting devices
   const customIdFilter = customIdMode ? `AND blob5 != ''` : ''

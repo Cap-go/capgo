@@ -1,6 +1,7 @@
 import { app as accept_invitation } from '../_backend/private/accept_invitation.ts'
 import { app as admin_credits } from '../_backend/private/admin_credits.ts'
 import { app as admin_stats } from '../_backend/private/admin_stats.ts'
+import { app as channel_stats } from '../_backend/private/channel_stats.ts'
 import { app as config } from '../_backend/private/config.ts'
 import { app as create_device } from '../_backend/private/create_device.ts'
 import { app as credits } from '../_backend/private/credits.ts'
@@ -38,6 +39,7 @@ appGlobal.route('/website_stats', publicStats)
 appGlobal.route('/config', config)
 appGlobal.route('/devices', devices_priv)
 appGlobal.route('/create_device', create_device)
+appGlobal.route('/channel_stats', channel_stats)
 appGlobal.route('/download_link', download_link)
 appGlobal.route('/log_as', log_as)
 appGlobal.route('/admin_credits', admin_credits)

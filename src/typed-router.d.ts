@@ -184,6 +184,13 @@ declare module 'vue-router/auto-routes' {
       { package: ParamValue<false>, channel: ParamValue<false> },
       | never
     >,
+    '/app/[package].channel.[channel].statistics': RouteRecordInfo<
+      '/app/[package].channel.[channel].statistics',
+      '/app/:package/channel/:channel/statistics',
+      { package: ParamValue<true>, channel: ParamValue<true> },
+      { package: ParamValue<false>, channel: ParamValue<false> },
+      | never
+    >,
     '/app/[package].channels': RouteRecordInfo<
       '/app/[package].channels',
       '/app/:package/channels',
@@ -577,6 +584,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/app/[package].channel.[channel].history.vue': {
       routes:
         | '/app/[package].channel.[channel].history'
+      views:
+        | never
+    }
+    'src/pages/app/[package].channel.[channel].statistics.vue': {
+      routes:
+        | '/app/[package].channel.[channel].statistics'
       views:
         | never
     }
