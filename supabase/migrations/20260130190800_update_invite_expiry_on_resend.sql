@@ -76,44 +76,47 @@ RETURNS TABLE(
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = '' AS $$
+DECLARE
+  api_key_text text;
 BEGIN
+  SELECT public.get_apikey_header() INTO api_key_text;
+
+  IF NOT public.rbac_check_permission_direct(public.rbac_perm_org_read(), auth.uid(), p_org_id, NULL, NULL, api_key_text) THEN
+    RAISE EXCEPTION 'NO_PERMISSION_TO_VIEW_MEMBERS';
+  END IF;
+
   RETURN QUERY
   WITH rbac_members AS (
     SELECT
       u.id AS user_id,
       u.email,
       u.image_url,
-      COALESCE(r.name, public.rbac_role_org_member()) AS role_name,
-      r.id AS role_id,
+      r.name AS role_name,
+      rb.role_id,
       rb.id AS binding_id,
       rb.granted_at,
       false AS is_invite,
       false AS is_tmp,
-      ou.id AS org_user_id
-    FROM public.org_users ou
-    INNER JOIN public.users u ON u.id = ou.user_id
-    LEFT JOIN public.role_bindings rb
-      ON rb.principal_id = ou.user_id
-      AND rb.principal_type = 'user'
-      AND rb.org_id = ou.org_id
-      AND rb.scope_type = 'org'
-      AND rb.is_direct = true
-    LEFT JOIN public.roles r
-      ON r.id = rb.role_id
-      AND r.scope_type = 'org'
-    WHERE ou.org_id = p_org_id
-      AND ou.user_right::text NOT LIKE 'invite_%'
+      NULL::bigint AS org_user_id
+    FROM public.users u
+    INNER JOIN public.role_bindings rb ON rb.principal_id = u.id
+      AND rb.principal_type = public.rbac_principal_user()
+      AND rb.scope_type = public.rbac_scope_org()
+      AND rb.org_id = p_org_id
+    INNER JOIN public.roles r ON rb.role_id = r.id
+    WHERE r.scope_type = public.rbac_scope_org()
+      AND r.name LIKE 'org_%'
   ),
   legacy_invites AS (
     SELECT
       u.id AS user_id,
       u.email,
       u.image_url,
-      (
+      COALESCE(
+        ou.rbac_role_name,
         CASE public.transform_role_to_non_invite(ou.user_right)
           WHEN public.rbac_right_super_admin() THEN public.rbac_role_org_super_admin()
           WHEN public.rbac_right_admin() THEN public.rbac_role_org_admin()
-          WHEN public.rbac_right_billing_admin() THEN public.rbac_role_org_billing_admin()
           ELSE public.rbac_role_org_member()
         END
       ) AS role_name,
