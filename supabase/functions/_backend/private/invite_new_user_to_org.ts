@@ -26,7 +26,7 @@ const inviteUserSchema = z.object({
     'org_admin',
     'org_super_admin',
   ]),
-  captcha_token: z.string().optional(),
+  captcha_token: z.optional(z.string().check(z.minLength(1))),
   first_name: z.string().check(z.minLength(1)),
   last_name: z.string().check(z.minLength(1)),
 })
