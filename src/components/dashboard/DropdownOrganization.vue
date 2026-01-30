@@ -176,6 +176,16 @@ function isSelected(org: Organization) {
   return !!(currentOrganization.value && org.gid === currentOrganization.value.gid)
 }
 
+function acronym(name: string) {
+  const trimmed = name.trim()
+  if (!trimmed)
+    return '?'
+  const parts = trimmed.split(/\s+/)
+  const first = parts[0]?.[0] ?? ''
+  const second = parts.length > 1 ? (parts[1]?.[0] ?? '') : (parts[0]?.[1] ?? '')
+  return (first + second).toUpperCase()
+}
+
 function onOrgItemClick(org: Organization, e: MouseEvent) {
   if (isSelected(org)) {
     e.preventDefault()
@@ -191,6 +201,18 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
     <details v-show="currentOrganization" ref="dropdown" class="w-full d-dropdown d-dropdown-end">
       <summary class="justify-between shadow-none w-full d-btn d-btn-sm border border-gray-700 text-white bg-[#1a1d24] hover:bg-gray-700 hover:text-white active:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-800">
         <div class="flex items-center w-4/5 text-left">
+          <img
+            v-if="currentOrganization?.logo"
+            :src="currentOrganization.logo"
+            :alt="`${currentOrganization.name} logo`"
+            class="object-cover w-6 h-6 mr-2 rounded-sm d-mask d-mask-squircle shrink-0"
+          >
+          <div
+            v-else
+            class="flex items-center justify-center w-6 h-6 mr-2 text-xs font-semibold text-gray-300 bg-gray-700 rounded-sm d-mask d-mask-squircle shrink-0"
+          >
+            {{ acronym(currentOrganization?.name ?? '') }}
+          </div>
           <span class="truncate">{{ currentOrganization?.name }}</span>
           <div v-if="hasNewInvitation" class="w-3 h-3 ml-1 bg-red-500 rounded-full" />
         </div>
@@ -210,7 +232,21 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
               :aria-current="isSelected(org) ? 'true' : undefined"
               @click="onOrgItemClick(org, $event)"
             >
-              <span class="truncate">{{ org.name }}</span>
+              <div class="flex items-center min-w-0">
+                <img
+                  v-if="org.logo"
+                  :src="org.logo"
+                  :alt="`${org.name} logo`"
+                  class="object-cover w-6 h-6 mr-2 rounded-sm d-mask d-mask-squircle shrink-0"
+                >
+                <div
+                  v-else
+                  class="flex items-center justify-center w-6 h-6 mr-2 text-xs font-semibold text-gray-300 bg-gray-700 rounded-sm d-mask d-mask-squircle shrink-0"
+                >
+                  {{ acronym(org.name) }}
+                </div>
+                <span class="truncate">{{ org.name }}</span>
+              </div>
               <div class="flex items-center gap-2">
                 <div v-if="org.role.startsWith('invite')" class="w-3 h-3 bg-red-500 rounded-full" />
               </div>

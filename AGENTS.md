@@ -48,8 +48,8 @@ testing against Cloudflare Workers.
 
 ### Database and Backend
 
-- `supabase start` - Start local Supabase instance
-- `supabase db reset` - Reset and seed local database
+- `bunx supabase start` - Start local Supabase instance
+- `bunx supabase db reset` - Reset and seed local database
 - `bun backend` - Start Supabase functions locally
 - `bun reset` - Reset Supabase database
 
@@ -120,8 +120,8 @@ Do NOT use `c.body(null, 204)` for success responses. Always return JSON for con
 ### Environment Setup
 
 1. Install dependencies: `bun install`
-2. Start Supabase: `supabase start`
-3. Reset database with seed data: `supabase db reset`
+2. Start Supabase: `bunx supabase start`
+3. Reset database with seed data: `bunx supabase db reset`
 4. Start frontend: `bun serve:dev`
 
 ### Test Accounts (Local Development)
@@ -225,7 +225,7 @@ Then in your test file, use ONLY these dedicated resources for modifications.
 - Use the Supabase CLI for every migration and operational task whenever
   possible; avoid manual changes through the dashboard or direct SQL.
 - When a feature requires schema changes, create a single migration file with
-  the Supabase CLI (`supabase migration new <feature_slug>`) and keep editing
+  the Supabase CLI (`bunx supabase migration new <feature_slug>`) and keep editing
   that file until the feature ships; never edit previously committed migrations.
 - Updating `supabase/seed.sql` to back new or evolved tests is expected; keep
   fixtures focused on current behavior while leaving committed migrations
