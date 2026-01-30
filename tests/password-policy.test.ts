@@ -15,25 +15,75 @@ async function createAuthUser(password = TEST_PASSWORD) {
 
   await executeSQL(
     `INSERT INTO auth.users (
+        instance_id,
         id,
+        aud,
+        role,
         email,
-        raw_user_meta_data,
+        encrypted_password,
+        email_confirmed_at,
+        invited_at,
+        confirmation_token,
+        confirmation_sent_at,
+        recovery_token,
+        recovery_sent_at,
+        email_change_token_new,
+        email_change,
+        email_change_sent_at,
+        last_sign_in_at,
         raw_app_meta_data,
+        raw_user_meta_data,
+        is_super_admin,
         created_at,
         updated_at,
-        email_confirmed_at,
-        encrypted_password
+        phone,
+        phone_confirmed_at,
+        phone_change,
+        phone_change_token,
+        phone_change_sent_at,
+        email_change_token_current,
+        email_change_confirm_status,
+        banned_until,
+        reauthentication_token,
+        reauthentication_sent_at,
+        is_sso_user,
+        is_anonymous
       ) VALUES (
+        '00000000-0000-0000-0000-000000000000',
         $1,
+        'authenticated',
+        'authenticated',
         $2,
-        jsonb_build_object('test_identifier', $3),
-        '{}'::jsonb,
+        crypt($4::text, gen_salt('bf')),
         NOW(),
         NOW(),
+        $5,
         NOW(),
-        crypt($4, gen_salt('bf'))
+        '',
+        NULL,
+        '',
+        '',
+        NULL,
+        NOW(),
+        '{"provider": "email", "providers": ["email"]}'::jsonb,
+        jsonb_build_object('test_identifier', $3::text),
+        false,
+        NOW(),
+        NOW(),
+        NULL,
+        NULL,
+        '',
+        '',
+        NULL,
+        '',
+        0,
+        NULL,
+        '',
+        NULL,
+        false,
+        false
       )`,
-    [userId, email, `password-policy-${userId}`, password],
+    [userId, email, `password-policy-${userId}`, password, `pwd-policy-${userId}`],
   )
 
   const { error: userError } = await getSupabaseClient()
@@ -387,6 +437,15 @@ describe('[POST] /private/validate_password_compliance', () => {
     if (orgError)
       throw orgError
 
+    const orgRows = await executeSQL('SELECT id FROM public.orgs WHERE id = $1', [testOrgId])
+    if (orgRows.length === 0)
+      throw new Error('Org was not created for password policy test')
+
+    const orgCreatedBy = await executeSQL('SELECT created_by FROM public.orgs WHERE id = $1', [testOrgId])
+    const orgUsers = await executeSQL('SELECT user_id FROM public.org_users WHERE user_id = $1 AND org_id = $2', [userId, testOrgId])
+    expect(orgCreatedBy[0]?.created_by).toBe(userId)
+    expect(orgUsers.length).toBeGreaterThan(0)
+
     try {
       const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
         headers,
@@ -398,8 +457,8 @@ describe('[POST] /private/validate_password_compliance', () => {
         }),
       })
 
+      const responseData = await response.json() as { status?: string, error?: string, message?: string }
       expect(response.status).toBe(200)
-      const responseData = await response.json() as { status?: string }
       expect(responseData.status).toBe('ok')
 
       const { data: meetsPolicy, error: meetsError } = await getSupabaseClient().rpc('user_meets_password_policy', {

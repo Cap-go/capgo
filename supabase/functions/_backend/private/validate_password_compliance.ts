@@ -3,7 +3,7 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
+import { emptySupabase, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 
 interface ValidatePasswordCompliance {
   email: string
@@ -92,8 +92,9 @@ app.post('/', async (c) => {
   }
 
   // Attempt to sign in with the provided credentials to verify password
-  // Note: signInWithPassword needs admin to work without session
-  const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
+  // Use a separate client so admin requests stay in service-role context
+  const supabaseAuth = emptySupabase(c)
+  const { data: signInData, error: signInError } = await supabaseAuth.auth.signInWithPassword({
     email: body.email,
     password: body.password,
   })
@@ -104,34 +105,28 @@ app.post('/', async (c) => {
   }
 
   const userId = signInData.user.id
-
-  const isOwner = org.created_by === userId
-  const { data: legacyMember, error: legacyError } = await supabaseAdmin
-    .from('org_users')
+  const { data: publicUser, error: publicUserError } = await supabaseAdmin
+    .from('users')
     .select('id')
-    .eq('org_id', body.org_id)
-    .eq('user_id', userId)
+    .eq('email', body.email)
     .maybeSingle()
 
-  if (legacyError) {
-    cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - org_users lookup failed', error: legacyError.message })
-    return quickError(500, 'membership_check_failed', 'Failed to verify organization membership', { error: legacyError.message })
+  if (publicUserError) {
+    cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - public user lookup failed', error: publicUserError.message })
+    return quickError(500, 'membership_check_failed', 'Failed to verify organization membership', { error: publicUserError.message })
   }
 
-  const { data: rbacMember, error: rbacError } = await supabaseAdmin
-    .from('role_bindings')
-    .select('id')
-    .eq('principal_type', 'user')
-    .eq('principal_id', userId)
-    .eq('org_id', body.org_id)
-    .maybeSingle()
+  const membershipUserId = publicUser?.id ?? userId
+  const isOwner = org.created_by === membershipUserId || org.created_by === userId
+  const { data: isMember, error: memberError } = await supabaseAdmin
+    .rpc('is_member_of_org', { user_id: membershipUserId, org_id: body.org_id })
 
-  if (rbacError) {
-    cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - role_bindings lookup failed', error: rbacError.message })
-    return quickError(500, 'membership_check_failed', 'Failed to verify organization membership', { error: rbacError.message })
+  if (memberError) {
+    cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - membership rpc failed', error: memberError.message })
+    return quickError(500, 'membership_check_failed', 'Failed to verify organization membership', { error: memberError.message })
   }
 
-  if (!isOwner && !legacyMember && !rbacMember) {
+  if (!isOwner && !isMember) {
     return quickError(403, 'not_member', 'You are not a member of this organization')
   }
 
