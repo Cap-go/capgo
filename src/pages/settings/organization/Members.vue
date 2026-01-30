@@ -77,7 +77,6 @@ const searchUserForAdminDelegation = ref('')
 
 const members = ref([] as OrganizationMemberRows)
 
-
 const isInviteFormValid = computed(() => {
   return inviteUserFirstName.value.trim() !== ''
     && inviteUserLastName.value.trim() !== ''
