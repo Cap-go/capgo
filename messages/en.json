@@ -341,6 +341,7 @@
   "change": "Change",
   "change-api-key-name": "Change the apikey's name",
   "change-app-organisation-owner": "Transfer the application to another organisation",
+  "change-org-picture": "Upload the organization logo",
   "change-your-picture": "Change your picture",
   "changed-app-name": "Successfully changed app name",
   "changed-app-retention": "Successfully changed the app's retention",

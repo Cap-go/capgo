@@ -322,6 +322,7 @@
   "change-encryption-key-warning-description": "Gerekli şifreleme anahtarını değiştirmek, diğer anahtarlarla şifrelenmiş paketleri silinmiş olarak işaretler.",
   "change-encryption-key-warning-title": "Uyarı: Paketler Silinecek",
   "change-password": "Şifreyi değiştir",
+  "change-org-picture": "Kuruluş logosunu yükle",
   "change-your-picture": "Resminizi değiştirin",
   "changed-allow-preview": "Ön izleme ayarı başarıyla değiştirildi",
   "changed-app-name": "Uygulama adı başarıyla değiştirildi",

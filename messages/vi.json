@@ -322,6 +322,7 @@
   "change-encryption-key-warning-description": "Thay đổi khóa mã hóa yêu cầu sẽ đánh dấu các gói đã được mã hóa bằng các khóa khác như đã bị xóa.",
   "change-encryption-key-warning-title": "Cảnh báo: Gói sẽ được xóa",
   "change-password": "Đổi mật khẩu",
+  "change-org-picture": "Tải lên logo của tổ chức",
   "change-your-picture": "Đổi hình ảnh của bạn",
   "changed-allow-preview": "Đã thay đổi thành công cài đặt cho phép xem trước",
   "changed-app-name": "Đã thay đổi tên ứng dụng thành công",
