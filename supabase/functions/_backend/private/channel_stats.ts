@@ -217,29 +217,6 @@ app.post('/', middlewareAuth, async (c) => {
 
     const filteredDailyVersion = dailyVersion.filter(row => versions.includes(row.version_name))
 
-    const deploymentWindowCounts = { h24: 0, h72: 0, d7: 0 }
-    if (currentVersionReleasedAt && currentVersionName) {
-      const startWindow = dayjs(currentVersionReleasedAt).utc().startOf('day')
-      const end24 = startWindow.add(1, 'day')
-      const end72 = startWindow.add(3, 'day')
-      const end7d = startWindow.add(7, 'day')
-
-      for (const row of filteredDailyVersion) {
-        if (row.version_name !== currentVersionName)
-          continue
-        const rowDate = dayjs(row.date).utc().startOf('day')
-        if (rowDate.isBefore(startWindow))
-          continue
-        const installs = row.install ?? 0
-        if (rowDate.isBefore(end24))
-          deploymentWindowCounts.h24 += installs
-        if (rowDate.isBefore(end72))
-          deploymentWindowCounts.h72 += installs
-        if (rowDate.isBefore(end7d))
-          deploymentWindowCounts.d7 += installs
-      }
-    }
-
     const dailyDeltas: Record<string, Record<string, { install: number, uninstall: number }>> = {}
     for (const row of filteredDailyVersion) {
       if (!dailyDeltas[row.date])
@@ -281,6 +258,22 @@ app.post('/', middlewareAuth, async (c) => {
     const devicesOnCurrent = currentVersionName ? rollingCounts[currentVersionName] ?? 0 : 0
     const percentOnCurrent = totalDevices > 0 ? Math.round((devicesOnCurrent / totalDevices) * 1000) / 10 : 0
     const deploymentHistorySorted = [...deploymentHistory].sort((a, b) => dayjs(b.deployed_at).valueOf() - dayjs(a.deployed_at).valueOf())
+
+    const deploymentWindowCounts = { h24: 0, h72: 0, d7: 0 }
+    if (currentVersionName && labels.length > 0) {
+      const lastIndex = labels.length - 1
+      const getCountAt = (index: number) => {
+        const label = labels[index]
+        return Math.round(countsByDate[label]?.[currentVersionName] ?? 0)
+      }
+      deploymentWindowCounts.h24 = getCountAt(lastIndex)
+      deploymentWindowCounts.h72 = Math.max(0, lastIndex - 2) <= lastIndex
+        ? labels.slice(Math.max(0, lastIndex - 2), lastIndex + 1).reduce((sum, label) => sum + Math.round(countsByDate[label]?.[currentVersionName] ?? 0), 0)
+        : 0
+      deploymentWindowCounts.d7 = Math.max(0, lastIndex - 6) <= lastIndex
+        ? labels.slice(Math.max(0, lastIndex - 6), lastIndex + 1).reduce((sum, label) => sum + Math.round(countsByDate[label]?.[currentVersionName] ?? 0), 0)
+        : 0
+    }
 
     return c.json({
       labels,

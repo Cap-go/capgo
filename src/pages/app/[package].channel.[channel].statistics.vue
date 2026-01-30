@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ChartData, ChartOptions } from 'chart.js'
+import type { TooltipClickHandler } from '~/services/chartTooltip'
 import type { Database } from '~/types/supabase.types'
 import { CategoryScale, Chart, Filler, LinearScale, LineElement, PointElement, Tooltip } from 'chart.js'
 import { computed, ref, watchEffect } from 'vue'
@@ -11,6 +12,7 @@ import IconAlertCircle from '~icons/lucide/alert-circle'
 import IconAlertTriangle from '~icons/lucide/alert-triangle'
 import IconCheckCircle from '~icons/lucide/check-circle'
 import IconTrendingUp from '~icons/lucide/trending-up'
+import { createTooltipConfig } from '~/services/chartTooltip'
 import { formatDistanceToNow } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useAppDetailStore } from '~/stores/appDetail'
@@ -62,6 +64,45 @@ const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
 const stats = ref<ChannelStatsResponse | null>(null)
 const days = ref(14)
 
+const bundleIdCache = ref<Record<string, number>>({})
+const versionByLabel = computed(() => {
+  const mapping: Record<string, string> = {}
+  const datasets = stats.value?.datasets ?? []
+  datasets.forEach((dataset) => {
+    mapping[dataset.label] = dataset.label
+  })
+  return mapping
+})
+
+async function navigateToBundle(versionName: string) {
+  if (!packageId.value)
+    return
+  if (bundleIdCache.value[versionName]) {
+    router.push(`/app/${packageId.value}/bundle/${bundleIdCache.value[versionName]}`)
+    return
+  }
+  const { data } = await supabase
+    .from('app_versions')
+    .select('id')
+    .eq('app_id', packageId.value)
+    .eq('name', versionName)
+    .limit(1)
+    .single()
+  if (data?.id) {
+    bundleIdCache.value[versionName] = data.id
+    router.push(`/app/${packageId.value}/bundle/${data.id}`)
+  }
+}
+
+const tooltipClickHandler = computed<TooltipClickHandler | undefined>(() => {
+  if (!stats.value?.datasets?.length)
+    return undefined
+  return {
+    onAppClick: navigateToBundle,
+    appIdByLabel: versionByLabel.value,
+  }
+})
+
 const statusType = computed(() => {
   if (!stats.value)
     return 'loading'
@@ -91,26 +132,26 @@ const statusMessage = computed(() => {
   }
 })
 
-const releaseDateLabel = computed(() => {
+const currentVersionDeployLabel = computed(() => {
   if (!stats.value?.currentVersionReleasedAt)
     return '-'
   const date = new Date(stats.value.currentVersionReleasedAt)
-  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString()
+  if (Number.isNaN(date.getTime()))
+    return '-'
+  const diffMs = Date.now() - date.getTime()
+  if (diffMs < 24 * 60 * 60 * 1000)
+    return formatDistanceToNow(date)
+  return date.toLocaleDateString()
 })
 
-const deploymentTimeLabel = computed(() => {
-  if (!stats.value?.currentVersionReleasedAt)
-    return '-'
-  const date = new Date(stats.value.currentVersionReleasedAt)
-  return Number.isNaN(date.getTime()) ? '-' : formatDistanceToNow(date)
-})
-
-const lastDeploymentLabel = computed(() => {
-  if (!stats.value?.lastDeploymentAt)
-    return '-'
-  const date = new Date(stats.value.lastDeploymentAt)
-  return Number.isNaN(date.getTime()) ? '-' : date.toLocaleString()
-})
+const chartPalette = [
+  { border: 'rgb(34, 197, 94)', background: 'rgba(34, 197, 94, 0.3)' },
+  { border: 'rgb(251, 146, 60)', background: 'rgba(251, 146, 60, 0.3)' },
+  { border: 'rgb(244, 63, 94)', background: 'rgba(244, 63, 94, 0.3)' },
+  { border: 'rgb(59, 130, 246)', background: 'rgba(59, 130, 246, 0.3)' },
+  { border: 'rgb(168, 85, 247)', background: 'rgba(168, 85, 247, 0.3)' },
+  { border: 'rgb(16, 185, 129)', background: 'rgba(16, 185, 129, 0.3)' },
+] as const
 
 const chartData = computed<ChartData<'line'>>(() => {
   if (!stats.value) {
@@ -126,15 +167,7 @@ const chartData = computed<ChartData<'line'>>(() => {
       return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
     }),
     datasets: stats.value.datasets.map((dataset, index) => {
-      const palette = [
-        { border: 'rgb(34, 197, 94)', background: 'rgba(34, 197, 94, 0.3)' },
-        { border: 'rgb(251, 146, 60)', background: 'rgba(251, 146, 60, 0.3)' },
-        { border: 'rgb(244, 63, 94)', background: 'rgba(244, 63, 94, 0.3)' },
-        { border: 'rgb(59, 130, 246)', background: 'rgba(59, 130, 246, 0.3)' },
-        { border: 'rgb(168, 85, 247)', background: 'rgba(168, 85, 247, 0.3)' },
-        { border: 'rgb(16, 185, 129)', background: 'rgba(16, 185, 129, 0.3)' },
-      ]
-      const color = palette[index % palette.length]
+      const color = chartPalette[index % chartPalette.length]
       return {
         label: dataset.label,
         data: dataset.data,
@@ -150,6 +183,16 @@ const chartData = computed<ChartData<'line'>>(() => {
   }
 })
 
+const currentVersionColor = computed(() => {
+  const current = stats.value?.currentVersion
+  if (!current || !stats.value?.datasets?.length)
+    return null
+  const index = stats.value.datasets.findIndex(dataset => dataset.label === current)
+  if (index < 0)
+    return null
+  return chartPalette[index % chartPalette.length]
+})
+
 const chartOptions = computed<ChartOptions<'line'>>(() => ({
   responsive: true,
   maintainAspectRatio: false,
@@ -161,23 +204,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
     legend: {
       display: false,
     },
-    tooltip: {
-      backgroundColor: 'rgba(0, 0, 0, 0.8)',
-      padding: 12,
-      titleFont: {
-        size: 13,
-      },
-      bodyFont: {
-        size: 12,
-      },
-      callbacks: {
-        title: (context) => {
-          if (context[0]?.label)
-            return context[0].label
-          return ''
-        },
-      },
-    },
+    tooltip: createTooltipConfig(true, false, undefined, tooltipClickHandler.value),
   },
   scales: {
     x: {
@@ -375,7 +402,7 @@ watchEffect(async () => {
                 {{ statusMessage }}
               </h3>
               <p
-                v-if="stats && stats.total_devices > 0"
+                v-if="stats && stats.totals.total_devices > 0"
                 class="mt-1 text-sm"
                 :class="{
                   'text-emerald-700 dark:text-emerald-300': statusType === 'healthy',
@@ -393,11 +420,18 @@ watchEffect(async () => {
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
             <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+              <span
+                class="w-2.5 h-2.5 rounded-full"
+                :style="currentVersionColor ? { backgroundColor: currentVersionColor.border } : undefined"
+              />
               <IconTrendingUp class="w-4 h-4" />
               {{ t('current-version') }}
             </div>
             <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
               {{ stats?.currentVersion || '-' }}
+            </div>
+            <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              {{ t('released') }}: {{ currentVersionDeployLabel }}
             </div>
           </div>
 
@@ -424,82 +458,6 @@ watchEffect(async () => {
             </div>
             <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
               {{ stats ? Math.round(stats.totals.total_devices) : 0 }}
-            </div>
-          </div>
-        </div>
-
-        <!-- Deployment Insights -->
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-            <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-              <IconTrendingUp class="w-4 h-4" />
-              {{ t('deployment-history') }}
-            </div>
-            <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
-              {{ stats?.totalDeployments ?? 0 }}
-            </div>
-            <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {{ t('last-deployment') }}: {{ lastDeploymentLabel }}
-            </div>
-            <div v-if="stats?.deploymentHistory?.length" class="mt-3 space-y-1 text-xs text-slate-600 dark:text-slate-400">
-              <div
-                v-for="entry in stats.deploymentHistory.slice(0, 3)"
-                :key="`${entry.version_name}-${entry.deployed_at}`"
-                class="flex items-center justify-between gap-2"
-              >
-                <span class="truncate">{{ entry.version_name }}</span>
-                <span class="shrink-0">{{ new Date(entry.deployed_at).toLocaleDateString() }}</span>
-              </div>
-            </div>
-          </div>
-
-          <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-            <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-              <IconCheckCircle class="w-4 h-4" />
-              {{ t('released-on-channel') }}
-            </div>
-            <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
-              {{ releaseDateLabel }}
-            </div>
-          </div>
-
-          <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-            <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-              <IconAlertCircle class="w-4 h-4" />
-              {{ t('deployment-time') }}
-            </div>
-            <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
-              {{ deploymentTimeLabel }}
-            </div>
-          </div>
-        </div>
-
-        <!-- Deployment Window Cards -->
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-            <div class="text-sm text-slate-600 dark:text-slate-400">
-              {{ t('deployed-in-24h') }}
-            </div>
-            <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
-              {{ stats?.deploymentWindowCounts?.h24 ?? 0 }}
-            </div>
-          </div>
-
-          <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-            <div class="text-sm text-slate-600 dark:text-slate-400">
-              {{ t('deployed-in-72h') }}
-            </div>
-            <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
-              {{ stats?.deploymentWindowCounts?.h72 ?? 0 }}
-            </div>
-          </div>
-
-          <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-            <div class="text-sm text-slate-600 dark:text-slate-400">
-              {{ t('deployed-in-7d') }}
-            </div>
-            <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
-              {{ stats?.deploymentWindowCounts?.d7 ?? 0 }}
             </div>
           </div>
         </div>
@@ -537,7 +495,7 @@ watchEffect(async () => {
             </p>
           </div>
 
-          <div v-else class="h-64">
+          <div v-else class="relative h-64">
             <Line :data="chartData" :options="chartOptions" />
           </div>
 
