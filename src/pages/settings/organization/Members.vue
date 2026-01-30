@@ -1066,6 +1066,14 @@ async function handleInviteNewUserSubmit() {
   if (isSubmittingInvite.value)
     return false
 
+  function resetInviteCaptcha() {
+    if (captchaElement.value) {
+      captchaElement.value.reset()
+    }
+    captchaToken.value = ''
+    updateInviteNewUserButton()
+  }
+
   if (!inviteUserFirstName.value.trim()) {
     toast.error(t('first-name-required', 'First name is required'))
     return false
@@ -1101,6 +1109,7 @@ async function handleInviteNewUserSubmit() {
     if (error) {
       console.error('Invitation failed:', error)
       toast.error(t('invitation-failed', 'Invitation failed'))
+      resetInviteCaptcha()
       return false
     }
 
@@ -1116,6 +1125,7 @@ async function handleInviteNewUserSubmit() {
   catch (error) {
     console.error('Invitation failed:', error)
     toast.error(t('invitation-failed', 'Invitation failed'))
+    resetInviteCaptcha()
     return false
   }
   finally {
