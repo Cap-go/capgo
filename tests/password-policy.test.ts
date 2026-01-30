@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { BASE_URL, executeSQL, getSupabaseClient, headers, TEST_EMAIL, USER_ID_2 } from './test-utils.ts'
+import { BASE_URL, executeSQL, getSupabaseClient, headers, TEST_EMAIL, USER_ID, USER_ID_2 } from './test-utils.ts'
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
