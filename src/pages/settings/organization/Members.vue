@@ -14,6 +14,7 @@ import IconSearch from '~icons/heroicons/magnifying-glass'
 import IconTrash from '~icons/heroicons/trash'
 import IconWrench from '~icons/heroicons/wrench'
 import { checkPermissions } from '~/services/permissions'
+import { createSignedImageUrl } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
@@ -277,23 +278,24 @@ async function reloadData() {
       }
 
       // Mapper les données RBAC vers le format attendu par la table
-      members.value = (rbacMembers || []).map((member: any) => {
+      members.value = await Promise.all((rbacMembers || []).map(async (member: any) => {
         const isInvite = member.is_invite === true
         const isTmp = member.is_tmp === true
         const orgUserId = member.org_user_id
         const hasOrgUserInvite = isInvite && !isTmp && orgUserId != null && orgUserId !== ''
+        const signedImage = member.image_url ? await createSignedImageUrl(member.image_url) : ''
 
         return {
           id: member.user_id,
           aid: hasOrgUserInvite ? Number(orgUserId) : -1,
           uid: member.user_id,
           email: member.email,
-          image_url: member.image_url ?? '',
+          image_url: signedImage || '',
           role: member.role_name,
           is_tmp: isTmp,
           is_invite: isInvite,
         }
-      })
+      }))
     }
     else {
       // Utiliser l'ancienne méthode pour les orgs sans RBAC
