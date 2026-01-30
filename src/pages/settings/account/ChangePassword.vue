@@ -118,21 +118,30 @@ async function validatePasswordForOrg(password: string, formId: 'verify-password
     return false
   }
 
-  // Call the backend to validate password compliance
-  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/private/validate_password_compliance`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify({
-      email: user.email,
-      password,
-      org_id: orgId,
-    }),
-  })
+  let response: Response
+  let result: { error?: string, message?: string }
+  try {
+    // Call the backend to validate password compliance
+    response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/private/validate_password_compliance`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        email: user.email,
+        password,
+        org_id: orgId,
+      }),
+    })
 
-  const result: { error?: string, message?: string } = await response.json()
+    result = await response.json()
+  }
+  catch (error) {
+    console.error('Failed to verify password policy compliance:', error)
+    setErrors(formId, [t('verification-failed')], {})
+    return false
+  }
 
   if (!response.ok) {
     if (result.error === 'invalid_credentials') {
