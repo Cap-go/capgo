@@ -12,6 +12,7 @@ import IconLock from '~icons/heroicons/lock-closed'
 import IconShield from '~icons/heroicons/shield-check'
 import IconUser from '~icons/heroicons/user'
 import { checkPermissions } from '~/services/permissions'
+import { createSignedImageUrl } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
@@ -242,13 +243,16 @@ async function loadMembersWithMfaStatus() {
     }
 
     // Merge members with MFA status
-    membersWithMfaStatus.value = (members || []).map(member => ({
-      uid: member.uid,
-      email: member.email,
-      image_url: member.image_url || '',
-      role: member.role,
-      is_tmp: member.is_tmp,
-      has_2fa: mfaMap.get(member.uid) ?? false,
+    membersWithMfaStatus.value = await Promise.all((members || []).map(async (member) => {
+      const signedImage = member.image_url ? await createSignedImageUrl(member.image_url) : ''
+      return {
+        uid: member.uid,
+        email: member.email,
+        image_url: signedImage || '',
+        role: member.role,
+        is_tmp: member.is_tmp,
+        has_2fa: mfaMap.get(member.uid) ?? false,
+      }
     }))
 
     // Calculate impacted members (those without 2FA, excluding pending invites)
@@ -304,19 +308,20 @@ async function loadMembersWithPasswordPolicyStatus() {
     }
 
     // Merge members with password policy compliance status
-    membersWithPasswordPolicyStatus.value = (members || []).map((member) => {
+    membersWithPasswordPolicyStatus.value = await Promise.all((members || []).map(async (member) => {
       const compliance = complianceMap.get(member.uid)
+      const signedImage = member.image_url ? await createSignedImageUrl(member.image_url) : ''
       return {
         uid: member.uid,
         email: member.email,
         first_name: compliance?.first_name || null,
         last_name: compliance?.last_name || null,
-        image_url: member.image_url || '',
+        image_url: signedImage || '',
         role: member.role,
         is_tmp: member.is_tmp,
         password_policy_compliant: compliance?.compliant ?? false,
       }
-    })
+    }))
 
     // Calculate non-compliant members (excluding pending invites)
     nonCompliantPasswordMembers.value = membersWithPasswordPolicyStatus.value.filter(m => !m.password_policy_compliant && !m.is_tmp)
