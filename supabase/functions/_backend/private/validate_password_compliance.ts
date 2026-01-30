@@ -70,7 +70,7 @@ app.post('/', async (c) => {
   // Get the org's password policy - need admin for initial lookup
   const { data: org, error: orgError } = await supabaseAdmin
     .from('orgs')
-    .select('id, password_policy_config')
+    .select('id, created_by, password_policy_config')
     .eq('id', body.org_id)
     .single()
 
@@ -105,15 +105,33 @@ app.post('/', async (c) => {
 
   const userId = signInData.user.id
 
-  // Verify user is a member of this organization.
-  // Use service role to avoid password-policy enforcement blocking the validation flow.
-  const { data: isMember, error: memberError } = await supabaseAdmin
-    .rpc('is_member_of_org', {
-      user_id: userId,
-      org_id: body.org_id,
-    })
+  const isOwner = org.created_by === userId
+  const { data: legacyMember, error: legacyError } = await supabaseAdmin
+    .from('org_users')
+    .select('id')
+    .eq('org_id', body.org_id)
+    .eq('user_id', userId)
+    .maybeSingle()
 
-  if (memberError || !isMember) {
+  if (legacyError) {
+    cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - org_users lookup failed', error: legacyError.message })
+    return quickError(500, 'membership_check_failed', 'Failed to verify organization membership', { error: legacyError.message })
+  }
+
+  const { data: rbacMember, error: rbacError } = await supabaseAdmin
+    .from('role_bindings')
+    .select('id')
+    .eq('principal_type', 'user')
+    .eq('principal_id', userId)
+    .eq('org_id', body.org_id)
+    .maybeSingle()
+
+  if (rbacError) {
+    cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - role_bindings lookup failed', error: rbacError.message })
+    return quickError(500, 'membership_check_failed', 'Failed to verify organization membership', { error: rbacError.message })
+  }
+
+  if (!isOwner && !legacyMember && !rbacMember) {
     return quickError(403, 'not_member', 'You are not a member of this organization')
   }
 
