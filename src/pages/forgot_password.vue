@@ -25,6 +25,25 @@ const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 const isLoading = ref(false)
 const isLoadingMain = ref(true)
 
+function getRecoveryParams() {
+  const hashParams = new URLSearchParams(route.hash.replace('#', ''))
+  const queryParams = new URLSearchParams(window.location.search)
+  return {
+    accessToken: hashParams.get('access_token') ?? queryParams.get('access_token') ?? '',
+    refreshToken: hashParams.get('refresh_token') ?? queryParams.get('refresh_token') ?? '',
+    code: queryParams.get('code') ?? hashParams.get('code') ?? '',
+    error: queryParams.get('error') ?? hashParams.get('error') ?? '',
+    errorDescription: queryParams.get('error_description') ?? hashParams.get('error_description') ?? '',
+  }
+}
+
+function finishWithError(message: string, error?: unknown) {
+  setErrors('forgot-password', [message], {})
+  if (error)
+    console.error('forgot password error', error)
+  isLoading.value = false
+}
+
 async function step1(form: { email: string }) {
   const redirectTo = `${import.meta.env.VITE_APP_URL}/forgot_password?step=2`
   // console.log('redirect', redirectTo)
@@ -43,14 +62,27 @@ async function step1(form: { email: string }) {
 }
 
 async function step2(form: { password: string, password_confirm: string }) {
-  const queryString = route.hash.replace('#', '')
-  const urlParams = new URLSearchParams(queryString)
-  const access_token = urlParams.get('access_token') ?? ''
-  const refresh_token = urlParams.get('refresh_token') ?? ''
-  // login with access_token
-  const { error } = await supabase.auth.setSession({ refresh_token, access_token })
+  const { accessToken, refreshToken, code, error, errorDescription } = getRecoveryParams()
   if (error) {
-    setErrors('forgot-password', [error.message], {})
+    finishWithError(errorDescription || error)
+    return
+  }
+  if (accessToken && refreshToken) {
+    const { error: sessionError } = await supabase.auth.setSession({ refresh_token: refreshToken, access_token: accessToken })
+    if (sessionError) {
+      finishWithError(sessionError.message, sessionError)
+      return
+    }
+  }
+  else if (code) {
+    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
+    if (exchangeError) {
+      finishWithError(exchangeError.message, exchangeError)
+      return
+    }
+  }
+  else {
+    finishWithError(t('expired'))
     return
   }
   const aal = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
@@ -58,21 +90,18 @@ async function step2(form: { password: string, password_confirm: string }) {
   if (nextLevel !== currentLevel) {
     const { data: mfaFactors, error: mfaError } = await supabase.auth.mfa.listFactors()
     if (mfaError) {
-      setErrors('forgot-password', [mfaError.message], {})
-      console.error('Cannot get MFA factors', mfaError)
+      finishWithError(mfaError.message, mfaError)
       return
     }
     const factor = mfaFactors.all.find(factor => factor.status === 'verified')
     if (!factor) {
-      setErrors('forgot-password', ['Cannot find MFA factor'], {})
-      console.error('Cannot get MFA factors', mfaError)
+      finishWithError('Cannot find MFA factor')
       return
     }
 
     const { data: challenge, error: errorChallenge } = await supabase.auth.mfa.challenge({ factorId: factor.id })
     if (errorChallenge) {
-      setErrors('forgot-password', [errorChallenge.message], {})
-      console.error('Cannot challenge MFA factor', errorChallenge)
+      finishWithError(errorChallenge.message, errorChallenge)
       return
     }
 
@@ -119,7 +148,7 @@ async function submit(form: { email: string, password: string, password_confirm:
   if (step.value === 1) {
     await step1(form)
   }
-  else if (step.value === 2 && route.hash) {
+  else if (step.value === 2) {
     await step2(form)
   }
 }
@@ -130,6 +159,8 @@ watchEffect(() => {
     // console.log('router.currentRoute.value.query', router.currentRoute.value.query)
     if (router.currentRoute.value.query && router.currentRoute.value.query.step)
       step.value = Number.parseInt(router.currentRoute.value.query.step as string)
+    else if (getRecoveryParams().accessToken || getRecoveryParams().refreshToken || getRecoveryParams().code)
+      step.value = 2
     isLoadingMain.value = false
   }
 })
