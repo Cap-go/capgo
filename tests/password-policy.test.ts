@@ -1,39 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_ID, USER_ID_2 } from './test-utils.ts'
+import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_EMAIL, USER_ID, USER_ID_2 } from './test-utils.ts'
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
 const name = `Test Password Policy Org ${globalId}`
 const customerId = `cus_test_pwd_${ORG_ID}`
 const TEST_PASSWORD = 'testtest'
-
-async function createAuthUser(password = TEST_PASSWORD) {
-  const email = `password-policy-${randomUUID()}@capgo.app`
-  const { data, error } = await getSupabaseClient().auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-  })
-  if (error || !data.user)
-    throw error || new Error('Failed to create auth user')
-
-  const { error: userError } = await getSupabaseClient()
-    .from('users')
-    .upsert({ id: data.user.id, email }, { onConflict: 'id' })
-  if (userError)
-    throw userError
-
-  return { email, userId: data.user.id, password }
-}
-
-async function cleanupAuthUser(userId: string) {
-  await getSupabaseClient().from('user_password_compliance').delete().eq('user_id', userId)
-  await getSupabaseClient().from('org_users').delete().eq('user_id', userId)
-  await getSupabaseClient().from('users').delete().eq('id', userId)
-  await getSupabaseClient().auth.admin.deleteUser(userId)
-}
 
 beforeAll(async () => {
   // Create stripe_info for this test org
@@ -345,8 +319,6 @@ describe('[POST] /private/validate_password_compliance', () => {
       require_number: false,
       require_special: false,
     }
-    const { email, userId, password } = await createAuthUser()
-
     const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
       customer_id: testCustomerId,
       status: 'succeeded',
@@ -362,7 +334,7 @@ describe('[POST] /private/validate_password_compliance', () => {
       id: testOrgId,
       name: `Password policy success org ${testOrgId}`,
       management_email: TEST_EMAIL,
-      created_by: userId,
+      created_by: USER_ID,
       customer_id: testCustomerId,
       password_policy_config: policyConfig,
     })
@@ -371,7 +343,7 @@ describe('[POST] /private/validate_password_compliance', () => {
 
     const { error: memberError } = await getSupabaseClient().from('org_users').insert({
       org_id: testOrgId,
-      user_id: userId,
+      user_id: USER_ID,
       user_right: 'super_admin',
     })
     if (memberError)
@@ -382,8 +354,8 @@ describe('[POST] /private/validate_password_compliance', () => {
         headers,
         method: 'POST',
         body: JSON.stringify({
-          email,
-          password,
+          email: USER_EMAIL,
+          password: TEST_PASSWORD,
           org_id: testOrgId,
         }),
       })
@@ -393,7 +365,7 @@ describe('[POST] /private/validate_password_compliance', () => {
       expect(responseData.status).toBe('ok')
 
       const { data: meetsPolicy, error: meetsError } = await getSupabaseClient().rpc('user_meets_password_policy', {
-        user_id: userId,
+        user_id: USER_ID,
         org_id: testOrgId,
       })
 
@@ -405,15 +377,12 @@ describe('[POST] /private/validate_password_compliance', () => {
       await getSupabaseClient().from('org_users').delete().eq('org_id', testOrgId)
       await getSupabaseClient().from('orgs').delete().eq('id', testOrgId)
       await getSupabaseClient().from('stripe_info').delete().eq('customer_id', testCustomerId)
-      await cleanupAuthUser(userId)
     }
   })
 
   it('rejects request when user is not a member of the org', async () => {
     const nonMemberOrgId = randomUUID()
     const nonMemberCustomerId = `cus_pwd_non_member_${nonMemberOrgId}`
-    const { email, password, userId } = await createAuthUser()
-
     const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
       customer_id: nonMemberCustomerId,
       status: 'succeeded',
@@ -447,8 +416,8 @@ describe('[POST] /private/validate_password_compliance', () => {
         headers,
         method: 'POST',
         body: JSON.stringify({
-          email,
-          password,
+          email: USER_EMAIL,
+          password: TEST_PASSWORD,
           org_id: nonMemberOrgId,
         }),
       })
@@ -462,7 +431,6 @@ describe('[POST] /private/validate_password_compliance', () => {
       await getSupabaseClient().from('org_users').delete().eq('org_id', nonMemberOrgId)
       await getSupabaseClient().from('orgs').delete().eq('id', nonMemberOrgId)
       await getSupabaseClient().from('stripe_info').delete().eq('customer_id', nonMemberCustomerId)
-      await cleanupAuthUser(userId)
     }
   })
 })
