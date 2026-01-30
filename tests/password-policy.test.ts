@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, USER_EMAIL, getSupabaseClient, headers, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
@@ -306,6 +306,51 @@ describe('[POST] /private/validate_password_compliance', () => {
       body: 'invalid json',
     })
     expect(response.status).toBeGreaterThanOrEqual(400)
+  })
+
+  it('accepts valid credentials and marks compliance for org members', async () => {
+    const policyConfig = {
+      enabled: true,
+      min_length: 6,
+      require_uppercase: false,
+      require_number: false,
+      require_special: false,
+    }
+
+    const { error: policyError } = await getSupabaseClient()
+      .from('orgs')
+      .update({ password_policy_config: policyConfig })
+      .eq('id', ORG_ID)
+
+    expect(policyError).toBeNull()
+
+    await getSupabaseClient()
+      .from('user_password_compliance')
+      .delete()
+      .eq('org_id', ORG_ID)
+      .eq('user_id', USER_ID)
+
+    const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
+      headers,
+      method: 'POST',
+      body: JSON.stringify({
+        email: USER_EMAIL,
+        password: 'testtest',
+        org_id: ORG_ID,
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const responseData = await response.json() as { status?: string }
+    expect(responseData.status).toBe('ok')
+
+    const { data: meetsPolicy, error: meetsError } = await getSupabaseClient().rpc('user_meets_password_policy', {
+      user_id: USER_ID,
+      org_id: ORG_ID,
+    })
+
+    expect(meetsError).toBeNull()
+    expect(meetsPolicy).toBe(true)
   })
 })
 

@@ -83,46 +83,9 @@ async function verifyPassword(form: { current_password: string }) {
   isVerifying.value = true
 
   try {
-    const user = mainStore.user
-    if (!user?.email) {
-      setErrors('verify-password', [t('user-not-found')], {})
+    const isValid = await validatePasswordForOrg(form.current_password, 'verify-password')
+    if (!isValid)
       return
-    }
-
-    const orgId = organizationStore.currentOrganization?.gid
-    if (!orgId) {
-      setErrors('verify-password', [t('no-organization-selected')], {})
-      return
-    }
-
-    // Call the backend to validate password compliance
-    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/private/validate_password_compliance`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-      },
-      body: JSON.stringify({
-        email: user.email,
-        password: form.current_password,
-        org_id: orgId,
-      }),
-    })
-
-    const result: { error?: string, message?: string } = await response.json()
-
-    if (!response.ok) {
-      if (result.error === 'invalid_credentials') {
-        setErrors('verify-password', [t('invalid-password')], {})
-      }
-      else if (result.error === 'password_does_not_meet_policy') {
-        setErrors('verify-password', [t('password-does-not-meet-requirements')], {})
-      }
-      else {
-        setErrors('verify-password', [result.message || t('verification-failed')], {})
-      }
-      return
-    }
 
     toast.success(t('password-verified-successfully'))
 
@@ -134,6 +97,60 @@ async function verifyPassword(form: { current_password: string }) {
   finally {
     isVerifying.value = false
   }
+}
+
+async function validatePasswordForOrg(password: string, formId: 'verify-password' | 'change-pass') {
+  const user = mainStore.user
+  if (!user?.email) {
+    setErrors(formId, [t('user-not-found')], {})
+    return false
+  }
+
+  const orgId = organizationStore.currentOrganization?.gid
+  if (!orgId) {
+    setErrors(formId, [t('no-organization-selected')], {})
+    return false
+  }
+
+  const accessToken = (await supabase.auth.getSession()).data.session?.access_token
+  if (!accessToken) {
+    setErrors(formId, [t('verification-failed')], {})
+    return false
+  }
+
+  // Call the backend to validate password compliance
+  const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/private/validate_password_compliance`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({
+      email: user.email,
+      password,
+      org_id: orgId,
+    }),
+  })
+
+  const result: { error?: string, message?: string } = await response.json()
+
+  if (!response.ok) {
+    if (result.error === 'invalid_credentials') {
+      setErrors(formId, [t('invalid-password')], {})
+    }
+    else if (result.error === 'password_does_not_meet_policy') {
+      setErrors(formId, [t('password-does-not-meet-requirements')], {})
+    }
+    else if (result.error === 'no_policy') {
+      setErrors(formId, [t('verification-failed')], {})
+    }
+    else {
+      setErrors(formId, [result.message || t('verification-failed')], {})
+    }
+    return false
+  }
+
+  return true
 }
 
 async function verifyCurrentPassword(currentPassword: string) {
@@ -249,8 +266,16 @@ async function submit(form: { current_password?: string, password: string, passw
     needsReauthentication.value = false
     toast.success(t('changed-password-suc'))
 
-    // If user was locked out due to password policy, refresh org data to regain access
-    if (!organizationStore.currentOrganization?.password_has_access) {
+    const org = organizationStore.currentOrganization
+    const policyEnabled = org?.password_policy_config?.enabled === true
+
+    if (policyEnabled) {
+      const complianceOk = await validatePasswordForOrg(form.password, 'change-pass')
+      if (complianceOk) {
+        await organizationStore.fetchOrganizations()
+      }
+    }
+    else if (!org?.password_has_access) {
       await organizationStore.fetchOrganizations()
     }
   }
