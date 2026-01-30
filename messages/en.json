@@ -716,6 +716,7 @@
   "invitation-page": "It looks like some has invited you to join their organization in Capgo.",
   "invitation-page-description": "Here are the invitation details",
   "invitation-page-not-found": "Oops, it looks like the invitation is not valid. Perhaps it got cancelled or expired.",
+  "invitation-resend-wait": "Please wait {minutes} minutes before resending the invitation.",
   "invitation-rescinded": "Invitation rescinded successfully!",
   "invite-accepted": "Successfully accepted organization invitation",
   "invite-new-user-dialog-header": "Invite New User",

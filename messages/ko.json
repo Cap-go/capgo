@@ -763,6 +763,7 @@
   "invitation-page": "당신이 Capgo의 그들의 조직에 가입하도록 초대받은 것 같습니다.",
   "invitation-page-description": "다음은 초대장의 세부 사항입니다",
   "invitation-page-not-found": "이런, 초대장이 유효하지 않은 것 같습니다. 아마 취소되었거나 기간이 만료된 것일 수 있습니다.",
+  "invitation-resend-wait": "초대를 다시 보내기 전에 {minutes}분 기다려 주세요.",
   "invitation-rescinded": "성공적으로 초대장이 철회되었습니다!",
   "invite-accepted": "조직 초대를 성공적으로 수락하였습니다.",
   "invite-new-user-dialog-header": "새 사용자 초대",

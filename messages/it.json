@@ -763,6 +763,7 @@
   "invitation-page": "Sembra che qualcuno ti abbia invitato a unirti alla loro organizzazione in Capgo.",
   "invitation-page-description": "Ecco i dettagli dell'invito",
   "invitation-page-not-found": "Oops, sembra che l'invito non sia valido. Forse è stato annullato o è scaduto.",
+  "invitation-resend-wait": "Attendi {minutes} minuti prima di reinviare l'invito.",
   "invitation-rescinded": "Invito revocato con successo!",
   "invite-accepted": "Invito all'organizzazione accettato con successo",
   "invite-new-user-dialog-header": "Invita Nuovo Utente",
