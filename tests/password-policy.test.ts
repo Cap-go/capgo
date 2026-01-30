@@ -1,13 +1,57 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { BASE_URL, executeSQL, getSupabaseClient, headers, TEST_EMAIL, USER_EMAIL, USER_ID, USER_ID_2 } from './test-utils.ts'
+import { BASE_URL, executeSQL, getSupabaseClient, headers, TEST_EMAIL, USER_ID_2 } from './test-utils.ts'
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
 const name = `Test Password Policy Org ${globalId}`
 const customerId = `cus_test_pwd_${ORG_ID}`
 const TEST_PASSWORD = 'testtest'
+
+async function createAuthUser(password = TEST_PASSWORD) {
+  const userId = randomUUID()
+  const email = `password-policy-${userId}@capgo.app`
+
+  await executeSQL(
+    `INSERT INTO auth.users (
+        id,
+        email,
+        raw_user_meta_data,
+        raw_app_meta_data,
+        created_at,
+        updated_at,
+        email_confirmed_at,
+        encrypted_password
+      ) VALUES (
+        $1,
+        $2,
+        jsonb_build_object('test_identifier', $3),
+        '{}'::jsonb,
+        NOW(),
+        NOW(),
+        NOW(),
+        crypt($4, gen_salt('bf'))
+      )`,
+    [userId, email, `password-policy-${userId}`, password],
+  )
+
+  const { error: userError } = await getSupabaseClient()
+    .from('users')
+    .upsert({ id: userId, email }, { onConflict: 'id' })
+  if (userError)
+    throw userError
+
+  return { email, userId, password }
+}
+
+async function cleanupAuthUser(userId: string) {
+  await getSupabaseClient().from('user_password_compliance').delete().eq('user_id', userId)
+  await getSupabaseClient().from('org_users').delete().eq('user_id', userId)
+  await getSupabaseClient().from('role_bindings').delete().eq('principal_id', userId)
+  await getSupabaseClient().from('users').delete().eq('id', userId)
+  await executeSQL('DELETE FROM auth.users WHERE id = $1', [userId])
+}
 
 beforeAll(async () => {
   // Create stripe_info for this test org
@@ -132,20 +176,7 @@ describe('Password Policy Configuration via SDK', () => {
 })
 
 describe('[POST] /private/validate_password_compliance', () => {
-  let originalEncryptedPassword: string | null = null
-
   beforeAll(async () => {
-    const passwordRows = await executeSQL('SELECT encrypted_password FROM auth.users WHERE id = $1', [USER_ID])
-    if (!passwordRows[0]?.encrypted_password)
-      throw new Error('Missing seeded auth user password')
-
-    originalEncryptedPassword = passwordRows[0].encrypted_password
-
-    await executeSQL('UPDATE auth.users SET encrypted_password = crypt($1, gen_salt(\'bf\')) WHERE id = $2', [
-      TEST_PASSWORD,
-      USER_ID,
-    ])
-
     // Enable password policy for testing
     await getSupabaseClient()
       .from('orgs')
@@ -159,15 +190,6 @@ describe('[POST] /private/validate_password_compliance', () => {
         },
       })
       .eq('id', ORG_ID)
-  })
-
-  afterAll(async () => {
-    if (originalEncryptedPassword) {
-      await executeSQL('UPDATE auth.users SET encrypted_password = $1 WHERE id = $2', [
-        originalEncryptedPassword,
-        USER_ID,
-      ])
-    }
   })
 
   it('reject request with missing email', async () => {
@@ -352,32 +374,26 @@ describe('[POST] /private/validate_password_compliance', () => {
     if (stripeError)
       throw stripeError
 
+    const { email, userId, password } = await createAuthUser()
+
     const { error: orgError } = await getSupabaseClient().from('orgs').insert({
       id: testOrgId,
       name: `Password policy success org ${testOrgId}`,
       management_email: TEST_EMAIL,
-      created_by: USER_ID,
+      created_by: userId,
       customer_id: testCustomerId,
       password_policy_config: policyConfig,
     })
     if (orgError)
       throw orgError
 
-    const { error: memberError } = await getSupabaseClient().from('org_users').insert({
-      org_id: testOrgId,
-      user_id: USER_ID,
-      user_right: 'super_admin',
-    })
-    if (memberError)
-      throw memberError
-
     try {
       const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
         headers,
         method: 'POST',
         body: JSON.stringify({
-          email: USER_EMAIL,
-          password: TEST_PASSWORD,
+          email,
+          password,
           org_id: testOrgId,
         }),
       })
@@ -387,7 +403,7 @@ describe('[POST] /private/validate_password_compliance', () => {
       expect(responseData.status).toBe('ok')
 
       const { data: meetsPolicy, error: meetsError } = await getSupabaseClient().rpc('user_meets_password_policy', {
-        user_id: USER_ID,
+        user_id: userId,
         org_id: testOrgId,
       })
 
@@ -399,12 +415,14 @@ describe('[POST] /private/validate_password_compliance', () => {
       await getSupabaseClient().from('org_users').delete().eq('org_id', testOrgId)
       await getSupabaseClient().from('orgs').delete().eq('id', testOrgId)
       await getSupabaseClient().from('stripe_info').delete().eq('customer_id', testCustomerId)
+      await cleanupAuthUser(userId)
     }
   })
 
   it('rejects request when user is not a member of the org', async () => {
     const nonMemberOrgId = randomUUID()
     const nonMemberCustomerId = `cus_pwd_non_member_${nonMemberOrgId}`
+    const { email, password, userId } = await createAuthUser()
     const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
       customer_id: nonMemberCustomerId,
       status: 'succeeded',
@@ -438,8 +456,8 @@ describe('[POST] /private/validate_password_compliance', () => {
         headers,
         method: 'POST',
         body: JSON.stringify({
-          email: USER_EMAIL,
-          password: TEST_PASSWORD,
+          email,
+          password,
           org_id: nonMemberOrgId,
         }),
       })
@@ -453,6 +471,7 @@ describe('[POST] /private/validate_password_compliance', () => {
       await getSupabaseClient().from('org_users').delete().eq('org_id', nonMemberOrgId)
       await getSupabaseClient().from('orgs').delete().eq('id', nonMemberOrgId)
       await getSupabaseClient().from('stripe_info').delete().eq('customer_id', nonMemberCustomerId)
+      await cleanupAuthUser(userId)
     }
   })
 })
