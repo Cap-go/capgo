@@ -15,12 +15,11 @@ const organizationStore = useOrganizationStore()
 
 async function uploadPhotoShared(
   data: string,
-  fileName: string,
+  storagePath: string,
   contentType: string,
   isLoading: Ref<boolean>,
   callback: (success: boolean, storagePath: string, signedUrl: string) => Promise<void>,
 ) {
-  const storagePath = `${main.user?.id}/${fileName}`
   const { error } = await supabase.storage
     .from('images')
     .upload(storagePath, decode(data), {
@@ -38,24 +37,24 @@ async function uploadPhotoShared(
 }
 
 async function uploadPhotoUser(formId: string, data: string, fileName: string, contentType: string, isLoading: Ref<boolean>, wentWrong: string) {
+  const userId = main.user?.id
+  if (!userId) {
+    setErrors(formId, [wentWrong], {})
+    console.error('No user id', userId)
+    return
+  }
+  const safeUserId = userId
+
   async function userCallback(success: boolean, storagePath: string, signedUrl: string) {
     if (!success) {
       setErrors(formId, [wentWrong], {})
       return
     }
 
-    const userId = main.user?.id
-
-    if (!userId) {
-      setErrors(formId, [wentWrong], {})
-      console.error('No user id', userId)
-      return
-    }
-
     const { data: usr, error: dbError } = await supabase
       .from('users')
       .update({ image_url: storagePath })
-      .eq('id', userId)
+      .eq('id', safeUserId)
       .select()
       .single()
 
@@ -68,28 +67,28 @@ async function uploadPhotoUser(formId: string, data: string, fileName: string, c
     main.user = usr
   }
 
-  await uploadPhotoShared(data, fileName, contentType, isLoading, userCallback)
+  await uploadPhotoShared(data, `${safeUserId}/${fileName}`, contentType, isLoading, userCallback)
 }
 
 async function uploadPhotoOrg(formId: string, data: string, fileName: string, contentType: string, isLoading: Ref<boolean>, wentWrong: string) {
+  const gid = organizationStore.currentOrganization?.gid
+  if (!gid) {
+    console.error('No current org id', gid)
+    setErrors(formId, [wentWrong], {})
+    return
+  }
+  const safeGid = gid
+
   async function orgCallback(success: boolean, storagePath: string, _signedUrl: string) {
     if (!success) {
       setErrors(formId, [wentWrong], {})
       return
     }
 
-    const gid = organizationStore.currentOrganization?.gid
-    const userId = main.user?.id
-
-    if (!gid || !userId) {
-      console.error('No current org id or user id', gid, userId)
-      return
-    }
-
     const { data: usr, error: dbError } = await supabase
       .from('orgs')
       .update({ logo: storagePath })
-      .eq('id', gid)
+      .eq('id', safeGid)
       .select('id')
       .single()
 
@@ -103,7 +102,7 @@ async function uploadPhotoOrg(formId: string, data: string, fileName: string, co
     organizationStore.setCurrentOrganization(usr.id)
   }
 
-  await uploadPhotoShared(data, fileName, contentType, isLoading, orgCallback)
+  await uploadPhotoShared(data, `org/${safeGid}/logo/${fileName}`, contentType, isLoading, orgCallback)
 }
 
 function blobToData(blob: Blob) {
