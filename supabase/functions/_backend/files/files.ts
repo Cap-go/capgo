@@ -147,6 +147,9 @@ async function getHandler(c: Context): Promise<Response> {
 function objectHeaders(object: R2Object): Headers {
   const headers = new Headers()
   object.writeHttpMetadata(headers)
+  // Prevent CDN transformations (auto-minify, email obfuscation, etc.) that modify
+  // bytes in transit, breaking checksum verification on devices.
+  headers.set('cache-control', 'no-transform')
   headers.set('etag', object.httpEtag)
 
   // the sha256 checksum was provided to R2 in the upload
