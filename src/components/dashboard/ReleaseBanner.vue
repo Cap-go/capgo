@@ -3,8 +3,6 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconCheckCircle from '~icons/lucide/check-circle'
-import IconClock from '~icons/lucide/clock'
-import IconPackage from '~icons/lucide/package'
 import IconTrendingUp from '~icons/lucide/trending-up'
 import { formatDistanceToNow } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
@@ -25,36 +23,6 @@ const lastReleaseDate = ref<string | null>(null)
 const defaultChannelId = ref<number | null>(null)
 
 const HOURS_48_IN_DAYS = 2
-
-const status = computed(() => {
-  if (isLoading.value)
-    return 'loading'
-  if (!lastReleaseDate.value)
-    return 'empty'
-
-  const releaseDate = new Date(lastReleaseDate.value)
-  const now = new Date()
-  const daysSinceRelease = (now.getTime() - releaseDate.getTime()) / (1000 * 60 * 60 * 24)
-
-  if (daysSinceRelease <= HOURS_48_IN_DAYS)
-    return 'recent'
-  return 'old'
-})
-
-const statusTitle = computed(() => {
-  switch (status.value) {
-    case 'loading':
-      return t('checking-releases')
-    case 'empty':
-      return t('no-releases-yet')
-    case 'recent':
-      return t('recent-releases-active')
-    case 'old':
-      return t('no-recent-releases')
-    default:
-      return ''
-  }
-})
 
 const lastReleaseDisplay = computed(() => {
   if (!lastReleaseDate.value)
@@ -142,7 +110,7 @@ watch(() => [props.appId, organizationStore.currentOrganization?.gid], () => {
 <template>
   <div
     v-if="hasRecentRelease"
-    class="mb-4 overflow-hidden border border-emerald-200 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-800"
+    class="mb-4 overflow-hidden border rounded-lg border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20 dark:border-emerald-800"
   >
     <div class="flex items-center justify-between p-4">
       <div class="flex items-center gap-3">
