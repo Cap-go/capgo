@@ -1,22 +1,26 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useRealtimeCLIFeed } from '~/composables/useRealtimeCLIFeed'
 import Navbar from '../components/Navbar.vue'
 import Sidebar from '../components/Sidebar.vue'
 
 const sidebarOpen = ref(false)
+
+// Initialize realtime CLI activity feed (toasts for CLI actions)
+useRealtimeCLIFeed()
 </script>
 
 <template>
-  <div class="flex overflow-hidden h-full bg-slate-800 pt-safe safe-areas">
+  <div class="flex h-full overflow-hidden bg-slate-800 pt-safe safe-areas">
     <!-- Sidebar -->
     <Sidebar :sidebar-open="sidebarOpen" @close-sidebar="sidebarOpen = false" />
     <!-- Content area -->
-    <div class="flex overflow-hidden flex-col flex-1 h-full lg:p-3">
-      <div class="flex overflow-hidden flex-col h-full border border-gray-200 lg:rounded-xl lg:shadow-sm dark:border-gray-700 bg-slate-100 dark:bg-slate-900">
+    <div class="flex flex-col flex-1 h-full overflow-hidden lg:p-3">
+      <div class="flex flex-col h-full overflow-hidden border border-gray-200 lg:rounded-xl lg:shadow-sm dark:border-gray-700 bg-slate-100 dark:bg-slate-900">
         <!-- Site header -->
         <Navbar :sidebar-open="sidebarOpen" @toggle-sidebar="sidebarOpen = !sidebarOpen" />
-        <main class="overflow-hidden w-full h-full">
-          <RouterView class="overflow-y-auto h-full grow" />
+        <main class="w-full h-full overflow-hidden">
+          <RouterView class="h-full overflow-y-auto grow" />
         </main>
       </div>
     </div>

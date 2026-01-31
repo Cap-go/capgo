@@ -28,6 +28,7 @@ interface EmailPreferences {
   bundle_deployed?: boolean
   device_error?: boolean
   channel_self_rejected?: boolean
+  cli_realtime_feed?: boolean
 }
 
 type EmailPreferenceKey = keyof EmailPreferences
@@ -218,6 +219,19 @@ async function toggleEmailPref(key: EmailPreferenceKey) {
               <Toggle
                 :value="getEmailPref('channel_self_rejected')"
                 @change="toggleEmailPref('channel_self_rejected')"
+              />
+            </InfoRow>
+          </dl>
+
+          <!-- Realtime CLI Feed Section -->
+          <h3 class="text-lg font-semibold mb-4 dark:text-white text-slate-700">
+            {{ t('notifications-realtime') }}
+          </h3>
+          <dl class="divide-y divide-slate-200 dark:divide-slate-500 mb-8">
+            <InfoRow :label="t('notifications-cli-realtime-feed')" :editable="false" :value="t('notifications-cli-realtime-feed-desc')">
+              <Toggle
+                :value="getEmailPref('cli_realtime_feed')"
+                @change="toggleEmailPref('cli_realtime_feed')"
               />
             </InfoRow>
           </dl>

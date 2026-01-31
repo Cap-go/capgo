@@ -7,6 +7,7 @@ import { trackBentoEvent } from '../utils/bento.ts'
 import { BRES, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { logsnag } from '../utils/logsnag.ts'
+import { broadcastCLIEvent } from '../utils/realtime_broadcast.ts'
 import { supabaseWithAuth } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
@@ -15,7 +16,28 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.use('/', useCors)
 
 app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
-  const body = await parseBody<TrackOptions>(c)
+  const body = await parseBody<TrackOptions & { notifyConsole?: boolean }>(c)
+
+  const orgId = body.user_id ?? c.get('auth')?.userId ?? ''
+
+  // notifyConsole: broadcast to Supabase Realtime only, skip all tracking
+  if (body.notifyConsole) {
+    if (orgId) {
+      await backgroundTask(c, broadcastCLIEvent(c, {
+        event: body.event,
+        channel: body.channel,
+        description: body.description,
+        icon: body.icon,
+        app_id: typeof body.tags?.['app-id'] === 'string' ? body.tags['app-id'] : undefined,
+        org_id: orgId,
+        channel_name: typeof body.tags?.channel === 'string' ? body.tags.channel : undefined,
+        bundle_name: typeof body.tags?.bundle === 'string' ? body.tags.bundle : undefined,
+        timestamp: new Date().toISOString(),
+      }))
+    }
+    return c.json(BRES)
+  }
+
   const supabase = supabaseWithAuth(c, c.get('auth')!)
   const ip = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for')?.split(',')[0]?.trim()
 
@@ -39,13 +61,12 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   await backgroundTask(c, logsnag(c).track(body))
   await backgroundTask(c, trackActivationpalEvent(c, activationPayload))
   if (body.user_id && body.tags && typeof body.tags['app-id'] === 'string' && body.event === 'onboarding-step-done') {
-    const orgId = body.user_id
     const appId = body.tags['app-id']
     await backgroundTask(c, Promise.all([
       supabase
         .from('orgs')
         .select('*')
-        .eq('id', orgId)
+        .eq('id', body.user_id)
         .single(),
       supabase
         .from('apps')
@@ -64,5 +85,6 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
         }, 'app:updated') as any
       }))
   }
+
   return c.json(BRES)
 })
