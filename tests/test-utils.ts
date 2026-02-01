@@ -414,9 +414,34 @@ export function getSupabaseClient(): SupabaseClient<Database> {
   if (!supabaseClient) {
     const supabaseUrl = env.SUPABASE_URL ?? ''
     const supabaseServiceKey = env.SUPABASE_SERVICE_KEY ?? ''
+    const supabaseFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
+      const maxRetries = 3
+      let lastError: unknown
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          const response = await fetch(url, options)
+          if (response.status === 503 && attempt < maxRetries - 1) {
+            await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)))
+            continue
+          }
+          return response
+        }
+        catch (error) {
+          lastError = error
+          if (attempt < maxRetries - 1) {
+            await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)))
+            continue
+          }
+        }
+      }
+      throw lastError ?? new Error('Supabase fetch failed')
+    }
     supabaseClient = createClient<Database>(supabaseUrl, supabaseServiceKey, {
       db: {
         schema: 'public',
+      },
+      global: {
+        fetch: supabaseFetch,
       },
       auth: {
         persistSession: false,

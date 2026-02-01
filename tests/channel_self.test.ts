@@ -49,6 +49,26 @@ async function getResponseErrorCode(response: Response) {
   return json.error
 }
 
+async function withSupabaseRetry<T extends { error?: { message?: string } | null }>(
+  fn: () => Promise<T>,
+  retries = 3,
+  delayMs = 200,
+): Promise<T> {
+  let lastResult: T | null = null
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const result = await fn()
+    lastResult = result
+    const message = result.error?.message ?? ''
+    if (!message.includes('fetch failed')) {
+      return result
+    }
+    if (attempt < retries - 1) {
+      await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)))
+    }
+  }
+  return lastResult as T
+}
+
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
 })
@@ -828,7 +848,14 @@ it('[PUT] /channel_self (with overwrite)', async () => {
   const data = getBaseData(APPNAME)
   data.device_id = randomUUID().toLowerCase()
 
-  const { data: noAccessChannel, error: noAccessChannelError } = await getSupabaseClient().from('channels').select('id, owner_org').eq('name', 'no_access').eq('app_id', APPNAME).single()
+  const { data: noAccessChannel, error: noAccessChannelError } = await withSupabaseRetry(() =>
+    getSupabaseClient()
+      .from('channels')
+      .select('id, owner_org')
+      .eq('name', 'no_access')
+      .eq('app_id', APPNAME)
+      .single(),
+  )
 
   expect(noAccessChannelError).toBeNull()
   expect(noAccessChannel).toBeTruthy()
@@ -836,12 +863,16 @@ it('[PUT] /channel_self (with overwrite)', async () => {
   const noAccessId = noAccessChannel!.id
   const ownerOrg = noAccessChannel!.owner_org
 
-  const { error } = await getSupabaseClient().from('channel_devices').upsert({
-    app_id: APPNAME,
-    channel_id: noAccessId,
-    device_id: data.device_id,
-    owner_org: ownerOrg,
-  }, { onConflict: 'device_id, app_id' })
+  const { error } = await withSupabaseRetry(() =>
+    getSupabaseClient()
+      .from('channel_devices')
+      .upsert({
+        app_id: APPNAME,
+        channel_id: noAccessId,
+        device_id: data.device_id,
+        owner_org: ownerOrg,
+      }, { onConflict: 'device_id, app_id' }),
+  )
 
   expect(error).toBeNull()
 
@@ -860,7 +891,16 @@ it('[PUT] /channel_self (with overwrite)', async () => {
     expect(channel).toBe('no_access')
   }
   finally {
-    const { error } = await getSupabaseClient().from('channel_devices').delete().eq('device_id', data.device_id).eq('app_id', APPNAME).eq('owner_org', ownerOrg).eq('channel_id', noAccessId).single()
+    const { error } = await withSupabaseRetry(() =>
+      getSupabaseClient()
+        .from('channel_devices')
+        .delete()
+        .eq('device_id', data.device_id)
+        .eq('app_id', APPNAME)
+        .eq('owner_org', ownerOrg)
+        .eq('channel_id', noAccessId)
+        .single(),
+    )
 
     expect(error).toBeNull()
   }
