@@ -11,7 +11,10 @@ interface ValidatePasswordCompliance {
   org_id: string
 }
 
-type OrgReadAccessResult = { allowed: boolean, error?: string }
+interface OrgReadAccessResult {
+  allowed: boolean
+  error?: string
+}
 
 const bodySchema = z.object({
   email: z.string().check(z.email()),
