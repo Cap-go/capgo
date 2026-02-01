@@ -1,11 +1,11 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { supabaseClient, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
-import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database } from '../utils/supabase.types.ts'
 
 interface ValidatePasswordCompliance {
   email: string
