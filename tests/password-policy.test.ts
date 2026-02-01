@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_EMAIL, USER_ID, USER_ID_2 } from './test-utils.ts'
+import { checkOrgReadAccess } from '../supabase/functions/_backend/private/validate_password_compliance.ts'
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
@@ -299,6 +300,55 @@ describe('[POST] /private/validate_password_compliance', () => {
     expect(responseData.error).toBe('invalid_credentials')
   })
 
+  it('reject request when user is not a member of the org', async () => {
+    const nonMemberOrgId = randomUUID()
+    const nonMemberCustomerId = `cus_pwd_nomember_${nonMemberOrgId}`
+
+    await getSupabaseClient().from('stripe_info').insert({
+      customer_id: nonMemberCustomerId,
+      status: 'succeeded',
+      product_id: 'prod_LQIregjtNduh4q',
+      subscription_id: `sub_${nonMemberOrgId}`,
+      trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+      is_good_plan: true,
+    })
+
+    await getSupabaseClient().from('orgs').insert({
+      id: nonMemberOrgId,
+      name: `Pwd Policy Non Member Org ${nonMemberOrgId}`,
+      management_email: TEST_EMAIL,
+      created_by: USER_ID_2,
+      customer_id: nonMemberCustomerId,
+      password_policy_config: {
+        enabled: true,
+        min_length: 10,
+        require_uppercase: true,
+        require_number: true,
+        require_special: true,
+      },
+    })
+
+    try {
+      const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
+        headers,
+        method: 'POST',
+        body: JSON.stringify({
+          email: USER_EMAIL,
+          password: 'testtest',
+          org_id: nonMemberOrgId,
+        }),
+      })
+
+      expect(response.status).toBe(403)
+      const responseData = await response.json() as { error: string }
+      expect(responseData.error).toBe('not_member')
+    }
+    finally {
+      await getSupabaseClient().from('orgs').delete().eq('id', nonMemberOrgId)
+      await getSupabaseClient().from('stripe_info').delete().eq('customer_id', nonMemberCustomerId)
+    }
+  })
+
   it('reject request with invalid JSON', async () => {
     const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
       headers,
@@ -306,6 +356,17 @@ describe('[POST] /private/validate_password_compliance', () => {
       body: 'invalid json',
     })
     expect(response.status).toBeGreaterThanOrEqual(400)
+  })
+})
+
+describe('checkOrgReadAccess', () => {
+  it('returns error when membership RPC fails', async () => {
+    const result = await checkOrgReadAccess({
+      rpc: async () => ({ data: null, error: { message: 'boom' } }),
+    }, ORG_ID, 'req-test')
+
+    expect(result.allowed).toBe(false)
+    expect(result.error).toBe('boom')
   })
 })
 

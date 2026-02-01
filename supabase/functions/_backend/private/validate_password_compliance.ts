@@ -11,6 +11,8 @@ interface ValidatePasswordCompliance {
   org_id: string
 }
 
+type OrgReadAccessResult = { allowed: boolean, error?: string }
+
 const bodySchema = z.object({
   email: z.string().check(z.email()),
   password: z.string().check(z.minLength(1)),
@@ -47,6 +49,24 @@ function passwordMeetsPolicy(password: string, policy: {
   }
 
   return { valid: errors.length === 0, errors }
+}
+
+export async function checkOrgReadAccess(
+  supabase: { rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: boolean | null, error: { message: string } | null }> },
+  orgId: string,
+  requestId: string,
+): Promise<OrgReadAccessResult> {
+  const { data, error } = await supabase.rpc('rbac_check_permission_no_password_policy', {
+    p_permission_key: 'org.read',
+    p_org_id: orgId,
+  })
+
+  if (error) {
+    cloudlog({ requestId, context: 'validate_password_compliance - org membership lookup failed', error: error.message })
+    return { allowed: false, error: error.message }
+  }
+
+  return { allowed: data === true }
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -108,17 +128,12 @@ app.post('/', async (c) => {
   // Use authenticated client for subsequent queries - RLS will enforce access
   const supabase = supabaseClient(c, `Bearer ${signInData.session.access_token}`)
 
-  // Verify user is a member of this organization without enforcing password policy checks
-  const { data: userOrgIds, error: userOrgIdsError } = await supabase
-    .rpc('get_user_org_ids')
-
-  if (userOrgIdsError) {
-    cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - org membership lookup failed', error: userOrgIdsError.message })
-    return quickError(500, 'org_membership_lookup_failed', 'Failed to verify organization membership', { error: userOrgIdsError.message })
+  const orgAccess = await checkOrgReadAccess(supabase, body.org_id, c.get('requestId'))
+  if (orgAccess.error) {
+    return quickError(500, 'org_membership_lookup_failed', 'Failed to verify organization membership', { error: orgAccess.error })
   }
 
-  const hasOrgAccess = (userOrgIds ?? []).some(row => row.org_id === body.org_id)
-  if (!hasOrgAccess) {
+  if (!orgAccess.allowed) {
     return quickError(403, 'not_member', 'You are not a member of this organization')
   }
 
