@@ -108,14 +108,17 @@ app.post('/', async (c) => {
   // Use authenticated client for subsequent queries - RLS will enforce access
   const supabase = supabaseClient(c, `Bearer ${signInData.session.access_token}`)
 
-  // Verify user has access to this organization (RBAC + legacy compatible)
-  const { data: hasOrgAccess, error: accessError } = await supabase
-    .rpc('rbac_check_permission', {
-      p_permission_key: 'org.read',
-      p_org_id: body.org_id,
-    })
+  // Verify user is a member of this organization without enforcing password policy checks
+  const { data: userOrgIds, error: userOrgIdsError } = await supabase
+    .rpc('get_user_org_ids')
 
-  if (accessError || !hasOrgAccess) {
+  if (userOrgIdsError) {
+    cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - org membership lookup failed', error: userOrgIdsError.message })
+    return quickError(500, 'org_membership_lookup_failed', 'Failed to verify organization membership', { error: userOrgIdsError.message })
+  }
+
+  const hasOrgAccess = (userOrgIds ?? []).some(row => row.org_id === body.org_id)
+  if (!hasOrgAccess) {
     return quickError(403, 'not_member', 'You are not a member of this organization')
   }
 
