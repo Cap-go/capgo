@@ -98,7 +98,7 @@ export function useRealtimeCLIFeed() {
     if (route) {
       toast(title, {
         description,
-        duration: 5000,
+        duration: 15000,
         action: {
           label: t('view'),
           onClick: () => router.push(route),
@@ -108,7 +108,7 @@ export function useRealtimeCLIFeed() {
     else {
       toast(title, {
         description,
-        duration: 4000,
+        duration: 10000,
       })
     }
   }
