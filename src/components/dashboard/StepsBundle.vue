@@ -44,7 +44,7 @@ const steps = ref<Step[]>([
   {
     title: t('add-another-bundle'),
     command: `npx @capgo/cli@latest bundle upload -a [APIKEY]${localCommand}`,
-    subtitle: '',
+    subtitle: t('onboarding-bundle-cli-why'),
   },
   {
     title: t('discover-your-bundle'),
