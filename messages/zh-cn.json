@@ -865,6 +865,7 @@
   "native-dependencies-description": "此包中包含的原生包及其版本",
   "need-more-contact-us": "需要更多 ？\n联系我们获取量身定制的计划",
   "need-upgrade-trend": "需要升级的组织",
+  "upgrade-trend": "Upgrade Trend",
   "never": "从未",
   "new-bundle-ready-banner": "您有新的捆绑包尚未部署到生产环境。",
   "new-name-not-changed": "新名称与旧名称相同",

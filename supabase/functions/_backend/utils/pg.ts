@@ -880,6 +880,7 @@ export interface AdminGlobalStatsTrend {
   paying_monthly: number
   new_paying_orgs: number
   canceled_orgs: number
+  upgraded_orgs: number
   mrr: number
   total_revenue: number
   revenue_solo: number
@@ -937,6 +938,7 @@ export async function getAdminGlobalStatsTrend(
         paying_monthly::int,
         new_paying_orgs::int,
         canceled_orgs::int,
+        COALESCE(upgraded_orgs, 0)::int AS upgraded_orgs,
         mrr::float,
         total_revenue::float,
         revenue_solo::float,
@@ -984,6 +986,7 @@ export async function getAdminGlobalStatsTrend(
       paying_monthly: Number(row.paying_monthly) || 0,
       new_paying_orgs: Number(row.new_paying_orgs) || 0,
       canceled_orgs: Number(row.canceled_orgs) || 0,
+      upgraded_orgs: Number(row.upgraded_orgs) || 0,
       mrr: Number(row.mrr) || 0,
       total_revenue: Number(row.total_revenue) || 0,
       revenue_solo: Number(row.revenue_solo) || 0,

@@ -865,6 +865,7 @@
   "native-dependencies-description": "このバンドルに含まれるネイティブパッケージとそのバージョン",
   "need-more-contact-us": "もっと必要ですか？カスタムプランについてはお問い合わせください。",
   "need-upgrade-trend": "アップグレードが必要な組織",
+  "upgrade-trend": "Upgrade Trend",
   "never": "なし",
   "new-bundle-ready-banner": "あなたは本番環境にデプロイされていない新しいバンドルを持っています。",
   "new-name-not-changed": "新しい名前は古い名前と同じです。",
