@@ -1110,6 +1110,7 @@ export type Database = {
           mrr: number
           need_upgrade: number | null
           new_paying_orgs: number
+          upgraded_orgs: number
           not_paying: number | null
           onboarded: number | null
           paying: number | null
@@ -1165,6 +1166,7 @@ export type Database = {
           mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
+          upgraded_orgs?: number
           not_paying?: number | null
           onboarded?: number | null
           paying?: number | null
@@ -1220,6 +1222,7 @@ export type Database = {
           mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
+          upgraded_orgs?: number
           not_paying?: number | null
           onboarded?: number | null
           paying?: number | null
@@ -1914,6 +1917,7 @@ export type Database = {
           subscription_id: string | null
           trial_at: string
           updated_at: string
+          upgraded_at: string | null
         }
         Insert: {
           bandwidth_exceeded?: boolean | null
@@ -1935,6 +1939,7 @@ export type Database = {
           subscription_id?: string | null
           trial_at?: string
           updated_at?: string
+          upgraded_at?: string | null
         }
         Update: {
           bandwidth_exceeded?: boolean | null
@@ -1956,6 +1961,7 @@ export type Database = {
           subscription_id?: string | null
           trial_at?: string
           updated_at?: string
+          upgraded_at?: string | null
         }
         Relationships: [
           {
@@ -4118,4 +4124,3 @@ export const Constants = {
     },
   },
 } as const
-

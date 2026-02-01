@@ -281,6 +281,8 @@ async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, Lo
     const updateData = Object.fromEntries(
       Object.entries(stripeData.data).filter(([_, v]) => v !== undefined),
     )
+    if (stripeData.isUpgrade && stripeData.previousProductId)
+      updateData.upgraded_at = new Date().toISOString()
     const { error: dbError2 } = await supabaseAdmin(c)
       .from('stripe_info')
       .update(updateData)

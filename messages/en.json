@@ -178,6 +178,7 @@
   "builds-last-month-trend": "Native Builds Last 30 Days (Total, iOS, Android)",
   "github-stars-trend": "GitHub Stars Trend",
   "need-upgrade-trend": "Organizations Needing Upgrade",
+  "upgrade-trend": "Upgrade Trend",
   "revenue": "Revenue",
   "subscription-flow": "Subscription Flow (New vs Canceled)",
   "subscription-type-trend": "Subscription Type (Yearly vs Monthly)",

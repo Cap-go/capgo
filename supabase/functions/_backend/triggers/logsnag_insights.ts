@@ -58,6 +58,7 @@ interface GlobalStats {
   revenue: PromiseLike<PlanRevenue>
   new_paying_orgs: PromiseLike<number>
   canceled_orgs: PromiseLike<number>
+  upgraded_orgs: PromiseLike<number>
   credits_bought: PromiseLike<number>
   credits_consumed: PromiseLike<number>
   plugin_breakdown: PromiseLike<PluginBreakdownResult>
@@ -425,6 +426,18 @@ function getStats(c: Context): GlobalStats {
         const uniqueCustomers = new Set((res.data || []).map(row => row.customer_id))
         return uniqueCustomers.size
       }),
+    upgraded_orgs: supabase
+      .from('stripe_info')
+      .select('customer_id', { count: 'exact', head: false })
+      .gte('upgraded_at', last24h)
+      .then((res) => {
+        if (res.error) {
+          cloudlog({ requestId: c.get('requestId'), message: 'upgraded_orgs error', error: res.error })
+          return 0
+        }
+        const uniqueCustomers = new Set((res.data || []).map(row => row.customer_id))
+        return uniqueCustomers.size
+      }),
     credits_bought: supabase
       .from('usage_credit_grants')
       .select('credits_total')
@@ -477,6 +490,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     revenue,
     new_paying_orgs,
     canceled_orgs,
+    upgraded_orgs,
     credits_bought,
     credits_consumed,
     plugin_breakdown,
@@ -502,6 +516,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     res.revenue,
     res.new_paying_orgs,
     res.canceled_orgs,
+    res.upgraded_orgs,
     res.credits_bought,
     res.credits_consumed,
     res.plugin_breakdown,
@@ -573,6 +588,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     // Subscription flow tracking
     new_paying_orgs,
     canceled_orgs,
+    upgraded_orgs,
     // Credits tracking (round to integers for bigint column)
     credits_bought: Math.round(credits_bought),
     credits_consumed: Math.round(credits_consumed),

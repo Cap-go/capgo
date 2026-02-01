@@ -48,6 +48,7 @@ const globalStatsTrendData = ref<Array<{
   paying_monthly: number
   new_paying_orgs: number
   canceled_orgs: number
+  upgraded_orgs: number
   mrr: number
   total_revenue: number
   revenue_solo: number
@@ -119,6 +120,30 @@ const subscriptionFlowSeries = computed(() => {
         value: item.canceled_orgs || 0,
       })),
       color: '#ef4444', // red
+    },
+  ]
+})
+
+const upgradeTrendSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Organizations Needing Upgrade',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.need_upgrade,
+      })),
+      color: '#ef4444', // red
+    },
+    {
+      label: 'Upgraded Organizations (24h)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.upgraded_orgs || 0,
+      })),
+      color: '#10b981', // green
     },
   ]
 })
@@ -376,6 +401,55 @@ displayStore.defaultBack = '/dashboard'
             </div>
           </div>
 
+          <!-- Upgrade Metrics Cards -->
+          <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <!-- Organizations Needing Upgrade -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-error/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-error"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v4m0 4h.01M5.07 19h13.86a2 2 0 001.74-3l-6.93-12a2 2 0 00-3.48 0l-6.93 12a2 2 0 001.74 3z" /></svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  Orgs Need Upgrade
+                </p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-error">
+                  {{ latestGlobalStats.need_upgrade.toLocaleString() }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-error">
+                  0
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Organizations over plan limits
+                </p>
+              </div>
+            </div>
+
+            <!-- Organizations Upgraded -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-success/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-success"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  Orgs Upgraded (24h)
+                </p>
+                <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-success">
+                  {{ (latestGlobalStats.upgraded_orgs || 0).toLocaleString() }}
+                </p>
+                <p v-else class="mt-2 text-3xl font-bold text-success">
+                  0
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Plan upgrades in the last 24 hours
+                </p>
+              </div>
+            </div>
+          </div>
+
           <!-- Charts - 2 per row -->
           <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <!-- Subscription Flow (New vs Canceled) -->
@@ -452,6 +526,18 @@ displayStore.defaultBack = '/dashboard'
             >
               <AdminMultiLineChart
                 :series="totalPayingOrgsSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+
+            <!-- Upgrade Trend -->
+            <ChartCard
+              :title="t('upgrade-trend')"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="upgradeTrendSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="upgradeTrendSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
               />
             </ChartCard>
