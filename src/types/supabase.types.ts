@@ -3405,7 +3405,27 @@ export type Database = {
         }
         Returns: boolean
       }
+      rbac_check_permission_no_password_policy: {
+        Args: {
+          p_app_id?: string
+          p_channel_id?: number
+          p_org_id?: string
+          p_permission_key: string
+        }
+        Returns: boolean
+      }
       rbac_check_permission_direct: {
+        Args: {
+          p_apikey?: string
+          p_app_id: string
+          p_channel_id: number
+          p_org_id: string
+          p_permission_key: string
+          p_user_id: string
+        }
+        Returns: boolean
+      }
+      rbac_check_permission_direct_no_password_policy: {
         Args: {
           p_apikey?: string
           p_app_id: string
