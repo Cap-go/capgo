@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { checkOrgReadAccess } from '../supabase/functions/_backend/private/validate_password_compliance.ts'
-import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_EMAIL_NONMEMBER, USER_ID, USER_ID_2, USER_PASSWORD_NONMEMBER } from './test-utils.ts'
+import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_EMAIL, USER_ID, USER_ID_2, USER_PASSWORD } from './test-utils.ts'
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
@@ -306,8 +306,8 @@ describe('[POST] /private/validate_password_compliance', () => {
   it('reject request when user is not a member of the org', async () => {
     const nonMemberOrgId = randomUUID()
     const nonMemberCustomerId = `cus_pwd_nomember_${nonMemberOrgId}`
-    const nonMemberEmail = USER_EMAIL_NONMEMBER
-    const nonMemberPassword = USER_PASSWORD_NONMEMBER
+    const nonMemberEmail = USER_EMAIL
+    const nonMemberPassword = USER_PASSWORD
     const supabase = getSupabaseClient()
 
     await supabase.from('stripe_info').insert({
