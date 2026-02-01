@@ -4,12 +4,16 @@ import { z } from 'zod/mini'
 import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { supabaseClient, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '../utils/supabase.types.ts'
 
 interface ValidatePasswordCompliance {
   email: string
   password: string
   org_id: string
 }
+
+type RpcClient = Pick<SupabaseClient<Database>, 'rpc'>
 
 interface OrgReadAccessResult {
   allowed: boolean
@@ -55,7 +59,7 @@ function passwordMeetsPolicy(password: string, policy: {
 }
 
 export async function checkOrgReadAccess(
-  supabase: { rpc: (fn: string, args?: Record<string, unknown>) => Promise<{ data: boolean | null, error: { message: string } | null }> },
+  supabase: RpcClient,
   orgId: string,
   requestId: string,
 ): Promise<OrgReadAccessResult> {

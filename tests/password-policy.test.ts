@@ -363,7 +363,7 @@ describe('checkOrgReadAccess', () => {
   it('returns error when membership RPC fails', async () => {
     const result = await checkOrgReadAccess({
       rpc: async () => ({ data: null, error: { message: 'boom' } }),
-    }, ORG_ID, 'req-test')
+    } as any, ORG_ID, 'req-test')
 
     expect(result.allowed).toBe(false)
     expect(result.error).toBe('boom')
