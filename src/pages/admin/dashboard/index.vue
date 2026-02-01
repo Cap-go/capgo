@@ -153,22 +153,6 @@ const githubStarsTrendSeries = computed(() => {
   ]
 })
 
-const needUpgradeTrendSeries = computed(() => {
-  if (globalStatsTrendData.value.length === 0)
-    return []
-
-  return [
-    {
-      label: 'Organizations Needing Upgrade',
-      data: globalStatsTrendData.value.map(item => ({
-        date: item.date,
-        value: item.need_upgrade,
-      })),
-      color: '#ef4444', // red
-    },
-  ]
-})
-
 const devicePlatformTrendSeries = computed(() => {
   if (globalStatsTrendData.value.length === 0)
     return []
@@ -728,9 +712,8 @@ displayStore.defaultBack = '/dashboard'
             </ChartCard>
           </div>
 
-          <!-- GitHub & Upgrade Metrics - 2 per row -->
-          <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <!-- GitHub Stars Trend -->
+          <!-- GitHub Stars Trend -->
+          <div class="grid grid-cols-1 gap-6">
             <ChartCard
               :title="t('github-stars-trend')"
               :is-loading="isLoadingGlobalStatsTrend"
@@ -738,18 +721,6 @@ displayStore.defaultBack = '/dashboard'
             >
               <AdminMultiLineChart
                 :series="githubStarsTrendSeries"
-                :is-loading="isLoadingGlobalStatsTrend"
-              />
-            </ChartCard>
-
-            <!-- Need Upgrade Trend -->
-            <ChartCard
-              :title="t('need-upgrade-trend')"
-              :is-loading="isLoadingGlobalStatsTrend"
-              :has-data="needUpgradeTrendSeries.length > 0"
-            >
-              <AdminMultiLineChart
-                :series="needUpgradeTrendSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
               />
             </ChartCard>

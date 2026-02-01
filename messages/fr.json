@@ -865,6 +865,7 @@
   "native-dependencies-description": "Paquets natifs et leurs versions inclus dans ce bundle",
   "need-more-contact-us": "Besoin de plus ? Contactez-nous pour un plan sur mesure",
   "need-upgrade-trend": "Organisations Nécessitant une Mise à Niveau",
+  "upgrade-trend": "Upgrade Trend",
   "never": "Jamais",
   "new-bundle-ready-banner": "Vous avez de nouveaux lots qui ne sont pas déployés en production.",
   "new-name-not-changed": "Le nouveau nom est le même que l'ancien.",
