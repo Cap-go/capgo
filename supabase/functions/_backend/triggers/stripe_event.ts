@@ -268,7 +268,51 @@ async function invoiceUpcoming(c: Context, LogSnag: ReturnType<typeof logsnag>, 
   return c.json(BRES)
 }
 
-async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, LogSnag: ReturnType<typeof logsnag>, originalStatus?: string) {
+function getStripeInfoChangedFields(oldRecord: Record<string, any> | null, newRecord: Record<string, any>, updateFields: string[]): string[] {
+  if (!oldRecord)
+    return updateFields
+
+  return updateFields.filter((field) => {
+    if (!(field in newRecord))
+      return false
+    return oldRecord[field] !== newRecord[field]
+  })
+}
+
+async function logStripeInfoAudit(c: Context, orgId: string, customerId: string, oldRecord: Record<string, any> | null, updateData: Record<string, any>) {
+  const newRecord = oldRecord ? { ...oldRecord, ...updateData } : { ...updateData }
+  const updateFields = Object.keys(updateData)
+  const changedFields = getStripeInfoChangedFields(oldRecord, newRecord, updateFields)
+
+  if (changedFields.length === 0)
+    return
+
+  const { error } = await supabaseAdmin(c)
+    .from('audit_logs')
+    .insert({
+      table_name: 'stripe_info',
+      record_id: customerId,
+      operation: 'UPDATE',
+      user_id: null,
+      org_id: orgId,
+      old_record: oldRecord,
+      new_record: newRecord,
+      changed_fields: changedFields,
+    })
+
+  if (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'audit_logs stripe_info insert error', error })
+  }
+}
+
+async function createdOrUpdated(
+  c: Context,
+  stripeData: StripeData,
+  org: Org,
+  LogSnag: ReturnType<typeof logsnag>,
+  originalStatus?: string,
+  previousStripeInfo?: Record<string, any> | null,
+) {
   const status = originalStatus ?? stripeData.data.status
   let statusName: string = status ?? ''
   const { data: plan } = await supabaseAdmin(c)
@@ -315,6 +359,8 @@ async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, Lo
       return quickError(404, 'succeeded_customer_id_not_found', `succeeded: customer_id not found`, { dbError2, stripeData })
     }
 
+    await logStripeInfoAudit(c, org.id, stripeData.data.customer_id, previousStripeInfo ?? null, updateData)
+
     const segment = await customerToSegmentOrg(c, org.id, stripeData.data.price_id, plan)
     const isMonthly = plan.price_m_id === stripeData.data.price_id
     const eventName = `user:subscribe_${statusName}:${isMonthly ? 'monthly' : 'yearly'}`
@@ -344,7 +390,7 @@ async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, Lo
   }
 }
 
-async function updateStripeInfo(c: Context, stripeData: StripeData) {
+async function updateStripeInfo(c: Context, stripeData: StripeData, org: Org, previousStripeInfo?: Record<string, any> | null) {
   // Filter out undefined values to avoid FK constraint violations
   const updateData = Object.fromEntries(
     Object.entries(stripeData.data).filter(([_, v]) => v !== undefined),
@@ -356,6 +402,7 @@ async function updateStripeInfo(c: Context, stripeData: StripeData) {
   if (dbError2) {
     return quickError(404, 'canceled_customer_id_not_found', `canceled:  customer_id not found`, { dbError2, stripeData })
   }
+  await logStripeInfoAudit(c, org.id, stripeData.data.customer_id, previousStripeInfo ?? null, updateData)
   return false
 }
 
@@ -450,12 +497,12 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
   if (['created', 'succeeded', 'updated'].includes(stripeData.data.status ?? '') && stripeData.data.price_id && stripeData.data.product_id) {
     const originalStatus = stripeData.data.status
     stripeData.data.status = 'succeeded'
-    await createdOrUpdated(c, stripeData, org, LogSnag, originalStatus!)
+    await createdOrUpdated(c, stripeData, org, LogSnag, originalStatus!, customer ?? null)
   }
   else if (stripeData.data.status === 'failed') {
     await trackBentoEvent(c, org.management_email, {}, 'org:failed_payment')
     // Update the database with failed status
-    await updateStripeInfo(c, stripeData)
+    await updateStripeInfo(c, stripeData, org, customer ?? null)
   }
   else if (['created', 'succeeded', 'updated'].includes(stripeData.data.status ?? '') && (!stripeData.data.price_id || !stripeData.data.product_id)) {
     // Subscription event without price/product data - log warning but don't process
@@ -472,7 +519,7 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
         stripeData.data.status = 'succeeded'
       }
       // Otherwise keep it as 'canceled' since the period has ended
-      await updateStripeInfo(c, stripeData)
+      await updateStripeInfo(c, stripeData, org, customer ?? null)
     }
     // If it's a different subscription (not the one in DB), ignore it
     // This prevents old subscription webhooks from overwriting newer active subscriptions
