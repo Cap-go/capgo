@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { checkOrgReadAccess } from '../supabase/functions/_backend/private/validate_password_compliance.ts'
-import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_EMAIL, USER_ID, USER_ID_2, USER_PASSWORD } from './test-utils.ts'
+import { BASE_URL, executeSQL, getSupabaseClient, headers, TEST_EMAIL, USER_EMAIL, USER_ID, USER_ID_2, USER_PASSWORD, USER_PASSWORD_HASH } from './test-utils.ts'
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
@@ -309,6 +309,19 @@ describe('[POST] /private/validate_password_compliance', () => {
     const nonMemberEmail = USER_EMAIL
     const nonMemberPassword = USER_PASSWORD
     const supabase = getSupabaseClient()
+
+    await executeSQL(
+      `INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_user_meta_data)
+       VALUES ($1, $2, $3, NOW(), NOW(), NOW(), '{}'::jsonb)
+       ON CONFLICT (id) DO NOTHING`,
+      [USER_ID, USER_EMAIL, USER_PASSWORD_HASH],
+    )
+    await executeSQL(
+      `INSERT INTO public.users (id, email, created_at, updated_at)
+       VALUES ($1, $2, NOW(), NOW())
+       ON CONFLICT (id) DO NOTHING`,
+      [USER_ID, USER_EMAIL],
+    )
 
     await supabase.from('stripe_info').insert({
       customer_id: nonMemberCustomerId,
