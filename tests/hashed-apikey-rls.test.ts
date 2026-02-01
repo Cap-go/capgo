@@ -9,15 +9,10 @@
  * org and API key to prevent interference with other tests that create/delete API keys.
  */
 import { createClient } from '@supabase/supabase-js'
+import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APIKEY_RLS_ALL, APP_NAME_RLS, BASE_URL, ORG_ID_2FA_TEST, ORG_ID_RLS, POSTGRES_URL, USER_ID_RLS } from './test-utils.ts'
-
-// Use dedicated RLS test user's API key to avoid conflicts with other tests
-const headersRLS = {
-  'Content-Type': 'application/json',
-  'Authorization': APIKEY_RLS_ALL,
-}
+import { APP_NAME_RLS, ORG_ID_2FA_TEST, ORG_ID_RLS, POSTGRES_URL, USER_ID_RLS } from './test-utils.ts'
 
 // Use dedicated RLS test user for complete isolation
 const RLS_TEST_USER_ID = USER_ID_RLS
@@ -41,39 +36,60 @@ async function execWithCapgkey(sql: string, capgkey: string): Promise<any> {
 }
 
 // Helper to create a hashed API key via the API
-async function createHashedApiKey(name: string): Promise<{ id: number, key: string, key_hash: string }> {
-  const response = await fetch(`${BASE_URL}/apikey`, {
-    method: 'POST',
-    headers: headersRLS,
-    body: JSON.stringify({ name, hashed: true }),
-  })
-  if (response.status !== 200) {
-    const error = await response.text()
-    throw new Error(`Failed to create hashed API key: ${error}`)
+async function createHashedApiKey(
+  name: string,
+  mode: 'all' | 'write' | 'read' | 'upload' = 'all',
+  limitedToOrgs: string[] = [],
+  limitedToApps: string[] = [],
+): Promise<{ id: number, key: string, key_hash: string }> {
+  const client = await pool.connect()
+  const plainKey = randomUUID()
+  try {
+    const { rows } = await client.query(
+      `INSERT INTO public.apikeys (user_id, key, key_hash, mode, name, limited_to_orgs, limited_to_apps)
+       VALUES ($1, NULL, encode(extensions.digest($2, 'sha256'), 'hex'), $3, $4, $5, $6)
+       RETURNING id, key_hash`,
+      [RLS_TEST_USER_ID, plainKey, mode, name, limitedToOrgs, limitedToApps],
+    )
+    return { id: Number(rows[0].id), key: plainKey, key_hash: rows[0].key_hash }
   }
-  return response.json()
+  finally {
+    client.release()
+  }
 }
 
 // Helper to create a plain API key via the API
-async function createPlainApiKey(name: string): Promise<{ id: number, key: string }> {
-  const response = await fetch(`${BASE_URL}/apikey`, {
-    method: 'POST',
-    headers: headersRLS,
-    body: JSON.stringify({ name, hashed: false }),
-  })
-  if (response.status !== 200) {
-    const error = await response.text()
-    throw new Error(`Failed to create plain API key: ${error}`)
+async function createPlainApiKey(
+  name: string,
+  mode: 'all' | 'write' | 'read' | 'upload' = 'all',
+  limitedToOrgs: string[] = [],
+  limitedToApps: string[] = [],
+): Promise<{ id: number, key: string }> {
+  const client = await pool.connect()
+  const plainKey = randomUUID()
+  try {
+    const { rows } = await client.query(
+      `INSERT INTO public.apikeys (user_id, key, mode, name, limited_to_orgs, limited_to_apps)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, key`,
+      [RLS_TEST_USER_ID, plainKey, mode, name, limitedToOrgs, limitedToApps],
+    )
+    return { id: Number(rows[0].id), key: rows[0].key }
   }
-  return response.json()
+  finally {
+    client.release()
+  }
 }
 
 // Helper to delete an API key
 async function deleteApiKey(id: number): Promise<void> {
-  await fetch(`${BASE_URL}/apikey/${id}`, {
-    method: 'DELETE',
-    headers: headersRLS,
-  })
+  const client = await pool.connect()
+  try {
+    await client.query('DELETE FROM public.apikeys WHERE id = $1', [id])
+  }
+  finally {
+    client.release()
+  }
 }
 
 // Helper to set API key expiration directly in DB

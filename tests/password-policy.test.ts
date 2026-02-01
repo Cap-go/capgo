@@ -1,8 +1,9 @@
+import type { PostgrestError } from '@supabase/supabase-js'
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_EMAIL, USER_ID, USER_ID_2 } from './test-utils.ts'
 import { checkOrgReadAccess } from '../supabase/functions/_backend/private/validate_password_compliance.ts'
+import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_EMAIL, USER_ID, USER_ID_2 } from './test-utils.ts'
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
@@ -50,7 +51,7 @@ afterAll(async () => {
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
 })
 
-describe('Password Policy Configuration via SDK', () => {
+describe('password Policy Configuration via SDK', () => {
   it('enable password policy with all requirements via direct update', async () => {
     const policyConfig = {
       enabled: true,
@@ -259,6 +260,7 @@ describe('[POST] /private/validate_password_compliance', () => {
     if (disableError)
       throw disableError
 
+    let restoreError: PostgrestError | null = null
     try {
       const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
         headers,
@@ -275,13 +277,14 @@ describe('[POST] /private/validate_password_compliance', () => {
       expect(responseData.error).toBe('no_policy')
     }
     finally {
-      const { error: restoreError } = await getSupabaseClient()
+      const { error } = await getSupabaseClient()
         .from('orgs')
         .update({ password_policy_config: policyConfig })
         .eq('id', ORG_ID)
-      if (restoreError)
-        throw restoreError
+      restoreError = error ?? null
     }
+    if (restoreError)
+      throw restoreError
   })
 
   it('reject request with invalid credentials', async () => {
@@ -303,8 +306,22 @@ describe('[POST] /private/validate_password_compliance', () => {
   it('reject request when user is not a member of the org', async () => {
     const nonMemberOrgId = randomUUID()
     const nonMemberCustomerId = `cus_pwd_nomember_${nonMemberOrgId}`
+    const nonMemberEmail = `pwd-nonmember-${randomUUID()}@test.com`
+    const nonMemberPassword = 'TestPassword123!'
+    const supabase = getSupabaseClient()
 
-    await getSupabaseClient().from('stripe_info').insert({
+    const { data: createdUser, error: createUserError } = await supabase.auth.admin.createUser({
+      email: nonMemberEmail,
+      password: nonMemberPassword,
+      email_confirm: true,
+    })
+    if (createUserError || !createdUser?.user) {
+      throw createUserError ?? new Error('Failed to create non-member user')
+    }
+
+    const nonMemberUserId = createdUser.user.id
+
+    await supabase.from('stripe_info').insert({
       customer_id: nonMemberCustomerId,
       status: 'succeeded',
       product_id: 'prod_LQIregjtNduh4q',
@@ -313,7 +330,7 @@ describe('[POST] /private/validate_password_compliance', () => {
       is_good_plan: true,
     })
 
-    await getSupabaseClient().from('orgs').insert({
+    await supabase.from('orgs').insert({
       id: nonMemberOrgId,
       name: `Pwd Policy Non Member Org ${nonMemberOrgId}`,
       management_email: TEST_EMAIL,
@@ -333,8 +350,8 @@ describe('[POST] /private/validate_password_compliance', () => {
         headers,
         method: 'POST',
         body: JSON.stringify({
-          email: USER_EMAIL,
-          password: 'testtest',
+          email: nonMemberEmail,
+          password: nonMemberPassword,
           org_id: nonMemberOrgId,
         }),
       })
@@ -344,8 +361,9 @@ describe('[POST] /private/validate_password_compliance', () => {
       expect(responseData.error).toBe('not_member')
     }
     finally {
-      await getSupabaseClient().from('orgs').delete().eq('id', nonMemberOrgId)
-      await getSupabaseClient().from('stripe_info').delete().eq('customer_id', nonMemberCustomerId)
+      await supabase.from('orgs').delete().eq('id', nonMemberOrgId)
+      await supabase.from('stripe_info').delete().eq('customer_id', nonMemberCustomerId)
+      await supabase.auth.admin.deleteUser(nonMemberUserId)
     }
   })
 
@@ -408,7 +426,7 @@ describe('[GET] /private/check_org_members_password_policy', () => {
   })
 })
 
-describe('Password Policy Enforcement Integration', () => {
+describe('password Policy Enforcement Integration', () => {
   const orgWithPolicyId = randomUUID()
   const orgWithPolicyName = `Pwd Policy Integration Org ${randomUUID()}`
   const orgWithPolicyCustomerId = `cus_pwd_int_${orgWithPolicyId}`
