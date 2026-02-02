@@ -23,6 +23,7 @@ const EMAIL_PREF_DISABLED_TAGS: Record<EmailPreferenceKey, string> = {
   device_error: 'device_error_disabled',
   channel_self_rejected: 'channel_self_rejected_disabled',
   daily_fail_ratio: 'daily_fail_ratio_disabled',
+  cli_realtime_feed: 'cli_realtime_feed_disabled',
 }
 
 const ALL_LEGACY_TAGS = [NOTIFICATION_TAG, NEWSLETTER_TAG]

@@ -5,7 +5,7 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { supabaseClient, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
+import { supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 
 interface ValidatePasswordCompliance {
   email: string
@@ -120,7 +120,8 @@ app.post('/', async (c) => {
 
   // Attempt to sign in with the provided credentials to verify password
   // Note: signInWithPassword needs admin to work without session
-  const { data: signInData, error: signInError } = await supabaseAdmin.auth.signInWithPassword({
+  const supabase = useSupabaseAdmin(c)
+  const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
     email: body.email,
     password: body.password,
   })
@@ -131,9 +132,6 @@ app.post('/', async (c) => {
   }
 
   const userId = signInData.user.id
-
-  // Use authenticated client for subsequent queries - RLS will enforce access
-  const supabase = supabaseClient(c, `Bearer ${signInData.session.access_token}`)
 
   const orgAccess = await checkOrgReadAccess(supabase, body.org_id, c.get('requestId'))
   if (orgAccess.error) {
@@ -169,8 +167,8 @@ app.post('/', async (c) => {
     return quickError(500, 'hash_failed', 'Failed to compute policy hash', { error: hashError?.message })
   }
 
-  // Upsert the compliance record
-  const { error: upsertError } = await supabase
+  // Upsert the compliance record (service role bypasses RLS)
+  const { error: upsertError } = await supabaseAdmin
     .from('user_password_compliance')
     .upsert({
       user_id: userId,

@@ -88,6 +88,13 @@ testing against Cloudflare Workers.
 - For **schema changes**, always edit or add files under
   `supabase/migrations/` and treat `supabase/schemas/prod.sql` as read-only
   reference.
+- **Supabase admin client + sign-in pitfall:** if you call
+  `supabaseAdmin.auth.signInWithPassword(...)`, that client becomes authenticated
+  as the user (it is no longer a pure service-role client). Always use a
+  **separate admin client** for sign-in, and keep a clean admin client for
+  service-role writes. Example:
+  - `const loginAdmin = supabaseAdmin(c)` → use for `signInWithPassword`
+  - `const adminClient = supabaseAdmin(c)` → use for admin writes
 
 ### HTTP Response Conventions
 

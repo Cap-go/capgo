@@ -138,6 +138,7 @@ export const users = pgTable('users', {
     bundle_deployed: true,
     device_error: true,
     channel_self_rejected: true,
+    cli_realtime_feed: true,
   }),
 })
 
