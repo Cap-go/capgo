@@ -63,9 +63,12 @@ export async function streamBuildLogs(
   appId: string,
   apikey: Database['public']['Tables']['apikeys']['Row'],
 ): Promise<Response> {
+  // DEPRECATION: This proxy endpoint is deprecated in favor of direct SSE streaming.
+  // New CLI versions receive logs_url and logs_token from /build/start and connect directly
+  // to the CF Worker. This proxy is kept for backwards compatibility with older CLI versions.
   cloudlog({
     requestId: c.get('requestId'),
-    message: 'Build logs stream request',
+    message: 'Build logs stream request (deprecated proxy - use direct SSE)',
     job_id: jobId,
     app_id: appId,
     user_id: apikey.user_id,

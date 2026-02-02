@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
+import { SignJWT } from 'jose'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
@@ -8,6 +9,33 @@ import { getEnv } from '../../utils/utils.ts'
 
 interface BuilderStartResponse {
   status: string
+  logs_url?: string
+  logs_token?: string
+}
+
+/**
+ * Generate a JWT token for direct log stream access
+ * Uses HMAC-SHA256 for signing
+ */
+async function generateLogStreamToken(
+  jobId: string,
+  userId: string,
+  appId: string,
+  jwtSecret: string,
+): Promise<string> {
+  const secret = new TextEncoder().encode(jwtSecret)
+
+  return await new SignJWT({
+    job_id: jobId,
+    app_id: appId,
+  })
+    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+    .setIssuer('capgo')
+    .setAudience('build-logs')
+    .setSubject(userId)
+    .setIssuedAt()
+    .setExpirationTime('4h')
+    .sign(secret)
 }
 
 async function markBuildAsFailed(
@@ -144,9 +172,54 @@ export async function startBuild(
       })
     }
 
+    // Generate JWT token for direct log stream access
+    const jwtSecret = getEnv(c, 'JWT_SECRET')
+    const publicUrl = getEnv(c, 'PUBLIC_URL') || 'https://api.capgo.app'
+
+    let logsUrl: string | undefined
+    let logsToken: string | undefined
+
+    if (jwtSecret) {
+      try {
+        // NOTE: The `/build_logs_direct/:jobId` endpoint is **not** implemented in this
+        // backend. It is provided by the external Capgo Builder worker/service.
+        // The JWT generated here is consumed and verified by that external service
+        // (using a shared secret compatible with `JWT_SECRET`) to:
+        //   - Authorize access to live build logs for the given jobId/appId/user
+        //   - Stream logs directly to the CLI without going through this API as a proxy
+        // If the direct URL and token are not provided, the CLI fails to get the logs of the build.
+        logsToken = await generateLogStreamToken(jobId, apikey.user_id, appId, jwtSecret)
+        logsUrl = `${publicUrl}/build_logs_direct/${jobId}`
+
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'Generated log stream token for direct access',
+          job_id: jobId,
+          logs_url: logsUrl,
+        })
+      }
+      catch (tokenError) {
+        // Log error but don't fail the request - CLI can fall back to proxy
+        cloudlogErr({
+          requestId: c.get('requestId'),
+          message: 'Failed to generate log stream token',
+          job_id: jobId,
+          error: tokenError instanceof Error ? tokenError.message : String(tokenError),
+        })
+      }
+    }
+    else {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'JWT_SECRET not configured, skipping direct log stream token',
+        job_id: jobId,
+      })
+    }
+
     return c.json({
       job_id: jobId,
       status: builderJob.status || 'running',
+      ...(logsUrl && logsToken ? { logs_url: logsUrl, logs_token: logsToken } : {}),
     }, 200)
   }
   catch (error) {
