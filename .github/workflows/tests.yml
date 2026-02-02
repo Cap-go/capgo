@@ -59,7 +59,7 @@ jobs:
       - name: Show Supabase CLI version
         run: supabase --version
       - name: Run Supabase Start
-        run: supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,studio,logflare,vector,realtime,gotrue
+        run: supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,studio,logflare,vector,realtime
       - name: Run Supabase Test DB
         run: supabase test db
       - name: Lint SQL
