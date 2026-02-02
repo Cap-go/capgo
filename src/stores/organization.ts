@@ -173,23 +173,19 @@ export const useOrganizationStore = defineStore('organization', () => {
 
   const STORAGE_KEY = 'capgo_current_org_id'
 
-  watch([currentOrganization, stripeEnabled], async ([currentOrganizationRaw, stripeEnabledValue], oldValues) => {
+  watch([currentOrganization, stripeEnabled], async ([currentOrganizationRaw, stripeEnabledValue], [previousOrganization]) => {
     if (!currentOrganizationRaw) {
       currentRole.value = null
       localStorage.removeItem(STORAGE_KEY)
       return
     }
-    const previousOrganization = oldValues?.[0]
 
     localStorage.setItem(STORAGE_KEY, currentOrganizationRaw.gid)
     currentRole.value = await getCurrentRole(currentOrganizationRaw.created_by)
     // Don't mark as failed if user lacks 2FA or password access - the data is redacted and unreliable
     const lacks2FAAccess = currentOrganizationRaw.enforcing_2fa === true && currentOrganizationRaw['2fa_has_access'] === false
     const lacksPasswordAccess = currentOrganizationRaw.password_policy_config?.enabled && currentOrganizationRaw.password_has_access === false
-    if (lacks2FAAccess || lacksPasswordAccess) {
-      currentOrganizationFailed.value = false
-    }
-    else if (!stripeEnabledValue) {
+    if (lacks2FAAccess || lacksPasswordAccess || !stripeEnabledValue) {
       currentOrganizationFailed.value = false
     }
     else {

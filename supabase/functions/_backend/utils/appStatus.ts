@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import { CacheHelper } from './cache.ts'
-import { backgroundTask } from './utils.ts'
+import { backgroundTask, isStripeConfigured } from './utils.ts'
 
 const APP_STATUS_CACHE_PATH = '/.app-status-v2'
 const APP_STATUS_CACHE_TTL_SECONDS = 60
@@ -24,6 +24,8 @@ export async function getAppStatus(c: Context, appId: string): Promise<AppStatus
   const payload = await cacheEntry.helper.matchJson<{ status: AppStatus }>(cacheEntry.request)
   if (!payload)
     return null
+  if (payload.status === 'cancelled' && !isStripeConfigured(c))
+    return 'cloud'
   return payload.status
 }
 
