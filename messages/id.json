@@ -947,6 +947,8 @@
   "onboarding-invite-option-title": "Lebih suka orang lain yang menangani pengaturannya?",
   "onboarding-manual-setup-link": "panduan pengaturan manual",
   "onboarding-manual-setup-prefix": "Atau ikuti",
+  "onboarding-cli-guide-prefix": "📖 Lihat apa yang dilakukan perintah ini:",
+  "onboarding-cli-guide-link": "Panduan onboarding lengkap",
   "onboarding-demo-option-title": "Hanya ingin menjelajahi Capgo?",
   "onboarding-demo-option-subtitle": "Buat aplikasi demo secara instan untuk melihat cara kerja Capgo. Tidak perlu CLI atau pengaturan teknis. Aplikasi demo akan dihapus secara otomatis setelah 14 hari.",
   "onboarding-demo-option-cta": "Buat Aplikasi Demo",

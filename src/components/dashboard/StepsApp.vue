@@ -434,6 +434,15 @@ onUnmounted(() => {
                   </code>
                   <i-ion-copy-outline class="absolute w-6 h-6 top-5 right-5 text-muted-blue-300" />
                 </div>
+                <p v-if="s.command" class="mt-3 text-sm font-medium text-gray-700">
+                  {{ t('onboarding-cli-guide-prefix') }}
+                  <a
+                    href="https://capgo.app/docs/getting-started/onboarding/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-muted-blue-700 underline hover:text-muted-blue-900"
+                  >{{ t('onboarding-cli-guide-link') }}</a>
+                </p>
                 <br v-if="s.command">
               </div>
             </div>
@@ -474,7 +483,7 @@ onUnmounted(() => {
               <button
                 type="button"
                 :disabled="isDemoLoading"
-                class="inline-flex items-center px-4 py-2 mt-4 text-sm font-semibold text-white transition-colors duration-200 rounded-md cursor-pointer focus:ring-2 focus:ring-offset-2 bg-pumpkin-orange-900 hover:bg-pumpkin-orange-800 focus:outline-hidden focus:ring-pumpkin-orange-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                class="inline-flex items-center px-4 py-2 mt-4 text-sm font-semibold transition-colors duration-200 rounded-md cursor-pointer focus:ring-2 focus:ring-offset-2 bg-muted-blue-50 text-muted-blue-800 hover:bg-muted-blue-100 focus:outline-hidden focus:ring-muted-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 @click="createDemoApp"
               >
                 <IconLoader v-if="isDemoLoading" class="w-4 h-4 mr-2 animate-spin" />

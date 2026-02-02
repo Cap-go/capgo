@@ -947,6 +947,8 @@
   "onboarding-invite-option-title": "Kurulumu başkasının yapmasını tercih eder misiniz?",
   "onboarding-manual-setup-link": "manuel kurulum kılavuzuna",
   "onboarding-manual-setup-prefix": "Ya da",
+  "onboarding-cli-guide-prefix": "📖 Bu komutun ne yaptığını görün:",
+  "onboarding-cli-guide-link": "Eksiksiz entegrasyon kılavuzu",
   "onboarding-demo-option-title": "Sadece Capgo'yu keşfetmek mi istiyorsunuz?",
   "onboarding-demo-option-subtitle": "Capgo'nun nasıl çalıştığını görmek için anında bir demo uygulaması oluşturun. CLI veya teknik kurulum gerekmez. Demo uygulamalar 14 gün sonra otomatik olarak silinir.",
   "onboarding-demo-option-cta": "Demo Uygulama Oluştur",

@@ -947,6 +947,8 @@
   "onboarding-invite-option-title": "Preferisci che qualcun altro gestisca l'installazione?",
   "onboarding-manual-setup-link": "guida alla configurazione manuale",
   "onboarding-manual-setup-prefix": "Oppure segui la nostra",
+  "onboarding-cli-guide-prefix": "📖 Vedi cosa fa questo comando:",
+  "onboarding-cli-guide-link": "Guida completa all'onboarding",
   "onboarding-demo-option-title": "Vuoi solo esplorare Capgo?",
   "onboarding-demo-option-subtitle": "Crea un'app demo istantaneamente per vedere come funziona Capgo. Nessuna CLI o configurazione tecnica richiesta. Le app demo vengono eliminate automaticamente dopo 14 giorni.",
   "onboarding-demo-option-cta": "Crea App Demo",

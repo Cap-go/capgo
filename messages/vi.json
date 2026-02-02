@@ -947,6 +947,8 @@
   "onboarding-invite-option-title": "Bạn muốn người khác đảm nhận việc thiết lập?",
   "onboarding-manual-setup-link": "hướng dẫn thiết lập thủ công",
   "onboarding-manual-setup-prefix": "Hoặc làm theo",
+  "onboarding-cli-guide-prefix": "📖 Xem lệnh này làm gì:",
+  "onboarding-cli-guide-link": "Hướng dẫn tích hợp đầy đủ",
   "onboarding-demo-option-title": "Chỉ muốn khám phá Capgo?",
   "onboarding-demo-option-subtitle": "Tạo ứng dụng demo ngay lập tức để xem Capgo hoạt động như thế nào. Không cần CLI hoặc thiết lập kỹ thuật. Ứng dụng demo sẽ tự động bị xóa sau 14 ngày.",
   "onboarding-demo-option-cta": "Tạo ứng dụng demo",

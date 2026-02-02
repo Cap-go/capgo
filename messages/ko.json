@@ -947,6 +947,8 @@
   "onboarding-invite-option-title": "설정을 다른 사람에게 맡기는 것을 선호하시나요?",
   "onboarding-manual-setup-link": "수동 설정 가이드",
   "onboarding-manual-setup-prefix": "또는",
+  "onboarding-cli-guide-prefix": "📖 이 명령어가 하는 일 보기:",
+  "onboarding-cli-guide-link": "전체 온보딩 가이드",
   "onboarding-demo-option-title": "Capgo를 탐색하고 싶으신가요?",
   "onboarding-demo-option-subtitle": "데모 앱을 즉시 생성하여 Capgo 작동 방식을 확인하세요. CLI나 기술 설정이 필요 없습니다. 데모 앱은 14일 후 자동으로 삭제됩니다.",
   "onboarding-demo-option-cta": "데모 앱 만들기",

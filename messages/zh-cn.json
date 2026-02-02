@@ -947,6 +947,8 @@
   "onboarding-invite-option-title": "更喜欢让别人来处理设置吗？",
   "onboarding-manual-setup-link": "手动设置指南",
   "onboarding-manual-setup-prefix": "或者查看我们的",
+  "onboarding-cli-guide-prefix": "📖 查看此命令的作用：",
+  "onboarding-cli-guide-link": "完整的入门指南",
   "onboarding-demo-option-title": "只想体验 Capgo？",
   "onboarding-demo-option-subtitle": "即时创建一个演示应用，了解 Capgo 的工作原理。无需 CLI 或技术设置。演示应用将在 14 天后自动删除。",
   "onboarding-demo-option-cta": "创建演示应用",
