@@ -28,7 +28,7 @@ jobs:
         with:
           bun-version: latest
       - name: Check for typos
-        uses: crate-ci/typos@v1.41.0
+        uses: crate-ci/typos@v1.42.3
       - name: Show bun version
         run: bun --version
       - name: Show capgo version
