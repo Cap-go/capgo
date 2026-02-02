@@ -7,7 +7,7 @@ import { parse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
-import { isChannelSelfRateLimited, recordChannelSelfRequest } from '../utils/channelSelfRateLimit.ts'
+import { isChannelSelfIPRateLimited, isChannelSelfRateLimited, recordChannelSelfIPRequest, recordChannelSelfRequest } from '../utils/channelSelfRateLimit.ts'
 import { BRES, parseBody, simpleError200, simpleErrorWithStatus, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrgCached } from '../utils/notifications.ts'
@@ -548,6 +548,12 @@ app.post('/', async (c) => {
     return simpleError200(c, 'missing_channel', 'Cannot find channel in body')
   }
 
+  const ipRateLimitStatus = await isChannelSelfIPRateLimited(c, bodyParsed.app_id)
+  if (ipRateLimitStatus.limited) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Channel self IP rate limited', app_id: bodyParsed.app_id })
+    return simpleRateLimit({ reason: 'ip_rate_limit_exceeded', app_id: bodyParsed.app_id, ...buildRateLimitInfo(ipRateLimitStatus.resetAt) })
+  }
+
   // Rate limit: max 1 set per second per device+app, and same set max once per 60 seconds
   const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'set', bodyParsed.channel)
   if (rateLimitStatus.limited) {
@@ -571,6 +577,7 @@ app.post('/', async (c) => {
 
   // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse)
   backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'set', bodyParsed.channel))
+  backgroundTask(c, recordChannelSelfIPRequest(c, bodyParsed.app_id))
 
   return res
 })
@@ -585,6 +592,12 @@ app.put('/', async (c) => {
   }
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
+
+  const ipRateLimitStatus = await isChannelSelfIPRateLimited(c, bodyParsed.app_id)
+  if (ipRateLimitStatus.limited) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Channel self IP rate limited', app_id: bodyParsed.app_id })
+    return simpleRateLimit({ reason: 'ip_rate_limit_exceeded', app_id: bodyParsed.app_id, ...buildRateLimitInfo(ipRateLimitStatus.resetAt) })
+  }
 
   // Rate limit: max 1 get per second per device+app
   const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'get')
@@ -608,6 +621,7 @@ app.put('/', async (c) => {
 
   // Record the request for rate limiting (all requests to prevent abuse)
   backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'get'))
+  backgroundTask(c, recordChannelSelfIPRequest(c, bodyParsed.app_id))
 
   return res
 })
@@ -621,6 +635,12 @@ app.delete('/', async (c) => {
   }
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
+
+  const ipRateLimitStatus = await isChannelSelfIPRateLimited(c, bodyParsed.app_id)
+  if (ipRateLimitStatus.limited) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Channel self IP rate limited', app_id: bodyParsed.app_id })
+    return simpleRateLimit({ reason: 'ip_rate_limit_exceeded', app_id: bodyParsed.app_id, ...buildRateLimitInfo(ipRateLimitStatus.resetAt) })
+  }
 
   // Rate limit: max 1 delete per second per device+app
   const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'delete')
@@ -645,6 +665,7 @@ app.delete('/', async (c) => {
 
   // Record the request for rate limiting (all requests to prevent abuse)
   backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'delete'))
+  backgroundTask(c, recordChannelSelfIPRequest(c, bodyParsed.app_id))
 
   return res
 })
@@ -658,6 +679,12 @@ app.get('/', async (c) => {
   }
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchemaGet, false)
+
+  const ipRateLimitStatus = await isChannelSelfIPRateLimited(c, bodyParsed.app_id)
+  if (ipRateLimitStatus.limited) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Channel self IP rate limited', app_id: bodyParsed.app_id })
+    return simpleRateLimit({ reason: 'ip_rate_limit_exceeded', app_id: bodyParsed.app_id, ...buildRateLimitInfo(ipRateLimitStatus.resetAt) })
+  }
 
   // Rate limit: max 1 list per second per device+app (if device_id is provided)
   if (body.device_id) {
@@ -687,6 +714,7 @@ app.get('/', async (c) => {
   if (body.device_id) {
     backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, body.device_id, 'list'))
   }
+  backgroundTask(c, recordChannelSelfIPRequest(c, bodyParsed.app_id))
 
   return res
 })
