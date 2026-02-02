@@ -7,7 +7,6 @@ import { cloudlog, cloudlogErr } from './logging.ts'
 import { logsnag } from './logsnag.ts'
 import { sendNotifToOrgMembers } from './org_email_notifications.ts'
 import { syncSubscriptionData } from './stripe.ts'
-import { isStripeConfigured } from './utils.ts'
 import {
   getCurrentPlanNameOrg,
   getPlanUsagePercent,
@@ -22,6 +21,7 @@ import {
   set_storage_exceeded,
   supabaseAdmin,
 } from './supabase.ts'
+import { isStripeConfigured } from './utils.ts'
 
 type CreditMetric = Database['public']['Enums']['credit_metric_type']
 

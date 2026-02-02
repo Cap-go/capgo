@@ -3,8 +3,8 @@ import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import type { Database } from '~/types/supabase.types'
 import { format, parse } from '@std/semver'
 import { createClient } from '@supabase/supabase-js'
-import { ref } from 'vue'
 import subset from 'semver/ranges/subset'
+import { ref } from 'vue'
 
 let supaClient: SupabaseClient<Database> = null as any
 

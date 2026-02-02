@@ -14,8 +14,8 @@ import { accountTabs } from '~/constants/accountTabs'
 import { organizationTabs as baseOrgTabs } from '~/constants/organizationTabs'
 import { settingsTabs } from '~/constants/settingsTabs'
 import { checkPermissions } from '~/services/permissions'
-import { stripeEnabled } from '~/services/supabase'
 import { openPortal } from '~/services/stripe'
+import { stripeEnabled } from '~/services/supabase'
 import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
