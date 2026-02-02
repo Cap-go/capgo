@@ -451,6 +451,14 @@ Key points:
   `src/styles/style.css` (e.g., `--color-primary-500: #515271`) when introducing
   new UI.
 
+## Auth Redirect Guardrails
+
+- We intentionally route auth email links through `/confirm-signup` to avoid
+  mailbox link prefetchers triggering Supabase verification/recovery links.
+- `confirm-signup.vue` only allows redirects to the console host and the
+  Supabase host; if you change `VITE_APP_URL` or `VITE_SUPABASE_URL`, update
+  both allow-lists accordingly.
+
 ## Frontend Testing
 
 - Cover customer-facing flows with the Playwright MCP suite. Add scenarios under
