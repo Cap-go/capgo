@@ -548,6 +548,7 @@ app.post('/', async (c) => {
     return simpleError200(c, 'missing_channel', 'Cannot find channel in body')
   }
 
+  // IP rate limit: per-minute cap to mitigate device_id spoofing (independent of device limit)
   const ipRateLimitStatus = await isChannelSelfIPRateLimited(c, bodyParsed.app_id)
   if (ipRateLimitStatus.limited) {
     cloudlog({ requestId: c.get('requestId'), message: 'Channel self IP rate limited', app_id: bodyParsed.app_id })
@@ -593,6 +594,7 @@ app.put('/', async (c) => {
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
 
+  // IP rate limit: per-minute cap to mitigate device_id spoofing (independent of device limit)
   const ipRateLimitStatus = await isChannelSelfIPRateLimited(c, bodyParsed.app_id)
   if (ipRateLimitStatus.limited) {
     cloudlog({ requestId: c.get('requestId'), message: 'Channel self IP rate limited', app_id: bodyParsed.app_id })
@@ -636,6 +638,7 @@ app.delete('/', async (c) => {
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
 
+  // IP rate limit: per-minute cap to mitigate device_id spoofing (independent of device limit)
   const ipRateLimitStatus = await isChannelSelfIPRateLimited(c, bodyParsed.app_id)
   if (ipRateLimitStatus.limited) {
     cloudlog({ requestId: c.get('requestId'), message: 'Channel self IP rate limited', app_id: bodyParsed.app_id })
@@ -680,6 +683,7 @@ app.get('/', async (c) => {
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchemaGet, false)
 
+  // IP rate limit: per-minute cap to mitigate device_id spoofing (independent of device limit)
   const ipRateLimitStatus = await isChannelSelfIPRateLimited(c, bodyParsed.app_id)
   if (ipRateLimitStatus.limited) {
     cloudlog({ requestId: c.get('requestId'), message: 'Channel self IP rate limited', app_id: bodyParsed.app_id })
