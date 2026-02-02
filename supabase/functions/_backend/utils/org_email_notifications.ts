@@ -75,6 +75,7 @@ export type EmailPreferenceKey
     | 'device_error'
     | 'channel_self_rejected'
     | 'daily_fail_ratio'
+    | 'cli_realtime_feed'
 
 export interface EmailPreferences {
   usage_limit?: boolean
@@ -89,6 +90,7 @@ export interface EmailPreferences {
   device_error?: boolean
   channel_self_rejected?: boolean
   daily_fail_ratio?: boolean
+  cli_realtime_feed?: boolean
 }
 
 interface OrgWithPreferences {

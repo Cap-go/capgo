@@ -79,10 +79,11 @@ SELECT
                 AND email_preferences ? 'bundle_created'
                 AND email_preferences ? 'bundle_deployed'
                 AND email_preferences ? 'device_error'
+                AND email_preferences ? 'cli_realtime_feed'
             FROM public.users
             WHERE id = (SELECT user_id FROM email_pref_context)
         ),
-        'email_preferences default contains all 9 preference keys'
+        'email_preferences default contains all 10 preference keys'
     );
 
 -- Test 4: Verify all default values are true
@@ -99,6 +100,7 @@ SELECT
                 AND (email_preferences ->> 'bundle_created')::boolean = true
                 AND (email_preferences ->> 'bundle_deployed')::boolean = true
                 AND (email_preferences ->> 'device_error')::boolean = true
+                AND (email_preferences ->> 'cli_realtime_feed')::boolean = true
             FROM public.users
             WHERE id = (SELECT user_id FROM email_pref_context)
         ),
