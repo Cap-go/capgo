@@ -173,13 +173,13 @@ export const useOrganizationStore = defineStore('organization', () => {
 
   const STORAGE_KEY = 'capgo_current_org_id'
 
-  watch([currentOrganization, stripeEnabled], async ([currentOrganizationRaw, stripeEnabledValue], [oldOrganization]) => {
+  watch([currentOrganization, stripeEnabled], async ([currentOrganizationRaw, stripeEnabledValue], oldValues) => {
     if (!currentOrganizationRaw) {
       currentRole.value = null
       localStorage.removeItem(STORAGE_KEY)
       return
     }
-    const previousOrganization = oldOrganization?.[0]
+    const previousOrganization = oldValues?.[0]
 
     localStorage.setItem(STORAGE_KEY, currentOrganizationRaw.gid)
     currentRole.value = await getCurrentRole(currentOrganizationRaw.created_by)
