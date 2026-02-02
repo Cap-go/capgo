@@ -17,6 +17,16 @@ const allowedHost = (() => {
   }
 })()
 
+// Also allow Supabase host for confirmation URLs
+const allowedSupabaseHost = (() => {
+  try {
+    return new URL(import.meta.env.VITE_SUPABASE_URL).hostname
+  }
+  catch {
+    return ''
+  }
+})()
+
 function isAllowedConfirmationUrl(urlValue: string) {
   const url = new URL(urlValue, window.location.origin)
 
@@ -30,8 +40,8 @@ function isAllowedConfirmationUrl(urlValue: string) {
   if (url.protocol !== 'https:')
     return false
 
-  // Only allow the exact hostname from VITE_APP_URL
-  return url.hostname === allowedHost
+  // Only allow exact hostnames from VITE_APP_URL or VITE_SUPABASE_URL
+  return url.hostname === allowedHost || url.hostname === allowedSupabaseHost
 }
 onMounted(() => {
   const confirmationUrl = route.query.confirmation_url as string
