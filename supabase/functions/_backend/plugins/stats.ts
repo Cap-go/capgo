@@ -12,7 +12,7 @@ import { sendNotifOrgCached } from '../utils/notifications.ts'
 import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from '../utils/stats.ts'
-import { backgroundTask, deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../utils/utils.ts'
+import { backgroundTask, deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, isStripeConfigured, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../utils/utils.ts'
 import { ALLOWED_STATS_ACTIONS } from './stats_actions.ts'
 
 z.config(z.locales.en())
@@ -69,6 +69,7 @@ interface PostResult {
 async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: AppStats): Promise<PostResult> {
   const device = makeDevice(body)
   const { app_id, action, version_name, old_version_name, plugin_version } = body
+  const stripeEnabled = isStripeConfigured(c)
 
   const planActions: Array<'mau' | 'bandwidth'> = ['mau', 'bandwidth']
   const cachedStatus = await getAppStatus(c, app_id)
@@ -77,8 +78,11 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     return { success: true, isOnprem: true }
   }
   if (cachedStatus === 'cancelled') {
-    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return { success: false, error: 'need_plan_upgrade', message: PLAN_ERROR }
+    if (stripeEnabled) {
+      await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+      return { success: false, error: 'need_plan_upgrade', message: PLAN_ERROR }
+    }
+    await setAppStatus(c, app_id, 'cloud')
   }
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, planActions)
   if (!appOwner) {
@@ -87,16 +91,18 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     return { success: true, isOnprem: true }
   }
   if (!appOwner.plan_valid) {
-    await setAppStatus(c, app_id, 'cancelled')
-    cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
-    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    // Send weekly notification about missing payment (not configurable - payment related)
-    backgroundTask(c, sendNotifOrgCached(c, 'org:missing_payment', {
-      app_id,
-      device_id: body.device_id,
-      app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
-    return { success: false, error: 'need_plan_upgrade', message: 'Cannot update, upgrade plan to continue to update' }
+    if (stripeEnabled) {
+      await setAppStatus(c, app_id, 'cancelled')
+      cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
+      await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+      // Send weekly notification about missing payment (not configurable - payment related)
+      backgroundTask(c, sendNotifOrgCached(c, 'org:missing_payment', {
+        app_id,
+        device_id: body.device_id,
+        app_id_url: app_id,
+      }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
+      return { success: false, error: 'need_plan_upgrade', message: 'Cannot update, upgrade plan to continue to update' }
+    }
   }
   await setAppStatus(c, app_id, 'cloud')
   const statsActions: StatsActions[] = []

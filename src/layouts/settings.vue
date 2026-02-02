@@ -14,6 +14,7 @@ import { accountTabs } from '~/constants/accountTabs'
 import { organizationTabs as baseOrgTabs } from '~/constants/organizationTabs'
 import { settingsTabs } from '~/constants/settingsTabs'
 import { checkPermissions } from '~/services/permissions'
+import { stripeEnabled } from '~/services/supabase'
 import { openPortal } from '~/services/stripe'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -94,8 +95,23 @@ const canManageSecurity = computedAsync(async () => {
 }, false)
 
 watchEffect(() => {
+  if (!stripeEnabled.value) {
+    const path = route.path.replace(/\/$/, '')
+    const billingPaths = [
+      '/settings/organization/usage',
+      '/settings/organization/credits',
+      '/settings/organization/plans',
+      '/billing',
+    ]
+    if (billingPaths.some(p => path === p || path.startsWith(`${p}/`)))
+      router.replace('/settings/organization')
+  }
+})
+
+watchEffect(() => {
+  const billingEnabled = stripeEnabled.value
   // ensure usage/plans tabs based on permissions (keeps icons from base)
-  const needsUsage = canReadBilling.value
+  const needsUsage = billingEnabled && canReadBilling.value
   const hasUsage = organizationTabs.value.find(tab => tab.key === '/settings/organization/usage')
   if (needsUsage && !hasUsage) {
     const base = baseOrgTabs.find(t => t.key === '/settings/organization/usage')
@@ -105,7 +121,7 @@ watchEffect(() => {
   if (!needsUsage && hasUsage)
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/usage')
 
-  const needsCredits = canUpdateBilling.value
+  const needsCredits = billingEnabled && canUpdateBilling.value
   const hasCredits = organizationTabs.value.find(tab => tab.key === '/settings/organization/credits')
 
   if (needsCredits && !hasCredits) {
@@ -117,7 +133,7 @@ watchEffect(() => {
   if (!needsCredits && hasCredits)
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/credits')
 
-  const needsPlans = canUpdateBilling.value
+  const needsPlans = billingEnabled && canUpdateBilling.value
   const hasPlans = organizationTabs.value.find(tab => tab.key === '/settings/organization/plans')
   if (needsPlans && !hasPlans) {
     const base = baseOrgTabs.find(t => t.key === '/settings/organization/plans')
@@ -151,6 +167,7 @@ watchEffect(() => {
 
   // Check billing access - users with org.read_billing permission can access billing
   if (!Capacitor.isNativePlatform()
+    && billingEnabled
     && canReadBilling.value
     && !organizationTabs.value.find(tab => tab.key === '/billing')) {
     organizationTabs.value.push({
@@ -168,7 +185,7 @@ watchEffect(() => {
       },
     })
   }
-  else if (!canReadBilling.value) {
+  else if (!canReadBilling.value || !billingEnabled) {
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/billing')
   }
 })

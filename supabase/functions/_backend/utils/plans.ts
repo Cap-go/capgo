@@ -7,6 +7,7 @@ import { cloudlog, cloudlogErr } from './logging.ts'
 import { logsnag } from './logsnag.ts'
 import { sendNotifToOrgMembers } from './org_email_notifications.ts'
 import { syncSubscriptionData } from './stripe.ts'
+import { isStripeConfigured } from './utils.ts'
 import {
   getCurrentPlanNameOrg,
   getPlanUsagePercent,
@@ -419,6 +420,8 @@ export async function updatePlanStatus(c: Context, org: any, is_good_plan: boole
 
 // New function for cron_stat_org - handles is_good_plan + plan % + exceeded flags
 export async function checkPlanStatusOnly(c: Context, orgId: string, drizzleClient: ReturnType<typeof getDrizzleClient>): Promise<void> {
+  if (!isStripeConfigured(c))
+    return
   const org = await getOrgWithCustomerInfo(c, orgId)
 
   // Handle trial organizations
@@ -436,6 +439,8 @@ export async function checkPlanStatusOnly(c: Context, orgId: string, drizzleClie
 
 // New function for cron_sync_sub - handles subscription sync + events
 export async function syncSubscriptionAndEvents(c: Context, orgId: string, drizzleClient: ReturnType<typeof getDrizzleClient>): Promise<void> {
+  if (!isStripeConfigured(c))
+    return
   const org = await getOrgWithCustomerInfo(c, orgId)
 
   // Sync subscription data with Stripe

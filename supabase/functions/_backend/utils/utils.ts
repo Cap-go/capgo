@@ -166,3 +166,8 @@ export function getEnv(c: Context, key: string): string {
     return env(c)[key] ?? ''
   return ''
 }
+
+export function isStripeConfigured(c: Context): boolean {
+  const secretKey = getEnv(c, 'STRIPE_SECRET_KEY')
+  return typeof secretKey === 'string' && secretKey.trim().length > 0
+}

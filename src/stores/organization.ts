@@ -4,7 +4,7 @@ import type { Database } from '~/types/supabase.types'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { createSignedImageUrl } from '~/services/storage'
-import { useSupabase } from '~/services/supabase'
+import { stripeEnabled, useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from './dashboardApps'
 import { useDisplayStore } from './display'
 import { useMainStore } from './main'
@@ -173,12 +173,13 @@ export const useOrganizationStore = defineStore('organization', () => {
 
   const STORAGE_KEY = 'capgo_current_org_id'
 
-  watch(currentOrganization, async (currentOrganizationRaw, oldOrganization) => {
+  watch([currentOrganization, stripeEnabled], async ([currentOrganizationRaw, stripeEnabledValue], [oldOrganization]) => {
     if (!currentOrganizationRaw) {
       currentRole.value = null
       localStorage.removeItem(STORAGE_KEY)
       return
     }
+    const previousOrganization = oldOrganization?.[0]
 
     localStorage.setItem(STORAGE_KEY, currentOrganizationRaw.gid)
     currentRole.value = await getCurrentRole(currentOrganizationRaw.created_by)
@@ -188,12 +189,15 @@ export const useOrganizationStore = defineStore('organization', () => {
     if (lacks2FAAccess || lacksPasswordAccess) {
       currentOrganizationFailed.value = false
     }
+    else if (!stripeEnabledValue) {
+      currentOrganizationFailed.value = false
+    }
     else {
       currentOrganizationFailed.value = !(!!currentOrganizationRaw.paying || (currentOrganizationRaw.trial_left ?? 0) > 0)
     }
 
     // Clear caches when org changes to prevent showing stale data from other orgs
-    if (oldOrganization?.gid !== currentOrganizationRaw.gid) {
+    if (previousOrganization?.gid !== currentOrganizationRaw.gid) {
       const displayStore = useDisplayStore()
       displayStore.clearCachesForOrg(currentOrganizationRaw.gid)
 

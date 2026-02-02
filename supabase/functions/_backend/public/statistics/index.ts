@@ -8,6 +8,7 @@ import { middlewareV2 } from '../../utils/hono_middleware.ts'
 import { cloudlog } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
+import { isStripeConfigured } from '../../utils/utils.ts'
 
 dayjs.extend(utc)
 
@@ -49,6 +50,9 @@ function getAuthenticatedSupabase(c: Context, auth: AuthInfo) {
 }
 
 async function checkOrganizationAccess(c: Context, orgId: string, supabase: ReturnType<typeof supabaseClient>) {
+  if (!isStripeConfigured(c)) {
+    return { isPayingAndGoodPlan: true }
+  }
   // Use the existing PostgreSQL function to check organization payment and plan status
   const { data: isPayingAndGoodPlan, error } = await supabase
     .rpc('is_paying_and_good_plan_org', { orgid: orgId })
