@@ -133,15 +133,16 @@ async function copyToast(allowed: boolean, id: string, text?: string) {
 
 async function addNewApiKey() {
   const newApiKey = crypto.randomUUID()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: claimsData } = await supabase.auth.getClaims()
+  const userId = claimsData?.claims?.sub
 
-  if (!user) {
+  if (!userId) {
     console.log('Not logged in, cannot regenerate API key')
     return
   }
   const { error } = await supabase
     .from('apikeys')
-    .upsert({ user_id: user.id, key: newApiKey, mode: 'all', name: '' })
+    .upsert({ user_id: userId, key: newApiKey, mode: 'all', name: '' })
     .select()
 
   if (error)

@@ -8,6 +8,7 @@ import { useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
+import { resolveInviteNewUserErrorMessage } from '~/utils/invites'
 
 const emit = defineEmits(['success'])
 
@@ -304,7 +305,10 @@ async function handleFullDetailsSubmit() {
 
     if (error) {
       console.error('Invite new user failed', error)
-      toast.error(t('invitation-failed', 'Invitation failed'))
+      const errorMessage = await resolveInviteNewUserErrorMessage(error, t, {
+        cancelledFallback: 'An invitation was cancelled recently. Please wait a bit longer.',
+      })
+      toast.error(errorMessage ?? t('invitation-failed', 'Invitation failed'))
       return
     }
 

@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import { CacheHelper } from './cache.ts'
 import { backgroundTask } from './utils.ts'
 
-const APP_STATUS_CACHE_PATH = '/.app-status'
+const APP_STATUS_CACHE_PATH = '/.app-status-v2'
 const APP_STATUS_CACHE_TTL_SECONDS = 60
 
 export type AppStatus = 'cloud' | 'onprem' | 'cancelled'

@@ -66,7 +66,6 @@ function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
     `${plan.storage.toLocaleString()} ${t('plan-storage')}`,
     `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')}`,
     buildTimeDisplay, // Will be empty string if 0, filtered out below
-    t('priority-support'),
   ]
 
   if (creditUnitPrices.value.mau)
@@ -81,9 +80,25 @@ function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
   if (creditUnitPrices.value.build_time)
     features[3] += ` included, then $${creditUnitPrices.value.build_time} per minute`
 
-  features.push('Dedicated support')
-  features.push('Custom Domain')
-  features.push('SOC II')
+  const planName = plan.name?.toLowerCase() ?? ''
+  if (planName === 'solo') {
+    features.push('Community support (Discord)')
+  }
+  else if (planName === 'maker') {
+    features.push('Priority bug fixes on plugins')
+  }
+  else if (planName === 'team') {
+    features.push('Priority bug fixes on plugins')
+    features.push('Priority support by email')
+  }
+  else if (planName === 'enterprise') {
+    features.push('Priority bug fixes on plugins')
+    features.push('Priority support by email')
+    features.push('Custom domain')
+    features.push('Direct chat support')
+    features.push('Service SLA agreement')
+    features.push('SOC 2 certified')
+  }
 
   return features.filter(Boolean)
 }
@@ -404,6 +419,28 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
 
       <!-- Credits CTA -->
       <CreditsCta class="mb-6 shrink-0" />
+
+      <!-- Expert as a Service CTA -->
+      <div class="mb-6 shrink-0">
+        <div class="flex flex-col gap-3 p-4 border border-amber-200 bg-amber-50 rounded-2xl text-amber-900 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p class="text-sm font-semibold">
+              {{ t('expert-service-title') }}
+            </p>
+            <p class="text-xs text-amber-800 dark:text-amber-200">
+              {{ t('expert-service-desc') }}
+            </p>
+          </div>
+          <a
+            class="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold text-white bg-amber-600 rounded-full hover:bg-amber-700"
+            href="https://capgo.app/premium-support/"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            {{ t('expert-service-cta') }}
+          </a>
+        </div>
+      </div>
 
       <!-- Plans Grid -->
       <div class="grid content-start min-h-0 grid-cols-1 gap-4 p-1 overflow-y-auto md:grid-cols-2 xl:grid-cols-4 grow">

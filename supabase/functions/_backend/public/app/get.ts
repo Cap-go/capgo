@@ -3,6 +3,7 @@ import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
+import { createSignedImageUrl } from '../../utils/storage.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
 import { fetchLimit, isValidAppId } from '../../utils/utils.ts'
 
@@ -29,6 +30,11 @@ export async function get(c: Context<MiddlewareKeyVariables>, appId: string, api
 
   if (dbError || !data) {
     throw quickError(404, 'cannot_find_app', 'Cannot find app', { supabaseError: dbError })
+  }
+
+  if (data.icon_url) {
+    const signedIcon = await createSignedImageUrl(c, data.icon_url)
+    data.icon_url = signedIcon ?? ''
   }
 
   return c.json(data)
@@ -93,5 +99,17 @@ export async function getAll(c: Context, apikey: Database['public']['Tables']['a
     throw simpleError('cannot_get_apps', 'Cannot get apps', { supabaseError: dbError })
   }
 
-  return c.json(data)
+  const signedApps = await Promise.all(
+    (data ?? []).map(async (app) => {
+      if (!app.icon_url)
+        return app
+      const signedIcon = await createSignedImageUrl(c, app.icon_url)
+      return {
+        ...app,
+        icon_url: signedIcon ?? '',
+      }
+    }),
+  )
+
+  return c.json(signedApps)
 }

@@ -6,9 +6,8 @@ import { and, eq } from 'drizzle-orm'
 import { trackBentoEvent } from './bento.ts'
 import { CacheHelper } from './cache.ts'
 import { cloudlog } from './logging.ts'
-import { logPgError } from './pg.ts'
+import { getDrizzleClient as createDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
-import { supabaseAdmin } from './supabase.ts'
 import { backgroundTask } from './utils.ts'
 
 interface EventData {
@@ -121,79 +120,91 @@ export async function sendNotifOrg(
   // Check if notification has already been sent (read from replica)
   const notif = await getNotification(c, drizzleClient, orgId, eventName, uniqId)
 
+  // Create write-capable drizzle client for mutations
+  const pgClient = getPgClient(c)
+  const writeClient = createDrizzleClient(pgClient)
+
   let shouldSend = false
   let isFirstSend = false
 
-  if (!notif) {
-    // First time: use upsert with ignoreDuplicates to avoid error logs
-    isFirstSend = true
+  try {
+    if (!notif) {
+      // First time: use insert with onConflictDoNothing to avoid error logs
+      isFirstSend = true
 
-    const { data: inserted, error } = await supabaseAdmin(c)
-      .from('notifications')
-      .upsert({
-        event: eventName,
-        uniq_id: uniqId,
-        owner_org: orgId,
-        last_send_at: dayjs().toISOString(),
-        total_send: 1,
-      }, {
-        onConflict: 'owner_org,event,uniq_id',
-        ignoreDuplicates: true, // Don't return error on conflict, just ignore
-      })
-      .select()
+      const inserted = await writeClient
+        .insert(schema.notifications)
+        .values({
+          event: eventName,
+          uniq_id: uniqId,
+          owner_org: orgId,
+          last_send_at: new Date(),
+          total_send: 1,
+        })
+        .onConflictDoNothing({
+          target: [schema.notifications.owner_org, schema.notifications.event, schema.notifications.uniq_id],
+        })
+        .returning()
 
-    // Only send if we successfully inserted (won the race)
-    // If conflict occurred, inserted will be null
-    shouldSend = !error && !!inserted && inserted.length > 0
-    if (!shouldSend) {
-      cloudlog({ requestId: c.get('requestId'), message: 'notif insert race lost', event: eventName, orgId })
-      return false
+      // Only send if we successfully inserted (won the race)
+      // If conflict occurred, inserted will be empty array
+      shouldSend = inserted.length > 0
+      if (!shouldSend) {
+        cloudlog({ requestId: c.get('requestId'), message: 'notif insert race lost', event: eventName, orgId })
+        return false
+      }
     }
+    else {
+      // Notification exists, check if sendable
+      const lastSendAtStr = notif.last_send_at.toISOString()
+      if (!isSendable(c, lastSendAtStr, cron)) {
+        cloudlog({ requestId: c.get('requestId'), message: 'notif already sent', event: eventName, orgId })
+        return { sent: false, lastSendAt: lastSendAtStr }
+      }
+
+      // Atomically update ONLY if timestamp hasn't changed (optimistic locking to prevent race)
+      const updated = await writeClient
+        .update(schema.notifications)
+        .set({
+          last_send_at: new Date(),
+          total_send: notif.total_send + 1,
+        })
+        .where(and(
+          eq(schema.notifications.event, eventName),
+          eq(schema.notifications.uniq_id, uniqId),
+          eq(schema.notifications.owner_org, orgId),
+          eq(schema.notifications.last_send_at, notif.last_send_at), // Optimistic lock: only update if timestamp unchanged
+        ))
+        .returning()
+
+      // Only send if we successfully claimed it (update succeeded)
+      shouldSend = updated.length > 0
+      if (!shouldSend) {
+        cloudlog({ requestId: c.get('requestId'), message: 'notif update race lost', event: eventName, orgId })
+        return false
+      }
+    }
+
+    // Only send if we successfully claimed the notification
+    if (shouldSend) {
+      cloudlog({ requestId: c.get('requestId'), message: isFirstSend ? 'notif never sent' : 'notif ready to sent', event: eventName, uniqId })
+      const res = await trackBentoEvent(c, managementEmail, eventData, eventName)
+      if (!res) {
+        cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed', eventName, email: managementEmail, eventData })
+        // Note: We already claimed it in DB, but email failed. On next attempt, cron will determine if we retry.
+        return false
+      }
+
+      cloudlog({ requestId: c.get('requestId'), message: 'send notif done', eventName, email: managementEmail })
+      return true
+    }
+
+    return false
   }
-  else {
-    // Notification exists, check if sendable
-    const lastSendAtStr = notif.last_send_at.toISOString()
-    if (!isSendable(c, lastSendAtStr, cron)) {
-      cloudlog({ requestId: c.get('requestId'), message: 'notif already sent', event: eventName, orgId })
-      return { sent: false, lastSendAt: lastSendAtStr }
-    }
-
-    // Atomically update ONLY if timestamp hasn't changed (optimistic locking to prevent race)
-    const { data: updated, error } = await supabaseAdmin(c)
-      .from('notifications')
-      .update({
-        last_send_at: dayjs().toISOString(),
-        total_send: notif.total_send + 1,
-      })
-      .eq('event', eventName)
-      .eq('uniq_id', uniqId)
-      .eq('owner_org', orgId)
-      .eq('last_send_at', lastSendAtStr) // Optimistic lock: only update if timestamp unchanged
-      .select()
-
-    // Only send if we successfully claimed it (update succeeded)
-    shouldSend = !error && updated && updated.length > 0
-    if (!shouldSend) {
-      cloudlog({ requestId: c.get('requestId'), message: 'notif update race lost', event: eventName, orgId })
-      return false
-    }
+  catch (e: unknown) {
+    logPgError(c, 'sendNotifOrg', e)
+    return false
   }
-
-  // Only send if we successfully claimed the notification
-  if (shouldSend) {
-    cloudlog({ requestId: c.get('requestId'), message: isFirstSend ? 'notif never sent' : 'notif ready to sent', event: eventName, uniqId })
-    const res = await trackBentoEvent(c, managementEmail, eventData, eventName)
-    if (!res) {
-      cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed', eventName, email: managementEmail, eventData })
-      // Note: We already claimed it in DB, but email failed. On next attempt, cron will determine if we retry.
-      return false
-    }
-
-    cloudlog({ requestId: c.get('requestId'), message: 'send notif done', eventName, email: managementEmail })
-    return true
-  }
-
-  return false
 }
 
 // dayjs subtract one week

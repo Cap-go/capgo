@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(25);
+SELECT plan(26);
 
 -- Create test users
 DO $$
@@ -104,7 +104,7 @@ SELECT
         'get_orgs_v7 test - user with 2FA can see enforcing_2fa field'
     );
 
--- Test 3: User without 2FA does NOT have access to org WITH 2FA enforcement
+-- Test 3: User without 2FA DOES see org WITH 2FA enforcement but with 2fa_has_access = false
 SELECT
     is(
         (
@@ -112,11 +112,11 @@ SELECT
             FROM public.get_orgs_v7(tests.get_supabase_uid('test_no_2fa_user_v7'))
             WHERE gid = current_setting('test.org_with_2fa_v7')::uuid
         ),
-        0::bigint,
-        'get_orgs_v7 test - user without 2FA does not see org with 2FA enforcement'
+        1::bigint,
+        'get_orgs_v7 test - user without 2FA DOES see org with 2FA enforcement (with redacted fields)'
     );
 
--- Test 4: User without 2FA does not see enforcing_2fa field when org is hidden
+-- Test 4: User without 2FA DOES see enforcing_2fa field (org is visible but redacted)
 SELECT
     is(
         (
@@ -124,8 +124,8 @@ SELECT
             FROM public.get_orgs_v7(tests.get_supabase_uid('test_no_2fa_user_v7'))
             WHERE gid = current_setting('test.org_with_2fa_v7')::uuid
         ),
-        NULL::boolean,
-        'get_orgs_v7 test - user without 2FA does not see enforcing_2fa field when org is hidden'
+        true,
+        'get_orgs_v7 test - user without 2FA DOES see enforcing_2fa field set to true'
     );
 
 -- ============================================================================
@@ -193,7 +193,7 @@ SELECT
         'get_orgs_v7 test - user with 2FA sees real management_email value'
     );
 
--- Test 20: User WITHOUT 2FA sees redacted management_email (should be NULL)
+-- Test 20: User WITHOUT 2FA sees redacted management_email (should be NULL) and has 2fa_has_access = false
 SELECT
     is(
         (
@@ -205,7 +205,19 @@ SELECT
         'get_orgs_v7 test - user without 2FA sees redacted management_email field (NULL)'
     );
 
--- Test 21: Verify redaction difference - management_email differs between users
+-- Test 20b: User WITHOUT 2FA has 2fa_has_access = false
+SELECT
+    is(
+        (
+            SELECT "2fa_has_access"
+            FROM public.get_orgs_v7(tests.get_supabase_uid('test_no_2fa_user_v7'))
+            WHERE gid = current_setting('test.org_with_2fa_v7')::uuid
+        ),
+        false,
+        'get_orgs_v7 test - user without 2FA has 2fa_has_access = false'
+    );
+
+-- Test 21: Verify redaction difference - management_email differs between users (now org is visible)
 SELECT
     ok(
         (
@@ -229,7 +241,7 @@ SELECT
         'get_orgs_v7 test - user with 2FA sees real name value'
     );
 
--- Test 23: User WITHOUT 2FA does not see the org when 2FA is enforced
+-- Test 23: User WITHOUT 2FA DOES see the org name (org is visible with redacted sensitive fields)
 SELECT
     is(
         (
@@ -237,18 +249,18 @@ SELECT
             FROM public.get_orgs_v7(tests.get_supabase_uid('test_no_2fa_user_v7'))
             WHERE gid = current_setting('test.org_with_2fa_v7')::uuid
         ),
-        NULL::text,
-        'get_orgs_v7 test - user without 2FA does not see org name when 2FA is enforced'
+        '2FA Enforced Org V7',
+        'get_orgs_v7 test - user without 2FA DOES see org name (org is visible, sensitive fields redacted)'
     );
 
--- Test 24: User WITHOUT 2FA does not see the org when 2FA is enforced
+-- Test 24: User WITHOUT 2FA DOES see the org gid (org is visible)
 SELECT
     ok(
         (
             SELECT
-                (SELECT gid FROM public.get_orgs_v7(tests.get_supabase_uid('test_no_2fa_user_v7')) WHERE gid = current_setting('test.org_with_2fa_v7')::uuid) IS NULL
+                (SELECT gid FROM public.get_orgs_v7(tests.get_supabase_uid('test_no_2fa_user_v7')) WHERE gid = current_setting('test.org_with_2fa_v7')::uuid) IS NOT NULL
         ),
-        'get_orgs_v7 test - user without 2FA does not see org when 2FA is enforced'
+        'get_orgs_v7 test - user without 2FA DOES see org gid (org is visible)'
     );
 
 -- Test 5: User with 2FA has access to org WITHOUT 2FA enforcement
@@ -279,7 +291,7 @@ SELECT
 -- Tests for sensitive data redaction in get_orgs_v7
 -- ============================================================================
 
--- Test 7: User without 2FA does not see paying field when org is hidden
+-- Test 7: User without 2FA sees redacted paying field (false, not NULL)
 SELECT
     is(
         (
@@ -287,11 +299,11 @@ SELECT
             FROM public.get_orgs_v7(tests.get_supabase_uid('test_no_2fa_user_v7'))
             WHERE gid = current_setting('test.org_with_2fa_v7')::uuid
         ),
-        NULL::boolean,
-        'get_orgs_v7 test - user without 2FA does not see paying field when org is hidden'
+        false,
+        'get_orgs_v7 test - user without 2FA sees redacted paying field (false)'
     );
 
--- Test 8: User without 2FA does not see trial_left field when org is hidden
+-- Test 8: User without 2FA sees redacted trial_left field (0, not NULL)
 SELECT
     is(
         (
@@ -299,11 +311,11 @@ SELECT
             FROM public.get_orgs_v7(tests.get_supabase_uid('test_no_2fa_user_v7'))
             WHERE gid = current_setting('test.org_with_2fa_v7')::uuid
         ),
-        NULL::integer,
-        'get_orgs_v7 test - user without 2FA does not see trial_left field when org is hidden'
+        0,
+        'get_orgs_v7 test - user without 2FA sees redacted trial_left field (0)'
     );
 
--- Test 9: User without 2FA does not see can_use_more field when org is hidden
+-- Test 9: User without 2FA sees redacted can_use_more field (false, not NULL)
 SELECT
     is(
         (
@@ -311,11 +323,11 @@ SELECT
             FROM public.get_orgs_v7(tests.get_supabase_uid('test_no_2fa_user_v7'))
             WHERE gid = current_setting('test.org_with_2fa_v7')::uuid
         ),
-        NULL::boolean,
-        'get_orgs_v7 test - user without 2FA does not see can_use_more field when org is hidden'
+        false,
+        'get_orgs_v7 test - user without 2FA sees redacted can_use_more field (false)'
     );
 
--- Test 10: User without 2FA does not see is_canceled field when org is hidden
+-- Test 10: User without 2FA sees redacted is_canceled field (false, not NULL)
 SELECT
     is(
         (
@@ -323,11 +335,11 @@ SELECT
             FROM public.get_orgs_v7(tests.get_supabase_uid('test_no_2fa_user_v7'))
             WHERE gid = current_setting('test.org_with_2fa_v7')::uuid
         ),
-        NULL::boolean,
-        'get_orgs_v7 test - user without 2FA does not see is_canceled field when org is hidden'
+        false,
+        'get_orgs_v7 test - user without 2FA sees redacted is_canceled field (false)'
     );
 
--- Test 11: User without 2FA does not see app_count field when org is hidden
+-- Test 11: User without 2FA sees redacted app_count field (0, not NULL)
 SELECT
     is(
         (
@@ -335,8 +347,8 @@ SELECT
             FROM public.get_orgs_v7(tests.get_supabase_uid('test_no_2fa_user_v7'))
             WHERE gid = current_setting('test.org_with_2fa_v7')::uuid
         ),
-        NULL::bigint,
-        'get_orgs_v7 test - user without 2FA does not see app_count field when org is hidden'
+        0::bigint,
+        'get_orgs_v7 test - user without 2FA sees redacted app_count field (0)'
     );
 
 -- Test 12: User without 2FA sees redacted subscription_start field (should be NULL)
@@ -363,7 +375,7 @@ SELECT
         'get_orgs_v7 test - user without 2FA sees redacted subscription_end field'
     );
 
--- Test 14: User without 2FA does not see management_email field when org is hidden
+-- Test 14: User without 2FA sees redacted management_email field (NULL)
 SELECT
     is(
         (
@@ -372,10 +384,10 @@ SELECT
             WHERE gid = current_setting('test.org_with_2fa_v7')::uuid
         ),
         NULL::text,
-        'get_orgs_v7 test - user without 2FA does not see management_email field when org is hidden'
+        'get_orgs_v7 test - user without 2FA sees redacted management_email field (NULL)'
     );
 
--- Test 15: User without 2FA does not see is_yearly field when org is hidden
+-- Test 15: User without 2FA sees redacted is_yearly field (false, not NULL)
 SELECT
     is(
         (
@@ -383,8 +395,8 @@ SELECT
             FROM public.get_orgs_v7(tests.get_supabase_uid('test_no_2fa_user_v7'))
             WHERE gid = current_setting('test.org_with_2fa_v7')::uuid
         ),
-        NULL::boolean,
-        'get_orgs_v7 test - user without 2FA does not see is_yearly field when org is hidden'
+        false,
+        'get_orgs_v7 test - user without 2FA sees redacted is_yearly field (false)'
     );
 
 -- ============================================================================

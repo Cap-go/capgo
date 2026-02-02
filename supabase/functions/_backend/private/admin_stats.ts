@@ -1,14 +1,16 @@
+import type Stripe from 'stripe'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { getAdminAppsTrend, getAdminBandwidthTrend, getAdminBundlesTrend, getAdminDistributionMetrics, getAdminFailureMetrics, getAdminMauTrend, getAdminOrgMetrics, getAdminPlatformOverview, getAdminStorageTrend, getAdminSuccessRate, getAdminSuccessRateTrend, getAdminUploadMetrics } from '../utils/cloudflare.ts'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { getAdminDeploymentsTrend, getAdminGlobalStatsTrend, getAdminPluginBreakdown } from '../utils/pg.ts'
+import { getAdminCancelledOrganizations, getAdminDeploymentsTrend, getAdminGlobalStatsTrend, getAdminOnboardingFunnel, getAdminPluginBreakdown, getAdminTrialOrganizations } from '../utils/pg.ts'
+import { getCancellationDetails } from '../utils/stripe.ts'
 import { supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
 const bodySchema = z.object({
-  metric_category: z.enum(['uploads', 'distribution', 'failures', 'success_rate', 'platform_overview', 'org_metrics', 'mau_trend', 'success_rate_trend', 'apps_trend', 'bundles_trend', 'deployments_trend', 'storage_trend', 'bandwidth_trend', 'global_stats_trend', 'plugin_breakdown']),
+  metric_category: z.enum(['uploads', 'distribution', 'failures', 'success_rate', 'platform_overview', 'org_metrics', 'mau_trend', 'success_rate_trend', 'apps_trend', 'bundles_trend', 'deployments_trend', 'storage_trend', 'bandwidth_trend', 'global_stats_trend', 'plugin_breakdown', 'trial_organizations', 'onboarding_funnel', 'cancelled_users']),
   start_date: z.string().check(z.minLength(1)),
   end_date: z.string().check(z.minLength(1)),
 })
@@ -20,6 +22,44 @@ interface AdminStatsBody {
   app_id?: string
   org_id?: string
   limit?: number
+  offset?: number
+}
+
+type CancellationDetails = Stripe.Subscription.CancellationDetails
+
+const cancellationFeedbackLabels: Record<string, string> = {
+  customer_service: 'Customer service',
+  low_quality: 'Low quality',
+  missing_features: 'Missing features',
+  other: 'Other',
+  switched_service: 'Switched service',
+  too_complex: 'Too complex',
+  too_expensive: 'Too expensive',
+  unused: 'Unused',
+}
+
+const cancellationReasonLabels: Record<string, string> = {
+  cancellation_requested: 'Cancellation requested',
+  payment_disputed: 'Payment disputed',
+  payment_failed: 'Payment failed',
+}
+
+/**
+ * Formats Stripe cancellation details into a short, human-readable label.
+ */
+function formatCancellationReason(details: CancellationDetails | null): string | null {
+  if (!details)
+    return null
+
+  const feedback = details.feedback ? (cancellationFeedbackLabels[details.feedback] ?? details.feedback) : null
+  const reason = details.reason ? (cancellationReasonLabels[details.reason] ?? details.reason) : null
+  const comment = details.comment?.trim()
+
+  let base = feedback || reason || null
+  if (comment)
+    base = base ? `${base} — ${comment}` : comment
+
+  return base
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -53,7 +93,7 @@ app.post('/', middlewareAuth, async (c) => {
   }
 
   // Use body directly since it has the full interface type
-  const { metric_category, start_date, end_date, app_id, org_id, limit } = body
+  const { metric_category, start_date, end_date, app_id, org_id, limit, offset } = body
 
   cloudlog({
     requestId: c.get('requestId'),
@@ -127,6 +167,45 @@ app.post('/', middlewareAuth, async (c) => {
 
       case 'plugin_breakdown':
         result = await getAdminPluginBreakdown(c, start_date, end_date)
+        break
+
+      case 'trial_organizations':
+        result = await getAdminTrialOrganizations(c, limit || 20, offset || 0)
+        break
+
+      case 'cancelled_users': {
+        const canceledOrgs = await getAdminCancelledOrganizations(c, start_date, end_date, limit || 20, offset || 0)
+        const detailsCache = new Map<string, CancellationDetails | null>()
+        const organizations = await Promise.all(
+          canceledOrgs.organizations.map(async (org) => {
+            let details: CancellationDetails | null = null
+            if (org.subscription_id) {
+              if (detailsCache.has(org.subscription_id)) {
+                details = detailsCache.get(org.subscription_id) ?? null
+              }
+              else {
+                details = await getCancellationDetails(c, org.subscription_id)
+                detailsCache.set(org.subscription_id, details)
+              }
+            }
+            return {
+              org_id: org.org_id,
+              org_name: org.org_name,
+              management_email: org.management_email,
+              canceled_at: org.canceled_at,
+              cancellation_reason: formatCancellationReason(details),
+            }
+          }),
+        )
+        result = {
+          organizations,
+          total: canceledOrgs.total,
+        }
+        break
+      }
+
+      case 'onboarding_funnel':
+        result = await getAdminOnboardingFunnel(c, start_date, end_date)
         break
 
       default:

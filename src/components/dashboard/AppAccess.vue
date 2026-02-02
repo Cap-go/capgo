@@ -9,7 +9,6 @@ import IconLock from '~icons/heroicons/lock-closed'
 import IconPlus from '~icons/heroicons/plus'
 import IconShield from '~icons/heroicons/shield-check'
 import IconTrash from '~icons/heroicons/trash'
-import DataTable from '~/components/Table.vue'
 import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -441,16 +440,16 @@ onMounted(async () => {
 <template>
   <div class="w-full px-3 py-2">
     <!-- RBAC not enabled message -->
-    <div v-if="!useNewRbac" class="alert alert-info mb-4">
+    <div v-if="!useNewRbac" class="mb-4 alert alert-info">
       <IconInformation class="size-5" />
       <span>{{ t('rbac-not-enabled-for-org') }}</span>
     </div>
 
     <!-- Header -->
-    <div class="mb-4 flex items-center justify-between">
+    <div class="flex items-center justify-between mb-4">
       <div>
         <h1 class="text-2xl font-bold">
-          <IconLock class="inline-block size-6 mr-2" />
+          <IconLock class="inline-block mr-2 size-6" />
           {{ t('app-access-control') }}
         </h1>
         <p class="text-sm text-gray-600">
@@ -473,7 +472,7 @@ onMounted(async () => {
         v-model="search"
         type="text"
         :placeholder="t('search-role-bindings')"
-        class="d-input max-w-md"
+        class="max-w-md d-input"
       >
     </div>
 
@@ -528,13 +527,13 @@ onMounted(async () => {
 
     <!-- Assign Role Modal -->
     <dialog :open="isAssignRoleModalOpen" class="modal" @close="isAssignRoleModalOpen = false">
-      <div class="modal-box max-w-2xl">
+      <div class="max-w-2xl modal-box">
         <h3 class="text-lg font-bold">
           {{ t('assign-app-role') }}
         </h3>
 
         <!-- Principal Type -->
-        <div class="form-control mt-4">
+        <div class="mt-4 form-control">
           <label class="label">
             <span class="label-text">{{ t('principal-type') }}</span>
           </label>
@@ -549,7 +548,7 @@ onMounted(async () => {
         </div>
 
         <!-- Principal Selection -->
-        <div class="form-control mt-4">
+        <div class="mt-4 form-control">
           <label class="label">
             <span class="label-text">
               {{ assignRoleForm.principal_type === 'user' ? t('select-user') : t('select-group') }}
@@ -570,7 +569,7 @@ onMounted(async () => {
         </div>
 
         <!-- Role Selection -->
-        <div class="form-control mt-4">
+        <div class="mt-4 form-control">
           <label class="label">
             <span class="label-text">{{ t('select-app-role') }}</span>
           </label>
@@ -583,14 +582,14 @@ onMounted(async () => {
             </option>
           </select>
           <label class="label">
-            <span class="label-text-alt text-gray-500">
+            <span class="text-gray-500 label-text-alt">
               {{ t('app-role-hint') }}
             </span>
           </label>
         </div>
 
         <!-- Reason (optional) -->
-        <div class="form-control mt-4">
+        <div class="mt-4 form-control">
           <label class="label">
             <span class="label-text">{{ t('reason-optional') }}</span>
           </label>

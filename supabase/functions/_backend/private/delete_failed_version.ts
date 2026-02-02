@@ -20,8 +20,15 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: 'delete failed version body', body })
   const apikey = c.get('apikey')
   const capgkey = c.get('capgkey') as string
-  cloudlog({ requestId: c.get('requestId'), message: 'apikey', apikey })
-  cloudlog({ requestId: c.get('requestId'), message: 'capgkey', capgkey })
+  if (apikey && typeof apikey === 'object') {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'apikey context',
+      apikeyId: (apikey as { id?: number }).id,
+      userId: (apikey as { user_id?: string }).user_id,
+      mode: (apikey as { mode?: string }).mode,
+    })
+  }
   const { data: _userId, error: _errorUserId } = await supabaseApikey(c, capgkey)
     .rpc('get_user_id', { apikey: capgkey, app_id: body.app_id })
   if (_errorUserId) {
@@ -75,7 +82,15 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     .eq('id', version.id)
     .single()
   if (errorDelete) {
-    throw simpleError('error_deleting_version', 'Error deleting version', { errorDelete })
+    if (errorDelete.code !== 'PGRST116') {
+      throw simpleError('error_deleting_version', 'Error deleting version', { errorDelete })
+    }
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'delete failed version already deleted',
+      versionId: version.id,
+      errorDelete,
+    })
   }
 
   const LogSnag = logsnag(c)

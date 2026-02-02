@@ -8,6 +8,7 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import VueTurnstile from 'vue-turnstile'
 import IconVersion from '~icons/heroicons/arrow-path'
 import iconEmail from '~icons/heroicons/envelope?raw'
 import iconFlag from '~icons/heroicons/flag?raw'
@@ -30,6 +31,11 @@ const main = useMainStore()
 const dialogStore = useDialogV2Store()
 const organizationStore = useOrganizationStore()
 const isLoading = ref(false)
+const isDeletingAccount = ref(false)
+const deleteAccountPassword = ref('')
+const deleteAccountCaptchaToken = ref('')
+const deleteAccountCaptchaRef = ref<InstanceType<typeof VueTurnstile> | null>(null)
+const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 // mfa = 2fa
 const mfaEnabled = ref(false)
 const mfaFactorId = ref('')
@@ -38,31 +44,6 @@ const mfaQRCode = ref('')
 const organizationsToDelete = ref<string[]>([])
 const paidOrganizationsToDelete = ref<Array<{ name: string, planName: string }>>([])
 displayStore.NavTitle = t('account')
-
-// Validation function to prevent URLs and malicious content in names
-// Allow Unicode letters from all languages, spaces, hyphens, and apostrophes
-// Rejects numbers, URLs, and most special characters while supporting international names
-function validateName(node: any): boolean {
-  const value = node.value
-  if (!value)
-    return true // Let required validation handle empty values
-
-  // Remove extra whitespace and trim
-  const trimmedValue = String(value).trim()
-
-  // Check if name is not empty after trimming
-  if (trimmedValue.length === 0)
-    return false
-
-  // Limit length to reasonable values
-  if (trimmedValue.length > 50)
-    return false
-
-  // Allow Unicode letters from all languages, spaces, hyphens, and apostrophes
-  // This rejects numbers, URLs, email addresses, and special characters
-  const nameRegex = /^[\p{L}\s'-]+$/u
-  return nameRegex.test(trimmedValue)
-}
 
 async function checkOrganizationImpact() {
   // Wait for organizations and main store to load
@@ -224,6 +205,9 @@ async function deleteAccount() {
   }
 
   // Show final confirmation
+  deleteAccountPassword.value = ''
+  deleteAccountCaptchaToken.value = ''
+  deleteAccountCaptchaRef.value?.reset()
   dialogStore.openDialog({
     id: 'delete-account-confirm',
     title: t('delete-account'),
@@ -236,32 +220,77 @@ async function deleteAccount() {
       {
         text: t('i-am-sure'),
         role: 'danger',
+        preventClose: true,
         handler: async () => {
-          await performAccountDeletion()
+          const success = await performAccountDeletion(deleteAccountPassword.value)
+          if (success) {
+            deleteAccountPassword.value = ''
+            dialogStore.closeDialog({ text: t('i-am-sure'), role: 'danger' })
+          }
+          return success
         },
       },
     ],
   })
-  return dialogStore.onDialogDismiss()
+  const dismissed = await dialogStore.onDialogDismiss()
+  deleteAccountPassword.value = ''
+  deleteAccountCaptchaToken.value = ''
+  deleteAccountCaptchaRef.value?.reset()
+  return dismissed
 }
 
-async function performAccountDeletion() {
+async function performAccountDeletion(password: string) {
   if (!main.auth || main.auth?.email == null)
-    return
+    return false
   const supabaseClient = useSupabase()
 
-  const authUser = await supabase.auth.getUser()
-  if (authUser.error)
-    return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+  if (!password) {
+    toast.error(t('password-placeholder'))
+    return false
+  }
 
+  if (captchaKey.value && !deleteAccountCaptchaToken.value) {
+    toast.error(t('captcha-required', 'Captcha verification is required'))
+    return false
+  }
+
+  if (isDeletingAccount.value)
+    return false
+
+  isDeletingAccount.value = true
   try {
+    const { error: signInError } = await supabase.auth.signInWithPassword({
+      email: main.auth.email,
+      password,
+      options: captchaKey.value ? { captchaToken: deleteAccountCaptchaToken.value } : undefined,
+    })
+    if (signInError) {
+      deleteAccountCaptchaToken.value = ''
+      deleteAccountCaptchaRef.value?.reset()
+      if (signInError.message.includes('captcha')) {
+        toast.error(t('captcha-fail'))
+        return false
+      }
+      toast.error(t('invalid-auth'))
+      return false
+    }
+
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims()
+    const userId = claimsData?.claims?.sub
+    if (claimsError || !userId) {
+      toast.error(t('something-went-wrong-try-again-later'))
+      return false
+    }
+
     const { data: user } = await supabaseClient
       .from('users')
       .select()
-      .eq('id', authUser.data.user.id)
+      .eq('id', userId)
       .single()
-    if (!user)
-      return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+    if (!user) {
+      toast.error(t('something-went-wrong-try-again-later'))
+      return false
+    }
 
     if (user.email.endsWith('review@capgo.app') && Capacitor.isNativePlatform()) {
       const { error: banErr } = await supabase
@@ -271,12 +300,13 @@ async function performAccountDeletion() {
 
       if (banErr) {
         console.error('Cannot set ban duration', banErr)
-        return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+        toast.error(t('something-went-wrong-try-again-later'))
+        return false
       }
 
       await main.logout()
       router.replace('/login')
-      return
+      return true
     }
 
     // Delete user using RPC function
@@ -284,15 +314,27 @@ async function performAccountDeletion() {
 
     if (deleteError) {
       console.error('Delete error:', deleteError)
-      return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+      if (deleteError.message?.includes('reauth_required')) {
+        deleteAccountCaptchaToken.value = ''
+        deleteAccountCaptchaRef.value?.reset()
+        toast.error(t('invalid-auth'))
+        return false
+      }
+      toast.error(t('something-went-wrong-try-again-later'))
+      return false
     }
 
     // Reload the web page after successful account deletion
     window.location.reload()
+    return true
   }
   catch (error) {
     console.error(error)
-    return setErrors('update-account', [t('something-went-wrong-try-again-later')], {})
+    toast.error(t('something-went-wrong-try-again-later'))
+    return false
+  }
+  finally {
+    isDeletingAccount.value = false
   }
 }
 
@@ -617,11 +659,7 @@ onMounted(async () => {
                   :prefix-icon="iconName"
                   :disabled="isLoading"
                   :value="main.user?.first_name ?? ''"
-                  :validation-rules="{ validName: validateName }"
-                  :validation-messages="{
-                    validName: t('name-contains-invalid-characters'),
-                  }"
-                  validation="required:trim|validName"
+                  validation="required:trim"
                   enterkeyhint="next"
                   autofocus
                   :label="t('first-name')"
@@ -636,11 +674,7 @@ onMounted(async () => {
                   :disabled="isLoading"
                   enterkeyhint="next"
                   :value="main.user?.last_name ?? ''"
-                  :validation-rules="{ validName: validateName }"
-                  :validation-messages="{
-                    validName: t('name-contains-invalid-characters'),
-                  }"
-                  validation="required:trim|validName"
+                  validation="required:trim"
                   :label="t('last-name')"
                 />
               </div>
@@ -813,6 +847,30 @@ onMounted(async () => {
         <p class="font-medium text-gray-700 dark:text-gray-300">
           Your account will be deleted after 30 days
         </p>
+        <div class="mt-6">
+          <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('current-password') }}
+          </label>
+          <input
+            v-model="deleteAccountPassword"
+            type="password"
+            :placeholder="t('password-placeholder')"
+            class="w-full p-3 border border-gray-300 rounded-lg dark:text-white dark:bg-gray-800 dark:border-gray-600"
+            autocomplete="current-password"
+            @keydown.enter="$event.preventDefault()"
+          >
+        </div>
+        <div v-if="captchaKey" class="mt-4">
+          <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
+            {{ t('captcha', 'Captcha') }}
+          </label>
+          <VueTurnstile
+            ref="deleteAccountCaptchaRef"
+            v-model="deleteAccountCaptchaToken"
+            size="flexible"
+            :site-key="captchaKey"
+          />
+        </div>
       </div>
     </Teleport>
   </div>

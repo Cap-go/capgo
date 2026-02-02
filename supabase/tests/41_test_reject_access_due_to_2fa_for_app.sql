@@ -164,13 +164,13 @@ SELECT
     );
 SELECT tests.clear_authentication();
 
--- Test 5: Non-existent app returns true (rejection)
+-- Test 5: Non-existent app returns false (no 2FA enforcement can apply)
 SELECT tests.authenticate_as('test_2fa_user_app');
 SELECT
     is(
         reject_access_due_to_2fa_for_app('com.nonexistent.app.12345'),
-        true,
-        'reject_access_due_to_2fa_for_app test - non-existent app returns true'
+        false,
+        'reject_access_due_to_2fa_for_app test - non-existent app returns false'
     );
 SELECT tests.clear_authentication();
 
@@ -224,13 +224,13 @@ BEGIN
   PERFORM set_config('request.headers', '{}', true);
 END $$;
 
--- Test 9: Anonymous user (no auth, no API key) returns true (rejection - no user identity found)
+-- Test 9: Anonymous user (no auth, no API key) returns false (auth failure handled elsewhere)
 SELECT tests.clear_authentication();
 SELECT
     is(
         reject_access_due_to_2fa_for_app(current_setting('test.app_with_2fa')),
-        true,
-        'reject_access_due_to_2fa_for_app test - anonymous user returns true (no user identity)'
+        false,
+        'reject_access_due_to_2fa_for_app test - anonymous user returns false (no user identity)'
     );
 
 -- Test 10: Verify function exists

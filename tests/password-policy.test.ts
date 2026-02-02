@@ -1,7 +1,9 @@
+import type { PostgrestError } from '@supabase/supabase-js'
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { checkOrgReadAccess } from '../supabase/functions/_backend/private/validate_password_compliance.ts'
+import { BASE_URL, executeSQL, getSupabaseClient, headers, TEST_EMAIL, USER_EMAIL, USER_ID, USER_ID_2, USER_PASSWORD, USER_PASSWORD_HASH } from './test-utils.ts'
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
@@ -49,7 +51,7 @@ afterAll(async () => {
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
 })
 
-describe('Password Policy Configuration via SDK', () => {
+describe('password Policy Configuration via SDK', () => {
   it('enable password policy with all requirements via direct update', async () => {
     const policyConfig = {
       enabled: true,
@@ -242,44 +244,47 @@ describe('[POST] /private/validate_password_compliance', () => {
   })
 
   it('reject request for org without password policy', async () => {
-    // Create a temp org without password policy
-    const tempOrgId = randomUUID()
-    const tempCustomerId = `cus_temp_${tempOrgId}`
+    const policyConfig = {
+      enabled: true,
+      min_length: 10,
+      require_uppercase: true,
+      require_number: true,
+      require_special: true,
+    }
 
-    await getSupabaseClient().from('stripe_info').insert({
-      customer_id: tempCustomerId,
-      status: 'succeeded',
-      product_id: 'prod_LQIregjtNduh4q',
-      subscription_id: `sub_temp_${tempOrgId}`,
-      is_good_plan: true,
-    })
+    // Temporarily disable policy on existing org to avoid DB mismatch across runtimes
+    const { error: disableError } = await getSupabaseClient()
+      .from('orgs')
+      .update({ password_policy_config: null })
+      .eq('id', ORG_ID)
+    if (disableError)
+      throw disableError
 
-    await getSupabaseClient().from('orgs').insert({
-      id: tempOrgId,
-      name: 'Temp No Policy Org',
-      management_email: TEST_EMAIL,
-      created_by: USER_ID,
-      customer_id: tempCustomerId,
-      password_policy_config: null,
-    })
+    let restoreError: PostgrestError | null = null
+    try {
+      const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
+        headers,
+        method: 'POST',
+        body: JSON.stringify({
+          email: TEST_EMAIL,
+          password: 'TestPassword123!',
+          org_id: ORG_ID,
+        }),
+      })
+      expect(response.status).toBe(400)
 
-    const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
-      headers,
-      method: 'POST',
-      body: JSON.stringify({
-        email: TEST_EMAIL,
-        password: 'TestPassword123!',
-        org_id: tempOrgId,
-      }),
-    })
-    expect(response.status).toBe(400)
-
-    const responseData = await response.json() as { error: string }
-    expect(responseData.error).toBe('no_policy')
-
-    // Clean up
-    await getSupabaseClient().from('orgs').delete().eq('id', tempOrgId)
-    await getSupabaseClient().from('stripe_info').delete().eq('customer_id', tempCustomerId)
+      const responseData = await response.json() as { error: string }
+      expect(responseData.error).toBe('no_policy')
+    }
+    finally {
+      const { error } = await getSupabaseClient()
+        .from('orgs')
+        .update({ password_policy_config: policyConfig })
+        .eq('id', ORG_ID)
+      restoreError = error ?? null
+    }
+    if (restoreError)
+      throw restoreError
   })
 
   it('reject request with invalid credentials', async () => {
@@ -298,6 +303,71 @@ describe('[POST] /private/validate_password_compliance', () => {
     expect(responseData.error).toBe('invalid_credentials')
   })
 
+  it('reject request when user is not a member of the org', async () => {
+    const nonMemberOrgId = randomUUID()
+    const nonMemberCustomerId = `cus_pwd_nomember_${nonMemberOrgId}`
+    const nonMemberEmail = USER_EMAIL
+    const nonMemberPassword = USER_PASSWORD
+    const supabase = getSupabaseClient()
+
+    await executeSQL(
+      `INSERT INTO auth.users (id, email, encrypted_password, email_confirmed_at, created_at, updated_at, raw_user_meta_data)
+       VALUES ($1, $2, $3, NOW(), NOW(), NOW(), '{}'::jsonb)
+       ON CONFLICT (id) DO NOTHING`,
+      [USER_ID, USER_EMAIL, USER_PASSWORD_HASH],
+    )
+    await executeSQL(
+      `INSERT INTO public.users (id, email, created_at, updated_at)
+       VALUES ($1, $2, NOW(), NOW())
+       ON CONFLICT (id) DO NOTHING`,
+      [USER_ID, USER_EMAIL],
+    )
+
+    await supabase.from('stripe_info').insert({
+      customer_id: nonMemberCustomerId,
+      status: 'succeeded',
+      product_id: 'prod_LQIregjtNduh4q',
+      subscription_id: `sub_${nonMemberOrgId}`,
+      trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+      is_good_plan: true,
+    })
+
+    await supabase.from('orgs').insert({
+      id: nonMemberOrgId,
+      name: `Pwd Policy Non Member Org ${nonMemberOrgId}`,
+      management_email: TEST_EMAIL,
+      created_by: USER_ID_2,
+      customer_id: nonMemberCustomerId,
+      password_policy_config: {
+        enabled: true,
+        min_length: 10,
+        require_uppercase: true,
+        require_number: true,
+        require_special: true,
+      },
+    })
+
+    try {
+      const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
+        headers,
+        method: 'POST',
+        body: JSON.stringify({
+          email: nonMemberEmail,
+          password: nonMemberPassword,
+          org_id: nonMemberOrgId,
+        }),
+      })
+
+      expect(response.status).toBe(403)
+      const responseData = await response.json() as { error: string }
+      expect(responseData.error).toBe('not_member')
+    }
+    finally {
+      await supabase.from('orgs').delete().eq('id', nonMemberOrgId)
+      await supabase.from('stripe_info').delete().eq('customer_id', nonMemberCustomerId)
+    }
+  })
+
   it('reject request with invalid JSON', async () => {
     const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
       headers,
@@ -305,6 +375,17 @@ describe('[POST] /private/validate_password_compliance', () => {
       body: 'invalid json',
     })
     expect(response.status).toBeGreaterThanOrEqual(400)
+  })
+})
+
+describe('checkOrgReadAccess', () => {
+  it('returns error when membership RPC fails', async () => {
+    const result = await checkOrgReadAccess({
+      rpc: async () => ({ data: null, error: { message: 'boom' } }),
+    } as any, ORG_ID, 'req-test')
+
+    expect(result.allowed).toBe(false)
+    expect(result.error).toBe('boom')
   })
 })
 
@@ -346,7 +427,7 @@ describe('[GET] /private/check_org_members_password_policy', () => {
   })
 })
 
-describe('Password Policy Enforcement Integration', () => {
+describe('password Policy Enforcement Integration', () => {
   const orgWithPolicyId = randomUUID()
   const orgWithPolicyName = `Pwd Policy Integration Org ${randomUUID()}`
   const orgWithPolicyCustomerId = `cus_pwd_int_${orgWithPolicyId}`

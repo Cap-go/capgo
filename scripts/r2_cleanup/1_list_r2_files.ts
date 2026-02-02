@@ -47,6 +47,32 @@ const supabase = createClient<Database>(
   { auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false } },
 )
 
+const PAGE_SIZE = 1000
+
+async function fetchAll<T>(
+  buildQuery: () => ReturnType<typeof supabase.from>,
+  context: string,
+): Promise<T[]> {
+  const all: T[] = []
+  let from = 0
+
+  // eslint-disable-next-line no-constant-condition
+  while (true) {
+    const { data, error } = await buildQuery().range(from, from + PAGE_SIZE - 1)
+    if (error) {
+      console.error(`Error fetching ${context}:`, error)
+      process.exit(1)
+    }
+    if (data && data.length > 0)
+      all.push(...data as T[])
+    if (!data || data.length < PAGE_SIZE)
+      break
+    from += PAGE_SIZE
+  }
+
+  return all
+}
+
 // List only folder names at a prefix level (not files inside)
 async function listFolders(prefix: string): Promise<string[]> {
   const folders: string[] = []
@@ -131,16 +157,11 @@ async function main() {
 
   // ===== STEP 2: Get all active orgs from database =====
   console.log('\nStep 2: Querying active orgs from database...')
-  const { data: dbOrgs, error: dbOrgsError } = await supabase
+  const dbOrgs = await fetchAll<{ owner_org: string }>(() => supabase
     .from('app_versions')
     .select('owner_org')
     .eq('deleted', false)
-    .not('r2_path', 'is', null)
-
-  if (dbOrgsError) {
-    console.error('Error querying orgs:', dbOrgsError)
-    process.exit(1)
-  }
+    .or('r2_path.not.is.null,manifest_count.gt.0'), 'orgs')
 
   const activeOrgIds = new Set(dbOrgs?.map(r => r.owner_org) ?? [])
   console.log(`  Found ${activeOrgIds.size} orgs with active versions in DB`)
@@ -181,12 +202,12 @@ async function main() {
     }
 
     // Query DB for active apps in this org
-    const { data: dbApps } = await supabase
+    const dbApps = await fetchAll<{ app_id: string }>(() => supabase
       .from('app_versions')
       .select('app_id')
       .eq('owner_org', orgId)
       .eq('deleted', false)
-      .not('r2_path', 'is', null)
+      .or('r2_path.not.is.null,manifest_count.gt.0'), `apps for org ${orgId}`)
 
     const activeAppIds = new Set(dbApps?.map(r => r.app_id) ?? [])
     const results: typeof orphanedPaths = []
@@ -210,14 +231,34 @@ async function main() {
       if (files.length === 0 && folders.length === 0)
         continue
 
-      const { data: dbVersions } = await supabase
+      const dbVersions = await fetchAll<{ id: number, r2_path: string | null, manifest_count: number }>(() => supabase
         .from('app_versions')
-        .select('r2_path')
+        .select('id, r2_path, manifest_count')
         .eq('app_id', appId)
         .eq('owner_org', orgId)
-        .eq('deleted', false)
+        .eq('deleted', false), `versions for app ${appId} (${orgId})`)
 
       const activeR2Paths = new Set(dbVersions?.map(r => r.r2_path).filter(Boolean) ?? [])
+      const manifestVersionIds = dbVersions
+        ?.filter(v => (v.manifest_count ?? 0) > 0)
+        .map(v => v.id) ?? []
+
+      const activeManifestPaths = new Set<string>()
+      if (manifestVersionIds.length > 0) {
+        const CHUNK_SIZE = 500
+        for (let i = 0; i < manifestVersionIds.length; i += CHUNK_SIZE) {
+          const chunk = manifestVersionIds.slice(i, i + CHUNK_SIZE)
+          const manifestEntries = await fetchAll<{ s3_path: string }>(() => supabase
+            .from('manifest')
+            .select('s3_path')
+            .in('app_version_id', chunk), `manifest entries for app ${appId} (${orgId})`)
+
+          for (const entry of manifestEntries ?? []) {
+            if (entry.s3_path)
+              activeManifestPaths.add(entry.s3_path)
+          }
+        }
+      }
 
       for (const filePath of files) {
         if (!activeR2Paths.has(filePath)) {
@@ -232,10 +273,26 @@ async function main() {
       for (const folderPath of folders) {
         const folderPathNormalized = folderPath.endsWith('/') ? folderPath.slice(0, -1) : folderPath
         let isActive = false
-        for (const activePath of activeR2Paths) {
-          if (activePath && (activePath === folderPathNormalized || activePath.startsWith(folderPath))) {
-            isActive = true
-            break
+        const isDeltaFolder = folderPath.endsWith('/delta/')
+        if (!isDeltaFolder) {
+          for (const activePath of activeR2Paths) {
+            if (activePath && (activePath === folderPathNormalized || activePath.startsWith(folderPath))) {
+              isActive = true
+              break
+            }
+          }
+          if (!isActive) {
+            const zipPath = `${folderPathNormalized}.zip`
+            if (activeR2Paths.has(zipPath))
+              isActive = true
+          }
+        }
+        if (!isActive) {
+          for (const manifestPath of activeManifestPaths) {
+            if (manifestPath.startsWith(folderPath)) {
+              isActive = true
+              break
+            }
           }
         }
         if (!isActive) {

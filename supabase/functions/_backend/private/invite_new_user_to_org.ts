@@ -11,11 +11,6 @@ import { checkPermission } from '../utils/rbac.ts'
 import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
-// Validate name to prevent HTML/script injection
-// Allow Unicode letters from all languages, spaces, hyphens, and apostrophes
-// Rejects numbers, URLs, and most special characters while supporting international names
-const nameRegex = /^[\p{L}\s'-]+$/u
-
 // Define the schema for the invite user request
 const inviteUserSchema = z.object({
   email: z.email(),
@@ -31,9 +26,9 @@ const inviteUserSchema = z.object({
     'org_admin',
     'org_super_admin',
   ]),
-  captcha_token: z.string().check(z.minLength(1)),
-  first_name: z.string().check(z.minLength(1), z.regex(nameRegex, 'First name contains invalid characters')),
-  last_name: z.string().check(z.minLength(1), z.regex(nameRegex, 'Last name contains invalid characters')),
+  captcha_token: z.optional(z.string().check(z.minLength(1))),
+  first_name: z.string().check(z.minLength(1)),
+  last_name: z.string().check(z.minLength(1)),
 })
 
 const captchaSchema = z.object({
@@ -59,6 +54,14 @@ const legacyRoleToRbac: Partial<Record<LegacyInviteRole, RbacInviteRole>> = {
   write: 'org_member',
   admin: 'org_admin',
   super_admin: 'org_super_admin',
+}
+
+const INVITE_RESEND_COOLDOWN_MINUTES = 5
+
+function generateInviteMagicString() {
+  const bytes = new Uint8Array(128)
+  crypto.getRandomValues(bytes)
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
 }
 
 function resolveInviteRoles(inviteType: string, useNewRbac: boolean) {
@@ -113,7 +116,13 @@ async function validateInvite(c: Context, rawBody: any) {
   }
 
   // Verify captcha token with Cloudflare Turnstile
-  await verifyCaptchaToken(c, body.captcha_token)
+  const captchaSecret = getEnv(c, 'CAPTCHA_SECRET_KEY')
+  if (captchaSecret.length > 0) {
+    if (!body.captcha_token) {
+      throw simpleError('invalid_request', 'Captcha token is required')
+    }
+    await verifyCaptchaToken(c, body.captcha_token, captchaSecret)
+  }
 
   // Use authenticated client - RLS will enforce access based on JWT
   const supabase = supabaseClient(c, authorization)
@@ -141,24 +150,20 @@ async function validateInvite(c: Context, rawBody: any) {
     return { message: 'Failed to invite user', error: orgError?.message ?? 'Organization not found', status: 500 }
   }
 
-  if (!org.name.match(nameRegex)) {
-    return { message: 'Failed to invite user due to invalid organization name', error: 'Organization name contains invalid characters', status: 400 }
-  }
-
   const useNewRbac = org.use_new_rbac === true
   const { legacyInviteType, rbacRoleName } = resolveInviteRoles(body.invite_type, useNewRbac)
 
   // Get current user ID from JWT
-  const { data: authData, error: authError } = await supabase.auth.getUser()
-  if (authError || !authData?.user?.id) {
-    return { message: 'Failed to get current user', error: authError?.message, status: 500 }
+  const authContext = c.get('auth')
+  if (!authContext?.userId) {
+    return { message: 'Failed to get current user', error: 'Not authorized', status: 500 }
   }
 
   // Get user details
   const { data: inviteCreatorUser, error: inviteCreatorUserError } = await supabase
     .from('users')
     .select('*')
-    .eq('id', authData.user.id)
+    .eq('id', authContext.userId)
     .single()
 
   if (inviteCreatorUserError) {
@@ -197,8 +202,22 @@ app.post('/', middlewareAuth, async (c) => {
   let newInvitation: Database['public']['Tables']['tmp_users']['Row'] | null = null
   if (existingInvitation) {
     const nowMinusThreeHours = dayjs().subtract(3, 'hours')
-    if (!dayjs(nowMinusThreeHours).isAfter(dayjs(existingInvitation.cancelled_at))) {
-      throw simpleError('user_already_invited', 'User already invited and it hasnt been 3 hours since the last invitation was cancelled')
+    if (existingInvitation.cancelled_at && !dayjs(nowMinusThreeHours).isAfter(dayjs(existingInvitation.cancelled_at))) {
+      throw simpleError('user_already_invited', 'User already invited and it hasn\'t been 3 hours since the last invitation was cancelled', {
+        reason: 'invite_cancelled_recently',
+        cooldown_minutes: 180,
+      })
+    }
+
+    const lastInviteAt = existingInvitation.updated_at ?? existingInvitation.created_at
+    if (!existingInvitation.cancelled_at && lastInviteAt) {
+      const minutesSinceLastInvite = dayjs().diff(dayjs(lastInviteAt), 'minute')
+      if (minutesSinceLastInvite < INVITE_RESEND_COOLDOWN_MINUTES) {
+        throw simpleError('user_already_invited', 'User already invited recently. Please wait before resending.', {
+          reason: 'invite_recently_sent',
+          cooldown_minutes: INVITE_RESEND_COOLDOWN_MINUTES,
+        })
+      }
     }
 
     const { error: updateInvitationError, data: updatedInvitationData } = await supabaseAdminClient
@@ -209,6 +228,7 @@ app.post('/', middlewareAuth, async (c) => {
         last_name: body.last_name,
         role: legacyInviteType,
         rbac_role_name: rbacRoleName,
+        invite_magic_string: generateInviteMagicString(),
       })
       .eq('email', body.email)
       .eq('org_id', body.org_id)
@@ -242,32 +262,27 @@ app.post('/', middlewareAuth, async (c) => {
     org_admin_name: `${inviteCreatorUser.first_name} ${inviteCreatorUser.last_name}`,
     org_name: org.name,
     invite_link: `${getEnv(c, 'WEBAPP_URL')}/invitation?invite_magic_string=${newInvitation?.invite_magic_string}`,
-    invited_first_name: `${body.first_name}`,
-    invited_last_name: `${body.last_name}`,
+    invited_first_name: `${newInvitation?.first_name ?? body.first_name}`,
+    invited_last_name: `${newInvitation?.last_name ?? body.last_name}`,
   }, 'org:invite_new_capgo_user_to_org')
-  if (!bentoEvent) {
-    throw simpleError('failed_to_invite_user', 'Failed to invite user', {}, 'Failed to track bento event')
+  if (bentoEvent === false) {
+    cloudlog({ requestId: c.get('requestId'), context: 'invite_new_user_to_org bento', message: 'Failed to track bento event' })
   }
   return c.json(BRES)
 })
 
 // Function to verify Cloudflare Turnstile token
-async function verifyCaptchaToken(c: Context, token: string) {
-  const captchaSecret = getEnv(c, 'CAPTCHA_SECRET_KEY')
-  if (!captchaSecret) {
-    throw simpleError('captcha_secret_key_not_set', 'CAPTCHA_SECRET_KEY not set')
-  }
-
+async function verifyCaptchaToken(c: Context, token: string, captchaSecret: string) {
   // "/siteverify" API endpoint.
   const url = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
   const result = await fetch(url, {
-    body: JSON.stringify({
+    body: new URLSearchParams({
       secret: captchaSecret,
       response: token,
     }),
     method: 'POST',
     headers: {
-      'Content-Type': 'application/json',
+      'Content-Type': 'application/x-www-form-urlencoded',
     },
   })
 

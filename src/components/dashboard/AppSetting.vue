@@ -14,6 +14,7 @@ import gearSix from '~icons/ph/gear-six?raw'
 import iconName from '~icons/ph/user?raw'
 import Toggle from '~/components/Toggle.vue'
 import { checkPermissions } from '~/services/permissions'
+import { createSignedImageUrl } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
@@ -111,6 +112,8 @@ onMounted(async () => {
 
   await organizationStore.awaitInitialLoad()
   appRef.value = data as any
+  if (appRef.value?.icon_url)
+    appRef.value.icon_url = await createSignedImageUrl(appRef.value.icon_url)
   initializeRetentionPreset()
   await loadChannels()
   isLoading.value = false
@@ -718,9 +721,10 @@ async function editPhoto() {
             return false
           }
 
+          const iconPath = `org/${appRef.value?.owner_org.id}/${props.appId}/icon`
           const { error } = await supabase.storage
-            .from(`images/org/${appRef.value?.owner_org.id}/${props.appId}`)
-            .upload('icon', blob, {
+            .from('images')
+            .upload(iconPath, blob, {
               contentType: mimeType,
             })
 
@@ -730,13 +734,8 @@ async function editPhoto() {
             return false
           }
 
-          const { data: signedURLData } = await supabase
-            .storage
-            .from(`images/org/${appRef.value?.owner_org.id}/${props.appId}`)
-            .getPublicUrl('icon')
-
           const { error: appUpdateErr } = await supabase.from('apps')
-            .update({ icon_url: signedURLData.publicUrl })
+            .update({ icon_url: iconPath })
             .eq('app_id', props.appId)
 
           if (appUpdateErr) {
@@ -746,7 +745,7 @@ async function editPhoto() {
           }
 
           if (appRef.value)
-            appRef.value.icon_url = signedURLData.publicUrl
+            appRef.value.icon_url = await createSignedImageUrl(iconPath)
 
           toast.success(t('picture-uploaded'))
         },
@@ -909,7 +908,7 @@ async function transferAppOwnership() {
 </script>
 
 <template>
-  <div class="pb-8 h-full md:pb-0 max-h-fit grow">
+  <div class="h-full pb-8 md:pb-0 max-h-fit grow">
     <FormKit id="update-app" type="form" :actions="false" @submit="submit">
       <!-- Panel body -->
       <div class="p-6 space-y-6">
@@ -933,7 +932,7 @@ async function transferAppOwnership() {
                 </span>
               </div>
             </div>
-            <button id="change-org-pic" type="button" class="py-2 px-3 text-xs font-medium text-center text-gray-700 rounded-lg border cursor-pointer dark:text-white hover:bg-gray-100 focus:ring-4 focus:ring-blue-300 border-slate-500 dark:hover:bg-gray-600 dark:focus:ring-blue-800 focus:outline-hidden" @click="editPhoto">
+            <button id="change-org-pic" type="button" class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg cursor-pointer dark:text-white hover:bg-gray-100 focus:ring-4 focus:ring-blue-300 border-slate-500 dark:hover:bg-gray-600 dark:focus:ring-blue-800 focus:outline-hidden" @click="editPhoto">
               {{ t('change') }}
             </button>
           </div>
@@ -964,8 +963,6 @@ async function transferAppOwnership() {
                 role="button"
                 tabindex="0"
                 @click="setDefaultChannel"
-                @keydown.enter.prevent="setDefaultChannel"
-                @keydown.space.prevent="setDefaultChannel"
               >
                 <FormKit
                   type="text"
@@ -989,7 +986,7 @@ async function transferAppOwnership() {
                   }"
                 >
                   <template #suffix>
-                    <button type="button" class="mr-1 ml-auto w-[24px] h-[24px]" @click.stop="setDefaultChannel">
+                    <button type="button" class="w-6 h-6 ml-auto mr-1" @click.stop="setDefaultChannel">
                       <Pencil width="24px" height="24px" />
                     </button>
                   </template>
@@ -1001,8 +998,6 @@ async function transferAppOwnership() {
                 role="button"
                 tabindex="0"
                 @click="openDefaultDownloadChannelDialog"
-                @keydown.enter.prevent="openDefaultDownloadChannelDialog"
-                @keydown.space.prevent="openDefaultDownloadChannelDialog"
               >
                 <FormKit
                   type="text"
@@ -1031,7 +1026,7 @@ async function transferAppOwnership() {
                   }"
                 >
                   <template #suffix>
-                    <button type="button" class="mr-1 ml-auto w-[24px] h-[24px]" @click.stop="openDefaultDownloadChannelDialog">
+                    <button type="button" class="w-6 h-6 ml-auto mr-1" @click.stop="openDefaultDownloadChannelDialog">
                       <Pencil width="24px" height="24px" />
                     </button>
                   </template>
@@ -1127,9 +1122,9 @@ async function transferAppOwnership() {
       </div>
       <!-- Panel footer -->
       <footer>
-        <div class="flex flex-col py-5 px-6 border-t dark:border-slate-600">
+        <div class="flex flex-col px-6 py-5 border-t dark:border-slate-600">
           <div class="flex self-end">
-            <button v-if="canDeleteApp" type="button" class="p-2 text-red-600 rounded-lg border border-red-400 hover:text-white hover:bg-red-600" @click="deleteApp()">
+            <button v-if="canDeleteApp" type="button" class="p-2 text-red-600 border border-red-400 rounded-lg hover:text-white hover:bg-red-600" @click="deleteApp()">
               {{ t('delete-app') }}
             </button>
             <button
@@ -1155,28 +1150,27 @@ async function transferAppOwnership() {
           v-model="transferAppIdInput"
           type="text"
           :placeholder="t('type-app-id-to-confirm')"
-          class="p-3 w-full rounded-lg border border-gray-300 dark:text-white dark:bg-gray-800 dark:border-gray-600"
-          @keydown.enter="$event.preventDefault()"
+          class="w-full p-3 border border-gray-300 rounded-lg dark:text-white dark:bg-gray-800 dark:border-gray-600"
         >
       </div>
     </Teleport>
 
     <!-- Teleport for Default Upload Channel Selection -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('select-default-upload-channel-header')" defer to="#dialog-v2-content">
-      <div class="space-y-3 w-full">
+      <div class="w-full space-y-3">
         <template v-if="uploadChannelOptions.length">
           <input
             v-model="uploadSearch"
             type="text"
             :placeholder="t('default-upload-channel-search-placeholder')"
-            class="py-2 px-3 w-full text-sm bg-white rounded-lg border focus:border-blue-500 focus:ring-2 border-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-blue-500/20"
+            class="w-full px-3 py-2 text-sm bg-white border rounded-lg focus:border-blue-500 focus:ring-2 border-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-blue-500/20"
           >
           <div v-if="visibleUploadChannels.length" class="space-y-2">
             <label
               v-for="channel in visibleUploadChannels"
               :key="`upload-${channel.name}`"
               :for="`upload-channel-${channel.name}`"
-              class="flex gap-3 items-center p-3 rounded-lg border transition hover:border-blue-400 border-slate-200 dark:border-slate-700 dark:hover:border-blue-500"
+              class="flex items-center gap-3 p-3 transition border rounded-lg hover:border-blue-400 border-slate-200 dark:border-slate-700 dark:hover:border-blue-500"
             >
               <input
                 :id="`upload-channel-${channel.name}`"
@@ -1188,7 +1182,7 @@ async function transferAppOwnership() {
               <span class="text-sm font-medium">{{ channel.name }}</span>
             </label>
           </div>
-          <div v-else class="py-6 px-3 text-sm text-center rounded-lg border border-dashed border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-300">
+          <div v-else class="px-3 py-6 text-sm text-center border border-dashed rounded-lg border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-300">
             {{ t('default-upload-channel-no-results') }}
           </div>
           <p v-if="uploadHasHidden" class="text-xs text-slate-500 dark:text-slate-300">
@@ -1203,7 +1197,7 @@ async function transferAppOwnership() {
 
     <!-- Teleport for Default Download Channel Selection -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('select-default-download-channel-header')" defer to="#dialog-v2-content">
-      <div class="space-y-6 w-full">
+      <div class="w-full space-y-6">
         <a
           class="inline-flex items-center text-sm font-medium text-blue-600 underline transition dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
           href="https://capgo.app/docs/live-updates/channels/"
@@ -1216,7 +1210,7 @@ async function transferAppOwnership() {
           {{ t('default-download-channel-dialog-info') }}
         </p>
 
-        <div v-if="hasCombinedOptions" class="p-4 space-y-4 rounded-lg border border-slate-200 dark:border-slate-700">
+        <div v-if="hasCombinedOptions" class="p-4 space-y-4 border rounded-lg border-slate-200 dark:border-slate-700">
           <div class="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-start">
             <div>
               <h3 class="text-sm font-semibold text-slate-800 dark:text-slate-100">
@@ -1226,7 +1220,7 @@ async function transferAppOwnership() {
                 {{ t('default-download-channel-use-unified-desc') }}
               </p>
             </div>
-            <div class="flex gap-2 items-center">
+            <div class="flex items-center gap-2">
               <Toggle
                 :value="!splitDownloadDefaults"
                 @update:value="setUnifiedDownloadMode"
@@ -1242,14 +1236,14 @@ async function transferAppOwnership() {
               v-model="combinedSearch"
               type="text"
               :placeholder="t('default-download-channel-search-placeholder')"
-              class="py-2 px-3 w-full text-sm bg-white rounded-lg border focus:border-blue-500 focus:ring-2 border-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-blue-500/20"
+              class="w-full px-3 py-2 text-sm bg-white border rounded-lg focus:border-blue-500 focus:ring-2 border-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-blue-500/20"
             >
             <div v-if="visibleCombinedOptions.length" class="space-y-2">
               <label
                 v-for="channel in visibleCombinedOptions"
                 :key="`combined-${channel.id}`"
                 :for="`combined-channel-${channel.id}`"
-                class="flex gap-3 items-start p-3 rounded-lg border transition hover:border-blue-400 border-slate-200 dark:border-slate-700 dark:hover:border-blue-500"
+                class="flex items-start gap-3 p-3 transition border rounded-lg hover:border-blue-400 border-slate-200 dark:border-slate-700 dark:hover:border-blue-500"
               >
                 <input
                   :id="`combined-channel-${channel.id}`"
@@ -1263,7 +1257,7 @@ async function transferAppOwnership() {
                 </div>
               </label>
             </div>
-            <div v-else class="py-6 px-3 text-sm text-center rounded-lg border border-dashed border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-300">
+            <div v-else class="px-3 py-6 text-sm text-center border border-dashed rounded-lg border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-300">
               {{ combinedSearch.trim() ? t('default-download-channel-no-results') : t('default-download-channel-no-unified') }}
             </div>
             <p v-if="combinedHasHidden" class="text-xs text-slate-500 dark:text-slate-300">
@@ -1285,14 +1279,14 @@ async function transferAppOwnership() {
               v-model="iosSearch"
               type="text"
               :placeholder="t('default-download-channel-search-placeholder')"
-              class="py-2 px-3 w-full text-sm bg-white rounded-lg border focus:border-blue-500 focus:ring-2 border-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-blue-500/20"
+              class="w-full px-3 py-2 text-sm bg-white border rounded-lg focus:border-blue-500 focus:ring-2 border-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-blue-500/20"
             >
             <div v-if="visibleIosSingleOptions.length" class="space-y-2">
               <label
                 v-for="channel in visibleIosSingleOptions"
                 :key="`ios-${channel.id}`"
                 :for="`ios-channel-${channel.id}`"
-                class="flex gap-3 items-start p-3 rounded-lg border transition hover:border-blue-400 border-slate-200 dark:border-slate-700 dark:hover:border-blue-500"
+                class="flex items-start gap-3 p-3 transition border rounded-lg hover:border-blue-400 border-slate-200 dark:border-slate-700 dark:hover:border-blue-500"
               >
                 <input
                   :id="`ios-channel-${channel.id}`"
@@ -1306,7 +1300,7 @@ async function transferAppOwnership() {
                 </div>
               </label>
             </div>
-            <div v-else class="py-6 px-3 text-sm text-center rounded-lg border border-dashed border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-300">
+            <div v-else class="px-3 py-6 text-sm text-center border border-dashed rounded-lg border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-300">
               {{ iosSearch.trim() ? t('default-download-channel-no-results') : t('default-download-channel-ios-only-empty') }}
             </div>
             <p v-if="iosHasHidden" class="text-xs text-slate-500 dark:text-slate-300">
@@ -1326,14 +1320,14 @@ async function transferAppOwnership() {
               v-model="androidSearch"
               type="text"
               :placeholder="t('default-download-channel-search-placeholder')"
-              class="py-2 px-3 w-full text-sm bg-white rounded-lg border focus:border-blue-500 focus:ring-2 border-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-blue-500/20"
+              class="w-full px-3 py-2 text-sm bg-white border rounded-lg focus:border-blue-500 focus:ring-2 border-slate-200 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100 focus:outline-hidden focus:ring-blue-500/20"
             >
             <div v-if="visibleAndroidSingleOptions.length" class="space-y-2">
               <label
                 v-for="channel in visibleAndroidSingleOptions"
                 :key="`android-${channel.id}`"
                 :for="`android-channel-${channel.id}`"
-                class="flex gap-3 items-start p-3 rounded-lg border transition hover:border-blue-400 border-slate-200 dark:border-slate-700 dark:hover:border-blue-500"
+                class="flex items-start gap-3 p-3 transition border rounded-lg hover:border-blue-400 border-slate-200 dark:border-slate-700 dark:hover:border-blue-500"
               >
                 <input
                   :id="`android-channel-${channel.id}`"
@@ -1347,7 +1341,7 @@ async function transferAppOwnership() {
                 </div>
               </label>
             </div>
-            <div v-else class="py-6 px-3 text-sm text-center rounded-lg border border-dashed border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-300">
+            <div v-else class="px-3 py-6 text-sm text-center border border-dashed rounded-lg border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-300">
               {{ androidSearch.trim() ? t('default-download-channel-no-results') : t('default-download-channel-android-only-empty') }}
             </div>
             <p v-if="androidHasHidden" class="text-xs text-slate-500 dark:text-slate-300">

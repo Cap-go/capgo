@@ -6,50 +6,55 @@ import { decode } from 'base64-arraybuffer'
 import mime from 'mime'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
+import { createSignedImageUrl } from './storage'
 import { useSupabase } from './supabase'
 
 const supabase = useSupabase()
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
 
-async function uploadPhotoShared(data: string, fileName: string, contentType: string, isLoading: Ref<boolean>, callback: (success: boolean, url: string) => Promise<void>) {
+async function uploadPhotoShared(
+  data: string,
+  storagePath: string,
+  contentType: string,
+  isLoading: Ref<boolean>,
+  callback: (success: boolean, storagePath: string, signedUrl: string) => Promise<void>,
+) {
   const { error } = await supabase.storage
     .from('images')
-    .upload(`${main.user?.id}/${fileName}`, decode(data), {
+    .upload(storagePath, decode(data), {
       contentType,
     })
 
-  const { data: res } = supabase.storage
-    .from('images')
-    .getPublicUrl(`${main.user?.id}/${fileName}`)
+  const signedUrl = error ? '' : await createSignedImageUrl(storagePath)
 
   isLoading.value = false
 
-  if (error || !res.publicUrl)
-    await callback(false, '')
+  if (error || !signedUrl)
+    await callback(false, '', '')
   else
-    await callback(true, res.publicUrl)
+    await callback(true, storagePath, signedUrl)
 }
 
 async function uploadPhotoUser(formId: string, data: string, fileName: string, contentType: string, isLoading: Ref<boolean>, wentWrong: string) {
-  async function userCallback(success: boolean, url: string) {
+  const userId = main.user?.id
+  if (!userId) {
+    setErrors(formId, [wentWrong], {})
+    console.error('No user id', userId)
+    return
+  }
+  const safeUserId = userId
+
+  async function userCallback(success: boolean, storagePath: string, signedUrl: string) {
     if (!success) {
       setErrors(formId, [wentWrong], {})
       return
     }
 
-    const userId = main.user?.id
-
-    if (!userId) {
-      setErrors(formId, [wentWrong], {})
-      console.error('No user id', userId)
-      return
-    }
-
     const { data: usr, error: dbError } = await supabase
       .from('users')
-      .update({ image_url: url })
-      .eq('id', userId)
+      .update({ image_url: storagePath })
+      .eq('id', safeUserId)
       .select()
       .single()
 
@@ -58,31 +63,32 @@ async function uploadPhotoUser(formId: string, data: string, fileName: string, c
       console.error('upload error', dbError)
       return
     }
+    usr.image_url = signedUrl
     main.user = usr
   }
 
-  await uploadPhotoShared(data, fileName, contentType, isLoading, userCallback)
+  await uploadPhotoShared(data, `${safeUserId}/${fileName}`, contentType, isLoading, userCallback)
 }
 
 async function uploadPhotoOrg(formId: string, data: string, fileName: string, contentType: string, isLoading: Ref<boolean>, wentWrong: string) {
-  async function orgCallback(success: boolean, url: string) {
+  const gid = organizationStore.currentOrganization?.gid
+  if (!gid) {
+    console.error('No current org id', gid)
+    setErrors(formId, [wentWrong], {})
+    return
+  }
+  const safeGid = gid
+
+  async function orgCallback(success: boolean, storagePath: string, _signedUrl: string) {
     if (!success) {
       setErrors(formId, [wentWrong], {})
       return
     }
 
-    const gid = organizationStore.currentOrganization?.gid
-    const userId = main.user?.id
-
-    if (!gid || !userId) {
-      console.error('No current org id or user id', gid, userId)
-      return
-    }
-
     const { data: usr, error: dbError } = await supabase
       .from('orgs')
-      .update({ logo: url })
-      .eq('id', gid)
+      .update({ logo: storagePath })
+      .eq('id', safeGid)
       .select('id')
       .single()
 
@@ -96,7 +102,7 @@ async function uploadPhotoOrg(formId: string, data: string, fileName: string, co
     organizationStore.setCurrentOrganization(usr.id)
   }
 
-  await uploadPhotoShared(data, fileName, contentType, isLoading, orgCallback)
+  await uploadPhotoShared(data, `org/${safeGid}/logo/${fileName}`, contentType, isLoading, orgCallback)
 }
 
 function blobToData(blob: Blob) {

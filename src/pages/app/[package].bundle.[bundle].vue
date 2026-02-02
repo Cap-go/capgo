@@ -732,14 +732,14 @@ async function deleteBundle() {
                     <!-- Tooltip -->
                     <div
                       v-show="showChecksumTooltip"
-                      class="absolute right-0 bottom-full mb-2 px-3 py-2 text-xs bg-gray-900 dark:bg-gray-700 text-white rounded-lg shadow-lg z-50 min-w-max"
+                      class="absolute right-0 z-50 px-3 py-2 mb-2 text-xs text-white bg-gray-900 rounded-lg shadow-lg bottom-full dark:bg-gray-700 min-w-max"
                     >
-                      <div class="font-medium mb-1">{{ t('checksum-type-info') }}</div>
+                      <div class="mb-1 font-medium">{{ t('checksum-type-info') }}</div>
                       <div>{{ t('min-plugin-version') }}: {{ checksumInfo.minPluginVersion }}</div>
-                      <div v-if="checksumInfo.type === 'sha256'" class="text-blue-300 mt-1">{{ t('checksum-sha256-desc') }}</div>
-                      <div v-else-if="checksumInfo.type === 'crc32'" class="text-green-300 mt-1">{{ t('checksum-crc32-desc') }}</div>
+                      <div v-if="checksumInfo.type === 'sha256'" class="mt-1 text-blue-300">{{ t('checksum-sha256-desc') }}</div>
+                      <div v-else-if="checksumInfo.type === 'crc32'" class="mt-1 text-green-300">{{ t('checksum-crc32-desc') }}</div>
                       <!-- Tooltip arrow -->
-                      <div class="absolute right-4 top-full -mt-px border-4 border-transparent border-t-gray-900 dark:border-t-gray-700" />
+                      <div class="absolute -mt-px border-4 border-transparent right-4 top-full border-t-gray-900 dark:border-t-gray-700" />
                     </div>
                   </div>
                   <button
@@ -762,7 +762,7 @@ async function deleteBundle() {
 
               <InfoRow v-if="channels && channels.length > 0 && version && channels.filter(c => c.version === version!.id).length > 0" :label="t('channel')">
                 <div class="flex flex-wrap justify-end w-full gap-3">
-                  <div v-for="chn in channels.filter(c => c.version === version!.id)" id="open-channel" :key="chn.id" class="flex items-center gap-2">
+                  <div v-for="chn in channels.filter(c => c.version === version!.id)" :id="`open-channel-${chn.id}`" :key="chn.id" class="flex items-center gap-2">
                     <span
                       class="font-bold text-blue-600 underline cursor-pointer dark:text-blue-500 hover:text-blue-700 underline-offset-4 dark:hover:text-blue-400"
                       @click="openChannel(chn)"

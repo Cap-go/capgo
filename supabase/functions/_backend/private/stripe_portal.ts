@@ -26,11 +26,11 @@ app.post('/', middlewareAuth, async (c) => {
   const supabase = supabaseClient(c, authorization)
 
   // Get current user ID from JWT
-  const { data: auth, error } = await supabase.auth.getUser()
-  if (error || !auth?.user?.id)
+  const authContext = c.get('auth')
+  if (!authContext?.userId)
     throw simpleError('not_authorized', 'Not authorized')
 
-  cloudlog({ requestId: c.get('requestId'), message: 'auth', auth: auth.user.id })
+  cloudlog({ requestId: c.get('requestId'), message: 'auth', auth: authContext.userId })
   const { data: org, error: dbError } = await supabase
     .from('orgs')
     .select('customer_id')

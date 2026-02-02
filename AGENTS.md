@@ -33,6 +33,8 @@ when working with code in this repository.
 - `./scripts/start-cloudflare-workers.sh` - Start local Cloudflare Workers for
   testing
 
+Note: Cloudflare test suite is currently unstable and may not pass reliably.
+
 See [CLOUDFLARE_TESTING.md](CLOUDFLARE_TESTING.md) for detailed information on
 testing against Cloudflare Workers.
 
@@ -46,8 +48,8 @@ testing against Cloudflare Workers.
 
 ### Database and Backend
 
-- `supabase start` - Start local Supabase instance
-- `supabase db reset` - Reset and seed local database
+- `bunx supabase start` - Start local Supabase instance
+- `bunx supabase db reset` - Reset and seed local database
 - `bun backend` - Start Supabase functions locally
 - `bun reset` - Reset Supabase database
 
@@ -78,6 +80,14 @@ testing against Cloudflare Workers.
   - `public/` - Public API endpoints (app, bundle, device management)
   - `triggers/` - Database triggers and CRON functions
   - `utils/` - Shared utilities and database schemas
+
+### AI Workflow Notes
+
+- For understanding the **current DB schema**, prefer
+  `supabase/schemas/prod.sql` (schema dump) instead of scanning all migrations.
+- For **schema changes**, always edit or add files under
+  `supabase/migrations/` and treat `supabase/schemas/prod.sql` as read-only
+  reference.
 
 ### HTTP Response Conventions
 
@@ -110,8 +120,8 @@ Do NOT use `c.body(null, 204)` for success responses. Always return JSON for con
 ### Environment Setup
 
 1. Install dependencies: `bun install`
-2. Start Supabase: `supabase start`
-3. Reset database with seed data: `supabase db reset`
+2. Start Supabase: `bunx supabase start`
+3. Reset database with seed data: `bunx supabase db reset`
 4. Start frontend: `bun serve:dev`
 
 ### Test Accounts (Local Development)
@@ -215,7 +225,7 @@ Then in your test file, use ONLY these dedicated resources for modifications.
 - Use the Supabase CLI for every migration and operational task whenever
   possible; avoid manual changes through the dashboard or direct SQL.
 - When a feature requires schema changes, create a single migration file with
-  the Supabase CLI (`supabase migration new <feature_slug>`) and keep editing
+  the Supabase CLI (`bunx supabase migration new <feature_slug>`) and keep editing
   that file until the feature ships; never edit previously committed migrations.
 - Updating `supabase/seed.sql` to back new or evolved tests is expected; keep
   fixtures focused on current behavior while leaving committed migrations
@@ -239,6 +249,10 @@ Then in your test file, use ONLY these dedicated resources for modifications.
   admin access is unavoidable for a user-facing endpoint, sanitize all user
   inputs carefully—the SDK is susceptible to PostgREST query injection (not SQL
   injection, but filter/modifier injection via crafted parameters).
+- Prefer claim-based auth lookups for performance: use
+  `supabase.auth.getClaims()` (frontend) or auth context from middleware
+  (backend) instead of `getUser()` unless you explicitly need the full user
+  record from the Auth API.
 
 ### PostgreSQL Function Security
 
@@ -528,6 +542,55 @@ transparent about AI-generated content. ALWAYS mark every section with
 
 Generated with AI
 ```
+
+## API and Plugin Backward Compatibility
+
+**CRITICAL: All changes to public APIs and plugin interfaces MUST be backward compatible.**
+
+Customers take time to update their apps and plugins. Breaking changes cause production issues for users who haven't updated yet. Follow these rules:
+
+### Backend API Changes
+
+- **New fields**: Can be added freely - old clients will ignore them
+- **Existing fields**: Never remove or change the type/meaning
+- **New error codes**: Fine to add, but don't remove existing ones
+- **Response format**: Must remain compatible with older plugin versions
+
+### Plugin Version Detection
+
+When behavior must differ between plugin versions, use version detection:
+
+```typescript
+const pluginVersion = body.plugin_version || '0.0.0'
+let isNewVersion = false
+try {
+  const parsed = parse(pluginVersion)
+  isNewVersion = !isDeprecatedPluginVersion(parsed, MIN_V5, MIN_V6, MIN_V7, MIN_V8)
+} catch (error) {
+  // If version parsing fails, assume old version for safety
+}
+
+if (isNewVersion) {
+  // New behavior for updated plugins
+} else {
+  // Legacy behavior for old plugins
+}
+```
+
+### Examples of Backward Compatible Changes
+
+- **Adding a new optional response field**: Old plugins ignore it, new plugins use it
+- **Changing error to success with new flag**: Return success with `unset: true` instead of error - old plugins see success, new plugins handle the flag
+- **New endpoint**: Doesn't affect existing clients
+
+### Examples of Breaking Changes (AVOID)
+
+- Removing a response field that old plugins depend on
+- Changing the meaning of an existing field
+- Returning different HTTP status codes for the same scenario
+- Removing support for old request formats
+
+**When in doubt, support both old and new behavior based on plugin version detection.**
 
 ## Deployment
 

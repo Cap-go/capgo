@@ -23,19 +23,7 @@ const INPUT_FILE = './tmp/r2_cleanup/1_orphaned_paths.json'
 const S3_BUCKET = env.S3_BUCKET || 'capgo'
 const CONCURRENCY = 50 // High parallelism
 
-// Ask user
-process.stdout.write('\nDo you want to actually DELETE files? (yes/no): ')
 let DRY_RUN = true
-for await (const line of console) {
-  const answer = line.trim().toLowerCase()
-  if (answer === 'yes' || answer === 'y') {
-    DRY_RUN = false
-    break
-  }
-  if (answer === 'no' || answer === 'n')
-    break
-  process.stdout.write('Please answer yes or no: ')
-}
 
 const s3 = new S3Client({
   credentials: { accessKeyId: env.S3_ACCESS_KEY_ID, secretAccessKey: env.S3_SECRET_ACCESS_KEY },
@@ -46,6 +34,31 @@ const s3 = new S3Client({
 
 let totalDeleted = 0
 let totalErrors = 0
+let totalToDelete = 0
+
+// Count objects under a prefix without deleting
+async function countPrefix(prefix: string): Promise<number> {
+  let continuationToken: string | undefined
+  let count = 0
+
+  while (true) {
+    const response = await s3.send(new ListObjectsV2Command({
+      Bucket: S3_BUCKET,
+      Prefix: prefix,
+      ContinuationToken: continuationToken,
+      MaxKeys: 1000,
+    }))
+
+    if (response.Contents)
+      count += response.Contents.length
+
+    if (!response.IsTruncated)
+      break
+    continuationToken = response.NextContinuationToken
+  }
+
+  return count
+}
 
 // Stream delete a prefix: list and delete simultaneously
 async function streamDelete(prefix: string): Promise<void> {
@@ -147,6 +160,38 @@ async function main() {
 
   console.log(`Files to delete: ${files.length}`)
   console.log(`Folders to delete: ${folders.length}`)
+
+  console.log('\nCounting total objects to delete (this can take time)...')
+  let folderObjects = 0
+  if (folders.length > 0) {
+    for (let i = 0; i < folders.length; i += CONCURRENCY) {
+      const batch = folders.slice(i, i + CONCURRENCY)
+      const counts = await Promise.all(batch.map(f => countPrefix(f)))
+      folderObjects += counts.reduce((a, b) => a + b, 0)
+      process.stdout.write(`\r  Counted folders: ${Math.min(i + CONCURRENCY, folders.length)}/${folders.length} | Objects so far: ${folderObjects}`)
+    }
+    process.stdout.write('\n')
+  }
+
+  totalToDelete = files.length + folderObjects
+  console.log(`\nTotal objects to delete: ${totalToDelete}`)
+
+  // Ask user after counting
+  process.stdout.write('\nDo you want to actually DELETE files? (yes/no): ')
+  for await (const line of console) {
+    const answer = line.trim().toLowerCase()
+    if (answer === 'yes' || answer === 'y') {
+      DRY_RUN = false
+      break
+    }
+    if (answer === 'no' || answer === 'n')
+      break
+    process.stdout.write('Please answer yes or no: ')
+  }
+  if (DRY_RUN) {
+    console.log('\nAborting delete (dry run).')
+    return
+  }
 
   // Progress ticker
   const ticker = setInterval(() => {

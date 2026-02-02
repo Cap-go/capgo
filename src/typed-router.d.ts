@@ -51,13 +51,6 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
-    '/admin/dashboard/performance': RouteRecordInfo<
-      '/admin/dashboard/performance',
-      '/admin/dashboard/performance',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
     '/admin/dashboard/plugins': RouteRecordInfo<
       '/admin/dashboard/plugins',
       '/admin/dashboard/plugins',
@@ -191,6 +184,13 @@ declare module 'vue-router/auto-routes' {
       { package: ParamValue<false>, channel: ParamValue<false> },
       | never
     >,
+    '/app/[package].channel.[channel].statistics': RouteRecordInfo<
+      '/app/[package].channel.[channel].statistics',
+      '/app/:package/channel/:channel/statistics',
+      { package: ParamValue<true>, channel: ParamValue<true> },
+      { package: ParamValue<false>, channel: ParamValue<false> },
+      | never
+    >,
     '/app/[package].channels': RouteRecordInfo<
       '/app/[package].channels',
       '/app/:package/channels',
@@ -306,13 +306,6 @@ declare module 'vue-router/auto-routes' {
     '/login': RouteRecordInfo<
       '/login',
       '/login',
-      Record<never, never>,
-      Record<never, never>,
-      | never
-    >,
-    '/onboarding/confirm_email': RouteRecordInfo<
-      '/onboarding/confirm_email',
-      '/onboarding/confirm_email',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -480,12 +473,6 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
-    'src/pages/admin/dashboard/performance.vue': {
-      routes:
-        | '/admin/dashboard/performance'
-      views:
-        | never
-    }
     'src/pages/admin/dashboard/plugins.vue': {
       routes:
         | '/admin/dashboard/plugins'
@@ -600,6 +587,12 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
+    'src/pages/app/[package].channel.[channel].statistics.vue': {
+      routes:
+        | '/app/[package].channel.[channel].statistics'
+      views:
+        | never
+    }
     'src/pages/app/[package].channels.vue': {
       routes:
         | '/app/[package].channels'
@@ -699,12 +692,6 @@ declare module 'vue-router/auto-routes' {
     'src/pages/login.vue': {
       routes:
         | '/login'
-      views:
-        | never
-    }
-    'src/pages/onboarding/confirm_email.vue': {
-      routes:
-        | '/onboarding/confirm_email'
       views:
         | never
     }

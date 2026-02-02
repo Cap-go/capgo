@@ -477,7 +477,7 @@ watch([() => props.channelId, () => props.bundleId, () => props.appId], () => {
 </script>
 
 <template>
-  <Table
+  <DataTable
     :is-loading="loading"
     :search="search"
     :search-placeholder="t('search-by-name')"

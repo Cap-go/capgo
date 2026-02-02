@@ -15,6 +15,8 @@ export function formatLocalDate(date: Date | string | undefined | null): string 
   if (!date)
     return ''
   const d = typeof date === 'string' ? new Date(date) : date
+  if (Number.isNaN(d.getTime()))
+    return ''
   return d.toLocaleDateString(getAppLocale())
 }
 
@@ -25,7 +27,21 @@ export function formatLocalDateLong(date: Date | string | undefined | null): str
   if (!date)
     return ''
   const d = typeof date === 'string' ? new Date(date) : date
+  if (Number.isNaN(d.getTime()))
+    return ''
   return d.toLocaleDateString(getAppLocale(), { month: 'long', day: 'numeric' })
+}
+
+/**
+ * Format a date/time using the app's locale (e.g., "Dec 15, 2025, 3:45 PM" in English)
+ */
+export function formatLocalDateTime(date: Date | string | undefined | null): string {
+  if (!date)
+    return ''
+  const d = typeof date === 'string' ? new Date(date) : date
+  if (Number.isNaN(d.getTime()))
+    return ''
+  return d.toLocaleString(getAppLocale(), { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 export function formatDate(date: string | undefined) {
@@ -149,4 +165,38 @@ export function generateMonthDays(useBillingPeriod: boolean, cycleStart: Date, c
 
   // Billing period mode - use the actual billing cycle end date
   return getDayNumbers(cycleStart, cycleEnd)
+}
+
+/**
+ * Format a date as a relative time string (e.g., "2 hours ago", "3 days ago")
+ */
+export function formatDistanceToNow(date: Date | string | undefined | null): string {
+  if (!date)
+    return ''
+  const d = typeof date === 'string' ? new Date(date) : date
+  if (Number.isNaN(d.getTime()))
+    return ''
+
+  const now = new Date()
+  const diffInMs = now.getTime() - d.getTime()
+  const diffInSeconds = Math.floor(diffInMs / 1000)
+  const diffInMinutes = Math.floor(diffInSeconds / 60)
+  const diffInHours = Math.floor(diffInMinutes / 60)
+  const diffInDays = Math.floor(diffInHours / 24)
+
+  if (diffInSeconds < 60) {
+    return i18n.global.t('just-now')
+  }
+  else if (diffInMinutes < 60) {
+    return i18n.global.t('minutes-ago', { count: diffInMinutes })
+  }
+  else if (diffInHours < 24) {
+    return i18n.global.t('hours-ago', { count: diffInHours })
+  }
+  else if (diffInDays < 30) {
+    return i18n.global.t('days-ago', { count: diffInDays })
+  }
+  else {
+    return formatLocalDate(d)
+  }
 }

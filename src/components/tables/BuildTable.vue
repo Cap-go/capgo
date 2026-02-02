@@ -158,7 +158,10 @@ function showErrorDetails(errorMessage: string | null) {
   setTimeout(() => {
     const contentDiv = document.getElementById('dialog-v2-content')
     if (contentDiv) {
-      contentDiv.innerHTML = `<pre class="p-4 overflow-x-auto font-mono text-sm break-words whitespace-pre-wrap bg-gray-100 rounded-md dark:bg-gray-800">${errorMessage}</pre>`
+      const pre = document.createElement('pre')
+      pre.className = 'p-4 overflow-x-auto font-mono text-sm break-words whitespace-pre-wrap bg-gray-100 rounded-md dark:bg-gray-800'
+      pre.textContent = errorMessage
+      contentDiv.replaceChildren(pre)
     }
   }, 0)
 }
@@ -239,7 +242,7 @@ watch(showSteps, (newValue) => {
 <template>
   <div>
     <div v-if="!showSteps" class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
-      <Table
+      <DataTable
         v-model:filters="filters"
         v-model:search="search"
         v-model:current-page="currentPage"
@@ -292,7 +295,7 @@ watch(showSteps, (newValue) => {
             </p>
           </div>
         </template>
-      </Table>
+      </DataTable>
     </div>
 
     <StepsBuild v-else :onboarding="(totalAllBuilds ?? 0) === 0" :app-id="props.appId" @done="onboardingDone" @close-step="closeSteps()" />

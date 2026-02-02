@@ -929,6 +929,29 @@ export async function readStatsVersionSB(c: Context, app_id: string, period_star
   return (data ?? []) as unknown as VersionUsage[]
 }
 
+export async function readDeviceVersionCountsSB(c: Context, app_id: string, channelName?: string): Promise<Record<string, number>> {
+  let query = supabaseAdmin(c)
+    .from('devices')
+    .select('version_name')
+    .eq('app_id', app_id)
+
+  if (channelName) {
+    query = query.eq('default_channel', channelName)
+  }
+
+  const { data, error } = await query
+  if (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading device version counts', error })
+    return {}
+  }
+
+  return (data ?? []).reduce<Record<string, number>>((acc, row) => {
+    const version = row.version_name || 'unknown'
+    acc[version] = (acc[version] || 0) + 1
+    return acc
+  }, {})
+}
+
 export async function readStatsSB(c: Context, params: ReadStatsParams) {
   const supabase = supabaseAdmin(c)
 

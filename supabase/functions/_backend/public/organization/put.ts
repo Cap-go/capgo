@@ -4,6 +4,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
+import { createSignedImageUrl, normalizeImagePath } from '../../utils/storage.ts'
 import { apikeyHasOrgRightWithPolicy, supabaseApikey } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
@@ -58,7 +59,7 @@ function buildUpdateFields(body: z.infer<typeof bodySchema>) {
   if (body.name !== undefined)
     updateFields.name = body.name
   if (body.logo !== undefined)
-    updateFields.logo = body.logo
+    updateFields.logo = normalizeImagePath(body.logo) ?? body.logo
   if (body.management_email !== undefined)
     updateFields.management_email = body.management_email
   if (body.require_apikey_expiration !== undefined)
@@ -98,6 +99,10 @@ export async function put(c: Context<MiddlewareKeyVariables>, bodyRaw: any, apik
   validateMaxExpirationDays(body.max_apikey_expiration_days)
   const updateFields = buildUpdateFields(body)
   const dataOrg = await updateOrg(supabase, body.orgId, updateFields)
+  if (dataOrg.logo) {
+    const signedLogo = await createSignedImageUrl(c, dataOrg.logo)
+    dataOrg.logo = signedLogo ?? null
+  }
 
   return c.json({ status: 'Organization updated', id: dataOrg.id, data: dataOrg }, 200)
 }

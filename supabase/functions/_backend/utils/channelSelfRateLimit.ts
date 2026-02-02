@@ -18,6 +18,11 @@ interface RateLimitEntry {
   timestamp: number
 }
 
+export interface ChannelSelfRateLimitStatus {
+  limited: boolean
+  resetAt?: number
+}
+
 function buildOperationRateRequest(c: Context, appId: string, deviceId: string, operation: ChannelSelfOperation) {
   const helper = new CacheHelper(c)
   // Note: We don't check helper.available here because it's set asynchronously.
@@ -61,13 +66,13 @@ export async function isChannelSelfRateLimited(
   deviceId: string,
   operation: ChannelSelfOperation,
   channel?: string,
-): Promise<boolean> {
+): Promise<ChannelSelfRateLimitStatus> {
   // Check operation-level rate limit (1 request per second per device+app+operation)
   const opRateEntry = buildOperationRateRequest(c, appId, deviceId, operation)
   const cached = await opRateEntry.helper.matchJson<RateLimitEntry>(opRateEntry.request)
   if (cached) {
     // Device has made the same operation within the last second - rate limit
-    return true
+    return { limited: true, resetAt: cached.timestamp + OP_RATE_TTL_SECONDS * 1000 }
   }
 
   // For 'set' operation: also check same-set rate limit (same device+app+channel within 60 seconds)
@@ -76,11 +81,11 @@ export async function isChannelSelfRateLimited(
     const cachedSet = await sameSetEntry.helper.matchJson<RateLimitEntry>(sameSetEntry.request)
     if (cachedSet) {
       // Same exact set was done within the last 60 seconds - rate limit
-      return true
+      return { limited: true, resetAt: cachedSet.timestamp + SAME_SET_RATE_TTL_SECONDS * 1000 }
     }
   }
 
-  return false
+  return { limited: false }
 }
 
 /**

@@ -13,12 +13,13 @@ import IconInformation from '~icons/heroicons/information-circle'
 import IconSearch from '~icons/heroicons/magnifying-glass'
 import IconTrash from '~icons/heroicons/trash'
 import IconWrench from '~icons/heroicons/wrench'
-import Table from '~/components/Table.vue'
 import { checkPermissions } from '~/services/permissions'
+import { createSignedImageUrl } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { getRbacRoleI18nKey, useOrganizationStore } from '~/stores/organization'
+import { resolveInviteNewUserErrorMessage } from '~/utils/invites'
 import DeleteOrgDialog from './DeleteOrgDialog.vue'
 
 const { t } = useI18n()
@@ -122,6 +123,14 @@ async function checkRbacEnabled() {
 }
 
 const isInviteNewUserDialogOpen = ref(false)
+
+function resetInviteCaptcha() {
+  if (captchaElement.value) {
+    captchaElement.value.reset()
+  }
+  captchaToken.value = ''
+  updateInviteNewUserButton()
+}
 
 function updateInviteNewUserButton() {
   const buttons = dialogStore.dialogOptions?.buttons
@@ -278,23 +287,24 @@ async function reloadData() {
       }
 
       // Mapper les données RBAC vers le format attendu par la table
-      members.value = (rbacMembers || []).map((member: any) => {
+      members.value = await Promise.all((rbacMembers || []).map(async (member: any) => {
         const isInvite = member.is_invite === true
         const isTmp = member.is_tmp === true
         const orgUserId = member.org_user_id
         const hasOrgUserInvite = isInvite && !isTmp && orgUserId != null && orgUserId !== ''
+        const signedImage = member.image_url ? await createSignedImageUrl(member.image_url) : ''
 
         return {
           id: member.user_id,
           aid: hasOrgUserInvite ? Number(orgUserId) : -1,
           uid: member.user_id,
           email: member.email,
-          image_url: member.image_url ?? '',
+          image_url: signedImage || '',
           role: member.role_name,
           is_tmp: isTmp,
           is_invite: isInvite,
         }
-      })
+      }))
     }
     else {
       // Utiliser l'ancienne méthode pour les orgs sans RBAC
@@ -1031,9 +1041,7 @@ async function showInviteNewUserDialog(email: string, roleType: Database['public
   isInviteNewUserDialogOpen.value = true
 
   // Reset captcha if available
-  if (captchaElement.value) {
-    captchaElement.value.reset()
-  }
+  resetInviteCaptcha()
 
   dialogStore.openDialog({
     title: t('invite-new-user-dialog-header', 'Invite New User'),
@@ -1099,7 +1107,9 @@ async function handleInviteNewUserSubmit() {
 
     if (error) {
       console.error('Invitation failed:', error)
-      toast.error(t('invitation-failed', 'Invitation failed'))
+      const errorMessage = await resolveInviteNewUserErrorMessage(error, t)
+      toast.error(errorMessage ?? t('invitation-failed', 'Invitation failed'))
+      resetInviteCaptcha()
       return false
     }
 
@@ -1114,7 +1124,9 @@ async function handleInviteNewUserSubmit() {
   }
   catch (error) {
     console.error('Invitation failed:', error)
-    toast.error(t('invitation-failed', 'Invitation failed'))
+    const errorMessage = await resolveInviteNewUserErrorMessage(error, t)
+    toast.error(errorMessage ?? t('invitation-failed', 'Invitation failed'))
+    resetInviteCaptcha()
     return false
   }
   finally {
@@ -1131,7 +1143,7 @@ async function handleInviteNewUserSubmit() {
           {{ t('members') }}
         </h2>
       </div>
-      <div v-if="rbacSystemEnabled && useNewRbac" class="mb-4 d-alert d-alert-info gap-3 items-start">
+      <div v-if="rbacSystemEnabled && useNewRbac" class="items-start gap-3 mb-4 d-alert d-alert-info">
         <IconInformation class="w-6 h-6 text-sky-400 shrink-0" />
         <div class="text-sm text-slate-100">
           <p class="font-semibold">
@@ -1142,7 +1154,7 @@ async function handleInviteNewUserSubmit() {
           </p>
         </div>
       </div>
-      <Table
+      <DataTable
         v-model:columns="columns"
         v-model:current-page="currentPage"
         v-model:search="search"

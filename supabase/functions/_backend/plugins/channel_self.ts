@@ -28,6 +28,17 @@ const devicePlatformScheme = z.enum(['ios', 'android', 'electron'])
 const PLAN_MAU_ACTIONS: Array<'mau'> = ['mau']
 const PLAN_ERROR = 'Cannot set channel, upgrade plan to continue to update'
 
+function buildRateLimitInfo(resetAt?: number) {
+  if (typeof resetAt !== 'number' || !Number.isFinite(resetAt)) {
+    return {}
+  }
+  const retryAfterSeconds = Math.max(0, Math.ceil((resetAt! - Date.now()) / 1000))
+  return {
+    rateLimitResetAt: resetAt,
+    retryAfterSeconds,
+  }
+}
+
 export const jsonRequestSchema = z.looseObject({
   app_id: z.string({
     error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,
@@ -538,10 +549,10 @@ app.post('/', async (c) => {
   }
 
   // Rate limit: max 1 set per second per device+app, and same set max once per 60 seconds
-  const isRateLimited = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'set', bodyParsed.channel)
-  if (isRateLimited) {
+  const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'set', bodyParsed.channel)
+  if (rateLimitStatus.limited) {
     cloudlog({ requestId: c.get('requestId'), message: 'Channel self set rate limited', app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, channel: bodyParsed.channel })
-    return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyParsed.device_id })
+    return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, ...buildRateLimitInfo(rateLimitStatus.resetAt) })
   }
 
   // POST has writes, so always create PG client (even if using D1 for reads)
@@ -576,10 +587,10 @@ app.put('/', async (c) => {
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
 
   // Rate limit: max 1 get per second per device+app
-  const isRateLimited = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'get')
-  if (isRateLimited) {
+  const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'get')
+  if (rateLimitStatus.limited) {
     cloudlog({ requestId: c.get('requestId'), message: 'Channel self get rate limited', app_id: bodyParsed.app_id, device_id: bodyParsed.device_id })
-    return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyParsed.device_id })
+    return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, ...buildRateLimitInfo(rateLimitStatus.resetAt) })
   }
 
   const pgClient = getPgClient(c)
@@ -612,10 +623,10 @@ app.delete('/', async (c) => {
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
 
   // Rate limit: max 1 delete per second per device+app
-  const isRateLimited = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'delete')
-  if (isRateLimited) {
+  const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'delete')
+  if (rateLimitStatus.limited) {
     cloudlog({ requestId: c.get('requestId'), message: 'Channel self delete rate limited', app_id: bodyParsed.app_id, device_id: bodyParsed.device_id })
-    return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyParsed.device_id })
+    return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, ...buildRateLimitInfo(rateLimitStatus.resetAt) })
   }
 
   // DELETE has writes, so always create PG client (even if using D1 for reads)
@@ -650,10 +661,10 @@ app.get('/', async (c) => {
 
   // Rate limit: max 1 list per second per device+app (if device_id is provided)
   if (body.device_id) {
-    const isRateLimited = await isChannelSelfRateLimited(c, bodyParsed.app_id, body.device_id, 'list')
-    if (isRateLimited) {
+    const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, body.device_id, 'list')
+    if (rateLimitStatus.limited) {
       cloudlog({ requestId: c.get('requestId'), message: 'Channel self list rate limited', app_id: bodyParsed.app_id, device_id: body.device_id })
-      return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: body.device_id })
+      return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: body.device_id, ...buildRateLimitInfo(rateLimitStatus.resetAt) })
     }
   }
 

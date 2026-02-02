@@ -50,6 +50,10 @@ export const STRIPE_INFO_CUSTOMER_ID_2 = 'cus_Pa0f3M6UCQ8g5Q' // Customer ID for
 // Dedicated data for email preference tests (isolated to prevent interference)
 export const USER_ID_EMAIL_PREFS = '9f1a2b3c-4d5e-4f60-8a7b-1c2d3e4f5061'
 export const USER_EMAIL_EMAIL_PREFS = 'emailprefs@capgo.app'
+export const USER_ID_DELETE_USER_STALE = 'b7a1d9f4-7b8f-4e3c-8f2b-1a2b3c4d5e6f'
+export const USER_EMAIL_DELETE_USER_STALE = 'delete-user-stale@capgo.app'
+export const USER_ID_DELETE_USER_FRESH = 'c8b2e0f5-8c90-4f4d-9f3c-2b3c4d5e6f70'
+export const USER_EMAIL_DELETE_USER_FRESH = 'delete-user-fresh@capgo.app'
 export const ORG_ID_EMAIL_PREFS = 'aa1b2c3d-4e5f-4a60-9b7c-1d2e3f4a5061'
 export const STRIPE_CUSTOMER_ID_EMAIL_PREFS = 'cus_email_prefs_test_123'
 // Dedicated data for cron/queue tests (isolated per file)
@@ -98,7 +102,12 @@ export const APIKEY_ENCRYPTED = 'b8c9d0e1-f2a3-4b4c-9d5e-6f7a8b9c0d14'
 export const APP_NAME_ENCRYPTED = 'com.encrypted.app'
 export const STRIPE_CUSTOMER_ID_ENCRYPTED = 'cus_encrypted_test_123'
 export const USER_EMAIL = 'test@capgo.app'
+export const USER_PASSWORD = 'testtest'
+export const USER_PASSWORD_HASH = '$2a$10$0CErXxryZPucjJWq3O7qXeTJgN.tnNU5XCZy9pXKDWRi/aS9W7UFi'
 export const TEST_EMAIL = 'test@test.com'
+export const USER_ID_NONMEMBER = '11111111-1111-4111-8111-111111111110'
+export const USER_EMAIL_NONMEMBER = 'nonmember@capgo.app'
+export const USER_PASSWORD_NONMEMBER = 'testtest'
 export const PRODUCT_ID = 'prod_LQIregjtNduh4q'
 export const USER_ADMIN_EMAIL = 'admin@capgo.app'
 export const APP_NAME = 'com.demo'
@@ -407,9 +416,34 @@ export function getSupabaseClient(): SupabaseClient<Database> {
   if (!supabaseClient) {
     const supabaseUrl = env.SUPABASE_URL ?? ''
     const supabaseServiceKey = env.SUPABASE_SERVICE_KEY ?? ''
+    const supabaseFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
+      const maxRetries = 3
+      let lastError: unknown
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+          const response = await fetch(url, options)
+          if (response.status === 503 && attempt < maxRetries - 1) {
+            await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)))
+            continue
+          }
+          return response
+        }
+        catch (error) {
+          lastError = error
+          if (attempt < maxRetries - 1) {
+            await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)))
+            continue
+          }
+        }
+      }
+      throw lastError ?? new Error('Supabase fetch failed')
+    }
     supabaseClient = createClient<Database>(supabaseUrl, supabaseServiceKey, {
       db: {
         schema: 'public',
+      },
+      global: {
+        fetch: supabaseFetch,
       },
       auth: {
         persistSession: false,

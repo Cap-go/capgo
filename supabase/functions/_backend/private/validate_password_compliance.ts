@@ -1,4 +1,6 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
@@ -9,6 +11,13 @@ interface ValidatePasswordCompliance {
   email: string
   password: string
   org_id: string
+}
+
+type RpcClient = Pick<SupabaseClient<Database>, 'rpc'>
+
+interface OrgReadAccessResult {
+  allowed: boolean
+  error?: string
 }
 
 const bodySchema = z.object({
@@ -47,6 +56,24 @@ function passwordMeetsPolicy(password: string, policy: {
   }
 
   return { valid: errors.length === 0, errors }
+}
+
+export async function checkOrgReadAccess(
+  supabase: RpcClient,
+  orgId: string,
+  requestId: string,
+): Promise<OrgReadAccessResult> {
+  const { data, error } = await supabase.rpc('rbac_check_permission_no_password_policy', {
+    p_permission_key: 'org.read',
+    p_org_id: orgId,
+  })
+
+  if (error) {
+    cloudlog({ requestId, context: 'validate_password_compliance - org membership lookup failed', error: error.message })
+    return { allowed: false, error: error.message }
+  }
+
+  return { allowed: data === true }
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -108,14 +135,12 @@ app.post('/', async (c) => {
   // Use authenticated client for subsequent queries - RLS will enforce access
   const supabase = supabaseClient(c, `Bearer ${signInData.session.access_token}`)
 
-  // Verify user has access to this organization (RBAC + legacy compatible)
-  const { data: hasOrgAccess, error: accessError } = await supabase
-    .rpc('rbac_check_permission', {
-      p_permission_key: 'org.read',
-      p_org_id: body.org_id,
-    })
+  const orgAccess = await checkOrgReadAccess(supabase, body.org_id, c.get('requestId'))
+  if (orgAccess.error) {
+    return quickError(500, 'org_membership_lookup_failed', 'Failed to verify organization membership', { error: orgAccess.error })
+  }
 
-  if (accessError || !hasOrgAccess) {
+  if (!orgAccess.allowed) {
     return quickError(403, 'not_member', 'You are not a member of this organization')
   }
 

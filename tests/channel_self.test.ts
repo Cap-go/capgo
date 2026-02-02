@@ -49,6 +49,28 @@ async function getResponseErrorCode(response: Response) {
   return json.error
 }
 
+type Awaitable<T> = T | PromiseLike<T>
+
+async function withSupabaseRetry<T extends { error?: { message?: string } | null }>(
+  fn: () => Awaitable<T>,
+  retries = 3,
+  delayMs = 200,
+): Promise<T> {
+  let lastResult: T | null = null
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const result = await Promise.resolve(fn())
+    lastResult = result
+    const message = result.error?.message ?? ''
+    if (!message.includes('fetch failed')) {
+      return result
+    }
+    if (attempt < retries - 1) {
+      await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)))
+    }
+  }
+  return lastResult as T
+}
+
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
 })
@@ -702,7 +724,8 @@ it('[POST] /channel_self with default channel', async () => {
   await resetAndSeedAppData(APPNAME)
 
   const data = getBaseData(APPNAME)
-  data.device_id = randomUUID().toLowerCase()
+  const deviceId = randomUUID().toLowerCase()
+  data.device_id = deviceId
 
   const { error: channelUpdateError, data: noAccessData } = await getSupabaseClient()
     .from('channels')
@@ -754,7 +777,8 @@ it('[PUT] /channel_self (no overwrite)', async () => {
   await resetAndSeedAppData(APPNAME)
 
   const data = getBaseData(APPNAME)
-  data.device_id = randomUUID().toLowerCase()
+  const deviceId = randomUUID().toLowerCase()
+  data.device_id = deviceId
 
   const response = await fetchEndpoint('PUT', data)
   expect(response.ok).toBe(true)
@@ -826,22 +850,38 @@ it('[PUT] /channel_self (with overwrite)', async () => {
   await resetAndSeedAppData(APPNAME)
 
   const data = getBaseData(APPNAME)
-  data.device_id = randomUUID().toLowerCase()
+  const deviceId = randomUUID().toLowerCase()
+  data.device_id = deviceId
 
-  const { data: noAccessChannel, error: noAccessChannelError } = await getSupabaseClient().from('channels').select('id, owner_org').eq('name', 'no_access').eq('app_id', APPNAME).single()
+  const { data: noAccessChannel, error: noAccessChannelError } = await withSupabaseRetry(() =>
+    getSupabaseClient()
+      .from('channels')
+      .select('id, owner_org')
+      .eq('name', 'no_access')
+      .eq('app_id', APPNAME)
+      .single(),
+  )
 
   expect(noAccessChannelError).toBeNull()
   expect(noAccessChannel).toBeTruthy()
 
-  const noAccessId = noAccessChannel!.id
-  const ownerOrg = noAccessChannel!.owner_org
+  if (!noAccessChannel?.owner_org) {
+    throw new Error('no_access channel not found or missing owner_org')
+  }
 
-  const { error } = await getSupabaseClient().from('channel_devices').upsert({
-    app_id: APPNAME,
-    channel_id: noAccessId,
-    device_id: data.device_id,
-    owner_org: ownerOrg,
-  }, { onConflict: 'device_id, app_id' })
+  const noAccessId = noAccessChannel.id
+  const ownerOrg = noAccessChannel.owner_org
+
+  const { error } = await withSupabaseRetry(() =>
+    getSupabaseClient()
+      .from('channel_devices')
+      .upsert({
+        app_id: APPNAME,
+        channel_id: noAccessId,
+        device_id: deviceId,
+        owner_org: ownerOrg,
+      }, { onConflict: 'device_id, app_id' }),
+  )
 
   expect(error).toBeNull()
 
@@ -860,7 +900,16 @@ it('[PUT] /channel_self (with overwrite)', async () => {
     expect(channel).toBe('no_access')
   }
   finally {
-    const { error } = await getSupabaseClient().from('channel_devices').delete().eq('device_id', data.device_id).eq('app_id', APPNAME).eq('owner_org', ownerOrg).eq('channel_id', noAccessId).single()
+    const { error } = await withSupabaseRetry(() =>
+      getSupabaseClient()
+        .from('channel_devices')
+        .delete()
+        .eq('device_id', deviceId)
+        .eq('app_id', APPNAME)
+        .eq('owner_org', ownerOrg)
+        .eq('channel_id', noAccessId)
+        .single(),
+    )
 
     expect(error).toBeNull()
   }
@@ -1230,7 +1279,7 @@ describe('[DELETE] /channel_self - new plugin version (>= 7.34.0) behavior', () 
       })
 
     // Verify the old entry exists
-    let { data: beforeDelete } = await getSupabaseClient()
+    const { data: beforeDelete } = await getSupabaseClient()
       .from('channel_devices')
       .select('*')
       .eq('device_id', deviceId)

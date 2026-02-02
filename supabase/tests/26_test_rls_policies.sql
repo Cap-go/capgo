@@ -359,7 +359,6 @@ SELECT
         'storage',
         'objects',
         ARRAY[
-            'All all users to act',
             'Allow user or apikey to delete they own folder in apps',
             'Allow user or apikey to delete they own folder in images',
             'Allow user or apikey to insert they own folder in apps',

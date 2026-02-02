@@ -4,6 +4,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
+import { createSignedImageUrl } from '../../utils/storage.ts'
 import { apikeyHasOrgRightWithPolicy, supabaseApikey } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
 
@@ -106,9 +107,24 @@ export async function get(c: Context<MiddlewareKeyVariables>, bodyRaw: any, apik
   if (body.orgId) {
     await ensureOrgAccess(c, apikey, body.orgId, supabase)
     const org = await fetchOrg(supabase, body.orgId)
+    if (org.logo) {
+      const signedLogo = await createSignedImageUrl(c, org.logo)
+      org.logo = signedLogo ?? null
+    }
+
     return c.json(org)
   }
 
   const orgs = await fetchOrgs(supabase, body.page)
-  return c.json(orgs)
+  const signedOrgs = await Promise.all(orgs.map(async (org) => {
+    if (!org.logo)
+      return org
+    const signedLogo = await createSignedImageUrl(c, org.logo)
+    return {
+      ...org,
+      logo: signedLogo ?? null,
+    }
+  }))
+
+  return c.json(signedOrgs)
 }

@@ -3,6 +3,7 @@ import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
+import { createSignedImageUrl, normalizeImagePath } from '../../utils/storage.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
 import { isValidAppId } from '../../utils/utils.ts'
 
@@ -32,11 +33,12 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
     throw quickError(400, 'retention_to_small', 'Retention cannot be smaller than 0', { retention: body.retention })
   }
 
+  const normalizedIcon = normalizeImagePath(body.icon)
   const { data, error: dbError } = await supabaseApikey(c, apikey.key)
     .from('apps')
     .update({
       name: body.name,
-      icon_url: body.icon,
+      icon_url: normalizedIcon ?? body.icon,
       retention: body.retention,
       expose_metadata: body.expose_metadata,
     })
@@ -46,6 +48,11 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
 
   if (dbError || !data) {
     throw simpleError('cannot_update_app', 'Cannot update app', { supabaseError: dbError })
+  }
+
+  if (data.icon_url) {
+    const signedIcon = await createSignedImageUrl(c, data.icon_url)
+    data.icon_url = signedIcon ?? ''
   }
 
   return c.json(data)

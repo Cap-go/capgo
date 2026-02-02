@@ -421,6 +421,7 @@ SELECT
 
 -- Test 20: In org with both policies, user needs both 2FA and compliant password
 -- Compliant password user without 2FA should have password_has_access=true but 2fa_has_access=false
+-- Org is visible but with redacted fields due to missing 2FA
 SELECT
     is(
         (
@@ -431,11 +432,12 @@ SELECT
                 )
             WHERE gid = current_setting('test.org_with_both_policies_v7')::uuid
         ),
-        NULL::boolean,
-        'get_orgs_v7 test - compliant password user without 2FA does not see org with both policies'
+        true,
+        'get_orgs_v7 test - compliant password user without 2FA sees org with password_has_access=true'
     );
 
 -- Test 21: Compliant password user without 2FA should have 2fa_has_access=false
+-- Org is visible but fields are redacted due to missing 2FA
 SELECT
     is(
         (
@@ -446,11 +448,12 @@ SELECT
                 )
             WHERE gid = current_setting('test.org_with_both_policies_v7')::uuid
         ),
-        NULL::boolean,
-        'get_orgs_v7 test - compliant password user without 2FA does not see 2fa_has_access in org with both policies'
+        false,
+        'get_orgs_v7 test - compliant password user without 2FA has 2fa_has_access=false in org with both policies'
     );
 
 -- Test 22: Non-compliant user should have password_has_access=false in org with both policies
+-- Org is visible but fields are redacted due to missing 2FA and non-compliant password
 SELECT
     is(
         (
@@ -461,8 +464,8 @@ SELECT
                 )
             WHERE gid = current_setting('test.org_with_both_policies_v7')::uuid
         ),
-        NULL::boolean,
-        'get_orgs_v7 test - non-compliant user without 2FA does not see org with both policies'
+        false,
+        'get_orgs_v7 test - non-compliant user without 2FA has password_has_access=false in org with both policies'
     );
 
 -- ============================================================================

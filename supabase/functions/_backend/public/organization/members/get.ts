@@ -5,6 +5,7 @@ import { z } from 'zod/mini'
 import { simpleError } from '../../../utils/hono.ts'
 import { cloudlog } from '../../../utils/logging.ts'
 import { checkPermission } from '../../../utils/rbac.ts'
+import { createSignedImageUrl } from '../../../utils/storage.ts'
 import { supabaseApikey } from '../../../utils/supabase.ts'
 
 const bodySchema = z.object({
@@ -59,6 +60,16 @@ export async function get(c: Context<MiddlewareKeyVariables>, bodyRaw: any, apik
   if (!parsed.success) {
     throw simpleError('cannot_parse_members', 'Cannot parse members', { error: parsed.error })
   }
-  cloudlog({ requestId: c.get('requestId'), message: 'Members', data: parsed.data })
-  return c.json(parsed.data)
+  const signedMembers = await Promise.all(parsed.data.map(async (member) => {
+    if (!member.image_url)
+      return member
+    const signedImage = await createSignedImageUrl(c, member.image_url)
+    return {
+      ...member,
+      image_url: signedImage ?? '',
+    }
+  }))
+
+  cloudlog({ requestId: c.get('requestId'), message: 'Members', data: signedMembers })
+  return c.json(signedMembers)
 }
