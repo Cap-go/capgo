@@ -2765,7 +2765,7 @@ export type Database = {
           name: string
         }[]
       }
-      get_account_removal_date: { Args: { user_id: string }; Returns: string }
+      get_account_removal_date: { Args: never; Returns: string }
       get_apikey: { Args: never; Returns: string }
       get_apikey_header: { Args: never; Returns: string }
       get_app_access_rbac: {
