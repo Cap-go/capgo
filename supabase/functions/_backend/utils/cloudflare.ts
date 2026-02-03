@@ -277,7 +277,13 @@ async function runQueryToCFA<T>(c: Context, query: string) {
     'Accept-Encoding': 'gzip, zlib, deflate, zstd, br',
     'User-Agent': 'Capgo/1.0',
   }
-  cloudlog({ requestId: c.get('requestId'), message: 'runQueryToCFA payload', headers, query })
+  const requestId = c.get('requestId')
+  cloudlog({
+    requestId,
+    message: 'runQueryToCFA payload',
+    queryLength: query.length,
+    headerNames: Object.keys(headers),
+  })
 
   try {
     const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/analytics_engine/sql`, {
