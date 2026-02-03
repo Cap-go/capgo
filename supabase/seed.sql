@@ -29,8 +29,6 @@ DECLARE
     demo_top_up_grant_id uuid;
     admin_bandwidth_overage_id uuid;
     demo_mau_overage_id uuid;
-    v_org RECORD;
-    v_migration_result text;
 BEGIN
     -- Suppress cascade notices during truncation
     SET LOCAL client_min_messages = WARNING;
@@ -291,6 +289,8 @@ BEGIN
     ('e4f5a6b7-c8d9-4ea0-9f1a-2b3c4d5e6f70', '6aa76066-55ef-4238-ade6-0b32334a4097', NOW(), NOW(), '', 'Overage Test Org', 'test@capgo.app', 'cus_overage_test_123'),
     ('e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a82', '6aa76066-55ef-4238-ade6-0b32334a4097', NOW(), NOW(), '', 'Private Error Test Org', 'test@capgo.app', NULL);
     ALTER TABLE public.orgs ENABLE TRIGGER generate_org_user_stripe_info_on_org_create;
+
+    UPDATE public.orgs SET use_new_rbac = true WHERE id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8';
 
     INSERT INTO public.usage_credit_grants (
       org_id,
