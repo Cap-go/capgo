@@ -11,7 +11,6 @@ import {
   getCurrentPlanNameOrg,
   getPlanUsageAndFit,
   getTotalStats,
-  isGoodPlanOrg,
   isOnboardedOrg,
   isOnboardingNeeded,
   isTrialOrg,
