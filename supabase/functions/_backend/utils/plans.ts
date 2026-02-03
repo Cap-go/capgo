@@ -9,7 +9,7 @@ import { sendNotifToOrgMembers } from './org_email_notifications.ts'
 import { syncSubscriptionData } from './stripe.ts'
 import {
   getCurrentPlanNameOrg,
-  getPlanUsagePercent,
+  getPlanUsageAndFit,
   getTotalStats,
   isGoodPlanOrg,
   isOnboardedOrg,
@@ -370,8 +370,9 @@ export async function handleTrialOrg(c: Context, orgId: string, org: any): Promi
 
 // Calculate plan status and usage
 export async function calculatePlanStatus(c: Context, orgId: string) {
-  const is_good_plan = await isGoodPlanOrg(c, orgId)
-  const percentUsage = await getPlanUsagePercent(c, orgId)
+  const planUsage = await getPlanUsageAndFit(c, orgId)
+  const { is_good_plan, total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent } = planUsage
+  const percentUsage = { total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent }
   return { is_good_plan, percentUsage }
 }
 
