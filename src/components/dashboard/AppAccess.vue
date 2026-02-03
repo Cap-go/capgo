@@ -9,6 +9,8 @@ import IconLock from '~icons/heroicons/lock-closed'
 import IconPlus from '~icons/heroicons/plus'
 import IconShield from '~icons/heroicons/shield-check'
 import IconTrash from '~icons/heroicons/trash'
+import IconWrench from '~icons/heroicons/wrench'
+import DataTable from '~/components/DataTable.vue'
 import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -18,7 +20,6 @@ interface Role {
   name: string
   scope_type: string
   description: string
-  family_name: string
   priority_rank: number
 }
 
@@ -113,6 +114,16 @@ const filteredBindings = computed(() => {
 const isAssignRoleFormValid = computed(() => {
   return assignRoleForm.value.principal_id !== ''
     && assignRoleForm.value.role_name !== ''
+})
+
+const isEditRoleModalOpen = ref(false)
+const editRoleBinding = ref<RoleBinding | null>(null)
+const editRoleName = ref('')
+const isEditingRole = ref(false)
+
+const editRoleDescription = computed(() => {
+  const role = availableAppRoles.value.find(r => r.name === editRoleName.value)
+  return role?.description ?? ''
 })
 
 async function fetchAppDetails() {
@@ -259,14 +270,17 @@ async function fetchAppRoleBindings() {
 
 async function fetchAvailableAppRoles() {
   try {
-    const { data, error } = await supabase.functions.invoke('private/roles/app', {
-      method: 'GET',
-    })
+    const { data, error } = await supabase
+      .from('roles')
+      .select('id, name, scope_type, description, priority_rank')
+      .eq('scope_type', 'app')
+      .eq('is_assignable', true)
+      .order('priority_rank')
 
     if (error)
       throw error
 
-    availableAppRoles.value = data || []
+    availableAppRoles.value = (data || []) as Role[]
   }
   catch (error: any) {
     console.error('Error fetching app roles:', error)
@@ -328,6 +342,12 @@ function openAssignRoleModal() {
   isAssignRoleModalOpen.value = true
 }
 
+function openEditRoleModal(binding: RoleBinding) {
+  editRoleBinding.value = binding
+  editRoleName.value = binding.role_name
+  isEditRoleModalOpen.value = true
+}
+
 async function assignRole() {
   if (!isAssignRoleFormValid.value || !ownerOrg.value || !props.appId)
     return
@@ -366,6 +386,53 @@ async function assignRole() {
   }
   finally {
     isLoading.value = false
+  }
+}
+
+async function updateRoleBinding() {
+  if (!editRoleBinding.value || !editRoleName.value) {
+    toast.error(t('please-select-permission'))
+    return
+  }
+
+  if (editRoleName.value === editRoleBinding.value.role_name) {
+    isEditRoleModalOpen.value = false
+    return
+  }
+
+  isEditingRole.value = true
+  try {
+    const { data: roleData, error: roleError } = await supabase
+      .from('roles')
+      .select('id')
+      .eq('name', editRoleName.value)
+      .single()
+
+    if (roleError || !roleData) {
+      console.error('Error fetching role UUID:', roleError)
+      throw new Error('Role not found')
+    }
+
+    const { error: updateError } = await supabase
+      .from('role_bindings')
+      .update({
+        role_id: roleData.id,
+      })
+      .eq('id', editRoleBinding.value.id)
+
+    if (updateError)
+      throw updateError
+
+    toast.success(t('permission-changed'))
+    isEditRoleModalOpen.value = false
+    await fetchAppRoleBindings()
+  }
+  catch (error: any) {
+    console.error('Error changing role:', error)
+    toast.error(t('error-assigning-role'))
+  }
+  finally {
+    isEditingRole.value = false
   }
 }
 
@@ -516,6 +583,14 @@ onMounted(async () => {
       <template #actions="{ row }">
         <button
           v-if="canAssignRoles"
+          class="d-btn d-btn-sm d-btn-ghost"
+          :title="t('edit-role', 'Edit role')"
+          @click="openEditRoleModal(row)"
+        >
+          <IconWrench class="size-4" />
+        </button>
+        <button
+          v-if="canAssignRoles"
           class="d-btn d-btn-sm d-btn-ghost text-error"
           :title="t('remove')"
           @click="removeRoleBinding(row.id)"
@@ -578,7 +653,7 @@ onMounted(async () => {
               {{ t('select-role') }}
             </option>
             <option v-for="role in availableAppRoles" :key="role.id" :value="role.name">
-              {{ role.name }} - {{ role.description }}
+              {{ role.description }}
             </option>
           </select>
           <label class="label">
@@ -615,6 +690,48 @@ onMounted(async () => {
         </div>
       </div>
       <div class="modal-backdrop" @click="isAssignRoleModalOpen = false" />
+    </dialog>
+
+    <!-- Edit Role Modal -->
+    <dialog :open="isEditRoleModalOpen" class="modal" @close="isEditRoleModalOpen = false">
+      <div class="modal-box max-w-2xl">
+        <h3 class="text-lg font-bold">
+          {{ t('select-app-role') }}
+        </h3>
+
+        <div class="form-control mt-4">
+          <label class="label">
+            <span class="label-text">{{ t('select-app-role') }}</span>
+          </label>
+          <select v-model="editRoleName" class="d-select" required>
+            <option value="">
+              {{ t('select-role') }}
+            </option>
+            <option v-for="role in availableAppRoles" :key="role.id" :value="role.name">
+              {{ role.description }}
+            </option>
+          </select>
+          <label v-if="editRoleDescription" class="label">
+            <span class="label-text-alt text-gray-500">
+              {{ editRoleDescription }}
+            </span>
+          </label>
+        </div>
+
+        <div class="modal-action">
+          <button class="d-btn" @click="isEditRoleModalOpen = false">
+            {{ t('cancel') }}
+          </button>
+          <button
+            class="d-btn d-btn-primary"
+            :disabled="!editRoleName || isEditingRole"
+            @click="updateRoleBinding"
+          >
+            {{ t('button-confirm') }}
+          </button>
+        </div>
+      </div>
+      <div class="modal-backdrop" @click="isEditRoleModalOpen = false" />
     </dialog>
   </div>
 </template>

@@ -29,6 +29,8 @@ DECLARE
     demo_top_up_grant_id uuid;
     admin_bandwidth_overage_id uuid;
     demo_mau_overage_id uuid;
+    v_org RECORD;
+    v_migration_result text;
 BEGIN
     -- Suppress cascade notices during truncation
     SET LOCAL client_min_messages = WARNING;
@@ -1155,13 +1157,11 @@ BEGIN
     WHERE r.name = public.rbac_role_org_billing_admin()
     ON CONFLICT DO NOTHING;
 
-    -- org_member: read-only access
+    -- org_member: org-only access (no app permissions)
     INSERT INTO public.role_permissions (role_id, permission_id)
     SELECT r.id, p.id FROM public.roles r
     JOIN public.permissions p ON p.key IN (
-      public.rbac_perm_org_read(), public.rbac_perm_org_read_members(),
-      public.rbac_perm_app_read(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_read_devices(), public.rbac_perm_app_read_audit(),
-      public.rbac_perm_channel_read(), public.rbac_perm_channel_read_history(), public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
+      public.rbac_perm_org_read(), public.rbac_perm_org_read_members()
     )
     WHERE r.name = public.rbac_role_org_member()
     ON CONFLICT DO NOTHING;

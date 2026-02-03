@@ -11,6 +11,7 @@ import { toast } from 'vue-sonner'
 import VueTurnstile from 'vue-turnstile'
 import IconInformation from '~icons/heroicons/information-circle'
 import IconSearch from '~icons/heroicons/magnifying-glass'
+import IconShield from '~icons/heroicons/shield-check'
 import IconTrash from '~icons/heroicons/trash'
 import IconWrench from '~icons/heroicons/wrench'
 import { checkPermissions } from '~/services/permissions'
@@ -41,6 +42,38 @@ const useNewRbac = ref(false)
 
 type OrganizationMemberRow = ExtendedOrganizationMember & { is_invite?: boolean }
 type OrganizationMemberRows = OrganizationMemberRow[]
+
+interface Role {
+  id: string
+  name: string
+  scope_type: string
+  description: string
+  priority_rank: number
+}
+
+interface OrgApp {
+  id: string
+  app_id: string
+  name: string | null
+}
+
+interface RoleBinding {
+  id: string
+  principal_type: string
+  principal_id: string
+  role_id: string
+  role_name: string
+  role_description: string
+  scope_type: string
+  org_id: string
+  app_id: string | null
+  channel_id: string | null
+  granted_at: string
+  granted_by: string
+  expires_at: string | null
+  reason: string | null
+  is_direct: boolean
+}
 
 // Permission modal state
 const selectedPermission = ref<Database['public']['Enums']['user_min_right'] | string | undefined>()
@@ -84,6 +117,16 @@ const isInviteFormValid = computed(() => {
 })
 
 const rbacSuperAdminRole = 'org_super_admin'
+const appAccessMember = ref<OrganizationMemberRow | null>(null)
+const appAccessSearch = ref('')
+const appAccessSelectedAppIds = ref<string[]>([])
+const appAccessSelectedRole = ref('')
+const appAccessApps = ref<OrgApp[]>([])
+const appAccessBindings = ref<RoleBinding[]>([])
+const availableAppRoles = ref<Role[]>([])
+const isAppAccessLoading = ref(false)
+const isAppAccessSubmitting = ref(false)
+const appAccessRoleTouched = ref(false)
 
 function isSuperAdminRole(role: string | undefined) {
   if (!role)
@@ -188,6 +231,89 @@ const permissionOptions = computed(() => {
   }
 })
 
+const filteredAppAccessApps = computed(() => {
+  if (!appAccessSearch.value)
+    return appAccessApps.value
+
+  const searchLower = appAccessSearch.value.toLowerCase()
+  return appAccessApps.value.filter((app) => {
+    const name = app.name || ''
+    return name.toLowerCase().includes(searchLower)
+      || app.app_id.toLowerCase().includes(searchLower)
+  })
+})
+
+const appAccessBindingByAppId = computed(() => {
+  const map = new Map<string, RoleBinding>()
+  for (const binding of appAccessBindings.value) {
+    if (binding.scope_type === 'app' && binding.app_id) {
+      map.set(binding.app_id, binding)
+    }
+  }
+  return map
+})
+
+function getInheritedAppAccessLabel(roleName?: string): string | null {
+  if (!roleName)
+    return null
+  const normalizedRole = roleName.replace(/^invite_/, '')
+  if (normalizedRole === 'org_billing_admin')
+    return t('app-access-none', 'No app access')
+  if (normalizedRole === 'org_member')
+    return t('app-access-none', 'No app access')
+  if (normalizedRole === 'org_admin')
+    return t('app-access-inherited', 'Inherited: {role}', { role: getRoleDisplayName('app_admin') })
+  if (normalizedRole === 'org_super_admin')
+    return t('app-access-inherited', 'Inherited: {role}', { role: getRoleDisplayName('app_admin') })
+  return null
+}
+
+function getAppAccessLabel(appId: string): string | null {
+  const binding = appAccessBindingByAppId.value.get(appId)
+  if (binding) {
+    return getRoleDisplayName(binding.role_name)
+  }
+  return getInheritedAppAccessLabel(appAccessMember.value?.role)
+}
+
+const selectedAppAccessBinding = computed(() => {
+  if (appAccessSelectedAppIds.value.length !== 1)
+    return undefined
+  const selectedId = appAccessSelectedAppIds.value[0]
+  return appAccessBindingByAppId.value.get(selectedId)
+})
+
+const selectedAppAccessApp = computed(() => {
+  if (appAccessSelectedAppIds.value.length !== 1)
+    return undefined
+  const selectedId = appAccessSelectedAppIds.value[0]
+  return appAccessApps.value.find(app => app.id === selectedId)
+})
+
+const selectedOrgRoleSummary = computed(() => {
+  if (!appAccessMember.value)
+    return ''
+
+  const normalizedRole = appAccessMember.value.role.replace(/^invite_/, '')
+
+  switch (normalizedRole) {
+    case 'org_super_admin':
+      return t('org-role-app-access-super-admin', 'Full access to all apps, including delete and role management.')
+    case 'org_admin':
+      return t('org-role-app-access-admin', 'Full app access is inherited at the org level.')
+    case 'org_member':
+      return t('org-role-app-access-member', 'No app access is granted at the org level.')
+    case 'org_billing_admin':
+      return t('org-role-app-access-billing', 'No app access (billing only).')
+    default:
+      return t('org-role-app-access-default', 'Org role access applies across all apps in this organization.')
+  }
+})
+
+const isAppAccessSelectionValid = computed(() => {
+  return appAccessSelectedAppIds.value.length > 0 && !!appAccessSelectedRole.value
+})
+
 const membersOptions = computed(() => {
   if (!searchUserForAdminDelegation.value) {
     return
@@ -255,6 +381,19 @@ columns.value = [
         visible: (member: OrganizationMemberRow) => canUpdateUserRoles.value && member.uid !== currentOrganization?.value?.created_by,
         onClick: (member: OrganizationMemberRow) => {
           changeMemberPermission(member)
+        },
+      },
+      {
+        icon: IconShield,
+        title: t('app-access-control'),
+        visible: (member: OrganizationMemberRow) => {
+          if (!useNewRbac.value || !canUpdateUserRoles.value || isInviteMember(member))
+            return false
+          const normalizedRole = member.role.replace(/^invite_/, '')
+          return !['org_super_admin', 'org_admin'].includes(normalizedRole)
+        },
+        onClick: (member: OrganizationMemberRow) => {
+          openAppAccessModal(member)
         },
       },
       {
@@ -327,6 +466,32 @@ watch([isInviteFormValid, isSubmittingInvite, isInviteNewUserDialogOpen], ([_val
     return
   updateInviteNewUserButton()
 }, { immediate: true })
+
+watch([isAppAccessSelectionValid, isAppAccessSubmitting], () => {
+  updateAppAccessSaveButton()
+})
+
+watch(appAccessSelectedAppIds, () => {
+  if (!appAccessRoleTouched.value) {
+    if (appAccessSelectedAppIds.value.length === 1) {
+      const existingBinding = selectedAppAccessBinding.value
+      appAccessSelectedRole.value = existingBinding?.role_name ?? ''
+    }
+    else if (appAccessSelectedAppIds.value.length > 1) {
+      const roles = appAccessSelectedAppIds.value
+        .map(id => appAccessBindingByAppId.value.get(id)?.role_name)
+        .filter(Boolean) as string[]
+      const firstRole = roles[0]
+      const allSame = roles.length === appAccessSelectedAppIds.value.length
+        && roles.every(role => role === firstRole)
+      appAccessSelectedRole.value = allSame ? firstRole : ''
+    }
+    else {
+      appAccessSelectedRole.value = ''
+    }
+  }
+  updateAppAccessSaveButton()
+}, { deep: true })
 
 onMounted(reloadData)
 
@@ -1069,6 +1234,233 @@ async function showInviteNewUserDialog(email: string, roleType: Database['public
   isInviteNewUserDialogOpen.value = false
 }
 
+function getRoleDisplayName(roleName?: string): string {
+  if (!roleName)
+    return t('none')
+  const normalizedRole = roleName.replace(/^invite_/, '')
+  const i18nKey = getRbacRoleI18nKey(normalizedRole)
+  return i18nKey ? t(i18nKey) : normalizedRole.replaceAll('_', ' ')
+}
+
+async function fetchAppAccessApps() {
+  if (!currentOrganization.value)
+    return
+  try {
+    const { data, error } = await supabase
+      .from('apps')
+      .select('id, app_id, name')
+      .eq('owner_org', currentOrganization.value.gid)
+
+    if (error)
+      throw error
+
+    appAccessApps.value = (data || []).filter(app => !!app.id) as OrgApp[]
+  }
+  catch (error) {
+    console.error('Error fetching apps:', error)
+    appAccessApps.value = []
+  }
+}
+
+async function fetchAvailableAppRoles() {
+  try {
+    const { data, error } = await supabase
+      .from('roles')
+      .select('id, name, scope_type, description, priority_rank')
+      .eq('scope_type', 'app')
+      .eq('is_assignable', true)
+      .order('priority_rank')
+
+    if (error)
+      throw error
+
+    availableAppRoles.value = (data || []) as Role[]
+  }
+  catch (error) {
+    console.error('Error fetching app roles:', error)
+    availableAppRoles.value = []
+  }
+}
+
+async function fetchMemberAppBindings(member: OrganizationMemberRow) {
+  if (!currentOrganization.value)
+    return
+  try {
+    const { data, error } = await supabase.functions.invoke(`private/role_bindings/${currentOrganization.value.gid}`, {
+      method: 'GET',
+    })
+
+    if (error)
+      throw error
+
+    appAccessBindings.value = (data || []).filter((binding: RoleBinding) => {
+      return binding.scope_type === 'app'
+        && binding.principal_type === 'user'
+        && binding.principal_id === member.uid
+    })
+
+    if (appAccessSelectedAppIds.value.length === 1 && !appAccessSelectedRole.value && !appAccessRoleTouched.value) {
+      const binding = appAccessBindings.value.find(b => b.app_id === appAccessSelectedAppIds.value[0])
+      if (binding)
+        appAccessSelectedRole.value = binding.role_name
+    }
+  }
+  catch (error) {
+    console.error('Error fetching role bindings:', error)
+    appAccessBindings.value = []
+  }
+}
+
+function updateAppAccessSaveButton() {
+  const buttons = dialogStore.dialogOptions?.buttons
+  if (!buttons)
+    return
+  const saveButton = buttons.find(b => b.id === 'app-access-save')
+  if (!saveButton)
+    return
+  saveButton.disabled = isAppAccessSubmitting.value || !isAppAccessSelectionValid.value
+}
+
+async function openAppAccessModal(member: OrganizationMemberRow) {
+  if (!currentOrganization.value || !useNewRbac.value) {
+    toast.error(t('no-permission'))
+    return
+  }
+
+  appAccessMember.value = member
+  appAccessSearch.value = ''
+  appAccessSelectedAppIds.value = []
+  appAccessSelectedRole.value = ''
+  appAccessRoleTouched.value = false
+
+  dialogStore.openDialog({
+    id: 'org-member-app-access',
+    title: t('app-access-control'),
+    description: t('app-access-control-description'),
+    size: 'xl',
+    preventAccidentalClose: true,
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('assign'),
+        id: 'app-access-save',
+        role: 'primary',
+        preventClose: true,
+        handler: handleAppAccessAssign,
+      },
+    ],
+  })
+
+  isAppAccessLoading.value = true
+  try {
+    await Promise.all([
+      fetchAppAccessApps(),
+      fetchAvailableAppRoles(),
+      fetchMemberAppBindings(member),
+    ])
+  }
+  finally {
+    isAppAccessLoading.value = false
+    updateAppAccessSaveButton()
+  }
+
+  await dialogStore.onDialogDismiss()
+  appAccessMember.value = null
+}
+
+async function handleAppAccessAssign() {
+  if (!appAccessMember.value || !currentOrganization.value) {
+    toast.error(t('no-permission'))
+    return false
+  }
+
+  if (appAccessSelectedAppIds.value.length === 0) {
+    toast.error(t('select-app', 'Select an app'))
+    return false
+  }
+
+  if (!appAccessSelectedRole.value) {
+    toast.error(t('please-select-permission'))
+    return false
+  }
+
+  isAppAccessSubmitting.value = true
+  updateAppAccessSaveButton()
+  try {
+    const { data: roleData, error: roleError } = await supabase
+      .from('roles')
+      .select('id')
+      .eq('name', appAccessSelectedRole.value)
+      .single()
+
+    if (roleError || !roleData)
+      throw roleError || new Error('Role not found')
+
+    const bindingMap = appAccessBindingByAppId.value
+    let createdCount = 0
+    let updatedCount = 0
+
+    for (const appId of appAccessSelectedAppIds.value) {
+      const existingBinding = bindingMap.get(appId)
+      if (existingBinding && existingBinding.role_name === appAccessSelectedRole.value) {
+        continue
+      }
+
+      if (existingBinding) {
+        const { error: updateError } = await supabase
+          .from('role_bindings')
+          .update({ role_id: roleData.id })
+          .eq('id', existingBinding.id)
+
+        if (updateError)
+          throw updateError
+
+        updatedCount += 1
+      }
+      else {
+        const { error } = await supabase.functions.invoke('private/role_bindings', {
+          method: 'POST',
+          body: {
+            principal_type: 'user',
+            principal_id: appAccessMember.value.uid,
+            role_name: appAccessSelectedRole.value,
+            scope_type: 'app',
+            org_id: currentOrganization.value.gid,
+            app_id: appId,
+            channel_id: null,
+          },
+        })
+
+        if (error)
+          throw error
+
+        createdCount += 1
+      }
+    }
+
+    if (updatedCount > 0) {
+      toast.success(t('permission-changed'))
+    }
+    else if (createdCount > 0) {
+      toast.success(t('role-assigned'))
+    }
+    await fetchMemberAppBindings(appAccessMember.value)
+    return true
+  }
+  catch (error: any) {
+    console.error('Error assigning app role:', error)
+    toast.error(t('error-assigning-role'))
+    return false
+  }
+  finally {
+    isAppAccessSubmitting.value = false
+    updateAppAccessSaveButton()
+  }
+}
+
 async function handleInviteNewUserSubmit() {
   if (isSubmittingInvite.value)
     return false
@@ -1294,6 +1686,125 @@ async function handleInviteNewUserSubmit() {
               </label>
             </div>
           </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Teleport for app access modal -->
+    <Teleport
+      v-if="dialogStore.showDialog && dialogStore.dialogOptions?.id === 'org-member-app-access'"
+      defer
+      to="#dialog-v2-content"
+    >
+      <div class="w-full">
+        <div class="max-h-[75vh] overflow-hidden">
+          <div class="grid h-full gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <div>
+            <div class="relative">
+              <input
+                v-model="appAccessSearch"
+                type="text"
+                :placeholder="t('search-apps', 'Search apps')"
+                :disabled="isAppAccessLoading"
+                class="w-full pl-10 d-input"
+              >
+              <IconSearch class="absolute w-4 h-4 text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
+            </div>
+            <div class="mt-3 overflow-hidden border rounded-lg dark:border-gray-600">
+              <div v-if="isAppAccessLoading" class="p-4 text-sm text-gray-500">
+                {{ t('loading') }}
+              </div>
+              <div v-else-if="filteredAppAccessApps.length" class="max-h-[55vh] space-y-2 overflow-y-auto p-3">
+                <label
+                  v-for="app in filteredAppAccessApps"
+                  :key="app.id"
+                  class="flex items-start gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                  :class="{ 'bg-gray-50 dark:bg-gray-800': appAccessSelectedAppIds.includes(app.id) }"
+                >
+                  <input
+                    v-model="appAccessSelectedAppIds"
+                    type="checkbox"
+                    name="app-access-app"
+                    :value="app.id"
+                    class="mt-1 checkbox checkbox-primary"
+                  >
+                  <div class="flex flex-col">
+                    <span class="text-sm font-medium">
+                      {{ app.name || app.app_id }}
+                    </span>
+                    <span class="text-xs text-gray-500">
+                      {{ app.app_id }}
+                    </span>
+                    <span v-if="getAppAccessLabel(app.id)" class="text-xs text-primary">
+                      {{ getAppAccessLabel(app.id) }}
+                    </span>
+                  </div>
+                </label>
+              </div>
+              <div v-else class="p-4 text-sm text-gray-500">
+                {{ t('no-results') }}
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="mb-4">
+              <div class="text-xs uppercase text-gray-500">
+                {{ t('organization') }} · {{ t('role') }}
+              </div>
+              <div class="text-sm font-medium">
+                {{ getRoleDisplayName(appAccessMember?.role) }}
+              </div>
+              <p class="text-xs text-gray-500">
+                {{ selectedOrgRoleSummary }}
+              </p>
+            </div>
+
+            <div class="mb-4">
+              <div class="text-xs uppercase text-gray-500">
+                {{ t('app') }} · {{ t('role') }}
+              </div>
+              <div class="text-sm font-medium">
+                <span v-if="appAccessSelectedAppIds.length === 1">
+                  {{ selectedAppAccessBinding ? getRoleDisplayName(selectedAppAccessBinding.role_name) : t('none') }}
+                </span>
+                <span v-else-if="appAccessSelectedAppIds.length > 1">
+                  {{ t('selected-apps', 'Selected apps') }}: {{ appAccessSelectedAppIds.length }}
+                </span>
+                <span v-else>
+                  {{ t('none') }}
+                </span>
+              </div>
+              <div v-if="selectedAppAccessApp" class="text-xs text-gray-500">
+                {{ selectedAppAccessApp.name || selectedAppAccessApp.app_id }}
+              </div>
+            </div>
+
+            <div class="form-control">
+              <label class="label">
+                <span class="label-text">{{ t('select-app-role') }}</span>
+              </label>
+              <select
+                v-model="appAccessSelectedRole"
+                class="d-select"
+                :disabled="appAccessSelectedAppIds.length === 0 || isAppAccessLoading"
+                @change="appAccessRoleTouched = true"
+              >
+                <option value="">
+                  {{ t('select-role') }}
+                </option>
+                <option v-for="role in availableAppRoles" :key="role.id" :value="role.name">
+                  {{ getRoleDisplayName(role.name) }} - {{ role.description }}
+                </option>
+              </select>
+              <label class="label">
+                <span class="label-text-alt text-gray-500">
+                  {{ t('app-role-hint') }}
+                </span>
+              </label>
+            </div>
+          </div>
+        </div>
         </div>
       </div>
     </Teleport>
