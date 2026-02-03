@@ -193,7 +193,7 @@ export function getPgClient(c: Context, readOnly = false) {
   const requestId = c.get('requestId')
   const appName = c.res.headers.get('X-Worker-Source') ?? 'unknown source'
   const dbName = c.res.headers.get('X-Database-Source') ?? 'unknown source'
-  cloudlog({ requestId, message: 'SUPABASE_DB_URL', dbUrl, dbName, appName })
+  cloudlog({ requestId, message: 'SUPABASE_DB_URL selected', dbName, appName, readOnly })
 
   const isPooler = dbName.startsWith('sb_pooler')
   const options = {
