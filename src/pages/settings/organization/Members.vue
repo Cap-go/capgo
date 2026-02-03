@@ -264,9 +264,9 @@ function getInheritedAppAccessLabel(roleName?: string): string | null {
   if (normalizedRole === 'org_member')
     return t('app-access-none', 'No app access')
   if (normalizedRole === 'org_admin')
-    return t('app-access-inherited', 'Inherited: {role}', { role: getRoleDisplayName('app_admin') })
+    return t('app-access-inherited', { role: getRoleDisplayName('app_admin') })
   if (normalizedRole === 'org_super_admin')
-    return t('app-access-inherited', 'Inherited: {role}', { role: getRoleDisplayName('app_admin') })
+    return t('app-access-inherited', { role: getRoleDisplayName('app_admin') })
   return null
 }
 
