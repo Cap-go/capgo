@@ -430,7 +430,15 @@ export async function checkPlanStatusOnly(c: Context, orgId: string, drizzleClie
   }
 
   // Calculate plan status and usage
-  const { is_good_plan, percentUsage } = await calculatePlanStatus(c, orgId)
+  let planStatus: { is_good_plan: boolean, percentUsage: PlanUsage }
+  try {
+    planStatus = await calculatePlanStatus(c, orgId)
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'calculatePlanStatus failed', orgId, error })
+    return
+  }
+  const { is_good_plan, percentUsage } = planStatus
 
   // Update plan status in database
   const finalIsGoodPlan = await handleOrgNotificationsAndEvents(c, org, orgId, is_good_plan, percentUsage, drizzleClient)
