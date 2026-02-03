@@ -86,6 +86,9 @@ async function main() {
 
   for (const chunk of chunks) {
     for (const row of chunk) {
+      if (row.app_id.startsWith('com.capdemo')) {
+        continue
+      }
       const { error: deleteError } = await supabase
         .from('manifest')
         .delete()

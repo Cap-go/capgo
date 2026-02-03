@@ -112,6 +112,7 @@ async function main() {
 
     for (const row of data ?? []) {
       if (row.deleted) continue
+      if (row.app_id.startsWith('com.capdemo')) continue
       const manifestCount = row.manifest_count ?? 0
       if (manifestCount > 0) {
         candidates.push({
