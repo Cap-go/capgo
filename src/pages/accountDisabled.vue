@@ -28,7 +28,7 @@ onMounted(async () => {
   try {
     if (main.auth?.id) {
       const { data: removalDateStr, error: dateError } = await supabase
-        .rpc('get_account_removal_date', { user_id: main.auth.id })
+        .rpc('get_account_removal_date')
 
       if (dateError) {
         console.error('Error fetching removal date:', dateError)
