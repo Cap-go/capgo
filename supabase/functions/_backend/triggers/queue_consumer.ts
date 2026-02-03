@@ -11,6 +11,7 @@ import { backgroundTask, getEnv } from '../utils/utils.ts'
 
 // Define constants
 const DEFAULT_BATCH_SIZE = 950 // Default batch size for queue reads limit of CF is 1000 fetches so we take a safe margin
+const DISCORD_IGNORED_ERROR_CODES = new Set(['version_not_found', 'no_channel'])
 
 // Zod schema for a message object
 export const messageSchema = z.object({
@@ -68,9 +69,11 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
     const body = message.message?.payload ?? {}
     const cfId = generateUUID()
     const httpResponse = await http_post_helper(c, function_name, function_type, body, cfId)
+    const errorCode = await extractErrorCode(httpResponse)
 
     return {
       httpResponse,
+      errorCode,
       cfId,
       ...message,
     }
@@ -109,70 +112,78 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
       read_count: msg.read_ct,
       status: msg.httpResponse.status,
       status_text: msg.httpResponse.statusText,
+      error_code: msg.errorCode ?? undefined,
       payload_size: msg.message?.payload ? JSON.stringify(msg.message.payload).length : 0,
       cf_id: msg.cfId,
     }))
 
-    const groupedByFunction = failureDetails.reduce((acc, detail) => {
+    const actionableFailures = failureDetails.filter(detail => !detail.error_code || !DISCORD_IGNORED_ERROR_CODES.has(detail.error_code))
+
+    const groupedByFunction = actionableFailures.reduce((acc, detail) => {
       const key = detail.function_name
       acc[key] ??= []
       acc[key].push(detail)
       return acc
-    }, {} as Record<string, typeof failureDetails>)
+    }, {} as Record<string, typeof actionableFailures>)
 
-    await sendDiscordAlert(c, {
-      content: `🚨 **Queue Processing Failures** - ${queueName}`,
-      embeds: [
-        {
-          title: `❌ ${messagesFailed.length} Messages Failed Processing`,
-          description: `**Queue:** ${queueName}\n**Failed Functions:** ${Object.keys(groupedByFunction).length}\n**Total Failures:** ${messagesFailed.length}`,
-          color: 0xFF6B35, // Orange color for warnings
-          timestamp,
-          fields: [
-            {
-              name: '📊 Failure Summary',
-              value: Object.entries(groupedByFunction)
-                .map(([funcName, failures]) =>
-                  `**${funcName}** (${failures[0].function_type}): ${failures.length} failures`,
-                )
-                .join('\n'),
-              inline: false,
+    if (actionableFailures.length > 0) {
+      await sendDiscordAlert(c, {
+        content: `🚨 **Queue Processing Failures** - ${queueName}`,
+        embeds: [
+          {
+            title: `❌ ${actionableFailures.length} Messages Failed Processing`,
+            description: `**Queue:** ${queueName}\n**Failed Functions:** ${Object.keys(groupedByFunction).length}\n**Total Failures:** ${actionableFailures.length}`,
+            color: 0xFF6B35, // Orange color for warnings
+            timestamp,
+            fields: [
+              {
+                name: '📊 Failure Summary',
+                value: Object.entries(groupedByFunction)
+                  .map(([funcName, failures]) =>
+                    `**${funcName}** (${failures[0].function_type}): ${failures.length} failures`,
+                  )
+                  .join('\n'),
+                inline: false,
+              },
+              {
+                name: '🔍 Detailed Failures',
+                value: actionableFailures.slice(0, 10).map((detail) => {
+                  const cfLogUrl = `https://dash.cloudflare.com/${getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID')}/workers/services/view/capgo_api-prod/production/observability/logs?workers-observability-view=%22invocations%22&filters=%5B%7B%22key%22%3A%22%24workers.event.request.headers.x-capgo-cf-id%22%2C%22type%22%3A%22string%22%2C%22value%22%3A%22${detail.cf_id}%22%2C%22operation%22%3A%22eq%22%7D%5D`
+                  return `**${detail.function_name}** | Status: ${detail.status} | Read: ${detail.read_count}/5 | [CF Logs](${cfLogUrl})`
+                }).join('\n'),
+                inline: false,
+              },
+              {
+                name: '📈 Status Code Distribution',
+                value: Object.entries(
+                  actionableFailures.reduce((acc, detail) => {
+                    acc[detail.status] = (acc[detail.status] ?? 0) + 1
+                    return acc
+                  }, {} as Record<number, number>),
+                ).map(([status, count]) => `**${status}:** ${count}`).join(' | '),
+                inline: false,
+              },
+              {
+                name: '⚠️ Retry Analysis',
+                value: `**Will Retry:** ${actionableFailures.filter(d => d.read_count < 5).length}\n**Will Archive:** ${actionableFailures.filter(d => d.read_count >= 5).length}`,
+                inline: true,
+              },
+              {
+                name: '📦 Payload Info',
+                value: `**Avg Size:** ${Math.round(actionableFailures.reduce((sum, d) => sum + d.payload_size, 0) / actionableFailures.length)} bytes\n**Max Size:** ${Math.max(...actionableFailures.map(d => d.payload_size))} bytes`,
+                inline: true,
+              },
+            ],
+            footer: {
+              text: `Queue: ${queueName} | Environment: ${getEnv(c, 'ENVIRONMENT') ?? 'unknown'}`,
             },
-            {
-              name: '🔍 Detailed Failures',
-              value: failureDetails.slice(0, 10).map((detail) => {
-                const cfLogUrl = `https://dash.cloudflare.com/${getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID')}/workers/services/view/capgo_api-prod/production/observability/logs?workers-observability-view=%22invocations%22&filters=%5B%7B%22key%22%3A%22%24workers.event.request.headers.x-capgo-cf-id%22%2C%22type%22%3A%22string%22%2C%22value%22%3A%22${detail.cf_id}%22%2C%22operation%22%3A%22eq%22%7D%5D`
-                return `**${detail.function_name}** | Status: ${detail.status} | Read: ${detail.read_count}/5 | [CF Logs](${cfLogUrl})`
-              }).join('\n'),
-              inline: false,
-            },
-            {
-              name: '📈 Status Code Distribution',
-              value: Object.entries(
-                failureDetails.reduce((acc, detail) => {
-                  acc[detail.status] = (acc[detail.status] ?? 0) + 1
-                  return acc
-                }, {} as Record<number, number>),
-              ).map(([status, count]) => `**${status}:** ${count}`).join(' | '),
-              inline: false,
-            },
-            {
-              name: '⚠️ Retry Analysis',
-              value: `**Will Retry:** ${failureDetails.filter(d => d.read_count < 5).length}\n**Will Archive:** ${failureDetails.filter(d => d.read_count >= 5).length}`,
-              inline: true,
-            },
-            {
-              name: '📦 Payload Info',
-              value: `**Avg Size:** ${Math.round(failureDetails.reduce((sum, d) => sum + d.payload_size, 0) / failureDetails.length)} bytes\n**Max Size:** ${Math.max(...failureDetails.map(d => d.payload_size))} bytes`,
-              inline: true,
-            },
-          ],
-          footer: {
-            text: `Queue: ${queueName} | Environment: ${getEnv(c, 'ENVIRONMENT') ?? 'unknown'}`,
           },
-        },
-      ],
-    })
+        ],
+      })
+    }
+    else {
+      cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Suppressed Discord alert for ignored error codes.`, ignoredErrors: Array.from(DISCORD_IGNORED_ERROR_CODES) })
+    }
     // set visibility timeout to random number to prevent Auto DDOS
   }
 
@@ -182,6 +193,41 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
   else {
     cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] All messages were processed successfully.` })
   }
+}
+
+async function extractErrorCode(response: Response): Promise<string | null> {
+  if (response.status < 400) {
+    return null
+  }
+  const cloned = response.clone()
+  const contentType = cloned.headers.get('content-type') ?? ''
+  let payload: any = null
+  try {
+    if (contentType.includes('application/json')) {
+      payload = await cloned.json()
+    }
+    else {
+      const text = await cloned.text()
+      if (text) {
+        try {
+          payload = JSON.parse(text)
+        }
+        catch {
+          payload = null
+        }
+      }
+    }
+  }
+  catch {
+    payload = null
+  }
+  if (payload && typeof payload === 'object') {
+    const errorCode = payload.error ?? payload.errorCode
+    if (typeof errorCode === 'string') {
+      return errorCode
+    }
+  }
+  return null
 }
 
 // Reads messages from the queue and logs them
