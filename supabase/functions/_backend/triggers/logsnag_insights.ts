@@ -20,6 +20,9 @@ interface BuildStats {
   last_month: number
   last_month_ios: number
   last_month_android: number
+  success_total: number
+  success_ios: number
+  success_android: number
 }
 interface PlanRevenue {
   mrr: number
@@ -273,6 +276,9 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
       lastMonthTotalResult,
       lastMonthIosResult,
       lastMonthAndroidResult,
+      successTotalResult,
+      successIosResult,
+      successAndroidResult,
     ] = await Promise.all([
       // Count total builds (all time)
       supabase.from('build_logs').select('*', { count: 'exact', head: true }),
@@ -286,6 +292,12 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
       supabase.from('build_logs').select('*', { count: 'exact', head: true }).eq('platform', 'ios').gte('created_at', last30days),
       // Count Android builds (last 30 days)
       supabase.from('build_logs').select('*', { count: 'exact', head: true }).eq('platform', 'android').gte('created_at', last30days),
+      // Count successful builds (all time)
+      supabase.from('build_requests').select('*', { count: 'exact', head: true }).eq('status', 'succeeded'),
+      // Count successful iOS builds (all time)
+      supabase.from('build_requests').select('*', { count: 'exact', head: true }).eq('platform', 'ios').eq('status', 'succeeded'),
+      // Count successful Android builds (all time)
+      supabase.from('build_requests').select('*', { count: 'exact', head: true }).eq('platform', 'android').eq('status', 'succeeded'),
     ])
 
     // Log any errors
@@ -301,6 +313,12 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
       cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats lastMonthIos error', error: lastMonthIosResult.error })
     if (lastMonthAndroidResult.error)
       cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats lastMonthAndroid error', error: lastMonthAndroidResult.error })
+    if (successTotalResult.error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats successTotal error', error: successTotalResult.error })
+    if (successIosResult.error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats successIos error', error: successIosResult.error })
+    if (successAndroidResult.error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats successAndroid error', error: successAndroidResult.error })
 
     return {
       total: totalResult.count ?? 0,
@@ -309,11 +327,24 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
       last_month: lastMonthTotalResult.count ?? 0,
       last_month_ios: lastMonthIosResult.count ?? 0,
       last_month_android: lastMonthAndroidResult.count ?? 0,
+      success_total: successTotalResult.count ?? 0,
+      success_ios: successIosResult.count ?? 0,
+      success_android: successAndroidResult.count ?? 0,
     }
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats error', error: e })
-    return { total: 0, ios: 0, android: 0, last_month: 0, last_month_ios: 0, last_month_android: 0 }
+    return {
+      total: 0,
+      ios: 0,
+      android: 0,
+      last_month: 0,
+      last_month_ios: 0,
+      last_month_android: 0,
+      success_total: 0,
+      success_ios: 0,
+      success_android: 0,
+    }
   }
 }
 
@@ -599,6 +630,9 @@ app.post('/', middlewareAPISecret, async (c) => {
     builds_total: build_stats.total,
     builds_ios: build_stats.ios,
     builds_android: build_stats.android,
+    builds_success_total: build_stats.success_total,
+    builds_success_ios: build_stats.success_ios,
+    builds_success_android: build_stats.success_android,
     // Build statistics (last 30 days)
     builds_last_month: build_stats.last_month,
     builds_last_month_ios: build_stats.last_month_ios,

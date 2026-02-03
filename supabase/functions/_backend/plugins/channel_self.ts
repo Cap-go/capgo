@@ -7,7 +7,7 @@ import { parse } from '@std/semver'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
-import { isChannelSelfRateLimited, recordChannelSelfRequest } from '../utils/channelSelfRateLimit.ts'
+import { checkChannelSelfIPRateLimit, isChannelSelfRateLimited, recordChannelSelfIPRequest, recordChannelSelfRequest } from '../utils/channelSelfRateLimit.ts'
 import { BRES, parseBody, simpleError200, simpleErrorWithStatus, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrgCached } from '../utils/notifications.ts'
@@ -37,6 +37,18 @@ function buildRateLimitInfo(resetAt?: number) {
     rateLimitResetAt: resetAt,
     retryAfterSeconds,
   }
+}
+
+async function assertChannelSelfIPRateLimit(c: Context, appId: string) {
+  // IP rate limit: per-minute cap (default 1000/min via RATE_LIMIT_CHANNEL_SELF_IP) to mitigate device_id spoofing
+  const ipRateLimitStatus = await checkChannelSelfIPRateLimit(c, appId, 'Channel self IP rate limited')
+  if (ipRateLimitStatus.limited) {
+    return simpleRateLimit({ reason: 'ip_rate_limit_exceeded', app_id: appId, ...buildRateLimitInfo(ipRateLimitStatus.resetAt) })
+  }
+}
+
+function recordChannelSelfIPRateLimit(c: Context, appId: string) {
+  backgroundTask(c, recordChannelSelfIPRequest(c, appId))
 }
 
 export const jsonRequestSchema = z.looseObject({
@@ -548,6 +560,8 @@ app.post('/', async (c) => {
     return simpleError200(c, 'missing_channel', 'Cannot find channel in body')
   }
 
+  await assertChannelSelfIPRateLimit(c, bodyParsed.app_id)
+
   // Rate limit: max 1 set per second per device+app, and same set max once per 60 seconds
   const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'set', bodyParsed.channel)
   if (rateLimitStatus.limited) {
@@ -571,6 +585,7 @@ app.post('/', async (c) => {
 
   // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse)
   backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'set', bodyParsed.channel))
+  recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
 
   return res
 })
@@ -585,6 +600,8 @@ app.put('/', async (c) => {
   }
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
+
+  await assertChannelSelfIPRateLimit(c, bodyParsed.app_id)
 
   // Rate limit: max 1 get per second per device+app
   const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'get')
@@ -608,6 +625,7 @@ app.put('/', async (c) => {
 
   // Record the request for rate limiting (all requests to prevent abuse)
   backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'get'))
+  recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
 
   return res
 })
@@ -621,6 +639,8 @@ app.delete('/', async (c) => {
   }
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
+
+  await assertChannelSelfIPRateLimit(c, bodyParsed.app_id)
 
   // Rate limit: max 1 delete per second per device+app
   const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'delete')
@@ -645,6 +665,7 @@ app.delete('/', async (c) => {
 
   // Record the request for rate limiting (all requests to prevent abuse)
   backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'delete'))
+  recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
 
   return res
 })
@@ -658,6 +679,8 @@ app.get('/', async (c) => {
   }
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchemaGet, false)
+
+  await assertChannelSelfIPRateLimit(c, bodyParsed.app_id)
 
   // Rate limit: max 1 list per second per device+app (if device_id is provided)
   if (body.device_id) {
@@ -687,6 +710,7 @@ app.get('/', async (c) => {
   if (body.device_id) {
     backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, body.device_id, 'list'))
   }
+  recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
 
   return res
 })
