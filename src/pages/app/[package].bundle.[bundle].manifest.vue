@@ -1,23 +1,17 @@
 <script setup lang="ts">
 import type { TableColumn } from '~/components/comp_def'
 import type { Database } from '~/types/supabase.types'
-import { FormKit } from '@formkit/vue'
-import { useDebounceFn } from '@vueuse/core'
 import { computed, h, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import IconDown from '~icons/ic/round-keyboard-arrow-down'
-import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
 import { formatBytes } from '~/services/conversion'
-import { formatLocalDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 
 type ManifestEntry = Database['public']['Tables']['manifest']['Row']
 
 type VersionRow = Pick<Database['public']['Tables']['app_versions']['Row'], 'id' | 'name' | 'created_at' | 'manifest_count' | 'app_id'>
-type DeployHistoryRow = Pick<Database['public']['Tables']['deploy_history']['Row'], 'channel_id' | 'version_id' | 'created_at' | 'deployed_at'>
 
 const route = useRoute('/app/[package].bundle.[bundle].manifest')
 const router = useRouter()
@@ -28,14 +22,8 @@ const packageId = ref<string>('')
 const id = ref<number>(0)
 const loading = ref(true)
 const tableLoading = ref(false)
-const compareSearchLoading = ref(false)
 const version = ref<Database['public']['Tables']['app_versions']['Row']>()
 const manifestEntries = ref<ManifestEntry[]>([])
-const latestCompareVersions = ref<VersionRow[]>([])
-const preferredCompareVersions = ref<VersionRow[]>([])
-const compareSearchResults = ref<VersionRow[]>([])
-const compareSearch = ref('')
-const compareVersionId = ref<number | null>(null)
 const selectedCompareVersion = ref<VersionRow | null>(null)
 const compareManifestEntries = ref<ManifestEntry[]>([])
 const compareManifestCache = ref<Record<number, ManifestEntry[]>>({})
@@ -43,8 +31,7 @@ const search = ref('')
 const currentPage = ref(1)
 const MANIFEST_PAGE_SIZE = 1000
 const compareRequestId = ref(0)
-const compareSearchRequestId = ref(0)
-let preferredCompareRequestId = 0
+const compareVersionId = computed(() => selectedCompareVersion.value?.id ?? null)
 const deltaUploadCommand = 'npx @capgo/cli@latest bundle upload --delta'
 const directUpdateConfigSnippet = `{
   "plugins": {
@@ -98,29 +85,6 @@ const columns = ref<TableColumn[]>([
   },
 ])
 
-const compareVersion = computed(() => {
-  if (selectedCompareVersion.value)
-    return selectedCompareVersion.value
-  if (!compareVersionId.value)
-    return null
-  return (
-    compareSearchResults.value.find(v => v.id === compareVersionId.value)
-    ?? preferredCompareVersions.value.find(v => v.id === compareVersionId.value)
-    ?? latestCompareVersions.value.find(v => v.id === compareVersionId.value)
-    ?? null
-  )
-})
-
-const compareOptions = computed(() => {
-  if (compareSearch.value.trim())
-    return compareSearchResults.value
-  const preferredIds = new Set(preferredCompareVersions.value.map(version => version.id))
-  return [
-    ...preferredCompareVersions.value,
-    ...latestCompareVersions.value.filter(version => !preferredIds.has(version.id)),
-  ]
-})
-
 const diffEntries = computed(() => {
   if (!compareVersionId.value)
     return manifestEntries.value
@@ -171,7 +135,7 @@ const compareStatusMessage = computed(() => {
     return t('loading')
   if (!compareVersionId.value)
     return t('manifest-status-full')
-  const compareName = compareVersion.value?.name ?? t('unknown')
+  const compareName = selectedCompareVersion.value?.name ?? t('unknown')
   if (compareManifestEntries.value.length === 0)
     return t('manifest-status-compare-empty', { bundle: compareName })
   if (diffEntries.value.length === 0)
@@ -181,12 +145,6 @@ const compareStatusMessage = computed(() => {
     count: diffEntries.value.length,
     unchanged: unchangedEntries.value.length,
   })
-})
-
-const compareOptionsLabel = computed(() => {
-  if (compareSearch.value.trim())
-    return t('manifest-compare-results')
-  return t('manifest-compare-latest')
 })
 
 async function fetchManifestEntries(versionId: number) {
@@ -251,146 +209,11 @@ async function loadManifest() {
   manifestEntries.value = await fetchManifestEntries(id.value)
 }
 
-async function loadLatestCompareVersions() {
-  if (!packageId.value)
-    return
-  const { data, error } = await supabase
-    .from('app_versions')
-    .select('id, name, created_at, manifest_count, app_id')
-    .eq('app_id', packageId.value)
-    .gt('manifest_count', 0)
-    .neq('id', id.value)
-    .order('created_at', { ascending: false })
-    .limit(5)
-
-  if (error) {
-    console.error('Failed to load latest compare versions', error)
-    return
-  }
-
-  latestCompareVersions.value = data ?? []
-}
-
-async function loadPreferredCompareVersions() {
-  const requestId = ++preferredCompareRequestId
-  preferredCompareVersions.value = []
-  if (!packageId.value || !id.value)
-    return
-
-  const channelIds = new Set<number>()
-  const deployedAtByChannel = new Map<number, string | null>()
-
-  const { data: currentChannels, error: currentChannelsError } = await supabase
-    .from('channels')
-    .select('id')
-    .eq('app_id', packageId.value)
-    .eq('version', id.value)
-
-  if (requestId !== preferredCompareRequestId)
-    return
-
-  if (currentChannelsError) {
-    console.error('Failed to load current channels', currentChannelsError)
-  }
-  else {
-    for (const channel of currentChannels ?? [])
-      channelIds.add(channel.id)
-  }
-
-  const { data: deployHistory, error: deployHistoryError } = await supabase
-    .from('deploy_history')
-    .select('channel_id, version_id, created_at, deployed_at')
-    .eq('app_id', packageId.value)
-    .eq('version_id', id.value)
-    .order('created_at', { ascending: false })
-
-  if (requestId !== preferredCompareRequestId)
-    return
-
-  if (deployHistoryError) {
-    console.error('Failed to load deploy history for bundle', deployHistoryError)
-  }
-  else {
-    for (const entry of deployHistory ?? []) {
-      const entryTime = entry.created_at ?? entry.deployed_at ?? null
-      if (!channelIds.has(entry.channel_id))
-        channelIds.add(entry.channel_id)
-      if (!deployedAtByChannel.has(entry.channel_id))
-        deployedAtByChannel.set(entry.channel_id, entryTime)
-    }
-  }
-
-  if (channelIds.size === 0)
-    return
-
-  const preferredHistory: Array<{ versionId: number, deployedAt: string | null }> = []
-  for (const channelId of channelIds) {
-    const cutoff = deployedAtByChannel.get(channelId)
-    let query = supabase
-      .from('deploy_history')
-      .select('version_id, created_at, deployed_at')
-      .eq('app_id', packageId.value)
-      .eq('channel_id', channelId)
-      .neq('version_id', id.value)
-
-    if (cutoff)
-      query = query.lt('created_at', cutoff)
-
-    const { data, error } = await query
-      .order('created_at', { ascending: false })
-      .limit(1)
-
-    if (requestId !== preferredCompareRequestId)
-      return
-
-    if (error) {
-      console.error('Failed to load previous deploy history', error)
-      continue
-    }
-
-    const entry = (data ?? [])[0] as DeployHistoryRow | undefined
-    if (!entry)
-      continue
-    preferredHistory.push({
-      versionId: entry.version_id,
-      deployedAt: entry.created_at ?? entry.deployed_at ?? null,
-    })
-  }
-
-  if (!preferredHistory.length)
-    return
-
-  const uniqueIds = [...new Set(preferredHistory.map(entry => entry.versionId))]
-  const { data: versions, error } = await supabase
-    .from('app_versions')
-    .select('id, name, created_at, manifest_count, app_id')
-    .eq('app_id', packageId.value)
-    .gt('manifest_count', 0)
-    .in('id', uniqueIds)
-
-  if (requestId !== preferredCompareRequestId)
-    return
-
-  if (error) {
-    console.error('Failed to load preferred compare versions', error)
-    return
-  }
-
-  const versionMap = new Map((versions ?? []).map(version => [version.id, version]))
-  const sorted = preferredHistory
-    .filter(entry => versionMap.has(entry.versionId))
-    .sort((a, b) => (b.deployedAt ?? '').localeCompare(a.deployedAt ?? ''))
-
-  preferredCompareVersions.value = sorted
-    .map(entry => versionMap.get(entry.versionId))
-    .filter((version): version is VersionRow => Boolean(version))
-}
-
 async function reloadManifest() {
   if (!id.value)
     return
   tableLoading.value = true
-  await Promise.all([loadManifest(), loadLatestCompareVersions(), loadPreferredCompareVersions()])
+  await loadManifest()
   if (compareVersionId.value) {
     const cached = compareManifestCache.value[compareVersionId.value]
     compareManifestEntries.value = cached ?? await fetchManifestEntries(compareVersionId.value)
@@ -401,76 +224,10 @@ async function reloadManifest() {
 }
 
 function resetCompareSelection() {
-  compareVersionId.value = null
   selectedCompareVersion.value = null
-  compareSearch.value = ''
-  compareSearchResults.value = []
   compareManifestEntries.value = []
   tableLoading.value = false
 }
-
-function selectCompareVersion(option: VersionRow | null) {
-  compareSearch.value = ''
-  compareSearchResults.value = []
-  if (!option) {
-    resetCompareSelection()
-    return
-  }
-  selectedCompareVersion.value = option
-  compareVersionId.value = option.id
-}
-
-async function searchCompareVersions(term: string) {
-  if (!packageId.value || !term.trim()) {
-    compareSearchResults.value = []
-    compareSearchLoading.value = false
-    return
-  }
-
-  const requestId = ++compareSearchRequestId.value
-  compareSearchLoading.value = true
-  const baseQuery = supabase
-    .from('app_versions')
-    .select('id, name, created_at, manifest_count, app_id')
-    .eq('app_id', packageId.value)
-    .gt('manifest_count', 0)
-    .neq('id', id.value)
-
-  const numericId = Number(term)
-  const query = Number.isNaN(numericId)
-    ? baseQuery.ilike('name', `%${term}%`)
-    : baseQuery.or(`name.ilike.%${term}%,id.eq.${numericId}`)
-
-  const { data, error } = await query
-    .order('created_at', { ascending: false })
-    .limit(5)
-
-  if (requestId !== compareSearchRequestId.value)
-    return
-
-  if (error) {
-    console.error('Failed to search compare versions', error)
-    compareSearchResults.value = []
-  }
-  else {
-    compareSearchResults.value = data ?? []
-  }
-  compareSearchLoading.value = false
-}
-
-const debouncedCompareSearch = useDebounceFn((term: string) => {
-  searchCompareVersions(term)
-}, 400)
-
-watch(compareSearch, (term) => {
-  if (!term.trim()) {
-    compareSearchRequestId.value += 1
-    compareSearchResults.value = []
-    compareSearchLoading.value = false
-    return
-  }
-  debouncedCompareSearch(term)
-})
 
 watch(compareVersionId, async (value) => {
   const requestId = ++compareRequestId.value
@@ -503,7 +260,7 @@ watchEffect(async () => {
     packageId.value = route.params.package as string
     id.value = Number(route.params.bundle as string)
     resetCompareSelection()
-    await Promise.all([getVersion(), loadManifest(), loadLatestCompareVersions(), loadPreferredCompareVersions()])
+    await Promise.all([getVersion(), loadManifest()])
     loading.value = false
     if (!version.value?.name)
       displayStore.NavTitle = t('bundle')
@@ -562,67 +319,19 @@ watchEffect(async () => {
           <template v-else>
             <div class="px-4 pt-4 pb-3 border-b border-slate-200 dark:border-slate-700">
               <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                <div class="w-full md:max-w-sm">
-                  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {{ t('manifest-compare-label') }}
-                  </label>
-                  <div class="flex items-center gap-2 mt-2">
-                    <div class="w-full d-dropdown">
-                      <button
-                        tabindex="0"
-                        class="inline-flex w-full min-w-0 items-center justify-between rounded-lg border border-slate-300 bg-white px-3 py-2 text-left text-sm text-slate-700 shadow-sm transition hover:border-slate-400 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
-                        :disabled="loading"
-                      >
-                        <span class="truncate min-w-0">
-                          {{ compareVersion?.name ?? t('manifest-compare-none') }}
-                        </span>
-                        <IconDown class="w-4 h-4 shrink-0 text-slate-400" />
-                      </button>
-                      <div
-                        tabindex="0"
-                        class="mt-1 w-full d-dropdown-content d-menu rounded-lg border border-slate-200 bg-white p-2 shadow-lg z-20 dark:border-slate-700 dark:bg-slate-900"
-                      >
-                        <div class="p-2">
-                          <FormKit
-                            v-model="compareSearch"
-                            :prefix-icon="IconSearch"
-                            :placeholder="t('search-by-name-or-bundle-id')"
-                            :classes="{ outer: 'mb-0! w-full' }"
-                          />
-                        </div>
-                        <div class="max-h-64 overflow-y-auto">
-                          <button
-                            type="button"
-                            class="flex w-full items-center justify-between rounded-md px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
-                            @click="selectCompareVersion(null)"
-                          >
-                            {{ t('manifest-compare-none') }}
-                          </button>
-                          <div class="px-3 pt-3 text-xs uppercase tracking-wide text-slate-400">
-                            {{ compareOptionsLabel }}
-                          </div>
-                          <button
-                            v-for="option in compareOptions"
-                            :key="option.id"
-                            type="button"
-                            class="flex w-full min-w-0 items-center justify-between rounded-md px-3 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
-                            @click="selectCompareVersion(option)"
-                          >
-                            <span class="truncate min-w-0">{{ option.name }}</span>
-                            <span class="ml-2 shrink-0 text-xs text-slate-400">{{ option.created_at ? formatLocalDate(option.created_at) : t('unknown') }}</span>
-                          </button>
-                          <div v-if="compareSearchLoading" class="px-3 py-2 text-xs text-slate-400">
-                            {{ t('loading') }}
-                          </div>
-                          <div v-else-if="compareSearch && compareOptions.length === 0" class="px-3 py-2 text-xs text-slate-400">
-                            {{ t('no-versions-found') }}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    <Spinner v-if="tableLoading" size="w-5 h-5" />
-                  </div>
-                </div>
+                <BundleCompareSelect
+                  v-model="selectedCompareVersion"
+                  :app-id="packageId"
+                  :current-version-id="id"
+                  :label="t('manifest-compare-label')"
+                  :none-label="t('manifest-compare-none')"
+                  :latest-label="t('manifest-compare-latest')"
+                  :results-label="t('manifest-compare-results')"
+                  :search-placeholder="t('search-by-name-or-bundle-id')"
+                  :no-results-label="t('no-versions-found')"
+                  :disabled="loading"
+                  :show-spinner="tableLoading"
+                />
 
                 <!-- Summary cards: show different layout when comparing vs not -->
                 <div v-if="!compareVersionId" class="grid w-full grid-cols-2 gap-4 text-right md:w-auto md:text-left">
@@ -684,7 +393,7 @@ watchEffect(async () => {
               <p v-if="compareStatusMessage" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
                 {{ compareStatusMessage }}
               </p>
-              <p v-if="compareVersion" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              <p v-if="selectedCompareVersion" class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 {{ t('manifest-download-estimate-note') }}
               </p>
             </div>
