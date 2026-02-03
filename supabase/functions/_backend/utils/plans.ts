@@ -21,6 +21,7 @@ import {
   set_storage_exceeded,
   supabaseAdmin,
 } from './supabase.ts'
+import { isStripeConfigured } from './utils.ts'
 
 type CreditMetric = Database['public']['Enums']['credit_metric_type']
 
@@ -419,6 +420,8 @@ export async function updatePlanStatus(c: Context, org: any, is_good_plan: boole
 
 // New function for cron_stat_org - handles is_good_plan + plan % + exceeded flags
 export async function checkPlanStatusOnly(c: Context, orgId: string, drizzleClient: ReturnType<typeof getDrizzleClient>): Promise<void> {
+  if (!isStripeConfigured(c))
+    return
   const org = await getOrgWithCustomerInfo(c, orgId)
 
   // Handle trial organizations
@@ -436,6 +439,8 @@ export async function checkPlanStatusOnly(c: Context, orgId: string, drizzleClie
 
 // New function for cron_sync_sub - handles subscription sync + events
 export async function syncSubscriptionAndEvents(c: Context, orgId: string, drizzleClient: ReturnType<typeof getDrizzleClient>): Promise<void> {
+  if (!isStripeConfigured(c))
+    return
   const org = await getOrgWithCustomerInfo(c, orgId)
 
   // Sync subscription data with Stripe

@@ -8,7 +8,7 @@ import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged } from './dev
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { createCustomer } from './stripe.ts'
-import { getEnv } from './utils.ts'
+import { getEnv, isStripeConfigured } from './utils.ts'
 
 const DEFAULT_LIMIT = 1000
 // Import Supabase client
@@ -382,6 +382,8 @@ export async function getPlanUsagePercent(c: Context, orgId?: string): Promise<P
 
 export async function isGoodPlanOrg(c: Context, orgId: string): Promise<boolean> {
   try {
+    if (!isStripeConfigured(c))
+      return true
     const { data } = await supabaseAdmin(c)
       .rpc('is_good_plan_v5_org', { orgid: orgId })
       .single()

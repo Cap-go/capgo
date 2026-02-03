@@ -4,6 +4,7 @@ import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 
+import { stripeEnabled } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -63,6 +64,8 @@ const bannerLeftText = computed(() => {
 })
 
 const bannerText = computed(() => {
+  if (!stripeEnabled.value)
+    return null
   const org = organizationStore.currentOrganization
   if (!org)
     return

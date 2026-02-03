@@ -4,6 +4,7 @@ import type { Database } from '~/types/supabase.types'
 import { format, parse } from '@std/semver'
 import { createClient } from '@supabase/supabase-js'
 import subset from 'semver/ranges/subset'
+import { ref } from 'vue'
 
 let supaClient: SupabaseClient<Database> = null as any
 
@@ -15,6 +16,7 @@ export interface CapgoConfig {
   supbaseId: string
   host: string
   hostWeb: string
+  stripeEnabled?: boolean
 }
 
 export function isLocal(supaHost: string) {
@@ -22,16 +24,19 @@ export function isLocal(supaHost: string) {
 }
 
 export function getLocalConfig() {
+  const stripeEnabledEnv = import.meta.env.VITE_STRIPE_ENABLED as string | undefined
   return {
     supaHost: import.meta.env.VITE_SUPABASE_URL as string,
     supaKey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
     supbaseId: import.meta.env.VITE_SUPABASE_URL?.split('//')[1].split('.')[0].split(':')[0] as string,
     host: import.meta.env.VITE_APP_URL as string,
     hostWeb: import.meta.env.LANDING_URL as string,
+    stripeEnabled: stripeEnabledEnv === undefined ? true : stripeEnabledEnv !== 'false',
   } as CapgoConfig
 }
 
 let config: CapgoConfig = getLocalConfig()
+export const stripeEnabled = ref<boolean>(config.stripeEnabled ?? true)
 
 export async function getRemoteConfig() {
   const localConfig = getLocalConfig()
@@ -42,15 +47,18 @@ export async function getRemoteConfig() {
     const response = await fetch(`${defaultApiHost}/private/config`)
     if (!response.ok) {
       console.log('Local config', localConfig)
+      stripeEnabled.value = localConfig.stripeEnabled ?? stripeEnabled.value
       return localConfig as CapgoConfig
     }
     const data = await response.json() as CapgoConfig
     const merged = { ...localConfig, ...data } as CapgoConfig
     config = merged
+    stripeEnabled.value = merged.stripeEnabled ?? stripeEnabled.value
     return merged
   }
   catch {
     console.log('Local config', localConfig)
+    stripeEnabled.value = localConfig.stripeEnabled ?? stripeEnabled.value
     return localConfig as CapgoConfig
   }
 }

@@ -15,6 +15,10 @@ async function updateManifestSize(c: Context, record: Database['public']['Tables
 
   const size = await s3.getSize(c, record.s3_path)
   if (size === 0) {
+    if (record.file_size && record.file_size > 0) {
+      cloudlog({ requestId: c.get('requestId'), message: 'getSize returned 0, keeping existing file_size', id: record.id, s3_path: record.s3_path, file_size: record.file_size })
+      return c.json(BRES)
+    }
     cloudlog({ requestId: c.get('requestId'), message: 'getSize returned 0, will retry', id: record.id, s3_path: record.s3_path })
     throw simpleError('file_size_zero', 'File size is 0, retrying', { record })
   }
