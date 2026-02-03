@@ -209,6 +209,59 @@ GRANT ALL ON FUNCTION public.get_total_metrics(uuid, date, date) TO service_role
 REVOKE ALL ON FUNCTION public.get_total_metrics(uuid, date, date) FROM anon;
 REVOKE ALL ON FUNCTION public.get_total_metrics(uuid, date, date) FROM authenticated;
 
+-- Keep 1-arg get_total_metrics in sync with new column list
+DROP FUNCTION IF EXISTS public.get_total_metrics(uuid);
+
+CREATE FUNCTION public.get_total_metrics(org_id uuid) RETURNS TABLE (
+    mau bigint,
+    storage bigint,
+    bandwidth bigint,
+    build_time_unit bigint,
+    get bigint,
+    fail bigint,
+    install bigint,
+    uninstall bigint
+) LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = '' AS $function$
+DECLARE
+    v_start_date date;
+    v_end_date date;
+    v_anchor_day interval;
+BEGIN
+    SELECT
+        COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
+    INTO v_anchor_day
+    FROM public.orgs o
+    LEFT JOIN public.stripe_info si ON o.customer_id = si.customer_id
+    WHERE o.id = org_id;
+
+    IF v_anchor_day > NOW() - date_trunc('MONTH', NOW()) THEN
+        v_start_date := (date_trunc('MONTH', NOW() - INTERVAL '1 MONTH') + v_anchor_day)::date;
+    ELSE
+        v_start_date := (date_trunc('MONTH', NOW()) + v_anchor_day)::date;
+    END IF;
+    v_end_date := (v_start_date + INTERVAL '1 MONTH')::date;
+
+    RETURN QUERY
+    SELECT
+        metrics.mau,
+        metrics.storage,
+        metrics.bandwidth,
+        metrics.build_time_unit,
+        metrics.get,
+        metrics.fail,
+        metrics.install,
+        metrics.uninstall
+    FROM public.get_total_metrics(org_id, v_start_date, v_end_date) AS metrics;
+END;
+$function$;
+
+ALTER FUNCTION public.get_total_metrics(uuid) OWNER TO "postgres";
+
+GRANT ALL ON FUNCTION public.get_total_metrics(uuid) TO service_role;
+REVOKE ALL ON FUNCTION public.get_total_metrics(uuid) FROM anon;
+REVOKE ALL ON FUNCTION public.get_total_metrics(uuid) FROM authenticated;
+
 -- Combined usage + plan fit (single get_total_metrics call)
 CREATE FUNCTION public.get_plan_usage_and_fit(orgid uuid)
 RETURNS TABLE (
