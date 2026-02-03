@@ -14,6 +14,8 @@ import IconSearch from '~icons/heroicons/magnifying-glass'
 import IconShield from '~icons/heroicons/shield-check'
 import IconTrash from '~icons/heroicons/trash'
 import IconWrench from '~icons/heroicons/wrench'
+import RoleSelect from '~/components/forms/RoleSelect.vue'
+import SearchInput from '~/components/forms/SearchInput.vue'
 import { checkPermissions } from '~/services/permissions'
 import { createSignedImageUrl } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
@@ -288,26 +290,6 @@ const selectedAppAccessApp = computed(() => {
     return undefined
   const selectedId = appAccessSelectedAppIds.value[0]
   return appAccessApps.value.find(app => app.id === selectedId)
-})
-
-const selectedOrgRoleSummary = computed(() => {
-  if (!appAccessMember.value)
-    return ''
-
-  const normalizedRole = appAccessMember.value.role.replace(/^invite_/, '')
-
-  switch (normalizedRole) {
-    case 'org_super_admin':
-      return t('org-role-app-access-super-admin', 'Full access to all apps, including delete and role management.')
-    case 'org_admin':
-      return t('org-role-app-access-admin', 'Full app access is inherited at the org level.')
-    case 'org_member':
-      return t('org-role-app-access-member', 'No app access is granted at the org level.')
-    case 'org_billing_admin':
-      return t('org-role-app-access-billing', 'No app access (billing only).')
-    default:
-      return t('org-role-app-access-default', 'Org role access applies across all apps in this organization.')
-  }
 })
 
 const isAppAccessSelectionValid = computed(() => {
@@ -1341,7 +1323,7 @@ async function openAppAccessModal(member: OrganizationMemberRow) {
     preventAccidentalClose: true,
     buttons: [
       {
-        text: t('button-cancel'),
+        text: t('close'),
         role: 'cancel',
       },
       {
@@ -1700,16 +1682,11 @@ async function handleInviteNewUserSubmit() {
         <div class="max-h-[75vh] overflow-hidden">
           <div class="grid h-full gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
           <div>
-            <div class="relative">
-              <input
-                v-model="appAccessSearch"
-                type="text"
-                :placeholder="t('search-apps', 'Search apps')"
-                :disabled="isAppAccessLoading"
-                class="w-full pl-10 d-input"
-              >
-              <IconSearch class="absolute w-4 h-4 text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
-            </div>
+            <SearchInput
+              v-model="appAccessSearch"
+              :placeholder="t('search-apps', 'Search apps')"
+              :disabled="isAppAccessLoading"
+            />
             <div class="mt-3 overflow-hidden border rounded-lg dark:border-gray-600">
               <div v-if="isAppAccessLoading" class="p-4 text-sm text-gray-500">
                 {{ t('loading') }}
@@ -1750,18 +1727,6 @@ async function handleInviteNewUserSubmit() {
           <div>
             <div class="mb-4">
               <div class="text-xs uppercase text-gray-500">
-                {{ t('organization') }} · {{ t('role') }}
-              </div>
-              <div class="text-sm font-medium">
-                {{ getRoleDisplayName(appAccessMember?.role) }}
-              </div>
-              <p class="text-xs text-gray-500">
-                {{ selectedOrgRoleSummary }}
-              </p>
-            </div>
-
-            <div class="mb-4">
-              <div class="text-xs uppercase text-gray-500">
                 {{ t('app') }} · {{ t('role') }}
               </div>
               <div class="text-sm font-medium">
@@ -1780,29 +1745,16 @@ async function handleInviteNewUserSubmit() {
               </div>
             </div>
 
-            <div class="form-control">
-              <label class="label">
-                <span class="label-text">{{ t('select-app-role') }}</span>
-              </label>
-              <select
-                v-model="appAccessSelectedRole"
-                class="d-select"
-                :disabled="appAccessSelectedAppIds.length === 0 || isAppAccessLoading"
-                @change="appAccessRoleTouched = true"
-              >
-                <option value="">
-                  {{ t('select-role') }}
-                </option>
-                <option v-for="role in availableAppRoles" :key="role.id" :value="role.name">
-                  {{ getRoleDisplayName(role.name) }} - {{ role.description }}
-                </option>
-              </select>
-              <label class="label">
-                <span class="label-text-alt text-gray-500">
-                  {{ t('app-role-hint') }}
-                </span>
-              </label>
-            </div>
+            <RoleSelect
+              v-model="appAccessSelectedRole"
+              :roles="availableAppRoles.map(role => ({
+                ...role,
+                description: `${getRoleDisplayName(role.name)} - ${role.description}`
+              }))"
+              :label="t('select-app-role')"
+              :disabled="appAccessSelectedAppIds.length === 0 || isAppAccessLoading"
+              @update:model-value="appAccessRoleTouched = true"
+            />
           </div>
         </div>
         </div>

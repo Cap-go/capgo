@@ -11,6 +11,9 @@ import IconShield from '~icons/heroicons/shield-check'
 import IconTrash from '~icons/heroicons/trash'
 import IconWrench from '~icons/heroicons/wrench'
 import DataTable from '~/components/DataTable.vue'
+import RoleSelect from '~/components/forms/RoleSelect.vue'
+import RoleSelectionModal from '~/components/modals/RoleSelectionModal.vue'
+import SearchInput from '~/components/forms/SearchInput.vue'
 import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -120,11 +123,6 @@ const isEditRoleModalOpen = ref(false)
 const editRoleBinding = ref<RoleBinding | null>(null)
 const editRoleName = ref('')
 const isEditingRole = ref(false)
-
-const editRoleDescription = computed(() => {
-  const role = availableAppRoles.value.find(r => r.name === editRoleName.value)
-  return role?.description ?? ''
-})
 
 async function fetchAppDetails() {
   if (!props.appId)
@@ -389,14 +387,12 @@ async function assignRole() {
   }
 }
 
-async function updateRoleBinding() {
-  if (!editRoleBinding.value || !editRoleName.value) {
-    toast.error(t('please-select-permission'))
+async function handleEditRoleConfirm(newRoleName: string) {
+  if (!editRoleBinding.value) {
     return
   }
 
-  if (editRoleName.value === editRoleBinding.value.role_name) {
-    isEditRoleModalOpen.value = false
+  if (newRoleName === editRoleBinding.value.role_name) {
     return
   }
 
@@ -405,7 +401,7 @@ async function updateRoleBinding() {
     const { data: roleData, error: roleError } = await supabase
       .from('roles')
       .select('id')
-      .eq('name', editRoleName.value)
+      .eq('name', newRoleName)
       .single()
 
     if (roleError || !roleData) {
@@ -424,7 +420,6 @@ async function updateRoleBinding() {
       throw updateError
 
     toast.success(t('permission-changed'))
-    isEditRoleModalOpen.value = false
     await fetchAppRoleBindings()
   }
   catch (error: any) {
@@ -535,12 +530,11 @@ onMounted(async () => {
 
     <!-- Search -->
     <div v-if="useNewRbac" class="mb-4">
-      <input
+      <SearchInput
         v-model="search"
-        type="text"
         :placeholder="t('search-role-bindings')"
-        class="max-w-md d-input"
-      >
+        class="max-w-md"
+      />
     </div>
 
     <!-- Role bindings table -->
@@ -644,24 +638,13 @@ onMounted(async () => {
         </div>
 
         <!-- Role Selection -->
-        <div class="mt-4 form-control">
-          <label class="label">
-            <span class="label-text">{{ t('select-app-role') }}</span>
-          </label>
-          <select v-model="assignRoleForm.role_name" class="d-select" required>
-            <option value="">
-              {{ t('select-role') }}
-            </option>
-            <option v-for="role in availableAppRoles" :key="role.id" :value="role.name">
-              {{ role.description }}
-            </option>
-          </select>
-          <label class="label">
-            <span class="text-gray-500 label-text-alt">
-              {{ t('app-role-hint') }}
-            </span>
-          </label>
-        </div>
+        <RoleSelect
+          v-model="assignRoleForm.role_name"
+          :roles="availableAppRoles"
+          :label="t('select-app-role')"
+          class="mt-4"
+          required
+        />
 
         <!-- Reason (optional) -->
         <div class="mt-4 form-control">
@@ -693,45 +676,13 @@ onMounted(async () => {
     </dialog>
 
     <!-- Edit Role Modal -->
-    <dialog :open="isEditRoleModalOpen" class="modal" @close="isEditRoleModalOpen = false">
-      <div class="modal-box max-w-2xl">
-        <h3 class="text-lg font-bold">
-          {{ t('select-app-role') }}
-        </h3>
-
-        <div class="form-control mt-4">
-          <label class="label">
-            <span class="label-text">{{ t('select-app-role') }}</span>
-          </label>
-          <select v-model="editRoleName" class="d-select" required>
-            <option value="">
-              {{ t('select-role') }}
-            </option>
-            <option v-for="role in availableAppRoles" :key="role.id" :value="role.name">
-              {{ role.description }}
-            </option>
-          </select>
-          <label v-if="editRoleDescription" class="label">
-            <span class="label-text-alt text-gray-500">
-              {{ editRoleDescription }}
-            </span>
-          </label>
-        </div>
-
-        <div class="modal-action">
-          <button class="d-btn" @click="isEditRoleModalOpen = false">
-            {{ t('cancel') }}
-          </button>
-          <button
-            class="d-btn d-btn-primary"
-            :disabled="!editRoleName || isEditingRole"
-            @click="updateRoleBinding"
-          >
-            {{ t('button-confirm') }}
-          </button>
-        </div>
-      </div>
-      <div class="modal-backdrop" @click="isEditRoleModalOpen = false" />
-    </dialog>
+    <RoleSelectionModal
+      v-model:open="isEditRoleModalOpen"
+      :roles="availableAppRoles"
+      :current-role="editRoleName"
+      :title="t('select-app-role')"
+      :is-loading="isEditingRole"
+      @confirm="handleEditRoleConfirm"
+    />
   </div>
 </template>
