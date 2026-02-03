@@ -276,7 +276,7 @@ watchEffect(async () => {
                     </tr>
                   </thead>
                   <tbody class="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
-                    <tr v-for="(pkg, index) in displayPackages" :key="index" class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <tr v-for="pkg in displayPackages" :key="`${pkg.name}@${pkg.version}`" class="hover:bg-gray-50 dark:hover:bg-gray-700">
                       <td class="px-6 py-4 text-sm font-medium text-gray-900 whitespace-nowrap dark:text-gray-100">
                         <div class="flex items-center gap-2">
                           <IconPuzzle class="w-4 h-4 text-gray-400" />

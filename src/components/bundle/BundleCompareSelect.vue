@@ -43,6 +43,7 @@ const compareSearchResults = ref<VersionRow[]>([])
 const compareSearch = ref('')
 const compareSearchLoading = ref(false)
 const compareSearchRequestId = ref(0)
+const latestCompareRequestId = ref(0)
 let preferredCompareRequestId = 0
 
 const compareOptions = computed(() => {
@@ -78,6 +79,7 @@ async function loadLatestCompareVersions() {
     latestCompareVersions.value = []
     return
   }
+  const requestId = ++latestCompareRequestId.value
   const { data, error } = await supabase
     .from('app_versions')
     .select('id, name, created_at, manifest_count, app_id')
@@ -87,8 +89,12 @@ async function loadLatestCompareVersions() {
     .order('created_at', { ascending: false })
     .limit(5)
 
+  if (requestId !== latestCompareRequestId.value)
+    return
+
   if (error) {
     console.error('Failed to load latest compare versions', error)
+    latestCompareVersions.value = []
     return
   }
 
@@ -227,13 +233,55 @@ async function searchCompareVersions(term: string) {
     .neq('id', props.currentVersionId)
 
   const numericId = Number(term)
-  const query = Number.isNaN(numericId)
-    ? baseQuery.ilike('name', `%${term}%`)
-    : baseQuery.or(`name.ilike.%${term}%,id.eq.${numericId}`)
+  let data: VersionRow[] | null = null
+  let error: unknown = null
 
-  const { data, error } = await query
-    .order('created_at', { ascending: false })
-    .limit(5)
+  if (Number.isNaN(numericId)) {
+    const response = await baseQuery
+      .ilike('name', `%${term}%`)
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    if (requestId !== compareSearchRequestId.value)
+      return
+
+    data = response.data ?? null
+    error = response.error
+  }
+  else {
+    const [nameResponse, idResponse] = await Promise.all([
+      baseQuery
+        .ilike('name', `%${term}%`)
+        .order('created_at', { ascending: false })
+        .limit(5),
+      baseQuery
+        .eq('id', numericId)
+        .order('created_at', { ascending: false })
+        .limit(5),
+    ])
+
+    if (requestId !== compareSearchRequestId.value)
+      return
+
+    if (nameResponse.error || idResponse.error) {
+      error = nameResponse.error ?? idResponse.error
+      data = null
+    }
+    else {
+      const combined = [
+        ...(nameResponse.data ?? []),
+        ...(idResponse.data ?? []),
+      ]
+      const seenIds = new Set<number>()
+      const unique = combined.filter((row) => {
+        if (seenIds.has(row.id))
+          return false
+        seenIds.add(row.id)
+        return true
+      })
+      data = unique.slice(0, 5)
+    }
+  }
 
   if (requestId !== compareSearchRequestId.value)
     return
