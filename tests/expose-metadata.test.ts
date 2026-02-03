@@ -110,6 +110,11 @@ describe('expose_metadata feature', () => {
         }),
       })
 
+      if (createResponse.status !== 200) {
+        const errorBody = await createResponse.json()
+        console.error('App creation failed:', createResponse.status, errorBody)
+      }
+
       expect(createResponse.status).toBe(200)
 
       const { data: appData, error } = await supabase
