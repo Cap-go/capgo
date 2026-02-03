@@ -302,9 +302,9 @@ describe('[GET] /channel_self tests', () => {
     data.app_id = 'com.nonexistent.app'
     const response = await fetchGetChannels(data as any)
 
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(429)
     const error = await getResponseErrorCode(response)
-    expect(error).toBe('app_not_found')
+    expect(error).toBe('on_premise_app')
   })
 
   it('[GET] should return compatible channels for iOS', async () => {

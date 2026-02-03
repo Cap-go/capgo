@@ -108,6 +108,20 @@ All API endpoints must follow these response patterns:
 
 Do NOT use `c.body(null, 204)` for success responses. Always return JSON for consistency.
 
+### Cache System (On-Prem + Plan Upgrade)
+
+Capgo relies on two layered caches for plugin endpoints (`/updates`, `/stats`, `/channel_self`) and they depend on specific response codes/body shapes. Do **not** change these without updating the Cloudflare snippet + app status logic.
+
+- **Edge on-prem cache (Cloudflare Snippet)**: `cloudflare_workers/snippet/index.js` caches responses when it detects:
+  - `429` + `{ error: 'on_premise_app' }` (from `/updates` or `/channel_self`), or
+  - `{ isOnprem: true }` (from `/stats`).
+  The snippet stores cached responses using the worker's `Cache-Control` TTL and serves them before routing.
+- **Edge plan-upgrade cache (Cloudflare Snippet)**: same file caches responses when it detects:
+  - `429` + `{ error: 'need_plan_upgrade' }`.
+- **App status cache (Worker runtime)**: `supabase/functions/_backend/utils/appStatus.ts` stores `onprem` / `cancelled` / `cloud` for 60s using the Cache API to short-circuit DB lookups.
+
+**Implication:** Keep the `429` + error payloads for on-prem and plan-upgrade responses; otherwise the edge caches and status cache effectiveness are broken.
+
 ### Key Frontend Directories
 
 - **`src/components/`** - Reusable Vue components

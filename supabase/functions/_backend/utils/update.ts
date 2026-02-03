@@ -12,7 +12,7 @@ import {
 import { getRuntimeKey } from 'hono/adapter'
 import { getAppStatus, setAppStatus } from './appStatus.ts'
 import { getBundleUrl, getManifestUrl } from './downloadUrl.ts'
-import { simpleError200, simpleErrorWithStatus } from './hono.ts'
+import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { sendNotifOrgCached } from './notifications.ts'
 import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, requestInfosPostgres, setReplicationLagHeader } from './pg.ts'
@@ -22,7 +22,6 @@ import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, 
 import { backgroundTask, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, fixSemver, isDeprecatedPluginVersion, isInternalVersionName } from './utils.ts'
 
 const PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth']
-const PLAN_ERROR = 'Cannot get update, upgrade plan to continue to update'
 
 export function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[], expose_metadata: boolean = false) {
   const pluginVersion = parse(plugin_version)
@@ -78,7 +77,7 @@ export async function updateWithPG(
   if (cachedStatus === 'cancelled') {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT)
   if (!appOwner) {
@@ -95,7 +94,7 @@ export async function updateWithPG(
       device_id,
       app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
-    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
   await setAppStatus(c, app_id, 'cloud')
   const channelDeviceCount = appOwner.channel_device_count ?? 0
