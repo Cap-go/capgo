@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
-import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
+import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -34,11 +34,11 @@ app.post('/', middlewareAPISecret, triggerValidator('channels', 'UPDATE'), async
 
   if (!record.id) {
     cloudlog({ requestId: c.get('requestId'), message: 'No id' })
-    return c.json(BRES)
+    throw simpleError('no_id', 'No id', { record })
   }
   if (!record.app_id) {
     cloudlog({ requestId: c.get('requestId'), message: 'No app id included the request' })
-    return c.json(BRES)
+    throw simpleError('no_app_id', 'No app id included the request', { record })
   }
 
   if (record.public && record.ios) {
