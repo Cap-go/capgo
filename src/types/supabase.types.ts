@@ -1097,6 +1097,9 @@ export type Database = {
           builds_last_month: number | null
           builds_last_month_android: number | null
           builds_last_month_ios: number | null
+          builds_success_android: number | null
+          builds_success_ios: number | null
+          builds_success_total: number | null
           builds_total: number | null
           bundle_storage_gb: number
           canceled_orgs: number
@@ -1152,6 +1155,9 @@ export type Database = {
           builds_last_month?: number | null
           builds_last_month_android?: number | null
           builds_last_month_ios?: number | null
+          builds_success_android?: number | null
+          builds_success_ios?: number | null
+          builds_success_total?: number | null
           builds_total?: number | null
           bundle_storage_gb?: number
           canceled_orgs?: number
@@ -1207,6 +1213,9 @@ export type Database = {
           builds_last_month?: number | null
           builds_last_month_android?: number | null
           builds_last_month_ios?: number | null
+          builds_success_android?: number | null
+          builds_success_ios?: number | null
+          builds_success_total?: number | null
           builds_total?: number | null
           bundle_storage_gb?: number
           canceled_orgs?: number
