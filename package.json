@@ -241,7 +241,6 @@
     "discord-api-types": "^0.38.33",
     "eslint": "9.39.2",
     "eslint-plugin-format": "^1.0.2",
-    "husky": "^9.1.7",
     "sass": "1.97.3",
     "tailwindcss": "^4.1.17",
     "typescript": "5.9.3",
@@ -260,11 +259,6 @@
     "vitest": "^4.0.8",
     "vue-tsc": "3.1.8",
     "wrangler": "^4.60.0"
-  },
-  "husky": {
-    "hooks": {
-      "pre-commit": "bun run lint"
-    }
   },
   "gitmoji": {
     "autoAdd": false,
