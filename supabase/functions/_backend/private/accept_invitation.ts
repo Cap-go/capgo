@@ -1,3 +1,4 @@
+import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
@@ -5,6 +6,7 @@ import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
 import { emptySupabase, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 import { syncUserPreferenceTags } from '../utils/user_preferences.ts'
+import { getEnv } from '../utils/utils.ts'
 
 interface AcceptInvitation {
   password: string
@@ -62,6 +64,10 @@ const baseInvitationSchema = z.object({
   magic_invite_string: z.string().check(z.minLength(1)),
   opt_for_newsletters: z.boolean(),
   captchaToken: z.string().check(z.minLength(1)),
+})
+
+const captchaSchema = z.object({
+  success: z.boolean(),
 })
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -134,6 +140,11 @@ app.post('/', async (c) => {
   }
   const { password: _pwd, ...bodyWithoutPassword } = body
   cloudlog({ requestId: c.get('requestId'), context: 'accept_invitation validated body', body: bodyWithoutPassword })
+
+  const captchaSecret = getEnv(c, 'CAPTCHA_SECRET_KEY')
+  if (captchaSecret.length > 0) {
+    await verifyCaptchaToken(c, body.captchaToken, captchaSecret)
+  }
 
   // here the real magic happens
   const { data: user, error: userError } = await supabaseAdmin.auth.admin.createUser({
@@ -290,3 +301,29 @@ app.post('/', async (c) => {
     refresh_token: session.session?.refresh_token,
   })
 })
+
+// Function to verify Cloudflare Turnstile token
+async function verifyCaptchaToken(c: Context, token: string, captchaSecret: string) {
+  // "/siteverify" API endpoint.
+  const url = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
+  const result = await fetch(url, {
+    body: new URLSearchParams({
+      secret: captchaSecret,
+      response: token,
+    }),
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+  })
+
+  const captchaResult = await result.json()
+  const captchaResultData = captchaSchema.safeParse(captchaResult)
+  if (!captchaResultData.success) {
+    throw simpleError('invalid_captcha', 'Invalid captcha result')
+  }
+  cloudlog({ requestId: c.get('requestId'), context: 'captcha_result', captchaResultData })
+  if (captchaResultData.data.success !== true) {
+    throw simpleError('invalid_captcha', 'Invalid captcha result')
+  }
+}
