@@ -213,7 +213,6 @@
   "app-not-found": "アプリが見つかりません",
   "app-not-found-description": "このアプリは見つかりませんでした。削除された可能性があるか、またはアクセス権限がない可能性があります。",
   "app-perm": "アプリの許可",
-  "app-role-hint": "アプリロールで実行可能な操作を制御します",
   "app-transferred": "アプリが正常に転送されました",
   "app-will-be-transferred": "アプリは$ORG_IDに移行されます。移行を確認するために、アプリID（'$APP_ID'）を入力してください。",
   "apps": "アプリ",

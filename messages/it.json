@@ -213,7 +213,6 @@
   "app-not-found": "App non trovata",
   "app-not-found-description": "Questa app non è stata trovata. Potrebbe essere stata cancellata o potresti non avere accesso ad essa.",
   "app-perm": "Autorizzazione dell'app",
-  "app-role-hint": "I ruoli dell'app controllano le azioni consentite",
   "app-transferred": "App trasferita con successo",
   "app-will-be-transferred": "L'app verrà trasferita a $ORG_ID. Si prega di digitare l'ID dell'app ('$APP_ID') per confermare il trasferimento.",
   "apps": "app",

@@ -213,7 +213,6 @@
   "app-not-found": "App not found",
   "app-not-found-description": "This app could not be found. It might have been deleted or you might not have access to it.",
   "app-perm": "App permission",
-  "app-role-hint": "App roles control what actions users can perform on this app",
   "app-transferred": "App transferred successfully",
   "app-will-be-transferred": "App will be transferred to $ORG_ID. Please type the app ID ('$APP_ID') to confirm the transfer. ",
   "apps": "apps",

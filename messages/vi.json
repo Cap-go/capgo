@@ -213,7 +213,6 @@
   "app-not-found": "Ứng dụng không tìm thấy",
   "app-not-found-description": "Ứng dụng này không thể tìm thấy. Có thể nó đã bị xóa hoặc bạn có thể không có quyền truy cập vào nó.",
   "app-perm": "Quyền ứng dụng",
-  "app-role-hint": "Vai trò ứng dụng quyết định các hành động được phép",
   "app-transferred": "Ứng dụng đã được chuyển thành công",
   "app-will-be-transferred": "Ứng dụng sẽ được chuyển giao cho $ORG_ID. Vui lòng nhập ID ứng dụng ('$APP_ID') để xác nhận việc chuyển giao.",
   "apps": "ứng dụng",
