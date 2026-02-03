@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
 import { CacheHelper } from './cache.ts'
+import { cloudlog } from './logging.ts'
 import { getClientIP } from './rate_limit.ts'
 import { getEnv } from './utils.ts'
 
@@ -139,6 +140,11 @@ export async function isChannelSelfIPRateLimited(
 ): Promise<ChannelSelfIPRateLimitStatus> {
   const ip = getClientIP(c)
   if (ip === 'unknown') {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'IP rate limit skipped: unknown IP',
+      app_id: appId,
+    })
     return { limited: false }
   }
 
@@ -151,6 +157,26 @@ export async function isChannelSelfIPRateLimited(
   const limit = getChannelSelfIpRateLimit(c)
   const limited = cached.count >= limit
   return { limited, resetAt: cached.resetAt, ip }
+}
+
+/**
+ * Check IP-based rate limiting and log when limited.
+ */
+export async function checkChannelSelfIPRateLimit(
+  c: Context,
+  appId: string,
+  logMessage: string,
+): Promise<ChannelSelfIPRateLimitStatus> {
+  const status = await isChannelSelfIPRateLimited(c, appId)
+  if (status.limited) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: logMessage,
+      app_id: appId,
+      ip: status.ip,
+    })
+  }
+  return status
 }
 
 /**
@@ -194,10 +220,14 @@ export async function recordChannelSelfIPRequest(
 
   const ipRateEntry = buildIpRateRequest(c, appId, ip)
   const existing = await ipRateEntry.helper.matchJson<RateLimitCounter>(ipRateEntry.request)
+  const now = Date.now()
+  const inWindow = typeof existing?.resetAt === 'number' && existing.resetAt > now
+  const resetAt = inWindow ? existing.resetAt : now + IP_RATE_TTL_SECONDS * 1000
   const newData: RateLimitCounter = {
-    count: (existing?.count ?? 0) + 1,
-    resetAt: Date.now() + IP_RATE_TTL_SECONDS * 1000,
+    count: inWindow ? (existing?.count ?? 0) + 1 : 1,
+    resetAt,
   }
+  const ttlSeconds = Math.max(1, Math.ceil((resetAt - now) / 1000))
 
-  await ipRateEntry.helper.putJson(ipRateEntry.request, newData, IP_RATE_TTL_SECONDS)
+  await ipRateEntry.helper.putJson(ipRateEntry.request, newData, ttlSeconds)
 }

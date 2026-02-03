@@ -1,6 +1,6 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import type { DeviceLink } from './delete.ts'
-import { isChannelSelfIPRateLimited, isChannelSelfRateLimited, recordChannelSelfIPRequest, recordChannelSelfRequest } from '../../utils/channelSelfRateLimit.ts'
+import { checkChannelSelfIPRateLimit, isChannelSelfRateLimited, recordChannelSelfIPRequest, recordChannelSelfRequest } from '../../utils/channelSelfRateLimit.ts'
 import { getBodyOrQuery, honoFactory, parseBody, simpleRateLimit } from '../../utils/hono.ts'
 import { middlewareKey } from '../../utils/hono_middleware.ts'
 import { cloudlog } from '../../utils/logging.ts'
@@ -18,6 +18,17 @@ function buildRateLimitInfo(resetAt?: number) {
     rateLimitResetAt: resetAt,
     retryAfterSeconds,
   }
+}
+
+async function assertDeviceIPRateLimit(c: Context, appId: string) {
+  const ipRateLimitStatus = await checkChannelSelfIPRateLimit(c, appId, 'Device API IP rate limited')
+  if (ipRateLimitStatus.limited) {
+    return simpleRateLimit({ reason: 'ip_rate_limit_exceeded', app_id: appId, ...buildRateLimitInfo(ipRateLimitStatus.resetAt) })
+  }
+}
+
+function recordDeviceIPRateLimit(c: Context, appId: string) {
+  backgroundTask(c, recordChannelSelfIPRequest(c, appId))
 }
 
 export const app = honoFactory.createApp()
@@ -38,11 +49,7 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
   // Rate limit: max 1 set per second per device+app, and same channel set max once per 60 seconds
   // Note: We check device_id && app_id only (not channel) so op-level rate limiting applies even for invalid requests
   if (body.app_id) {
-    const ipRateLimitStatus = await isChannelSelfIPRateLimited(c, body.app_id)
-    if (ipRateLimitStatus.limited) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Device API IP rate limited', app_id: body.app_id })
-      return simpleRateLimit({ reason: 'ip_rate_limit_exceeded', app_id: body.app_id, ...buildRateLimitInfo(ipRateLimitStatus.resetAt) })
-    }
+    await assertDeviceIPRateLimit(c, body.app_id)
   }
   if (body.device_id && body.app_id) {
     const rateLimitStatus = await isChannelSelfRateLimited(c, body.app_id, body.device_id, 'set', body.channel)
@@ -59,7 +66,7 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
     backgroundTask(c, recordChannelSelfRequest(c, body.app_id, body.device_id, 'set', body.channel))
   }
   if (body.app_id) {
-    backgroundTask(c, recordChannelSelfIPRequest(c, body.app_id))
+    recordDeviceIPRateLimit(c, body.app_id)
   }
 
   return res
@@ -79,11 +86,7 @@ app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
 
   // Rate limit: max 1 get per second per device+app
   if (body.app_id) {
-    const ipRateLimitStatus = await isChannelSelfIPRateLimited(c, body.app_id)
-    if (ipRateLimitStatus.limited) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Device API IP rate limited', app_id: body.app_id })
-      return simpleRateLimit({ reason: 'ip_rate_limit_exceeded', app_id: body.app_id, ...buildRateLimitInfo(ipRateLimitStatus.resetAt) })
-    }
+    await assertDeviceIPRateLimit(c, body.app_id)
   }
   if (body.device_id && body.app_id) {
     const rateLimitStatus = await isChannelSelfRateLimited(c, body.app_id, body.device_id, 'get')
@@ -100,7 +103,7 @@ app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
     backgroundTask(c, recordChannelSelfRequest(c, body.app_id, body.device_id, 'get'))
   }
   if (body.app_id) {
-    backgroundTask(c, recordChannelSelfIPRequest(c, body.app_id))
+    recordDeviceIPRateLimit(c, body.app_id)
   }
 
   return res
@@ -120,11 +123,7 @@ app.delete('/', middlewareKey(['all', 'write']), async (c) => {
 
   // Rate limit: max 1 delete per second per device+app
   if (body.app_id) {
-    const ipRateLimitStatus = await isChannelSelfIPRateLimited(c, body.app_id)
-    if (ipRateLimitStatus.limited) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Device API IP rate limited', app_id: body.app_id })
-      return simpleRateLimit({ reason: 'ip_rate_limit_exceeded', app_id: body.app_id, ...buildRateLimitInfo(ipRateLimitStatus.resetAt) })
-    }
+    await assertDeviceIPRateLimit(c, body.app_id)
   }
   if (body.device_id && body.app_id) {
     const rateLimitStatus = await isChannelSelfRateLimited(c, body.app_id, body.device_id, 'delete')
@@ -141,7 +140,7 @@ app.delete('/', middlewareKey(['all', 'write']), async (c) => {
     backgroundTask(c, recordChannelSelfRequest(c, body.app_id, body.device_id, 'delete'))
   }
   if (body.app_id) {
-    backgroundTask(c, recordChannelSelfIPRequest(c, body.app_id))
+    recordDeviceIPRateLimit(c, body.app_id)
   }
 
   return res
