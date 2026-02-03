@@ -10,15 +10,19 @@ const drizzleErrorNames = new Set(['DrizzleError', 'DrizzleQueryError', 'Transac
 export function onError(functionName: string) {
   return async (e: any, c: Context) => {
     let body = 'N/A'
-    try {
-      body = await c.req.json().then(body => JSON.stringify(body)).catch(failToReadBody => `Failed to read body (${JSON.stringify(failToReadBody)})`)
-      if (body.length > 1000) {
-        body = `${body.substring(0, 1000)}... (truncated)`
+    const method = c.req.method.toUpperCase()
+    const shouldReadBody = method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS'
+    if (shouldReadBody) {
+      try {
+        body = await c.req.json().then(body => JSON.stringify(body)).catch(failToReadBody => `Failed to read body (${JSON.stringify(failToReadBody)})`)
+        if (body.length > 1000) {
+          body = `${body.substring(0, 1000)}... (truncated)`
+        }
       }
-    }
-    catch (failToReadBody) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'failToReadBody', failToReadBody })
-      body = `Failed to read body (${JSON.stringify(failToReadBody)})`
+      catch (failToReadBody) {
+        cloudlogErr({ requestId: c.get('requestId'), message: 'failToReadBody', failToReadBody })
+        body = `Failed to read body (${JSON.stringify(failToReadBody)})`
+      }
     }
 
     // const safeCause = e ? JSON.stringify(e, Object.getOwnPropertyNames(e)) : undefined
