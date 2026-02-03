@@ -21,6 +21,6 @@ app.post('/', middlewareAPISecret, triggerValidator('users', 'UPDATE'), async (c
     throw simpleError('no_id', 'No id', { record })
   }
   await createApiKey(c, record.id)
-  await syncUserPreferenceTags(c, record.email, record, oldRecord?.email)
+  await syncUserPreferenceTags(c, record.email, record, oldRecord, oldRecord?.email)
   return c.json(BRES)
 })

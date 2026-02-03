@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { EmailPreferenceKey, EmailPreferences } from './org_email_notifications.ts'
 import type { Database } from './supabase.types.ts'
-import { addTagBento } from './bento.ts'
+import { syncBentoSubscriberTags } from './bento.ts'
 import { cloudlog } from './logging.ts'
 
 // Legacy tags for general notifications and newsletters
@@ -34,61 +34,61 @@ type UserPreferenceRecord = Database['public']['Tables']['users']['Row'] & {
   email_preferences?: EmailPreferences | null
 }
 
-function buildPreferenceSegments(record: UserPreferenceRecord | null | undefined) {
-  const segments: string[] = []
-  const deleteSegments: string[] = []
+function buildDesiredTags(record: UserPreferenceRecord | null | undefined) {
+  const tags = new Set<string>()
 
-  // Legacy notification toggle
-  if (record?.enable_notifications) {
-    segments.push(NOTIFICATION_TAG)
-  }
-  else {
-    deleteSegments.push(NOTIFICATION_TAG)
-  }
+  if (record?.enable_notifications)
+    tags.add(NOTIFICATION_TAG)
 
-  // Legacy newsletter toggle
-  if (record?.opt_for_newsletters) {
-    segments.push(NEWSLETTER_TAG)
-  }
-  else {
-    deleteSegments.push(NEWSLETTER_TAG)
-  }
+  if (record?.opt_for_newsletters)
+    tags.add(NEWSLETTER_TAG)
 
-  // Granular email preferences - add disabled tag when preference is OFF
   const emailPrefs = record?.email_preferences ?? {}
   for (const [key, disabledTag] of Object.entries(EMAIL_PREF_DISABLED_TAGS)) {
     const prefKey = key as EmailPreferenceKey
-    const isEnabled = emailPrefs[prefKey] ?? true // Default to true
+    const isEnabled = emailPrefs[prefKey] ?? true
+    if (!isEnabled)
+      tags.add(disabledTag)
+  }
 
-    if (isEnabled) {
-      // Preference is ON, remove the disabled tag
-      deleteSegments.push(disabledTag)
-    }
-    else {
-      // Preference is OFF, add the disabled tag
-      segments.push(disabledTag)
+  return tags
+}
+
+function buildTagDelta(currentTags: Set<string>, previousTags?: Set<string>) {
+  if (!previousTags) {
+    return {
+      segments: [...currentTags],
+      deleteSegments: ALL_TAGS.filter(tag => !currentTags.has(tag)),
     }
   }
 
-  return { segments, deleteSegments }
+  return {
+    segments: [...currentTags].filter(tag => !previousTags.has(tag)),
+    deleteSegments: [...previousTags].filter(tag => !currentTags.has(tag)),
+  }
 }
 
 export async function syncUserPreferenceTags(
   c: Context,
   email: string | null | undefined,
   record: UserPreferenceRecord | null | undefined,
+  previousRecord?: UserPreferenceRecord | null,
   previousEmail?: string | null,
 ) {
   try {
     if (previousEmail && previousEmail !== email) {
-      await addTagBento(c, previousEmail, { segments: [], deleteSegments: ALL_TAGS })
+      await syncBentoSubscriberTags(c, { email: previousEmail, segments: [], deleteSegments: ALL_TAGS })
     }
 
     if (!email)
       return
 
-    const segments = buildPreferenceSegments(record)
-    await addTagBento(c, email, segments)
+    const currentTags = buildDesiredTags(record)
+    const previousTags = previousEmail === email && previousRecord ? buildDesiredTags(previousRecord) : undefined
+    const segments = buildTagDelta(currentTags, previousTags)
+    if (segments.segments.length === 0 && segments.deleteSegments.length === 0)
+      return
+    await syncBentoSubscriberTags(c, { email, ...segments })
   }
   catch (error) {
     cloudlog({ requestId: c.get('requestId'), message: 'syncUserPreferenceTags error', error })
