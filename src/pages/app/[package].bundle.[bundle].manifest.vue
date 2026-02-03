@@ -45,6 +45,16 @@ const MANIFEST_PAGE_SIZE = 1000
 const compareRequestId = ref(0)
 const compareSearchRequestId = ref(0)
 let preferredCompareRequestId = 0
+const deltaUploadCommand = 'npx @capgo/cli@latest bundle upload --delta'
+const directUpdateConfigSnippet = `{
+  "plugins": {
+    "CapacitorUpdater": {
+      "autoUpdate": true,
+      "directUpdate": "atInstall"
+    }
+  }
+}`
+const differentialsDocUrl = 'https://capgo.app/docs/live-updates/differentials/'
 
 function hideHash(hash: string) {
   if (!hash)
@@ -514,6 +524,9 @@ watchEffect(async () => {
             <h3 class="text-lg font-medium leading-6 text-gray-900 dark:text-gray-100">
               {{ t('manifest') }}
             </h3>
+            <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+              {{ t('manifest-description') }}
+            </p>
           </div>
 
           <div v-if="manifestEntries.length === 0" class="flex flex-col items-center justify-center px-4 py-12">
@@ -521,6 +534,29 @@ watchEffect(async () => {
             <h4 class="text-lg font-medium text-gray-900 dark:text-gray-100">
               {{ t('no-manifest-bundle') }}
             </h4>
+            <p class="mt-2 max-w-xl text-center text-sm text-slate-600 dark:text-slate-300">
+              {{ t('manifest-no-manifest-body') }}
+            </p>
+            <div class="mt-6 w-full max-w-xl rounded-lg border border-slate-200 bg-slate-50 p-4 text-left text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+              <div class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                {{ t('manifest-delta-command-label') }}
+              </div>
+              <div class="mt-2 rounded-md bg-white px-3 py-2 font-mono text-xs text-slate-800 shadow-sm dark:bg-slate-950 dark:text-slate-100">
+                {{ deltaUploadCommand }}
+              </div>
+              <div class="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+                {{ t('manifest-direct-update-config') }}
+              </div>
+              <pre class="mt-2 overflow-x-auto rounded-md bg-white px-3 py-2 text-xs font-mono text-slate-800 shadow-sm dark:bg-slate-950 dark:text-slate-100">{{ directUpdateConfigSnippet }}</pre>
+            </div>
+            <a
+              class="mt-4 text-sm font-medium text-emerald-600 hover:underline dark:text-emerald-400"
+              :href="differentialsDocUrl"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {{ t('manifest-docs-link') }}
+            </a>
           </div>
 
           <template v-else>
