@@ -9,8 +9,8 @@ import { schema } from '../utils/postgres_schema.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
-app.use('/', useCors)
-app.use('/', middlewareAuth)
+app.use('*', useCors)
+app.use('*', middlewareAuth)
 
 // GET /private/roles - Liste des rôles assignables
 app.get('/', async (c: Context<MiddlewareKeyVariables>) => {
