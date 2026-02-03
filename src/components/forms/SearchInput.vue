@@ -31,7 +31,7 @@ const localValue = computed({
       type="text"
       :placeholder="placeholder"
       :disabled="disabled"
-      :class="['w-full pl-10 d-input', props.class]"
+      class="w-full pl-10 d-input" :class="[props.class]"
     >
     <IconSearch class="absolute w-4 h-4 text-gray-400 transform -translate-y-1/2 left-3 top-1/2" />
   </div>

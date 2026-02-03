@@ -32,8 +32,8 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
-  confirm: [role: string]
-  cancel: []
+  'confirm': [role: string]
+  'cancel': []
 }>()
 
 const { t } = useI18n()

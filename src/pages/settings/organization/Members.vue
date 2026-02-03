@@ -1681,82 +1681,82 @@ async function handleInviteNewUserSubmit() {
       <div class="w-full">
         <div class="max-h-[75vh] overflow-hidden">
           <div class="grid h-full gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <div>
-            <SearchInput
-              v-model="appAccessSearch"
-              :placeholder="t('search-apps', 'Search apps')"
-              :disabled="isAppAccessLoading"
-            />
-            <div class="mt-3 overflow-hidden border rounded-lg dark:border-gray-600">
-              <div v-if="isAppAccessLoading" class="p-4 text-sm text-gray-500">
-                {{ t('loading') }}
-              </div>
-              <div v-else-if="filteredAppAccessApps.length" class="max-h-[55vh] space-y-2 overflow-y-auto p-3">
-                <label
-                  v-for="app in filteredAppAccessApps"
-                  :key="app.id"
-                  class="flex items-start gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
-                  :class="{ 'bg-gray-50 dark:bg-gray-800': appAccessSelectedAppIds.includes(app.id) }"
-                >
-                  <input
-                    v-model="appAccessSelectedAppIds"
-                    type="checkbox"
-                    name="app-access-app"
-                    :value="app.id"
-                    class="mt-1 checkbox checkbox-primary"
+            <div>
+              <SearchInput
+                v-model="appAccessSearch"
+                :placeholder="t('search-apps', 'Search apps')"
+                :disabled="isAppAccessLoading"
+              />
+              <div class="mt-3 overflow-hidden border rounded-lg dark:border-gray-600">
+                <div v-if="isAppAccessLoading" class="p-4 text-sm text-gray-500">
+                  {{ t('loading') }}
+                </div>
+                <div v-else-if="filteredAppAccessApps.length" class="max-h-[55vh] space-y-2 overflow-y-auto p-3">
+                  <label
+                    v-for="app in filteredAppAccessApps"
+                    :key="app.id"
+                    class="flex items-start gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                    :class="{ 'bg-gray-50 dark:bg-gray-800': appAccessSelectedAppIds.includes(app.id) }"
                   >
-                  <div class="flex flex-col">
-                    <span class="text-sm font-medium">
-                      {{ app.name || app.app_id }}
-                    </span>
-                    <span class="text-xs text-gray-500">
-                      {{ app.app_id }}
-                    </span>
-                    <span v-if="getAppAccessLabel(app.id)" class="text-xs text-primary">
-                      {{ getAppAccessLabel(app.id) }}
-                    </span>
-                  </div>
-                </label>
-              </div>
-              <div v-else class="p-4 text-sm text-gray-500">
-                {{ t('no-results') }}
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <div class="mb-4">
-              <div class="text-xs uppercase text-gray-500">
-                {{ t('app') }} · {{ t('role') }}
-              </div>
-              <div class="text-sm font-medium">
-                <span v-if="appAccessSelectedAppIds.length === 1">
-                  {{ selectedAppAccessBinding ? getRoleDisplayName(selectedAppAccessBinding.role_name) : t('none') }}
-                </span>
-                <span v-else-if="appAccessSelectedAppIds.length > 1">
-                  {{ t('selected-apps', 'Selected apps') }}: {{ appAccessSelectedAppIds.length }}
-                </span>
-                <span v-else>
-                  {{ t('none') }}
-                </span>
-              </div>
-              <div v-if="selectedAppAccessApp" class="text-xs text-gray-500">
-                {{ selectedAppAccessApp.name || selectedAppAccessApp.app_id }}
+                    <input
+                      v-model="appAccessSelectedAppIds"
+                      type="checkbox"
+                      name="app-access-app"
+                      :value="app.id"
+                      class="mt-1 checkbox checkbox-primary"
+                    >
+                    <div class="flex flex-col">
+                      <span class="text-sm font-medium">
+                        {{ app.name || app.app_id }}
+                      </span>
+                      <span class="text-xs text-gray-500">
+                        {{ app.app_id }}
+                      </span>
+                      <span v-if="getAppAccessLabel(app.id)" class="text-xs text-primary">
+                        {{ getAppAccessLabel(app.id) }}
+                      </span>
+                    </div>
+                  </label>
+                </div>
+                <div v-else class="p-4 text-sm text-gray-500">
+                  {{ t('no-results') }}
+                </div>
               </div>
             </div>
 
-            <RoleSelect
-              v-model="appAccessSelectedRole"
-              :roles="availableAppRoles.map(role => ({
-                ...role,
-                description: `${getRoleDisplayName(role.name)} - ${role.description}`
-              }))"
-              :label="t('select-app-role')"
-              :disabled="appAccessSelectedAppIds.length === 0 || isAppAccessLoading"
-              @update:model-value="appAccessRoleTouched = true"
-            />
+            <div>
+              <div class="mb-4">
+                <div class="text-xs uppercase text-gray-500">
+                  {{ t('app') }} · {{ t('role') }}
+                </div>
+                <div class="text-sm font-medium">
+                  <span v-if="appAccessSelectedAppIds.length === 1">
+                    {{ selectedAppAccessBinding ? getRoleDisplayName(selectedAppAccessBinding.role_name) : t('none') }}
+                  </span>
+                  <span v-else-if="appAccessSelectedAppIds.length > 1">
+                    {{ t('selected-apps', 'Selected apps') }}: {{ appAccessSelectedAppIds.length }}
+                  </span>
+                  <span v-else>
+                    {{ t('none') }}
+                  </span>
+                </div>
+                <div v-if="selectedAppAccessApp" class="text-xs text-gray-500">
+                  {{ selectedAppAccessApp.name || selectedAppAccessApp.app_id }}
+                </div>
+              </div>
+
+              <RoleSelect
+                v-model="appAccessSelectedRole"
+                :roles="availableAppRoles.map(role => ({
+                  ...role,
+                  description: `${getRoleDisplayName(role.name)} - ${role.description}`,
+                }))"
+                :label="t('select-app-role')"
+                :disabled="appAccessSelectedAppIds.length === 0 || isAppAccessLoading"
+                @update:model-value="appAccessRoleTouched = true"
+              />
+            </div>
           </div>
-        </div>
         </div>
       </div>
     </Teleport>
