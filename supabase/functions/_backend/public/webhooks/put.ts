@@ -3,7 +3,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../utils/hono.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
-import { WEBHOOK_EVENT_TYPES } from '../../utils/webhook.ts'
+import { getWebhookUrlValidationError, WEBHOOK_EVENT_TYPES } from '../../utils/webhook.ts'
 import { checkWebhookPermission } from './index.ts'
 
 const bodySchema = z.object({
@@ -56,12 +56,9 @@ export async function put(c: Context, bodyRaw: any, apikey: Database['public']['
 
   // Validate URL if provided
   if (body.url) {
-    const url = new URL(body.url)
-    const isLocalhost = url.hostname === 'localhost' || url.hostname.endsWith('.localhost')
-    const isLoopback = url.hostname === '127.0.0.1' || url.hostname === '::1'
-    if (url.protocol !== 'https:' && !isLocalhost && !isLoopback) {
-      throw simpleError('invalid_url', 'Webhook URL must use HTTPS', { url: body.url })
-    }
+    const urlError = getWebhookUrlValidationError(c, body.url)
+    if (urlError)
+      throw simpleError('invalid_url', urlError, { url: body.url })
   }
 
   // Build update object
