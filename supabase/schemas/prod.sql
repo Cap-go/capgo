@@ -1232,6 +1232,57 @@ $$;
 ALTER FUNCTION "public"."check_min_rights_legacy"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."check_min_rights_legacy_no_password_policy"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  user_right_record RECORD;
+  v_org_enforcing_2fa boolean;
+BEGIN
+  IF user_id IS NULL THEN
+    PERFORM public.pg_log('deny: CHECK_MIN_RIGHTS_LEGACY_NO_UID', jsonb_build_object('org_id', org_id, 'app_id', app_id, 'channel_id', channel_id, 'min_right', min_right::text));
+    RETURN false;
+  END IF;
+
+  -- Enforce 2FA if the org requires it.
+  IF org_id IS NOT NULL THEN
+    SELECT enforcing_2fa INTO v_org_enforcing_2fa FROM public.orgs WHERE id = org_id;
+    IF v_org_enforcing_2fa = true AND NOT public.has_2fa_enabled(user_id) THEN
+      PERFORM public.pg_log('deny: CHECK_MIN_RIGHTS_LEGACY_NO_PW_2FA_ENFORCEMENT', jsonb_build_object(
+        'org_id', org_id,
+        'app_id', app_id,
+        'channel_id', channel_id,
+        'min_right', min_right::text,
+        'user_id', user_id
+      ));
+      RETURN false;
+    END IF;
+  END IF;
+
+  FOR user_right_record IN
+    SELECT org_users.user_right, org_users.app_id, org_users.channel_id
+    FROM public.org_users
+    WHERE org_users.org_id = check_min_rights_legacy_no_password_policy.org_id
+      AND org_users.user_id = check_min_rights_legacy_no_password_policy.user_id
+  LOOP
+    IF (user_right_record.user_right >= min_right AND user_right_record.app_id IS NULL AND user_right_record.channel_id IS NULL) OR
+       (user_right_record.user_right >= min_right AND user_right_record.app_id = check_min_rights_legacy_no_password_policy.app_id AND user_right_record.channel_id IS NULL) OR
+       (user_right_record.user_right >= min_right AND user_right_record.app_id = check_min_rights_legacy_no_password_policy.app_id AND user_right_record.channel_id = check_min_rights_legacy_no_password_policy.channel_id)
+    THEN
+      RETURN true;
+    END IF;
+  END LOOP;
+
+  PERFORM public.pg_log('deny: CHECK_MIN_RIGHTS_LEGACY_NO_PW', jsonb_build_object('org_id', org_id, 'app_id', app_id, 'channel_id', channel_id, 'min_right', min_right::text, 'user_id', user_id));
+  RETURN false;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."check_min_rights_legacy_no_password_policy"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."check_org_encrypted_bundle_enforcement"("org_id" "uuid", "session_key" "text") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -3391,7 +3442,7 @@ BEGIN
   JOIN public.orgs o ON tmp.org_id = o.id
   WHERE tmp.invite_magic_string = get_invite_by_magic_lookup.lookup
     AND tmp.cancelled_at IS NULL
-    AND tmp.created_at > (CURRENT_TIMESTAMP - INTERVAL '7 days');
+    AND GREATEST(tmp.updated_at, tmp.created_at) > (CURRENT_TIMESTAMP - INTERVAL '7 days');
 END;
 $$;
 
@@ -3565,7 +3616,7 @@ BEGIN
     FROM public.tmp_users tmp
     WHERE tmp.org_id = get_org_members.guild_id
     AND tmp.cancelled_at IS NULL
-    AND tmp.created_at > (CURRENT_TIMESTAMP - INTERVAL '7 days');
+    AND GREATEST(tmp.updated_at, tmp.created_at) > (CURRENT_TIMESTAMP - INTERVAL '7 days');
 END;
 $$;
 
@@ -3647,14 +3698,14 @@ BEGIN
       ) AS role_name,
       NULL::uuid AS role_id,
       NULL::uuid AS binding_id,
-      tmp.created_at AS granted_at,
+      GREATEST(tmp.updated_at, tmp.created_at) AS granted_at,
       true AS is_invite,
       true AS is_tmp,
       NULL::bigint AS org_user_id
     FROM public.tmp_users tmp
     WHERE tmp.org_id = p_org_id
       AND tmp.cancelled_at IS NULL
-      AND tmp.created_at > (CURRENT_TIMESTAMP - INTERVAL '7 days')
+      AND GREATEST(tmp.updated_at, tmp.created_at) > (CURRENT_TIMESTAMP - INTERVAL '7 days')
   )
   SELECT *
   FROM (
@@ -6850,6 +6901,156 @@ ALTER FUNCTION "public"."rbac_check_permission_direct"("p_permission_key" "text"
 
 
 COMMENT ON FUNCTION "public"."rbac_check_permission_direct"("p_permission_key" "text", "p_user_id" "uuid", "p_org_id" "uuid", "p_app_id" character varying, "p_channel_id" bigint, "p_apikey" "text") IS 'Direct RBAC permission check with automatic legacy fallback based on org feature flag. Use this from application code for explicit permission checks.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."rbac_check_permission_direct_no_password_policy"("p_permission_key" "text", "p_user_id" "uuid", "p_org_id" "uuid", "p_app_id" character varying, "p_channel_id" bigint, "p_apikey" "text" DEFAULT NULL::"text") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_allowed boolean := false;
+  v_use_rbac boolean;
+  v_effective_org_id uuid := p_org_id;
+  v_legacy_right public.user_min_right;
+  v_apikey_principal uuid;
+  v_org_enforcing_2fa boolean;
+  v_effective_user_id uuid := p_user_id;
+BEGIN
+  -- Validate permission key
+  IF p_permission_key IS NULL OR p_permission_key = '' THEN
+    PERFORM public.pg_log('deny: RBAC_CHECK_PERM_NO_KEY', jsonb_build_object('user_id', p_user_id));
+    RETURN false;
+  END IF;
+
+  -- Derive org from app/channel when not provided
+  IF v_effective_org_id IS NULL AND p_app_id IS NOT NULL THEN
+    SELECT owner_org INTO v_effective_org_id
+    FROM public.apps
+    WHERE app_id = p_app_id
+    LIMIT 1;
+  END IF;
+
+  IF v_effective_org_id IS NULL AND p_channel_id IS NOT NULL THEN
+    SELECT owner_org INTO v_effective_org_id
+    FROM public.channels
+    WHERE id = p_channel_id
+    LIMIT 1;
+  END IF;
+
+  -- Resolve user from API key when needed (handles hashed keys too).
+  IF v_effective_user_id IS NULL AND p_apikey IS NOT NULL THEN
+    SELECT user_id INTO v_effective_user_id
+    FROM public.find_apikey_by_value(p_apikey)
+    LIMIT 1;
+  END IF;
+
+  -- Enforce 2FA if the org requires it.
+  IF v_effective_org_id IS NOT NULL THEN
+    SELECT enforcing_2fa INTO v_org_enforcing_2fa
+    FROM public.orgs
+    WHERE id = v_effective_org_id;
+
+    IF v_org_enforcing_2fa = true AND (v_effective_user_id IS NULL OR NOT public.has_2fa_enabled(v_effective_user_id)) THEN
+      PERFORM public.pg_log('deny: RBAC_CHECK_PERM_2FA_ENFORCEMENT', jsonb_build_object(
+        'permission', p_permission_key,
+        'org_id', v_effective_org_id,
+        'app_id', p_app_id,
+        'channel_id', p_channel_id,
+        'user_id', v_effective_user_id,
+        'has_apikey', p_apikey IS NOT NULL
+      ));
+      RETURN false;
+    END IF;
+  END IF;
+
+  -- Check if RBAC is enabled for this org
+  v_use_rbac := public.rbac_is_enabled_for_org(v_effective_org_id);
+
+  IF v_use_rbac THEN
+    -- RBAC path: Check user permission directly
+    IF v_effective_user_id IS NOT NULL THEN
+      v_allowed := public.rbac_has_permission(public.rbac_principal_user(), v_effective_user_id, p_permission_key, v_effective_org_id, p_app_id, p_channel_id);
+    END IF;
+
+    -- If user doesn't have permission, check apikey permission
+    IF NOT v_allowed AND p_apikey IS NOT NULL THEN
+      SELECT rbac_id INTO v_apikey_principal
+      FROM public.apikeys
+      WHERE key = p_apikey
+      LIMIT 1;
+
+      IF v_apikey_principal IS NOT NULL THEN
+        v_allowed := public.rbac_has_permission(public.rbac_principal_apikey(), v_apikey_principal, p_permission_key, v_effective_org_id, p_app_id, p_channel_id);
+      END IF;
+    END IF;
+
+    IF NOT v_allowed THEN
+      PERFORM public.pg_log('deny: RBAC_CHECK_PERM_DIRECT', jsonb_build_object(
+        'permission', p_permission_key,
+        'user_id', v_effective_user_id,
+        'org_id', v_effective_org_id,
+        'app_id', p_app_id,
+        'channel_id', p_channel_id,
+        'has_apikey', p_apikey IS NOT NULL
+      ));
+    END IF;
+
+    RETURN v_allowed;
+  ELSE
+    -- Legacy path: Map permission to min_right and use legacy check
+    v_legacy_right := public.rbac_legacy_right_for_permission(p_permission_key);
+
+    IF v_legacy_right IS NULL THEN
+      -- Unknown permission in legacy mode, deny by default
+      PERFORM public.pg_log('deny: RBAC_CHECK_PERM_UNKNOWN_LEGACY', jsonb_build_object(
+        'permission', p_permission_key,
+        'user_id', v_effective_user_id
+      ));
+      RETURN false;
+    END IF;
+
+    -- Use appropriate legacy check based on context
+    IF p_apikey IS NOT NULL AND p_app_id IS NOT NULL THEN
+      RETURN public.has_app_right_apikey(p_app_id, v_legacy_right, v_effective_user_id, p_apikey);
+    ELSIF p_app_id IS NOT NULL THEN
+      RETURN public.has_app_right_userid(p_app_id, v_legacy_right, v_effective_user_id);
+    ELSE
+      RETURN public.check_min_rights_legacy_no_password_policy(v_legacy_right, v_effective_user_id, v_effective_org_id, p_app_id, p_channel_id);
+    END IF;
+  END IF;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."rbac_check_permission_direct_no_password_policy"("p_permission_key" "text", "p_user_id" "uuid", "p_org_id" "uuid", "p_app_id" character varying, "p_channel_id" bigint, "p_apikey" "text") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."rbac_check_permission_no_password_policy"("p_permission_key" "text", "p_org_id" "uuid" DEFAULT NULL::"uuid", "p_app_id" character varying DEFAULT NULL::character varying, "p_channel_id" bigint DEFAULT NULL::bigint) RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RETURN false;
+  END IF;
+
+  RETURN public.rbac_check_permission_direct_no_password_policy(
+    p_permission_key,
+    auth.uid(),
+    p_org_id,
+    p_app_id,
+    p_channel_id,
+    NULL
+  );
+END;
+$$;
+
+
+ALTER FUNCTION "public"."rbac_check_permission_no_password_policy"("p_permission_key" "text", "p_org_id" "uuid", "p_app_id" character varying, "p_channel_id" bigint) OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."rbac_check_permission_no_password_policy"("p_permission_key" "text", "p_org_id" "uuid", "p_app_id" character varying, "p_channel_id" bigint) IS 'RBAC permission check without password policy enforcement. Uses auth.uid() and delegates to rbac_check_permission_direct_no_password_policy.';
 
 
 
@@ -10837,7 +11038,8 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
     "builds_android" bigint DEFAULT 0,
     "builds_last_month" bigint DEFAULT 0,
     "builds_last_month_ios" bigint DEFAULT 0,
-    "builds_last_month_android" bigint DEFAULT 0
+    "builds_last_month_android" bigint DEFAULT 0,
+    "upgraded_orgs" integer DEFAULT 0 NOT NULL
 );
 
 
@@ -10937,6 +11139,10 @@ COMMENT ON COLUMN "public"."global_stats"."builds_last_month_ios" IS 'Number of 
 
 
 COMMENT ON COLUMN "public"."global_stats"."builds_last_month_android" IS 'Number of Android native builds in the last 30 days';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."upgraded_orgs" IS 'Number of organizations that upgraded plans in the last 24 hours';
 
 
 
@@ -11327,7 +11533,8 @@ CREATE TABLE IF NOT EXISTS "public"."stripe_info" (
     "bandwidth_exceeded" boolean DEFAULT false,
     "id" integer NOT NULL,
     "plan_calculated_at" timestamp with time zone,
-    "build_time_exceeded" boolean DEFAULT false
+    "build_time_exceeded" boolean DEFAULT false,
+    "upgraded_at" timestamp with time zone
 );
 
 ALTER TABLE ONLY "public"."stripe_info" REPLICA IDENTITY FULL;
@@ -11337,6 +11544,10 @@ ALTER TABLE "public"."stripe_info" OWNER TO "postgres";
 
 
 COMMENT ON COLUMN "public"."stripe_info"."build_time_exceeded" IS 'Organization exceeded build time limit';
+
+
+
+COMMENT ON COLUMN "public"."stripe_info"."upgraded_at" IS 'Timestamp of last paid plan upgrade for the org';
 
 
 
@@ -11701,14 +11912,14 @@ CREATE TABLE IF NOT EXISTS "public"."users" (
     "enable_notifications" boolean DEFAULT true NOT NULL,
     "opt_for_newsletters" boolean DEFAULT true NOT NULL,
     "ban_time" timestamp with time zone,
-    "email_preferences" "jsonb" DEFAULT '{"onboarding": true, "usage_limit": true, "credit_usage": true, "device_error": true, "weekly_stats": true, "monthly_stats": true, "bundle_created": true, "bundle_deployed": true, "deploy_stats_24h": true, "billing_period_stats": true, "channel_self_rejected": true}'::"jsonb" NOT NULL
+    "email_preferences" "jsonb" DEFAULT '{"onboarding": true, "usage_limit": true, "credit_usage": true, "device_error": true, "weekly_stats": true, "monthly_stats": true, "bundle_created": true, "bundle_deployed": true, "deploy_stats_24h": true, "cli_realtime_feed": true, "billing_period_stats": true, "channel_self_rejected": true}'::"jsonb" NOT NULL
 );
 
 
 ALTER TABLE "public"."users" OWNER TO "postgres";
 
 
-COMMENT ON COLUMN "public"."users"."email_preferences" IS 'Per-user email notification preferences. Keys: usage_limit, credit_usage, onboarding, weekly_stats, monthly_stats, billing_period_stats, deploy_stats_24h, bundle_created, bundle_deployed, device_error, channel_self_rejected. Values are booleans.';
+COMMENT ON COLUMN "public"."users"."email_preferences" IS 'Per-user email notification preferences. Keys: usage_limit, credit_usage, onboarding, weekly_stats, monthly_stats, billing_period_stats, deploy_stats_24h, bundle_created, bundle_deployed, device_error, channel_self_rejected, cli_realtime_feed. Values are booleans.';
 
 
 
@@ -14476,6 +14687,11 @@ GRANT ALL ON FUNCTION "public"."check_min_rights_legacy"("min_right" "public"."u
 
 
 
+REVOKE ALL ON FUNCTION "public"."check_min_rights_legacy_no_password_policy"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."check_min_rights_legacy_no_password_policy"("min_right" "public"."user_min_right", "user_id" "uuid", "org_id" "uuid", "app_id" character varying, "channel_id" bigint) TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."check_org_encrypted_bundle_enforcement"("org_id" "uuid", "session_key" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."check_org_encrypted_bundle_enforcement"("org_id" "uuid", "session_key" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."check_org_encrypted_bundle_enforcement"("org_id" "uuid", "session_key" "text") TO "service_role";
@@ -15347,6 +15563,17 @@ GRANT ALL ON FUNCTION "public"."rbac_check_permission"("p_permission_key" "text"
 
 REVOKE ALL ON FUNCTION "public"."rbac_check_permission_direct"("p_permission_key" "text", "p_user_id" "uuid", "p_org_id" "uuid", "p_app_id" character varying, "p_channel_id" bigint, "p_apikey" "text") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."rbac_check_permission_direct"("p_permission_key" "text", "p_user_id" "uuid", "p_org_id" "uuid", "p_app_id" character varying, "p_channel_id" bigint, "p_apikey" "text") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."rbac_check_permission_direct_no_password_policy"("p_permission_key" "text", "p_user_id" "uuid", "p_org_id" "uuid", "p_app_id" character varying, "p_channel_id" bigint, "p_apikey" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."rbac_check_permission_direct_no_password_policy"("p_permission_key" "text", "p_user_id" "uuid", "p_org_id" "uuid", "p_app_id" character varying, "p_channel_id" bigint, "p_apikey" "text") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."rbac_check_permission_no_password_policy"("p_permission_key" "text", "p_org_id" "uuid", "p_app_id" character varying, "p_channel_id" bigint) TO "anon";
+GRANT ALL ON FUNCTION "public"."rbac_check_permission_no_password_policy"("p_permission_key" "text", "p_org_id" "uuid", "p_app_id" character varying, "p_channel_id" bigint) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."rbac_check_permission_no_password_policy"("p_permission_key" "text", "p_org_id" "uuid", "p_app_id" character varying, "p_channel_id" bigint) TO "service_role";
 
 
 
