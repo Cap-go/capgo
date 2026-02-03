@@ -22,15 +22,17 @@ app.post('/', middlewareAPISecret, async (c) => {
   const pgClient = getPgClient(c, true)
   const drizzleClient = getDrizzleClient(pgClient)
   try {
+    let planStatusCalculated = false
     try {
       await checkPlanStatusOnly(c, body.orgId, drizzleClient)
+      planStatusCalculated = true
     }
     catch (error) {
       cloudlog({ requestId: c.get('requestId'), message: 'checkPlanStatusOnly failed', orgId: body.orgId, error })
     }
 
     // Update plan_calculated_at timestamp if we have customerId
-    if (body.customerId) {
+    if (body.customerId && planStatusCalculated) {
       try {
         const supabase = supabaseAdmin(c)
         await supabase
@@ -44,6 +46,9 @@ app.post('/', middlewareAPISecret, async (c) => {
       catch (error) {
         cloudlog({ requestId: c.get('requestId'), message: 'plan calculated timestamp update failed', customerId: body.customerId, error })
       }
+    }
+    else if (body.customerId) {
+      cloudlog({ requestId: c.get('requestId'), message: 'plan calculated timestamp skipped', customerId: body.customerId })
     }
 
     return c.json(BRES)

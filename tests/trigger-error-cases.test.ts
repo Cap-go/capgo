@@ -346,7 +346,7 @@ describe('[POST] /triggers/on_deploy_history_create - Error Cases', () => {
 })
 
 describe('[POST] /triggers/on_manifest_create - Error Cases', () => {
-  it('should return 500 when manifest size update fails', async () => {
+  it('should return 400 when manifest data is incomplete', async () => {
     const response = await fetch(`${BASE_URL}/triggers/on_manifest_create`, {
       method: 'POST',
       headers: triggerHeaders,

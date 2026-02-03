@@ -4,6 +4,7 @@ import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
+import { retryWithBackoff } from '../utils/retry.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -13,19 +14,22 @@ const UPDATE_RETRY_DELAY_MS = 300
 
 async function updateChannelsWithRetry(
   c: Context<MiddlewareKeyVariables>,
-  operation: () => Promise<{ error: any }>,
+  operation: () => Promise<{ error: unknown }>,
   context: Record<string, unknown>,
 ) {
-  let lastError: any
-  for (let attempt = 0; attempt < UPDATE_RETRY_ATTEMPTS; attempt++) {
-    const { error } = await operation()
-    if (!error)
-      return
-    lastError = error
-    if (attempt < UPDATE_RETRY_ATTEMPTS - 1)
-      await new Promise(resolve => setTimeout(resolve, UPDATE_RETRY_DELAY_MS * (attempt + 1)))
+  const { result, lastError } = await retryWithBackoff(operation, {
+    attempts: UPDATE_RETRY_ATTEMPTS,
+    baseDelayMs: UPDATE_RETRY_DELAY_MS,
+    shouldRetry: result => Boolean(result?.error),
+  })
+  if (result?.error || lastError) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'on_channel_update failed after retries',
+      error: result?.error ?? lastError,
+      ...context,
+    })
   }
-  cloudlogErr({ requestId: c.get('requestId'), message: 'on_channel_update failed after retries', error: lastError, ...context })
 }
 
 app.post('/', middlewareAPISecret, triggerValidator('channels', 'UPDATE'), async (c) => {
