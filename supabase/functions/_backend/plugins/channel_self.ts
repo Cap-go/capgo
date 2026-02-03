@@ -8,7 +8,7 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { checkChannelSelfIPRateLimit, isChannelSelfRateLimited, recordChannelSelfIPRequest, recordChannelSelfRequest } from '../utils/channelSelfRateLimit.ts'
-import { BRES, parseBody, simpleError200, simpleErrorWithStatus, simpleRateLimit } from '../utils/hono.ts'
+import { BRES, parseBody, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrgCached } from '../utils/notifications.ts'
 import { sendNotifToOrgMembersCached } from '../utils/org_email_notifications.ts'
@@ -26,7 +26,6 @@ const CHANNEL_SELF_MIN_V8 = '8.0.0'
 z.config(z.locales.en())
 const devicePlatformScheme = z.enum(['ios', 'android', 'electron'])
 const PLAN_MAU_ACTIONS: Array<'mau'> = ['mau']
-const PLAN_ERROR = 'Cannot set channel, upgrade plan to continue to update'
 
 function buildRateLimitInfo(resetAt?: number) {
   if (typeof resetAt !== 'number' || !Number.isFinite(resetAt)) {
@@ -96,7 +95,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   }
   if (cachedStatus === 'cancelled') {
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
   // Check if app exists first - Read operation can use v2 flag
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
@@ -117,7 +116,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       device_id,
       app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
-    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
 
   await setAppStatus(c, app_id, 'cloud')
@@ -286,7 +285,7 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
   }
   if (cachedStatus === 'cancelled') {
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
@@ -305,7 +304,7 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
       device_id,
       app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
-    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
   await setAppStatus(c, app_id, 'cloud')
 
@@ -400,7 +399,7 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
   }
   if (cachedStatus === 'cancelled') {
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
@@ -419,7 +418,7 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
       device_id,
       app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
-    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
   await setAppStatus(c, app_id, 'cloud')
 
@@ -487,15 +486,6 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
   const { app_id, platform, is_emulator, is_prod } = body
   const device = makeDevice(body)
 
-  // First check if app exists - Read operation can use v2 flag
-  const appExists = await getAppByIdPg(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
-
-  if (!appExists) {
-    // App doesn't exist in database
-    return simpleError200(c, 'app_not_found', 'App not found', { app_id })
-  }
-
-  // Check if app has valid org association (not on-premise) - Read operation can use v2 flag
   const cachedStatus = await getAppStatus(c, app_id)
   if (cachedStatus === 'onprem') {
     cloudlog({ requestId: c.get('requestId'), message: 'Channel_self cache hit (list), app marked onprem', app_id })
@@ -503,8 +493,18 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
   }
   if (cachedStatus === 'cancelled') {
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
+
+  // First check if app exists - Read operation can use v2 flag
+  const appExists = await getAppByIdPg(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
+
+  if (!appExists) {
+    // App doesn't exist in database - normalize response to avoid oracle
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  }
+
+  // Check if app has valid org association (not on-premise) - Read operation can use v2 flag
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
   if (!appOwner) {
@@ -522,7 +522,7 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
       app_id,
       app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
-    return simpleErrorWithStatus(c, 429, 'need_plan_upgrade', PLAN_ERROR)
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
   await setAppStatus(c, app_id, 'cloud')
 

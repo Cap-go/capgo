@@ -210,7 +210,7 @@ describe('[POST] /triggers/cron_stat_org', () => {
     const updateResponse = await postUpdate(baseData)
 
     expect(updateResponse.status).toBe(429)
-    expect(await updateResponse.json<{ error: string }>().then(data => data.error)).toEqual('need_plan_upgrade')
+    expect(await updateResponse.json<{ error: string }>().then(data => data.error)).toEqual('on_premise_app')
   })
 
   it('should handle too big storage correctly', async () => {
