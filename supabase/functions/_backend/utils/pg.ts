@@ -890,6 +890,9 @@ export interface AdminGlobalStatsTrend {
   builds_total: number
   builds_ios: number
   builds_android: number
+  builds_success_total: number
+  builds_success_ios: number
+  builds_success_android: number
   builds_last_month: number
   builds_last_month_ios: number
   builds_last_month_android: number
@@ -948,6 +951,9 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(builds_total, 0)::int AS builds_total,
         COALESCE(builds_ios, 0)::int AS builds_ios,
         COALESCE(builds_android, 0)::int AS builds_android,
+        COALESCE(builds_success_total, 0)::int AS builds_success_total,
+        COALESCE(builds_success_ios, 0)::int AS builds_success_ios,
+        COALESCE(builds_success_android, 0)::int AS builds_success_android,
         COALESCE(builds_last_month, 0)::int AS builds_last_month,
         COALESCE(builds_last_month_ios, 0)::int AS builds_last_month_ios,
         COALESCE(builds_last_month_android, 0)::int AS builds_last_month_android
@@ -996,6 +1002,9 @@ export async function getAdminGlobalStatsTrend(
       builds_total: Number(row.builds_total) || 0,
       builds_ios: Number(row.builds_ios) || 0,
       builds_android: Number(row.builds_android) || 0,
+      builds_success_total: Number(row.builds_success_total) || 0,
+      builds_success_ios: Number(row.builds_success_ios) || 0,
+      builds_success_android: Number(row.builds_success_android) || 0,
       builds_last_month: Number(row.builds_last_month) || 0,
       builds_last_month_ios: Number(row.builds_last_month_ios) || 0,
       builds_last_month_android: Number(row.builds_last_month_android) || 0,
