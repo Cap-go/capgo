@@ -44,7 +44,7 @@ app.post('/', middlewareAPISecret, triggerValidator('channels', 'UPDATE'), async
   if (record.public && record.ios) {
     await updateChannelsWithRetry(
       c,
-      () => supabaseAdmin(c)
+      async () => await supabaseAdmin(c)
         .from('channels')
         .update({ public: false })
         .eq('app_id', record.app_id)
@@ -54,7 +54,7 @@ app.post('/', middlewareAPISecret, triggerValidator('channels', 'UPDATE'), async
     )
     await updateChannelsWithRetry(
       c,
-      () => supabaseAdmin(c)
+      async () => await supabaseAdmin(c)
         .from('channels')
         .update({ public: false })
         .eq('app_id', record.app_id)
@@ -67,7 +67,7 @@ app.post('/', middlewareAPISecret, triggerValidator('channels', 'UPDATE'), async
   if (record.public && record.android) {
     await updateChannelsWithRetry(
       c,
-      () => supabaseAdmin(c)
+      async () => await supabaseAdmin(c)
         .from('channels')
         .update({ public: false })
         .eq('app_id', record.app_id)
@@ -77,7 +77,7 @@ app.post('/', middlewareAPISecret, triggerValidator('channels', 'UPDATE'), async
     )
     await updateChannelsWithRetry(
       c,
-      () => supabaseAdmin(c)
+      async () => await supabaseAdmin(c)
         .from('channels')
         .update({ public: false })
         .eq('app_id', record.app_id)
@@ -90,7 +90,7 @@ app.post('/', middlewareAPISecret, triggerValidator('channels', 'UPDATE'), async
   if (record.public && (record.ios === record.android)) {
     await updateChannelsWithRetry(
       c,
-      () => supabaseAdmin(c)
+      async () => await supabaseAdmin(c)
         .from('channels')
         .update({ public: false })
         .eq('app_id', record.app_id)
