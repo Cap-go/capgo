@@ -222,7 +222,7 @@ export async function recordChannelSelfIPRequest(
   const existing = await ipRateEntry.helper.matchJson<RateLimitCounter>(ipRateEntry.request)
   const now = Date.now()
   const inWindow = typeof existing?.resetAt === 'number' && existing.resetAt > now
-  const resetAt = inWindow ? existing.resetAt : now + IP_RATE_TTL_SECONDS * 1000
+  const resetAt = inWindow ? (existing.resetAt as number) : now + IP_RATE_TTL_SECONDS * 1000
   const newData: RateLimitCounter = {
     count: inWindow ? (existing?.count ?? 0) + 1 : 1,
     resetAt,

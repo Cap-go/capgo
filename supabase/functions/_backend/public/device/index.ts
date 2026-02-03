@@ -1,3 +1,4 @@
+import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import type { DeviceLink } from './delete.ts'
 import { checkChannelSelfIPRateLimit, isChannelSelfRateLimited, recordChannelSelfIPRequest, recordChannelSelfRequest } from '../../utils/channelSelfRateLimit.ts'
