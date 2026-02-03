@@ -168,6 +168,18 @@ DECLARE
     cache_entry public.org_metrics_cache%ROWTYPE;
     cache_ttl interval := '5 minutes';
 BEGIN
+    IF start_date IS NULL OR end_date IS NULL THEN
+        RETURN;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1
+        FROM public.orgs
+        WHERE orgs.id = get_total_metrics.org_id
+    ) THEN
+        RETURN;
+    END IF;
+
     SELECT * INTO cache_entry
     FROM public.org_metrics_cache
     WHERE org_metrics_cache.org_id = get_total_metrics.org_id;
@@ -234,6 +246,10 @@ BEGIN
     FROM public.orgs o
     LEFT JOIN public.stripe_info si ON o.customer_id = si.customer_id
     WHERE o.id = org_id;
+
+    IF NOT FOUND THEN
+        RETURN;
+    END IF;
 
     IF v_anchor_day > NOW() - date_trunc('MONTH', NOW()) THEN
         v_start_date := (date_trunc('MONTH', NOW() - INTERVAL '1 MONTH') + v_anchor_day)::date;
