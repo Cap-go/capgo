@@ -125,8 +125,23 @@ export async function isChannelSelfRateLimited(
     }
     else {
       const resetAt = cached.timestamp + OP_RATE_TTL_SECONDS * 1000
-      if (resetAt > now)
-        return { limited: true, resetAt }
+      if (resetAt > now) {
+        const ttlSeconds = Math.max(1, Math.ceil((resetAt - now) / 1000))
+        const migratedEntry: RateLimitCounter = { count: 1, resetAt }
+        try {
+          await opRateEntry.helper.putJson(opRateEntry.request, migratedEntry, ttlSeconds)
+        }
+        catch (error) {
+          cloudlog({
+            requestId: c.get('requestId'),
+            message: 'Failed to migrate legacy channel-self op rate limit entry',
+            app_id: appId,
+            device_id: deviceId,
+            op: operation,
+            error,
+          })
+        }
+      }
     }
   }
 
@@ -209,7 +224,7 @@ export async function recordChannelSelfRequest(
   const timestamp = Date.now()
   const entry: RateLimitEntry = { timestamp }
 
-  // Record operation-level rate limit (1 second TTL)
+  // Record operation-level rate limit (allows up to 5 operations per second)
   const opRateEntry = buildOperationRateRequest(c, appId, deviceId, operation)
   const existing = await opRateEntry.helper.matchJson<OperationRateLimitCache>(opRateEntry.request)
   const now = Date.now()
