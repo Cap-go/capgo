@@ -1253,18 +1253,27 @@ export async function checkKey(c: Context, authorization: string | undefined, su
  * Check API key by ID
  * Expiration is checked directly in SQL query: expires_at IS NULL OR expires_at > now()
  */
-export async function checkKeyById(c: Context, id: number, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
+export async function checkKeyById(
+  c: Context,
+  id: number,
+  supabase: SupabaseClient<Database>,
+  allowed: Database['public']['Enums']['key_mode'][],
+  userId?: string,
+): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   if (!id)
     return null
   try {
     // Expiration check is done in SQL: expires_at IS NULL OR expires_at > now()
-    const { data, error } = await supabase
+    let query = supabase
       .from('apikeys')
       .select('*')
       .eq('id', id)
       .in('mode', allowed)
       .or('expires_at.is.null,expires_at.gt.now()')
-      .single()
+    if (userId) {
+      query = query.eq('user_id', userId)
+    }
+    const { data, error } = await query.single()
     if (!data || error)
       return null
     return data
