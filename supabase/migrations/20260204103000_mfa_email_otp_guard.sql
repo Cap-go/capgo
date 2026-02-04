@@ -108,56 +108,62 @@ GRANT EXECUTE ON FUNCTION "public"."is_recent_email_otp_verified"(uuid) TO "serv
 -- Section 5: Trigger to block MFA enrollment without recent OTP verification
 -- ============================================================================
 
-CREATE OR REPLACE FUNCTION "auth"."enforce_email_otp_for_mfa"() RETURNS trigger
-LANGUAGE "plpgsql" SECURITY DEFINER
-SET "search_path" TO ''
-AS $$
-DECLARE
-    otp_ok boolean;
-    enforced_at timestamptz;
-    user_created_at timestamptz;
+DO $$
 BEGIN
-    SELECT public.security_settings.mfa_email_otp_enforced_at
-    INTO enforced_at
-    FROM public.security_settings
-    WHERE public.security_settings.id = true;
+    BEGIN
+        EXECUTE $authfn$
+        CREATE OR REPLACE FUNCTION "auth"."enforce_email_otp_for_mfa"() RETURNS trigger
+        LANGUAGE "plpgsql" SECURITY DEFINER
+        SET "search_path" TO ''
+        AS $body$
+        DECLARE
+            otp_ok boolean;
+            enforced_at timestamptz;
+            user_created_at timestamptz;
+        BEGIN
+            SELECT public.security_settings.mfa_email_otp_enforced_at
+            INTO enforced_at
+            FROM public.security_settings
+            WHERE public.security_settings.id = true;
 
-    IF enforced_at IS NOT NULL THEN
-        SELECT auth.users.created_at
-        INTO user_created_at
-        FROM auth.users
-        WHERE auth.users.id = NEW.user_id;
+            IF enforced_at IS NOT NULL THEN
+                SELECT auth.users.created_at
+                INTO user_created_at
+                FROM auth.users
+                WHERE auth.users.id = NEW.user_id;
 
-        IF user_created_at IS NOT NULL AND user_created_at < enforced_at THEN
+                IF user_created_at IS NOT NULL AND user_created_at < enforced_at THEN
+                    RETURN NEW;
+                END IF;
+            END IF;
+
+            IF TG_OP = 'INSERT' THEN
+                otp_ok := public.is_recent_email_otp_verified(NEW.user_id);
+                IF NOT otp_ok THEN
+                    RAISE EXCEPTION 'email otp verification required for mfa enrollment';
+                END IF;
+                RETURN NEW;
+            END IF;
+
+            IF TG_OP = 'UPDATE'
+                AND (NEW.status IS DISTINCT FROM OLD.status)
+                AND NEW.status = 'verified' THEN
+                otp_ok := public.is_recent_email_otp_verified(NEW.user_id);
+                IF NOT otp_ok THEN
+                    RAISE EXCEPTION 'email otp verification required for mfa enrollment';
+                END IF;
+            END IF;
+
             RETURN NEW;
-        END IF;
-    END IF;
+        END;
+        $body$;
+        $authfn$;
 
-    IF TG_OP = 'INSERT' THEN
-        otp_ok := public.is_recent_email_otp_verified(NEW.user_id);
-        IF NOT otp_ok THEN
-            RAISE EXCEPTION 'email otp verification required for mfa enrollment';
-        END IF;
-        RETURN NEW;
-    END IF;
-
-    IF TG_OP = 'UPDATE'
-        AND (NEW.status IS DISTINCT FROM OLD.status)
-        AND NEW.status = 'verified' THEN
-        otp_ok := public.is_recent_email_otp_verified(NEW.user_id);
-        IF NOT otp_ok THEN
-            RAISE EXCEPTION 'email otp verification required for mfa enrollment';
-        END IF;
-    END IF;
-
-    RETURN NEW;
-END;
-$$;
-
-ALTER FUNCTION "auth"."enforce_email_otp_for_mfa"() OWNER TO "postgres";
-
-DROP TRIGGER IF EXISTS "trg_enforce_email_otp_for_mfa" ON auth.mfa_factors;
-CREATE TRIGGER "trg_enforce_email_otp_for_mfa"
-BEFORE INSERT OR UPDATE ON auth.mfa_factors
-FOR EACH ROW
-EXECUTE FUNCTION auth.enforce_email_otp_for_mfa();
+        EXECUTE 'ALTER FUNCTION "auth"."enforce_email_otp_for_mfa"() OWNER TO "postgres"';
+        EXECUTE 'DROP TRIGGER IF EXISTS "trg_enforce_email_otp_for_mfa" ON auth.mfa_factors';
+        EXECUTE 'CREATE TRIGGER "trg_enforce_email_otp_for_mfa" BEFORE INSERT OR UPDATE ON auth.mfa_factors FOR EACH ROW EXECUTE FUNCTION auth.enforce_email_otp_for_mfa()';
+    EXCEPTION
+        WHEN insufficient_privilege THEN
+            RAISE NOTICE 'Skipping auth.mfa_factors trigger setup (insufficient privileges)';
+    END;
+END $$;
