@@ -2,9 +2,9 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
+import { closeClient, getPgClient, logPgError } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { createSignedImageUrl, normalizeImagePath } from '../../utils/storage.ts'
-import { supabaseApikey } from '../../utils/supabase.ts'
 import { isValidAppId } from '../../utils/utils.ts'
 
 export interface CreateApp {
@@ -14,7 +14,7 @@ export interface CreateApp {
   icon?: string
 }
 
-export async function post(c: Context<MiddlewareKeyVariables>, body: CreateApp, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function post(c: Context<MiddlewareKeyVariables>, body: CreateApp, _apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   if (!body.app_id) {
     throw simpleError('missing_app_id', 'Missing app_id', { body })
   }
@@ -39,24 +39,37 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: CreateApp, 
     retention: 2592000,
     default_upload_channel: 'dev',
   }
-  // Use anon client with capgkey header; RLS will authorize insert based on org rights
-  const supabase = supabaseApikey(c, apikey.key)
-  const { error: dbError } = await supabase
-    .from('apps')
-    .insert(dataInsert)
-
-  if (dbError) {
-    throw simpleError('cannot_create_app', 'Cannot create app', { supabaseError: dbError })
+  let pgClient
+  let data: Record<string, any> | undefined
+  try {
+    pgClient = getPgClient(c)
+    const result = await pgClient.query(
+      `INSERT INTO public.apps (owner_org, app_id, icon_url, name, retention, default_upload_channel)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *`,
+      [
+        dataInsert.owner_org,
+        dataInsert.app_id,
+        dataInsert.icon_url,
+        dataInsert.name,
+        dataInsert.retention,
+        dataInsert.default_upload_channel,
+      ],
+    )
+    data = result.rows[0]
+  }
+  catch (error) {
+    logPgError(c, 'create_app', error)
+    throw simpleError('cannot_create_app', 'Cannot create app', { error: (error as Error)?.message })
+  }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
   }
 
-  const { data, error: fetchError } = await supabase
-    .from('apps')
-    .select()
-    .eq('app_id', body.app_id)
-    .single()
-
-  if (fetchError || !data) {
-    throw simpleError('cannot_read_app', 'Cannot read created app', { supabaseError: fetchError })
+  if (!data) {
+    throw simpleError('cannot_read_app', 'Cannot read created app')
   }
 
   if (data.icon_url) {
