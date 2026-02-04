@@ -85,7 +85,21 @@ async function getCreditTopUpProductId(c: AppContext, customerId: string, token:
       customerId,
       error: stripeInfoError,
     })
-    throw simpleError('credit_product_not_configured', 'Organization does not have a Stripe plan configured')
+    const { data: fallbackPlan, error: fallbackError } = await supabase
+      .from('plans')
+      .select('credit_id')
+      .eq('name', 'Solo')
+      .single()
+    if (fallbackError || !fallbackPlan?.credit_id) {
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'credit_fallback_plan_missing',
+        customerId,
+        error: fallbackError,
+      })
+      throw simpleError('credit_product_not_configured', 'Credit product is not configured')
+    }
+    return { productId: fallbackPlan.credit_id }
   }
 
   const { data: plan, error: planError } = await supabase
@@ -102,7 +116,21 @@ async function getCreditTopUpProductId(c: AppContext, customerId: string, token:
       planStripeId: stripeInfo.product_id,
       error: planError,
     })
-    throw simpleError('credit_product_not_configured', 'Credit product is not configured for this plan')
+    const { data: fallbackPlan, error: fallbackError } = await supabase
+      .from('plans')
+      .select('credit_id')
+      .eq('name', 'Solo')
+      .single()
+    if (fallbackError || !fallbackPlan?.credit_id) {
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'credit_fallback_plan_missing',
+        customerId,
+        error: fallbackError,
+      })
+      throw simpleError('credit_product_not_configured', 'Credit product is not configured')
+    }
+    return { productId: fallbackPlan.credit_id }
   }
 
   return { productId: plan.credit_id }
