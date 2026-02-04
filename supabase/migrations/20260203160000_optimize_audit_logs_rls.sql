@@ -5,7 +5,6 @@ REVOKE ALL ON TABLE "public"."audit_logs" FROM "anon";
 REVOKE ALL ON SEQUENCE "public"."audit_logs_id_seq" FROM "anon";
 
 DROP POLICY IF EXISTS "Allow select for auth, api keys (super_admin+)" ON "public"."audit_logs";
-DROP POLICY IF EXISTS "Allow select for auth (super_admin+)" ON "public"."audit_logs";
 
 CREATE POLICY "Allow select for auth (super_admin+)" ON "public"."audit_logs"
 FOR SELECT TO "authenticated"

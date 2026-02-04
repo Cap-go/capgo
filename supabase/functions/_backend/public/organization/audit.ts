@@ -1,8 +1,8 @@
 import type { Context } from 'hono'
-import type { Database } from '../../utils/supabase.types.ts'
+import type { AuthInfo } from '../../utils/hono.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../utils/hono.ts'
-import { apikeyHasOrgRight, hasOrgRightApikey, supabaseApikey } from '../../utils/supabase.ts'
+import { hasOrgRight, supabaseWithAuth } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
   orgId: z.string(),
@@ -25,19 +25,20 @@ const auditLogSchema = z.object({
   changed_fields: z.nullable(z.array(z.string())),
 })
 
-export async function getAuditLogs(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function getAuditLogs(c: Context, bodyRaw: any): Promise<Response> {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
 
-  // Validate org access
-  if (!(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'read', c.get('capgkey') as string))) {
-    throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
+  const auth = c.get('auth') as AuthInfo | undefined
+  if (!auth?.userId) {
+    throw simpleError('not_authorized', 'Not authorized')
   }
 
-  if (!apikeyHasOrgRight(apikey, body.orgId)) {
+  // Validate org access (super_admin required by RLS)
+  if (!(await hasOrgRight(c, body.orgId, auth.userId, 'super_admin'))) {
     throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
   }
 
@@ -46,7 +47,7 @@ export async function getAuditLogs(c: Context, bodyRaw: any, apikey: Database['p
   const from = page * limit
   const to = (page + 1) * limit - 1
 
-  let query = supabaseApikey(c, c.get('capgkey') as string)
+  let query = supabaseWithAuth(c, auth)
     .from('audit_logs')
     .select('*', { count: 'exact' })
     .eq('org_id', body.orgId)
