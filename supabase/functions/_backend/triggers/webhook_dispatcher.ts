@@ -9,7 +9,9 @@ import {
   buildWebhookPayload,
   createDeliveryRecord,
   findWebhooksForEvent,
+  getWebhookUrlValidationError,
   queueWebhookDelivery,
+  updateDeliveryResult,
 } from '../utils/webhook.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -93,6 +95,25 @@ app.post('/', middlewareAPISecret, async (c) => {
             requestId: c.get('requestId'),
             message: 'Failed to create delivery record',
             webhookId: webhook.id,
+          })
+          return
+        }
+
+        const urlError = getWebhookUrlValidationError(c, webhook.url)
+        if (urlError) {
+          await updateDeliveryResult(
+            c,
+            delivery.id,
+            false,
+            null,
+            `Error: ${urlError}`,
+            0,
+          )
+          cloudlogErr({
+            requestId: c.get('requestId'),
+            message: 'Webhook URL failed validation',
+            webhookId: webhook.id,
+            error: urlError,
           })
           return
         }
