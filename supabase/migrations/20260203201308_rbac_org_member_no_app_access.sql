@@ -36,6 +36,7 @@ AS $$
 DECLARE
   v_is_super_admin boolean := false;
   v_use_rbac boolean := false;
+  v_enforcing_2fa boolean := false;
 BEGIN
   -- Allow service_role / postgres to bypass
   IF (((SELECT auth.jwt() ->> 'role') = 'service_role') OR ((SELECT current_user) IS NOT DISTINCT FROM 'postgres')) THEN
@@ -60,6 +61,17 @@ BEGIN
             AND r.name = public.rbac_role_platform_super_admin())
         )
     ) INTO v_is_super_admin;
+
+    IF v_is_super_admin THEN
+      SELECT enforcing_2fa INTO v_enforcing_2fa
+      FROM public.orgs
+      WHERE id = NEW.org_id;
+
+      IF v_enforcing_2fa AND NOT public.has_2fa_enabled(auth.uid()) THEN
+        PERFORM public.pg_log('deny: SUPER_ADMIN_2FA_REQUIRED', jsonb_build_object('org_id', NEW.org_id, 'uid', auth.uid()));
+        v_is_super_admin := false;
+      END IF;
+    END IF;
   ELSE
     v_is_super_admin := public.check_min_rights(
       'super_admin'::public.user_min_right,
@@ -226,6 +238,11 @@ BEGIN
 
       IF NOT v_is_super_admin THEN
         PERFORM public.pg_log('deny: NO_RIGHTS_SUPER_ADMIN', jsonb_build_object('org_id', invite_user_to_org.org_id, 'invite_type', invite_user_to_org.invite_type));
+        RETURN 'NO_RIGHTS';
+      END IF;
+
+      IF org.enforcing_2fa AND NOT public.has_2fa_enabled(auth.uid()) THEN
+        PERFORM public.pg_log('deny: SUPER_ADMIN_2FA_REQUIRED', jsonb_build_object('org_id', invite_user_to_org.org_id, 'invite_type', invite_user_to_org.invite_type, 'uid', auth.uid()));
         RETURN 'NO_RIGHTS';
       END IF;
     ELSE
