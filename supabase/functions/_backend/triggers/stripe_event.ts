@@ -60,7 +60,25 @@ async function getCreditTopUpProductIdFromCustomer(c: Context, customerId: strin
         customerId,
         error: stripeInfoError,
       })
-      throw simpleError('credit_product_not_configured', 'Organization does not have a Stripe plan configured')
+      let fallbackPlan: { credit_id: string | null } | undefined
+      try {
+        ;[fallbackPlan] = await drizzleClient
+          .select({ credit_id: schema.plans.credit_id })
+          .from(schema.plans)
+          .where(eq(schema.plans.name, 'Solo'))
+          .limit(1)
+      }
+      catch (error) {
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'credit_fallback_plan_missing',
+          customerId,
+          error,
+        })
+      }
+      if (!fallbackPlan?.credit_id)
+        throw simpleError('credit_product_not_configured', 'Credit product is not configured')
+      return fallbackPlan.credit_id
     }
 
     let planError: unknown | null = null
@@ -84,7 +102,25 @@ async function getCreditTopUpProductIdFromCustomer(c: Context, customerId: strin
         planStripeId: stripeInfo.product_id,
         error: planError,
       })
-      throw simpleError('credit_product_not_configured', 'Credit product is not configured for this plan')
+      let fallbackPlan: { credit_id: string | null } | undefined
+      try {
+        ;[fallbackPlan] = await drizzleClient
+          .select({ credit_id: schema.plans.credit_id })
+          .from(schema.plans)
+          .where(eq(schema.plans.name, 'Solo'))
+          .limit(1)
+      }
+      catch (error) {
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'credit_fallback_plan_missing',
+          customerId,
+          error,
+        })
+      }
+      if (!fallbackPlan?.credit_id)
+        throw simpleError('credit_product_not_configured', 'Credit product is not configured')
+      return fallbackPlan.credit_id
     }
 
     return plan.credit_id

@@ -68,10 +68,10 @@ async function applyCreditsForMetric(
   if (overageAmount <= 0)
     return null
 
-  if (!planId || !billingCycle?.subscription_anchor_start || !billingCycle?.subscription_anchor_end) {
+  if (!billingCycle?.subscription_anchor_start || !billingCycle?.subscription_anchor_end) {
     cloudlogErr({
       requestId: c.get('requestId'),
-      message: 'applyCreditsForMetric missing plan or billing cycle context',
+      message: 'applyCreditsForMetric missing billing cycle context',
       orgId,
       metric,
       planId,
@@ -86,6 +86,15 @@ async function applyCreditsForMetric(
       overage_unpaid: overageAmount,
       credit_step_id: null,
     }
+  }
+  else if (!planId) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'applyCreditsForMetric missing plan context, continuing',
+      orgId,
+      metric,
+      billingCycle,
+    })
   }
   try {
     const { data, error } = await supabaseAdmin(c)
@@ -184,32 +193,39 @@ async function userAbovePlan(c: Context, org: {
   customer_id: string | null
   stripe_info: {
     subscription_id: string | null
+    status?: string | null
   } | null
 }, orgId: string, is_good_plan: boolean, drizzleClient: ReturnType<typeof getDrizzleClient>): Promise<boolean> {
   cloudlog({ requestId: c.get('requestId'), message: 'userAbovePlan', orgId, is_good_plan })
+  const hasActivePlan = org?.stripe_info?.status === 'succeeded'
   const totalStats = await getTotalStats(c, orgId)
-  const currentPlanName = await getCurrentPlanNameOrg(c, orgId)
   if (!totalStats) {
     return false
   }
 
-  const { data: currentPlan, error: currentPlanError } = await supabaseAdmin(c)
-    .from('plans')
-    .select('*')
-    .eq('name', currentPlanName)
-    .single()
-  if (currentPlanError) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'currentPlanError', error: currentPlanError })
+  let currentPlanName: string | null = null
+  let currentPlan: Database['public']['Tables']['plans']['Row'] | null = null
+  if (hasActivePlan) {
+    currentPlanName = await getCurrentPlanNameOrg(c, orgId)
+    const { data, error: currentPlanError } = await supabaseAdmin(c)
+      .from('plans')
+      .select('*')
+      .eq('name', currentPlanName)
+      .single()
+    if (currentPlanError) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'currentPlanError', error: currentPlanError })
+    }
+    currentPlan = data ?? null
   }
 
   const billingCycle = await getBillingCycleRange(c, orgId)
   const planId = currentPlan?.id
 
   const metrics: Array<{ key: CreditMetric, usage: number, limit: number | null | undefined }> = [
-    { key: 'mau', usage: Number(totalStats.mau ?? 0), limit: currentPlan?.mau },
-    { key: 'storage', usage: Number(totalStats.storage ?? 0), limit: currentPlan?.storage },
-    { key: 'bandwidth', usage: Number(totalStats.bandwidth ?? 0), limit: currentPlan?.bandwidth },
-    { key: 'build_time', usage: Number(totalStats.build_time_unit ?? 0), limit: currentPlan?.build_time_unit },
+    { key: 'mau', usage: Number(totalStats.mau ?? 0), limit: currentPlan?.mau ?? 0 },
+    { key: 'storage', usage: Number(totalStats.storage ?? 0), limit: currentPlan?.storage ?? 0 },
+    { key: 'bandwidth', usage: Number(totalStats.bandwidth ?? 0), limit: currentPlan?.bandwidth ?? 0 },
+    { key: 'build_time', usage: Number(totalStats.build_time_unit ?? 0), limit: currentPlan?.build_time_unit ?? 0 },
   ]
 
   const creditResults: Record<CreditMetric, CreditApplicationResult | null> = {
@@ -260,6 +276,11 @@ async function userAbovePlan(c: Context, org: {
     return false
   }
 
+  if (!hasActivePlan) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Credits-only org overage check completed', orgId, creditResults })
+    return true
+  }
+
   const bestPlan = await findBestPlan(c, {
     mau: totalStats.mau,
     storage: totalStats.storage,
@@ -268,12 +289,21 @@ async function userAbovePlan(c: Context, org: {
   })
 
   // If the calculated best plan ranks lower than the current one, the org is over-provisioned, so skip upgrade nudges.
-  if (planToInt(bestPlan) < planToInt(currentPlanName)) {
+  if (currentPlanName && planToInt(bestPlan) < planToInt(currentPlanName)) {
     return true
   }
 
   const bestPlanKey = bestPlan.toLowerCase().replace(' ', '_')
-  const sent = await sendNotifToOrgMembers(c, `user:upgrade_to_${bestPlanKey}`, 'usage_limit', { best_plan: bestPlanKey, plan_name: currentPlanName }, orgId, orgId, '0 0 * * 1', drizzleClient)
+  const sent = await sendNotifToOrgMembers(
+    c,
+    `user:upgrade_to_${bestPlanKey}`,
+    'usage_limit',
+    { best_plan: bestPlanKey, plan_name: currentPlanName },
+    orgId,
+    orgId,
+    '0 0 * * 1',
+    drizzleClient,
+  )
   if (sent) {
     cloudlog({ requestId: c.get('requestId'), message: `user:upgrade_to_${bestPlanKey}`, orgId })
     await logsnag(c).track({
@@ -340,7 +370,7 @@ async function userIsAtPlanUsage(c: Context, orgId: string, percentUsage: PlanUs
 export async function getOrgWithCustomerInfo(c: Context, orgId: string) {
   const { data: org, error: userError } = await supabaseAdmin(c)
     .from('orgs')
-    .select('customer_id, stripe_info(subscription_id, subscription_anchor_start, subscription_anchor_end)')
+    .select('customer_id, stripe_info(status, subscription_id, subscription_anchor_start, subscription_anchor_end)')
     .eq('id', orgId)
     .single()
   if (userError || !org)
