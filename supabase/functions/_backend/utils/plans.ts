@@ -99,6 +99,16 @@ async function applyCreditsForMetric(
     ? (billingCycle as BillingCycleRange)
     : getDefaultBillingCycleRange()
 
+  if (!billingCycle?.subscription_anchor_start || !billingCycle?.subscription_anchor_end) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'applyCreditsForMetric missing billing cycle context',
+      orgId,
+      metric,
+      billingCycle,
+    })
+  }
+
   if (!planId) {
     cloudlog({
       requestId: c.get('requestId'),
@@ -215,26 +225,29 @@ async function userAbovePlan(c: Context, org: {
     return false
   }
 
-  const currentPlanName = await getCurrentPlanNameOrg(c, orgId)
+  let currentPlanName: string | null = null
   let currentPlan: Database['public']['Tables']['plans']['Row'] | null = null
-  const { data, error: currentPlanError } = await supabaseAdmin(c)
-    .from('plans')
-    .select('*')
-    .eq('name', currentPlanName)
-    .single()
-  if (currentPlanError) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'currentPlanError', error: currentPlanError })
+  if (hasActivePlan) {
+    currentPlanName = await getCurrentPlanNameOrg(c, orgId)
+    const { data, error: currentPlanError } = await supabaseAdmin(c)
+      .from('plans')
+      .select('*')
+      .eq('name', currentPlanName)
+      .single()
+    if (currentPlanError) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'currentPlanError', error: currentPlanError })
+    }
+    currentPlan = data ?? null
   }
-  currentPlan = data ?? null
 
   const billingCycle = await getBillingCycleRange(c, orgId)
   const planId = currentPlan?.id
 
   const metrics: Array<{ key: CreditMetric, usage: number, limit: number | null | undefined }> = [
-    { key: 'mau', usage: Number(totalStats.mau ?? 0), limit: currentPlan?.mau },
-    { key: 'storage', usage: Number(totalStats.storage ?? 0), limit: currentPlan?.storage },
-    { key: 'bandwidth', usage: Number(totalStats.bandwidth ?? 0), limit: currentPlan?.bandwidth },
-    { key: 'build_time', usage: Number(totalStats.build_time_unit ?? 0), limit: currentPlan?.build_time_unit },
+    { key: 'mau', usage: Number(totalStats.mau ?? 0), limit: currentPlan?.mau ?? 0 },
+    { key: 'storage', usage: Number(totalStats.storage ?? 0), limit: currentPlan?.storage ?? 0 },
+    { key: 'bandwidth', usage: Number(totalStats.bandwidth ?? 0), limit: currentPlan?.bandwidth ?? 0 },
+    { key: 'build_time', usage: Number(totalStats.build_time_unit ?? 0), limit: currentPlan?.build_time_unit ?? 0 },
   ]
 
   const creditResults: Record<CreditMetric, CreditApplicationResult | null> = {
