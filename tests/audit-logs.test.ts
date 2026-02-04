@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { BASE_URL, fetchWithRetry, getAuthHeaders, getSupabaseClient, ORG_ID as SEED_ORG_ID, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, fetchWithRetry, getAuthHeaders, getSupabaseClient, headers as apiKeyHeaders, ORG_ID as SEED_ORG_ID, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
@@ -358,7 +358,7 @@ describe('audit logs for app_versions via API key', () => {
     // Create a bundle via the API (uses API key authentication)
     const response = await fetchWithRetry(`${BASE_URL}/bundle`, {
       method: 'POST',
-      headers: authHeaders,
+      headers: apiKeyHeaders,
       body: JSON.stringify({
         app_id: 'com.demo.app',
         version: testVersionName,
@@ -417,7 +417,7 @@ describe('audit logs for app_versions via API key', () => {
     // Update the bundle via the API - note: endpoint requires version_id (number), not version name
     const response = await fetchWithRetry(`${BASE_URL}/bundle/metadata`, {
       method: 'POST',
-      headers: authHeaders,
+      headers: apiKeyHeaders,
       body: JSON.stringify({
         app_id: 'com.demo.app',
         version_id: createdVersionId,
@@ -473,7 +473,7 @@ describe('audit logs for app_versions via API key', () => {
     // Delete the bundle via the API - note: this is a soft-delete (sets deleted=true)
     const response = await fetchWithRetry(`${BASE_URL}/bundle`, {
       method: 'DELETE',
-      headers: authHeaders,
+      headers: apiKeyHeaders,
       body: JSON.stringify({
         app_id: 'com.demo.app',
         version: testVersionName,

@@ -130,30 +130,37 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
   }
 
   authHeadersPromise = (async () => {
-    if (!env.SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      throw new Error('SUPABASE_URL or SUPABASE_ANON_KEY is missing for auth headers')
+    try {
+      if (!env.SUPABASE_URL || !SUPABASE_ANON_KEY) {
+        throw new Error('SUPABASE_URL or SUPABASE_ANON_KEY is missing for auth headers')
+      }
+
+      const supabase = createClient<Database>(env.SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          persistSession: false,
+        },
+      })
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: USER_EMAIL,
+        password: USER_PASSWORD,
+      })
+
+      if (error || !data.session?.access_token) {
+        throw error ?? new Error('Unable to obtain JWT for tests')
+      }
+
+      cachedAuthHeaders = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${data.session.access_token}`,
+      }
+      return cachedAuthHeaders
     }
-
-    const supabase = createClient<Database>(env.SUPABASE_URL, SUPABASE_ANON_KEY, {
-      auth: {
-        persistSession: false,
-      },
-    })
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: USER_EMAIL,
-      password: USER_PASSWORD,
-    })
-
-    if (error || !data.session?.access_token) {
-      throw error ?? new Error('Unable to obtain JWT for tests')
+    catch (err) {
+      cachedAuthHeaders = null
+      authHeadersPromise = null
+      throw err
     }
-
-    cachedAuthHeaders = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${data.session.access_token}`,
-    }
-    return cachedAuthHeaders
   })()
 
   return authHeadersPromise

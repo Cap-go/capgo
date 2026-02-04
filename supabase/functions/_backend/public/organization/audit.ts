@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { AuthInfo } from '../../utils/hono.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../utils/hono.ts'
-import { hasOrgRight, supabaseWithAuth } from '../../utils/supabase.ts'
+import { supabaseWithAuth } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
   orgId: z.string(),
@@ -33,12 +33,21 @@ export async function getAuditLogs(c: Context, bodyRaw: any): Promise<Response> 
   const body = bodyParsed.data
 
   const auth = c.get('auth') as AuthInfo | undefined
-  if (!auth?.userId) {
+  if (!auth?.userId || auth.authType !== 'jwt' || !auth.jwt) {
     throw simpleError('not_authorized', 'Not authorized')
   }
 
+  const supabase = supabaseWithAuth(c, auth)
+  const { data: hasRight, error: rightsError } = await supabase.rpc('check_min_rights', {
+    min_right: 'super_admin',
+    org_id: body.orgId,
+    user_id: auth.userId,
+    channel_id: null as any,
+    app_id: null as any,
+  })
+
   // Validate org access (super_admin required by RLS)
-  if (!(await hasOrgRight(c, body.orgId, auth.userId, 'super_admin'))) {
+  if (rightsError || !hasRight) {
     throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
   }
 
@@ -47,7 +56,7 @@ export async function getAuditLogs(c: Context, bodyRaw: any): Promise<Response> 
   const from = page * limit
   const to = (page + 1) * limit - 1
 
-  let query = supabaseWithAuth(c, auth)
+  let query = supabase
     .from('audit_logs')
     .select('*', { count: 'exact' })
     .eq('org_id', body.orgId)
