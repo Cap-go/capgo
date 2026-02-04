@@ -100,7 +100,7 @@ END $$;
 
 SELECT ok(TRUE, 'app_version UPDATE with API key creates audit log with changed_fields');
 
--- Test 5: Delete app_version with API key context and verify audit log is created
+-- Test 5: Soft-delete app_version with API key context and verify audit log is created
 DO $$
 DECLARE
   v_version_id bigint;
@@ -115,28 +115,30 @@ BEGIN
   FROM public.app_versions
   WHERE name = '99.0.0-test-audit' AND app_id = 'com.demo.app';
 
-  -- Delete the app_version
-  DELETE FROM public.app_versions
+  -- Soft-delete the app_version (API keys cannot hard delete)
+  UPDATE public.app_versions
+  SET deleted = true
   WHERE name = '99.0.0-test-audit' AND app_id = 'com.demo.app';
 
-  -- Check that an audit log was created for the DELETE
+  -- Check that an audit log was created for the UPDATE (soft-delete)
   PERFORM set_config('request.headers', null, true);
   PERFORM tests.authenticate_as('test_user');
   SELECT COUNT(*) INTO v_audit_count
   FROM public.audit_logs
   WHERE table_name = 'app_versions'
     AND record_id = v_version_id::text
-    AND operation = 'DELETE'
-    AND user_id = '6aa76066-55ef-4238-ade6-0b32334a4097';
+    AND operation = 'UPDATE'
+    AND user_id = '6aa76066-55ef-4238-ade6-0b32334a4097'
+    AND 'deleted' = ANY(changed_fields);
 
   IF v_audit_count = 0 THEN
-    RAISE EXCEPTION 'No audit log created for app_version DELETE with API key';
+    RAISE EXCEPTION 'No audit log created for app_version soft-delete with API key';
   END IF;
 
-  RAISE NOTICE 'Audit log created for app_version DELETE (version_id: %)', v_version_id;
+  RAISE NOTICE 'Audit log created for app_version soft-delete (version_id: %)', v_version_id;
 END $$;
 
-SELECT ok(TRUE, 'app_version DELETE with API key creates audit log');
+SELECT ok(TRUE, 'app_version soft-delete with API key creates audit log');
 
 -- Test 6: Verify audit log contains correct old_record and new_record data
 DO $$
