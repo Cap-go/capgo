@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, headers, NON_OWNER_ORG_ID, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils.ts'
+import { APIKEY_TEST2_ALL, BASE_URL, getSupabaseClient, headers, NON_OWNER_ORG_ID, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils.ts'
 
 describe('[DELETE] /app operations', () => {
   const id = randomUUID()
@@ -204,6 +204,49 @@ describe('[GET] /app operations with subkey', () => {
     const appsDataWithoutSubkey = await getAllApps.json() as { app_id: string }[]
     const appNamesWithoutSubkey = appsDataWithoutSubkey.map(app => app.app_id)
     expect(appNamesWithoutSubkey).toContain(APPNAME)
+  })
+})
+
+describe('[GET] /app subkey ownership enforcement', () => {
+  const headersTest2 = {
+    'Content-Type': 'application/json',
+    'Authorization': APIKEY_TEST2_ALL,
+  }
+  const appId = 'com.test2.app'
+  let subkeyId = 0
+
+  afterAll(async () => {
+    if (subkeyId) {
+      const deleteApikey = await fetch(`${BASE_URL}/apikey/${subkeyId}`, {
+        method: 'DELETE',
+        headers: headersTest2,
+      })
+      expect(deleteApikey.status).toBe(200)
+    }
+  })
+
+  it('should reject subkey id owned by another user', async () => {
+    const createSubkey = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers: headersTest2,
+      body: JSON.stringify({
+        name: `Cross-tenant subkey ${randomUUID()}`,
+        mode: 'read',
+        limited_to_apps: [appId],
+      }),
+    })
+    expect(createSubkey.status).toBe(200)
+    const subkeyData = await createSubkey.json() as { id: number }
+    subkeyId = subkeyData.id
+
+    const subkeyHeaders = { 'x-limited-key-id': String(subkeyId) }
+    const response = await fetch(`${BASE_URL}/app/${appId}`, {
+      method: 'GET',
+      headers: { ...headers, ...subkeyHeaders },
+    })
+    expect(response.status).toBe(401)
+    const data = await response.json() as { error?: string }
+    expect(data.error).toBe('invalid_subkey')
   })
 })
 
