@@ -9,7 +9,6 @@ Legend: R = reads user records only (no direct auth/public users writes detected
 | tests/app-id-validation.test.ts | USER_ID | R | Shared |
 | tests/app-permissions.test.ts | USER_ID, USER_ID_2 | R | Shared |
 | tests/app.test.ts | USER_ID | R | Shared |
-| tests/audit-logs.test.ts | USER_ID | R | Shared |
 | tests/build_time_tracking.test.ts | USER_ID | R | Shared |
 | tests/bundle-create.test.ts | USER_ID | R | Shared |
 | tests/bundle-error-cases.test.ts | USER_ID | R | Shared |
