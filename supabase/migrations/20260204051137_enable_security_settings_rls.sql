@@ -1,5 +1,5 @@
 -- Enable RLS on singleton security settings table
-ALTER TABLE "public"."security_settings" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS "public"."security_settings" ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Deny access to security settings"
 ON "public"."security_settings"
