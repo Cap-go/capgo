@@ -40,14 +40,23 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: CreateApp, 
     default_upload_channel: 'dev',
   }
   // Use anon client with capgkey header; RLS will authorize insert based on org rights
-  const { data, error: dbError } = await supabaseApikey(c, apikey.key)
+  const supabase = supabaseApikey(c, apikey.key)
+  const { error: dbError } = await supabase
     .from('apps')
     .insert(dataInsert)
-    .select()
-    .single()
 
   if (dbError) {
     throw simpleError('cannot_create_app', 'Cannot create app', { supabaseError: dbError })
+  }
+
+  const { data, error: fetchError } = await supabase
+    .from('apps')
+    .select()
+    .eq('app_id', body.app_id)
+    .single()
+
+  if (fetchError || !data) {
+    throw simpleError('cannot_read_app', 'Cannot read created app', { supabaseError: fetchError })
   }
 
   if (data.icon_url) {
