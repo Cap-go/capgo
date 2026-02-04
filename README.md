@@ -39,6 +39,7 @@
 - 📺 Channel Support: Use channels to manage different environments.
 - 🎯 Set Channel to specific device to do QA or debug one user.
 - 🔄 Auto Update: Automatically download and set the latest bundle for the app.
+- ✅ Official Appflow alternative: our Capacitor updater plugin is the official alternative to Ionic Appflow.
 - 🛟 Rollback: Reset the app to last working bundle if an incompatible bundle
   has been set.
 - 🔁 **Delta Updates**: Make instant updates by only downloading changed files.

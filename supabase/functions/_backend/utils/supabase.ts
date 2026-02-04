@@ -362,6 +362,10 @@ export interface PlanUsage {
   build_time_percent: number
 }
 
+export interface PlanUsageAndFit extends PlanUsage {
+  is_good_plan: boolean
+}
+
 export async function getPlanUsagePercent(c: Context, orgId?: string): Promise<PlanUsage> {
   if (!orgId) {
     return {
@@ -374,6 +378,32 @@ export async function getPlanUsagePercent(c: Context, orgId?: string): Promise<P
   }
   const { data, error } = await supabaseAdmin(c)
     .rpc('get_plan_usage_percent_detailed', { orgid: orgId })
+    .single()
+  if (error)
+    throw new Error(error.message)
+  return data
+}
+
+export async function getPlanUsageAndFit(c: Context, orgId: string): Promise<PlanUsageAndFit> {
+  if (!isStripeConfigured(c)) {
+    const percentUsage = await getPlanUsagePercent(c, orgId)
+    return { is_good_plan: true, ...percentUsage }
+  }
+  const { data, error } = await supabaseAdmin(c)
+    .rpc('get_plan_usage_and_fit', { orgid: orgId })
+    .single()
+  if (error)
+    throw new Error(error.message)
+  return data
+}
+
+export async function getPlanUsageAndFitUncached(c: Context, orgId: string): Promise<PlanUsageAndFit> {
+  if (!isStripeConfigured(c)) {
+    const percentUsage = await getPlanUsagePercent(c, orgId)
+    return { is_good_plan: true, ...percentUsage }
+  }
+  const { data, error } = await supabaseAdmin(c)
+    .rpc('get_plan_usage_and_fit_uncached', { orgid: orgId })
     .single()
   if (error)
     throw new Error(error.message)
