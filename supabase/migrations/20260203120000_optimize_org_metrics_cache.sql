@@ -162,7 +162,7 @@ CREATE FUNCTION public.get_total_metrics(
     fail bigint,
     install bigint,
     uninstall bigint
-) LANGUAGE plpgsql STABLE SECURITY DEFINER
+) LANGUAGE plpgsql VOLATILE SECURITY DEFINER
 SET search_path = '' AS $function$
 DECLARE
     cache_entry public.org_metrics_cache%ROWTYPE;
@@ -262,7 +262,7 @@ CREATE FUNCTION public.get_total_metrics(org_id uuid) RETURNS TABLE (
     fail bigint,
     install bigint,
     uninstall bigint
-) LANGUAGE plpgsql STABLE SECURITY DEFINER
+) LANGUAGE plpgsql VOLATILE SECURITY DEFINER
 SET search_path = '' AS $function$
 DECLARE
     v_start_date date;
@@ -316,7 +316,7 @@ RETURNS TABLE (
     bandwidth_percent double precision,
     storage_percent double precision,
     build_time_percent double precision
-) LANGUAGE plpgsql STABLE SECURITY DEFINER
+) LANGUAGE plpgsql VOLATILE SECURITY DEFINER
 SET search_path = '' AS $function$
 DECLARE
     v_start_date date;
@@ -398,7 +398,7 @@ RETURNS TABLE (
     bandwidth_percent double precision,
     storage_percent double precision,
     build_time_percent double precision
-) LANGUAGE plpgsql STABLE SECURITY DEFINER
+) LANGUAGE plpgsql VOLATILE SECURITY DEFINER
 SET search_path = '' AS $function$
 DECLARE
     v_start_date date;
