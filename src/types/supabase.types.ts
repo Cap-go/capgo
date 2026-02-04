@@ -2684,6 +2684,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      record_email_otp_verified: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       check_revert_to_builtin_version: {
         Args: { appid: string }
         Returns: number

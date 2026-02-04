@@ -4,7 +4,7 @@ import { Capacitor } from '@capacitor/core'
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages, reset } from '@formkit/vue'
 import dayjs from 'dayjs'
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -45,6 +45,8 @@ const otpVerificationCode = ref('')
 const otpVerifiedAt = ref<string | null>(null)
 const otpVerificationLoading = ref(false)
 const otpSending = ref(false)
+const otpNow = ref(dayjs())
+let otpNowTimer: ReturnType<typeof setInterval> | null = null
 const organizationsToDelete = ref<string[]>([])
 const paidOrganizationsToDelete = ref<Array<{ name: string, planName: string }>>([])
 displayStore.NavTitle = t('account')
@@ -57,7 +59,7 @@ const otpVerifiedUntil = computed(() => {
 const otpVerificationValid = computed(() => {
   if (!otpVerifiedUntil.value)
     return false
-  return dayjs().isBefore(otpVerifiedUntil.value)
+  return otpNow.value.isBefore(otpVerifiedUntil.value)
 })
 const otpVerificationStatus = computed(() => {
   if (!otpVerifiedAt.value)
@@ -688,31 +690,25 @@ async function verifyOtpForMfa() {
     return
   }
 
-  const now = new Date().toISOString()
-  const { error: upsertError } = await supabase
-    .from('user_security')
-    .upsert(
-      {
-        user_id: main.auth.id,
-        email_otp_verified_at: now,
-        updated_at: now,
-      },
-      { onConflict: 'user_id' },
-    )
+  const { data: verifiedAt, error: recordError } = await supabase
+    .rpc('record_email_otp_verified')
 
   otpVerificationLoading.value = false
 
-  if (upsertError) {
+  if (recordError || !verifiedAt) {
     toast.error(t('verification-failed'))
-    console.error('Cannot store email OTP verification', upsertError)
+    console.error('Cannot store email OTP verification', recordError)
     return
   }
 
-  otpVerifiedAt.value = now
+  otpVerifiedAt.value = verifiedAt
   toast.success(t('email-otp-verified'))
 }
 
 onMounted(async () => {
+  otpNowTimer = setInterval(() => {
+    otpNow.value = dayjs()
+  }, 60000)
   await loadOtpVerification()
   const { data: mfaFactors, error } = await supabase.auth.mfa.listFactors()
   if (error) {
@@ -742,6 +738,11 @@ onMounted(async () => {
     await nextTick()
     handleMfa()
   }
+})
+
+onBeforeUnmount(() => {
+  if (otpNowTimer)
+    clearInterval(otpNowTimer)
 })
 </script>
 
@@ -870,7 +871,7 @@ onMounted(async () => {
               <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <button
                   type="button"
-                  class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg cursor-pointer dark:text-white hover:bg-gray-100 focus:ring-4 focus:ring-blue-300 dark:hover:bg-gray-600 dark:focus:ring-blue-800 focus:outline-hidden"
+                  class="d-btn d-btn-outline d-btn-sm"
                   :class="{ 'opacity-50 cursor-not-allowed': otpSending }"
                   :disabled="otpSending"
                   @click="sendOtpVerification"
@@ -879,7 +880,7 @@ onMounted(async () => {
                 </button>
                 <button
                   type="button"
-                  class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg cursor-pointer dark:text-white hover:bg-gray-100 focus:ring-4 focus:ring-blue-300 dark:hover:bg-gray-600 dark:focus:ring-blue-800 focus:outline-hidden"
+                  class="d-btn d-btn-outline d-btn-sm"
                   :class="{ 'opacity-50 cursor-not-allowed': otpVerificationLoading || !otpVerificationCode }"
                   :disabled="otpVerificationLoading || !otpVerificationCode"
                   @click="verifyOtpForMfa"
@@ -892,7 +893,8 @@ onMounted(async () => {
                 type="text"
                 inputmode="numeric"
                 :placeholder="t('verification-code')"
-                class="w-full p-3 mt-2 border border-gray-300 rounded-lg dark:text-white dark:bg-gray-800 dark:border-gray-600"
+                class="d-input w-full mt-2"
+                autocomplete="one-time-code"
                 @keydown.enter.prevent="verifyOtpForMfa"
               >
             </div>
