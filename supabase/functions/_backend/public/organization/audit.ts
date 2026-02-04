@@ -1,8 +1,8 @@
 import type { Context } from 'hono'
 import type { AuthInfo } from '../../utils/hono.ts'
 import { z } from 'zod/mini'
-import { simpleError } from '../../utils/hono.ts'
-import { apikeyHasOrgRight, hasOrgRightApikey, supabaseWithAuth } from '../../utils/supabase.ts'
+import { quickError, simpleError } from '../../utils/hono.ts'
+import { apikeyHasOrgRightWithPolicy, hasOrgRightApikey, supabaseWithAuth } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
   orgId: z.string(),
@@ -43,11 +43,21 @@ export async function getAuditLogs(c: Context, bodyRaw: any): Promise<Response> 
       throw simpleError('not_authorized', 'Not authorized')
     }
 
-    if (!apikeyHasOrgRight(auth.apikey, body.orgId)) {
+    // Enforce org scoping + API key policy (expiration) before checking user rights.
+    const orgCheck = await apikeyHasOrgRightWithPolicy(c, auth.apikey, body.orgId, supabase)
+    if (!orgCheck.valid) {
+      if (orgCheck.error === 'org_requires_expiring_key') {
+        throw quickError(401, 'org_requires_expiring_key', 'This organization requires API keys with an expiration date. Please use a different key or update this key with an expiration date.')
+      }
       throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
     }
 
-    const hasRight = await hasOrgRightApikey(c, body.orgId, auth.userId, 'super_admin', c.get('capgkey') as string)
+    // Separate check: API key scope is not enough; user must have super_admin rights.
+    const capgkey = c.get('capgkey')
+    if (!capgkey || typeof capgkey !== 'string') {
+      throw simpleError('not_authorized', 'Not authorized')
+    }
+    const hasRight = await hasOrgRightApikey(c, body.orgId, auth.userId, 'super_admin', capgkey)
     if (!hasRight) {
       throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
     }
