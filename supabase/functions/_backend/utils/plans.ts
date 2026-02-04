@@ -9,9 +9,9 @@ import { sendNotifToOrgMembers } from './org_email_notifications.ts'
 import { syncSubscriptionData } from './stripe.ts'
 import {
   getCurrentPlanNameOrg,
-  getPlanUsagePercent,
+  getPlanUsageAndFit,
+  getPlanUsageAndFitUncached,
   getTotalStats,
-  isGoodPlanOrg,
   isOnboardedOrg,
   isOnboardingNeeded,
   isTrialOrg,
@@ -370,8 +370,16 @@ export async function handleTrialOrg(c: Context, orgId: string, org: any): Promi
 
 // Calculate plan status and usage
 export async function calculatePlanStatus(c: Context, orgId: string) {
-  const is_good_plan = await isGoodPlanOrg(c, orgId)
-  const percentUsage = await getPlanUsagePercent(c, orgId)
+  const planUsage = await getPlanUsageAndFit(c, orgId)
+  const { is_good_plan, total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent } = planUsage
+  const percentUsage = { total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent }
+  return { is_good_plan, percentUsage }
+}
+
+export async function calculatePlanStatusFresh(c: Context, orgId: string) {
+  const planUsage = await getPlanUsageAndFitUncached(c, orgId)
+  const { is_good_plan, total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent } = planUsage
+  const percentUsage = { total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent }
   return { is_good_plan, percentUsage }
 }
 
@@ -432,7 +440,7 @@ export async function checkPlanStatusOnly(c: Context, orgId: string, drizzleClie
   // Calculate plan status and usage
   let planStatus: { is_good_plan: boolean, percentUsage: PlanUsage }
   try {
-    planStatus = await calculatePlanStatus(c, orgId)
+    planStatus = await calculatePlanStatusFresh(c, orgId)
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'calculatePlanStatus failed', orgId, error })

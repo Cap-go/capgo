@@ -9,7 +9,7 @@ import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { BRES, simpleError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrgCached } from '../utils/notifications.ts'
-import { closeClient, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
+import { closeClient, ensurePlaceholderVersions, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
 import { createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from '../utils/stats.ts'
 import { backgroundTask, deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../utils/utils.ts'
@@ -118,6 +118,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
       cloudlog({ requestId: c.get('requestId'), message: `Version name ${version_name} not found, using unknown instead`, app_id, version_name })
     }
     else {
+      backgroundTask(c, ensurePlaceholderVersions(c, app_id))
       return { success: false, error: 'version_not_found', message: 'Version not found', moreInfo: { app_id, version_name } }
     }
   }

@@ -362,6 +362,10 @@ export interface PlanUsage {
   build_time_percent: number
 }
 
+export interface PlanUsageAndFit extends PlanUsage {
+  is_good_plan: boolean
+}
+
 export async function getPlanUsagePercent(c: Context, orgId?: string): Promise<PlanUsage> {
   if (!orgId) {
     return {
@@ -374,6 +378,32 @@ export async function getPlanUsagePercent(c: Context, orgId?: string): Promise<P
   }
   const { data, error } = await supabaseAdmin(c)
     .rpc('get_plan_usage_percent_detailed', { orgid: orgId })
+    .single()
+  if (error)
+    throw new Error(error.message)
+  return data
+}
+
+export async function getPlanUsageAndFit(c: Context, orgId: string): Promise<PlanUsageAndFit> {
+  if (!isStripeConfigured(c)) {
+    const percentUsage = await getPlanUsagePercent(c, orgId)
+    return { is_good_plan: true, ...percentUsage }
+  }
+  const { data, error } = await supabaseAdmin(c)
+    .rpc('get_plan_usage_and_fit', { orgid: orgId })
+    .single()
+  if (error)
+    throw new Error(error.message)
+  return data
+}
+
+export async function getPlanUsageAndFitUncached(c: Context, orgId: string): Promise<PlanUsageAndFit> {
+  if (!isStripeConfigured(c)) {
+    const percentUsage = await getPlanUsagePercent(c, orgId)
+    return { is_good_plan: true, ...percentUsage }
+  }
+  const { data, error } = await supabaseAdmin(c)
+    .rpc('get_plan_usage_and_fit_uncached', { orgid: orgId })
     .single()
   if (error)
     throw new Error(error.message)
@@ -1223,18 +1253,27 @@ export async function checkKey(c: Context, authorization: string | undefined, su
  * Check API key by ID
  * Expiration is checked directly in SQL query: expires_at IS NULL OR expires_at > now()
  */
-export async function checkKeyById(c: Context, id: number, supabase: SupabaseClient<Database>, allowed: Database['public']['Enums']['key_mode'][]): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
+export async function checkKeyById(
+  c: Context,
+  id: number,
+  supabase: SupabaseClient<Database>,
+  allowed: Database['public']['Enums']['key_mode'][],
+  userId?: string,
+): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   if (!id)
     return null
   try {
     // Expiration check is done in SQL: expires_at IS NULL OR expires_at > now()
-    const { data, error } = await supabase
+    let query = supabase
       .from('apikeys')
       .select('*')
       .eq('id', id)
       .in('mode', allowed)
       .or('expires_at.is.null,expires_at.gt.now()')
-      .single()
+    if (userId) {
+      query = query.eq('user_id', userId)
+    }
+    const { data, error } = await query.single()
     if (!data || error)
       return null
     return data

@@ -19,6 +19,7 @@ export const CLOUDFLARE_FILES_URL = env.CLOUDFLARE_FILES_URL ?? 'http://127.0.0.
 export const BASE_URL = USE_CLOUDFLARE ? CLOUDFLARE_API_URL : `${env.SUPABASE_URL}/functions/v1`
 export const PLUGIN_BASE_URL = USE_CLOUDFLARE ? CLOUDFLARE_PLUGIN_URL : `${env.SUPABASE_URL}/functions/v1`
 export const API_SECRET = 'testsecret'
+const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY ?? ''
 
 /**
  * Get the correct base URL for an endpoint based on whether it's a plugin endpoint or API endpoint
@@ -115,6 +116,54 @@ export const NON_ACCESS_APP_NAME = 'com.demoadmin.app'
 export const headers = {
   'Content-Type': 'application/json',
   'Authorization': APIKEY_TEST_ALL,
+}
+
+let cachedAuthHeaders: Record<string, string> | null = null
+let authHeadersPromise: Promise<Record<string, string>> | null = null
+
+export async function getAuthHeaders(): Promise<Record<string, string>> {
+  if (cachedAuthHeaders) {
+    return cachedAuthHeaders
+  }
+  if (authHeadersPromise) {
+    return authHeadersPromise
+  }
+
+  authHeadersPromise = (async () => {
+    try {
+      if (!env.SUPABASE_URL || !SUPABASE_ANON_KEY) {
+        throw new Error('SUPABASE_URL or SUPABASE_ANON_KEY is missing for auth headers')
+      }
+
+      const supabase = createClient<Database>(env.SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: {
+          persistSession: false,
+        },
+      })
+
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: USER_EMAIL,
+        password: USER_PASSWORD,
+      })
+
+      if (error || !data.session?.access_token) {
+        throw error ?? new Error('Unable to obtain JWT for tests')
+      }
+
+      cachedAuthHeaders = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${data.session.access_token}`,
+      }
+      return cachedAuthHeaders
+    }
+    catch (err) {
+      cachedAuthHeaders = null
+      authHeadersPromise = null
+      throw err
+    }
+  })()
+
+  return authHeadersPromise
 }
 export const headersStats = {
   'Content-Type': 'application/json',

@@ -7,6 +7,7 @@ import {
   createDeliveryRecord,
   createTestPayload,
   deliverWebhook,
+  getWebhookUrlValidationError,
   updateDeliveryResult,
 } from '../../utils/webhook.ts'
 import { checkWebhookPermissionV2 } from './index.ts'
@@ -43,6 +44,10 @@ export async function test(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw
   if (webhook.org_id !== body.orgId) {
     throw simpleError('no_permission', 'Webhook does not belong to this organization', { webhookId: body.webhookId })
   }
+
+  const urlError = getWebhookUrlValidationError(c, webhook.url)
+  if (urlError)
+    throw simpleError('invalid_url', urlError, { url: webhook.url })
 
   // Create test payload
   const payload = createTestPayload(body.orgId)

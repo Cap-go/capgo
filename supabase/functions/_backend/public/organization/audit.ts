@@ -1,8 +1,8 @@
 import type { Context } from 'hono'
-import type { Database } from '../../utils/supabase.types.ts'
+import type { AuthInfo } from '../../utils/hono.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../utils/hono.ts'
-import { apikeyHasOrgRight, hasOrgRightApikey, supabaseApikey } from '../../utils/supabase.ts'
+import { supabaseWithAuth } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
   orgId: z.string(),
@@ -25,19 +25,29 @@ const auditLogSchema = z.object({
   changed_fields: z.nullable(z.array(z.string())),
 })
 
-export async function getAuditLogs(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function getAuditLogs(c: Context, bodyRaw: any): Promise<Response> {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
 
-  // Validate org access
-  if (!(await hasOrgRightApikey(c, body.orgId, apikey.user_id, 'read', c.get('capgkey') as string))) {
-    throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
+  const auth = c.get('auth') as AuthInfo | undefined
+  if (!auth?.userId || auth.authType !== 'jwt' || !auth.jwt) {
+    throw simpleError('not_authorized', 'Not authorized')
   }
 
-  if (!apikeyHasOrgRight(apikey, body.orgId)) {
+  const supabase = supabaseWithAuth(c, auth)
+  const { data: hasRight, error: rightsError } = await supabase.rpc('check_min_rights', {
+    min_right: 'super_admin',
+    org_id: body.orgId,
+    user_id: auth.userId,
+    channel_id: null as any,
+    app_id: null as any,
+  })
+
+  // Validate org access (super_admin required by RLS)
+  if (rightsError || !hasRight) {
     throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: body.orgId })
   }
 
@@ -46,7 +56,7 @@ export async function getAuditLogs(c: Context, bodyRaw: any, apikey: Database['p
   const from = page * limit
   const to = (page + 1) * limit - 1
 
-  let query = supabaseApikey(c, c.get('capgkey') as string)
+  let query = supabase
     .from('audit_logs')
     .select('*', { count: 'exact' })
     .eq('org_id', body.orgId)

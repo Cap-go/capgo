@@ -2306,6 +2306,35 @@ export type Database = {
           },
         ]
       }
+      user_security: {
+        Row: {
+          created_at: string
+          email_otp_verified_at: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email_otp_verified_at?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email_otp_verified_at?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_security_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       users: {
         Row: {
           ban_time: string | null
@@ -2654,6 +2683,10 @@ export type Database = {
           password_policy_compliant: boolean
           user_id: string
         }[]
+      }
+      record_email_otp_verified: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
       check_revert_to_builtin_version: {
         Args: { appid: string }
@@ -3117,6 +3150,28 @@ export type Database = {
       get_password_policy_hash: {
         Args: { policy_config: Json }
         Returns: string
+      }
+      get_plan_usage_and_fit: {
+        Args: { orgid: string }
+        Returns: {
+          bandwidth_percent: number
+          build_time_percent: number
+          is_good_plan: boolean
+          mau_percent: number
+          storage_percent: number
+          total_percent: number
+        }[]
+      }
+      get_plan_usage_and_fit_uncached: {
+        Args: { orgid: string }
+        Returns: {
+          bandwidth_percent: number
+          build_time_percent: number
+          is_good_plan: boolean
+          mau_percent: number
+          storage_percent: number
+          total_percent: number
+        }[]
       }
       get_plan_usage_percent_detailed:
         | {
