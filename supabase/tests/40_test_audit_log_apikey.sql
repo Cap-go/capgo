@@ -11,6 +11,7 @@ BEGIN;
 SELECT plan(6);
 
 -- Test 1: Verify get_identity returns user_id when API key header is set
+SELECT tests.clear_authentication();
 DO $$
 BEGIN
   PERFORM set_config('request.headers', '{"capgkey": "ae6e7458-c46d-4c00-aa3b-153b0b8520ea"}', true);
@@ -39,6 +40,7 @@ DECLARE
   v_audit_count int;
 BEGIN
   -- Set API key context
+  PERFORM tests.clear_authentication();
   PERFORM set_config('request.headers', '{"capgkey": "ae6e7458-c46d-4c00-aa3b-153b0b8520ea"}', true);
 
   -- Insert a new app_version
@@ -47,6 +49,8 @@ BEGIN
   RETURNING id INTO v_version_id;
 
   -- Check that an audit log was created
+  PERFORM set_config('request.headers', null, true);
+  PERFORM tests.authenticate_as('test_user');
   SELECT COUNT(*) INTO v_audit_count
   FROM public.audit_logs
   WHERE table_name = 'app_versions'
@@ -69,6 +73,7 @@ DECLARE
   v_audit_count int;
 BEGIN
   -- Set API key context
+  PERFORM tests.clear_authentication();
   PERFORM set_config('request.headers', '{"capgkey": "ae6e7458-c46d-4c00-aa3b-153b0b8520ea"}', true);
 
   -- Update the app_version
@@ -77,6 +82,8 @@ BEGIN
   WHERE name = '99.0.0-test-audit' AND app_id = 'com.demo.app';
 
   -- Check that an audit log was created for the UPDATE
+  PERFORM set_config('request.headers', null, true);
+  PERFORM tests.authenticate_as('test_user');
   SELECT COUNT(*) INTO v_audit_count
   FROM public.audit_logs
   WHERE table_name = 'app_versions'
@@ -100,6 +107,7 @@ DECLARE
   v_audit_count int;
 BEGIN
   -- Set API key context
+  PERFORM tests.clear_authentication();
   PERFORM set_config('request.headers', '{"capgkey": "ae6e7458-c46d-4c00-aa3b-153b0b8520ea"}', true);
 
   -- Get the version id before deleting
@@ -112,6 +120,8 @@ BEGIN
   WHERE name = '99.0.0-test-audit' AND app_id = 'com.demo.app';
 
   -- Check that an audit log was created for the DELETE
+  PERFORM set_config('request.headers', null, true);
+  PERFORM tests.authenticate_as('test_user');
   SELECT COUNT(*) INTO v_audit_count
   FROM public.audit_logs
   WHERE table_name = 'app_versions'
@@ -135,6 +145,7 @@ DECLARE
   v_audit_record record;
 BEGIN
   -- Set API key context
+  PERFORM tests.clear_authentication();
   PERFORM set_config('request.headers', '{"capgkey": "ae6e7458-c46d-4c00-aa3b-153b0b8520ea"}', true);
 
   -- Insert a new app_version
@@ -143,6 +154,8 @@ BEGIN
   RETURNING id INTO v_version_id;
 
   -- Check the INSERT audit log
+  PERFORM set_config('request.headers', null, true);
+  PERFORM tests.authenticate_as('test_user');
   SELECT * INTO v_audit_record
   FROM public.audit_logs
   WHERE table_name = 'app_versions'
@@ -164,11 +177,15 @@ BEGIN
   END IF;
 
   -- Update the version
+  PERFORM tests.clear_authentication();
+  PERFORM set_config('request.headers', '{"capgkey": "ae6e7458-c46d-4c00-aa3b-153b0b8520ea"}', true);
   UPDATE public.app_versions
   SET comment = 'Updated comment'
   WHERE id = v_version_id;
 
   -- Check the UPDATE audit log
+  PERFORM set_config('request.headers', null, true);
+  PERFORM tests.authenticate_as('test_user');
   SELECT * INTO v_audit_record
   FROM public.audit_logs
   WHERE table_name = 'app_versions'
