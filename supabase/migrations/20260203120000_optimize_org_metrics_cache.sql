@@ -166,7 +166,7 @@ CREATE FUNCTION public.get_total_metrics(
 SET search_path = '' AS $function$
 DECLARE
     cache_entry public.org_metrics_cache%ROWTYPE;
-    cache_ttl interval := '5 minutes';
+    cache_ttl interval := '5 minutes'::interval;
 BEGIN
     IF start_date IS NULL OR end_date IS NULL THEN
         RETURN;
