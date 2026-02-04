@@ -3129,6 +3129,17 @@ export type Database = {
           total_percent: number
         }[]
       }
+      get_plan_usage_and_fit_uncached: {
+        Args: { orgid: string }
+        Returns: {
+          bandwidth_percent: number
+          build_time_percent: number
+          is_good_plan: boolean
+          mau_percent: number
+          storage_percent: number
+          total_percent: number
+        }[]
+      }
       get_plan_usage_percent_detailed:
         | {
             Args: { orgid: string }

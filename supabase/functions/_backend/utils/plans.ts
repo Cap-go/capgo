@@ -10,6 +10,7 @@ import { syncSubscriptionData } from './stripe.ts'
 import {
   getCurrentPlanNameOrg,
   getPlanUsageAndFit,
+  getPlanUsageAndFitUncached,
   getTotalStats,
   isOnboardedOrg,
   isOnboardingNeeded,
@@ -375,6 +376,13 @@ export async function calculatePlanStatus(c: Context, orgId: string) {
   return { is_good_plan, percentUsage }
 }
 
+export async function calculatePlanStatusFresh(c: Context, orgId: string) {
+  const planUsage = await getPlanUsageAndFitUncached(c, orgId)
+  const { is_good_plan, total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent } = planUsage
+  const percentUsage = { total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent }
+  return { is_good_plan, percentUsage }
+}
+
 // Handle notifications and events based on org status
 export async function handleOrgNotificationsAndEvents(c: Context, org: any, orgId: string, is_good_plan: boolean, percentUsage: PlanUsage, drizzleClient: ReturnType<typeof getDrizzleClient>): Promise<boolean> {
   const is_onboarded = await isOnboardedOrg(c, orgId)
@@ -432,7 +440,7 @@ export async function checkPlanStatusOnly(c: Context, orgId: string, drizzleClie
   // Calculate plan status and usage
   let planStatus: { is_good_plan: boolean, percentUsage: PlanUsage }
   try {
-    planStatus = await calculatePlanStatus(c, orgId)
+    planStatus = await calculatePlanStatusFresh(c, orgId)
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'calculatePlanStatus failed', orgId, error })
