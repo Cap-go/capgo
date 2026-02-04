@@ -117,6 +117,11 @@ BEGIN
     RETURN false;
   END IF;
 
+  IF api_key.user_id IS DISTINCT FROM "userid" THEN
+    PERFORM public.pg_log('deny: USERID_MISMATCH', jsonb_build_object('appid', "appid", 'org_id', org_id, 'apikey_id', api_key.id, 'userid', "userid", 'apikey_user_id', api_key.user_id));
+    RETURN false;
+  END IF;
+
   IF public.is_apikey_expired(api_key.expires_at) THEN
     PERFORM public.pg_log('deny: APIKEY_EXPIRED', jsonb_build_object('appid', "appid", 'org_id', org_id, 'apikey_id', api_key.id));
     RETURN false;
