@@ -908,10 +908,10 @@ onBeforeUnmount(() => {
               <button
                 type="button"
                 data-test="setup-mfa"
-                class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg cursor-pointer dark:text-white hover:bg-gray-100 focus:ring-4 focus:ring-blue-300 dark:hover:bg-gray-600 dark:focus:ring-blue-800 focus:outline-hidden"
+                class="d-btn d-btn-outline d-btn-sm"
                 :class="{
-                  'border border-emerald-600 focus:ring-emerald-800': !mfaEnabled,
-                  'border border-red-500 focus:ring-rose-600': mfaEnabled,
+                  'd-btn-success': !mfaEnabled,
+                  'd-btn-error': mfaEnabled,
                   'opacity-50 cursor-not-allowed': !mfaEnabled && !otpVerificationValid,
                 }"
                 :disabled="!mfaEnabled && !otpVerificationValid"
