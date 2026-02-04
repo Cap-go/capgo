@@ -180,6 +180,35 @@ BEGIN
         RETURN;
     END IF;
 
+    IF EXISTS (
+        SELECT 1
+        FROM pg_catalog.pg_stat_xact_user_tables
+        WHERE relname IN (
+            'apps',
+            'deleted_apps',
+            'daily_mau',
+            'daily_bandwidth',
+            'daily_build_time',
+            'daily_version',
+            'app_versions',
+            'app_versions_meta'
+        )
+        AND (n_tup_ins > 0 OR n_tup_upd > 0 OR n_tup_del > 0)
+    ) THEN
+        cache_entry := public.seed_org_metrics_cache(org_id, start_date, end_date);
+
+        RETURN QUERY SELECT
+            cache_entry.mau,
+            cache_entry.storage,
+            cache_entry.bandwidth,
+            cache_entry.build_time_unit,
+            cache_entry.get,
+            cache_entry.fail,
+            cache_entry.install,
+            cache_entry.uninstall;
+        RETURN;
+    END IF;
+
     SELECT * INTO cache_entry
     FROM public.org_metrics_cache
     WHERE org_metrics_cache.org_id = get_total_metrics.org_id;
