@@ -168,6 +168,12 @@ export function getEnv(c: Context, key: string): string {
 }
 
 export function isStripeConfigured(c: Context): boolean {
-  const secretKey = getEnv(c, 'STRIPE_SECRET_KEY')
-  return typeof secretKey === 'string' && secretKey.trim().length > 0
+  const secretKey = getEnv(c, 'STRIPE_SECRET_KEY').trim()
+  if (!secretKey)
+    return false
+
+  // In CI/local we often set placeholder values (e.g. "test") to satisfy env var checks.
+  // Only treat Stripe as configured when the key looks like a real Stripe secret/restricted key.
+  // https://stripe.com/docs/keys
+  return /^(?:sk|rk)_(?:test|live)_[A-Za-z0-9]{10,}$/.test(secretKey)
 }

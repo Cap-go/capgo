@@ -21,10 +21,34 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
     throw simpleError('no_id', 'No id', { record })
   }
 
+  const supabase = supabaseAdmin(c)
+
+  // Some environments/triggers may deliver a partial payload (e.g. missing owner_org).
+  // Resolve it from the database so we don't insert invalid app_versions rows.
+  let ownerOrg = record.owner_org
+  if (!ownerOrg) {
+    const { data, error } = await supabase
+      .from('apps')
+      .select('owner_org')
+      .eq('id', record.id)
+      .maybeSingle()
+
+    if (error) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Error fetching app owner_org', error, appId: record.id })
+    }
+    ownerOrg = data?.owner_org ?? null
+  }
+
   // Check if this is a demo app - skip onboarding emails and store info for demo apps
   const isDemo = record.is_demo === true
   if (isDemo) {
     cloudlog({ requestId: c.get('requestId'), message: 'Demo app detected, skipping onboarding emails and store info' })
+  }
+
+  // Can't proceed with onboarding/default versions without an org id.
+  if (!ownerOrg) {
+    cloudlog({ requestId: c.get('requestId'), message: 'No owner_org on app record, skipping onboarding and default versions', record })
+    return c.json(BRES)
   }
 
   const LogSnag = logsnag(c)
@@ -32,7 +56,7 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
     channel: 'app-created',
     event: isDemo ? 'Demo App Created' : 'App Created',
     icon: isDemo ? '🎮' : '🎉',
-    user_id: record.owner_org,
+    user_id: ownerOrg,
     tags: {
       app_id: record.app_id,
       is_demo: isDemo ? 'true' : 'false',
@@ -42,18 +66,17 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
 
   // Purge on-prem cache for this app to clear any stale responses
   await backgroundTask(c, purgeOnPremCache(c, record.app_id))
-  const supabase = supabaseAdmin(c)
   const { error: dbVersionError } = await supabase
     .from('app_versions')
     .upsert([
       {
-        owner_org: record.owner_org,
+        owner_org: ownerOrg,
         deleted: true,
         name: 'unknown',
         app_id: record.app_id,
       },
       {
-        owner_org: record.owner_org,
+        owner_org: ownerOrg,
         deleted: true,
         name: 'builtin',
         app_id: record.app_id,
@@ -70,14 +93,14 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
     await backgroundTask(c, supabase
       .from('orgs')
       .select('*')
-      .eq('id', record.owner_org)
+      .eq('id', ownerOrg)
       .single()
       .then(({ data, error }) => {
         if (error || !data) {
           throw simpleError('error_fetching_organization', 'Error fetching organization', { error })
         }
         return trackBentoEvent(c, data.management_email, {
-          org_id: record.owner_org,
+          org_id: ownerOrg,
           org_name: data.name,
           app_name: record.name,
         }, 'app:created')
