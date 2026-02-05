@@ -4,7 +4,7 @@ ALTER TABLE public.apikeys
 DO $$
 BEGIN
   UPDATE public.apikeys
-    SET key = gen_random_uuid()::text
+    SET key = extensions.gen_random_uuid()::text
     WHERE key IS NULL AND key_hash IS NULL;
 
   IF NOT EXISTS (
@@ -46,7 +46,7 @@ BEGIN
     v_is_hashed := NEW.key_hash IS NOT NULL;
   END IF;
 
-  v_plain_key := gen_random_uuid()::text;
+  v_plain_key := extensions.gen_random_uuid()::text;
 
   IF v_is_hashed THEN
     NEW.key_hash := encode(extensions.digest(v_plain_key, 'sha256'), 'hex');
@@ -92,7 +92,8 @@ FOR EACH ROW
 EXECUTE FUNCTION public.apikeys_force_server_key();
 
 DROP TRIGGER IF EXISTS apikeys_strip_plain_key_for_hashed ON public.apikeys;
-CREATE TRIGGER apikeys_strip_plain_key_for_hashed
+CREATE CONSTRAINT TRIGGER apikeys_strip_plain_key_for_hashed
 AFTER INSERT OR UPDATE ON public.apikeys
+DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW
 EXECUTE FUNCTION public.apikeys_strip_plain_key_for_hashed();
