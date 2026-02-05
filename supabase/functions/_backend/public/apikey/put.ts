@@ -1,5 +1,6 @@
 import type { AuthInfo } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
+import { hashApiKey } from '../../utils/hash.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
 import { supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
@@ -16,11 +17,12 @@ function isValidIdFormat(id: string): boolean {
 }
 
 interface ApiKeyPut {
-  name: string
-  mode: 'read' | 'write' | 'all' | 'upload'
-  limited_to_apps: string[]
-  limited_to_orgs: string[]
+  name?: string
+  mode?: 'read' | 'write' | 'all' | 'upload'
+  limited_to_apps?: string[]
+  limited_to_orgs?: string[]
   expires_at?: string | null
+  regenerate?: boolean
 }
 
 app.put('/:id', middlewareV2(['all']), async (c) => {
@@ -43,7 +45,7 @@ app.put('/:id', middlewareV2(['all']), async (c) => {
   }
 
   const body = await parseBody<ApiKeyPut>(c)
-  const { name, mode, limited_to_apps, limited_to_orgs, expires_at } = body
+  const { name, mode, limited_to_apps, limited_to_orgs, expires_at, regenerate } = body
 
   // Validate expiration date format (throws if invalid)
   validateExpirationDate(expires_at)
@@ -78,7 +80,11 @@ app.put('/:id', middlewareV2(['all']), async (c) => {
     throw simpleError('limited_to_orgs_must_be_an_array_of_strings', 'limited_to_orgs must be an array of strings')
   }
 
-  if (Object.keys(updateData).length === 0) {
+  if (regenerate !== undefined && typeof regenerate !== 'boolean') {
+    throw simpleError('regenerate_must_be_boolean', 'regenerate must be a boolean')
+  }
+
+  if (Object.keys(updateData).length === 0 && !regenerate) {
     throw simpleError('no_valid_fields_provided_for_update', 'No valid fields provided for update. Provide name, mode, limited_to_apps, limited_to_orgs, or expires_at.')
   }
 
@@ -88,7 +94,7 @@ app.put('/:id', middlewareV2(['all']), async (c) => {
   // Check if the apikey to update exists (RLS handles ownership)
   const { data: existingApikey, error: fetchError } = await supabase
     .from('apikeys')
-    .select('id, limited_to_orgs, expires_at') // Also fetch expires_at for policy validation
+    .select('id, limited_to_orgs, expires_at, key, key_hash') // Also fetch expires_at for policy validation
     .or(`key.eq.${id},id.eq.${id}`)
     .eq('user_id', auth.userId)
     .single()
@@ -111,6 +117,21 @@ app.put('/:id', middlewareV2(['all']), async (c) => {
     await validateExpirationAgainstOrgPolicies(orgsToValidate, expirationToValidate, supabase)
   }
 
+  let plainKey: string | null = null
+  let wasHashed = false
+  if (regenerate) {
+    plainKey = crypto.randomUUID()
+    wasHashed = existingApikey.key === null && existingApikey.key_hash !== null
+    if (wasHashed) {
+      updateData.key = null
+      updateData.key_hash = await hashApiKey(plainKey)
+    }
+    else {
+      updateData.key = plainKey
+      updateData.key_hash = null
+    }
+  }
+
   const { data: updatedApikey, error: updateError } = await supabase
     .from('apikeys')
     .update(updateData)
@@ -123,7 +144,11 @@ app.put('/:id', middlewareV2(['all']), async (c) => {
     throw quickError(500, 'failed_to_update_apikey', 'Failed to update API key', { supabaseError: updateError })
   }
 
-  return c.json(updatedApikey)
+  const responseData = { ...updatedApikey }
+  if (regenerate && wasHashed && plainKey)
+    responseData.key = plainKey
+
+  return c.json(responseData)
 })
 
 export default app
