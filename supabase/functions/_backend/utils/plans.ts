@@ -32,6 +32,11 @@ interface BillingCycleInfo {
   subscription_anchor_end: string | null
 }
 
+interface BillingCycleRange {
+  subscription_anchor_start: string
+  subscription_anchor_end: string
+}
+
 interface CreditApplicationResult {
   overage_amount: number
   credits_required: number
@@ -42,7 +47,7 @@ interface CreditApplicationResult {
   credit_step_id: number | null
 }
 
-function getDefaultBillingCycleRange(referenceDate = new Date()): BillingCycleInfo {
+function getDefaultBillingCycleRange(referenceDate = new Date()): BillingCycleRange {
   const start = new Date(Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), 1, 0, 0, 0, 0))
   const end = new Date(Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth() + 1, 1, 0, 0, 0, 0))
   return {
@@ -51,7 +56,7 @@ function getDefaultBillingCycleRange(referenceDate = new Date()): BillingCycleIn
   }
 }
 
-async function getBillingCycleRange(c: Context, orgId: string): Promise<BillingCycleInfo> {
+async function getBillingCycleRange(c: Context, orgId: string): Promise<BillingCycleRange> {
   try {
     const { data, error } = await supabaseAdmin(c)
       .rpc('get_cycle_info_org', { orgid: orgId })
@@ -69,7 +74,7 @@ async function getBillingCycleRange(c: Context, orgId: string): Promise<BillingC
       })
       return getDefaultBillingCycleRange()
     }
-    return data
+    return data as BillingCycleRange
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getBillingCycleRange error', orgId, error })
@@ -85,13 +90,13 @@ async function applyCreditsForMetric(
   planId: string | undefined,
   usage: number,
   limit: number | null | undefined,
-  billingCycle: BillingCycleInfo,
+  billingCycle: BillingCycleInfo | null,
 ): Promise<CreditApplicationResult | null> {
   if (overageAmount <= 0)
     return null
 
-  const resolvedBillingCycle = billingCycle?.subscription_anchor_start && billingCycle?.subscription_anchor_end
-    ? billingCycle
+  const resolvedBillingCycle: BillingCycleRange = billingCycle?.subscription_anchor_start && billingCycle?.subscription_anchor_end
+    ? (billingCycle as BillingCycleRange)
     : getDefaultBillingCycleRange()
 
   if (!planId) {
