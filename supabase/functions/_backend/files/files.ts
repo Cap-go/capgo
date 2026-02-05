@@ -21,7 +21,7 @@ import { app as files_config } from './files_config.ts'
 import { parseUploadMetadata } from './parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
 import { supabaseTusCreateHandler, supabaseTusHeadHandler, supabaseTusPatchHandler } from './supabaseTusProxy.ts'
-import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, MAX_UPLOAD_LENGTH_BYTES, toBase64, TUS_VERSION, X_CHECKSUM_SHA256 } from './util.ts'
+import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, MAX_UPLOAD_LENGTH_BYTES, toBase64, TUS_EXTENSIONS, TUS_VERSION, X_CHECKSUM_SHA256 } from './util.ts'
 
 const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 20 minutes
 
@@ -216,7 +216,7 @@ function optionsHandler(c: Context) {
     'Tus-Resumable': TUS_VERSION,
     'Tus-Version': TUS_VERSION,
     'Tus-Max-Size': MAX_UPLOAD_LENGTH_BYTES.toString(),
-    'Tus-Extension': 'creation,creation-defer-length,creation-with-upload,expiration',
+    'Tus-Extension': TUS_EXTENSIONS,
   })
 }
 

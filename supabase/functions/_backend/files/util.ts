@@ -33,6 +33,7 @@ export const HEADERS_LOWERCASE = HEADERS.map((header) => {
 }) as Array<Lowercase<(typeof HEADERS)[number]>>
 
 export const TUS_VERSION = '1.0.0'
+export const TUS_EXTENSIONS = 'creation,creation-defer-length,creation-with-upload,expiration'
 
 // uploads larger than this will be rejected
 export const MAX_UPLOAD_LENGTH_BYTES = 1024 * 1024 * 1024 // 1GB
