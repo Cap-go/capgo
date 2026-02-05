@@ -1,6 +1,5 @@
 import type { AuthInfo } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
-import { hashApiKey } from '../../utils/hash.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
 import { supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
@@ -57,6 +56,11 @@ app.put('/:id', middlewareV2(['all']), async (c) => {
     limited_to_apps: limited_to_apps?.length > 0 ? limited_to_apps : undefined,
     limited_to_orgs: limited_to_orgs?.length > 0 ? limited_to_orgs : undefined,
   }
+  const hasUpdates = name !== undefined
+    || mode !== undefined
+    || limited_to_apps !== undefined
+    || limited_to_orgs !== undefined
+    || expires_at !== undefined
 
   // Handle expires_at: null means remove expiration, undefined means don't update
   if (expires_at !== undefined) {
@@ -84,7 +88,7 @@ app.put('/:id', middlewareV2(['all']), async (c) => {
     throw simpleError('regenerate_must_be_boolean', 'regenerate must be a boolean')
   }
 
-  if (Object.keys(updateData).length === 0 && !regenerate) {
+  if (!hasUpdates && !regenerate) {
     throw simpleError('no_valid_fields_provided_for_update', 'No valid fields provided for update. Provide name, mode, limited_to_apps, limited_to_orgs, or expires_at.')
   }
 
@@ -117,38 +121,33 @@ app.put('/:id', middlewareV2(['all']), async (c) => {
     await validateExpirationAgainstOrgPolicies(orgsToValidate, expirationToValidate, supabase)
   }
 
-  let plainKey: string | null = null
-  let wasHashed = false
+  let updatedApikey = existingApikey
+  if (hasUpdates) {
+    const { data: updatedData, error: updateError } = await supabase
+      .from('apikeys')
+      .update(updateData)
+      .eq('id', existingApikey.id) // Use the fetched ID to ensure we update the correct record
+      .eq('user_id', auth.userId)
+      .select()
+      .single()
+
+    if (updateError || !updatedData) {
+      throw quickError(500, 'failed_to_update_apikey', 'Failed to update API key', { supabaseError: updateError })
+    }
+    updatedApikey = updatedData
+  }
+
   if (regenerate) {
-    plainKey = crypto.randomUUID()
-    wasHashed = existingApikey.key === null && existingApikey.key_hash !== null
-    if (wasHashed) {
-      updateData.key = null
-      updateData.key_hash = await hashApiKey(plainKey)
+    const { data: regeneratedApikey, error: regenerateError } = await supabase
+      .rpc('regenerate_apikey', { p_apikey_id: existingApikey.id })
+      .single()
+    if (regenerateError || !regeneratedApikey) {
+      throw quickError(500, 'failed_to_regenerate_apikey', 'Failed to regenerate API key', { supabaseError: regenerateError })
     }
-    else {
-      updateData.key = plainKey
-      updateData.key_hash = null
-    }
+    return c.json(regeneratedApikey)
   }
 
-  const { data: updatedApikey, error: updateError } = await supabase
-    .from('apikeys')
-    .update(updateData)
-    .eq('id', existingApikey.id) // Use the fetched ID to ensure we update the correct record
-    .eq('user_id', auth.userId)
-    .select()
-    .single()
-
-  if (updateError) {
-    throw quickError(500, 'failed_to_update_apikey', 'Failed to update API key', { supabaseError: updateError })
-  }
-
-  const responseData = { ...updatedApikey }
-  if (regenerate && wasHashed && plainKey)
-    responseData.key = plainKey
-
-  return c.json(responseData)
+  return c.json(updatedApikey)
 })
 
 export default app
