@@ -6,9 +6,10 @@ import {
   ALLOWED_METHODS,
   EXPOSED_HEADERS,
   MAX_UPLOAD_LENGTH_BYTES,
+  TUS_EXTENSIONS,
   TUS_VERSION,
 } from '../../files/util.ts'
-import { BRES, getBodyOrQuery, honoFactory } from '../../utils/hono.ts'
+import { getBodyOrQuery, honoFactory } from '../../utils/hono.ts'
 import { middlewareKey } from '../../utils/hono_middleware.ts'
 import { cancelBuild } from './cancel.ts'
 import { streamBuildLogs } from './logs.ts'
@@ -66,8 +67,6 @@ app.post('/cancel/:jobId', middlewareKey(['all', 'write']), async (c) => {
   return cancelBuild(c, jobId, body.app_id, apikey)
 })
 
-const TUS_EXTENSIONS = 'creation,creation-defer-length,creation-with-upload,expiration'
-
 function tusOptionsResponse() {
   return {
     'Access-Control-Allow-Origin': '*',
@@ -105,10 +104,10 @@ app.patch('/upload/:jobId/*', middlewareKey(['all', 'write']), async (c) => {
 
 // OPTIONS /build/upload/:jobId - TUS capabilities (no auth needed)
 app.options('/upload/:jobId', (c) => {
-  return c.json(BRES, 200, tusOptionsResponse())
+  return c.newResponse(null, 204, tusOptionsResponse())
 })
 
 // OPTIONS /build/upload/:jobId/* - TUS capabilities (no auth needed)
 app.options('/upload/:jobId/*', (c) => {
-  return c.json(BRES, 200, tusOptionsResponse())
+  return c.newResponse(null, 204, tusOptionsResponse())
 })

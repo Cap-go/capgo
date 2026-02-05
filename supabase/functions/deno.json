@@ -10,6 +10,7 @@
     "@logsnag/node": "npm:@logsnag/node@1.0.1",
     "cron-schedule": "npm:cron-schedule@5.0.4",
     "dayjs": "npm:dayjs@1.11.19",
+    "dayjs/": "npm:/dayjs@1.11.19/",
     "drizzle-orm": "npm:drizzle-orm@0.44.7",
     "drizzle-orm/": "npm:/drizzle-orm@0.44.7/",
     "adm-zip": "npm:adm-zip@0.5.16",
