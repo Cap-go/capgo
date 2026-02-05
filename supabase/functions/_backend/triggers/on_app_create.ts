@@ -25,7 +25,7 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
 
   // Some environments/triggers may deliver a partial payload (e.g. missing owner_org).
   // Resolve it from the database so we don't insert invalid app_versions rows.
-  let ownerOrg = record.owner_org
+  let ownerOrg: string | undefined = record.owner_org ?? undefined
   if (!ownerOrg) {
     const { data, error } = await supabase
       .from('apps')
@@ -36,7 +36,7 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
     if (error) {
       cloudlog({ requestId: c.get('requestId'), message: 'Error fetching app owner_org', error, appId: record.id })
     }
-    ownerOrg = data?.owner_org ?? null
+    ownerOrg = data?.owner_org ?? undefined
   }
 
   // Check if this is a demo app - skip onboarding emails and store info for demo apps
