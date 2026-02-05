@@ -42,16 +42,38 @@ interface CreditApplicationResult {
   credit_step_id: number | null
 }
 
-async function getBillingCycleRange(c: Context, orgId: string): Promise<BillingCycleInfo | null> {
+function getDefaultBillingCycleRange(referenceDate = new Date()): BillingCycleInfo {
+  const start = new Date(Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), 1, 0, 0, 0, 0))
+  const end = new Date(Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth() + 1, 1, 0, 0, 0, 0))
+  return {
+    subscription_anchor_start: start.toISOString(),
+    subscription_anchor_end: end.toISOString(),
+  }
+}
+
+async function getBillingCycleRange(c: Context, orgId: string): Promise<BillingCycleInfo> {
   try {
-    const { data } = await supabaseAdmin(c)
+    const { data, error } = await supabaseAdmin(c)
       .rpc('get_cycle_info_org', { orgid: orgId })
       .single()
-    return data ?? null
+    if (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getBillingCycleRange error', orgId, error })
+      return getDefaultBillingCycleRange()
+    }
+    if (!data?.subscription_anchor_start || !data?.subscription_anchor_end) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'getBillingCycleRange fallback to default',
+        orgId,
+        billingCycle: data,
+      })
+      return getDefaultBillingCycleRange()
+    }
+    return data
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getBillingCycleRange error', orgId, error })
-    return null
+    return getDefaultBillingCycleRange()
   }
 }
 
@@ -63,37 +85,22 @@ async function applyCreditsForMetric(
   planId: string | undefined,
   usage: number,
   limit: number | null | undefined,
-  billingCycle: BillingCycleInfo | null,
+  billingCycle: BillingCycleInfo,
 ): Promise<CreditApplicationResult | null> {
   if (overageAmount <= 0)
     return null
 
-  if (!billingCycle?.subscription_anchor_start || !billingCycle?.subscription_anchor_end) {
-    cloudlogErr({
-      requestId: c.get('requestId'),
-      message: 'applyCreditsForMetric missing billing cycle context',
-      orgId,
-      metric,
-      planId,
-      billingCycle,
-    })
-    return {
-      overage_amount: overageAmount,
-      credits_required: 0,
-      credits_applied: 0,
-      credits_remaining: 0,
-      overage_covered: 0,
-      overage_unpaid: overageAmount,
-      credit_step_id: null,
-    }
-  }
-  else if (!planId) {
+  const resolvedBillingCycle = billingCycle?.subscription_anchor_start && billingCycle?.subscription_anchor_end
+    ? billingCycle
+    : getDefaultBillingCycleRange()
+
+  if (!planId) {
     cloudlog({
       requestId: c.get('requestId'),
       message: 'applyCreditsForMetric missing plan context, continuing',
       orgId,
       metric,
-      billingCycle,
+      billingCycle: resolvedBillingCycle,
     })
   }
   try {
@@ -102,8 +109,8 @@ async function applyCreditsForMetric(
         p_org_id: orgId,
         p_metric: metric,
         p_overage_amount: overageAmount,
-        p_billing_cycle_start: billingCycle.subscription_anchor_start,
-        p_billing_cycle_end: billingCycle.subscription_anchor_end,
+        p_billing_cycle_start: resolvedBillingCycle.subscription_anchor_start,
+        p_billing_cycle_end: resolvedBillingCycle.subscription_anchor_end,
         p_details: {
           usage,
           limit: limit ?? 0,
@@ -203,29 +210,26 @@ async function userAbovePlan(c: Context, org: {
     return false
   }
 
-  let currentPlanName: string | null = null
+  const currentPlanName = await getCurrentPlanNameOrg(c, orgId)
   let currentPlan: Database['public']['Tables']['plans']['Row'] | null = null
-  if (hasActivePlan) {
-    currentPlanName = await getCurrentPlanNameOrg(c, orgId)
-    const { data, error: currentPlanError } = await supabaseAdmin(c)
-      .from('plans')
-      .select('*')
-      .eq('name', currentPlanName)
-      .single()
-    if (currentPlanError) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'currentPlanError', error: currentPlanError })
-    }
-    currentPlan = data ?? null
+  const { data, error: currentPlanError } = await supabaseAdmin(c)
+    .from('plans')
+    .select('*')
+    .eq('name', currentPlanName)
+    .single()
+  if (currentPlanError) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'currentPlanError', error: currentPlanError })
   }
+  currentPlan = data ?? null
 
   const billingCycle = await getBillingCycleRange(c, orgId)
   const planId = currentPlan?.id
 
   const metrics: Array<{ key: CreditMetric, usage: number, limit: number | null | undefined }> = [
-    { key: 'mau', usage: Number(totalStats.mau ?? 0), limit: currentPlan?.mau ?? 0 },
-    { key: 'storage', usage: Number(totalStats.storage ?? 0), limit: currentPlan?.storage ?? 0 },
-    { key: 'bandwidth', usage: Number(totalStats.bandwidth ?? 0), limit: currentPlan?.bandwidth ?? 0 },
-    { key: 'build_time', usage: Number(totalStats.build_time_unit ?? 0), limit: currentPlan?.build_time_unit ?? 0 },
+    { key: 'mau', usage: Number(totalStats.mau ?? 0), limit: currentPlan?.mau },
+    { key: 'storage', usage: Number(totalStats.storage ?? 0), limit: currentPlan?.storage },
+    { key: 'bandwidth', usage: Number(totalStats.bandwidth ?? 0), limit: currentPlan?.bandwidth },
+    { key: 'build_time', usage: Number(totalStats.build_time_unit ?? 0), limit: currentPlan?.build_time_unit },
   ]
 
   const creditResults: Record<CreditMetric, CreditApplicationResult | null> = {

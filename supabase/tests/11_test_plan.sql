@@ -24,6 +24,11 @@ DECLARE
   bandwidth_count bigint;
 BEGIN
 
+  -- Ensure credits do not bypass plan action checks in this test file.
+  UPDATE public.usage_credit_grants
+  SET credits_consumed = credits_total
+  WHERE org_id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8';
+
   -- Test action_type checks
   UPDATE stripe_info 
   SET mau_exceeded = false, storage_exceeded = false, bandwidth_exceeded = false, 
