@@ -5,7 +5,8 @@ import { emptySupabase, supabaseClient } from '../utils/supabase.ts'
 import { version } from '../utils/version.ts'
 
 const bodySchema = z.object({
-  token: z.string().check(z.minLength(6), z.maxLength(6)),
+  token: z.optional(z.string()),
+  token_hash: z.optional(z.string()),
   type: z.optional(z.enum(['email', 'magiclink'])),
 })
 
@@ -14,14 +15,24 @@ export const app = createHono('', version)
 app.use('/', useCors)
 
 app.post('/', middlewareAuth, async (c) => {
-  const rawBody = await parseBody<{ token?: string, type?: 'email' | 'magiclink' }>(c)
+  const rawBody = await parseBody<{ token?: string, token_hash?: string, type?: 'email' | 'magiclink' }>(c)
   const token = rawBody.token?.replaceAll(' ', '') ?? ''
+  const tokenHash = rawBody.token_hash?.trim() ?? ''
 
-  const validation = bodySchema.safeParse({ token, type: rawBody.type })
+  const validation = bodySchema.safeParse({ token, token_hash: tokenHash, type: rawBody.type })
   if (!validation.success) {
     throw simpleError('invalid_body', 'Invalid request body', { errors: z.prettifyError(validation.error) })
   }
   const otpType = validation.data.type ?? 'email'
+  if (!token && !tokenHash) {
+    throw simpleError('invalid_body', 'Token or token_hash is required')
+  }
+  if (token && tokenHash) {
+    throw simpleError('invalid_body', 'Provide token or token_hash, not both')
+  }
+  if (token && token.length !== 6) {
+    throw simpleError('invalid_body', 'Token must be 6 characters long')
+  }
 
   const auth = c.get('auth')
   if (!auth?.userId) {
@@ -37,16 +48,21 @@ app.post('/', middlewareAuth, async (c) => {
   }
 
   const claims = getClaimsFromJWT(authorization)
-  if (!claims?.email) {
+  if (!claims?.email && token) {
     return quickError(400, 'missing_email', 'Email is required to verify OTP')
   }
 
   const supabase = emptySupabase(c)
-  const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
-    email: claims.email,
-    token,
-    type: otpType,
-  })
+  const { data: verifyData, error: verifyError } = tokenHash
+    ? await supabase.auth.verifyOtp({
+        token_hash: tokenHash,
+        type: otpType,
+      })
+    : await supabase.auth.verifyOtp({
+        email: claims!.email,
+        token,
+        type: otpType,
+      })
 
   if (verifyError || !verifyData?.session?.access_token) {
     cloudlog({ requestId: c.get('requestId'), context: 'verify_email_otp - verifyOtp failed', error: verifyError?.message })

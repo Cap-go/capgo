@@ -4,15 +4,18 @@ import { getAuthHeaders, getEndpointUrl, getSupabaseClient, USER_EMAIL, USER_ID 
 const OTP_ENDPOINT = '/private/verify_email_otp'
 const OTHER_USER_EMAIL = 'test2@capgo.app'
 
-async function generateEmailOtp(email: string): Promise<string> {
+async function generateEmailOtp(email: string): Promise<{ token: string, tokenHash: string }> {
   const { data, error } = await getSupabaseClient().auth.admin.generateLink({
     type: 'magiclink',
     email,
   })
-  if (error || !data?.properties?.email_otp) {
+  if (error || !data?.properties?.email_otp || !data?.properties?.hashed_token) {
     throw error ?? new Error('Failed to generate email OTP')
   }
-  return data.properties.email_otp
+  return {
+    token: data.properties.email_otp,
+    tokenHash: data.properties.hashed_token,
+  }
 }
 
 describe('[POST] /private/verify_email_otp', () => {
@@ -23,12 +26,12 @@ describe('[POST] /private/verify_email_otp', () => {
   })
 
   it('verifies OTP and records verification timestamp', async () => {
-    const otp = await generateEmailOtp(USER_EMAIL)
+    const { tokenHash } = await generateEmailOtp(USER_EMAIL)
 
     const response = await fetch(getEndpointUrl(OTP_ENDPOINT), {
       method: 'POST',
       headers: authHeaders,
-      body: JSON.stringify({ token: otp, type: 'magiclink' }),
+      body: JSON.stringify({ token_hash: tokenHash, type: 'magiclink' }),
     })
 
     expect(response.status).toBe(200)
@@ -87,12 +90,12 @@ describe('[POST] /private/verify_email_otp', () => {
   })
 
   it.concurrent('returns 403 when OTP user mismatches JWT user', async () => {
-    const otp = await generateEmailOtp(OTHER_USER_EMAIL)
+    const { tokenHash } = await generateEmailOtp(OTHER_USER_EMAIL)
 
     const response = await fetch(getEndpointUrl(OTP_ENDPOINT), {
       method: 'POST',
       headers: authHeaders,
-      body: JSON.stringify({ token: otp, type: 'magiclink' }),
+      body: JSON.stringify({ token_hash: tokenHash, type: 'magiclink' }),
     })
 
     expect(response.status).toBe(403)
