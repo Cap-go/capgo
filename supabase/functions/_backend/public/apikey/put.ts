@@ -51,26 +51,27 @@ async function handlePut(c: Context, idParam?: string) {
   // Validate expiration date format (throws if invalid)
   validateExpirationDate(expires_at)
 
-  const limitedToApps = Array.isArray(limited_to_apps) ? limited_to_apps : undefined
-  const limitedToOrgs = Array.isArray(limited_to_orgs) ? limited_to_orgs : undefined
-
-  const updateData: Partial<Database['public']['Tables']['apikeys']['Update']> = {
-    name,
-    mode,
-    // we use undefined to remove the field from the update
-    limited_to_apps: limitedToApps && limitedToApps.length > 0 ? limitedToApps : undefined,
-    limited_to_orgs: limitedToOrgs && limitedToOrgs.length > 0 ? limitedToOrgs : undefined,
+  // Build update data from only explicitly-provided fields.
+  // Note: empty arrays are meaningful and should clear the list.
+  const updateData: Partial<Database['public']['Tables']['apikeys']['Update']> = {}
+  if (name !== undefined) {
+    updateData.name = name
   }
-  const hasUpdates = name !== undefined
-    || mode !== undefined
-    || limitedToApps !== undefined
-    || limitedToOrgs !== undefined
-    || expires_at !== undefined
-
-  // Handle expires_at: null means remove expiration, undefined means don't update
+  if (mode !== undefined) {
+    updateData.mode = mode
+  }
+  if (limited_to_apps !== undefined) {
+    updateData.limited_to_apps = limited_to_apps
+  }
+  if (limited_to_orgs !== undefined) {
+    updateData.limited_to_orgs = limited_to_orgs
+  }
+  // Handle expires_at: null means remove expiration, undefined means don't update.
   if (expires_at !== undefined) {
     updateData.expires_at = expires_at
   }
+
+  const hasUpdates = Object.keys(updateData).length > 0
 
   if (name !== undefined && typeof name !== 'string') {
     throw simpleError('name_must_be_a_string', 'Name must be a string')
