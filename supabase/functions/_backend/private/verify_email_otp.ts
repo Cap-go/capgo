@@ -1,30 +1,34 @@
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
-import { getClaimsFromJWT, middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { createHono, getClaimsFromJWT, middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { emptySupabase, supabaseClient } from '../utils/supabase.ts'
+import { version } from '../utils/version.ts'
 
 const bodySchema = z.object({
   token: z.string().check(z.minLength(6), z.maxLength(6)),
+  type: z.enum(['email', 'magiclink']).optional(),
 })
 
-export const app = new Hono<MiddlewareKeyVariables>()
+export const app = createHono('', version)
 
 app.use('/', useCors)
 
 app.post('/', middlewareAuth, async (c) => {
-  const rawBody = await parseBody<{ token?: string }>(c)
+  const rawBody = await parseBody<{ token?: string, type?: 'email' | 'magiclink' }>(c)
   const token = rawBody.token?.replaceAll(' ', '') ?? ''
 
-  const validation = bodySchema.safeParse({ token })
+  const validation = bodySchema.safeParse({ token, type: rawBody.type })
   if (!validation.success) {
     throw simpleError('invalid_body', 'Invalid request body', { errors: z.prettifyError(validation.error) })
   }
+  const otpType = validation.data.type ?? 'email'
 
   const auth = c.get('auth')
   if (!auth?.userId) {
     return quickError(401, 'not_authenticated', 'Not authenticated')
+  }
+  if (auth.authType !== 'jwt') {
+    return quickError(401, 'invalid_auth_type', 'JWT authentication required')
   }
 
   const authorization = c.get('authorization')
@@ -41,7 +45,7 @@ app.post('/', middlewareAuth, async (c) => {
   const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
     email: claims.email,
     token,
-    type: 'email',
+    type: otpType,
   })
 
   if (verifyError || !verifyData?.session?.access_token) {
