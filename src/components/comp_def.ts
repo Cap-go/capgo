@@ -22,6 +22,7 @@ export interface TableAction {
   onClick: (item: any) => void
   visible?: (item: any) => boolean
   disabled?: (item: any) => boolean
+  title?: string | ((item: any) => string)
 }
 
 export interface TableColumn {

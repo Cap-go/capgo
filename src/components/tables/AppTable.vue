@@ -36,6 +36,8 @@ const internalCurrentPage = ref(props.currentPage || 1)
 const filters = ref({})
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
+const appRoleByAppId = ref<Map<string, string>>(new Map())
+const appRoleLoaded = ref(false)
 
 // Create enriched apps with MAU data
 const appsWithMau = ref<any[]>([])
@@ -65,6 +67,47 @@ async function loadMauNumbers() {
 watchEffect(async () => {
   if (props.apps.length > 0)
     await loadMauNumbers()
+})
+
+async function loadAppRoles() {
+  const userId = main.user?.id
+  const orgId = organizationStore.currentOrganization?.gid
+  if (!userId || !orgId) {
+    appRoleByAppId.value = new Map()
+    appRoleLoaded.value = false
+    return
+  }
+
+  appRoleLoaded.value = false
+  try {
+    const { data, error } = await supabase.rpc('get_org_user_access_rbac', {
+      p_user_id: userId,
+      p_org_id: orgId,
+    })
+
+    if (error)
+      throw error
+
+    const next = new Map<string, string>()
+    for (const row of (data as any[] || [])) {
+      if (row.scope_type === 'app' && row.app_id && row.role_name) {
+        next.set(row.app_id, row.role_name)
+      }
+    }
+    appRoleByAppId.value = next
+  }
+  catch (error) {
+    console.error('Error loading app roles:', error)
+    appRoleByAppId.value = new Map()
+  }
+  finally {
+    appRoleLoaded.value = true
+  }
+}
+
+watchEffect(async () => {
+  if (props.apps.length > 0)
+    await loadAppRoles()
 })
 
 const columns = ref<TableColumn[]>([
@@ -119,20 +162,16 @@ const columns = ref<TableColumn[]>([
     key: 'perm',
     mobile: false,
     displayFunction: (item) => {
-      if (item.name) {
-        const org = organizationStore.getOrgByAppId(item.app_id)
-        const roleName = org?.role
-        if (!roleName)
-          return t('unknown')
+      if (!appRoleLoaded.value)
+        return t('loading')
 
-        // Normalize role (remove invite_ prefix if present)
-        const normalizedRole = roleName.replace(/^invite_/, '')
+      const roleName = appRoleByAppId.value.get(item.id)
+      if (!roleName)
+        return t('none')
 
-        // Get i18n key and translate, or fallback to human-readable format
-        const i18nKey = getRbacRoleI18nKey(normalizedRole)
-        return i18nKey ? t(i18nKey) : normalizedRole.replaceAll('_', ' ')
-      }
-      return t('unknown')
+      const normalizedRole = roleName.replace(/^invite_/, '')
+      const i18nKey = getRbacRoleI18nKey(normalizedRole)
+      return i18nKey ? t(i18nKey) : normalizedRole.replaceAll('_', ' ')
     },
   },
   {
