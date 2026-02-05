@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
+import { getFallbackCreditProductId } from '../utils/credits.ts'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { checkPermission } from '../utils/rbac.ts'
@@ -85,21 +86,17 @@ async function getCreditTopUpProductId(c: AppContext, customerId: string, token:
       customerId,
       error: stripeInfoError,
     })
-    const { data: fallbackPlan, error: fallbackError } = await supabase
-      .from('plans')
-      .select('credit_id')
-      .eq('name', 'Solo')
-      .single()
-    if (fallbackError || !fallbackPlan?.credit_id) {
-      cloudlogErr({
-        requestId: c.get('requestId'),
-        message: 'credit_fallback_plan_missing',
-        customerId,
-        error: fallbackError,
-      })
-      throw simpleError('credit_product_not_configured', 'Credit product is not configured')
-    }
-    return { productId: fallbackPlan.credit_id }
+    const productId = await getFallbackCreditProductId(c, customerId, async () => {
+      const { data, error } = await supabase
+        .from('plans')
+        .select('credit_id')
+        .eq('name', 'Solo')
+        .single()
+      if (error)
+        throw error
+      return data ?? null
+    })
+    return { productId }
   }
 
   const { data: plan, error: planError } = await supabase
@@ -116,21 +113,17 @@ async function getCreditTopUpProductId(c: AppContext, customerId: string, token:
       planStripeId: stripeInfo.product_id,
       error: planError,
     })
-    const { data: fallbackPlan, error: fallbackError } = await supabase
-      .from('plans')
-      .select('credit_id')
-      .eq('name', 'Solo')
-      .single()
-    if (fallbackError || !fallbackPlan?.credit_id) {
-      cloudlogErr({
-        requestId: c.get('requestId'),
-        message: 'credit_fallback_plan_missing',
-        customerId,
-        error: fallbackError,
-      })
-      throw simpleError('credit_product_not_configured', 'Credit product is not configured')
-    }
-    return { productId: fallbackPlan.credit_id }
+    const productId = await getFallbackCreditProductId(c, customerId, async () => {
+      const { data, error } = await supabase
+        .from('plans')
+        .select('credit_id')
+        .eq('name', 'Solo')
+        .single()
+      if (error)
+        throw error
+      return data ?? null
+    })
+    return { productId }
   }
 
   return { productId: plan.credit_id }
