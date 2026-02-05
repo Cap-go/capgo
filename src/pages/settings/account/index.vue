@@ -677,31 +677,19 @@ async function verifyOtpForMfa() {
     return
 
   otpVerificationLoading.value = true
-  const { error: verifyError } = await supabase.auth.verifyOtp({
-    email: otpEmail.value,
-    token,
-    type: 'email',
+  const { data, error: verifyError } = await supabase.functions.invoke('private/verify_email_otp', {
+    body: { token },
   })
 
-  if (verifyError) {
-    otpVerificationLoading.value = false
+  otpVerificationLoading.value = false
+
+  if (verifyError || !data?.verified_at) {
     toast.error(t('verification-failed'))
     console.error('Cannot verify email OTP', verifyError)
     return
   }
 
-  const { data: verifiedAt, error: recordError } = await supabase
-    .rpc('record_email_otp_verified')
-
-  otpVerificationLoading.value = false
-
-  if (recordError || !verifiedAt) {
-    toast.error(t('verification-failed'))
-    console.error('Cannot store email OTP verification', recordError)
-    return
-  }
-
-  otpVerifiedAt.value = verifiedAt
+  otpVerifiedAt.value = data.verified_at
   toast.success(t('email-otp-verified'))
 }
 
