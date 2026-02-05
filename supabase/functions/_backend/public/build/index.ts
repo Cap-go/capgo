@@ -1,7 +1,14 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import type { RequestBuildBody } from './request.ts'
 import type { BuildStatusParams } from './status.ts'
-import { getBodyOrQuery, honoFactory } from '../../utils/hono.ts'
+import {
+  ALLOWED_HEADERS,
+  ALLOWED_METHODS,
+  EXPOSED_HEADERS,
+  MAX_UPLOAD_LENGTH_BYTES,
+  TUS_VERSION,
+} from '../../files/util.ts'
+import { BRES, getBodyOrQuery, honoFactory } from '../../utils/hono.ts'
 import { middlewareKey } from '../../utils/hono_middleware.ts'
 import { cancelBuild } from './cancel.ts'
 import { streamBuildLogs } from './logs.ts'
@@ -59,7 +66,22 @@ app.post('/cancel/:jobId', middlewareKey(['all', 'write']), async (c) => {
   return cancelBuild(c, jobId, body.app_id, apikey)
 })
 
-// TUS proxy endpoints - ALL methods proxied to builder with API key injection
+const TUS_EXTENSIONS = 'creation,creation-defer-length,creation-with-upload,expiration'
+
+function tusOptionsResponse() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': ALLOWED_METHODS,
+    'Access-Control-Allow-Headers': ALLOWED_HEADERS,
+    'Access-Control-Expose-Headers': EXPOSED_HEADERS,
+    'Tus-Resumable': TUS_VERSION,
+    'Tus-Version': TUS_VERSION,
+    'Tus-Max-Size': MAX_UPLOAD_LENGTH_BYTES.toString(),
+    'Tus-Extension': TUS_EXTENSIONS,
+  }
+}
+
+// TUS proxy endpoints - POST/HEAD/PATCH proxied to builder with API key injection
 // POST /build/upload/:jobId - Create TUS upload (proxied to builder)
 app.post('/upload/:jobId', middlewareKey(['all', 'write']), async (c) => {
   const jobId = c.req.param('jobId')
@@ -81,10 +103,12 @@ app.patch('/upload/:jobId/*', middlewareKey(['all', 'write']), async (c) => {
   return tusProxy(c, jobId, apikey)
 })
 
-// OPTIONS /build/upload/:jobId/* - TUS capabilities (proxied to builder, no auth needed)
-app.options('/upload/:jobId/*', async (c) => {
-  const jobId = c.req.param('jobId')
-  // For OPTIONS we still need to proxy but without auth check
-  const apikey = { user_id: '', key: '' } as Database['public']['Tables']['apikeys']['Row']
-  return tusProxy(c, jobId, apikey)
+// OPTIONS /build/upload/:jobId - TUS capabilities (no auth needed)
+app.options('/upload/:jobId', (c) => {
+  return c.json(BRES, 200, tusOptionsResponse())
+})
+
+// OPTIONS /build/upload/:jobId/* - TUS capabilities (no auth needed)
+app.options('/upload/:jobId/*', (c) => {
+  return c.json(BRES, 200, tusOptionsResponse())
 })
