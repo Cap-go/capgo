@@ -3,7 +3,7 @@ import type { Database } from './supabase.types.ts'
 import Stripe from 'stripe'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { supabaseAdmin } from './supabase.ts'
-import { existInEnv, getEnv } from './utils.ts'
+import { getEnv, isStripeConfigured } from './utils.ts'
 
 // Checks if SUPABASE_URL points to a local instance
 function isLocalSupabase(c: Context): boolean {
@@ -130,7 +130,7 @@ export async function getSubscriptionData(c: Context, customerId: string, subscr
 export async function getCancellationDetails(c: Context, subscriptionId: string | null): Promise<Stripe.Subscription.CancellationDetails | null> {
   if (!subscriptionId)
     return null
-  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+  if (!isStripeConfigured(c))
     return null
 
   try {
@@ -176,7 +176,7 @@ async function getActiveSubscription(c: Context, customerId: string, subscriptio
 }
 
 export async function syncSubscriptionData(c: Context, customerId: string, subscriptionId: string | null): Promise<void> {
-  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+  if (!isStripeConfigured(c))
     return
   try {
     // Get subscription data from Stripe using the ID stored in our DB
@@ -237,7 +237,7 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
 }
 
 export async function createPortal(c: Context, customerId: string, callbackUrl: string) {
-  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+  if (!isStripeConfigured(c))
     return { url: '' }
   const session = await getStripe(c).billingPortal.sessions.create({
     customer: customerId,
@@ -247,14 +247,14 @@ export async function createPortal(c: Context, customerId: string, callbackUrl: 
 }
 
 export function updateCustomerEmail(c: Context, customerId: string, newEmail: string) {
-  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+  if (!isStripeConfigured(c))
     return Promise.resolve()
   return getStripe(c).customers.update(customerId, { email: newEmail, name: newEmail, metadata: { email: newEmail } },
   )
 }
 
 export async function cancelSubscription(c: Context, customerId: string) {
-  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+  if (!isStripeConfigured(c))
     return Promise.resolve()
   const allSubscriptions = await getStripe(c).subscriptions.list({
     customer: customerId,
@@ -268,7 +268,7 @@ export async function cancelSubscription(c: Context, customerId: string) {
 
 async function getPriceIds(c: Context, planId: string, recurrence: string): Promise<{ priceId: string | null }> {
   let priceId = null
-  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+  if (!isStripeConfigured(c))
     return { priceId }
   try {
     const prices = await getStripe(c).prices.search({
@@ -299,7 +299,7 @@ export interface StripeData {
 export function parsePriceIds(c: Context, prices: Stripe.SubscriptionItem[]): { priceId: string | null, productId: string | null } {
   let priceId: string | null = null
   let productId: string | null = null
-  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+  if (!isStripeConfigured(c))
     return { priceId, productId }
   try {
     cloudlog({ requestId: c.get('requestId'), message: 'prices stripe', prices })
@@ -317,7 +317,7 @@ export function parsePriceIds(c: Context, prices: Stripe.SubscriptionItem[]): { 
 }
 
 export async function createCheckout(c: Context, customerId: string, recurrence: string, planId: string, successUrl: string, cancelUrl: string, clientReferenceId?: string, attributionId?: string) {
-  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+  if (!isStripeConfigured(c))
     return { url: '' }
   const prices = await getPriceIds(c, planId, recurrence)
   cloudlog({ requestId: c.get('requestId'), message: 'prices', prices })
@@ -349,7 +349,7 @@ export async function createCheckout(c: Context, customerId: string, recurrence:
 }
 
 async function getOneTimePriceId(c: Context, productId: string): Promise<string | null> {
-  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+  if (!isStripeConfigured(c))
     return null
   try {
     const prices = await getStripe(c).prices.search({
@@ -376,7 +376,7 @@ export async function createOneTimeCheckout(
   cancelUrl: string,
   clientReferenceId?: string,
 ) {
-  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+  if (!isStripeConfigured(c))
     return { url: '' }
 
   const priceId = await getOneTimePriceId(c, productId)
@@ -440,7 +440,7 @@ export async function createCustomer(c: Context, email: string, userId: string, 
   if (baseConsoleUrl) {
     metadata.log_as = `${baseConsoleUrl}/log-as/${userId}`
   }
-  if (!existInEnv(c, 'STRIPE_SECRET_KEY')) {
+  if (!isStripeConfigured(c)) {
     cloudlog({ requestId: c.get('requestId'), message: 'createCustomer no stripe key', email, userId, name })
     // create a fake customer id like stripe one and random id
     const randomId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
@@ -463,7 +463,7 @@ export async function createCustomer(c: Context, email: string, userId: string, 
 export async function ensureCustomerMetadata(c: Context, customerId: string, orgId: string, userId?: string | null) {
   if (!customerId)
     return
-  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+  if (!isStripeConfigured(c))
     return
 
   const baseConsoleUrl = (getEnv(c, 'WEBAPP_URL') || '').replace(/\/+$/, '')
@@ -490,7 +490,7 @@ export async function ensureCustomerMetadata(c: Context, customerId: string, org
 }
 
 export async function removeOldSubscription(c: Context, subscriptionId: string) {
-  if (!existInEnv(c, 'STRIPE_SECRET_KEY'))
+  if (!isStripeConfigured(c))
     return Promise.resolve()
   cloudlog({ requestId: c.get('requestId'), message: 'removeOldSubscription', id: subscriptionId })
   const deletedSubscription = await getStripe(c).subscriptions.cancel(subscriptionId)
