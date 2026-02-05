@@ -244,9 +244,9 @@ describe('[PUT] /apikey/:id operations', () => {
       headers,
       body: JSON.stringify({}),
     })
-    expect(response.status).toBe(500)
+    expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toContain('failed_to_update_apikey')
+    expect(data.error).toContain('no_valid_fields_provided_for_update')
   })
 })
 

@@ -7,6 +7,7 @@ import IconCheck from '~icons/lucide/check'
 import IconChevronDown from '~icons/lucide/chevron-down'
 import IconLoader from '~icons/lucide/loader-2'
 import InviteTeammateModal from '~/components/dashboard/InviteTeammateModal.vue'
+import { createDefaultApiKey } from '~/services/apikeys'
 import { pushEvent } from '~/services/posthog'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
@@ -222,13 +223,7 @@ async function addNewApiKey() {
     console.log('Not logged in, cannot regenerate API key')
     return
   }
-  const { error } = await supabase.functions.invoke('apikey', {
-    method: 'POST',
-    body: {
-      name: t('api-key'),
-      mode: 'all',
-    },
-  })
+  const { error } = await createDefaultApiKey(supabase, t('api-key'))
 
   if (error)
     throw error

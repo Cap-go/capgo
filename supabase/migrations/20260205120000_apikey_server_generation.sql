@@ -3,6 +3,10 @@ ALTER TABLE public.apikeys
 
 DO $$
 BEGIN
+  UPDATE public.apikeys
+    SET key = gen_random_uuid()::text
+    WHERE key IS NULL AND key_hash IS NULL;
+
   IF NOT EXISTS (
     SELECT 1
     FROM pg_constraint
