@@ -67,14 +67,18 @@ app.post('/', middlewareV2(['all']), async (c) => {
   await validateExpirationAgainstOrgPolicies(allOrgIds, expiresAt, supabase)
 
   const { data: apikeyData, error: apikeyError } = await supabase
-    .rpc('create_apikey_v2', {
-      p_name: name,
-      p_mode: mode,
-      p_limited_to_orgs: limitedToOrgs,
-      p_limited_to_apps: limitedToApps,
-      p_expires_at: expiresAt,
-      p_hashed: isHashed,
+    .from('apikeys')
+    .insert({
+      user_id: auth.userId,
+      key: null,
+      key_hash: isHashed ? 'requested' : null,
+      mode,
+      name,
+      limited_to_apps: limitedToApps,
+      limited_to_orgs: limitedToOrgs,
+      expires_at: expiresAt,
     })
+    .select()
     .single()
   if (apikeyError) {
     throw simpleError('failed_to_create_apikey', 'Failed to create API key', { supabaseError: apikeyError })

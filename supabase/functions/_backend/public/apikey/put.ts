@@ -121,8 +121,12 @@ app.put('/:id', middlewareV2(['all']), async (c) => {
     await validateExpirationAgainstOrgPolicies(orgsToValidate, expirationToValidate, supabase)
   }
 
+  if (regenerate) {
+    updateData.key = 'regenerate'
+  }
+
   let updatedApikey = existingApikey
-  if (hasUpdates) {
+  if (hasUpdates || regenerate) {
     const { data: updatedData, error: updateError } = await supabase
       .from('apikeys')
       .update(updateData)
@@ -135,16 +139,6 @@ app.put('/:id', middlewareV2(['all']), async (c) => {
       throw quickError(500, 'failed_to_update_apikey', 'Failed to update API key', { supabaseError: updateError })
     }
     updatedApikey = updatedData
-  }
-
-  if (regenerate) {
-    const { data: regeneratedApikey, error: regenerateError } = await supabase
-      .rpc('regenerate_apikey', { p_apikey_id: existingApikey.id })
-      .single()
-    if (regenerateError || !regeneratedApikey) {
-      throw quickError(500, 'failed_to_regenerate_apikey', 'Failed to regenerate API key', { supabaseError: regenerateError })
-    }
-    return c.json(regeneratedApikey)
   }
 
   return c.json(updatedApikey)
