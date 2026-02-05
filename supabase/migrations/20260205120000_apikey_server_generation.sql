@@ -33,6 +33,10 @@ BEGIN
     RETURN NEW;
   END IF;
 
+  IF current_user IN ('postgres', 'service_role', 'supabase_admin', 'supabase_auth_admin', 'supabase_storage_admin', 'supabase_realtime_admin') THEN
+    RETURN NEW;
+  END IF;
+
   IF TG_OP = 'UPDATE' THEN
     IF NEW.key IS NOT DISTINCT FROM OLD.key AND NEW.key_hash IS NOT DISTINCT FROM OLD.key_hash THEN
       RETURN NEW;
