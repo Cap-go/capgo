@@ -405,8 +405,21 @@ export async function getPlanUsageAndFitUncached(c: Context, orgId: string): Pro
   const { data, error } = await supabaseAdmin(c)
     .rpc('get_plan_usage_and_fit_uncached', { orgid: orgId })
     .single()
-  if (error)
+  if (error) {
+    const message = error.message ?? ''
+    const isMissingFunction = message.includes('get_plan_usage_and_fit_uncached')
+      || message.includes('schema cache')
+    if (isMissingFunction) {
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'getPlanUsageAndFitUncached unavailable, falling back to cached plan usage',
+        orgId,
+        error,
+      })
+      return getPlanUsageAndFit(c, orgId)
+    }
     throw new Error(error.message)
+  }
   return data
 }
 

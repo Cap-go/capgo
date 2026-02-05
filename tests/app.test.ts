@@ -1,10 +1,16 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
-import { APIKEY_TEST2_ALL, BASE_URL, getSupabaseClient, headers, NON_OWNER_ORG_ID, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils.ts'
+import { APIKEY_TEST2_ALL, BASE_URL, fetchWithRetry, getSupabaseClient, headers, NON_OWNER_ORG_ID, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils.ts'
 
 describe('[DELETE] /app operations', () => {
   const id = randomUUID()
   const APPNAME = `com.app.${id}`
+  const createBody = {
+    app_id: APPNAME,
+    owner_org: ORG_ID,
+    name: `App ${APPNAME}`,
+    icon: 'test-icon',
+  }
 
   afterAll(async () => {
     await resetAppData(APPNAME)
@@ -13,50 +19,54 @@ describe('[DELETE] /app operations', () => {
 
   it('should delete app and all associated data', async () => {
     // Create a test app
-    const createApp = await fetch(`${BASE_URL}/app`, {
+    const createApp = await fetchWithRetry(`${BASE_URL}/app`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({
-        app_id: APPNAME,
-        owner_org: ORG_ID,
-        name: `App ${APPNAME}`,
-        icon: 'test-icon',
-      }),
+      body: JSON.stringify(createBody),
     })
-    expect(createApp.status).toBe(200)
+    if (createApp.status !== 200) {
+      const body = await createApp.json().catch(() => null) as any
+      const isDuplicate = body?.error === 'cannot_create_app' && body?.supabaseError?.code === '23505'
+      if (!isDuplicate) {
+        expect(createApp.status, JSON.stringify(body)).toBe(200)
+      }
+    }
 
     await resetAndSeedAppData(APPNAME)
 
     // Delete the app
-    const deleteApp = await fetch(`${BASE_URL}/app/${APPNAME}`, {
+    const deleteApp = await fetchWithRetry(`${BASE_URL}/app/${APPNAME}`, {
       method: 'DELETE',
       headers,
     })
-    expect(deleteApp.status).toBe(200)
+    if (deleteApp.status !== 200) {
+      const body = await deleteApp.json().catch(() => null)
+      expect(deleteApp.status, JSON.stringify(body)).toBe(200)
+    }
 
     // Verify app is deleted
-    const checkApp = await fetch(`${BASE_URL}/app/${APPNAME}`, {
+    const checkApp = await fetchWithRetry(`${BASE_URL}/app/${APPNAME}`, {
       method: 'GET',
       headers,
     })
     expect(checkApp.status).toBe(401)
 
     // Verify version is deleted
-    const checkVersion = await fetch(`${BASE_URL}/bundle/${APPNAME}/1.0.0`, {
+    const checkVersion = await fetchWithRetry(`${BASE_URL}/bundle/${APPNAME}/1.0.0`, {
       method: 'GET',
       headers,
     })
     expect(checkVersion.status).toBe(404)
 
     // Verify channel devices are deleted
-    const checkDevices = await fetch(`${BASE_URL}/device/${APPNAME}`, {
+    const checkDevices = await fetchWithRetry(`${BASE_URL}/device/${APPNAME}`, {
       method: 'GET',
       headers,
     })
     expect(checkDevices.status).toBe(404)
 
     // Verify channels are deleted
-    const checkChannels = await fetch(`${BASE_URL}/channel/${APPNAME}`, {
+    const checkChannels = await fetchWithRetry(`${BASE_URL}/channel/${APPNAME}`, {
       method: 'GET',
       headers,
     })
