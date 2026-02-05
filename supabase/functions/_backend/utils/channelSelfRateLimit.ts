@@ -87,6 +87,15 @@ function buildIpRateRequest(c: Context, appId: string, ip: string) {
   }
 }
 
+function getRateLimitWindowSeconds(resetAt: number, now: number): number {
+  return Math.max(1, Math.ceil((resetAt - now) / 1000))
+}
+
+function getLegacyResetAt(timestamp: number, now: number): number | undefined {
+  const resetAt = timestamp + OP_RATE_TTL_SECONDS * 1000
+  return resetAt > now ? resetAt : undefined
+}
+
 function getChannelSelfIpRateLimit(c: Context): number {
   const envLimit = getEnv(c, 'RATE_LIMIT_CHANNEL_SELF_IP')
   if (envLimit) {
@@ -124,10 +133,10 @@ export async function isChannelSelfRateLimited(
         return { limited: true, resetAt }
     }
     else {
-      const resetAt = cached.timestamp + OP_RATE_TTL_SECONDS * 1000
-      if (resetAt > now) {
-        const ttlSeconds = Math.max(1, Math.ceil((resetAt - now) / 1000))
-        const migratedEntry: RateLimitCounter = { count: 1, resetAt }
+      const legacyResetAt = getLegacyResetAt(cached.timestamp, now)
+      if (legacyResetAt) {
+        const ttlSeconds = getRateLimitWindowSeconds(legacyResetAt, now)
+        const migratedEntry: RateLimitCounter = { count: 1, resetAt: legacyResetAt }
         try {
           await opRateEntry.helper.putJson(opRateEntry.request, migratedEntry, ttlSeconds)
         }
@@ -238,15 +247,15 @@ export async function recordChannelSelfRequest(
       }
     }
     else {
-      const legacyResetAt = existing.timestamp + OP_RATE_TTL_SECONDS * 1000
-      if (legacyResetAt > now) {
+      const legacyResetAt = getLegacyResetAt(existing.timestamp, now)
+      if (legacyResetAt) {
         resetAt = legacyResetAt
         count = 2
       }
     }
   }
 
-  const ttlSeconds = Math.max(1, Math.ceil((resetAt - now) / 1000))
+  const ttlSeconds = getRateLimitWindowSeconds(resetAt, now)
   const opCounter: RateLimitCounter = { count, resetAt }
   await opRateEntry.helper.putJson(opRateEntry.request, opCounter, ttlSeconds)
 
@@ -277,7 +286,7 @@ export async function recordChannelSelfIPRequest(
     count: inWindow ? (existing?.count ?? 0) + 1 : 1,
     resetAt,
   }
-  const ttlSeconds = Math.max(1, Math.ceil((resetAt - now) / 1000))
+  const ttlSeconds = getRateLimitWindowSeconds(resetAt, now)
 
   await ipRateEntry.helper.putJson(ipRateEntry.request, newData, ttlSeconds)
 }
