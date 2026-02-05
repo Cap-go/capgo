@@ -374,3 +374,9 @@ import_map = "./functions/deno.json"
 [functions.webhooks]
 verify_jwt = false
 import_map = "./functions/deno.json"
+
+# Replication 
+
+[functions.replication]
+verify_jwt = false
+import_map = "./functions/deno.json"
