@@ -5,7 +5,7 @@ import type { Database } from '~/types/supabase.types'
 import { FormKit } from '@formkit/vue'
 import { computedAsync } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
-import { computed, ref, watch } from 'vue'
+import { computed, h, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -50,6 +50,8 @@ const currentPage = ref(1)
 const versionId = ref<number>()
 const filters = ref()
 const newChannelName = ref('')
+const canPromoteChannel = ref<Record<number, boolean>>({})
+const canReadChannel = ref<Record<number, boolean>>({})
 
 const canDeleteChannel = computedAsync(async () => {
   if (!props.appId)
@@ -111,6 +113,7 @@ async function addChannel(name: string) {
 
 async function getData() {
   isLoading.value = true
+  canPromoteChannel.value = {}
   try {
     let req = supabase
       .from('channels')
@@ -169,6 +172,7 @@ async function getData() {
     // Inform the parent component if there are any misconfigured channels
     emit('misconfigured', anyMisconfigured)
     versionId.value = await findUnknownVersion()
+    await loadChannelPermissions(elements.value)
   }
   catch (error) {
     console.error(error)
@@ -242,6 +246,31 @@ async function deleteOne(one: Element) {
   return dialogStore.onDialogDismiss()
 }
 
+async function loadChannelPermissions(rows: Element[]) {
+  if (!rows.length) {
+    canPromoteChannel.value = {}
+    canReadChannel.value = {}
+    return
+  }
+
+  const entries = await Promise.all(rows.map(async (row) => {
+    const [canRead, canPromote] = await Promise.all([
+      checkPermissions('channel.read', { channelId: row.id }),
+      checkPermissions('channel.promote_bundle', { channelId: row.id }),
+    ])
+    return { id: row.id, canRead, canPromote }
+  }))
+
+  const nextPromote: Record<number, boolean> = {}
+  const nextRead: Record<number, boolean> = {}
+  for (const entry of entries) {
+    nextRead[entry.id] = entry.canRead
+    nextPromote[entry.id] = entry.canPromote
+  }
+  canPromoteChannel.value = nextPromote
+  canReadChannel.value = nextRead
+}
+
 columns.value = [
   {
     label: t('name'),
@@ -249,7 +278,23 @@ columns.value = [
     mobile: true,
     sortable: true,
     head: true,
-    onClick: (elem: Element) => openOne(elem),
+    renderFunction: (elem: Element) => {
+      const canRead = !!canReadChannel.value[elem.id]
+      const title = canRead ? '' : t('channel-permission-read-required')
+      const className = canRead
+        ? 'w-full text-left hover:underline'
+        : 'w-full text-left text-gray-400 dark:text-gray-500 cursor-not-allowed'
+      return h('button', {
+        type: 'button',
+        class: className,
+        disabled: !canRead,
+        title,
+        onClick: () => {
+          if (canRead)
+            openOne(elem)
+        },
+      }, elem.name)
+    },
   },
   {
     label: t('last-upload'),
@@ -279,6 +324,10 @@ columns.value = [
     actions: [
       {
         icon: IconSettings,
+        disabled: (elem: Element) => !canPromoteChannel.value[elem.id],
+        title: (elem: Element) => (!canPromoteChannel.value[elem.id]
+          ? t('channel-permission-associate-required')
+          : ''),
         onClick: (elem: Element) => openOne(elem),
       },
       {

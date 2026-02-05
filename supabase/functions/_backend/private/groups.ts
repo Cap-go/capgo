@@ -25,8 +25,8 @@ async function parseJsonBody(c: Context<MiddlewareKeyVariables>) {
 
 export const app = createHono('', version)
 
-app.use('/', useCors)
-app.use('/', middlewareAuth)
+app.use('*', useCors)
+app.use('*', middlewareAuth)
 
 // GET /private/groups/:org_id - List groups for an org
 app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {

@@ -206,9 +206,6 @@ CREATE TABLE public.role_permissions (
 
 **Example for `org_member`**:
 - `org.read`, `org.read_members`
-- `app.read`, `app.list_bundles`, `app.list_channels`, `app.read_logs`, `app.read_devices`, `app.read_audit`
-- `bundle.read`
-- `channel.read`, `channel.read_history`, `channel.read_forced_devices`, `channel.read_audit`
 
 **Example for `bundle_admin`**:
 - `bundle.read`, `bundle.update`, `bundle.delete`
@@ -450,11 +447,8 @@ The system defines 13 predefined roles covering all hierarchy levels.
 - **Priority rank**: 75
 - **Permissions**:
   - **Org**: read, read_members
-  - **App**: read, list_bundles, list_channels, read_logs, read_devices, read_audit
-  - **Channel**: read, read_history, read_forced_devices, read_audit
-  - **Bundle**: read
-- **Usage**: Basic member, read-only across the entire org
-- **Use case**: Observers, stakeholders, QA with visibility but no modification power
+- **Usage**: Basic org member (no app access by default)
+- **Use case**: Users who only need org visibility; grant app access via app-scoped roles
 
 ### Application Roles
 
@@ -594,20 +588,20 @@ The system defines **40+ atomic permissions** organized by scope.
 
 | Permission | Description | Roles with this permission |
 |-----------|-------------|------------------------------|
-| `app.read` | View app info | All app_* roles, org_admin, org_super_admin, org_member |
+| `app.read` | View app info | All app_* roles, org_admin, org_super_admin |
 | `app.update_settings` | Modify app settings | app_admin, org_admin, org_super_admin |
 | `app.delete` | Delete app | org_super_admin only |
 | `app.read_bundles` | View bundle metadata | app_admin, app_developer, app_uploader, app_reader, org_admin, org_super_admin |
-| `app.list_bundles` | List bundles | org_member |
+| `app.list_bundles` | List bundles | None |
 | `app.upload_bundle` | Upload bundles | app_admin, app_developer, app_uploader, org_admin, org_super_admin |
 | `app.create_channel` | Create channels | app_admin, org_admin, org_super_admin |
 | `app.read_channels` | View channels | app_admin, app_developer, app_uploader, app_reader, org_admin, org_super_admin |
-| `app.list_channels` | List channels | org_member |
-| `app.read_logs` | View logs | app_admin, app_developer, app_uploader, app_reader, org_admin, org_super_admin, org_member |
+| `app.list_channels` | List channels | None |
+| `app.read_logs` | View logs | app_admin, app_developer, app_uploader, app_reader, org_admin, org_super_admin |
 | `app.manage_devices` | Manage devices | app_admin, app_developer, org_admin, org_super_admin |
-| `app.read_devices` | View devices | All app_* roles, org_admin, org_super_admin, org_member |
+| `app.read_devices` | View devices | All app_* roles, org_admin, org_super_admin |
 | `app.build_native` | Build native versions | app_admin, app_developer, org_admin, org_super_admin |
-| `app.read_audit` | View app audit | All app_* roles, org_admin, org_super_admin, org_member |
+| `app.read_audit` | View app audit | All app_* roles, org_admin, org_super_admin |
 | `app.update_user_roles` | Manage user roles for this app | app_admin, org_admin, org_super_admin |
 
 ### Bundle Permissions (scope: `bundle`)
@@ -616,7 +610,7 @@ The system defines **40+ atomic permissions** organized by scope.
 
 | Permission | Description | Roles with this permission |
 |-----------|-------------|------------------------------|
-| `bundle.read` | Read bundle metadata | bundle_admin, bundle_reader, org_member |
+| `bundle.read` | Read bundle metadata | bundle_admin, bundle_reader |
 | `bundle.update` | Modify a bundle | bundle_admin |
 | `bundle.delete` | Delete a bundle | bundle_admin, app_admin, org_admin, org_super_admin |
 
@@ -624,15 +618,15 @@ The system defines **40+ atomic permissions** organized by scope.
 
 | Permission | Description | Roles with this permission |
 |-----------|-------------|------------------------------|
-| `channel.read` | View a channel | All channel_* roles, app_admin, app_developer, org_admin, org_super_admin, org_member |
+| `channel.read` | View a channel | All channel_* roles, app_admin, app_developer, org_admin, org_super_admin |
 | `channel.update_settings` | Modify channel settings | channel_admin, app_admin, app_developer, org_admin, org_super_admin |
 | `channel.delete` | Delete a channel | channel_admin, app_admin, org_admin, org_super_admin |
-| `channel.read_history` | View deployment history | All channel_* roles, app_admin, app_developer, org_admin, org_super_admin, org_member |
+| `channel.read_history` | View deployment history | All channel_* roles, app_admin, app_developer, org_admin, org_super_admin |
 | `channel.promote_bundle` | Promote a bundle | channel_admin, app_admin, app_developer, org_admin, org_super_admin |
 | `channel.rollback_bundle` | Rollback a bundle | channel_admin, app_admin, app_developer, org_admin, org_super_admin |
 | `channel.manage_forced_devices` | Manage forced devices | channel_admin, app_admin, app_developer, org_admin, org_super_admin |
-| `channel.read_forced_devices` | View forced devices | All channel_* roles, app_admin, app_developer, org_admin, org_super_admin, org_member |
-| `channel.read_audit` | View channel audit | All channel_* roles, app_admin, app_developer, org_admin, org_super_admin, org_member |
+| `channel.read_forced_devices` | View forced devices | All channel_* roles, app_admin, app_developer, org_admin, org_super_admin |
+| `channel.read_audit` | View channel audit | All channel_* roles, app_admin, app_developer, org_admin, org_super_admin |
 
 ### Platform Permissions (scope: `platform`)
 
@@ -1752,11 +1746,10 @@ ORDER BY rb.granted_at DESC;
 #### 8. Find missing permissions for a role
 
 ```sql
--- Permissions that org_member should have but doesn't
+-- Permissions not granted to a role (example: org_member)
 SELECT DISTINCT p.key, p.description
 FROM permissions p
 WHERE p.scope_type IN ('org', 'app', 'channel')
-  AND p.key LIKE 'app.read%'
   AND p.id NOT IN (
     SELECT permission_id
     FROM role_permissions rp
