@@ -1,6 +1,6 @@
 import type { Database } from '../../utils/supabase.types.ts'
-import { getBodyOrQuery, honoFactory, middlewareAuth } from '../../utils/hono.ts'
-import { middlewareKey } from '../../utils/hono_middleware.ts'
+import { getBodyOrQuery, honoFactory } from '../../utils/hono.ts'
+import { middlewareKey, middlewareV2 } from '../../utils/hono_middleware.ts'
 import { getAuditLogs } from './audit.ts'
 import { deleteOrg } from './delete.ts'
 import { get } from './get.ts'
@@ -54,7 +54,7 @@ app.delete('/members', middlewareKey(['all', 'write', 'read', 'upload']), async 
   return deleteMember(c, body, apikey)
 })
 
-app.get('/audit', middlewareAuth, async (c) => {
+app.get('/audit', middlewareV2(['all', 'write', 'read', 'upload']), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   return getAuditLogs(c, body)
 })
