@@ -48,21 +48,30 @@ app.post('/', middlewareAuth, async (c) => {
   }
 
   const claims = getClaimsFromJWT(authorization)
-  if (!claims?.email && token) {
+  const email = claims?.email
+  if (!email && token) {
     return quickError(400, 'missing_email', 'Email is required to verify OTP')
   }
 
   const supabase = emptySupabase(c)
-  const { data: verifyData, error: verifyError } = tokenHash
-    ? await supabase.auth.verifyOtp({
-        token_hash: tokenHash,
-        type: otpType,
-      })
-    : await supabase.auth.verifyOtp({
-        email: claims!.email,
-        token,
-        type: otpType,
-      })
+  let verifyData: Awaited<ReturnType<typeof supabase.auth.verifyOtp>>['data']
+  let verifyError: Awaited<ReturnType<typeof supabase.auth.verifyOtp>>['error']
+  if (tokenHash) {
+    ({ data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+      token_hash: tokenHash,
+      type: otpType,
+    }))
+  }
+  else {
+    if (!email) {
+      return quickError(400, 'missing_email', 'Email is required to verify OTP')
+    }
+    ({ data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: otpType,
+    }))
+  }
 
   if (verifyError || !verifyData?.session?.access_token) {
     cloudlog({ requestId: c.get('requestId'), context: 'verify_email_otp - verifyOtp failed', error: verifyError?.message })
