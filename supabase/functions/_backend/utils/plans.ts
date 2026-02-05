@@ -90,12 +90,12 @@ async function applyCreditsForMetric(
   planId: string | undefined,
   usage: number,
   limit: number | null | undefined,
-  billingCycle: BillingCycleInfo,
+  billingCycle: BillingCycleInfo | null,
 ): Promise<CreditApplicationResult | null> {
   if (overageAmount <= 0)
     return null
 
-  const resolvedBillingCycle: BillingCycleRange = billingCycle.subscription_anchor_start && billingCycle.subscription_anchor_end
+  const resolvedBillingCycle: BillingCycleRange = billingCycle?.subscription_anchor_start && billingCycle?.subscription_anchor_end
     ? (billingCycle as BillingCycleRange)
     : getDefaultBillingCycleRange()
 
