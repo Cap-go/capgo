@@ -114,8 +114,8 @@ async function applyCreditsForMetric(
         p_org_id: orgId,
         p_metric: metric,
         p_overage_amount: overageAmount,
-        p_billing_cycle_start: resolvedBillingCycle.subscription_anchor_start,
-        p_billing_cycle_end: resolvedBillingCycle.subscription_anchor_end,
+        p_billing_cycle_start: resolvedBillingCycle.subscription_anchor_start!,
+        p_billing_cycle_end: resolvedBillingCycle.subscription_anchor_end!,
         p_details: {
           usage,
           limit: limit ?? 0,
