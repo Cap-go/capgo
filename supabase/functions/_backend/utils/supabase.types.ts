@@ -2677,6 +2677,24 @@ export type Database = {
           credits_required: number
         }[]
       }
+      create_hashed_apikey: {
+        Args: {
+          p_expires_at: string | null
+          p_limited_to_apps: string[]
+          p_limited_to_orgs: string[]
+          p_mode: Database["public"]["Enums"]["key_mode"]
+          p_name: string
+          p_user_id: string
+        }
+        Returns: Database["public"]["Tables"]["apikeys"]["Row"]
+      }
+      regenerate_hashed_apikey: {
+        Args: {
+          p_apikey_id: number
+          p_user_id: string
+        }
+        Returns: Database["public"]["Tables"]["apikeys"]["Row"]
+      }
       check_min_rights:
         | {
             Args: {
