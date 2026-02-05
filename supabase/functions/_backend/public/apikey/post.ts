@@ -66,21 +66,40 @@ app.post('/', middlewareV2(['all']), async (c) => {
   // Validate expiration against org policies (throws if invalid)
   await validateExpirationAgainstOrgPolicies(allOrgIds, expiresAt, supabase)
 
-  const { data: apikeyData, error: apikeyError } = await supabase
-    .from('apikeys')
-    .insert({
-      user_id: auth.userId,
-      key: null,
-      key_hash: isHashed ? 'requested' : null,
-      mode,
-      name,
-      limited_to_apps: limitedToApps,
-      limited_to_orgs: limitedToOrgs,
-      expires_at: expiresAt,
+  let apikeyData: Database['public']['Tables']['apikeys']['Row'] | null = null
+  let apikeyError: unknown = null
+
+  if (isHashed) {
+    const { data, error } = await supabase.rpc('create_hashed_apikey', {
+      p_user_id: auth.userId,
+      p_mode: mode,
+      p_name: name,
+      p_limited_to_orgs: limitedToOrgs,
+      p_limited_to_apps: limitedToApps,
+      p_expires_at: expiresAt,
     })
-    .select()
-    .single()
-  if (apikeyError) {
+    apikeyData = data
+    apikeyError = error
+  }
+  else {
+    const { data, error } = await supabase
+      .from('apikeys')
+      .insert({
+        user_id: auth.userId,
+        key: null,
+        key_hash: null,
+        mode,
+        name,
+        limited_to_apps: limitedToApps,
+        limited_to_orgs: limitedToOrgs,
+        expires_at: expiresAt,
+      })
+      .select()
+      .single()
+    apikeyData = data
+    apikeyError = error
+  }
+  if (apikeyError || !apikeyData) {
     throw simpleError('failed_to_create_apikey', 'Failed to create API key', { supabaseError: apikeyError })
   }
 

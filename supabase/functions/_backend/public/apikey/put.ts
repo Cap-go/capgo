@@ -126,12 +126,10 @@ async function handlePut(c: Context, idParam?: string) {
     await validateExpirationAgainstOrgPolicies(orgsToValidate, expirationToValidate, supabase)
   }
 
-  if (regenerate) {
-    updateData.key = 'regenerate'
-  }
+  const isHashedKey = existingApikey.key_hash !== null
 
   let updatedApikey = existingApikey
-  if (hasUpdates || regenerate) {
+  if (hasUpdates) {
     const { data: updatedData, error: updateError } = await supabase
       .from('apikeys')
       .update(updateData)
@@ -144,6 +142,32 @@ async function handlePut(c: Context, idParam?: string) {
       throw quickError(500, 'failed_to_update_apikey', 'Failed to update API key', { supabaseError: updateError })
     }
     updatedApikey = updatedData
+  }
+
+  if (regenerate) {
+    if (isHashedKey) {
+      const { data: regeneratedApikey, error: regenerateError } = await supabase.rpc('regenerate_hashed_apikey', {
+        p_apikey_id: existingApikey.id,
+        p_user_id: auth.userId,
+      })
+      if (regenerateError || !regeneratedApikey) {
+        throw quickError(500, 'failed_to_update_apikey', 'Failed to regenerate API key', { supabaseError: regenerateError })
+      }
+      return c.json(regeneratedApikey)
+    }
+
+    const { data: updatedData, error: updateError } = await supabase
+      .from('apikeys')
+      .update({ key: 'regenerate' })
+      .eq('id', existingApikey.id)
+      .eq('user_id', auth.userId)
+      .select()
+      .single()
+
+    if (updateError || !updatedData) {
+      throw quickError(500, 'failed_to_update_apikey', 'Failed to regenerate API key', { supabaseError: updateError })
+    }
+    return c.json(updatedData)
   }
 
   return c.json(updatedApikey)
