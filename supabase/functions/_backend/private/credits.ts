@@ -80,7 +80,8 @@ async function getCreditTopUpProductId(c: AppContext, customerId: string, token:
     .single()
 
   if (stripeInfoError || !stripeInfo?.product_id) {
-    cloudlogErr({
+    const log = stripeInfoError ? cloudlogErr : cloudlog
+    log({
       requestId: c.get('requestId'),
       message: 'credit_plan_missing',
       customerId,
