@@ -11,7 +11,9 @@ import {
   getCurrentPlanNameOrg,
   getPlanUsageAndFit,
   getPlanUsageAndFitUncached,
+  getPlanUsagePercent,
   getTotalStats,
+  isGoodPlanOrg,
   isOnboardedOrg,
   isOnboardingNeeded,
   isTrialOrg,
@@ -377,10 +379,18 @@ export async function calculatePlanStatus(c: Context, orgId: string) {
 }
 
 export async function calculatePlanStatusFresh(c: Context, orgId: string) {
-  const planUsage = await getPlanUsageAndFitUncached(c, orgId)
-  const { is_good_plan, total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent } = planUsage
-  const percentUsage = { total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent }
-  return { is_good_plan, percentUsage }
+  try {
+    const planUsage = await getPlanUsageAndFitUncached(c, orgId)
+    const { is_good_plan, total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent } = planUsage
+    const percentUsage = { total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent }
+    return { is_good_plan, percentUsage }
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'calculatePlanStatusFresh fallback', orgId, error })
+    const percentUsage = await getPlanUsagePercent(c, orgId)
+    const is_good_plan = await isGoodPlanOrg(c, orgId)
+    return { is_good_plan, percentUsage }
+  }
 }
 
 // Handle notifications and events based on org status
