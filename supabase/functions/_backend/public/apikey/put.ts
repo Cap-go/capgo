@@ -1,3 +1,4 @@
+import type { Context } from 'hono'
 import type { AuthInfo } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
@@ -16,6 +17,7 @@ function isValidIdFormat(id: string): boolean {
 }
 
 interface ApiKeyPut {
+  id?: string | number
   name?: string
   mode?: 'read' | 'write' | 'all' | 'upload'
   limited_to_apps?: string[]
@@ -24,7 +26,7 @@ interface ApiKeyPut {
   regenerate?: boolean
 }
 
-app.put('/:id', middlewareV2(['all']), async (c) => {
+async function handlePut(c: Context, idParam?: string) {
   const auth = c.get('auth') as AuthInfo
   const authApikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
 
@@ -33,33 +35,36 @@ app.put('/:id', middlewareV2(['all']), async (c) => {
     throw quickError(401, 'cannot_update_apikey', 'You cannot do that as a limited API key', { apikeyId: authApikey.id })
   }
 
-  const id = c.req.param('id')
-  if (!id) {
+  const body = await parseBody<ApiKeyPut>(c)
+  const { id, name, mode, limited_to_apps, limited_to_orgs, expires_at, regenerate } = body
+
+  const resolvedId = typeof idParam === 'string' && idParam.length > 0 ? idParam : (id !== undefined ? String(id) : '')
+  if (!resolvedId) {
     throw simpleError('api_key_id_required', 'API key ID is required')
   }
 
   // Validate id format to prevent PostgREST filter injection
-  if (!isValidIdFormat(id)) {
+  if (!isValidIdFormat(resolvedId)) {
     throw simpleError('invalid_id_format', 'API key ID must be a valid UUID or number')
   }
 
-  const body = await parseBody<ApiKeyPut>(c)
-  const { name, mode, limited_to_apps, limited_to_orgs, expires_at, regenerate } = body
-
   // Validate expiration date format (throws if invalid)
   validateExpirationDate(expires_at)
+
+  const limitedToApps = Array.isArray(limited_to_apps) ? limited_to_apps : undefined
+  const limitedToOrgs = Array.isArray(limited_to_orgs) ? limited_to_orgs : undefined
 
   const updateData: Partial<Database['public']['Tables']['apikeys']['Update']> = {
     name,
     mode,
     // we use undefined to remove the field from the update
-    limited_to_apps: limited_to_apps?.length > 0 ? limited_to_apps : undefined,
-    limited_to_orgs: limited_to_orgs?.length > 0 ? limited_to_orgs : undefined,
+    limited_to_apps: limitedToApps && limitedToApps.length > 0 ? limitedToApps : undefined,
+    limited_to_orgs: limitedToOrgs && limitedToOrgs.length > 0 ? limitedToOrgs : undefined,
   }
   const hasUpdates = name !== undefined
     || mode !== undefined
-    || limited_to_apps !== undefined
-    || limited_to_orgs !== undefined
+    || limitedToApps !== undefined
+    || limitedToOrgs !== undefined
     || expires_at !== undefined
 
   // Handle expires_at: null means remove expiration, undefined means don't update
@@ -99,7 +104,7 @@ app.put('/:id', middlewareV2(['all']), async (c) => {
   const { data: existingApikey, error: fetchError } = await supabase
     .from('apikeys')
     .select('id, limited_to_orgs, expires_at, key, key_hash') // Also fetch expires_at for policy validation
-    .or(`key.eq.${id},id.eq.${id}`)
+    .or(`key.eq.${resolvedId},id.eq.${resolvedId}`)
     .eq('user_id', auth.userId)
     .single()
 
@@ -142,6 +147,9 @@ app.put('/:id', middlewareV2(['all']), async (c) => {
   }
 
   return c.json(updatedApikey)
-})
+}
+
+app.put('/', middlewareV2(['all']), async c => handlePut(c))
+app.put('/:id', middlewareV2(['all']), async c => handlePut(c, c.req.param('id')))
 
 export default app

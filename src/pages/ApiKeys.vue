@@ -537,8 +537,8 @@ async function regenrateKey(apikey: Database['public']['Tables']['apikeys']['Row
 
   const { data, error } = await supabase.functions.invoke('apikey', {
     method: 'PUT',
-    path: `/${apikey.id}`,
     body: {
+      id: apikey.id,
       regenerate: true,
     },
   })
