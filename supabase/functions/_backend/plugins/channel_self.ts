@@ -562,7 +562,7 @@ app.post('/', async (c) => {
 
   await assertChannelSelfIPRateLimit(c, bodyParsed.app_id)
 
-  // Rate limit: max 1 set per second per device+app, and same set max once per 60 seconds
+  // Rate limit: max 5 set per second per device+app, and same set max once per 60 seconds
   const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'set', bodyParsed.channel)
   if (rateLimitStatus.limited) {
     cloudlog({ requestId: c.get('requestId'), message: 'Channel self set rate limited', app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, channel: bodyParsed.channel })
@@ -603,7 +603,7 @@ app.put('/', async (c) => {
 
   await assertChannelSelfIPRateLimit(c, bodyParsed.app_id)
 
-  // Rate limit: max 1 get per second per device+app
+  // Rate limit: max 5 get per second per device+app
   const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'get')
   if (rateLimitStatus.limited) {
     cloudlog({ requestId: c.get('requestId'), message: 'Channel self get rate limited', app_id: bodyParsed.app_id, device_id: bodyParsed.device_id })
@@ -642,7 +642,7 @@ app.delete('/', async (c) => {
 
   await assertChannelSelfIPRateLimit(c, bodyParsed.app_id)
 
-  // Rate limit: max 1 delete per second per device+app
+  // Rate limit: max 5 delete per second per device+app
   const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'delete')
   if (rateLimitStatus.limited) {
     cloudlog({ requestId: c.get('requestId'), message: 'Channel self delete rate limited', app_id: bodyParsed.app_id, device_id: bodyParsed.device_id })
@@ -682,7 +682,7 @@ app.get('/', async (c) => {
 
   await assertChannelSelfIPRateLimit(c, bodyParsed.app_id)
 
-  // Rate limit: max 1 list per second per device+app (if device_id is provided)
+  // Rate limit: max 5 list per second per device+app (if device_id is provided)
   if (body.device_id) {
     const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, body.device_id, 'list')
     if (rateLimitStatus.limited) {
