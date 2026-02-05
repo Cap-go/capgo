@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
 import IconLoader from '~icons/lucide/loader-2'
+import { createDefaultApiKey } from '~/services/apikeys'
 import { pushEvent } from '~/services/posthog'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
@@ -139,13 +140,7 @@ async function addNewApiKey() {
     console.log('Not logged in, cannot regenerate API key')
     return
   }
-  const { error } = await supabase.functions.invoke('apikey', {
-    method: 'POST',
-    body: {
-      name: t('api-key'),
-      mode: 'all',
-    },
-  })
+  const { error } = await createDefaultApiKey(supabase, t('api-key'))
 
   if (error)
     throw error
