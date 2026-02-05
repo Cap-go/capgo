@@ -6,7 +6,7 @@ import { version } from '../utils/version.ts'
 
 const bodySchema = z.object({
   token: z.string().check(z.minLength(6), z.maxLength(6)),
-  type: z.enum(['email', 'magiclink']).optional(),
+  type: z.optional(z.enum(['email', 'magiclink'])),
 })
 
 export const app = createHono('', version)
