@@ -20,8 +20,31 @@ export async function cancelBuild(
     user_id: apikey.user_id,
   })
 
+  // Bind jobId to appId under RLS before calling the builder.
+  // This prevents cross-app access by mixing an allowed app_id with another app's jobId.
+  const supabase = supabaseApikey(c, apikey.key)
+  const { data: buildRequest, error: buildRequestError } = await supabase
+    .from('build_requests')
+    .select('app_id')
+    .eq('builder_job_id', jobId)
+    .maybeSingle()
+
+  if (buildRequestError) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Failed to fetch build_request for cancel build',
+      job_id: jobId,
+      error: buildRequestError.message,
+    })
+    throw simpleError('internal_error', 'Failed to fetch build request')
+  }
+
+  if (!buildRequest || buildRequest.app_id !== appId) {
+    throw simpleError('unauthorized', 'You do not have permission to cancel builds for this app')
+  }
+
   // Security: Check if user has permission to manage builds (auth context set by middlewareKey)
-  if (!(await checkPermission(c, 'app.build_native', { appId }))) {
+  if (!(await checkPermission(c, 'app.build_native', { appId: buildRequest.app_id }))) {
     cloudlogErr({
       requestId: c.get('requestId'),
       message: 'Unauthorized cancel build',
@@ -63,7 +86,6 @@ export async function cancelBuild(
 
   // Update build_requests status to cancelled
   // Use authenticated client for data queries - RLS will enforce access
-  const supabase = supabaseApikey(c, apikey.key)
   const { error: updateError } = await supabase
     .from('build_requests')
     .update({
@@ -71,6 +93,7 @@ export async function cancelBuild(
       updated_at: new Date().toISOString(),
     })
     .eq('builder_job_id', jobId)
+    .eq('app_id', buildRequest.app_id)
 
   if (updateError) {
     cloudlogErr({
