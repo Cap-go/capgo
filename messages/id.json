@@ -1498,6 +1498,6 @@
   "your-role-in-org": "Peran Anda dalam organisasi",
   "your-usage": "Penggunaan Anda:",
   "zip-bundle": "Paket bundel aplikasi Zip",
-  "failed-to-create-api-key": "Failed to create API key",
-  "failed-to-regenerate-api-key": "Failed to regenerate API key"
+  "failed-to-create-api-key": "Gagal membuat kunci API",
+  "failed-to-regenerate-api-key": "Gagal membuat ulang kunci API"
 }

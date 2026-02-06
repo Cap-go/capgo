@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import type { AuthInfo } from '../../utils/hono.ts'
+import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
@@ -26,13 +26,14 @@ interface ApiKeyPut {
   regenerate?: boolean
 }
 
-async function handlePut(c: Context, idParam?: string) {
+async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
+  const requestId = c.get('requestId')
   const auth = c.get('auth') as AuthInfo
   const authApikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
 
   // Only check limited_to_orgs constraint for API key auth (not JWT)
   if (auth.authType === 'apikey' && authApikey?.limited_to_orgs?.length) {
-    throw quickError(401, 'cannot_update_apikey', 'You cannot do that as a limited API key', { apikeyId: authApikey.id })
+    throw quickError(401, 'cannot_update_apikey', 'You cannot do that as a limited API key', { requestId, apikeyId: authApikey.id })
   }
 
   const body = await parseBody<ApiKeyPut>(c)
@@ -40,12 +41,12 @@ async function handlePut(c: Context, idParam?: string) {
 
   const resolvedId = typeof idParam === 'string' && idParam.length > 0 ? idParam : (id !== undefined ? String(id) : '')
   if (!resolvedId) {
-    throw simpleError('api_key_id_required', 'API key ID is required')
+    throw simpleError('api_key_id_required', 'API key ID is required', { requestId })
   }
 
   // Validate id format to prevent PostgREST filter injection
   if (!isValidIdFormat(resolvedId)) {
-    throw simpleError('invalid_id_format', 'API key ID must be a valid UUID or number')
+    throw simpleError('invalid_id_format', 'API key ID must be a valid UUID or number', { requestId })
   }
 
   // Validate expiration date format (throws if invalid)
@@ -74,28 +75,28 @@ async function handlePut(c: Context, idParam?: string) {
   const hasUpdates = Object.keys(updateData).length > 0
 
   if (name !== undefined && typeof name !== 'string') {
-    throw simpleError('name_must_be_a_string', 'Name must be a string')
+    throw simpleError('name_must_be_a_string', 'Name must be a string', { requestId })
   }
 
   const validModes = Constants.public.Enums.key_mode
   if (mode !== undefined && (typeof mode !== 'string' || !validModes.includes(mode as any))) {
-    throw simpleError('invalid_mode', `Invalid mode. Must be one of: ${validModes.join(', ')}`)
+    throw simpleError('invalid_mode', `Invalid mode. Must be one of: ${validModes.join(', ')}`, { requestId })
   }
 
   if (limited_to_apps !== undefined && (!Array.isArray(limited_to_apps) || !limited_to_apps.every(item => typeof item === 'string'))) {
-    throw simpleError('limited_to_apps_must_be_an_array_of_strings', 'limited_to_apps must be an array of strings')
+    throw simpleError('limited_to_apps_must_be_an_array_of_strings', 'limited_to_apps must be an array of strings', { requestId })
   }
 
   if (limited_to_orgs !== undefined && (!Array.isArray(limited_to_orgs) || !limited_to_orgs.every(item => typeof item === 'string'))) {
-    throw simpleError('limited_to_orgs_must_be_an_array_of_strings', 'limited_to_orgs must be an array of strings')
+    throw simpleError('limited_to_orgs_must_be_an_array_of_strings', 'limited_to_orgs must be an array of strings', { requestId })
   }
 
   if (regenerate !== undefined && typeof regenerate !== 'boolean') {
-    throw simpleError('regenerate_must_be_boolean', 'regenerate must be a boolean')
+    throw simpleError('regenerate_must_be_boolean', 'regenerate must be a boolean', { requestId })
   }
 
   if (!hasUpdates && !regenerate) {
-    throw simpleError('no_valid_fields_provided_for_update', 'No valid fields provided for update. Provide name, mode, limited_to_apps, limited_to_orgs, or expires_at.')
+    throw simpleError('no_valid_fields_provided_for_update', 'No valid fields provided for update. Provide name, mode, limited_to_apps, limited_to_orgs, or expires_at.', { requestId })
   }
 
   // Use supabaseWithAuth which handles both JWT and API key authentication
@@ -118,10 +119,10 @@ async function handlePut(c: Context, idParam?: string) {
 
   if (fetchError) {
     // RLS might return an error or just no data if not found/accessible
-    throw quickError(fetchError.code === 'PGRST116' ? 404 : 500, 'api_key_not_found_or_access_denied', 'API key not found or access denied', { supabaseError: fetchError })
+    throw quickError(fetchError.code === 'PGRST116' ? 404 : 500, 'api_key_not_found_or_access_denied', 'API key not found or access denied', { requestId, supabaseError: fetchError })
   }
   if (!existingApikey) {
-    throw quickError(404, 'api_key_not_found_or_access_denied', 'API key not found or access denied')
+    throw quickError(404, 'api_key_not_found_or_access_denied', 'API key not found or access denied', { requestId })
   }
 
   // Determine the org IDs to validate against (use new ones if provided, otherwise existing)
@@ -147,7 +148,7 @@ async function handlePut(c: Context, idParam?: string) {
       .single()
 
     if (updateError || !updatedData) {
-      throw quickError(500, 'failed_to_update_apikey', 'Failed to update API key', { supabaseError: updateError })
+      throw quickError(500, 'failed_to_update_apikey', 'Failed to update API key', { requestId, supabaseError: updateError })
     }
     updatedApikey = updatedData
   }
@@ -158,7 +159,7 @@ async function handlePut(c: Context, idParam?: string) {
         p_apikey_id: existingApikey.id,
       })
       if (regenerateError || !regeneratedApikey) {
-        throw quickError(500, 'failed_to_update_apikey', 'Failed to regenerate API key', { supabaseError: regenerateError })
+        throw quickError(500, 'failed_to_update_apikey', 'Failed to regenerate API key', { requestId, supabaseError: regenerateError })
       }
       return c.json(regeneratedApikey)
     }
@@ -176,7 +177,7 @@ async function handlePut(c: Context, idParam?: string) {
       .single()
 
     if (updateError || !updatedData) {
-      throw quickError(500, 'failed_to_update_apikey', 'Failed to regenerate API key', { supabaseError: updateError })
+      throw quickError(500, 'failed_to_update_apikey', 'Failed to regenerate API key', { requestId, supabaseError: updateError })
     }
     return c.json(updatedData)
   }

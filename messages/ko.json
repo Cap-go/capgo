@@ -1498,6 +1498,6 @@
   "your-role-in-org": "조직에서의 당신의 역할",
   "your-usage": "당신의 사용량:",
   "zip-bundle": "ZIP 앱 번들",
-  "failed-to-create-api-key": "Failed to create API key",
-  "failed-to-regenerate-api-key": "Failed to regenerate API key"
+  "failed-to-create-api-key": "API 키를 생성하지 못했습니다",
+  "failed-to-regenerate-api-key": "API 키를 재생성하지 못했습니다"
 }

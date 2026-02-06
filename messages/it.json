@@ -1498,6 +1498,6 @@
   "your-role-in-org": "Il tuo ruolo nell'organizzazione",
   "your-usage": "Il tuo utilizzo:",
   "zip-bundle": "Pacchetto app ZIP",
-  "failed-to-create-api-key": "Failed to create API key",
-  "failed-to-regenerate-api-key": "Failed to regenerate API key"
+  "failed-to-create-api-key": "Impossibile creare la chiave API",
+  "failed-to-regenerate-api-key": "Impossibile rigenerare la chiave API"
 }

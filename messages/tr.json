@@ -1498,6 +1498,6 @@
   "your-role-in-org": "Organizasyondaki rolünüz",
   "your-usage": "Kullanımınız:",
   "zip-bundle": "Zip uygulama paketi",
-  "failed-to-create-api-key": "Failed to create API key",
-  "failed-to-regenerate-api-key": "Failed to regenerate API key"
+  "failed-to-create-api-key": "API anahtarı oluşturulamadı",
+  "failed-to-regenerate-api-key": "API anahtarı yeniden oluşturulamadı"
 }

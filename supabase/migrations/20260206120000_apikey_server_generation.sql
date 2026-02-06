@@ -4,7 +4,7 @@ ALTER TABLE public.apikeys
 DO $$
 BEGIN
   UPDATE public.apikeys
-    SET key = extensions.gen_random_uuid()::text
+    SET key = gen_random_uuid()::text
     WHERE key IS NULL AND key_hash IS NULL;
 
   IF NOT EXISTS (
@@ -56,7 +56,7 @@ BEGIN
     v_is_hashed := NEW.key_hash IS NOT NULL;
   END IF;
 
-  v_plain_key := extensions.gen_random_uuid()::text;
+  v_plain_key := gen_random_uuid()::text;
 
   IF v_is_hashed THEN
     NEW.key_hash := encode(extensions.digest(v_plain_key, 'sha256'), 'hex');
@@ -131,7 +131,7 @@ DECLARE
   v_plain_key text;
   v_apikey public.apikeys;
 BEGIN
-  v_plain_key := extensions.gen_random_uuid()::text;
+  v_plain_key := gen_random_uuid()::text;
 
   PERFORM set_config('capgo.skip_apikey_trigger', 'true', true);
 
@@ -176,7 +176,7 @@ DECLARE
   v_plain_key text;
   v_apikey public.apikeys;
 BEGIN
-  v_plain_key := extensions.gen_random_uuid()::text;
+  v_plain_key := gen_random_uuid()::text;
 
   PERFORM set_config('capgo.skip_apikey_trigger', 'true', true);
 
@@ -186,6 +186,11 @@ BEGIN
     WHERE id = p_apikey_id
       AND user_id = p_user_id
     RETURNING * INTO v_apikey;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'apikey_not_found'
+      USING ERRCODE = 'P0002';
+  END IF;
 
   v_apikey.key := v_plain_key;
 
