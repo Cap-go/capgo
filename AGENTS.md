@@ -507,6 +507,14 @@ Applications are configured to read from the nearest replica based on the user's
 location. This repartition is done by Cloudflare snippets at
 `cloudflare_workers/snippet/index.js`.
 
+### Replica Data Contract (CRITICAL)
+
+When backend code uses the plugin read-path (`/updates`, `/stats`, `/channel_self`), it must only query what exists in the read replicas.
+
+- Logical replication replicates **table data**, not derived objects like **views** and **SQL functions**.
+- Treat the read replica (what you see in PlanetScale) as the source of truth for what is queryable from plugin endpoints.
+- Do **not** query credits ledger tables/views from the replica (e.g. `usage_credit_*` / `usage_credit_balances`). If plugin logic needs a “has credits” signal, **materialize it into a replicated column/table** (example: an org-level boolean flag that is refreshed by primary-side jobs).
+
 ## Pull Request Guidelines
 
 ### Required Sections
