@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import { parseCronExpression } from 'cron-schedule'
 import { and, eq, inArray, isNull } from 'drizzle-orm'
-import { trackBentoEvent } from './bento.ts'
+import { isBentoConfigured, trackBentoEvent } from './bento.ts'
 import { CacheHelper } from './cache.ts'
 import { cloudlog } from './logging.ts'
 import { sendNotifOrg } from './notifications.ts'
@@ -366,6 +366,11 @@ export async function sendEmailToOrgMembers(
   orgId: string,
   drizzleClient?: ReturnType<typeof getDrizzleClient>,
 ): Promise<number> {
+  // If Bento isn't configured, sending is impossible; skip DB work entirely.
+  // This also keeps CI/test runs fast/stable.
+  if (!isBentoConfigured(c))
+    return 0
+
   const client = drizzleClient ?? getDrizzleClient(getPgClient(c, true))
   const { adminEmails, managementEmail } = await getAllEligibleEmails(c, orgId, preferenceKey, client)
 
@@ -429,6 +434,10 @@ export async function sendNotifToOrgMembers(
   cron: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<boolean | { sent: false, lastSendAt: string }> {
+  // If Bento isn't configured, sending is impossible; skip DB work entirely.
+  if (!isBentoConfigured(c))
+    return false
+
   // Get all eligible emails (includes org info)
   const { adminEmails, managementEmail, org } = await getAllEligibleEmails(c, orgId, preferenceKey, drizzleClient)
 

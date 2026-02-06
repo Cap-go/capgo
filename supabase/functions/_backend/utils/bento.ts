@@ -2,12 +2,25 @@ import type { Context } from 'hono'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
 import { getEnv } from './utils.ts'
 
-function hasBento(c: Context) {
-  return getEnv(c, 'BENTO_PUBLISHABLE_KEY').length > 0 && getEnv(c, 'BENTO_SECRET_KEY').length > 0 && getEnv(c, 'BENTO_SITE_UUID').length > 0
+export function isBentoConfigured(c: Context) {
+  const publishableKey = (getEnv(c, 'BENTO_PUBLISHABLE_KEY') || '').trim()
+  const secretKey = (getEnv(c, 'BENTO_SECRET_KEY') || '').trim()
+  const siteUuid = (getEnv(c, 'BENTO_SITE_UUID') || '').trim()
+
+  if (!publishableKey || !secretKey || !siteUuid)
+    return false
+
+  // CI sometimes sets placeholder values like "test" which should not trigger
+  // outbound Bento requests or related DB work.
+  const placeholders = new Set(['test', 'TEST', 'placeholder', 'changeme'])
+  if (placeholders.has(publishableKey) || placeholders.has(secretKey) || placeholders.has(siteUuid))
+    return false
+
+  return true
 }
 
 function getBentoHeaders(c: Context) {
-  if (!hasBento(c)) {
+  if (!isBentoConfigured(c)) {
     cloudlog({ requestId: c.get('requestId'), context: 'getBentoHeaders', error: 'Bento is not enabled' })
     return null
   }
@@ -47,7 +60,7 @@ async function bentoFetch(c: Context, path: string, siteUuid: string, body: any)
 }
 
 export async function trackBentoEvent(c: Context, email: string, data: any, event: string) {
-  if (!hasBento(c))
+  if (!isBentoConfigured(c))
     return
 
   try {
@@ -75,7 +88,7 @@ export async function trackBentoEvent(c: Context, email: string, data: any, even
 }
 
 export async function addTagBento(c: Context, email: string, segments: { segments: string[], deleteSegments: string[] }) {
-  if (!hasBento(c))
+  if (!isBentoConfigured(c))
     return
 
   try {
@@ -111,7 +124,7 @@ export async function syncBentoSubscriberTags(
   c: Context,
   update: { email: string, segments: string[], deleteSegments: string[] } | Array<{ email: string, segments: string[], deleteSegments: string[] }>,
 ) {
-  if (!hasBento(c))
+  if (!isBentoConfigured(c))
     return
 
   const updates = Array.isArray(update) ? update : [update]
@@ -151,7 +164,7 @@ export async function syncBentoSubscriberTags(
 }
 
 export async function unsubscribeBento(c: Context, email: string) {
-  if (!hasBento(c))
+  if (!isBentoConfigured(c))
     return
 
   try {
