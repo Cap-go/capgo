@@ -37,11 +37,21 @@ function buildPlanValidationExpression(
     FROM ${schema.orgs}
     WHERE ${schema.orgs.id} = ${ownerColumn}
   )`
+  // IMPORTANT: read replicas replicate table data but not views/functions.
+  // Keep this expression replica-safe by relying on a replicated org flag.
+  //
+  // Semantics note: this flag means "org uses credits/top-up billing", not
+  // "org currently has a positive balance". This avoids plugin read-path
+  // depending on credit ledger tables/views which are not present on replicas.
+  //
+  // Backward compatibility for replicas that haven't replicated the column yet:
+  // read via `to_jsonb(row)->>'has_usage_credits'` so the query still parses
+  // even if the column doesn't exist.
   const hasCreditsExpression = sql`EXISTS (
     SELECT 1
-    FROM public.usage_credit_balances ucb
-    WHERE ucb.org_id = ${ownerColumn}
-      AND COALESCE(ucb.available_credits, 0) > 0
+    FROM ${schema.orgs}
+    WHERE ${schema.orgs.id} = ${ownerColumn}
+      AND COALESCE((to_jsonb(orgs) ->> 'has_usage_credits')::boolean, false) = true
   )`
   return sql<boolean>`(${hasCreditsExpression}) OR EXISTS (
     SELECT 1

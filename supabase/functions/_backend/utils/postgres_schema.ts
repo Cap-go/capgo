@@ -103,6 +103,7 @@ export const orgs = pgTable('orgs', {
   require_apikey_expiration: boolean('require_apikey_expiration').notNull().default(false),
   max_apikey_expiration_days: integer('max_apikey_expiration_days'),
   email_preferences: jsonb('email_preferences'),
+  has_usage_credits: boolean('has_usage_credits').notNull().default(false),
 })
 
 export const notifications = pgTable('notifications', {
