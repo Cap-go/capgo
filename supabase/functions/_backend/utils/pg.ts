@@ -469,13 +469,11 @@ export async function getAppOwnerPostgres(
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
 ): Promise<{ owner_org: string, orgs: { created_by: string, id: string, management_email: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number, expose_metadata: boolean } | null> {
-  try {
-    if (actions.length === 0)
-      return null
+  const queryOnce = async (client: ReturnType<typeof getDrizzleClient>) => {
     const orgAlias = alias(schema.orgs, 'orgs')
     const planExpression = buildPlanValidationExpression(actions, schema.apps.owner_org)
 
-    const appOwner = await drizzleClient
+    return client
       .select({
         owner_org: schema.apps.owner_org,
         plan_valid: planExpression,
@@ -492,13 +490,35 @@ export async function getAppOwnerPostgres(
       .where(eq(schema.apps.app_id, appId))
       .innerJoin(orgAlias, eq(schema.apps.owner_org, orgAlias.id))
       .limit(1)
-      .then(data => data[0])
+      .then(data => data[0] ?? null)
+  }
 
-    return appOwner
+  if (actions.length === 0)
+    return null
+
+  try {
+    return await queryOnce(drizzleClient)
   }
   catch (e: unknown) {
+    // Replica outages or permission/schema mismatches should not downgrade paying customers
+    // to on-prem by accident. Retry once against the primary DB before giving up.
     logPgError(c, 'getAppOwnerPostgres', e)
-    return null
+
+    let primaryPgClient: ReturnType<typeof getPgClient> | undefined
+    try {
+      cloudlog({ requestId: c.get('requestId'), message: 'getAppOwnerPostgres retrying on primary DB', appId })
+      primaryPgClient = getPgClient(c, false)
+      const primaryDrizzle = getDrizzleClient(primaryPgClient)
+      return await queryOnce(primaryDrizzle)
+    }
+    catch (e2: unknown) {
+      logPgError(c, 'getAppOwnerPostgres.primaryRetry', e2)
+      return null
+    }
+    finally {
+      if (primaryPgClient)
+        await closeClient(c, primaryPgClient)
+    }
   }
 }
 
