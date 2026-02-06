@@ -170,27 +170,38 @@ describe.concurrent('tests CLI upload options in parallel', () => {
     usedApps.push(app.APPNAME)
 
     const semver = getSemver()
-    const testApiKey = randomUUID()
     const supabase = getSupabaseClient()
 
+    let createdApikeyId: number | null = null
+    let createdPlainKey: string | null = null
+
     try {
-      await supabase.from('apikeys')
+      const { data: createdApikey, error: createError } = await supabase.from('apikeys')
         .insert({
-          key: testApiKey,
           user_id: USER_ID,
           mode: 'all',
           name: 'test',
           limited_to_orgs: [ORG_ID],
         })
+        .select('id, key')
+        .single()
+
+      expect(createError).toBeNull()
+      // Server-side trigger will override any user-provided `key`, so always use the returned key.
+      createdApikeyId = createdApikey?.id ?? null
+      createdPlainKey = createdApikey?.key ?? null
+      expect(createdApikeyId).not.toBeNull()
+      expect(typeof createdPlainKey).toBe('string')
 
       const result = await retryUpload(() => uploadBundleSDK(app.APPNAME, semver, 'production', {
         ignoreCompatibilityCheck: true,
-        apikey: testApiKey,
+        apikey: createdPlainKey as string,
       }))
       expect(result.success).toBe(true)
     }
     finally {
-      await supabase.from('apikeys').delete().eq('key', testApiKey)
+      if (createdApikeyId !== null)
+        await supabase.from('apikeys').delete().eq('id', createdApikeyId)
     }
   }, 30000)
 
@@ -201,23 +212,32 @@ describe.concurrent('tests CLI upload options in parallel', () => {
     usedApps.push(app.APPNAME)
 
     const semver = getSemver()
-    const testApiKey = randomUUID()
     const wrongOrgId = randomUUID()
     const supabase = getSupabaseClient()
 
+    let createdApikeyId: number | null = null
+    let createdPlainKey: string | null = null
+
     try {
-      await supabase.from('apikeys')
+      const { data: createdApikey, error: createError } = await supabase.from('apikeys')
         .insert({
-          key: testApiKey,
           user_id: USER_ID,
           mode: 'upload',
           name: 'test',
           limited_to_orgs: [wrongOrgId],
         })
+        .select('id, key')
+        .single()
+
+      expect(createError).toBeNull()
+      createdApikeyId = createdApikey?.id ?? null
+      createdPlainKey = createdApikey?.key ?? null
+      expect(createdApikeyId).not.toBeNull()
+      expect(typeof createdPlainKey).toBe('string')
 
       const result = await uploadBundleSDK(app.APPNAME, semver, 'production', {
         ignoreCompatibilityCheck: true,
-        apikey: testApiKey,
+        apikey: createdPlainKey as string,
       })
       expect(result.success).toBe(false)
       // Error message can vary - either explicit org mismatch or generic permission error
@@ -227,7 +247,8 @@ describe.concurrent('tests CLI upload options in parallel', () => {
       ).toBe(true)
     }
     finally {
-      await supabase.from('apikeys').delete().eq('key', testApiKey)
+      if (createdApikeyId !== null)
+        await supabase.from('apikeys').delete().eq('id', createdApikeyId)
     }
   }, 30000)
 })
