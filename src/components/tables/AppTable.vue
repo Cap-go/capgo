@@ -9,7 +9,7 @@ import IconSettings from '~icons/heroicons/cog-8-tooth'
 import { formatDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
-import { useOrganizationStore } from '~/stores/organization'
+import { getRbacRoleI18nKey, useOrganizationStore } from '~/stores/organization'
 
 const props = defineProps<{
   apps: (Database['public']['Tables']['apps']['Row'])[]
@@ -121,7 +121,16 @@ const columns = ref<TableColumn[]>([
     displayFunction: (item) => {
       if (item.name) {
         const org = organizationStore.getOrgByAppId(item.app_id)
-        return org?.role ?? t('unknown')
+        const roleName = org?.role
+        if (!roleName)
+          return t('unknown')
+
+        // Normalize role (remove invite_ prefix if present)
+        const normalizedRole = roleName.replace(/^invite_/, '')
+
+        // Get i18n key and translate, or fallback to human-readable format
+        const i18nKey = getRbacRoleI18nKey(normalizedRole)
+        return i18nKey ? t(i18nKey) : normalizedRole.replaceAll('_', ' ')
       }
       return t('unknown')
     },

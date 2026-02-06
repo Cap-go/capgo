@@ -290,6 +290,8 @@ BEGIN
     ('e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a82', '6aa76066-55ef-4238-ade6-0b32334a4097', NOW(), NOW(), '', 'Private Error Test Org', 'test@capgo.app', NULL);
     ALTER TABLE public.orgs ENABLE TRIGGER generate_org_user_stripe_info_on_org_create;
 
+    UPDATE public.orgs SET use_new_rbac = true WHERE id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8';
+
     INSERT INTO public.usage_credit_grants (
       org_id,
       credits_total,
@@ -1155,13 +1157,11 @@ BEGIN
     WHERE r.name = public.rbac_role_org_billing_admin()
     ON CONFLICT DO NOTHING;
 
-    -- org_member: read-only access
+    -- org_member: org-only access (no app permissions)
     INSERT INTO public.role_permissions (role_id, permission_id)
     SELECT r.id, p.id FROM public.roles r
     JOIN public.permissions p ON p.key IN (
-      public.rbac_perm_org_read(), public.rbac_perm_org_read_members(),
-      public.rbac_perm_app_read(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_read_devices(), public.rbac_perm_app_read_audit(),
-      public.rbac_perm_channel_read(), public.rbac_perm_channel_read_history(), public.rbac_perm_channel_read_forced_devices(), public.rbac_perm_channel_read_audit()
+      public.rbac_perm_org_read(), public.rbac_perm_org_read_members()
     )
     WHERE r.name = public.rbac_role_org_member()
     ON CONFLICT DO NOTHING;

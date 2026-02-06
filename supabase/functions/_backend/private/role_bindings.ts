@@ -26,8 +26,8 @@ type ValidationResult<T> = { ok: true, data: T } | { ok: false, status: number, 
 
 export const app = createHono('', version)
 
-app.use('/', useCors)
-app.use('/', middlewareAuth)
+app.use('*', useCors)
+app.use('*', middlewareAuth)
 
 function parseRoleBindingBody(body: any): ValidationResult<RoleBindingBody> {
   const {

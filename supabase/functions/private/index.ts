@@ -17,6 +17,7 @@ import { app as log_as } from '../_backend/private/log_as.ts'
 import { app as plans } from '../_backend/private/plans.ts'
 import { app as publicStats } from '../_backend/private/public_stats.ts'
 import { app as role_bindings } from '../_backend/private/role_bindings.ts'
+import { app as roles } from '../_backend/private/roles.ts'
 import { app as set_org_email } from '../_backend/private/set_org_email.ts'
 import { app as stats_priv } from '../_backend/private/stats.ts'
 import { app as storeTop } from '../_backend/private/store_top.ts'
@@ -55,6 +56,7 @@ appGlobal.route('/latency', latency)
 appGlobal.route('/events', events)
 appGlobal.route('/groups', groups)
 appGlobal.route('/role_bindings', role_bindings)
+appGlobal.route('/roles', roles)
 appGlobal.route('/invite_new_user_to_org', invite_new_user_to_org)
 appGlobal.route('/accept_invitation', accept_invitation)
 appGlobal.route('/validate_password_compliance', validate_password_compliance)
