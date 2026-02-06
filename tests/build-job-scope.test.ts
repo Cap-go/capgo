@@ -20,10 +20,9 @@ describe('Build Endpoints Job/App Binding', () => {
   let buildRequestId: string | null = null
 
   beforeAll(async () => {
-    await Promise.all([
-      resetAndSeedAppData(appA, { orgId, userId, stripeCustomerId }),
-      resetAndSeedAppData(appB, { orgId, userId, stripeCustomerId }),
-    ])
+    // Seed sequentially to avoid unique constraint races (orgs/stripe_info share IDs).
+    await resetAndSeedAppData(appA, { orgId, userId, stripeCustomerId })
+    await resetAndSeedAppData(appB, { orgId, userId, stripeCustomerId })
 
     const supabase = getSupabaseClient()
 
