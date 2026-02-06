@@ -223,7 +223,6 @@
   "app-not-found": "Uygulama bulunamadı",
   "app-not-found-description": "Bu uygulama bulunamadı. Silinmiş olabilir veya erişiminiz olmayabilir.",
   "app-perm": "Uygulama izni",
-  "app-role-hint": "Uygulama rolleri hangi işlemlerin yapılabileceğini belirler",
   "app-transferred": "Uygulama başarıyla aktarıldı",
   "app-will-be-transferred": "Uygulama $ORG_ID'ye aktarılacak. Aktarımı onaylamak için lütfen uygulama ID'sini ('$APP_ID') yazın.",
   "apps": "uygulama",

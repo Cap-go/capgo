@@ -223,7 +223,6 @@
   "app-not-found": "Aplikasi tidak ditemukan",
   "app-not-found-description": "Aplikasi ini tidak dapat ditemukan. Mungkin sudah dihapus atau Anda mungkin tidak memiliki akses kepadanya.",
   "app-perm": "Izin aplikasi",
-  "app-role-hint": "Peran aplikasi mengontrol tindakan yang diizinkan",
   "app-transferred": "Aplikasi berhasil dipindahkan",
   "app-will-be-transferred": "Aplikasi akan dipindahkan ke $ORG_ID. Silakan ketik ID aplikasi ('$APP_ID') untuk mengkonfirmasi pemindahan.",
   "apps": "aplikasi",

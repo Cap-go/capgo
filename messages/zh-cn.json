@@ -223,7 +223,6 @@
   "app-not-found": "应用未找到",
   "app-not-found-description": "找不到此应用。可能已被删除，或者您可能无法访问它。",
   "app-perm": "应用程序权限",
-  "app-role-hint": "应用角色控制可执行的操作",
   "app-transferred": "应用程序传输成功",
   "app-will-be-transferred": "应用程序将转移到 $ORG_ID。请输入应用程序 ID ('$APP_ID') 以确认转移。",
   "apps": "应用程序",

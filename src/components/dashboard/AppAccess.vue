@@ -9,6 +9,11 @@ import IconLock from '~icons/heroicons/lock-closed'
 import IconPlus from '~icons/heroicons/plus'
 import IconShield from '~icons/heroicons/shield-check'
 import IconTrash from '~icons/heroicons/trash'
+import IconWrench from '~icons/heroicons/wrench'
+import DataTable from '~/components/DataTable.vue'
+import RoleSelect from '~/components/forms/RoleSelect.vue'
+import SearchInput from '~/components/forms/SearchInput.vue'
+import RoleSelectionModal from '~/components/modals/RoleSelectionModal.vue'
 import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -18,7 +23,6 @@ interface Role {
   name: string
   scope_type: string
   description: string
-  family_name: string
   priority_rank: number
 }
 
@@ -114,6 +118,11 @@ const isAssignRoleFormValid = computed(() => {
   return assignRoleForm.value.principal_id !== ''
     && assignRoleForm.value.role_name !== ''
 })
+
+const isEditRoleModalOpen = ref(false)
+const editRoleBinding = ref<RoleBinding | null>(null)
+const editRoleName = ref('')
+const isEditingRole = ref(false)
 
 async function fetchAppDetails() {
   if (!props.appId)
@@ -259,14 +268,17 @@ async function fetchAppRoleBindings() {
 
 async function fetchAvailableAppRoles() {
   try {
-    const { data, error } = await supabase.functions.invoke('private/roles/app', {
-      method: 'GET',
-    })
+    const { data, error } = await supabase
+      .from('roles')
+      .select('id, name, scope_type, description, priority_rank')
+      .eq('scope_type', 'app')
+      .eq('is_assignable', true)
+      .order('priority_rank')
 
     if (error)
       throw error
 
-    availableAppRoles.value = data || []
+    availableAppRoles.value = (data || []) as Role[]
   }
   catch (error: any) {
     console.error('Error fetching app roles:', error)
@@ -328,6 +340,12 @@ function openAssignRoleModal() {
   isAssignRoleModalOpen.value = true
 }
 
+function openEditRoleModal(binding: RoleBinding) {
+  editRoleBinding.value = binding
+  editRoleName.value = binding.role_name
+  isEditRoleModalOpen.value = true
+}
+
 async function assignRole() {
   if (!isAssignRoleFormValid.value || !ownerOrg.value || !props.appId)
     return
@@ -366,6 +384,50 @@ async function assignRole() {
   }
   finally {
     isLoading.value = false
+  }
+}
+
+async function handleEditRoleConfirm(newRoleName: string) {
+  if (!editRoleBinding.value) {
+    return
+  }
+
+  if (newRoleName === editRoleBinding.value.role_name) {
+    return
+  }
+
+  isEditingRole.value = true
+  try {
+    const { data: roleData, error: roleError } = await supabase
+      .from('roles')
+      .select('id')
+      .eq('name', newRoleName)
+      .single()
+
+    if (roleError || !roleData) {
+      console.error('Error fetching role UUID:', roleError)
+      throw new Error('Role not found')
+    }
+
+    const { error: updateError } = await supabase
+      .from('role_bindings')
+      .update({
+        role_id: roleData.id,
+      })
+      .eq('id', editRoleBinding.value.id)
+
+    if (updateError)
+      throw updateError
+
+    toast.success(t('permission-changed'))
+    await fetchAppRoleBindings()
+  }
+  catch (error: any) {
+    console.error('Error changing role:', error)
+    toast.error(t('error-assigning-role'))
+  }
+  finally {
+    isEditingRole.value = false
   }
 }
 
@@ -468,12 +530,11 @@ onMounted(async () => {
 
     <!-- Search -->
     <div v-if="useNewRbac" class="mb-4">
-      <input
+      <SearchInput
         v-model="search"
-        type="text"
         :placeholder="t('search-role-bindings')"
-        class="max-w-md d-input"
-      >
+        class="max-w-md"
+      />
     </div>
 
     <!-- Role bindings table -->
@@ -514,6 +575,14 @@ onMounted(async () => {
       </template>
 
       <template #actions="{ row }">
+        <button
+          v-if="canAssignRoles"
+          class="d-btn d-btn-sm d-btn-ghost"
+          :title="t('edit-role', 'Edit role')"
+          @click="openEditRoleModal(row)"
+        >
+          <IconWrench class="size-4" />
+        </button>
         <button
           v-if="canAssignRoles"
           class="d-btn d-btn-sm d-btn-ghost text-error"
@@ -569,24 +638,13 @@ onMounted(async () => {
         </div>
 
         <!-- Role Selection -->
-        <div class="mt-4 form-control">
-          <label class="label">
-            <span class="label-text">{{ t('select-app-role') }}</span>
-          </label>
-          <select v-model="assignRoleForm.role_name" class="d-select" required>
-            <option value="">
-              {{ t('select-role') }}
-            </option>
-            <option v-for="role in availableAppRoles" :key="role.id" :value="role.name">
-              {{ role.name }} - {{ role.description }}
-            </option>
-          </select>
-          <label class="label">
-            <span class="text-gray-500 label-text-alt">
-              {{ t('app-role-hint') }}
-            </span>
-          </label>
-        </div>
+        <RoleSelect
+          v-model="assignRoleForm.role_name"
+          :roles="availableAppRoles"
+          :label="t('select-app-role')"
+          class="mt-4"
+          required
+        />
 
         <!-- Reason (optional) -->
         <div class="mt-4 form-control">
@@ -616,5 +674,15 @@ onMounted(async () => {
       </div>
       <div class="modal-backdrop" @click="isAssignRoleModalOpen = false" />
     </dialog>
+
+    <!-- Edit Role Modal -->
+    <RoleSelectionModal
+      v-model:open="isEditRoleModalOpen"
+      :roles="availableAppRoles"
+      :current-role="editRoleName"
+      :title="t('select-app-role')"
+      :is-loading="isEditingRole"
+      @confirm="handleEditRoleConfirm"
+    />
   </div>
 </template>
