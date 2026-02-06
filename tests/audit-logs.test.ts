@@ -57,6 +57,16 @@ beforeAll(async () => {
   })
   if (error)
     throw error
+
+  // Ensure the creator is a member; org creation side-effects can be async in CI.
+  // The /organization/audit endpoint requires super_admin rights.
+  const { error: memberError } = await getSupabaseClient().from('org_users').insert({
+    org_id: ORG_ID,
+    user_id: USER_ID,
+    user_right: 'super_admin',
+  })
+  if (memberError)
+    throw memberError
 })
 
 afterAll(async () => {
@@ -64,6 +74,7 @@ afterAll(async () => {
   await getSupabaseClient().from('audit_logs').delete().eq('org_id', ORG_ID)
 
   // Clean up test organization and stripe_info
+  await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID)
   await getSupabaseClient().from('orgs').delete().eq('id', ORG_ID)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
 })
