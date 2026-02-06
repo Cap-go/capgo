@@ -11,6 +11,11 @@ import { cloudlog, cloudlogErr } from './logging.ts'
 import * as schema from './postgres_schema.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
 
+// In workerd runtimes (Cloudflare Workers + Supabase Edge Runtime), module globals
+// are reused across requests within an isolate. Creating a new Pool per request
+// quickly exhausts DB connections, so we cache pools by connection settings.
+const WORKER_POOL_CACHE = new Map<string, Pool>()
+
 // Replication lag threshold
 const REPLICATION_LAG_THRESHOLD_SECONDS = 180 // 3 minutes threshold
 
@@ -204,6 +209,33 @@ export function getPgClient(c: Context, readOnly = false) {
     maxLifetimeMillis: 30 * 60 * 1000, // 30 minutes
     // PgBouncer/Supabase pooler doesn't support the 'options' startup parameter
     options: readOnly && !isPooler ? '-c default_transaction_read_only=on' : undefined,
+  }
+
+  if (getRuntimeKey() === 'workerd') {
+    // Keep application_name stable per pool key, but avoid creating a new pool per request.
+    const poolKey = `${dbUrl}|${readOnly ? 'ro' : 'rw'}|${options.application_name}`
+    const existing = WORKER_POOL_CACHE.get(poolKey)
+    // Pool exposes `.ended` in pg; if it was ended for some reason, recreate it.
+    if (existing && !existing.ended) {
+      return existing
+    }
+    if (existing) {
+      WORKER_POOL_CACHE.delete(poolKey)
+    }
+    const pool = new Pool(options)
+    WORKER_POOL_CACHE.set(poolKey, pool)
+
+    pool.on('remove', () => {
+      cloudlog({ requestId, message: 'PG Connection Removed from Pool' })
+    })
+
+    pool.on('error', (err: Error) => {
+      cloudlogErr({ requestId, message: 'PG Pool Error', error: err })
+      // If the pool becomes unhealthy, drop it so a future request recreates it.
+      WORKER_POOL_CACHE.delete(poolKey)
+    })
+
+    return pool
   }
 
   const pool = new Pool(options)
