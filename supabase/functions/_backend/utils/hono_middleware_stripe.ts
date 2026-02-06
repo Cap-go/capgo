@@ -5,7 +5,7 @@ import { createFactory } from 'hono/factory'
 import { simpleError } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { extractDataEvent, parseStripeEvent } from './stripe_event.ts'
-import { getEnv, isStripeConfigured } from './utils.ts'
+import { getEnv } from './utils.ts'
 
 export interface MiddlewareKeyVariablesStripe {
   Bindings: Bindings
@@ -19,12 +19,12 @@ export const honoFactory = createFactory<MiddlewareKeyVariablesStripe>()
 
 export function middlewareStripeWebhook() {
   return honoFactory.createMiddleware(async (c, next) => {
-    if (!getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !isStripeConfigured(c)) {
+    if (!getEnv(c, 'STRIPE_WEBHOOK_SECRET')) {
       cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no secret found' })
       throw simpleError('webhook_error_no_secret', 'Webhook Error: no secret found')
     }
     const signature = c.req.raw.headers.get('stripe-signature')
-    if (!signature || !getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !isStripeConfigured(c)) {
+    if (!signature || !getEnv(c, 'STRIPE_WEBHOOK_SECRET')) {
       cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no signature' })
       throw simpleError('webhook_error_no_signature', 'Webhook Error: no signature')
     }
