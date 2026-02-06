@@ -205,13 +205,15 @@ LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = ''
 AS $$
-DECLARE
-  v_user_id uuid;
-BEGIN
-  SELECT public.get_identity() INTO v_user_id;
-  IF v_user_id IS NULL THEN
-    RAISE EXCEPTION 'No authentication provided';
-  END IF;
+	DECLARE
+	  v_user_id uuid;
+	BEGIN
+	  -- Use the key_mode-aware identity function so this RPC works for both JWT auth
+	  -- (role: authenticated) and API key auth (role: anon + capgkey header).
+	  SELECT public.get_identity('{write,all}'::public.key_mode[]) INTO v_user_id;
+	  IF v_user_id IS NULL THEN
+	    RAISE EXCEPTION 'No authentication provided';
+	  END IF;
 
   RETURN public.create_hashed_apikey_for_user(
     v_user_id,
@@ -232,13 +234,15 @@ LANGUAGE plpgsql
 SECURITY INVOKER
 SET search_path = ''
 AS $$
-DECLARE
-  v_user_id uuid;
-BEGIN
-  SELECT public.get_identity() INTO v_user_id;
-  IF v_user_id IS NULL THEN
-    RAISE EXCEPTION 'No authentication provided';
-  END IF;
+	DECLARE
+	  v_user_id uuid;
+	BEGIN
+	  -- Use the key_mode-aware identity function so this RPC works for both JWT auth
+	  -- (role: authenticated) and API key auth (role: anon + capgkey header).
+	  SELECT public.get_identity('{write,all}'::public.key_mode[]) INTO v_user_id;
+	  IF v_user_id IS NULL THEN
+	    RAISE EXCEPTION 'No authentication provided';
+	  END IF;
 
   RETURN public.regenerate_hashed_apikey_for_user(p_apikey_id, v_user_id);
 END;
