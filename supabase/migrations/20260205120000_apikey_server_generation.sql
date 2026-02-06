@@ -37,7 +37,8 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  IF current_user IN ('postgres', 'service_role', 'supabase_admin', 'supabase_auth_admin', 'supabase_storage_admin', 'supabase_realtime_admin') THEN
+  -- SECURITY DEFINER makes current_user the function owner, so use session_user to detect the caller.
+  IF session_user IN ('postgres', 'service_role', 'supabase_admin', 'supabase_auth_admin', 'supabase_storage_admin', 'supabase_realtime_admin') THEN
     RETURN NEW;
   END IF;
 
