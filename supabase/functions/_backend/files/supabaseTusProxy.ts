@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import { cloudlog } from '../utils/logging.ts'
 import { getEnv } from '../utils/utils.ts'
 import { parseUploadMetadata } from './parse.ts'
-import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, MAX_UPLOAD_LENGTH_BYTES, TUS_VERSION } from './util.ts'
+import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, MAX_UPLOAD_LENGTH_BYTES, TUS_EXTENSIONS, TUS_VERSION } from './util.ts'
 
 const BUCKET_NAME = 'capgo'
 const SUPABASE_TIMEOUT = 1000 * 60 * 5 // 5 minutes for large uploads
@@ -124,7 +124,7 @@ function buildTusResponseHeaders(): Headers {
   headers.set('Tus-Resumable', TUS_VERSION)
   headers.set('Tus-Version', TUS_VERSION)
   headers.set('Tus-Max-Size', MAX_UPLOAD_LENGTH_BYTES.toString())
-  headers.set('Tus-Extension', 'creation,creation-defer-length,creation-with-upload,expiration')
+  headers.set('Tus-Extension', TUS_EXTENSIONS)
   return headers
 }
 

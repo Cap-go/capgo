@@ -4,7 +4,7 @@ import { Capacitor } from '@capacitor/core'
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages, reset } from '@formkit/vue'
 import dayjs from 'dayjs'
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -41,9 +41,36 @@ const mfaEnabled = ref(false)
 const mfaFactorId = ref('')
 const mfaVerificationCode = ref('')
 const mfaQRCode = ref('')
+const otpVerificationCode = ref('')
+const otpVerifiedAt = ref<string | null>(null)
+const otpVerificationLoading = ref(false)
+const otpSending = ref(false)
+const otpNow = ref(dayjs())
+let otpNowTimer: ReturnType<typeof setInterval> | null = null
 const organizationsToDelete = ref<string[]>([])
 const paidOrganizationsToDelete = ref<Array<{ name: string, planName: string }>>([])
 displayStore.NavTitle = t('account')
+const otpEmail = computed(() => main.auth?.email ?? main.user?.email ?? '')
+const otpVerifiedUntil = computed(() => {
+  if (!otpVerifiedAt.value)
+    return null
+  return dayjs(otpVerifiedAt.value).add(1, 'hour')
+})
+const otpVerificationValid = computed(() => {
+  if (!otpVerifiedUntil.value)
+    return false
+  return otpNow.value.isBefore(otpVerifiedUntil.value)
+})
+const otpVerificationStatus = computed(() => {
+  if (!otpVerifiedAt.value)
+    return 'none'
+  return otpVerificationValid.value ? 'valid' : 'expired'
+})
+const otpVerifiedUntilLabel = computed(() => {
+  if (!otpVerifiedUntil.value)
+    return ''
+  return otpVerifiedUntil.value.format('YYYY-MM-DD HH:mm')
+})
 
 async function checkOrganizationImpact() {
   // Wait for organizations and main store to load
@@ -499,6 +526,11 @@ async function handleMfa() {
     await disableMfa()
     return
   }
+  await loadOtpVerification()
+  if (!otpVerificationValid.value) {
+    toast.error(t('email-otp-required'))
+    return
+  }
   const { data, error } = await supabase.auth.mfa.enroll({
     factorType: 'totp',
   })
@@ -584,7 +616,88 @@ async function handleMfa() {
   }
 }
 
+async function loadOtpVerification() {
+  if (!main.auth?.id)
+    return
+  const { data, error } = await supabase
+    .from('user_security')
+    .select('email_otp_verified_at')
+    .eq('user_id', main.auth.id)
+    .maybeSingle()
+
+  if (error) {
+    console.error('Cannot load email OTP status', error)
+    return
+  }
+
+  otpVerifiedAt.value = data?.email_otp_verified_at ?? null
+}
+
+async function sendOtpVerification() {
+  if (!otpEmail.value) {
+    toast.error(t('account-error'))
+    return
+  }
+  if (otpSending.value)
+    return
+
+  otpSending.value = true
+  const { error } = await supabase.auth.signInWithOtp({
+    email: otpEmail.value,
+    options: {
+      shouldCreateUser: false,
+    },
+  })
+  otpSending.value = false
+
+  if (error) {
+    toast.error(t('verification-failed'))
+    console.error('Cannot send email OTP', error)
+    return
+  }
+
+  otpVerificationCode.value = ''
+  toast.success(t('email-otp-sent'))
+}
+
+async function verifyOtpForMfa() {
+  if (!otpEmail.value) {
+    toast.error(t('account-error'))
+    return
+  }
+  if (!main.auth?.id)
+    return
+
+  const token = otpVerificationCode.value.replaceAll(' ', '')
+  if (!token) {
+    toast.error(t('email-otp-code-required'))
+    return
+  }
+  if (otpVerificationLoading.value)
+    return
+
+  otpVerificationLoading.value = true
+  const { data, error: verifyError } = await supabase.functions.invoke('private/verify_email_otp', {
+    body: { token },
+  })
+
+  otpVerificationLoading.value = false
+
+  if (verifyError || !data?.verified_at) {
+    toast.error(t('verification-failed'))
+    console.error('Cannot verify email OTP', verifyError)
+    return
+  }
+
+  otpVerifiedAt.value = data.verified_at
+  toast.success(t('email-otp-verified'))
+}
+
 onMounted(async () => {
+  otpNowTimer = setInterval(() => {
+    otpNow.value = dayjs()
+  }, 60000)
+  await loadOtpVerification()
   const { data: mfaFactors, error } = await supabase.auth.mfa.listFactors()
   if (error) {
     console.error('Cannot get MFA factors', error)
@@ -613,6 +726,11 @@ onMounted(async () => {
     await nextTick()
     handleMfa()
   }
+})
+
+onBeforeUnmount(() => {
+  if (otpNowTimer)
+    clearInterval(otpNowTimer)
 })
 </script>
 
@@ -719,6 +837,57 @@ onMounted(async () => {
             </div>
           </section>
 
+          <section class="flex flex-col md:flex-row md:items-start items-left">
+            <div class="md:w-1/2">
+              <p class="dark:text-white text-slate-800">
+                {{ t('email-otp-2fa-title') }}:
+              </p>
+              <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                {{ t('email-otp-2fa-description') }}
+              </p>
+              <p v-if="otpVerificationStatus === 'valid'" class="mt-1 text-xs text-emerald-600">
+                {{ t('email-otp-verified-until', { time: otpVerifiedUntilLabel }) }}
+              </p>
+              <p v-else-if="otpVerificationStatus === 'expired'" class="mt-1 text-xs text-orange-600">
+                {{ t('email-otp-expired') }}
+              </p>
+              <p v-else class="mt-1 text-xs text-orange-600">
+                {{ t('email-otp-not-verified') }}
+              </p>
+            </div>
+            <div class="mt-3 w-full md:mt-0 md:ml-6 md:w-1/2">
+              <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <button
+                  type="button"
+                  class="d-btn d-btn-outline d-btn-sm"
+                  :class="{ 'opacity-50 cursor-not-allowed': otpSending }"
+                  :disabled="otpSending"
+                  @click="sendOtpVerification"
+                >
+                  {{ t('email-otp-send-code') }}
+                </button>
+                <button
+                  type="button"
+                  class="d-btn d-btn-outline d-btn-sm"
+                  :class="{ 'opacity-50 cursor-not-allowed': otpVerificationLoading || !otpVerificationCode }"
+                  :disabled="otpVerificationLoading || !otpVerificationCode"
+                  @click="verifyOtpForMfa"
+                >
+                  {{ t('verify') }}
+                </button>
+              </div>
+              <input
+                v-model="otpVerificationCode"
+                type="text"
+                inputmode="numeric"
+                :placeholder="t('verification-code')"
+                class="d-input w-full mt-2"
+                autocomplete="one-time-code"
+                @keydown.enter.prevent="verifyOtpForMfa"
+              >
+            </div>
+          </section>
+
           <section class="flex flex-col md:flex-row md:items-center items-left">
             <p class="dark:text-white text-slate-800">
               {{ t('2fa') }}:
@@ -727,8 +896,13 @@ onMounted(async () => {
               <button
                 type="button"
                 data-test="setup-mfa"
-                class="px-3 py-2 text-xs font-medium text-center text-gray-700 border rounded-lg cursor-pointer dark:text-white hover:bg-gray-100 focus:ring-4 focus:ring-blue-300 dark:hover:bg-gray-600 dark:focus:ring-blue-800 focus:outline-hidden"
-                :class="{ 'border border-emerald-600 focus:ring-emerald-800': !mfaEnabled, 'border border-red-500 focus:ring-rose-600': mfaEnabled }"
+                class="d-btn d-btn-outline d-btn-sm"
+                :class="{
+                  'd-btn-success': !mfaEnabled,
+                  'd-btn-error': mfaEnabled,
+                  'opacity-50 cursor-not-allowed': !mfaEnabled && !otpVerificationValid,
+                }"
+                :disabled="!mfaEnabled && !otpVerificationValid"
                 @click="handleMfa"
               >
                 {{ !mfaEnabled ? t('enable') : t('disable') }}

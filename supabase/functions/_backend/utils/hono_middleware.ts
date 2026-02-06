@@ -252,16 +252,23 @@ async function checkKeyByIdPg(
   id: number,
   rights: Database['public']['Enums']['key_mode'][],
   drizzleClient: ReturnType<typeof getDrizzleClient>,
+  expectedUserId?: string,
 ): Promise<Database['public']['Tables']['apikeys']['Row'] | null> {
   try {
+    const conditions = [
+      eq(schema.apikeys.id, id),
+      inArray(schema.apikeys.mode, rights),
+      notExpiredCondition,
+    ]
+    if (expectedUserId) {
+      conditions.push(eq(schema.apikeys.user_id, expectedUserId))
+    }
     // Expiration check is done in SQL: expires_at IS NULL OR expires_at > now()
     const result = await drizzleClient
       .select()
       .from(schema.apikeys)
       .where(and(
-        eq(schema.apikeys.id, id),
-        inArray(schema.apikeys.mode, rights),
-        notExpiredCondition,
+        ...conditions,
       ))
       .limit(1)
       .then(data => data[0])
@@ -398,16 +405,17 @@ async function resolveSubkey(
   subkeyId: number,
   rights: Database['public']['Enums']['key_mode'][],
   usePostgres: boolean,
+  expectedUserId?: string,
 ) {
   if (!usePostgres) {
-    return checkKeyById(c, subkeyId, supabaseAdmin(c), rights)
+    return checkKeyById(c, subkeyId, supabaseAdmin(c), rights, expectedUserId)
   }
 
   let subkeyPgClient: ReturnType<typeof getPgClient> | null = null
   try {
     subkeyPgClient = getPgClient(c, true)
     const drizzleClient = getDrizzleClient(subkeyPgClient)
-    return await checkKeyByIdPg(c, subkeyId, rights, drizzleClient)
+    return await checkKeyByIdPg(c, subkeyId, rights, drizzleClient, expectedUserId)
   }
   finally {
     if (subkeyPgClient) {
@@ -445,7 +453,7 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
   setApiKeyAuthContext(c, apikey, capgkeyString)
   if (subkey_id) {
     cloudlog({ requestId: c.get('requestId'), message: 'Subkey id provided', subkey_id })
-    const subkey = await resolveSubkey(c, subkey_id, rights, false)
+    const subkey = await resolveSubkey(c, subkey_id, rights, false, apikey.user_id)
     if (!subkey) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
       return quickError(401, 'invalid_subkey', 'Invalid subkey')
@@ -575,11 +583,15 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
     setApiKeyAuthContext(c, apikey, key)
 
     if (subkey_id) {
-      const subkey = await resolveSubkey(c, subkey_id, rights, usePostgres)
+      const subkey = await resolveSubkey(c, subkey_id, rights, usePostgres, apikey.user_id)
 
       if (!subkey) {
         cloudlog({ requestId: c.get('requestId'), message: 'Invalid subkey', subkey_id })
         return quickError(401, 'invalid_subkey', 'Invalid subkey')
+      }
+      const userError = validateSubkeyUser(c, subkey, apikey)
+      if (userError) {
+        return userError
       }
       const limitError = validateSubkeyLimits(c, subkey)
       if (limitError) {

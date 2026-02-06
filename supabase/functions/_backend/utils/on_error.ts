@@ -10,15 +10,36 @@ const drizzleErrorNames = new Set(['DrizzleError', 'DrizzleQueryError', 'Transac
 export function onError(functionName: string) {
   return async (e: any, c: Context) => {
     let body = 'N/A'
-    try {
-      body = await c.req.json().then(body => JSON.stringify(body)).catch(failToReadBody => `Failed to read body (${JSON.stringify(failToReadBody)})`)
-      if (body.length > 1000) {
-        body = `${body.substring(0, 1000)}... (truncated)`
+    const rawReq = c.req.raw
+    const method = c.req.method.toUpperCase()
+    const shouldReadBody = method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS'
+    if (shouldReadBody) {
+      try {
+        if (rawReq?.bodyUsed) {
+          body = 'Body already consumed'
+        }
+        else {
+          const textBody = await rawReq?.clone().text()
+          if (textBody) {
+            try {
+              body = JSON.stringify(JSON.parse(textBody))
+            }
+            catch {
+              body = textBody
+            }
+          }
+          else {
+            body = '(empty body)'
+          }
+        }
+        if (body.length > 1000) {
+          body = `${body.substring(0, 1000)}... (truncated)`
+        }
       }
-    }
-    catch (failToReadBody) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'failToReadBody', failToReadBody })
-      body = `Failed to read body (${JSON.stringify(failToReadBody)})`
+      catch (failToReadBody) {
+        cloudlogErr({ requestId: c.get('requestId'), message: 'failToReadBody', failToReadBody })
+        body = `Failed to read body (${JSON.stringify(failToReadBody)})`
+      }
     }
 
     // const safeCause = e ? JSON.stringify(e, Object.getOwnPropertyNames(e)) : undefined

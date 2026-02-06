@@ -177,7 +177,7 @@ The system also supports sending notifications to the organization's management 
 
 - User tags are synced via `syncUserPreferenceTags()` in `user_preferences.ts`
 - The sync happens whenever a user record is updated
-- Tag operations use `addTagBento()` which handles both adding and removing tags
+- Tag operations use `syncBentoSubscriberTags()` which batches tag updates per subscriber
 - The backend also checks preferences before sending emails as a fallback (defense in depth)
 - Organization preferences are checked in `org_email_notifications.ts` via `getAllEligibleEmails()`
 

@@ -4,7 +4,7 @@ import { cloudlog } from './logging.ts'
 import { getClientIP } from './rate_limit.ts'
 import { getEnv } from './utils.ts'
 
-// Cache path for operation-level rate limiting (1 second between same operations)
+// Cache path for operation-level rate limiting (short per-second window)
 const CHANNEL_SELF_OP_RATE_PATH = '/.channel-self-op-rate'
 // Cache path for same-channel rate limiting (60 seconds for identical sets)
 const CHANNEL_SELF_SAME_SET_PATH = '/.channel-self-same-set'
@@ -13,6 +13,8 @@ const CHANNEL_SELF_IP_RATE_PATH = '/.channel-self-ip-rate'
 
 // TTL for operation-level rate limit (1 second)
 const OP_RATE_TTL_SECONDS = 1
+// Operation-level rate limit per second
+const OP_RATE_LIMIT_PER_SECOND = 5
 // TTL for same channel set rate limit (60 seconds)
 const SAME_SET_RATE_TTL_SECONDS = 60
 // TTL for IP-based rate limit (per minute)
@@ -32,6 +34,8 @@ interface RateLimitCounter {
   count: number
   resetAt?: number
 }
+
+type OperationRateLimitCache = RateLimitCounter | RateLimitEntry
 
 export interface ChannelSelfRateLimitStatus {
   limited: boolean
@@ -83,6 +87,15 @@ function buildIpRateRequest(c: Context, appId: string, ip: string) {
   }
 }
 
+function getRateLimitWindowSeconds(resetAt: number, now: number): number {
+  return Math.max(1, Math.ceil((resetAt - now) / 1000))
+}
+
+function getLegacyResetAt(timestamp: number, now: number): number | undefined {
+  const resetAt = timestamp + OP_RATE_TTL_SECONDS * 1000
+  return resetAt > now ? resetAt : undefined
+}
+
 function getChannelSelfIpRateLimit(c: Context): number {
   const envLimit = getEnv(c, 'RATE_LIMIT_CHANNEL_SELF_IP')
   if (envLimit) {
@@ -97,7 +110,7 @@ function getChannelSelfIpRateLimit(c: Context): number {
  * Check if a device should be rate limited for a channel operation.
  *
  * Rate limiting rules:
- * 1. Same device+app+operation cannot be done more than once per second
+ * 1. Same device+app+operation cannot be done more than 5 times per second
  * 2. For 'set' operation: Same device+app+channel combination cannot be set more than once in 60 seconds
  *
  * @returns true if the request should be rate limited, false otherwise
@@ -109,12 +122,35 @@ export async function isChannelSelfRateLimited(
   operation: ChannelSelfOperation,
   channel?: string,
 ): Promise<ChannelSelfRateLimitStatus> {
-  // Check operation-level rate limit (1 request per second per device+app+operation)
+  // Check operation-level rate limit (5 requests per second per device+app+operation)
   const opRateEntry = buildOperationRateRequest(c, appId, deviceId, operation)
-  const cached = await opRateEntry.helper.matchJson<RateLimitEntry>(opRateEntry.request)
+  const cached = await opRateEntry.helper.matchJson<OperationRateLimitCache>(opRateEntry.request)
   if (cached) {
-    // Device has made the same operation within the last second - rate limit
-    return { limited: true, resetAt: cached.timestamp + OP_RATE_TTL_SECONDS * 1000 }
+    const now = Date.now()
+    const isCounter = 'count' in cached
+    const resetAt = isCounter ? cached.resetAt : getLegacyResetAt(cached.timestamp, now)
+    const count = isCounter ? cached.count : 1
+    if (typeof resetAt === 'number' && resetAt > now) {
+      if (count >= OP_RATE_LIMIT_PER_SECOND)
+        return { limited: true, resetAt }
+      if (!isCounter) {
+        const ttlSeconds = getRateLimitWindowSeconds(resetAt, now)
+        const migratedEntry: RateLimitCounter = { count, resetAt }
+        try {
+          await opRateEntry.helper.putJson(opRateEntry.request, migratedEntry, ttlSeconds)
+        }
+        catch (error) {
+          cloudlog({
+            requestId: c.get('requestId'),
+            message: 'Failed to migrate legacy channel-self op rate limit entry',
+            app_id: appId,
+            device_id: deviceId,
+            op: operation,
+            error,
+          })
+        }
+      }
+    }
   }
 
   // For 'set' operation: also check same-set rate limit (same device+app+channel within 60 seconds)
@@ -196,9 +232,31 @@ export async function recordChannelSelfRequest(
   const timestamp = Date.now()
   const entry: RateLimitEntry = { timestamp }
 
-  // Record operation-level rate limit (1 second TTL)
+  // Record operation-level rate limit (allows up to 5 operations per second)
   const opRateEntry = buildOperationRateRequest(c, appId, deviceId, operation)
-  await opRateEntry.helper.putJson(opRateEntry.request, entry, OP_RATE_TTL_SECONDS)
+  const existing = await opRateEntry.helper.matchJson<OperationRateLimitCache>(opRateEntry.request)
+  const now = Date.now()
+  let resetAt = now + OP_RATE_TTL_SECONDS * 1000
+  let count = 1
+  if (existing) {
+    if ('count' in existing) {
+      if (typeof existing.resetAt === 'number' && existing.resetAt > now) {
+        resetAt = existing.resetAt
+        count = existing.count + 1
+      }
+    }
+    else {
+      const legacyResetAt = getLegacyResetAt(existing.timestamp, now)
+      if (legacyResetAt) {
+        resetAt = legacyResetAt
+        count = 2
+      }
+    }
+  }
+
+  const ttlSeconds = getRateLimitWindowSeconds(resetAt, now)
+  const opCounter: RateLimitCounter = { count, resetAt }
+  await opRateEntry.helper.putJson(opRateEntry.request, opCounter, ttlSeconds)
 
   // For 'set' operation: also record same-set rate limit (60 seconds TTL)
   if (operation === 'set' && channel) {
@@ -227,7 +285,7 @@ export async function recordChannelSelfIPRequest(
     count: inWindow ? (existing?.count ?? 0) + 1 : 1,
     resetAt,
   }
-  const ttlSeconds = Math.max(1, Math.ceil((resetAt - now) / 1000))
+  const ttlSeconds = getRateLimitWindowSeconds(resetAt, now)
 
   await ipRateEntry.helper.putJson(ipRateEntry.request, newData, ttlSeconds)
 }

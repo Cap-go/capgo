@@ -193,7 +193,7 @@ describe('[POST] /webhooks', () => {
     expect(response.status).toBe(400)
   })
 
-  it('create webhook allows localhost URL', async () => {
+  it('create webhook rejects localhost URL', async () => {
     const response = await fetch(`${BASE_URL}/webhooks`, {
       method: 'POST',
       headers,
@@ -204,10 +204,9 @@ describe('[POST] /webhooks', () => {
         events: ['app_versions'],
       }),
     })
-    expect(response.status).toBe(201)
-    const data = await response.json() as { webhook: { id: string } }
-    // Clean up - Using type assertion as webhooks table types are not yet generated
-    await (getSupabaseClient() as any).from('webhooks').delete().eq('id', data.webhook.id)
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('invalid_url')
   })
 })
 

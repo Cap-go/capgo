@@ -516,6 +516,27 @@ export async function getAppVersionPostgres(
   }
 }
 
+export async function ensurePlaceholderVersions(c: Context, appId: string) {
+  let pgClient: ReturnType<typeof getPgClient> | undefined
+  try {
+    pgClient = getPgClient(c)
+    await pgClient.query(
+      `INSERT INTO public.app_versions (name, app_id, storage_provider)
+       VALUES ('builtin', $1, 'r2'), ('unknown', $1, 'r2')
+       ON CONFLICT (name, app_id) DO NOTHING`,
+      [appId],
+    )
+  }
+  catch (e: unknown) {
+    logPgError(c, 'ensurePlaceholderVersions', e)
+  }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
+  }
+}
+
 export async function getAppVersionsByAppIdPg(
   c: Context,
   appId: string,

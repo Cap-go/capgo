@@ -9,6 +9,8 @@ import { sendNotifToOrgMembers } from './org_email_notifications.ts'
 import { syncSubscriptionData } from './stripe.ts'
 import {
   getCurrentPlanNameOrg,
+  getPlanUsageAndFit,
+  getPlanUsageAndFitUncached,
   getPlanUsagePercent,
   getTotalStats,
   isGoodPlanOrg,
@@ -370,9 +372,25 @@ export async function handleTrialOrg(c: Context, orgId: string, org: any): Promi
 
 // Calculate plan status and usage
 export async function calculatePlanStatus(c: Context, orgId: string) {
-  const is_good_plan = await isGoodPlanOrg(c, orgId)
-  const percentUsage = await getPlanUsagePercent(c, orgId)
+  const planUsage = await getPlanUsageAndFit(c, orgId)
+  const { is_good_plan, total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent } = planUsage
+  const percentUsage = { total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent }
   return { is_good_plan, percentUsage }
+}
+
+export async function calculatePlanStatusFresh(c: Context, orgId: string) {
+  try {
+    const planUsage = await getPlanUsageAndFitUncached(c, orgId)
+    const { is_good_plan, total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent } = planUsage
+    const percentUsage = { total_percent, mau_percent, bandwidth_percent, storage_percent, build_time_percent }
+    return { is_good_plan, percentUsage }
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'calculatePlanStatusFresh fallback', orgId, error })
+    const percentUsage = await getPlanUsagePercent(c, orgId)
+    const is_good_plan = await isGoodPlanOrg(c, orgId)
+    return { is_good_plan, percentUsage }
+  }
 }
 
 // Handle notifications and events based on org status
@@ -430,7 +448,15 @@ export async function checkPlanStatusOnly(c: Context, orgId: string, drizzleClie
   }
 
   // Calculate plan status and usage
-  const { is_good_plan, percentUsage } = await calculatePlanStatus(c, orgId)
+  let planStatus: { is_good_plan: boolean, percentUsage: PlanUsage }
+  try {
+    planStatus = await calculatePlanStatusFresh(c, orgId)
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'calculatePlanStatus failed', orgId, error })
+    return
+  }
+  const { is_good_plan, percentUsage } = planStatus
 
   // Update plan status in database
   const finalIsGoodPlan = await handleOrgNotificationsAndEvents(c, org, orgId, is_good_plan, percentUsage, drizzleClient)

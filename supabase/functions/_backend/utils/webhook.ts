@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
 import { closeClient, getPgClient } from './pg.ts'
 import { supabaseAdmin } from './supabase.ts'
+import { getEnv } from './utils.ts'
 
 // Webhook payload structure sent to user endpoints
 export interface WebhookPayload {
@@ -43,6 +44,51 @@ export const WEBHOOK_EVENT_TYPES = [
 ] as const
 
 export type WebhookEventType = typeof WEBHOOK_EVENT_TYPES[number]
+
+const LOCALHOST_SUFFIX = '.localhost'
+const IPV4_REGEX = /^\d{1,3}(?:\.\d{1,3}){3}$/
+
+function isLocalWebhookEnv(c: Context): boolean {
+  const supabaseUrl = getEnv(c, 'SUPABASE_URL')
+  return Boolean(supabaseUrl && (supabaseUrl.includes('localhost') || supabaseUrl.includes('127.0.0.1')))
+}
+
+function normalizeHostname(hostname: string): string {
+  return hostname.replace(/\.$/, '').toLowerCase()
+}
+
+function isLocalhostHostname(hostname: string): boolean {
+  return hostname === 'localhost' || hostname.endsWith(LOCALHOST_SUFFIX)
+}
+
+function isIpLiteral(hostname: string): boolean {
+  return IPV4_REGEX.test(hostname) || hostname.includes(':')
+}
+
+export function getWebhookUrlValidationError(c: Context, urlString: string): string | null {
+  let url: URL
+  try {
+    url = new URL(urlString)
+  }
+  catch {
+    return 'Webhook URL is invalid'
+  }
+
+  if (isLocalWebhookEnv(c))
+    return null
+
+  const hostname = normalizeHostname(url.hostname)
+  if (isLocalhostHostname(hostname))
+    return 'Webhook URL must point to a public host'
+
+  if (isIpLiteral(hostname))
+    return 'Webhook URL must use a hostname, not an IP address'
+
+  if (url.protocol !== 'https:')
+    return 'Webhook URL must use HTTPS'
+
+  return null
+}
 
 /**
  * Build a webhook payload from audit log data
@@ -166,6 +212,26 @@ export async function deliverWebhook(
   secret: string,
 ): Promise<{ success: boolean, status?: number, body?: string, duration?: number }> {
   const startTime = Date.now()
+
+  const urlValidationError = getWebhookUrlValidationError(c, url)
+  if (urlValidationError) {
+    const duration = Date.now() - startTime
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Webhook delivery blocked by URL validation',
+      deliveryId,
+      url,
+      error: urlValidationError,
+      duration,
+    })
+
+    return {
+      success: false,
+      body: `Error: ${urlValidationError}`,
+      duration,
+    }
+  }
+
   const payloadString = JSON.stringify(payload)
   const timestamp = Math.floor(Date.now() / 1000).toString()
 
@@ -228,7 +294,7 @@ export async function deliverWebhook(
 
     return {
       success: false,
-      body: `Error: ${errorMessage}`,
+      body: 'Error: Webhook delivery failed',
       duration,
     }
   }

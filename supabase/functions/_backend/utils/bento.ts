@@ -107,6 +107,49 @@ export async function addTagBento(c: Context, email: string, segments: { segment
   }
 }
 
+export async function syncBentoSubscriberTags(
+  c: Context,
+  update: { email: string, segments: string[], deleteSegments: string[] } | Array<{ email: string, segments: string[], deleteSegments: string[] }>,
+) {
+  if (!hasBento(c))
+    return
+
+  const updates = Array.isArray(update) ? update : [update]
+  const subscribers = updates
+    .filter(item => item.segments.length > 0 || item.deleteSegments.length > 0)
+    .map((item) => {
+      const tags = item.segments.join(',')
+      const removeTags = item.deleteSegments.join(',')
+      return {
+        email: item.email,
+        ...(tags ? { tags } : {}),
+        ...(removeTags ? { remove_tags: removeTags } : {}),
+      }
+    })
+
+  if (subscribers.length === 0)
+    return true
+
+  try {
+    const siteUuid = getEnv(c, 'BENTO_SITE_UUID')
+    const chunkSize = 1000
+    for (let i = 0; i < subscribers.length; i += chunkSize) {
+      const chunk = subscribers.slice(i, i + chunkSize)
+      const payload = { subscribers: chunk }
+      const res = await bentoFetch(c, 'batch/subscribers', siteUuid, payload) as { results?: number, failed?: number, errors?: unknown }
+      if (res?.failed && res.failed > 0) {
+        cloudlogErr({ requestId: c.get('requestId'), message: 'syncBentoSubscriberTags', error: res })
+        return false
+      }
+    }
+    return true
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'syncBentoSubscriberTags error', error: serializeError(e) })
+    return false
+  }
+}
+
 export async function unsubscribeBento(c: Context, email: string) {
   if (!hasBento(c))
     return

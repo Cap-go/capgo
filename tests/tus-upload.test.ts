@@ -132,6 +132,30 @@ describe('tus upload protocol tests', () => {
     })
   })
 
+  describe('build upload options - tus discovery', () => {
+    it('should return TUS capabilities for /build/upload/:jobId', async () => {
+      const response = await fetch(getEndpointUrl('/build/upload/test-job'), {
+        method: 'OPTIONS',
+      })
+
+      expect(response.status).toBe(204)
+      expect(response.headers.get('Tus-Resumable')).toBe(TUS_VERSION)
+      expect(response.headers.get('Tus-Version')).toBe(TUS_VERSION)
+      expect(response.headers.get('Tus-Extension')).toContain('creation')
+    })
+
+    it('should return TUS capabilities for /build/upload/:jobId/*', async () => {
+      const response = await fetch(getEndpointUrl('/build/upload/test-job/any-file.zip'), {
+        method: 'OPTIONS',
+      })
+
+      expect(response.status).toBe(204)
+      expect(response.headers.get('Tus-Resumable')).toBe(TUS_VERSION)
+      expect(response.headers.get('Tus-Version')).toBe(TUS_VERSION)
+      expect(response.headers.get('Tus-Extension')).toContain('creation')
+    })
+  })
+
   describe('post - create upload', () => {
     it('should create upload with valid metadata', async () => {
       const { response, uploadUrl } = await createTusUploadViaApi(

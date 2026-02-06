@@ -8,9 +8,9 @@ import { app as download_link } from '../private/download_link.ts'
 import { app as upload_link } from '../private/upload_link.ts'
 import { app as ok } from '../public/ok.ts'
 import { sendDiscordAlert } from '../utils/discord.ts'
-import { simpleError } from '../utils/hono.ts'
+import { quickError, simpleError } from '../utils/hono.ts'
 import { middlewareKey } from '../utils/hono_middleware.ts'
-import { cloudlog } from '../utils/logging.ts'
+import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { getAppByAppIdPg, getUserIdFromApikey } from '../utils/pg_files.ts'
 import { checkPermissionPg } from '../utils/rbac.ts'
@@ -21,7 +21,7 @@ import { app as files_config } from './files_config.ts'
 import { parseUploadMetadata } from './parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
 import { supabaseTusCreateHandler, supabaseTusHeadHandler, supabaseTusPatchHandler } from './supabaseTusProxy.ts'
-import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, MAX_UPLOAD_LENGTH_BYTES, toBase64, TUS_VERSION, X_CHECKSUM_SHA256 } from './util.ts'
+import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, MAX_UPLOAD_LENGTH_BYTES, toBase64, TUS_EXTENSIONS, TUS_VERSION, X_CHECKSUM_SHA256 } from './util.ts'
 
 const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 20 minutes
 
@@ -102,26 +102,36 @@ async function getHandler(c: Context): Promise<Response> {
   const rangeHeaderFromRequest = c.req.header('range')
   if (rangeHeaderFromRequest) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files range request', range: rangeHeaderFromRequest })
-    const objectInfo = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).head(fileId)
-    if (objectInfo == null) {
-      cloudlog({ requestId: c.get('requestId'), message: 'getHandler files object is null' })
-      return c.json({ error: 'not_found', message: 'Not found' }, 404)
-    }
-    const fileSize = objectInfo.size
-    const rangeMatch = rangeHeaderFromRequest.match(/bytes=(\d+)-(\d*)/)
-    if (rangeMatch) {
-      const rangeStart = Number.parseInt(rangeMatch[1])
-      if (rangeStart >= fileSize) {
-        const emptyHeaders = new Headers()
-        emptyHeaders.set('Content-Range', `bytes */${fileSize}`)
-        return new Response(new Uint8Array(0), { status: 206, headers: emptyHeaders })
+    try {
+      const objectInfo = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).head(fileId)
+      if (objectInfo != null) {
+        const fileSize = objectInfo.size
+        const rangeMatch = rangeHeaderFromRequest.match(/bytes=(\d+)-(\d*)/)
+        if (rangeMatch) {
+          const rangeStart = Number.parseInt(rangeMatch[1])
+          if (rangeStart >= fileSize) {
+            const emptyHeaders = new Headers()
+            emptyHeaders.set('Content-Range', `bytes */${fileSize}`)
+            return new Response(new Uint8Array(0), { status: 206, headers: emptyHeaders })
+          }
+        }
       }
+    }
+    catch (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getHandler files head failed', fileId, error })
     }
   }
 
-  const object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(fileId, {
-    range: c.req.raw.headers,
-  })
+  let object: R2ObjectBody | null = null
+  try {
+    object = await new RetryBucket(bucket, DEFAULT_RETRY_PARAMS).get(fileId, {
+      range: c.req.raw.headers,
+    })
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getHandler files get failed', fileId, error })
+    throw quickError(503, 'upstream_unavailable', 'File storage temporarily unavailable', { fileId })
+  }
   if (object == null) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files object is null' })
     return c.json({ error: 'not_found', message: 'Not found' }, 404)
@@ -206,7 +216,7 @@ function optionsHandler(c: Context) {
     'Tus-Resumable': TUS_VERSION,
     'Tus-Version': TUS_VERSION,
     'Tus-Max-Size': MAX_UPLOAD_LENGTH_BYTES.toString(),
-    'Tus-Extension': 'creation,creation-defer-length,creation-with-upload,expiration',
+    'Tus-Extension': TUS_EXTENSIONS,
   })
 }
 
