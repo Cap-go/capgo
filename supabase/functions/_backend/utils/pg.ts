@@ -5,7 +5,7 @@ import { alias } from 'drizzle-orm/pg-core'
 import { getRuntimeKey } from 'hono/adapter'
 // @ts-types="npm:@types/pg"
 import { Pool } from 'pg'
-import { backgroundTask, existInEnv, getEnv, isStripeConfigured } from '../utils/utils.ts'
+import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { getClientDbRegionSB } from './geolocation.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import * as schema from './postgres_schema.ts'
@@ -30,19 +30,18 @@ const PLAN_EXCEEDED_COLUMNS: Record<'mau' | 'storage' | 'bandwidth', string> = {
 function buildPlanValidationExpression(
   actions: ('mau' | 'storage' | 'bandwidth')[],
   ownerColumn: typeof schema.app_versions.owner_org | typeof schema.apps.owner_org,
-  stripeEnabled: boolean,
 ) {
-  if (!stripeEnabled) {
-    return sql<boolean>`true`
-  }
   const extraConditions = actions.map(action => ` AND ${PLAN_EXCEEDED_COLUMNS[action]} = false`).join('')
+  const customerIdSubquery = sql<string | null>`(
+    SELECT ${schema.orgs.customer_id}
+    FROM ${schema.orgs}
+    WHERE ${schema.orgs.id} = ${ownerColumn}
+  )`
   return sql<boolean>`EXISTS (
     SELECT 1
     FROM ${schema.stripe_info}
     WHERE ${schema.stripe_info.customer_id} = (
-      SELECT ${schema.orgs.customer_id}
-      FROM ${schema.orgs}
-      WHERE ${schema.orgs.id} = ${ownerColumn}
+      ${customerIdSubquery}
     )
     AND (
       (${schema.stripe_info.trial_at}::date > CURRENT_DATE)
@@ -52,7 +51,7 @@ function buildPlanValidationExpression(
         ${sql.raw(extraConditions)}
       )
     )
-  )`
+  ) OR (${customerIdSubquery} IS NULL)`
 }
 
 export function selectOne(pgClient: ReturnType<typeof getPgClient>) {
@@ -458,7 +457,7 @@ export async function getAppOwnerPostgres(
     if (actions.length === 0)
       return null
     const orgAlias = alias(schema.orgs, 'orgs')
-    const planExpression = buildPlanValidationExpression(actions, schema.apps.owner_org, isStripeConfigured(c))
+    const planExpression = buildPlanValidationExpression(actions, schema.apps.owner_org)
 
     const appOwner = await drizzleClient
       .select({
@@ -547,7 +546,7 @@ export async function getAppVersionsByAppIdPg(
   try {
     if (actions.length === 0)
       return []
-    const planExpression = buildPlanValidationExpression(actions, schema.app_versions.owner_org, isStripeConfigured(c))
+    const planExpression = buildPlanValidationExpression(actions, schema.app_versions.owner_org)
     const versions = await drizzleClient
       .select({
         id: schema.app_versions.id,
@@ -766,7 +765,7 @@ export async function getAppByIdPg(
   try {
     if (actions.length === 0)
       return null
-    const planExpression = buildPlanValidationExpression(actions, schema.apps.owner_org, isStripeConfigured(c))
+    const planExpression = buildPlanValidationExpression(actions, schema.apps.owner_org)
     const app = await drizzleClient
       .select({
         owner_org: schema.apps.owner_org,

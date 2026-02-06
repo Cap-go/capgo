@@ -8,7 +8,7 @@ import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged } from './dev
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { createCustomer } from './stripe.ts'
-import { getEnv, isStripeConfigured } from './utils.ts'
+import { getEnv } from './utils.ts'
 
 const DEFAULT_LIMIT = 1000
 // Import Supabase client
@@ -385,23 +385,24 @@ export async function getPlanUsagePercent(c: Context, orgId?: string): Promise<P
 }
 
 export async function getPlanUsageAndFit(c: Context, orgId: string): Promise<PlanUsageAndFit> {
-  if (!isStripeConfigured(c)) {
-    const percentUsage = await getPlanUsagePercent(c, orgId)
-    return { is_good_plan: true, ...percentUsage }
+  try {
+    const { data, error } = await supabaseAdmin(c)
+      .rpc('get_plan_usage_and_fit', { orgid: orgId })
+      .single()
+    if (error)
+      throw new Error(error.message)
+    return data
   }
-  const { data, error } = await supabaseAdmin(c)
-    .rpc('get_plan_usage_and_fit', { orgid: orgId })
-    .single()
-  if (error)
-    throw new Error(error.message)
-  return data
+  catch (error) {
+    // Fallback for local/on-prem deployments where Stripe isn't configured or RPC is unavailable.
+    // We can still compute plan usage percent from DB and derive a conservative fit.
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getPlanUsageAndFit fallback', orgId, error })
+    const percentUsage = await getPlanUsagePercent(c, orgId)
+    return { is_good_plan: percentUsage.total_percent <= 100, ...percentUsage }
+  }
 }
 
 export async function getPlanUsageAndFitUncached(c: Context, orgId: string): Promise<PlanUsageAndFit> {
-  if (!isStripeConfigured(c)) {
-    const percentUsage = await getPlanUsagePercent(c, orgId)
-    return { is_good_plan: true, ...percentUsage }
-  }
   const { data, error } = await supabaseAdmin(c)
     .rpc('get_plan_usage_and_fit_uncached', { orgid: orgId })
     .single()
@@ -418,15 +419,16 @@ export async function getPlanUsageAndFitUncached(c: Context, orgId: string): Pro
       })
       return getPlanUsageAndFit(c, orgId)
     }
-    throw new Error(error.message)
+    // Non-missing-function errors: fall back to percent usage based fit.
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getPlanUsageAndFitUncached fallback', orgId, error })
+    const percentUsage = await getPlanUsagePercent(c, orgId)
+    return { is_good_plan: percentUsage.total_percent <= 100, ...percentUsage }
   }
   return data
 }
 
 export async function isGoodPlanOrg(c: Context, orgId: string): Promise<boolean> {
   try {
-    if (!isStripeConfigured(c))
-      return true
     const { data } = await supabaseAdmin(c)
       .rpc('is_good_plan_v5_org', { orgid: orgId })
       .single()
@@ -436,7 +438,14 @@ export async function isGoodPlanOrg(c: Context, orgId: string): Promise<boolean>
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'isGoodPlan error', orgId, error })
   }
-  return false
+  // Fallback: derive from percent usage when the RPC is unavailable.
+  try {
+    const percentUsage = await getPlanUsagePercent(c, orgId)
+    return percentUsage.total_percent <= 100
+  }
+  catch {
+    return false
+  }
 }
 
 export async function isOnboardedOrg(c: Context, orgId: string): Promise<boolean> {
