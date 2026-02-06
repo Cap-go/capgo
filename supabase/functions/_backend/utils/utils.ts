@@ -168,7 +168,7 @@ export function getEnv(c: Context, key: string): string {
 }
 
 export function isStripeConfigured(c: Context): boolean {
-  const secretKey = getEnv(c, 'STRIPE_SECRET_KEY').trim()
+  const secretKey = (getEnv(c, 'STRIPE_SECRET_KEY') || '').trim()
   if (!secretKey)
     return false
 
