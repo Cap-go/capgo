@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
-import { getBaseData, getSupabaseClient, postUpdate, resetAndSeedAppData, resetAppData } from './test-utils.ts'
+import { executeSQL, getBaseData, getSupabaseClient, postUpdate, resetAndSeedAppData, resetAppData } from './test-utils.ts'
 
 describe('plugin plan gating: credits flag', () => {
   const supabase = getSupabaseClient()
@@ -25,7 +25,8 @@ describe('plugin plan gating: credits flag', () => {
       .eq('customer_id', stripeCustomerId)
 
     // Ensure default state is "no credits flag".
-    await supabase.from('orgs').update({ has_usage_credits: false }).eq('id', orgId)
+    // Do this via SQL to avoid coupling the test to generated Supabase types.
+    await executeSQL('UPDATE public.orgs SET has_usage_credits = false WHERE id = $1', [orgId])
   })
 
   afterAll(async () => {
@@ -43,11 +44,7 @@ describe('plugin plan gating: credits flag', () => {
     const jsonBlocked = await responseBlocked.json<{ error?: string }>()
     expect(jsonBlocked.error).toBe('on_premise_app')
 
-    const { error } = await supabase
-      .from('orgs')
-      .update({ has_usage_credits: true })
-      .eq('id', orgId)
-    expect(error).toBeNull()
+    await executeSQL('UPDATE public.orgs SET has_usage_credits = true WHERE id = $1', [orgId])
 
     const responseAllowed = await postUpdate({
       ...baseData,
