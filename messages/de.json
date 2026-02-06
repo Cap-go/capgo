@@ -1497,5 +1497,7 @@
   "your-api-key": "Ihr API-Schlüssel",
   "your-role-in-org": "Ihre Rolle in der Organisation",
   "your-usage": "Ihre Nutzung:",
-  "zip-bundle": "ZIP-App-Bündel"
+  "zip-bundle": "ZIP-App-Bündel",
+  "failed-to-create-api-key": "Fehler beim Erstellen des API-Schlüssels",
+  "failed-to-regenerate-api-key": "Fehler beim Neuerstellen des API-Schlüssels"
 }

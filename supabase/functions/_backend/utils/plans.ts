@@ -438,8 +438,9 @@ export async function updatePlanStatus(c: Context, org: any, is_good_plan: boole
 
 // New function for cron_stat_org - handles is_good_plan + plan % + exceeded flags
 export async function checkPlanStatusOnly(c: Context, orgId: string, drizzleClient: ReturnType<typeof getDrizzleClient>): Promise<void> {
-  if (!isStripeConfigured(c))
-    return
+  // This cron task updates plan usage + exceeded flags based on DB state.
+  // It must run even when Stripe is not configured (e.g. local tests / on-prem),
+  // as it does not require Stripe API calls.
   const org = await getOrgWithCustomerInfo(c, orgId)
 
   // Handle trial organizations

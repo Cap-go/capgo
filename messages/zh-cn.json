@@ -1497,5 +1497,7 @@
   "your-api-key": "你的 API 密钥",
   "your-role-in-org": "您在组织中的角色",
   "your-usage": "您的使用情况：",
-  "zip-bundle": "ZIP应用程序包"
+  "zip-bundle": "ZIP应用程序包",
+  "failed-to-create-api-key": "创建API密钥失败",
+  "failed-to-regenerate-api-key": "重新生成API密钥失败"
 }

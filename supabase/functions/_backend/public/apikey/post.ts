@@ -1,6 +1,5 @@
 import type { AuthInfo } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
-import { hashApiKey } from '../../utils/hash.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
 import { supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
@@ -22,8 +21,20 @@ app.post('/', middlewareV2(['all']), async (c) => {
   const orgId = body.org_id
   const appId = body.app_id
   const name = body.name ?? ''
-  const limitedToApps = body.limited_to_apps ?? []
-  const limitedToOrgs = body.limited_to_orgs ?? []
+  if (body.limited_to_apps !== undefined && !Array.isArray(body.limited_to_apps)) {
+    throw simpleError('invalid_limited_to_apps', 'limited_to_apps must be an array of app ids')
+  }
+  if (body.limited_to_orgs !== undefined && !Array.isArray(body.limited_to_orgs)) {
+    throw simpleError('invalid_limited_to_orgs', 'limited_to_orgs must be an array of org ids')
+  }
+  const limitedToApps: string[] = Array.isArray(body.limited_to_apps) ? [...body.limited_to_apps] : []
+  const limitedToOrgs: string[] = Array.isArray(body.limited_to_orgs) ? [...body.limited_to_orgs] : []
+  if (!limitedToApps.every(item => typeof item === 'string')) {
+    throw simpleError('invalid_limited_to_apps', 'limited_to_apps must be an array of app ids')
+  }
+  if (!limitedToOrgs.every(item => typeof item === 'string')) {
+    throw simpleError('invalid_limited_to_orgs', 'limited_to_orgs must be an array of org ids')
+  }
   const expiresAt = body.expires_at ?? null
   const isHashed = body.hashed === true
 
@@ -42,33 +53,18 @@ app.post('/', middlewareV2(['all']), async (c) => {
   // Validate expiration date format (throws if invalid)
   validateExpirationDate(expiresAt)
 
-  // Generate the plain key
-  const plainKey = crypto.randomUUID()
-
   // Use supabaseWithAuth which handles both JWT and API key authentication
   const supabase = supabaseWithAuth(c, auth)
 
   // Collect all org IDs for policy validation
   let allOrgIds: string[] = [...limitedToOrgs]
 
-  const newData: Database['public']['Tables']['apikeys']['Insert'] = {
-    user_id: auth.userId,
-    // For hashed keys: key is null, key_hash stores the hash
-    // For plain keys: key stores the plain value, key_hash is null
-    key: isHashed ? null : plainKey,
-    key_hash: isHashed ? await hashApiKey(plainKey) : null,
-    mode,
-    name,
-    limited_to_apps: limitedToApps,
-    limited_to_orgs: limitedToOrgs,
-    expires_at: expiresAt,
-  }
   if (orgId) {
     const { data: org, error } = await supabase.from('orgs').select('*').eq('id', orgId).single()
     if (!org || error) {
       throw quickError(404, 'org_not_found', 'Org not found', { supabaseError: error })
     }
-    newData.limited_to_orgs = [org.id]
+    limitedToOrgs.splice(0, limitedToOrgs.length, org.id)
     allOrgIds = [org.id]
   }
   if (appId) {
@@ -76,27 +72,49 @@ app.post('/', middlewareV2(['all']), async (c) => {
     if (!app || error) {
       throw quickError(404, 'app_not_found', 'App not found', { supabaseError: error })
     }
-    newData.limited_to_apps = [app.app_id]
+    limitedToApps.splice(0, limitedToApps.length, app.app_id)
   }
 
   // Validate expiration against org policies (throws if invalid)
   await validateExpirationAgainstOrgPolicies(allOrgIds, expiresAt, supabase)
 
-  const { data: apikeyData, error: apikeyError } = await supabase.from('apikeys')
-    .insert(newData)
-    .select()
-    .single()
-  if (apikeyError) {
+  let apikeyData: Database['public']['Tables']['apikeys']['Row'] | null = null
+  let apikeyError: unknown = null
+
+  if (isHashed) {
+    const { data, error } = await supabase.rpc('create_hashed_apikey', {
+      p_mode: mode,
+      p_name: name,
+      p_limited_to_orgs: limitedToOrgs,
+      p_limited_to_apps: limitedToApps,
+      p_expires_at: expiresAt,
+    })
+    apikeyData = data
+    apikeyError = error
+  }
+  else {
+    const { data, error } = await supabase
+      .from('apikeys')
+      .insert({
+        user_id: auth.userId,
+        key: null,
+        key_hash: null,
+        mode,
+        name,
+        limited_to_apps: limitedToApps,
+        limited_to_orgs: limitedToOrgs,
+        expires_at: expiresAt,
+      })
+      .select()
+      .single()
+    apikeyData = data
+    apikeyError = error
+  }
+  if (apikeyError || !apikeyData) {
     throw simpleError('failed_to_create_apikey', 'Failed to create API key', { supabaseError: apikeyError })
   }
 
-  // For hashed keys, include the plain key in response for one-time display
-  // The key column in DB is null for hashed keys, but we return it here for the user to save
-  const responseData = { ...apikeyData }
-  if (isHashed) {
-    responseData.key = plainKey
-  }
-  return c.json(responseData)
+  return c.json(apikeyData)
 })
 
 export default app

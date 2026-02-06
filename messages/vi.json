@@ -1497,5 +1497,7 @@
   "your-api-key": "Khóa API của bạn",
   "your-role-in-org": "Vai trò của bạn trong tổ chức",
   "your-usage": "Sử dụng của bạn:",
-  "zip-bundle": "Gói ứng dụng Zip"
+  "zip-bundle": "Gói ứng dụng Zip",
+  "failed-to-create-api-key": "Không thể tạo khóa API",
+  "failed-to-regenerate-api-key": "Không thể tạo lại khóa API"
 }

@@ -135,16 +135,51 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
         throw new Error('SUPABASE_URL or SUPABASE_ANON_KEY is missing for auth headers')
       }
 
+      const supabaseFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
+        const maxRetries = 3
+        let lastError: unknown
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+          try {
+            const response = await fetch(url, options)
+            if (response.status === 503 && attempt < maxRetries - 1) {
+              await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)))
+              continue
+            }
+            return response
+          }
+          catch (error) {
+            lastError = error
+            if (attempt < maxRetries - 1) {
+              await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)))
+              continue
+            }
+          }
+        }
+        throw lastError ?? new Error('Supabase fetch failed')
+      }
+
       const supabase = createClient<Database>(env.SUPABASE_URL, SUPABASE_ANON_KEY, {
+        global: {
+          fetch: supabaseFetch,
+        },
         auth: {
           persistSession: false,
         },
       })
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: USER_EMAIL,
-        password: USER_PASSWORD,
-      })
+      const maxLoginRetries = 3
+      let data: any
+      let error: any
+      for (let attempt = 0; attempt < maxLoginRetries; attempt++) {
+        ({ data, error } = await supabase.auth.signInWithPassword({
+          email: USER_EMAIL,
+          password: USER_PASSWORD,
+        }))
+        if (!error && data?.session?.access_token)
+          break
+        if (attempt < maxLoginRetries - 1)
+          await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1) + Math.random() * 100))
+      }
 
       if (error || !data.session?.access_token) {
         throw error ?? new Error('Unable to obtain JWT for tests')

@@ -1497,5 +1497,7 @@
   "your-api-key": "Ваш API-ключ",
   "your-role-in-org": "Ваша роль в организации",
   "your-usage": "Ваше использование:",
-  "zip-bundle": "Приложение в формате ZIP"
+  "zip-bundle": "Приложение в формате ZIP",
+  "failed-to-create-api-key": "Не удалось создать API-ключ",
+  "failed-to-regenerate-api-key": "Не удалось пересоздать API-ключ"
 }

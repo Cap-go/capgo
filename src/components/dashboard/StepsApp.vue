@@ -7,6 +7,7 @@ import IconCheck from '~icons/lucide/check'
 import IconChevronDown from '~icons/lucide/chevron-down'
 import IconLoader from '~icons/lucide/loader-2'
 import InviteTeammateModal from '~/components/dashboard/InviteTeammateModal.vue'
+import { createDefaultApiKey } from '~/services/apikeys'
 import { pushEvent } from '~/services/posthog'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
@@ -215,7 +216,6 @@ async function copyToast(allowed: boolean, _id: string, text?: string) {
 }
 
 async function addNewApiKey() {
-  const newApiKey = crypto.randomUUID()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
 
@@ -223,10 +223,7 @@ async function addNewApiKey() {
     console.log('Not logged in, cannot regenerate API key')
     return
   }
-  const { error } = await supabase
-    .from('apikeys')
-    .upsert({ user_id: userId, key: newApiKey, mode: 'all', name: '' })
-    .select()
+  const { error } = await createDefaultApiKey(supabase, t('api-key'))
 
   if (error)
     throw error

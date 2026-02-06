@@ -1497,5 +1497,7 @@
   "your-api-key": "API anahtarınız",
   "your-role-in-org": "Organizasyondaki rolünüz",
   "your-usage": "Kullanımınız:",
-  "zip-bundle": "Zip uygulama paketi"
+  "zip-bundle": "Zip uygulama paketi",
+  "failed-to-create-api-key": "API anahtarı oluşturulamadı",
+  "failed-to-regenerate-api-key": "API anahtarı yeniden oluşturulamadı"
 }
