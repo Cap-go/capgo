@@ -1,9 +1,9 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { getBundleUrl, getManifestUrl } from '../utils/downloadUrl.ts'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { checkPermission } from '../utils/rbac.ts'
+import { s3 } from '../utils/s3.ts'
 import { supabaseClient } from '../utils/supabase.ts'
 
 interface DataDownload {
@@ -13,6 +13,8 @@ interface DataDownload {
   id: number
   isManifest?: boolean
 }
+
+const EXPIRATION_SECONDS = 604800
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
@@ -32,8 +34,6 @@ app.post('/', middlewareAuth, async (c) => {
   const authContext = c.get('auth')
   if (!authContext?.userId)
     throw simpleError('not_authorized', 'Not authorized')
-
-  const userId = authContext.userId
 
   // Auth context is already set by middlewareAuth
   if (!(await checkPermission(c, 'app.read_bundles', { appId: body.app_id })))
@@ -60,20 +60,28 @@ app.post('/', middlewareAuth, async (c) => {
     const { data: manifest, error: getManifestError } = await supabase
       .from('manifest')
       .select('*')
-      .eq('app_id', body.app_id)
-      .eq('id', body.id)
+      .eq('app_version_id', bundle.id)
 
     if (getManifestError) {
       throw simpleError('cannot_get_manifest', 'Cannot get manifest', { getManifestError })
     }
-    const manifestEntries = getManifestUrl(c, bundle.id, manifest, userId)
-    return c.json({ manifest: manifestEntries })
+
+    const signed = await Promise.all((manifest ?? []).map(async (entry) => {
+      const download_url = await s3.getSignedUrl(c, entry.s3_path, EXPIRATION_SECONDS)
+      return {
+        file_name: entry.file_name,
+        file_hash: entry.file_hash,
+        download_url,
+      }
+    }))
+
+    return c.json({ manifest: signed })
   }
   else {
-    const url = await getBundleUrl(c, bundle.r2_path, userId, bundle.checksum ?? '')
-    if (!url)
+    if (!bundle.r2_path)
       throw simpleError('cannot_get_bundle_url', 'Cannot get bundle url')
 
+    const url = await s3.getSignedUrl(c, bundle.r2_path, EXPIRATION_SECONDS)
     return c.json({ url })
   }
 })

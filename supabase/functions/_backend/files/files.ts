@@ -574,6 +574,123 @@ async function checkWriteAppAccess(c: Context, next: Next) {
   await next()
 }
 
+async function checkReadAttachmentAccess(c: Context, next: Next) {
+  const fileId = c.get('fileId') as string
+  const deviceId = c.req.query('device_id') ?? ''
+  const key = c.req.query('key') ?? ''
+
+  // This endpoint is intentionally public. We must still ensure that a caller can only
+  // fetch bundles/manifests that are actually linked to a channel the device can access.
+  if (!deviceId || !key || deviceId.length > 64 || key.length > 256) {
+    cloudlog({ requestId: c.get('requestId'), message: 'checkReadAttachmentAccess - missing/invalid key/device_id', fileId })
+    return c.json({ error: 'not_found', message: 'Not found' }, 404)
+  }
+
+  const pgClient = getPgClient(c, true) // read-only
+  try {
+    const { rows } = await pgClient.query<{
+      allowed: boolean
+      version_id: number
+      app_id: string
+    }>(
+      `
+      WITH target AS (
+        SELECT
+          v.id AS version_id,
+          v.app_id AS app_id,
+          v.checksum AS checksum,
+          TRUE AS is_bundle
+        FROM public.app_versions v
+        WHERE v.r2_path = $1
+        UNION ALL
+        SELECT
+          v.id AS version_id,
+          v.app_id AS app_id,
+          v.checksum AS checksum,
+          FALSE AS is_bundle
+        FROM public.manifest m
+        INNER JOIN public.app_versions v ON v.id = m.app_version_id
+        WHERE m.s3_path = $1
+        LIMIT 1
+      ),
+      device_channel AS (
+        SELECT cd.channel_id
+        FROM public.channel_devices cd
+        INNER JOIN target t ON t.app_id = cd.app_id
+        WHERE cd.device_id = $2
+        LIMIT 1
+      )
+      SELECT
+        EXISTS (
+          SELECT 1
+          FROM target t
+          LEFT JOIN device_channel dc ON TRUE
+          WHERE
+            (
+              -- For bundle zip downloads, we accept either the bundle checksum or the version ID as key.
+              -- This avoids breaking older rows that may not have checksum set.
+              (t.is_bundle = TRUE AND ((t.checksum IS NOT NULL AND t.checksum = $3) OR (t.version_id::text = $3)))
+              OR
+              -- For manifest entry downloads, key is the version ID (see getManifestUrl()).
+              (t.is_bundle = FALSE AND t.version_id::text = $3)
+            )
+            AND
+            (
+              (
+                dc.channel_id IS NOT NULL
+                AND EXISTS (
+                  SELECT 1
+                  FROM public.channels ch
+                  WHERE ch.id = dc.channel_id
+                    AND ch.app_id = t.app_id
+                    AND ch.version = t.version_id
+                )
+              )
+              OR
+              (
+                dc.channel_id IS NULL
+                AND EXISTS (
+                  SELECT 1
+                  FROM public.channels ch
+                  WHERE ch.app_id = t.app_id
+                    AND ch.version = t.version_id
+                    AND (ch.public = TRUE OR ch.allow_device_self_set = TRUE)
+                )
+              )
+            )
+        ) AS allowed,
+        (SELECT version_id FROM target) AS version_id,
+        (SELECT app_id FROM target) AS app_id
+      `,
+      [fileId, deviceId, key],
+    )
+
+    const row = rows?.[0]
+    if (!row?.allowed) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'checkReadAttachmentAccess - denied',
+        fileId,
+        deviceId,
+        keyPrefix: `${key.substring(0, 12)}...`,
+        versionId: row?.version_id ?? null,
+        app_id: row?.app_id ?? null,
+      })
+      return c.json({ error: 'not_found', message: 'Not found' }, 404)
+    }
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'checkReadAttachmentAccess - query failed', fileId, error })
+    // Fail closed: don't allow downloads if auth checks can't be performed.
+    return c.json({ error: 'not_found', message: 'Not found' }, 404)
+  }
+  finally {
+    await closeClient(c, pgClient)
+  }
+
+  await next()
+}
+
 app.options(`/upload/${ATTACHMENT_PREFIX}`, optionsHandler)
 app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromMetadata, checkWriteAppAccess, async (c) => {
   if (getRuntimeKey() !== 'workerd') {
@@ -601,7 +718,7 @@ app.get(
     return getHandler(c)
   },
 )
-app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, getHandler)
+app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, checkReadAttachmentAccess, getHandler)
 app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromIdParam, checkWriteAppAccess, async (c) => {
   if (getRuntimeKey() !== 'workerd') {
     return supabaseTusPatchHandler(c)

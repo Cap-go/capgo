@@ -372,7 +372,9 @@ export async function updateWithPG(
   let manifest: ManifestEntry[] = []
   if (!version.external_url) {
     if (version.r2_path) {
-      const url = await getBundleUrl(c, version.r2_path, device_id, version.checksum ?? '')
+      // `key` query param is required by the /files/read/attachments guard.
+      // Prefer checksum when available, otherwise fall back to the version ID.
+      const url = await getBundleUrl(c, version.r2_path, device_id, version.checksum ?? String(version.id))
       if (url) {
         // only count the size of the bundle if it's not external and zip for now
         signedURL = url
