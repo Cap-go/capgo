@@ -168,11 +168,12 @@ export function getEnv(c: Context, key: string): string {
 }
 
 export function isStripeConfigured(c: Context): boolean {
-  const secretKey = getEnv(c, 'STRIPE_SECRET_KEY').trim()
+  const secretKey = (getEnv(c, 'STRIPE_SECRET_KEY') || '').trim()
   if (!secretKey)
     return false
 
-  // Stripe keys are documented by prefix; treat the remainder as an opaque string.
-  // This also avoids considering placeholder values like "test" as configured.
-  return /^(?:sk_(?:test|live|org)_|rk_(?:test|live)_)/.test(secretKey)
+  // Accept Stripe secret keys ("sk_...") and restricted keys ("rk_...").
+  // In CI/local development we sometimes set STRIPE_SECRET_KEY to placeholders
+  // like "test"; those should be treated as not configured to avoid network calls.
+  return secretKey.startsWith('sk_') || secretKey.startsWith('rk_')
 }

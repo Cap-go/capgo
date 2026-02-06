@@ -6,7 +6,7 @@ import type { Database } from '../utils/supabase.types.ts'
 import { eq } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { addTagBento, trackBentoEvent } from '../utils/bento.ts'
-import { purgePlanCacheForOrg } from '../utils/cloudflare_cache_purge.ts'
+import { getFallbackCreditProductId } from '../utils/credits.ts'
 import { BRES, quickError, simpleError } from '../utils/hono.ts'
 import { middlewareStripeWebhook } from '../utils/hono_middleware_stripe.ts'
 import { cloudlog } from '../utils/logging.ts'
@@ -15,7 +15,6 @@ import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import * as schema from '../utils/postgres_schema.ts'
 import { ensureCustomerMetadata, getStripe } from '../utils/stripe.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
-import { backgroundTask } from '../utils/utils.ts'
 
 export const app = new Hono<MiddlewareKeyVariablesStripe>()
 
@@ -60,7 +59,14 @@ async function getCreditTopUpProductIdFromCustomer(c: Context, customerId: strin
         customerId,
         error: stripeInfoError,
       })
-      throw simpleError('credit_product_not_configured', 'Organization does not have a Stripe plan configured')
+      return await getFallbackCreditProductId(c, customerId, async () => {
+        const [fallbackPlan] = await drizzleClient
+          .select({ credit_id: schema.plans.credit_id })
+          .from(schema.plans)
+          .where(eq(schema.plans.name, 'Solo'))
+          .limit(1)
+        return fallbackPlan ?? null
+      })
     }
 
     let planError: unknown | null = null
@@ -84,7 +90,14 @@ async function getCreditTopUpProductIdFromCustomer(c: Context, customerId: strin
         planStripeId: stripeInfo.product_id,
         error: planError,
       })
-      throw simpleError('credit_product_not_configured', 'Credit product is not configured for this plan')
+      return await getFallbackCreditProductId(c, customerId, async () => {
+        const [fallbackPlan] = await drizzleClient
+          .select({ credit_id: schema.plans.credit_id })
+          .from(schema.plans)
+          .where(eq(schema.plans.name, 'Solo'))
+          .limit(1)
+        return fallbackPlan ?? null
+      })
     }
 
     return plan.credit_id
@@ -268,51 +281,7 @@ async function invoiceUpcoming(c: Context, LogSnag: ReturnType<typeof logsnag>, 
   return c.json(BRES)
 }
 
-function getStripeInfoChangedFields(oldRecord: Record<string, any> | null, newRecord: Record<string, any>, updateFields: string[]): string[] {
-  if (!oldRecord)
-    return updateFields
-
-  return updateFields.filter((field) => {
-    if (!(field in newRecord))
-      return false
-    return oldRecord[field] !== newRecord[field]
-  })
-}
-
-async function logStripeInfoAudit(c: Context, orgId: string, customerId: string, oldRecord: Record<string, any> | null, updateData: Record<string, any>) {
-  const newRecord = oldRecord ? { ...oldRecord, ...updateData } : { ...updateData }
-  const updateFields = Object.keys(updateData)
-  const changedFields = getStripeInfoChangedFields(oldRecord, newRecord, updateFields)
-
-  if (changedFields.length === 0)
-    return
-
-  const { error } = await supabaseAdmin(c)
-    .from('audit_logs')
-    .insert({
-      table_name: 'stripe_info',
-      record_id: customerId,
-      operation: 'UPDATE',
-      user_id: null,
-      org_id: orgId,
-      old_record: oldRecord,
-      new_record: newRecord,
-      changed_fields: changedFields,
-    })
-
-  if (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'audit_logs stripe_info insert error', error })
-  }
-}
-
-async function createdOrUpdated(
-  c: Context,
-  stripeData: StripeData,
-  org: Org,
-  LogSnag: ReturnType<typeof logsnag>,
-  originalStatus?: string,
-  previousStripeInfo?: Record<string, any> | null,
-) {
+async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, LogSnag: ReturnType<typeof logsnag>, originalStatus?: string) {
   const status = originalStatus ?? stripeData.data.status
   let statusName: string = status ?? ''
   const { data: plan } = await supabaseAdmin(c)
@@ -325,8 +294,6 @@ async function createdOrUpdated(
     const updateData = Object.fromEntries(
       Object.entries(stripeData.data).filter(([_, v]) => v !== undefined),
     )
-    if (stripeData.isUpgrade && stripeData.previousProductId)
-      updateData.upgraded_at = new Date().toISOString()
     const { error: dbError2 } = await supabaseAdmin(c)
       .from('stripe_info')
       .update(updateData)
@@ -359,8 +326,6 @@ async function createdOrUpdated(
       return quickError(404, 'succeeded_customer_id_not_found', `succeeded: customer_id not found`, { dbError2, stripeData })
     }
 
-    await logStripeInfoAudit(c, org.id, stripeData.data.customer_id, previousStripeInfo ?? null, updateData)
-
     const segment = await customerToSegmentOrg(c, org.id, stripeData.data.price_id, plan)
     const isMonthly = plan.price_m_id === stripeData.data.price_id
     const eventName = `user:subscribe_${statusName}:${isMonthly ? 'monthly' : 'yearly'}`
@@ -377,20 +342,14 @@ async function createdOrUpdated(
         plan_name: plan.name,
       },
     }).catch()
-
-    // Purge plan cache for all apps in this org to clear any stale need_plan_upgrade responses
-    await backgroundTask(c, purgePlanCacheForOrg(c, org.id))
   }
   else {
     const segment = await customerToSegmentOrg(c, org.id, stripeData.data.price_id)
     await addTagBento(c, org.management_email, segment)
-
-    // Purge plan cache even if no plan found (customer may have apps)
-    await backgroundTask(c, purgePlanCacheForOrg(c, org.id))
   }
 }
 
-async function updateStripeInfo(c: Context, stripeData: StripeData, org: Org, previousStripeInfo?: Record<string, any> | null) {
+async function updateStripeInfo(c: Context, stripeData: StripeData) {
   // Filter out undefined values to avoid FK constraint violations
   const updateData = Object.fromEntries(
     Object.entries(stripeData.data).filter(([_, v]) => v !== undefined),
@@ -402,7 +361,6 @@ async function updateStripeInfo(c: Context, stripeData: StripeData, org: Org, pr
   if (dbError2) {
     return quickError(404, 'canceled_customer_id_not_found', `canceled:  customer_id not found`, { dbError2, stripeData })
   }
-  await logStripeInfoAudit(c, org.id, stripeData.data.customer_id, previousStripeInfo ?? null, updateData)
   return false
 }
 
@@ -497,12 +455,12 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
   if (['created', 'succeeded', 'updated'].includes(stripeData.data.status ?? '') && stripeData.data.price_id && stripeData.data.product_id) {
     const originalStatus = stripeData.data.status
     stripeData.data.status = 'succeeded'
-    await createdOrUpdated(c, stripeData, org, LogSnag, originalStatus!, customer ?? null)
+    await createdOrUpdated(c, stripeData, org, LogSnag, originalStatus!)
   }
   else if (stripeData.data.status === 'failed') {
     await trackBentoEvent(c, org.management_email, {}, 'org:failed_payment')
     // Update the database with failed status
-    await updateStripeInfo(c, stripeData, org, customer ?? null)
+    await updateStripeInfo(c, stripeData)
   }
   else if (['created', 'succeeded', 'updated'].includes(stripeData.data.status ?? '') && (!stripeData.data.price_id || !stripeData.data.product_id)) {
     // Subscription event without price/product data - log warning but don't process
@@ -519,7 +477,7 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
         stripeData.data.status = 'succeeded'
       }
       // Otherwise keep it as 'canceled' since the period has ended
-      await updateStripeInfo(c, stripeData, org, customer ?? null)
+      await updateStripeInfo(c, stripeData)
     }
     // If it's a different subscription (not the one in DB), ignore it
     // This prevents old subscription webhooks from overwriting newer active subscriptions

@@ -19,12 +19,12 @@ export const honoFactory = createFactory<MiddlewareKeyVariablesStripe>()
 
 export function middlewareStripeWebhook() {
   return honoFactory.createMiddleware(async (c, next) => {
-    if (!getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY')) {
+    if (!getEnv(c, 'STRIPE_WEBHOOK_SECRET')) {
       cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no secret found' })
       throw simpleError('webhook_error_no_secret', 'Webhook Error: no secret found')
     }
     const signature = c.req.raw.headers.get('stripe-signature')
-    if (!signature || !getEnv(c, 'STRIPE_WEBHOOK_SECRET') || !getEnv(c, 'STRIPE_SECRET_KEY')) {
+    if (!signature || !getEnv(c, 'STRIPE_WEBHOOK_SECRET')) {
       cloudlog({ requestId: c.get('requestId'), message: 'Webhook Error: no signature' })
       throw simpleError('webhook_error_no_signature', 'Webhook Error: no signature')
     }

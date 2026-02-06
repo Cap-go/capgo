@@ -37,7 +37,13 @@ function buildPlanValidationExpression(
     FROM ${schema.orgs}
     WHERE ${schema.orgs.id} = ${ownerColumn}
   )`
-  return sql<boolean>`EXISTS (
+  const hasCreditsExpression = sql`EXISTS (
+    SELECT 1
+    FROM public.usage_credit_balances ucb
+    WHERE ucb.org_id = ${ownerColumn}
+      AND COALESCE(ucb.available_credits, 0) > 0
+  )`
+  return sql<boolean>`(${hasCreditsExpression}) OR EXISTS (
     SELECT 1
     FROM ${schema.stripe_info}
     WHERE ${schema.stripe_info.customer_id} = (

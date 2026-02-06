@@ -32,6 +32,11 @@ interface BillingCycleInfo {
   subscription_anchor_end: string | null
 }
 
+interface BillingCycleRange {
+  subscription_anchor_start: string
+  subscription_anchor_end: string
+}
+
 interface CreditApplicationResult {
   overage_amount: number
   credits_required: number
@@ -42,16 +47,38 @@ interface CreditApplicationResult {
   credit_step_id: number | null
 }
 
-async function getBillingCycleRange(c: Context, orgId: string): Promise<BillingCycleInfo | null> {
+function getDefaultBillingCycleRange(referenceDate = new Date()): BillingCycleRange {
+  const start = new Date(Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), 1, 0, 0, 0, 0))
+  const end = new Date(Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth() + 1, 1, 0, 0, 0, 0))
+  return {
+    subscription_anchor_start: start.toISOString(),
+    subscription_anchor_end: end.toISOString(),
+  }
+}
+
+async function getBillingCycleRange(c: Context, orgId: string): Promise<BillingCycleRange> {
   try {
-    const { data } = await supabaseAdmin(c)
+    const { data, error } = await supabaseAdmin(c)
       .rpc('get_cycle_info_org', { orgid: orgId })
       .single()
-    return data ?? null
+    if (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getBillingCycleRange error', orgId, error })
+      return getDefaultBillingCycleRange()
+    }
+    if (!data?.subscription_anchor_start || !data?.subscription_anchor_end) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'getBillingCycleRange fallback to default',
+        orgId,
+        billingCycle: data,
+      })
+      return getDefaultBillingCycleRange()
+    }
+    return data as BillingCycleRange
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getBillingCycleRange error', orgId, error })
-    return null
+    return getDefaultBillingCycleRange()
   }
 }
 
@@ -68,24 +95,18 @@ async function applyCreditsForMetric(
   if (overageAmount <= 0)
     return null
 
-  if (!planId || !billingCycle?.subscription_anchor_start || !billingCycle?.subscription_anchor_end) {
-    cloudlogErr({
+  const resolvedBillingCycle: BillingCycleRange = billingCycle?.subscription_anchor_start && billingCycle?.subscription_anchor_end
+    ? (billingCycle as BillingCycleRange)
+    : getDefaultBillingCycleRange()
+
+  if (!planId) {
+    cloudlog({
       requestId: c.get('requestId'),
-      message: 'applyCreditsForMetric missing plan or billing cycle context',
+      message: 'applyCreditsForMetric missing plan context, continuing',
       orgId,
       metric,
-      planId,
-      billingCycle,
+      billingCycle: resolvedBillingCycle,
     })
-    return {
-      overage_amount: overageAmount,
-      credits_required: 0,
-      credits_applied: 0,
-      credits_remaining: 0,
-      overage_covered: 0,
-      overage_unpaid: overageAmount,
-      credit_step_id: null,
-    }
   }
   try {
     const { data, error } = await supabaseAdmin(c)
@@ -93,8 +114,8 @@ async function applyCreditsForMetric(
         p_org_id: orgId,
         p_metric: metric,
         p_overage_amount: overageAmount,
-        p_billing_cycle_start: billingCycle.subscription_anchor_start,
-        p_billing_cycle_end: billingCycle.subscription_anchor_end,
+        p_billing_cycle_start: resolvedBillingCycle.subscription_anchor_start!,
+        p_billing_cycle_end: resolvedBillingCycle.subscription_anchor_end!,
         p_details: {
           usage,
           limit: limit ?? 0,
@@ -184,16 +205,19 @@ async function userAbovePlan(c: Context, org: {
   customer_id: string | null
   stripe_info: {
     subscription_id: string | null
+    status?: string | null
   } | null
 }, orgId: string, is_good_plan: boolean, drizzleClient: ReturnType<typeof getDrizzleClient>): Promise<boolean> {
   cloudlog({ requestId: c.get('requestId'), message: 'userAbovePlan', orgId, is_good_plan })
+  const hasActivePlan = org?.stripe_info?.status === 'succeeded'
   const totalStats = await getTotalStats(c, orgId)
-  const currentPlanName = await getCurrentPlanNameOrg(c, orgId)
   if (!totalStats) {
     return false
   }
 
-  const { data: currentPlan, error: currentPlanError } = await supabaseAdmin(c)
+  const currentPlanName = await getCurrentPlanNameOrg(c, orgId)
+  let currentPlan: Database['public']['Tables']['plans']['Row'] | null = null
+  const { data, error: currentPlanError } = await supabaseAdmin(c)
     .from('plans')
     .select('*')
     .eq('name', currentPlanName)
@@ -201,6 +225,7 @@ async function userAbovePlan(c: Context, org: {
   if (currentPlanError) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'currentPlanError', error: currentPlanError })
   }
+  currentPlan = data ?? null
 
   const billingCycle = await getBillingCycleRange(c, orgId)
   const planId = currentPlan?.id
@@ -260,6 +285,11 @@ async function userAbovePlan(c: Context, org: {
     return false
   }
 
+  if (!hasActivePlan) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Credits-only org overage check completed', orgId, creditResults })
+    return true
+  }
+
   const bestPlan = await findBestPlan(c, {
     mau: totalStats.mau,
     storage: totalStats.storage,
@@ -268,12 +298,21 @@ async function userAbovePlan(c: Context, org: {
   })
 
   // If the calculated best plan ranks lower than the current one, the org is over-provisioned, so skip upgrade nudges.
-  if (planToInt(bestPlan) < planToInt(currentPlanName)) {
+  if (currentPlanName && planToInt(bestPlan) < planToInt(currentPlanName)) {
     return true
   }
 
   const bestPlanKey = bestPlan.toLowerCase().replace(' ', '_')
-  const sent = await sendNotifToOrgMembers(c, `user:upgrade_to_${bestPlanKey}`, 'usage_limit', { best_plan: bestPlanKey, plan_name: currentPlanName }, orgId, orgId, '0 0 * * 1', drizzleClient)
+  const sent = await sendNotifToOrgMembers(
+    c,
+    `user:upgrade_to_${bestPlanKey}`,
+    'usage_limit',
+    { best_plan: bestPlanKey, plan_name: currentPlanName },
+    orgId,
+    orgId,
+    '0 0 * * 1',
+    drizzleClient,
+  )
   if (sent) {
     cloudlog({ requestId: c.get('requestId'), message: `user:upgrade_to_${bestPlanKey}`, orgId })
     await logsnag(c).track({
@@ -340,7 +379,7 @@ async function userIsAtPlanUsage(c: Context, orgId: string, percentUsage: PlanUs
 export async function getOrgWithCustomerInfo(c: Context, orgId: string) {
   const { data: org, error: userError } = await supabaseAdmin(c)
     .from('orgs')
-    .select('customer_id, stripe_info(subscription_id, subscription_anchor_start, subscription_anchor_end)')
+    .select('customer_id, stripe_info(status, subscription_id, subscription_anchor_start, subscription_anchor_end)')
     .eq('id', orgId)
     .single()
   if (userError || !org)
