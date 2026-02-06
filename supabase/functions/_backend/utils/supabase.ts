@@ -8,7 +8,7 @@ import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged } from './dev
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { createCustomer } from './stripe.ts'
-import { getEnv, isStripeConfigured } from './utils.ts'
+import { getEnv } from './utils.ts'
 
 const DEFAULT_LIMIT = 1000
 // Import Supabase client
@@ -366,6 +366,10 @@ export interface PlanUsageAndFit extends PlanUsage {
   is_good_plan: boolean
 }
 
+function hasStripeSecretKey(c: Context) {
+  return (getEnv(c, 'STRIPE_SECRET_KEY') || '').trim().length > 0
+}
+
 export async function getPlanUsagePercent(c: Context, orgId?: string): Promise<PlanUsage> {
   if (!orgId) {
     return {
@@ -385,7 +389,9 @@ export async function getPlanUsagePercent(c: Context, orgId?: string): Promise<P
 }
 
 export async function getPlanUsageAndFit(c: Context, orgId: string): Promise<PlanUsageAndFit> {
-  if (!isStripeConfigured(c)) {
+  // Plan usage/fit is computed via Postgres (no Stripe API calls).
+  // Only skip if Stripe isn't configured at all (no secret key present).
+  if (!hasStripeSecretKey(c)) {
     const percentUsage = await getPlanUsagePercent(c, orgId)
     return { is_good_plan: true, ...percentUsage }
   }
@@ -398,7 +404,9 @@ export async function getPlanUsageAndFit(c: Context, orgId: string): Promise<Pla
 }
 
 export async function getPlanUsageAndFitUncached(c: Context, orgId: string): Promise<PlanUsageAndFit> {
-  if (!isStripeConfigured(c)) {
+  // Plan usage/fit is computed via Postgres (no Stripe API calls).
+  // Only skip if Stripe isn't configured at all (no secret key present).
+  if (!hasStripeSecretKey(c)) {
     const percentUsage = await getPlanUsagePercent(c, orgId)
     return { is_good_plan: true, ...percentUsage }
   }
@@ -425,7 +433,9 @@ export async function getPlanUsageAndFitUncached(c: Context, orgId: string): Pro
 
 export async function isGoodPlanOrg(c: Context, orgId: string): Promise<boolean> {
   try {
-    if (!isStripeConfigured(c))
+    // Computed via Postgres (no Stripe API calls).
+    // Only skip if Stripe isn't configured at all (no secret key present).
+    if (!hasStripeSecretKey(c))
       return true
     const { data } = await supabaseAdmin(c)
       .rpc('is_good_plan_v5_org', { orgid: orgId })
