@@ -7,7 +7,10 @@ export default defineConfig(({ mode }) => ({
     include: ['tests/*.test.ts'],
     environment: 'node',
     watch: false,
-    bail: 1,
+    // NOTE: With retry enabled, bail>0 can mark the run failed even if a test
+    // passes on retry (Vitest cancels the remaining queue on the first failure).
+    // This was causing CI to exit 1 with "passed" summary but canceled test files.
+    bail: 0,
     testTimeout: 30_000, // Increased from 20s to handle slow edge function responses
     hookTimeout: 15_000, // Increased from 8s to handle slow setup/teardown
     retry: 3, // Increased retries for network flakiness
