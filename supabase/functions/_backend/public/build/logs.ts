@@ -3,6 +3,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
+import { supabaseApikey } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
 
 async function cancelBuildOnDisconnect(
@@ -74,8 +75,32 @@ export async function streamBuildLogs(
     user_id: apikey.user_id,
   })
 
+  // Bind jobId to appId under RLS before calling the builder.
+  // This prevents cross-app access by mixing an allowed app_id with another app's jobId.
+  const supabase = supabaseApikey(c, apikey.key)
+  const { data: buildRequest, error: buildRequestError } = await supabase
+    .from('build_requests')
+    .select('app_id')
+    .eq('builder_job_id', jobId)
+    .maybeSingle()
+
+  if (buildRequestError) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Failed to fetch build_request for logs',
+      job_id: jobId,
+      error: buildRequestError.message,
+    })
+    throw simpleError('internal_error', 'Failed to fetch build request')
+  }
+
+  if (!buildRequest || buildRequest.app_id !== appId) {
+    // Treat missing row and mismatched app_id as unauthorized to avoid leaking job existence.
+    throw simpleError('unauthorized', 'You do not have permission to view logs for this app')
+  }
+
   // Security: Check if user has read access to this app (auth context set by middlewareKey)
-  if (!(await checkPermission(c, 'app.read_logs', { appId }))) {
+  if (!(await checkPermission(c, 'app.read_logs', { appId: buildRequest.app_id }))) {
     cloudlogErr({
       requestId: c.get('requestId'),
       message: 'Unauthorized logs request',
@@ -138,7 +163,7 @@ export async function streamBuildLogs(
   const requestId = c.get('requestId')
   c.req.raw.signal.addEventListener('abort', () => {
     // Fire and forget - cancel the build when client disconnects
-    cancelBuildOnDisconnect(builderUrl, builderApiKey, jobId, appId, requestId)
+    cancelBuildOnDisconnect(builderUrl, builderApiKey, jobId, buildRequest.app_id, requestId)
   })
 
   // Directly return the builder's response body as an SSE stream
