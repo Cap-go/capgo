@@ -1,6 +1,6 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { eq } from 'drizzle-orm'
+import { eq, or } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { createIfNotExistStoreInfo } from '../utils/cloudflare.ts'
@@ -26,26 +26,49 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
 
   const supabase = supabaseAdmin(c)
 
-  // Some environments/triggers may deliver a partial payload (e.g. missing owner_org).
-  // Resolve it from the database so we don't insert invalid app_versions rows.
-  let ownerOrg: string | undefined = record.owner_org ?? undefined
-  if (!ownerOrg) {
-    const pg = getPgClient(c)
-    const drizzleClient = getDrizzleClient(pg)
-    try {
-      const rows = await drizzleClient
-        .select({ owner_org: schema.apps.owner_org })
-        .from(schema.apps)
-        .where(eq(schema.apps.id, record.id))
-        .limit(1)
-      ownerOrg = rows[0]?.owner_org ?? undefined
+  // The app_versions table uses a DB trigger (auto_owner_org_by_app_id) that derives owner_org
+  // from apps.app_id. If the app is deleted before this async trigger runs, inserting default
+  // versions will fail with a NOT NULL violation. Always re-check that the app still exists.
+  const pg = getPgClient(c, true)
+  const drizzleClient = getDrizzleClient(pg)
+  let appExists = false
+  let ownerOrg: string | undefined
+  try {
+    const rows = await drizzleClient
+      .select({ owner_org: schema.apps.owner_org })
+      .from(schema.apps)
+      .where(or(eq(schema.apps.id, record.id), eq(schema.apps.app_id, record.app_id)))
+      .limit(1)
+    appExists = rows.length > 0
+    ownerOrg = rows[0]?.owner_org ?? undefined
+  }
+  catch (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Error fetching app owner_org', error, appId: record.id, app_id: record.app_id })
+  }
+  finally {
+    closeClient(c, pg)
+  }
+
+  // If the app no longer exists (deleted between INSERT and async trigger processing), skip
+  // all side effects. Still validate the org exists to keep the "error cases" contract.
+  if (!appExists) {
+    ownerOrg = ownerOrg ?? (record.owner_org ?? undefined)
+    if (!ownerOrg) {
+      cloudlog({ requestId: c.get('requestId'), message: 'App missing and no owner_org in webhook payload, skipping', record })
+      return c.json(BRES)
     }
-    catch (error) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Error fetching app owner_org', error, appId: record.id })
+
+    const { data, error } = await supabase
+      .from('orgs')
+      .select('*')
+      .eq('id', ownerOrg)
+      .single()
+    if (error || !data) {
+      throw simpleError('error_fetching_organization', 'Error fetching organization', { error })
     }
-    finally {
-      closeClient(c, pg)
-    }
+
+    cloudlog({ requestId: c.get('requestId'), message: 'App missing, skipping onboarding and default versions', record })
+    return c.json(BRES)
   }
 
   // Check if this is a demo app - skip onboarding emails and store info for demo apps
@@ -56,7 +79,7 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
 
   // Can't proceed with onboarding/default versions without an org id.
   if (!ownerOrg) {
-    cloudlog({ requestId: c.get('requestId'), message: 'No owner_org on app record, skipping onboarding and default versions', record })
+    cloudlog({ requestId: c.get('requestId'), message: 'App missing or no owner_org, skipping onboarding and default versions', record })
     return c.json(BRES)
   }
 
