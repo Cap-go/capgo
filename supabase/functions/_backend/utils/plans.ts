@@ -477,8 +477,6 @@ export async function updatePlanStatus(c: Context, org: any, is_good_plan: boole
 
 // New function for cron_stat_org - handles is_good_plan + plan % + exceeded flags
 export async function checkPlanStatusOnly(c: Context, orgId: string, drizzleClient: ReturnType<typeof getDrizzleClient>): Promise<void> {
-  if (!isStripeConfigured(c))
-    return
   const org = await getOrgWithCustomerInfo(c, orgId)
 
   // Handle trial organizations
