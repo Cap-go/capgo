@@ -43,12 +43,11 @@ function buildPlanValidationExpression(
   // Also keep it backward compatible with replicas that haven't replicated the
   // new column yet: we read it via `to_jsonb(row)->>'has_usage_credits'` so the
   // query still parses even if the column doesn't exist.
-  const orgCreditsAlias = alias(schema.orgs, 'org_credits')
   const hasCreditsExpression = sql`EXISTS (
     SELECT 1
-    FROM ${orgCreditsAlias}
-    WHERE ${orgCreditsAlias.id} = ${ownerColumn}
-      AND COALESCE((to_jsonb(org_credits) ->> 'has_usage_credits')::boolean, false) = true
+    FROM ${schema.orgs}
+    WHERE ${schema.orgs.id} = ${ownerColumn}
+      AND COALESCE((to_jsonb(orgs) ->> 'has_usage_credits')::boolean, false) = true
   )`
   return sql<boolean>`(${hasCreditsExpression}) OR EXISTS (
     SELECT 1
