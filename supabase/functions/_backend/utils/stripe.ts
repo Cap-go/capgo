@@ -43,7 +43,7 @@ export type StripeEnvironment = 'live' | 'test'
 
 export function resolveStripeEnvironment(c: Context): StripeEnvironment {
   const secretKey = getEnv(c, 'STRIPE_SECRET_KEY') || ''
-  if (secretKey.startsWith('sk_live'))
+  if (secretKey.startsWith('sk_live') || secretKey.startsWith('rk_live'))
     return 'live'
   return 'test'
 }
