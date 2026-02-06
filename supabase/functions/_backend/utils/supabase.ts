@@ -8,7 +8,7 @@ import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged } from './dev
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { createCustomer } from './stripe.ts'
-import { getEnv } from './utils.ts'
+import { getEnv, isStripeConfigured } from './utils.ts'
 
 const DEFAULT_LIMIT = 1000
 // Import Supabase client
@@ -433,6 +433,15 @@ export async function isGoodPlanOrg(c: Context, orgId: string): Promise<boolean>
       .rpc('is_good_plan_v5_org', { orgid: orgId })
       .single()
       .throwOnError()
+
+    // In local/on-prem or misconfigured environments, Stripe isn't available and the
+    // RPC may conservatively return false due to missing stripe_info state. Fall back
+    // to percent usage derived from the DB in that case.
+    if (data === false && !isStripeConfigured(c)) {
+      const percentUsage = await getPlanUsagePercent(c, orgId)
+      return percentUsage.total_percent <= 100
+    }
+
     return data ?? false
   }
   catch (error) {

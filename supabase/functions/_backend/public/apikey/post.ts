@@ -21,8 +21,20 @@ app.post('/', middlewareV2(['all']), async (c) => {
   const orgId = body.org_id
   const appId = body.app_id
   const name = body.name ?? ''
-  const limitedToApps = body.limited_to_apps ?? []
-  const limitedToOrgs = body.limited_to_orgs ?? []
+  if (body.limited_to_apps !== undefined && !Array.isArray(body.limited_to_apps)) {
+    throw simpleError('invalid_limited_to_apps', 'limited_to_apps must be an array of app ids')
+  }
+  if (body.limited_to_orgs !== undefined && !Array.isArray(body.limited_to_orgs)) {
+    throw simpleError('invalid_limited_to_orgs', 'limited_to_orgs must be an array of org ids')
+  }
+  const limitedToApps: string[] = Array.isArray(body.limited_to_apps) ? [...body.limited_to_apps] : []
+  const limitedToOrgs: string[] = Array.isArray(body.limited_to_orgs) ? [...body.limited_to_orgs] : []
+  if (!limitedToApps.every(item => typeof item === 'string')) {
+    throw simpleError('invalid_limited_to_apps', 'limited_to_apps must be an array of app ids')
+  }
+  if (!limitedToOrgs.every(item => typeof item === 'string')) {
+    throw simpleError('invalid_limited_to_orgs', 'limited_to_orgs must be an array of org ids')
+  }
   const expiresAt = body.expires_at ?? null
   const isHashed = body.hashed === true
 
@@ -71,7 +83,6 @@ app.post('/', middlewareV2(['all']), async (c) => {
 
   if (isHashed) {
     const { data, error } = await supabase.rpc('create_hashed_apikey', {
-      p_user_id: auth.userId,
       p_mode: mode,
       p_name: name,
       p_limited_to_orgs: limitedToOrgs,

@@ -172,8 +172,7 @@ export function isStripeConfigured(c: Context): boolean {
   if (!secretKey)
     return false
 
-  // In CI/local we often set placeholder values (e.g. "test") to satisfy env var checks.
-  // Only treat Stripe as configured when the key looks like a real Stripe secret/restricted key.
-  // https://stripe.com/docs/keys
-  return /^(?:sk|rk)_(?:test|live)_[A-Za-z0-9]{10,}$/.test(secretKey)
+  // Stripe keys are documented by prefix; treat the remainder as an opaque string.
+  // This also avoids considering placeholder values like "test" as configured.
+  return /^(?:sk_(?:test|live|org)_|rk_(?:test|live)_)/.test(secretKey)
 }

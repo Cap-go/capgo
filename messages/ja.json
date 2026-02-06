@@ -1497,5 +1497,7 @@
   "your-api-key": "あなたのAPIキー",
   "your-role-in-org": "組織におけるあなたの役割",
   "your-usage": "あなたの使用法：",
-  "zip-bundle": "Zipアプリバンドル"
+  "zip-bundle": "Zipアプリバンドル",
+  "failed-to-create-api-key": "Failed to create API key",
+  "failed-to-regenerate-api-key": "Failed to regenerate API key"
 }

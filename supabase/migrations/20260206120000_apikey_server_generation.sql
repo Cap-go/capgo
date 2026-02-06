@@ -43,7 +43,12 @@ BEGIN
   END IF;
 
   IF TG_OP = 'UPDATE' THEN
-    IF NEW.key IS NOT DISTINCT FROM OLD.key AND NEW.key_hash IS NOT DISTINCT FROM OLD.key_hash THEN
+    -- Allow callers to force regeneration even if they mistakenly re-submit the same value.
+    -- This is primarily useful for controlled internal operations; normal API flows always
+    -- write a different placeholder value.
+    IF current_setting('capgo.force_regenerate_apikey', true) IS DISTINCT FROM 'true'
+      AND NEW.key IS NOT DISTINCT FROM OLD.key
+      AND NEW.key_hash IS NOT DISTINCT FROM OLD.key_hash THEN
       RETURN NEW;
     END IF;
     v_is_hashed := (OLD.key_hash IS NOT NULL AND OLD.key IS NULL) OR NEW.key_hash IS NOT NULL;
@@ -107,7 +112,9 @@ DEFERRABLE INITIALLY DEFERRED
 FOR EACH ROW
 EXECUTE FUNCTION public.apikeys_strip_plain_key_for_hashed();
 
-CREATE OR REPLACE FUNCTION public.create_hashed_apikey(
+-- Internal functions that accept a user_id are intentionally not granted to anon/authenticated.
+-- Public wrappers below derive the caller identity (supports both JWT and capgkey-based auth).
+CREATE OR REPLACE FUNCTION public.create_hashed_apikey_for_user(
   p_user_id uuid,
   p_mode public.key_mode,
   p_name text,
@@ -156,7 +163,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.regenerate_hashed_apikey(
+CREATE OR REPLACE FUNCTION public.regenerate_hashed_apikey_for_user(
   p_apikey_id bigint,
   p_user_id uuid
 )
@@ -186,5 +193,56 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.create_hashed_apikey(uuid, public.key_mode, text, uuid[], text[], timestamptz) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.regenerate_hashed_apikey(bigint, uuid) TO anon, authenticated;
+CREATE OR REPLACE FUNCTION public.create_hashed_apikey(
+  p_mode public.key_mode,
+  p_name text,
+  p_limited_to_orgs uuid[],
+  p_limited_to_apps text[],
+  p_expires_at timestamptz
+)
+RETURNS public.apikeys
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+DECLARE
+  v_user_id uuid;
+BEGIN
+  SELECT public.get_identity() INTO v_user_id;
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'No authentication provided';
+  END IF;
+
+  RETURN public.create_hashed_apikey_for_user(
+    v_user_id,
+    p_mode,
+    p_name,
+    COALESCE(p_limited_to_orgs, '{}'::uuid[]),
+    COALESCE(p_limited_to_apps, '{}'::text[]),
+    p_expires_at
+  );
+END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.regenerate_hashed_apikey(
+  p_apikey_id bigint
+)
+RETURNS public.apikeys
+LANGUAGE plpgsql
+SECURITY INVOKER
+SET search_path = ''
+AS $$
+DECLARE
+  v_user_id uuid;
+BEGIN
+  SELECT public.get_identity() INTO v_user_id;
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'No authentication provided';
+  END IF;
+
+  RETURN public.regenerate_hashed_apikey_for_user(p_apikey_id, v_user_id);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.create_hashed_apikey(public.key_mode, text, uuid[], text[], timestamptz) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.regenerate_hashed_apikey(bigint) TO anon, authenticated;

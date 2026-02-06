@@ -1500,5 +1500,7 @@
   "your-api-key": "Your API Key",
   "your-role-in-org": "Your role in the organization",
   "your-usage": "Your usage:",
-  "zip-bundle": "Zip app bundle"
+  "zip-bundle": "Zip app bundle",
+  "failed-to-create-api-key": "Failed to create API key",
+  "failed-to-regenerate-api-key": "Failed to regenerate API key"
 }

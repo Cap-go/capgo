@@ -445,15 +445,15 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
       },
     })
 
-    if (error) {
+    if (error || !data) {
       console.error('Error creating API key:', error)
-      toast.error('Failed to create API key')
+      toast.error(t('failed-to-create-api-key'))
       return false
     }
 
     const createdKey = data
     if (isHashed)
-      plainKeyForDisplay = data.key // This is the one-time visible key
+      plainKeyForDisplay = typeof data.key === 'string' ? data.key : null // This is the one-time visible key
 
     // For hashed keys, clear the key field before adding to the list
     // (the plainkey was only returned for one-time display)
@@ -474,7 +474,7 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
   }
   catch (error) {
     console.error('Error creating API key:', error)
-    toast.error('Failed to create API key')
+    toast.error(t('failed-to-create-api-key'))
     return false
   }
 }
@@ -543,14 +543,16 @@ async function regenrateKey(apikey: Database['public']['Tables']['apikeys']['Row
     },
   })
 
-  if (error) {
+  if (error || !data) {
     console.error('Error regenerating API key:', error)
-    toast.error('Failed to regenerate API key')
+    toast.error(t('failed-to-regenerate-api-key'))
     return
   }
 
-  // Extract the plaintext key for one-time display before clearing it
-  const plainKeyForDisplay = wasHashed ? data.key as string | undefined : undefined
+  // Extract the plaintext key for display before optionally clearing it.
+  // For hashed keys: this is the one-time visible key.
+  // For plain keys: we still show it to make regeneration explicit for the user.
+  const plainKeyForDisplay = typeof data.key === 'string' ? data.key : undefined
 
   // Clear the key field before caching to maintain the "hashed" state
   // This ensures isHashedKey() returns true and the key cannot be copied

@@ -1497,5 +1497,7 @@
   "your-api-key": "आपकी API कुंजी",
   "your-role-in-org": "संगठन में आपकी भूमिका",
   "your-usage": "आपका उपयोग:",
-  "zip-bundle": "ज़िप ऐप बंडल"
+  "zip-bundle": "ज़िप ऐप बंडल",
+  "failed-to-create-api-key": "Failed to create API key",
+  "failed-to-regenerate-api-key": "Failed to regenerate API key"
 }

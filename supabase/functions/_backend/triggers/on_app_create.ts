@@ -1,5 +1,6 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
+import { eq } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { createIfNotExistStoreInfo } from '../utils/cloudflare.ts'
@@ -7,6 +8,8 @@ import { purgeOnPremCache } from '../utils/cloudflare_cache_purge.ts'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
+import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
+import * as schema from '../utils/postgres_schema.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
@@ -27,16 +30,22 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
   // Resolve it from the database so we don't insert invalid app_versions rows.
   let ownerOrg: string | undefined = record.owner_org ?? undefined
   if (!ownerOrg) {
-    const { data, error } = await supabase
-      .from('apps')
-      .select('owner_org')
-      .eq('id', record.id)
-      .maybeSingle()
-
-    if (error) {
+    const pg = getPgClient(c)
+    const drizzleClient = getDrizzleClient(pg)
+    try {
+      const rows = await drizzleClient
+        .select({ owner_org: schema.apps.owner_org })
+        .from(schema.apps)
+        .where(eq(schema.apps.id, record.id))
+        .limit(1)
+      ownerOrg = rows[0]?.owner_org ?? undefined
+    }
+    catch (error) {
       cloudlog({ requestId: c.get('requestId'), message: 'Error fetching app owner_org', error, appId: record.id })
     }
-    ownerOrg = data?.owner_org ?? undefined
+    finally {
+      closeClient(c, pg)
+    }
   }
 
   // Check if this is a demo app - skip onboarding emails and store info for demo apps
