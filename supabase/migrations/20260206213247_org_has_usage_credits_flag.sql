@@ -62,20 +62,21 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
 AS $$
-DECLARE
-  v_org_id uuid;
 BEGIN
-  v_org_id := COALESCE(NEW."org_id", OLD."org_id");
-
+  -- Transition tables are available because the trigger is FOR EACH STATEMENT.
   UPDATE "public"."orgs" AS o
   SET "has_usage_credits" = EXISTS (
     SELECT 1
     FROM "public"."usage_credit_grants" AS g
-    WHERE g."org_id" = v_org_id
+    WHERE g."org_id" = o."id"
       AND g."expires_at" >= NOW()
       AND (g."credits_total" - g."credits_consumed") > 0
   )
-  WHERE o."id" = v_org_id;
+  WHERE o."id" IN (
+    SELECT DISTINCT "org_id" FROM "new_grants"
+    UNION
+    SELECT DISTINCT "org_id" FROM "old_grants"
+  );
 
   RETURN NULL;
 END;
@@ -84,7 +85,8 @@ $$;
 DROP TRIGGER IF EXISTS "trg_sync_org_has_usage_credits" ON "public"."usage_credit_grants";
 CREATE TRIGGER "trg_sync_org_has_usage_credits"
 AFTER INSERT OR UPDATE OR DELETE ON "public"."usage_credit_grants"
-FOR EACH ROW
+REFERENCING NEW TABLE AS "new_grants" OLD TABLE AS "old_grants"
+FOR EACH STATEMENT
 EXECUTE FUNCTION "public"."sync_org_has_usage_credits_from_grants"();
 
 -- Run daily after credits expiry (03:00:30 UTC) so replicas get a stable replicated flag.
