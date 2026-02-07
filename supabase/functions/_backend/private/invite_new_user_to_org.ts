@@ -192,12 +192,16 @@ app.post('/', middlewareAuth, async (c) => {
   // Use admin client for tmp_users operations since RLS blocks all access on that table
   const supabaseAdminClient = supabaseAdmin(c)
 
-  const { data: existingInvitation } = await supabaseAdminClient
+  const { data: existingInvitation, error: existingInvitationError } = await supabaseAdminClient
     .from('tmp_users')
     .select('*')
     .eq('email', body.email)
     .eq('org_id', body.org_id)
-    .single()
+    .maybeSingle()
+
+  if (existingInvitationError) {
+    throw simpleError('failed_to_invite_user', 'Failed to invite user', {}, existingInvitationError.message)
+  }
 
   let newInvitation: Database['public']['Tables']['tmp_users']['Row'] | null = null
   if (existingInvitation) {
