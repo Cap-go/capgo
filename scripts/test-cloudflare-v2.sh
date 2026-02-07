@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 
-# Complete workflow for testing Cloudflare Workers with V2 (D1) enabled
+# Complete workflow for testing Cloudflare Workers locally.
+#
+# Note: Despite the "V2/D1" naming, this script currently validates the Cloudflare
+# Workers runtime integration (API/Plugin/Files) against the local Supabase
+# database. If/when a D1 sync worker is reintroduced, extend this script to run
+# the sync step before tests.
 
 set -e
 
@@ -14,11 +19,7 @@ NC='\033[0m'
 
 # 1. Reset and seed database
 echo -e "\n${YELLOW}Step 1: Resetting Supabase database...${NC}"
-supabase db reset
-
-# 2. Sync to D1
-echo -e "\n${YELLOW}Step 2: Syncing data from Postgres to D1...${NC}"
-bun run scripts/sync-postgres-to-d1.ts
+PAGER=cat bunx supabase db reset
 
 # 3. Start workers
 echo -e "\n${YELLOW}Step 3: Starting Cloudflare Workers...${NC}"

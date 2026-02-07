@@ -5,17 +5,22 @@ import { app as channel_stats } from '../../supabase/functions/_backend/private/
 import { app as config } from '../../supabase/functions/_backend/private/config.ts'
 import { app as create_device } from '../../supabase/functions/_backend/private/create_device.ts'
 import { app as credits } from '../../supabase/functions/_backend/private/credits.ts'
+import { app as accept_invitation } from '../../supabase/functions/_backend/private/accept_invitation.ts'
 import { app as deleted_failed_version } from '../../supabase/functions/_backend/private/delete_failed_version.ts'
 import { app as devices_priv } from '../../supabase/functions/_backend/private/devices.ts'
 import { app as events } from '../../supabase/functions/_backend/private/events.ts'
 import { app as groups } from '../../supabase/functions/_backend/private/groups.ts'
+import { app as invite_new_user_to_org } from '../../supabase/functions/_backend/private/invite_new_user_to_org.ts'
+import { app as latency } from '../../supabase/functions/_backend/private/latency.ts'
 import { app as log_as } from '../../supabase/functions/_backend/private/log_as.ts'
 import { app as plans } from '../../supabase/functions/_backend/private/plans.ts'
 import { app as publicStats } from '../../supabase/functions/_backend/private/public_stats.ts'
+import { app as set_org_email } from '../../supabase/functions/_backend/private/set_org_email.ts'
 import { app as stats_priv } from '../../supabase/functions/_backend/private/stats.ts'
 import { app as storeTop } from '../../supabase/functions/_backend/private/store_top.ts'
 import { app as stripe_checkout } from '../../supabase/functions/_backend/private/stripe_checkout.ts'
 import { app as stripe_portal } from '../../supabase/functions/_backend/private/stripe_portal.ts'
+import { app as validate_password_compliance } from '../../supabase/functions/_backend/private/validate_password_compliance.ts'
 import { app as verify_email_otp } from '../../supabase/functions/_backend/private/verify_email_otp.ts'
 import { app as apikey } from '../../supabase/functions/_backend/public/apikey/index.ts'
 import { app as appEndpoint } from '../../supabase/functions/_backend/public/app/index.ts'
@@ -27,6 +32,7 @@ import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
 import { app as organization } from '../../supabase/functions/_backend/public/organization/index.ts'
 import { app as replication } from '../../supabase/functions/_backend/public/replication.ts'
 import { app as statistics } from '../../supabase/functions/_backend/public/statistics/index.ts'
+import { app as webhooks } from '../../supabase/functions/_backend/public/webhooks/index.ts'
 import { app as cron_clean_orphan_images } from '../../supabase/functions/_backend/triggers/cron_clean_orphan_images.ts'
 import { app as cron_clear_versions } from '../../supabase/functions/_backend/triggers/cron_clear_versions.ts'
 import { app as cron_email } from '../../supabase/functions/_backend/triggers/cron_email.ts'
@@ -60,6 +66,7 @@ app.route('/channel', channel)
 app.route('/device', device)
 app.route('/organization', organization)
 app.route('/statistics', statistics)
+app.route('/webhooks', webhooks)
 app.route('/app', appEndpoint)
 app.route('/build', build)
 app.route('/replication', replication)
@@ -72,8 +79,12 @@ appPrivate.route('/credits', credits)
 appPrivate.route('/store_top', storeTop)
 appPrivate.route('/website_stats', publicStats)
 appPrivate.route('/config', config)
+appPrivate.route('/accept_invitation', accept_invitation)
 appPrivate.route('/devices', devices_priv)
 appPrivate.route('/log_as', log_as)
+appPrivate.route('/invite_new_user_to_org', invite_new_user_to_org)
+appPrivate.route('/set_org_email', set_org_email)
+appPrivate.route('/validate_password_compliance', validate_password_compliance)
 appPrivate.route('/admin_credits', admin_credits)
 appPrivate.route('/admin_stats', admin_stats)
 appPrivate.route('/stats', stats_priv)
@@ -83,12 +94,14 @@ appPrivate.route('/stripe_portal', stripe_portal)
 appPrivate.route('/verify_email_otp', verify_email_otp)
 appPrivate.route('/delete_failed_version', deleted_failed_version)
 appPrivate.route('/create_device', create_device)
+appPrivate.route('/latency', latency)
 appPrivate.route('/events', events)
 appPrivate.route('/groups', groups)
 
 // Triggers
 const functionNameTriggers = 'triggers'
 const appTriggers = createHono(functionNameTriggers, version)
+appTriggers.route('/ok', ok)
 appTriggers.route('/cron_email', cron_email)
 appTriggers.route('/cron_clear_versions', cron_clear_versions)
 appTriggers.route('/cron_clean_orphan_images', cron_clean_orphan_images)

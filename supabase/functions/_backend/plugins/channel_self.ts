@@ -560,7 +560,9 @@ app.post('/', async (c) => {
     return simpleError200(c, 'missing_channel', 'Cannot find channel in body')
   }
 
-  await assertChannelSelfIPRateLimit(c, bodyParsed.app_id)
+  const ipLimit = await assertChannelSelfIPRateLimit(c, bodyParsed.app_id)
+  if (ipLimit)
+    return ipLimit
 
   // Rate limit: max 5 set per second per device+app, and same set max once per 60 seconds
   const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'set', bodyParsed.channel)
@@ -578,16 +580,19 @@ app.post('/', async (c) => {
   let res
   try {
     res = await post(c, getDrizzleClient(pgClient), bodyParsed)
+    return res
   }
   finally {
     await closeClient(c, pgClient)
+    // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse)
+    try {
+      await recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'set', bodyParsed.channel)
+    }
+    catch (error) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Failed to record channel_self set rate limit', app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, channel: bodyParsed.channel, error })
+    }
+    recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
   }
-
-  // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse)
-  backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'set', bodyParsed.channel))
-  recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
-
-  return res
 })
 
 app.put('/', async (c) => {
@@ -601,7 +606,9 @@ app.put('/', async (c) => {
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
 
-  await assertChannelSelfIPRateLimit(c, bodyParsed.app_id)
+  const ipLimit = await assertChannelSelfIPRateLimit(c, bodyParsed.app_id)
+  if (ipLimit)
+    return ipLimit
 
   // Rate limit: max 5 get per second per device+app
   const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'get')
@@ -618,16 +625,19 @@ app.put('/', async (c) => {
   let res
   try {
     res = await put(c, getDrizzleClient(pgClient as any), bodyParsed)
+    return res
   }
   finally {
     await closeClient(c, pgClient)
+    // Record the request for rate limiting (all requests to prevent abuse)
+    try {
+      await recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'get')
+    }
+    catch (error) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Failed to record channel_self get rate limit', app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, error })
+    }
+    recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
   }
-
-  // Record the request for rate limiting (all requests to prevent abuse)
-  backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'get'))
-  recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
-
-  return res
 })
 
 app.delete('/', async (c) => {
@@ -640,7 +650,9 @@ app.delete('/', async (c) => {
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
 
-  await assertChannelSelfIPRateLimit(c, bodyParsed.app_id)
+  const ipLimit = await assertChannelSelfIPRateLimit(c, bodyParsed.app_id)
+  if (ipLimit)
+    return ipLimit
 
   // Rate limit: max 5 delete per second per device+app
   const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'delete')
@@ -658,16 +670,19 @@ app.delete('/', async (c) => {
   let res
   try {
     res = await deleteOverride(c, getDrizzleClient(pgClient), bodyParsed)
+    return res
   }
   finally {
     await closeClient(c, pgClient)
+    // Record the request for rate limiting (all requests to prevent abuse)
+    try {
+      await recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'delete')
+    }
+    catch (error) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Failed to record channel_self delete rate limit', app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, error })
+    }
+    recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
   }
-
-  // Record the request for rate limiting (all requests to prevent abuse)
-  backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'delete'))
-  recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
-
-  return res
 })
 
 app.get('/', async (c) => {
@@ -680,7 +695,9 @@ app.get('/', async (c) => {
 
   const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchemaGet, false)
 
-  await assertChannelSelfIPRateLimit(c, bodyParsed.app_id)
+  const ipLimit = await assertChannelSelfIPRateLimit(c, bodyParsed.app_id)
+  if (ipLimit)
+    return ipLimit
 
   // Rate limit: max 5 list per second per device+app (if device_id is provided)
   if (body.device_id) {
@@ -699,18 +716,21 @@ app.get('/', async (c) => {
   let res
   try {
     res = await listCompatibleChannels(c, getDrizzleClient(pgClient as any), bodyParsed)
+    return res
   }
   finally {
     await closeClient(c, pgClient)
+    // Record the request for rate limiting (all requests to prevent abuse, if device_id is provided)
+    // Note: body.device_id is used since jsonRequestSchemaGet doesn't include device_id,
+    // but parsePluginBody lowercases it in the body object before validation
+    if (body.device_id) {
+      try {
+        await recordChannelSelfRequest(c, bodyParsed.app_id, body.device_id, 'list')
+      }
+      catch (error) {
+        cloudlog({ requestId: c.get('requestId'), message: 'Failed to record channel_self list rate limit', app_id: bodyParsed.app_id, device_id: body.device_id, error })
+      }
+    }
+    recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
   }
-
-  // Record the request for rate limiting (all requests to prevent abuse, if device_id is provided)
-  // Note: body.device_id is used since jsonRequestSchemaGet doesn't include device_id,
-  // but parsePluginBody lowercases it in the body object before validation
-  if (body.device_id) {
-    backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, body.device_id, 'list'))
-  }
-  recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
-
-  return res
 })

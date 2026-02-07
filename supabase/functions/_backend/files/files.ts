@@ -591,11 +591,17 @@ app.get(
   checkWriteAppAccess,
   async (c) => {
     const isTusRequest = c.req.header('Tus-Resumable') != null
-    const isHead = c.req.method === 'HEAD'
+    // In Hono/tiny, HEAD is routed to the GET handler. Use the raw request method.
+    const isHead = c.req.raw.method === 'HEAD'
 
-    if (isHead && isTusRequest && getRuntimeKey() !== 'workerd') {
-      cloudlog({ requestId: c.get('requestId'), message: 'Routing HEAD TUS request to supabaseTusHeadHandler' })
-      return supabaseTusHeadHandler(c)
+    if (isHead && isTusRequest) {
+      if (getRuntimeKey() !== 'workerd') {
+        cloudlog({ requestId: c.get('requestId'), message: 'Routing HEAD TUS request to supabaseTusHeadHandler' })
+        return supabaseTusHeadHandler(c)
+      }
+
+      cloudlog({ requestId: c.get('requestId'), message: 'Routing HEAD TUS request to uploadHandler (DO)' })
+      return uploadHandler(c)
     }
 
     return getHandler(c)
