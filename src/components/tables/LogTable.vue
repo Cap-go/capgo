@@ -54,6 +54,7 @@ const supabase = useSupabase()
 const search = ref('')
 const elements = ref<Element[]>([])
 const isLoading = ref(false)
+const isExporting = ref(false)
 const currentPage = ref(1)
 
 // Initialize date range from query parameters if provided, otherwise default to last hour
@@ -311,6 +312,79 @@ async function getData() {
   }
   isLoading.value = false
 }
+
+function downloadText(filename: string, content: string, mime: string) {
+  const blob = new Blob([content], { type: mime })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+async function exportCsv() {
+  if (isExporting.value)
+    return
+  isExporting.value = true
+  const loadingToastId = toast.loading('Exporting logs...')
+  try {
+    const { data: currentSession } = await supabase.auth.getSession()!
+    if (!currentSession.session) {
+      toast.dismiss(loadingToastId)
+      toast.error('Not logged in')
+      return
+    }
+    const currentJwt = currentSession.session.access_token
+
+    const response = await fetch(`${defaultApiHost}/private/stats/export`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'authorization': `Bearer ${currentJwt ?? ''}`,
+      },
+      body: JSON.stringify({
+        appId: props.appId,
+        devicesId: props.deviceId ? [props.deviceId] : undefined,
+        search: search.value ? search.value : undefined,
+        order: columns.value.filter(elem => elem.sortable).map(elem => ({ key: elem.key as string, sortable: elem.sortable })),
+        rangeStart: range.value?.[0]?.toISOString(),
+        rangeEnd: range.value?.[1]?.toISOString(),
+        actions: activeActions.value,
+        format: 'csv',
+        limit: 10_000,
+      }),
+    })
+
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}))
+      toast.dismiss(loadingToastId)
+      toast.error(err?.message || 'Export failed')
+      return
+    }
+
+    const data = await response.json() as { csv: string, filename: string, contentType: string }
+    if (!data.csv || !data.filename) {
+      toast.dismiss(loadingToastId)
+      toast.error('Export failed')
+      return
+    }
+
+    downloadText(data.filename, data.csv, data.contentType || 'text/csv; charset=utf-8')
+    toast.dismiss(loadingToastId)
+    toast.success('Export ready')
+  }
+  catch (error) {
+    console.error(error)
+    toast.dismiss(loadingToastId)
+    toast.error('Export failed')
+  }
+  finally {
+    isExporting.value = false
+  }
+}
 async function refreshData() {
   // console.log('refreshData')
   try {
@@ -434,10 +508,12 @@ watch(range, async () => {
       :element-list="elements"
       filter-text="filter-actions"
       :is-loading="isLoading"
+      :exportable="true"
+      :export-loading="isExporting"
       :auto-reload="false"
       :app-id="props.appId ?? ''"
       :search-placeholder="deviceId ? t('search-by-device-id-0') : t('search-by-device-id-')"
-      @reload="reload()" @reset="refreshData()"
+      @reload="reload()" @reset="refreshData()" @export="exportCsv()"
     />
   </div>
 </template>

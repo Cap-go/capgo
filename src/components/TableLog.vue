@@ -15,12 +15,15 @@ import IconSearch from '~icons/ic/round-search?raw'
 import IconSortDown from '~icons/lucide/chevron-down'
 import IconSortUp from '~icons/lucide/chevron-up'
 import IconSort from '~icons/lucide/chevrons-up-down'
+import IconDownload from '~icons/lucide/download'
 import IconFilter from '~icons/system-uicons/filtering'
 import IconReload from '~icons/tabler/reload'
 import '@vuepic/vue-datepicker/dist/main.css'
 
 interface Props {
   isLoading?: boolean
+  exportable?: boolean
+  exportLoading?: boolean
   filterText?: string
   filters?: { [key: string]: boolean }
   range?: [Date, Date]
@@ -36,6 +39,7 @@ const props = defineProps<Props>()
 const emit = defineEmits([
   'reload',
   'reset',
+  'export',
   'next',
   'prev',
   'fastForward',
@@ -130,6 +134,10 @@ const startTime = computed(() => {
 })
 function reloadData() {
   emit('reset')
+}
+
+function exportData() {
+  emit('export')
 }
 
 function sortClick(key: number) {
@@ -431,6 +439,17 @@ onMounted(async () => {
           <IconReload v-if="!isLoading" class="m-1 md:mr-2" />
           <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
           <span class="hidden text-sm md:block">{{ t('reload') }}</span>
+        </button>
+        <button
+          v-if="exportable"
+          class="inline-flex items-center py-1.5 px-3 mr-2 text-sm font-medium text-gray-500 bg-white rounded-md border border-gray-300 dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:border-gray-600 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
+          type="button"
+          :disabled="isLoading || exportLoading"
+          @click="exportData"
+        >
+          <IconDownload v-if="!exportLoading" class="m-1 md:mr-2" />
+          <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
+          <span class="hidden text-sm md:block">{{ t('download') }} CSV</span>
         </button>
       </div>
       <div class="flex h-10 mr-2" :class="{ 'md:mr-auto': !filterText || !filterList.length }">
