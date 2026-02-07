@@ -5,7 +5,6 @@ import { checkChannelSelfIPRateLimit, isChannelSelfRateLimited, recordChannelSel
 import { getBodyOrQuery, honoFactory, parseBody, simpleRateLimit } from '../../utils/hono.ts'
 import { middlewareKey } from '../../utils/hono_middleware.ts'
 import { cloudlog } from '../../utils/logging.ts'
-import { backgroundTask } from '../../utils/utils.ts'
 import { deleteOverride } from './delete.ts'
 import { get } from './get.ts'
 import { post } from './post.ts'
@@ -29,7 +28,10 @@ async function assertDeviceIPRateLimit(c: Context, appId: string) {
 }
 
 function recordDeviceIPRateLimit(c: Context, appId: string) {
-  backgroundTask(c, recordChannelSelfIPRequest(c, appId))
+  // Rate limiting must be effective immediately (especially in Workers where
+  // waitUntil/background tasks may not complete before a rapid follow-up
+  // request). Best-effort, but do it synchronously.
+  return recordChannelSelfIPRequest(c, appId)
 }
 
 export const app = honoFactory.createApp()
@@ -50,27 +52,41 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
   // Rate limit: max 1 set per second per device+app, and same channel set max once per 60 seconds
   // Note: We check device_id && app_id only (not channel) so op-level rate limiting applies even for invalid requests
   if (body.app_id) {
-    await assertDeviceIPRateLimit(c, body.app_id)
+    const ipLimit = await assertDeviceIPRateLimit(c, body.app_id)
+    if (ipLimit)
+      return ipLimit
   }
   if (body.device_id && body.app_id) {
-    const rateLimitStatus = await isChannelSelfRateLimited(c, body.app_id, body.device_id, 'set', body.channel)
+    // Device API uses operation-level rate limiting only.
+    const rateLimitStatus = await isChannelSelfRateLimited(c, body.app_id, body.device_id, 'set')
     if (rateLimitStatus.limited) {
       cloudlog({ requestId: c.get('requestId'), message: 'Device API set rate limited', app_id: body.app_id, device_id: body.device_id, channel: body.channel })
       return simpleRateLimit({ app_id: body.app_id, device_id: body.device_id, ...buildRateLimitInfo(rateLimitStatus.resetAt) })
     }
   }
 
-  const res = await post(c, body, apikey)
-
-  // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse through repeated invalid requests)
-  if (body.device_id && body.app_id) {
-    backgroundTask(c, recordChannelSelfRequest(c, body.app_id, body.device_id, 'set', body.channel))
+  try {
+    return await post(c, body, apikey)
   }
-  if (body.app_id) {
-    recordDeviceIPRateLimit(c, body.app_id)
+  finally {
+    // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse through repeated invalid requests)
+    if (body.device_id && body.app_id) {
+      try {
+        await recordChannelSelfRequest(c, body.app_id, body.device_id, 'set')
+      }
+      catch (error) {
+        cloudlog({ requestId: c.get('requestId'), message: 'Failed to record device set rate limit', app_id: body.app_id, device_id: body.device_id, error })
+      }
+    }
+    if (body.app_id) {
+      try {
+        await recordDeviceIPRateLimit(c, body.app_id)
+      }
+      catch (error) {
+        cloudlog({ requestId: c.get('requestId'), message: 'Failed to record device IP rate limit', app_id: body.app_id, error })
+      }
+    }
   }
-
-  return res
 })
 
 app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
@@ -87,7 +103,9 @@ app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
 
   // Rate limit: max 1 get per second per device+app
   if (body.app_id) {
-    await assertDeviceIPRateLimit(c, body.app_id)
+    const ipLimit = await assertDeviceIPRateLimit(c, body.app_id)
+    if (ipLimit)
+      return ipLimit
   }
   if (body.device_id && body.app_id) {
     const rateLimitStatus = await isChannelSelfRateLimited(c, body.app_id, body.device_id, 'get')
@@ -97,17 +115,28 @@ app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
     }
   }
 
-  const res = await get(c, body, apikey)
-
-  // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse through repeated invalid requests)
-  if (body.device_id && body.app_id) {
-    backgroundTask(c, recordChannelSelfRequest(c, body.app_id, body.device_id, 'get'))
+  try {
+    return await get(c, body, apikey)
   }
-  if (body.app_id) {
-    recordDeviceIPRateLimit(c, body.app_id)
+  finally {
+    // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse through repeated invalid requests)
+    if (body.device_id && body.app_id) {
+      try {
+        await recordChannelSelfRequest(c, body.app_id, body.device_id, 'get')
+      }
+      catch (error) {
+        cloudlog({ requestId: c.get('requestId'), message: 'Failed to record device get rate limit', app_id: body.app_id, device_id: body.device_id, error })
+      }
+    }
+    if (body.app_id) {
+      try {
+        await recordDeviceIPRateLimit(c, body.app_id)
+      }
+      catch (error) {
+        cloudlog({ requestId: c.get('requestId'), message: 'Failed to record device IP rate limit', app_id: body.app_id, error })
+      }
+    }
   }
-
-  return res
 })
 
 app.delete('/', middlewareKey(['all', 'write']), async (c) => {
@@ -124,7 +153,9 @@ app.delete('/', middlewareKey(['all', 'write']), async (c) => {
 
   // Rate limit: max 1 delete per second per device+app
   if (body.app_id) {
-    await assertDeviceIPRateLimit(c, body.app_id)
+    const ipLimit = await assertDeviceIPRateLimit(c, body.app_id)
+    if (ipLimit)
+      return ipLimit
   }
   if (body.device_id && body.app_id) {
     const rateLimitStatus = await isChannelSelfRateLimited(c, body.app_id, body.device_id, 'delete')
@@ -134,15 +165,26 @@ app.delete('/', middlewareKey(['all', 'write']), async (c) => {
     }
   }
 
-  const res = await deleteOverride(c, body, apikey)
-
-  // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse through repeated invalid requests)
-  if (body.device_id && body.app_id) {
-    backgroundTask(c, recordChannelSelfRequest(c, body.app_id, body.device_id, 'delete'))
+  try {
+    return await deleteOverride(c, body, apikey)
   }
-  if (body.app_id) {
-    recordDeviceIPRateLimit(c, body.app_id)
+  finally {
+    // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse through repeated invalid requests)
+    if (body.device_id && body.app_id) {
+      try {
+        await recordChannelSelfRequest(c, body.app_id, body.device_id, 'delete')
+      }
+      catch (error) {
+        cloudlog({ requestId: c.get('requestId'), message: 'Failed to record device delete rate limit', app_id: body.app_id, device_id: body.device_id, error })
+      }
+    }
+    if (body.app_id) {
+      try {
+        await recordDeviceIPRateLimit(c, body.app_id)
+      }
+      catch (error) {
+        cloudlog({ requestId: c.get('requestId'), message: 'Failed to record device IP rate limit', app_id: body.app_id, error })
+      }
+    }
   }
-
-  return res
 })

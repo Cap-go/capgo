@@ -16,6 +16,12 @@ type ChannelsListResponse = ChannelInfo[]
 const id = randomUUID()
 const APPNAME = `com.sa.${id}`
 
+function getUniqueBaseData(appId: string) {
+  const data = getBaseData(appId)
+  data.device_id = randomUUID().toLowerCase()
+  return data
+}
+
 async function fetchEndpoint(method: HttpMethod, bodyIn: object) {
   const url = new URL(`${PLUGIN_BASE_URL}/channel_self`)
   if (method === 'DELETE') {
@@ -102,7 +108,7 @@ describe('invalids /channel_self tests', () => {
   })
 
   it('[POST] invalid semver', async () => {
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     data.version_build = 'invalid semver'
 
     const response = await fetchEndpoint('POST', data)
@@ -112,7 +118,7 @@ describe('invalids /channel_self tests', () => {
   })
 
   it('[POST] without field (device_id)', async () => {
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     delete data.device_id
 
     const response = await fetchEndpoint('POST', data)
@@ -123,7 +129,7 @@ describe('invalids /channel_self tests', () => {
   })
 
   it('[POST] without field (app_id)', async () => {
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     delete data.app_id
 
     const response = await fetchEndpoint('POST', data)
@@ -134,7 +140,7 @@ describe('invalids /channel_self tests', () => {
   })
 
   it('[POST] without channel', async () => {
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     delete data.channel
 
     const response = await fetchEndpoint('POST', data)
@@ -145,7 +151,7 @@ describe('invalids /channel_self tests', () => {
   })
 
   it('[POST] with a channel that does not exist', async () => {
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     data.channel = 'unexisting_channel'
 
     const response = await fetchEndpoint('POST', data)
@@ -156,7 +162,7 @@ describe('invalids /channel_self tests', () => {
   })
 
   it('[POST] with a channel that does not allow self assign', async () => {
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     if (!data.channel)
       throw new Error('channel is undefined')
 
@@ -179,7 +185,7 @@ describe('invalids /channel_self tests', () => {
   })
 
   it('[PUT] invalid semver', async () => {
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     data.version_build = 'invalid semver'
 
     const response = await fetchEndpoint('PUT', data)
@@ -189,7 +195,7 @@ describe('invalids /channel_self tests', () => {
   })
 
   it('[PUT] post without field (device_id)', async () => {
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     delete data.device_id
 
     const response = await fetchEndpoint('PUT', data)
@@ -200,7 +206,7 @@ describe('invalids /channel_self tests', () => {
   })
 
   it('[PUT] post without field (app_id)', async () => {
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     delete data.app_id
 
     const response = await fetchEndpoint('PUT', data)
@@ -212,7 +218,7 @@ describe('invalids /channel_self tests', () => {
 
   it('[PUT] with a version that does not exist', async () => {
     // Version check was removed from channel_self - devices with unknown versions can still get channel info
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     data.version_name = `1.0.${Math.floor(Math.random() * 10000000)}`
 
     const response = await fetchEndpoint('PUT', data)
@@ -224,7 +230,7 @@ describe('invalids /channel_self tests', () => {
   })
 
   it('[DELETE] invalid semver', async () => {
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     data.version_build = 'invalid semver'
 
     const response = await fetchEndpoint('DELETE', data)
@@ -234,7 +240,7 @@ describe('invalids /channel_self tests', () => {
   })
 
   it('[DELETE] post without field (device_id)', async () => {
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     delete data.device_id
 
     const response = await fetchEndpoint('DELETE', data)
@@ -245,7 +251,7 @@ describe('invalids /channel_self tests', () => {
   })
 
   it('[DELETE] post without field (app_id)', async () => {
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     delete data.app_id
 
     const response = await fetchEndpoint('DELETE', data)
@@ -268,7 +274,7 @@ describe('[GET] /channel_self tests', () => {
   })
 
   it('[GET] with invalid app_id format', async () => {
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     data.app_id = 'invalid-app-id'
     const response = await fetchGetChannels(data as any)
 
@@ -278,7 +284,7 @@ describe('[GET] /channel_self tests', () => {
   })
 
   it('[GET] with missing app_id', async () => {
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     delete data.app_id
     const response = await fetchGetChannels(data as any)
 
@@ -288,7 +294,7 @@ describe('[GET] /channel_self tests', () => {
   })
 
   it('[GET] with invalid platform', async () => {
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     data.platform = 'windows'
     const response = await fetchGetChannels(data as any)
 
@@ -298,7 +304,7 @@ describe('[GET] /channel_self tests', () => {
   })
 
   it('[GET] with non-existent app_id', async () => {
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     data.app_id = 'com.nonexistent.app'
     const response = await fetchGetChannels(data as any)
 
@@ -310,7 +316,7 @@ describe('[GET] /channel_self tests', () => {
   it('[GET] should return compatible channels for iOS', async () => {
     await resetAndSeedAppData(APPNAME)
 
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     data.platform = 'ios'
     data.is_emulator = false
     data.is_prod = true
@@ -333,7 +339,7 @@ describe('[GET] /channel_self tests', () => {
   it('[GET] should return compatible channels for Android', async () => {
     await resetAndSeedAppData(APPNAME)
 
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     data.platform = 'android'
     data.is_emulator = false
     data.is_prod = true
@@ -364,7 +370,7 @@ describe('[GET] /channel_self tests', () => {
 
     expect(updateError).toBeNull()
 
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     data.platform = 'ios'
     data.is_emulator = false
     data.is_prod = true
@@ -395,7 +401,7 @@ describe('[GET] /channel_self tests', () => {
     expect(updateError).toBeNull()
 
     // Request iOS channels - real device (is_emulator=false)
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     data.platform = 'ios'
     data.is_emulator = false
     data.is_prod = true
@@ -453,7 +459,7 @@ describe('[GET] /channel_self tests', () => {
   it('[GET] should return compatible channels for Electron', async () => {
     await resetAndSeedAppData(APPNAME)
 
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     data.platform = 'electron'
     data.is_emulator = false
     data.is_prod = true
@@ -493,7 +499,7 @@ describe('[GET] /channel_self tests', () => {
     expect(channelData?.allow_emulator).toBe(false)
 
     try {
-      const data = getBaseData(APPNAME)
+      const data = getUniqueBaseData(APPNAME)
       data.platform = 'ios'
       data.is_emulator = true
       data.is_prod = true
@@ -551,7 +557,7 @@ describe('[GET] /channel_self tests', () => {
 
     try {
       // Test dev device - should only get channels that allow dev builds
-      const data = getBaseData(APPNAME)
+      const data = getUniqueBaseData(APPNAME)
       data.platform = 'ios'
       data.is_emulator = false
       data.is_prod = false
@@ -594,7 +600,7 @@ describe('[GET] /channel_self tests', () => {
   it('[GET] should default prod to true when not specified', async () => {
     await resetAndSeedAppData(APPNAME)
 
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     data.platform = 'ios'
     data.is_emulator = false
     data.is_prod = true
@@ -615,7 +621,7 @@ describe('[GET] /channel_self tests', () => {
   it('[GET] should return channels for emulator devices', async () => {
     await resetAndSeedAppData(APPNAME)
 
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     data.platform = 'ios'
     data.is_emulator = true
     data.is_prod = true
@@ -641,7 +647,7 @@ describe('[GET] /channel_self tests', () => {
 })
 
 it('[POST] with a version that does not exist', async () => {
-  const data = getBaseData(APPNAME)
+  const data = getUniqueBaseData(APPNAME)
   data.version_name = `1.0.350`
 
   const response = await fetchEndpoint('POST', data)
@@ -671,7 +677,7 @@ it('[POST] /channel_self creates new channel_device with owner_org', async () =>
 
   try {
     // Use a brand new device_id that has never been in channel_devices
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     data.device_id = randomUUID().toLowerCase()
     data.channel = 'beta' // Use non-default channel to trigger INSERT
 
@@ -723,7 +729,7 @@ it('[POST] /channel_self creates new channel_device with owner_org', async () =>
 it('[POST] /channel_self with default channel', async () => {
   await resetAndSeedAppData(APPNAME)
 
-  const data = getBaseData(APPNAME)
+  const data = getUniqueBaseData(APPNAME)
   const deviceId = randomUUID().toLowerCase()
   data.device_id = deviceId
 
@@ -776,7 +782,7 @@ it('[POST] /channel_self with default channel', async () => {
 it('[PUT] /channel_self (no overwrite)', async () => {
   await resetAndSeedAppData(APPNAME)
 
-  const data = getBaseData(APPNAME)
+  const data = getUniqueBaseData(APPNAME)
   const deviceId = randomUUID().toLowerCase()
   data.device_id = deviceId
 
@@ -849,7 +855,7 @@ it('[PUT] /channel_self with all optional fields included', async () => {
 it('[PUT] /channel_self (with overwrite)', async () => {
   await resetAndSeedAppData(APPNAME)
 
-  const data = getBaseData(APPNAME)
+  const data = getUniqueBaseData(APPNAME)
   const deviceId = randomUUID().toLowerCase()
   data.device_id = deviceId
 
@@ -918,7 +924,7 @@ it('[PUT] /channel_self (with overwrite)', async () => {
 it('[PUT] /channel_self with defaultChannel parameter', async () => {
   await resetAndSeedAppData(APPNAME)
 
-  const data = getBaseData(APPNAME) as DeviceLink
+  const data = getUniqueBaseData(APPNAME) as DeviceLink
   data.device_id = randomUUID().toLowerCase()
   data.defaultChannel = 'no_access'
 
@@ -933,7 +939,7 @@ it('[PUT] /channel_self with defaultChannel parameter', async () => {
 it('[PUT] /channel_self with non-existent defaultChannel', async () => {
   await resetAndSeedAppData(APPNAME)
 
-  const data = getBaseData(APPNAME) as DeviceLink
+  const data = getUniqueBaseData(APPNAME) as DeviceLink
   data.device_id = randomUUID().toLowerCase()
   data.defaultChannel = 'non_existent_channel'
 
@@ -947,7 +953,7 @@ it('[PUT] /channel_self with non-existent defaultChannel', async () => {
 it('[DELETE] /channel_self (no overwrite)', async () => {
   await resetAndSeedAppData(APPNAME)
 
-  const data = getBaseData(APPNAME)
+  const data = getUniqueBaseData(APPNAME)
   data.device_id = randomUUID().toLowerCase()
 
   const response = await fetchEndpoint('DELETE', data)
@@ -960,7 +966,7 @@ it('[DELETE] /channel_self (no overwrite)', async () => {
 it('[DELETE] /channel_self (with overwrite)', async () => {
   await resetAndSeedAppData(APPNAME)
 
-  const data = getBaseData(APPNAME)
+  const data = getUniqueBaseData(APPNAME)
   data.device_id = randomUUID().toLowerCase()
 
   const { data: productionChannel, error: productionChannelError } = await getSupabaseClient().from('channels').select('id, owner_org').eq('name', 'production').eq('app_id', APPNAME).single()
@@ -1077,7 +1083,7 @@ it('saves default_channel when provided', async () => {
 
   expect(updateError).toBeNull()
 
-  const baseData = getBaseData(APPNAME)
+  const baseData = getUniqueBaseData(APPNAME)
   baseData.device_id = uuid
   baseData.defaultChannel = testDefaultChannel
   baseData.channel = 'beta' // Required for POST /channel_self
@@ -1106,7 +1112,7 @@ it('saves default_channel when provided', async () => {
 
 describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () => {
   it('should validate and return success without storing in channel_devices for new plugin versions', async () => {
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     data.plugin_version = '7.34.0' // New version
     data.channel = 'production'
 
@@ -1132,7 +1138,7 @@ describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () =>
   })
 
   it('should return error when channel does not allow self-assignment for new plugin versions', async () => {
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     data.plugin_version = '7.34.0'
     data.channel = 'production'
 
@@ -1160,22 +1166,30 @@ describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () =>
     }
   })
 
-  it('should clean up old channel_devices entry when migrating from old to new version', async () => {
-    const deviceId = randomUUID()
-    const data = getBaseData(APPNAME)
-    data.device_id = deviceId
+	  it('should clean up old channel_devices entry when migrating from old to new version', async () => {
+	    const deviceId = randomUUID()
+	    const data = getUniqueBaseData(APPNAME)
+	    data.device_id = deviceId
 
-    // Enable allow_device_self_set for beta channel (non-default channel)
-    await getSupabaseClient()
-      .from('channels')
-      .update({ allow_device_self_set: true })
-      .eq('name', 'beta')
-      .eq('app_id', APPNAME)
+	    // Enable allow_device_self_set for beta channel (non-default channel)
+	    await getSupabaseClient()
+	      .from('channels')
+	      .update({ allow_device_self_set: true })
+	      .eq('name', 'beta')
+	      .eq('app_id', APPNAME)
 
-    try {
-      // First, set channel with old version (stores in channel_devices)
-      data.plugin_version = '7.33.0'
-      data.channel = 'beta' // Use non-default channel
+	    // Also enable it for a second channel so the migration request can avoid
+	    // the "same set max once per 60 seconds" limiter (keyed by channel).
+	    await getSupabaseClient()
+	      .from('channels')
+	      .update({ allow_device_self_set: true })
+	      .eq('name', 'development')
+	      .eq('app_id', APPNAME)
+
+	    try {
+	      // First, set channel with old version (stores in channel_devices)
+	      data.plugin_version = '7.33.0'
+	      data.channel = 'beta' // Use non-default channel
 
       const oldResponse = await fetchEndpoint('POST', data)
       expect(oldResponse.status).toBe(200)
@@ -1188,13 +1202,14 @@ describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () =>
         .eq('app_id', APPNAME)
         .maybeSingle()
 
-      expect(oldChannelDevice).toBeTruthy()
+	      expect(oldChannelDevice).toBeTruthy()
 
-      // Then, set channel with new version (should clean up old entry)
-      data.plugin_version = '7.34.0'
+	      // Then, set channel with new version (should clean up old entry)
+	      data.plugin_version = '7.34.0'
+	      data.channel = 'development'
 
-      const newResponse = await fetchEndpoint('POST', data)
-      expect(newResponse.status).toBe(200)
+	      const newResponse = await fetchEndpoint('POST', data)
+	      expect(newResponse.status).toBe(200)
 
       const result = await newResponse.json<{ status: string, allowSet: boolean }>()
       expect(result.status).toBe('ok')
@@ -1210,20 +1225,26 @@ describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () =>
 
       expect(newChannelDevice).toBeNull()
     }
-    finally {
-      // Reset beta channel
-      await getSupabaseClient()
-        .from('channels')
-        .update({ allow_device_self_set: false })
-        .eq('name', 'beta')
-        .eq('app_id', APPNAME)
-    }
-  })
-})
+	    finally {
+	      // Reset beta channel
+	      await getSupabaseClient()
+	        .from('channels')
+	        .update({ allow_device_self_set: false })
+	        .eq('name', 'beta')
+	        .eq('app_id', APPNAME)
+
+	      await getSupabaseClient()
+	        .from('channels')
+	        .update({ allow_device_self_set: false })
+	        .eq('name', 'development')
+	        .eq('app_id', APPNAME)
+	    }
+	  })
+	})
 
 describe('[PUT] /channel_self - new plugin version (>= 7.34.0) behavior', () => {
   it('should return channel from request body for new plugin versions', async () => {
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     data.plugin_version = '7.34.0'
     data.channel = 'production' // Plugin sends its local channelOverride
     data.defaultChannel = 'production'
@@ -1237,7 +1258,7 @@ describe('[PUT] /channel_self - new plugin version (>= 7.34.0) behavior', () => 
   })
 
   it('should return defaultChannel when no channel override is set', async () => {
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     data.plugin_version = '7.34.0'
     data.defaultChannel = 'production'
     // No channel field - no override
@@ -1255,7 +1276,7 @@ describe('[PUT] /channel_self - new plugin version (>= 7.34.0) behavior', () => 
 describe('[DELETE] /channel_self - new plugin version (>= 7.34.0) behavior', () => {
   it('should return success and clean up old channel_devices entries for new plugin versions', async () => {
     const deviceId = randomUUID()
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     data.device_id = deviceId
     data.plugin_version = '7.34.0'
 
@@ -1307,7 +1328,7 @@ describe('[DELETE] /channel_self - new plugin version (>= 7.34.0) behavior', () 
   })
 
   it('should return success even when no old channel_devices entry exists', async () => {
-    const data = getBaseData(APPNAME)
+    const data = getUniqueBaseData(APPNAME)
     data.plugin_version = '7.34.0'
     data.device_id = randomUUID()
 

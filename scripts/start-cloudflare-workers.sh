@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 
 # Script to start Cloudflare Workers for testing
-# This script starts all workers (D1 Sync, API, Plugin, Files) in the background
+# This script starts all workers (API, Plugin, Files) in the background
 
 set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 echo "Starting Cloudflare Workers for testing..."
 
@@ -12,17 +15,58 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Use the installed Supabase CLI in CI, fall back to bunx locally.
+if command -v supabase >/dev/null 2>&1; then
+  SUPABASE_CLI="supabase"
+else
+  SUPABASE_CLI="bunx supabase"
+fi
+
+# Build a runtime env file with local Supabase keys so we don't commit secrets.
+BASE_ENV_FILE="${ROOT_DIR}/cloudflare_workers/.env.local"
+RUNTIME_ENV_FILE="$(mktemp)"
+cp "${BASE_ENV_FILE}" "${RUNTIME_ENV_FILE}"
+
+SUPA_ENV="$(${SUPABASE_CLI} status -o env 2>/dev/null || true)"
+SUPABASE_URL_FROM_STATUS="$(printf '%s\n' "${SUPA_ENV}" | awk -F= '/^API_URL=/{print $2}' | tr -d '"')"
+SUPABASE_SERVICE_ROLE_KEY_FROM_STATUS="$(printf '%s\n' "${SUPA_ENV}" | awk -F= '/^SECRET_KEY=/{print $2}' | tr -d '"')"
+SUPABASE_ANON_KEY_FROM_STATUS="$(printf '%s\n' "${SUPA_ENV}" | awk -F= '/^PUBLISHABLE_KEY=/{print $2}' | tr -d '"')"
+
+# Allow overrides via environment, otherwise use supabase status output.
+SUPABASE_URL="${SUPABASE_URL:-${SUPABASE_URL_FROM_STATUS}}"
+SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY:-${SUPABASE_SERVICE_ROLE_KEY_FROM_STATUS}}"
+SUPABASE_ANON_KEY="${SUPABASE_ANON_KEY:-${SUPABASE_ANON_KEY_FROM_STATUS}}"
+
+if [ -z "${SUPABASE_SERVICE_ROLE_KEY}" ] || [ -z "${SUPABASE_ANON_KEY}" ] || [ -z "${SUPABASE_URL}" ]; then
+  echo -e "${YELLOW}Missing Supabase keys for Cloudflare Workers.${NC}"
+  echo "Ensure Supabase is running, or set SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and SUPABASE_ANON_KEY in your environment."
+  exit 1
+fi
+
+# Cloudflare local testing defaults.
+CLOUDFLARE_FUNCTION_URL="${CLOUDFLARE_FUNCTION_URL:-http://127.0.0.1:8787}"
+STRIPE_WEBHOOK_SECRET="${STRIPE_WEBHOOK_SECRET:-testsecret}"
+
+# In CI/linux, `host.docker.internal` is unreliable. Prefer localhost (mapped ports).
+S3_ENDPOINT_TO_USE="${S3_ENDPOINT:-127.0.0.1:9000}"
+
+cat >> "${RUNTIME_ENV_FILE}" <<EOF
+SUPABASE_URL=${SUPABASE_URL}
+SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
+CLOUDFLARE_FUNCTION_URL=${CLOUDFLARE_FUNCTION_URL}
+STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
+S3_ENDPOINT=${S3_ENDPOINT_TO_USE}
+EOF
+
 # Kill any existing wrangler processes
 echo -e "${YELLOW}Cleaning up existing wrangler processes...${NC}"
 pkill -f "wrangler dev" || true
 sleep 2
 
-# Wait a bit for the sync worker to start
-sleep 3
-
 # Start API worker on port 8787
 echo -e "${GREEN}Starting API worker on port 8787...${NC}"
-(cd cloudflare_workers/api && bunx wrangler dev -c wrangler.jsonc --port 8787 --env-file=../.env.local --env=local --persist-to ../../.wrangler-shared) &
+(cd "${ROOT_DIR}/cloudflare_workers/api" && bunx wrangler dev -c wrangler.jsonc --port 8787 --env-file="${RUNTIME_ENV_FILE}" --env=local --persist-to "${ROOT_DIR}/.wrangler-shared") &
 API_PID=$!
 
 # Wait a bit for the first worker to start
@@ -30,7 +74,7 @@ sleep 3
 
 # Start Plugin worker on port 8788
 echo -e "${GREEN}Starting Plugin worker on port 8788...${NC}"
-(cd cloudflare_workers/plugin && bunx wrangler dev -c wrangler.jsonc --port 8788 --env-file=../.env.local --env=local --persist-to ../../.wrangler-shared) &
+(cd "${ROOT_DIR}/cloudflare_workers/plugin" && bunx wrangler dev -c wrangler.jsonc --port 8788 --env-file="${RUNTIME_ENV_FILE}" --env=local --persist-to "${ROOT_DIR}/.wrangler-shared") &
 PLUGIN_PID=$!
 
 # Wait a bit for the second worker to start
@@ -38,35 +82,14 @@ sleep 3
 
 # Start Files worker on port 8789
 echo -e "${GREEN}Starting Files worker on port 8789...${NC}"
-(cd cloudflare_workers/files && bunx wrangler dev -c wrangler.jsonc --port 8789 --env-file=../.env.local --env=local --persist-to ../../.wrangler-shared) &
+(cd "${ROOT_DIR}/cloudflare_workers/files" && bunx wrangler dev -c wrangler.jsonc --port 8789 --env-file="${RUNTIME_ENV_FILE}" --env=local --persist-to "${ROOT_DIR}/.wrangler-shared") &
 FILES_PID=$!
 
 echo -e "${GREEN}All workers started!${NC}"
-echo "D1 Sync Worker PID: $SYNC_PID (http://127.0.0.1:8790)"
 echo "API Worker PID: $API_PID (http://127.0.0.1:8787)"
 echo "Plugin Worker PID: $PLUGIN_PID (http://127.0.0.1:8788)"
 echo "Files Worker PID: $FILES_PID (http://127.0.0.1:8789)"
 echo ""
-
-# Queue initial data to D1 via PGMQ (production-like approach)
-echo -e "${GREEN}Queueing initial data for D1 sync...${NC}"
-psql postgresql://postgres:postgres@127.0.0.1:54322/postgres -f scripts/trigger-initial-d1-sync.sql > /dev/null 2>&1
-if [ $? -eq 0 ]; then
-  echo -e "${GREEN}✓ Initial data queued to PGMQ${NC}"
-
-  # Trigger sync worker to process the queue
-  echo -e "${GREEN}Triggering D1 sync worker...${NC}"
-  curl -s -X POST http://127.0.0.1:8790/sync -H "x-webhook-signature: testsecret" > /dev/null 2>&1
-  if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✓ D1 sync triggered successfully${NC}"
-    sleep 2
-    echo -e "${GREEN}✓ D1 database is now ready with initial data${NC}"
-  else
-    echo -e "${YELLOW}⚠ Warning: Failed to trigger D1 sync${NC}"
-  fi
-else
-  echo -e "${YELLOW}⚠ Warning: Failed to queue initial data${NC}"
-fi
 
 echo ""
 echo "Press Ctrl+C to stop all workers"
@@ -74,8 +97,9 @@ echo "Press Ctrl+C to stop all workers"
 # Function to cleanup on exit
 cleanup() {
   echo -e "\n${YELLOW}Stopping workers...${NC}"
-  kill $SYNC_PID $API_PID $PLUGIN_PID $FILES_PID 2>/dev/null || true
+  kill $API_PID $PLUGIN_PID $FILES_PID 2>/dev/null || true
   pkill -f "wrangler dev" || true
+  rm -f "${RUNTIME_ENV_FILE}" 2>/dev/null || true
   echo -e "${GREEN}All workers stopped${NC}"
 }
 
