@@ -5,6 +5,7 @@ import { checkChannelSelfIPRateLimit, isChannelSelfRateLimited, recordChannelSel
 import { getBodyOrQuery, honoFactory, parseBody, simpleRateLimit } from '../../utils/hono.ts'
 import { middlewareKey } from '../../utils/hono_middleware.ts'
 import { cloudlog } from '../../utils/logging.ts'
+import { backgroundTask } from '../../utils/utils.ts'
 import { deleteOverride } from './delete.ts'
 import { get } from './get.ts'
 import { post } from './post.ts'
@@ -28,10 +29,29 @@ async function assertDeviceIPRateLimit(c: Context, appId: string) {
 }
 
 function recordDeviceIPRateLimit(c: Context, appId: string) {
-  // Rate limiting must be effective immediately (especially in Workers where
-  // waitUntil/background tasks may not complete before a rapid follow-up
-  // request). Best-effort, but do it synchronously.
+  // IP rate limiting is a second-layer limiter (per-minute) and is not required
+  // for per-operation burst enforcement. Record it in the background.
   return recordChannelSelfIPRequest(c, appId)
+}
+
+async function recordDeviceRateLimitSafely(
+  c: Context,
+  body: Partial<DeviceLink>,
+  operation: 'set' | 'get' | 'delete',
+) {
+  // Intentionally awaited for op-level rate limiting: this is the limiter that
+  // must be effective immediately for burst protection.
+  if (body.device_id && body.app_id) {
+    try {
+      await recordChannelSelfRequest(c, body.app_id, body.device_id, operation)
+    }
+    catch (error) {
+      cloudlog({ requestId: c.get('requestId'), message: `Failed to record device ${operation} rate limit`, app_id: body.app_id, device_id: body.device_id, error })
+    }
+  }
+  if (body.app_id) {
+    backgroundTask(c, recordDeviceIPRateLimit(c, body.app_id))
+  }
 }
 
 export const app = honoFactory.createApp()
@@ -70,22 +90,7 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
   }
   finally {
     // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse through repeated invalid requests)
-    if (body.device_id && body.app_id) {
-      try {
-        await recordChannelSelfRequest(c, body.app_id, body.device_id, 'set')
-      }
-      catch (error) {
-        cloudlog({ requestId: c.get('requestId'), message: 'Failed to record device set rate limit', app_id: body.app_id, device_id: body.device_id, error })
-      }
-    }
-    if (body.app_id) {
-      try {
-        await recordDeviceIPRateLimit(c, body.app_id)
-      }
-      catch (error) {
-        cloudlog({ requestId: c.get('requestId'), message: 'Failed to record device IP rate limit', app_id: body.app_id, error })
-      }
-    }
+    await recordDeviceRateLimitSafely(c, body, 'set')
   }
 })
 
@@ -120,22 +125,7 @@ app.get('/', middlewareKey(['all', 'write', 'read']), async (c) => {
   }
   finally {
     // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse through repeated invalid requests)
-    if (body.device_id && body.app_id) {
-      try {
-        await recordChannelSelfRequest(c, body.app_id, body.device_id, 'get')
-      }
-      catch (error) {
-        cloudlog({ requestId: c.get('requestId'), message: 'Failed to record device get rate limit', app_id: body.app_id, device_id: body.device_id, error })
-      }
-    }
-    if (body.app_id) {
-      try {
-        await recordDeviceIPRateLimit(c, body.app_id)
-      }
-      catch (error) {
-        cloudlog({ requestId: c.get('requestId'), message: 'Failed to record device IP rate limit', app_id: body.app_id, error })
-      }
-    }
+    await recordDeviceRateLimitSafely(c, body, 'get')
   }
 })
 
@@ -170,21 +160,6 @@ app.delete('/', middlewareKey(['all', 'write']), async (c) => {
   }
   finally {
     // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse through repeated invalid requests)
-    if (body.device_id && body.app_id) {
-      try {
-        await recordChannelSelfRequest(c, body.app_id, body.device_id, 'delete')
-      }
-      catch (error) {
-        cloudlog({ requestId: c.get('requestId'), message: 'Failed to record device delete rate limit', app_id: body.app_id, device_id: body.device_id, error })
-      }
-    }
-    if (body.app_id) {
-      try {
-        await recordDeviceIPRateLimit(c, body.app_id)
-      }
-      catch (error) {
-        cloudlog({ requestId: c.get('requestId'), message: 'Failed to record device IP rate limit', app_id: body.app_id, error })
-      }
-    }
+    await recordDeviceRateLimitSafely(c, body, 'delete')
   }
 })

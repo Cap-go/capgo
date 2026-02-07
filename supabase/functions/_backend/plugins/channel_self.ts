@@ -50,6 +50,32 @@ function recordChannelSelfIPRateLimit(c: Context, appId: string) {
   backgroundTask(c, recordChannelSelfIPRequest(c, appId))
 }
 
+async function recordChannelSelfRequestSafely(
+  c: Context,
+  appId: string,
+  deviceId: string,
+  operation: 'set' | 'get' | 'delete' | 'list',
+  channel?: string,
+) {
+  // Intentionally awaited: in Cloudflare Workers local testing we disable
+  // background tasks (`CAPGO_PREVENT_BACKGROUND_FUNCTIONS=true`) and
+  // `waitUntil` is not guaranteed in all runtimes. Awaiting ensures the
+  // Cache-based limiter is updated before a rapid follow-up request.
+  try {
+    await recordChannelSelfRequest(c, appId, deviceId, operation, channel)
+  }
+  catch (error) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: `Failed to record channel_self ${operation} rate limit`,
+      app_id: appId,
+      device_id: deviceId,
+      channel,
+      error,
+    })
+  }
+}
+
 export const jsonRequestSchema = z.looseObject({
   app_id: z.string({
     error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,
@@ -585,12 +611,7 @@ app.post('/', async (c) => {
   finally {
     await closeClient(c, pgClient)
     // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse)
-    try {
-      await recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'set', bodyParsed.channel)
-    }
-    catch (error) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Failed to record channel_self set rate limit', app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, channel: bodyParsed.channel, error })
-    }
+    await recordChannelSelfRequestSafely(c, bodyParsed.app_id, bodyParsed.device_id, 'set', bodyParsed.channel)
     recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
   }
 })
@@ -630,12 +651,7 @@ app.put('/', async (c) => {
   finally {
     await closeClient(c, pgClient)
     // Record the request for rate limiting (all requests to prevent abuse)
-    try {
-      await recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'get')
-    }
-    catch (error) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Failed to record channel_self get rate limit', app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, error })
-    }
+    await recordChannelSelfRequestSafely(c, bodyParsed.app_id, bodyParsed.device_id, 'get')
     recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
   }
 })
@@ -675,12 +691,7 @@ app.delete('/', async (c) => {
   finally {
     await closeClient(c, pgClient)
     // Record the request for rate limiting (all requests to prevent abuse)
-    try {
-      await recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'delete')
-    }
-    catch (error) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Failed to record channel_self delete rate limit', app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, error })
-    }
+    await recordChannelSelfRequestSafely(c, bodyParsed.app_id, bodyParsed.device_id, 'delete')
     recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
   }
 })
@@ -724,12 +735,7 @@ app.get('/', async (c) => {
     // Note: body.device_id is used since jsonRequestSchemaGet doesn't include device_id,
     // but parsePluginBody lowercases it in the body object before validation
     if (body.device_id) {
-      try {
-        await recordChannelSelfRequest(c, bodyParsed.app_id, body.device_id, 'list')
-      }
-      catch (error) {
-        cloudlog({ requestId: c.get('requestId'), message: 'Failed to record channel_self list rate limit', app_id: bodyParsed.app_id, device_id: body.device_id, error })
-      }
+      await recordChannelSelfRequestSafely(c, bodyParsed.app_id, body.device_id, 'list')
     }
     recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
   }
