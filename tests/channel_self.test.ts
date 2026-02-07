@@ -1166,30 +1166,30 @@ describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () =>
     }
   })
 
-	  it('should clean up old channel_devices entry when migrating from old to new version', async () => {
-	    const deviceId = randomUUID()
-	    const data = getUniqueBaseData(APPNAME)
-	    data.device_id = deviceId
+  it('should clean up old channel_devices entry when migrating from old to new version', async () => {
+    const deviceId = randomUUID()
+    const data = getUniqueBaseData(APPNAME)
+    data.device_id = deviceId
 
-	    // Enable allow_device_self_set for beta channel (non-default channel)
-	    await getSupabaseClient()
-	      .from('channels')
-	      .update({ allow_device_self_set: true })
-	      .eq('name', 'beta')
-	      .eq('app_id', APPNAME)
+    // Enable allow_device_self_set for beta channel (non-default channel)
+    await getSupabaseClient()
+      .from('channels')
+      .update({ allow_device_self_set: true })
+      .eq('name', 'beta')
+      .eq('app_id', APPNAME)
 
-	    // Also enable it for a second channel so the migration request can avoid
-	    // the "same set max once per 60 seconds" limiter (keyed by channel).
-	    await getSupabaseClient()
-	      .from('channels')
-	      .update({ allow_device_self_set: true })
-	      .eq('name', 'development')
-	      .eq('app_id', APPNAME)
+    // Also enable it for a second channel so the migration request can avoid
+    // the "same set max once per 60 seconds" limiter (keyed by channel).
+    await getSupabaseClient()
+      .from('channels')
+      .update({ allow_device_self_set: true })
+      .eq('name', 'development')
+      .eq('app_id', APPNAME)
 
-	    try {
-	      // First, set channel with old version (stores in channel_devices)
-	      data.plugin_version = '7.33.0'
-	      data.channel = 'beta' // Use non-default channel
+    try {
+      // First, set channel with old version (stores in channel_devices)
+      data.plugin_version = '7.33.0'
+      data.channel = 'beta' // Use non-default channel
 
       const oldResponse = await fetchEndpoint('POST', data)
       expect(oldResponse.status).toBe(200)
@@ -1202,14 +1202,14 @@ describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () =>
         .eq('app_id', APPNAME)
         .maybeSingle()
 
-	      expect(oldChannelDevice).toBeTruthy()
+      expect(oldChannelDevice).toBeTruthy()
 
-	      // Then, set channel with new version (should clean up old entry)
-	      data.plugin_version = '7.34.0'
-	      data.channel = 'development'
+      // Then, set channel with new version (should clean up old entry)
+      data.plugin_version = '7.34.0'
+      data.channel = 'development'
 
-	      const newResponse = await fetchEndpoint('POST', data)
-	      expect(newResponse.status).toBe(200)
+      const newResponse = await fetchEndpoint('POST', data)
+      expect(newResponse.status).toBe(200)
 
       const result = await newResponse.json<{ status: string, allowSet: boolean }>()
       expect(result.status).toBe('ok')
@@ -1225,22 +1225,22 @@ describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () =>
 
       expect(newChannelDevice).toBeNull()
     }
-	    finally {
-	      // Reset beta channel
-	      await getSupabaseClient()
-	        .from('channels')
-	        .update({ allow_device_self_set: false })
-	        .eq('name', 'beta')
-	        .eq('app_id', APPNAME)
+    finally {
+      // Reset beta channel
+      await getSupabaseClient()
+        .from('channels')
+        .update({ allow_device_self_set: false })
+        .eq('name', 'beta')
+        .eq('app_id', APPNAME)
 
-	      await getSupabaseClient()
-	        .from('channels')
-	        .update({ allow_device_self_set: false })
-	        .eq('name', 'development')
-	        .eq('app_id', APPNAME)
-	    }
-	  })
-	})
+      await getSupabaseClient()
+        .from('channels')
+        .update({ allow_device_self_set: false })
+        .eq('name', 'development')
+        .eq('app_id', APPNAME)
+    }
+  })
+})
 
 describe('[PUT] /channel_self - new plugin version (>= 7.34.0) behavior', () => {
   it('should return channel from request body for new plugin versions', async () => {

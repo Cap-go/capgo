@@ -22,15 +22,32 @@ else
   SUPABASE_CLI="bunx supabase"
 fi
 
+# Extract a single variable from `supabase status -o env`, preserving any '=' in values (JWT padding).
+get_supabase_status_var() {
+  local key_regex="$1"
+  # Output looks like: KEY="value" or KEY=value
+  printf '%s\n' "${SUPA_ENV}" \
+    | grep -E "^(${key_regex})=" \
+    | head -n 1 \
+    | sed -E 's/^[^=]+=//' \
+    | sed -E 's/^"//; s/"$//'
+}
+
 # Build a runtime env file with local Supabase keys so we don't commit secrets.
 BASE_ENV_FILE="${ROOT_DIR}/cloudflare_workers/.env.local"
-RUNTIME_ENV_FILE="$(mktemp)"
-cp "${BASE_ENV_FILE}" "${RUNTIME_ENV_FILE}"
+RUNTIME_ENV_FILE="$(mktemp "${TMPDIR:-/tmp}/capgo-cloudflare-env.XXXXXX")"
+chmod 600 "${RUNTIME_ENV_FILE}"
+if [ -f "${BASE_ENV_FILE}" ]; then
+  cp "${BASE_ENV_FILE}" "${RUNTIME_ENV_FILE}"
+else
+  echo -e "${YELLOW}Warning: ${BASE_ENV_FILE} not found - starting with empty base env${NC}"
+fi
 
 SUPA_ENV="$(${SUPABASE_CLI} status -o env 2>/dev/null || true)"
-SUPABASE_URL_FROM_STATUS="$(printf '%s\n' "${SUPA_ENV}" | awk -F= '/^API_URL=/{print $2}' | tr -d '"')"
-SUPABASE_SERVICE_ROLE_KEY_FROM_STATUS="$(printf '%s\n' "${SUPA_ENV}" | awk -F= '/^SECRET_KEY=/{print $2}' | tr -d '"')"
-SUPABASE_ANON_KEY_FROM_STATUS="$(printf '%s\n' "${SUPA_ENV}" | awk -F= '/^PUBLISHABLE_KEY=/{print $2}' | tr -d '"')"
+SUPABASE_URL_FROM_STATUS="$(get_supabase_status_var 'API_URL')"
+# Supabase CLI has historically emitted either SERVICE_ROLE_KEY/ANON_KEY or SECRET_KEY/PUBLISHABLE_KEY.
+SUPABASE_SERVICE_ROLE_KEY_FROM_STATUS="$(get_supabase_status_var 'SERVICE_ROLE_KEY|SECRET_KEY')"
+SUPABASE_ANON_KEY_FROM_STATUS="$(get_supabase_status_var 'ANON_KEY|PUBLISHABLE_KEY')"
 
 # Allow overrides via environment, otherwise use supabase status output.
 SUPABASE_URL="${SUPABASE_URL:-${SUPABASE_URL_FROM_STATUS}}"

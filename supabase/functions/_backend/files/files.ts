@@ -233,15 +233,17 @@ async function uploadHandler(c: Context) {
   }
 
   const handler = durableObjNs.get(durableObjNs.idFromName(normalizedRequestId))
-  cloudlog({ requestId: c.get('requestId'), message: 'upload handler - forwarding to DO', method: c.req.method, url: c.req.url })
+  cloudlog({ requestId: c.get('requestId'), message: 'upload handler - forwarding to DO', method: c.req.raw.method, url: c.req.url })
 
   // Pass requestId to DO via header so it can use it in logs
   const headers = new Headers(c.req.raw.headers)
   headers.set('X-Request-Id', c.get('requestId') || 'unknown')
 
+  const method = c.req.raw.method
   return await handler.fetch(c.req.url, {
-    body: c.req.raw.body,
-    method: c.req.method,
+    // HEAD must not forward a request body and must preserve the verb (Hono/tiny maps HEAD to GET).
+    body: method === 'HEAD' ? undefined : c.req.raw.body,
+    method,
     headers,
     signal: AbortSignal.timeout(DO_CALL_TIMEOUT),
   })
