@@ -47,8 +47,9 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION "public"."has_auth_or_valid_apikey"("keymode" "public"."key_mode"[]) TO "anon";
-GRANT EXECUTE ON FUNCTION "public"."has_auth_or_valid_apikey"("keymode" "public"."key_mode"[]) TO "authenticated";
+-- NOTE: GRANT/REVOKE must specify only argument types (not parameter names).
+GRANT EXECUTE ON FUNCTION "public"."has_auth_or_valid_apikey"("public"."key_mode"[]) TO "anon";
+GRANT EXECUTE ON FUNCTION "public"."has_auth_or_valid_apikey"("public"."key_mode"[]) TO "authenticated";
 
 -- 2) Compute readable app_ids once per statement, then let policies use a simple index predicate:
 --    app_id = ANY(allowed_read_apps()).
@@ -72,20 +73,22 @@ DECLARE
 BEGIN
   SELECT auth.uid() INTO v_user_id;
 
-  -- Always load api key if present; RBAC permissions may be bound to the API key principal.
-  SELECT public.get_apikey_header() INTO v_api_key_text;
-  IF v_api_key_text IS NOT NULL THEN
-    SELECT * FROM public.find_apikey_by_value(v_api_key_text) INTO v_api_key;
-    IF v_api_key.id IS NOT NULL
-      AND v_api_key.mode = ANY('{read,upload,write,all}'::public.key_mode[])
-      AND NOT public.is_apikey_expired(v_api_key.expires_at)
-    THEN
-      IF v_user_id IS NULL THEN
+  -- IMPORTANT: If the request is already authenticated, ignore any provided API key.
+  -- This preserves the historical behavior where a stray `capgkey` header does not
+  -- reduce the user's access compared to a normal authenticated request.
+  IF v_user_id IS NULL THEN
+    SELECT public.get_apikey_header() INTO v_api_key_text;
+    IF v_api_key_text IS NOT NULL THEN
+      SELECT * FROM public.find_apikey_by_value(v_api_key_text) INTO v_api_key;
+      IF v_api_key.id IS NOT NULL
+        AND v_api_key.mode = ANY('{read,upload,write,all}'::public.key_mode[])
+        AND NOT public.is_apikey_expired(v_api_key.expires_at)
+      THEN
         v_user_id := v_api_key.user_id;
+      ELSE
+        -- Treat invalid/mismatched/expired keys as absent (fail closed).
+        v_api_key := NULL;
       END IF;
-    ELSE
-      -- Treat invalid/mismatched/expired keys as absent (fail closed).
-      v_api_key := NULL;
     END IF;
   END IF;
 
@@ -221,8 +224,8 @@ DROP POLICY IF EXISTS "Allow select for auth, api keys (super_admin+)" ON "publi
 CREATE POLICY "Allow select for auth, api keys (super_admin+)" ON "public"."audit_logs"
 FOR SELECT TO "anon", "authenticated"
 USING (
-  public.has_auth_or_valid_apikey('{read,upload,write,all}'::public.key_mode[])
-  AND "org_id" = ANY("public"."audit_logs_allowed_orgs"())
+  "org_id" = ANY("public"."audit_logs_allowed_orgs"())
+  AND public.has_auth_or_valid_apikey('{read,upload,write,all}'::public.key_mode[])
 );
 
 -- app_versions + app_versions_meta: avoid per-row identity resolution; use allowed_read_apps().
@@ -230,26 +233,29 @@ DROP POLICY IF EXISTS "Allow for auth, api keys (read+)" ON "public"."app_versio
 CREATE POLICY "Allow for auth, api keys (read+)" ON "public"."app_versions"
 FOR SELECT TO "anon", "authenticated"
 USING (
-  public.has_auth_or_valid_apikey('{read,upload,write,all}'::public.key_mode[])
-  AND "app_id" = ANY("public"."allowed_read_apps"())
+  "app_id" = ANY("public"."allowed_read_apps"())
+  AND public.has_auth_or_valid_apikey('{read,upload,write,all}'::public.key_mode[])
 );
 
 DROP POLICY IF EXISTS "Allow read for auth (read+)" ON "public"."app_versions_meta";
 CREATE POLICY "Allow read for auth (read+)" ON "public"."app_versions_meta"
 FOR SELECT TO "anon", "authenticated"
 USING (
-  public.has_auth_or_valid_apikey('{read,upload,write,all}'::public.key_mode[])
-  AND "app_id" = ANY("public"."allowed_read_apps"())
+  "app_id" = ANY("public"."allowed_read_apps"())
+  AND public.has_auth_or_valid_apikey('{read,upload,write,all}'::public.key_mode[])
 );
 
 -- 4) (Optional hardening) Replace common read policies to avoid per-row get_identity_org_appid() on large tables.
+-- NOTE: This intentionally deviates from the "use get_identity_org_appid() in every policy" convention
+-- for large tables, because per-row identity resolution is the root cause of the PostgREST DoS vector.
+-- The statement-scoped helpers keep the same security checks, but compute them once per statement.
 -- apps
 DROP POLICY IF EXISTS "Allow for auth, api keys (read+)" ON "public"."apps";
 CREATE POLICY "Allow for auth, api keys (read+)" ON "public"."apps"
 FOR SELECT TO "anon", "authenticated"
 USING (
-  public.has_auth_or_valid_apikey('{read,upload,write,all}'::public.key_mode[])
-  AND "app_id" = ANY("public"."allowed_read_apps"())
+  "app_id" = ANY("public"."allowed_read_apps"())
+  AND public.has_auth_or_valid_apikey('{read,upload,write,all}'::public.key_mode[])
 );
 
 -- channels
@@ -257,8 +263,8 @@ DROP POLICY IF EXISTS "Allow select for auth, api keys (read+)" ON "public"."cha
 CREATE POLICY "Allow select for auth, api keys (read+)" ON "public"."channels"
 FOR SELECT TO "anon", "authenticated"
 USING (
-  public.has_auth_or_valid_apikey('{read,upload,write,all}'::public.key_mode[])
-  AND "app_id" = ANY("public"."allowed_read_apps"())
+  "app_id" = ANY("public"."allowed_read_apps"())
+  AND public.has_auth_or_valid_apikey('{read,upload,write,all}'::public.key_mode[])
 );
 
 -- channel_devices
@@ -267,8 +273,8 @@ DROP POLICY IF EXISTS "Allow read for auth (read+)" ON "public"."channel_devices
 CREATE POLICY "Allow read for auth, api keys (read+)" ON "public"."channel_devices"
 FOR SELECT TO "anon", "authenticated"
 USING (
-  public.has_auth_or_valid_apikey('{read,upload,write,all}'::public.key_mode[])
-  AND "app_id" = ANY("public"."allowed_read_apps"())
+  "app_id" = ANY("public"."allowed_read_apps"())
+  AND public.has_auth_or_valid_apikey('{read,upload,write,all}'::public.key_mode[])
 );
 
 -- build_requests
@@ -276,6 +282,6 @@ DROP POLICY IF EXISTS "Allow org members to select build_requests" ON "public"."
 CREATE POLICY "Allow org members to select build_requests" ON "public"."build_requests"
 FOR SELECT TO "anon", "authenticated"
 USING (
-  public.has_auth_or_valid_apikey('{read,upload,write,all}'::public.key_mode[])
-  AND "app_id" = ANY("public"."allowed_read_apps"())
+  "app_id" = ANY("public"."allowed_read_apps"())
+  AND public.has_auth_or_valid_apikey('{read,upload,write,all}'::public.key_mode[])
 );
