@@ -138,10 +138,15 @@ export async function setReplicationLagHeader(c: Context, pool: Pool): Promise<v
   }
 }
 
+/**
+ * Best-effort response header setter.
+ *
+ * In Cloudflare Workers, we sometimes run background tasks via `waitUntil()`
+ * after the response has started streaming. Hono's `c.header()` clones the
+ * Response and reuses the body stream; if the stream is already used/locked
+ * this can throw (e.g. "ReadableStream is disturbed").
+ */
 function safeSetResponseHeader(c: Context, name: string, value: string): void {
-  // In Cloudflare Workers, we run some tasks via `waitUntil()` after the response
-  // has started streaming. Hono's `c.header()` clones the Response using the
-  // current body stream, which can be "disturbed"/locked at that point.
   try {
     const res = c.res
     if (res?.bodyUsed)
@@ -162,6 +167,10 @@ function safeSetResponseHeader(c: Context, name: string, value: string): void {
   }
 }
 
+/**
+ * Store the selected DB source in the context (for logging) and try to also
+ * expose it via a response header when still safe to mutate headers.
+ */
 function setDatabaseSource(c: Context, source: string): void {
   try {
     c.set('databaseSource', source)

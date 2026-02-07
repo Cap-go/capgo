@@ -10,7 +10,12 @@ describe('getDatabaseURL header safety', () => {
     let headerCalls = 0
     const ctx = {
       res,
-      env: {},
+      env: {
+        // Provide a deterministic code path that doesn't depend on host env vars.
+        HYPERDRIVE_CAPGO_DIRECT_EU: { connectionString: 'postgres://postgres:postgres@localhost:5432/postgres' },
+        // Included to satisfy environments where `getEnv()` might read from `c.env`.
+        SUPABASE_DB_URL: 'postgres://postgres:postgres@localhost:5432/postgres',
+      },
       header: () => {
         headerCalls++
         throw new TypeError('This ReadableStream is disturbed (has already been read from), and cannot be used as a body.')
@@ -37,7 +42,12 @@ describe('getDatabaseURL header safety', () => {
     let headerCalls = 0
     const ctx = {
       res,
-      env: {},
+      env: {
+        // Provide a deterministic code path that doesn't depend on host env vars.
+        HYPERDRIVE_CAPGO_DIRECT_EU: { connectionString: 'postgres://postgres:postgres@localhost:5432/postgres' },
+        // Included to satisfy environments where `getEnv()` might read from `c.env`.
+        SUPABASE_DB_URL: 'postgres://postgres:postgres@localhost:5432/postgres',
+      },
       header: () => {
         headerCalls++
         throw new TypeError('This ReadableStream is disturbed (has already been read from), and cannot be used as a body.')
