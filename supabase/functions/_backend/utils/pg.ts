@@ -132,10 +132,53 @@ async function queryReplicaLag(c: Context, pool: Pool): Promise<ReplicationLagSt
  */
 export async function setReplicationLagHeader(c: Context, pool: Pool): Promise<void> {
   const status = await queryReplicaLag(c, pool)
-  c.header('X-Replication-Lag', status.status)
+  safeSetResponseHeader(c, 'X-Replication-Lag', status.status)
   if (status.max_lag_seconds !== null) {
-    c.header('X-Replication-Lag-Seconds', String(Math.round(status.max_lag_seconds)))
+    safeSetResponseHeader(c, 'X-Replication-Lag-Seconds', String(Math.round(status.max_lag_seconds)))
   }
+}
+
+/**
+ * Best-effort response header setter.
+ *
+ * In Cloudflare Workers, we sometimes run background tasks via `waitUntil()`
+ * after the response has started streaming. Hono's `c.header()` clones the
+ * Response and reuses the body stream; if the stream is already used/locked
+ * this can throw (e.g. "ReadableStream is disturbed").
+ */
+function safeSetResponseHeader(c: Context, name: string, value: string): void {
+  try {
+    const res = c.res
+    if (res?.bodyUsed)
+      return
+    const body = res?.body as unknown as { locked?: boolean } | null
+    if (body?.locked)
+      return
+  }
+  catch {
+    return
+  }
+
+  try {
+    c.header(name, value)
+  }
+  catch {
+    // Best-effort only: avoid crashing background tasks due to header mutation.
+  }
+}
+
+/**
+ * Store the selected DB source in the context (for logging) and try to also
+ * expose it via a response header when still safe to mutate headers.
+ */
+function setDatabaseSource(c: Context, source: string): void {
+  try {
+    c.set('databaseSource', source)
+  }
+  catch {
+    // Ignore: mostly useful for logging in request-scoped context.
+  }
+  safeSetResponseHeader(c, 'X-Database-Source', source)
 }
 
 export function getDatabaseURL(c: Context, readOnly = false): string {
@@ -147,37 +190,37 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
     // When using Hyperdrive we use session databases directly to avoid supabase pooler overhead and allow prepared statements
     // Asia region - Japan
     if (c.env.HYPERDRIVE_CAPGO_PS_AS_JAPAN && dbRegion === 'AS_JAPAN') {
-      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_PLANETSCALE_AS_JAPAN')
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_AS_JAPAN')
       cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_AS_JAPAN for read-only' })
       return c.env.HYPERDRIVE_CAPGO_PS_AS_JAPAN.connectionString
     }
     // Asia region - India
     if (c.env.HYPERDRIVE_CAPGO_PS_AS_INDIA && dbRegion === 'AS_INDIA') {
-      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_PLANETSCALE_AS_INDIA')
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_AS_INDIA')
       cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_AS_INDIA for read-only' })
       return c.env.HYPERDRIVE_CAPGO_PS_AS_INDIA.connectionString
     }
     // // US region
     if (c.env.HYPERDRIVE_CAPGO_PS_NA && dbRegion === 'NA') {
-      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_PLANETSCALE_NA')
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_NA')
       cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_NA for read-only' })
       return c.env.HYPERDRIVE_CAPGO_PS_NA.connectionString
     }
     // // EU region
     if (c.env.HYPERDRIVE_CAPGO_PS_EU && dbRegion === 'EU') {
-      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_PLANETSCALE_EU')
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_EU')
       cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_EU for read-only' })
       return c.env.HYPERDRIVE_CAPGO_PS_EU.connectionString
     }
     // // OC region
     if (c.env.HYPERDRIVE_CAPGO_PS_OC && dbRegion === 'OC') {
-      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_PLANETSCALE_OC')
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_OC')
       cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_OC for read-only' })
       return c.env.HYPERDRIVE_CAPGO_PS_OC.connectionString
     }
     // // SA region
     if (c.env.HYPERDRIVE_CAPGO_PS_SA && dbRegion === 'SA') {
-      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_PLANETSCALE_SA')
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_SA')
       cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_SA for read-only' })
       return c.env.HYPERDRIVE_CAPGO_PS_SA.connectionString
     }
@@ -185,20 +228,20 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
 
   // Fallback to single Hyperdrive if available
   if (c.env.HYPERDRIVE_CAPGO_DIRECT_EU) {
-    c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_DIRECT_EU')
+    setDatabaseSource(c, 'HYPERDRIVE_CAPGO_DIRECT_EU')
     cloudlog({ requestId: c.get('requestId'), message: `Using HYPERDRIVE_CAPGO_DIRECT_EU for ${readOnly ? 'read-only' : 'read-write'}` })
     return c.env.HYPERDRIVE_CAPGO_DIRECT_EU.connectionString
   }
 
   // Main DB write poller EU region in supabase
   if (existInEnv(c, 'MAIN_SUPABASE_DB_URL')) {
-    c.header('X-Database-Source', 'sb_pooler_main')
+    setDatabaseSource(c, 'sb_pooler_main')
     cloudlog({ requestId: c.get('requestId'), message: 'Using MAIN_SUPABASE_DB_URL for read-write' })
     return getEnv(c, 'MAIN_SUPABASE_DB_URL')
   }
 
   // Default Supabase direct connection used for testing or if no other option is available
-  c.header('X-Database-Source', 'direct')
+  setDatabaseSource(c, 'direct')
   cloudlog({ requestId: c.get('requestId'), message: 'Using Direct Supabase for read-write' })
   return fixSupabaseHost(getEnv(c, 'SUPABASE_DB_URL'))
 }
@@ -207,7 +250,7 @@ export function getPgClient(c: Context, readOnly = false) {
   const dbUrl = getDatabaseURL(c, readOnly)
   const requestId = c.get('requestId')
   const appName = c.res.headers.get('X-Worker-Source') ?? 'unknown source'
-  const dbName = c.res.headers.get('X-Database-Source') ?? 'unknown source'
+  const dbName = String(c.get('databaseSource') ?? c.res.headers.get('X-Database-Source') ?? 'unknown source')
   cloudlog({ requestId, message: 'SUPABASE_DB_URL selected', dbName, appName, readOnly })
 
   const isPooler = dbName.startsWith('sb_pooler')
