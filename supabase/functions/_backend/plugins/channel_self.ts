@@ -1,5 +1,6 @@
 // channel self old function
 import type { Context } from 'hono'
+import type { ZodMiniObject } from 'zod/mini'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { DeviceLink } from '../utils/plugin_parser.ts'
 import type { Database } from '../utils/supabase.types.ts'
@@ -50,6 +51,102 @@ function recordChannelSelfIPRateLimit(c: Context, appId: string) {
   backgroundTask(c, recordChannelSelfIPRequest(c, appId))
 }
 
+async function recordChannelSelfRequestSafely(
+  c: Context,
+  appId: string,
+  deviceId: string,
+  operation: 'set' | 'get' | 'delete' | 'list',
+  channel?: string,
+) {
+  // Intentionally awaited: in Cloudflare Workers local testing we disable
+  // background tasks (`CAPGO_PREVENT_BACKGROUND_FUNCTIONS=true`) and
+  // `waitUntil` is not guaranteed in all runtimes. Awaiting ensures the
+  // Cache-based limiter is updated before a rapid follow-up request.
+  try {
+    await recordChannelSelfRequest(c, appId, deviceId, operation, channel)
+  }
+  catch (error) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: `Failed to record channel_self ${operation} rate limit`,
+      app_id: appId,
+      device_id: deviceId,
+      channel,
+      error,
+    })
+  }
+}
+
+type AppOwnerResult = Awaited<ReturnType<typeof getAppOwnerPostgres>>
+
+async function assertChannelSelfCachedStatus(c: Context, appId: string, device: ReturnType<typeof makeDevice>, operationLabel: string) {
+  const cachedStatus = await getAppStatus(c, appId)
+  if (cachedStatus === 'onprem') {
+    cloudlog({ requestId: c.get('requestId'), message: `Channel_self cache hit (${operationLabel}), app marked onprem`, app_id: appId })
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  }
+  if (cachedStatus === 'cancelled') {
+    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  }
+}
+
+async function assertChannelSelfAppOwnerPlanValid(
+  c: Context,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  appId: string,
+  device: ReturnType<typeof makeDevice>,
+  operationLabel: string,
+  deviceId?: string,
+): Promise<{ response: Response } | { appOwner: NonNullable<AppOwnerResult> }> {
+  const appOwner = await getAppOwnerPostgres(c, appId, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
+
+  if (!appOwner) {
+    cloudlog({ requestId: c.get('requestId'), message: `On-premise app detected in channel_self ${operationLabel}, returning 429`, app_id: appId })
+    await setAppStatus(c, appId, 'onprem')
+    return { response: c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429) }
+  }
+
+  if (!appOwner.plan_valid) {
+    await setAppStatus(c, appId, 'cancelled')
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: appId })
+    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+
+    // Send weekly notification about missing payment (not configurable - payment related)
+    const payload = deviceId
+      ? { app_id: appId, device_id: deviceId, app_id_url: appId }
+      : { app_id: appId, app_id_url: appId }
+    backgroundTask(c, sendNotifOrgCached(
+      c,
+      'org:missing_payment',
+      payload,
+      appOwner.owner_org,
+      appId,
+      '0 0 * * 1',
+      appOwner.orgs.management_email,
+      drizzleClient,
+    )) // Weekly on Monday
+
+    return { response: c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429) }
+  }
+
+  await setAppStatus(c, appId, 'cloud')
+  return { appOwner }
+}
+
+function isChannelSelfLocalChannelStorageVersion(c: Context, body: DeviceLink, operationLabel: string) {
+  const pluginVersion = body.plugin_version || '0.0.0'
+  try {
+    const parsed = parse(pluginVersion)
+    return !isDeprecatedPluginVersion(parsed, CHANNEL_SELF_MIN_V5, CHANNEL_SELF_MIN_V6, CHANNEL_SELF_MIN_V7, CHANNEL_SELF_MIN_V8)
+  }
+  catch (error) {
+    // If version parsing fails, assume old version
+    cloudlog({ requestId: c.get('requestId'), message: `Failed to parse plugin version in ${operationLabel}, assuming old version`, plugin_version: pluginVersion, error })
+    return false
+  }
+}
+
 export const jsonRequestSchema = z.looseObject({
   app_id: z.string({
     error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,
@@ -88,38 +185,17 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   const device = makeDevice(body)
   const { app_id, device_id, channel } = body
 
-  const cachedStatus = await getAppStatus(c, app_id)
-  if (cachedStatus === 'onprem') {
-    cloudlog({ requestId: c.get('requestId'), message: 'Channel_self cache hit, app marked onprem', app_id })
-    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  const cachedLimit = await assertChannelSelfCachedStatus(c, app_id, device, 'post')
+  if (cachedLimit) {
+    return cachedLimit
   }
-  if (cachedStatus === 'cancelled') {
-    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
-  }
+
   // Check if app exists first - Read operation can use v2 flag
-  const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
-
-  if (!appOwner) {
-    // On-premise app detected - return 429 to prevent DDOS
-    cloudlog({ requestId: c.get('requestId'), message: 'On-premise app detected in channel_self POST, returning 429', app_id })
-    await setAppStatus(c, app_id, 'onprem')
-    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, app_id, device, 'POST', device_id)
+  if ('response' in ownerRes) {
+    return ownerRes.response
   }
-  if (!appOwner.plan_valid) {
-    await setAppStatus(c, app_id, 'cancelled')
-    cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
-    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    // Send weekly notification about missing payment (not configurable - payment related)
-    backgroundTask(c, sendNotifOrgCached(c, 'org:missing_payment', {
-      app_id,
-      device_id,
-      app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
-    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
-  }
-
-  await setAppStatus(c, app_id, 'cloud')
+  const appOwner = ownerRes.appOwner
 
   // Read operations can use v2 flag
   const dataChannelOverride = await getChannelDeviceOverridePg(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
@@ -180,17 +256,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     return simpleError200(c, 'channel_self_set_not_allowed', 'This channel does not allow devices to self associate', { channel, app_id })
   }
 
-  // Check if plugin version supports local channel storage (5.34.0+, 6.34.0+, 7.34.0+)
-  const pluginVersion = body.plugin_version || '0.0.0'
-  let isNewVersion = false
-  try {
-    const parsed = parse(pluginVersion)
-    isNewVersion = !isDeprecatedPluginVersion(parsed, CHANNEL_SELF_MIN_V5, CHANNEL_SELF_MIN_V6, CHANNEL_SELF_MIN_V7, CHANNEL_SELF_MIN_V8)
-  }
-  catch (error) {
-    // If version parsing fails, assume old version
-    cloudlog({ requestId: c.get('requestId'), message: 'Failed to parse plugin version, assuming old version', plugin_version: pluginVersion, error })
-  }
+  const isNewVersion = isChannelSelfLocalChannelStorageVersion(c, body, 'POST')
 
   // For vX.34.0+: Only validate, don't store in channel_devices
   if (isNewVersion) {
@@ -277,48 +343,17 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
   const device = makeDevice(body)
   const { app_id, defaultChannel, device_id } = body
 
-  // Check if app exists first - Read operation can use v2 flag
-  const cachedStatus = await getAppStatus(c, app_id)
-  if (cachedStatus === 'onprem') {
-    cloudlog({ requestId: c.get('requestId'), message: 'Channel_self cache hit (put), app marked onprem', app_id })
-    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  const cachedLimit = await assertChannelSelfCachedStatus(c, app_id, device, 'put')
+  if (cachedLimit) {
+    return cachedLimit
   }
-  if (cachedStatus === 'cancelled') {
-    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
-  }
-  const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
-  if (!appOwner) {
-    cloudlog({ requestId: c.get('requestId'), message: 'On-premise app detected in channel_self PUT, returning 429', app_id })
-    await setAppStatus(c, app_id, 'onprem')
-    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, app_id, device, 'PUT', device_id)
+  if ('response' in ownerRes) {
+    return ownerRes.response
   }
-  if (!appOwner.plan_valid) {
-    await setAppStatus(c, app_id, 'cancelled')
-    cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
-    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    // Send weekly notification about missing payment (not configurable - payment related)
-    backgroundTask(c, sendNotifOrgCached(c, 'org:missing_payment', {
-      app_id,
-      device_id,
-      app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
-    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
-  }
-  await setAppStatus(c, app_id, 'cloud')
 
-  // Check if plugin version supports local channel storage (5.34.0+, 6.34.0+, 7.34.0+)
-  const pluginVersion = body.plugin_version || '0.0.0'
-  let isNewVersion = false
-  try {
-    const parsed = parse(pluginVersion)
-    isNewVersion = !isDeprecatedPluginVersion(parsed, CHANNEL_SELF_MIN_V5, CHANNEL_SELF_MIN_V6, CHANNEL_SELF_MIN_V7, CHANNEL_SELF_MIN_V8)
-  }
-  catch (error) {
-    // If version parsing fails, assume old version
-    cloudlog({ requestId: c.get('requestId'), message: 'Failed to parse plugin version in PUT, assuming old version', plugin_version: pluginVersion, error })
-  }
+  const isNewVersion = isChannelSelfLocalChannelStorageVersion(c, body, 'PUT')
 
   // For vX.34.0+: Use channel from request body (plugin sends its local channelOverride)
   if (isNewVersion) {
@@ -391,48 +426,18 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
   const device = makeDevice(body)
   cloudlog({ requestId: c.get('requestId'), message: 'delete override', version_build })
 
-  // Check if app exists first - Read operation can use v2 flag
-  const cachedStatus = await getAppStatus(c, app_id)
-  if (cachedStatus === 'onprem') {
-    cloudlog({ requestId: c.get('requestId'), message: 'Channel_self cache hit (delete), app marked onprem', app_id })
-    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  const cachedLimit = await assertChannelSelfCachedStatus(c, app_id, device, 'delete')
+  if (cachedLimit) {
+    return cachedLimit
   }
-  if (cachedStatus === 'cancelled') {
-    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
-  }
-  const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
 
-  if (!appOwner) {
-    cloudlog({ requestId: c.get('requestId'), message: 'On-premise app detected in channel_self DELETE, returning 429', app_id })
-    await setAppStatus(c, app_id, 'onprem')
-    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, app_id, device, 'DELETE', device_id)
+  if ('response' in ownerRes) {
+    return ownerRes.response
   }
-  if (!appOwner.plan_valid) {
-    await setAppStatus(c, app_id, 'cancelled')
-    cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
-    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    // Send weekly notification about missing payment (not configurable - payment related)
-    backgroundTask(c, sendNotifOrgCached(c, 'org:missing_payment', {
-      app_id,
-      device_id,
-      app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
-    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
-  }
-  await setAppStatus(c, app_id, 'cloud')
+  const appOwner = ownerRes.appOwner
 
-  // Check if plugin version supports local channel storage (5.34.0+, 6.34.0+, 7.34.0+)
-  const pluginVersion = body.plugin_version || '0.0.0'
-  let isNewVersion = false
-  try {
-    const parsed = parse(pluginVersion)
-    isNewVersion = !isDeprecatedPluginVersion(parsed, CHANNEL_SELF_MIN_V5, CHANNEL_SELF_MIN_V6, CHANNEL_SELF_MIN_V7, CHANNEL_SELF_MIN_V8)
-  }
-  catch (error) {
-    // If version parsing fails, assume old version
-    cloudlog({ requestId: c.get('requestId'), message: 'Failed to parse plugin version in DELETE, assuming old version', plugin_version: pluginVersion, error })
-  }
+  const isNewVersion = isChannelSelfLocalChannelStorageVersion(c, body, 'DELETE')
 
   // For vX.34.0+: Still check and clean up old channel_devices entries (migration cleanup)
   // Read operation can use v2 flag
@@ -486,14 +491,9 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
   const { app_id, platform, is_emulator, is_prod } = body
   const device = makeDevice(body)
 
-  const cachedStatus = await getAppStatus(c, app_id)
-  if (cachedStatus === 'onprem') {
-    cloudlog({ requestId: c.get('requestId'), message: 'Channel_self cache hit (list), app marked onprem', app_id })
-    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
-  }
-  if (cachedStatus === 'cancelled') {
-    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  const cachedLimit = await assertChannelSelfCachedStatus(c, app_id, device, 'list')
+  if (cachedLimit) {
+    return cachedLimit
   }
 
   // First check if app exists - Read operation can use v2 flag
@@ -505,26 +505,10 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
   }
 
   // Check if app has valid org association (not on-premise) - Read operation can use v2 flag
-  const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
-
-  if (!appOwner) {
-    cloudlog({ requestId: c.get('requestId'), message: 'On-premise app detected in channel_self GET, returning 429', app_id })
-    await setAppStatus(c, app_id, 'onprem')
-    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, app_id, device, 'GET')
+  if ('response' in ownerRes) {
+    return ownerRes.response
   }
-  if (!appOwner.plan_valid) {
-    await setAppStatus(c, app_id, 'cancelled')
-    cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
-    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    // Send weekly notification about missing payment (not configurable - payment related)
-    // Note: We don't have device_id in GET request for listing compatible channels
-    backgroundTask(c, sendNotifOrgCached(c, 'org:missing_payment', {
-      app_id,
-      app_id_url: app_id,
-    }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
-    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
-  }
-  await setAppStatus(c, app_id, 'cloud')
 
   // Channels compatible with platform/device/build AND (public OR allow_device_self_set)
   const channels = await getCompatibleChannelsPg(c, app_id, platform as 'ios' | 'android' | 'electron', is_emulator!, is_prod!, drizzleClient as ReturnType<typeof getDrizzleClient>)
@@ -545,22 +529,57 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
   return c.json(compatibleChannels)
 }
 
+async function parseChannelSelfPluginRequest(
+  c: Context,
+  body: DeviceLink,
+  logMessage: string,
+  schema: ZodMiniObject,
+  requireDevice = true,
+): Promise<{ response: Response } | { body: DeviceLink, bodyParsed: DeviceLink }> {
+  cloudlog({ requestId: c.get('requestId'), message: logMessage, body })
+
+  if (isLimited(c, body.app_id)) {
+    return { response: simpleRateLimit(body) }
+  }
+
+  const bodyParsed = parsePluginBody<DeviceLink>(c, body, schema, requireDevice)
+
+  const ipLimit = await assertChannelSelfIPRateLimit(c, bodyParsed.app_id)
+  if (ipLimit) {
+    return { response: ipLimit }
+  }
+
+  return { body, bodyParsed }
+}
+
+async function runChannelSelfWithPgClient(
+  c: Context,
+  pgClient: ReturnType<typeof getPgClient>,
+  run: (drizzleClient: ReturnType<typeof getDrizzleClient>) => Promise<Response>,
+  record: () => Promise<void>,
+) {
+  await setReplicationLagHeader(c, pgClient)
+  try {
+    return await run(getDrizzleClient(pgClient as any))
+  }
+  finally {
+    await closeClient(c, pgClient)
+    await record()
+  }
+}
+
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', async (c) => {
   const body = await parseBody<DeviceLink>(c)
-  cloudlog({ requestId: c.get('requestId'), message: 'post body', body })
-
-  if (isLimited(c, body.app_id)) {
-    return simpleRateLimit(body)
+  const parsed = await parseChannelSelfPluginRequest(c, body, 'post body', jsonRequestSchema)
+  if ('response' in parsed) {
+    return parsed.response
   }
-
-  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
+  const { bodyParsed } = parsed
   if (!bodyParsed.channel) {
     return simpleError200(c, 'missing_channel', 'Cannot find channel in body')
   }
-
-  await assertChannelSelfIPRateLimit(c, bodyParsed.app_id)
 
   // Rate limit: max 5 set per second per device+app, and same set max once per 60 seconds
   const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'set', bodyParsed.channel)
@@ -572,36 +591,26 @@ app.post('/', async (c) => {
   // POST has writes, so always create PG client (even if using D1 for reads)
   const pgClient = getPgClient(c)
 
-  // Set replication lag header using the existing pool
-  await setReplicationLagHeader(c, pgClient)
-
-  let res
-  try {
-    res = await post(c, getDrizzleClient(pgClient), bodyParsed)
-  }
-  finally {
-    await closeClient(c, pgClient)
-  }
-
-  // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse)
-  backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'set', bodyParsed.channel))
-  recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
-
-  return res
+  return await runChannelSelfWithPgClient(
+    c,
+    pgClient,
+    drizzleClient => post(c, drizzleClient, bodyParsed),
+    async () => {
+      // Record the request for rate limiting (all requests, not just successful ones, to prevent abuse)
+      await recordChannelSelfRequestSafely(c, bodyParsed.app_id, bodyParsed.device_id, 'set', bodyParsed.channel)
+      recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
+    },
+  )
 })
 
 app.put('/', async (c) => {
   // TODO: Used as get, should be refactor with query param instead
   const body = await parseBody<DeviceLink>(c)
-  cloudlog({ requestId: c.get('requestId'), message: 'put body', body })
-
-  if (isLimited(c, body.app_id)) {
-    return simpleRateLimit(body)
+  const parsed = await parseChannelSelfPluginRequest(c, body, 'put body', jsonRequestSchema)
+  if ('response' in parsed) {
+    return parsed.response
   }
-
-  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
-
-  await assertChannelSelfIPRateLimit(c, bodyParsed.app_id)
+  const { bodyParsed } = parsed
 
   // Rate limit: max 5 get per second per device+app
   const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'get')
@@ -612,35 +621,25 @@ app.put('/', async (c) => {
 
   const pgClient = getPgClient(c)
 
-  // Set replication lag header using the existing pool
-  await setReplicationLagHeader(c, pgClient)
-
-  let res
-  try {
-    res = await put(c, getDrizzleClient(pgClient as any), bodyParsed)
-  }
-  finally {
-    await closeClient(c, pgClient)
-  }
-
-  // Record the request for rate limiting (all requests to prevent abuse)
-  backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'get'))
-  recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
-
-  return res
+  return await runChannelSelfWithPgClient(
+    c,
+    pgClient,
+    drizzleClient => put(c, drizzleClient, bodyParsed),
+    async () => {
+      // Record the request for rate limiting (all requests to prevent abuse)
+      await recordChannelSelfRequestSafely(c, bodyParsed.app_id, bodyParsed.device_id, 'get')
+      recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
+    },
+  )
 })
 
 app.delete('/', async (c) => {
   const body = convertQueryToBody(c.req.query())
-  cloudlog({ requestId: c.get('requestId'), message: 'delete body', body })
-
-  if (isLimited(c, body.app_id)) {
-    return simpleRateLimit(body)
+  const parsed = await parseChannelSelfPluginRequest(c, body, 'delete body', jsonRequestSchema)
+  if ('response' in parsed) {
+    return parsed.response
   }
-
-  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchema)
-
-  await assertChannelSelfIPRateLimit(c, bodyParsed.app_id)
+  const { bodyParsed } = parsed
 
   // Rate limit: max 5 delete per second per device+app
   const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyParsed.device_id, 'delete')
@@ -652,65 +651,47 @@ app.delete('/', async (c) => {
   // DELETE has writes, so always create PG client (even if using D1 for reads)
   const pgClient = getPgClient(c)
 
-  // Set replication lag header using the existing pool
-  await setReplicationLagHeader(c, pgClient)
-
-  let res
-  try {
-    res = await deleteOverride(c, getDrizzleClient(pgClient), bodyParsed)
-  }
-  finally {
-    await closeClient(c, pgClient)
-  }
-
-  // Record the request for rate limiting (all requests to prevent abuse)
-  backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, bodyParsed.device_id, 'delete'))
-  recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
-
-  return res
+  return await runChannelSelfWithPgClient(
+    c,
+    pgClient,
+    drizzleClient => deleteOverride(c, drizzleClient, bodyParsed),
+    async () => {
+      // Record the request for rate limiting (all requests to prevent abuse)
+      await recordChannelSelfRequestSafely(c, bodyParsed.app_id, bodyParsed.device_id, 'delete')
+      recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
+    },
+  )
 })
 
 app.get('/', async (c) => {
   const body = convertQueryToBody(c.req.query())
-  cloudlog({ requestId: c.get('requestId'), message: 'list compatible channels', body })
-
-  if (isLimited(c, body.app_id)) {
-    return simpleRateLimit(body)
+  const parsed = await parseChannelSelfPluginRequest(c, body, 'list compatible channels', jsonRequestSchemaGet, false)
+  if ('response' in parsed) {
+    return parsed.response
   }
-
-  const bodyParsed = parsePluginBody<DeviceLink>(c, body, jsonRequestSchemaGet, false)
-
-  await assertChannelSelfIPRateLimit(c, bodyParsed.app_id)
+  const { body: bodyRaw, bodyParsed } = parsed
 
   // Rate limit: max 5 list per second per device+app (if device_id is provided)
-  if (body.device_id) {
-    const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, body.device_id, 'list')
+  if (bodyRaw.device_id) {
+    const rateLimitStatus = await isChannelSelfRateLimited(c, bodyParsed.app_id, bodyRaw.device_id, 'list')
     if (rateLimitStatus.limited) {
-      cloudlog({ requestId: c.get('requestId'), message: 'Channel self list rate limited', app_id: bodyParsed.app_id, device_id: body.device_id })
-      return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: body.device_id, ...buildRateLimitInfo(rateLimitStatus.resetAt) })
+      cloudlog({ requestId: c.get('requestId'), message: 'Channel self list rate limited', app_id: bodyParsed.app_id, device_id: bodyRaw.device_id })
+      return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyRaw.device_id, ...buildRateLimitInfo(rateLimitStatus.resetAt) })
     }
   }
 
   const pgClient = getPgClient(c, true)
 
-  // Set replication lag header using the existing pool
-  await setReplicationLagHeader(c, pgClient)
-
-  let res
-  try {
-    res = await listCompatibleChannels(c, getDrizzleClient(pgClient as any), bodyParsed)
-  }
-  finally {
-    await closeClient(c, pgClient)
-  }
-
-  // Record the request for rate limiting (all requests to prevent abuse, if device_id is provided)
-  // Note: body.device_id is used since jsonRequestSchemaGet doesn't include device_id,
-  // but parsePluginBody lowercases it in the body object before validation
-  if (body.device_id) {
-    backgroundTask(c, recordChannelSelfRequest(c, bodyParsed.app_id, body.device_id, 'list'))
-  }
-  recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
-
-  return res
+  return await runChannelSelfWithPgClient(
+    c,
+    pgClient,
+    drizzleClient => listCompatibleChannels(c, drizzleClient, bodyParsed),
+    async () => {
+      // Record the request for rate limiting (all requests to prevent abuse, if device_id is provided)
+      if (bodyRaw.device_id) {
+        await recordChannelSelfRequestSafely(c, bodyParsed.app_id, bodyRaw.device_id, 'list')
+      }
+      recordChannelSelfIPRateLimit(c, bodyParsed.app_id)
+    },
+  )
 })
