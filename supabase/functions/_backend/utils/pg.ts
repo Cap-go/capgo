@@ -512,6 +512,13 @@ export async function getAppOwnerPostgres(
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
 ): Promise<{ owner_org: string, orgs: { created_by: string, id: string, management_email: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number, expose_metadata: boolean } | null> {
+  const isReplicaDb = () => {
+    const src = c.res.headers.get('X-Database-Source') ?? ''
+    // getDatabaseURL() sets X-Database-Source to identify Hyperdrive/PlanetScale
+    // read-replica routing vs primary/Supabase pooler usage.
+    return src.includes('HYPERDRIVE') || src.includes('PLANETSCALE') || src.includes('_PS_')
+  }
+
   const queryOnce = async (client: ReturnType<typeof getDrizzleClient>) => {
     const orgAlias = alias(schema.orgs, 'orgs')
     const planExpression = buildPlanValidationExpression(actions, schema.apps.owner_org)
@@ -546,6 +553,11 @@ export async function getAppOwnerPostgres(
     // Replica outages or permission/schema mismatches should not downgrade paying customers
     // to on-prem by accident. Retry once against the primary DB before giving up.
     logPgError(c, 'getAppOwnerPostgres', e)
+
+    if (!isReplicaDb()) {
+      cloudlog({ requestId: c.get('requestId'), message: 'getAppOwnerPostgres skipping primary retry (already on primary)', appId })
+      return null
+    }
 
     let primaryPgClient: ReturnType<typeof getPgClient> | undefined
     try {
