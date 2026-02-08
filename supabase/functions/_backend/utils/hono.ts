@@ -318,14 +318,15 @@ export function simpleError(errorCode: string, message: string, moreInfo: any = 
 }
 
 export function parseBody<T>(c: Context) {
-  return c.req.json<T>()
-    .catch((e) => {
-      throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
-    })
-    .then((body) => {
-      if ((body as any).device_id) {
-        (body as any).device_id = (body as any).device_id.toLowerCase()
-      }
-      return body
-    })
+  // IMPORTANT: c.req.json() consumes the request body.
+  // Supabase/CF error reporters may try to read the body later for alerts and log
+  // "Body already consumed". Parsing from a clone keeps the original readable.
+  return c.req.raw.clone().json<T>().catch((e) => {
+    throw simpleError('invalid_json_parse_body', 'Invalid JSON body', { e })
+  }).then((body) => {
+    if ((body as any).device_id) {
+      (body as any).device_id = (body as any).device_id.toLowerCase()
+    }
+    return body
+  })
 }

@@ -265,7 +265,7 @@ app.post('/', async (c) => {
   const { data: invitation, error: invitationError } = await supabaseAdmin.from('tmp_users')
     .select('*')
     .eq('invite_magic_string', baseBody.magic_invite_string)
-    .single()
+    .maybeSingle()
 
   if (invitationError) {
     return quickError(500, 'failed_to_accept_invitation', 'Failed to accept invitation get tmp_users', { error: invitationError.message })
