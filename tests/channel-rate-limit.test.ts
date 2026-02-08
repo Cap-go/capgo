@@ -5,6 +5,7 @@ import { BASE_URL, getBaseData, headers, PLUGIN_BASE_URL, resetAndSeedAppData, r
 
 // Rate limiting uses Cloudflare Workers Cache API, which isn't available in Supabase Edge Functions
 const USE_CLOUDFLARE = env.USE_CLOUDFLARE_WORKERS === 'true'
+const OP_LIMIT_PER_SECOND = 5
 
 const id = randomUUID()
 const APPNAME = `com.ratelimit.${id}`
@@ -66,19 +67,29 @@ async function testRateLimitBehavior(
       expect(response.status).not.toBe(429)
     })
 
-    it('should rate limit immediate second request', async () => {
+    it('should rate limit after burst within 1 second', async () => {
       const deviceId = randomUUID().toLowerCase()
-      const response1 = await makeRequest(deviceId)
-      expect(response1.status).not.toBe(429)
 
-      const response2 = await makeRequest(deviceId)
-      expect(response2.status).toBe(429)
+      // Allow up to OP_LIMIT_PER_SECOND within the window
+      for (let i = 0; i < OP_LIMIT_PER_SECOND; i++) {
+        const response = await makeRequest(deviceId)
+        expect(response.status).not.toBe(429)
+      }
+
+      // Next one should be rate limited
+      const responseLimited = await makeRequest(deviceId)
+      expect(responseLimited.status).toBe(429)
     })
 
     it('should allow request after 1 second delay', async () => {
       const deviceId = randomUUID().toLowerCase()
-      const response1 = await makeRequest(deviceId)
-      expect(response1.status).not.toBe(429)
+      // Hit the limit
+      for (let i = 0; i < OP_LIMIT_PER_SECOND; i++) {
+        const response = await makeRequest(deviceId)
+        expect(response.status).not.toBe(429)
+      }
+      const responseLimited = await makeRequest(deviceId)
+      expect(responseLimited.status).toBe(429)
 
       await sleep(1100)
 
@@ -100,9 +111,16 @@ afterAll(async () => {
 // Skip all rate limiting tests when not running against Cloudflare Workers
 // because the Cache API used for rate limiting isn't available in Supabase Edge Functions
 describe.skipIf(!USE_CLOUDFLARE)('channel_self rate limiting', () => {
+  // For the generic "op-level" tests, avoid the 60s same-channel rule by
+  // ensuring the channel differs on every call per deviceId.
+  const setCallCounts = new Map<string, number>()
+
   testRateLimitBehavior('[POST] set operation', async (deviceId) => {
     const data = getBaseData(APPNAME)
     data.device_id = deviceId
+    const count = setCallCounts.get(deviceId) ?? 0
+    setCallCounts.set(deviceId, count + 1)
+    data.channel = `rl-op-${deviceId}-${count}`
     return fetchChannelSelfEndpoint('POST', data)
   })
 
@@ -173,33 +191,35 @@ describe.skipIf(!USE_CLOUDFLARE)('channel_self rate limiting', () => {
       responses.forEach(r => expect(r.status).not.toBe(429))
     })
 
-    it('should rate limit same operation independently', async () => {
+    it('should rate limit one operation without affecting others', async () => {
       const deviceId = randomUUID().toLowerCase()
       const data = getBaseData(APPNAME)
       data.device_id = deviceId
 
-      // First of each operation - should succeed
-      const [post1, put1] = await Promise.all([
-        fetchChannelSelfEndpoint('POST', data),
-        fetchChannelSelfEndpoint('PUT', data),
-      ])
-      expect(post1.status).not.toBe(429)
-      expect(put1.status).not.toBe(429)
+      // Exhaust POST
+      for (let i = 0; i < OP_LIMIT_PER_SECOND; i++) {
+        const response = await fetchChannelSelfEndpoint('POST', { ...data, channel: `rl-xop-${deviceId}-${i}` })
+        expect(response.status).not.toBe(429)
+      }
+      const postLimited = await fetchChannelSelfEndpoint('POST', { ...data, channel: `rl-xop-${deviceId}-limited` })
+      expect(postLimited.status).toBe(429)
 
-      // Second of each - should be rate limited
-      const [post2, put2] = await Promise.all([
-        fetchChannelSelfEndpoint('POST', data),
-        fetchChannelSelfEndpoint('PUT', data),
-      ])
-      expect(post2.status).toBe(429)
-      expect(put2.status).toBe(429)
+      // PUT should still be allowed (separate bucket)
+      const put = await fetchChannelSelfEndpoint('PUT', data)
+      expect(put.status).not.toBe(429)
     })
   })
 })
 
 describe.skipIf(!USE_CLOUDFLARE)('device API rate limiting', () => {
+  // For the generic "op-level" tests, avoid the 60s same-channel rule by
+  // ensuring the channel differs on every call per deviceId.
+  const setCallCounts = new Map<string, number>()
+
   testRateLimitBehavior('[POST] set operation', async (deviceId) => {
-    return fetchDeviceApi('POST', { app_id: APPNAME, device_id: deviceId, channel: 'production' })
+    const count = setCallCounts.get(deviceId) ?? 0
+    setCallCounts.set(deviceId, count + 1)
+    return fetchDeviceApi('POST', { app_id: APPNAME, device_id: deviceId, channel: `rl-op-${deviceId}-${count}` })
   })
 
   testRateLimitBehavior('[GET] get operation', async (deviceId) => {

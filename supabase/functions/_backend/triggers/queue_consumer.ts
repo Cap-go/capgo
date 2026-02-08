@@ -290,11 +290,20 @@ export async function http_post_helper(
   }
 
   let url: string
-  if (function_type === 'cloudflare_pp' && getEnv(c, 'CLOUDFLARE_PP_FUNCTION_URL')) {
-    url = `${getEnv(c, 'CLOUDFLARE_PP_FUNCTION_URL')}/triggers/${function_name}`
+  const cfPpUrl = getEnv(c, 'CLOUDFLARE_PP_FUNCTION_URL')
+  const cfUrl = getEnv(c, 'CLOUDFLARE_FUNCTION_URL')
+  const normalizedType = (function_type ?? '').trim()
+
+  if (normalizedType === 'cloudflare_pp' && cfPpUrl) {
+    url = `${cfPpUrl}/triggers/${function_name}`
   }
-  else if (function_type === 'cloudflare' && getEnv(c, 'CLOUDFLARE_FUNCTION_URL')) {
-    url = `${getEnv(c, 'CLOUDFLARE_FUNCTION_URL')}/triggers/${function_name}`
+  else if (normalizedType === 'cloudflare' && cfUrl) {
+    url = `${cfUrl}/triggers/${function_name}`
+  }
+  else if (normalizedType === '' && cfUrl) {
+    // Backward compatibility: older queue messages may not have function_type set.
+    // If a Cloudflare URL is configured, prefer it.
+    url = `${cfUrl}/triggers/${function_name}`
   }
   else {
     url = `${getEnv(c, 'SUPABASE_URL')}/functions/v1/triggers/${function_name}`

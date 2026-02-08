@@ -233,15 +233,17 @@ async function uploadHandler(c: Context) {
   }
 
   const handler = durableObjNs.get(durableObjNs.idFromName(normalizedRequestId))
-  cloudlog({ requestId: c.get('requestId'), message: 'upload handler - forwarding to DO', method: c.req.method, url: c.req.url })
+  cloudlog({ requestId: c.get('requestId'), message: 'upload handler - forwarding to DO', method: c.req.raw.method, url: c.req.url })
 
   // Pass requestId to DO via header so it can use it in logs
   const headers = new Headers(c.req.raw.headers)
   headers.set('X-Request-Id', c.get('requestId') || 'unknown')
 
+  const method = c.req.raw.method
   return await handler.fetch(c.req.url, {
-    body: c.req.raw.body,
-    method: c.req.method,
+    // HEAD must not forward a request body and must preserve the verb (Hono/tiny maps HEAD to GET).
+    body: method === 'HEAD' ? undefined : c.req.raw.body,
+    method,
     headers,
     signal: AbortSignal.timeout(DO_CALL_TIMEOUT),
   })
@@ -591,11 +593,17 @@ app.get(
   checkWriteAppAccess,
   async (c) => {
     const isTusRequest = c.req.header('Tus-Resumable') != null
-    const isHead = c.req.method === 'HEAD'
+    // In Hono/tiny, HEAD is routed to the GET handler. Use the raw request method.
+    const isHead = c.req.raw.method === 'HEAD'
 
-    if (isHead && isTusRequest && getRuntimeKey() !== 'workerd') {
-      cloudlog({ requestId: c.get('requestId'), message: 'Routing HEAD TUS request to supabaseTusHeadHandler' })
-      return supabaseTusHeadHandler(c)
+    if (isHead && isTusRequest) {
+      if (getRuntimeKey() !== 'workerd') {
+        cloudlog({ requestId: c.get('requestId'), message: 'Routing HEAD TUS request to supabaseTusHeadHandler' })
+        return supabaseTusHeadHandler(c)
+      }
+
+      cloudlog({ requestId: c.get('requestId'), message: 'Routing HEAD TUS request to uploadHandler (DO)' })
+      return uploadHandler(c)
     }
 
     return getHandler(c)

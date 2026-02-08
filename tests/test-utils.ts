@@ -50,6 +50,12 @@ export function getEndpointUrl(path: string): string {
     return `${SUPABASE_BASE_URL}/functions/v1${path}`
   }
 
+  // Files endpoints (separate worker in Cloudflare)
+  const filesEndpoints = ['/files', '/private/upload_link', '/private/download_link', '/private/files']
+  const isFilesEndpoint = filesEndpoints.some(endpoint => path.startsWith(endpoint))
+  if (isFilesEndpoint)
+    return `${CLOUDFLARE_FILES_URL}${path}`
+
   // Plugin endpoints
   const pluginEndpoints = ['/updates', '/channel_self', '/stats', '/ok', '/latency', '/plugin/']
   const isPluginEndpoint = pluginEndpoints.some(endpoint => path.startsWith(endpoint))

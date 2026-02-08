@@ -6,6 +6,7 @@ import { cloudlog } from './logging.ts'
 import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
 import { clearFailedAuth, isAPIKeyRateLimited, isIPRateLimited, recordAPIKeyUsage, recordFailedAuth } from './rate_limit.ts'
+import { buildRateLimitInfo } from './rateLimitInfo.ts'
 import { checkKey, checkKeyById, supabaseAdmin } from './supabase.ts'
 import { backgroundTask } from './utils.ts'
 
@@ -15,17 +16,6 @@ import { backgroundTask } from './utils.ts'
 
 interface RbacContextOptions {
   orgIdResolver?: (c: Context) => string | null | Promise<string | null>
-}
-
-function buildRateLimitInfo(resetAt?: number) {
-  if (typeof resetAt !== 'number' || !Number.isFinite(resetAt)) {
-    return {}
-  }
-  const retryAfterSeconds = Math.max(0, Math.ceil((resetAt! - Date.now()) / 1000))
-  return {
-    rateLimitResetAt: resetAt,
-    retryAfterSeconds,
-  }
 }
 
 async function getAppIdFromRequest(c: Context) {
