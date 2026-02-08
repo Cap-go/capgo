@@ -73,7 +73,9 @@ const exportSchema = z.object({
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
-app.use('/', useCors)
+// Browser clients call this endpoint and require CORS preflight (OPTIONS).
+// Use '*' so it also applies to sub-routes like '/export'.
+app.use('*', useCors)
 
 app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   const body = await parseBody<DataStats>(c)
