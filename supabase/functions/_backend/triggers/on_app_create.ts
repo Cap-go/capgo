@@ -64,6 +64,22 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
       .eq('id', ownerOrg)
       .single()
     if (error || !data) {
+      // In prod, INSERT triggers are processed async via PGMQ; the app (and even org)
+      // may be deleted before the queued handler runs. If this handler was invoked
+      // by the queue consumer, skip instead of retrying forever / alerting.
+      const cfId = c.req.header('x-capgo-cf-id')
+      if (cfId) {
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'App missing and org missing during queued trigger processing, skipping',
+          ownerOrg,
+          app_id: record.app_id,
+          cfId,
+          error,
+        })
+        return c.json(BRES)
+      }
+
       throw simpleError('error_fetching_organization', 'Error fetching organization', { error })
     }
 

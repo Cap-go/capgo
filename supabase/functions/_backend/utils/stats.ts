@@ -79,11 +79,14 @@ export function createStatsLogs(c: Context, app_id: string, device_id: string, a
 }
 
 export function createStatsDevices(c: Context, device: DeviceWithoutCreatedAt) {
-  // Use Analytics Engine DEVICE_INFO in workerd (Cloudflare Workers)
-  if (getRuntimeKey() !== 'workerd')
-    return backgroundTask(c, trackDevicesSB(c, device))
-  // trackDevicesCF writes to Analytics Engine (and D1 if available)
-  return backgroundTask(c, trackDevicesCF(c, device))
+  // In Cloudflare Workers (workerd), prefer Analytics Engine when available.
+  // For local Cloudflare testing, these bindings are typically absent, so we
+  // must fall back to the Postgres/Supabase path or device state won't be
+  // recorded and downstream APIs/tests will break.
+  if (getRuntimeKey() === 'workerd' && c.env.DEVICE_INFO)
+    return backgroundTask(c, trackDevicesCF(c, device))
+
+  return backgroundTask(c, trackDevicesSB(c, device))
 }
 
 export function sendStatsAndDevice(c: Context, device: DeviceWithoutCreatedAt, statsActions: StatsActions[], isFailedStat = false) {
@@ -279,19 +282,23 @@ export async function readStats(c: Context, params: ReadStatsParams) {
 }
 
 export function countDevices(c: Context, app_id: string, customIdMode: boolean) {
-  // Use Analytics Engine DEVICE_INFO if available (via CF_ANALYTICS_TOKEN)
-  if (getRuntimeKey() !== 'workerd')
-    return countDevicesSB(c, app_id, customIdMode)
-  return countDevicesCF(c, app_id, customIdMode)
+  // Use Analytics Engine DEVICE_INFO when available in Cloudflare Workers.
+  // In local Cloudflare testing these bindings are often absent, so fall back
+  // to the Postgres/Supabase path.
+  if (getRuntimeKey() === 'workerd' && c.env.DEVICE_INFO)
+    return countDevicesCF(c, app_id, customIdMode)
+  return countDevicesSB(c, app_id, customIdMode)
 }
 
 export async function readDevices(c: Context, params: ReadDevicesParams, customIdMode: boolean): Promise<ReadDevicesResponse> {
   let results: DeviceRes[]
-  // Use Analytics Engine DEVICE_INFO if in workerd (Cloudflare Workers)
-  if (getRuntimeKey() !== 'workerd')
-    results = await readDevicesSB(c, params, customIdMode)
-  else
+  // Use Analytics Engine DEVICE_INFO when available in Cloudflare Workers.
+  // In local Cloudflare testing these bindings are often absent, so fall back
+  // to the Postgres/Supabase path.
+  if (getRuntimeKey() === 'workerd' && c.env.DEVICE_INFO)
     results = await readDevicesCF(c, params, customIdMode)
+  else
+    results = await readDevicesSB(c, params, customIdMode)
 
   const limit = params.limit ?? DEFAULT_LIMIT
   const hasMore = results.length > limit

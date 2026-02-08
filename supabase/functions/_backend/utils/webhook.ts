@@ -48,9 +48,8 @@ export type WebhookEventType = typeof WEBHOOK_EVENT_TYPES[number]
 const LOCALHOST_SUFFIX = '.localhost'
 const IPV4_REGEX = /^\d{1,3}(?:\.\d{1,3}){3}$/
 
-function isLocalWebhookEnv(c: Context): boolean {
-  const supabaseUrl = getEnv(c, 'SUPABASE_URL')
-  return Boolean(supabaseUrl && (supabaseUrl.includes('localhost') || supabaseUrl.includes('127.0.0.1')))
+function allowLocalWebhookUrls(c: Context): boolean {
+  return getEnv(c, 'CAPGO_ALLOW_LOCAL_WEBHOOK_URLS') === 'true'
 }
 
 function normalizeHostname(hostname: string): string {
@@ -74,7 +73,7 @@ export function getWebhookUrlValidationError(c: Context, urlString: string): str
     return 'Webhook URL is invalid'
   }
 
-  if (isLocalWebhookEnv(c))
+  if (allowLocalWebhookUrls(c))
     return null
 
   const hostname = normalizeHostname(url.hostname)

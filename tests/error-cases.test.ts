@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, headers, resetAndSeedAppData, resetAppData } from './test-utils.ts'
+import { BASE_URL, getEndpointUrl, headers, resetAndSeedAppData, resetAppData } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.error.test.${id}`
@@ -280,7 +280,7 @@ describe('private Endpoint Error Cases', () => {
   })
 
   it('should return 401 for upload_link with invalid API key', async () => {
-    const response = await fetch(`${BASE_URL}/private/upload_link`, {
+    const response = await fetch(getEndpointUrl('/private/upload_link'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -299,7 +299,7 @@ describe('private Endpoint Error Cases', () => {
 
 describe('plugin Endpoint Error Cases', () => {
   it('should return 400 for updates with invalid request', async () => {
-    const response = await fetch(`${BASE_URL}/updates`, {
+    const response = await fetch(getEndpointUrl('/updates'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -320,7 +320,7 @@ describe('plugin Endpoint Error Cases', () => {
 
 describe('files Endpoint Error Cases', () => {
   it('should return 404 for non-existent file', async () => {
-    const response = await fetch(`${BASE_URL}/files/nonexistent-file.zip`, {
+    const response = await fetch(getEndpointUrl('/files/nonexistent-file.zip'), {
       method: 'GET',
       headers,
     })
@@ -331,7 +331,7 @@ describe('files Endpoint Error Cases', () => {
 
   it('should return 404 for invalid file name', async () => {
     // This test may be environment-specific
-    const response = await fetch(`${BASE_URL}/files/invalid-file-name`, {
+    const response = await fetch(getEndpointUrl('/files/invalid-file-name'), {
       method: 'GET',
       headers,
     })

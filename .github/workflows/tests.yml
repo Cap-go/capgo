@@ -17,18 +17,18 @@ jobs:
     name: Run tests
     steps:
       - name: Cache Deno dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ${{ env.DENO_DIR }}
           key: my_cache_key
       - name: Checkout capgo
-        uses: actions/checkout@v6
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Setup bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3 # v2
         with:
           bun-version: latest
       - name: Check for typos
-        uses: crate-ci/typos@v1.42.3
+        uses: crate-ci/typos@06d010dfe4c84fdab1a25ea02b57b3585018ba80 # v1.42.3
       - name: Show bun version
         run: bun --version
       - name: Show capgo version
@@ -53,7 +53,7 @@ jobs:
       # - name: Lint I18n
       #   run: bunx @inlang/cli lint --project project.inlang
       - name: Install Supabase CLI
-        uses: supabase/setup-cli@v1
+        uses: supabase/setup-cli@b60b5899c73b63a2d2d651b1e90db8d4c9392f51 # v1
         with:
           version: latest
       - name: Show Supabase CLI version
@@ -64,7 +64,7 @@ jobs:
         run: supabase test db
       - name: Lint SQL
         run: supabase db lint -s public --fail-on warning
-      - uses: JarvusInnovations/background-action@v1
+      - uses: JarvusInnovations/background-action@2428e7b970a846423095c79d43f759abf979a635 # v1
         name: Bootstrap Edge server
         with:
           run: supabase functions serve &
@@ -89,39 +89,23 @@ jobs:
           working-directory: .
       - name: Run all backend and CLI tests
         run: bun run test:all
-        # TODO: enable these tests when they are stable
-      # - uses: JarvusInnovations/background-action@v1
-      #   name: Start Cloudflare Workers for testing
-      #   with:
-      #     run: |
-      #       chmod +x scripts/start-cloudflare-workers.sh
-      #       ./scripts/start-cloudflare-workers.sh
-      #     wait-on: |
-      #       http-get://127.0.0.1:8790/ok
-      #       http-get://127.0.0.1:8787/ok
-      #       http-get://127.0.0.1:8788/ok
-      #       http-get://127.0.0.1:8789/ok
-      #     tail: stderr,stdout
-      #     log-output-resume: stderr,stdout
-      #     wait-for: 2m
-      #     log-output: stderr,stdout
-      #     log-output-if: true
-      #     working-directory: .
-      # - name: Verify D1 sync is ready
-      #   run: |
-      #     echo "Verifying D1 sync worker is operational..."
-      #     for i in {1..30}; do
-      #       response=$(curl -s -w "%{http_code}" -X POST http://127.0.0.1:8790/sync -H "x-webhook-signature: testsecret" -o /dev/null)
-      #       if [ "$response" = "200" ]; then
-      #         echo "✓ D1 sync is ready"
-      #         exit 0
-      #       fi
-      #       echo "Waiting for D1 sync... ($i/30) - HTTP $response"
-      #       sleep 2
-      #     done
-      #     echo "✗ D1 sync failed to become ready"
-      #     exit 1
-      # - name: Run Cloudflare Workers plugin tests
-      #   run: bun run test:cloudflare:plugin
+      - uses: JarvusInnovations/background-action@2428e7b970a846423095c79d43f759abf979a635 # v1
+        name: Start Cloudflare Workers for testing
+        with:
+          run: |
+            chmod +x scripts/start-cloudflare-workers.sh
+            ./scripts/start-cloudflare-workers.sh
+          wait-on: |
+            http-get://127.0.0.1:8787/ok
+            http-get://127.0.0.1:8788/ok
+            http-get://127.0.0.1:8789/ok
+          tail: stderr,stdout
+          log-output-resume: stderr,stdout
+          wait-for: 2m
+          log-output: stderr,stdout
+          log-output-if: true
+          working-directory: .
+      - name: Run Cloudflare Workers backend tests
+        run: bun run test:cloudflare:backend
       # - name: Run playwright tests
       #   run: bun run test:front
