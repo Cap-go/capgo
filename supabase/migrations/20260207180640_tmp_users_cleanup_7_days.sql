@@ -14,6 +14,11 @@ BEGIN
 END;
 $$;
 
+-- SECURITY: tmp_users has RLS disabled for all; keep this definer function
+-- executable only by internal roles to avoid bypassing RLS via PUBLIC execute.
+REVOKE EXECUTE ON FUNCTION "public"."cleanup_tmp_users"() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."cleanup_tmp_users"() TO "service_role";
+
 -- The cron runner is table-driven via public.cron_tasks (see migrations around
 -- 2025-12-28 and 2026-01-03). Register tmp_users cleanup as a per-minute task.
 INSERT INTO "public"."cron_tasks" (
