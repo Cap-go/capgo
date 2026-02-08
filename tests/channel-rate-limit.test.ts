@@ -212,8 +212,14 @@ describe.skipIf(!USE_CLOUDFLARE)('channel_self rate limiting', () => {
 })
 
 describe.skipIf(!USE_CLOUDFLARE)('device API rate limiting', () => {
+  // For the generic "op-level" tests, avoid the 60s same-channel rule by
+  // ensuring the channel differs on every call per deviceId.
+  const setCallCounts = new Map<string, number>()
+
   testRateLimitBehavior('[POST] set operation', async (deviceId) => {
-    return fetchDeviceApi('POST', { app_id: APPNAME, device_id: deviceId, channel: 'production' })
+    const count = setCallCounts.get(deviceId) ?? 0
+    setCallCounts.set(deviceId, count + 1)
+    return fetchDeviceApi('POST', { app_id: APPNAME, device_id: deviceId, channel: `rl-op-${deviceId}-${count}` })
   })
 
   testRateLimitBehavior('[GET] get operation', async (deviceId) => {
