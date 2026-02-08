@@ -13,20 +13,21 @@ describe('plugin plan gating: credits flag', () => {
     await resetAndSeedAppData(appId, { orgId, stripeCustomerId })
 
     // Force the "plan" branch to fail: buildPlanValidationExpression joins stripe_info by customer_id.
-    // By making the subscription invalid and the trial expired, only the replicated org flag can
-    // allow plugin access.
-    await supabase
-      .from('stripe_info')
-      .update({
-        status: 'canceled',
-        is_good_plan: false,
-        trial_at: '1970-01-01T00:00:00+00:00',
-      })
-      .eq('customer_id', stripeCustomerId)
+    // Use direct SQL to avoid any RLS/service-key issues accidentally leaving the org "plan_valid".
+    await executeSQL(
+      'UPDATE public.stripe_info SET status = $1, is_good_plan = $2, trial_at = $3 WHERE customer_id = $4',
+      ['canceled', false, '1970-01-01T00:00:00+00:00', stripeCustomerId],
+    )
 
     // Ensure default state is "no credits flag".
-    // Do this via SQL to avoid coupling the test to generated Supabase types.
     await executeSQL('UPDATE public.orgs SET has_usage_credits = false WHERE id = $1', [orgId])
+
+    // Sanity checks: if these don't apply, the test may silently become a no-op and pass/fail randomly.
+    const stripeRows = await executeSQL('SELECT status, is_good_plan, trial_at FROM public.stripe_info WHERE customer_id = $1', [stripeCustomerId])
+    expect(stripeRows[0]?.status).toBe('canceled')
+    expect(stripeRows[0]?.is_good_plan).toBe(false)
+    const orgRows = await executeSQL('SELECT has_usage_credits FROM public.orgs WHERE id = $1', [orgId])
+    expect(orgRows[0]?.has_usage_credits).toBe(false)
   })
 
   afterAll(async () => {

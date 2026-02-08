@@ -6,6 +6,22 @@ import { Pool } from 'pg'
 
 export const POSTGRES_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
 
+function normalizeLocalhostUrl(raw: string | undefined): string | undefined {
+  if (!raw)
+    return raw
+  try {
+    const url = new URL(raw)
+    if (url.hostname === 'localhost')
+      url.hostname = '127.0.0.1'
+    // Keep a stable base URL without trailing slash.
+    return url.toString().replace(/\/$/, '')
+  }
+  catch {
+    // Best-effort: keep behavior for non-standard values.
+    return raw.replace('localhost', '127.0.0.1')
+  }
+}
+
 // Determine which backend to use based on environment variable
 const USE_CLOUDFLARE = env.USE_CLOUDFLARE_WORKERS === 'true'
 
@@ -16,8 +32,9 @@ export const CLOUDFLARE_PLUGIN_URL = env.CLOUDFLARE_PLUGIN_URL ?? 'http://127.0.
 export const CLOUDFLARE_FILES_URL = env.CLOUDFLARE_FILES_URL ?? 'http://127.0.0.1:8789'
 
 // Default to Supabase Edge Functions for backward compatibility
-export const BASE_URL = USE_CLOUDFLARE ? CLOUDFLARE_API_URL : `${env.SUPABASE_URL}/functions/v1`
-export const PLUGIN_BASE_URL = USE_CLOUDFLARE ? CLOUDFLARE_PLUGIN_URL : `${env.SUPABASE_URL}/functions/v1`
+const SUPABASE_BASE_URL = normalizeLocalhostUrl(env.SUPABASE_URL) ?? ''
+export const BASE_URL = USE_CLOUDFLARE ? CLOUDFLARE_API_URL : `${SUPABASE_BASE_URL}/functions/v1`
+export const PLUGIN_BASE_URL = USE_CLOUDFLARE ? CLOUDFLARE_PLUGIN_URL : `${SUPABASE_BASE_URL}/functions/v1`
 export const API_SECRET = 'testsecret'
 const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY ?? ''
 
@@ -28,7 +45,9 @@ const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY ?? ''
  */
 export function getEndpointUrl(path: string): string {
   if (!USE_CLOUDFLARE) {
-    return `${env.SUPABASE_URL}/functions/v1${path}`
+    // In CI, Node/Undici prefers IPv6 for localhost (::1). Supabase Edge runtime
+    // is bound to IPv4 (127.0.0.1) in the workflow, so normalize to IPv4.
+    return `${SUPABASE_BASE_URL}/functions/v1${path}`
   }
 
   // Plugin endpoints
@@ -158,7 +177,7 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
         throw lastError ?? new Error('Supabase fetch failed')
       }
 
-      const supabase = createClient<Database>(env.SUPABASE_URL, SUPABASE_ANON_KEY, {
+      const supabase = createClient<Database>(SUPABASE_BASE_URL, SUPABASE_ANON_KEY, {
         global: {
           fetch: supabaseFetch,
         },
@@ -498,7 +517,7 @@ export async function resetAppDataStats(appId: string): Promise<void> {
 
 export function getSupabaseClient(): SupabaseClient<Database> {
   if (!supabaseClient) {
-    const supabaseUrl = env.SUPABASE_URL ?? ''
+    const supabaseUrl = SUPABASE_BASE_URL
     const supabaseServiceKey = env.SUPABASE_SERVICE_KEY ?? ''
     const supabaseFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
       const maxRetries = 3
@@ -612,12 +631,18 @@ export function getUpdateBaseData(appId: string): ReturnType<typeof updateAndroi
 }
 
 export async function postUpdate(data: object) {
-  const response = await fetch(getEndpointUrl('/updates'), {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(data),
-  })
-  return response
+  return await fetchWithRetry(
+    getEndpointUrl('/updates'),
+    {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(data),
+    },
+    // Supabase Edge can occasionally drop/close sockets under parallel CI load.
+    // Retrying only on 503/network errors makes the test suite substantially less flaky.
+    3,
+    250,
+  )
 }
 
 export interface DeviceLink {
