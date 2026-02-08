@@ -5,21 +5,11 @@ import { checkChannelSelfIPRateLimit, isChannelSelfRateLimited, recordChannelSel
 import { getBodyOrQuery, honoFactory, parseBody, simpleRateLimit } from '../../utils/hono.ts'
 import { middlewareKey } from '../../utils/hono_middleware.ts'
 import { cloudlog } from '../../utils/logging.ts'
+import { buildRateLimitInfo } from '../../utils/rateLimitInfo.ts'
 import { backgroundTask } from '../../utils/utils.ts'
 import { deleteOverride } from './delete.ts'
 import { get } from './get.ts'
 import { post } from './post.ts'
-
-function buildRateLimitInfo(resetAt?: number) {
-  if (typeof resetAt !== 'number' || !Number.isFinite(resetAt)) {
-    return {}
-  }
-  const retryAfterSeconds = Math.max(0, Math.ceil((resetAt - Date.now()) / 1000))
-  return {
-    rateLimitResetAt: resetAt,
-    retryAfterSeconds,
-  }
-}
 
 function logDeviceRequestContext(
   c: Context,
@@ -40,7 +30,7 @@ function logDeviceRequestContext(
 async function assertDeviceIPRateLimit(c: Context, appId: string) {
   const ipRateLimitStatus = await checkChannelSelfIPRateLimit(c, appId, 'Device API IP rate limited')
   if (ipRateLimitStatus.limited) {
-    return simpleRateLimit({ reason: 'ip_rate_limit_exceeded', app_id: appId, ...buildRateLimitInfo(ipRateLimitStatus.resetAt) })
+    simpleRateLimit({ reason: 'ip_rate_limit_exceeded', app_id: appId, ...buildRateLimitInfo(ipRateLimitStatus.resetAt) })
   }
 }
 
@@ -49,7 +39,8 @@ async function assertDeviceOperationRateLimit(c: Context, body: Partial<DeviceLi
     return
   }
 
-  const rateLimitStatus = await isChannelSelfRateLimited(c, body.app_id, body.device_id, operation)
+  const rateLimitChannel = operation === 'set' ? body.channel : undefined
+  const rateLimitStatus = await isChannelSelfRateLimited(c, body.app_id, body.device_id, operation, rateLimitChannel)
   if (rateLimitStatus.limited) {
     cloudlog({
       requestId: c.get('requestId'),
@@ -58,7 +49,7 @@ async function assertDeviceOperationRateLimit(c: Context, body: Partial<DeviceLi
       device_id: body.device_id,
       channel: body.channel,
     })
-    return simpleRateLimit({ app_id: body.app_id, device_id: body.device_id, ...buildRateLimitInfo(rateLimitStatus.resetAt) })
+    simpleRateLimit({ app_id: body.app_id, device_id: body.device_id, ...buildRateLimitInfo(rateLimitStatus.resetAt) })
   }
 }
 
@@ -77,7 +68,8 @@ async function recordDeviceRateLimitSafely(
   // must be effective immediately for burst protection.
   if (body.device_id && body.app_id) {
     try {
-      await recordChannelSelfRequest(c, body.app_id, body.device_id, operation)
+      const rateLimitChannel = operation === 'set' ? body.channel : undefined
+      await recordChannelSelfRequest(c, body.app_id, body.device_id, operation, rateLimitChannel)
     }
     catch (error) {
       cloudlog({ requestId: c.get('requestId'), message: `Failed to record device ${operation} rate limit`, app_id: body.app_id, device_id: body.device_id, error })
@@ -100,16 +92,10 @@ async function handleDeviceOperation<TBody extends Partial<DeviceLink>>(
   logDeviceRequestContext(c, operation, body, apikey)
 
   if (body.app_id) {
-    const ipLimit = await assertDeviceIPRateLimit(c, body.app_id)
-    if (ipLimit) {
-      return ipLimit
-    }
+    await assertDeviceIPRateLimit(c, body.app_id)
   }
 
-  const opLimit = await assertDeviceOperationRateLimit(c, body, operation)
-  if (opLimit) {
-    return opLimit
-  }
+  await assertDeviceOperationRateLimit(c, body, operation)
 
   try {
     return await handler(c, body, apikey)

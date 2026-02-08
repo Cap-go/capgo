@@ -15,6 +15,7 @@ import { sendNotifOrgCached } from '../utils/notifications.ts'
 import { sendNotifToOrgMembersCached } from '../utils/org_email_notifications.ts'
 import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, setReplicationLagHeader, upsertChannelDevicePg } from '../utils/pg.ts'
 import { convertQueryToBody, makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
+import { buildRateLimitInfo } from '../utils/rateLimitInfo.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
 import { backgroundTask, deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isDeprecatedPluginVersion, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
 
@@ -27,17 +28,6 @@ const CHANNEL_SELF_MIN_V8 = '8.0.0'
 z.config(z.locales.en())
 const devicePlatformScheme = z.enum(['ios', 'android', 'electron'])
 const PLAN_MAU_ACTIONS: Array<'mau'> = ['mau']
-
-function buildRateLimitInfo(resetAt?: number) {
-  if (typeof resetAt !== 'number' || !Number.isFinite(resetAt)) {
-    return {}
-  }
-  const retryAfterSeconds = Math.max(0, Math.ceil((resetAt! - Date.now()) / 1000))
-  return {
-    rateLimitResetAt: resetAt,
-    retryAfterSeconds,
-  }
-}
 
 async function assertChannelSelfIPRateLimit(c: Context, appId: string) {
   // IP rate limit: per-minute cap (default 1000/min via RATE_LIMIT_CHANNEL_SELF_IP) to mitigate device_id spoofing
