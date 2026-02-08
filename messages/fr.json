@@ -1498,5 +1498,10 @@
   "your-usage": "Votre utilisation :",
   "zip-bundle": "Paquet d'application Zip",
   "failed-to-create-api-key": "Échec de la création de la clé API",
-  "failed-to-regenerate-api-key": "Échec de la régénération de la clé API"
+  "failed-to-regenerate-api-key": "Échec de la régénération de la clé API",
+  "download-csv": "Télécharger CSV",
+  "exporting-logs": "Export des journaux...",
+  "export-ready": "Export prêt",
+  "export-failed": "Échec de l'export",
+  "not-logged-in": "Non connecté"
 }

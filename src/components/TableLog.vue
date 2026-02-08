@@ -449,7 +449,7 @@ onMounted(async () => {
         >
           <IconDownload v-if="!exportLoading" class="m-1 md:mr-2" />
           <Spinner v-else size="w-[16.8px] h-[16.8px] m-1 mr-2" />
-          <span class="hidden text-sm md:block">{{ t('download') }} CSV</span>
+          <span class="hidden text-sm md:block">{{ t('download-csv') }}</span>
         </button>
       </div>
       <div class="flex h-10 mr-2" :class="{ 'md:mr-auto': !filterText || !filterList.length }">

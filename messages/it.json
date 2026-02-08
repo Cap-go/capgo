@@ -1498,5 +1498,10 @@
   "your-usage": "Il tuo utilizzo:",
   "zip-bundle": "Pacchetto app ZIP",
   "failed-to-create-api-key": "Impossibile creare la chiave API",
-  "failed-to-regenerate-api-key": "Impossibile rigenerare la chiave API"
+  "failed-to-regenerate-api-key": "Impossibile rigenerare la chiave API",
+  "download-csv": "Scarica CSV",
+  "exporting-logs": "Esportazione log...",
+  "export-ready": "Export pronto",
+  "export-failed": "Esportazione non riuscita",
+  "not-logged-in": "Non connesso"
 }

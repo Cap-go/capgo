@@ -20,19 +20,54 @@ interface DataStats {
   actions?: string[]
 }
 
+const ORDER_KEYS = ['created_at', 'app_id', 'device_id', 'action', 'version_name'] as const
+const EXPORT_FORMATS = ['csv', 'json'] as const
+
+function stripControlChars(input: string): string {
+  const out: string[] = []
+  for (let i = 0; i < input.length; i++) {
+    const code = input.charCodeAt(i)
+    // 0-31 are control chars, 127 is DEL.
+    if ((code >= 0 && code <= 31) || code === 127)
+      continue
+    out.push(input[i])
+  }
+  return out.join('')
+}
+
+function sanitizeFilename(input: string | undefined, extension: 'csv' | 'json'): string | undefined {
+  if (!input)
+    return undefined
+
+  const trimmed = input.trim()
+  if (!trimmed)
+    return undefined
+
+  // Strip path separators and control characters.
+  const safe = stripControlChars(trimmed)
+    .replace(/[\\/]/g, '_')
+    .replace(/\s+/g, ' ')
+    .slice(0, 180)
+
+  const ext = `.${extension}`
+  if (safe.toLowerCase().endsWith(ext))
+    return safe
+  return `${safe}${ext}`
+}
+
 const exportSchema = z.object({
   appId: z.string(),
   devicesId: z.optional(z.array(z.string())),
   search: z.optional(z.string()),
   order: z.optional(z.array(z.object({
-    key: z.string(),
-    sortable: z.union([z.boolean(), z.literal('asc'), z.literal('desc')]),
+    key: z.enum(ORDER_KEYS),
+    sortable: z.enum(['asc', 'desc']),
   }))),
-  rangeStart: z.optional(z.union([z.string(), z.number()]).transform(v => String(v))),
-  rangeEnd: z.optional(z.union([z.string(), z.number()]).transform(v => String(v))),
+  rangeStart: z.optional(z.union([z.string(), z.number()])),
+  rangeEnd: z.optional(z.union([z.string(), z.number()])),
   limit: z.optional(z.coerce.number()),
   actions: z.optional(z.array(z.string())),
-  format: z.optional(z.string()),
+  format: z.optional(z.enum(EXPORT_FORMATS)),
   filename: z.optional(z.string()),
 })
 
@@ -71,16 +106,20 @@ app.post('/export', middlewareV2(['read', 'write', 'all', 'upload']), async (c) 
     throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.appId })
   }
 
-  const format = (body.format ?? 'csv').toLowerCase()
+  const format = body.format ?? 'csv'
   const limit = Math.min(Math.max(body.limit ?? 10_000, 1), 50_000)
+
+  const order: Order[] | undefined = body.order?.map(o => ({ key: o.key, sortable: o.sortable }))
+  const startDate = body.rangeStart !== undefined ? String(body.rangeStart) : undefined
+  const endDate = body.rangeEnd !== undefined ? String(body.rangeEnd) : undefined
 
   const data = await readStats(c, {
     app_id: body.appId,
-    start_date: body.rangeStart,
-    end_date: body.rangeEnd,
+    start_date: startDate,
+    end_date: endDate,
     deviceIds: body.devicesId,
     search: body.search,
-    order: body.order as any,
+    order,
     limit,
     actions: body.actions,
   })
@@ -107,9 +146,10 @@ app.post('/export', middlewareV2(['read', 'write', 'all', 'upload']), async (c) 
   )
 
   const defaultFilename = `capgo-logs-${body.appId}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`
+  const safeFilename = sanitizeFilename(body.filename, 'csv')
   return c.json({
     format: 'csv',
-    filename: body.filename?.trim() || defaultFilename,
+    filename: safeFilename || defaultFilename,
     contentType: 'text/csv; charset=utf-8',
     limit,
     rowCount: Array.isArray(data) ? data.length : 0,

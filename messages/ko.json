@@ -1498,5 +1498,10 @@
   "your-usage": "당신의 사용량:",
   "zip-bundle": "ZIP 앱 번들",
   "failed-to-create-api-key": "API 키를 생성하지 못했습니다",
-  "failed-to-regenerate-api-key": "API 키를 재생성하지 못했습니다"
+  "failed-to-regenerate-api-key": "API 키를 재생성하지 못했습니다",
+  "download-csv": "CSV 다운로드",
+  "exporting-logs": "로그 내보내는 중...",
+  "export-ready": "내보내기 준비됨",
+  "export-failed": "내보내기 실패",
+  "not-logged-in": "로그인되지 않음"
 }

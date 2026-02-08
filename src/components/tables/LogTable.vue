@@ -329,12 +329,12 @@ async function exportCsv() {
   if (isExporting.value)
     return
   isExporting.value = true
-  const loadingToastId = toast.loading('Exporting logs...')
+  const loadingToastId = toast.loading(t('exporting-logs'))
   try {
     const { data: currentSession } = await supabase.auth.getSession()!
     if (!currentSession.session) {
       toast.dismiss(loadingToastId)
-      toast.error('Not logged in')
+      toast.error(t('not-logged-in'))
       return
     }
     const currentJwt = currentSession.session.access_token
@@ -349,7 +349,9 @@ async function exportCsv() {
         appId: props.appId,
         devicesId: props.deviceId ? [props.deviceId] : undefined,
         search: search.value ? search.value : undefined,
-        order: columns.value.filter(elem => elem.sortable).map(elem => ({ key: elem.key as string, sortable: elem.sortable })),
+        order: columns.value
+          .filter(elem => typeof elem.sortable === 'string')
+          .map(elem => ({ key: elem.key as string, sortable: elem.sortable as 'asc' | 'desc' })),
         rangeStart: range.value?.[0]?.toISOString(),
         rangeEnd: range.value?.[1]?.toISOString(),
         actions: activeActions.value,
@@ -359,27 +361,27 @@ async function exportCsv() {
     })
 
     if (!response.ok) {
-      const err = await response.json().catch(() => ({}))
+      const err = (await response.json().catch(() => ({}))) as { message?: string }
       toast.dismiss(loadingToastId)
-      toast.error(err?.message || 'Export failed')
+      toast.error(err?.message || t('export-failed'))
       return
     }
 
     const data = await response.json() as { csv: string, filename: string, contentType: string }
     if (!data.csv || !data.filename) {
       toast.dismiss(loadingToastId)
-      toast.error('Export failed')
+      toast.error(t('export-failed'))
       return
     }
 
     downloadText(data.filename, data.csv, data.contentType || 'text/csv; charset=utf-8')
     toast.dismiss(loadingToastId)
-    toast.success('Export ready')
+    toast.success(t('export-ready'))
   }
   catch (error) {
     console.error(error)
     toast.dismiss(loadingToastId)
-    toast.error('Export failed')
+    toast.error(t('export-failed'))
   }
   finally {
     isExporting.value = false
