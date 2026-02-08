@@ -685,9 +685,12 @@ export async function readStatsCF(c: Context, params: ReadStatsParams) {
       searchFilter = `AND (position('${searchLower}' IN toLower(device_id)) > 0 OR position('${searchLower}' IN toLower(action)) > 0 OR position('${searchLower}' IN toLower(blob3)) > 0)`
   }
   const orderFilters: string[] = []
+  const allowedOrderKeys = new Set(['created_at', 'app_id', 'device_id', 'action', 'version_name'])
   if (params.order?.length) {
     params.order.forEach((col) => {
       if (col.sortable && typeof col.sortable === 'string') {
+        if (!allowedOrderKeys.has(col.key))
+          return
         cloudlog({ requestId: c.get('requestId'), message: 'order', colKey: col.key, colSortable: col.sortable })
         orderFilters.push(`${col.key} ${col.sortable.toUpperCase()}`)
       }

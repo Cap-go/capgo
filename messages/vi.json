@@ -1498,5 +1498,10 @@
   "your-usage": "Sử dụng của bạn:",
   "zip-bundle": "Gói ứng dụng Zip",
   "failed-to-create-api-key": "Không thể tạo khóa API",
-  "failed-to-regenerate-api-key": "Không thể tạo lại khóa API"
+  "failed-to-regenerate-api-key": "Không thể tạo lại khóa API",
+  "download-csv": "Tải CSV",
+  "exporting-logs": "Đang xuất nhật ký...",
+  "export-ready": "Xuất xong",
+  "export-failed": "Xuất thất bại",
+  "not-logged-in": "Chưa đăng nhập"
 }

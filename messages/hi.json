@@ -1498,5 +1498,10 @@
   "your-usage": "आपका उपयोग:",
   "zip-bundle": "ज़िप ऐप बंडल",
   "failed-to-create-api-key": "API कुंजी बनाने में विफल",
-  "failed-to-regenerate-api-key": "API कुंजी पुनः उत्पन्न करने में विफल"
+  "failed-to-regenerate-api-key": "API कुंजी पुनः उत्पन्न करने में विफल",
+  "download-csv": "CSV डाउनलोड करें",
+  "exporting-logs": "लॉग निर्यात हो रहे हैं...",
+  "export-ready": "निर्यात तैयार है",
+  "export-failed": "निर्यात विफल",
+  "not-logged-in": "लॉग इन नहीं है"
 }

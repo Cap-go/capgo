@@ -1498,5 +1498,10 @@
   "your-usage": "Penggunaan Anda:",
   "zip-bundle": "Paket bundel aplikasi Zip",
   "failed-to-create-api-key": "Gagal membuat kunci API",
-  "failed-to-regenerate-api-key": "Gagal membuat ulang kunci API"
+  "failed-to-regenerate-api-key": "Gagal membuat ulang kunci API",
+  "download-csv": "Unduh CSV",
+  "exporting-logs": "Mengekspor log...",
+  "export-ready": "Ekspor siap",
+  "export-failed": "Ekspor gagal",
+  "not-logged-in": "Belum masuk"
 }

@@ -1501,5 +1501,10 @@
   "your-usage": "Your usage:",
   "zip-bundle": "Zip app bundle",
   "failed-to-create-api-key": "Failed to create API key",
-  "failed-to-regenerate-api-key": "Failed to regenerate API key"
+  "failed-to-regenerate-api-key": "Failed to regenerate API key",
+  "download-csv": "Download CSV",
+  "exporting-logs": "Exporting logs...",
+  "export-ready": "Export ready",
+  "export-failed": "Export failed",
+  "not-logged-in": "Not logged in"
 }
