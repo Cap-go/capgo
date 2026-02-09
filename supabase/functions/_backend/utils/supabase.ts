@@ -521,8 +521,13 @@ export async function isOnboardedOrg(c: Context, orgId: string): Promise<boolean
   return false
 }
 
-export async function set_mau_exceeded(c: Context, orgId: string, disabled: boolean): Promise<boolean> {
-  const { error } = await supabaseAdmin(c).rpc('set_mau_exceeded_by_org', { org_id: orgId, disabled })
+export async function set_mau_exceeded(c: Context, orgId: string, customerId: string | null, disabled: boolean): Promise<boolean> {
+  if (!customerId)
+    return true
+  const { error } = await supabaseAdmin(c)
+    .from('stripe_info')
+    .update({ mau_exceeded: disabled })
+    .eq('customer_id', customerId)
   if (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'set_mau_exceeded error', orgId, error })
     return false
@@ -530,17 +535,27 @@ export async function set_mau_exceeded(c: Context, orgId: string, disabled: bool
   return true
 }
 
-export async function set_storage_exceeded(c: Context, orgId: string, disabled: boolean): Promise<boolean> {
-  const { error } = await supabaseAdmin(c).rpc('set_storage_exceeded_by_org', { org_id: orgId, disabled })
+export async function set_storage_exceeded(c: Context, orgId: string, customerId: string | null, disabled: boolean): Promise<boolean> {
+  if (!customerId)
+    return true
+  const { error } = await supabaseAdmin(c)
+    .from('stripe_info')
+    .update({ storage_exceeded: disabled })
+    .eq('customer_id', customerId)
   if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'set_download_disabled error', orgId, error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'set_storage_exceeded error', orgId, error })
     return false
   }
   return true
 }
 
-export async function set_bandwidth_exceeded(c: Context, orgId: string, disabled: boolean): Promise<boolean> {
-  const { error } = await supabaseAdmin(c).rpc('set_bandwidth_exceeded_by_org', { org_id: orgId, disabled })
+export async function set_bandwidth_exceeded(c: Context, orgId: string, customerId: string | null, disabled: boolean): Promise<boolean> {
+  if (!customerId)
+    return true
+  const { error } = await supabaseAdmin(c)
+    .from('stripe_info')
+    .update({ bandwidth_exceeded: disabled })
+    .eq('customer_id', customerId)
   if (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'set_bandwidth_exceeded error', orgId, error })
     return false
