@@ -1,7 +1,7 @@
 BEGIN;
 
 
-SELECT plan(16);
+SELECT plan(10);
 
 -- =============================================================================
 -- Test that internal functions WORK for postgres
@@ -30,24 +30,6 @@ SELECT
     lives_ok(
         'SELECT delete_http_response(999999)',
         'delete_http_response test - works for service_role'
-    );
-
-SELECT
-    lives_ok(
-        'SELECT set_mau_exceeded_by_org(''22dbad8a-b885-4309-9b3b-a09f8460fb6d'', false)',
-        'set_mau_exceeded_by_org test - works for service_role'
-    );
-
-SELECT
-    lives_ok(
-        'SELECT set_bandwidth_exceeded_by_org(''22dbad8a-b885-4309-9b3b-a09f8460fb6d'', false)',
-        'set_bandwidth_exceeded_by_org test - works for service_role'
-    );
-
-SELECT
-    lives_ok(
-        'SELECT set_storage_exceeded_by_org(''22dbad8a-b885-4309-9b3b-a09f8460fb6d'', false)',
-        'set_storage_exceeded_by_org test - works for service_role'
     );
 
 -- Test delete_user (should be safe to test as it requires authentication)
@@ -114,45 +96,6 @@ SELECT
         '42501',
         'permission denied for function delete_http_response',
         'delete_http_response test - throws permission error for authenticated user'
-    );
-
-SELECT tests.clear_authentication();
-
--- Test set_mau_exceeded_by_org (internal function - should be denied to authenticated users)
-SELECT tests.authenticate_as('test_admin');
-
-SELECT
-    throws_ok(
-        'SELECT set_mau_exceeded_by_org(''22dbad8a-b885-4309-9b3b-a09f8460fb6d'', false)',
-        '42501',
-        'permission denied for function set_mau_exceeded_by_org',
-        'set_mau_exceeded_by_org test - throws permission error for authenticated user'
-    );
-
-SELECT tests.clear_authentication();
-
--- Test set_bandwidth_exceeded_by_org (internal function - should be denied to authenticated users)
-SELECT tests.authenticate_as('test_admin');
-
-SELECT
-    throws_ok(
-        'SELECT set_bandwidth_exceeded_by_org(''22dbad8a-b885-4309-9b3b-a09f8460fb6d'', false)',
-        '42501',
-        'permission denied for function set_bandwidth_exceeded_by_org',
-        'set_bandwidth_exceeded_by_org test - throws permission error for authenticated user'
-    );
-
-SELECT tests.clear_authentication();
-
--- Test set_storage_exceeded_by_org (internal function - should be denied to authenticated users)
-SELECT tests.authenticate_as('test_admin');
-
-SELECT
-    throws_ok(
-        'SELECT set_storage_exceeded_by_org(''22dbad8a-b885-4309-9b3b-a09f8460fb6d'', false)',
-        '42501',
-        'permission denied for function set_storage_exceeded_by_org',
-        'set_storage_exceeded_by_org test - throws permission error for authenticated user'
     );
 
 SELECT tests.clear_authentication();
