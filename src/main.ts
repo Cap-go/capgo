@@ -72,6 +72,10 @@ const newRoutes = routes.map((route) => {
 const router = createRouter({
   routes: [
     { path: '/', redirect: '/login' },
+    // Canonical apps list route
+    { path: '/app', redirect: '/apps' },
+    // Legacy onboarding routes (kept to avoid breaking old links)
+    { path: '/new', redirect: '/apps/new' },
     { path: '/settings/plans', redirect: '/settings/organization/plans' },
     { path: '/settings/usage', redirect: '/settings/organization/usage' },
     { path: '/settings/change-password', redirect: '/settings/account/change-password' },

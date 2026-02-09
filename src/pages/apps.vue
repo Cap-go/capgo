@@ -14,7 +14,6 @@ const router = useRouter()
 const organizationStore = useOrganizationStore()
 const isLoading = ref(true)
 const isTableLoading = ref(false)
-const stepsOpen = ref(false)
 const supabase = useSupabase()
 const { t } = useI18n()
 const displayStore = useDisplayStore()
@@ -34,13 +33,6 @@ const lacksSecurityAccess = computed(() => {
   return lacks2FA || lacksPassword
 })
 
-async function NextStep(appId: string) {
-  console.log('Navigating to app with ID:', appId)
-  // Small delay to ensure database writes are committed before fetching dashboard data
-  await new Promise(resolve => setTimeout(resolve, 500))
-  // Add refresh=true to force dashboard to fetch fresh data (skip cache)
-  router.push(`/app/${appId}?refresh=true`)
-}
 async function getMyApps() {
   isTableLoading.value = true
   try {
@@ -102,11 +94,9 @@ async function getMyApps() {
         }),
       )
       apps.value = signedApps
-      stepsOpen.value = false
     }
     else {
       apps.value = []
-      stepsOpen.value = totalApps.value === 0
     }
   }
   finally {
@@ -139,10 +129,22 @@ displayStore.defaultBack = '/apps'
       <FailedCard />
     </div>
     <div v-else-if="!isLoading">
-      <!-- Show onboarding steps when no apps -->
-      <StepsApp v-if="stepsOpen" :onboarding="!apps.length" @done="NextStep" @close-step="stepsOpen = !stepsOpen" />
-      <div v-else class="relative overflow-hidden pb-4 h-full">
+      <div class="relative overflow-hidden pb-4 h-full">
         <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+          <div
+            v-if="totalApps === 0 && !searchQuery"
+            class="p-6 mb-6 bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900"
+          >
+            <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+              {{ t('start-using-capgo') }} <span class="font-prompt">Capgo</span> !
+            </h2>
+            <p class="mt-2 text-slate-600 dark:text-slate-200">
+              {{ t('add-your-first-app-t') }}
+            </p>
+            <button class="mt-4 d-btn d-btn-primary" @click="router.push('/apps/new')">
+              {{ t('add-app') }}
+            </button>
+          </div>
           <!-- App table - always visible even when payment failed -->
           <div class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
             <AppTable
@@ -153,7 +155,7 @@ displayStore.defaultBack = '/apps'
               :delete-button="!organizationStore.currentOrganizationFailed"
               :server-side-pagination="true"
               :is-loading="isTableLoading"
-              @add-app="stepsOpen = !stepsOpen"
+              @add-app="router.push('/apps/new')"
               @update:current-page="(page) => { currentPage = page; getMyApps() }"
               @update:search="(query) => { searchQuery = query; currentPage = 1; getMyApps() }"
               @reload="getMyApps()"
@@ -168,3 +170,8 @@ displayStore.defaultBack = '/apps'
     </div>
   </div>
 </template>
+
+<route lang="yaml">
+meta:
+  layout: app
+</route>

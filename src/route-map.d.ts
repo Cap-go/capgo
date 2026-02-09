@@ -236,6 +236,13 @@ declare module 'vue-router/auto-routes' {
       { app: ParamValue<false> },
       | never
     >,
+    '/app/[package].bundles.new': RouteRecordInfo<
+      '/app/[package].bundles.new',
+      '/app/:package/bundles/new',
+      { package: ParamValue<true> },
+      { package: ParamValue<false> },
+      | never
+    >,
     '/app/modules': RouteRecordInfo<
       '/app/modules',
       '/app/modules',
@@ -253,6 +260,13 @@ declare module 'vue-router/auto-routes' {
     '/apps': RouteRecordInfo<
       '/apps',
       '/apps',
+      Record<never, never>,
+      Record<never, never>,
+      | '/apps/new'
+    >,
+    '/apps/new': RouteRecordInfo<
+      '/apps/new',
+      '/apps/new',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -632,6 +646,12 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
+    'src/pages/app/[package].bundles.new.vue': {
+      routes:
+        | '/app/[package].bundles.new'
+      views:
+        | never
+    }
     'src/pages/app/modules.vue': {
       routes:
         | '/app/modules'
@@ -647,6 +667,13 @@ declare module 'vue-router/auto-routes' {
     'src/pages/apps.vue': {
       routes:
         | '/apps'
+        | '/apps/new'
+      views:
+        | 'default'
+    }
+    'src/pages/apps/new.vue': {
+      routes:
+        | '/apps/new'
       views:
         | never
     }
