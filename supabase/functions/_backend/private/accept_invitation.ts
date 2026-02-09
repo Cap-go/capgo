@@ -81,6 +81,16 @@ function isUserAlreadyExistsAuthError(err: unknown): boolean {
   )
 }
 
+function isMissingCreatedViaInviteColumnError(err: unknown): boolean {
+  const anyErr = err as any
+  const code = String(anyErr?.code ?? '').toUpperCase()
+  const msg = String(anyErr?.message ?? '').toLowerCase()
+
+  // PostgREST returns schema cache errors as PGRST204.
+  // Some environments may surface a Postgres undefined_column code (42703).
+  return code === 'PGRST204' || code === '42703' || msg.includes('created_via_invite')
+}
+
 async function rollbackCreatedUser(c: Parameters<typeof useSupabaseAdmin>[0], userId: string) {
   // Best-effort rollback so users can retry the invite flow if something fails mid-way.
   const admin = useSupabaseAdmin(c)
@@ -106,6 +116,7 @@ async function rollbackCreatedUser(c: Parameters<typeof useSupabaseAdmin>[0], us
 }
 
 async function ensurePublicUserRowExists(
+  c: Parameters<typeof useSupabaseAdmin>[0],
   supabaseAdmin: ReturnType<typeof useSupabaseAdmin>,
   userId: string,
   invitation: any,
@@ -123,14 +134,36 @@ async function ensurePublicUserRowExists(
   if (existingRows && existingRows.length > 0)
     return
 
-  const { error: insertError } = await supabaseAdmin.from('users').insert({
+  const insertPayload = {
     id: userId,
     email: invitation.email,
     first_name: invitation.first_name,
     last_name: invitation.last_name,
     enable_notifications: true,
     opt_for_newsletters: optForNewsletters,
-  })
+    created_via_invite: true,
+  }
+
+  let { error: insertError } = await supabaseAdmin.from('users').insert(insertPayload)
+
+  // Log any initial error for observability during rollout
+  if (insertError) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'ensurePublicUserRowExists: initial insert error',
+      error: insertError,
+    })
+  }
+
+  // Backward compatible rollout: if the column doesn't exist yet, retry without it.
+  if (isMissingCreatedViaInviteColumnError(insertError)) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'ensurePublicUserRowExists: created_via_invite column missing, retrying without it',
+    })
+    const { created_via_invite: _createdViaInvite, ...fallbackPayload } = insertPayload
+    ;({ error: insertError } = await supabaseAdmin.from('users').insert(fallbackPayload))
+  }
 
   if (insertError) {
     return quickError(500, 'failed_to_accept_invitation', 'Failed to create user row', { error: insertError.message })
@@ -380,7 +413,7 @@ app.post('/', async (c) => {
       })
 
       if (!sessionError && session.user?.id) {
-        await ensurePublicUserRowExists(supabaseAdmin, session.user.id, invitation, body.opt_for_newsletters)
+        await ensurePublicUserRowExists(c, supabaseAdmin, session.user.id, invitation, body.opt_for_newsletters)
         await ensureOrgMembership(supabaseAdmin, session.user.id, invitation, org)
 
         const { error: tmpUserDeleteError } = await supabaseAdmin.from('tmp_users').delete().eq('invite_magic_string', body.magic_invite_string)
@@ -404,14 +437,39 @@ app.post('/', async (c) => {
   let didRollback = false
   try {
     // TODO: improve error handling
-    const { error: userNormalTableError, data } = await supabaseAdmin.from('users').insert({
+    const insertUserPayload = {
       id: user.user.id,
       email: invitation.email,
       first_name: invitation.first_name,
       last_name: invitation.last_name,
       enable_notifications: true,
       opt_for_newsletters: body.opt_for_newsletters,
-    }).select().single()
+      created_via_invite: true,
+    }
+
+    let {
+      error: userNormalTableError,
+      data,
+    } = await supabaseAdmin.from('users').insert(insertUserPayload).select().single()
+
+    // Log any initial error for observability during rollout
+    if (userNormalTableError) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'accept_invitation: initial user insert error',
+        error: userNormalTableError,
+      })
+    }
+
+    // Backward compatible rollout: if the column doesn't exist yet, retry without it.
+    if (isMissingCreatedViaInviteColumnError(userNormalTableError)) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'accept_invitation: created_via_invite column missing, retrying without it',
+      })
+      const { created_via_invite: _createdViaInvite, ...fallbackPayload } = insertUserPayload
+      ;({ error: userNormalTableError, data } = await supabaseAdmin.from('users').insert(fallbackPayload).select().single())
+    }
 
     if (userNormalTableError) {
       didRollback = true

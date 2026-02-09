@@ -2391,6 +2391,7 @@ export type Database = {
           ban_time: string | null
           country: string | null
           created_at: string | null
+          created_via_invite: boolean
           email: string
           email_preferences: Json
           enable_notifications: boolean
@@ -2405,6 +2406,7 @@ export type Database = {
           ban_time?: string | null
           country?: string | null
           created_at?: string | null
+          created_via_invite?: boolean
           email: string
           email_preferences?: Json
           enable_notifications?: boolean
@@ -2419,6 +2421,7 @@ export type Database = {
           ban_time?: string | null
           country?: string | null
           created_at?: string | null
+          created_via_invite?: boolean
           email?: string
           email_preferences?: Json
           enable_notifications?: boolean
