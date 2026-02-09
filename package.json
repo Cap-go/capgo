@@ -215,7 +215,7 @@
     "@capacitor/cli": "^8.0.0",
     "@capacitor/core": "^8.0.0",
     "@capgo/cli": "7.72.4",
-    "@cloudflare/workers-types": "4.20251229.0",
+    "@cloudflare/workers-types": "4.20260207.0",
     "@formkit/core": "1.6.9",
     "@iconify/json": "^2.2.406",
     "@playwright/test": "1.57.0",
