@@ -254,13 +254,13 @@ async function userAbovePlan(c: Context, org: {
       creditResults[metric.key] = creditResult
       const unpaid = creditResult?.overage_unpaid ?? overage
       if (metric.key === 'mau') {
-        await set_mau_exceeded(c, orgId, org.customer_id, unpaid > 0)
+        await set_mau_exceeded(c, org.customer_id, unpaid > 0, orgId)
       }
       else if (metric.key === 'storage') {
-        await set_storage_exceeded(c, orgId, org.customer_id, unpaid > 0)
+        await set_storage_exceeded(c, org.customer_id, unpaid > 0, orgId)
       }
       else if (metric.key === 'bandwidth') {
-        await set_bandwidth_exceeded(c, orgId, org.customer_id, unpaid > 0)
+        await set_bandwidth_exceeded(c, org.customer_id, unpaid > 0, orgId)
       }
       else if (metric.key === 'build_time') {
         await set_build_time_exceeded(c, orgId, unpaid > 0)
@@ -270,11 +270,11 @@ async function userAbovePlan(c: Context, org: {
     }
     else {
       if (metric.key === 'mau')
-        await set_mau_exceeded(c, orgId, org.customer_id, false)
+        await set_mau_exceeded(c, org.customer_id, false, orgId)
       else if (metric.key === 'storage')
-        await set_storage_exceeded(c, orgId, org.customer_id, false)
+        await set_storage_exceeded(c, org.customer_id, false, orgId)
       else if (metric.key === 'bandwidth')
-        await set_bandwidth_exceeded(c, orgId, org.customer_id, false)
+        await set_bandwidth_exceeded(c, org.customer_id, false, orgId)
       else if (metric.key === 'build_time')
         await set_build_time_exceeded(c, orgId, false)
     }
@@ -329,9 +329,9 @@ async function userAbovePlan(c: Context, org: {
 
 async function userIsAtPlanUsage(c: Context, orgId: string, customerId: string | null, percentUsage: PlanUsage, drizzleClient: ReturnType<typeof getDrizzleClient>) {
   // Reset exceeded flags if plan is good
-  await set_mau_exceeded(c, orgId, customerId, false)
-  await set_storage_exceeded(c, orgId, customerId, false)
-  await set_bandwidth_exceeded(c, orgId, customerId, false)
+  await set_mau_exceeded(c, customerId, false, orgId)
+  await set_storage_exceeded(c, customerId, false, orgId)
+  await set_bandwidth_exceeded(c, customerId, false, orgId)
   await set_build_time_exceeded(c, orgId, false)
 
   // check if user is at more than 90%, 50% or 70% of plan usage

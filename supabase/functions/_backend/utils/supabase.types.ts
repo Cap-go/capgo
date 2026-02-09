@@ -3834,19 +3834,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      set_bandwidth_exceeded_by_org: {
-        Args: { disabled: boolean; org_id: string }
-        Returns: undefined
-      }
       set_build_time_exceeded_by_org: {
-        Args: { disabled: boolean; org_id: string }
-        Returns: undefined
-      }
-      set_mau_exceeded_by_org: {
-        Args: { disabled: boolean; org_id: string }
-        Returns: undefined
-      }
-      set_storage_exceeded_by_org: {
         Args: { disabled: boolean; org_id: string }
         Returns: undefined
       }

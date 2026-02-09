@@ -521,43 +521,79 @@ export async function isOnboardedOrg(c: Context, orgId: string): Promise<boolean
   return false
 }
 
-export async function set_mau_exceeded(c: Context, orgId: string, customerId: string | null, disabled: boolean): Promise<boolean> {
+/**
+ * Update the MAU exceeded flag for a Stripe customer.
+ *
+ * Note: `logOrgId` is used for logging/debugging only. The update is scoped by `customerId`.
+ */
+export async function set_mau_exceeded(c: Context, customerId: string | null, disabled: boolean, logOrgId?: string): Promise<boolean> {
   if (!customerId)
     return true
-  const { error } = await supabaseAdmin(c)
+  // Return the updated row key so we can detect "0 rows affected".
+  const { data, error } = await supabaseAdmin(c)
     .from('stripe_info')
     .update({ mau_exceeded: disabled })
     .eq('customer_id', customerId)
+    .select('customer_id')
   if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'set_mau_exceeded error', orgId, error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'set_mau_exceeded error', orgId: logOrgId, customerId, disabled, error })
+    return false
+  }
+  // If no row matched, PostgREST returns an empty array with no error.
+  // Treat as failure to avoid silently "succeeding" while not persisting the change.
+  // This also protects against accidental mismatched `customerId`.
+  if (!data?.length) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'set_mau_exceeded no stripe_info row matched', orgId: logOrgId, customerId, disabled })
     return false
   }
   return true
 }
 
-export async function set_storage_exceeded(c: Context, orgId: string, customerId: string | null, disabled: boolean): Promise<boolean> {
+/**
+ * Update the storage exceeded flag for a Stripe customer.
+ *
+ * Note: `logOrgId` is used for logging/debugging only. The update is scoped by `customerId`.
+ */
+export async function set_storage_exceeded(c: Context, customerId: string | null, disabled: boolean, logOrgId?: string): Promise<boolean> {
   if (!customerId)
     return true
-  const { error } = await supabaseAdmin(c)
+  // Return the updated row key so we can detect "0 rows affected".
+  const { data, error } = await supabaseAdmin(c)
     .from('stripe_info')
     .update({ storage_exceeded: disabled })
     .eq('customer_id', customerId)
+    .select('customer_id')
   if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'set_storage_exceeded error', orgId, error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'set_storage_exceeded error', orgId: logOrgId, customerId, disabled, error })
+    return false
+  }
+  if (!data?.length) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'set_storage_exceeded no stripe_info row matched', orgId: logOrgId, customerId, disabled })
     return false
   }
   return true
 }
 
-export async function set_bandwidth_exceeded(c: Context, orgId: string, customerId: string | null, disabled: boolean): Promise<boolean> {
+/**
+ * Update the bandwidth exceeded flag for a Stripe customer.
+ *
+ * Note: `logOrgId` is used for logging/debugging only. The update is scoped by `customerId`.
+ */
+export async function set_bandwidth_exceeded(c: Context, customerId: string | null, disabled: boolean, logOrgId?: string): Promise<boolean> {
   if (!customerId)
     return true
-  const { error } = await supabaseAdmin(c)
+  // Return the updated row key so we can detect "0 rows affected".
+  const { data, error } = await supabaseAdmin(c)
     .from('stripe_info')
     .update({ bandwidth_exceeded: disabled })
     .eq('customer_id', customerId)
+    .select('customer_id')
   if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'set_bandwidth_exceeded error', orgId, error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'set_bandwidth_exceeded error', orgId: logOrgId, customerId, disabled, error })
+    return false
+  }
+  if (!data?.length) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'set_bandwidth_exceeded no stripe_info row matched', orgId: logOrgId, customerId, disabled })
     return false
   }
   return true
