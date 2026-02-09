@@ -123,14 +123,23 @@ async function ensurePublicUserRowExists(
   if (existingRows && existingRows.length > 0)
     return
 
-  const { error: insertError } = await supabaseAdmin.from('users').insert({
+  const insertPayload = {
     id: userId,
     email: invitation.email,
     first_name: invitation.first_name,
     last_name: invitation.last_name,
     enable_notifications: true,
     opt_for_newsletters: optForNewsletters,
-  })
+    created_via_invite: true,
+  }
+
+  let { error: insertError } = await supabaseAdmin.from('users').insert(insertPayload)
+
+  // Backward compatible rollout: if the column doesn't exist yet, retry without it.
+  if (insertError?.message?.toLowerCase().includes('created_via_invite')) {
+    const { created_via_invite: _createdViaInvite, ...fallbackPayload } = insertPayload
+    ;({ error: insertError } = await supabaseAdmin.from('users').insert(fallbackPayload))
+  }
 
   if (insertError) {
     return quickError(500, 'failed_to_accept_invitation', 'Failed to create user row', { error: insertError.message })
@@ -404,14 +413,26 @@ app.post('/', async (c) => {
   let didRollback = false
   try {
     // TODO: improve error handling
-    const { error: userNormalTableError, data } = await supabaseAdmin.from('users').insert({
+    const insertUserPayload = {
       id: user.user.id,
       email: invitation.email,
       first_name: invitation.first_name,
       last_name: invitation.last_name,
       enable_notifications: true,
       opt_for_newsletters: body.opt_for_newsletters,
-    }).select().single()
+      created_via_invite: true,
+    }
+
+    let {
+      error: userNormalTableError,
+      data,
+    } = await supabaseAdmin.from('users').insert(insertUserPayload).select().single()
+
+    // Backward compatible rollout: if the column doesn't exist yet, retry without it.
+    if (userNormalTableError?.message?.toLowerCase().includes('created_via_invite')) {
+      const { created_via_invite: _createdViaInvite, ...fallbackPayload } = insertUserPayload
+      ;({ error: userNormalTableError, data } = await supabaseAdmin.from('users').insert(fallbackPayload).select().single())
+    }
 
     if (userNormalTableError) {
       didRollback = true

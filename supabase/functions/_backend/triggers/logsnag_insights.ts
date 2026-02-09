@@ -407,15 +407,28 @@ function getStats(c: Context): GlobalStats {
     updates_last_month: readLastMonthUpdatesCF(c),
     devices_last_month: readLastMonthDevicesCF(c),
     devices_by_platform: readLastMonthDevicesByPlatformCF(c),
-    registers_today: supabase
-      .from('users')
-      .select('id', { count: 'exact', head: true })
-      .gte('created_at', last24h)
-      .then((res) => {
-        if (res.error)
-          cloudlog({ requestId: c.get('requestId'), message: 'registers_today error', error: res.error })
-        return res.count ?? 0
-      }),
+    registers_today: (async () => {
+      // Backward compatible rollout: if the column doesn't exist yet, fall back to the legacy count.
+      const filtered = await supabase
+        .from('users')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', last24h)
+        .eq('created_via_invite', false)
+
+      if (filtered.error?.message?.toLowerCase().includes('created_via_invite')) {
+        const legacy = await supabase
+          .from('users')
+          .select('id', { count: 'exact', head: true })
+          .gte('created_at', last24h)
+        if (legacy.error)
+          cloudlog({ requestId: c.get('requestId'), message: 'registers_today legacy error', error: legacy.error })
+        return legacy.count ?? 0
+      }
+
+      if (filtered.error)
+        cloudlog({ requestId: c.get('requestId'), message: 'registers_today error', error: filtered.error })
+      return filtered.count ?? 0
+    })(),
     bundle_storage_gb: supabase
       .rpc('total_bundle_storage_bytes')
       .then((res) => {
