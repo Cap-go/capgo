@@ -416,6 +416,11 @@ function getStats(c: Context): GlobalStats {
         .eq('created_via_invite', false)
 
       if (filtered.error?.message?.toLowerCase().includes('created_via_invite')) {
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'registers_today: created_via_invite column missing, falling back to legacy count',
+          error: filtered.error,
+        })
         const legacy = await supabase
           .from('users')
           .select('id', { count: 'exact', head: true })

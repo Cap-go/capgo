@@ -25,7 +25,13 @@ app.post('/', middlewareAPISecret, triggerValidator('users', 'INSERT'), async (c
       icon: '🎉',
       user_id: record.id,
       notify: false,
-    }).catch()
+    }).catch((error) => {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'LogSnag.track user-register failed',
+        error,
+      })
+    })
   }
   return c.json(BRES)
 })

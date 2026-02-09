@@ -106,6 +106,7 @@ async function rollbackCreatedUser(c: Parameters<typeof useSupabaseAdmin>[0], us
 }
 
 async function ensurePublicUserRowExists(
+  c: Parameters<typeof useSupabaseAdmin>[0],
   supabaseAdmin: ReturnType<typeof useSupabaseAdmin>,
   userId: string,
   invitation: any,
@@ -137,6 +138,11 @@ async function ensurePublicUserRowExists(
 
   // Backward compatible rollout: if the column doesn't exist yet, retry without it.
   if (insertError?.message?.toLowerCase().includes('created_via_invite')) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'ensurePublicUserRowExists: created_via_invite column missing, retrying without it',
+      error: insertError,
+    })
     const { created_via_invite: _createdViaInvite, ...fallbackPayload } = insertPayload
     ;({ error: insertError } = await supabaseAdmin.from('users').insert(fallbackPayload))
   }
@@ -389,7 +395,7 @@ app.post('/', async (c) => {
       })
 
       if (!sessionError && session.user?.id) {
-        await ensurePublicUserRowExists(supabaseAdmin, session.user.id, invitation, body.opt_for_newsletters)
+        await ensurePublicUserRowExists(c, supabaseAdmin, session.user.id, invitation, body.opt_for_newsletters)
         await ensureOrgMembership(supabaseAdmin, session.user.id, invitation, org)
 
         const { error: tmpUserDeleteError } = await supabaseAdmin.from('tmp_users').delete().eq('invite_magic_string', body.magic_invite_string)
@@ -430,6 +436,11 @@ app.post('/', async (c) => {
 
     // Backward compatible rollout: if the column doesn't exist yet, retry without it.
     if (userNormalTableError?.message?.toLowerCase().includes('created_via_invite')) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'accept_invitation: created_via_invite column missing, retrying without it',
+        error: userNormalTableError,
+      })
       const { created_via_invite: _createdViaInvite, ...fallbackPayload } = insertUserPayload
       ;({ error: userNormalTableError, data } = await supabaseAdmin.from('users').insert(fallbackPayload).select().single())
     }
