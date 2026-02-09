@@ -168,7 +168,7 @@ async function openChangePlan(plan: Database['public']['Tables']['plans']['Row']
         text: t('add-another-app'),
         id: 'add-app-button',
         handler: () => {
-          router.push('/app')
+          router.push('/apps')
           return true
         },
       },
@@ -269,7 +269,7 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
       })
       await dialogStore.onDialogDismiss()
       if (!prevOrg)
-        router.push('/app')
+        router.push('/apps')
       else
         organizationStore.setCurrentOrganization(prevOrg.gid)
       return
@@ -321,7 +321,7 @@ watchEffect(async () => {
             ],
           })
           await dialogStore.onDialogDismiss()
-          router.push('/app')
+          router.push('/apps')
           return
         }
       }

@@ -80,7 +80,7 @@ onMounted(async () => {
   }
 })
 displayStore.NavTitle = t('dashboard')
-displayStore.defaultBack = '/app'
+displayStore.defaultBack = '/apps'
 </script>
 
 <template>

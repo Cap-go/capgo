@@ -9,7 +9,7 @@ import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 
-const route = useRoute('/app/')
+const route = useRoute('/apps')
 const router = useRouter()
 const organizationStore = useOrganizationStore()
 const isLoading = ref(true)
@@ -121,7 +121,7 @@ watch(currentOrganization, async () => {
 })
 
 watchEffect(async () => {
-  if (route.path === '/app') {
+  if (route.path === '/apps') {
     displayStore.NavTitle = ''
     isLoading.value = true
     await getMyApps()
@@ -129,7 +129,7 @@ watchEffect(async () => {
   }
 })
 displayStore.NavTitle = t('apps')
-displayStore.defaultBack = '/app'
+displayStore.defaultBack = '/apps'
 </script>
 
 <template>

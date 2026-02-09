@@ -50,7 +50,7 @@ async function open() {
                 dialogStore.closeDialog({ text: t('button-confirm'), role: 'danger' })
                 await organizationStore.fetchOrganizations()
                 await organizationStore.setCurrentOrganizationToFirst()
-                router.push('/app')
+                router.push('/apps')
               }
             }
           }

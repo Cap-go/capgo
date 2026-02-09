@@ -49,7 +49,7 @@ interface ChannelStatsResponse {
   }
 }
 
-const route = useRoute('/app/[package].channel.[channel].statistics')
+const route = useRoute('/app/[app].channel.[channel].statistics')
 const router = useRouter()
 const displayStore = useDisplayStore()
 const appDetailStore = useAppDetailStore()
@@ -342,7 +342,7 @@ async function fetchStats() {
 watchEffect(async () => {
   if (route.path.includes('/channel/') && route.path.includes('/statistics')) {
     loading.value = true
-    packageId.value = route.params.package as string
+    packageId.value = route.params.app as string
     id.value = Number(route.params.channel as string)
     await getChannel()
     await fetchStats()
@@ -350,7 +350,7 @@ watchEffect(async () => {
 
     if (!channel.value?.name)
       displayStore.NavTitle = t('channel')
-    displayStore.defaultBack = `/app/${route.params.package}/channels`
+    displayStore.defaultBack = `/app/${route.params.app}/channels`
   }
 })
 </script>

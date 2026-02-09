@@ -142,7 +142,7 @@ export const useDisplayStore = defineStore('display', () => {
     // App flow: Apps / <AppName> / <Section>
     if (splitPath[0] === 'app' && splitPath[1]) {
       const appId = splitPath[1]
-      breadcrumbs.push({ path: '/app', name: 'apps' })
+      breadcrumbs.push({ path: '/apps', name: 'apps' })
 
       // App name entry
       const cachedName = appNameCache.value.get(appId)

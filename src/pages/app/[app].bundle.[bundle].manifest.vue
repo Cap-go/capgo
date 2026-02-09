@@ -13,7 +13,7 @@ type ManifestEntry = Database['public']['Tables']['manifest']['Row']
 
 type VersionRow = Pick<Database['public']['Tables']['app_versions']['Row'], 'id' | 'name' | 'created_at' | 'manifest_count' | 'app_id'>
 
-const route = useRoute('/app/[package].bundle.[bundle].manifest')
+const route = useRoute('/app/[app].bundle.[bundle].manifest')
 const router = useRouter()
 const displayStore = useDisplayStore()
 const { t } = useI18n()
@@ -257,7 +257,7 @@ watch(compareVersionId, async (value) => {
 watchEffect(async () => {
   if (route.path.includes('/bundle/') && route.path.includes('/manifest')) {
     loading.value = true
-    packageId.value = route.params.package as string
+    packageId.value = route.params.app as string
     id.value = Number(route.params.bundle as string)
     resetCompareSelection()
     await Promise.all([getVersion(), loadManifest()])

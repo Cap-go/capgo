@@ -18,7 +18,7 @@ interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
 }
 
-const route = useRoute('/app/[package].channel.[channel].devices')
+const route = useRoute('/app/[app].channel.[channel].devices')
 const router = useRouter()
 const dialogStore = useDialogV2Store()
 const displayStore = useDisplayStore()
@@ -127,7 +127,7 @@ async function customDeviceOverwritePart5(
   const { error: addDeviceError } = await supabase.functions.invoke('private/create_device', {
     body: {
       device_id: deviceId,
-      app_id: route.params.package as string,
+      app_id: route.params.app as string,
       org_id: channel.value?.owner_org ?? '',
       platform,
       version_name: channel.value?.version.name ?? 'unknown',
@@ -142,7 +142,7 @@ async function customDeviceOverwritePart5(
 
   const { error: overwriteError } = await supabase.from('channel_devices')
     .insert({
-      app_id: route.params.package as string,
+      app_id: route.params.app as string,
       channel_id: Number(route.params.channel),
       device_id: deviceId.toLowerCase(),
       owner_org: channel.value?.owner_org ?? '',
@@ -250,14 +250,14 @@ async function reload() {
 watchEffect(async () => {
   if (route.path.includes('/channel/') && route.path.includes('/devices')) {
     loading.value = true
-    packageId.value = route.params.package as string
+    packageId.value = route.params.app as string
     id.value = Number(route.params.channel as string)
     await getChannel()
     await getDeviceIds()
     loading.value = false
     if (!channel.value?.name)
       displayStore.NavTitle = t('channel')
-    displayStore.defaultBack = `/app/${route.params.package}/channels`
+    displayStore.defaultBack = `/app/${route.params.app}/channels`
 
     // Load role
     await organizationStore.awaitInitialLoad()

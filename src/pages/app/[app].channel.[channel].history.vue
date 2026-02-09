@@ -12,7 +12,7 @@ interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
 }
 
-const route = useRoute('/app/[package].channel.[channel].history')
+const route = useRoute('/app/[app].channel.[channel].history')
 const router = useRouter()
 const displayStore = useDisplayStore()
 const appDetailStore = useAppDetailStore()
@@ -91,13 +91,13 @@ async function getChannel() {
 watchEffect(async () => {
   if (route.path.includes('/channel/') && route.path.includes('/history')) {
     loading.value = true
-    packageId.value = route.params.package as string
+    packageId.value = route.params.app as string
     id.value = Number(route.params.channel as string)
     await getChannel()
     loading.value = false
     if (!channel.value?.name)
       displayStore.NavTitle = t('channel')
-    displayStore.defaultBack = `/app/${route.params.package}/channels`
+    displayStore.defaultBack = `/app/${route.params.app}/channels`
   }
 })
 </script>

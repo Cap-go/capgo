@@ -24,7 +24,7 @@ import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
-const route = useRoute('/app/[package].bundle.[bundle]')
+const route = useRoute('/app/[app].bundle.[bundle]')
 const router = useRouter()
 const dialogStore = useDialogV2Store()
 const displayStore = useDisplayStore()
@@ -413,14 +413,14 @@ async function getVersion() {
 watchEffect(async () => {
   if (route.path.includes('/bundle/')) {
     loading.value = true
-    packageId.value = route.params.package as string
+    packageId.value = route.params.app as string
     id.value = Number(route.params.bundle as string)
     await getVersion()
     await getChannels()
     loading.value = false
     if (!version.value?.name)
       displayStore.NavTitle = t('bundle')
-    displayStore.defaultBack = `/app/${route.params.package}/bundles`
+    displayStore.defaultBack = `/app/${route.params.app}/bundles`
   }
 })
 

@@ -23,7 +23,7 @@ let downloadListener: any = null
 
 onMounted(async () => {
   displayStore.NavTitle = 'QR Scanner'
-  displayStore.defaultBack = '/app'
+  displayStore.defaultBack = '/apps'
   await startScanner()
 })
 

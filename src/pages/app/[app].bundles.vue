@@ -8,15 +8,15 @@ import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
+
 const id = ref('')
-const route = useRoute('/app/[package].access')
+const route = useRoute('/app/[app].bundles')
 const lastPath = ref('')
 const isLoading = ref(false)
 const supabase = useSupabase()
 const displayStore = useDisplayStore()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
-
-displayStore.NavTitle = t('app-access-control')
+const showingBundleSteps = ref(false)
 
 async function loadAppInfo() {
   try {
@@ -28,7 +28,7 @@ async function loadAppInfo() {
     app.value = dataApp || app.value
   }
   catch (error) {
-    console.error('Error loading app info:', error)
+    console.error(error)
   }
 }
 
@@ -38,20 +38,18 @@ async function refreshData() {
     await loadAppInfo()
   }
   catch (error) {
-    console.error('Error refreshing data:', error)
+    console.error(error)
   }
-  finally {
-    isLoading.value = false
-  }
+  isLoading.value = false
 }
 
 watchEffect(async () => {
-  if (route.params.package && lastPath.value !== route.path) {
+  if (route.params.app && lastPath.value !== route.path) {
     lastPath.value = route.path
-    id.value = route.params.package as string
+    id.value = route.params.app as string
     await refreshData()
-    displayStore.NavTitle = t('app-access-control')
-    displayStore.defaultBack = '/app'
+    displayStore.NavTitle = ''
+    displayStore.defaultBack = '/apps'
   }
 })
 </script>
@@ -61,7 +59,7 @@ watchEffect(async () => {
     <div v-if="app || isLoading">
       <div class="mt-0 md:mt-8">
         <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
-          <AccessTable :app-id="id" />
+          <BundleTable :app-id="id" @update:showing-steps="showingBundleSteps = $event" />
         </div>
       </div>
     </div>

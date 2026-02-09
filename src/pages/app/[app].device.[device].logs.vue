@@ -11,7 +11,7 @@ import { useDisplayStore } from '~/stores/display'
 const displayStore = useDisplayStore()
 const { t } = useI18n()
 const router = useRouter()
-const route = useRoute('/app/[package].device.[device].logs')
+const route = useRoute('/app/[app].device.[device].logs')
 const supabase = useSupabase()
 const packageId = ref<string>('')
 const id = ref<string>()
@@ -87,14 +87,14 @@ async function getDevice() {
 watchEffect(async () => {
   if (route.path.includes('/device/') && route.path.includes('/logs')) {
     isLoading.value = true
-    packageId.value = route.params.package as string
+    packageId.value = route.params.app as string
     id.value = route.params.device as string
     id.value = id.value!.toLowerCase()
     await getDevice()
     isLoading.value = false
     if (!displayStore.NavTitle)
       displayStore.NavTitle = t('device')
-    displayStore.defaultBack = `/app/${route.params.package}/devices`
+    displayStore.defaultBack = `/app/${route.params.app}/devices`
   }
 })
 </script>

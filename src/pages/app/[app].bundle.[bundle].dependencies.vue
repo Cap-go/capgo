@@ -158,9 +158,9 @@ watch(compareVersionId, async (value) => {
 
 watchEffect(async () => {
   if (route.path.includes('/bundle/') && route.path.includes('/dependencies')) {
-    const params = route.params as { package?: string, bundle?: string }
+    const params = route.params as { app?: string, bundle?: string }
     loading.value = true
-    packageId.value = params.package as string
+    packageId.value = params.app as string
     id.value = Number(params.bundle as string)
     comparePackagesCache.value = {}
     resetCompareSelection()
@@ -168,7 +168,7 @@ watchEffect(async () => {
     loading.value = false
     if (!version.value?.name)
       displayStore.NavTitle = t('bundle')
-    displayStore.defaultBack = `/app/${params.package}/bundles`
+    displayStore.defaultBack = `/app/${params.app}/bundles`
   }
 })
 </script>

@@ -9,7 +9,7 @@ import { useDisplayStore } from '~/stores/display'
 
 const { t } = useI18n()
 const id = ref('')
-const route = useRoute('/app/[package].logs')
+const route = useRoute('/app/[app].logs')
 const lastPath = ref('')
 const isLoading = ref(false)
 const supabase = useSupabase()
@@ -42,12 +42,12 @@ async function refreshData() {
 }
 
 watchEffect(async () => {
-  if (route.params.package && lastPath.value !== route.path) {
+  if (route.params.app && lastPath.value !== route.path) {
     lastPath.value = route.path
-    id.value = route.params.package as string
+    id.value = route.params.app as string
     await refreshData()
     displayStore.NavTitle = ''
-    displayStore.defaultBack = '/app'
+    displayStore.defaultBack = '/apps'
   }
 })
 </script>

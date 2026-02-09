@@ -33,7 +33,7 @@ const bundleLinkSearchVal = ref('')
 const bundleLinkSearchMode = ref(false)
 
 const main = useMainStore()
-const route = useRoute('/app/[package].channel.[channel]')
+const route = useRoute('/app/[app].channel.[channel]')
 const router = useRouter()
 const dialogStore = useDialogV2Store()
 const displayStore = useDisplayStore()
@@ -68,7 +68,7 @@ function openBundle() {
     return
   if (channel.value.version.name === 'unknown')
     return
-  router.push(`/app/${route.params.package}/bundle/${channel.value.version.id}`)
+  router.push(`/app/${route.params.app}/bundle/${channel.value.version.id}`)
 }
 
 async function getChannel(force = false) {
@@ -178,18 +178,18 @@ async function saveChannelChange(key: string, val: any) {
 watchEffect(async () => {
   if (route.path.includes('/channel/')) {
     loading.value = true
-    packageId.value = route.params.package as string
+    packageId.value = route.params.app as string
     id.value = Number(route.params.channel as string)
     await getChannel()
     loading.value = false
     if (!channel.value?.name)
       displayStore.NavTitle = t('channel')
-    displayStore.defaultBack = `/app/${route.params.package}/channels`
+    displayStore.defaultBack = `/app/${route.params.app}/channels`
   }
 })
 
 function goToDefaultChannelSettings() {
-  router.push(`/app/${route.params.package}/info`)
+  router.push(`/app/${route.params.app}/info`)
 }
 
 const currentChannelVersion = computed(() => {

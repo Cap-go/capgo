@@ -27,7 +27,7 @@ function getRouteForEvent(payload: CLIActivityPayload): string | null {
   const evt = payload.event.toLowerCase()
 
   if (evt.includes('deleted') && (evt.includes('app') && !evt.includes('bundle')))
-    return '/app'
+    return '/apps'
   if (evt.includes('upload') || evt.includes('bundle') || evt.includes('external') || evt.includes('unlink'))
     return `/app/${appId}/bundles`
   if (evt.includes('channel'))

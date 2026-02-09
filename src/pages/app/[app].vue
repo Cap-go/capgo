@@ -14,7 +14,7 @@ import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
 const id = ref('')
-const route = useRoute('/app/[package]')
+const route = useRoute('/app/[app]')
 const lastPath = ref('')
 const bundlesNb = ref(0)
 const devicesNb = ref(0)
@@ -110,12 +110,12 @@ async function refreshData() {
 }
 
 watchEffect(async () => {
-  if (route.params.package && lastPath.value !== route.path) {
+  if (route.params.app && lastPath.value !== route.path) {
     lastPath.value = route.path
-    id.value = route.params.package as string
+    id.value = route.params.app as string
     await refreshData()
     displayStore.NavTitle = ''
-    displayStore.defaultBack = '/app'
+    displayStore.defaultBack = '/apps'
   }
 })
 </script>

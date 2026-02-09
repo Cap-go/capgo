@@ -766,7 +766,7 @@ watch(() => limitToOrgCheckbox.value, (newVal) => {
 })
 
 displayStore.NavTitle = t('api-keys')
-displayStore.defaultBack = '/app'
+displayStore.defaultBack = '/apps'
 getKeys()
 </script>
 

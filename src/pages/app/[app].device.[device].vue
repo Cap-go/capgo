@@ -26,7 +26,7 @@ interface Channel {
 const displayStore = useDisplayStore()
 const { t } = useI18n()
 const router = useRouter()
-const route = useRoute('/app/[package].device.[device]')
+const route = useRoute('/app/[app].device.[device]')
 const supabase = useSupabase()
 const packageId = ref<string>('')
 const id = ref<string>()
@@ -324,13 +324,13 @@ async function onSelectChannel(value: string) {
 
 watchEffect(async () => {
   if (route.path.includes('/device/') && !route.path.includes('/deployments') && !route.path.includes('/logs')) {
-    packageId.value = route.params.package as string
+    packageId.value = route.params.app as string
     id.value = route.params.device as string
     id.value = id.value!.toLowerCase()
     await loadData()
     if (!displayStore.NavTitle)
       displayStore.NavTitle = t('device')
-    displayStore.defaultBack = `/app/${route.params.package}/devices`
+    displayStore.defaultBack = `/app/${route.params.app}/devices`
   }
 })
 

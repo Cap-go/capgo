@@ -19,3 +19,4 @@
 /dashboard/settings/organization/usage /settings/organization/usage
 /p/* /app/:splat 301
 /app/p/:appid/settings /app/p/:appid?tab=info
+/app/ /apps/

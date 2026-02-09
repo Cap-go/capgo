@@ -49,7 +49,7 @@ const tabs = computed<Tab[]>(() => {
     {
       label: 'apps',
       icon: IconAppStore,
-      key: '/app',
+      key: '/apps',
     },
     {
       label: 'api-keys',

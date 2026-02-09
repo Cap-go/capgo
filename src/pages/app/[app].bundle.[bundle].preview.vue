@@ -105,10 +105,10 @@ function goToAppSettings() {
 
 watchEffect(async () => {
   // Use route.name for more specific matching instead of path.includes()
-  if (route.name === '/app/[package].bundle.[bundle].preview') {
+  if (route.name === '/app/[app].bundle.[bundle].preview') {
     loading.value = true
     previewState.value = 'loading'
-    packageId.value = route.params.package as string
+    packageId.value = route.params.app as string
     id.value = Number(route.params.bundle)
     await Promise.all([getVersion(), getApp()])
     determinePreviewState()
