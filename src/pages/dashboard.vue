@@ -108,7 +108,7 @@ displayStore.defaultBack = '/apps'
               {{ t('add-your-first-app-to-see-dashboard') }}
             </p>
             <router-link
-              to="/app"
+              to="/apps"
               class="inline-flex gap-2 items-center px-6 py-3 text-white bg-blue-600 rounded-lg transition-colors hover:bg-blue-700"
             >
               <span class="i-heroicons-plus-circle text-xl" />

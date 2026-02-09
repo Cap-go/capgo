@@ -112,7 +112,7 @@ const tabs = computed<Tab[]>(() => {
       <div class="flex justify-between px-3 py-4 border-b lg:py-6 lg:px-6 lg:border-b border-slate-800 shrink-0 lg:border-slate-700">
         <router-link
           class="flex items-center p-1 space-x-2 rounded-lg cursor-pointer lg:space-x-3 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none focus:ring-offset-slate-800"
-          to="/app"
+          to="/apps"
           aria-label="Capgo - Go to dashboard"
         >
           <img src="/capgo.webp" alt="Capgo logo" class="w-8 h-8">

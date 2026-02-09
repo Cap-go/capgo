@@ -44,7 +44,7 @@ const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost}
 const steps = ref<Step[]>([
   {
     title: t('add-another-bundle'),
-    command: `npx @capgo/cli@latest bundle upload -a [APIKEY]${localCommand}`,
+    command: `bunx @capgo/cli@latest bundle upload -a [APIKEY]${localCommand}`,
     subtitle: t('onboarding-bundle-cli-why'),
   },
   {

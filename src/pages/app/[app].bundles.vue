@@ -16,7 +16,6 @@ const isLoading = ref(false)
 const supabase = useSupabase()
 const displayStore = useDisplayStore()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
-const showingBundleSteps = ref(false)
 
 async function loadAppInfo() {
   try {
@@ -59,7 +58,7 @@ watchEffect(async () => {
     <div v-if="app || isLoading">
       <div class="mt-0 md:mt-8">
         <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
-          <BundleTable :app-id="id" @update:showing-steps="showingBundleSteps = $event" />
+          <BundleTable :app-id="id" />
         </div>
       </div>
     </div>
@@ -71,7 +70,7 @@ watchEffect(async () => {
       <p class="mt-2 text-muted-foreground">
         {{ t('app-not-found-description') }}
       </p>
-      <button class="mt-4 text-white d-btn d-btn-primary" @click="$router.push(`/app`)">
+      <button class="mt-4 text-white d-btn d-btn-primary" @click="$router.push(`/apps`)">
         {{ t('back-to-apps') }}
       </button>
     </div>
