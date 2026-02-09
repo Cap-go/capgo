@@ -81,6 +81,16 @@ function isUserAlreadyExistsAuthError(err: unknown): boolean {
   )
 }
 
+function isMissingCreatedViaInviteColumnError(err: unknown): boolean {
+  const anyErr = err as any
+  const code = String(anyErr?.code ?? '').toUpperCase()
+  const msg = String(anyErr?.message ?? '').toLowerCase()
+
+  // PostgREST returns schema cache errors as PGRST204.
+  // Some environments may surface a Postgres undefined_column code (42703).
+  return code === 'PGRST204' || code === '42703' || msg.includes('created_via_invite')
+}
+
 async function rollbackCreatedUser(c: Parameters<typeof useSupabaseAdmin>[0], userId: string) {
   // Best-effort rollback so users can retry the invite flow if something fails mid-way.
   const admin = useSupabaseAdmin(c)
@@ -137,7 +147,7 @@ async function ensurePublicUserRowExists(
   let { error: insertError } = await supabaseAdmin.from('users').insert(insertPayload)
 
   // Backward compatible rollout: if the column doesn't exist yet, retry without it.
-  if (insertError?.message?.toLowerCase().includes('created_via_invite')) {
+  if (isMissingCreatedViaInviteColumnError(insertError)) {
     cloudlog({
       requestId: c.get('requestId'),
       message: 'ensurePublicUserRowExists: created_via_invite column missing, retrying without it',
@@ -435,7 +445,7 @@ app.post('/', async (c) => {
     } = await supabaseAdmin.from('users').insert(insertUserPayload).select().single()
 
     // Backward compatible rollout: if the column doesn't exist yet, retry without it.
-    if (userNormalTableError?.message?.toLowerCase().includes('created_via_invite')) {
+    if (isMissingCreatedViaInviteColumnError(userNormalTableError)) {
       cloudlog({
         requestId: c.get('requestId'),
         message: 'accept_invitation: created_via_invite column missing, retrying without it',

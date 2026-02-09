@@ -408,6 +408,7 @@ function getStats(c: Context): GlobalStats {
     devices_last_month: readLastMonthDevicesCF(c),
     devices_by_platform: readLastMonthDevicesByPlatformCF(c),
     registers_today: (async () => {
+      // TODO: Remove backward-compat fallback once migration 20260209014020 is deployed to all environments.
       // Backward compatible rollout: if the column doesn't exist yet, fall back to the legacy count.
       const filtered = await supabase
         .from('users')
@@ -415,7 +416,8 @@ function getStats(c: Context): GlobalStats {
         .gte('created_at', last24h)
         .eq('created_via_invite', false)
 
-      if (filtered.error?.message?.toLowerCase().includes('created_via_invite')) {
+      const filteredCode = String((filtered.error as any)?.code ?? '').toUpperCase()
+      if (filteredCode === 'PGRST204' || filteredCode === '42703' || filtered.error?.message?.toLowerCase().includes('created_via_invite')) {
         cloudlog({
           requestId: c.get('requestId'),
           message: 'registers_today: created_via_invite column missing, falling back to legacy count',
