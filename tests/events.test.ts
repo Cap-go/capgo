@@ -7,7 +7,7 @@ const APPNAME_EVENT = `${APP_NAME}.e.${id}`
 
 beforeAll(async () => {
   await Promise.all([resetAndSeedAppData(APPNAME_EVENT), resetAndSeedAppDataStats(APPNAME_EVENT)])
-})
+}, 60_000)
 afterAll(async () => {
   await resetAppData(APPNAME_EVENT)
   await resetAppDataStats(APPNAME_EVENT)

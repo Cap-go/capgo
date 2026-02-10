@@ -174,8 +174,11 @@ function statusToEnv(status: any): Record<string, string> {
     env.SUPABASE_DB_URL = dbUrl
   if (anon)
     env.SUPABASE_ANON_KEY = anon
-  if (service)
+  if (service) {
+    // Keep both names for backwards compatibility across scripts/tests.
     env.SUPABASE_SERVICE_ROLE_KEY = service
+    env.SUPABASE_SERVICE_KEY = service
+  }
 
   // Also forward the raw keys so existing scripts that expect them keep working.
   for (const [k, v] of Object.entries(status)) {
@@ -257,7 +260,8 @@ function runWithEnv(cmdArgs: string[], repoRoot: string): number {
   const res = spawnSync(commandArgs[0], commandArgs.slice(1), {
     stdio: 'inherit',
     env: childEnv,
-    shell: false,
+    // On Windows, many package binaries are `.cmd` shims and require `shell: true`.
+    shell: process.platform === 'win32',
   })
   return res.status ?? 1
 }
