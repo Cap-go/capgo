@@ -213,6 +213,166 @@ describe('[POST] /stats', () => {
     await resetAppDataStats(appId)
   })
 
+  it('should drop custom_id when plan is invalid (cancelled) and not emit customIdBlocked', async () => {
+    const shortId = randomUUID().split('-')[0]
+    const orgId = randomUUID()
+    const stripeCustomerId = `cus_stats_cancel_${shortId}`
+    const appId = `${APP_NAME}.cidcancel.${shortId}`
+
+    await resetAndSeedAppData(appId, { orgId, stripeCustomerId })
+    await resetAndSeedAppDataStats(appId)
+
+    // Disable device-supplied custom_id persistence for this app
+    const { error: appUpdateError } = await getSupabaseClient()
+      .from('apps')
+      .update({ allow_device_custom_id: false })
+      .eq('app_id', appId)
+    expect(appUpdateError).toBeNull()
+
+    // Force plan invalid for this app's dedicated org by cancelling its Stripe info.
+    const { error: stripeUpdateError } = await getSupabaseClient()
+      .from('stripe_info')
+      .update({
+        status: 'canceled',
+        trial_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+        is_good_plan: false,
+      })
+      .eq('customer_id', stripeCustomerId)
+    expect(stripeUpdateError).toBeNull()
+
+    const uuid = randomUUID().toLowerCase()
+    const baseData = getBaseData(appId) as StatsPayload
+    baseData.device_id = uuid
+    baseData.action = 'set'
+    baseData.version_build = getVersionFromAction('set')
+    baseData.version_name = '1.0.0'
+    baseData.custom_id = 'POISON-TEST'
+
+    const response = await postStats(baseData)
+    expect(response.status).toBe(429)
+
+    // Verify device exists but custom_id was not persisted (DB default is empty string)
+    const { error: deviceError, data: deviceData } = await getSupabaseClient()
+      .from('devices')
+      .select()
+      .eq('device_id', uuid)
+      .eq('app_id', appId)
+      .single()
+
+    expect(deviceError).toBeNull()
+    expect(deviceData).toBeTruthy()
+    expect(deviceData?.custom_id).toBe('')
+
+    // Verify we recorded needPlanUpgrade
+    const { error: planError, count: planCount } = await getSupabaseClient()
+      .from('stats')
+      .select('*', { count: 'exact', head: true })
+      .eq('device_id', uuid)
+      .eq('app_id', appId)
+      .eq('action', 'needPlanUpgrade')
+    expect(planError).toBeNull()
+    expect(planCount).toBe(1)
+
+    // Verify we did not emit customIdBlocked (cancelled apps don't need it)
+    const { error: blockedError, count: blockedCount } = await getSupabaseClient()
+      .from('stats')
+      .select('*', { count: 'exact', head: true })
+      .eq('device_id', uuid)
+      .eq('app_id', appId)
+      .eq('action', 'customIdBlocked')
+    expect(blockedError).toBeNull()
+    expect(blockedCount).toBe(0)
+
+    await resetAppDataStats(appId)
+    await resetAppData(appId)
+    await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
+    await getSupabaseClient().from('orgs').delete().eq('id', orgId)
+    await getSupabaseClient().from('stripe_info').delete().eq('customer_id', stripeCustomerId)
+  })
+
+  const cacheIt = USE_CLOUDFLARE ? it : it.skip
+  cacheIt('should use cancelled app-status cache fast-path (cloudflare)', async () => {
+    const shortId = randomUUID().split('-')[0]
+    const orgId = randomUUID()
+    const stripeCustomerId = `cus_stats_cancel_cache_${shortId}`
+    const appId = `${APP_NAME}.cidcancelcache.${shortId}`
+
+    await resetAndSeedAppData(appId, { orgId, stripeCustomerId })
+    await resetAndSeedAppDataStats(appId)
+
+    const { error: appUpdateError } = await getSupabaseClient()
+      .from('apps')
+      .update({ allow_device_custom_id: false })
+      .eq('app_id', appId)
+    expect(appUpdateError).toBeNull()
+
+    const { error: stripeUpdateError } = await getSupabaseClient()
+      .from('stripe_info')
+      .update({
+        status: 'canceled',
+        trial_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+        is_good_plan: false,
+      })
+      .eq('customer_id', stripeCustomerId)
+    expect(stripeUpdateError).toBeNull()
+
+    const uuid = randomUUID().toLowerCase()
+    const baseData = getBaseData(appId) as StatsPayload
+    baseData.device_id = uuid
+    baseData.action = 'set'
+    baseData.version_build = getVersionFromAction('set')
+    baseData.version_name = '1.0.0'
+    baseData.custom_id = 'POISON-TEST'
+
+    // First request: populates cancelled app-status cache entry.
+    let response = await postStats(baseData)
+    expect(response.status).toBe(429)
+
+    // Delete app row: if the next request hits the DB, it will look like on-prem.
+    const { error: deleteAppError } = await getSupabaseClient()
+      .from('apps')
+      .delete()
+      .eq('app_id', appId)
+    expect(deleteAppError).toBeNull()
+
+    // Second request: should use cancelled cache fast-path.
+    response = await postStats(baseData)
+    expect(response.status).toBe(429)
+
+    const { error: planError, count: planCount } = await getSupabaseClient()
+      .from('stats')
+      .select('*', { count: 'exact', head: true })
+      .eq('device_id', uuid)
+      .eq('app_id', appId)
+      .eq('action', 'needPlanUpgrade')
+    expect(planError).toBeNull()
+    expect(planCount).toBe(2)
+
+    const { error: blockedError, count: blockedCount } = await getSupabaseClient()
+      .from('stats')
+      .select('*', { count: 'exact', head: true })
+      .eq('device_id', uuid)
+      .eq('app_id', appId)
+      .eq('action', 'customIdBlocked')
+    expect(blockedError).toBeNull()
+    expect(blockedCount).toBe(0)
+
+    const { error: getError, count: getCount } = await getSupabaseClient()
+      .from('stats')
+      .select('*', { count: 'exact', head: true })
+      .eq('device_id', uuid)
+      .eq('app_id', appId)
+      .eq('action', 'get')
+    expect(getError).toBeNull()
+    expect(getCount).toBe(0)
+
+    await resetAppDataStats(appId)
+    await resetAppData(appId)
+    await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
+    await getSupabaseClient().from('orgs').delete().eq('id', orgId)
+    await getSupabaseClient().from('stripe_info').delete().eq('customer_id', stripeCustomerId)
+  })
+
   it('should trim custom_id before persisting', async () => {
     const shortId = randomUUID().split('-')[0]
     const appId = `${APP_NAME}.cidt.${shortId}`

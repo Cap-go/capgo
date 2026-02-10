@@ -16,8 +16,6 @@ export interface AppStatusPayload {
 
 function buildAppStatusRequest(c: Context, appId: string) {
   const helper = new CacheHelper(c)
-  if (!helper.available)
-    return null
   return {
     helper,
     request: helper.buildRequest(APP_STATUS_CACHE_PATH, { app_id: appId }),

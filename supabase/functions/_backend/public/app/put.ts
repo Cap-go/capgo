@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
+import { getAppStatusPayload, setAppStatus } from '../../utils/appStatus.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { createSignedImageUrl, normalizeImagePath } from '../../utils/storage.ts'
@@ -55,6 +56,15 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
   if (data.icon_url) {
     const signedIcon = await createSignedImageUrl(c, data.icon_url)
     data.icon_url = signedIcon ?? ''
+  }
+
+  // Best-effort: if the plugin app-status cache already exists (cancelled fast-path),
+  // update the cached allow_device_custom_id value so enforcement is immediate.
+  if (body.allow_device_custom_id !== undefined) {
+    const cached = await getAppStatusPayload(c, appId)
+    if (cached?.status === 'cancelled') {
+      setAppStatus(c, appId, cached.status, { allow_device_custom_id: body.allow_device_custom_id })
+    }
   }
 
   return c.json(data)
