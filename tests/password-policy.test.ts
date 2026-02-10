@@ -278,7 +278,6 @@ describe('[POST] /private/validate_password_compliance', () => {
     if (disableError)
       throw disableError
 
-    let restoreError: PostgrestError | null = null
     try {
       const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
         headers,
@@ -299,10 +298,9 @@ describe('[POST] /private/validate_password_compliance', () => {
         .from('orgs')
         .update({ password_policy_config: policyConfig })
         .eq('id', ORG_ID)
-      restoreError = error ?? null
+      if (error)
+        throw error
     }
-    if (restoreError)
-      throw restoreError
   })
 
   it('reject request with invalid credentials', async () => {
