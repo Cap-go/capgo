@@ -7,6 +7,9 @@ concurrency:
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   release_android:
     runs-on: ubuntu-latest

@@ -8,6 +8,10 @@ on:
   pull_request:
   workflow_call: # Allow this workflow to be called by other workflows
 
+permissions:
+  contents: read
+  actions: write
+
 env:
   DENO_DIR: my_cache_directory
 

@@ -9,6 +9,9 @@ on:
     tags:
       - '*'
 
+permissions:
+  contents: read
+
 jobs:
   # Tests already passed before tag was created, so just build and deploy
   supabase_deploy:
@@ -28,10 +31,17 @@ jobs:
           else
             echo "SUPA_ENV=PROD" >> $GITHUB_ENV
           fi
-      - name: Set Supabase credentials
+      - name: Set Supabase credentials (ALPHA)
+        if: env.SUPA_ENV == 'ALPHA'
         run: |
-          echo "SUPABASE_DB_PASSWORD=${{ secrets[format('SUPABASE_DB_PASS_{0}', env.SUPA_ENV)] }}" >> $GITHUB_ENV
-          echo "SUPABASE_PROJECT_ID=${{ secrets[format('SUPABASE_PROJECT_ID_{0}', env.SUPA_ENV)] }}" >> $GITHUB_ENV
+          echo "SUPABASE_DB_PASSWORD=${{ secrets.SUPABASE_DB_PASS_ALPHA }}" >> $GITHUB_ENV
+          echo "SUPABASE_PROJECT_ID=${{ secrets.SUPABASE_PROJECT_ID_ALPHA }}" >> $GITHUB_ENV
+
+      - name: Set Supabase credentials (PROD)
+        if: env.SUPA_ENV == 'PROD'
+        run: |
+          echo "SUPABASE_DB_PASSWORD=${{ secrets.SUPABASE_DB_PASS_PROD }}" >> $GITHUB_ENV
+          echo "SUPABASE_PROJECT_ID=${{ secrets.SUPABASE_PROJECT_ID_PROD }}" >> $GITHUB_ENV
       - name: Install dependencies
         run: bun install
       - name: Install Supabase CLI

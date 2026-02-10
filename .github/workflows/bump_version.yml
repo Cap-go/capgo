@@ -6,6 +6,10 @@ on:
       - main
       - development
 
+permissions:
+  contents: read
+  actions: write
+
 jobs:
   # Run all tests first before creating any tags
   test:
