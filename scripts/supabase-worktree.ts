@@ -1,31 +1,16 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
-import { platform } from 'node:process'
 import { getSupabaseWorktreeConfig } from './supabase-worktree-config'
 
 type SupabaseCmd = { cmd: string, argsPrefix: string[] }
 
 /**
- * Returns whether an executable is available on PATH.
- *
  * Used to decide whether to call the globally installed `supabase` CLI or fall back to `bunx supabase`.
  */
-function which(cmd: string): boolean {
-  // Cross-platform "which".
-  if (platform === 'win32') {
-    const res = spawnSync('where', [cmd], { stdio: 'ignore' })
-    return res.status === 0
-  }
-
-  // Prefer the external `which` binary on Unix.
-  const whichRes = spawnSync('which', [cmd], { stdio: 'ignore' })
-  if (whichRes.status === 0)
-    return true
-
-  // Fallback to POSIX shell builtin `command -v` if `which` is unavailable.
-  const cmdRes = spawnSync('/bin/sh', ['-lc', `command -v ${cmd}`], { stdio: 'ignore' })
-  return cmdRes.status === 0
+function hasSupabaseCli(): boolean {
+  const res = spawnSync('supabase', ['--version'], { stdio: 'ignore' })
+  return res.status === 0
 }
 
 /**
@@ -35,7 +20,7 @@ function which(cmd: string): boolean {
  */
 function getSupabaseCmd(): SupabaseCmd {
   // In CI we may have `supabase` installed; locally we usually rely on `bunx supabase`.
-  if (which('supabase'))
+  if (hasSupabaseCli())
     return { cmd: 'supabase', argsPrefix: [] }
   return { cmd: 'bunx', argsPrefix: ['supabase'] }
 }
