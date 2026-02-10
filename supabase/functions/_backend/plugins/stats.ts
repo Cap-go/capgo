@@ -85,7 +85,11 @@ interface PostResult {
 async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: AppStats): Promise<PostResult> {
   const device = makeDevice(body)
   const { app_id, action, version_name, old_version_name, plugin_version } = body
-  const requestedCustomId = typeof body.custom_id === 'string' ? body.custom_id.trim() : ''
+  const rawCustomId = typeof body.custom_id === 'string' ? body.custom_id : ''
+  const requestedCustomId = rawCustomId.trim()
+  // Normalize once and use consistently for gating + persistence.
+  // Whitespace-only values are treated as "not provided".
+  device.custom_id = requestedCustomId === '' ? undefined : requestedCustomId
 
   const planActions: Array<'mau' | 'bandwidth'> = ['mau', 'bandwidth']
   const cachedStatus = await getAppStatus(c, app_id)
@@ -94,13 +98,13 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     return { success: true, isOnprem: true }
   }
 
-  const allowDeviceCustomId = requestedCustomId === '' ? true : await allowDeviceCustomIdFromPg(drizzleClient, app_id)
+  const allowDeviceCustomId = device.custom_id === undefined ? true : await allowDeviceCustomIdFromPg(drizzleClient, app_id)
 
   if (cachedStatus === 'cancelled') {
     const statsActions: StatsActions[] = [{ action: 'needPlanUpgrade' }]
     // Keep behavior backward compatible (default allow=true), but allow owners to
     // disable custom_id persistence from unauthenticated /stats traffic.
-    if (!allowDeviceCustomId && requestedCustomId !== '') {
+    if (!allowDeviceCustomId && device.custom_id !== undefined) {
       device.custom_id = undefined
       statsActions.push({ action: 'customIdBlocked' })
     }
@@ -117,7 +121,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     await setAppStatus(c, app_id, 'cancelled')
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     const upgradeActions: StatsActions[] = [{ action: 'needPlanUpgrade' }]
-    if (!allowDeviceCustomId && requestedCustomId !== '') {
+    if (!allowDeviceCustomId && device.custom_id !== undefined) {
       device.custom_id = undefined
       upgradeActions.push({ action: 'customIdBlocked' })
     }
@@ -132,7 +136,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   }
   await setAppStatus(c, app_id, 'cloud')
   const statsActions: StatsActions[] = []
-  if (!allowDeviceCustomId && requestedCustomId !== '') {
+  if (!allowDeviceCustomId && device.custom_id !== undefined) {
     device.custom_id = undefined
     statsActions.push({ action: 'customIdBlocked' })
   }
