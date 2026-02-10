@@ -409,7 +409,7 @@ describe('[POST] /private/validate_password_compliance', () => {
       method: 'POST',
       body: 'invalid json',
     })
-    expect(response.status).toBeGreaterThanOrEqual(400)
+    expect(response.status).toBe(400)
   })
 })
 
