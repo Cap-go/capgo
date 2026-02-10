@@ -554,10 +554,12 @@ describe('user_password_compliance table', () => {
       .eq('id', ORG_ID)
       .single()
 
-    const policyHash = org?.password_policy_config
-      // eslint-disable-next-line node/prefer-global/buffer
-      ? Buffer.from(JSON.stringify(org.password_policy_config)).toString('base64').substring(0, 32)
-      : 'test_hash'
+    // Use the same RPC that production uses to compute the password policy hash
+    const { data: rpcResult } = await getSupabaseClient().rpc('get_password_policy_hash', {
+      policy_config: org?.password_policy_config,
+    })
+
+    const policyHash = (rpcResult as string | null) ?? 'test_hash'
 
     const { error } = await getSupabaseClient()
       .from('user_password_compliance')
