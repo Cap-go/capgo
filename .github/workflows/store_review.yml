@@ -7,9 +7,13 @@ concurrency:
 on:
   workflow_dispatch:
 
+permissions: {}
+
 jobs:
   release_android:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v6
       - name: Setup java
@@ -41,6 +45,8 @@ jobs:
           lane: android prod_release
   release_ios:
     runs-on: macOS-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v6
       - uses: ruby/setup-ruby@v1

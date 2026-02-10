@@ -6,11 +6,16 @@ on:
       - main
       - development
 
+permissions: {}
+
 jobs:
   # Run all tests first before creating any tags
   test:
     if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
     uses: ./.github/workflows/tests.yml
+    permissions:
+      contents: read
+      actions: write
 
   # Only bump version and create tag if all tests pass
   bump-version:
@@ -18,6 +23,8 @@ jobs:
     if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
     runs-on: ubuntu-latest
     name: Bump version and create tag
+    permissions:
+      contents: read
     steps:
       - name: Check out
         uses: actions/checkout@v6
