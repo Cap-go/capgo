@@ -11,7 +11,7 @@ This project uses a custom test runner located in [tests_backend](https://github
 There exists some requirements to run the tests:
  * Having `bun` installed (Only for CLI tests)
  * Having the [supabase cli](https://supabase.com/docs/guides/cli) installed
- * Having a running supabase (`supabase start`)
+ * Having a running supabase (`bun run supabase:start`)
 
 The tests can be run with the following commands:
  * `CLI_PATH=/home/user/CLI/ bun test:backend` (backend only)

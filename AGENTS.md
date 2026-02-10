@@ -48,8 +48,8 @@ testing against Cloudflare Workers.
 
 ### Database and Backend
 
-- `bunx supabase start` - Start local Supabase instance
-- `bunx supabase db reset` - Reset and seed local database
+- `bun run supabase:start` - Start local Supabase instance (worktree-isolated)
+- `bun run supabase:db:reset` - Reset and seed local database
 - `bun backend` - Start Supabase functions locally
 - `bun reset` - Reset Supabase database
 
@@ -141,8 +141,8 @@ Capgo relies on two layered caches for plugin endpoints (`/updates`, `/stats`, `
 ### Environment Setup
 
 1. Install dependencies: `bun install`
-2. Start Supabase: `bunx supabase start`
-3. Reset database with seed data: `bunx supabase db reset`
+2. Start Supabase: `bun run supabase:start`
+3. Reset database with seed data: `bun run supabase:db:reset`
 4. Start frontend: `bun serve:dev`
 
 ### Test Accounts (Local Development)

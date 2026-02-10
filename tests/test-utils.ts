@@ -4,7 +4,16 @@ import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 import { Pool } from 'pg'
 
-export const POSTGRES_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+function normalizePostgresUrl(raw: string): string {
+  // Avoid Node preferring IPv6 (::1) for localhost in some environments.
+  return raw.replace('localhost', '127.0.0.1')
+}
+
+export const POSTGRES_URL = normalizePostgresUrl(
+  env.SUPABASE_DB_URL
+  ?? env.DB_URL
+  ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+)
 
 function normalizeLocalhostUrl(raw: string | undefined): string | undefined {
   if (!raw)
