@@ -21,6 +21,11 @@ export interface SupabaseWorktreeConfig {
   ports: SupabaseWorktreePorts
 }
 
+/**
+ * Best-effort repo root lookup for the current worktree.
+ *
+ * Falls back to `cwd` when git is unavailable.
+ */
 function getGitRepoRoot(cwd: string): string {
   const res = spawnSync('git', ['rev-parse', '--show-toplevel'], {
     cwd,
@@ -34,6 +39,13 @@ function getGitRepoRoot(cwd: string): string {
   return cwd
 }
 
+/**
+ * Returns a deterministic per-worktree Supabase configuration (unique project_id and ports)
+ * derived from the git worktree path.
+ *
+ * This allows running multiple `supabase start` instances in parallel across worktrees
+ * without Docker container/volume name collisions or port conflicts.
+ */
 export function getSupabaseWorktreeConfig(cwd: string = process.cwd()): SupabaseWorktreeConfig {
   const repoRootRaw = getGitRepoRoot(cwd)
   const repoRoot = realpathSync(resolve(repoRootRaw))
@@ -69,4 +81,3 @@ export function getSupabaseWorktreeConfig(cwd: string = process.cwd()): Supabase
     },
   }
 }
-

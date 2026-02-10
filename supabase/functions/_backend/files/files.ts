@@ -31,8 +31,29 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 function getExternalBaseUrl(c: Context): string {
   const protoHeader = c.req.header('X-Forwarded-Proto')
-  const proto = protoHeader || new URL(c.req.url).protocol.replace(':', '') || 'http'
-  const host = c.req.header('X-Forwarded-Host') || c.req.header('Host') || 'localhost:54321'
+  const proto = protoHeader?.split(',')[0]?.trim() || new URL(c.req.url).protocol.replace(':', '') || 'http'
+
+  const forwardedHost = c.req.header('X-Forwarded-Host')
+  const forwardedPort = c.req.header('X-Forwarded-Port')
+  const hostHeader = c.req.header('Host') || 'localhost:54321'
+
+  let host: string
+  if (forwardedHost) {
+    if (forwardedHost.includes(':')) {
+      host = forwardedHost
+    }
+    else if (forwardedPort) {
+      host = `${forwardedHost}:${forwardedPort}`
+    }
+    else {
+      // Prefer Host header in local/worktree setups where it usually includes the mapped port.
+      host = hostHeader
+    }
+  }
+  else {
+    host = hostHeader
+  }
+
   return `${proto}://${host}`
 }
 

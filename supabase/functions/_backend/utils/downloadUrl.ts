@@ -6,6 +6,41 @@ import { s3 } from './s3.ts'
 
 const EXPIRATION_SECONDS = 604800
 const BASE_PATH = 'files/read/attachments'
+const LOCAL_DEFAULT_HOST = 'localhost:54321'
+
+function firstForwardedHeaderValue(value: string | undefined): string | undefined {
+  if (!value)
+    return undefined
+  return value.split(',')[0]?.trim() || undefined
+}
+
+function rewriteLocalEdgeRuntimeUrl(url: URL, c: Context): { url: URL, finalPath: string } {
+  let finalPath = BASE_PATH
+
+  // When running on Supabase Edge Runtime, the request host can be the internal container.
+  // Build URLs using the externally visible host/port from forwarded headers when possible.
+  if (url.host.endsWith(':8081') && url.hostname.startsWith('supabase_edge_runtime_')) {
+    const forwardedHost = c.req.header('X-Forwarded-Host')
+    const forwardedPort = c.req.header('X-Forwarded-Port')
+    const forwardedProto = firstForwardedHeaderValue(c.req.header('X-Forwarded-Proto'))
+
+    if (forwardedHost) {
+      url.host = forwardedHost.includes(':') ? forwardedHost : `${forwardedHost}:${forwardedPort || '54321'}`
+      if (forwardedProto)
+        url.protocol = `${forwardedProto}:`
+    }
+    else {
+      // Preserve the old behavior: if we cannot determine the public host, fall back to localhost.
+      url.host = forwardedPort ? `localhost:${forwardedPort}` : LOCAL_DEFAULT_HOST
+      if (forwardedProto)
+        url.protocol = `${forwardedProto}:`
+    }
+
+    finalPath = `functions/v1/${BASE_PATH}`
+  }
+
+  return { url, finalPath }
+}
 
 export interface ManifestEntry {
   file_name: string | null
@@ -37,22 +72,7 @@ export async function getBundleUrl(
     }
   }
   const url = new URL(c.req.url)
-  let finalPath = BASE_PATH
-  // When running on Supabase Edge Runtime, the request host can be the internal container.
-  // Build URLs using the externally visible host/port from forwarded headers when possible.
-  if (url.host.endsWith(':8081') && url.hostname.startsWith('supabase_edge_runtime_')) {
-    const forwardedHost = c.req.header('X-Forwarded-Host') || c.req.header('Host')
-    const forwardedProto = c.req.header('X-Forwarded-Proto')
-    if (forwardedHost) {
-      url.host = forwardedHost
-      if (forwardedProto)
-        url.protocol = `${forwardedProto}:`
-    }
-    else {
-      url.host = 'localhost:54321'
-    }
-    finalPath = `functions/v1/${BASE_PATH}`
-  }
+  const { finalPath } = rewriteLocalEdgeRuntimeUrl(url, c)
   const downloadUrl = `${url.protocol}//${url.host}/${finalPath}/${r2_path}?key=${checksum}&device_id=${deviceId}`
   return downloadUrl
 }
@@ -64,20 +84,7 @@ export function getManifestUrl(c: Context, versionId: number, manifest: Partial<
 
   try {
     const url = new URL(c.req.url)
-    let finalPath = BASE_PATH
-    if (url.host.endsWith(':8081') && url.hostname.startsWith('supabase_edge_runtime_')) {
-      const forwardedHost = c.req.header('X-Forwarded-Host') || c.req.header('Host')
-      const forwardedProto = c.req.header('X-Forwarded-Proto')
-      if (forwardedHost) {
-        url.host = forwardedHost
-        if (forwardedProto)
-          url.protocol = `${forwardedProto}:`
-      }
-      else {
-        url.host = 'localhost:54321'
-      }
-      finalPath = `functions/v1/${BASE_PATH}`
-    }
+    const { finalPath } = rewriteLocalEdgeRuntimeUrl(url, c)
     const signKey = versionId
 
     return manifest.map((entry) => {
