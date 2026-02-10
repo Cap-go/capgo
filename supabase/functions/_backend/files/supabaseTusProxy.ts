@@ -83,7 +83,8 @@ function rewriteLocationHeader(c: Context, supabaseLocation: string): string {
 
   let forwardedHost = c.req.header('X-Forwarded-Host')
   const forwardedPort = c.req.header('X-Forwarded-Port')
-  const forwardedProto = c.req.header('X-Forwarded-Proto') || (isLocalDev ? 'http' : 'https')
+  const forwardedProtoRaw = c.req.header('X-Forwarded-Proto')
+  const forwardedProto = forwardedProtoRaw?.split(',')[0]?.trim() || (isLocalDev ? 'http' : 'https')
   const hostHeader = c.req.header('Host')
 
   if (isLocalDev && forwardedHost && !forwardedHost.includes(':')) {

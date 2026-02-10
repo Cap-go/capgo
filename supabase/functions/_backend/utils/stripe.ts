@@ -32,7 +32,7 @@ function buildSupabaseDashboardLink(c: Context, customerId: string): string | nu
   if (isLocalSupabase(c)) {
     try {
       const api = new URL(supabaseUrl)
-      const apiPort = Number.parseInt(api.port || '54321')
+      const apiPort = Number.parseInt(api.port || '54321', 10)
       const studioPort = apiPort + 2
       return `${api.protocol}//${api.hostname}:${studioPort}/project/default/editor/445780?schema=public&filter=customer_id%3Aeq%3A${customerId}`
     }

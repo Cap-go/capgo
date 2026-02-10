@@ -11,7 +11,7 @@ import { getSupabaseWorktreeConfig } from './scripts/supabase-worktree-config'
 const headless = !!env.CI || !!env.PLAYWRIGHT_HEADLESS
 
 const webServer: PlaywrightTestConfig['webServer'] = []
-const { ports: supabasePorts } = getSupabaseWorktreeConfig(process.cwd())
+const { ports: supabasePorts } = getSupabaseWorktreeConfig()
 
 if (!env.SKIP_BACKEND_START) {
   webServer.push({

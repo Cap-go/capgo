@@ -1,15 +1,38 @@
 import { spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
+import { platform } from 'node:process'
 import { getSupabaseWorktreeConfig } from './supabase-worktree-config'
 
 type SupabaseCmd = { cmd: string, argsPrefix: string[] }
 
+/**
+ * Returns whether an executable is available on PATH.
+ *
+ * Used to decide whether to call the globally installed `supabase` CLI or fall back to `bunx supabase`.
+ */
 function which(cmd: string): boolean {
-  const res = spawnSync('command', ['-v', cmd], { shell: true, stdio: 'ignore' })
-  return res.status === 0
+  // Cross-platform "which".
+  if (platform === 'win32') {
+    const res = spawnSync('where', [cmd], { stdio: 'ignore' })
+    return res.status === 0
+  }
+
+  // Prefer the external `which` binary on Unix.
+  const whichRes = spawnSync('which', [cmd], { stdio: 'ignore' })
+  if (whichRes.status === 0)
+    return true
+
+  // Fallback to POSIX shell builtin `command -v` if `which` is unavailable.
+  const cmdRes = spawnSync('/bin/sh', ['-lc', `command -v ${cmd}`], { stdio: 'ignore' })
+  return cmdRes.status === 0
 }
 
+/**
+ * Resolve the Supabase CLI invocation.
+ *
+ * Prefers the globally installed `supabase` binary (CI), otherwise falls back to `bunx supabase` (local dev).
+ */
 function getSupabaseCmd(): SupabaseCmd {
   // In CI we may have `supabase` installed; locally we usually rely on `bunx supabase`.
   if (which('supabase'))
@@ -17,6 +40,12 @@ function getSupabaseCmd(): SupabaseCmd {
   return { cmd: 'bunx', argsPrefix: ['supabase'] }
 }
 
+/**
+ * Ensure `linkPath` is a symlink pointing at `targetPath`.
+ *
+ * This is used to build a lightweight per-worktree Supabase workdir that reuses the repo's
+ * functions/migrations/seed without copying.
+ */
 function ensureSymlink(linkPath: string, targetPath: string): void {
   try {
     if (existsSync(linkPath)) {
@@ -37,11 +66,26 @@ function ensureSymlink(linkPath: string, targetPath: string): void {
   symlinkSync(targetPath, linkPath)
 }
 
+/**
+ * Rewrite `supabase/config.toml` to use a worktree-specific `project_id` and port set.
+ *
+ * The `project_id` affects Docker resource names (containers/volumes). Ports are shifted to
+ * avoid collisions when multiple worktrees run Supabase concurrently.
+ */
 function rewriteConfigToml(raw: string, cfg: ReturnType<typeof getSupabaseWorktreeConfig>): string {
   const { projectId, ports } = cfg
   const lines = raw.split('\n')
   let section = ''
   const out: string[] = []
+
+  const portBySection: Record<string, number> = {
+    api: ports.api,
+    db: ports.db,
+    'db.pooler': ports.dbPooler,
+    studio: ports.studio,
+    inbucket: ports.inbucket,
+    analytics: ports.analytics,
+  }
 
   for (const line of lines) {
     const secMatch = line.match(/^\s*\[([^\]]+)\]\s*$/)
@@ -50,22 +94,12 @@ function rewriteConfigToml(raw: string, cfg: ReturnType<typeof getSupabaseWorktr
 
     if (line.match(/^\s*project_id\s*=/))
       out.push(`project_id = "${projectId}"`)
-    else if (section === 'api' && line.match(/^\s*port\s*=\s*\d+\s*$/))
-      out.push(`port = ${ports.api}`)
-    else if (section === 'db' && line.match(/^\s*port\s*=\s*\d+\s*$/))
-      out.push(`port = ${ports.db}`)
     else if (section === 'db' && line.match(/^\s*shadow_port\s*=\s*\d+\s*$/))
       out.push(`shadow_port = ${ports.dbShadow}`)
-    else if (section === 'db.pooler' && line.match(/^\s*port\s*=\s*\d+\s*$/))
-      out.push(`port = ${ports.dbPooler}`)
-    else if (section === 'studio' && line.match(/^\s*port\s*=\s*\d+\s*$/))
-      out.push(`port = ${ports.studio}`)
-    else if (section === 'inbucket' && line.match(/^\s*port\s*=\s*\d+\s*$/))
-      out.push(`port = ${ports.inbucket}`)
-    else if (section === 'analytics' && line.match(/^\s*port\s*=\s*\d+\s*$/))
-      out.push(`port = ${ports.analytics}`)
     else if (section === 'edge_runtime' && line.match(/^\s*inspector_port\s*=\s*\d+\s*$/))
       out.push(`inspector_port = ${ports.edgeInspector}`)
+    else if (section in portBySection && line.match(/^\s*port\s*=\s*\d+\s*$/))
+      out.push(`port = ${portBySection[section]}`)
     else
       out.push(line)
   }
@@ -73,6 +107,12 @@ function rewriteConfigToml(raw: string, cfg: ReturnType<typeof getSupabaseWorktr
   return out.join('\n')
 }
 
+/**
+ * Create (or update) the per-worktree Supabase workdir under `.context/`.
+ *
+ * The resulting directory is suitable to pass to `supabase --workdir`, and contains a rewritten
+ * `supabase/config.toml` plus symlinks to the project's Supabase assets.
+ */
 function ensureWorktreeSupabaseDir(repoRoot: string): { workdir: string, cfg: ReturnType<typeof getSupabaseWorktreeConfig> } {
   const cfg = getSupabaseWorktreeConfig(repoRoot)
   const workdir = resolve(cfg.repoRoot, '.context', 'supabase-worktrees', cfg.worktreeHash)
@@ -97,6 +137,9 @@ function ensureWorktreeSupabaseDir(repoRoot: string): { workdir: string, cfg: Re
   return { workdir, cfg }
 }
 
+/**
+ * Parse `supabase status -o json` output, which may include non-JSON informational lines.
+ */
 function parseStatusJson(mixed: string): any {
   // `supabase status -o json` can print non-JSON lines like:
   // "Stopped services: [...]"
@@ -106,6 +149,9 @@ function parseStatusJson(mixed: string): any {
   return JSON.parse(mixed.slice(idx))
 }
 
+/**
+ * Get Supabase status as JSON, optionally for a specific `--workdir`.
+ */
 function getStatusJson(supa: SupabaseCmd, workdir?: string): { ok: true, json: any } | { ok: false, status: number } {
   const args = [...supa.argsPrefix, 'status', '-o', 'json']
   if (workdir)
@@ -127,6 +173,9 @@ function getStatusJson(supa: SupabaseCmd, workdir?: string): { ok: true, json: a
   }
 }
 
+/**
+ * Map Supabase CLI status variables to the env vars used by the codebase/tests.
+ */
 function statusToEnv(status: any): Record<string, string> {
   const apiUrl = status.API_URL as string | undefined
   const dbUrl = status.DB_URL as string | undefined
@@ -151,6 +200,33 @@ function statusToEnv(status: any): Record<string, string> {
   return env
 }
 
+/**
+ * Parse leading `KEY=VALUE` tokens into an env map.
+ *
+ * This allows `bun run supabase:with-env -- FOO=bar bunx vitest ...` without requiring `cross-env`.
+ */
+function parseInlineEnvAssignments(args: string[]): { env: Record<string, string>, rest: string[] } {
+  // Allow leading KEY=VALUE tokens so callers don't need `cross-env` (works cross-platform).
+  const env: Record<string, string> = {}
+  let idx = 0
+  for (; idx < args.length; idx++) {
+    const token = args[idx]
+    if (!token)
+      break
+    const eq = token.indexOf('=')
+    if (eq <= 0)
+      break
+    const key = token.slice(0, eq)
+    if (!/^[A-Z0-9_]+$/.test(key))
+      break
+    env[key] = token.slice(eq + 1)
+  }
+  return { env, rest: args.slice(idx) }
+}
+
+/**
+ * Run a Supabase CLI command against the current worktree's generated `--workdir`.
+ */
 function runSupabase(args: string[], repoRoot: string): number {
   const { workdir } = ensureWorktreeSupabaseDir(repoRoot)
   const supa = getSupabaseCmd()
@@ -161,9 +237,21 @@ function runSupabase(args: string[], repoRoot: string): number {
   return res.status ?? 1
 }
 
+/**
+ * Run an arbitrary command with Supabase env (URL/keys) injected for the current worktree.
+ *
+ * This is used by the test scripts so parallel worktrees do not accidentally target the same
+ * local Supabase stack.
+ */
 function runWithEnv(cmdArgs: string[], repoRoot: string): number {
   const { workdir } = ensureWorktreeSupabaseDir(repoRoot)
   const supa = getSupabaseCmd()
+
+  const { env: inlineEnv, rest: commandArgs } = parseInlineEnvAssignments(cmdArgs)
+  if (commandArgs.length === 0) {
+    console.error('Usage: bun scripts/supabase-worktree.ts with-env <command...>')
+    return 2
+  }
 
   // Prefer the worktree-isolated stack, but fall back to legacy `supabase start`
   // (e.g. CI workflows or older developer habits) so tests keep working.
@@ -180,8 +268,8 @@ function runWithEnv(cmdArgs: string[], repoRoot: string): number {
 
   const status = (worktreeStatus.ok ? worktreeStatus.json : (legacyStatus as any).json) as any
 
-  const childEnv = { ...process.env, ...statusToEnv(status) }
-  const res = spawnSync(cmdArgs[0], cmdArgs.slice(1), {
+  const childEnv = { ...process.env, ...statusToEnv(status), ...inlineEnv }
+  const res = spawnSync(commandArgs[0], commandArgs.slice(1), {
     stdio: 'inherit',
     env: childEnv,
     shell: false,
@@ -189,6 +277,11 @@ function runWithEnv(cmdArgs: string[], repoRoot: string): number {
   return res.status ?? 1
 }
 
+/**
+ * CLI entrypoint. Supports:
+ * - `bun scripts/supabase-worktree.ts <supabase-subcommand...>`
+ * - `bun scripts/supabase-worktree.ts with-env <command...>`
+ */
 function main(): number {
   const repoRoot = process.cwd()
   const args = process.argv.slice(2)
