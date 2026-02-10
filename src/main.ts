@@ -72,6 +72,8 @@ const newRoutes = routes.map((route) => {
 const router = createRouter({
   routes: [
     { path: '/', redirect: '/login' },
+    // Canonical apps list route
+    { path: '/app', redirect: '/apps' },
     { path: '/settings/plans', redirect: '/settings/organization/plans' },
     { path: '/settings/usage', redirect: '/settings/organization/usage' },
     { path: '/settings/change-password', redirect: '/settings/account/change-password' },

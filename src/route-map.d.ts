@@ -159,6 +159,13 @@ declare module 'vue-router/auto-routes' {
       { app: ParamValue<false> },
       | never
     >,
+    '/app/[app].bundles.new': RouteRecordInfo<
+      '/app/[app].bundles.new',
+      '/app/:app/bundles/new',
+      { app: ParamValue<true> },
+      { app: ParamValue<false> },
+      | never
+    >,
     '/app/[app].channel.[channel]': RouteRecordInfo<
       '/app/[app].channel.[channel]',
       '/app/:app/channel/:channel',
@@ -246,6 +253,13 @@ declare module 'vue-router/auto-routes' {
     '/app/modules_test': RouteRecordInfo<
       '/app/modules_test',
       '/app/modules_test',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/app/new': RouteRecordInfo<
+      '/app/new',
+      '/app/new',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -566,6 +580,12 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
+    'src/pages/app/[app].bundles.new.vue': {
+      routes:
+        | '/app/[app].bundles.new'
+      views:
+        | never
+    }
     'src/pages/app/[app].channel.[channel].vue': {
       routes:
         | '/app/[app].channel.[channel]'
@@ -641,6 +661,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/app/modules_test.vue': {
       routes:
         | '/app/modules_test'
+      views:
+        | never
+    }
+    'src/pages/app/new.vue': {
+      routes:
+        | '/app/new'
       views:
         | never
     }

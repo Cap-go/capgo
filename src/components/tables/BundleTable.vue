@@ -20,10 +20,6 @@ const props = defineProps<{
   appId: string
 }>()
 
-const emit = defineEmits<{
-  'update:showingSteps': [value: boolean]
-}>()
-
 type Element = Database['public']['Tables']['app_versions']['Row'] & Database['public']['Tables']['app_versions_meta']['Row']
 
 const canDeleteBundle = computedAsync(async () => {
@@ -35,8 +31,6 @@ const canDeleteBundle = computedAsync(async () => {
 const isMobile = Capacitor.isNativePlatform()
 const offset = 10
 const { t } = useI18n()
-const showSteps = ref(false)
-const autoShowSteps = ref(false)
 const dialogStore = useDialogV2Store()
 const supabase = useSupabase()
 const router = useRouter()
@@ -54,21 +48,6 @@ const filters = ref({
   'encrypted': false,
 })
 const channelCache = ref<Record<number, { name: string, id?: number }>>({})
-
-function closeSteps() {
-  autoShowSteps.value = false
-  showSteps.value = false
-}
-
-function openStepsManually() {
-  autoShowSteps.value = false
-  showSteps.value = true
-}
-
-function onboardingDone() {
-  closeSteps()
-  reload()
-}
 
 const currentVersionsNumber = computed(() => {
   return (currentPage.value - 1) * offset
@@ -294,7 +273,6 @@ async function refreshData() {
     selectedElements.value.length = 0
     channelCache.value = {} // Clear cache on refresh
     await Promise.all([getData(), updateOverallBundlesCount()])
-    applyAutoOnboardingState()
   }
   catch (error) {
     console.error(error)
@@ -476,7 +454,6 @@ async function reload() {
   elements.value.length = 0
   try {
     await Promise.all([getData(), updateOverallBundlesCount()])
-    applyAutoOnboardingState()
   }
   catch (error) {
     console.error(error)
@@ -572,7 +549,7 @@ function selectedElementsFilter(val: boolean[]) {
 }
 
 async function addOne() {
-  openStepsManually()
+  router.push(`/app/${encodeURIComponent(props.appId)}/bundles/new`)
 }
 
 async function openOne(one: Element) {
@@ -596,28 +573,29 @@ async function updateOverallBundlesCount() {
   }
 }
 
-function applyAutoOnboardingState() {
-  if ((totalAllBundles.value ?? 0) === 0) {
-    showSteps.value = true
-    autoShowSteps.value = true
-  }
-  else if (autoShowSteps.value) {
-    closeSteps()
-  }
-}
-
 watch(props, async () => {
   await refreshData()
-})
-
-watch(showSteps, (newValue) => {
-  emit('update:showingSteps', newValue)
 })
 </script>
 
 <template>
   <div>
-    <div v-if="!showSteps" class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+    <div
+      v-if="totalAllBundles !== null && totalAllBundles === 0 && !search"
+      class="p-6 mb-6 bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900"
+    >
+      <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+        {{ t('feel-magic-of-capgo') }} <span class="font-prompt">Capgo</span> !
+      </h2>
+      <p class="mt-2 text-slate-600 dark:text-slate-200">
+        {{ t('add-your-first-bundle') }}
+      </p>
+      <button class="mt-4 d-btn d-btn-primary" @click="addOne()">
+        {{ t('add-another-bundle') }}
+      </button>
+    </div>
+
+    <div class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
       <DataTable
         v-model:filters="filters" v-model:columns="columns" v-model:current-page="currentPage" v-model:search="search"
         :total="total"
@@ -634,8 +612,6 @@ watch(showSteps, (newValue) => {
         @reset="refreshData()"
       />
     </div>
-
-    <StepsBundle v-else :onboarding="(totalAllBundles ?? 0) === 0" :app-id="props.appId" @done="onboardingDone" @close-step="closeSteps()" />
 
     <!-- Teleport Content for Deletion Style Modal -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('select-style-of-deletion')" defer to="#dialog-v2-content">
