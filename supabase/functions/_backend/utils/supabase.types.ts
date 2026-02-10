@@ -4024,6 +4024,7 @@ export type Database = {
         | "reset"
         | "set"
         | "get"
+        | "customIdBlocked"
         | "set_fail"
         | "update_fail"
         | "download_fail"
