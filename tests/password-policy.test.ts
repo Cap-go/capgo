@@ -243,6 +243,24 @@ describe('[POST] /private/validate_password_compliance', () => {
     expect(responseData.error).toBe('not_member')
   })
 
+  it('returns policy errors for non-compliant member', async () => {
+    const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
+      headers,
+      method: 'POST',
+      body: JSON.stringify({
+        email: USER_EMAIL,
+        password: USER_PASSWORD,
+        org_id: ORG_ID,
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { error: string, moreInfo?: { errors?: string[] } }
+    expect(responseData.error).toBe('password_does_not_meet_policy')
+    expect(Array.isArray(responseData.moreInfo?.errors)).toBe(true)
+    expect(responseData.moreInfo!.errors!.length).toBeGreaterThan(0)
+  })
+
   it('reject request for org without password policy', async () => {
     const policyConfig = {
       enabled: true,

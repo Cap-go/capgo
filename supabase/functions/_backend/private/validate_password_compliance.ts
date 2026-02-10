@@ -120,17 +120,20 @@ app.post('/', async (c) => {
     return quickError(403, 'not_member', 'You are not a member of this organization')
   }
 
-  // Fetch the org's password policy (member-only).
-  const { data: org, error: orgError } = await userClient
+  // Fetch the org's password policy after membership verification.
+  //
+  // IMPORTANT: do not use userClient here. orgs SELECT is guarded by check_min_rights,
+  // which enforces password-policy compliance, creating a circular dependency for users
+  // who are non-compliant (this endpoint is their remediation path).
+  const { data: org, error: orgError } = await adminClient
     .from('orgs')
     .select('id, password_policy_config')
     .eq('id', body.org_id)
     .single()
 
   if (orgError || !org) {
-    // Do not return org_not_found here; keep the response stable for callers.
     cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - org lookup failed', error: orgError?.message })
-    return quickError(403, 'not_member', 'You are not a member of this organization')
+    return quickError(500, 'org_lookup_failed', 'Failed to load organization password policy', { error: orgError?.message })
   }
 
   // Check if org has password policy enabled
