@@ -36,7 +36,37 @@ const customEnv = parse(envContent)
 
 console.log('Environment file:', envFileName)
 console.log('Worker Name:', envName)
-console.log('Environment variables', customEnv)
+// Avoid printing secret values to stdout (this file is used for local workflows too).
+console.log('Environment variable keys', Object.keys(customEnv))
+
+function escapeTomlBasicString(value) {
+  let out = ''
+  for (const ch of String(value)) {
+    switch (ch) {
+      case '\\': out += '\\\\'; break
+      case '"': out += '\\"'; break
+      case '\n': out += '\\n'; break
+      case '\r': out += '\\r'; break
+      case '\t': out += '\\t'; break
+      default: {
+        const code = ch.codePointAt(0)
+        // Escape other control characters to keep the TOML valid.
+        if (code != null && code < 0x20)
+          out += `\\u${code.toString(16).padStart(4, '0')}`
+        else
+          out += ch
+      }
+    }
+  }
+  return out
+}
+
+function formatTomlKey(key) {
+  // Wrangler expects TOML: use bare keys when safe, otherwise quote.
+  if (/^[A-Za-z0-9_-]+$/.test(key))
+    return key
+  return `"${escapeTomlBasicString(key)}"`
+}
 
 // wrangler config file path
 const wranglerPath = resolve('./wrangler.toml')
@@ -66,11 +96,9 @@ else {
 }
 
 for (const key in customEnv) {
-  // if json string value, escape double quotes
-  if (typeof customEnv[key] === 'string') {
-    customEnv[key] = customEnv[key].replace(/"/g, '\\"')
-  }
-  wranglerFileLines.splice(varsIndex + 1, 0, `${key} = "${customEnv[key]}"`)
+  const tomlKey = formatTomlKey(key)
+  const tomlValue = escapeTomlBasicString(customEnv[key])
+  wranglerFileLines.splice(varsIndex + 1, 0, `${tomlKey} = "${tomlValue}"`)
   varsIndex++ // Move the index forward after each insertion
 }
 const newWranglerFile = wranglerFileLines.join('\n')
