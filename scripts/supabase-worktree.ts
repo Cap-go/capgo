@@ -240,6 +240,10 @@ function runWithEnv(cmdArgs: string[], repoRoot: string): number {
     console.error('Usage: bun scripts/supabase-worktree.ts with-env <command...>')
     return 2
   }
+  if (commandArgs[0] !== 'bun' && commandArgs[0] !== 'bunx') {
+    console.error('Unsupported command for supabase:with-env. Use `bun` or `bunx` as the executable (e.g. `bunx vitest run ...`).')
+    return 2
+  }
 
   // Prefer the worktree-isolated stack, but fall back to legacy `supabase start`
   // (e.g. CI workflows or older developer habits) so tests keep working.
