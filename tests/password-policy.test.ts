@@ -462,7 +462,7 @@ describe('[GET] /private/check_org_members_password_policy', () => {
   })
 })
 
-describe('password Policy Enforcement Integration', () => {
+describe('Password Policy Enforcement Integration', () => {
   const orgWithPolicyId = randomUUID()
   const orgWithPolicyName = `Pwd Policy Integration Org ${randomUUID()}`
   const orgWithPolicyCustomerId = `cus_pwd_int_${orgWithPolicyId}`
