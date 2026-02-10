@@ -1,4 +1,3 @@
-import type { PostgrestError } from '@supabase/supabase-js'
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -278,6 +277,7 @@ describe('[POST] /private/validate_password_compliance', () => {
     if (disableError)
       throw disableError
 
+    let testError: Error | null = null
     try {
       const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
         headers,
@@ -293,13 +293,25 @@ describe('[POST] /private/validate_password_compliance', () => {
       const responseData = await response.json() as { error: string }
       expect(responseData.error).toBe('no_policy')
     }
+    catch (error) {
+      testError = error as Error
+    }
     finally {
-      const { error } = await getSupabaseClient()
+      const { error: restoreError } = await getSupabaseClient()
         .from('orgs')
         .update({ password_policy_config: policyConfig })
         .eq('id', ORG_ID)
-      if (error)
-        throw error
+      
+      // If restore failed, throw it (but preserve test failure if there was one)
+      if (restoreError) {
+        if (testError)
+          throw new Error(`Test failed AND restore failed: ${testError.message} | Restore error: ${restoreError.message}`)
+        throw restoreError
+      }
+      
+      // Re-throw original test error if any
+      if (testError)
+        throw testError
     }
   })
 
@@ -546,18 +558,25 @@ describe('Password Policy Enforcement Integration', () => {
 describe('user_password_compliance table', () => {
   it('can insert compliance record via service role', async () => {
     // Get the policy hash
-    const { data: org } = await getSupabaseClient()
+    const { data: org, error: orgError } = await getSupabaseClient()
       .from('orgs')
       .select('password_policy_config')
       .eq('id', ORG_ID)
       .single()
+    
+    expect(orgError).toBeNull()
+    expect(org?.password_policy_config).not.toBeNull()
 
     // Use the same RPC that production uses to compute the password policy hash
-    const { data: rpcResult } = await getSupabaseClient().rpc('get_password_policy_hash', {
+    const { data: rpcResult, error: rpcError } = await getSupabaseClient().rpc('get_password_policy_hash', {
       policy_config: org?.password_policy_config,
     })
 
-    const policyHash = (rpcResult as string | null) ?? 'test_hash'
+    expect(rpcError).toBeNull()
+    expect(rpcResult).not.toBeNull()
+    expect(typeof rpcResult).toBe('string')
+    
+    const policyHash = rpcResult as string
 
     const { error } = await getSupabaseClient()
       .from('user_password_compliance')
