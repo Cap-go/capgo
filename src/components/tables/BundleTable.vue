@@ -351,7 +351,8 @@ async function deleteOne(one: Element) {
 
     let unlink = [] as Database['public']['Tables']['channels']['Row'][]
     if ((channelFound && channelFound.length) || errorChannel) {
-      const message = t('channel-bundle-linked').replace('%', channelFound?.map(ch => `${ch.name} (${ch.version.name})`).join(', ') ?? '')
+      const channelsList = channelFound?.map(ch => `${ch.name} (${ch.version.name})`).join(', ') ?? ''
+      const message = t('channel-bundle-linked', { channels: channelsList })
       const shouldUnlink = await showUnlinkDialog(message)
 
       if (!shouldUnlink) {
@@ -526,7 +527,10 @@ async function massDelete() {
   let unlink = [] as Database['public']['Tables']['channels']['Row'][]
 
   if (linkedChannelsList.length > 0) {
-    const message = t('channel-bundle-linked').replace('%', linkedChannelsList.map(val => val.rawChannel?.map((ch: any) => `${ch.name} (${ch.version.name})`).join(', ')).join(', ') ?? '')
+    const channelsList = linkedChannelsList
+      .map(val => val.rawChannel?.map((ch: any) => `${ch.name} (${ch.version.name})`).join(', '))
+      .join(', ') ?? ''
+    const message = t('channel-bundle-linked', { channels: channelsList })
     const shouldUnlink = await showUnlinkDialog(message)
 
     if (!shouldUnlink) {

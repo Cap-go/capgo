@@ -230,11 +230,11 @@ async function handleChannelLink(chan: Database['public']['Tables']['channels'][
     // Check if any package is incompatible
     if (localDependencies.length > 0 && finalCompatibility.find(x => !isCompatible(x))) {
       toast.error(t('bundle-not-compatible-with-channel', { channel: chan.name }))
-      toast.info(t('channel-not-compatible-with-channel-description').replace('%', 'npx @capgo/cli@latest bundle compatibility'))
+      toast.info(t('channel-not-compatible-with-channel-description', { cmd: 'bunx @capgo/cli@latest bundle compatibility' }))
 
       dialogStore.openDialog({
         title: t('confirm-action'),
-        description: t('set-even-not-compatible').replace('%', 'npx @capgo/cli@latest bundle compatibility'),
+        description: t('set-even-not-compatible', { cmd: 'bunx @capgo/cli@latest bundle compatibility' }),
         buttons: [
           {
             text: t('button-cancel'),
@@ -253,7 +253,7 @@ async function handleChannelLink(chan: Database['public']['Tables']['channels'][
       toast.info('ignore-compatibility')
     }
     else {
-      toast.info(t('bundle-compatible-with-channel').replace('%', chan.name))
+      toast.info(t('bundle-compatible-with-channel', { channel: chan.name }))
     }
     await setChannel(chan, version.value.id)
     await getChannels()
