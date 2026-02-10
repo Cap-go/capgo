@@ -12,6 +12,26 @@ import { createStatsMeta } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
+async function resolveOwnerOrg(c: Context, record: Database['public']['Tables']['app_versions']['Row']): Promise<string | null> {
+  if (record.owner_org)
+    return record.owner_org
+  if (!record.app_id)
+    return null
+
+  const { data, error } = await supabaseAdmin(c)
+    .from('apps')
+    .select('owner_org')
+    .eq('app_id', record.app_id)
+    .maybeSingle()
+
+  if (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'error resolveOwnerOrg', error, app_id: record.app_id })
+    return null
+  }
+
+  return data?.owner_org ?? null
+}
+
 async function v2PathSize(c: Context, record: Database['public']['Tables']['app_versions']['Row'], v2Path: string) {
   // pdate size and checksum
   cloudlog({ requestId: c.get('requestId'), message: 'V2', r2_path: record.r2_path })
@@ -21,13 +41,20 @@ async function v2PathSize(c: Context, record: Database['public']['Tables']['app_
     cloudlog({ requestId: c.get('requestId'), message: 'no size found for r2_path', r2_path: record.r2_path })
     return
   }
+
+  const ownerOrg = await resolveOwnerOrg(c, record)
+  if (!ownerOrg) {
+    cloudlog({ requestId: c.get('requestId'), message: 'missing owner_org for app_versions_meta upsert', id: record.id, app_id: record.app_id })
+    return
+  }
+
   // allow to update even without checksum, to prevent bad actor to remove checksum to get free storage
   const { error: errorUpdate } = await supabaseAdmin(c)
     .from('app_versions_meta')
     .upsert({
       id: record.id,
       app_id: record.app_id,
-      owner_org: record.owner_org,
+      owner_org: ownerOrg,
       size,
       checksum: record.checksum ?? '',
     }, {
@@ -117,12 +144,17 @@ async function updateIt(c: Context, record: Database['public']['Tables']['app_ve
   }
   else {
     cloudlog({ requestId: c.get('requestId'), message: 'no v2 path' })
+    const ownerOrg = await resolveOwnerOrg(c, record)
+    if (!ownerOrg) {
+      cloudlog({ requestId: c.get('requestId'), message: 'missing owner_org for app_versions_meta upsert', id: record.id, app_id: record.app_id })
+      return c.json(BRES)
+    }
     const { error: errorUpdate } = await supabaseAdmin(c)
       .from('app_versions_meta')
       .upsert({
         id: record.id,
         app_id: record.app_id,
-        owner_org: record.owner_org,
+        owner_org: ownerOrg,
         size: 0,
         checksum: record.checksum ?? '',
       }, {

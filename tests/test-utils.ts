@@ -533,7 +533,9 @@ export async function resetAppDataStats(appId: string): Promise<void> {
 export function getSupabaseClient(): SupabaseClient<Database> {
   if (!supabaseClient) {
     const supabaseUrl = SUPABASE_BASE_URL
-    const supabaseServiceKey = env.SUPABASE_SERVICE_KEY ?? ''
+    // Support both env names. Supabase CLI exposes SERVICE_ROLE_KEY, and our wrapper exports
+    // SUPABASE_SERVICE_ROLE_KEY + SUPABASE_SERVICE_KEY for convenience.
+    const supabaseServiceKey = env.SUPABASE_SERVICE_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY ?? env.SERVICE_ROLE_KEY ?? ''
     const supabaseFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
       const maxRetries = 3
       let lastError: unknown
