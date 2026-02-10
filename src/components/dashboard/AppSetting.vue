@@ -220,7 +220,9 @@ async function submit(form: { app_name: string, expose_metadata: boolean, allow_
   }
 
   try {
-    await updateAllowDeviceCustomId(form.allow_device_custom_id)
+    // Defensive: avoid flipping the flag if the value is missing/invalid.
+    if (typeof form.allow_device_custom_id === 'boolean')
+      await updateAllowDeviceCustomId(form.allow_device_custom_id)
   }
   catch (error) {
     toast.error(error as string)
@@ -302,7 +304,13 @@ async function updateAllowPreview(newAllowPreview: boolean) {
 }
 
 async function updateAllowDeviceCustomId(newAllowDeviceCustomId: boolean) {
-  if (newAllowDeviceCustomId === appRef.value?.allow_device_custom_id) {
+  // Defensive: if the backend ever returns null/undefined for legacy rows, don't
+  // silently flip the setting when submitting other fields.
+  const current = appRef.value?.allow_device_custom_id
+  if (current === null || current === undefined)
+    return Promise.resolve()
+
+  if (newAllowDeviceCustomId === current) {
     return Promise.resolve()
   }
 
@@ -1109,7 +1117,7 @@ async function transferAppOwnership() {
               <FormKit
                 type="checkbox"
                 name="allow_device_custom_id"
-                :value="appRef?.allow_device_custom_id ?? true"
+                :value="appRef?.allow_device_custom_id ?? false"
                 :label="t('allow-device-custom-id')"
                 :help="t('allow-device-custom-id-help')"
               />
