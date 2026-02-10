@@ -3,16 +3,14 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import type { AppStats, StatsActions } from '../utils/types.ts'
 import { greaterOrEqual, parse } from '@std/semver'
-import { eq, sql } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
-import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
+import { getAppStatusPayload, setAppStatus } from '../utils/appStatus.ts'
 import { BRES, simpleError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrgCached } from '../utils/notifications.ts'
 import { closeClient, ensurePlaceholderVersions, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
-import * as schema from '../utils/postgres_schema.ts'
 import { createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from '../utils/stats.ts'
 import { backgroundTask, deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../utils/utils.ts'
 import { ALLOWED_STATS_ACTIONS } from './stats_actions.ts'
@@ -20,20 +18,6 @@ import { ALLOWED_STATS_ACTIONS } from './stats_actions.ts'
 z.config(z.locales.en())
 
 const PLAN_ERROR = 'Cannot send stats, upgrade plan to continue to update'
-
-async function allowDeviceCustomIdFromPg(drizzleClient: ReturnType<typeof getDrizzleClient>, app_id: string): Promise<boolean> {
-  const res = await drizzleClient
-    .select({
-      // Replicas may lag schema changes. Read via to_jsonb(row)->>... so the
-      // query still parses even if the column doesn't exist yet.
-      allow_device_custom_id: sql<boolean>`COALESCE((to_jsonb(apps) ->> 'allow_device_custom_id')::boolean, true)`,
-    })
-    .from(schema.apps)
-    .where(eq(schema.apps.app_id, app_id))
-    .limit(1)
-
-  return res[0]?.allow_device_custom_id ?? true
-}
 
 export interface BatchStatsResult {
   status: 'ok' | 'error'
@@ -90,23 +74,24 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   // Normalize once and use consistently for gating + persistence.
   // Whitespace-only values are treated as "not provided".
   device.custom_id = requestedCustomId === '' ? undefined : requestedCustomId
+  const hasCustomId = device.custom_id !== undefined
 
   const planActions: Array<'mau' | 'bandwidth'> = ['mau', 'bandwidth']
-  const cachedStatus = await getAppStatus(c, app_id)
+  const cached = await getAppStatusPayload(c, app_id)
+  const cachedStatus = cached?.status ?? null
+
   if (cachedStatus === 'onprem') {
     await onPremStats(c, app_id, action, device)
     return { success: true, isOnprem: true }
   }
 
-  const allowDeviceCustomId = device.custom_id === undefined ? true : await allowDeviceCustomIdFromPg(drizzleClient, app_id)
-
   if (cachedStatus === 'cancelled') {
     const statsActions: StatsActions[] = [{ action: 'needPlanUpgrade' }]
     // Keep behavior backward compatible (default allow=true), but allow owners to
     // disable custom_id persistence from unauthenticated /stats traffic.
-    if (!allowDeviceCustomId && device.custom_id !== undefined) {
+    const allowDeviceCustomId = hasCustomId ? (cached?.allow_device_custom_id ?? true) : true
+    if (!allowDeviceCustomId && hasCustomId) {
       device.custom_id = undefined
-      statsActions.push({ action: 'customIdBlocked' })
     }
     await sendStatsAndDevice(c, device, statsActions)
     return { success: false, error: 'need_plan_upgrade', message: PLAN_ERROR }
@@ -117,13 +102,14 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     await onPremStats(c, app_id, action, device)
     return { success: true, isOnprem: true }
   }
+
+  const allowDeviceCustomId = hasCustomId ? appOwner.allow_device_custom_id : true
   if (!appOwner.plan_valid) {
-    await setAppStatus(c, app_id, 'cancelled')
+    await setAppStatus(c, app_id, 'cancelled', { allow_device_custom_id: appOwner.allow_device_custom_id })
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     const upgradeActions: StatsActions[] = [{ action: 'needPlanUpgrade' }]
-    if (!allowDeviceCustomId && device.custom_id !== undefined) {
+    if (!allowDeviceCustomId && hasCustomId) {
       device.custom_id = undefined
-      upgradeActions.push({ action: 'customIdBlocked' })
     }
     await sendStatsAndDevice(c, device, upgradeActions)
     // Send weekly notification about missing payment (not configurable - payment related)
@@ -134,9 +120,9 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
     return { success: false, error: 'need_plan_upgrade', message: 'Cannot update, upgrade plan to continue to update' }
   }
-  await setAppStatus(c, app_id, 'cloud')
+  await setAppStatus(c, app_id, 'cloud', { allow_device_custom_id: appOwner.allow_device_custom_id })
   const statsActions: StatsActions[] = []
-  if (!allowDeviceCustomId && device.custom_id !== undefined) {
+  if (!allowDeviceCustomId && hasCustomId) {
     device.custom_id = undefined
     statsActions.push({ action: 'customIdBlocked' })
   }

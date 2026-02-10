@@ -7,6 +7,13 @@ const APP_STATUS_CACHE_TTL_SECONDS = 60
 
 export type AppStatus = 'cloud' | 'onprem' | 'cancelled'
 
+export interface AppStatusPayload {
+  status: AppStatus
+  // Optional metadata attached to the cached app status.
+  // Kept optional for backward compatibility with older cache entries.
+  allow_device_custom_id?: boolean
+}
+
 function buildAppStatusRequest(c: Context, appId: string) {
   const helper = new CacheHelper(c)
   if (!helper.available)
@@ -17,23 +24,28 @@ function buildAppStatusRequest(c: Context, appId: string) {
   }
 }
 
-export async function getAppStatus(c: Context, appId: string): Promise<AppStatus | null> {
+export async function getAppStatusPayload(c: Context, appId: string): Promise<AppStatusPayload | null> {
   const cacheEntry = buildAppStatusRequest(c, appId)
   if (!cacheEntry)
     return null
-  const payload = await cacheEntry.helper.matchJson<{ status: AppStatus }>(cacheEntry.request)
+  const payload = await cacheEntry.helper.matchJson<AppStatusPayload>(cacheEntry.request)
   if (!payload)
     return null
   if (payload.status === 'cancelled' && !isStripeConfigured(c))
-    return 'cloud'
-  return payload.status
+    return { ...payload, status: 'cloud' }
+  return payload
 }
 
-export function setAppStatus(c: Context, appId: string, status: AppStatus) {
+export async function getAppStatus(c: Context, appId: string): Promise<AppStatus | null> {
+  const payload = await getAppStatusPayload(c, appId)
+  return payload?.status ?? null
+}
+
+export function setAppStatus(c: Context, appId: string, status: AppStatus, payload?: Omit<AppStatusPayload, 'status'>) {
   return backgroundTask(c, async () => {
     const cacheEntry = buildAppStatusRequest(c, appId)
     if (!cacheEntry)
       return
-    await cacheEntry.helper.putJson(cacheEntry.request, { status }, APP_STATUS_CACHE_TTL_SECONDS)
+    await cacheEntry.helper.putJson(cacheEntry.request, { status, ...payload }, APP_STATUS_CACHE_TTL_SECONDS)
   })
 }

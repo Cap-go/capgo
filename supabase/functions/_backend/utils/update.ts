@@ -85,7 +85,7 @@ export async function updateWithPG(
     return onPremStats(c, app_id, 'get', device)
   }
   if (!appOwner.plan_valid) {
-    await setAppStatus(c, app_id, 'cancelled')
+    await setAppStatus(c, app_id, 'cancelled', { allow_device_custom_id: appOwner.allow_device_custom_id })
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     // Send weekly notification about missing payment (not configurable - payment related)
@@ -96,7 +96,7 @@ export async function updateWithPG(
     }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
-  await setAppStatus(c, app_id, 'cloud')
+  await setAppStatus(c, app_id, 'cloud', { allow_device_custom_id: appOwner.allow_device_custom_id })
   const channelDeviceCount = appOwner.channel_device_count ?? 0
   const manifestBundleCount = appOwner.manifest_bundle_count ?? 0
   const bypassChannelOverrides = channelDeviceCount <= 0

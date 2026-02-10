@@ -98,7 +98,7 @@ async function assertChannelSelfAppOwnerPlanValid(
   }
 
   if (!appOwner.plan_valid) {
-    await setAppStatus(c, appId, 'cancelled')
+    await setAppStatus(c, appId, 'cancelled', { allow_device_custom_id: appOwner.allow_device_custom_id })
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: appId })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
 
@@ -120,7 +120,7 @@ async function assertChannelSelfAppOwnerPlanValid(
     return { response: c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429) }
   }
 
-  await setAppStatus(c, appId, 'cloud')
+  await setAppStatus(c, appId, 'cloud', { allow_device_custom_id: appOwner.allow_device_custom_id })
   return { appOwner }
 }
 
