@@ -39,11 +39,24 @@ export async function getAppStatus(c: Context, appId: string): Promise<AppStatus
   return payload?.status ?? null
 }
 
-export function setAppStatus(c: Context, appId: string, status: AppStatus, payload?: Omit<AppStatusPayload, 'status'>) {
-  return backgroundTask(c, async () => {
-    const cacheEntry = buildAppStatusRequest(c, appId)
-    if (!cacheEntry)
-      return
-    await cacheEntry.helper.putJson(cacheEntry.request, { status, ...payload }, APP_STATUS_CACHE_TTL_SECONDS)
-  })
+export async function setAppStatus(c: Context, appId: string, status: AppStatus, payload?: Omit<AppStatusPayload, 'status'>) {
+  const cacheEntry = buildAppStatusRequest(c, appId)
+  if (!cacheEntry)
+    return
+
+  const write = cacheEntry.helper.putJson(
+    cacheEntry.request,
+    { status, ...payload },
+    APP_STATUS_CACHE_TTL_SECONDS,
+  )
+
+  // Cancelled/on-prem statuses are used as DB short-circuit fast-paths.
+  // Write them eagerly so the next request sees the cached state immediately.
+  if (status === 'cancelled' || status === 'onprem') {
+    await write
+    return
+  }
+
+  // Cloud status is best-effort: avoid adding latency on the hot path.
+  await backgroundTask(c, write)
 }

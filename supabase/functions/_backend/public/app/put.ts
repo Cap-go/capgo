@@ -63,7 +63,7 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
   if (body.allow_device_custom_id !== undefined) {
     const cached = await getAppStatusPayload(c, appId)
     if (cached?.status === 'cancelled') {
-      setAppStatus(c, appId, cached.status, { allow_device_custom_id: body.allow_device_custom_id })
+      await setAppStatus(c, appId, cached.status, { allow_device_custom_id: body.allow_device_custom_id })
     }
   }
 
