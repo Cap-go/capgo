@@ -7,14 +7,14 @@ import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 
-const route = useRoute('/app/[package].bundles.new')
+const route = useRoute('/app/[app].bundles.new')
 const router = useRouter()
 const supabase = useSupabase()
 const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
 const { currentOrganization } = storeToRefs(organizationStore)
 
-const appId = computed(() => String(route.params.package || ''))
+const appId = computed(() => String(route.params.app || ''))
 const isLoading = ref(true)
 const bundlesCount = ref<number | null>(null)
 

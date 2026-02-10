@@ -159,6 +159,13 @@ declare module 'vue-router/auto-routes' {
       { app: ParamValue<false> },
       | never
     >,
+    '/app/[app].bundles.new': RouteRecordInfo<
+      '/app/[app].bundles.new',
+      '/app/:app/bundles/new',
+      { app: ParamValue<true> },
+      { app: ParamValue<false> },
+      | never
+    >,
     '/app/[app].channel.[channel]': RouteRecordInfo<
       '/app/[app].channel.[channel]',
       '/app/:app/channel/:channel',
@@ -234,13 +241,6 @@ declare module 'vue-router/auto-routes' {
       '/app/:app/logs',
       { app: ParamValue<true> },
       { app: ParamValue<false> },
-      | never
-    >,
-    '/app/[package].bundles.new': RouteRecordInfo<
-      '/app/[package].bundles.new',
-      '/app/:package/bundles/new',
-      { package: ParamValue<true> },
-      { package: ParamValue<false> },
       | never
     >,
     '/app/modules': RouteRecordInfo<
@@ -580,6 +580,12 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
+    'src/pages/app/[app].bundles.new.vue': {
+      routes:
+        | '/app/[app].bundles.new'
+      views:
+        | never
+    }
     'src/pages/app/[app].channel.[channel].vue': {
       routes:
         | '/app/[app].channel.[channel]'
@@ -643,12 +649,6 @@ declare module 'vue-router/auto-routes' {
     'src/pages/app/[app].logs.vue': {
       routes:
         | '/app/[app].logs'
-      views:
-        | never
-    }
-    'src/pages/app/[package].bundles.new.vue': {
-      routes:
-        | '/app/[package].bundles.new'
       views:
         | never
     }
