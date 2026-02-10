@@ -304,12 +304,9 @@ async function updateAllowPreview(newAllowPreview: boolean) {
 }
 
 async function updateAllowDeviceCustomId(newAllowDeviceCustomId: boolean) {
-  // Defensive: if the backend ever returns null/undefined for legacy rows, don't
-  // silently flip the setting when submitting other fields.
-  const current = appRef.value?.allow_device_custom_id
-  if (current === null || current === undefined)
-    return Promise.resolve()
-
+  // Defensive: if the backend ever returns null/undefined, treat it as false for
+  // comparison so an explicit user toggle will still persist.
+  const current = appRef.value?.allow_device_custom_id ?? false
   if (newAllowDeviceCustomId === current) {
     return Promise.resolve()
   }
