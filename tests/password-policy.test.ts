@@ -51,7 +51,7 @@ afterAll(async () => {
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
 })
 
-describe('password Policy Configuration via SDK', () => {
+describe('Password Policy Configuration via SDK', () => {
   it('enable password policy with all requirements via direct update', async () => {
     const policyConfig = {
       enabled: true,
