@@ -36,7 +36,8 @@ const customEnv = parse(envContent)
 
 console.log('Environment file:', envFileName)
 console.log('Worker Name:', envName)
-console.log('Environment variables', customEnv)
+// Avoid printing secret values to stdout (this file is used for local workflows too).
+console.log('Environment variable keys', Object.keys(customEnv))
 
 function escapeTomlBasicString(value) {
   let out = ''

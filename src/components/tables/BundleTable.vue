@@ -529,7 +529,7 @@ async function massDelete() {
   if (linkedChannelsList.length > 0) {
     const channelsList = linkedChannelsList
       .map(val => val.rawChannel?.map((ch: any) => `${ch.name} (${ch.version.name})`).join(', '))
-      .join(', ') ?? ''
+      .join(', ')
     const message = t('channel-bundle-linked', { channels: channelsList })
     const shouldUnlink = await showUnlinkDialog(message)
 

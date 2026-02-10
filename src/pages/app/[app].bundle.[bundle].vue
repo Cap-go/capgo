@@ -613,7 +613,9 @@ async function deleteBundle() {
 
       dialogStore.openDialog({
         title: t('want-to-unlink'),
-        description: t('channel-bundle-linked').replace('%s', channelFound.map((ch: any) => `${ch.name} (${ch.version.name})`).join(', ')),
+        description: t('channel-bundle-linked', {
+          channels: channelFound.map((ch: any) => `${ch.name} (${ch.version.name})`).join(', '),
+        }),
         buttons: [
           {
             text: t('no'),
