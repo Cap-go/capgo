@@ -83,7 +83,13 @@ async function getHandler(c: Context): Promise<Response> {
     const { data } = supabaseAdmin(c).storage.from('capgo').getPublicUrl(fileId)
 
     // cloudlog('publicUrl', data.publicUrl)
-    const url = data.publicUrl.replace('http://kong:8000', getExternalBaseUrl(c))
+    // `data.publicUrl` points to the internal Supabase gateway (Kong) on local stacks.
+    // Rewrite the origin using the externally visible base URL derived from forwarded headers.
+    const internalUrl = new URL(data.publicUrl)
+    const externalBase = new URL(getExternalBaseUrl(c))
+    internalUrl.protocol = externalBase.protocol
+    internalUrl.host = externalBase.host
+    const url = internalUrl.toString()
     // cloudlog('url', url)
     return c.redirect(url)
   }
