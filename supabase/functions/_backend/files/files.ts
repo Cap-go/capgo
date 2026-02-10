@@ -29,6 +29,13 @@ const ATTACHMENT_PREFIX = 'attachments'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
+function getExternalBaseUrl(c: Context): string {
+  const protoHeader = c.req.header('X-Forwarded-Proto')
+  const proto = protoHeader || new URL(c.req.url).protocol.replace(':', '') || 'http'
+  const host = c.req.header('X-Forwarded-Host') || c.req.header('Host') || 'localhost:54321'
+  return `${proto}://${host}`
+}
+
 async function saveBandwidthUsage(c: Context, fileSize: number | null | undefined) {
   cloudlog({ requestId: c.get('requestId'), message: 'saveBandwidthUsage', fileSize })
   if (!fileSize || fileSize <= 0)
@@ -55,7 +62,7 @@ async function getHandler(c: Context): Promise<Response> {
     const { data } = supabaseAdmin(c).storage.from('capgo').getPublicUrl(fileId)
 
     // cloudlog('publicUrl', data.publicUrl)
-    const url = data.publicUrl.replace('http://kong:8000', 'http://localhost:54321')
+    const url = data.publicUrl.replace('http://kong:8000', getExternalBaseUrl(c))
     // cloudlog('url', url)
     return c.redirect(url)
   }

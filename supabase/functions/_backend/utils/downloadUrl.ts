@@ -38,9 +38,19 @@ export async function getBundleUrl(
   }
   const url = new URL(c.req.url)
   let finalPath = BASE_PATH
-  // .replace('http://supabase_edge_runtime_capgo:8081', 'http://localhost:54321')
-  if (url.host === 'supabase_edge_runtime_capgo-app:8081') {
-    url.host = 'localhost:54321'
+  // When running on Supabase Edge Runtime, the request host can be the internal container.
+  // Build URLs using the externally visible host/port from forwarded headers when possible.
+  if (url.host.endsWith(':8081') && url.hostname.startsWith('supabase_edge_runtime_')) {
+    const forwardedHost = c.req.header('X-Forwarded-Host') || c.req.header('Host')
+    const forwardedProto = c.req.header('X-Forwarded-Proto')
+    if (forwardedHost) {
+      url.host = forwardedHost
+      if (forwardedProto)
+        url.protocol = `${forwardedProto}:`
+    }
+    else {
+      url.host = 'localhost:54321'
+    }
     finalPath = `functions/v1/${BASE_PATH}`
   }
   const downloadUrl = `${url.protocol}//${url.host}/${finalPath}/${r2_path}?key=${checksum}&device_id=${deviceId}`
@@ -55,9 +65,17 @@ export function getManifestUrl(c: Context, versionId: number, manifest: Partial<
   try {
     const url = new URL(c.req.url)
     let finalPath = BASE_PATH
-    // .replace('http://supabase_edge_runtime_capgo:8081', 'http://localhost:54321')
-    if (url.host === 'supabase_edge_runtime_capgo:8081') {
-      url.host = 'localhost:54321'
+    if (url.host.endsWith(':8081') && url.hostname.startsWith('supabase_edge_runtime_')) {
+      const forwardedHost = c.req.header('X-Forwarded-Host') || c.req.header('Host')
+      const forwardedProto = c.req.header('X-Forwarded-Proto')
+      if (forwardedHost) {
+        url.host = forwardedHost
+        if (forwardedProto)
+          url.protocol = `${forwardedProto}:`
+      }
+      else {
+        url.host = 'localhost:54321'
+      }
       finalPath = `functions/v1/${BASE_PATH}`
     }
     const signKey = versionId

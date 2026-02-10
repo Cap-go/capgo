@@ -2,6 +2,7 @@ import type { PlaywrightTestConfig } from '@playwright/test'
 import * as os from 'node:os'
 import { env } from 'node:process'
 import { defineConfig, devices } from '@playwright/test'
+import { getSupabaseWorktreeConfig } from './scripts/supabase-worktree-config'
 
 /**
  * Read environment variables from file.
@@ -10,11 +11,12 @@ import { defineConfig, devices } from '@playwright/test'
 const headless = !!env.CI || !!env.PLAYWRIGHT_HEADLESS
 
 const webServer: PlaywrightTestConfig['webServer'] = []
+const { ports: supabasePorts } = getSupabaseWorktreeConfig(process.cwd())
 
 if (!env.SKIP_BACKEND_START) {
   webServer.push({
     command: 'ENV=local bun run backend',
-    port: 54321,
+    port: supabasePorts.api,
     timeout: 60_000,
     reuseExistingServer: true,
   })

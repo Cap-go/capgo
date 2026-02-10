@@ -256,7 +256,7 @@ Notes:
   dedicated seed data in `supabase/seed.sql`.
 - `LOCAL_CLI_PATH=true bun test:all:local` uses a local CLI build.
 - SQL tests in `supabase/tests/` are run by the Supabase CLI test runner.
-- Run `supabase start` first so the local DB is available.
+- Run `bun run supabase:start` first so the local DB is available (worktree-isolated).
 
 ## Dev contribution
 
@@ -332,22 +332,13 @@ In the following guideline, we will assume that you have installed the
 Start the Supabase DB:
 
 ```bash
-supabase start
+bun run supabase:start
 ```
 
-If the command is completed successfully, your console should output:
+Ports may differ per git worktree. To see the exact URLs/keys for the current worktree run:
 
 ```bash
-Started supabase local development setup.
-
-         API URL: http://localhost:54321
-     GraphQL URL: http://localhost:54321/graphql/v1
-          DB URL: postgresql://postgres:postgres@localhost:54322/postgres
-      Studio URL: http://localhost:54323
-    Inbucket URL: http://localhost:54324
-      JWT secret: super-secret-jwt-token-with-at-least-32-characters-long
-        anon key: xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXx.xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXx
-service_role key: xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXx.xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxxXxxxxxX
+bun run supabase:status
 ```
 
 #### Seed Supabase DB locally
@@ -355,7 +346,7 @@ service_role key: xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXx.xxxxXxxxxXxxxxXxxxxXxxxxX
 [!WARNING] ⚠️ Ensure Docker is running.
 
 ```bash
-supabase db reset
+bun run supabase:db:reset
 ```
 
 #### Start Frontend locally
