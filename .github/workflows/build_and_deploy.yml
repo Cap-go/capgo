@@ -9,14 +9,13 @@ on:
     tags:
       - '*'
 
-permissions:
-  contents: read
-
 jobs:
   # Tests already passed before tag was created, so just build and deploy
   supabase_deploy:
     runs-on: ubuntu-latest
     name: Build code and deploy to Supabase
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -64,6 +63,8 @@ jobs:
   deploy_webapp:
     needs: supabase_deploy
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v6

@@ -8,10 +8,6 @@ on:
   pull_request:
   workflow_call: # Allow this workflow to be called by other workflows
 
-permissions:
-  contents: read
-  actions: write
-
 env:
   DENO_DIR: my_cache_directory
 
@@ -19,6 +15,9 @@ jobs:
   test_all:
     runs-on: ubuntu-latest
     name: Run tests
+    permissions:
+      contents: read
+      actions: write
     steps:
       - name: Cache Deno dependencies
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4

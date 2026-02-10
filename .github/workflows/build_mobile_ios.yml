@@ -11,13 +11,12 @@ on:
         description: "Tag to build (e.g., v1.0.0)"
         required: true
 
-permissions:
-  contents: read
-  actions: write
-
 jobs:
   build_ios:
     runs-on: macos-latest-xlarge
+    permissions:
+      contents: read
+      actions: write
     steps:
       - uses: actions/checkout@v6
         with:
