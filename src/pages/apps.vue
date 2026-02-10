@@ -141,7 +141,7 @@ displayStore.defaultBack = '/apps'
             <p class="mt-2 text-slate-600 dark:text-slate-200">
               {{ t('add-your-first-app-t') }}
             </p>
-            <button class="mt-4 d-btn d-btn-primary" @click="router.push('/apps/new')">
+            <button class="mt-4 d-btn d-btn-primary" @click="router.push('/app/new')">
               {{ t('add-app') }}
             </button>
           </div>
@@ -155,7 +155,7 @@ displayStore.defaultBack = '/apps'
               :delete-button="!organizationStore.currentOrganizationFailed"
               :server-side-pagination="true"
               :is-loading="isTableLoading"
-              @add-app="router.push('/apps/new')"
+              @add-app="router.push('/app/new')"
               @update:current-page="(page) => { currentPage = page; getMyApps() }"
               @update:search="(query) => { searchQuery = query; currentPage = 1; getMyApps() }"
               @reload="getMyApps()"
