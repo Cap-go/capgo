@@ -232,15 +232,15 @@ describe('[POST] /private/validate_password_compliance', () => {
       headers,
       method: 'POST',
       body: JSON.stringify({
-        email: TEST_EMAIL,
-        password: 'TestPassword123!',
+        email: USER_EMAIL,
+        password: USER_PASSWORD,
         org_id: nonExistentOrgId,
       }),
     })
-    expect(response.status).toBe(404)
+    expect(response.status).toBe(403)
 
     const responseData = await response.json() as { error: string }
-    expect(responseData.error).toBe('org_not_found')
+    expect(responseData.error).toBe('not_member')
   })
 
   it('reject request for org without password policy', async () => {
@@ -266,8 +266,8 @@ describe('[POST] /private/validate_password_compliance', () => {
         headers,
         method: 'POST',
         body: JSON.stringify({
-          email: TEST_EMAIL,
-          password: 'TestPassword123!',
+          email: USER_EMAIL,
+          password: USER_PASSWORD,
           org_id: ORG_ID,
         }),
       })
@@ -292,13 +292,30 @@ describe('[POST] /private/validate_password_compliance', () => {
       headers,
       method: 'POST',
       body: JSON.stringify({
-        email: TEST_EMAIL,
+        email: USER_EMAIL,
         password: 'WrongPassword123!',
         org_id: ORG_ID,
       }),
     })
     expect(response.status).toBe(401)
 
+    const responseData = await response.json() as { error: string }
+    expect(responseData.error).toBe('invalid_credentials')
+  })
+
+  it('does not reveal org existence when credentials are invalid', async () => {
+    const nonExistentOrgId = randomUUID()
+    const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
+      headers,
+      method: 'POST',
+      body: JSON.stringify({
+        email: USER_EMAIL,
+        password: 'WrongPassword123!',
+        org_id: nonExistentOrgId,
+      }),
+    })
+
+    expect(response.status).toBe(401)
     const responseData = await response.json() as { error: string }
     expect(responseData.error).toBe('invalid_credentials')
   })
