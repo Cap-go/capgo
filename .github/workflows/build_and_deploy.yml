@@ -9,6 +9,8 @@ on:
     tags:
       - '*'
 
+permissions: {}
+
 jobs:
   # Tests already passed before tag was created, so just build and deploy
   supabase_deploy:

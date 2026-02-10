@@ -6,6 +6,8 @@ on:
       - main
       - development
 
+permissions: {}
+
 jobs:
   # Run all tests first before creating any tags
   test:

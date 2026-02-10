@@ -11,6 +11,8 @@ on:
         description: 'Tag to build (e.g., v1.0.0)'
         required: true
 
+permissions: {}
+
 jobs:
   build_android:
     runs-on: ubuntu-latest
