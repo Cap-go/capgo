@@ -4,7 +4,7 @@ import type { AuthInfo, MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, Order, ReadDevicesParams, ReadStatsParams, VersionUsage } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
-import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged } from './deviceComparison.ts'
+import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged, nullableString } from './deviceComparison.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { createCustomer } from './stripe.ts'
@@ -1025,24 +1025,33 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error fetching existing device', error })
   }
 
-  if (existingRow && !hasComparableDeviceChanged(existingRow, device)) {
+  // Preserve existing custom_id when the client doesn't send one.
+  // This avoids accidental clearing, and lets higher-level callers strip custom_id
+  // (e.g., when an app disables device self-setting) without overwriting owner-set values.
+  const requestedCustomId = nullableString(device.custom_id)
+  const deviceForWrite: DeviceWithoutCreatedAt = requestedCustomId === null && existingRow
+    ? { ...device, custom_id: existingRow.custom_id ?? '' }
+    : device
+
+  if (existingRow && !hasComparableDeviceChanged(existingRow, deviceForWrite)) {
     cloudlog({ requestId: c.get('requestId'), message: 'No Supabase upsert needed for device', device_id: device.device_id })
     return Promise.resolve()
   }
 
-  const normalizedDevice = buildNormalizedDeviceForWrite(device)
+  const normalizedDevice = buildNormalizedDeviceForWrite(deviceForWrite)
   const updatedAt = new Date().toISOString()
 
   const payload = {
     app_id: device.app_id,
     updated_at: updatedAt,
     device_id: device.device_id,
-    platform: normalizedDevice.platform ?? device.platform,
+    platform: normalizedDevice.platform ?? deviceForWrite.platform,
     plugin_version: normalizedDevice.plugin_version ?? undefined,
     os_version: normalizedDevice.os_version ?? undefined,
     version_build: normalizedDevice.version_build ?? undefined,
-    custom_id: normalizedDevice.custom_id ?? undefined,
-    version_name: normalizedDevice.version_name ?? device.version_name,
+    // Only persist custom_id if the client explicitly sent one.
+    custom_id: requestedCustomId ?? undefined,
+    version_name: normalizedDevice.version_name ?? deviceForWrite.version_name,
     is_prod: normalizedDevice.is_prod,
     is_emulator: normalizedDevice.is_emulator,
     default_channel: device.default_channel ?? null,

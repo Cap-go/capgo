@@ -45,7 +45,7 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
 
 app.put('/:id', middlewareKey(['all', 'write']), async (c) => {
   const id = c.req.param('id')
-  const body = await getBodyOrQuery<{ name?: string, icon?: string, retention?: number, expose_metadata?: boolean }>(c)
+  const body = await getBodyOrQuery<{ name?: string, icon?: string, retention?: number, expose_metadata?: boolean, allow_device_custom_id?: boolean }>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   const subkey = c.get('subkey') as Database['public']['Tables']['apikeys']['Row'] | undefined
   const keyToUse = subkey || apikey

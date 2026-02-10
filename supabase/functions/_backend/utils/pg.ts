@@ -511,7 +511,7 @@ export async function getAppOwnerPostgres(
   appId: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
-): Promise<{ owner_org: string, orgs: { created_by: string, id: string, management_email: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number, expose_metadata: boolean } | null> {
+): Promise<{ owner_org: string, orgs: { created_by: string, id: string, management_email: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number, expose_metadata: boolean, allow_device_custom_id: boolean } | null> {
   const isReplicaDb = () => {
     const src = c.res.headers.get('X-Database-Source') ?? ''
     // getDatabaseURL() sets X-Database-Source to identify Hyperdrive/PlanetScale
@@ -530,6 +530,9 @@ export async function getAppOwnerPostgres(
         channel_device_count: schema.apps.channel_device_count,
         manifest_bundle_count: schema.apps.manifest_bundle_count,
         expose_metadata: schema.apps.expose_metadata,
+        // Replicas may lag schema changes. Read via to_jsonb(row)->>... so the
+        // query still parses even if the column doesn't exist yet.
+        allow_device_custom_id: sql<boolean>`COALESCE((to_jsonb(apps) ->> 'allow_device_custom_id')::boolean, true)`,
         orgs: {
           created_by: orgAlias.created_by,
           id: orgAlias.id,
