@@ -150,6 +150,154 @@ describe('[POST] /stats', () => {
     await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_STATS)
   })
 
+  it('should ignore custom_id when app disables allow_device_custom_id and emit customIdBlocked stat', async () => {
+    const shortId = randomUUID().split('-')[0]
+    const appId = `${APP_NAME}.cidb.${shortId}`
+    await resetAndSeedAppData(appId)
+    await resetAndSeedAppDataStats(appId)
+
+    // Disable device-supplied custom_id persistence for this app
+    const { error: appUpdateError } = await getSupabaseClient()
+      .from('apps')
+      .update({ allow_device_custom_id: false })
+      .eq('app_id', appId)
+    expect(appUpdateError).toBeNull()
+
+    const { error: appReadError, data: appData } = await getSupabaseClient()
+      .from('apps')
+      .select('allow_device_custom_id')
+      .eq('app_id', appId)
+      .single()
+    expect(appReadError).toBeNull()
+    expect(appData?.allow_device_custom_id).toBe(false)
+
+    const uuid = randomUUID().toLowerCase()
+    const baseData = getBaseData(appId) as StatsPayload
+    baseData.device_id = uuid
+    baseData.action = 'set'
+    baseData.version_build = getVersionFromAction('set')
+
+    const version = await createAppVersions(baseData.version_build, appId)
+    baseData.version_name = version.name
+    baseData.custom_id = 'POISON-TEST'
+
+    const response = await postStats(baseData)
+    expect(response.status).toBe(200)
+    expect(await response.json<StatsRes>()).toEqual({ status: 'ok' })
+
+    // Verify device exists but custom_id was not persisted (DB default is empty string)
+    const { error: deviceError, data: deviceData } = await getSupabaseClient()
+      .from('devices')
+      .select()
+      .eq('device_id', uuid)
+      .eq('app_id', appId)
+      .single()
+
+    expect(deviceError).toBeNull()
+    expect(deviceData).toBeTruthy()
+    expect(deviceData?.custom_id).toBe('')
+
+    // Verify server-side stat was emitted
+    const { error: blockedError, data: blockedStat } = await getSupabaseClient()
+      .from('stats')
+      .select()
+      .eq('device_id', uuid)
+      .eq('app_id', appId)
+      .eq('action', 'customIdBlocked')
+      .single()
+
+    expect(blockedError).toBeNull()
+    expect(blockedStat).toBeTruthy()
+
+    await resetAppData(appId)
+    await resetAppDataStats(appId)
+  })
+
+  it('should trim custom_id before persisting', async () => {
+    const shortId = randomUUID().split('-')[0]
+    const appId = `${APP_NAME}.cidt.${shortId}`
+    await resetAndSeedAppData(appId)
+    await resetAndSeedAppDataStats(appId)
+
+    const uuid = randomUUID().toLowerCase()
+    const baseData = getBaseData(appId) as StatsPayload
+    baseData.device_id = uuid
+    baseData.action = 'set'
+    baseData.version_build = getVersionFromAction('set')
+
+    const version = await createAppVersions(baseData.version_build, appId)
+    baseData.version_name = version.name
+    baseData.custom_id = '  TRIM-ME  '
+
+    const response = await postStats(baseData)
+    expect(response.status).toBe(200)
+    expect(await response.json<StatsRes>()).toEqual({ status: 'ok' })
+
+    const { error: deviceError, data: deviceData } = await getSupabaseClient()
+      .from('devices')
+      .select()
+      .eq('device_id', uuid)
+      .eq('app_id', appId)
+      .single()
+
+    expect(deviceError).toBeNull()
+    expect(deviceData?.custom_id).toBe('TRIM-ME')
+
+    await resetAppData(appId)
+    await resetAppDataStats(appId)
+  })
+
+  it('should block trimmed custom_id when app disables allow_device_custom_id', async () => {
+    const shortId = randomUUID().split('-')[0]
+    const appId = `${APP_NAME}.cidt2.${shortId}`
+    await resetAndSeedAppData(appId)
+    await resetAndSeedAppDataStats(appId)
+
+    const { error: appUpdateError } = await getSupabaseClient()
+      .from('apps')
+      .update({ allow_device_custom_id: false })
+      .eq('app_id', appId)
+    expect(appUpdateError).toBeNull()
+
+    const uuid = randomUUID().toLowerCase()
+    const baseData = getBaseData(appId) as StatsPayload
+    baseData.device_id = uuid
+    baseData.action = 'set'
+    baseData.version_build = getVersionFromAction('set')
+
+    const version = await createAppVersions(baseData.version_build, appId)
+    baseData.version_name = version.name
+    baseData.custom_id = '  BLOCK-ME  '
+
+    const response = await postStats(baseData)
+    expect(response.status).toBe(200)
+    expect(await response.json<StatsRes>()).toEqual({ status: 'ok' })
+
+    const { error: deviceError, data: deviceData } = await getSupabaseClient()
+      .from('devices')
+      .select()
+      .eq('device_id', uuid)
+      .eq('app_id', appId)
+      .single()
+
+    expect(deviceError).toBeNull()
+    expect(deviceData?.custom_id).toBe('')
+
+    const { error: blockedError, data: blockedStat } = await getSupabaseClient()
+      .from('stats')
+      .select()
+      .eq('device_id', uuid)
+      .eq('app_id', appId)
+      .eq('action', 'customIdBlocked')
+      .single()
+
+    expect(blockedError).toBeNull()
+    expect(blockedStat).toBeTruthy()
+
+    await resetAppData(appId)
+    await resetAppDataStats(appId)
+  })
+
   // Test each stats action - concurrent for Supabase, sequential for Cloudflare (due to D1 sync)
   // Cloudflare Workers use D1 which requires sequential sync, Supabase can run concurrently
   const testDescribe = USE_CLOUDFLARE ? describe : describe.concurrent

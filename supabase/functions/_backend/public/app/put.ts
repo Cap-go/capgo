@@ -12,6 +12,7 @@ interface UpdateApp {
   icon?: string
   retention?: number
   expose_metadata?: boolean
+  allow_device_custom_id?: boolean
 }
 
 export async function put(c: Context<MiddlewareKeyVariables>, appId: string, body: UpdateApp, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
@@ -41,6 +42,7 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
       icon_url: normalizedIcon ?? body.icon,
       retention: body.retention,
       expose_metadata: body.expose_metadata,
+      allow_device_custom_id: body.allow_device_custom_id,
     })
     .eq('app_id', appId)
     .select()

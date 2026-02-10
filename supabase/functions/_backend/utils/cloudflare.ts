@@ -593,7 +593,9 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
   argMax(blob2, timestamp) AS version_name,
   argMax(blob3, timestamp) AS plugin_version,
   argMax(blob4, timestamp) AS os_version,
-  argMax(blob5, timestamp) AS custom_id,
+  -- Preserve the last non-empty custom_id so events that don't include it
+  -- (or blocked /stats traffic) don't clear owner-visible device metadata.
+  argMaxIf(blob5, timestamp, blob5 != '') AS custom_id,
   argMax(blob6, timestamp) AS version_build,
   argMax(blob7, timestamp) AS default_channel,
   argMax(blob8, timestamp) AS key_id,
