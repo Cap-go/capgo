@@ -321,7 +321,7 @@ export default {
       ALA: ZONE.ASIA, // Almaty, Kazakhstan
       ALG: ZONE.AFRICA, // Algiers, Algeria
       AMD: ZONE.ASIA, // Ahmedabad, India
-      AMM: ZONE.EUROPE, // Amman, Jordan
+      AMM: ZONE.MIDDLE_EAST, // Amman, Jordan
       AMS: ZONE.EUROPE, // Amsterdam, Netherlands
       ANC: ZONE.NORTH_AMERICA, // Anchorage, USA
       ARI: ZONE.SOUTH_AMERICA, // Arica, Chile
@@ -332,7 +332,7 @@ export default {
       ATH: ZONE.EUROPE, // Athens, Greece
       ATL: ZONE.NORTH_AMERICA, // Atlanta, USA
       AUS: ZONE.NORTH_AMERICA, // Austin, USA
-      BAH: ZONE.EUROPE, // Manama, Bahrain
+      BAH: ZONE.MIDDLE_EAST, // Manama, Bahrain
       BAQ: ZONE.SOUTH_AMERICA, // Barranquilla, Colombia
       BCN: ZONE.EUROPE, // Barcelona, Spain
       BEG: ZONE.EUROPE, // Belgrade, Serbia
@@ -626,7 +626,7 @@ export default {
       XAP: ZONE.SOUTH_AMERICA, // Chapeco, Brazil
       XFN: ZONE.HONG_KONG, // Xiangyang, China
       XIY: ZONE.HONG_KONG, // Baoji (Xi'an), China
-      XNH: ZONE.HONG_KONG, // Nasiriyah, Iraq
+      XNH: ZONE.MIDDLE_EAST, // Nasiriyah, Iraq
       XNN: ZONE.HONG_KONG, // Xining, China
       YHZ: ZONE.NORTH_AMERICA, // Halifax, Canada
       YOW: ZONE.NORTH_AMERICA, // Ottawa, Canada
