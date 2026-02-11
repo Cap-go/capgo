@@ -4,6 +4,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { getPluginBreakdownCF, readActiveAppsCF, readLastMonthDevicesByPlatformCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
+import { DEMO_APP_PREFIX } from '../utils/demo.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { logsnag, logsnagInsights } from '../utils/logsnag.ts'
@@ -64,6 +65,7 @@ interface GlobalStats {
   upgraded_orgs: PromiseLike<number>
   credits_bought: PromiseLike<number>
   credits_consumed: PromiseLike<number>
+  demo_apps_created: PromiseLike<number>
   plugin_breakdown: PromiseLike<PluginBreakdownResult>
   build_stats: PromiseLike<BuildStats>
 }
@@ -351,6 +353,10 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
 function getStats(c: Context): GlobalStats {
   const supabase = supabaseAdmin(c)
   const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const todayStart = new Date()
+  todayStart.setUTCHours(0, 0, 0, 0)
+  const todayStartIso = todayStart.toISOString()
+  const tomorrowStartIso = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000).toISOString()
   return {
     apps: countAllApps(c),
     updates: countAllUpdates(c),
@@ -511,6 +517,19 @@ function getStats(c: Context): GlobalStats {
         }
         return (res.data || []).reduce((sum, row) => sum + (Number(row.credits_used) || 0), 0)
       }),
+    demo_apps_created: supabase
+      .from('apps')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', todayStartIso)
+      .lt('created_at', tomorrowStartIso)
+      .like('app_id', `${DEMO_APP_PREFIX}%`)
+      .then((res) => {
+        if (res.error) {
+          cloudlog({ requestId: c.get('requestId'), message: 'demo_apps_created error', error: res.error })
+          return 0
+        }
+        return res.count ?? 0
+      }),
     plugin_breakdown: getPluginBreakdownCF(c),
     build_stats: getBuildStats(c),
   }
@@ -544,6 +563,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     upgraded_orgs,
     credits_bought,
     credits_consumed,
+    demo_apps_created,
     plugin_breakdown,
     build_stats,
   ] = await Promise.all([
@@ -570,6 +590,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     res.upgraded_orgs,
     res.credits_bought,
     res.credits_consumed,
+    res.demo_apps_created,
     res.plugin_breakdown,
     res.build_stats,
   ])
@@ -590,6 +611,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     devices_last_month,
     registers_today,
     bundle_storage_gb,
+    demo_apps_created,
   })
   // cloudlog(c.get('requestId'), 'app', app.app_id, downloads, versions, shared, channels)
   // create var date_id with yearn-month-day
@@ -643,6 +665,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     // Credits tracking (round to integers for bigint column)
     credits_bought: Math.round(credits_bought),
     credits_consumed: Math.round(credits_consumed),
+    demo_apps_created,
     // Plugin version breakdown (percentage per version)
     plugin_version_breakdown: plugin_breakdown.version_breakdown,
     plugin_major_breakdown: plugin_breakdown.major_breakdown,
