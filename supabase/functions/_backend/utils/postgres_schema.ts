@@ -29,6 +29,7 @@ export const apps = pgTable('apps', {
   channel_device_count: bigint('channel_device_count', { mode: 'number' }).notNull().default(0),
   manifest_bundle_count: bigint('manifest_bundle_count', { mode: 'number' }).notNull().default(0),
   expose_metadata: boolean('expose_metadata').notNull().default(false),
+  allow_device_custom_id: boolean('allow_device_custom_id').notNull().default(true),
 })
 
 export const app_versions = pgTable('app_versions', {

@@ -252,6 +252,7 @@ export type Database = {
       }
       apps: {
         Row: {
+          allow_device_custom_id: boolean
           allow_preview: boolean
           app_id: string
           channel_device_count: number
@@ -270,6 +271,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          allow_device_custom_id?: boolean
           allow_preview?: boolean
           app_id: string
           channel_device_count?: number
@@ -288,6 +290,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          allow_device_custom_id?: boolean
           allow_preview?: boolean
           app_id?: string
           channel_device_count?: number
@@ -4021,6 +4024,7 @@ export type Database = {
         | "reset"
         | "set"
         | "get"
+        | "customIdBlocked"
         | "set_fail"
         | "update_fail"
         | "download_fail"
@@ -4275,6 +4279,7 @@ export const Constants = {
         "reset",
         "set",
         "get",
+        "customIdBlocked",
         "set_fail",
         "update_fail",
         "download_fail",
