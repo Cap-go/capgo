@@ -287,9 +287,10 @@ export default {
       NORTH_AMERICA: 'https://plugin.na.capgo.app', // NA DB
       SOUTH_AMERICA: 'https://plugin.sa.capgo.app', // SA DB
       OCEANIA: 'https://plugin.oc.capgo.app', // OC DB
-      AFRICA: 'https://plugin.af.capgo.app', // AS_INDIA DB (via smart placement)
-      MIDDLE_EAST: 'https://plugin.me.capgo.app', // AS_INDIA DB (via smart placement)
-      HONG_KONG: 'https://plugin.hk.capgo.app', // AS_JAPAN DB (Tokyo)
+      AFRICA: 'https://plugin.af.capgo.app', // Google AF DB (africa-south1)
+      MIDDLE_EAST: 'https://plugin.me.capgo.app', // Google ME DB (me-central1)
+      HONG_KONG: 'https://plugin.hk.capgo.app', // Google HK DB (asia-east2)
+      JAPAN: 'https://plugin.jp.capgo.app', // AS_JAPAN DB (Tokyo)
     }
 
     // Zone codes used for routing decisions
@@ -302,6 +303,7 @@ export default {
       AFRICA: 'AF',
       MIDDLE_EAST: 'ME',
       HONG_KONG: 'HK',
+      JAPAN: 'JP',
     }
 
     // Maps Cloudflare colo (data center) codes to zones
@@ -419,7 +421,11 @@ export default {
       FRA: ZONE.EUROPE, // Frankfurt, Germany
       FRU: ZONE.ASIA, // Bishkek, Kyrgyzstan
       FSD: ZONE.NORTH_AMERICA, // Sioux Falls, USA
-      FUK: ZONE.HONG_KONG, // Fukuoka, Japan
+      FUK: ZONE.JAPAN, // Fukuoka, Japan
+      CTS: ZONE.JAPAN, // Sapporo, Japan
+      NGO: ZONE.JAPAN, // Nagoya, Japan
+      SDJ: ZONE.JAPAN, // Sendai, Japan
+      KOJ: ZONE.JAPAN, // Kagoshima, Japan
       FUO: ZONE.HONG_KONG, // Foshan, China
       GBE: ZONE.AFRICA, // Gaborone, Botswana
       GDL: ZONE.NORTH_AMERICA, // Guadalajara, Mexico
@@ -473,7 +479,7 @@ export default {
       KHN: ZONE.HONG_KONG, // Nanchang, China
       KIN: ZONE.NORTH_AMERICA, // Kingston, Jamaica
       KIV: ZONE.EUROPE, // Chișinău, Moldova
-      KIX: ZONE.HONG_KONG, // Osaka, Japan
+      KIX: ZONE.JAPAN, // Osaka, Japan
       KJA: ZONE.ASIA, // Krasnoyarsk, Russia
       KMG: ZONE.HONG_KONG, // Kunming, China
       KNU: ZONE.ASIA, // Kanpur, India
@@ -525,9 +531,9 @@ export default {
       NOU: ZONE.OCEANIA, // Noumea, New Caledonia
       NQN: ZONE.SOUTH_AMERICA, // Neuquen, Argentina
       NQZ: ZONE.ASIA, // Astana, Kazakhstan
-      NRT: ZONE.HONG_KONG, // Tokyo Narita, Japan
+      NRT: ZONE.JAPAN, // Tokyo Narita, Japan
       NVT: ZONE.SOUTH_AMERICA, // Timbo (Navegantes), Brazil
-      OKA: ZONE.HONG_KONG, // Naha (Okinawa), Japan
+      OKA: ZONE.JAPAN, // Naha (Okinawa), Japan
       OKC: ZONE.NORTH_AMERICA, // Oklahoma City, USA
       OMA: ZONE.NORTH_AMERICA, // Omaha, USA
       ORD: ZONE.NORTH_AMERICA, // Chicago, USA
@@ -637,7 +643,8 @@ export default {
 
     // Fallback order for each zone
     const zoneFallbackUrls = {
-      [ZONE.HONG_KONG]: [WORKER_URL.HONG_KONG, WORKER_URL.ASIA, WORKER_URL.EUROPE],
+      [ZONE.HONG_KONG]: [WORKER_URL.HONG_KONG, WORKER_URL.JAPAN, WORKER_URL.ASIA],
+      [ZONE.JAPAN]: [WORKER_URL.JAPAN, WORKER_URL.HONG_KONG, WORKER_URL.ASIA],
       [ZONE.ASIA]: [WORKER_URL.ASIA, WORKER_URL.HONG_KONG, WORKER_URL.EUROPE],
       [ZONE.AFRICA]: [WORKER_URL.AFRICA, WORKER_URL.ASIA, WORKER_URL.EUROPE],
       [ZONE.MIDDLE_EAST]: [WORKER_URL.MIDDLE_EAST, WORKER_URL.ASIA, WORKER_URL.EUROPE],

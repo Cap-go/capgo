@@ -46,7 +46,7 @@ export function getClientDbRegionSB(c: Context): DbRegionSB {
       return 'AS_INDIA'
     case 'HK': // Hong Kong/China CF
       return 'HK'
-    case 'JP': // Hong Kong/China CF
+    case 'JP': // Japan CF / JP worker
       return 'AS_JAPAN'
     case 'OC': // Oceania CF
       return 'OC'

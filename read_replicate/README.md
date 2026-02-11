@@ -120,6 +120,12 @@ Stronger verification:
    ./replicate_to_replica.sh
    ```
 
+### Why Do Subscriptions Start With `planetscale_subscription_`?
+
+Logical replication objects (`PUBLICATION`/`SUBSCRIPTION`/replication slots) were originally created for PlanetScale,
+and some operational tooling (like replication-lag checks) matches on the `planetscale_subscription_%` prefix.
+We keep the prefix for backward compatibility even when the target replica is hosted on Google.
+
 ## References
 
 - [PlanetScale Postgres Migration Guide](https://planetscale.com/docs/postgres/imports/postgres-migrate-walstream)
