@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import { getRuntimeKey } from 'hono/adapter'
 import { existInEnv, getEnv } from './utils.ts'
 
 // Antartica and Tor are redirected to EU in our snippet
@@ -32,7 +33,10 @@ export function getContinentSB(c: Context): RegionsAWS | undefined {
 export function getClientDbRegionSB(c: Context): DbRegionSB {
   // 1. Supabase Edge Functions provide region in ENV VAR SB_REGION (e.g., eu-west-3, us-east-1, ap-southeast-1)
   // 2. Cloudflare Workers: we use the name of the worker to ensure there is no weird placement (primary deployment, 99% of traffic)
-  const continent = getContinentSB(c) ?? getContinentCF(c)
+  // IMPORTANT: prefer Cloudflare worker identity (ENV_NAME) when present.
+  // We have seen SB_REGION accidentally set in Cloudflare environments (e.g. to a non-AWS string like "asia-east2"),
+  // which would break routing and make read-only requests fall back to DIRECT_EU.
+  const continent = (getRuntimeKey() === 'workerd') ? getContinentCF(c) : getContinentSB(c)
   switch (continent) {
     case 'EU': // Europe CF, AWS
     case 'IL': // Israel AWS

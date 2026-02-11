@@ -454,7 +454,7 @@ export default {
       HYN: ZONE.ASIA, // Taizhou, China
       IAD: ZONE.NORTH_AMERICA, // Ashburn (Washington DC), USA
       IAH: ZONE.NORTH_AMERICA, // Houston, USA
-      ICN: ZONE.HONG_KONG, // Seoul, South Korea
+      ICN: ZONE.JAPAN, // Seoul, South Korea (North Asia -> Japan)
       IND: ZONE.NORTH_AMERICA, // Indianapolis, USA
       ISB: ZONE.ASIA, // Islamabad, Pakistan
       IST: ZONE.EUROPE, // Istanbul, Turkey
@@ -474,7 +474,7 @@ export default {
       KCH: ZONE.HONG_KONG, // Kuching, Malaysia
       KEF: ZONE.EUROPE, // Reykjavík, Iceland
       KGL: ZONE.AFRICA, // Kigali, Rwanda
-      KHH: ZONE.HONG_KONG, // Kaohsiung City, Taiwan
+      KHH: ZONE.JAPAN, // Kaohsiung City, Taiwan (North Asia -> Japan)
       KHI: ZONE.ASIA, // Karachi, Pakistan
       KHN: ZONE.HONG_KONG, // Nanchang, China
       KIN: ZONE.NORTH_AMERICA, // Kingston, Jamaica
@@ -608,13 +608,13 @@ export default {
       TNA: ZONE.HONG_KONG, // Zibo (Jinan), China
       TNR: ZONE.AFRICA, // Antananarivo, Madagascar
       TPA: ZONE.NORTH_AMERICA, // Tampa, USA
-      TPE: ZONE.HONG_KONG, // Taipei, Taiwan
+      TPE: ZONE.JAPAN, // Taipei, Taiwan (North Asia -> Japan)
       TUN: ZONE.AFRICA, // Tunis, Tunisia
       TXL: ZONE.EUROPE, // Berlin, Germany
       TYN: ZONE.HONG_KONG, // Yangquan (Taiyuan), China
       UDI: ZONE.SOUTH_AMERICA, // Uberlandia, Brazil
       UIO: ZONE.SOUTH_AMERICA, // Quito, Ecuador
-      ULN: ZONE.ASIA, // Ulaanbaatar, Mongolia
+      ULN: ZONE.JAPAN, // Ulaanbaatar, Mongolia (North Asia -> Japan)
       URT: ZONE.HONG_KONG, // Surat Thani, Thailand
       VCP: ZONE.SOUTH_AMERICA, // Campinas, Brazil
       VIE: ZONE.EUROPE, // Vienna, Austria
