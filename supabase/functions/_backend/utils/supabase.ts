@@ -1194,12 +1194,6 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
     .select('*')
     .eq('app_id', params.app_id)
 
-  if (customIdMode) {
-    query = query
-      .not('custom_id', 'is', null)
-      .neq('custom_id', '')
-  }
-
   if (params.deviceIds?.length) {
     cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds: params.deviceIds })
     if (params.deviceIds.length === 1)
@@ -1250,12 +1244,6 @@ export async function countDevicesSB(c: Context, app_id: string, customIdMode: b
     .from('devices')
     .select('device_id', { count: 'exact', head: true })
     .eq('app_id', app_id)
-
-  if (customIdMode) {
-    req
-      .not('custom_id', 'is', null)
-      .neq('custom_id', '')
-  }
 
   const { count, error } = await req
 
