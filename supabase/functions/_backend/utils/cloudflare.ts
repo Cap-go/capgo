@@ -550,68 +550,91 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
   //         index1=app_id, timestamp=updated_at
 
   const limit = params.limit ?? DEFAULT_LIMIT
-  const conditions: string[] = [`index1 = '${params.app_id}'`]
-
-  if (customIdMode) {
-    conditions.push(`blob5 != ''`)
-  }
+  
+  // Build WHERE conditions for the inner query (pre-aggregation filters)
+  const innerConditions: string[] = [`index1 = '${params.app_id}'`]
 
   if (params.deviceIds?.length) {
     cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds: params.deviceIds })
     if (params.deviceIds.length === 1) {
-      conditions.push(`blob1 = '${params.deviceIds[0]}'`)
+      innerConditions.push(`blob1 = '${params.deviceIds[0]}'`)
     }
     else {
       const devicesList = params.deviceIds.map(id => `'${id}'`).join(', ')
-      conditions.push(`blob1 IN (${devicesList})`)
+      innerConditions.push(`blob1 IN (${devicesList})`)
     }
+  }
+
+  // Build WHERE conditions for the outer query (post-aggregation filters)
+  const outerConditions: string[] = []
+
+  if (customIdMode) {
+    outerConditions.push(`custom_id != ''`)
   }
 
   if (params.search) {
     cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
     const searchLower = params.search.toLowerCase()
     if (params.deviceIds?.length) {
-      conditions.push(`position('${searchLower}' IN toLower(blob5)) > 0`)
+      outerConditions.push(`position('${searchLower}' IN toLower(custom_id)) > 0`)
     }
     else {
       // Search in device_id, custom_id, or version_name
-      conditions.push(`(position('${searchLower}' IN toLower(blob1)) > 0 OR position('${searchLower}' IN toLower(blob5)) > 0 OR position('${searchLower}' IN toLower(blob2)) > 0)`)
+      outerConditions.push(`(position('${searchLower}' IN toLower(device_id)) > 0 OR position('${searchLower}' IN toLower(custom_id)) > 0 OR position('${searchLower}' IN toLower(version_name)) > 0)`)
     }
   }
 
   if (params.version_name) {
-    conditions.push(`blob2 = '${params.version_name}'`)
+    outerConditions.push(`version_name = '${params.version_name}'`)
   }
 
-  // Cursor-based pagination using timestamp
-  let cursorFilter = ''
+  // Cursor-based pagination - must filter on aggregated updated_at
   if (params.cursor) {
     // Cursor format: "timestamp|device_id"
     const [cursorTime, cursorDeviceId] = params.cursor.split('|')
     if (cursorTime && cursorDeviceId) {
-      cursorFilter = `AND (timestamp < toDateTime('${cursorTime}') OR (timestamp = toDateTime('${cursorTime}') AND blob1 > '${cursorDeviceId}'))`
+      outerConditions.push(`(updated_at < toDateTime('${cursorTime}') OR (updated_at = toDateTime('${cursorTime}') AND device_id > '${cursorDeviceId}'))`)
     }
   }
 
-  // Query to get latest record per device_id using argMax
+  // Build the outer WHERE clause
+  const outerWhereClause = outerConditions.length > 0 ? `WHERE ${outerConditions.join(' AND ')}` : ''
+
+  // Query to get latest record per device_id using argMax with subquery pattern
   const query = `SELECT
-  argMax(blob1, timestamp) AS device_id,
-  argMax(blob2, timestamp) AS version_name,
-  argMax(blob3, timestamp) AS plugin_version,
-  argMax(blob4, timestamp) AS os_version,
-  -- Preserve the last non-empty custom_id so events that don't include it
-  -- (or blocked /stats traffic) don't clear owner-visible device metadata.
-  argMaxIf(blob5, timestamp, blob5 != '') AS custom_id,
-  argMax(blob6, timestamp) AS version_build,
-  argMax(blob7, timestamp) AS default_channel,
-  argMax(blob8, timestamp) AS key_id,
-  argMax(double1, timestamp) AS platform,
-  argMax(double2, timestamp) AS is_prod,
-  argMax(double3, timestamp) AS is_emulator,
-  max(timestamp) AS updated_at
-FROM device_info
-WHERE ${conditions.join(' AND ')} ${cursorFilter}
-GROUP BY blob1
+  device_id,
+  version_name,
+  plugin_version,
+  os_version,
+  custom_id,
+  version_build,
+  default_channel,
+  key_id,
+  platform,
+  is_prod,
+  is_emulator,
+  updated_at
+FROM (
+  SELECT
+    argMax(blob1, timestamp) AS device_id,
+    argMax(blob2, timestamp) AS version_name,
+    argMax(blob3, timestamp) AS plugin_version,
+    argMax(blob4, timestamp) AS os_version,
+    -- Preserve the last non-empty custom_id so events that don't include it
+    -- (or blocked /stats traffic) don't clear owner-visible device metadata.
+    argMaxIf(blob5, timestamp, blob5 != '') AS custom_id,
+    argMax(blob6, timestamp) AS version_build,
+    argMax(blob7, timestamp) AS default_channel,
+    argMax(blob8, timestamp) AS key_id,
+    argMax(double1, timestamp) AS platform,
+    argMax(double2, timestamp) AS is_prod,
+    argMax(double3, timestamp) AS is_emulator,
+    max(timestamp) AS updated_at
+  FROM device_info
+  WHERE ${innerConditions.join(' AND ')}
+  GROUP BY blob1
+)
+${outerWhereClause}
 ORDER BY updated_at DESC, device_id ASC
 LIMIT ${limit + 1}`
 
