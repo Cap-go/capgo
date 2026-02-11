@@ -31,6 +31,28 @@ interface OrgBalance {
   next_expiration: string | null
 }
 
+interface CreditStatsAggregate {
+  purchased: number
+  granted: number
+  used: number
+  expired: number
+  deducted: number
+  refunded: number
+  net: number
+}
+
+interface UsageMetricStats {
+  used_total: number
+  last_30_days: number
+  events: number
+}
+
+interface OrgCreditStats {
+  totals: CreditStatsAggregate
+  last_30_days: CreditStatsAggregate
+  usage_by_metric: Record<string, UsageMetricStats>
+}
+
 interface AdminGrant {
   id: string
   org_id: string
@@ -61,6 +83,8 @@ const isSearching = ref(false)
 const selectedOrg = ref<OrgSearchResult | null>(null)
 const orgBalance = ref<OrgBalance | null>(null)
 const isLoadingBalance = ref(false)
+const orgStats = ref<OrgCreditStats | null>(null)
+const isLoadingStats = ref(false)
 
 const creditAmountStr = ref('100')
 const creditNotes = ref('')
@@ -79,6 +103,23 @@ const expiresInMonths = computed(() => {
 
 const recentGrants = ref<AdminGrant[]>([])
 const isLoadingGrants = ref(false)
+const usageMetricOrder = ['mau', 'bandwidth', 'storage', 'build_time'] as const
+
+const orderedUsageStats = computed(() => {
+  const metricStats = orgStats.value?.usage_by_metric || {}
+  const metricOrder = [...usageMetricOrder]
+  return Object.entries(metricStats).sort(([left], [right]) => {
+    const leftIndex = metricOrder.indexOf(left as typeof usageMetricOrder[number])
+    const rightIndex = metricOrder.indexOf(right as typeof usageMetricOrder[number])
+    if (leftIndex === -1 && rightIndex === -1)
+      return left.localeCompare(right)
+    if (leftIndex === -1)
+      return 1
+    if (rightIndex === -1)
+      return -1
+    return leftIndex - rightIndex
+  })
+})
 
 let searchDebounce: ReturnType<typeof setTimeout> | null = null
 let currentSearchQuery = '' // Track current query to avoid race conditions
@@ -147,12 +188,16 @@ async function selectOrg(org: OrgSearchResult) {
   selectedOrg.value = org
   searchQuery.value = ''
   searchResults.value = []
-  await loadOrgBalance(org.id)
+  await Promise.all([
+    loadOrgBalance(org.id),
+    loadOrgStats(org.id),
+  ])
 }
 
 function clearSelectedOrg() {
   selectedOrg.value = null
   orgBalance.value = null
+  orgStats.value = null
 }
 
 async function loadOrgBalance(orgId: string) {
@@ -180,6 +225,48 @@ async function loadOrgBalance(orgId: string) {
   }
   finally {
     isLoadingBalance.value = false
+  }
+}
+
+async function loadOrgStats(orgId: string) {
+  isLoadingStats.value = true
+
+  try {
+    const { data } = await supabase.auth.getSession()
+    const response = await fetch(`${defaultApiHost}/private/admin_credits/org-stats/${orgId}`, {
+      headers: {
+        authorization: `Bearer ${data.session?.access_token}`,
+      },
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to load stats')
+    }
+
+    const result = await response.json() as { stats?: OrgCreditStats }
+    orgStats.value = result.stats ?? null
+  }
+  catch (error) {
+    console.error('Stats load error:', error)
+    orgStats.value = null
+  }
+  finally {
+    isLoadingStats.value = false
+  }
+}
+
+function metricLabel(metric: string) {
+  switch (metric) {
+    case 'mau':
+      return 'MAU'
+    case 'bandwidth':
+      return t('Bandwidth')
+    case 'storage':
+      return t('Storage')
+    case 'build_time':
+      return t('build-time')
+    default:
+      return metric.replaceAll('_', ' ')
   }
 }
 
@@ -220,6 +307,7 @@ async function grantCredits() {
     // Refresh balance and grants
     await Promise.all([
       loadOrgBalance(selectedOrg.value.id),
+      loadOrgStats(selectedOrg.value.id),
       loadRecentGrants(),
     ])
 
@@ -385,6 +473,91 @@ onMounted(async () => {
                   {{ t('admin-credits-expires') }}: {{ formatLocalDateTime(orgBalance.next_expiration) }}
                 </div>
               </div>
+              <div v-else class="mt-2 text-gray-500 dark:text-gray-400">
+                {{ t('admin-credits-no-balance') }}
+              </div>
+            </div>
+
+            <!-- Credit Stats -->
+            <div v-if="selectedOrg" class="p-4 rounded-lg bg-gray-50 dark:bg-gray-700">
+              <div class="text-sm font-medium text-gray-500 dark:text-gray-400">
+                {{ t('statistics') }}
+              </div>
+
+              <div v-if="isLoadingStats" class="mt-2">
+                <Spinner size="w-5 h-5" />
+              </div>
+
+              <div v-else-if="orgStats" class="mt-3 space-y-4">
+                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-600 dark:bg-gray-800">
+                    <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      {{ t('credit-transaction-purchase') }}
+                    </div>
+                    <div class="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                      {{ formatCredits(orgStats.totals.purchased) }}
+                    </div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                      {{ t('30-days') }}: {{ formatCredits(orgStats.last_30_days.purchased) }}
+                    </div>
+                  </div>
+
+                  <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-600 dark:bg-gray-800">
+                    <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      {{ t('credit-transaction-manual_grant') }}
+                    </div>
+                    <div class="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                      {{ formatCredits(orgStats.totals.granted) }}
+                    </div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                      {{ t('30-days') }}: {{ formatCredits(orgStats.last_30_days.granted) }}
+                    </div>
+                  </div>
+
+                  <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-600 dark:bg-gray-800">
+                    <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      {{ t('credit-transaction-deduction') }}
+                    </div>
+                    <div class="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                      {{ formatCredits(orgStats.totals.used) }}
+                    </div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                      {{ t('30-days') }}: {{ formatCredits(orgStats.last_30_days.used) }}
+                    </div>
+                  </div>
+
+                  <div class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-600 dark:bg-gray-800">
+                    <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      {{ t('credit-transaction-expiry') }}
+                    </div>
+                    <div class="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                      {{ formatCredits(orgStats.totals.expired) }}
+                    </div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                      {{ t('30-days') }}: {{ formatCredits(orgStats.last_30_days.expired) }}
+                    </div>
+                  </div>
+                </div>
+
+                <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div
+                    v-for="[metric, metricData] in orderedUsageStats"
+                    :key="metric"
+                    class="rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-600 dark:bg-gray-800"
+                  >
+                    <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      {{ metricLabel(metric) }}
+                    </div>
+                    <div class="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
+                      {{ formatCredits(metricData.used_total) }}
+                    </div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">
+                      {{ t('30-days') }}: {{ formatCredits(metricData.last_30_days) }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div v-else class="mt-2 text-gray-500 dark:text-gray-400">
                 {{ t('admin-credits-no-balance') }}
               </div>
