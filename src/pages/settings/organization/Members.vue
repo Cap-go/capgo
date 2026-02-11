@@ -798,7 +798,7 @@ async function cannotDeleteOwner() {
                   // delete current member from org
                   _deleteMember(currentMember)
                   // redirect to /app
-                  router.push('/app')
+                  router.push('/apps')
 
                   return true
                 },

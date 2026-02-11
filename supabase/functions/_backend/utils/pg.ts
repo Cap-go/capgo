@@ -224,6 +224,22 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
       cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_SA for read-only' })
       return c.env.HYPERDRIVE_CAPGO_PS_SA.connectionString
     }
+    // Google Cloud Hyperdrive read replica routing
+    if (c.env.HYPERDRIVE_CAPGO_GG_ME && dbRegion === 'ME') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_GOOGLE_ME')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_GOOGLE_ME for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_GG_ME.connectionString
+    }
+    if (c.env.HYPERDRIVE_CAPGO_GG_AF && dbRegion === 'AF') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_GOOGLE_AF')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_GOOGLE_AF for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_GG_AF.connectionString
+    }
+    if (c.env.HYPERDRIVE_CAPGO_GG_HK && dbRegion === 'HK') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_GOOGLE_HK')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_GOOGLE_HK for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_GG_HK.connectionString
+    }
   }
 
   // Fallback to single Hyperdrive if available

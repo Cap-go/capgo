@@ -30,7 +30,7 @@ test.describe('Authentication', () => {
     await page.fill('[data-test="email"]', 'test@capgo.app')
     await page.fill('[data-test="password"]', 'testtest')
     await page.click('[data-test="submit"]')
-    await page.waitForURL('/app')
+    await page.waitForURL('/apps')
   })
 
   test('should navigate to forgot password page', async ({ page }) => {

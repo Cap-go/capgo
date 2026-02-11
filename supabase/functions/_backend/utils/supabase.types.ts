@@ -252,6 +252,7 @@ export type Database = {
       }
       apps: {
         Row: {
+          allow_device_custom_id: boolean
           allow_preview: boolean
           app_id: string
           channel_device_count: number
@@ -270,6 +271,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          allow_device_custom_id?: boolean
           allow_preview?: boolean
           app_id: string
           channel_device_count?: number
@@ -288,6 +290,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          allow_device_custom_id?: boolean
           allow_preview?: boolean
           app_id?: string
           channel_device_count?: number
@@ -1530,6 +1533,7 @@ export type Database = {
           enforce_encrypted_bundles: boolean
           enforce_hashed_api_keys: boolean
           enforcing_2fa: boolean
+          has_usage_credits: boolean
           id: string
           last_stats_updated_at: string | null
           logo: string | null
@@ -1551,6 +1555,7 @@ export type Database = {
           enforce_encrypted_bundles?: boolean
           enforce_hashed_api_keys?: boolean
           enforcing_2fa?: boolean
+          has_usage_credits?: boolean
           id?: string
           last_stats_updated_at?: string | null
           logo?: string | null
@@ -1572,6 +1577,7 @@ export type Database = {
           enforce_encrypted_bundles?: boolean
           enforce_hashed_api_keys?: boolean
           enforcing_2fa?: boolean
+          has_usage_credits?: boolean
           id?: string
           last_stats_updated_at?: string | null
           logo?: string | null
@@ -2391,6 +2397,7 @@ export type Database = {
           ban_time: string | null
           country: string | null
           created_at: string | null
+          created_via_invite: boolean
           email: string
           email_preferences: Json
           enable_notifications: boolean
@@ -2405,6 +2412,7 @@ export type Database = {
           ban_time?: string | null
           country?: string | null
           created_at?: string | null
+          created_via_invite?: boolean
           email: string
           email_preferences?: Json
           enable_notifications?: boolean
@@ -2419,6 +2427,7 @@ export type Database = {
           ban_time?: string | null
           country?: string | null
           created_at?: string | null
+          created_via_invite?: boolean
           email?: string
           email_preferences?: Json
           enable_notifications?: boolean
@@ -2666,6 +2675,7 @@ export type Database = {
           overage_unpaid: number
         }[]
       }
+      audit_logs_allowed_orgs: { Args: never; Returns: string[] }
       calculate_credit_cost: {
         Args: {
           p_metric: Database["public"]["Enums"]["credit_metric_type"]
@@ -2676,22 +2686,6 @@ export type Database = {
           credit_step_id: number
           credits_required: number
         }[]
-      }
-      create_hashed_apikey: {
-        Args: {
-          p_expires_at: string | null
-          p_limited_to_apps: string[]
-          p_limited_to_orgs: string[]
-          p_mode: Database["public"]["Enums"]["key_mode"]
-          p_name: string
-        }
-        Returns: Database["public"]["Tables"]["apikeys"]["Row"]
-      }
-      regenerate_hashed_apikey: {
-        Args: {
-          p_apikey_id: number
-        }
-        Returns: Database["public"]["Tables"]["apikeys"]["Row"]
       }
       check_min_rights:
         | {
@@ -2772,6 +2766,7 @@ export type Database = {
       cleanup_old_audit_logs: { Args: never; Returns: undefined }
       cleanup_old_channel_devices: { Args: never; Returns: undefined }
       cleanup_queue_messages: { Args: never; Returns: undefined }
+      cleanup_tmp_users: { Args: never; Returns: undefined }
       cleanup_webhook_deliveries: { Args: never; Returns: undefined }
       convert_bytes_to_gb: { Args: { bytes_value: number }; Returns: number }
       convert_bytes_to_mb: { Args: { bytes_value: number }; Returns: number }
@@ -2798,6 +2793,65 @@ export type Database = {
           total_non_compliant: number
           wrong_key_count: number
         }[]
+      }
+      create_hashed_apikey: {
+        Args: {
+          p_expires_at: string
+          p_limited_to_apps: string[]
+          p_limited_to_orgs: string[]
+          p_mode: Database["public"]["Enums"]["key_mode"]
+          p_name: string
+        }
+        Returns: {
+          created_at: string | null
+          expires_at: string | null
+          id: number
+          key: string | null
+          key_hash: string | null
+          limited_to_apps: string[] | null
+          limited_to_orgs: string[] | null
+          mode: Database["public"]["Enums"]["key_mode"]
+          name: string
+          rbac_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "apikeys"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      create_hashed_apikey_for_user: {
+        Args: {
+          p_expires_at: string
+          p_limited_to_apps: string[]
+          p_limited_to_orgs: string[]
+          p_mode: Database["public"]["Enums"]["key_mode"]
+          p_name: string
+          p_user_id: string
+        }
+        Returns: {
+          created_at: string | null
+          expires_at: string | null
+          id: number
+          key: string | null
+          key_hash: string | null
+          limited_to_apps: string[] | null
+          limited_to_orgs: string[] | null
+          mode: Database["public"]["Enums"]["key_mode"]
+          name: string
+          rbac_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "apikeys"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       delete_accounts_marked_for_deletion: {
         Args: never
@@ -3773,6 +3827,53 @@ export type Database = {
         Returns: string
       }
       record_email_otp_verified: { Args: never; Returns: string }
+      refresh_orgs_has_usage_credits: { Args: never; Returns: undefined }
+      regenerate_hashed_apikey: {
+        Args: { p_apikey_id: number }
+        Returns: {
+          created_at: string | null
+          expires_at: string | null
+          id: number
+          key: string | null
+          key_hash: string | null
+          limited_to_apps: string[] | null
+          limited_to_orgs: string[] | null
+          mode: Database["public"]["Enums"]["key_mode"]
+          name: string
+          rbac_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "apikeys"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      regenerate_hashed_apikey_for_user: {
+        Args: { p_apikey_id: number; p_user_id: string }
+        Returns: {
+          created_at: string | null
+          expires_at: string | null
+          id: number
+          key: string | null
+          key_hash: string | null
+          limited_to_apps: string[] | null
+          limited_to_orgs: string[] | null
+          mode: Database["public"]["Enums"]["key_mode"]
+          name: string
+          rbac_id: string
+          updated_at: string | null
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "apikeys"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       reject_access_due_to_2fa: {
         Args: { org_id: string; user_id: string }
         Returns: boolean
@@ -3834,19 +3935,7 @@ export type Database = {
           isSetofReturn: false
         }
       }
-      set_bandwidth_exceeded_by_org: {
-        Args: { disabled: boolean; org_id: string }
-        Returns: undefined
-      }
       set_build_time_exceeded_by_org: {
-        Args: { disabled: boolean; org_id: string }
-        Returns: undefined
-      }
-      set_mau_exceeded_by_org: {
-        Args: { disabled: boolean; org_id: string }
-        Returns: undefined
-      }
-      set_storage_exceeded_by_org: {
         Args: { disabled: boolean; org_id: string }
         Returns: undefined
       }
@@ -3935,6 +4024,7 @@ export type Database = {
         | "reset"
         | "set"
         | "get"
+        | "customIdBlocked"
         | "set_fail"
         | "update_fail"
         | "download_fail"
@@ -4189,6 +4279,7 @@ export const Constants = {
         "reset",
         "set",
         "get",
+        "customIdBlocked",
         "set_fail",
         "update_fail",
         "download_fail",

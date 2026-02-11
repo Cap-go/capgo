@@ -92,6 +92,10 @@
           "zone_name": "capgo.app"
         },
         {
+          "pattern": "plugin.jp.capgo.app/files*",
+          "zone_name": "capgo.app"
+        },
+        {
           "pattern": "plugin.me.capgo.app/files*",
           "zone_name": "capgo.app"
         },

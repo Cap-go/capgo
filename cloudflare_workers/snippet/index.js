@@ -287,9 +287,10 @@ export default {
       NORTH_AMERICA: 'https://plugin.na.capgo.app', // NA DB
       SOUTH_AMERICA: 'https://plugin.sa.capgo.app', // SA DB
       OCEANIA: 'https://plugin.oc.capgo.app', // OC DB
-      AFRICA: 'https://plugin.af.capgo.app', // AS_INDIA DB (via smart placement)
-      MIDDLE_EAST: 'https://plugin.me.capgo.app', // AS_INDIA DB (via smart placement)
-      HONG_KONG: 'https://plugin.hk.capgo.app', // AS_JAPAN DB (Tokyo)
+      AFRICA: 'https://plugin.af.capgo.app', // Google AF DB (africa-south1)
+      MIDDLE_EAST: 'https://plugin.me.capgo.app', // Google ME DB (me-central1)
+      HONG_KONG: 'https://plugin.hk.capgo.app', // Google HK DB (asia-east2)
+      JAPAN: 'https://plugin.jp.capgo.app', // AS_JAPAN DB (Tokyo)
     }
 
     // Zone codes used for routing decisions
@@ -302,6 +303,7 @@ export default {
       AFRICA: 'AF',
       MIDDLE_EAST: 'ME',
       HONG_KONG: 'HK',
+      JAPAN: 'JP',
     }
 
     // Maps Cloudflare colo (data center) codes to zones
@@ -319,7 +321,7 @@ export default {
       ALA: ZONE.ASIA, // Almaty, Kazakhstan
       ALG: ZONE.AFRICA, // Algiers, Algeria
       AMD: ZONE.ASIA, // Ahmedabad, India
-      AMM: ZONE.EUROPE, // Amman, Jordan
+      AMM: ZONE.MIDDLE_EAST, // Amman, Jordan
       AMS: ZONE.EUROPE, // Amsterdam, Netherlands
       ANC: ZONE.NORTH_AMERICA, // Anchorage, USA
       ARI: ZONE.SOUTH_AMERICA, // Arica, Chile
@@ -330,7 +332,7 @@ export default {
       ATH: ZONE.EUROPE, // Athens, Greece
       ATL: ZONE.NORTH_AMERICA, // Atlanta, USA
       AUS: ZONE.NORTH_AMERICA, // Austin, USA
-      BAH: ZONE.EUROPE, // Manama, Bahrain
+      BAH: ZONE.MIDDLE_EAST, // Manama, Bahrain
       BAQ: ZONE.SOUTH_AMERICA, // Barranquilla, Colombia
       BCN: ZONE.EUROPE, // Barcelona, Spain
       BEG: ZONE.EUROPE, // Belgrade, Serbia
@@ -419,7 +421,11 @@ export default {
       FRA: ZONE.EUROPE, // Frankfurt, Germany
       FRU: ZONE.ASIA, // Bishkek, Kyrgyzstan
       FSD: ZONE.NORTH_AMERICA, // Sioux Falls, USA
-      FUK: ZONE.HONG_KONG, // Fukuoka, Japan
+      FUK: ZONE.JAPAN, // Fukuoka, Japan
+      CTS: ZONE.JAPAN, // Sapporo, Japan
+      NGO: ZONE.JAPAN, // Nagoya, Japan
+      SDJ: ZONE.JAPAN, // Sendai, Japan
+      KOJ: ZONE.JAPAN, // Kagoshima, Japan
       FUO: ZONE.HONG_KONG, // Foshan, China
       GBE: ZONE.AFRICA, // Gaborone, Botswana
       GDL: ZONE.NORTH_AMERICA, // Guadalajara, Mexico
@@ -445,10 +451,10 @@ export default {
       HNL: ZONE.NORTH_AMERICA, // Honolulu, USA
       HRE: ZONE.AFRICA, // Harare, Zimbabwe
       HYD: ZONE.ASIA, // Hyderabad, India
-      HYN: ZONE.ASIA, // Taizhou, China
+      HYN: ZONE.HONG_KONG, // Taizhou, China
       IAD: ZONE.NORTH_AMERICA, // Ashburn (Washington DC), USA
       IAH: ZONE.NORTH_AMERICA, // Houston, USA
-      ICN: ZONE.HONG_KONG, // Seoul, South Korea
+      ICN: ZONE.JAPAN, // Seoul, South Korea (North Asia -> Japan)
       IND: ZONE.NORTH_AMERICA, // Indianapolis, USA
       ISB: ZONE.ASIA, // Islamabad, Pakistan
       IST: ZONE.EUROPE, // Istanbul, Turkey
@@ -463,17 +469,17 @@ export default {
       JNB: ZONE.AFRICA, // Johannesburg, South Africa
       JOG: ZONE.HONG_KONG, // Yogyakarta, Indonesia
       JOI: ZONE.SOUTH_AMERICA, // Joinville, Brazil
-      JXG: ZONE.ASIA, // Jiaxing, China
+      JXG: ZONE.HONG_KONG, // Jiaxing, China
       KBP: ZONE.EUROPE, // Kyiv, Ukraine
       KCH: ZONE.HONG_KONG, // Kuching, Malaysia
       KEF: ZONE.EUROPE, // Reykjavík, Iceland
       KGL: ZONE.AFRICA, // Kigali, Rwanda
-      KHH: ZONE.HONG_KONG, // Kaohsiung City, Taiwan
+      KHH: ZONE.JAPAN, // Kaohsiung City, Taiwan (North Asia -> Japan)
       KHI: ZONE.ASIA, // Karachi, Pakistan
       KHN: ZONE.HONG_KONG, // Nanchang, China
       KIN: ZONE.NORTH_AMERICA, // Kingston, Jamaica
       KIV: ZONE.EUROPE, // Chișinău, Moldova
-      KIX: ZONE.HONG_KONG, // Osaka, Japan
+      KIX: ZONE.JAPAN, // Osaka, Japan
       KJA: ZONE.ASIA, // Krasnoyarsk, Russia
       KMG: ZONE.HONG_KONG, // Kunming, China
       KNU: ZONE.ASIA, // Kanpur, India
@@ -525,9 +531,9 @@ export default {
       NOU: ZONE.OCEANIA, // Noumea, New Caledonia
       NQN: ZONE.SOUTH_AMERICA, // Neuquen, Argentina
       NQZ: ZONE.ASIA, // Astana, Kazakhstan
-      NRT: ZONE.HONG_KONG, // Tokyo Narita, Japan
+      NRT: ZONE.JAPAN, // Tokyo Narita, Japan
       NVT: ZONE.SOUTH_AMERICA, // Timbo (Navegantes), Brazil
-      OKA: ZONE.HONG_KONG, // Naha (Okinawa), Japan
+      OKA: ZONE.JAPAN, // Naha (Okinawa), Japan
       OKC: ZONE.NORTH_AMERICA, // Oklahoma City, USA
       OMA: ZONE.NORTH_AMERICA, // Omaha, USA
       ORD: ZONE.NORTH_AMERICA, // Chicago, USA
@@ -602,13 +608,13 @@ export default {
       TNA: ZONE.HONG_KONG, // Zibo (Jinan), China
       TNR: ZONE.AFRICA, // Antananarivo, Madagascar
       TPA: ZONE.NORTH_AMERICA, // Tampa, USA
-      TPE: ZONE.HONG_KONG, // Taipei, Taiwan
+      TPE: ZONE.JAPAN, // Taipei, Taiwan (North Asia -> Japan)
       TUN: ZONE.AFRICA, // Tunis, Tunisia
       TXL: ZONE.EUROPE, // Berlin, Germany
       TYN: ZONE.HONG_KONG, // Yangquan (Taiyuan), China
       UDI: ZONE.SOUTH_AMERICA, // Uberlandia, Brazil
       UIO: ZONE.SOUTH_AMERICA, // Quito, Ecuador
-      ULN: ZONE.ASIA, // Ulaanbaatar, Mongolia
+      ULN: ZONE.JAPAN, // Ulaanbaatar, Mongolia (North Asia -> Japan)
       URT: ZONE.HONG_KONG, // Surat Thani, Thailand
       VCP: ZONE.SOUTH_AMERICA, // Campinas, Brazil
       VIE: ZONE.EUROPE, // Vienna, Austria
@@ -620,7 +626,7 @@ export default {
       XAP: ZONE.SOUTH_AMERICA, // Chapeco, Brazil
       XFN: ZONE.HONG_KONG, // Xiangyang, China
       XIY: ZONE.HONG_KONG, // Baoji (Xi'an), China
-      XNH: ZONE.HONG_KONG, // Nasiriyah, Iraq
+      XNH: ZONE.MIDDLE_EAST, // Nasiriyah, Iraq
       XNN: ZONE.HONG_KONG, // Xining, China
       YHZ: ZONE.NORTH_AMERICA, // Halifax, Canada
       YOW: ZONE.NORTH_AMERICA, // Ottawa, Canada
@@ -637,7 +643,8 @@ export default {
 
     // Fallback order for each zone
     const zoneFallbackUrls = {
-      [ZONE.HONG_KONG]: [WORKER_URL.HONG_KONG, WORKER_URL.ASIA, WORKER_URL.EUROPE],
+      [ZONE.HONG_KONG]: [WORKER_URL.HONG_KONG, WORKER_URL.JAPAN, WORKER_URL.ASIA],
+      [ZONE.JAPAN]: [WORKER_URL.JAPAN, WORKER_URL.HONG_KONG, WORKER_URL.ASIA],
       [ZONE.ASIA]: [WORKER_URL.ASIA, WORKER_URL.HONG_KONG, WORKER_URL.EUROPE],
       [ZONE.AFRICA]: [WORKER_URL.AFRICA, WORKER_URL.ASIA, WORKER_URL.EUROPE],
       [ZONE.MIDDLE_EAST]: [WORKER_URL.MIDDLE_EAST, WORKER_URL.ASIA, WORKER_URL.EUROPE],
