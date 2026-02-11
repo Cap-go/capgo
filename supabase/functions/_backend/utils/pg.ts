@@ -224,6 +224,22 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
       cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_SA for read-only' })
       return c.env.HYPERDRIVE_CAPGO_PS_SA.connectionString
     }
+    // Google Cloud Hyperdrive read replica routing
+    if (c.env.HYPERDRIVE_CAPGO_GG_ME && dbRegion === 'ME') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_GOOGLE_ME')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_GOOGLE_ME for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_GG_ME.connectionString
+    }
+    if (c.env.HYPERDRIVE_CAPGO_GG_AF && dbRegion === 'AF') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_GOOGLE_AF')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_GOOGLE_AF for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_GG_AF.connectionString
+    }
+    if (c.env.HYPERDRIVE_CAPGO_GG_HK && dbRegion === 'HK') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_GOOGLE_HK')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_GOOGLE_HK for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_GG_HK.connectionString
+    }
   }
 
   // Fallback to single Hyperdrive if available
@@ -511,28 +527,20 @@ export async function getAppOwnerPostgres(
   appId: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
-): Promise<{ owner_org: string, orgs: { created_by: string, id: string, management_email: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number, expose_metadata: boolean, allow_device_custom_id: boolean } | null> {
-  const isReplicaDb = () => {
-    const src = c.res.headers.get('X-Database-Source') ?? ''
-    // getDatabaseURL() sets X-Database-Source to identify Hyperdrive/PlanetScale
-    // read-replica routing vs primary/Supabase pooler usage.
-    return src.includes('HYPERDRIVE') || src.includes('PLANETSCALE') || src.includes('_PS_')
-  }
-
-  const queryOnce = async (client: ReturnType<typeof getDrizzleClient>) => {
+): Promise<{ owner_org: string, orgs: { created_by: string, id: string, management_email: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number, expose_metadata: boolean } | null> {
+  try {
+    if (actions.length === 0)
+      return null
     const orgAlias = alias(schema.orgs, 'orgs')
     const planExpression = buildPlanValidationExpression(actions, schema.apps.owner_org)
 
-    return client
+    const appOwner = await drizzleClient
       .select({
         owner_org: schema.apps.owner_org,
         plan_valid: planExpression,
         channel_device_count: schema.apps.channel_device_count,
         manifest_bundle_count: schema.apps.manifest_bundle_count,
         expose_metadata: schema.apps.expose_metadata,
-        // Replicas may lag schema changes. Read via to_jsonb(row)->>... so the
-        // query still parses even if the column doesn't exist yet.
-        allow_device_custom_id: sql<boolean>`COALESCE((to_jsonb(apps) ->> 'allow_device_custom_id')::boolean, true)`,
         orgs: {
           created_by: orgAlias.created_by,
           id: orgAlias.id,
@@ -543,40 +551,13 @@ export async function getAppOwnerPostgres(
       .where(eq(schema.apps.app_id, appId))
       .innerJoin(orgAlias, eq(schema.apps.owner_org, orgAlias.id))
       .limit(1)
-      .then(data => data[0] ?? null)
-  }
+      .then(data => data[0])
 
-  if (actions.length === 0)
-    return null
-
-  try {
-    return await queryOnce(drizzleClient)
+    return appOwner
   }
   catch (e: unknown) {
-    // Replica outages or permission/schema mismatches should not downgrade paying customers
-    // to on-prem by accident. Retry once against the primary DB before giving up.
     logPgError(c, 'getAppOwnerPostgres', e)
-
-    if (!isReplicaDb()) {
-      cloudlog({ requestId: c.get('requestId'), message: 'getAppOwnerPostgres skipping primary retry (already on primary)', appId })
-      return null
-    }
-
-    let primaryPgClient: ReturnType<typeof getPgClient> | undefined
-    try {
-      cloudlog({ requestId: c.get('requestId'), message: 'getAppOwnerPostgres retrying on primary DB', appId })
-      primaryPgClient = getPgClient(c, false)
-      const primaryDrizzle = getDrizzleClient(primaryPgClient)
-      return await queryOnce(primaryDrizzle)
-    }
-    catch (e2: unknown) {
-      logPgError(c, 'getAppOwnerPostgres.primaryRetry', e2)
-      return null
-    }
-    finally {
-      if (primaryPgClient)
-        await closeClient(c, primaryPgClient)
-    }
+    return null
   }
 }
 

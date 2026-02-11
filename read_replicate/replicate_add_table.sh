@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ============================================================================
-# Add a new table to existing PlanetScale replication
+# Add a new table to existing read-replica replication (PlanetScale + Google)
 # Usage: ./replicate_add_table.sh <table_name>
 # ============================================================================
 
@@ -18,7 +18,7 @@ TABLE_NAME="$1"
 DUMP_DIR="${SCRIPT_DIR}/dumps"
 mkdir -p "$DUMP_DIR"
 
-echo "==> Adding table '${TABLE_NAME}' to PlanetScale replication..."
+echo "==> Adding table '${TABLE_NAME}' to read replica replication..."
 
 # -------- Load Config --------
 ENV_FILE="${SCRIPT_DIR}/../internal/cloudflare/.env.prod"
@@ -31,12 +31,42 @@ if [[ -f "$ENV_FILE" ]]; then
   PLANETSCALE_OC=$(grep '^PLANETSCALE_OC=' "$ENV_FILE" | cut -d'=' -f2- || true)
   PLANETSCALE_AS_INDIA=$(grep '^PLANETSCALE_AS_INDIA=' "$ENV_FILE" | cut -d'=' -f2- || true)
   PLANETSCALE_AS_JAPAN=$(grep '^PLANETSCALE_AS_JAPAN=' "$ENV_FILE" | cut -d'=' -f2- || true)
+
+  GOOGLE_HK=$(grep '^GOOGLE_HK=' "$ENV_FILE" | cut -d'=' -f2- || true)
+  GOOGLE_ME=$(grep '^GOOGLE_ME=' "$ENV_FILE" | cut -d'=' -f2- || true)
+  GOOGLE_AF=$(grep '^GOOGLE_AF=' "$ENV_FILE" | cut -d'=' -f2- || true)
+
   DB_URL=$(grep '^MAIN_SUPABASE_DB_URL=' "$ENV_FILE" | cut -d'=' -f2-)
   DB_URL="${DB_URL//ssl=false/sslmode=disable}"
 else
   echo "Error: $ENV_FILE not found"
   exit 1
 fi
+
+# Ensure sslrootcert=system is present for libpq when using verify modes.
+# Postgres 17+ rejects sslrootcert=system when sslmode is "require" (weak mode).
+ensure_sslrootcert_system() {
+  local url="$1"
+  if [[ "$url" == *"sslmode=require"* ]]; then
+    printf "%s" "$url"
+    return 0
+  fi
+  if [[ "$url" == *"sslrootcert="* ]]; then
+    printf "%s" "$url"
+    return 0
+  fi
+  if [[ "$url" == *"?"* ]]; then
+    printf "%s" "${url}&sslrootcert=system"
+  else
+    printf "%s" "${url}?sslrootcert=system"
+  fi
+}
+
+# Extract hostname from a postgres URL (handles host:port, host/db, querystring)
+extract_host() {
+  local url="$1"
+  echo "$url" | sed -E 's|.*@([^/:?]+).*|\1|'
+}
 
 # Parse source connection
 SOURCE_USER=$(echo "$DB_URL" | sed -E 's|postgresql://([^:]+):.*|\1|')
@@ -61,16 +91,19 @@ PUBLICATION_NAME='planetscale_replicate'
 
 # -------- Region Selection --------
 echo ""
-echo "Select PlanetScale region:"
-echo "  1) NA (North America)"
-echo "  2) EU (Europe)"
-echo "  3) SA (South America)"
-echo "  4) OC (Oceania)"
-echo "  5) AS_INDIA (Asia - India)"
-echo "  6) AS_JAPAN (Asia - Japan)"
-echo "  7) ALL regions"
+echo "Select read replica target:"
+echo "  1) PlanetScale NA (North America)"
+echo "  2) PlanetScale EU (Europe)"
+echo "  3) PlanetScale SA (South America)"
+echo "  4) PlanetScale OC (Oceania)"
+echo "  5) PlanetScale AS_INDIA (Asia - India)"
+echo "  6) PlanetScale AS_JAPAN (Asia - Japan)"
+echo "  7) Google HK (Hong Kong)"
+echo "  8) Google ME (Middle East)"
+echo "  9) Google AF (Africa)"
+echo "  10) ALL targets"
 echo ""
-read -rp "Enter choice [1-7]: " REGION_CHOICE
+read -rp "Enter choice [1-10]: " REGION_CHOICE
 
 REGIONS=()
 case "$REGION_CHOICE" in
@@ -80,7 +113,10 @@ case "$REGION_CHOICE" in
   4) REGIONS=("PLANETSCALE_OC") ;;
   5) REGIONS=("PLANETSCALE_AS_INDIA") ;;
   6) REGIONS=("PLANETSCALE_AS_JAPAN") ;;
-  7) REGIONS=("PLANETSCALE_NA" "PLANETSCALE_EU" "PLANETSCALE_SA" "PLANETSCALE_OC" "PLANETSCALE_AS_INDIA" "PLANETSCALE_AS_JAPAN") ;;
+  7) REGIONS=("GOOGLE_HK") ;;
+  8) REGIONS=("GOOGLE_ME") ;;
+  9) REGIONS=("GOOGLE_AF") ;;
+  10) REGIONS=("PLANETSCALE_NA" "PLANETSCALE_EU" "PLANETSCALE_SA" "PLANETSCALE_OC" "PLANETSCALE_AS_INDIA" "PLANETSCALE_AS_JAPAN" "GOOGLE_HK" "GOOGLE_ME" "GOOGLE_AF") ;;
   *) echo "Invalid choice"; exit 1 ;;
 esac
 
@@ -178,13 +214,26 @@ for REGION_VAR in "${REGIONS[@]}"; do
     continue
   fi
 
-  TARGET_DB_URL="${DB_T}&sslrootcert=system"
+  # Google (Cloud SQL) usually can't use sslmode=verify-full with IP hosts out-of-the-box.
+  if [[ "$REGION_VAR" == GOOGLE_* && "$DB_T" == *"sslmode=verify-full"* ]]; then
+    echo "==> WARNING: ${REGION_VAR} uses sslmode=verify-full with an IP host; this typically fails on Cloud SQL."
+    echo "==> Downgrading to sslmode=require (encrypted, no cert verification)."
+    DB_T="${DB_T/sslmode=verify-full/sslmode=require}"
+  fi
 
-  # Extract region name from host
-  host=${DB_T#*@}
-  host=${host%%:*}
-  REGION=${host%%.*}
+  TARGET_DB_URL="$(ensure_sslrootcert_system "$DB_T")"
+
+  # Extract region name from host (PlanetScale DNS) or env key (Google IPs)
+  host="$(extract_host "$DB_T")"
+  if [[ "$host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ && "$REGION_VAR" == GOOGLE_* ]]; then
+    REGION="google_${REGION_VAR#GOOGLE_}"
+  else
+    REGION="${host%%.*}"
+  fi
   REGION="${REGION//-/_}"
+  REGION="${REGION//[^A-Za-z0-9_]/_}"
+  # bash 3.2 (macOS default) doesn't support ${var,,}
+  REGION="$(printf '%s' "$REGION" | tr '[:upper:]' '[:lower:]')"
   SUBSCRIPTION_NAME="planetscale_subscription_${REGION}"
 
   echo ""

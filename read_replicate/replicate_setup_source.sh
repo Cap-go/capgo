@@ -2,11 +2,11 @@
 set -euo pipefail
 
 # ============================================================================
-# Setup Supabase (source) for PlanetScale replication
-# Creates/recreates the publication needed for logical replication
+# Setup Supabase (source) for read-replica replication (PlanetScale + Google)
+# Creates/recreates the publication needed for logical replication.
 # ============================================================================
 
-echo "==> Setting up Supabase source for PlanetScale replication..."
+echo "==> Setting up Supabase source for read-replica replication..."
 
 # Load source DB URL from .env.prod
 ENV_FILE="$(dirname "$0")/../internal/cloudflare/.env.prod"
@@ -203,4 +203,4 @@ echo "========================================"
 echo ""
 echo "Next steps:"
 echo "  1. Run ./replicate_prepare.sh to generate schema SQL"
-echo "  2. Run ./replicate_to_planetscale.sh to sync to PlanetScale"
+echo "  2. Run ./replicate_to_replica.sh to sync to the read replica (PlanetScale + Google)"

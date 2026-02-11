@@ -3,7 +3,10 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-# Load PlanetScale connection strings from .env.prod
+# Load read-replica connection strings from .env.prod
+# Supported targets:
+# - PlanetScale: PLANETSCALE_*
+# - Google: GOOGLE_*
 ENV_FILE="$(dirname "$0")/../internal/cloudflare/.env.prod"
 
 if [[ -f "$ENV_FILE" ]]; then
@@ -13,10 +16,33 @@ if [[ -f "$ENV_FILE" ]]; then
   PLANETSCALE_OC=$(grep '^PLANETSCALE_OC=' "$ENV_FILE" | cut -d'=' -f2- || true)
   PLANETSCALE_AS_INDIA=$(grep '^PLANETSCALE_AS_INDIA=' "$ENV_FILE" | cut -d'=' -f2- || true)
   PLANETSCALE_AS_JAPAN=$(grep '^PLANETSCALE_AS_JAPAN=' "$ENV_FILE" | cut -d'=' -f2- || true)
+
+  GOOGLE_HK=$(grep '^GOOGLE_HK=' "$ENV_FILE" | cut -d'=' -f2- || true)
+  GOOGLE_ME=$(grep '^GOOGLE_ME=' "$ENV_FILE" | cut -d'=' -f2- || true)
+  GOOGLE_AF=$(grep '^GOOGLE_AF=' "$ENV_FILE" | cut -d'=' -f2- || true)
 else
   echo "Error: $ENV_FILE not found"
   exit 1
 fi
+
+# Ensure sslrootcert=system is present for libpq when using verify modes.
+# Postgres 17+ rejects sslrootcert=system when sslmode is "require" (weak mode).
+ensure_sslrootcert_system() {
+  local url="$1"
+  if [[ "$url" == *"sslmode=require"* ]]; then
+    printf "%s" "$url"
+    return 0
+  fi
+  if [[ "$url" == *"sslrootcert="* ]]; then
+    printf "%s" "$url"
+    return 0
+  fi
+  if [[ "$url" == *"?"* ]]; then
+    printf "%s" "${url}&sslrootcert=system"
+  else
+    printf "%s" "${url}?sslrootcert=system"
+  fi
+}
 
 # Tables to check
 TABLES=(
@@ -33,15 +59,18 @@ TABLES=(
 
 # Region selection
 echo ""
-echo "Select PlanetScale region:"
-echo "  1) NA (North America)"
-echo "  2) EU (Europe)"
-echo "  3) SA (South America)"
-echo "  4) OC (Oceania)"
-echo "  5) AS_INDIA (Asia - India)"
-echo "  6) AS_JAPAN (Asia - Japan)"
+echo "Select read replica target:"
+echo "  1) PlanetScale NA (North America)"
+echo "  2) PlanetScale EU (Europe)"
+echo "  3) PlanetScale SA (South America)"
+echo "  4) PlanetScale OC (Oceania)"
+echo "  5) PlanetScale AS_INDIA (Asia - India)"
+echo "  6) PlanetScale AS_JAPAN (Asia - Japan)"
+echo "  7) Google HK (Hong Kong)"
+echo "  8) Google ME (Middle East)"
+echo "  9) Google AF (Africa)"
 echo ""
-read -rp "Enter choice [1-6]: " REGION_CHOICE
+read -rp "Enter choice [1-9]: " REGION_CHOICE
 
 case "$REGION_CHOICE" in
   1) TARGET_DB_URL="$PLANETSCALE_NA"; SELECTED_REGION="PLANETSCALE_NA" ;;
@@ -50,6 +79,9 @@ case "$REGION_CHOICE" in
   4) TARGET_DB_URL="$PLANETSCALE_OC"; SELECTED_REGION="PLANETSCALE_OC" ;;
   5) TARGET_DB_URL="$PLANETSCALE_AS_INDIA"; SELECTED_REGION="PLANETSCALE_AS_INDIA" ;;
   6) TARGET_DB_URL="$PLANETSCALE_AS_JAPAN"; SELECTED_REGION="PLANETSCALE_AS_JAPAN" ;;
+  7) TARGET_DB_URL="$GOOGLE_HK"; SELECTED_REGION="GOOGLE_HK" ;;
+  8) TARGET_DB_URL="$GOOGLE_ME"; SELECTED_REGION="GOOGLE_ME" ;;
+  9) TARGET_DB_URL="$GOOGLE_AF"; SELECTED_REGION="GOOGLE_AF" ;;
   *) echo "Invalid choice"; exit 1 ;;
 esac
 
@@ -58,14 +90,14 @@ if [[ -z "$TARGET_DB_URL" ]]; then
   exit 1
 fi
 
-# Ensure sslrootcert=system is in the URL
-if [[ "$TARGET_DB_URL" != *"sslrootcert=system"* ]]; then
-  if [[ "$TARGET_DB_URL" == *"?"* ]]; then
-    TARGET_DB_URL="${TARGET_DB_URL}&sslrootcert=system"
-  else
-    TARGET_DB_URL="${TARGET_DB_URL}?sslrootcert=system"
-  fi
+# Google (Cloud SQL) usually can't use sslmode=verify-full with IP hosts out-of-the-box.
+if [[ "$SELECTED_REGION" == GOOGLE_* && "$TARGET_DB_URL" == *"sslmode=verify-full"* ]]; then
+  echo "==> WARNING: ${SELECTED_REGION} uses sslmode=verify-full with an IP host; this typically fails on Cloud SQL."
+  echo "==> Downgrading to sslmode=require (encrypted, no cert verification)."
+  TARGET_DB_URL="${TARGET_DB_URL/sslmode=verify-full/sslmode=require}"
 fi
+
+TARGET_DB_URL="$(ensure_sslrootcert_system "$TARGET_DB_URL")"
 
 echo ""
 echo "========================================"
