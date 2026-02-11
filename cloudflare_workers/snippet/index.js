@@ -451,7 +451,7 @@ export default {
       HNL: ZONE.NORTH_AMERICA, // Honolulu, USA
       HRE: ZONE.AFRICA, // Harare, Zimbabwe
       HYD: ZONE.ASIA, // Hyderabad, India
-      HYN: ZONE.ASIA, // Taizhou, China
+      HYN: ZONE.HONG_KONG, // Taizhou, China
       IAD: ZONE.NORTH_AMERICA, // Ashburn (Washington DC), USA
       IAH: ZONE.NORTH_AMERICA, // Houston, USA
       ICN: ZONE.JAPAN, // Seoul, South Korea (North Asia -> Japan)
@@ -469,7 +469,7 @@ export default {
       JNB: ZONE.AFRICA, // Johannesburg, South Africa
       JOG: ZONE.HONG_KONG, // Yogyakarta, Indonesia
       JOI: ZONE.SOUTH_AMERICA, // Joinville, Brazil
-      JXG: ZONE.ASIA, // Jiaxing, China
+      JXG: ZONE.HONG_KONG, // Jiaxing, China
       KBP: ZONE.EUROPE, // Kyiv, Ukraine
       KCH: ZONE.HONG_KONG, // Kuching, Malaysia
       KEF: ZONE.EUROPE, // Reykjavík, Iceland
