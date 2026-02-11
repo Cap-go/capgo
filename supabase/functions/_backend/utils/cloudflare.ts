@@ -557,10 +557,13 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
   if (params.deviceIds?.length) {
     cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds: params.deviceIds })
     if (params.deviceIds.length === 1) {
-      innerConditions.push(`blob1 = '${params.deviceIds[0]}'`)
+      // Escape single quotes to prevent SQL injection
+      const safeDeviceId = params.deviceIds[0].replace(/'/g, `''`)
+      innerConditions.push(`blob1 = '${safeDeviceId}'`)
     }
     else {
-      const devicesList = params.deviceIds.map(id => `'${id}'`).join(', ')
+      // Escape single quotes to prevent SQL injection
+      const devicesList = params.deviceIds.map(id => `'${id.replace(/'/g, `''`)}'`).join(', ')
       innerConditions.push(`blob1 IN (${devicesList})`)
     }
   }
@@ -574,7 +577,8 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
 
   if (params.search) {
     cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
-    const searchLower = params.search.toLowerCase()
+    // Escape single quotes to prevent SQL injection
+    const searchLower = params.search.toLowerCase().replace(/'/g, `''`)
     if (params.deviceIds?.length) {
       outerConditions.push(`position('${searchLower}' IN toLower(custom_id)) > 0`)
     }
@@ -585,7 +589,9 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
   }
 
   if (params.version_name) {
-    outerConditions.push(`version_name = '${params.version_name}'`)
+    // Escape single quotes to prevent SQL injection
+    const safeVersionName = params.version_name.replace(/'/g, `''`)
+    outerConditions.push(`version_name = '${safeVersionName}'`)
   }
 
   // Cursor-based pagination - must filter on aggregated updated_at
@@ -593,7 +599,10 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
     // Cursor format: "timestamp|device_id"
     const [cursorTime, cursorDeviceId] = params.cursor.split('|')
     if (cursorTime && cursorDeviceId) {
-      outerConditions.push(`(updated_at < toDateTime('${cursorTime}') OR (updated_at = toDateTime('${cursorTime}') AND device_id > '${cursorDeviceId}'))`)
+      // Escape single quotes to prevent SQL injection
+      const safeCursorTime = cursorTime.replace(/'/g, `''`)
+      const safeCursorDeviceId = cursorDeviceId.replace(/'/g, `''`)
+      outerConditions.push(`(updated_at < toDateTime('${safeCursorTime}') OR (updated_at = toDateTime('${safeCursorTime}') AND device_id > '${safeCursorDeviceId}'))`)
     }
   }
 
