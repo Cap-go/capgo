@@ -235,6 +235,30 @@ describe('[GET] /private/admin_credits/org-balance/:orgId - Admin Access Control
   })
 })
 
+describe('[GET] /private/admin_credits/org-stats/:orgId - Admin Access Control', () => {
+  it('should return 401 when no authorization header is provided', async () => {
+    const response = await fetch(`${BASE_URL}/private/admin_credits/org-stats/${TEST_ORG_ID}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+    expect(response.status).toBe(401)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('no_jwt_apikey_or_subkey')
+  })
+
+  it('should return 400 not_admin when non-admin user tries to view org stats', async () => {
+    const response = await fetch(`${BASE_URL}/private/admin_credits/org-stats/${TEST_ORG_ID}`, {
+      method: 'GET',
+      headers,
+    })
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('not_admin')
+  })
+})
+
 describe('[GET] /private/admin_credits/grants-history - Admin Access Control', () => {
   it('should return 401 when no authorization header is provided', async () => {
     const response = await fetch(`${BASE_URL}/private/admin_credits/grants-history`, {
@@ -259,12 +283,32 @@ describe('[GET] /private/admin_credits/grants-history - Admin Access Control', (
   })
 })
 
+describe('[OPTIONS] /private/admin_credits/* - CORS preflight', () => {
+  it('should return CORS headers for grant preflight request', async () => {
+    const response = await fetch(`${BASE_URL}/private/admin_credits/grant`, {
+      method: 'OPTIONS',
+      headers: {
+        'Origin': 'https://example.com',
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'authorization,content-type',
+      },
+    })
+
+    expect([200, 204]).toContain(response.status)
+    expect(response.headers.get('access-control-allow-origin')).toBe('*')
+    expect(response.headers.get('access-control-allow-methods')).toContain('OPTIONS')
+    const allowHeaders = response.headers.get('access-control-allow-headers') || ''
+    expect(allowHeaders.toLowerCase()).toContain('authorization')
+  })
+})
+
 describe('admin credits - consistent error responses', () => {
   it('all endpoints should return consistent not_admin error for unauthorized users', async () => {
     const endpoints = [
       { method: 'POST', path: '/private/admin_credits/grant', body: JSON.stringify({ org_id: TEST_ORG_ID, amount: 100 }) },
       { method: 'GET', path: '/private/admin_credits/search-orgs?q=test', body: null },
       { method: 'GET', path: `/private/admin_credits/org-balance/${TEST_ORG_ID}`, body: null },
+      { method: 'GET', path: `/private/admin_credits/org-stats/${TEST_ORG_ID}`, body: null },
       { method: 'GET', path: '/private/admin_credits/grants-history', body: null },
     ]
 
@@ -286,6 +330,7 @@ describe('admin credits - consistent error responses', () => {
       { method: 'POST', path: '/private/admin_credits/grant', body: JSON.stringify({ org_id: TEST_ORG_ID, amount: 100 }) },
       { method: 'GET', path: '/private/admin_credits/search-orgs?q=test', body: null },
       { method: 'GET', path: `/private/admin_credits/org-balance/${TEST_ORG_ID}`, body: null },
+      { method: 'GET', path: `/private/admin_credits/org-stats/${TEST_ORG_ID}`, body: null },
       { method: 'GET', path: '/private/admin_credits/grants-history', body: null },
     ]
 
