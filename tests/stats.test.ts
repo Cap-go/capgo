@@ -11,6 +11,9 @@ const APP_NAME_STATS = `${APP_NAME}.${id}`
 
 // Check if we're using Cloudflare Workers (which requires sequential tests due to D1 sync)
 const USE_CLOUDFLARE = env.USE_CLOUDFLARE_WORKERS === 'true'
+// Cancelled app-status cache is only honored when Stripe is configured in the worker env.
+// CI/local Cloudflare tests typically don't configure Stripe, so we skip cache-specific tests there.
+const STRIPE_CONFIGURED = /^(sk_|rk_)/.test(env.STRIPE_SECRET_KEY || '')
 
 interface StatsRes {
   error?: string
@@ -290,7 +293,7 @@ describe('[POST] /stats', () => {
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', stripeCustomerId)
   })
 
-  const cacheIt = USE_CLOUDFLARE ? it : it.skip
+  const cacheIt = USE_CLOUDFLARE && STRIPE_CONFIGURED ? it : it.skip
   cacheIt('should use cancelled app-status cache fast-path (cloudflare)', async () => {
     const shortId = randomUUID().split('-')[0]
     const orgId = randomUUID()
