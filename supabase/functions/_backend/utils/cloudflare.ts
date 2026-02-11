@@ -20,9 +20,15 @@ export type Bindings = {
   DEVICE_INFO: AnalyticsEngineDataPoint
   DB_STOREAPPS: D1Database
   HYPERDRIVE_CAPGO_DIRECT_EU: Hyperdrive // Add Hyperdrive binding
-  HYPERDRIVE_CAPGO_PS_EU: Hyperdrive // Add Hyperdrive binding
-  HYPERDRIVE_CAPGO_PS_AS: Hyperdrive // Add Hyperdrive binding
-  HYPERDRIVE_CAPGO_PS_NA: Hyperdrive // Add Hyperdrive binding
+  HYPERDRIVE_CAPGO_PS_NA: Hyperdrive
+  HYPERDRIVE_CAPGO_PS_EU: Hyperdrive
+  HYPERDRIVE_CAPGO_PS_SA: Hyperdrive
+  HYPERDRIVE_CAPGO_PS_OC: Hyperdrive
+  HYPERDRIVE_CAPGO_PS_AS_JAPAN: Hyperdrive
+  HYPERDRIVE_CAPGO_PS_AS_INDIA: Hyperdrive
+  HYPERDRIVE_CAPGO_GG_ME: Hyperdrive
+  HYPERDRIVE_CAPGO_GG_AF: Hyperdrive
+  HYPERDRIVE_CAPGO_GG_HK: Hyperdrive
   ATTACHMENT_UPLOAD_HANDLER: DurableObjectNamespace
   ATTACHMENT_BUCKET: R2Bucket
 }
@@ -593,7 +599,9 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
   argMax(blob2, timestamp) AS version_name,
   argMax(blob3, timestamp) AS plugin_version,
   argMax(blob4, timestamp) AS os_version,
-  argMax(blob5, timestamp) AS custom_id,
+  -- Preserve the last non-empty custom_id so events that don't include it
+  -- (or blocked /stats traffic) don't clear owner-visible device metadata.
+  argMaxIf(blob5, timestamp, blob5 != '') AS custom_id,
   argMax(blob6, timestamp) AS version_build,
   argMax(blob7, timestamp) AS default_channel,
   argMax(blob8, timestamp) AS key_id,

@@ -4,35 +4,71 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # -------- Config (edit these) --------
-# Load PlanetScale connection strings from .env.prod
+# Load read-replica connection strings from .env.prod
+# Supported targets:
+# - PlanetScale: PLANETSCALE_*
+# - Google: GOOGLE_*
 ENV_FILE="$(dirname "$0")/../internal/cloudflare/.env.prod"
-echo "==> Starting replication to PlanetScale..."
+echo "==> Starting replication to read replica..."
 
 if [[ -f "$ENV_FILE" ]]; then
-  echo "==> Loading PlanetScale connection strings from $ENV_FILE"
+  echo "==> Loading connection strings from $ENV_FILE"
   PLANETSCALE_NA=$(grep '^PLANETSCALE_NA=' "$ENV_FILE" | cut -d'=' -f2- || true)
   PLANETSCALE_EU=$(grep '^PLANETSCALE_EU=' "$ENV_FILE" | cut -d'=' -f2- || true)
   PLANETSCALE_SA=$(grep '^PLANETSCALE_SA=' "$ENV_FILE" | cut -d'=' -f2- || true)
   PLANETSCALE_OC=$(grep '^PLANETSCALE_OC=' "$ENV_FILE" | cut -d'=' -f2- || true)
   PLANETSCALE_AS_INDIA=$(grep '^PLANETSCALE_AS_INDIA=' "$ENV_FILE" | cut -d'=' -f2- || true)
   PLANETSCALE_AS_JAPAN=$(grep '^PLANETSCALE_AS_JAPAN=' "$ENV_FILE" | cut -d'=' -f2- || true)
-  echo "==> Loaded PlanetScale connection strings."
+
+  GOOGLE_HK=$(grep '^GOOGLE_HK=' "$ENV_FILE" | cut -d'=' -f2- || true)
+  GOOGLE_ME=$(grep '^GOOGLE_ME=' "$ENV_FILE" | cut -d'=' -f2- || true)
+  GOOGLE_AF=$(grep '^GOOGLE_AF=' "$ENV_FILE" | cut -d'=' -f2- || true)
+
+  echo "==> Loaded connection strings."
 else
   echo "Error: $ENV_FILE not found"
   exit 1
 fi
 
+# Ensure sslrootcert=system is present for libpq when using verify modes.
+# Postgres 17+ rejects sslrootcert=system when sslmode is "require" (weak mode).
+ensure_sslrootcert_system() {
+  local url="$1"
+  if [[ "$url" == *"sslmode=require"* ]]; then
+    printf "%s" "$url"
+    return 0
+  fi
+  if [[ "$url" == *"sslrootcert="* ]]; then
+    printf "%s" "$url"
+    return 0
+  fi
+  if [[ "$url" == *"?"* ]]; then
+    printf "%s" "${url}&sslrootcert=system"
+  else
+    printf "%s" "${url}?sslrootcert=system"
+  fi
+}
+
+# Extract hostname from a postgres URL (handles host:port, host/db, querystring)
+extract_host() {
+  local url="$1"
+  echo "$url" | sed -E 's|.*@([^/:?]+).*|\1|'
+}
+
 # Region selection
 echo ""
-echo "Select PlanetScale region:"
-echo "  1) NA (North America)"
-echo "  2) EU (Europe)"
-echo "  3) SA (South America)"
-echo "  4) OC (Oceania)"
-echo "  5) AS_INDIA (Asia - India)"
-echo "  6) AS_JAPAN (Asia - Japan)"
+echo "Select read replica target:"
+echo "  1) PlanetScale NA (North America)"
+echo "  2) PlanetScale EU (Europe)"
+echo "  3) PlanetScale SA (South America)"
+echo "  4) PlanetScale OC (Oceania)"
+echo "  5) PlanetScale AS_INDIA (Asia - India)"
+echo "  6) PlanetScale AS_JAPAN (Asia - Japan)"
+echo "  7) Google HK (Hong Kong)"
+echo "  8) Google ME (Middle East)"
+echo "  9) Google AF (Africa)"
 echo ""
-read -rp "Enter choice [1-6]: " REGION_CHOICE
+read -rp "Enter choice [1-9]: " REGION_CHOICE
 
 case "$REGION_CHOICE" in
   1) SELECTED_REGION="PLANETSCALE_NA" ;;
@@ -41,6 +77,9 @@ case "$REGION_CHOICE" in
   4) SELECTED_REGION="PLANETSCALE_OC" ;;
   5) SELECTED_REGION="PLANETSCALE_AS_INDIA" ;;
   6) SELECTED_REGION="PLANETSCALE_AS_JAPAN" ;;
+  7) SELECTED_REGION="GOOGLE_HK" ;;
+  8) SELECTED_REGION="GOOGLE_ME" ;;
+  9) SELECTED_REGION="GOOGLE_AF" ;;
   *) echo "Invalid choice"; exit 1 ;;
 esac
 
@@ -63,16 +102,33 @@ esac
 if [[ -z "$DB_T" ]]; then
   echo "Error: $SELECTED_REGION not found in $ENV_FILE"
   echo "Available variables:"
-  grep '^PLANETSCALE_' "$ENV_FILE" | cut -d'=' -f1 || echo "  (none)"
+  (grep -E '^(PLANETSCALE|GOOGLE)_' "$ENV_FILE" | cut -d'=' -f1 || true) | sed 's/^/  /'
   exit 1
 fi
 
-host=${DB_T#*@}     # remove up to @
-host=${host%%:*}    # remove :port...
-REGION=${host%%.*}  # first DNS label
-REGION="${REGION//-/_}"
+# Google (Cloud SQL) notes:
+# - The cert is signed by "Google Cloud SQL Server CA" (not in system trust store),
+# - verify-full also checks hostname; our GOOGLE_* URLs use IPs.
+# So if env uses sslmode=verify-full, downgrade to sslmode=require to keep encryption but avoid verification failure.
+if [[ "$SELECTED_REGION" == GOOGLE_* && "$DB_T" == *"sslmode=verify-full"* ]]; then
+  echo "==> WARNING: ${SELECTED_REGION} uses sslmode=verify-full with an IP host; this typically fails on Cloud SQL."
+  echo "==> Downgrading to sslmode=require (encrypted, no cert verification)."
+  DB_T="${DB_T/sslmode=verify-full/sslmode=require}"
+fi
 
-TARGET_DB_URL="${DB_T}&sslrootcert=system"
+host="$(extract_host "$DB_T")"
+# PlanetScale URLs use DNS names, Google replicas here use IPs.
+if [[ "$host" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ && "$SELECTED_REGION" == GOOGLE_* ]]; then
+  REGION="google_${SELECTED_REGION#GOOGLE_}"
+else
+  REGION="${host%%.*}"  # first DNS label
+fi
+REGION="${REGION//-/_}"
+REGION="${REGION//[^A-Za-z0-9_]/_}"
+# bash 3.2 (macOS default) doesn't support ${var,,}
+REGION="$(printf '%s' "$REGION" | tr '[:upper:]' '[:lower:]')"
+
+TARGET_DB_URL="$(ensure_sslrootcert_system "$DB_T")"
 echo "==> Using target database for region: $REGION"
 
 # Load source DB URL from .env.preprod and parse connection info
@@ -237,14 +293,14 @@ END
 \$\$;
 SQL
 
-  echo "==> Cleaning up public schema on PlanetScale (full reset)..."
+  echo "==> Cleaning up public schema on target replica (full reset)..."
   psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 <<'SQL'
 DROP SCHEMA IF EXISTS public CASCADE;
 CREATE SCHEMA public;
 GRANT ALL ON SCHEMA public TO PUBLIC;
 SQL
 
-  echo "==> Importing schema into PlanetScale..."
+  echo "==> Importing schema into target replica..."
   psql-17 "$TARGET_DB_URL" -v ON_ERROR_STOP=1 -f "schema_replicate.sql"
 
   echo "==> Ensuring publication has all tables on SOURCE..."

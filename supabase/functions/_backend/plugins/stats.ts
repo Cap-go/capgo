@@ -3,6 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import type { AppStats, StatsActions } from '../utils/types.ts'
 import { greaterOrEqual, parse } from '@std/semver'
+import { eq, sql } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
@@ -11,6 +12,7 @@ import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrgCached } from '../utils/notifications.ts'
 import { closeClient, ensurePlaceholderVersions, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
+import * as schema from '../utils/postgres_schema.ts'
 import { createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from '../utils/stats.ts'
 import { backgroundTask, deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../utils/utils.ts'
 import { ALLOWED_STATS_ACTIONS } from './stats_actions.ts'
@@ -18,6 +20,20 @@ import { ALLOWED_STATS_ACTIONS } from './stats_actions.ts'
 z.config(z.locales.en())
 
 const PLAN_ERROR = 'Cannot send stats, upgrade plan to continue to update'
+
+async function allowDeviceCustomIdFromPg(drizzleClient: ReturnType<typeof getDrizzleClient>, app_id: string): Promise<boolean> {
+  const res = await drizzleClient
+    .select({
+      // Replicas may lag schema changes. Read via to_jsonb(row)->>... so the
+      // query still parses even if the column doesn't exist yet.
+      allow_device_custom_id: sql<boolean>`COALESCE((to_jsonb(apps) ->> 'allow_device_custom_id')::boolean, true)`,
+    })
+    .from(schema.apps)
+    .where(eq(schema.apps.app_id, app_id))
+    .limit(1)
+
+  return res[0]?.allow_device_custom_id ?? true
+}
 
 export interface BatchStatsResult {
   status: 'ok' | 'error'
@@ -49,7 +65,7 @@ export const jsonRequestSchema = z.object({
   version_code: z.optional(z.string()),
   version_build: z.optional(z.string()),
   action: z.optional(z.enum(ALLOWED_STATS_ACTIONS)),
-  custom_id: z.optional(z.string()),
+  custom_id: z.optional(z.string().check(z.maxLength(36))),
   channel: z.optional(z.string()),
   defaultChannel: z.optional(z.string()),
   plugin_version: z.optional(z.string()),
@@ -69,6 +85,11 @@ interface PostResult {
 async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: AppStats): Promise<PostResult> {
   const device = makeDevice(body)
   const { app_id, action, version_name, old_version_name, plugin_version } = body
+  const rawCustomId = typeof body.custom_id === 'string' ? body.custom_id : ''
+  const requestedCustomId = rawCustomId.trim()
+  // Normalize once and use consistently for gating + persistence.
+  // Whitespace-only values are treated as "not provided".
+  device.custom_id = requestedCustomId === '' ? undefined : requestedCustomId
 
   const planActions: Array<'mau' | 'bandwidth'> = ['mau', 'bandwidth']
   const cachedStatus = await getAppStatus(c, app_id)
@@ -76,8 +97,18 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
     await onPremStats(c, app_id, action, device)
     return { success: true, isOnprem: true }
   }
+
+  const allowDeviceCustomId = device.custom_id === undefined ? true : await allowDeviceCustomIdFromPg(drizzleClient, app_id)
+
   if (cachedStatus === 'cancelled') {
-    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    const statsActions: StatsActions[] = [{ action: 'needPlanUpgrade' }]
+    // Keep behavior backward compatible (default allow=true), but allow owners to
+    // disable custom_id persistence from unauthenticated /stats traffic.
+    if (!allowDeviceCustomId && device.custom_id !== undefined) {
+      device.custom_id = undefined
+      statsActions.push({ action: 'customIdBlocked' })
+    }
+    await sendStatsAndDevice(c, device, statsActions)
     return { success: false, error: 'need_plan_upgrade', message: PLAN_ERROR }
   }
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, planActions)
@@ -89,7 +120,12 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   if (!appOwner.plan_valid) {
     await setAppStatus(c, app_id, 'cancelled')
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
-    await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
+    const upgradeActions: StatsActions[] = [{ action: 'needPlanUpgrade' }]
+    if (!allowDeviceCustomId && device.custom_id !== undefined) {
+      device.custom_id = undefined
+      upgradeActions.push({ action: 'customIdBlocked' })
+    }
+    await sendStatsAndDevice(c, device, upgradeActions)
     // Send weekly notification about missing payment (not configurable - payment related)
     backgroundTask(c, sendNotifOrgCached(c, 'org:missing_payment', {
       app_id,
@@ -100,6 +136,10 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   }
   await setAppStatus(c, app_id, 'cloud')
   const statsActions: StatsActions[] = []
+  if (!allowDeviceCustomId && device.custom_id !== undefined) {
+    device.custom_id = undefined
+    statsActions.push({ action: 'customIdBlocked' })
+  }
 
   // Extract version from composite format if present (e.g., "1.2.3:main.js" -> "1.2.3")
   // Composite format is used for file-specific failure stats
@@ -226,7 +266,17 @@ app.post('/', async (c) => {
     return simpleRateLimit({ app_id: firstAppId })
   }
 
-  const pgClient = getPgClient(c, true)
+  // When clients send a custom_id, the app-level allow flag should take effect
+  // immediately. Use a read-write (primary) connection in that case to avoid
+  // replica staleness.
+  const hasCustomId = events.some((event) => {
+    if (!event || typeof event !== 'object')
+      return false
+    const v = (event as AppStats).custom_id
+    return typeof v === 'string' && v.trim() !== ''
+  })
+
+  const pgClient = getPgClient(c, !hasCustomId)
   const drizzleClient = getDrizzleClient(pgClient!)
 
   try {
