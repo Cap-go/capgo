@@ -9,8 +9,11 @@ LIST_FILE="schema_replicate.list"
 FILTERED_LIST="schema_replicate.filtered.list"
 OUT_SQL="schema_replicate.sql"
 
-# Load DB_SB from .env.preprod
+# Load DB_SB from .env.preprod (fallback to .env.prod)
 ENV_FILE="$(dirname "$0")/../internal/cloudflare/.env.preprod"
+if [[ ! -f "$ENV_FILE" ]]; then
+  ENV_FILE="$(dirname "$0")/../internal/cloudflare/.env.prod"
+fi
 if [[ -f "$ENV_FILE" ]]; then
   DB_SB=$(grep '^MAIN_SUPABASE_DB_URL=' "$ENV_FILE" | cut -d'=' -f2-)
   # Convert ssl=false to sslmode=disable for pg_dump compatibility

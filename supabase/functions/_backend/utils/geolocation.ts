@@ -2,9 +2,9 @@ import type { Context } from 'hono'
 import { existInEnv, getEnv } from './utils.ts'
 
 // Antartica and Tor are redirected to EU in our snippet
-type ContinentsCFWorker = 'EU' | 'NA' | 'AS' | 'OC' | 'SA' | 'AF' | 'ME' | 'HK'
+type ContinentsCFWorker = 'EU' | 'NA' | 'AS' | 'OC' | 'SA' | 'AF' | 'ME' | 'HK' | 'JP'
 type RegionsAWS = 'EU' | 'NA' | 'SA' | 'AF' | 'AP' | 'ME' | 'IL' | 'CA' | 'MX'
-type DbRegionSB = 'EU' | 'NA' | 'AS_JAPAN' | 'AS_INDIA' | 'SA' | 'OC' | undefined
+type DbRegionSB = 'EU' | 'NA' | 'AS_JAPAN' | 'AS_INDIA' | 'SA' | 'OC' | 'HK' | 'ME' | 'AF' | undefined
 
 export function getContinentCF(c: Context): ContinentsCFWorker | undefined {
   if (!existInEnv(c, 'ENV_NAME')) {
@@ -38,11 +38,15 @@ export function getClientDbRegionSB(c: Context): DbRegionSB {
     case 'IL': // Israel AWS
       return 'EU'
     case 'ME': // Middle East AWS
+      return 'ME'
     case 'AF': // Africa, CF, AWS
+      return 'AF'
     case 'AS': // Asia CF
     case 'AP': // Asia Pacific AWS
       return 'AS_INDIA'
     case 'HK': // Hong Kong/China CF
+      return 'HK'
+    case 'JP': // Hong Kong/China CF
       return 'AS_JAPAN'
     case 'OC': // Oceania CF
       return 'OC'

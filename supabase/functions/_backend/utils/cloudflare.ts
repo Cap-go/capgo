@@ -23,6 +23,9 @@ export type Bindings = {
   HYPERDRIVE_CAPGO_PS_EU: Hyperdrive // Add Hyperdrive binding
   HYPERDRIVE_CAPGO_PS_AS: Hyperdrive // Add Hyperdrive binding
   HYPERDRIVE_CAPGO_PS_NA: Hyperdrive // Add Hyperdrive binding
+  HYPERDRIVE_CAPGO_GG_ME: Hyperdrive // Add Hyperdrive binding
+  HYPERDRIVE_CAPGO_GG_AF: Hyperdrive // Add Hyperdrive binding
+  HYPERDRIVE_CAPGO_GG_HK: Hyperdrive // Add Hyperdrive binding
   ATTACHMENT_UPLOAD_HANDLER: DurableObjectNamespace
   ATTACHMENT_BUCKET: R2Bucket
 }

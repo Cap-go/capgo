@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8CyWvzR9ov0rYZVjUJ71m5caBDRa0DVtT7xPLLamXeAIm9lgGQUuiLGKsLLlqi7
+\restrict C4mQCKQc2td69OZQGlL0uiSolhCv6WtfosUkv8txhO7eRMlHySNYxj32SGk8I1U
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.7 (Homebrew)
@@ -82,13 +82,13 @@ $$;
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8CyWvzR9ov0rYZVjUJ71m5caBDRa0DVtT7xPLLamXeAIm9lgGQUuiLGKsLLlqi7
+\unrestrict C4mQCKQc2td69OZQGlL0uiSolhCv6WtfosUkv8txhO7eRMlHySNYxj32SGk8I1U
 
 --
 -- PostgreSQL database dump
 --
 
-\restrict Z2cGVhjpgMgehVSpKMpZvLhy6AMojMI78KLKpnJEqagrOmYSpu9SQVMMPJ9DOp4
+\restrict ajcZRcMIM38gDqFi6EyWk4zCsNhYfisqAqePtBuGfLfn8jZEHaRKBKd4Ef3Cgll
 
 -- Dumped from database version 17.6
 -- Dumped by pg_dump version 17.7 (Homebrew)
@@ -162,7 +162,8 @@ CREATE TABLE public.apps (
     channel_device_count bigint DEFAULT 0 NOT NULL,
     manifest_bundle_count bigint DEFAULT 0 NOT NULL,
     expose_metadata boolean DEFAULT false NOT NULL,
-    allow_preview boolean DEFAULT false NOT NULL
+    allow_preview boolean DEFAULT false NOT NULL,
+    allow_device_custom_id boolean DEFAULT true NOT NULL
 );
 
 ALTER TABLE ONLY public.apps REPLICA IDENTITY FULL;
@@ -349,7 +350,8 @@ CREATE TABLE public.orgs (
     max_apikey_expiration_days integer,
     enforce_encrypted_bundles boolean DEFAULT false NOT NULL,
     required_encryption_key character varying(21) DEFAULT NULL::character varying,
-    use_new_rbac boolean DEFAULT false NOT NULL
+    use_new_rbac boolean DEFAULT false NOT NULL,
+    has_usage_credits boolean DEFAULT false NOT NULL
 );
 
 ALTER TABLE ONLY public.orgs REPLICA IDENTITY FULL;
@@ -378,7 +380,8 @@ CREATE TABLE public.stripe_info (
     bandwidth_exceeded boolean DEFAULT false,
     id integer NOT NULL,
     plan_calculated_at timestamp with time zone,
-    build_time_exceeded boolean DEFAULT false
+    build_time_exceeded boolean DEFAULT false,
+    upgraded_at timestamp with time zone
 );
 
 ALTER TABLE ONLY public.stripe_info REPLICA IDENTITY FULL;
@@ -831,5 +834,5 @@ CREATE INDEX si_customer_status_trial_idx ON public.stripe_info USING btree (cus
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Z2cGVhjpgMgehVSpKMpZvLhy6AMojMI78KLKpnJEqagrOmYSpu9SQVMMPJ9DOp4
+\unrestrict ajcZRcMIM38gDqFi6EyWk4zCsNhYfisqAqePtBuGfLfn8jZEHaRKBKd4Ef3Cgll
 
