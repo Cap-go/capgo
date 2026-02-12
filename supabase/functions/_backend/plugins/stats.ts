@@ -26,7 +26,8 @@ async function allowDeviceCustomIdFromPg(drizzleClient: ReturnType<typeof getDri
     .select({
       // Replicas may lag schema changes. Read via to_jsonb(row)->>... so the
       // query still parses even if the column doesn't exist yet.
-      allow_device_custom_id: sql<boolean>`COALESCE((to_jsonb(apps) ->> 'allow_device_custom_id')::boolean, true)`,
+      // Default to 'true' before casting to boolean to handle NULL values when column doesn't exist
+      allow_device_custom_id: sql<boolean>`COALESCE(to_jsonb(apps) ->> 'allow_device_custom_id', 'true')::boolean`,
     })
     .from(schema.apps)
     .where(eq(schema.apps.app_id, app_id))
