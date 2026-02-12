@@ -111,12 +111,12 @@ describe('expose_metadata feature', () => {
       })
 
       if (createResponse.status !== 200) {
+        const errorText = await createResponse.text()
         try {
-          const errorBody = await createResponse.json()
+          const errorBody = JSON.parse(errorText)
           console.error('App creation failed:', createResponse.status, errorBody)
         }
         catch (error) {
-          const errorText = await createResponse.text()
           console.error('App creation failed: non-JSON response', {
             status: createResponse.status,
             parseError: error,
