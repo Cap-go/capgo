@@ -21,7 +21,7 @@ import { app as files_config } from './files_config.ts'
 import { parseUploadMetadata } from './parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
 import { supabaseTusCreateHandler, supabaseTusHeadHandler, supabaseTusPatchHandler } from './supabaseTusProxy.ts'
-import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, MAX_UPLOAD_LENGTH_BYTES, toBase64, TUS_VERSION, X_CHECKSUM_SHA256 } from './util.ts'
+import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, MAX_UPLOAD_LENGTH_BYTES, toBase64, TUS_EXTENSIONS, TUS_VERSION, X_CHECKSUM_SHA256 } from './util.ts'
 
 const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 20 minutes
 
@@ -216,7 +216,7 @@ function optionsHandler(c: Context) {
     'Tus-Resumable': TUS_VERSION,
     'Tus-Version': TUS_VERSION,
     'Tus-Max-Size': MAX_UPLOAD_LENGTH_BYTES.toString(),
-    'Tus-Extension': 'creation,creation-defer-length,creation-with-upload,expiration',
+    'Tus-Extension': TUS_EXTENSIONS,
   })
 }
 
@@ -233,15 +233,17 @@ async function uploadHandler(c: Context) {
   }
 
   const handler = durableObjNs.get(durableObjNs.idFromName(normalizedRequestId))
-  cloudlog({ requestId: c.get('requestId'), message: 'upload handler - forwarding to DO', method: c.req.method, url: c.req.url })
+  cloudlog({ requestId: c.get('requestId'), message: 'upload handler - forwarding to DO', method: c.req.raw.method, url: c.req.url })
 
   // Pass requestId to DO via header so it can use it in logs
   const headers = new Headers(c.req.raw.headers)
   headers.set('X-Request-Id', c.get('requestId') || 'unknown')
 
+  const method = c.req.raw.method
   return await handler.fetch(c.req.url, {
-    body: c.req.raw.body,
-    method: c.req.method,
+    // HEAD must not forward a request body and must preserve the verb (Hono/tiny maps HEAD to GET).
+    body: method === 'HEAD' ? undefined : c.req.raw.body,
+    method,
     headers,
     signal: AbortSignal.timeout(DO_CALL_TIMEOUT),
   })
@@ -591,11 +593,17 @@ app.get(
   checkWriteAppAccess,
   async (c) => {
     const isTusRequest = c.req.header('Tus-Resumable') != null
-    const isHead = c.req.method === 'HEAD'
+    // In Hono/tiny, HEAD is routed to the GET handler. Use the raw request method.
+    const isHead = c.req.raw.method === 'HEAD'
 
-    if (isHead && isTusRequest && getRuntimeKey() !== 'workerd') {
-      cloudlog({ requestId: c.get('requestId'), message: 'Routing HEAD TUS request to supabaseTusHeadHandler' })
-      return supabaseTusHeadHandler(c)
+    if (isHead && isTusRequest) {
+      if (getRuntimeKey() !== 'workerd') {
+        cloudlog({ requestId: c.get('requestId'), message: 'Routing HEAD TUS request to supabaseTusHeadHandler' })
+        return supabaseTusHeadHandler(c)
+      }
+
+      cloudlog({ requestId: c.get('requestId'), message: 'Routing HEAD TUS request to uploadHandler (DO)' })
+      return uploadHandler(c)
     }
 
     return getHandler(c)

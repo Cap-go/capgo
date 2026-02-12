@@ -215,11 +215,6 @@ BEGIN
     RETURN 'NO_RIGHTS';
   END IF;
 
-  IF org.enforcing_2fa AND NOT public.has_2fa_enabled(auth.uid()) THEN
-    PERFORM public.pg_log('deny: SUPER_ADMIN_2FA_REQUIRED', jsonb_build_object('org_id', invite_user_to_org.org_id, 'invite_type', invite_user_to_org.invite_type, 'uid', auth.uid()));
-    RETURN 'NO_RIGHTS';
-  END IF;
-
   -- If inviting as super_admin, caller must be super_admin
   IF (invite_type = public.rbac_right_super_admin()::public.user_min_right OR invite_type = public.rbac_right_invite_super_admin()::public.user_min_right) THEN
     v_use_rbac := public.rbac_is_enabled_for_org(invite_user_to_org.org_id);
@@ -243,6 +238,11 @@ BEGIN
 
       IF NOT v_is_super_admin THEN
         PERFORM public.pg_log('deny: NO_RIGHTS_SUPER_ADMIN', jsonb_build_object('org_id', invite_user_to_org.org_id, 'invite_type', invite_user_to_org.invite_type));
+        RETURN 'NO_RIGHTS';
+      END IF;
+
+      IF org.enforcing_2fa AND NOT public.has_2fa_enabled(auth.uid()) THEN
+        PERFORM public.pg_log('deny: SUPER_ADMIN_2FA_REQUIRED', jsonb_build_object('org_id', invite_user_to_org.org_id, 'invite_type', invite_user_to_org.invite_type, 'uid', auth.uid()));
         RETURN 'NO_RIGHTS';
       END IF;
     ELSE

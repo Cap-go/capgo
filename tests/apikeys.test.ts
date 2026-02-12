@@ -244,9 +244,119 @@ describe('[PUT] /apikey/:id operations', () => {
       headers,
       body: JSON.stringify({}),
     })
-    expect(response.status).toBe(500)
+    expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toContain('failed_to_update_apikey')
+    expect(data.error).toContain('no_valid_fields_provided_for_update')
+  })
+
+  it('regenerate plain api key (key changes and old key no longer works)', async () => {
+    const createResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ name: 'temp-plain-key-regenerate', hashed: false }),
+    })
+    const createData = await createResponse.json<{ id: number, key: string }>()
+    expect(createResponse.status).toBe(200)
+    expect(typeof createData.key).toBe('string')
+
+    const oldKey = createData.key
+
+    const regenerateResponse = await fetch(`${BASE_URL}/apikey/${createData.id}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ regenerate: true }),
+    })
+    const regenerateData = await regenerateResponse.json<{ id: number, key: string }>()
+    expect(regenerateResponse.status).toBe(200)
+    expect(regenerateData.id).toBe(createData.id)
+    expect(typeof regenerateData.key).toBe('string')
+    expect(regenerateData.key).not.toBe(oldKey)
+
+    // Old key must no longer authenticate.
+    const oldAuthHeaders = { 'Content-Type': 'application/json', Authorization: oldKey }
+    const oldAuthResponse = await fetch(`${BASE_URL}/apikey`, { method: 'GET', headers: oldAuthHeaders })
+    expect(oldAuthResponse.status).toBe(401)
+
+    // New key must authenticate.
+    const newAuthHeaders = { 'Content-Type': 'application/json', Authorization: regenerateData.key }
+    const newAuthResponse = await fetch(`${BASE_URL}/apikey`, { method: 'GET', headers: newAuthHeaders })
+    expect(newAuthResponse.status).toBe(200)
+
+    await fetch(`${BASE_URL}/apikey/${createData.id}`, { method: 'DELETE', headers })
+  })
+
+  it('regenerate hashed api key (key changes and remains hashed in DB)', async () => {
+    const createResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ name: 'temp-hashed-key-regenerate', hashed: true }),
+    })
+    const createData = await createResponse.json<{ id: number, key: string, key_hash: string }>()
+    expect(createResponse.status).toBe(200)
+
+    const oldKey = createData.key
+    const oldHash = createData.key_hash
+
+    const regenerateResponse = await fetch(`${BASE_URL}/apikey/${createData.id}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ regenerate: true }),
+    })
+    const regenerateData = await regenerateResponse.json<{ id: number, key: string, key_hash: string }>()
+    expect(regenerateResponse.status).toBe(200)
+    expect(regenerateData.id).toBe(createData.id)
+    expect(regenerateData.key).not.toBe(oldKey)
+    expect(regenerateData.key_hash).not.toBe(oldHash)
+
+    // DB must keep the hashed key non-copyable (key column null).
+    const verifyResponse = await fetch(`${BASE_URL}/apikey/${createData.id}`, { headers })
+    const verifyData = await verifyResponse.json() as { key: string | null, key_hash: string }
+    expect(verifyData.key).toBeNull()
+    expect(verifyData.key_hash).toBe(regenerateData.key_hash)
+
+    // Old key must no longer authenticate.
+    const oldAuthHeaders = { 'Content-Type': 'application/json', Authorization: oldKey }
+    const oldAuthResponse = await fetch(`${BASE_URL}/apikey`, { method: 'GET', headers: oldAuthHeaders })
+    expect(oldAuthResponse.status).toBe(401)
+
+    // New key must authenticate.
+    const newAuthHeaders = { 'Content-Type': 'application/json', Authorization: regenerateData.key }
+    const newAuthResponse = await fetch(`${BASE_URL}/apikey`, { method: 'GET', headers: newAuthHeaders })
+    expect(newAuthResponse.status).toBe(200)
+
+    await fetch(`${BASE_URL}/apikey/${createData.id}`, { method: 'DELETE', headers })
+  })
+
+  it('regenerate and update name in a single request', async () => {
+    const createResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ name: 'temp-key-regenerate-and-rename', hashed: false }),
+    })
+    const createData = await createResponse.json<{ id: number, key: string }>()
+    expect(createResponse.status).toBe(200)
+
+    const newName = 'temp-key-regenerated-renamed'
+    const regenerateResponse = await fetch(`${BASE_URL}/apikey/${createData.id}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ regenerate: true, name: newName }),
+    })
+    const regenerateData = await regenerateResponse.json() as { id: number, name: string, key: string }
+    expect(regenerateResponse.status).toBe(200)
+    expect(regenerateData.name).toBe(newName)
+    expect(regenerateData.key).not.toBe(createData.key)
+
+    await fetch(`${BASE_URL}/apikey/${createData.id}`, { method: 'DELETE', headers })
+  })
+
+  it('regenerate non-existent key returns 404', async () => {
+    const response = await fetch(`${BASE_URL}/apikey/424242`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ regenerate: true }),
+    })
+    expect(response.status).toBe(404)
   })
 })
 

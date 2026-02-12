@@ -127,16 +127,15 @@ export async function isChannelSelfRateLimited(
   const cached = await opRateEntry.helper.matchJson<OperationRateLimitCache>(opRateEntry.request)
   if (cached) {
     const now = Date.now()
-    if ('count' in cached) {
-      const resetAt = cached.resetAt
-      if (typeof resetAt === 'number' && resetAt > now && cached.count >= OP_RATE_LIMIT_PER_SECOND)
+    const isCounter = 'count' in cached
+    const resetAt = isCounter ? cached.resetAt : getLegacyResetAt(cached.timestamp, now)
+    const count = isCounter ? cached.count : 1
+    if (typeof resetAt === 'number' && resetAt > now) {
+      if (count >= OP_RATE_LIMIT_PER_SECOND)
         return { limited: true, resetAt }
-    }
-    else {
-      const legacyResetAt = getLegacyResetAt(cached.timestamp, now)
-      if (legacyResetAt) {
-        const ttlSeconds = getRateLimitWindowSeconds(legacyResetAt, now)
-        const migratedEntry: RateLimitCounter = { count: 1, resetAt: legacyResetAt }
+      if (!isCounter) {
+        const ttlSeconds = getRateLimitWindowSeconds(resetAt, now)
+        const migratedEntry: RateLimitCounter = { count, resetAt }
         try {
           await opRateEntry.helper.putJson(opRateEntry.request, migratedEntry, ttlSeconds)
         }

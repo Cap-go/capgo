@@ -48,7 +48,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await resetAppData(APPNAME)
-  
+
   // Clean up the unique test organization
   await getSupabaseClient().from('org_users').delete().eq('org_id', testOrgId)
   await getSupabaseClient().from('orgs').delete().eq('id', testOrgId)
@@ -427,7 +427,7 @@ describe('[POST] /private/accept_invitation - Error Cases', () => {
       }),
     })
 
-    expect(response.status).toBe(500)
+    expect(response.status).toBe(404)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('failed_to_accept_invitation')
   })

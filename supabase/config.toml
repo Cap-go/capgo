@@ -254,7 +254,7 @@ enabled = false
 # user_pool_region = "us-east-1"
 
 [edge_runtime]
-deno_version = 2
+deno_version = 1
 enabled = true
 # Configure one of the supported request policies: `oneshot`, `per_worker`.
 # Use `oneshot` for hot reload, or `per_worker` for load testing.
@@ -375,3 +375,8 @@ import_map = "./functions/deno.json"
 verify_jwt = false
 import_map = "./functions/deno.json"
 
+# Replication 
+
+[functions.replication]
+verify_jwt = false
+import_map = "./functions/deno.json"

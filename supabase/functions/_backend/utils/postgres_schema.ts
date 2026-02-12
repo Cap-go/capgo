@@ -29,6 +29,7 @@ export const apps = pgTable('apps', {
   channel_device_count: bigint('channel_device_count', { mode: 'number' }).notNull().default(0),
   manifest_bundle_count: bigint('manifest_bundle_count', { mode: 'number' }).notNull().default(0),
   expose_metadata: boolean('expose_metadata').notNull().default(false),
+  allow_device_custom_id: boolean('allow_device_custom_id').notNull().default(true),
 })
 
 export const app_versions = pgTable('app_versions', {
@@ -103,6 +104,7 @@ export const orgs = pgTable('orgs', {
   require_apikey_expiration: boolean('require_apikey_expiration').notNull().default(false),
   max_apikey_expiration_days: integer('max_apikey_expiration_days'),
   email_preferences: jsonb('email_preferences'),
+  has_usage_credits: boolean('has_usage_credits').notNull().default(false),
 })
 
 export const notifications = pgTable('notifications', {

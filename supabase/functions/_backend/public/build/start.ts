@@ -103,8 +103,41 @@ export async function startBuild(
       throw simpleError('not_authorized', errorMsg)
     }
 
+    // Bind jobId to appId under RLS before calling the builder.
+    // This prevents cross-app access by mixing an allowed app_id with another app's jobId.
+    const supabase = supabaseApikey(c, apikeyKey)
+    const { data: buildRequest, error: buildRequestError } = await supabase
+      .from('build_requests')
+      .select('app_id')
+      .eq('builder_job_id', jobId)
+      .maybeSingle()
+
+    if (buildRequestError) {
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'Failed to fetch build_request for start build',
+        job_id: jobId,
+        error: buildRequestError.message,
+      })
+      throw simpleError('internal_error', 'Failed to fetch build request')
+    }
+
+    if (!buildRequest || buildRequest.app_id !== appId) {
+      const errorMsg = 'You do not have permission to start builds for this app'
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'Unauthorized start build (job/app mismatch or not accessible)',
+        job_id: jobId,
+        app_id: appId,
+        user_id: apikey.user_id,
+      })
+      await markBuildAsFailed(c, jobId, errorMsg, apikeyKey)
+      alreadyMarkedAsFailed = true
+      throw simpleError('unauthorized', errorMsg)
+    }
+
     // Security: Check if user has permission to manage builds (auth context set by middlewareKey)
-    if (!(await checkPermission(c, 'app.build_native', { appId }))) {
+    if (!(await checkPermission(c, 'app.build_native', { appId: buildRequest.app_id }))) {
       const errorMsg = 'You do not have permission to start builds for this app'
       cloudlogErr({
         requestId: c.get('requestId'),
@@ -154,7 +187,6 @@ export async function startBuild(
 
     // Update build_requests status to running
     // Use authenticated client - RLS will enforce access
-    const supabase = supabaseApikey(c, apikeyKey)
     const { error: updateError } = await supabase
       .from('build_requests')
       .update({
@@ -162,6 +194,7 @@ export async function startBuild(
         updated_at: new Date().toISOString(),
       })
       .eq('builder_job_id', jobId)
+      .eq('app_id', buildRequest.app_id)
 
     if (updateError) {
       cloudlogErr({

@@ -15,13 +15,21 @@ app.post('/', middlewareAPISecret, triggerValidator('users', 'INSERT'), async (c
   await createApiKey(c, record.id)
   cloudlog({ requestId: c.get('requestId'), message: 'createCustomer stripe' })
   await syncUserPreferenceTags(c, record.email, record)
+  // "User Joined" should represent a self-signup (technical user expected to onboard),
+  // not an account created by accepting an org invite.
   const LogSnag = logsnag(c)
   await LogSnag.track({
     channel: 'user-register',
-    event: 'User Joined',
+    event: !record.created_via_invite ? 'User Joined' : 'User Joined by Invite',
     icon: '🎉',
     user_id: record.id,
     notify: false,
-  }).catch()
+  }).catch((error) => {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'LogSnag.track user-register failed',
+      error,
+    })
+  })
   return c.json(BRES)
 })

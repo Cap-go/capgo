@@ -60,7 +60,7 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: CreateApp, 
   }
   catch (error) {
     logPgError(c, 'create_app', error)
-    throw simpleError('cannot_create_app', 'Cannot create app', { request_id: c.get('requestId') })
+    throw simpleError('cannot_create_app', 'Cannot create app', { error: (error as Error)?.message })
   }
   finally {
     if (pgClient) {

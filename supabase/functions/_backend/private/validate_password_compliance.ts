@@ -5,7 +5,7 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
+import { emptySupabase, supabaseClient, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 
 interface ValidatePasswordCompliance {
   email: string
@@ -92,17 +92,48 @@ app.post('/', async (c) => {
   const body = validationResult.data
   const { password: _password, ...bodyWithoutPassword } = body
   cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance raw body', rawBody: bodyWithoutPassword })
-  const supabaseAdmin = useSupabaseAdmin(c)
+  const adminClient = useSupabaseAdmin(c)
 
-  // Get the org's password policy - need admin for initial lookup
-  const { data: org, error: orgError } = await supabaseAdmin
+  // Authenticate first to avoid leaking org existence to unauthenticated callers.
+  const loginClient = emptySupabase(c)
+  const { data: signInData, error: signInError } = await loginClient.auth.signInWithPassword({
+    email: body.email,
+    password: body.password,
+  })
+
+  if (signInError || !signInData.user || !signInData.session) {
+    cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - login failed', error: signInError?.message })
+    return quickError(401, 'invalid_credentials', 'Invalid email or password')
+  }
+
+  const userId = signInData.user.id
+  const userClient = supabaseClient(c, `Bearer ${signInData.session.access_token}`)
+
+  // Check org membership/rights first. For non-members (and for non-existent orgs),
+  // this returns the same not_member response to avoid an existence oracle.
+  const orgAccess = await checkOrgReadAccess(userClient, body.org_id, c.get('requestId'))
+  if (orgAccess.error) {
+    return quickError(500, 'org_membership_lookup_failed', 'Failed to verify organization membership', { error: orgAccess.error })
+  }
+
+  if (!orgAccess.allowed) {
+    return quickError(403, 'not_member', 'You are not a member of this organization')
+  }
+
+  // Fetch the org's password policy after membership verification.
+  //
+  // IMPORTANT: do not use userClient here. orgs SELECT is guarded by check_min_rights,
+  // which enforces password-policy compliance, creating a circular dependency for users
+  // who are non-compliant (this endpoint is their remediation path).
+  const { data: org, error: orgError } = await adminClient
     .from('orgs')
     .select('id, password_policy_config')
     .eq('id', body.org_id)
     .single()
 
   if (orgError || !org) {
-    return quickError(404, 'org_not_found', 'Organization not found', { error: orgError?.message })
+    cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - org lookup failed', error: orgError?.message })
+    return quickError(500, 'org_lookup_failed', 'Failed to load organization password policy', { error: orgError?.message })
   }
 
   // Check if org has password policy enabled
@@ -116,30 +147,6 @@ app.post('/', async (c) => {
 
   if (!policy || !policy.enabled) {
     return quickError(400, 'no_policy', 'Organization does not have a password policy enabled')
-  }
-
-  // Attempt to sign in with the provided credentials to verify password
-  // Note: signInWithPassword needs admin to work without session
-  const supabase = useSupabaseAdmin(c)
-  const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-    email: body.email,
-    password: body.password,
-  })
-
-  if (signInError || !signInData.user || !signInData.session) {
-    cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - login failed', error: signInError?.message })
-    return quickError(401, 'invalid_credentials', 'Invalid email or password')
-  }
-
-  const userId = signInData.user.id
-
-  const orgAccess = await checkOrgReadAccess(supabase, body.org_id, c.get('requestId'))
-  if (orgAccess.error) {
-    return quickError(500, 'org_membership_lookup_failed', 'Failed to verify organization membership', { error: orgAccess.error })
-  }
-
-  if (!orgAccess.allowed) {
-    return quickError(403, 'not_member', 'You are not a member of this organization')
   }
 
   // Check if the password meets the policy requirements
@@ -159,7 +166,7 @@ app.post('/', async (c) => {
 
   // Password is valid! Create or update the compliance record
   // Get the policy hash from the SQL function (matches the validation logic)
-  const { data: policyHash, error: hashError } = await supabase
+  const { data: policyHash, error: hashError } = await userClient
     .rpc('get_password_policy_hash', { policy_config: org.password_policy_config })
 
   if (hashError || !policyHash) {
@@ -168,7 +175,7 @@ app.post('/', async (c) => {
   }
 
   // Upsert the compliance record (service role bypasses RLS)
-  const { error: upsertError } = await supabaseAdmin
+  const { error: upsertError } = await adminClient
     .from('user_password_compliance')
     .upsert({
       user_id: userId,

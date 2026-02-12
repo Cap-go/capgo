@@ -132,13 +132,23 @@ const activeTab = computed(() => {
     return `/app/${appId.value}/${parentTab}`
   }
 
-  // Match the full path to a tab
-  const tab = tabs.value.find((t) => {
+  // Prefer exact match.
+  const exactTab = tabs.value.find((t) => {
     const tabKey = t.key.replace(/\/$/, '')
     return path === tabKey
   })
 
-  return tab?.key ?? `/app/${appId.value}`
+  if (exactTab)
+    return exactTab.key
+
+  // Fallback: nested pages under a tab should keep the parent tab active.
+  // Example: `/app/:id/bundles/new` should keep `/app/:id/bundles` active.
+  const prefixMatch = tabs.value
+    .map(t => ({ t, tabKey: t.key.replace(/\/$/, '') }))
+    .filter(({ tabKey }) => path.startsWith(`${tabKey}/`))
+    .sort((a, b) => b.tabKey.length - a.tabKey.length)[0]
+
+  return prefixMatch?.t.key ?? `/app/${appId.value}`
 })
 
 const activeSecondaryTab = computed(() => {

@@ -1,5 +1,6 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
+import { eq, or } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { createIfNotExistStoreInfo } from '../utils/cloudflare.ts'
@@ -7,6 +8,8 @@ import { purgeOnPremCache } from '../utils/cloudflare_cache_purge.ts'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
+import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
+import * as schema from '../utils/postgres_schema.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
@@ -21,10 +24,79 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
     throw simpleError('no_id', 'No id', { record })
   }
 
+  const supabase = supabaseAdmin(c)
+
+  // The app_versions table uses a DB trigger (auto_owner_org_by_app_id) that derives owner_org
+  // from apps.app_id. If the app is deleted before this async trigger runs, inserting default
+  // versions will fail with a NOT NULL violation. Always re-check that the app still exists.
+  const pg = getPgClient(c, true)
+  const drizzleClient = getDrizzleClient(pg)
+  let appExists = false
+  let ownerOrg: string | undefined
+  try {
+    const rows = await drizzleClient
+      .select({ owner_org: schema.apps.owner_org })
+      .from(schema.apps)
+      .where(or(eq(schema.apps.id, record.id), eq(schema.apps.app_id, record.app_id)))
+      .limit(1)
+    appExists = rows.length > 0
+    ownerOrg = rows[0]?.owner_org ?? undefined
+  }
+  catch (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Error fetching app owner_org', error, appId: record.id, app_id: record.app_id })
+  }
+  finally {
+    closeClient(c, pg)
+  }
+
+  // If the app no longer exists (deleted between INSERT and async trigger processing), skip
+  // all side effects. Still validate the org exists to keep the "error cases" contract.
+  if (!appExists) {
+    ownerOrg = ownerOrg ?? (record.owner_org ?? undefined)
+    if (!ownerOrg) {
+      cloudlog({ requestId: c.get('requestId'), message: 'App missing and no owner_org in webhook payload, skipping', record })
+      return c.json(BRES)
+    }
+
+    const { data, error } = await supabase
+      .from('orgs')
+      .select('*')
+      .eq('id', ownerOrg)
+      .single()
+    if (error || !data) {
+      // In prod, INSERT triggers are processed async via PGMQ; the app (and even org)
+      // may be deleted before the queued handler runs. If this handler was invoked
+      // by the queue consumer, skip instead of retrying forever / alerting.
+      const cfId = c.req.header('x-capgo-cf-id')
+      if (cfId) {
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'App missing and org missing during queued trigger processing, skipping',
+          ownerOrg,
+          app_id: record.app_id,
+          cfId,
+          error,
+        })
+        return c.json(BRES)
+      }
+
+      throw simpleError('error_fetching_organization', 'Error fetching organization', { error })
+    }
+
+    cloudlog({ requestId: c.get('requestId'), message: 'App missing, skipping onboarding and default versions', record })
+    return c.json(BRES)
+  }
+
   // Check if this is a demo app - skip onboarding emails and store info for demo apps
   const isDemo = record.is_demo === true
   if (isDemo) {
     cloudlog({ requestId: c.get('requestId'), message: 'Demo app detected, skipping onboarding emails and store info' })
+  }
+
+  // Can't proceed with onboarding/default versions without an org id.
+  if (!ownerOrg) {
+    cloudlog({ requestId: c.get('requestId'), message: 'App missing or no owner_org, skipping onboarding and default versions', record })
+    return c.json(BRES)
   }
 
   const LogSnag = logsnag(c)
@@ -32,7 +104,7 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
     channel: 'app-created',
     event: isDemo ? 'Demo App Created' : 'App Created',
     icon: isDemo ? '🎮' : '🎉',
-    user_id: record.owner_org,
+    user_id: ownerOrg,
     tags: {
       app_id: record.app_id,
       is_demo: isDemo ? 'true' : 'false',
@@ -42,18 +114,17 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
 
   // Purge on-prem cache for this app to clear any stale responses
   await backgroundTask(c, purgeOnPremCache(c, record.app_id))
-  const supabase = supabaseAdmin(c)
   const { error: dbVersionError } = await supabase
     .from('app_versions')
     .upsert([
       {
-        owner_org: record.owner_org,
+        owner_org: ownerOrg,
         deleted: true,
         name: 'unknown',
         app_id: record.app_id,
       },
       {
-        owner_org: record.owner_org,
+        owner_org: ownerOrg,
         deleted: true,
         name: 'builtin',
         app_id: record.app_id,
@@ -70,14 +141,14 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
     await backgroundTask(c, supabase
       .from('orgs')
       .select('*')
-      .eq('id', record.owner_org)
+      .eq('id', ownerOrg)
       .single()
       .then(({ data, error }) => {
         if (error || !data) {
           throw simpleError('error_fetching_organization', 'Error fetching organization', { error })
         }
         return trackBentoEvent(c, data.management_email, {
-          org_id: record.owner_org,
+          org_id: ownerOrg,
           org_name: data.name,
           app_name: record.name,
         }, 'app:created')

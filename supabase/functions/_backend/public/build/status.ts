@@ -30,26 +30,41 @@ export async function getBuildStatus(
 ): Promise<Response> {
   const { job_id, app_id, platform } = params
 
-  // Security: Check if user has read access to this app (auth context set by middlewareKey)
-  if (!(await checkPermission(c, 'app.read', { appId: app_id }))) {
-    throw simpleError('unauthorized', 'You do not have permission to view builds for this app')
-  }
-
   // Use authenticated client for data queries - RLS will enforce access
   const supabase = supabaseApikey(c, apikey.key)
 
-  // Get app's org_id
-  const { data: app, error: appError } = await supabase
-    .from('apps')
-    .select('owner_org')
-    .eq('app_id', app_id)
-    .single()
+  // Bind job_id to app_id under RLS before calling the builder.
+  // This prevents cross-app access by mixing an allowed app_id with another app's job_id.
+  const { data: buildRequest, error: buildRequestError } = await supabase
+    .from('build_requests')
+    .select('app_id, owner_org, platform')
+    .eq('builder_job_id', job_id)
+    .maybeSingle()
 
-  if (appError || !app) {
-    throw simpleError('not_found', 'App not found')
+  if (buildRequestError) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Failed to fetch build_request for status',
+      job_id,
+      error: buildRequestError.message,
+    })
+    throw simpleError('internal_error', 'Failed to fetch build request')
   }
 
-  const org_id = app.owner_org
+  if (!buildRequest || buildRequest.app_id !== app_id) {
+    // Treat missing row and mismatched app_id as unauthorized to avoid leaking job existence.
+    throw simpleError('unauthorized', 'You do not have permission to view builds for this app')
+  }
+
+  // Security: Check if user has read access to the job's app (auth context set by middlewareKey)
+  if (!(await checkPermission(c, 'app.read', { appId: buildRequest.app_id }))) {
+    throw simpleError('unauthorized', 'You do not have permission to view builds for this app')
+  }
+
+  const org_id = buildRequest.owner_org
+  const resolvedPlatform = (buildRequest.platform === 'ios' || buildRequest.platform === 'android')
+    ? buildRequest.platform
+    : platform
 
   // Fetch status from builder
   const builderResponse = await fetch(`${getEnv(c, 'BUILDER_URL')}/jobs/${job_id}`, {
@@ -91,6 +106,7 @@ export async function getBuildStatus(
       updated_at: new Date().toISOString(),
     })
     .eq('builder_job_id', job_id)
+    .eq('app_id', buildRequest.app_id)
 
   if (updateError) {
     cloudlogErr({
@@ -121,7 +137,7 @@ export async function getBuildStatus(
         org_id,
         apikey.user_id,
         job_id,
-        platform,
+        resolvedPlatform,
         buildTimeSeconds,
       )
     }

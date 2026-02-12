@@ -175,7 +175,7 @@ async function deleteApp() {
       toast.success(t('app-deleted'))
 
     // return to home
-    router.push('/app')
+    router.push('/apps')
   }
   catch (error) {
     console.error(error)
@@ -183,7 +183,7 @@ async function deleteApp() {
   }
 }
 
-async function submit(form: { app_name: string, expose_metadata: boolean, allow_preview: boolean }) {
+async function submit(form: { app_name: string, expose_metadata: boolean, allow_preview: boolean, allow_device_custom_id: boolean }) {
   isLoading.value = true
   if (!canUpdateSettings.value) {
     toast.error(t('no-permission'))
@@ -214,6 +214,15 @@ async function submit(form: { app_name: string, expose_metadata: boolean, allow_
 
   try {
     await updateAllowPreview(form.allow_preview)
+  }
+  catch (error) {
+    toast.error(error as string)
+  }
+
+  try {
+    // Defensive: avoid flipping the flag if the value is missing/invalid.
+    if (typeof form.allow_device_custom_id === 'boolean')
+      await updateAllowDeviceCustomId(form.allow_device_custom_id)
   }
   catch (error) {
     toast.error(error as string)
@@ -292,6 +301,23 @@ async function updateAllowPreview(newAllowPreview: boolean) {
   toast.success(t('changed-allow-preview'))
   if (appRef.value)
     appRef.value.allow_preview = newAllowPreview
+}
+
+async function updateAllowDeviceCustomId(newAllowDeviceCustomId: boolean) {
+  // Defensive: if the backend ever returns null/undefined, treat it as false for
+  // comparison so an explicit user toggle will still persist.
+  const current = appRef.value?.allow_device_custom_id ?? false
+  if (newAllowDeviceCustomId === current) {
+    return Promise.resolve()
+  }
+
+  const { error } = await supabase.from('apps').update({ allow_device_custom_id: newAllowDeviceCustomId }).eq('app_id', props.appId)
+  if (error) {
+    return Promise.reject(t('cannot-change-allow-device-custom-id'))
+  }
+  toast.success(t('changed-allow-device-custom-id'))
+  if (appRef.value)
+    appRef.value.allow_device_custom_id = newAllowDeviceCustomId
 }
 
 async function loadChannels() {
@@ -823,7 +849,7 @@ function confirmTransferAppOwnership(org: Organization) {
           }
           toast.success(t('app-transferred'))
           setTimeout(() => {
-            router.push('/app')
+            router.push('/apps')
           }, 2500)
         },
       },
@@ -1084,6 +1110,13 @@ async function transferAppOwnership() {
                 :value="appRef?.allow_preview ?? false"
                 :label="t('allow-preview')"
                 :help="t('allow-preview-help')"
+              />
+              <FormKit
+                type="checkbox"
+                name="allow_device_custom_id"
+                :value="appRef?.allow_device_custom_id ?? false"
+                :label="t('allow-device-custom-id')"
+                :help="t('allow-device-custom-id-help')"
               />
               <FormKit
                 type="button"

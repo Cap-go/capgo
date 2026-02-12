@@ -35,6 +35,7 @@ import {
   MAX_UPLOAD_LENGTH_BYTES,
   readIntFromHeader,
   toBase64,
+  TUS_EXTENSIONS,
   TUS_VERSION,
   UPLOAD_EXPIRATION_MS,
   UPLOAD_INFO_KEY,
@@ -67,7 +68,7 @@ function optionsHandler(c: Context) {
     'Tus-Resumable': TUS_VERSION,
     'Tus-Version': TUS_VERSION,
     'Tus-Max-Size': MAX_UPLOAD_LENGTH_BYTES.toString(),
-    'Tus-Extension': 'creation,creation-defer-length,creation-with-upload,expiration',
+    'Tus-Extension': TUS_EXTENSIONS,
   })
 }
 

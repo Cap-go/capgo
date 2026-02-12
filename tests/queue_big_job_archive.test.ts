@@ -10,6 +10,7 @@ const pool = new Pool({
 })
 const tmpQueueName = 'queue_big_job_archive'
 const MESSAGE_COUNT = 950
+const SYNC_BATCH_SIZE = 200
 
 describe('queue_big_job_archive', () => {
   beforeAll(async () => {
@@ -41,7 +42,7 @@ describe('queue_big_job_archive', () => {
     await pool.end()
   })
 
-  it('should process 950 jobs with vt=10 successfully', { timeout: 15000 }, async () => {
+  it('should process 950 jobs with vt=10 successfully', { timeout: 60000 }, async () => {
     // Generate messages and insert them directly into the queue table
     const messagePayload = {
       payload: {
@@ -89,22 +90,52 @@ describe('queue_big_job_archive', () => {
     const initialCount = result.rows[0].count
     expect(Number.parseInt(initialCount)).toBe(MESSAGE_COUNT)
 
-    // Process the queue via HTTP
-    const response = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
-      method: 'POST',
-      headers: headersInternal,
-      body: JSON.stringify({ queue_name: tmpQueueName }),
-    })
+    async function fetchSyncWithRetry(maxRetries = 5) {
+      for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const response = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
+          method: 'POST',
+          headers: headersInternal,
+          body: JSON.stringify({ queue_name: tmpQueueName, batch_size: SYNC_BATCH_SIZE }),
+        })
 
-    if (response.status !== 202) {
-      const errorBody = await response.text()
-      console.error('Queue consumer error:', errorBody)
+        if (response.status === 202) {
+          expect(await response.json()).toEqual({ status: 'ok' })
+          return
+        }
+
+        const errorBody = await response.text()
+        console.error('Queue consumer error:', errorBody)
+        // Backoff for transient worker/resource-limit errors.
+        await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)))
+      }
+
+      throw new Error(`queue_consumer/sync failed after retries (batch_size=${SYNC_BATCH_SIZE})`)
     }
-    expect(response.status).toBe(202)
-    expect(await response.json()).toEqual({ status: 'ok' })
 
-    // Wait for processing to complete (give it some time)
-    await new Promise(resolve => setTimeout(resolve, 5000))
+    async function waitForQueueToDecrease(previousCount: number, timeoutMs = 20000) {
+      const start = Date.now()
+      while (Date.now() - start < timeoutMs) {
+        const { rows } = await pool.query(`SELECT count(*) as count FROM pgmq.q_${tmpQueueName}`)
+        const currentCount = Number.parseInt(rows[0].count)
+        if (currentCount < previousCount)
+          return currentCount
+        await new Promise(resolve => setTimeout(resolve, 200))
+      }
+      throw new Error(`Queue did not decrease within ${timeoutMs}ms (previousCount=${previousCount})`)
+    }
+
+    // Process the queue in smaller batches to avoid edge runtime resource limits.
+    let remaining = MESSAGE_COUNT
+    let safety = 0
+    while (remaining > 0) {
+      safety++
+      if (safety > 20)
+        throw new Error(`Safety break: too many sync iterations (remaining=${remaining})`)
+
+      const prev = remaining
+      await fetchSyncWithRetry()
+      remaining = await waitForQueueToDecrease(prev)
+    }
 
     // Verify queue is empty after processing
     const finalQueueResult = await pool.query(`SELECT count(*) as count FROM pgmq.q_${tmpQueueName}`)

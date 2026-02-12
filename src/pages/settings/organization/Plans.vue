@@ -168,7 +168,7 @@ async function openChangePlan(plan: Database['public']['Tables']['plans']['Row']
         text: t('add-another-app'),
         id: 'add-app-button',
         handler: () => {
-          router.push('/app')
+          router.push('/apps')
           return true
         },
       },
@@ -269,7 +269,7 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
       })
       await dialogStore.onDialogDismiss()
       if (!prevOrg)
-        router.push('/app')
+        router.push('/apps')
       else
         organizationStore.setCurrentOrganization(prevOrg.gid)
       return
@@ -321,7 +321,7 @@ watchEffect(async () => {
             ],
           })
           await dialogStore.onDialogDismiss()
-          router.push('/app')
+          router.push('/apps')
           return
         }
       }
@@ -532,7 +532,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
         <div class="mb-8 text-6xl">
           🎉
         </div>
-        <router-link to="/app" class="inline-flex items-center px-6 py-3 text-base font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700">
+        <router-link to="/apps" class="inline-flex items-center px-6 py-3 text-base font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700">
           {{ t('use-capgo') }} 🚀
         </router-link>
       </div>

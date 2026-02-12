@@ -421,7 +421,6 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
   }
 
   try {
-    const newApiKey = crypto.randomUUID()
     const { data: claimsData } = await supabase.auth.getClaims()
     const userId = claimsData?.claims?.sub
 
@@ -431,56 +430,30 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
       return false
     }
 
-    let createdKey: Database['public']['Tables']['apikeys']['Row']
     let plainKeyForDisplay: string | null = null
 
-    if (isHashed) {
-      // For hashed keys, we use the backend API which will hash the key
-      // and return the plain key only once for display
-      const { data, error } = await supabase.functions.invoke('apikey', {
-        method: 'POST',
-        body: {
-          mode: keyType,
-          name: newApiKeyName.value.trim(),
-          limited_to_orgs: finalSelectedOrganizations.length > 0 ? finalSelectedOrganizations : [],
-          limited_to_apps: finalSelectedApps.length > 0 ? finalSelectedApps.map(app => app.app_id) : [],
-          expires_at: expiresAt,
-          hashed: true,
-        },
-      })
+    // Use the backend API to generate the key server-side
+    const { data, error } = await supabase.functions.invoke('apikey', {
+      method: 'POST',
+      body: {
+        mode: keyType,
+        name: newApiKeyName.value.trim(),
+        limited_to_orgs: finalSelectedOrganizations.length > 0 ? finalSelectedOrganizations : [],
+        limited_to_apps: finalSelectedApps.length > 0 ? finalSelectedApps.map(app => app.app_id) : [],
+        expires_at: expiresAt,
+        hashed: isHashed,
+      },
+    })
 
-      if (error) {
-        console.error('Error creating hashed API key:', error)
-        toast.error('Failed to create API key')
-        return false
-      }
-
-      createdKey = data
-      plainKeyForDisplay = data.key // This is the one-time visible key
+    if (error || !data) {
+      console.error('Error creating API key:', error)
+      toast.error(t('failed-to-create-api-key'))
+      return false
     }
-    else {
-      // For plain-text keys, use direct database insert
-      const { data, error } = await supabase
-        .from('apikeys')
-        .upsert({
-          user_id: userId,
-          key: newApiKey,
-          mode: keyType,
-          name: newApiKeyName.value.trim(),
-          limited_to_orgs: finalSelectedOrganizations.length > 0 ? finalSelectedOrganizations : [],
-          limited_to_apps: finalSelectedApps.length > 0 ? finalSelectedApps.map(app => app.app_id) : [],
-          expires_at: expiresAt,
-        })
-        .select()
 
-      if (error) {
-        console.error('Error creating API key:', error)
-        toast.error('Failed to create API key')
-        return false
-      }
-
-      createdKey = data[0]
-    }
+    const createdKey = data
+    if (isHashed)
+      plainKeyForDisplay = typeof data.key === 'string' ? data.key : null // This is the one-time visible key
 
     // For hashed keys, clear the key field before adding to the list
     // (the plainkey was only returned for one-time display)
@@ -501,7 +474,7 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
   }
   catch (error) {
     console.error('Error creating API key:', error)
-    toast.error('Failed to create API key')
+    toast.error(t('failed-to-create-api-key'))
     return false
   }
 }
@@ -552,7 +525,6 @@ async function regenrateKey(apikey: Database['public']['Tables']['apikeys']['Row
   if (await showRegenerateKeyModal())
     return
 
-  const newApiKey = crypto.randomUUID()
   const { data: claimsData } = await supabase.auth.getClaims()
   const userId = claimsData?.claims?.sub
 
@@ -563,63 +535,39 @@ async function regenrateKey(apikey: Database['public']['Tables']['apikeys']['Row
 
   const wasHashed = isHashedKey(apikey)
 
-  if (wasHashed) {
-    // For hashed keys, we need to hash the new key too
-    // We'll update both key_hash with the new hash and keep key as null
-    // Use the backend API which handles hashing
-    const { data, error } = await supabase.functions.invoke('apikey', {
-      method: 'POST',
-      body: {
-        mode: apikey.mode,
-        name: apikey.name,
-        limited_to_orgs: apikey.limited_to_orgs ?? [],
-        limited_to_apps: apikey.limited_to_apps ?? [],
-        hashed: true,
-      },
-    })
+  const { data, error } = await supabase.functions.invoke('apikey', {
+    method: 'PUT',
+    body: {
+      id: apikey.id,
+      regenerate: true,
+    },
+  })
 
-    if (error) {
-      console.error('Error regenerating hashed API key:', error)
-      toast.error('Failed to regenerate API key')
-      return
-    }
+  if (error || !data) {
+    console.error('Error regenerating API key:', error)
+    toast.error(t('failed-to-regenerate-api-key'))
+    return
+  }
 
-    // Extract the plaintext key for one-time display before clearing it
-    const plainKeyForDisplay = data.key as string | undefined
+  // Extract the plaintext key for display before optionally clearing it.
+  // For hashed keys: this is the one-time visible key.
+  // For plain keys: we still show it to make regeneration explicit for the user.
+  const plainKeyForDisplay = typeof data.key === 'string' ? data.key : undefined
 
-    // Clear the key field before caching to maintain the "hashed" state
-    // This ensures isHashedKey() returns true and the key cannot be copied
+  // Clear the key field before caching to maintain the "hashed" state
+  // This ensures isHashedKey() returns true and the key cannot be copied
+  if (wasHashed)
     data.key = null as any
 
-    // Delete the old key
-    await supabase.from('apikeys').delete().eq('id', apikey.id)
+  const idx = keys.value.findIndex(k => k.id === apikey.id)
+  if (idx !== -1)
+    keys.value[idx] = data
 
-    // Update the local key reference with the new hashed row (key = null)
-    const idx = keys.value.findIndex(k => k.id === apikey.id)
-    if (idx !== -1) {
-      keys.value[idx] = data
-    }
+  // Show the new key one time
+  if (plainKeyForDisplay)
+    await showOneTimeKeyModal(plainKeyForDisplay)
 
-    // Show the new key one time
-    if (plainKeyForDisplay) {
-      await showOneTimeKeyModal(plainKeyForDisplay)
-    }
-    toast.success(t('generated-new-apikey'))
-  }
-  else {
-    // For plain-text keys, update directly
-    const { error } = await supabase
-      .from('apikeys')
-      .update({ key: newApiKey })
-      .eq('user_id', userId)
-      .eq('id', apikey.id)
-
-    if (error || typeof newApiKey !== 'string')
-      throw error
-
-    apikey.key = newApiKey
-    toast.success(t('generated-new-apikey'))
-  }
+  toast.success(t('generated-new-apikey'))
 }
 
 async function deleteKey(key: Database['public']['Tables']['apikeys']['Row']) {
@@ -818,7 +766,7 @@ watch(() => limitToOrgCheckbox.value, (newVal) => {
 })
 
 displayStore.NavTitle = t('api-keys')
-displayStore.defaultBack = '/app'
+displayStore.defaultBack = '/apps'
 getKeys()
 </script>
 

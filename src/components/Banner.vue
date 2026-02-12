@@ -18,7 +18,7 @@ const main = useMainStore()
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
 
-const route = useRoute('/app/[package]')
+const route = useRoute('/app/[app]')
 const appId = ref('')
 // const organization = ref(null as null | Organization)
 const isOrgOwner = ref(false)
@@ -26,7 +26,7 @@ const isOrgOwner = ref(false)
 watchEffect(async () => {
   try {
     if (route.path.includes('/app/')) {
-      appId.value = route.params.package as string
+      appId.value = route.params.app as string
       if (!appId.value) {
         console.error('cannot get app id. Params:', route.params)
         return
@@ -34,7 +34,7 @@ watchEffect(async () => {
 
       await organizationStore.awaitInitialLoad()
     }
-    else if (route.path.includes('/app') && route.path.includes('home')) {
+    else {
       appId.value = ''
     }
 

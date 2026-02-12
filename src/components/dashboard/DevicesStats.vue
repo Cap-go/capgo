@@ -90,7 +90,7 @@ Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, F
 
 const isDark = useDark()
 const { t } = useI18n()
-const route = useRoute('/app/[package]')
+const route = useRoute('/app/[app]')
 const router = useRouter()
 const organizationStore = useOrganizationStore()
 const supabase = useSupabase()
@@ -627,10 +627,10 @@ watch(() => props.reloadTrigger, async () => {
 })
 
 watch(
-  () => [route.path, route.params.package as string | undefined] as const,
+  () => [route.path, route.params.app as string | undefined] as const,
   async ([path, packageId], old) => {
     const oldPackageId = old?.[1]
-    // Check for /app/[package] route pattern
+    // Check for app route pattern
     if (path.includes('/app/') && packageId) {
       const packageChanged = packageId !== oldPackageId
       appId.value = packageId

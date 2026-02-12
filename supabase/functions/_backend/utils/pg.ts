@@ -5,7 +5,7 @@ import { alias } from 'drizzle-orm/pg-core'
 import { getRuntimeKey } from 'hono/adapter'
 // @ts-types="npm:@types/pg"
 import { Pool } from 'pg'
-import { backgroundTask, existInEnv, getEnv, isStripeConfigured } from '../utils/utils.ts'
+import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
 import { getClientDbRegionSB } from './geolocation.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import * as schema from './postgres_schema.ts'
@@ -30,19 +30,34 @@ const PLAN_EXCEEDED_COLUMNS: Record<'mau' | 'storage' | 'bandwidth', string> = {
 function buildPlanValidationExpression(
   actions: ('mau' | 'storage' | 'bandwidth')[],
   ownerColumn: typeof schema.app_versions.owner_org | typeof schema.apps.owner_org,
-  stripeEnabled: boolean,
 ) {
-  if (!stripeEnabled) {
-    return sql<boolean>`true`
-  }
   const extraConditions = actions.map(action => ` AND ${PLAN_EXCEEDED_COLUMNS[action]} = false`).join('')
-  return sql<boolean>`EXISTS (
+  const customerIdSubquery = sql<string | null>`(
+    SELECT ${schema.orgs.customer_id}
+    FROM ${schema.orgs}
+    WHERE ${schema.orgs.id} = ${ownerColumn}
+  )`
+  // IMPORTANT: read replicas replicate table data but not views/functions.
+  // Keep this expression replica-safe by relying on a replicated org flag.
+  //
+  // Semantics note: this flag means "org uses credits/top-up billing", not
+  // "org currently has a positive balance". This avoids plugin read-path
+  // depending on credit ledger tables/views which are not present on replicas.
+  //
+  // Backward compatibility for replicas that haven't replicated the column yet:
+  // read via `to_jsonb(row)->>'has_usage_credits'` so the query still parses
+  // even if the column doesn't exist.
+  const hasCreditsExpression = sql`EXISTS (
+    SELECT 1
+    FROM ${schema.orgs}
+    WHERE ${schema.orgs.id} = ${ownerColumn}
+      AND COALESCE((to_jsonb(orgs) ->> 'has_usage_credits')::boolean, false) = true
+  )`
+  return sql<boolean>`(${hasCreditsExpression}) OR EXISTS (
     SELECT 1
     FROM ${schema.stripe_info}
     WHERE ${schema.stripe_info.customer_id} = (
-      SELECT ${schema.orgs.customer_id}
-      FROM ${schema.orgs}
-      WHERE ${schema.orgs.id} = ${ownerColumn}
+      ${customerIdSubquery}
     )
     AND (
       (${schema.stripe_info.trial_at}::date > CURRENT_DATE)
@@ -52,7 +67,7 @@ function buildPlanValidationExpression(
         ${sql.raw(extraConditions)}
       )
     )
-  )`
+  ) OR (${customerIdSubquery} IS NULL)`
 }
 
 export function selectOne(pgClient: ReturnType<typeof getPgClient>) {
@@ -117,10 +132,53 @@ async function queryReplicaLag(c: Context, pool: Pool): Promise<ReplicationLagSt
  */
 export async function setReplicationLagHeader(c: Context, pool: Pool): Promise<void> {
   const status = await queryReplicaLag(c, pool)
-  c.header('X-Replication-Lag', status.status)
+  safeSetResponseHeader(c, 'X-Replication-Lag', status.status)
   if (status.max_lag_seconds !== null) {
-    c.header('X-Replication-Lag-Seconds', String(Math.round(status.max_lag_seconds)))
+    safeSetResponseHeader(c, 'X-Replication-Lag-Seconds', String(Math.round(status.max_lag_seconds)))
   }
+}
+
+/**
+ * Best-effort response header setter.
+ *
+ * In Cloudflare Workers, we sometimes run background tasks via `waitUntil()`
+ * after the response has started streaming. Hono's `c.header()` clones the
+ * Response and reuses the body stream; if the stream is already used/locked
+ * this can throw (e.g. "ReadableStream is disturbed").
+ */
+function safeSetResponseHeader(c: Context, name: string, value: string): void {
+  try {
+    const res = c.res
+    if (res?.bodyUsed)
+      return
+    const body = res?.body as unknown as { locked?: boolean } | null
+    if (body?.locked)
+      return
+  }
+  catch {
+    return
+  }
+
+  try {
+    c.header(name, value)
+  }
+  catch {
+    // Best-effort only: avoid crashing background tasks due to header mutation.
+  }
+}
+
+/**
+ * Store the selected DB source in the context (for logging) and try to also
+ * expose it via a response header when still safe to mutate headers.
+ */
+function setDatabaseSource(c: Context, source: string): void {
+  try {
+    c.set('databaseSource', source)
+  }
+  catch {
+    // Ignore: mostly useful for logging in request-scoped context.
+  }
+  safeSetResponseHeader(c, 'X-Database-Source', source)
 }
 
 export function getDatabaseURL(c: Context, readOnly = false): string {
@@ -132,58 +190,74 @@ export function getDatabaseURL(c: Context, readOnly = false): string {
     // When using Hyperdrive we use session databases directly to avoid supabase pooler overhead and allow prepared statements
     // Asia region - Japan
     if (c.env.HYPERDRIVE_CAPGO_PS_AS_JAPAN && dbRegion === 'AS_JAPAN') {
-      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_PLANETSCALE_AS_JAPAN')
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_AS_JAPAN')
       cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_AS_JAPAN for read-only' })
       return c.env.HYPERDRIVE_CAPGO_PS_AS_JAPAN.connectionString
     }
     // Asia region - India
     if (c.env.HYPERDRIVE_CAPGO_PS_AS_INDIA && dbRegion === 'AS_INDIA') {
-      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_PLANETSCALE_AS_INDIA')
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_AS_INDIA')
       cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_AS_INDIA for read-only' })
       return c.env.HYPERDRIVE_CAPGO_PS_AS_INDIA.connectionString
     }
     // // US region
     if (c.env.HYPERDRIVE_CAPGO_PS_NA && dbRegion === 'NA') {
-      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_PLANETSCALE_NA')
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_NA')
       cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_NA for read-only' })
       return c.env.HYPERDRIVE_CAPGO_PS_NA.connectionString
     }
     // // EU region
     if (c.env.HYPERDRIVE_CAPGO_PS_EU && dbRegion === 'EU') {
-      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_PLANETSCALE_EU')
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_EU')
       cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_EU for read-only' })
       return c.env.HYPERDRIVE_CAPGO_PS_EU.connectionString
     }
     // // OC region
     if (c.env.HYPERDRIVE_CAPGO_PS_OC && dbRegion === 'OC') {
-      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_PLANETSCALE_OC')
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_OC')
       cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_OC for read-only' })
       return c.env.HYPERDRIVE_CAPGO_PS_OC.connectionString
     }
     // // SA region
     if (c.env.HYPERDRIVE_CAPGO_PS_SA && dbRegion === 'SA') {
-      c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_PLANETSCALE_SA')
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_PLANETSCALE_SA')
       cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_PLANETSCALE_SA for read-only' })
       return c.env.HYPERDRIVE_CAPGO_PS_SA.connectionString
+    }
+    // Google Cloud Hyperdrive read replica routing
+    if (c.env.HYPERDRIVE_CAPGO_GG_ME && dbRegion === 'ME') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_GOOGLE_ME')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_GOOGLE_ME for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_GG_ME.connectionString
+    }
+    if (c.env.HYPERDRIVE_CAPGO_GG_AF && dbRegion === 'AF') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_GOOGLE_AF')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_GOOGLE_AF for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_GG_AF.connectionString
+    }
+    if (c.env.HYPERDRIVE_CAPGO_GG_HK && dbRegion === 'HK') {
+      setDatabaseSource(c, 'HYPERDRIVE_CAPGO_GOOGLE_HK')
+      cloudlog({ requestId: c.get('requestId'), message: 'Using HYPERDRIVE_CAPGO_GOOGLE_HK for read-only' })
+      return c.env.HYPERDRIVE_CAPGO_GG_HK.connectionString
     }
   }
 
   // Fallback to single Hyperdrive if available
   if (c.env.HYPERDRIVE_CAPGO_DIRECT_EU) {
-    c.header('X-Database-Source', 'HYPERDRIVE_CAPGO_DIRECT_EU')
+    setDatabaseSource(c, 'HYPERDRIVE_CAPGO_DIRECT_EU')
     cloudlog({ requestId: c.get('requestId'), message: `Using HYPERDRIVE_CAPGO_DIRECT_EU for ${readOnly ? 'read-only' : 'read-write'}` })
     return c.env.HYPERDRIVE_CAPGO_DIRECT_EU.connectionString
   }
 
   // Main DB write poller EU region in supabase
   if (existInEnv(c, 'MAIN_SUPABASE_DB_URL')) {
-    c.header('X-Database-Source', 'sb_pooler_main')
+    setDatabaseSource(c, 'sb_pooler_main')
     cloudlog({ requestId: c.get('requestId'), message: 'Using MAIN_SUPABASE_DB_URL for read-write' })
     return getEnv(c, 'MAIN_SUPABASE_DB_URL')
   }
 
   // Default Supabase direct connection used for testing or if no other option is available
-  c.header('X-Database-Source', 'direct')
+  setDatabaseSource(c, 'direct')
   cloudlog({ requestId: c.get('requestId'), message: 'Using Direct Supabase for read-write' })
   return fixSupabaseHost(getEnv(c, 'SUPABASE_DB_URL'))
 }
@@ -192,7 +266,7 @@ export function getPgClient(c: Context, readOnly = false) {
   const dbUrl = getDatabaseURL(c, readOnly)
   const requestId = c.get('requestId')
   const appName = c.res.headers.get('X-Worker-Source') ?? 'unknown source'
-  const dbName = c.res.headers.get('X-Database-Source') ?? 'unknown source'
+  const dbName = String(c.get('databaseSource') ?? c.res.headers.get('X-Database-Source') ?? 'unknown source')
   cloudlog({ requestId, message: 'SUPABASE_DB_URL selected', dbName, appName, readOnly })
 
   const isPooler = dbName.startsWith('sb_pooler')
@@ -458,7 +532,7 @@ export async function getAppOwnerPostgres(
     if (actions.length === 0)
       return null
     const orgAlias = alias(schema.orgs, 'orgs')
-    const planExpression = buildPlanValidationExpression(actions, schema.apps.owner_org, isStripeConfigured(c))
+    const planExpression = buildPlanValidationExpression(actions, schema.apps.owner_org)
 
     const appOwner = await drizzleClient
       .select({
@@ -547,7 +621,7 @@ export async function getAppVersionsByAppIdPg(
   try {
     if (actions.length === 0)
       return []
-    const planExpression = buildPlanValidationExpression(actions, schema.app_versions.owner_org, isStripeConfigured(c))
+    const planExpression = buildPlanValidationExpression(actions, schema.app_versions.owner_org)
     const versions = await drizzleClient
       .select({
         id: schema.app_versions.id,
@@ -766,7 +840,7 @@ export async function getAppByIdPg(
   try {
     if (actions.length === 0)
       return null
-    const planExpression = buildPlanValidationExpression(actions, schema.apps.owner_org, isStripeConfigured(c))
+    const planExpression = buildPlanValidationExpression(actions, schema.apps.owner_org)
     const app = await drizzleClient
       .select({
         owner_org: schema.apps.owner_org,

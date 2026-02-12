@@ -4,7 +4,7 @@ import type { AuthInfo, MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import type { DeviceWithoutCreatedAt, Order, ReadDevicesParams, ReadStatsParams, VersionUsage } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
-import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged } from './deviceComparison.ts'
+import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged, nullableString } from './deviceComparison.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { createCustomer } from './stripe.ts'
@@ -385,45 +385,126 @@ export async function getPlanUsagePercent(c: Context, orgId?: string): Promise<P
 }
 
 export async function getPlanUsageAndFit(c: Context, orgId: string): Promise<PlanUsageAndFit> {
+  // When Stripe isn't configured, still compute usage via Postgres and derive fit from usage.
+  // This avoids Stripe API calls while keeping plan enforcement deterministic for tests/on-prem.
   if (!isStripeConfigured(c)) {
-    const percentUsage = await getPlanUsagePercent(c, orgId)
-    return { is_good_plan: true, ...percentUsage }
+    try {
+      const { data, error } = await supabaseAdmin(c)
+        .rpc('get_plan_usage_and_fit', { orgid: orgId })
+        .single()
+      if (error)
+        throw new Error(error.message)
+      return { ...data, is_good_plan: data.total_percent <= 100 }
+    }
+    catch (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getPlanUsageAndFit (no stripe) fallback', orgId, error })
+      const percentUsage = await getPlanUsagePercent(c, orgId)
+      return { is_good_plan: percentUsage.total_percent <= 100, ...percentUsage }
+    }
   }
-  const { data, error } = await supabaseAdmin(c)
-    .rpc('get_plan_usage_and_fit', { orgid: orgId })
-    .single()
-  if (error)
-    throw new Error(error.message)
-  return data
+
+  try {
+    const { data, error } = await supabaseAdmin(c)
+      .rpc('get_plan_usage_and_fit', { orgid: orgId })
+      .single()
+    if (error)
+      throw new Error(error.message)
+    return data
+  }
+  catch (error) {
+    // Fallback when the RPC is unavailable or fails.
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getPlanUsageAndFit fallback', orgId, error })
+    const percentUsage = await getPlanUsagePercent(c, orgId)
+    return { is_good_plan: percentUsage.total_percent <= 100, ...percentUsage }
+  }
 }
 
 export async function getPlanUsageAndFitUncached(c: Context, orgId: string): Promise<PlanUsageAndFit> {
   if (!isStripeConfigured(c)) {
-    const percentUsage = await getPlanUsagePercent(c, orgId)
-    return { is_good_plan: true, ...percentUsage }
+    try {
+      const { data, error } = await supabaseAdmin(c)
+        .rpc('get_plan_usage_and_fit_uncached', { orgid: orgId })
+        .single()
+      if (error) {
+        const message = error.message ?? ''
+        const isMissingFunction = message.includes('get_plan_usage_and_fit_uncached')
+          || message.includes('schema cache')
+        if (isMissingFunction)
+          return getPlanUsageAndFit(c, orgId)
+        throw new Error(error.message)
+      }
+      return { ...data, is_good_plan: data.total_percent <= 100 }
+    }
+    catch (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getPlanUsageAndFitUncached (no stripe) fallback', orgId, error })
+      const percentUsage = await getPlanUsagePercent(c, orgId)
+      return { is_good_plan: percentUsage.total_percent <= 100, ...percentUsage }
+    }
   }
+
   const { data, error } = await supabaseAdmin(c)
     .rpc('get_plan_usage_and_fit_uncached', { orgid: orgId })
     .single()
-  if (error)
-    throw new Error(error.message)
+  if (error) {
+    const message = error.message ?? ''
+    const isMissingFunction = message.includes('get_plan_usage_and_fit_uncached')
+      || message.includes('schema cache')
+    if (isMissingFunction) {
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'getPlanUsageAndFitUncached unavailable, falling back to cached plan usage',
+        orgId,
+        error,
+      })
+      return getPlanUsageAndFit(c, orgId)
+    }
+    // Non-missing-function errors: fall back to percent usage based fit.
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getPlanUsageAndFitUncached fallback', orgId, error })
+    const percentUsage = await getPlanUsagePercent(c, orgId)
+    return { is_good_plan: percentUsage.total_percent <= 100, ...percentUsage }
+  }
   return data
 }
 
 export async function isGoodPlanOrg(c: Context, orgId: string): Promise<boolean> {
+  if (!isStripeConfigured(c)) {
+    try {
+      const planUsage = await getPlanUsageAndFit(c, orgId)
+      return planUsage.total_percent <= 100
+    }
+    catch (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'isGoodPlan (no stripe) fallback', orgId, error })
+      return false
+    }
+  }
+
   try {
-    if (!isStripeConfigured(c))
-      return true
     const { data } = await supabaseAdmin(c)
       .rpc('is_good_plan_v5_org', { orgid: orgId })
       .single()
       .throwOnError()
+
+    // In local/on-prem or misconfigured environments, Stripe isn't available and the
+    // RPC may conservatively return false due to missing stripe_info state. Fall back
+    // to percent usage derived from the DB in that case.
+    if (data === false && !isStripeConfigured(c)) {
+      const percentUsage = await getPlanUsagePercent(c, orgId)
+      return percentUsage.total_percent <= 100
+    }
+
     return data ?? false
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'isGoodPlan error', orgId, error })
   }
-  return false
+  // Fallback: derive from percent usage when the RPC is unavailable.
+  try {
+    const percentUsage = await getPlanUsagePercent(c, orgId)
+    return percentUsage.total_percent <= 100
+  }
+  catch {
+    return false
+  }
 }
 
 export async function isOnboardedOrg(c: Context, orgId: string): Promise<boolean> {
@@ -440,28 +521,79 @@ export async function isOnboardedOrg(c: Context, orgId: string): Promise<boolean
   return false
 }
 
-export async function set_mau_exceeded(c: Context, orgId: string, disabled: boolean): Promise<boolean> {
-  const { error } = await supabaseAdmin(c).rpc('set_mau_exceeded_by_org', { org_id: orgId, disabled })
+/**
+ * Update the MAU exceeded flag for a Stripe customer.
+ *
+ * Note: `logOrgId` is used for logging/debugging only. The update is scoped by `customerId`.
+ */
+export async function set_mau_exceeded(c: Context, customerId: string | null, disabled: boolean, logOrgId?: string): Promise<boolean> {
+  if (!customerId)
+    return true
+  // Return the updated row key so we can detect "0 rows affected".
+  const { data, error } = await supabaseAdmin(c)
+    .from('stripe_info')
+    .update({ mau_exceeded: disabled })
+    .eq('customer_id', customerId)
+    .select('customer_id')
   if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'set_mau_exceeded error', orgId, error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'set_mau_exceeded error', orgId: logOrgId, customerId, disabled, error })
+    return false
+  }
+  // If no row matched, PostgREST returns an empty array with no error.
+  // Treat as failure to avoid silently "succeeding" while not persisting the change.
+  // This also protects against accidental mismatched `customerId`.
+  if (!data?.length) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'set_mau_exceeded no stripe_info row matched', orgId: logOrgId, customerId, disabled })
     return false
   }
   return true
 }
 
-export async function set_storage_exceeded(c: Context, orgId: string, disabled: boolean): Promise<boolean> {
-  const { error } = await supabaseAdmin(c).rpc('set_storage_exceeded_by_org', { org_id: orgId, disabled })
+/**
+ * Update the storage exceeded flag for a Stripe customer.
+ *
+ * Note: `logOrgId` is used for logging/debugging only. The update is scoped by `customerId`.
+ */
+export async function set_storage_exceeded(c: Context, customerId: string | null, disabled: boolean, logOrgId?: string): Promise<boolean> {
+  if (!customerId)
+    return true
+  // Return the updated row key so we can detect "0 rows affected".
+  const { data, error } = await supabaseAdmin(c)
+    .from('stripe_info')
+    .update({ storage_exceeded: disabled })
+    .eq('customer_id', customerId)
+    .select('customer_id')
   if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'set_download_disabled error', orgId, error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'set_storage_exceeded error', orgId: logOrgId, customerId, disabled, error })
+    return false
+  }
+  if (!data?.length) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'set_storage_exceeded no stripe_info row matched', orgId: logOrgId, customerId, disabled })
     return false
   }
   return true
 }
 
-export async function set_bandwidth_exceeded(c: Context, orgId: string, disabled: boolean): Promise<boolean> {
-  const { error } = await supabaseAdmin(c).rpc('set_bandwidth_exceeded_by_org', { org_id: orgId, disabled })
+/**
+ * Update the bandwidth exceeded flag for a Stripe customer.
+ *
+ * Note: `logOrgId` is used for logging/debugging only. The update is scoped by `customerId`.
+ */
+export async function set_bandwidth_exceeded(c: Context, customerId: string | null, disabled: boolean, logOrgId?: string): Promise<boolean> {
+  if (!customerId)
+    return true
+  // Return the updated row key so we can detect "0 rows affected".
+  const { data, error } = await supabaseAdmin(c)
+    .from('stripe_info')
+    .update({ bandwidth_exceeded: disabled })
+    .eq('customer_id', customerId)
+    .select('customer_id')
   if (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'set_bandwidth_exceeded error', orgId, error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'set_bandwidth_exceeded error', orgId: logOrgId, customerId, disabled, error })
+    return false
+  }
+  if (!data?.length) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'set_bandwidth_exceeded no stripe_info row matched', orgId: logOrgId, customerId, disabled })
     return false
   }
   return true
@@ -893,24 +1025,33 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error fetching existing device', error })
   }
 
-  if (existingRow && !hasComparableDeviceChanged(existingRow, device)) {
+  // Preserve existing custom_id when the client doesn't send one.
+  // This avoids accidental clearing, and lets higher-level callers strip custom_id
+  // (e.g., when an app disables device self-setting) without overwriting owner-set values.
+  const requestedCustomId = nullableString(device.custom_id)
+  const deviceForWrite: DeviceWithoutCreatedAt = requestedCustomId === null && existingRow
+    ? { ...device, custom_id: existingRow.custom_id ?? '' }
+    : device
+
+  if (existingRow && !hasComparableDeviceChanged(existingRow, deviceForWrite)) {
     cloudlog({ requestId: c.get('requestId'), message: 'No Supabase upsert needed for device', device_id: device.device_id })
     return Promise.resolve()
   }
 
-  const normalizedDevice = buildNormalizedDeviceForWrite(device)
+  const normalizedDevice = buildNormalizedDeviceForWrite(deviceForWrite)
   const updatedAt = new Date().toISOString()
 
   const payload = {
     app_id: device.app_id,
     updated_at: updatedAt,
     device_id: device.device_id,
-    platform: normalizedDevice.platform ?? device.platform,
+    platform: normalizedDevice.platform ?? deviceForWrite.platform,
     plugin_version: normalizedDevice.plugin_version ?? undefined,
     os_version: normalizedDevice.os_version ?? undefined,
     version_build: normalizedDevice.version_build ?? undefined,
-    custom_id: normalizedDevice.custom_id ?? undefined,
-    version_name: normalizedDevice.version_name ?? device.version_name,
+    // Only persist custom_id if the client explicitly sent one.
+    custom_id: requestedCustomId ?? undefined,
+    version_name: normalizedDevice.version_name ?? deviceForWrite.version_name,
     is_prod: normalizedDevice.is_prod,
     is_emulator: normalizedDevice.is_emulator,
     default_channel: device.default_channel ?? null,

@@ -7,7 +7,7 @@ const { t } = useI18n()
 const router = useRouter()
 
 function goToApps() {
-  router.push('/app')
+  router.push('/apps')
 }
 </script>
 

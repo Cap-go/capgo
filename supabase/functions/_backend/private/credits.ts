@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
+import { getFallbackCreditProductId } from '../utils/credits.ts'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { checkPermission } from '../utils/rbac.ts'
@@ -79,13 +80,24 @@ async function getCreditTopUpProductId(c: AppContext, customerId: string, token:
     .single()
 
   if (stripeInfoError || !stripeInfo?.product_id) {
-    cloudlogErr({
+    const log = stripeInfoError ? cloudlogErr : cloudlog
+    log({
       requestId: c.get('requestId'),
       message: 'credit_plan_missing',
       customerId,
       error: stripeInfoError,
     })
-    throw simpleError('credit_product_not_configured', 'Organization does not have a Stripe plan configured')
+    const productId = await getFallbackCreditProductId(c, customerId, async () => {
+      const { data, error } = await supabase
+        .from('plans')
+        .select('credit_id')
+        .eq('name', 'Solo')
+        .single()
+      if (error)
+        throw error
+      return data ?? null
+    })
+    return { productId }
   }
 
   const { data: plan, error: planError } = await supabase
@@ -102,7 +114,17 @@ async function getCreditTopUpProductId(c: AppContext, customerId: string, token:
       planStripeId: stripeInfo.product_id,
       error: planError,
     })
-    throw simpleError('credit_product_not_configured', 'Credit product is not configured for this plan')
+    const productId = await getFallbackCreditProductId(c, customerId, async () => {
+      const { data, error } = await supabase
+        .from('plans')
+        .select('credit_id')
+        .eq('name', 'Solo')
+        .single()
+      if (error)
+        throw error
+      return data ?? null
+    })
+    return { productId }
   }
 
   return { productId: plan.credit_id }

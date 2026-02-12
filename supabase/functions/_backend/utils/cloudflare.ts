@@ -20,9 +20,15 @@ export type Bindings = {
   DEVICE_INFO: AnalyticsEngineDataPoint
   DB_STOREAPPS: D1Database
   HYPERDRIVE_CAPGO_DIRECT_EU: Hyperdrive // Add Hyperdrive binding
-  HYPERDRIVE_CAPGO_PS_EU: Hyperdrive // Add Hyperdrive binding
-  HYPERDRIVE_CAPGO_PS_AS: Hyperdrive // Add Hyperdrive binding
-  HYPERDRIVE_CAPGO_PS_NA: Hyperdrive // Add Hyperdrive binding
+  HYPERDRIVE_CAPGO_PS_NA: Hyperdrive
+  HYPERDRIVE_CAPGO_PS_EU: Hyperdrive
+  HYPERDRIVE_CAPGO_PS_SA: Hyperdrive
+  HYPERDRIVE_CAPGO_PS_OC: Hyperdrive
+  HYPERDRIVE_CAPGO_PS_AS_JAPAN: Hyperdrive
+  HYPERDRIVE_CAPGO_PS_AS_INDIA: Hyperdrive
+  HYPERDRIVE_CAPGO_GG_ME: Hyperdrive
+  HYPERDRIVE_CAPGO_GG_AF: Hyperdrive
+  HYPERDRIVE_CAPGO_GG_HK: Hyperdrive
   ATTACHMENT_UPLOAD_HANDLER: DurableObjectNamespace
   ATTACHMENT_BUCKET: R2Bucket
 }
@@ -685,9 +691,12 @@ export async function readStatsCF(c: Context, params: ReadStatsParams) {
       searchFilter = `AND (position('${searchLower}' IN toLower(device_id)) > 0 OR position('${searchLower}' IN toLower(action)) > 0 OR position('${searchLower}' IN toLower(blob3)) > 0)`
   }
   const orderFilters: string[] = []
+  const allowedOrderKeys = new Set(['created_at', 'app_id', 'device_id', 'action', 'version_name'])
   if (params.order?.length) {
     params.order.forEach((col) => {
       if (col.sortable && typeof col.sortable === 'string') {
+        if (!allowedOrderKeys.has(col.key))
+          return
         cloudlog({ requestId: c.get('requestId'), message: 'order', colKey: col.key, colSortable: col.sortable })
         orderFilters.push(`${col.key} ${col.sortable.toUpperCase()}`)
       }
