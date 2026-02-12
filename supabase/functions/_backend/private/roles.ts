@@ -5,8 +5,9 @@ import { createHono, middlewareAuth, useCors } from '../utils/hono.ts'
 import { cloudlogErr } from '../utils/logging.ts'
 import { getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { schema } from '../utils/postgres_schema.ts'
+import { version } from '../utils/version.ts'
 
-export const app = createHono<MiddlewareKeyVariables>()
+export const app = createHono('', version)
 
 app.use('*', useCors)
 app.use('*', middlewareAuth)
