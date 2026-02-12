@@ -1,13 +1,12 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { and, eq } from 'drizzle-orm'
-import { Hono } from 'hono/tiny'
-import { middlewareAuth, useCors } from '../utils/hono.ts'
+import { createHono, middlewareAuth, useCors } from '../utils/hono.ts'
 import { cloudlogErr } from '../utils/logging.ts'
 import { getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { schema } from '../utils/postgres_schema.ts'
 
-export const app = new Hono<MiddlewareKeyVariables>()
+export const app = createHono<MiddlewareKeyVariables>()
 
 app.use('*', useCors)
 app.use('*', middlewareAuth)
