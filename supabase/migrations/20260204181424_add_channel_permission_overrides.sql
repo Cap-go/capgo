@@ -237,8 +237,7 @@ BEGIN
     -- If user doesn't have permission, check apikey permission
     IF NOT v_allowed AND p_apikey IS NOT NULL THEN
       SELECT rbac_id INTO v_apikey_principal
-      FROM public.apikeys
-      WHERE key = p_apikey
+      FROM public.find_apikey_by_value(p_apikey)
       LIMIT 1;
 
       IF v_apikey_principal IS NOT NULL THEN
