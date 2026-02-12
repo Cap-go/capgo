@@ -114,6 +114,7 @@ async function addChannel(name: string) {
 async function getData() {
   isLoading.value = true
   canPromoteChannel.value = {}
+  canReadChannel.value = {}
   try {
     let req = supabase
       .from('channels')
