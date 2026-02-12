@@ -162,20 +162,22 @@ const columns = ref<TableColumn[]>([
     key: 'perm',
     mobile: false,
     displayFunction: (item) => {
-      if (item.name) {
-        const org = organizationStore.getOrgByAppId(item.app_id)
-        const roleName = org?.role
-        if (!roleName)
-          return t('unknown')
+      if (!appRoleLoaded.value)
+        return t('loading')
 
-        // Normalize role (remove invite_ prefix if present)
-        const normalizedRole = roleName.replace(/^invite_/, '')
+      const appRole = appRoleByAppId.value.get(item.app_id)
+      const orgRole = organizationStore.getOrgByAppId(item.app_id)?.role
+      const roleName = appRole || orgRole
 
-        // Get i18n key and translate, or fallback to human-readable format
-        const i18nKey = getRbacRoleI18nKey(normalizedRole)
-        return i18nKey ? t(i18nKey) : normalizedRole.replaceAll('_', ' ')
-      }
-      return t('unknown')
+      if (!roleName)
+        return t('unknown')
+
+      // Normalize role (remove invite_ prefix if present)
+      const normalizedRole = roleName.replace(/^invite_/, '')
+
+      // Get i18n key and translate, or fallback to human-readable format
+      const i18nKey = getRbacRoleI18nKey(normalizedRole)
+      return i18nKey ? t(i18nKey) : normalizedRole.replaceAll('_', ' ')
     },
   },
   {
