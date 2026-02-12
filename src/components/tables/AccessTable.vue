@@ -5,6 +5,7 @@ import type { Database } from '~/types/supabase.types'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
+import IconShield from '~icons/heroicons/shield-check'
 import IconTrash from '~icons/heroicons/trash'
 import IconWrench from '~icons/heroicons/wrench'
 import { formatDate } from '~/services/date'
@@ -39,6 +40,13 @@ interface RoleBinding {
 
 type Element = RoleBinding
 
+type ChannelPermissionKey = 'channel.read' | 'channel.read_history' | 'channel.promote_bundle'
+
+interface ChannelSummary {
+  id: number
+  name: string
+}
+
 const { t } = useI18n()
 const dialogStore = useDialogV2Store()
 const supabase = useSupabase()
@@ -51,6 +59,12 @@ const isLoading = ref(true)
 const currentPage = ref(1)
 const canUpdateUserRoles = ref(false)
 const selectedRole = ref('')
+const channelOverrides = ref<Record<string, boolean>>({})
+const channelOverridesLoading = ref(false)
+const channelOverridesSearch = ref('')
+const channelOverridesSaving = ref<Record<string, boolean>>({})
+const selectedPrincipal = ref<Element | null>(null)
+const channels = ref<ChannelSummary[]>([])
 
 // Define app role options
 const appRoleOptions = computed(() => [
@@ -58,6 +72,73 @@ const appRoleOptions = computed(() => [
   { label: t('role-app-uploader'), value: 'app_uploader' },
   { label: t('role-app-reader'), value: 'app_reader' },
 ])
+
+const channelPermissionOptions = computed(() => [
+  { key: 'channel.read' as ChannelPermissionKey, label: t('channel-permission-read') },
+  { key: 'channel.read_history' as ChannelPermissionKey, label: t('channel-permission-history') },
+  { key: 'channel.promote_bundle' as ChannelPermissionKey, label: t('channel-permission-associate') },
+])
+
+const roleDefaultChannelPermissions: Record<string, Record<ChannelPermissionKey, boolean>> = {
+  app_admin: {
+    'channel.read': true,
+    'channel.read_history': true,
+    'channel.promote_bundle': true,
+  },
+  app_developer: {
+    'channel.read': true,
+    'channel.read_history': true,
+    'channel.promote_bundle': true,
+  },
+  app_uploader: {
+    'channel.read': true,
+    'channel.read_history': true,
+    'channel.promote_bundle': true,
+  },
+  app_reader: {
+    'channel.read': false,
+    'channel.read_history': false,
+    'channel.promote_bundle': false,
+  },
+}
+
+function getOverrideKey(channelId: number, permission: ChannelPermissionKey) {
+  return `${channelId}:${permission}`
+}
+
+function hasOverride(channelId: number, permission: ChannelPermissionKey) {
+  const key = getOverrideKey(channelId, permission)
+  return Object.prototype.hasOwnProperty.call(channelOverrides.value, key)
+}
+
+function getOverrideValue(channelId: number, permission: ChannelPermissionKey) {
+  const key = getOverrideKey(channelId, permission)
+  if (!hasOverride(channelId, permission))
+    return undefined
+  return channelOverrides.value[key]
+}
+
+function getDefaultPermission(roleName: string, permission: ChannelPermissionKey) {
+  return roleDefaultChannelPermissions[roleName]?.[permission] ?? false
+}
+
+function getSelectValue(channelId: number, permission: ChannelPermissionKey): 'default' | 'allow' | 'deny' {
+  const override = getOverrideValue(channelId, permission)
+  if (override === undefined)
+    return 'default'
+  return override ? 'allow' : 'deny'
+}
+
+function getDefaultLabel(roleName: string, permission: ChannelPermissionKey) {
+  return getDefaultPermission(roleName, permission)
+    ? t('channel-permissions-default-allow')
+    : t('channel-permissions-default-deny')
+}
+
+function isSavingOverride(channelId: number, permission: ChannelPermissionKey) {
+  const key = getOverrideKey(channelId, permission)
+  return !!channelOverridesSaving.value[key]
+}
 
 async function loadAppInfo() {
   try {
@@ -106,6 +187,159 @@ async function fetchData() {
   }
   finally {
     isLoading.value = false
+  }
+}
+
+const filteredChannels = computed(() => {
+  if (!channelOverridesSearch.value)
+    return channels.value
+  const searchLower = channelOverridesSearch.value.toLowerCase()
+  return channels.value.filter(channel => channel.name.toLowerCase().includes(searchLower))
+})
+
+async function loadChannelPermissions() {
+  if (!selectedPrincipal.value)
+    return
+
+  channelOverridesLoading.value = true
+  try {
+    const { data: channelData, error: channelError } = await supabase
+      .from('channels')
+      .select('id, name')
+      .eq('app_id', props.appId)
+      .order('name', { ascending: true })
+
+    if (channelError)
+      throw channelError
+
+    channels.value = (channelData as ChannelSummary[]) || []
+
+    if (channels.value.length === 0) {
+      channelOverrides.value = {}
+      return
+    }
+
+    const channelIds = channels.value.map(channel => channel.id)
+    const { data: overrides, error: overridesError } = await supabase
+      .from('channel_permission_overrides' as any)
+      .select('channel_id, permission_key, is_allowed')
+      .eq('principal_type', selectedPrincipal.value.principal_type)
+      .eq('principal_id', selectedPrincipal.value.principal_id)
+      .in('channel_id', channelIds)
+
+    if (overridesError)
+      throw overridesError
+
+    const nextOverrides: Record<string, boolean> = {}
+    for (const override of (overrides as any[] || [])) {
+      const key = getOverrideKey(override.channel_id, override.permission_key)
+      nextOverrides[key] = override.is_allowed
+    }
+    channelOverrides.value = nextOverrides
+  }
+  catch (error) {
+    console.error('Error loading channel permissions:', error)
+    toast.error(t('error-loading-channel-permissions'))
+  }
+  finally {
+    channelOverridesLoading.value = false
+  }
+}
+
+async function openChannelPermissions(element: Element) {
+  if (!canUpdateUserRoles.value)
+    return
+
+  selectedPrincipal.value = element
+  channelOverridesSearch.value = ''
+  channelOverrides.value = {}
+  channels.value = []
+
+  dialogStore.openDialog({
+    id: 'channel-permissions',
+    title: t('channel-permissions-title'),
+    description: t('channel-permissions-description'),
+    size: 'xl',
+    buttons: [
+      {
+        text: t('close'),
+        role: 'cancel',
+      },
+    ],
+  })
+
+  await loadChannelPermissions()
+}
+
+async function updateChannelPermission(channelId: number, permission: ChannelPermissionKey, value: 'default' | 'allow' | 'deny') {
+  if (!selectedPrincipal.value || !canUpdateUserRoles.value)
+    return
+
+  const key = getOverrideKey(channelId, permission)
+  if (channelOverridesSaving.value[key])
+    return
+
+  const roleName = selectedPrincipal.value.role_name
+  const defaultAllowed = getDefaultPermission(roleName, permission)
+  const previousOverrides = { ...channelOverrides.value }
+
+  channelOverridesSaving.value = { ...channelOverridesSaving.value, [key]: true }
+
+  let nextOverride: boolean | null = null
+  if (value === 'default') {
+    nextOverride = null
+  }
+  else {
+    const isAllowed = value === 'allow'
+    nextOverride = isAllowed === defaultAllowed ? null : isAllowed
+  }
+
+  if (nextOverride === null) {
+    const updated = { ...channelOverrides.value }
+    delete updated[key]
+    channelOverrides.value = updated
+  }
+  else {
+    channelOverrides.value = { ...channelOverrides.value, [key]: nextOverride }
+  }
+
+  try {
+    if (nextOverride === null) {
+      const { error } = await supabase
+        .from('channel_permission_overrides' as any)
+        .delete()
+        .eq('principal_type', selectedPrincipal.value.principal_type)
+        .eq('principal_id', selectedPrincipal.value.principal_id)
+        .eq('channel_id', channelId)
+        .eq('permission_key', permission)
+
+      if (error)
+        throw error
+    }
+    else {
+      const { error } = await supabase
+        .from('channel_permission_overrides' as any)
+        .upsert({
+          principal_type: selectedPrincipal.value.principal_type,
+          principal_id: selectedPrincipal.value.principal_id,
+          channel_id: channelId,
+          permission_key: permission,
+          is_allowed: nextOverride,
+        }, { onConflict: 'principal_type,principal_id,channel_id,permission_key' })
+
+      if (error)
+        throw error
+    }
+  }
+  catch (error) {
+    console.error('Error saving channel permission override:', error)
+    channelOverrides.value = previousOverrides
+    toast.error(t('error-saving-channel-permissions'))
+  }
+  finally {
+    const updatedSaving = { ...channelOverridesSaving.value }
+    delete updatedSaving[key]
+    channelOverridesSaving.value = updatedSaving
   }
 }
 
@@ -319,6 +553,10 @@ const dynamicColumns = computed<TableColumn[]>(() => {
       label: t('actions'),
       actions: [
         {
+          icon: IconShield,
+          onClick: (row: Element) => openChannelPermissions(row),
+        },
+        {
           icon: IconWrench,
           onClick: (row: Element) => changeUserRole(row),
         },
@@ -378,6 +616,95 @@ watch(dynamicColumns, (newCols) => {
             </label>
           </div>
         </div>
+      </div>
+    </div>
+  </Teleport>
+
+  <Teleport
+    v-if="dialogStore.showDialog && dialogStore.dialogOptions?.id === 'channel-permissions'"
+    defer
+    to="#dialog-v2-content"
+  >
+    <div class="space-y-4">
+      <div class="space-y-1">
+        <div class="text-xs font-semibold tracking-wide text-gray-400 uppercase">
+          {{ t('channel-permissions-principal') }}
+        </div>
+        <div class="text-base text-gray-900 dark:text-gray-100">
+          {{ selectedPrincipal?.principal_name || '-' }}
+        </div>
+        <div class="text-xs text-gray-500">
+          {{ t('channel-permissions-role') }}: {{ selectedPrincipal ? getRoleDisplayName(selectedPrincipal.role_name) : '-' }}
+        </div>
+      </div>
+
+      <div>
+        <input
+          v-model="channelOverridesSearch"
+          type="text"
+          class="w-full d-input d-input-bordered"
+          :placeholder="t('search-channels')"
+        >
+      </div>
+
+      <div v-if="channelOverridesLoading" class="py-6 text-sm text-gray-500">
+        {{ t('loading') }}...
+      </div>
+
+      <div v-else-if="filteredChannels.length === 0" class="py-6 text-sm text-gray-500">
+        {{ t('channel-permissions-empty') }}
+      </div>
+
+      <div v-else class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg">
+        <table class="min-w-full text-sm">
+          <thead class="bg-slate-50 dark:bg-slate-900/40">
+            <tr>
+              <th class="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-200">
+                {{ t('channels') }}
+              </th>
+              <th
+                v-for="perm in channelPermissionOptions"
+                :key="perm.key"
+                class="px-3 py-2 text-left font-semibold text-gray-700 dark:text-gray-200"
+              >
+                {{ perm.label }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="channel in filteredChannels"
+              :key="channel.id"
+              class="border-t border-slate-200 dark:border-slate-700"
+            >
+              <td class="px-3 py-2 text-gray-900 dark:text-gray-100">
+                {{ channel.name }}
+              </td>
+              <td
+                v-for="perm in channelPermissionOptions"
+                :key="perm.key"
+                class="px-3 py-2"
+              >
+                <select
+                  class="w-full d-select d-select-sm d-select-bordered"
+                  :value="getSelectValue(channel.id, perm.key)"
+                  :disabled="isSavingOverride(channel.id, perm.key)"
+                  @change="updateChannelPermission(channel.id, perm.key, ($event.target as HTMLSelectElement).value as 'default' | 'allow' | 'deny')"
+                >
+                  <option value="default">
+                    {{ getDefaultLabel(selectedPrincipal?.role_name || 'app_reader', perm.key) }}
+                  </option>
+                  <option value="allow">
+                    {{ t('channel-permissions-allow') }}
+                  </option>
+                  <option value="deny">
+                    {{ t('channel-permissions-deny') }}
+                  </option>
+                </select>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </Teleport>
