@@ -165,7 +165,7 @@ const columns = ref<TableColumn[]>([
       if (!appRoleLoaded.value)
         return t('loading')
 
-      const roleName = appRoleByAppId.value.get(item.id)
+      const roleName = appRoleByAppId.value.get(item.app_id)
       if (!roleName)
         return t('none')
 
