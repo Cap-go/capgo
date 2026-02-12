@@ -51,7 +51,7 @@ function buildPlanValidationExpression(
     SELECT 1
     FROM ${schema.orgs}
     WHERE ${schema.orgs.id} = ${ownerColumn}
-      AND COALESCE(to_jsonb(orgs) ->> 'has_usage_credits', 'false')::boolean = true
+      AND COALESCE((to_jsonb(orgs) ->> 'has_usage_credits')::boolean, false) = true
   )`
   return sql<boolean>`(${hasCreditsExpression}) OR EXISTS (
     SELECT 1
