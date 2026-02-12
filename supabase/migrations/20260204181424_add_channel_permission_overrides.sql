@@ -108,10 +108,13 @@ DECLARE
   v_allowed boolean := false;
   v_use_rbac boolean;
   v_effective_org_id uuid := p_org_id;
+  v_effective_user_id uuid := p_user_id;
   v_legacy_right public.user_min_right;
   v_apikey_principal uuid;
   v_override boolean;
   v_channel_scope boolean := false;
+  v_org_enforcing_2fa boolean;
+  v_password_policy_ok boolean;
 BEGIN
   -- Validate permission key
   IF p_permission_key IS NULL OR p_permission_key = '' THEN
@@ -136,6 +139,48 @@ BEGIN
     FROM public.channels
     WHERE id = p_channel_id
     LIMIT 1;
+  END IF;
+
+  -- Resolve user from API key when needed (handles hashed keys too).
+  IF v_effective_user_id IS NULL AND p_apikey IS NOT NULL THEN
+    SELECT user_id INTO v_effective_user_id
+    FROM public.find_apikey_by_value(p_apikey)
+    LIMIT 1;
+  END IF;
+
+  -- Enforce 2FA if the org requires it.
+  IF v_effective_org_id IS NOT NULL THEN
+    SELECT enforcing_2fa INTO v_org_enforcing_2fa
+    FROM public.orgs
+    WHERE id = v_effective_org_id;
+
+    IF v_org_enforcing_2fa = true AND (v_effective_user_id IS NULL OR NOT public.has_2fa_enabled(v_effective_user_id)) THEN
+      PERFORM public.pg_log('deny: RBAC_CHECK_PERM_2FA_ENFORCEMENT', jsonb_build_object(
+        'permission', p_permission_key,
+        'org_id', v_effective_org_id,
+        'app_id', p_app_id,
+        'channel_id', p_channel_id,
+        'user_id', v_effective_user_id,
+        'has_apikey', p_apikey IS NOT NULL
+      ));
+      RETURN false;
+    END IF;
+  END IF;
+
+  -- Enforce password policy if enabled for the org.
+  IF v_effective_org_id IS NOT NULL THEN
+    v_password_policy_ok := public.user_meets_password_policy(v_effective_user_id, v_effective_org_id);
+    IF v_password_policy_ok = false THEN
+      PERFORM public.pg_log('deny: RBAC_CHECK_PERM_PASSWORD_POLICY_ENFORCEMENT', jsonb_build_object(
+        'permission', p_permission_key,
+        'org_id', v_effective_org_id,
+        'app_id', p_app_id,
+        'channel_id', p_channel_id,
+        'user_id', v_effective_user_id,
+        'has_apikey', p_apikey IS NOT NULL
+      ));
+      RETURN false;
+    END IF;
   END IF;
 
   -- Check if RBAC is enabled for this org
