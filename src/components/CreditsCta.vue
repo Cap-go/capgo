@@ -28,9 +28,10 @@ function goToCredits() {
 
 <template>
   <!-- Credits-only info banner: shown for orgs using credits without a plan -->
-  <div
+  <button
     v-if="props.creditsOnly"
-    class="flex items-center w-full p-4 transition-all duration-200 border cursor-pointer bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-700 rounded-xl group"
+    type="button"
+    class="flex items-center w-full p-4 text-left transition-all duration-200 border cursor-pointer bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 hover:border-blue-300 dark:hover:border-blue-700 rounded-xl group"
     @click="goToCredits"
   >
     <!-- Icon -->
@@ -55,13 +56,14 @@ function goToCredits() {
       </span>
       <IconChevronRight class="w-5 h-5 ml-1 text-blue-600 transition-transform dark:text-blue-400 group-hover:translate-x-0.5" />
     </div>
-  </div>
+  </button>
 
   <!-- Default CTA: "Don't want to upgrade?" — hidden for credits-only orgs
        because they already know about credits and this message would be confusing -->
-  <div
+  <button
     v-else
-    class="flex items-center w-full p-4 transition-all duration-200 border cursor-pointer bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 rounded-xl group"
+    type="button"
+    class="flex items-center w-full p-4 text-left transition-all duration-200 border cursor-pointer bg-gray-50 dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 rounded-xl group"
     @click="goToCredits"
   >
     <!-- Icon -->
@@ -86,5 +88,5 @@ function goToCredits() {
       </span>
       <IconChevronRight class="w-5 h-5 ml-1 text-blue-600 transition-transform dark:text-blue-400 group-hover:translate-x-0.5" />
     </div>
-  </div>
+  </button>
 </template>
