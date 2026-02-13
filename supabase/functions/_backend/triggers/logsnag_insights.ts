@@ -353,10 +353,6 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
 function getStats(c: Context): GlobalStats {
   const supabase = supabaseAdmin(c)
   const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-  const todayStart = new Date()
-  todayStart.setUTCHours(0, 0, 0, 0)
-  const todayStartIso = todayStart.toISOString()
-  const tomorrowStartIso = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000).toISOString()
   return {
     apps: countAllApps(c),
     updates: countAllUpdates(c),
@@ -520,8 +516,7 @@ function getStats(c: Context): GlobalStats {
     demo_apps_created: supabase
       .from('apps')
       .select('id', { count: 'exact', head: true })
-      .gte('created_at', todayStartIso)
-      .lt('created_at', tomorrowStartIso)
+      .gte('created_at', last24h)
       .like('app_id', `${DEMO_APP_PREFIX}%`)
       .then((res) => {
         if (res.error) {
