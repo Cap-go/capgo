@@ -239,18 +239,6 @@ app.get('/org-balance/:orgId', middlewareV2(['all']), async (c) => {
   })
 })
 
-interface OrgCreditTransaction {
-  transaction_type: 'grant' | 'purchase' | 'manual_grant' | 'deduction' | 'expiry' | 'refund'
-  amount: number
-  occurred_at: string
-}
-
-interface OrgCreditConsumption {
-  credits_used: number
-  metric: 'mau' | 'bandwidth' | 'storage' | 'build_time'
-  applied_at: string
-}
-
 interface CreditStatsAggregate {
   purchased: number
   granted: number
@@ -267,29 +255,10 @@ interface UsageMetricStats {
   events: number
 }
 
-function roundCredits(value: number): number {
-  return Math.round(value * 100) / 100
-}
-
-function isWithinWindow(dateInput: string | null | undefined, sinceMs: number): boolean {
-  if (!dateInput)
-    return false
-  const parsed = Date.parse(dateInput)
-  if (Number.isNaN(parsed))
-    return false
-  return parsed >= sinceMs
-}
-
-function createEmptyAggregate(): CreditStatsAggregate {
-  return {
-    purchased: 0,
-    granted: 0,
-    used: 0,
-    expired: 0,
-    deducted: 0,
-    refunded: 0,
-    net: 0,
-  }
+interface OrgCreditStatsPayload {
+  totals: CreditStatsAggregate
+  last_30_days: CreditStatsAggregate
+  usage_by_metric: Record<string, UsageMetricStats>
 }
 
 function createBaseMetricStats(): Record<string, UsageMetricStats> {
@@ -301,25 +270,30 @@ function createBaseMetricStats(): Record<string, UsageMetricStats> {
   }
 }
 
-function roundAggregate(aggregate: CreditStatsAggregate): CreditStatsAggregate {
+function toFiniteNumber(value: unknown): number {
+  const numeric = Number(value ?? 0)
+  return Number.isFinite(numeric) ? numeric : 0
+}
+
+function normalizeAggregate(aggregate: Partial<CreditStatsAggregate> | undefined): CreditStatsAggregate {
   return {
-    purchased: roundCredits(aggregate.purchased),
-    granted: roundCredits(aggregate.granted),
-    used: roundCredits(aggregate.used),
-    expired: roundCredits(aggregate.expired),
-    deducted: roundCredits(aggregate.deducted),
-    refunded: roundCredits(aggregate.refunded),
-    net: roundCredits(aggregate.net),
+    purchased: toFiniteNumber(aggregate?.purchased),
+    granted: toFiniteNumber(aggregate?.granted),
+    used: toFiniteNumber(aggregate?.used),
+    expired: toFiniteNumber(aggregate?.expired),
+    deducted: toFiniteNumber(aggregate?.deducted),
+    refunded: toFiniteNumber(aggregate?.refunded),
+    net: toFiniteNumber(aggregate?.net),
   }
 }
 
-function roundMetrics(metrics: Record<string, UsageMetricStats>): Record<string, UsageMetricStats> {
-  const result: Record<string, UsageMetricStats> = {}
-  for (const [metric, values] of Object.entries(metrics)) {
+function normalizeMetrics(metrics: Record<string, Partial<UsageMetricStats>> | undefined): Record<string, UsageMetricStats> {
+  const result = createBaseMetricStats()
+  for (const [metric, values] of Object.entries(metrics || {})) {
     result[metric] = {
-      used_total: roundCredits(values.used_total),
-      last_30_days: roundCredits(values.last_30_days),
-      events: values.events,
+      used_total: toFiniteNumber(values.used_total),
+      last_30_days: toFiniteNumber(values.last_30_days),
+      events: Math.trunc(toFiniteNumber(values.events)),
     }
   }
   return result
@@ -340,122 +314,27 @@ app.get('/org-stats/:orgId', middlewareV2(['all']), async (c) => {
   }
 
   const adminSupabase = supabaseAdmin(c)
-  const sinceMs = Date.now() - (30 * 24 * 60 * 60 * 1000)
+  const { data: rpcResult, error } = await (adminSupabase as any)
+    .rpc('get_admin_org_credit_stats', { p_org_id: orgId })
+    .single()
 
-  const [transactionsResult, consumptionsResult] = await Promise.all([
-    adminSupabase
-      .from('usage_credit_transactions')
-      .select('transaction_type, amount, occurred_at')
-      .eq('org_id', orgId),
-    adminSupabase
-      .from('usage_credit_consumptions')
-      .select('credits_used, metric, applied_at')
-      .eq('org_id', orgId),
-  ])
-
-  if (transactionsResult.error) {
+  if (error) {
     cloudlogErr({
       requestId: c.get('requestId'),
-      message: 'admin_get_org_credit_stats_transactions_failed',
+      message: 'admin_get_org_credit_stats_failed',
       orgId,
-      error: transactionsResult.error,
+      error,
     })
     throw simpleError('org_stats_fetch_failed', 'Failed to fetch organization credit stats')
   }
 
-  if (consumptionsResult.error) {
-    cloudlogErr({
-      requestId: c.get('requestId'),
-      message: 'admin_get_org_credit_stats_consumptions_failed',
-      orgId,
-      error: consumptionsResult.error,
-    })
-    throw simpleError('org_stats_fetch_failed', 'Failed to fetch organization credit stats')
-  }
-
-  const transactions = (transactionsResult.data || []) as OrgCreditTransaction[]
-  const consumptions = (consumptionsResult.data || []) as OrgCreditConsumption[]
-
-  const totals = createEmptyAggregate()
-  const last30Days = createEmptyAggregate()
-  const usageByMetric = createBaseMetricStats()
-
-  for (const transaction of transactions) {
-    const amount = Number(transaction.amount || 0)
-    const isRecent = isWithinWindow(transaction.occurred_at, sinceMs)
-
-    totals.net += amount
-    if (isRecent)
-      last30Days.net += amount
-
-    if (transaction.transaction_type === 'purchase') {
-      const value = Math.max(amount, 0)
-      totals.purchased += value
-      if (isRecent)
-        last30Days.purchased += value
-      continue
-    }
-
-    if (transaction.transaction_type === 'grant' || transaction.transaction_type === 'manual_grant') {
-      const value = Math.max(amount, 0)
-      totals.granted += value
-      if (isRecent)
-        last30Days.granted += value
-      continue
-    }
-
-    if (transaction.transaction_type === 'refund') {
-      const value = Math.max(amount, 0)
-      totals.refunded += value
-      if (isRecent)
-        last30Days.refunded += value
-      continue
-    }
-
-    if (transaction.transaction_type === 'expiry') {
-      const value = Math.abs(Math.min(amount, 0))
-      totals.expired += value
-      if (isRecent)
-        last30Days.expired += value
-      continue
-    }
-
-    if (transaction.transaction_type === 'deduction') {
-      const value = Math.abs(Math.min(amount, 0))
-      totals.deducted += value
-      if (isRecent)
-        last30Days.deducted += value
-    }
-  }
-
-  for (const consumption of consumptions) {
-    const used = Number(consumption.credits_used || 0)
-    const isRecent = isWithinWindow(consumption.applied_at, sinceMs)
-    const metric = consumption.metric || 'unknown'
-
-    totals.used += used
-    if (isRecent)
-      last30Days.used += used
-
-    if (!usageByMetric[metric]) {
-      usageByMetric[metric] = {
-        used_total: 0,
-        last_30_days: 0,
-        events: 0,
-      }
-    }
-
-    usageByMetric[metric].used_total += used
-    usageByMetric[metric].events += 1
-    if (isRecent)
-      usageByMetric[metric].last_30_days += used
-  }
+  const stats = (rpcResult || {}) as Partial<OrgCreditStatsPayload>
 
   return c.json({
     stats: {
-      totals: roundAggregate(totals),
-      last_30_days: roundAggregate(last30Days),
-      usage_by_metric: roundMetrics(usageByMetric),
+      totals: normalizeAggregate(stats.totals),
+      last_30_days: normalizeAggregate(stats.last_30_days),
+      usage_by_metric: normalizeMetrics(stats.usage_by_metric),
     },
   })
 })

@@ -519,10 +519,10 @@ onMounted(async () => {
                       {{ t('credit-transaction-deduction') }}
                     </div>
                     <div class="mt-1 text-lg font-semibold text-gray-900 dark:text-white">
-                      {{ formatCredits(orgStats.totals.used) }}
+                      {{ formatCredits(orgStats.totals.deducted) }}
                     </div>
                     <div class="text-xs text-gray-500 dark:text-gray-400">
-                      {{ t('30-days') }}: {{ formatCredits(orgStats.last_30_days.used) }}
+                      {{ t('30-days') }}: {{ formatCredits(orgStats.last_30_days.deducted) }}
                     </div>
                   </div>
 
@@ -559,7 +559,7 @@ onMounted(async () => {
               </div>
 
               <div v-else class="mt-2 text-gray-500 dark:text-gray-400">
-                {{ t('admin-credits-no-balance') }}
+                {{ t('no-data') }}
               </div>
             </div>
 
