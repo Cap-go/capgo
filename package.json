@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.110.1",
+  "version": "12.110.4",
   "private": true,
   "license": "GPL-3.0",
   "scripts": {
@@ -10,6 +10,7 @@
     "readreplicate:replica": "bash read_replicate/replicate_to_replica.sh",
     "readreplicate:indexes": "bash read_replicate/replicate_ensure_indexes.sh",
     "readreplicate:add-table": "bash read_replicate/replicate_add_table.sh",
+    "cloudsql:allow-cloudflare": "bash scripts/update_cloudsql_authorized_networks.sh",
     "env:hard-setup": "supabase stop && supabase start && supabase db reset",
     "preview": "vite preview",
     "preview:https": "serve dist",
