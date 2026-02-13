@@ -3,7 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import type { AppStats, StatsActions } from '../utils/types.ts'
 import { greaterOrEqual, parse } from '@std/semver'
-import { eq, sql } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
@@ -24,9 +24,7 @@ const PLAN_ERROR = 'Cannot send stats, upgrade plan to continue to update'
 async function allowDeviceCustomIdFromPg(drizzleClient: ReturnType<typeof getDrizzleClient>, app_id: string): Promise<boolean> {
   const res = await drizzleClient
     .select({
-      // Replicas may lag schema changes. Read via to_jsonb(row)->>... so the
-      // query still parses even if the column doesn't exist yet.
-      allow_device_custom_id: sql<boolean>`COALESCE((to_jsonb(apps) ->> 'allow_device_custom_id')::boolean, true)`,
+      allow_device_custom_id: schema.apps.allow_device_custom_id,
     })
     .from(schema.apps)
     .where(eq(schema.apps.app_id, app_id))
