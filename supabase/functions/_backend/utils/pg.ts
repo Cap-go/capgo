@@ -971,6 +971,7 @@ export interface AdminGlobalStatsTrend {
   plan_team: number
   plan_enterprise: number
   registers_today: number
+  demo_apps_created: number
   devices_last_month: number
   devices_last_month_ios: number
   devices_last_month_android: number
@@ -1032,6 +1033,7 @@ export async function getAdminGlobalStatsTrend(
         plan_team::int,
         plan_enterprise::int,
         registers_today::int,
+        COALESCE(demo_apps_created, 0)::int AS demo_apps_created,
         devices_last_month::int,
         COALESCE(devices_last_month_ios, 0)::int AS devices_last_month_ios,
         COALESCE(devices_last_month_android, 0)::int AS devices_last_month_android,
@@ -1083,6 +1085,7 @@ export async function getAdminGlobalStatsTrend(
       plan_team: Number(row.plan_team) || 0,
       plan_enterprise: Number(row.plan_enterprise) || 0,
       registers_today: Number(row.registers_today) || 0,
+      demo_apps_created: Number(row.demo_apps_created) || 0,
       devices_last_month: Number(row.devices_last_month) || 0,
       devices_last_month_ios: Number(row.devices_last_month_ios) || 0,
       devices_last_month_android: Number(row.devices_last_month_android) || 0,
