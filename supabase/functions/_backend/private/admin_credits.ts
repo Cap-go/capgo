@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { z } from 'zod/mini'
-import { createHono, parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { BRES, createHono, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -51,6 +51,7 @@ async function verifyAdmin(c: AppContext): Promise<{ isAdmin: boolean, userId: s
 export const app = createHono('', version)
 
 app.use('*', useCors)
+app.options('*', c => c.json(BRES))
 
 // Grant credits to an organization (admin only)
 app.post('/grant', middlewareV2(['all']), async (c) => {
@@ -235,6 +236,106 @@ app.get('/org-balance/:orgId', middlewareV2(['all']), async (c) => {
 
   return c.json({
     balance: balance || { total_credits: 0, available_credits: 0, next_expiration: null },
+  })
+})
+
+interface CreditStatsAggregate {
+  purchased: number
+  granted: number
+  used: number
+  expired: number
+  deducted: number
+  refunded: number
+  net: number
+}
+
+interface UsageMetricStats {
+  used_total: number
+  last_30_days: number
+  events: number
+}
+
+interface OrgCreditStatsPayload {
+  totals: CreditStatsAggregate
+  last_30_days: CreditStatsAggregate
+  usage_by_metric: Record<string, UsageMetricStats>
+}
+
+function createBaseMetricStats(): Record<string, UsageMetricStats> {
+  return {
+    mau: { used_total: 0, last_30_days: 0, events: 0 },
+    bandwidth: { used_total: 0, last_30_days: 0, events: 0 },
+    storage: { used_total: 0, last_30_days: 0, events: 0 },
+    build_time: { used_total: 0, last_30_days: 0, events: 0 },
+  }
+}
+
+function toFiniteNumber(value: unknown): number {
+  const numeric = Number(value ?? 0)
+  return Number.isFinite(numeric) ? numeric : 0
+}
+
+function normalizeAggregate(aggregate: Partial<CreditStatsAggregate> | undefined): CreditStatsAggregate {
+  return {
+    purchased: toFiniteNumber(aggregate?.purchased),
+    granted: toFiniteNumber(aggregate?.granted),
+    used: toFiniteNumber(aggregate?.used),
+    expired: toFiniteNumber(aggregate?.expired),
+    deducted: toFiniteNumber(aggregate?.deducted),
+    refunded: toFiniteNumber(aggregate?.refunded),
+    net: toFiniteNumber(aggregate?.net),
+  }
+}
+
+function normalizeMetrics(metrics: Record<string, Partial<UsageMetricStats>> | undefined): Record<string, UsageMetricStats> {
+  const result = createBaseMetricStats()
+  for (const [metric, values] of Object.entries(metrics || {})) {
+    result[metric] = {
+      used_total: toFiniteNumber(values.used_total),
+      last_30_days: toFiniteNumber(values.last_30_days),
+      events: Math.trunc(toFiniteNumber(values.events)),
+    }
+  }
+  return result
+}
+
+// Get org credit statistics (admin only)
+app.get('/org-stats/:orgId', middlewareV2(['all']), async (c) => {
+  const { isAdmin } = await verifyAdmin(c)
+
+  if (!isAdmin) {
+    throw simpleError('not_admin', 'Only admin users can view organization credit stats')
+  }
+
+  const orgId = c.req.param('orgId')
+
+  if (!orgId) {
+    throw simpleError('missing_org_id', 'Organization ID is required')
+  }
+
+  const adminSupabase = supabaseAdmin(c)
+  const { data: rpcResult, error } = await (adminSupabase as any)
+    .rpc('get_admin_org_credit_stats', { p_org_id: orgId })
+    .single()
+
+  if (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'admin_get_org_credit_stats_failed',
+      orgId,
+      error,
+    })
+    throw simpleError('org_stats_fetch_failed', 'Failed to fetch organization credit stats')
+  }
+
+  const stats = (rpcResult || {}) as Partial<OrgCreditStatsPayload>
+
+  return c.json({
+    stats: {
+      totals: normalizeAggregate(stats.totals),
+      last_30_days: normalizeAggregate(stats.last_30_days),
+      usage_by_metric: normalizeMetrics(stats.usage_by_metric),
+    },
   })
 })
 
