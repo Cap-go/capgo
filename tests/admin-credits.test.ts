@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto'
+import { env } from 'node:process'
+import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { BASE_URL, getSupabaseClient, headers, ORG_ID, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
@@ -6,6 +8,46 @@ import { BASE_URL, getSupabaseClient, headers, ORG_ID, TEST_EMAIL, USER_ID } fro
 const TEST_ORG_ID = randomUUID()
 const TEST_ORG_NAME = `Admin Credits Test Org ${TEST_ORG_ID}`
 const TEST_CUSTOMER_ID = `cus_admin_credits_test_${TEST_ORG_ID}`
+const ADMIN_EMAIL = 'admin@capgo.app'
+const ADMIN_PASSWORD = 'adminadmin'
+
+let adminHeadersCache: Record<string, string> | null = null
+
+async function getAdminHeaders() {
+  if (adminHeadersCache)
+    return adminHeadersCache
+
+  const supabaseUrl = env.SUPABASE_URL
+  const supabaseAnonKey = env.SUPABASE_ANON_KEY
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('SUPABASE_URL or SUPABASE_ANON_KEY is missing for admin auth headers')
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  })
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: ADMIN_EMAIL,
+    password: ADMIN_PASSWORD,
+  })
+
+  if (error || !data.session?.access_token) {
+    throw error ?? new Error('Unable to obtain admin JWT for tests')
+  }
+
+  adminHeadersCache = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${data.session.access_token}`,
+  }
+
+  return adminHeadersCache
+}
 
 beforeAll(async () => {
   // Create stripe_info for the test org
@@ -34,6 +76,8 @@ beforeAll(async () => {
 
 afterAll(async () => {
   // Clean up test data
+  await getSupabaseClient().from('usage_credit_transactions').delete().eq('org_id', TEST_ORG_ID)
+  await getSupabaseClient().from('usage_credit_grants').delete().eq('org_id', TEST_ORG_ID)
   await getSupabaseClient().from('orgs').delete().eq('id', TEST_ORG_ID)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', TEST_CUSTOMER_ID)
 })
@@ -256,6 +300,59 @@ describe('[GET] /private/admin_credits/grants-history - Admin Access Control', (
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('not_admin')
+  })
+})
+
+describe('admin credits - admin JWT access', () => {
+  it('should allow admin user to search organizations', async () => {
+    const adminHeaders = await getAdminHeaders()
+
+    const response = await fetch(`${BASE_URL}/private/admin_credits/search-orgs?q=${TEST_ORG_ID}`, {
+      method: 'GET',
+      headers: adminHeaders,
+    })
+
+    expect(response.status).toBe(200)
+    const data = await response.json() as { orgs: Array<{ id: string }> }
+    expect(Array.isArray(data.orgs)).toBe(true)
+    expect(data.orgs.some(org => org.id === TEST_ORG_ID)).toBe(true)
+  })
+
+  it('should allow admin user to grant credits', async () => {
+    const adminHeaders = await getAdminHeaders()
+
+    const grantResponse = await fetch(`${BASE_URL}/private/admin_credits/grant`, {
+      method: 'POST',
+      headers: adminHeaders,
+      body: JSON.stringify({
+        org_id: TEST_ORG_ID,
+        amount: 25,
+        notes: 'Admin grant test',
+      }),
+    })
+
+    expect(grantResponse.status).toBe(200)
+    const grantData = await grantResponse.json() as {
+      success: boolean
+      org: { id: string }
+    }
+    expect(grantData.success).toBe(true)
+    expect(grantData.org.id).toBe(TEST_ORG_ID)
+
+    const balanceResponse = await fetch(`${BASE_URL}/private/admin_credits/org-balance/${TEST_ORG_ID}`, {
+      method: 'GET',
+      headers: adminHeaders,
+    })
+    expect(balanceResponse.status).toBe(200)
+
+    const balanceData = await balanceResponse.json() as {
+      balance: {
+        total_credits: number
+        available_credits: number
+      }
+    }
+    expect(balanceData.balance.total_credits).toBeGreaterThanOrEqual(25)
+    expect(balanceData.balance.available_credits).toBeGreaterThanOrEqual(25)
   })
 })
 
