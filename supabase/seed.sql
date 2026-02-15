@@ -10,7 +10,7 @@ BEGIN
     END IF;
 
     IF NOT EXISTS (SELECT 1 FROM vault.secrets WHERE name = 'db_url') THEN
-        PERFORM vault.create_secret('http://172.17.0.1:54321', 'db_url', 'db url');
+        PERFORM vault.create_secret('http://kong:8000', 'db_url', 'db url');
     END IF;
 
     IF NOT EXISTS (SELECT 1 FROM vault.secrets WHERE name = 'apikey') THEN
