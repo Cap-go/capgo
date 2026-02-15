@@ -79,25 +79,35 @@ function rewriteLocationHeader(c: Context, supabaseLocation: string): string {
   }
 
   const supabaseUrl = getEnv(c, 'SUPABASE_URL')
+  const localExternalBaseUrl = getEnv(c, 'SUPABASE_EXTERNAL_URL') || getEnv(c, 'API_URL') || 'http://localhost:54321'
   const isLocalDev = supabaseUrl.includes('kong:8000')
 
   let forwardedHost = c.req.header('X-Forwarded-Host')
   const forwardedProto = c.req.header('X-Forwarded-Proto') || 'https'
 
-  if (isLocalDev && forwardedHost && !forwardedHost.includes(':')) {
-    if (forwardedHost === 'localhost' || forwardedHost === '127.0.0.1') {
-      forwardedHost = `${forwardedHost}:54321`
+  if (isLocalDev && forwardedHost) {
+    try {
+      const localExternalUrl = new URL(localExternalBaseUrl)
+      const localPort = localExternalUrl.port
+      if (localPort) {
+        const [forwardedHostName] = forwardedHost.split(':')
+        if (forwardedHostName === 'localhost' || forwardedHostName === '127.0.0.1')
+          forwardedHost = `${forwardedHostName}:${localPort}`
+      }
+    }
+    catch {
+      // Keep forwarded host untouched; fallback logic below handles defaults.
     }
   }
 
-  cloudlog({ requestId, message: 'rewriteLocationHeader debug', supabaseUrl, forwardedHost, forwardedProto, isLocalDev })
+  cloudlog({ requestId, message: 'rewriteLocationHeader debug', supabaseUrl, localExternalBaseUrl, forwardedHost, forwardedProto, isLocalDev })
 
   let baseUrl: string
   if (forwardedHost) {
     baseUrl = `${forwardedProto}://${forwardedHost}`
   }
   else if (isLocalDev) {
-    baseUrl = 'http://localhost:54321'
+    baseUrl = localExternalBaseUrl
   }
   else {
     cloudlog({

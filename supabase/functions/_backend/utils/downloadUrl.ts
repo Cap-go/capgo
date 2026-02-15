@@ -3,6 +3,7 @@ import type { Database } from './supabase.types.ts'
 import { getRuntimeKey } from 'hono/adapter'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { s3 } from './s3.ts'
+import { getEnv } from './utils.ts'
 
 const EXPIRATION_SECONDS = 604800
 const BASE_PATH = 'files/read/attachments'
@@ -11,6 +12,19 @@ export interface ManifestEntry {
   file_name: string | null
   file_hash: string | null
   download_url: string | null
+}
+
+function getLocalHost(c: Context, fallbackHost: string): string {
+  const externalUrl = getEnv(c, 'SUPABASE_EXTERNAL_URL') || getEnv(c, 'API_URL')
+  if (externalUrl) {
+    try {
+      return new URL(externalUrl).host
+    }
+    catch {
+      return fallbackHost
+    }
+  }
+  return fallbackHost
 }
 
 export async function getBundleUrl(
@@ -39,8 +53,8 @@ export async function getBundleUrl(
   const url = new URL(c.req.url)
   let finalPath = BASE_PATH
   // .replace('http://supabase_edge_runtime_capgo:8081', 'http://localhost:54321')
-  if (url.host === 'supabase_edge_runtime_capgo-app:8081') {
-    url.host = 'localhost:54321'
+  if (url.host.includes('supabase_edge_runtime') && url.port === '8081') {
+    url.host = getLocalHost(c, 'localhost:54321')
     finalPath = `functions/v1/${BASE_PATH}`
   }
   const downloadUrl = `${url.protocol}//${url.host}/${finalPath}/${r2_path}?key=${checksum}&device_id=${deviceId}`
@@ -56,8 +70,8 @@ export function getManifestUrl(c: Context, versionId: number, manifest: Partial<
     const url = new URL(c.req.url)
     let finalPath = BASE_PATH
     // .replace('http://supabase_edge_runtime_capgo:8081', 'http://localhost:54321')
-    if (url.host === 'supabase_edge_runtime_capgo:8081') {
-      url.host = 'localhost:54321'
+    if (url.host.includes('supabase_edge_runtime') && url.port === '8081') {
+      url.host = getLocalHost(c, 'localhost:54321')
       finalPath = `functions/v1/${BASE_PATH}`
     }
     const signKey = versionId

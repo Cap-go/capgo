@@ -7,7 +7,7 @@ interface UploadResponse {
 }
 
 describe('upload_link', async () => {
-  const API_URL = process.env.API_URL ?? 'http://127.0.0.1:54321'
+  const API_URL = process.env.API_URL ?? process.env.SUPABASE_URL ?? 'http://127.0.0.1:54321'
   const id = randomUUID()
   const fileId = '1.0.42'
   const APPNAME = `com.cli_s3_${id}`
