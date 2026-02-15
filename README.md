@@ -239,7 +239,7 @@ bun test:local
 bun test:front
 
 # Database SQL tests (Supabase CLI)
-supabase test db
+./scripts/with-worktree-supabase-env.sh bunx supabase test db
 
 # Cloudflare Workers
 bun test:cloudflare:all
@@ -256,7 +256,7 @@ Notes:
   dedicated seed data in `supabase/seed.sql`.
 - `LOCAL_CLI_PATH=true bun test:all:local` uses a local CLI build.
 - SQL tests in `supabase/tests/` are run by the Supabase CLI test runner.
-- Run `supabase start` first so the local DB is available.
+- Run `./scripts/with-worktree-supabase-env.sh bunx supabase start` first so the local DB is available.
 
 ## Dev contribution
 
@@ -317,22 +317,24 @@ Before continuing, ensure you have the following installed:
 - [bun](https://bun.sh/)
 - [Supabase CLI](https://supabase.com/docs/guides/cli)
 
-You can install the `supabase` CLI globally with `bun install supabase -g` and
-you'll be able to invoke `supabase` from anywhere.
+This repository uses `./scripts/with-worktree-supabase-env.sh bunx supabase ...`
+for Supabase commands so each git worktree gets isolated Docker project and
+port assignments.
 
-Alternatively, you can install the `supabase` CLI locally with
-`bun install supabase --save-dev` but, to invoke it, you have to use:
-`./node_modules/supabase/bin/supabase`.
+You can use the shorthand `bun run supabase:local -- <supabase-command>` for the
+same behavior. Examples:
 
-In the following guideline, we will assume that you have installed the
-`supabase` CLI globally.
+```bash
+bun run supabase:local -- start
+bun run supabase:local -- db reset
+```
 
 #### Start Supabase DB Locally
 
 Start the Supabase DB:
 
 ```bash
-supabase start
+./scripts/with-worktree-supabase-env.sh bunx supabase start
 ```
 
 If the command is completed successfully, your console should output:
@@ -340,11 +342,11 @@ If the command is completed successfully, your console should output:
 ```bash
 Started supabase local development setup.
 
-         API URL: http://localhost:54321
-     GraphQL URL: http://localhost:54321/graphql/v1
-          DB URL: postgresql://postgres:postgres@localhost:54322/postgres
-      Studio URL: http://localhost:54323
-    Inbucket URL: http://localhost:54324
+         API URL: http://localhost:<worktree-api-port>
+     GraphQL URL: http://localhost:<worktree-api-port>/graphql/v1
+          DB URL: postgresql://postgres:postgres@localhost:<worktree-db-port>/postgres
+      Studio URL: http://localhost:<worktree-studio-port>
+    Inbucket URL: http://localhost:<worktree-inbucket-port>
       JWT secret: super-secret-jwt-token-with-at-least-32-characters-long
         anon key: xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXx.xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXx
 service_role key: xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXx.xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxxXxxxxxX
@@ -355,7 +357,7 @@ service_role key: xxxxXxxxxXxxxxXxxxxXxxxxXxxxxXxxxxXx.xxxxXxxxxXxxxxXxxxxXxxxxX
 [!WARNING] ⚠️ Ensure Docker is running.
 
 ```bash
-supabase db reset
+./scripts/with-worktree-supabase-env.sh bunx supabase db reset
 ```
 
 #### Start Frontend locally
@@ -377,7 +379,7 @@ There are two login credentials you can use:
 | Admin User | admin@capgo.app | adminadmin |
 
 The _demo user_ account has some demo data in it. If the data is not fresh, just
-reset the db with `supabase db reset`. The seed has been made in a way that
+reset the db with `./scripts/with-worktree-supabase-env.sh bunx supabase db reset`. The seed has been made in a way that
 ensures the data is always fresh.
 
 The _admin user_ account has administration rights so the user can impersonate
@@ -390,7 +392,7 @@ other users. You can find the interface for that in the "Account" section.
 This will seed the DB with demo data.
 
 ```bash
-supabase db reset
+./scripts/with-worktree-supabase-env.sh bunx supabase db reset
 ```
 
 ### Deploy Supabase self hosted
@@ -402,7 +404,7 @@ Before deploying, duplicate `supabase/functions/.env.example` to
 `supabase/functions/.env`, replace the placeholder values with your
 self-hosted credentials, and keep the file local (it is gitignored). Use that
 file for commands such as
-`supabase secrets set --env-file supabase/functions/.env`.
+`./scripts/with-worktree-supabase-env.sh bunx supabase secrets set --env-file supabase/functions/.env`.
 
 ### Deploy Supabase cloud
 
@@ -412,7 +414,7 @@ $25/month.
 Link the project to the cloud with the following command:
 
 ```bash
-supabase link
+./scripts/with-worktree-supabase-env.sh bunx supabase link
 ```
 
 https://supabase.com/docs/reference/cli/supabase-link
@@ -420,7 +422,7 @@ https://supabase.com/docs/reference/cli/supabase-link
 Then you need to push the migrations to the cloud with the following command:
 
 ```bash
-supabase db push --linked
+./scripts/with-worktree-supabase-env.sh bunx supabase db push --linked
 ```
 
 https://supabase.com/docs/reference/cli/supabase-migration-up
@@ -428,7 +430,7 @@ https://supabase.com/docs/reference/cli/supabase-migration-up
 And seed the DB with demo data:
 
 ```bash
-supabase seed buckets
+./scripts/with-worktree-supabase-env.sh bunx supabase seed buckets
 ```
 
 https://supabase.com/docs/reference/cli/supabase-seed-buckets
@@ -436,13 +438,13 @@ https://supabase.com/docs/reference/cli/supabase-seed-buckets
 Seed the secret for functions:
 
 ```bash
-supabase secrets set --env-file supabase/functions/.env
+./scripts/with-worktree-supabase-env.sh bunx supabase secrets set --env-file supabase/functions/.env
 ```
 
 Push the functions to the cloud:
 
 ```bash
-supabase functions deploy
+./scripts/with-worktree-supabase-env.sh bunx supabase functions deploy
 ```
 
 ### Environment Variables for Self-Hosted Deployments

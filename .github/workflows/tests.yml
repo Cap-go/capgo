@@ -63,18 +63,20 @@ jobs:
           version: latest
       - name: Show Supabase CLI version
         run: supabase --version
+      - name: Configure worktree Supabase env
+        run: ./scripts/with-worktree-supabase-env.sh --print-env >> "$GITHUB_ENV"
       - name: Run Supabase Start
-        run: supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,studio,logflare,vector,realtime
+        run: ./scripts/with-worktree-supabase-env.sh supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,studio,logflare,vector,realtime
       - name: Run Supabase Test DB
-        run: supabase test db
+        run: ./scripts/with-worktree-supabase-env.sh supabase test db
       - name: Lint SQL
-        run: supabase db lint -s public --fail-on warning
+        run: ./scripts/with-worktree-supabase-env.sh supabase db lint -s public --fail-on warning
       - uses: JarvusInnovations/background-action@2428e7b970a846423095c79d43f759abf979a635 # v1
         name: Bootstrap Edge server
         with:
-          run: supabase functions serve &
+          run: ./scripts/with-worktree-supabase-env.sh supabase functions serve &
           wait-on: |
-            http-get://127.0.0.1:54321/functions/v1/ok
+            http-get://127.0.0.1:${{ env.SUPABASE_API_PORT }}/functions/v1/ok
           # IMPORTANT: to use environment variables in wait-on, you must use this form: ${{ env.VAR }}
           # See wait-on section below for all resource types and prefixes
 
