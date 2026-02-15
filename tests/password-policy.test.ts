@@ -51,7 +51,7 @@ afterAll(async () => {
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
 })
 
-describe('password Policy Configuration via SDK', () => {
+describe('Password Policy Configuration via SDK', () => {
   it('enable password policy with all requirements via direct update', async () => {
     const policyConfig = {
       enabled: true,
@@ -278,7 +278,6 @@ describe('[POST] /private/validate_password_compliance', () => {
     if (disableError)
       throw disableError
 
-    let restoreError: PostgrestError | null = null
     try {
       const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
         headers,
@@ -299,10 +298,9 @@ describe('[POST] /private/validate_password_compliance', () => {
         .from('orgs')
         .update({ password_policy_config: policyConfig })
         .eq('id', ORG_ID)
-      restoreError = error ?? null
+      if (error)
+        throw error
     }
-    if (restoreError)
-      throw restoreError
   })
 
   it('reject request with invalid credentials', async () => {
@@ -409,7 +407,7 @@ describe('[POST] /private/validate_password_compliance', () => {
       method: 'POST',
       body: 'invalid json',
     })
-    expect(response.status).toBeGreaterThanOrEqual(400)
+    expect(response.status).toBe(400)
   })
 })
 
@@ -462,7 +460,7 @@ describe('[GET] /private/check_org_members_password_policy', () => {
   })
 })
 
-describe('password Policy Enforcement Integration', () => {
+describe('Password Policy Enforcement Integration', () => {
   const orgWithPolicyId = randomUUID()
   const orgWithPolicyName = `Pwd Policy Integration Org ${randomUUID()}`
   const orgWithPolicyCustomerId = `cus_pwd_int_${orgWithPolicyId}`
@@ -554,10 +552,12 @@ describe('user_password_compliance table', () => {
       .eq('id', ORG_ID)
       .single()
 
-    const policyHash = org?.password_policy_config
-      // eslint-disable-next-line node/prefer-global/buffer
-      ? Buffer.from(JSON.stringify(org.password_policy_config)).toString('base64').substring(0, 32)
-      : 'test_hash'
+    // Use the same RPC that production uses to compute the password policy hash
+    const { data: rpcResult } = await getSupabaseClient().rpc('get_password_policy_hash', {
+      policy_config: org?.password_policy_config,
+    })
+
+    const policyHash = (rpcResult as string | null) ?? 'test_hash'
 
     const { error } = await getSupabaseClient()
       .from('user_password_compliance')
