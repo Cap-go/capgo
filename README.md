@@ -321,6 +321,14 @@ This repository uses `./scripts/with-worktree-supabase-env.sh bunx supabase ...`
 for Supabase commands so each git worktree gets isolated Docker project and
 port assignments.
 
+You can use the shorthand `bun run supabase:local -- <supabase-command>` for the
+same behavior. Examples:
+
+```bash
+bun run supabase:local -- start
+bun run supabase:local -- db reset
+```
+
 #### Start Supabase DB Locally
 
 Start the Supabase DB:
