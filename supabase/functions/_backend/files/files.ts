@@ -16,7 +16,7 @@ import { getAppByAppIdPg, getUserIdFromApikey } from '../utils/pg_files.ts'
 import { checkPermissionPg } from '../utils/rbac.ts'
 import { createStatsBandwidth } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
-import { backgroundTask } from '../utils/utils.ts'
+import { backgroundTask, getEnv } from '../utils/utils.ts'
 import { app as files_config } from './files_config.ts'
 import { parseUploadMetadata } from './parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
@@ -55,7 +55,8 @@ async function getHandler(c: Context): Promise<Response> {
     const { data } = supabaseAdmin(c).storage.from('capgo').getPublicUrl(fileId)
 
     // cloudlog('publicUrl', data.publicUrl)
-    const url = data.publicUrl.replace('http://kong:8000', 'http://localhost:54321')
+    const localExternalUrl = getEnv(c, 'SUPABASE_EXTERNAL_URL') || getEnv(c, 'API_URL') || 'http://localhost:54321'
+    const url = data.publicUrl.replace('http://kong:8000', localExternalUrl)
     // cloudlog('url', url)
     return c.redirect(url)
   }
