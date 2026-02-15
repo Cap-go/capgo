@@ -2,19 +2,29 @@
 
 set -euo pipefail
 
+for cmd in cksum awk tr sed cut; do
+  if ! command -v "${cmd}" >/dev/null 2>&1; then
+    echo "Missing required command: ${cmd}" >&2
+    exit 1
+  fi
+done
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORKTREE_NAME="$(basename "${ROOT_DIR}")"
-
-SLUG="$(printf '%s' "${WORKTREE_NAME}" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed -E 's/^-+//; s/-+$//')"
-if [ -z "${SLUG}" ]; then
-  SLUG="worktree"
-fi
 
 WORKTREE_HASH_DEC="$(printf '%s' "${ROOT_DIR}" | cksum | awk '{ print $1 }')"
 WORKTREE_HASH_HEX="$(printf '%x' "${WORKTREE_HASH_DEC}")"
 WORKTREE_HASH_SHORT="$(printf '%s' "${WORKTREE_HASH_HEX}" | cut -c1-6)"
+
+SLUG="$(printf '%s' "${WORKTREE_NAME}" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed -E 's/^-+//; s/-+$//')"
+if [ -z "${SLUG}" ]; then
+  SLUG="worktree-${WORKTREE_HASH_SHORT}"
+fi
+
 SLUG_SHORT="$(printf '%s' "${SLUG}" | cut -c1-20)"
 
+# Reserve a 20-port block per worktree to keep room for additional local services
+# without renumbering existing allocations.
 SLOT=$((WORKTREE_HASH_DEC % 600))
 BASE_PORT=$((42000 + SLOT * 20))
 
