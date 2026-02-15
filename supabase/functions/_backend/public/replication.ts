@@ -66,6 +66,7 @@ function buildReplicationQuery(mode: ReplicationQueryMode) {
         FROM pg_replication_slots
         WHERE slot_type = 'logical'
           AND slot_name !~ '^pg_[0-9]+_sync_[0-9]+_[0-9]+$'
+          AND slot_name !~ '^supabase_'
       )
   `
 
@@ -88,6 +89,7 @@ function buildReplicationQuery(mode: ReplicationQueryMode) {
         FROM pg_replication_slots
         WHERE slot_type = 'logical'
           AND slot_name !~ '^pg_[0-9]+_sync_[0-9]+_[0-9]+$'
+          AND slot_name !~ '^supabase_'
       )
       SELECT
         slots.*,
