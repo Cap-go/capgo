@@ -15,12 +15,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Use the installed Supabase CLI in CI, fall back to bunx locally.
-if command -v supabase >/dev/null 2>&1; then
-  SUPABASE_CLI="supabase"
-else
-  SUPABASE_CLI="bunx supabase"
-fi
+SUPABASE_CLI="${ROOT_DIR}/scripts/with-worktree-supabase-env.sh bunx supabase"
 
 # Extract a single variable from `supabase status -o env`, preserving any '=' in values (JWT padding).
 get_supabase_status_var() {

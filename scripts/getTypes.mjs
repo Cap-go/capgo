@@ -5,7 +5,7 @@ import { supa_url } from './utils.mjs'
 const exec = util.promisify(execCb)
 const supaId = supa_url.split('//')[1].split('.')[0].split('-')[0]
 const id = process.env.BRANCH === 'local' ? '--local' : `--project-id=${supaId}`
-const command = `bun x supabase gen types typescript ${id} > src/types/supabase.types.ts`
+const command = `./scripts/with-worktree-supabase-env.sh bunx supabase gen types typescript ${id} > src/types/supabase.types.ts`
 
 async function main() {
   try {
