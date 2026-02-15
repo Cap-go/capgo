@@ -4,7 +4,16 @@ import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 import { Pool } from 'pg'
 
-export const POSTGRES_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+function normalizePostgresUrl(raw: string): string {
+  // Avoid Node preferring IPv6 (::1) for localhost in some environments.
+  return raw.replace('localhost', '127.0.0.1')
+}
+
+export const POSTGRES_URL = normalizePostgresUrl(
+  env.SUPABASE_DB_URL
+  ?? env.DB_URL
+  ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+)
 
 function normalizeLocalhostUrl(raw: string | undefined): string | undefined {
   if (!raw)
@@ -524,7 +533,9 @@ export async function resetAppDataStats(appId: string): Promise<void> {
 export function getSupabaseClient(): SupabaseClient<Database> {
   if (!supabaseClient) {
     const supabaseUrl = SUPABASE_BASE_URL
-    const supabaseServiceKey = env.SUPABASE_SERVICE_KEY ?? ''
+    // Support both env names. Supabase CLI exposes SERVICE_ROLE_KEY, and our wrapper exports
+    // SUPABASE_SERVICE_ROLE_KEY + SUPABASE_SERVICE_KEY for convenience.
+    const supabaseServiceKey = env.SUPABASE_SERVICE_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY ?? env.SERVICE_ROLE_KEY ?? ''
     const supabaseFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
       const maxRetries = 3
       let lastError: unknown

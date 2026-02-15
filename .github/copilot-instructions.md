@@ -60,10 +60,10 @@ Use `cloudlog({ requestId: c.get('requestId'), message: '...' })` for structured
 
 ```bash
 # Start Supabase (required for all development)
-supabase start
+bun run supabase:start
 
 # Seed database with fresh test data
-supabase db reset
+bun run supabase:db:reset
 
 # Start frontend (localhost:5173)
 bun serve:local  # Uses local env
@@ -76,7 +76,7 @@ bun backend  # Supabase functions on :54321
 ./scripts/start-cloudflare-workers.sh
 ```
 
-Test accounts (after `supabase db reset`):
+Test accounts (after `bun run supabase:db:reset`):
 - `test@capgo.app` / `testtest` (demo user with data)
 - `admin@capgo.app` / `adminadmin` (admin user)
 
@@ -121,7 +121,7 @@ bun types         # Generate Supabase types (after migrations)
 
 1. Create migration: `supabase migration new <feature_slug>`
 2. Edit the **single migration file** until feature ships
-3. Test locally: `supabase db reset` (applies all migrations + seed)
+3. Test locally: `bun run supabase:db:reset` (applies all migrations + seed)
 4. Update `supabase/seed.sql` for new/changed test fixtures
 5. Push to cloud: `supabase db push --linked` (prod only)
 

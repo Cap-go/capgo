@@ -82,12 +82,17 @@ function rewriteLocationHeader(c: Context, supabaseLocation: string): string {
   const isLocalDev = supabaseUrl.includes('kong:8000')
 
   let forwardedHost = c.req.header('X-Forwarded-Host')
-  const forwardedProto = c.req.header('X-Forwarded-Proto') || 'https'
+  const forwardedPort = c.req.header('X-Forwarded-Port')
+  const forwardedProtoRaw = c.req.header('X-Forwarded-Proto')
+  const forwardedProto = forwardedProtoRaw?.split(',')[0]?.trim() || (isLocalDev ? 'http' : 'https')
+  const hostHeader = c.req.header('Host')
 
   if (isLocalDev && forwardedHost && !forwardedHost.includes(':')) {
-    if (forwardedHost === 'localhost' || forwardedHost === '127.0.0.1') {
-      forwardedHost = `${forwardedHost}:54321`
-    }
+    // X-Forwarded-Host sometimes omits the port. Prefer X-Forwarded-Port, then Host header.
+    const portToUse = forwardedPort
+      || (hostHeader && hostHeader.includes(':') ? hostHeader.split(':').pop() : undefined)
+      || '54321'
+    forwardedHost = `${forwardedHost}:${portToUse}`
   }
 
   cloudlog({ requestId, message: 'rewriteLocationHeader debug', supabaseUrl, forwardedHost, forwardedProto, isLocalDev })
@@ -97,7 +102,8 @@ function rewriteLocationHeader(c: Context, supabaseLocation: string): string {
     baseUrl = `${forwardedProto}://${forwardedHost}`
   }
   else if (isLocalDev) {
-    baseUrl = 'http://localhost:54321'
+    // Best-effort fallback; callers should generally send Host / X-Forwarded-* so we preserve the correct worktree port.
+    baseUrl = `http://${hostHeader || 'localhost:54321'}`
   }
   else {
     cloudlog({

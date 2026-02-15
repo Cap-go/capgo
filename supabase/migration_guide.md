@@ -40,7 +40,7 @@ Before running migrations locally, make sure you have the local Supabase DB runn
    
 ```bash
 
-supabase start
+bun run supabase:start
 
 ```
 If the command completes successfully, your console output should provide details about the locally running Supabase instance.

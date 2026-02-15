@@ -40,6 +40,15 @@ require_cmd() {
   fi
 }
 
+require_arg() {
+  local flag="$1"
+  local value="${2:-}"
+  if [[ -z "$value" || "$value" == --* ]]; then
+    echo "Error: $flag requires a value." >&2
+    exit 1
+  fi
+}
+
 PROJECT_ID=""
 INSTANCE_NAME=""
 REPLACE="false"
@@ -48,11 +57,13 @@ DRY_RUN="false"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --project)
-      PROJECT_ID="${2:-}"
+      require_arg "$1" "${2:-}"
+      PROJECT_ID="$2"
       shift 2
       ;;
     --instance)
-      INSTANCE_NAME="${2:-}"
+      require_arg "$1" "${2:-}"
+      INSTANCE_NAME="$2"
       shift 2
       ;;
     --replace)
@@ -64,7 +75,8 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --cloudflare-url)
-      CF_IPS_URL="${2:-}"
+      require_arg "$1" "${2:-}"
+      CF_IPS_URL="$2"
       shift 2
       ;;
     -h|--help)

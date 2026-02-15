@@ -10,7 +10,9 @@ BEGIN
     END IF;
 
     IF NOT EXISTS (SELECT 1 FROM vault.secrets WHERE name = 'db_url') THEN
-        PERFORM vault.create_secret('http://172.17.0.1:54321', 'db_url', 'db url');
+        -- Used by DB-side cron jobs to call edge functions. `kong:8000` is stable inside the local Docker network
+        -- (unlike host-mapped ports which may differ per git worktree).
+        PERFORM vault.create_secret('http://kong:8000', 'db_url', 'db url');
     END IF;
 
     IF NOT EXISTS (SELECT 1 FROM vault.secrets WHERE name = 'apikey') THEN
