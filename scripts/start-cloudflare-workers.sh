@@ -63,6 +63,9 @@ fi
 # Cloudflare local testing defaults.
 CLOUDFLARE_FUNCTION_URL="${CLOUDFLARE_FUNCTION_URL:-http://127.0.0.1:8787}"
 STRIPE_WEBHOOK_SECRET="${STRIPE_WEBHOOK_SECRET:-testsecret}"
+API_INSPECTOR_PORT="${API_INSPECTOR_PORT:-9230}"
+PLUGIN_INSPECTOR_PORT="${PLUGIN_INSPECTOR_PORT:-9231}"
+FILES_INSPECTOR_PORT="${FILES_INSPECTOR_PORT:-9232}"
 
 # In CI/linux, `host.docker.internal` is unreliable. Prefer localhost (mapped ports).
 S3_ENDPOINT_TO_USE="${S3_ENDPOINT:-127.0.0.1:9000}"
@@ -83,7 +86,7 @@ sleep 2
 
 # Start API worker on port 8787
 echo -e "${GREEN}Starting API worker on port 8787...${NC}"
-(cd "${ROOT_DIR}/cloudflare_workers/api" && bunx wrangler dev -c wrangler.jsonc --port 8787 --env-file="${RUNTIME_ENV_FILE}" --env=local --persist-to "${ROOT_DIR}/.wrangler-shared") &
+(cd "${ROOT_DIR}/cloudflare_workers/api" && bunx wrangler dev -c wrangler.jsonc --port 8787 --inspector-port "${API_INSPECTOR_PORT}" --env-file="${RUNTIME_ENV_FILE}" --env=local --persist-to "${ROOT_DIR}/.wrangler-shared") &
 API_PID=$!
 
 # Wait a bit for the first worker to start
@@ -91,7 +94,7 @@ sleep 3
 
 # Start Plugin worker on port 8788
 echo -e "${GREEN}Starting Plugin worker on port 8788...${NC}"
-(cd "${ROOT_DIR}/cloudflare_workers/plugin" && bunx wrangler dev -c wrangler.jsonc --port 8788 --env-file="${RUNTIME_ENV_FILE}" --env=local --persist-to "${ROOT_DIR}/.wrangler-shared") &
+(cd "${ROOT_DIR}/cloudflare_workers/plugin" && bunx wrangler dev -c wrangler.jsonc --port 8788 --inspector-port "${PLUGIN_INSPECTOR_PORT}" --env-file="${RUNTIME_ENV_FILE}" --env=local --persist-to "${ROOT_DIR}/.wrangler-shared") &
 PLUGIN_PID=$!
 
 # Wait a bit for the second worker to start
@@ -99,7 +102,7 @@ sleep 3
 
 # Start Files worker on port 8789
 echo -e "${GREEN}Starting Files worker on port 8789...${NC}"
-(cd "${ROOT_DIR}/cloudflare_workers/files" && bunx wrangler dev -c wrangler.jsonc --port 8789 --env-file="${RUNTIME_ENV_FILE}" --env=local --persist-to "${ROOT_DIR}/.wrangler-shared") &
+(cd "${ROOT_DIR}/cloudflare_workers/files" && bunx wrangler dev -c wrangler.jsonc --port 8789 --inspector-port "${FILES_INSPECTOR_PORT}" --env-file="${RUNTIME_ENV_FILE}" --env=local --persist-to "${ROOT_DIR}/.wrangler-shared") &
 FILES_PID=$!
 
 echo -e "${GREEN}All workers started!${NC}"
