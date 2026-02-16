@@ -50,7 +50,7 @@ afterAll(async () => {
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
 })
 
-describe('Password Policy Configuration via SDK', () => {
+describe('password Policy Configuration via SDK', () => {
   it('enable password policy with all requirements via direct update', async () => {
     const policyConfig = {
       enabled: true,
@@ -301,14 +301,14 @@ describe('[POST] /private/validate_password_compliance', () => {
         .from('orgs')
         .update({ password_policy_config: policyConfig })
         .eq('id', ORG_ID)
-      
+
       // If restore failed, throw it (but preserve test failure if there was one)
       if (restoreError) {
         if (testError)
           throw new Error(`Test failed AND restore failed: ${testError.message} | Restore error: ${restoreError.message}`)
         throw restoreError
       }
-      
+
       // Re-throw original test error if any
       if (testError)
         throw testError
@@ -472,7 +472,7 @@ describe('[GET] /private/check_org_members_password_policy', () => {
   })
 })
 
-describe('Password Policy Enforcement Integration', () => {
+describe('password Policy Enforcement Integration', () => {
   const orgWithPolicyId = randomUUID()
   const orgWithPolicyName = `Pwd Policy Integration Org ${randomUUID()}`
   const orgWithPolicyCustomerId = `cus_pwd_int_${orgWithPolicyId}`
@@ -563,19 +563,22 @@ describe('user_password_compliance table', () => {
       .select('password_policy_config')
       .eq('id', ORG_ID)
       .single()
-    
+
     expect(orgError).toBeNull()
     expect(org?.password_policy_config).not.toBeNull()
+    const policyConfig = org?.password_policy_config
+    if (policyConfig == null)
+      throw new Error('Expected password_policy_config to be set for test org')
 
     // Use the same RPC that production uses to compute the password policy hash
     const { data: rpcResult, error: rpcError } = await getSupabaseClient().rpc('get_password_policy_hash', {
-      policy_config: org?.password_policy_config,
+      policy_config: policyConfig,
     })
 
     expect(rpcError).toBeNull()
     expect(rpcResult).not.toBeNull()
     expect(typeof rpcResult).toBe('string')
-    
+
     const policyHash = rpcResult as string
 
     const { error } = await getSupabaseClient()
