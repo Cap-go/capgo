@@ -26,7 +26,7 @@ interface Channel {
 
 interface ChannelStatsResponse {
   labels: string[]
-  datasets: Array<{ label: string, data: number[] }>
+  datasets: Array<{ label: string, data: number[], metaCounts?: number[] }>
   latestVersion: {
     name: string
     percentage: string
@@ -168,9 +168,13 @@ const chartData = computed<ChartData<'line'>>(() => {
     }),
     datasets: stats.value.datasets.map((dataset, index) => {
       const color = chartPalette[index % chartPalette.length]
+      const metaCounts = Array.isArray(dataset.metaCounts)
+        ? dataset.metaCounts.map(value => Math.max(0, Math.round(Number(value) || 0)))
+        : undefined
       return {
         label: dataset.label,
         data: dataset.data,
+        ...(metaCounts ? { metaCountValues: metaCounts } : {}),
         backgroundColor: color.background,
         borderColor: color.border,
         borderWidth: 2,
@@ -219,6 +223,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
     },
     y: {
       beginAtZero: true,
+      max: 100,
       grid: {
         color: 'rgba(0, 0, 0, 0.05)',
       },
@@ -226,7 +231,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
         font: {
           size: 11,
         },
-        precision: 0,
+        callback: (value: string | number) => `${value}%`,
       },
     },
   },

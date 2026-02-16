@@ -32,6 +32,7 @@ interface AppUsageByVersion {
   date: string
   app_id: string
   version_name: string
+  get: number | null
   install: number | null
   uninstall: number | null
 }
@@ -330,7 +331,7 @@ async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLate
   // Query uses version_name column - cast needed because auto-generated types are stale
   const { data: rawDailyVersion, error: dailyVersionError } = await supabase
     .from('daily_version')
-    .select('date, app_id, version_name, install, uninstall')
+    .select('date, app_id, version_name, get, install, uninstall')
     .eq('app_id', appId)
     .gte('date', from.toISOString())
     .lte('date', to.toISOString())
@@ -346,38 +347,22 @@ async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLate
   const versions = [...new Set(dailyVersion.map(d => d.version_name).filter(Boolean))] as string[]
   const dates = generateDateLabels(from, to)
 
-  // Step 1: Calculate accumulated data (now using version_name directly)
-  const accumulatedData = calculateAccumulatedDataByName(dailyVersion, dates, versions)
-  // Step 2: Convert to percentages, ensuring total <= 100% per day
-  const percentageData = convertToPercentagesByName(accumulatedData)
-  // Step 3: Get active versions (versions with non-zero usage)
-  const activeVersions = getActiveVersionsByName(versions, percentageData)
-  // Step 4: Create datasets for the chart (now using version_name directly)
-  let datasets = createDatasetsByName(activeVersions, dates, percentageData)
-  datasets = fillMissingDailyData(datasets, dates)
+  // Daily reported devices by version (from "get" stats), not synthetic install reconstruction.
+  const dailyCounts = buildDailyReportedCountsByName(dailyVersion, dates, versions)
+  const dailyPercentages = convertCountsToPercentagesByName(dailyCounts, dates, versions)
+  const activeVersions = getActiveVersionsByName(versions, dailyCounts)
+  const datasets = createDatasetsByName(activeVersions, dates, dailyPercentages, dailyCounts)
 
   if (shouldGetLatestVersion) {
-    // For latest version, we need to query app_versions to get created_at
-    const { data: versionData } = await supabase
-      .from('app_versions')
-      .select('name, created_at')
-      .eq('app_id', appId)
-      .in('name', versions)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single()
-
-    const latestVersionPercentage = versionData
-      ? getLatestVersionPercentage(datasets, { name: versionData.name })
-      : 0
+    const latestVersion = getLatestDayVersionShare(activeVersions, dates, dailyCounts)
 
     return {
       data: {
         labels: dates,
         datasets,
         latestVersion: {
-          name: versionData?.name,
-          percentage: latestVersionPercentage.toFixed(1),
+          name: latestVersion.name,
+          percentage: latestVersion.percentage.toFixed(1),
         },
       },
       error: null,
@@ -393,91 +378,73 @@ async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLate
   }
 }
 
-// Calculate cumulative installs for each version over time (by version_name)
-function calculateAccumulatedDataByName(usage: AppUsageByVersion[], dates: string[], versions: string[]) {
-  const accumulated: { [date: string]: { [version: string]: number } } = {}
+function buildDailyReportedCountsByName(
+  usage: AppUsageByVersion[],
+  dates: string[],
+  versions: string[],
+) {
+  const counts: { [date: string]: { [version: string]: number } } = {}
 
-  // Initialize with zeros
   dates.forEach((date) => {
-    accumulated[date] = {}
-    versions.forEach(version => accumulated[date][version] = 0)
+    counts[date] = {}
+    versions.forEach((version) => {
+      counts[date][version] = 0
+    })
   })
 
-  // Process data day by day
-  dates.forEach((date, index) => {
-    const dailyUsage = usage.filter(u => u.date === date)
-    const totalNewInstalls = dailyUsage.reduce((sum, u) => sum + (u.install ?? 0), 0)
-
-    if (index === 0) {
-      // First day: just add installs
-      dailyUsage.forEach(({ version_name, install }) => {
-        if (version_name)
-          accumulated[date][version_name] = install ?? 0
-      })
-    }
-    else {
-      const prevDate = dates[index - 1]
-      const prevTotal = Object.values(accumulated[prevDate]).reduce((sum, val) => sum + val, 0)
-
-      versions.forEach((version) => {
-        const change = dailyUsage.find(u => u.version_name === version)
-        const prevValue = accumulated[prevDate][version]
-
-        if (change?.install) {
-          // Version has new installs: add them
-          accumulated[date][version] = prevValue + change.install
-        }
-        else {
-          // Version has no new installs: decrease proportionally (guard against zero totals)
-          const decreaseFactor = prevTotal === 0 ? 1 : Math.max(0, 1 - (totalNewInstalls / prevTotal))
-          accumulated[date][version] = Math.max(0, prevValue * decreaseFactor)
-        }
-
-        // Subtract uninstalls if any
-        if (change?.uninstall) {
-          accumulated[date][version] = Math.max(0, accumulated[date][version] - change.uninstall)
-        }
-      })
-    }
+  usage.forEach((entry) => {
+    const date = entry.date
+    const version = entry.version_name
+    if (!version || !counts[date] || counts[date][version] === undefined)
+      return
+    counts[date][version] += Math.max(0, Math.round(entry.get ?? 0))
   })
 
-  return accumulated
+  return counts
 }
 
-// Convert accumulated data to percentages (by version_name)
-function convertToPercentagesByName(accumulated: { [date: string]: { [version: string]: number } }) {
+function convertCountsToPercentagesByName(
+  counts: { [date: string]: { [version: string]: number } },
+  dates: string[],
+  versions: string[],
+) {
   const percentages: { [date: string]: { [version: string]: number } } = {}
 
-  Object.keys(accumulated).forEach((date) => {
-    const dayData = accumulated[date]
-    const total = Object.values(dayData).reduce((sum, value) => sum + value, 0)
-
+  dates.forEach((date) => {
+    const dayData = counts[date] ?? {}
+    const total = versions.reduce((sum, version) => sum + (dayData[version] ?? 0), 0)
     percentages[date] = {}
-    if (total > 0) {
-      Object.keys(dayData).forEach((version) => {
-        percentages[date][version] = (dayData[version] / total) * 100
-      })
-    }
+    versions.forEach((version) => {
+      const count = dayData[version] ?? 0
+      percentages[date][version] = total > 0 ? (count / total) * 100 : 0
+    })
   })
 
   return percentages
 }
 
 // Filter out versions with no usage (by version_name)
-function getActiveVersionsByName(versions: string[], percentages: { [date: string]: { [version: string]: number } }) {
+function getActiveVersionsByName(versions: string[], counts: { [date: string]: { [version: string]: number } }) {
   return versions.filter(version =>
-    Object.values(percentages).some(dayData => (dayData[version] ?? 0) > 0),
+    Object.values(counts).some(dayData => (dayData[version] ?? 0) > 0),
   )
 }
 
 // Create datasets for Chart.js (by version_name - no lookup needed)
-function createDatasetsByName(versions: string[], dates: string[], percentages: { [date: string]: { [version: string]: number } }) {
+function createDatasetsByName(
+  versions: string[],
+  dates: string[],
+  percentages: { [date: string]: { [version: string]: number } },
+  counts: { [date: string]: { [version: string]: number } },
+) {
   return versions.map((version) => {
     const percentageData = dates.map(date => Number((percentages[date][version] ?? 0).toFixed(1)))
+    const countData = dates.map(date => Math.max(0, Math.round(counts[date][version] ?? 0)))
 
     return {
       label: version,
       data: percentageData,
+      metaCounts: countData,
     }
   })
 }
@@ -529,12 +496,46 @@ function fillMissingDailyData(datasets: { label: string, data: number[] }[], lab
 export const bundleUsageTestUtils = {
   generateDateLabels,
   fillMissingDailyData,
+  buildDailyReportedCountsByName,
+  convertCountsToPercentagesByName,
+  getActiveVersionsByName,
+  createDatasetsByName,
+  getLatestDayVersionShare,
 }
 
-// Get the percentage of the latest version on the last day
-function getLatestVersionPercentage(datasets: any[], latestVersion: { name: string }) {
-  const latestVersionDataset = datasets.find(dataset => dataset.label === latestVersion?.name)
-  return latestVersionDataset ? latestVersionDataset.data[latestVersionDataset.data.length - 1] : 0
+function getLatestDayVersionShare(
+  versions: string[],
+  dates: string[],
+  counts: { [date: string]: { [version: string]: number } },
+) {
+  if (versions.length === 0 || dates.length === 0)
+    return { name: '', percentage: 0 }
+
+  for (let index = dates.length - 1; index >= 0; index--) {
+    const date = dates[index]
+    const dayData = counts[date] ?? {}
+    let totalAtIndex = 0
+    let maxVersion = ''
+    let maxCount = -1
+
+    versions.forEach((version) => {
+      const count = Math.max(0, Number(dayData[version]) || 0)
+      totalAtIndex += count
+      if (count > maxCount) {
+        maxCount = count
+        maxVersion = version
+      }
+    })
+
+    if (totalAtIndex > 0) {
+      return {
+        name: maxVersion,
+        percentage: (maxCount / totalAtIndex) * 100,
+      }
+    }
+  }
+
+  return { name: '', percentage: 0 }
 }
 
 function getDaysBetweenDates(firstDate: Date, secondDate: Date) {
