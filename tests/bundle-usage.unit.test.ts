@@ -62,4 +62,75 @@ describe('bundle usage helpers', () => {
     expect(result[0].data[1]).toBe(0)
     expect(result[1].data[1]).toBe(0)
   })
+
+  it('buildDailyReportedCountsByName aggregates daily get counts by version', () => {
+    const usage = [
+      { date: '2024-10-24', app_id: 'app', version_name: '1.0.0', get: 3, install: 0, uninstall: 0 },
+      { date: '2024-10-24', app_id: 'app', version_name: '1.1.0', get: 2, install: 0, uninstall: 0 },
+      { date: '2024-10-25', app_id: 'app', version_name: '1.0.0', get: 1, install: 0, uninstall: 0 },
+      { date: '2024-10-25', app_id: 'app', version_name: '1.1.0', get: 4, install: 0, uninstall: 0 },
+    ]
+    const dates = ['2024-10-24', '2024-10-25']
+    const versions = ['1.0.0', '1.1.0']
+
+    const counts = bundleUsageTestUtils.buildDailyReportedCountsByName(usage as any, dates, versions)
+    expect(counts).toEqual({
+      '2024-10-24': { '1.0.0': 3, '1.1.0': 2 },
+      '2024-10-25': { '1.0.0': 1, '1.1.0': 4 },
+    })
+  })
+
+  it('fillMissingDailyCounts carries forward historical zero days', () => {
+    const versions = ['1.0.0', '1.1.0']
+    const dates = ['2024-10-24', '2024-10-25', '2024-10-26']
+    const counts = {
+      '2024-10-24': { '1.0.0': 3, '1.1.0': 2 },
+      '2024-10-25': { '1.0.0': 0, '1.1.0': 0 },
+      '2024-10-26': { '1.0.0': 1, '1.1.0': 4 },
+    }
+
+    const filled = bundleUsageTestUtils.fillMissingDailyCounts(counts as any, dates, versions, '2024-11-01')
+    expect(filled['2024-10-25']).toEqual({ '1.0.0': 3, '1.1.0': 2 })
+  })
+
+  it('convertCountsToPercentagesByName converts daily counts into 0-100 share', () => {
+    const counts = {
+      '2024-10-24': { '1.0.0': 3, '1.1.0': 2 },
+      '2024-10-25': { '1.0.0': 1, '1.1.0': 4 },
+    }
+    const dates = ['2024-10-24', '2024-10-25']
+    const versions = ['1.0.0', '1.1.0']
+
+    const percentages = bundleUsageTestUtils.convertCountsToPercentagesByName(counts as any, dates, versions)
+    expect(percentages['2024-10-24']['1.0.0']).toBe(60)
+    expect(percentages['2024-10-24']['1.1.0']).toBe(40)
+    expect(percentages['2024-10-25']['1.0.0']).toBe(20)
+    expect(percentages['2024-10-25']['1.1.0']).toBe(80)
+  })
+
+  it('convertCountsToPercentagesByName keeps rounded totals at exactly 100', () => {
+    const counts = {
+      '2024-10-24': { '1.0.0': 1, '1.1.0': 1, '1.2.0': 1 },
+    }
+    const dates = ['2024-10-24']
+    const versions = ['1.0.0', '1.1.0', '1.2.0']
+
+    const percentages = bundleUsageTestUtils.convertCountsToPercentagesByName(counts as any, dates, versions)
+    const total = versions.reduce((sum, version) => sum + percentages['2024-10-24'][version], 0)
+
+    expect(total).toBeCloseTo(100, 5)
+  })
+
+  it('getLatestDayVersionShare returns top version share from latest day with data', () => {
+    const versions = ['1.0.0', '1.1.0']
+    const dates = ['2024-10-24', '2024-10-25']
+    const counts = {
+      '2024-10-24': { '1.0.0': 3, '1.1.0': 2 },
+      '2024-10-25': { '1.0.0': 0, '1.1.0': 5 },
+    }
+
+    const latest = bundleUsageTestUtils.getLatestDayVersionShare(versions, dates, counts as any)
+    expect(latest.name).toBe('1.1.0')
+    expect(latest.percentage).toBe(100)
+  })
 })

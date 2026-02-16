@@ -69,8 +69,13 @@ async function recordChannelSelfRequestSafely(
 
 type AppOwnerResult = Awaited<ReturnType<typeof getAppOwnerPostgres>>
 
-async function assertChannelSelfCachedStatus(c: Context, appId: string, device: ReturnType<typeof makeDevice>, operationLabel: string) {
-  const cachedStatus = await getAppStatus(c, appId)
+async function assertChannelSelfCachedStatus(
+  c: Context,
+  cachedStatus: Awaited<ReturnType<typeof getAppStatus>>['status'],
+  appId: string,
+  device: ReturnType<typeof makeDevice>,
+  operationLabel: string,
+) {
   if (cachedStatus === 'onprem') {
     cloudlog({ requestId: c.get('requestId'), message: `Channel_self cache hit (${operationLabel}), app marked onprem`, app_id: appId })
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
@@ -84,21 +89,20 @@ async function assertChannelSelfCachedStatus(c: Context, appId: string, device: 
 async function assertChannelSelfAppOwnerPlanValid(
   c: Context,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
+  appOwner: AppOwnerResult,
   appId: string,
   device: ReturnType<typeof makeDevice>,
   operationLabel: string,
   deviceId?: string,
 ): Promise<{ response: Response } | { appOwner: NonNullable<AppOwnerResult> }> {
-  const appOwner = await getAppOwnerPostgres(c, appId, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
-
   if (!appOwner) {
     cloudlog({ requestId: c.get('requestId'), message: `On-premise app detected in channel_self ${operationLabel}, returning 429`, app_id: appId })
-    await setAppStatus(c, appId, 'onprem')
+    await setAppStatus(c, appId, 'onprem', true)
     return { response: c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429) }
   }
 
   if (!appOwner.plan_valid) {
-    await setAppStatus(c, appId, 'cancelled')
+    await setAppStatus(c, appId, 'cancelled', appOwner.allow_device_custom_id)
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: appId })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
 
@@ -120,7 +124,7 @@ async function assertChannelSelfAppOwnerPlanValid(
     return { response: c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429) }
   }
 
-  await setAppStatus(c, appId, 'cloud')
+  await setAppStatus(c, appId, 'cloud', appOwner.allow_device_custom_id)
   return { appOwner }
 }
 
@@ -172,20 +176,22 @@ export const jsonRequestSchemaGet = z.looseObject({
 
 async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'post channel self body', body })
-  const device = makeDevice(body)
   const { app_id, device_id, channel } = body
 
-  const cachedLimit = await assertChannelSelfCachedStatus(c, app_id, device, 'post')
+  const cachedAppStatus = await getAppStatus(c, app_id)
+  const cachedLimit = await assertChannelSelfCachedStatus(c, cachedAppStatus.status, app_id, makeDevice(body, cachedAppStatus.allow_device_custom_id), 'post')
   if (cachedLimit) {
     return cachedLimit
   }
+  const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
+  const device = makeDevice(body, appOwner?.allow_device_custom_id)
 
   // Check if app exists first - Read operation can use v2 flag
-  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, app_id, device, 'POST', device_id)
+  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, 'POST', device_id)
   if ('response' in ownerRes) {
     return ownerRes.response
   }
-  const appOwner = ownerRes.appOwner
+  const validatedAppOwner = ownerRes.appOwner
 
   // Read operations can use v2 flag
   const dataChannelOverride = await getChannelDeviceOverridePg(c, app_id, device_id, drizzleClient as ReturnType<typeof getDrizzleClient>)
@@ -205,7 +211,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
         device_id: dataChannelOverride.device_id,
         app_id,
       },
-      appOwner.owner_org,
+      validatedAppOwner.owner_org,
       `${app_id}`,
       '0 0 * * 0', // Weekly on Sunday at midnight
       drizzleClient,
@@ -230,7 +236,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
         channel_name: dataChannel.name,
         app_id,
       },
-      appOwner.owner_org,
+      validatedAppOwner.owner_org,
       `${app_id}`,
       '0 0 * * 0', // Weekly on Sunday at midnight
       drizzleClient,
@@ -330,15 +336,17 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
 
 async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'put channel self body', body })
-  const device = makeDevice(body)
   const { app_id, defaultChannel, device_id } = body
 
-  const cachedLimit = await assertChannelSelfCachedStatus(c, app_id, device, 'put')
+  const cachedAppStatus = await getAppStatus(c, app_id)
+  const cachedLimit = await assertChannelSelfCachedStatus(c, cachedAppStatus.status, app_id, makeDevice(body, cachedAppStatus.allow_device_custom_id), 'put')
   if (cachedLimit) {
     return cachedLimit
   }
+  const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
+  const device = makeDevice(body, appOwner?.allow_device_custom_id)
 
-  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, app_id, device, 'PUT', device_id)
+  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, 'PUT', device_id)
   if ('response' in ownerRes) {
     return ownerRes.response
   }
@@ -413,19 +421,20 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
     device_id,
     version_build,
   } = body
-  const device = makeDevice(body)
-  cloudlog({ requestId: c.get('requestId'), message: 'delete override', version_build })
-
-  const cachedLimit = await assertChannelSelfCachedStatus(c, app_id, device, 'delete')
+  const cachedAppStatus = await getAppStatus(c, app_id)
+  const cachedLimit = await assertChannelSelfCachedStatus(c, cachedAppStatus.status, app_id, makeDevice(body, cachedAppStatus.allow_device_custom_id), 'delete')
   if (cachedLimit) {
     return cachedLimit
   }
+  const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
+  const device = makeDevice(body, appOwner?.allow_device_custom_id)
+  cloudlog({ requestId: c.get('requestId'), message: 'delete override', version_build })
 
-  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, app_id, device, 'DELETE', device_id)
+  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, 'DELETE', device_id)
   if ('response' in ownerRes) {
     return ownerRes.response
   }
-  const appOwner = ownerRes.appOwner
+  const validatedAppOwner = ownerRes.appOwner
 
   const isNewVersion = isChannelSelfLocalChannelStorageVersion(c, body, 'DELETE')
 
@@ -459,7 +468,7 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
         channel_name: dataChannelOverride.channel_id.name,
         app_id,
       },
-      appOwner.owner_org,
+      validatedAppOwner.owner_org,
       `${app_id}`,
       '0 0 * * 0', // Weekly on Sunday at midnight
       drizzleClient,
@@ -479,9 +488,8 @@ async function deleteOverride(c: Context, drizzleClient: ReturnType<typeof getDr
 
 async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink): Promise<Response> {
   const { app_id, platform, is_emulator, is_prod } = body
-  const device = makeDevice(body)
-
-  const cachedLimit = await assertChannelSelfCachedStatus(c, app_id, device, 'list')
+  const cachedAppStatus = await getAppStatus(c, app_id)
+  const cachedLimit = await assertChannelSelfCachedStatus(c, cachedAppStatus.status, app_id, makeDevice(body, cachedAppStatus.allow_device_custom_id), 'list')
   if (cachedLimit) {
     return cachedLimit
   }
@@ -494,8 +502,11 @@ async function listCompatibleChannels(c: Context, drizzleClient: ReturnType<type
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
 
+  const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient as ReturnType<typeof getDrizzleClient>, PLAN_MAU_ACTIONS)
+  const device = makeDevice(body, appOwner?.allow_device_custom_id)
+
   // Check if app has valid org association (not on-premise) - Read operation can use v2 flag
-  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, app_id, device, 'GET')
+  const ownerRes = await assertChannelSelfAppOwnerPlanValid(c, drizzleClient, appOwner, app_id, device, 'GET')
   if ('response' in ownerRes) {
     return ownerRes.response
   }

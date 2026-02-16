@@ -10,11 +10,20 @@ export interface DeviceLink extends AppInfos {
   channel?: string
 }
 
+function normalizeCustomId(customId: unknown): string | undefined {
+  if (typeof customId !== 'string')
+    return undefined
+  const trimmed = customId.trim()
+  return trimmed === '' ? undefined : trimmed
+}
+
 function getInvalidCode(c: Context) {
   return c.req.method === 'GET' || c.req.method === 'DELETE' ? 'invalid_query_parameters' : 'invalid_json_body'
 }
 
-export function makeDevice(devBody: AppInfos | DeviceLink | AppStats): DeviceWithoutCreatedAt {
+export function makeDevice(devBody: AppInfos | DeviceLink | AppStats, allowCustomID = true): DeviceWithoutCreatedAt {
+  const normalizedCustomId = normalizeCustomId(devBody.custom_id)
+  const customId = allowCustomID ? normalizedCustomId : undefined
   const device = {
     platform: devBody.platform as Database['public']['Enums']['platform_os'],
     device_id: devBody.device_id,
@@ -25,7 +34,7 @@ export function makeDevice(devBody: AppInfos | DeviceLink | AppStats): DeviceWit
     version_name: devBody.version_name,
     is_emulator: devBody.is_emulator ?? false,
     is_prod: devBody.is_prod ?? true,
-    custom_id: devBody.custom_id,
+    custom_id: customId,
     updated_at: new Date().toISOString(),
     default_channel: devBody.defaultChannel ?? null,
     key_id: devBody.key_id ?? null,

@@ -10,12 +10,19 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import AdminBarChart from '~/components/admin/AdminBarChart.vue'
 import AdminFilterBar from '~/components/admin/AdminFilterBar.vue'
+import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
 import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
 import Spinner from '~/components/Spinner.vue'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
+
+interface PluginBreakdownTrendPoint {
+  date: string
+  version_breakdown: Record<string, number>
+  major_breakdown: Record<string, number>
+}
 
 interface PluginBreakdownData {
   date: string | null
@@ -24,6 +31,7 @@ interface PluginBreakdownData {
   devices_last_month_android: number
   version_breakdown: Record<string, number>
   major_breakdown: Record<string, number>
+  trend?: PluginBreakdownTrendPoint[]
 }
 
 const { t } = useI18n()
@@ -38,6 +46,8 @@ const pluginBreakdown = ref<PluginBreakdownData | null>(null)
 const thresholdSelection = ref<'0' | '0.1' | '0.5' | '1' | '2' | '5' | 'custom'>('1')
 const customThreshold = ref(1)
 const maxVersionRows = 20
+const maxTrendVersions = 5
+const trendColorPalette = ['#119eff', '#10b981', '#f59e0b', '#6366f1', '#ec4899', '#14b8a6', '#f97316', '#8b5cf6']
 
 async function loadPluginBreakdown() {
   isLoadingBreakdown.value = true
@@ -98,6 +108,35 @@ const hasMajorData = computed(() => majorEntries.value.length > 0)
 
 const versionCountTotal = computed(() => Object.keys(pluginBreakdown.value?.version_breakdown ?? {}).length)
 const versionCountShown = computed(() => versionEntries.value.length)
+const versionTrendPoints = computed(() => pluginBreakdown.value?.trend ?? [])
+const topVersionsForTrend = computed(() => {
+  const latestPoint = versionTrendPoints.value[versionTrendPoints.value.length - 1]
+  if (!latestPoint)
+    return []
+
+  return Object.entries(latestPoint.version_breakdown ?? {})
+    .map(([version, percent]) => ({
+      version,
+      percent: Number(percent) || 0,
+    }))
+    .filter(entry => entry.percent > thresholdValue.value)
+    .sort((a, b) => b.percent - a.percent)
+    .slice(0, maxTrendVersions)
+})
+const versionTrendSeries = computed(() => {
+  if (versionTrendPoints.value.length === 0 || topVersionsForTrend.value.length === 0)
+    return []
+
+  return topVersionsForTrend.value.map((entry, index) => ({
+    label: entry.version,
+    data: versionTrendPoints.value.map(point => ({
+      date: point.date,
+      value: Number(point.version_breakdown?.[entry.version]) || 0,
+    })),
+    color: trendColorPalette[index % trendColorPalette.length],
+  }))
+})
+const hasVersionTrendData = computed(() => versionTrendSeries.value.length > 0)
 
 watch(() => adminStore.activeDateRange, () => {
   loadPluginBreakdown()
@@ -164,6 +203,28 @@ displayStore.defaultBack = '/dashboard'
               subtitle="Active Android devices"
             />
           </div>
+
+          <ChartCard
+            title="Version Breakdown Over Time"
+            :is-loading="isLoadingBreakdown"
+            :has-data="hasVersionTrendData"
+            no-data-message="No plugin version trend data available"
+          >
+            <template #header>
+              <div class="flex flex-col gap-1">
+                <h2 class="text-2xl font-semibold leading-tight dark:text-white text-slate-600">
+                  Version Breakdown Over Time
+                </h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  Top {{ topVersionsForTrend.length }} versions from latest snapshot (min share {{ thresholdValue }}%)
+                </p>
+              </div>
+            </template>
+            <AdminMultiLineChart
+              :series="versionTrendSeries"
+              :is-loading="isLoadingBreakdown"
+            />
+          </ChartCard>
 
           <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
             <ChartCard

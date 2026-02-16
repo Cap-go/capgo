@@ -119,6 +119,15 @@ watch(() => main.bestPlan, (newBestPlan) => {
 
 const isTrial = computed(() => currentOrganization?.value ? (!currentOrganization?.value.paying && (currentOrganization?.value.trial_left ?? 0) > 0) : false)
 
+// Credits-only org: has credits but no active subscription and no trial remaining.
+// These orgs use pay-as-you-go credits as their primary payment method.
+const isCreditsOnly = computed(() => {
+  const org = currentOrganization?.value
+  if (!org)
+    return false
+  return !org.paying && (org.trial_left ?? 0) <= 0 && (org.credit_available ?? 0) > 0
+})
+
 async function openChangePlan(plan: Database['public']['Tables']['plans']['Row'], index: number) {
   // Show admin modal for non-admins instead of blocking
   if (!isSuperAdmin.value) {
@@ -417,8 +426,8 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
         {{ t('plan-failed') }}
       </div>
 
-      <!-- Credits CTA -->
-      <CreditsCta class="mb-6 shrink-0" />
+      <!-- Credits CTA: shows info banner for credits-only orgs, upsell CTA for others -->
+      <CreditsCta class="mb-6 shrink-0" :credits-only="isCreditsOnly" />
 
       <!-- Expert as a Service CTA -->
       <div class="mb-6 shrink-0">
@@ -449,7 +458,9 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           :key="p.price_m"
           class="relative flex flex-col p-5 overflow-hidden transition-all duration-200 bg-gray-100 border rounded-2xl group dark:bg-base-200"
           :class="[
-            p.name === currentPlan?.name ? 'border-2 border-blue-500' : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700',
+            // Don't highlight the plan card for credits-only orgs — they are not actually
+            // on any plan, and highlighting Solo (the fallback) would be misleading.
+            p.name === currentPlan?.name && !isCreditsOnly ? 'border-2 border-blue-500' : 'border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700',
             isRecommended(p) ? 'shadow-lg shadow-blue-500/10' : 'shadow-sm',
           ]"
         >
