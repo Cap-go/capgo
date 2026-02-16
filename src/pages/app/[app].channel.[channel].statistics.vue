@@ -49,6 +49,71 @@ interface ChannelStatsResponse {
   }
 }
 
+type ChannelAdoptionStatus = 'loading' | 'no-devices' | 'ramping' | 'healthy' | 'warning' | 'critical'
+
+function getHoursSinceRelease(releasedAt: string | null | undefined): number | null {
+  if (!releasedAt)
+    return null
+
+  const releaseDate = new Date(releasedAt)
+  if (Number.isNaN(releaseDate.getTime()))
+    return null
+
+  const elapsedMs = Date.now() - releaseDate.getTime()
+  if (elapsedMs < 0)
+    return 0
+
+  return elapsedMs / (1000 * 60 * 60)
+}
+
+function getAdoptionStatus(percentOnCurrent: number, totalDevices: number, hoursSinceRelease: number | null): ChannelAdoptionStatus {
+  if (totalDevices <= 0)
+    return 'no-devices'
+
+  // Fall back to legacy thresholds when release timestamp is not available.
+  if (hoursSinceRelease === null) {
+    if (percentOnCurrent >= 90)
+      return 'healthy'
+    if (percentOnCurrent >= 50)
+      return 'warning'
+    return 'critical'
+  }
+
+  // First 24h: low percentage is expected, keep this neutral unless it ramps quickly.
+  if (hoursSinceRelease < 24) {
+    if (percentOnCurrent >= 50)
+      return 'healthy'
+    if (percentOnCurrent >= 10)
+      return 'warning'
+    return 'ramping'
+  }
+
+  // 24h-72h: now low adoption is concerning.
+  if (hoursSinceRelease < 72) {
+    if (percentOnCurrent >= 75)
+      return 'healthy'
+    if (percentOnCurrent >= 25)
+      return 'warning'
+    return 'critical'
+  }
+
+  // 3-7 days: should be significantly rolled out.
+  if (hoursSinceRelease < 168) {
+    if (percentOnCurrent >= 85)
+      return 'healthy'
+    if (percentOnCurrent >= 45)
+      return 'warning'
+    return 'critical'
+  }
+
+  // After a week: expect strong adoption.
+  if (percentOnCurrent >= 90)
+    return 'healthy'
+  if (percentOnCurrent >= 60)
+    return 'warning'
+  return 'critical'
+}
+
 const route = useRoute('/app/[app].channel.[channel].statistics')
 const router = useRouter()
 const displayStore = useDisplayStore()
@@ -103,30 +168,32 @@ const tooltipClickHandler = computed<TooltipClickHandler | undefined>(() => {
   }
 })
 
-const statusType = computed(() => {
+const percentOnCurrent = computed(() => stats.value?.totals.percent_on_current ?? 0)
+const totalDevices = computed(() => stats.value?.totals.total_devices ?? 0)
+const devicesOnCurrent = computed(() => stats.value?.totals.devices_on_current ?? 0)
+const hoursSinceCurrentVersionRelease = computed(() => getHoursSinceRelease(stats.value?.currentVersionReleasedAt))
+
+const statusType = computed<ChannelAdoptionStatus>(() => {
   if (!stats.value)
     return 'loading'
-  if (stats.value.totals.total_devices === 0)
-    return 'no-devices'
-  if (stats.value.totals.percent_on_current >= 90)
-    return 'healthy'
-  if (stats.value.totals.percent_on_current >= 50)
-    return 'warning'
-  return 'critical'
+  return getAdoptionStatus(percentOnCurrent.value, totalDevices.value, hoursSinceCurrentVersionRelease.value)
 })
 
 const statusMessage = computed(() => {
+  const percent = percentOnCurrent.value.toFixed(1)
   switch (statusType.value) {
     case 'loading':
       return t('loading-statistics')
     case 'no-devices':
       return t('no-devices-on-channel')
+    case 'ramping':
+      return t('partial-adoption', { percent })
     case 'healthy':
-      return t('updates-working-well', { percent: stats.value?.totals.percent_on_current.toFixed(1) })
+      return t('updates-working-well', { percent })
     case 'warning':
-      return t('partial-adoption', { percent: stats.value?.totals.percent_on_current.toFixed(1) })
+      return t('partial-adoption', { percent })
     case 'critical':
-      return t('low-adoption-warning', { percent: stats.value?.totals.percent_on_current.toFixed(1) })
+      return t('low-adoption-warning', { percent })
     default:
       return ''
   }
@@ -142,6 +209,36 @@ const currentVersionDeployLabel = computed(() => {
   if (diffMs < 24 * 60 * 60 * 1000)
     return formatDistanceToNow(date)
   return date.toLocaleDateString()
+})
+
+const statusDetail = computed(() => {
+  if (!stats.value || totalDevices.value <= 0)
+    return ''
+
+  const base = `${Math.round(devicesOnCurrent.value)} / ${Math.round(totalDevices.value)} ${t('devices-updated')}`
+  if (statusType.value !== 'ramping')
+    return base
+
+  const releaseLabel = currentVersionDeployLabel.value
+  if (!releaseLabel || releaseLabel === '-')
+    return base
+
+  return `${base} • ${t('released')}: ${releaseLabel}`
+})
+
+const adoptionRateColorClass = computed(() => {
+  switch (statusType.value) {
+    case 'healthy':
+      return 'text-emerald-600 dark:text-emerald-400'
+    case 'warning':
+      return 'text-amber-600 dark:text-amber-400'
+    case 'critical':
+      return 'text-rose-600 dark:text-rose-400'
+    case 'ramping':
+      return 'text-sky-600 dark:text-sky-400'
+    default:
+      return 'text-slate-600 dark:text-slate-300'
+  }
 })
 
 const chartPalette = [
@@ -372,9 +469,10 @@ watchEffect(async () => {
           class="p-4 border rounded-lg shadow-sm"
           :class="{
             'bg-emerald-50 border-emerald-200 dark:bg-emerald-900/20 dark:border-emerald-800': statusType === 'healthy',
-            'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800': statusType === 'warning' || statusType === 'no-devices',
+            'bg-amber-50 border-amber-200 dark:bg-amber-900/20 dark:border-amber-800': statusType === 'warning',
             'bg-rose-50 border-rose-200 dark:bg-rose-900/20 dark:border-rose-800': statusType === 'critical',
-            'bg-slate-50 border-slate-200 dark:bg-slate-800 dark:border-slate-700': statusType === 'loading',
+            'bg-sky-50 border-sky-200 dark:bg-sky-900/20 dark:border-sky-800': statusType === 'ramping',
+            'bg-slate-50 border-slate-200 dark:bg-slate-800 dark:border-slate-700': statusType === 'no-devices' || statusType === 'loading',
           }"
         >
           <div class="flex items-center gap-3">
@@ -383,12 +481,20 @@ watchEffect(async () => {
               class="w-6 h-6 text-emerald-600 dark:text-emerald-400"
             />
             <IconAlertTriangle
-              v-else-if="statusType === 'warning' || statusType === 'no-devices'"
+              v-else-if="statusType === 'warning'"
               class="w-6 h-6 text-amber-600 dark:text-amber-400"
+            />
+            <IconTrendingUp
+              v-else-if="statusType === 'ramping'"
+              class="w-6 h-6 text-sky-600 dark:text-sky-400"
             />
             <IconAlertCircle
               v-else-if="statusType === 'critical'"
               class="w-6 h-6 text-rose-600 dark:text-rose-400"
+            />
+            <IconAlertCircle
+              v-else-if="statusType === 'no-devices'"
+              class="w-6 h-6 text-slate-500 dark:text-slate-300"
             />
             <div
               v-else
@@ -399,9 +505,10 @@ watchEffect(async () => {
                 class="font-semibold"
                 :class="{
                   'text-emerald-800 dark:text-emerald-200': statusType === 'healthy',
-                  'text-amber-800 dark:text-amber-200': statusType === 'warning' || statusType === 'no-devices',
+                  'text-amber-800 dark:text-amber-200': statusType === 'warning',
                   'text-rose-800 dark:text-rose-200': statusType === 'critical',
-                  'text-slate-800 dark:text-slate-200': statusType === 'loading',
+                  'text-sky-800 dark:text-sky-200': statusType === 'ramping',
+                  'text-slate-800 dark:text-slate-200': statusType === 'no-devices' || statusType === 'loading',
                 }"
               >
                 {{ statusMessage }}
@@ -413,9 +520,10 @@ watchEffect(async () => {
                   'text-emerald-700 dark:text-emerald-300': statusType === 'healthy',
                   'text-amber-700 dark:text-amber-300': statusType === 'warning',
                   'text-rose-700 dark:text-rose-300': statusType === 'critical',
+                  'text-sky-700 dark:text-sky-300': statusType === 'ramping',
                 }"
               >
-                {{ Math.round(stats.totals.devices_on_current) }} / {{ Math.round(stats.totals.total_devices) }} {{ t('devices-updated') }}
+                {{ statusDetail }}
               </p>
             </div>
           </div>
@@ -445,13 +553,7 @@ watchEffect(async () => {
               <IconCheckCircle class="w-4 h-4" />
               {{ t('adoption-rate') }}
             </div>
-            <div
-              class="mt-2 text-lg font-semibold" :class="{
-                'text-emerald-600 dark:text-emerald-400': (stats?.totals.percent_on_current || 0) >= 90,
-                'text-amber-600 dark:text-amber-400': (stats?.totals.percent_on_current || 0) >= 50 && (stats?.totals.percent_on_current || 0) < 90,
-                'text-rose-600 dark:text-rose-400': (stats?.totals.percent_on_current || 0) < 50,
-              }"
-            >
+            <div class="mt-2 text-lg font-semibold" :class="adoptionRateColorClass">
               {{ stats?.totals.percent_on_current.toFixed(1) || '0.0' }}%
             </div>
           </div>
