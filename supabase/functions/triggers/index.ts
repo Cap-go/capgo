@@ -1,6 +1,7 @@
 import { app as credit_usage_alerts } from '../_backend/triggers/credit_usage_alerts.ts'
 import { app as cron_clean_orphan_images } from '../_backend/triggers/cron_clean_orphan_images.ts'
 import { app as cron_clear_versions } from '../_backend/triggers/cron_clear_versions.ts'
+import { app as cron_reconcile_build_status } from '../_backend/triggers/cron_reconcile_build_status.ts'
 import { app as cron_email } from '../_backend/triggers/cron_email.ts'
 import { app as cron_stat_app } from '../_backend/triggers/cron_stat_app.ts'
 import { app as cron_stat_org } from '../_backend/triggers/cron_stat_org.ts'
@@ -48,6 +49,7 @@ appGlobal.route('/cron_stat_org', cron_stat_org)
 appGlobal.route('/cron_sync_sub', cron_sync_sub)
 appGlobal.route('/cron_clear_versions', cron_clear_versions)
 appGlobal.route('/cron_clean_orphan_images', cron_clean_orphan_images)
+appGlobal.route('/cron_reconcile_build_status', cron_reconcile_build_status)
 appGlobal.route('/credit_usage_alerts', credit_usage_alerts)
 appGlobal.route('/on_organization_delete', on_organization_delete)
 appGlobal.route('/on_deploy_history_create', on_deploy_history_create)
