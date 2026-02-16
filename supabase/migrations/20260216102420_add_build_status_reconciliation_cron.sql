@@ -58,7 +58,7 @@ INSERT INTO public.cron_tasks (
     '["cron_reconcile_build_status"]',
     null,
     null,
-    5,
+    1,
     null,
     null,
     null,
