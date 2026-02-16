@@ -121,18 +121,20 @@ app.post('/', middlewareAPISecret, async (c) => {
         && builderJob.job.completed_at
       ) {
         const buildTimeSeconds = Math.floor((builderJob.job.completed_at - builderJob.job.started_at) / 1000)
-        const resolvedPlatform = (build.platform === 'ios' || build.platform === 'android')
-          ? build.platform
-          : 'ios'
 
-        await recordBuildTime(
-          c,
-          build.owner_org,
-          build.requested_by,
-          build.builder_job_id,
-          resolvedPlatform as 'ios' | 'android',
-          buildTimeSeconds,
-        )
+        if (build.platform !== 'ios' && build.platform !== 'android') {
+          cloudlogErr({ requestId: c.get('requestId'), message: 'Unexpected platform, skipping recordBuildTime', buildId: build.id, platform: build.platform })
+        }
+        else {
+          await recordBuildTime(
+            c,
+            build.owner_org,
+            build.requested_by,
+            build.builder_job_id,
+            build.platform,
+            buildTimeSeconds,
+          )
+        }
       }
     }
     catch (err) {
