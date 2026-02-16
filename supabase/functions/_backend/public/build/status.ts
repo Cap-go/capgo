@@ -3,7 +3,7 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
-import { recordBuildTime, supabaseApikey } from '../../utils/supabase.ts'
+import { recordBuildTime, supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
 
 export interface BuildStatusParams {
@@ -98,7 +98,10 @@ export async function getBuildStatus(
   })
 
   // Update build_requests table with current status
-  const { error: updateError } = await supabase
+  // Use admin client: access was already verified above (RLS SELECT + checkPermission).
+  // The data written comes from the trusted builder API, not from user input.
+  // An RLS UPDATE policy would let API-key holders forge status/build-time, so we bypass RLS here.
+  const { error: updateError } = await supabaseAdmin(c)
     .from('build_requests')
     .update({
       status: builderJob.job.status,
