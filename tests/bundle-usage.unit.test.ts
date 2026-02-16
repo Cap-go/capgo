@@ -95,6 +95,19 @@ describe('bundle usage helpers', () => {
     expect(percentages['2024-10-25']['1.1.0']).toBe(80)
   })
 
+  it('convertCountsToPercentagesByName keeps rounded totals at exactly 100', () => {
+    const counts = {
+      '2024-10-24': { '1.0.0': 1, '1.1.0': 1, '1.2.0': 1 },
+    }
+    const dates = ['2024-10-24']
+    const versions = ['1.0.0', '1.1.0', '1.2.0']
+
+    const percentages = bundleUsageTestUtils.convertCountsToPercentagesByName(counts as any, dates, versions)
+    const total = versions.reduce((sum, version) => sum + percentages['2024-10-24'][version], 0)
+
+    expect(total).toBeCloseTo(100, 5)
+  })
+
   it('getLatestDayVersionShare returns top version share from latest day with data', () => {
     const versions = ['1.0.0', '1.1.0']
     const dates = ['2024-10-24', '2024-10-25']

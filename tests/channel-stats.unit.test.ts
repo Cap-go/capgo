@@ -76,4 +76,30 @@ describe('channel stats helpers', () => {
     const result = channelStatsTestUtils.getLatestCounts(labels, countsByDate)
     expect(result).toEqual({ '1.0.0': 5, '1.1.0': 4 })
   })
+
+  it('convertCountsToPercentagesByName keeps rounded totals at exactly 100', () => {
+    const counts = {
+      '2024-12-01': { '1.0.0': 1, '1.1.0': 1, '1.2.0': 1 },
+    }
+    const dates = ['2024-12-01']
+    const versions = ['1.0.0', '1.1.0', '1.2.0']
+
+    const percentages = channelStatsTestUtils.convertCountsToPercentagesByName(counts as any, dates, versions)
+    const total = versions.reduce((sum, version) => sum + percentages['2024-12-01'][version], 0)
+
+    expect(total).toBeCloseTo(100, 5)
+  })
+
+  it('selectRecentChannelVersions returns at most 10 latest deployed versions', () => {
+    const deploymentHistory = Array.from({ length: 12 }, (_, index) => ({
+      version_name: `1.${index}.0`,
+      deployed_at: new Date(`2024-12-${String(index + 1).padStart(2, '0')}T00:00:00Z`).toISOString(),
+    }))
+
+    const versions = channelStatsTestUtils.selectRecentChannelVersions(deploymentHistory, '1.11.0', {}, 10)
+
+    expect(versions).toHaveLength(10)
+    expect(versions[0]).toBe('1.11.0')
+    expect(versions[9]).toBe('1.2.0')
+  })
 })

@@ -54,7 +54,7 @@ function createPercentageDatasetsByName(
   countsByDate: { [date: string]: { [version: string]: number } },
 ) {
   return versions.map((version) => {
-    const percentageData = dates.map(date => Number((percentagesByDate[date]?.[version] ?? 0).toFixed(1)))
+    const percentageData = dates.map(date => percentagesByDate[date]?.[version] ?? 0)
     const countData = dates.map(date => Math.round(countsByDate[date]?.[version] ?? 0))
 
     return {
@@ -101,13 +101,75 @@ function convertCountsToPercentagesByName(
     const dayData = counts[date] ?? {}
     const total = versions.reduce((sum, version) => sum + (dayData[version] ?? 0), 0)
     percentages[date] = {}
-    versions.forEach((version) => {
+    if (total <= 0) {
+      versions.forEach((version) => {
+        percentages[date][version] = 0
+      })
+      return
+    }
+
+    const preciseShares = versions.map((version) => {
       const count = dayData[version] ?? 0
-      percentages[date][version] = total > 0 ? (count / total) * 100 : 0
+      return (count / total) * 100
+    })
+    const flooredShares = preciseShares.map(share => Math.floor(share * 10) / 10)
+    const flooredSum = flooredShares.reduce((sum, share) => sum + share, 0)
+    let unitsToDistribute = Math.max(0, Math.round((100 - flooredSum) * 10))
+
+    const remainderOrder = preciseShares
+      .map((share, index) => ({ index, remainder: share - flooredShares[index] }))
+      .sort((a, b) => {
+        if (b.remainder === a.remainder)
+          return a.index - b.index
+        return b.remainder - a.remainder
+      })
+
+    const roundedShares = [...flooredShares]
+    for (let i = 0; i < remainderOrder.length && unitsToDistribute > 0; i++, unitsToDistribute--) {
+      const target = remainderOrder[i].index
+      roundedShares[target] = Number((roundedShares[target] + 0.1).toFixed(1))
+    }
+
+    versions.forEach((version, index) => {
+      percentages[date][version] = roundedShares[index] ?? 0
     })
   })
 
   return percentages
+}
+
+function selectRecentChannelVersions(
+  deploymentHistory: DeploymentHistoryEntry[],
+  currentVersionName: string,
+  currentCounts: Record<string, number>,
+  limit: number = 10,
+) {
+  const sortedByRecency = [...deploymentHistory]
+    .sort((a, b) => dayjs(b.deployed_at).valueOf() - dayjs(a.deployed_at).valueOf())
+    .map(entry => entry.version_name)
+
+  const uniqueRecentDeployed: string[] = []
+  for (const versionName of sortedByRecency) {
+    if (!versionName || uniqueRecentDeployed.includes(versionName))
+      continue
+    uniqueRecentDeployed.push(versionName)
+    if (uniqueRecentDeployed.length >= limit)
+      break
+  }
+
+  if (currentVersionName && !uniqueRecentDeployed.includes(currentVersionName)) {
+    uniqueRecentDeployed.unshift(currentVersionName)
+    if (uniqueRecentDeployed.length > limit)
+      uniqueRecentDeployed.length = limit
+  }
+
+  if (uniqueRecentDeployed.length > 0)
+    return uniqueRecentDeployed
+
+  return Object.entries(currentCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([versionName]) => versionName)
 }
 
 function fillMissingDailyData(datasets: { label: string, data: number[] }[], labels: string[]) {
@@ -253,35 +315,13 @@ app.post('/', middlewareAuth, async (c) => {
       })
       .filter(Boolean) as DeploymentHistoryEntry[]
 
-    const channelVersions = new Set<string>()
     const versionIdToName: Record<string, string> = {}
-    const firstDeployByVersion: Record<string, string> = {}
-
-    if (currentVersionName) {
-      channelVersions.add(currentVersionName)
-    }
 
     for (const deploy of (deployHistory || [])) {
       const versionName = (deploy.app_versions as any)?.name
       const versionId = deploy.version_id
-      if (versionName) {
-        channelVersions.add(versionName)
-        if (versionId !== null && versionId !== undefined) {
-          versionIdToName[String(versionId)] = versionName
-        }
-      }
-      if (versionName && deploy.deployed_at) {
-        const deployDate = dayjs(deploy.deployed_at).utc().format('YYYY-MM-DD')
-        if (!firstDeployByVersion[versionName] || deployDate < firstDeployByVersion[versionName])
-          firstDeployByVersion[versionName] = deployDate
-      }
-    }
-
-    if (currentVersionName && !firstDeployByVersion[currentVersionName]) {
-      const fallbackDate = channelData.updated_at
-        ? dayjs(channelData.updated_at).utc().format('YYYY-MM-DD')
-        : dayjs(startDate).utc().format('YYYY-MM-DD')
-      firstDeployByVersion[currentVersionName] = fallbackDate
+      if (versionName && versionId !== null && versionId !== undefined)
+        versionIdToName[String(versionId)] = versionName
     }
 
     const currentVersionRelease = deploymentHistory
@@ -312,12 +352,7 @@ app.post('/', middlewareAuth, async (c) => {
 
     const currentCounts = await readDeviceVersionCounts(c, body.app_id, channelData.name)
 
-    for (const versionName of Object.keys(currentCounts)) {
-      if (!channelVersions.has(versionName))
-        channelVersions.add(versionName)
-    }
-
-    const versions = Array.from(channelVersions)
+    const versions = selectRecentChannelVersions(deploymentHistory, currentVersionName, currentCounts, 10)
 
     const filteredDailyVersion = dailyVersion.filter(row => versions.includes(row.version_name))
     const countsByDate = buildDailyReportedCountsByName(filteredDailyVersion, labels, versions)
@@ -391,6 +426,7 @@ export const channelStatsTestUtils = {
   fillMissingDailyData,
   buildDailyReportedCountsByName,
   convertCountsToPercentagesByName,
+  selectRecentChannelVersions,
   maskDataBeforeFirstDeployment,
   getLatestCounts,
 }

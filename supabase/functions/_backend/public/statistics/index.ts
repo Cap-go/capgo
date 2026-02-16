@@ -414,9 +414,37 @@ function convertCountsToPercentagesByName(
     const dayData = counts[date] ?? {}
     const total = versions.reduce((sum, version) => sum + (dayData[version] ?? 0), 0)
     percentages[date] = {}
-    versions.forEach((version) => {
+    if (total <= 0) {
+      versions.forEach((version) => {
+        percentages[date][version] = 0
+      })
+      return
+    }
+
+    const preciseShares = versions.map((version) => {
       const count = dayData[version] ?? 0
-      percentages[date][version] = total > 0 ? (count / total) * 100 : 0
+      return (count / total) * 100
+    })
+    const flooredShares = preciseShares.map(share => Math.floor(share * 10) / 10)
+    const flooredSum = flooredShares.reduce((sum, share) => sum + share, 0)
+    let unitsToDistribute = Math.max(0, Math.round((100 - flooredSum) * 10))
+
+    const remainderOrder = preciseShares
+      .map((share, index) => ({ index, remainder: share - flooredShares[index] }))
+      .sort((a, b) => {
+        if (b.remainder === a.remainder)
+          return a.index - b.index
+        return b.remainder - a.remainder
+      })
+
+    const roundedShares = [...flooredShares]
+    for (let i = 0; i < remainderOrder.length && unitsToDistribute > 0; i++, unitsToDistribute--) {
+      const target = remainderOrder[i].index
+      roundedShares[target] = Number((roundedShares[target] + 0.1).toFixed(1))
+    }
+
+    versions.forEach((version, index) => {
+      percentages[date][version] = roundedShares[index] ?? 0
     })
   })
 
@@ -438,7 +466,7 @@ function createDatasetsByName(
   counts: { [date: string]: { [version: string]: number } },
 ) {
   return versions.map((version) => {
-    const percentageData = dates.map(date => Number((percentages[date][version] ?? 0).toFixed(1)))
+    const percentageData = dates.map(date => percentages[date][version] ?? 0)
     const countData = dates.map(date => Math.max(0, Math.round(counts[date][version] ?? 0)))
 
     return {
