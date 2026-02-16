@@ -634,4 +634,5 @@ if (isNewVersion) {
 The deployment happens automatically after GitHub CI/CD on main branch.
 
 You are not allowed to deploy on your own, unless if asked. Same for git you
-never git push, add or commit unless asked.
+never git push on main branch, add or commit unless asked.
+You can do it in others branches

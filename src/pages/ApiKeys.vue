@@ -798,7 +798,7 @@ getKeys()
           <div class="mb-2 ml-4">
             <a
               class="inline-flex items-center text-blue-500 underline rounded-sm focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:outline-none"
-              href="https://capgo.app/docs/tooling/cli/"
+              href="https://capgo.app/docs/cli/reference/key/"
               target="_blank"
               rel="noopener noreferrer"
               :aria-label="`${t('cli-doc')} (opens in new tab)`"
@@ -811,7 +811,7 @@ getKeys()
             </a>
             <a
               class="inline-flex items-center ml-1 text-blue-500 underline rounded-sm focus:ring-2 focus:ring-blue-500 focus:ring-offset-1 focus:outline-none"
-              href="https://capgo.app/docs/tooling/api/"
+              href="https://capgo.app/docs/public-api/api-keys/"
               target="_blank"
               rel="noopener noreferrer"
               :aria-label="`${t('api-doc')} (opens in new tab)`"
