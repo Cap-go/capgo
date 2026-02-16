@@ -72,7 +72,7 @@ fi
 # For local functions runtime, override only non-reserved local endpoints so
 # uploads and storage calls follow the worktree port assignments.
 cmd=("$@")
-if [ "${#cmd[@]}" -ge 4 ]; then
+if [ "${#cmd[@]}" -ge 3 ]; then
   subcommand_start=-1
   if [ "${cmd[0]}" = "supabase" ]; then
     subcommand_start=1
@@ -102,6 +102,7 @@ if [ "${#cmd[@]}" -ge 4 ]; then
       {
         printf '\n'
         printf 'API_URL=%s\n' "${API_URL}"
+        printf 'SUPABASE_EXTERNAL_URL=%s\n' "${SUPABASE_EXTERNAL_URL}"
         printf 'S3_ENDPOINT=%s\n' "${S3_ENDPOINT}"
         printf 'STORAGE_API_URL=%s\n' "${STORAGE_API_URL}"
       } >> "${functions_env_file}"
