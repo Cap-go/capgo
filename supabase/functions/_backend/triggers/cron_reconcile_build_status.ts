@@ -33,6 +33,11 @@ app.post('/', middlewareAPISecret, async (c) => {
   const builderUrl = getEnv(c, 'BUILDER_URL')
   const builderApiKey = getEnv(c, 'BUILDER_API_KEY')
 
+  if (!builderUrl || !builderApiKey) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Missing BUILDER_URL or BUILDER_API_KEY env var, skipping reconciliation' })
+    return c.json(BRES)
+  }
+
   const { data: staleBuilds, error: queryError } = await supabase
     .from('build_requests')
     .select('id, builder_job_id, app_id, owner_org, requested_by, platform, status, created_at')
