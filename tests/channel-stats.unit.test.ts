@@ -15,42 +15,17 @@ describe('channel stats helpers', () => {
     ])
   })
 
-  it('maskDataBeforeFirstDeployment clears values before first deployment date', () => {
-    const labels = ['2024-12-01', '2024-12-02', '2024-12-03', '2024-12-04']
-    const source = [
-      { label: '1.0.0', data: [8, 7, 6, 5] },
-      { label: '1.1.0', data: [0, 1, 3, 4] },
-    ]
+  it('fillMissingDailyCounts carries forward historical zero days', () => {
+    const versions = ['1.0.0', '1.1.0']
+    const labels = ['2024-12-01', '2024-12-02', '2024-12-03']
+    const source = {
+      '2024-12-01': { '1.0.0': 4, '1.1.0': 6 },
+      '2024-12-02': { '1.0.0': 0, '1.1.0': 0 },
+      '2024-12-03': { '1.0.0': 5, '1.1.0': 5 },
+    }
 
-    const result = channelStatsTestUtils.maskDataBeforeFirstDeployment(source, labels, {
-      '1.0.0': '2024-12-01',
-      '1.1.0': '2024-12-03',
-    })
-
-    expect(result).toEqual([
-      { label: '1.0.0', data: [8, 7, 6, 5] },
-      { label: '1.1.0', data: [0, 0, 3, 4] },
-    ])
-
-    expect(source).toEqual([
-      { label: '1.0.0', data: [8, 7, 6, 5] },
-      { label: '1.1.0', data: [0, 1, 3, 4] },
-    ])
-  })
-
-  it('maskDataBeforeFirstDeployment clears all values when deployment is outside range', () => {
-    const labels = ['2024-12-01', '2024-12-02']
-    const source = [
-      { label: '2.0.0', data: [2, 3] },
-    ]
-
-    const result = channelStatsTestUtils.maskDataBeforeFirstDeployment(source, labels, {
-      '2.0.0': '2024-12-10',
-    })
-
-    expect(result).toEqual([
-      { label: '2.0.0', data: [0, 0] },
-    ])
+    const result = channelStatsTestUtils.fillMissingDailyCounts(source, labels, versions, '2024-12-10')
+    expect(result['2024-12-02']).toEqual({ '1.0.0': 4, '1.1.0': 6 })
   })
 
   it('getLatestCounts returns the last label snapshot', () => {

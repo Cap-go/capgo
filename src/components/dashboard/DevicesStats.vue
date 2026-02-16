@@ -184,6 +184,7 @@ const latestVersion = computed(() => {
     const numericCount = typeof countAtIndex === 'number' && !Number.isNaN(countAtIndex) ? countAtIndex : 0
     return sum + Math.max(0, numericCount)
   }, 0)
+  const hasCountMetadata = totalCountAtLastDay > 0
 
   const datasetAtLastDay = datasets.reduce<{ name: string, count: number, share: number } | null>((current, dataset) => {
     const value = dataset.data?.[lastIndexWithData]
@@ -200,7 +201,16 @@ const latestVersion = computed(() => {
     const share = totalCountAtLastDay > 0
       ? (count / totalCountAtLastDay) * 100
       : Math.max(0, numericValue)
-    if (!current || count > current.count)
+    if (!current)
+      return { name: dataset.label, count, share }
+
+    if (hasCountMetadata) {
+      if (count > current.count || (count === current.count && share > current.share))
+        return { name: dataset.label, count, share }
+      return current
+    }
+
+    if (share > current.share)
       return { name: dataset.label, count, share }
 
     return current
@@ -209,20 +219,20 @@ const latestVersion = computed(() => {
   if (datasetAtLastDay)
     return datasetAtLastDay
 
-  const fallbackDataset = datasets.find(dataset => dataset.data && dataset.data[lastIndexWithData] !== undefined)
+  const fallbackDataset = datasets.reduce<{ label: string, value: number } | null>((current, dataset) => {
+    const value = dataset.data?.[lastIndexWithData]
+    const numericValue = typeof value === 'number' && !Number.isNaN(value) ? value : null
+    if (numericValue === null)
+      return current
+    if (!current || numericValue > current.value)
+      return { label: dataset.label, value: numericValue }
+    return current
+  }, null)
   if (fallbackDataset) {
-    const fallbackValue = fallbackDataset.data?.[lastIndexWithData]
-    const numericFallback = typeof fallbackValue === 'number' && !Number.isNaN(fallbackValue) ? fallbackValue : 0
-    const countValues = (fallbackDataset as any)?.metaCountValues as Array<number | undefined> | undefined
-    const fallbackCountAtIndex = countValues?.[lastIndexWithData]
-    const count = typeof fallbackCountAtIndex === 'number' && !Number.isNaN(fallbackCountAtIndex)
-      ? Math.max(0, fallbackCountAtIndex)
-      : 0
-    const share = totalCountAtLastDay > 0 ? (count / totalCountAtLastDay) * 100 : Math.max(0, numericFallback)
     return {
       name: fallbackDataset.label,
-      count,
-      share,
+      count: 0,
+      share: Math.max(0, fallbackDataset.value),
     }
   }
 
@@ -555,12 +565,12 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
   return {
     maintainAspectRatio: false,
     scales: createChartScales(isDark.value, {
-      max: 110,
+      max: props.accumulated ? 110 : 100,
       xStacked: props.accumulated,
       yStacked: props.accumulated,
       yTickCallback: (tickValue: string | number) => {
         const numericValue = typeof tickValue === 'number' ? tickValue : Number(tickValue)
-        if (numericValue > 100)
+        if (props.accumulated && numericValue > 100)
           return ''
         const display = Number.isFinite(numericValue) ? numericValue : tickValue
         return `${display}%`

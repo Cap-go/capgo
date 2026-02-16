@@ -7,6 +7,7 @@ import { cloudlog } from '../utils/logging.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { readDeviceVersionCounts, readStatsVersion } from '../utils/stats.ts'
 import { supabaseWithAuth } from '../utils/supabase.ts'
+import { buildDailyReportedCountsByName, convertCountsToPercentagesByName, fillMissingDailyCounts } from '../utils/version_stats_helpers.ts'
 
 dayjs.extend(utc)
 
@@ -65,79 +66,6 @@ function createPercentageDatasetsByName(
   })
 }
 
-function buildDailyReportedCountsByName(
-  usage: AppUsageByVersion[],
-  dates: string[],
-  versions: string[],
-) {
-  const counts: { [date: string]: { [version: string]: number } } = {}
-
-  dates.forEach((date) => {
-    counts[date] = {}
-    versions.forEach((version) => {
-      counts[date][version] = 0
-    })
-  })
-
-  usage.forEach((entry) => {
-    const date = entry.date
-    const version = entry.version_name
-    if (!version || !counts[date] || counts[date][version] === undefined)
-      return
-    counts[date][version] += Math.max(0, Math.round(entry.get ?? 0))
-  })
-
-  return counts
-}
-
-function convertCountsToPercentagesByName(
-  counts: { [date: string]: { [version: string]: number } },
-  dates: string[],
-  versions: string[],
-) {
-  const percentages: { [date: string]: { [version: string]: number } } = {}
-
-  dates.forEach((date) => {
-    const dayData = counts[date] ?? {}
-    const total = versions.reduce((sum, version) => sum + (dayData[version] ?? 0), 0)
-    percentages[date] = {}
-    if (total <= 0) {
-      versions.forEach((version) => {
-        percentages[date][version] = 0
-      })
-      return
-    }
-
-    const preciseShares = versions.map((version) => {
-      const count = dayData[version] ?? 0
-      return (count / total) * 100
-    })
-    const flooredShares = preciseShares.map(share => Math.floor(share * 10) / 10)
-    const flooredSum = flooredShares.reduce((sum, share) => sum + share, 0)
-    let unitsToDistribute = Math.max(0, Math.round((100 - flooredSum) * 10))
-
-    const remainderOrder = preciseShares
-      .map((share, index) => ({ index, remainder: share - flooredShares[index] }))
-      .sort((a, b) => {
-        if (b.remainder === a.remainder)
-          return a.index - b.index
-        return b.remainder - a.remainder
-      })
-
-    const roundedShares = [...flooredShares]
-    for (let i = 0; i < remainderOrder.length && unitsToDistribute > 0; i++, unitsToDistribute--) {
-      const target = remainderOrder[i].index
-      roundedShares[target] = Number((roundedShares[target] + 0.1).toFixed(1))
-    }
-
-    versions.forEach((version, index) => {
-      percentages[date][version] = roundedShares[index] ?? 0
-    })
-  })
-
-  return percentages
-}
-
 function selectRecentChannelVersions(
   deploymentHistory: DeploymentHistoryEntry[],
   currentVersionName: string,
@@ -170,66 +98,6 @@ function selectRecentChannelVersions(
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
     .map(([versionName]) => versionName)
-}
-
-function fillMissingDailyData(datasets: { label: string, data: number[] }[], labels: string[]) {
-  if (datasets.length === 0 || labels.length === 0)
-    return datasets
-
-  const today = dayjs().utc().format('YYYY-MM-DD')
-  const populated = datasets.map(dataset => ({
-    ...dataset,
-    data: [...dataset.data],
-  }))
-
-  for (let index = 1; index < labels.length; index++) {
-    if (labels[index] === today)
-      continue
-
-    const dailyTotal = populated.reduce((sum, dataset) => sum + (dataset.data[index] ?? 0), 0)
-    const previousTotal = populated.reduce((sum, dataset) => sum + (dataset.data[index - 1] ?? 0), 0)
-
-    if (dailyTotal === 0 && previousTotal > 0) {
-      populated.forEach((dataset) => {
-        dataset.data[index] = dataset.data[index - 1] ?? 0
-      })
-    }
-  }
-
-  return populated
-}
-
-function maskDataBeforeFirstDeployment(
-  datasets: { label: string, data: number[] }[],
-  labels: string[],
-  firstDeployByVersion: Record<string, string>,
-) {
-  if (datasets.length === 0 || labels.length === 0)
-    return datasets
-
-  const masked = datasets.map(dataset => ({
-    ...dataset,
-    data: [...dataset.data],
-  }))
-
-  masked.forEach((dataset) => {
-    const firstDeployDate = firstDeployByVersion[dataset.label]
-    if (!firstDeployDate)
-      return
-
-    // Labels use YYYY-MM-DD, so lexical comparison is chronological.
-    const firstVisibleIndex = labels.findIndex(label => label >= firstDeployDate)
-
-    if (firstVisibleIndex < 0) {
-      dataset.data.fill(0)
-      return
-    }
-
-    for (let index = 0; index < firstVisibleIndex; index++)
-      dataset.data[index] = 0
-  })
-
-  return masked
 }
 
 function getLatestCounts(labels: string[], countsByDate: Record<string, Record<string, number>>) {
@@ -355,7 +223,8 @@ app.post('/', middlewareAuth, async (c) => {
     const versions = selectRecentChannelVersions(deploymentHistory, currentVersionName, currentCounts, 10)
 
     const filteredDailyVersion = dailyVersion.filter(row => versions.includes(row.version_name))
-    const countsByDate = buildDailyReportedCountsByName(filteredDailyVersion, labels, versions)
+    const rawCountsByDate = buildDailyReportedCountsByName(filteredDailyVersion, labels, versions)
+    const countsByDate = fillMissingDailyCounts(rawCountsByDate, labels, versions)
 
     const activeVersions = versions.filter((version) => {
       if (version === currentVersionName)
@@ -423,10 +292,9 @@ app.post('/', middlewareAuth, async (c) => {
 
 export const channelStatsTestUtils = {
   generateDateLabels,
-  fillMissingDailyData,
   buildDailyReportedCountsByName,
+  fillMissingDailyCounts,
   convertCountsToPercentagesByName,
   selectRecentChannelVersions,
-  maskDataBeforeFirstDeployment,
   getLatestCounts,
 }

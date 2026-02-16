@@ -80,6 +80,19 @@ describe('bundle usage helpers', () => {
     })
   })
 
+  it('fillMissingDailyCounts carries forward historical zero days', () => {
+    const versions = ['1.0.0', '1.1.0']
+    const dates = ['2024-10-24', '2024-10-25', '2024-10-26']
+    const counts = {
+      '2024-10-24': { '1.0.0': 3, '1.1.0': 2 },
+      '2024-10-25': { '1.0.0': 0, '1.1.0': 0 },
+      '2024-10-26': { '1.0.0': 1, '1.1.0': 4 },
+    }
+
+    const filled = bundleUsageTestUtils.fillMissingDailyCounts(counts as any, dates, versions, '2024-11-01')
+    expect(filled['2024-10-25']).toEqual({ '1.0.0': 3, '1.1.0': 2 })
+  })
+
   it('convertCountsToPercentagesByName converts daily counts into 0-100 share', () => {
     const counts = {
       '2024-10-24': { '1.0.0': 3, '1.1.0': 2 },

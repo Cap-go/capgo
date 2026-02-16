@@ -9,6 +9,7 @@ import { cloudlog } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
 import { isStripeConfigured } from '../../utils/utils.ts'
+import { buildDailyReportedCountsByName, convertCountsToPercentagesByName, fillMissingDailyCounts } from '../../utils/version_stats_helpers.ts'
 
 dayjs.extend(utc)
 
@@ -349,12 +350,13 @@ async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLate
 
   // Daily reported devices by version (from "get" stats), not synthetic install reconstruction.
   const dailyCounts = buildDailyReportedCountsByName(dailyVersion, dates, versions)
-  const dailyPercentages = convertCountsToPercentagesByName(dailyCounts, dates, versions)
-  const activeVersions = getActiveVersionsByName(versions, dailyCounts)
-  const datasets = createDatasetsByName(activeVersions, dates, dailyPercentages, dailyCounts)
+  const filledCounts = fillMissingDailyCounts(dailyCounts, dates, versions)
+  const dailyPercentages = convertCountsToPercentagesByName(filledCounts, dates, versions)
+  const activeVersions = getActiveVersionsByName(versions, filledCounts)
+  const datasets = createDatasetsByName(activeVersions, dates, dailyPercentages, filledCounts)
 
   if (shouldGetLatestVersion) {
-    const latestVersion = getLatestDayVersionShare(activeVersions, dates, dailyCounts)
+    const latestVersion = getLatestDayVersionShare(activeVersions, dates, filledCounts)
 
     return {
       data: {
@@ -376,79 +378,6 @@ async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLate
     },
     error: null,
   }
-}
-
-function buildDailyReportedCountsByName(
-  usage: AppUsageByVersion[],
-  dates: string[],
-  versions: string[],
-) {
-  const counts: { [date: string]: { [version: string]: number } } = {}
-
-  dates.forEach((date) => {
-    counts[date] = {}
-    versions.forEach((version) => {
-      counts[date][version] = 0
-    })
-  })
-
-  usage.forEach((entry) => {
-    const date = entry.date
-    const version = entry.version_name
-    if (!version || !counts[date] || counts[date][version] === undefined)
-      return
-    counts[date][version] += Math.max(0, Math.round(entry.get ?? 0))
-  })
-
-  return counts
-}
-
-function convertCountsToPercentagesByName(
-  counts: { [date: string]: { [version: string]: number } },
-  dates: string[],
-  versions: string[],
-) {
-  const percentages: { [date: string]: { [version: string]: number } } = {}
-
-  dates.forEach((date) => {
-    const dayData = counts[date] ?? {}
-    const total = versions.reduce((sum, version) => sum + (dayData[version] ?? 0), 0)
-    percentages[date] = {}
-    if (total <= 0) {
-      versions.forEach((version) => {
-        percentages[date][version] = 0
-      })
-      return
-    }
-
-    const preciseShares = versions.map((version) => {
-      const count = dayData[version] ?? 0
-      return (count / total) * 100
-    })
-    const flooredShares = preciseShares.map(share => Math.floor(share * 10) / 10)
-    const flooredSum = flooredShares.reduce((sum, share) => sum + share, 0)
-    let unitsToDistribute = Math.max(0, Math.round((100 - flooredSum) * 10))
-
-    const remainderOrder = preciseShares
-      .map((share, index) => ({ index, remainder: share - flooredShares[index] }))
-      .sort((a, b) => {
-        if (b.remainder === a.remainder)
-          return a.index - b.index
-        return b.remainder - a.remainder
-      })
-
-    const roundedShares = [...flooredShares]
-    for (let i = 0; i < remainderOrder.length && unitsToDistribute > 0; i++, unitsToDistribute--) {
-      const target = remainderOrder[i].index
-      roundedShares[target] = Number((roundedShares[target] + 0.1).toFixed(1))
-    }
-
-    versions.forEach((version, index) => {
-      percentages[date][version] = roundedShares[index] ?? 0
-    })
-  })
-
-  return percentages
 }
 
 // Filter out versions with no usage (by version_name)
@@ -525,6 +454,7 @@ export const bundleUsageTestUtils = {
   generateDateLabels,
   fillMissingDailyData,
   buildDailyReportedCountsByName,
+  fillMissingDailyCounts,
   convertCountsToPercentagesByName,
   getActiveVersionsByName,
   createDatasetsByName,
