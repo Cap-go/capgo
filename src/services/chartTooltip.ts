@@ -10,6 +10,7 @@ interface TooltipContext {
 interface ProcessedTooltipItem {
   body: string[]
   value: number
+  count?: number | null
   colors: TooltipLabelStyle
   appId?: string
   label?: string
@@ -58,7 +59,14 @@ function formatDateForTooltip(date: Date): string {
   return formatLocalDateLong(date)
 }
 
-function getDatasetBaseValue(chart: Chart | undefined, dataset: any, datasetIndex: number, dataIndex: number, parsedY: unknown) {
+function getDatasetBaseValue(
+  chart: Chart | undefined,
+  dataset: any,
+  datasetIndex: number,
+  dataIndex: number,
+  parsedY: unknown,
+  isAccumulated: boolean = false,
+) {
   const metaValues = Array.isArray(dataset?.metaBaseValues) ? dataset.metaBaseValues as Array<number | null> : null
   if (metaValues) {
     const candidate = metaValues[dataIndex]
@@ -69,6 +77,10 @@ function getDatasetBaseValue(chart: Chart | undefined, dataset: any, datasetInde
 
   if (typeof parsedY !== 'number' || Number.isNaN(parsedY))
     return null
+
+  // In non-accumulated charts, parsedY is already the real value.
+  if (!isAccumulated)
+    return parsedY
 
   if (!chart || datasetIndex <= 0)
     return parsedY
@@ -205,20 +217,29 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
       const datasetIndex = dataPoint.datasetIndex ?? 0
       const dataIndex = dataPoint.dataIndex ?? 0
       const dataset = dataPoint.dataset as any
-      const baseValue = getDatasetBaseValue(chart, dataset, datasetIndex, dataIndex, dataPoint.parsed?.y)
+      const baseValue = getDatasetBaseValue(chart, dataset, datasetIndex, dataIndex, dataPoint.parsed?.y, isAccumulated)
       const numericValue = typeof baseValue === 'number' && Number.isFinite(baseValue) ? baseValue : 0
+      const countValues = Array.isArray(dataset?.metaCountValues) ? dataset.metaCountValues as Array<number | null | undefined> : null
+      const countCandidate = countValues ? countValues[dataIndex] : null
+      const numericCount = typeof countCandidate === 'number' && Number.isFinite(countCandidate)
+        ? Math.max(0, Math.round(countCandidate))
+        : null
       const label = dataset?.label ?? ''
       // Look up the app ID from the label using the provided mapping
       const appId = clickHandler?.appIdByLabel?.[label]
+      const formattedValue = numericCount !== null
+        ? `${formatTooltipValue(numericValue)}% (${numericCount.toLocaleString()})`
+        : formatTooltipValue(numericValue)
 
       return {
-        body: [`${formatTooltipValue(numericValue)} - ${label}`],
+        body: [`${formattedValue} - ${label}`],
         value: numericValue,
+        count: numericCount,
         colors: tooltip.labelColors[index],
         appId,
         label,
       }
-    }).filter(item => item.value !== 0)
+    }).filter(item => item.value !== 0 || (item.count ?? 0) !== 0)
 
     // Sort by value in descending order (highest to lowest)
     items.sort((a, b) => b.value - a.value)
@@ -243,6 +264,8 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
       // Multi-app view
       totalValue = items.reduce((sum, item) => sum + item.value, 0)
     }
+    const totalCount = items.reduce((sum, item) => sum + (typeof item.count === 'number' ? item.count : 0), 0)
+    const hasCountValues = items.some(item => typeof item.count === 'number')
 
     const titleColor = isDark.value ? '#e5e7eb' : '#374151'
     const totalColor = isDark.value ? '#60a5fa' : '#2563eb'
@@ -265,7 +288,9 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
       totalEl.style.paddingBottom = '8px'
       totalEl.style.borderBottom = `1px solid ${isDark.value ? 'rgba(75, 85, 99, 0.3)' : 'rgba(209, 213, 219, 0.3)'}`
       totalEl.style.color = totalColor
-      totalEl.textContent = `Total: ${formatTooltipValue(totalValue)}`
+      totalEl.textContent = hasCountValues
+        ? `Total devices: ${Math.round(totalCount).toLocaleString()}`
+        : `Total: ${formatTooltipValue(totalValue)}`
       container.appendChild(totalEl)
     }
 
@@ -673,8 +698,17 @@ export function createTooltipConfig(hasMultipleDatasets: boolean, isAccumulated:
         else if (hasMultipleDatasets) {
           const datasetIndex = context.datasetIndex ?? 0
           const dataIndex = context.dataIndex ?? 0
-          const baseValue = getDatasetBaseValue(context.chart, context.dataset, datasetIndex, dataIndex, context.parsed?.y)
+          const baseValue = getDatasetBaseValue(context.chart, context.dataset, datasetIndex, dataIndex, context.parsed?.y, isAccumulated)
           const numericValue = typeof baseValue === 'number' && Number.isFinite(baseValue) ? baseValue : 0
+          const countValues = Array.isArray((context.dataset as any)?.metaCountValues)
+            ? ((context.dataset as any).metaCountValues as Array<number | null | undefined>)
+            : null
+          const countCandidate = countValues ? countValues[dataIndex] : null
+          const numericCount = typeof countCandidate === 'number' && Number.isFinite(countCandidate)
+            ? Math.max(0, Math.round(countCandidate))
+            : null
+          if (numericCount !== null)
+            return `${formatTooltipValue(numericValue)}% (${numericCount.toLocaleString()}) - ${context.dataset.label}`
           return `${formatTooltipValue(numericValue)} - ${context.dataset.label}`
         }
         // For single dataset in daily mode, use default formatting

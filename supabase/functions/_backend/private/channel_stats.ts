@@ -7,6 +7,7 @@ import { cloudlog } from '../utils/logging.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { readDeviceVersionCounts, readStatsVersion } from '../utils/stats.ts'
 import { supabaseWithAuth } from '../utils/supabase.ts'
+import { buildDailyReportedCountsByName, convertCountsToPercentagesByName, fillMissingDailyCounts } from '../utils/version_stats_helpers.ts'
 
 dayjs.extend(utc)
 
@@ -20,6 +21,7 @@ interface AppUsageByVersion {
   date: string
   app_id: string
   version_name: string
+  get: number | null
   install: number | null
   uninstall: number | null
 }
@@ -46,42 +48,74 @@ function generateDateLabels(from: Date, to: Date) {
   return labels
 }
 
-function createCountDatasetsByName(versions: string[], dates: string[], countsByDate: { [date: string]: { [version: string]: number } }) {
+function createPercentageDatasetsByName(
+  versions: string[],
+  dates: string[],
+  percentagesByDate: { [date: string]: { [version: string]: number } },
+  countsByDate: { [date: string]: { [version: string]: number } },
+) {
   return versions.map((version) => {
+    const percentageData = dates.map(date => percentagesByDate[date]?.[version] ?? 0)
     const countData = dates.map(date => Math.round(countsByDate[date]?.[version] ?? 0))
 
     return {
       label: version,
-      data: countData,
+      data: percentageData,
+      metaCounts: countData,
     }
   })
 }
 
-function fillMissingDailyData(datasets: { label: string, data: number[] }[], labels: string[]) {
-  if (datasets.length === 0 || labels.length === 0)
-    return datasets
+function selectRecentChannelVersions(
+  deploymentHistory: DeploymentHistoryEntry[],
+  currentVersionName: string,
+  currentCounts: Record<string, number>,
+  limit: number = 10,
+) {
+  const sortedByRecency = [...deploymentHistory]
+    .sort((a, b) => dayjs(b.deployed_at).valueOf() - dayjs(a.deployed_at).valueOf())
+    .map(entry => entry.version_name)
 
-  const today = dayjs().utc().format('YYYY-MM-DD')
-  const populated = datasets.map(dataset => ({
-    ...dataset,
-    data: [...dataset.data],
-  }))
-
-  for (let index = 1; index < labels.length; index++) {
-    if (labels[index] === today)
+  const uniqueRecentDeployed: string[] = []
+  for (const versionName of sortedByRecency) {
+    if (!versionName || uniqueRecentDeployed.includes(versionName))
       continue
-
-    const dailyTotal = populated.reduce((sum, dataset) => sum + (dataset.data[index] ?? 0), 0)
-    const previousTotal = populated.reduce((sum, dataset) => sum + (dataset.data[index - 1] ?? 0), 0)
-
-    if (dailyTotal === 0 && previousTotal > 0) {
-      populated.forEach((dataset) => {
-        dataset.data[index] = dataset.data[index - 1] ?? 0
-      })
-    }
+    uniqueRecentDeployed.push(versionName)
+    if (uniqueRecentDeployed.length >= limit)
+      break
   }
 
-  return populated
+  if (currentVersionName && !uniqueRecentDeployed.includes(currentVersionName)) {
+    uniqueRecentDeployed.unshift(currentVersionName)
+    if (uniqueRecentDeployed.length > limit)
+      uniqueRecentDeployed.length = limit
+  }
+
+  if (uniqueRecentDeployed.length > 0)
+    return uniqueRecentDeployed
+
+  return Object.entries(currentCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([versionName]) => versionName)
+}
+
+function getLatestCounts(labels: string[], countsByDate: Record<string, Record<string, number>>) {
+  if (labels.length === 0)
+    return {} as Record<string, number>
+
+  // Prefer the latest non-zero snapshot to avoid false "no devices" when
+  // the most recent day is temporarily empty due ingestion lag.
+  for (let index = labels.length - 1; index >= 0; index--) {
+    const label = labels[index]
+    const counts = countsByDate[label] ?? {}
+    const total = Object.values(counts).reduce((sum, value) => sum + value, 0)
+    if (total > 0)
+      return counts
+  }
+
+  const latestLabel = labels[labels.length - 1]
+  return countsByDate[latestLabel] ?? {}
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -149,35 +183,13 @@ app.post('/', middlewareAuth, async (c) => {
       })
       .filter(Boolean) as DeploymentHistoryEntry[]
 
-    const channelVersions = new Set<string>()
     const versionIdToName: Record<string, string> = {}
-    const firstDeployByVersion: Record<string, string> = {}
-
-    if (currentVersionName) {
-      channelVersions.add(currentVersionName)
-    }
 
     for (const deploy of (deployHistory || [])) {
       const versionName = (deploy.app_versions as any)?.name
       const versionId = deploy.version_id
-      if (versionName) {
-        channelVersions.add(versionName)
-        if (versionId !== null && versionId !== undefined) {
-          versionIdToName[String(versionId)] = versionName
-        }
-      }
-      if (versionName && deploy.deployed_at) {
-        const deployDate = dayjs(deploy.deployed_at).utc().format('YYYY-MM-DD')
-        if (!firstDeployByVersion[versionName] || deployDate < firstDeployByVersion[versionName])
-          firstDeployByVersion[versionName] = deployDate
-      }
-    }
-
-    if (currentVersionName && !firstDeployByVersion[currentVersionName]) {
-      const fallbackDate = channelData.updated_at
-        ? dayjs(channelData.updated_at).utc().format('YYYY-MM-DD')
-        : dayjs(startDate).utc().format('YYYY-MM-DD')
-      firstDeployByVersion[currentVersionName] = fallbackDate
+      if (versionName && versionId !== null && versionId !== undefined)
+        versionIdToName[String(versionId)] = versionName
     }
 
     const currentVersionRelease = deploymentHistory
@@ -208,42 +220,11 @@ app.post('/', middlewareAuth, async (c) => {
 
     const currentCounts = await readDeviceVersionCounts(c, body.app_id, channelData.name)
 
-    for (const versionName of Object.keys(currentCounts)) {
-      if (!channelVersions.has(versionName))
-        channelVersions.add(versionName)
-    }
-
-    const versions = Array.from(channelVersions)
+    const versions = selectRecentChannelVersions(deploymentHistory, currentVersionName, currentCounts, 10)
 
     const filteredDailyVersion = dailyVersion.filter(row => versions.includes(row.version_name))
-
-    const dailyDeltas: Record<string, Record<string, { install: number, uninstall: number }>> = {}
-    for (const row of filteredDailyVersion) {
-      if (!dailyDeltas[row.date])
-        dailyDeltas[row.date] = {}
-      if (!dailyDeltas[row.date][row.version_name]) {
-        dailyDeltas[row.date][row.version_name] = { install: 0, uninstall: 0 }
-      }
-      dailyDeltas[row.date][row.version_name].install += row.install ?? 0
-      dailyDeltas[row.date][row.version_name].uninstall += row.uninstall ?? 0
-    }
-
-    const countsByDate: Record<string, Record<string, number>> = {}
-    const rollingCounts: Record<string, number> = {}
-    versions.forEach((version) => {
-      rollingCounts[version] = Math.round(currentCounts[version] ?? 0)
-    })
-
-    for (let index = labels.length - 1; index >= 0; index--) {
-      const date = labels[index]
-      countsByDate[date] = { ...rollingCounts }
-      const deltas = dailyDeltas[date] || {}
-      Object.entries(deltas).forEach(([versionName, delta]) => {
-        const currentValue = rollingCounts[versionName] ?? 0
-        const previousValue = currentValue - delta.install + delta.uninstall
-        rollingCounts[versionName] = Math.max(0, Math.round(previousValue))
-      })
-    }
+    const rawCountsByDate = buildDailyReportedCountsByName(filteredDailyVersion, labels, versions)
+    const countsByDate = fillMissingDailyCounts(rawCountsByDate, labels, versions)
 
     const activeVersions = versions.filter((version) => {
       if (version === currentVersionName)
@@ -251,11 +232,14 @@ app.post('/', middlewareAuth, async (c) => {
       return labels.some(label => (countsByDate[label]?.[version] ?? 0) > 0)
     })
 
-    let datasets = createCountDatasetsByName(activeVersions, labels, countsByDate)
-    datasets = fillMissingDailyData(datasets, labels)
+    const percentagesByDate = convertCountsToPercentagesByName(countsByDate, labels, activeVersions)
+    const datasets = createPercentageDatasetsByName(activeVersions, labels, percentagesByDate, countsByDate)
 
-    const totalDevices = Object.values(rollingCounts).reduce((sum, val) => sum + val, 0)
-    const devicesOnCurrent = currentVersionName ? rollingCounts[currentVersionName] ?? 0 : 0
+    const latestDailyCounts = getLatestCounts(labels, countsByDate)
+    const currentCountTotal = Object.values(currentCounts).reduce((sum, val) => sum + Math.round(val ?? 0), 0)
+    const totalsSource = currentCountTotal > 0 ? currentCounts : latestDailyCounts
+    const totalDevices = Object.values(totalsSource).reduce((sum, val) => sum + Math.round(val ?? 0), 0)
+    const devicesOnCurrent = currentVersionName ? Math.round(totalsSource[currentVersionName] ?? 0) : 0
     const percentOnCurrent = totalDevices > 0 ? Math.round((devicesOnCurrent / totalDevices) * 1000) / 10 : 0
     const deploymentHistorySorted = [...deploymentHistory].sort((a, b) => dayjs(b.deployed_at).valueOf() - dayjs(a.deployed_at).valueOf())
 
@@ -305,3 +289,12 @@ app.post('/', middlewareAuth, async (c) => {
     throw simpleError('fetch_error', 'Failed to fetch channel statistics', { error: String(error) })
   }
 })
+
+export const channelStatsTestUtils = {
+  generateDateLabels,
+  buildDailyReportedCountsByName,
+  fillMissingDailyCounts,
+  convertCountsToPercentagesByName,
+  selectRecentChannelVersions,
+  getLatestCounts,
+}
