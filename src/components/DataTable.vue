@@ -583,6 +583,7 @@ const isAdding = computed(() => props.isLoading || pendingAdd.value)
                         v-for="(action, actionIndex) in col.actions"
                         v-show="!action.visible || action.visible(elem)" :key="actionIndex"
                         :disabled="action.disabled && action.disabled(elem)"
+                        :title="typeof action.title === 'function' ? action.title(elem) : action.title"
                         class="p-2 text-gray-500 rounded-md cursor-pointer dark:text-gray-400 hover:text-gray-600 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed dark:hover:bg-gray-700 dark:hover:text-gray-300 dark:disabled:hover:text-gray-400 disabled:hover:bg-transparent disabled:hover:text-gray-500"
                         @click.stop="action.onClick(elem)"
                       >

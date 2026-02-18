@@ -52,9 +52,9 @@ const canUpdateChannelSettings = computedAsync(async () => {
 }, false)
 
 const canPromoteBundle = computedAsync(async () => {
-  if (!packageId.value)
+  if (!id.value)
     return false
-  return await checkPermissions('channel.promote_bundle', { appId: packageId.value })
+  return await checkPermissions('channel.promote_bundle', { channelId: id.value })
 }, false)
 
 const showDebugSection = ref(false)
@@ -344,6 +344,10 @@ async function handleRevert() {
 }
 
 async function openSelectVersion() {
+  if (!canPromoteBundle.value) {
+    toast.error(t('no-permission'))
+    return
+  }
   if (!channel.value)
     return
 
@@ -655,7 +659,8 @@ async function copyCurlCommand() {
                 <span class="cursor-pointer" @click="openBundle()">{{ channel.version.name }}</span>
                 <button
                   v-if="channel"
-                  class="p-1 transition-colors border border-gray-200 rounded-md dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800"
+                  class="p-1 transition-colors border border-gray-200 rounded-md dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-gray-200 dark:disabled:hover:border-gray-700"
+                  :disabled="!canPromoteBundle"
                   @click="openSelectVersion()"
                 >
                   <Settings class="w-4 h-4 text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400" />

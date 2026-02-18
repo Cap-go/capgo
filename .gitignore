@@ -50,6 +50,7 @@ cloudflare_workers_deno/.denoflare
 src/types/supabase.types.ts
 supabase/functions/_backend/utils/supabase.types.ts
 .env.alpha
+.codex/
 
 dist_cf
 .gitsecret/keys/random_seed
