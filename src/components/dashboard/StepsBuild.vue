@@ -43,6 +43,7 @@ const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost}
 const steps = ref<Step[]>([
   {
     title: t('build-step-request-build'),
+    // keep NPX for better support of our customers env, everyone has npx but not everyone has bunx, and bunx has some issues with pnpm
     command: `npx @capgo/cli@latest build request -a [APIKEY] --platform ios${localCommand}`,
     subtitle: t('build-step-request-subtitle'),
   },
