@@ -278,7 +278,7 @@ onMounted(async () => {
 
   if (verifiedFactor) {
     mfaFactorId.value = verifiedFactor.id
-    mfaSetupDate.value = (verifiedFactor as any).created_at ?? (verifiedFactor as any).updated_at ?? null
+    mfaSetupDate.value = verifiedFactor.created_at ?? verifiedFactor.updated_at ?? null
   }
 
   isLoading.value = false
