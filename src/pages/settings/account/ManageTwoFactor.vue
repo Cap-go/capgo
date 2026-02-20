@@ -80,6 +80,8 @@ async function sendOtpVerification() {
   })
   otpSending.value = false
 
+  captchaToken.value = ''
+
   if (error) {
     toast.error(t('verification-failed'))
     console.error('Cannot send email OTP', error)
