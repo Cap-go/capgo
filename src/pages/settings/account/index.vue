@@ -4,7 +4,7 @@ import { Capacitor } from '@capacitor/core'
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages, reset } from '@formkit/vue'
 import dayjs from 'dayjs'
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -36,41 +36,9 @@ const deleteAccountPassword = ref('')
 const deleteAccountCaptchaToken = ref('')
 const deleteAccountCaptchaRef = ref<InstanceType<typeof VueTurnstile> | null>(null)
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
-// mfa = 2fa
-const mfaEnabled = ref(false)
-const mfaFactorId = ref('')
-const mfaVerificationCode = ref('')
-const mfaQRCode = ref('')
-const otpVerificationCode = ref('')
-const otpVerifiedAt = ref<string | null>(null)
-const otpVerificationLoading = ref(false)
-const otpSending = ref(false)
-const otpNow = ref(dayjs())
-let otpNowTimer: ReturnType<typeof setInterval> | null = null
 const organizationsToDelete = ref<string[]>([])
 const paidOrganizationsToDelete = ref<Array<{ name: string, planName: string }>>([])
 displayStore.NavTitle = t('account')
-const otpEmail = computed(() => main.auth?.email ?? main.user?.email ?? '')
-const otpVerifiedUntil = computed(() => {
-  if (!otpVerifiedAt.value)
-    return null
-  return dayjs(otpVerifiedAt.value).add(1, 'hour')
-})
-const otpVerificationValid = computed(() => {
-  if (!otpVerifiedUntil.value)
-    return false
-  return otpNow.value.isBefore(otpVerifiedUntil.value)
-})
-const otpVerificationStatus = computed(() => {
-  if (!otpVerifiedAt.value)
-    return 'none'
-  return otpVerificationValid.value ? 'valid' : 'expired'
-})
-const otpVerifiedUntilLabel = computed(() => {
-  if (!otpVerifiedUntil.value)
-    return ''
-  return otpVerifiedUntil.value.format('YYYY-MM-DD HH:mm')
-})
 
 async function checkOrganizationImpact() {
   // Wait for organizations and main store to load
@@ -479,258 +447,11 @@ async function submit(form: { first_name: string, last_name: string, email: stri
   isLoading.value = false
 }
 
-async function disableMfa() {
-  dialogStore.openDialog({
-    title: t('alert-2fa-disable'),
-    description: `${t('alert-not-reverse-message')} ${t('alert-disable-2fa-message')}?`,
-    buttons: [
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-      },
-      {
-        text: t('disable'),
-        role: 'danger',
-        id: 'confirm-button',
-      },
-    ],
-  })
-  const canceled = await dialogStore.onDialogDismiss()
-
-  // User has changed his mind - keepin 2fa
-  if (canceled)
-    return
-
-  // Remove 2fa
-  const factorId = mfaFactorId.value
-  if (!factorId) {
-    toast.error(t('mfa-fail'))
-    console.error('Factor id = null')
-    return
-  }
-
-  const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId })
-  if (unregisterError) {
-    toast.error(t('mfa-fail'))
-    console.error('Cannot unregister MFA', unregisterError)
-    return
-  }
-
-  mfaFactorId.value = ''
-  mfaEnabled.value = false
-  toast.success(t('2fa-disabled'))
-}
-
-async function handleMfa() {
-  if (mfaEnabled.value) {
-    await disableMfa()
-    return
-  }
-  await loadOtpVerification()
-  if (!otpVerificationValid.value) {
-    toast.error(t('email-otp-required'))
-    return
-  }
-  const { data, error } = await supabase.auth.mfa.enroll({
-    factorType: 'totp',
-  })
-
-  if (error) {
-    toast.error(t('mfa-fail'))
-    console.error(error)
-    return
-  }
-
-  // Store QR code for display
-  mfaQRCode.value = data.totp.qr_code
-
-  // Step 1: Show QR code
-  dialogStore.openDialog({
-    title: t('enable-2FA'),
-    description: `${t('mfa-enable-instruction')}`,
-    size: 'lg',
-    preventAccidentalClose: true,
-    buttons: [
-      {
-        text: t('verify'),
-        id: 'verify',
-      },
-    ],
-  })
-  const didCancel = await dialogStore.onDialogDismiss()
-
-  if (didCancel) {
-    // User closed the window, go ahead and unregister mfa
-    const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId: data.id })
-    if (error)
-      console.error('Cannot unregister MFA', unregisterError)
-    mfaQRCode.value = ''
-    return
-  }
-  // Step 2: User has scanned the code - verify his claim
-  mfaVerificationCode.value = ''
-  mfaQRCode.value = ''
-
-  dialogStore.openDialog({
-    title: t('verify-2FA'),
-    description: `${t('mfa-enable-instruction-2')}`,
-    size: 'lg',
-    preventAccidentalClose: true,
-    buttons: [
-      {
-        text: t('verify'),
-        id: 'verify',
-        handler: async () => {
-          // User has clicked the "verify button - let's check"
-          const verifyCode = mfaVerificationCode.value.replaceAll(' ', '')
-
-          const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: data.id })
-
-          if (challengeError) {
-            toast.error(t('mfa-fail'))
-            console.error('Cannot create MFA challenge', challengeError)
-            return false
-          }
-
-          const { data: _verify, error: verifyError } = await supabase.auth.mfa.verify({ factorId: data.id, challengeId: challenge.id, code: verifyCode.trim() })
-          if (verifyError) {
-            toast.error(t('mfa-invalid-code'))
-            return false
-          }
-
-          toast.success(t('mfa-enabled'))
-          mfaEnabled.value = true
-          mfaFactorId.value = data.id
-        },
-      },
-    ],
-  })
-
-  // Check the cancel again
-  const didCancel2 = await dialogStore.onDialogDismiss()
-  if (didCancel2) {
-    // User closed the window, go ahead and unregister mfa
-    const { error: unregisterError } = await supabase.auth.mfa.unenroll({ factorId: data.id })
-    if (error)
-      console.error('Cannot unregister MFA', unregisterError)
-  }
-}
-
-async function loadOtpVerification() {
-  if (!main.auth?.id)
-    return
-  const { data, error } = await supabase
-    .from('user_security')
-    .select('email_otp_verified_at')
-    .eq('user_id', main.auth.id)
-    .maybeSingle()
-
-  if (error) {
-    console.error('Cannot load email OTP status', error)
-    return
-  }
-
-  otpVerifiedAt.value = data?.email_otp_verified_at ?? null
-}
-
-async function sendOtpVerification() {
-  if (!otpEmail.value) {
-    toast.error(t('account-error'))
-    return
-  }
-  if (otpSending.value)
-    return
-
-  otpSending.value = true
-  const { error } = await supabase.auth.signInWithOtp({
-    email: otpEmail.value,
-    options: {
-      shouldCreateUser: false,
-    },
-  })
-  otpSending.value = false
-
-  if (error) {
-    toast.error(t('verification-failed'))
-    console.error('Cannot send email OTP', error)
-    return
-  }
-
-  otpVerificationCode.value = ''
-  toast.success(t('email-otp-sent'))
-}
-
-async function verifyOtpForMfa() {
-  if (!otpEmail.value) {
-    toast.error(t('account-error'))
-    return
-  }
-  if (!main.auth?.id)
-    return
-
-  const token = otpVerificationCode.value.replaceAll(' ', '')
-  if (!token) {
-    toast.error(t('email-otp-code-required'))
-    return
-  }
-  if (otpVerificationLoading.value)
-    return
-
-  otpVerificationLoading.value = true
-  const { data, error: verifyError } = await supabase.functions.invoke('private/verify_email_otp', {
-    body: { token },
-  })
-
-  otpVerificationLoading.value = false
-
-  if (verifyError || !data?.verified_at) {
-    toast.error(t('verification-failed'))
-    console.error('Cannot verify email OTP', verifyError)
-    return
-  }
-
-  otpVerifiedAt.value = data.verified_at
-  toast.success(t('email-otp-verified'))
-}
-
 onMounted(async () => {
-  otpNowTimer = setInterval(() => {
-    otpNow.value = dayjs()
-  }, 60000)
-  await loadOtpVerification()
-  const { data: mfaFactors, error } = await supabase.auth.mfa.listFactors()
-  if (error) {
-    console.error('Cannot get MFA factors', error)
-    return
+  // Auto-redirect to Manage 2FA page if setup2fa query param is present
+  if (route.query.setup2fa === 'true') {
+    router.replace('/settings/account/manage-2fa?setup2fa=true')
   }
-
-  const unverified = mfaFactors.all.filter(factor => factor.status === 'unverified')
-  if (unverified && unverified.length > 0) {
-    console.log(`Found ${unverified.length} unverified MFA factors, removing all`)
-    const responses = await Promise.all(unverified.map(factor => supabase.auth.mfa.unenroll({ factorId: factor.id })))
-
-    responses.filter(res => !!res.error).forEach(() => console.error('Failed to unregister', error))
-  }
-
-  const hasMfa = mfaFactors?.all.find(factor => factor.status === 'verified')
-  mfaEnabled.value = !!hasMfa
-
-  if (hasMfa)
-    mfaFactorId.value = hasMfa.id
-
-  // Auto-trigger 2FA setup if redirected from enforcement card
-  if (route.query.setup2fa === 'true' && !mfaEnabled.value) {
-    // Clear the query param first, wait for it to complete, then open dialog
-    // This prevents the DialogV2's route watcher from closing the dialog
-    await router.replace({ query: {} })
-    await nextTick()
-    handleMfa()
-  }
-})
-
-onBeforeUnmount(() => {
-  if (otpNowTimer)
-    clearInterval(otpNowTimer)
 })
 </script>
 
@@ -837,78 +558,6 @@ onBeforeUnmount(() => {
             </div>
           </section>
 
-          <section class="flex flex-col md:flex-row md:items-start items-left">
-            <div class="md:w-1/2">
-              <p class="dark:text-white text-slate-800">
-                {{ t('email-otp-2fa-title') }}:
-              </p>
-              <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                {{ t('email-otp-2fa-description') }}
-              </p>
-              <p v-if="otpVerificationStatus === 'valid'" class="mt-1 text-xs text-emerald-600">
-                {{ t('email-otp-verified-until', { time: otpVerifiedUntilLabel }) }}
-              </p>
-              <p v-else-if="otpVerificationStatus === 'expired'" class="mt-1 text-xs text-orange-600">
-                {{ t('email-otp-expired') }}
-              </p>
-              <p v-else class="mt-1 text-xs text-orange-600">
-                {{ t('email-otp-not-verified') }}
-              </p>
-            </div>
-            <div class="mt-3 w-full md:mt-0 md:ml-6 md:w-1/2">
-              <div class="flex flex-col gap-2 sm:flex-row sm:items-center">
-                <button
-                  type="button"
-                  class="d-btn d-btn-outline d-btn-sm"
-                  :class="{ 'opacity-50 cursor-not-allowed': otpSending }"
-                  :disabled="otpSending"
-                  @click="sendOtpVerification"
-                >
-                  {{ t('email-otp-send-code') }}
-                </button>
-                <button
-                  type="button"
-                  class="d-btn d-btn-outline d-btn-sm"
-                  :class="{ 'opacity-50 cursor-not-allowed': otpVerificationLoading || !otpVerificationCode }"
-                  :disabled="otpVerificationLoading || !otpVerificationCode"
-                  @click="verifyOtpForMfa"
-                >
-                  {{ t('verify') }}
-                </button>
-              </div>
-              <input
-                v-model="otpVerificationCode"
-                type="text"
-                inputmode="numeric"
-                :placeholder="t('verification-code')"
-                class="d-input w-full mt-2"
-                autocomplete="one-time-code"
-                @keydown.enter.prevent="verifyOtpForMfa"
-              >
-            </div>
-          </section>
-
-          <section class="flex flex-col md:flex-row md:items-center items-left">
-            <p class="dark:text-white text-slate-800">
-              {{ t('2fa') }}:
-            </p>
-            <div class="md:ml-6">
-              <button
-                type="button"
-                data-test="setup-mfa"
-                class="d-btn d-btn-outline d-btn-sm"
-                :class="{
-                  'd-btn-success': !mfaEnabled,
-                  'd-btn-error': mfaEnabled,
-                  'opacity-50 cursor-not-allowed': !mfaEnabled && !otpVerificationValid,
-                }"
-                :disabled="!mfaEnabled && !otpVerificationValid"
-                @click="handleMfa"
-              >
-                {{ !mfaEnabled ? t('enable') : t('disable') }}
-              </button>
-            </div>
-          </section>
           <div class="flex flex-col md:flex-row md:items-center items-left">
             <p class="dark:text-white text-slate-800">
               {{ t('account-id') }}:
@@ -946,36 +595,6 @@ onBeforeUnmount(() => {
         </div>
       </FormKit>
     </div>
-
-    <Teleport
-      v-if="
-        dialogStore.showDialog
-          && (dialogStore.dialogOptions?.title === t('enable-2FA')
-            || dialogStore.dialogOptions?.title === t('verify-2FA'))
-      "
-      to="#dialog-v2-content"
-      defer
-    >
-      <!-- QR Code display for MFA setup -->
-      <div v-if="mfaQRCode" class="w-full text-center">
-        <img
-          :src="mfaQRCode"
-          alt="QR Code for 2FA setup"
-          class="mx-auto mb-4"
-        >
-      </div>
-
-      <!-- MFA verification code input -->
-      <div v-if="!mfaQRCode" class="w-full">
-        <input
-          v-model="mfaVerificationCode"
-          type="text"
-          :placeholder="t('verification-code')"
-          class="w-full p-3 border border-gray-300 rounded-lg dark:text-white dark:bg-gray-800 dark:border-gray-600"
-          @keydown.enter="$event.preventDefault()"
-        >
-      </div>
-    </Teleport>
 
     <!-- Teleport for Organization Deletion Warning -->
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.id === 'delete-account-warning-orgs'" to="#dialog-v2-content" defer>
