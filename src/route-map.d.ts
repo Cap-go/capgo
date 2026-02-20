@@ -369,6 +369,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/settings/account/ManageTwoFactor': RouteRecordInfo<
+      '/settings/account/ManageTwoFactor',
+      '/settings/account/manage-2fa',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/settings/account/Notifications': RouteRecordInfo<
       '/settings/account/Notifications',
       '/settings/account/Notifications',
@@ -757,6 +764,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/settings/account/ChangePassword.vue': {
       routes:
         | '/settings/account/ChangePassword'
+      views:
+        | never
+    }
+    'src/pages/settings/account/ManageTwoFactor.vue': {
+      routes:
+        | '/settings/account/ManageTwoFactor'
       views:
         | never
     }
