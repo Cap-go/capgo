@@ -33,6 +33,7 @@ const totalSteps = 5
 // Step 1: CAPTCHA
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 const captchaToken = ref('')
+const savedCaptchaToken = ref('')
 const captchaRef = ref<InstanceType<typeof VueTurnstile> | null>(null)
 
 // Step 2 & 3: Email OTP
@@ -62,8 +63,10 @@ const setupDateLabel = computed(() => {
 })
 
 watch(captchaToken, (token) => {
-  if (token && currentStep.value === 1)
+  if (token && currentStep.value === 1) {
+    savedCaptchaToken.value = token
     currentStep.value = 2
+  }
 })
 
 async function sendOtpVerification() {
@@ -75,12 +78,12 @@ async function sendOtpVerification() {
     email: otpEmail.value,
     options: {
       shouldCreateUser: false,
-      captchaToken: captchaToken.value || undefined,
+      captchaToken: savedCaptchaToken.value || undefined,
     },
   })
   otpSending.value = false
 
-  captchaToken.value = ''
+  savedCaptchaToken.value = ''
 
   if (error) {
     toast.error(t('verification-failed'))
@@ -214,9 +217,18 @@ async function disableMfa() {
   toast.success(t('2fa-disabled'))
 }
 
+function restartFromCaptcha() {
+  captchaToken.value = ''
+  savedCaptchaToken.value = ''
+  captchaRef.value?.reset()
+  otpVerificationCode.value = ''
+  currentStep.value = 1
+}
+
 function resetWizard() {
   currentStep.value = 1
   captchaToken.value = ''
+  savedCaptchaToken.value = ''
   captchaRef.value?.reset()
   otpVerificationCode.value = ''
   mfaQRCode.value = ''
@@ -486,8 +498,7 @@ onBeforeUnmount(async () => {
                 <button
                   type="button"
                   class="d-btn d-btn-outline d-btn-sm"
-                  :disabled="otpSending"
-                  @click="sendOtpVerification"
+                  @click="restartFromCaptcha"
                 >
                   {{ t('resend') }}
                 </button>
