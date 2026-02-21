@@ -14,6 +14,8 @@ export function getContinentCF(c: Context): ContinentsCFWorker | undefined {
   // const cfData = (c.req.raw as Request & { cf?: { continent?: string } })?.cf
   // return cfData?.continent
   // capgo_plugin-eu-prod-12.46.2
+  // split on - ['capgo_plugin', 'eu', 'prod', '12.46.2']
+  // 1 = 'eu'
   const nameList = getEnv(c, 'ENV_NAME')?.split('-') ?? []
   if (nameList.length < 2) {
     return undefined
@@ -39,9 +41,9 @@ export function getClientDbRegionSB(c: Context): DbRegionSB {
   const continent = (getRuntimeKey() === 'workerd') ? getContinentCF(c) : getContinentSB(c)
   switch (continent) {
     case 'EU': // Europe CF, AWS
-    case 'IL': // Israel AWS
       return 'EU'
     case 'ME': // Middle East AWS
+    case 'IL': // Israel AWS
       return 'ME'
     case 'AF': // Africa, CF, AWS
       return 'AF'
