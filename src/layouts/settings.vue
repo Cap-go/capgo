@@ -165,6 +165,19 @@ watchEffect(() => {
   if (!needsSecurity && hasSecurity)
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/security')
 
+  // Ensure tabs appear in the exact order defined by baseOrgTabs
+  organizationTabs.value.sort((a, b) => {
+    const idxA = baseOrgTabs.findIndex(t => t.key === a.key)
+    const idxB = baseOrgTabs.findIndex(t => t.key === b.key)
+    if (idxA === -1 && idxB === -1)
+      return 0
+    if (idxA === -1)
+      return 1
+    if (idxB === -1)
+      return -1
+    return idxA - idxB
+  })
+
   // Check billing access - users with org.read_billing permission can access billing
   if (!Capacitor.isNativePlatform()
     && billingEnabled
