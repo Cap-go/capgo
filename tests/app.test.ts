@@ -25,7 +25,10 @@ describe('[DELETE] /app operations', () => {
       body: JSON.stringify(createBody),
     })
     if (createApp.status !== 200) {
-      const body = await createApp.json().catch(() => null) as any
+      const body = await createApp.json().catch(() => null) as {
+        error?: string
+        supabaseError?: { code?: string }
+      } | null
       const isDuplicate = body?.error === 'cannot_create_app' && body?.supabaseError?.code === '23505'
       if (!isDuplicate) {
         expect(createApp.status, JSON.stringify(body)).toBe(200)
@@ -106,8 +109,17 @@ describe('[GET] /app operations with subkey', () => {
     }
 
     // Create a subkey with limited rights to this app
-    let createSubkey: Response | null = null
-    for (let attempt = 0; attempt < 3; attempt++) {
+    let createSubkey = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'Limited Subkey',
+        mode: 'all',
+        limited_to_apps: [APPNAME],
+      }),
+    })
+    for (let attempt = 1; attempt < 3 && createSubkey.status !== 200; attempt++) {
+      await new Promise(resolve => setTimeout(resolve, 250))
       createSubkey = await fetch(`${BASE_URL}/apikey`, {
         method: 'POST',
         headers,
@@ -117,14 +129,8 @@ describe('[GET] /app operations with subkey', () => {
           limited_to_apps: [APPNAME],
         }),
       })
-      if (createSubkey.status === 200)
-        break
-      if (attempt < 2)
-        await new Promise(resolve => setTimeout(resolve, 250))
     }
-    expect(createSubkey?.status).toBe(200)
-    if (!createSubkey)
-      throw new Error('Failed to create subkey')
+    expect(createSubkey.status).toBe(200)
     const subkeyData = await createSubkey.json() as { id: number }
     subkey = subkeyData.id
   })
