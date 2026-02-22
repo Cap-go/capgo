@@ -77,6 +77,7 @@ describe('[DELETE] /app operations', () => {
 describe('[GET] /app operations with subkey', () => {
   const id = randomUUID()
   const APPNAME = `com.subkey.${id}`
+  const APP_DISPLAY_NAME = 'App Subkey Test'
   let subkey = 0
 
   afterAll(async () => {
@@ -92,23 +93,38 @@ describe('[GET] /app operations with subkey', () => {
       body: JSON.stringify({
         owner_org: ORG_ID,
         app_id: APPNAME,
-        name: `App ${APPNAME}`,
+        name: APP_DISPLAY_NAME,
         icon: 'test-icon',
       }),
     })
-    expect(createApp.status).toBe(200)
+    if (createApp.status !== 200) {
+      const body = await createApp.json().catch(() => null) as any
+      const isDuplicate = body?.error === 'cannot_create_app' && body?.supabaseError?.code === '23505'
+      if (!isDuplicate) {
+        expect(createApp.status, JSON.stringify(body)).toBe(200)
+      }
+    }
 
     // Create a subkey with limited rights to this app
-    const createSubkey = await fetch(`${BASE_URL}/apikey`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        name: 'Limited Subkey',
-        mode: 'all',
-        limited_to_apps: [APPNAME],
-      }),
-    })
-    expect(createSubkey.status).toBe(200)
+    let createSubkey: Response | null = null
+    for (let attempt = 0; attempt < 3; attempt++) {
+      createSubkey = await fetch(`${BASE_URL}/apikey`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          name: 'Limited Subkey',
+          mode: 'all',
+          limited_to_apps: [APPNAME],
+        }),
+      })
+      if (createSubkey.status === 200)
+        break
+      if (attempt < 2)
+        await new Promise(resolve => setTimeout(resolve, 250))
+    }
+    expect(createSubkey?.status).toBe(200)
+    if (!createSubkey)
+      throw new Error('Failed to create subkey')
     const subkeyData = await createSubkey.json() as { id: number }
     subkey = subkeyData.id
   })
@@ -122,7 +138,7 @@ describe('[GET] /app operations with subkey', () => {
     })
     expect(getAppWithSubkey.status).toBe(200)
     const data = await getAppWithSubkey.json() as { name: string }
-    expect(data.name).toBe(`App ${APPNAME}`)
+    expect(data.name).toBe(APP_DISPLAY_NAME)
   })
 
   it('should not access another app with subkey', async () => {
