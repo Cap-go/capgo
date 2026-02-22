@@ -82,22 +82,27 @@ onMounted(() => {
         <!-- Buttons -->
         <div v-if="dialogStore.dialogOptions?.buttons?.length" class="px-6 pb-6">
           <div class="flex justify-end space-x-2">
-            <button
-              v-for="(button, i) in dialogStore.dialogOptions.buttons"
-              :key="i"
-              :class="{
-                'd-btn d-btn-primary': button.role === 'primary',
-                'd-btn d-btn-secondary': button.role === 'secondary',
-                'd-btn d-btn-warning': button.role === 'danger',
-                'd-btn d-btn-outline': button.role === 'cancel',
-                'd-btn': !button.role,
-                'opacity-70 cursor-not-allowed': button.disabled,
-              }"
-              :disabled="button.disabled"
-              @click="close(button)"
-            >
-              {{ button.text }}
-            </button>
+            <template v-for="(button, i) in dialogStore.dialogOptions.buttons" :key="i">
+              <component
+                :is="button.href ? 'a' : 'button'"
+                :href="button.href"
+                :target="button.target"
+                :rel="button.rel"
+                :type="button.href ? undefined : 'button'"
+                :class="{
+                  'd-btn d-btn-primary': button.role === 'primary',
+                  'd-btn d-btn-secondary': button.role === 'secondary',
+                  'd-btn d-btn-warning': button.role === 'danger',
+                  'd-btn d-btn-outline': button.role === 'cancel',
+                  'd-btn': !button.role,
+                  'opacity-70 cursor-not-allowed': button.disabled,
+                }"
+                :disabled="button.disabled"
+                @click="close(button)"
+              >
+                {{ button.text }}
+              </component>
+            </template>
           </div>
         </div>
       </div>
