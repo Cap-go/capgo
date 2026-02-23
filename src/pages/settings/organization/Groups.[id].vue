@@ -409,8 +409,22 @@ async function createGroup() {
       throw error
 
     group.value = data as Group
-    await saveGroupOrgRole()
-    await syncAppBindings()
+
+    try {
+      await saveGroupOrgRole()
+    }
+    catch (roleError) {
+      console.error('Error saving group org role:', roleError)
+      toast.warning(t('error-saving-group-role', 'Group created but role assignment failed'))
+    }
+
+    try {
+      await syncAppBindings()
+    }
+    catch (bindingError) {
+      console.error('Error syncing app bindings:', bindingError)
+      toast.warning(t('error-syncing-app-bindings', 'Group created but app role assignments failed'))
+    }
 
     toast.success(t('group-created', 'Group created'))
     await router.replace(`/settings/organization/groups/${data.id}`)
