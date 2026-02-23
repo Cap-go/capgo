@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.114.9",
+  "version": "12.114.11",
   "private": true,
   "license": "GPL-3.0",
   "scripts": {
@@ -176,7 +176,7 @@
     "@logsnag/node": "1.0.1",
     "@revenuecat/purchases-capacitor": "11.2.13",
     "@sentry/cli": "^2.58.2",
-    "@std/semver": "npm:@jsr/std__semver@1.0.6",
+    "@std/semver": "npm:@jsr/std__semver@1.0.8",
     "@supabase/supabase-js": "2.93.3",
     "@tailwindcss/forms": "^0.5.10",
     "@types/semver": "^7.7.1",
@@ -222,7 +222,7 @@
     "@antfu/eslint-config": "6.7.3",
     "@capacitor/cli": "^8.0.0",
     "@capacitor/core": "^8.0.0",
-    "@capgo/cli": "7.72.4",
+    "@capgo/cli": "7.76.4",
     "@cloudflare/workers-types": "4.20260207.0",
     "@formkit/core": "1.6.9",
     "@iconify/json": "^2.2.406",
