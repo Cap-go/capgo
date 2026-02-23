@@ -1,0 +1,88 @@
+TASK 7: SSO Enforcement Check Endpoint
+========================================
+
+OBJECTIVE:
+Create POST /private/sso/check-enforcement endpoint that determines if a user is allowed to log in via password when SSO is enforced.
+
+IMPLEMENTATION DETAILS:
+- File: supabase/functions/_backend/private/sso/check-enforcement.ts
+- Route: POST /private/sso/check-enforcement
+- Authentication: middlewareAuth (JWT required)
+
+INPUT SCHEMA:
+{
+  email: string (validated as email),
+  auth_type: 'password' | 'sso'
+}
+
+OUTPUT SCHEMA:
+{
+  allowed: boolean,
+  reason?: string (only when allowed=false, value: 'sso_enforced')
+}
+
+LOGIC FLOW:
+1. If auth_type = 'sso': return { allowed: true } immediately
+   - SSO authentication is always allowed, no enforcement check needed
+
+2. Extract domain from email (email.split('@')[1])
+   - Return 400 error if no domain found
+
+3. Query sso_providers via check_domain_sso RPC
+   - If no provider found: return { allowed: true } (no enforcement)
+   - If provider found: extract org_id
+
+4. Query sso_providers table for enforce_sso flag
+   - If enforce_sso = false: return { allowed: true }
+   - If enforce_sso = true: proceed to role check
+
+5. Query org_users table for user's role in the org
+   - If user has 'org_super_admin' role: return { allowed: true } (break-glass bypass)
+   - If user does not have super_admin role: return { allowed: false, reason: 'sso_enforced' }
+
+SECURITY FEATURES:
+- Break-glass bypass: org_super_admin role can always use password auth
+- Enforcement only applies to non-super-admin users
+- All queries logged with requestId for audit trail
+- Proper error handling for missing users/orgs
+
+ROUTER REGISTRATION:
+- Import added to supabase/functions/private/index.ts (line 23)
+- Route registered: appGlobal.route('/sso/check-enforcement', sso_check_enforcement) (line 67)
+- Alphabetically sorted imports maintained
+
+TESTING SCENARIOS:
+✓ SSO auth_type always returns { allowed: true }
+✓ Non-SSO domain returns { allowed: true }
+✓ Enforced SSO with super_admin user returns { allowed: true }
+✓ Enforced SSO with regular user returns { allowed: false, reason: 'sso_enforced' }
+✓ Invalid email format returns 400 error
+✓ Missing JWT returns 401 error
+
+CODE QUALITY:
+✓ No linting errors (bun lint:backend passed)
+✓ Follows @antfu/eslint-config (no semicolons, single quotes)
+✓ Zod validation with .check(z.email()) pattern
+✓ Proper error handling with quickError/simpleError
+✓ Structured logging with cloudlog()
+✓ Type-safe with TypeScript
+
+DEPENDENCIES:
+- Zod mini for input validation
+- Hono middleware (middlewareAuth, parseBody, useCors)
+- Supabase client (emptySupabase for RPC calls)
+- Existing check_domain_sso RPC function
+- org_users table with role column
+- sso_providers table with enforce_sso column
+
+INTEGRATION POINTS:
+- Used by authentication flows to enforce SSO policies
+- Called before password authentication is allowed
+- Respects org_super_admin break-glass bypass
+- Logs all enforcement decisions for audit
+
+STATUS: ✓ COMPLETE
+- Endpoint created and tested
+- Router registration complete
+- Linting passed
+- Evidence documented

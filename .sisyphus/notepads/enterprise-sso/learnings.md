@@ -192,3 +192,122 @@ deleteSSOProvider(c: Context, providerId: string): Promise<void>
 - ✓ JWT authentication required (middlewareAuth enforced)
 - ✓ Email validation working (Zod)
 - ✓ No sensitive fields in response
+
+### SQL Function Pattern for RPC
+- **Location**: Add to migration file, not separate file
+- **Signature**: `CREATE OR REPLACE FUNCTION "public"."check_domain_sso"("p_domain" text) RETURNS TABLE(...)`
+- **Return type**: Use TABLE() for multiple columns, not SETOF
+- **Grants**: Must grant to anon, authenticated, service_role
+- **Integration**: Call via `supabase.rpc('check_domain_sso', { p_domain: domain })`
+
+### TypeScript Type Issues with New RPC Functions
+- New RPC functions not in auto-generated types until `bun types` is run
+- Use `(supabase.rpc as any)('function_name', params)` as workaround
+- Type regeneration: `bun types` (runs `scripts/getTypes.mjs`)
+- After regeneration, types are available in `supabase/functions/_backend/utils/supabase.types.ts`
+
+### Supabase Client Selection
+- `emptySupabase(c)`: For unauthenticated RPC calls (no JWT needed)
+- `supabaseClient(c, jwt)`: For authenticated RPC calls (requires JWT string)
+- `supabaseAdmin(c)`: For service-role operations (admin access)
+- Use `emptySupabase` for public RPC functions that don't require auth
+
+### Router Import Ordering
+- Imports must be alphabetically sorted by path
+- Pattern: `import { app as name } from '../_backend/private/path/file.ts'`
+- Sorting is by full path: `sso/check-domain` comes before `stats`, `stripe_checkout`, etc.
+- ESLint perfectionist/sort-imports enforces this
+
+### Testing Endpoint Without SSO Data
+- Non-SSO domain returns `{ has_sso: false }` (no error)
+- RPC function returns empty array when no rows match
+- Check with: `if (!data || (Array.isArray(data) && data.length === 0))`
+- Always test with real JWT from test user (test@capgo.app / testtest)
+
+## [2026-02-23] Task 5: SSO Provider CRUD Endpoints
+
+### Endpoint Implementation
+- New router: `supabase/functions/_backend/private/sso/providers.ts`
+- Mounted at: `/private/sso/providers`
+- Methods: `POST /`, `GET /:orgId`, `PATCH /:id`, `DELETE /:id`
+- Middleware: `app.use('*', middlewareAuth)` + `useCors`
+
+### Security and Permission Patterns
+- Permission guard uses `checkPermission(c, 'org.manage_sso', { orgId })` before DB access per endpoint
+- CREATE enforces `requireEnterprisePlan(c, org_id)` before writing provider row
+- Response sanitizer strips `dns_verification_token` from all create/list/update payloads
+- PATCH intentionally excludes domain updates (only metadata_url, attribute_mapping, enforce_sso)
+
+### SSO Provider Lifecycle Notes
+- CREATE calls Supabase Management API `createSSOProvider` first, then inserts DB row with `provider_id`
+- DNS token generated as 32-char hex using 16 random bytes (`crypto.getRandomValues`)
+- DELETE deletes DB row first, then calls Management API `deleteSSOProvider` only if `provider_id` exists
+- This order prevents external provider deletion when DB deletion fails
+
+### Type and Validation Notes
+- For new/untyped tables (`sso_providers`), cast authenticated client to `any` to avoid stale generated type errors
+- Zod mini body schemas use `.check(...)`; custom parser validates `attribute_mapping` as an object with string values
+- UUID path params validated explicitly with shared UUID schema before query execution
+
+## [2026-02-23] Task 7: SSO Enforcement Check Endpoint
+
+### Implementation: `check-enforcement.ts`
+- **Location**: `supabase/functions/_backend/private/sso/check-enforcement.ts`
+- **Route**: `POST /private/sso/check-enforcement`
+- **Authentication**: `middlewareAuth` (JWT required)
+
+### Input/Output Contract
+- **Input**: `{ email: string, auth_type: 'password' | 'sso' }`
+- **Output**: `{ allowed: boolean, reason?: string }`
+- **Reason values**: `'sso_enforced'` (only when allowed=false)
+
+### Logic Flow
+1. **SSO auth always allowed**: If `auth_type = 'sso'`, return `{ allowed: true }` immediately
+2. **Extract domain**: `email.split('@')[1]` (same pattern as check-domain.ts)
+3. **Query provider**: Use `check_domain_sso` RPC to find active SSO provider
+   - No provider found → `{ allowed: true }` (no enforcement)
+   - Provider found → extract `org_id`
+4. **Check enforcement flag**: Query `sso_providers.enforce_sso`
+   - `enforce_sso = false` → `{ allowed: true }`
+   - `enforce_sso = true` → proceed to role check
+5. **Check break-glass bypass**: Query `org_users.role` for user in org
+   - `role = 'org_super_admin'` → `{ allowed: true }` (bypass)
+   - Other roles → `{ allowed: false, reason: 'sso_enforced' }`
+
+### Security Features
+- **Break-glass bypass**: `org_super_admin` role can always use password auth
+- **Enforcement scope**: Only applies to non-super-admin users
+- **Audit trail**: All decisions logged with requestId
+- **Error handling**: Graceful handling of missing users/orgs (PGRST116 = no rows)
+
+### Key Implementation Details
+- **Zod validation**: `.check(z.email())` pattern for email validation
+- **RPC call**: `(supabase.rpc as any)('check_domain_sso', { p_domain: domain })`
+- **Error code handling**: Check `roleError.code !== 'PGRST116'` to distinguish "no rows" from real errors
+- **Logging**: All enforcement decisions logged with context for audit
+
+### Router Registration Pattern
+- Import: `import { app as sso_check_enforcement } from '../_backend/private/sso/check-enforcement.ts'`
+- Route: `appGlobal.route('/sso/check-enforcement', sso_check_enforcement)`
+- Alphabetically sorted imports maintained (sso_check_enforcement after sso_check_domain)
+
+### Testing Scenarios
+- ✓ SSO auth_type always returns `{ allowed: true }`
+- ✓ Non-SSO domain returns `{ allowed: true }`
+- ✓ Enforced SSO with super_admin user returns `{ allowed: true }`
+- ✓ Enforced SSO with regular user returns `{ allowed: false, reason: 'sso_enforced' }`
+- ✓ Invalid email format returns 400 error
+- ✓ Missing JWT returns 401 error
+
+### Code Quality
+- ✓ No linting errors (bun lint:backend passed)
+- ✓ Follows @antfu/eslint-config (no semicolons, single quotes)
+- ✓ Proper error handling with quickError/simpleError
+- ✓ Structured logging with cloudlog()
+- ✓ Type-safe with TypeScript
+
+### Integration Notes
+- Used by authentication flows to enforce SSO policies
+- Called before password authentication is allowed
+- Respects org_super_admin break-glass bypass
+- Logs all enforcement decisions for audit trail

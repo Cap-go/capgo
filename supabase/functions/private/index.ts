@@ -20,6 +20,8 @@ import { app as role_bindings } from '../_backend/private/role_bindings.ts'
 import { app as roles } from '../_backend/private/roles.ts'
 import { app as set_org_email } from '../_backend/private/set_org_email.ts'
 import { app as sso_check_domain } from '../_backend/private/sso/check-domain.ts'
+import { app as sso_check_enforcement } from '../_backend/private/sso/check-enforcement.ts'
+import { app as sso_providers } from '../_backend/private/sso/providers.ts'
 import { app as stats_priv } from '../_backend/private/stats.ts'
 import { app as storeTop } from '../_backend/private/store_top.ts'
 import { app as stripe_checkout } from '../_backend/private/stripe_checkout.ts'
@@ -63,6 +65,8 @@ appGlobal.route('/accept_invitation', accept_invitation)
 appGlobal.route('/validate_password_compliance', validate_password_compliance)
 appGlobal.route('/verify_email_otp', verify_email_otp)
 appGlobal.route('/sso/check-domain', sso_check_domain)
+appGlobal.route('/sso/check-enforcement', sso_check_enforcement)
+appGlobal.route('/sso/providers', sso_providers)
 
 createAllCatch(appGlobal, functionName)
 Deno.serve(appGlobal.fetch)
