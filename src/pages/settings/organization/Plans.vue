@@ -430,7 +430,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
       <CreditsCta class="mb-6 shrink-0" :credits-only="isCreditsOnly" />
 
       <!-- Expert as a Service CTA -->
-      <div v-if="currentOrganization?.paying" class="mb-6 shrink-0">
+      <div class="mb-6 shrink-0">
         <div class="flex flex-col gap-3 p-4 border border-amber-200 bg-amber-50 rounded-2xl text-amber-900 dark:border-amber-800/50 dark:bg-amber-900/20 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p class="text-sm font-semibold">
