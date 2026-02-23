@@ -208,6 +208,8 @@ watch(memberDynamicColumns, (cols: TableColumn[]) => {
   memberColumns.value = cols
 }, { immediate: true })
 
+const UUID_REGEX = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/i
+
 watch(groupId, async (id: string) => {
   if (!id)
     return
@@ -220,8 +222,17 @@ watch(groupId, async (id: string) => {
     displayStore.NavTitle = t('create-group', 'Create group')
     await Promise.all([fetchRoles(), fetchApps()])
   }
-  else {
+  else if (UUID_REGEX.test(id)) {
     await loadAll()
+  }
+  else {
+    group.value = null
+    editName.value = ''
+    editDescription.value = ''
+    selectedOrgRole.value = ''
+    pendingAppBindings.value = {}
+    displayStore.NavTitle = t('groups')
+    toast.error(t('invalid-group-id', 'Invalid group ID'))
   }
 }, { immediate: true })
 
