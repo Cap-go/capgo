@@ -398,23 +398,10 @@ async function handleEditRoleConfirm(newRoleName: string) {
 
   isEditingRole.value = true
   try {
-    const { data: roleData, error: roleError } = await supabase
-      .from('roles')
-      .select('id')
-      .eq('name', newRoleName)
-      .single()
-
-    if (roleError || !roleData) {
-      console.error('Error fetching role UUID:', roleError)
-      throw new Error('Role not found')
-    }
-
-    const { error: updateError } = await supabase
-      .from('role_bindings')
-      .update({
-        role_id: roleData.id,
-      })
-      .eq('id', editRoleBinding.value.id)
+    const { error: updateError } = await supabase.functions.invoke(`private/role_bindings/${editRoleBinding.value.id}`, {
+      method: 'PATCH',
+      body: { role_name: newRoleName },
+    })
 
     if (updateError)
       throw updateError

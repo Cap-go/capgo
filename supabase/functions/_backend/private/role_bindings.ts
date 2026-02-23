@@ -346,6 +346,99 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
   }
 })
 
+// PATCH /private/role_bindings/:binding_id - Update a role binding
+app.patch('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
+  const bindingId = c.req.param('binding_id')
+  const userId = c.get('auth')?.userId
+
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  let body
+  try {
+    body = await c.req.json()
+  }
+  catch {
+    return c.json({ error: 'Invalid JSON' }, 400)
+  }
+
+  const { role_name } = body ?? {}
+  if (!role_name) {
+    return c.json({ error: 'role_name is required' }, 400)
+  }
+
+  let pgClient
+  try {
+    pgClient = getPgClient(c)
+    const drizzle = getDrizzleClient(pgClient)
+
+    const [binding] = await drizzle
+      .select()
+      .from(schema.role_bindings)
+      .where(eq(schema.role_bindings.id, bindingId))
+      .limit(1)
+
+    if (!binding) {
+      return c.json({ error: 'Role binding not found' }, 404)
+    }
+
+    if (!(await checkPermission(c, 'org.update_user_roles', { orgId: binding.org_id ?? undefined }))) {
+      return c.json({ error: 'Forbidden - Admin rights required' }, 403)
+    }
+
+    const [role] = await drizzle
+      .select()
+      .from(schema.roles)
+      .where(eq(schema.roles.name, role_name))
+      .limit(1)
+
+    if (!role) {
+      return c.json({ error: 'Role not found' }, 404)
+    }
+
+    if (!role.is_assignable) {
+      return c.json({ error: 'Role is not assignable' }, 403)
+    }
+
+    const [updated] = await drizzle
+      .update(schema.role_bindings)
+      .set({ role_id: role.id })
+      .where(eq(schema.role_bindings.id, bindingId))
+      .returning()
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'role_binding_updated',
+      bindingId,
+      orgId: binding.org_id,
+      principal_type: binding.principal_type,
+      principal_id: binding.principal_id,
+      old_role_id: binding.role_id,
+      new_role_id: role.id,
+      scope_type: binding.scope_type,
+      app_id: binding.app_id,
+      channel_id: binding.channel_id,
+    })
+
+    return c.json(updated)
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'role_binding_update_failed',
+      bindingId,
+      error,
+    })
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
+  }
+})
+
 // DELETE /private/role_bindings/:binding_id - Remove a role
 app.delete('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
   const bindingId = c.req.param('binding_id')

@@ -411,6 +411,20 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/settings/organization/Groups': RouteRecordInfo<
+      '/settings/organization/Groups',
+      '/settings/organization/Groups',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/settings/organization/Groups.[id]': RouteRecordInfo<
+      '/settings/organization/Groups.[id]',
+      '/settings/organization/Groups/:id',
+      { id: ParamValue<true> },
+      { id: ParamValue<false> },
+      | never
+    >,
     '/settings/organization/Members': RouteRecordInfo<
       '/settings/organization/Members',
       '/settings/organization/Members',
@@ -793,6 +807,18 @@ declare module 'vue-router/auto-routes' {
     'src/pages/settings/organization/DeleteOrgDialog.vue': {
       routes:
         | '/settings/organization/DeleteOrgDialog'
+      views:
+        | never
+    }
+    'src/pages/settings/organization/Groups.vue': {
+      routes:
+        | '/settings/organization/Groups'
+      views:
+        | never
+    }
+    'src/pages/settings/organization/Groups.[id].vue': {
+      routes:
+        | '/settings/organization/Groups.[id]'
       views:
         | never
     }

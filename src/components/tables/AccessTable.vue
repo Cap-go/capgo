@@ -395,25 +395,10 @@ async function changeUserRole(element: Element) {
 
   isLoading.value = true
   try {
-    // Fetch the new role UUID from the roles table
-    const { data: roleData, error: roleError } = await supabase
-      .from('roles')
-      .select('id')
-      .eq('name', newRoleName)
-      .single()
-
-    if (roleError || !roleData) {
-      console.error('Error fetching role UUID:', roleError)
-      throw new Error('Role not found')
-    }
-
-    // Update the existing role_id
-    const { error: updateError } = await supabase
-      .from('role_bindings')
-      .update({
-        role_id: roleData.id,
-      })
-      .eq('id', element.id)
+    const { error: updateError } = await supabase.functions.invoke(`private/role_bindings/${element.id}`, {
+      method: 'PATCH',
+      body: { role_name: newRoleName },
+    })
 
     if (updateError)
       throw updateError
