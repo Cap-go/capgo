@@ -76,7 +76,7 @@ const { currentOrganization } = storeToRefs(organizationStore)
 const displayStore = useDisplayStore()
 const dialogStore = useDialogV2Store()
 
-const groupId = computed(() => route.params.id as string)
+const groupId = computed(() => route.params['id'] as string)
 const isCreateMode = computed(() => groupId.value === 'new')
 
 const isLoading = ref(false)
@@ -313,7 +313,7 @@ async function fetchApps() {
   if (error)
     throw error
 
-  apps.value = (data || []).filter((app: OrgApp) => !!app.id) as OrgApp[]
+  apps.value = (data || []).filter((app): app is OrgApp => !!app.id)
 }
 
 async function fetchOrgMembers() {
