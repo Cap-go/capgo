@@ -252,9 +252,9 @@ export function showUploadReplicationToast({
   }
 
   const finalize = () => {
-  if (finished)
-    return
-  cleanup()
+    if (finished)
+      return
+    cleanup()
     toast(i18n.global.t('replication-toast-globally-available'), {
       id: toastId,
       descriptionClass: 'w-full',
