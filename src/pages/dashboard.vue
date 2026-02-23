@@ -90,6 +90,9 @@ displayStore.defaultBack = '/apps'
         <!-- Only show FailedCard for security access issues (2FA/password) -->
         <FailedCard v-if="lacksSecurityAccess" />
 
+        <!-- Trial subscription banner -->
+        <TrialBanner />
+
         <!-- Dashboard content - blurred when no apps or payment failed -->
         <div :class="{ 'blur-sm pointer-events-none select-none': shouldBlurContent }">
           <Usage v-if="!lacksSecurityAccess" :force-demo="paymentFailed" />

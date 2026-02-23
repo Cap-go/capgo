@@ -1400,6 +1400,8 @@
   "transfer-app-ownership": "Transfer app ownership",
   "transfer-app-ownership-requirements": "To transfer an app between organizations, you must have super_admin privileges in both the source and destination organizations. This ensures secure transfer of ownership and prevents unauthorized access.",
   "transfer-app-ownership-too-soon": "You can only transfer apps every 32 days",
+  "trial-banner-cta": "View plans",
+  "trial-banner-message": "Enjoying your Capgo trial? Subscribe to a plan.",
   "trial-end-date": "Trial End Date",
   "trial-left": "days left",
   "trial-organizations-list": "Trial Organizations List",
