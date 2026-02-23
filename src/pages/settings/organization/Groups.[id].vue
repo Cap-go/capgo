@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Ref } from 'vue'
 import type { Tab, TableColumn } from '~/components/comp_def'
+import { computedAsync } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -11,6 +12,7 @@ import IconTrash from '~icons/heroicons/trash'
 import IconUsers from '~icons/heroicons/users'
 import DataTable from '~/components/DataTable.vue'
 import SearchInput from '~/components/forms/SearchInput.vue'
+import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
@@ -78,6 +80,17 @@ const dialogStore = useDialogV2Store()
 
 const groupId = computed(() => (route.params as { id: string }).id)
 const isCreateMode = computed(() => groupId.value === 'new')
+
+const canShow = computed(() =>
+  !!currentOrganization.value?.use_new_rbac && !!currentOrganization.value?.gid,
+)
+
+const isPermissionLoading = ref(false)
+const canManage = computedAsync(async () => {
+  if (!currentOrganization.value?.gid)
+    return false
+  return await checkPermissions('org.update_user_roles', { orgId: currentOrganization.value.gid })
+}, false, { evaluating: isPermissionLoading })
 
 const isLoading = ref(false)
 const isSubmitting = ref(false)
@@ -664,7 +677,23 @@ async function removeMemberFromGroup(userId: string) {
 
 <template>
   <div>
-    <div>
+    <div v-if="isPermissionLoading" class="flex items-center justify-center py-12">
+      <span class="d-loading d-loading-spinner d-loading-lg" />
+    </div>
+
+    <div
+      v-else-if="!canShow || !canManage"
+      class="flex flex-col bg-white border shadow-lg md:p-6 md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900"
+    >
+      <h2 class="text-2xl font-bold dark:text-white text-slate-800">
+        {{ t('groups') }}
+      </h2>
+      <p class="mt-2 text-sm text-slate-500">
+        {{ t('groups-unavailable') }}
+      </p>
+    </div>
+
+    <div v-else>
       <div class="flex flex-col bg-white border shadow-lg md:p-8 md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
         <!-- Back link -->
         <div class="mb-6">
