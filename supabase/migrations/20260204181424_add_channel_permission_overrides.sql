@@ -41,12 +41,13 @@ CREATE POLICY channel_permission_overrides_admin_select ON public.channel_permis
       SELECT 1
       FROM public.channels
       JOIN public.apps ON apps.app_id = channels.app_id
-      WHERE public.rbac_check_permission(
-        public.rbac_perm_app_update_user_roles(),
-        apps.owner_org,
-        apps.app_id,
-        NULL::bigint
-      )
+      WHERE channels.id = channel_permission_overrides.channel_id
+        AND public.rbac_check_permission(
+          public.rbac_perm_app_update_user_roles(),
+          apps.owner_org,
+          apps.app_id,
+          NULL::bigint
+        )
     )
   );
 
@@ -58,12 +59,13 @@ CREATE POLICY channel_permission_overrides_admin_write ON public.channel_permiss
       SELECT 1
       FROM public.channels
       JOIN public.apps ON apps.app_id = channels.app_id
-      WHERE public.rbac_check_permission(
-        public.rbac_perm_app_update_user_roles(),
-        apps.owner_org,
-        apps.app_id,
-        NULL::bigint
-      )
+      WHERE channels.id = channel_permission_overrides.channel_id
+        AND public.rbac_check_permission(
+          public.rbac_perm_app_update_user_roles(),
+          apps.owner_org,
+          apps.app_id,
+          NULL::bigint
+        )
     )
   )
   WITH CHECK (
@@ -71,12 +73,13 @@ CREATE POLICY channel_permission_overrides_admin_write ON public.channel_permiss
       SELECT 1
       FROM public.channels
       JOIN public.apps ON apps.app_id = channels.app_id
-      WHERE public.rbac_check_permission(
-        public.rbac_perm_app_update_user_roles(),
-        apps.owner_org,
-        apps.app_id,
-        NULL::bigint
-      )
+      WHERE channels.id = channel_permission_overrides.channel_id
+        AND public.rbac_check_permission(
+          public.rbac_perm_app_update_user_roles(),
+          apps.owner_org,
+          apps.app_id,
+          NULL::bigint
+        )
     )
   );
 
