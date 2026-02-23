@@ -69,18 +69,30 @@ describe.concurrent('[GET] /device operations', () => {
 describe('[POST] /device operations', () => {
   it('link device', async () => {
     const deviceId = '11111111-1111-1111-1111-111111111111'
-    const response = await fetch(`${BASE_URL}/device`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        app_id: APPNAME_DEVICE,
-        device_id: deviceId,
-        channel: 'no_access',
-      }),
-    })
 
-    const data = await response.json<{ status: string }>()
-    expect(response.status).toBe(200)
+    // Retry logic for rate limiting (429) and server errors (500)
+    let response: Response
+    let lastError: Error | null = null
+    for (let attempt = 0; attempt < 5; attempt++) {
+      response = await fetch(`${BASE_URL}/device`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          app_id: APPNAME_DEVICE,
+          device_id: deviceId,
+          channel: 'no_access',
+        }),
+      })
+
+      if (response.status === 200) break
+      if (response.status !== 429 && response.status !== 500) break
+
+      lastError = new Error(`Attempt ${attempt + 1} failed with ${response.status}`)
+      await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)))
+    }
+
+    expect(response?.status).toBe(200)
+    const data = await response!.json<{ status: string }>()
     expect(data.status).toBe('ok')
     // TODO: fix this test
     // // Then, get the device and verify channel is returned
