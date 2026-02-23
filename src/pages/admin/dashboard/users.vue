@@ -66,6 +66,7 @@ const globalStatsTrendData = ref<Array<{
   plan_team: number
   plan_enterprise: number
   registers_today: number
+  demo_apps_created: number
   devices_last_month: number
 }>>([])
 
@@ -476,6 +477,7 @@ const onboardingFunnelTrendSeries = computed(() => {
     return []
 
   const trend = onboardingFunnelData.value.trend
+  const demoAppsCreatedByDate = new Map(globalStatsTrendData.value.map(item => [item.date, item.demo_apps_created]))
   return [
     {
       label: 'New Organizations',
@@ -508,6 +510,14 @@ const onboardingFunnelTrendSeries = computed(() => {
         value: item.orgs_created_bundle,
       })),
       color: '#10b981', // green
+    },
+    {
+      label: 'Demo Apps Created',
+      data: trend.map(item => ({
+        date: item.date,
+        value: demoAppsCreatedByDate.get(item.date) ?? 0,
+      })),
+      color: '#ef4444', // red
     },
   ]
 })

@@ -55,6 +55,10 @@ describe('upload_link', async () => {
     const filePath = `orgs/${ORG_ID}/apps/${APPNAME}/${fileId}.zip`
     //  be sure to remove the file from the bucket before running the test
     const supabase = getSupabaseClient()
+
+    // Clean up any existing version with this name before inserting (handles test retries)
+    await supabase.from('app_versions').delete().eq('app_id', APPNAME).eq('name', fileId)
+
     // create in supabase app_version with version 4
     const { data: data2, error } = await supabase.from('app_versions').insert({
       app_id: APPNAME,

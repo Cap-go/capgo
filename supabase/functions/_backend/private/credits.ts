@@ -447,7 +447,9 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
     itemsSummary,
   }
 
-  const { data: grant, error: rpcError } = await supabase
+  // SECURITY: supabaseAdmin required — authenticated role lacks EXECUTE on
+  // top_up_usage_credits. Auth enforced above (JWT + RBAC + Stripe verification).
+  const { data: grant, error: rpcError } = await supabaseAdmin(c)
     .rpc('top_up_usage_credits', {
       p_org_id: body.orgId,
       p_amount: creditQuantity,

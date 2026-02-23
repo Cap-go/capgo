@@ -45,7 +45,8 @@ const config = getLocalConfig()
 
 const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ``
 const apiKey = ref<string | null>(null)
-const commandTemplate = `bunx @capgo/cli@latest i [APIKEY]${localCommand}`
+// keep NPX for better support of our customers env, everyone has npx but not everyone has bunx, and bunx has some issues with pnpm
+const commandTemplate = `npx @capgo/cli@latest i [APIKEY]${localCommand}`
 const stepCommand = computed(() => commandTemplate.replace('[APIKEY]', apiKey.value ?? '[APIKEY]'))
 const steps = computed<Step[]>(() => [
   {

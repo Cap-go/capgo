@@ -41,6 +41,7 @@ export async function useChartData(supabase: SupabaseClient, appId: string, from
   interface ChartDataset {
     label: string
     data: number[]
+    metaCounts?: number[]
   }
 
   interface ChartData {
@@ -57,6 +58,9 @@ export async function useChartData(supabase: SupabaseClient, appId: string, from
     labels: chartDataFromApi.labels,
     datasets: chartDataFromApi.datasets.map((dataset, i) => {
       const color = colorKeys[(i + SKIP_COLOR) % colorKeys.length]
+      const metaCounts = Array.isArray(dataset.metaCounts)
+        ? dataset.metaCounts.map(value => Math.max(0, Math.round(Number(value) || 0)))
+        : undefined
 
       return {
         borderColor: colors[color as keyof typeof colors][400],
@@ -65,6 +69,7 @@ export async function useChartData(supabase: SupabaseClient, appId: string, from
         pointRadius: 2,
         pointBorderWidth: 0,
         ...dataset,
+        ...(metaCounts ? { metaCountValues: metaCounts } : {}),
       }
     }),
     latestVersion: chartDataFromApi.latestVersion,

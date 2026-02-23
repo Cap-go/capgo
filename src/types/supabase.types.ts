@@ -1098,6 +1098,7 @@ export type Database = {
           credits_bought: number
           credits_consumed: number
           date_id: string
+          demo_apps_created: number
           devices_last_month: number | null
           devices_last_month_android: number | null
           devices_last_month_ios: number | null
@@ -1157,6 +1158,7 @@ export type Database = {
           credits_bought?: number
           credits_consumed?: number
           date_id: string
+          demo_apps_created?: number
           devices_last_month?: number | null
           devices_last_month_android?: number | null
           devices_last_month_ios?: number | null
@@ -1216,6 +1218,7 @@ export type Database = {
           credits_bought?: number
           credits_consumed?: number
           date_id?: string
+          demo_apps_created?: number
           devices_last_month?: number | null
           devices_last_month_android?: number | null
           devices_last_month_ios?: number | null

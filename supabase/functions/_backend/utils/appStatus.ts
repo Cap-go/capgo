@@ -2,10 +2,11 @@ import type { Context } from 'hono'
 import { CacheHelper } from './cache.ts'
 import { backgroundTask, isStripeConfigured } from './utils.ts'
 
-const APP_STATUS_CACHE_PATH = '/.app-status-v2'
+const APP_STATUS_CACHE_PATH = '/.app-status-v3'
 const APP_STATUS_CACHE_TTL_SECONDS = 60
 
 export type AppStatus = 'cloud' | 'onprem' | 'cancelled'
+interface AppStatusCachePayload { status: AppStatus, allow_device_custom_id: boolean }
 
 function buildAppStatusRequest(c: Context, appId: string) {
   const helper = new CacheHelper(c)
@@ -17,23 +18,24 @@ function buildAppStatusRequest(c: Context, appId: string) {
   }
 }
 
-export async function getAppStatus(c: Context, appId: string): Promise<AppStatus | null> {
+export async function getAppStatus(c: Context, appId: string): Promise<{ status: AppStatus | null, allow_device_custom_id: boolean }> {
   const cacheEntry = buildAppStatusRequest(c, appId)
   if (!cacheEntry)
-    return null
-  const payload = await cacheEntry.helper.matchJson<{ status: AppStatus }>(cacheEntry.request)
+    return { status: null, allow_device_custom_id: true }
+  const payload = await cacheEntry.helper.matchJson<AppStatusCachePayload>(cacheEntry.request)
   if (!payload)
-    return null
+    return { status: null, allow_device_custom_id: true }
   if (payload.status === 'cancelled' && !isStripeConfigured(c))
-    return 'cloud'
-  return payload.status
+    return { status: 'cloud', allow_device_custom_id: payload.allow_device_custom_id }
+  return { status: payload.status, allow_device_custom_id: payload.allow_device_custom_id }
 }
 
-export function setAppStatus(c: Context, appId: string, status: AppStatus) {
+export function setAppStatus(c: Context, appId: string, status: AppStatus, allowDeviceCustomId: boolean) {
   return backgroundTask(c, async () => {
     const cacheEntry = buildAppStatusRequest(c, appId)
     if (!cacheEntry)
       return
-    await cacheEntry.helper.putJson(cacheEntry.request, { status }, APP_STATUS_CACHE_TTL_SECONDS)
+    const payload: AppStatusCachePayload = { status, allow_device_custom_id: allowDeviceCustomId }
+    await cacheEntry.helper.putJson(cacheEntry.request, payload, APP_STATUS_CACHE_TTL_SECONDS)
   })
 }

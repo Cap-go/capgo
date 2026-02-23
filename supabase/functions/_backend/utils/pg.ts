@@ -527,7 +527,7 @@ export async function getAppOwnerPostgres(
   appId: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
-): Promise<{ owner_org: string, orgs: { created_by: string, id: string, management_email: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number, expose_metadata: boolean } | null> {
+): Promise<{ owner_org: string, orgs: { created_by: string, id: string, management_email: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number, expose_metadata: boolean, allow_device_custom_id: boolean } | null> {
   try {
     if (actions.length === 0)
       return null
@@ -541,6 +541,7 @@ export async function getAppOwnerPostgres(
         channel_device_count: schema.apps.channel_device_count,
         manifest_bundle_count: schema.apps.manifest_bundle_count,
         expose_metadata: schema.apps.expose_metadata,
+        allow_device_custom_id: schema.apps.allow_device_custom_id,
         orgs: {
           created_by: orgAlias.created_by,
           id: orgAlias.id,
@@ -970,6 +971,7 @@ export interface AdminGlobalStatsTrend {
   plan_team: number
   plan_enterprise: number
   registers_today: number
+  demo_apps_created: number
   devices_last_month: number
   devices_last_month_ios: number
   devices_last_month_android: number
@@ -1031,6 +1033,7 @@ export async function getAdminGlobalStatsTrend(
         plan_team::int,
         plan_enterprise::int,
         registers_today::int,
+        COALESCE(demo_apps_created, 0)::int AS demo_apps_created,
         devices_last_month::int,
         COALESCE(devices_last_month_ios, 0)::int AS devices_last_month_ios,
         COALESCE(devices_last_month_android, 0)::int AS devices_last_month_android,
@@ -1082,6 +1085,7 @@ export async function getAdminGlobalStatsTrend(
       plan_team: Number(row.plan_team) || 0,
       plan_enterprise: Number(row.plan_enterprise) || 0,
       registers_today: Number(row.registers_today) || 0,
+      demo_apps_created: Number(row.demo_apps_created) || 0,
       devices_last_month: Number(row.devices_last_month) || 0,
       devices_last_month_ios: Number(row.devices_last_month_ios) || 0,
       devices_last_month_android: Number(row.devices_last_month_android) || 0,
@@ -1126,6 +1130,11 @@ export interface AdminPluginBreakdown {
   devices_last_month_android: number
   version_breakdown: Record<string, number>
   major_breakdown: Record<string, number>
+  trend: Array<{
+    date: string
+    version_breakdown: Record<string, number>
+    major_breakdown: Record<string, number>
+  }>
 }
 
 function parseBreakdownJson(value: unknown): Record<string, number> {
@@ -1513,14 +1522,13 @@ export async function getAdminPluginBreakdown(
       FROM global_stats
       WHERE date_id >= ${startDateOnly}
         AND date_id <= ${endDateOnly}
-      ORDER BY date_id DESC
-      LIMIT 1
+      ORDER BY date_id ASC
     `
 
     const result = await drizzleClient.execute(query)
-    const row = result.rows[0] as any | undefined
+    const rows = result.rows as any[]
 
-    if (!row) {
+    if (rows.length === 0) {
       return {
         date: null,
         devices_last_month: 0,
@@ -1528,16 +1536,29 @@ export async function getAdminPluginBreakdown(
         devices_last_month_android: 0,
         version_breakdown: {},
         major_breakdown: {},
+        trend: [],
       }
     }
 
+    const trend = rows.map((row) => {
+      const date = row.date instanceof Date ? row.date.toISOString().split('T')[0] : String(row.date)
+      return {
+        date,
+        version_breakdown: parseBreakdownJson(row.plugin_version_breakdown),
+        major_breakdown: parseBreakdownJson(row.plugin_major_breakdown),
+      }
+    })
+    const latestRow = rows[rows.length - 1]
+    const latestDate = latestRow.date instanceof Date ? latestRow.date.toISOString().split('T')[0] : String(latestRow.date)
+
     return {
-      date: row.date ?? null,
-      devices_last_month: Number(row.devices_last_month) || 0,
-      devices_last_month_ios: Number(row.devices_last_month_ios) || 0,
-      devices_last_month_android: Number(row.devices_last_month_android) || 0,
-      version_breakdown: parseBreakdownJson(row.plugin_version_breakdown),
-      major_breakdown: parseBreakdownJson(row.plugin_major_breakdown),
+      date: latestDate,
+      devices_last_month: Number(latestRow.devices_last_month) || 0,
+      devices_last_month_ios: Number(latestRow.devices_last_month_ios) || 0,
+      devices_last_month_android: Number(latestRow.devices_last_month_android) || 0,
+      version_breakdown: parseBreakdownJson(latestRow.plugin_version_breakdown),
+      major_breakdown: parseBreakdownJson(latestRow.plugin_major_breakdown),
+      trend,
     }
   }
   catch (e: unknown) {
@@ -1549,6 +1570,7 @@ export async function getAdminPluginBreakdown(
       devices_last_month_android: 0,
       version_breakdown: {},
       major_breakdown: {},
+      trend: [],
     }
   }
 }

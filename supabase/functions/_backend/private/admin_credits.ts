@@ -4,7 +4,7 @@ import { z } from 'zod/mini'
 import { createHono, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
-import { supabaseAdmin } from '../utils/supabase.ts'
+import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 import { version } from '../utils/version.ts'
 
 type AppContext = Context<MiddlewareKeyVariables, any, any>
@@ -29,16 +29,16 @@ interface SearchOrgsQuery {
 
 async function verifyAdmin(c: AppContext): Promise<{ isAdmin: boolean, userId: string | null }> {
   const auth = c.get('auth')
-  if (!auth || !auth.userId) {
+  if (!auth || !auth.userId || auth.authType !== 'jwt' || !auth.jwt) {
     cloudlog({ requestId: c.get('requestId'), message: 'admin_verify_no_auth' })
     return { isAdmin: false, userId: null }
   }
 
   const userId = auth.userId
-  const adminSupabase = supabaseAdmin(c)
+  const userSupabase = supabaseClient(c, auth.jwt)
 
-  // Use admin client to check if user is admin (using the is_admin(userid) variant)
-  const { data: isAdmin, error: adminError } = await adminSupabase.rpc('is_admin', { userid: userId })
+  // is_admin() is MFA-aware and must run with the caller JWT context.
+  const { data: isAdmin, error: adminError } = await userSupabase.rpc('is_admin')
 
   if (adminError) {
     cloudlog({ requestId: c.get('requestId'), message: 'is_admin_error', error: adminError })

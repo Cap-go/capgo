@@ -12,11 +12,10 @@ export const organizationTabs: Tab[] = [
   { label: 'general', key: '/settings/organization', icon: IconInfo },
   { label: 'members', key: '/settings/organization/members', icon: IconUsers },
   { label: 'groups', key: '/settings/organization/groups', icon: IconUsers },
-  // Security tab is added dynamically in settings.vue for super_admins only
-  { label: 'security', key: '/settings/organization/security', icon: IconSecurity },
-  { label: 'audit-logs', key: '/settings/organization/auditlogs', icon: IconAudit },
   { label: 'plans', key: '/settings/organization/plans', icon: IconPlan },
-  { label: 'usage', key: '/settings/organization/usage', icon: IconChart },
   { label: 'credits', key: '/settings/organization/credits', icon: IconCredits },
+  { label: 'security', key: '/settings/organization/security', icon: IconSecurity },
+  { label: 'usage', key: '/settings/organization/usage', icon: IconChart },
+  { label: 'audit-logs', key: '/settings/organization/auditlogs', icon: IconAudit },
   { label: 'webhooks', key: '/settings/organization/webhooks', icon: IconWebhook },
 ]

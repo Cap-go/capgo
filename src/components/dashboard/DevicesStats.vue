@@ -79,6 +79,7 @@ function generateDemoDevicesData(days: number): { labels: string[], datasets: { 
 interface ChartDataset {
   label: string
   data: Array<number | undefined>
+  metaCountValues?: Array<number | undefined>
 }
 
 interface ChartApiData {
@@ -177,15 +178,40 @@ const latestVersion = computed(() => {
   if (lastIndexWithData < 0)
     return null
 
-  const datasetAtLastDay = datasets.reduce<{ name: string, percentage: number } | null>((current, dataset) => {
+  const totalCountAtLastDay = datasets.reduce((sum, dataset) => {
+    const countValues = (dataset as any)?.metaCountValues as Array<number | undefined> | undefined
+    const countAtIndex = countValues?.[lastIndexWithData]
+    const numericCount = typeof countAtIndex === 'number' && !Number.isNaN(countAtIndex) ? countAtIndex : 0
+    return sum + Math.max(0, numericCount)
+  }, 0)
+  const hasCountMetadata = totalCountAtLastDay > 0
+
+  const datasetAtLastDay = datasets.reduce<{ name: string, count: number, share: number } | null>((current, dataset) => {
     const value = dataset.data?.[lastIndexWithData]
     const numericValue = typeof value === 'number' && !Number.isNaN(value) ? value : null
 
     if (numericValue === null)
       return current
 
-    if (!current || numericValue > current.percentage)
-      return { name: dataset.label, percentage: numericValue }
+    const countValues = (dataset as any)?.metaCountValues as Array<number | undefined> | undefined
+    const countAtIndex = countValues?.[lastIndexWithData]
+    const count = typeof countAtIndex === 'number' && !Number.isNaN(countAtIndex)
+      ? Math.max(0, countAtIndex)
+      : 0
+    const share = totalCountAtLastDay > 0
+      ? (count / totalCountAtLastDay) * 100
+      : Math.max(0, numericValue)
+    if (!current)
+      return { name: dataset.label, count, share }
+
+    if (hasCountMetadata) {
+      if (count > current.count || (count === current.count && share > current.share))
+        return { name: dataset.label, count, share }
+      return current
+    }
+
+    if (share > current.share)
+      return { name: dataset.label, count, share }
 
     return current
   }, null)
@@ -193,20 +219,27 @@ const latestVersion = computed(() => {
   if (datasetAtLastDay)
     return datasetAtLastDay
 
-  const fallbackDataset = datasets.find(dataset => dataset.data && dataset.data[lastIndexWithData] !== undefined)
+  const fallbackDataset = datasets.reduce<{ label: string, value: number } | null>((current, dataset) => {
+    const value = dataset.data?.[lastIndexWithData]
+    const numericValue = typeof value === 'number' && !Number.isNaN(value) ? value : null
+    if (numericValue === null)
+      return current
+    if (!current || numericValue > current.value)
+      return { label: dataset.label, value: numericValue }
+    return current
+  }, null)
   if (fallbackDataset) {
-    const fallbackValue = fallbackDataset.data?.[lastIndexWithData]
-    const numericFallback = typeof fallbackValue === 'number' && !Number.isNaN(fallbackValue) ? fallbackValue : 0
     return {
       name: fallbackDataset.label,
-      percentage: numericFallback,
+      count: 0,
+      share: Math.max(0, fallbackDataset.value),
     }
   }
 
   return null
 })
 const latestVersionPercentageDisplay = computed(() => {
-  const rawPercentage = latestVersion.value?.percentage ?? 0
+  const rawPercentage = latestVersion.value?.share ?? 0
   if (rawPercentage === null || rawPercentage === undefined)
     return ''
 
@@ -225,6 +258,10 @@ const latestVersionPercentageDisplay = computed(() => {
   const formatted = Number.isInteger(rounded) ? Math.trunc(rounded).toString() : rounded.toFixed(1)
   const replaced = percentage.replace(match[1], formatted)
   return hasSymbol ? replaced : `${formatted}%`
+})
+const latestVersionCountDisplay = computed(() => {
+  const count = latestVersion.value?.count ?? 0
+  return count.toLocaleString()
 })
 
 function resolveOrganizationForCurrentContext(): Organization | undefined {
@@ -298,6 +335,9 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
   let globalLastDataIndex = -1
   const normalizedDatasets = rawChartData.value.datasets.map((dataset) => {
     const rawValues = dataset.data ?? []
+    const rawCountValues = Array.isArray((dataset as any).metaCountValues)
+      ? ((dataset as any).metaCountValues as Array<number | undefined>)
+      : []
     const limitIndex = (() => {
       if (!props.useBillingPeriod)
         return rawValues.length - 1
@@ -330,6 +370,20 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
         return undefined
       return value
     })
+    const normalizedCountValues = rawCountValues.map((value) => {
+      if (typeof value === 'number')
+        return Math.max(0, Math.round(value))
+      if (value === null || value === undefined)
+        return undefined
+      const parsed = Number(value)
+      return Number.isNaN(parsed) ? undefined : Math.max(0, Math.round(parsed))
+    }).map((value, index) => {
+      if (limitIndex < 0)
+        return undefined
+      if (index > limitIndex)
+        return undefined
+      return value
+    })
 
     for (let index = normalizedValues.length - 1; index >= 0; index--) {
       const candidate = normalizedValues[index]
@@ -340,16 +394,20 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
       }
     }
 
-    return { dataset, normalizedValues }
+    return { dataset, normalizedValues, normalizedCountValues }
   })
   const formattedLabels = generateDayLabels(targetLength)
   const datasets: ChartData<'line'>['datasets'] = []
 
-  normalizedDatasets.forEach(({ dataset, normalizedValues }, datasetIndex) => {
+  normalizedDatasets.forEach(({ dataset, normalizedValues, normalizedCountValues }, datasetIndex) => {
     // Pad with nulls at the start if needed (when billing period starts before API data)
     const paddedValues = Array.from({ length: targetLength }, (_val, index) => {
       const dataIndex = index - dataOffset
       return dataIndex >= 0 && dataIndex < normalizedValues.length ? normalizedValues[dataIndex] : undefined
+    })
+    const paddedCountValues = Array.from({ length: targetLength }, (_val, index) => {
+      const dataIndex = index - dataOffset
+      return dataIndex >= 0 && dataIndex < normalizedCountValues.length ? normalizedCountValues[dataIndex] : undefined
     })
     const previousDataset = datasetIndex > 0 ? datasets[datasetIndex - 1] : null
     const previousDatasetData = previousDataset && Array.isArray(previousDataset.data)
@@ -396,6 +454,7 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
       : paddedValues.map((val, pointIndex) => {
           if (globalLastDataIndex >= 0 && pointIndex > globalLastDataIndex) {
             tooltipBaseValues.push(null)
+            paddedCountValues[pointIndex] = undefined
             return null
           }
           const numericValue = typeof val === 'number' && Number.isFinite(val) ? val : null
@@ -412,7 +471,10 @@ const processedChartData = computed<ChartData<'line'> | null>(() => {
       pointBorderWidth: 0,
       borderWidth: 2,
     } as ChartData<'line'>['datasets'][number]
-    Object.assign(chartDataset, { metaBaseValues: tooltipBaseValues })
+    Object.assign(chartDataset, {
+      metaBaseValues: tooltipBaseValues,
+      metaCountValues: paddedCountValues,
+    })
     datasets.push(chartDataset)
   })
 
@@ -503,13 +565,12 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
   return {
     maintainAspectRatio: false,
     scales: createChartScales(isDark.value, {
-      max: 110,
+      max: props.accumulated ? 110 : 100,
       xStacked: props.accumulated,
       yStacked: props.accumulated,
       yTickCallback: (tickValue: string | number) => {
         const numericValue = typeof tickValue === 'number' ? tickValue : Number(tickValue)
-        // Hide the 110% tick - it's only there for visual spacing
-        if (numericValue > 100)
+        if (props.accumulated && numericValue > 100)
           return ''
         const display = Number.isFinite(numericValue) ? numericValue : tickValue
         return `${display}%`
@@ -677,6 +738,9 @@ watch(
           </div>
           <div v-if="latestVersion" class="text-3xl font-bold dark:text-white text-slate-600">
             {{ latestVersion.name }}
+          </div>
+          <div v-if="latestVersion" class="text-xs text-slate-500 dark:text-slate-400">
+            {{ latestVersionCountDisplay }} {{ t('devices') }}
           </div>
         </div>
       </div>

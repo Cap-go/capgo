@@ -189,7 +189,7 @@ export const useOrganizationStore = defineStore('organization', () => {
       currentOrganizationFailed.value = false
     }
     else {
-      currentOrganizationFailed.value = !(!!currentOrganizationRaw.paying || (currentOrganizationRaw.trial_left ?? 0) > 0)
+      currentOrganizationFailed.value = !(!!currentOrganizationRaw.paying || (currentOrganizationRaw.trial_left ?? 0) > 0 || !!currentOrganizationRaw.can_use_more)
     }
 
     // Clear caches when org changes to prevent showing stale data from other orgs
@@ -399,7 +399,7 @@ export const useOrganizationStore = defineStore('organization', () => {
       currentOrganizationFailed.value = false
     }
     else {
-      currentOrganizationFailed.value = !(!!currentOrganization.value?.paying || (currentOrganization.value?.trial_left ?? 0) > 0)
+      currentOrganizationFailed.value = !(!!currentOrganization.value?.paying || (currentOrganization.value?.trial_left ?? 0) > 0 || !!currentOrganization.value?.can_use_more)
     }
   }
 
