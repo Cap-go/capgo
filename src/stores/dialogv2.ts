@@ -3,6 +3,9 @@ import { acceptHMRUpdate, defineStore } from 'pinia'
 export interface DialogV2Button {
   text: string
   id?: string
+  href?: string
+  target?: '_self' | '_blank' | '_parent' | '_top'
+  rel?: string
   handler?: () => void | boolean | Promise<void | boolean>
   role?: 'primary' | 'secondary' | 'danger' | 'cancel'
   preventClose?: boolean

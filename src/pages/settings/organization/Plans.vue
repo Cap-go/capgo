@@ -5,11 +5,12 @@ import { storeToRefs } from 'pinia'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
 import AdminOnlyModal from '~/components/AdminOnlyModal.vue'
 import CreditsCta from '~/components/CreditsCta.vue'
 import { checkPermissions } from '~/services/permissions'
 import { openCheckout } from '~/services/stripe'
-import { getCreditUnitPricing, getCurrentPlanNameOrg } from '~/services/supabase'
+import { getCreditUnitPricing, getCurrentPlanNameOrg, useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -128,6 +129,81 @@ const isCreditsOnly = computed(() => {
   return !org.paying && (org.trial_left ?? 0) <= 0 && (org.credit_available ?? 0) > 0
 })
 
+function isSafariBrowser() {
+  if (Capacitor.getPlatform() !== 'web')
+    return false
+  if (typeof navigator === 'undefined')
+    return false
+  const ua = navigator.userAgent
+  return /Version\/[\d.]+/.test(ua) && /Safari\//.test(ua) && !/Chrome|CriOS|FxiOS|OPiOS|Edg|Chromium/.test(ua)
+}
+
+async function getStripeAttributionId() {
+  return (await cookieStore.get('datafast_visitor_id'))?.value
+}
+
+async function prefetchStripeCheckoutUrl(plan: Database['public']['Tables']['plans']['Row'], isYear: boolean) {
+  if (!plan.stripe_id)
+    return
+  const supabase = useSupabase()
+  const session = await supabase.auth.getSession()
+  if (!session)
+    return
+
+  const successUrl = `${window.location.href}?success=1`
+  const cancelUrl = `${window.location.href}?cancel=1`
+  const attributionId = await getStripeAttributionId()
+  try {
+    const resp = await supabase.functions.invoke('private/stripe_checkout', {
+      body: JSON.stringify({
+        priceId: plan.stripe_id,
+        successUrl,
+        cancelUrl,
+        recurrence: isYear ? 'year' : 'month',
+        orgId: currentOrganization.value?.gid ?? '',
+        attributionId,
+      }),
+    })
+
+    if (!resp.error && resp.data?.url)
+      return resp.data.url as string
+    return undefined
+  }
+  catch {
+    return undefined
+  }
+}
+
+async function openSafariStripeCheckout(plan: Database['public']['Tables']['plans']['Row'], isYear: boolean) {
+  const url = await prefetchStripeCheckoutUrl(plan, isYear)
+  if (!url) {
+    toast.error('Cannot get your checkout')
+    return false
+  }
+
+  dialogStore.openDialog({
+    title: t('open-in-new-tab'),
+    description: 'This will open Stripe to complete checkout.',
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('button-confirm'),
+        id: 'confirm-button',
+        role: 'primary',
+        href: url,
+        target: '_blank',
+        rel: 'noopener noreferrer',
+      },
+    ],
+  })
+
+  const dismissedByCancel = await dialogStore.onDialogDismiss()
+  return !dismissedByCancel
+}
+
 async function openChangePlan(plan: Database['public']['Tables']['plans']['Row'], index: number) {
   // Show admin modal for non-admins instead of blocking
   if (!isSuperAdmin.value) {
@@ -204,8 +280,18 @@ async function openChangePlan(plan: Database['public']['Tables']['plans']['Row']
 
   // get the current url
   isSubscribeLoading.value[index] = true
-  if (plan.stripe_id)
-    await openCheckout(plan.stripe_id, `${window.location.href}?success=1`, `${window.location.href}?cancel=1`, plan.price_y !== plan.price_m ? isYearly.value : false, currentOrganization?.value?.gid ?? '')
+  if (plan.stripe_id) {
+    if (isSafariBrowser()) {
+      const shouldContinue = await openSafariStripeCheckout(plan, plan.price_y !== plan.price_m ? isYearly.value : false)
+      if (!shouldContinue) {
+        isSubscribeLoading.value[index] = false
+        return
+      }
+    }
+    else {
+      await openCheckout(plan.stripe_id, `${window.location.href}?success=1`, `${window.location.href}?cancel=1`, plan.price_y !== plan.price_m ? isYearly.value : false, currentOrganization?.value?.gid ?? '')
+    }
+  }
   isSubscribeLoading.value[index] = false
 }
 
@@ -441,7 +527,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
             </p>
           </div>
           <a
-            class="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold text-white bg-amber-600 rounded-full hover:bg-amber-700"
+            class="inline-flex items-center gap-2 px-3 py-1 text-xs font-semibold text-white rounded-full bg-amber-600 hover:bg-amber-700"
             href="https://capgo.app/premium-support/"
             rel="noopener noreferrer"
             target="_blank"

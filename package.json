@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.114.0",
+  "version": "12.114.10",
   "private": true,
   "license": "GPL-3.0",
   "scripts": {
@@ -222,7 +222,7 @@
     "@antfu/eslint-config": "6.7.3",
     "@capacitor/cli": "^8.0.0",
     "@capacitor/core": "^8.0.0",
-    "@capgo/cli": "7.72.4",
+    "@capgo/cli": "7.76.4",
     "@cloudflare/workers-types": "4.20260207.0",
     "@formkit/core": "1.6.9",
     "@iconify/json": "^2.2.406",
@@ -247,7 +247,7 @@
     "adm-zip": "^0.5.16",
     "cross-env": "^10.1.0",
     "discord-api-types": "^0.38.33",
-    "eslint": "9.39.2",
+    "eslint": "9.39.3",
     "eslint-plugin-format": "^1.0.2",
     "sass": "1.97.3",
     "tailwindcss": "^4.1.17",
@@ -266,7 +266,7 @@
     "vite-plugin-webfont-dl": "^3.11.1",
     "vitest": "^4.0.8",
     "vue-tsc": "3.1.8",
-    "wrangler": "^4.65.0"
+    "wrangler": "^4.67.0"
   },
   "gitmoji": {
     "autoAdd": false,
