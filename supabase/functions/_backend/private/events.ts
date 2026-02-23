@@ -1,12 +1,11 @@
 import type { TrackOptions } from '@logsnag/node'
-import type { ActivationPalPayload } from '../utils/activationpal.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { trackActivationpalEvent } from '../utils/activationpal.ts'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { BRES, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { logsnag } from '../utils/logsnag.ts'
+import { trackPosthogEvent } from '../utils/posthog.ts'
 import { broadcastCLIEvent } from '../utils/realtime_broadcast.ts'
 import { supabaseWithAuth } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
@@ -41,25 +40,15 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   const supabase = supabaseWithAuth(c, c.get('auth')!)
   const ip = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for')?.split(',')[0]?.trim()
 
-  const activationPayload: ActivationPalPayload = {
-    user: {
-      id: body.user_id ?? c.get('auth')?.userId,
-      traits: body.tags,
-    },
-    event: {
-      name: body.event,
-      ip,
-      trackSession: true,
-      properties: {
-        ...(body.tags ?? {}),
-        channel: body.channel,
-        description: body.description,
-      },
-    },
-  }
-
   await backgroundTask(c, logsnag(c).track(body))
-  await backgroundTask(c, trackActivationpalEvent(c, activationPayload))
+  await backgroundTask(c, trackPosthogEvent(c, {
+    event: body.event,
+    user_id: orgId,
+    tags: body.tags,
+    channel: body.channel,
+    description: body.description,
+    ip,
+  }))
   if (body.user_id && body.tags && typeof body.tags['app-id'] === 'string' && body.event === 'onboarding-step-done') {
     const appId = body.tags['app-id']
     await backgroundTask(c, Promise.all([
