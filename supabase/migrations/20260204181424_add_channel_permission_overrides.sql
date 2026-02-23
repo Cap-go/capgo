@@ -118,6 +118,7 @@ DECLARE
   v_channel_scope boolean := false;
   v_org_enforcing_2fa boolean;
   v_password_policy_ok boolean;
+  v_apikey_user_id uuid;
 BEGIN
   -- Validate permission key
   IF p_permission_key IS NULL OR p_permission_key = '' THEN
@@ -144,11 +145,16 @@ BEGIN
     LIMIT 1;
   END IF;
 
-  -- Resolve user from API key when needed (handles hashed keys too).
-  IF v_effective_user_id IS NULL AND p_apikey IS NOT NULL THEN
-    SELECT user_id INTO v_effective_user_id
+  -- Resolve API key once, caching both user_id and rbac_id for reuse below.
+  IF p_apikey IS NOT NULL THEN
+    SELECT user_id, rbac_id INTO v_apikey_user_id, v_apikey_principal
     FROM public.find_apikey_by_value(p_apikey)
     LIMIT 1;
+  END IF;
+
+  -- Resolve user from API key when not provided directly.
+  IF v_effective_user_id IS NULL AND v_apikey_user_id IS NOT NULL THEN
+    v_effective_user_id := v_apikey_user_id;
   END IF;
 
   -- Enforce 2FA if the org requires it.
@@ -238,26 +244,20 @@ BEGIN
     END IF;
 
     -- If user doesn't have permission, check apikey permission
-    IF NOT v_allowed AND p_apikey IS NOT NULL THEN
-      SELECT rbac_id INTO v_apikey_principal
-      FROM public.find_apikey_by_value(p_apikey)
-      LIMIT 1;
+    IF NOT v_allowed AND v_apikey_principal IS NOT NULL THEN
+      v_allowed := public.rbac_has_permission(public.rbac_principal_apikey(), v_apikey_principal, p_permission_key, v_effective_org_id, p_app_id, p_channel_id);
 
-      IF v_apikey_principal IS NOT NULL THEN
-        v_allowed := public.rbac_has_permission(public.rbac_principal_apikey(), v_apikey_principal, p_permission_key, v_effective_org_id, p_app_id, p_channel_id);
+      IF v_channel_scope THEN
+        SELECT o.is_allowed INTO v_override
+        FROM public.channel_permission_overrides o
+        WHERE o.principal_type = public.rbac_principal_apikey()
+          AND o.principal_id = v_apikey_principal
+          AND o.channel_id = p_channel_id
+          AND o.permission_key = p_permission_key
+        LIMIT 1;
 
-        IF v_channel_scope THEN
-          SELECT o.is_allowed INTO v_override
-          FROM public.channel_permission_overrides o
-          WHERE o.principal_type = public.rbac_principal_apikey()
-            AND o.principal_id = v_apikey_principal
-            AND o.channel_id = p_channel_id
-            AND o.permission_key = p_permission_key
-          LIMIT 1;
-
-          IF v_override IS NOT NULL THEN
-            v_allowed := v_override;
-          END IF;
+        IF v_override IS NOT NULL THEN
+          v_allowed := v_override;
         END IF;
       END IF;
     END IF;
