@@ -3,6 +3,9 @@
 -- This caused silent failures when a user with app.update_user_roles permission
 -- (but not legacy admin rights) tried to update or insert app-scoped role bindings
 -- via the Supabase client (RLS path).
+--
+-- Also use get_identity_org_appid() for app-scoped branches so that API key holders
+-- are correctly resolved, matching the pattern used by other app-scoped RLS policies.
 
 -- =============================================================================
 -- 1. Fix INSERT policy
@@ -22,22 +25,23 @@ CREATE POLICY role_bindings_insert ON public.role_bindings
         -- Org admin for org-scoped bindings
         (scope_type = public.rbac_scope_org() AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth_user.uid, org_id, NULL::varchar, NULL::bigint))
         OR
-        -- App admin for app-scoped bindings (legacy admin path)
+        -- App admin (legacy path) or users with app.update_user_roles permission
         (scope_type = public.rbac_scope_app() AND EXISTS (
           SELECT 1 FROM public.apps
           WHERE apps.id = role_bindings.app_id
-            AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth_user.uid, apps.owner_org, apps.app_id, NULL::bigint)
+            AND (
+              public.check_min_rights(public.rbac_right_admin()::public.user_min_right, public.get_identity_org_appid('{all}'::public.key_mode[], apps.owner_org, apps.app_id), apps.owner_org, apps.app_id, NULL::bigint)
+              OR
+              public.user_has_app_update_user_roles(public.get_identity_org_appid('{all}'::public.key_mode[], apps.owner_org, apps.app_id), apps.id)
+            )
         ))
-        OR
-        -- Users with app.update_user_roles permission can insert app-scoped bindings
-        (scope_type = public.rbac_scope_app() AND public.user_has_app_update_user_roles(auth_user.uid, app_id))
         OR
         -- Channel admin for channel-scoped bindings
         (scope_type = public.rbac_scope_channel() AND EXISTS (
           SELECT 1 FROM public.channels
           JOIN public.apps ON apps.app_id = channels.app_id
           WHERE channels.rbac_id = role_bindings.channel_id
-            AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth_user.uid, apps.owner_org, channels.app_id, channels.id)
+            AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, public.get_identity_org_appid('{all}'::public.key_mode[], apps.owner_org, apps.app_id), apps.owner_org, channels.app_id, channels.id)
         ))
     )
   );
@@ -63,22 +67,23 @@ CREATE POLICY role_bindings_update ON public.role_bindings
         -- Org admin for org-scoped bindings
         (scope_type = public.rbac_scope_org() AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth_user.uid, org_id, NULL::varchar, NULL::bigint))
         OR
-        -- App admin for app-scoped bindings (legacy admin path)
+        -- App admin (legacy path) or users with app.update_user_roles permission
         (scope_type = public.rbac_scope_app() AND EXISTS (
           SELECT 1 FROM public.apps
           WHERE apps.id = role_bindings.app_id
-            AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth_user.uid, apps.owner_org, apps.app_id, NULL::bigint)
+            AND (
+              public.check_min_rights(public.rbac_right_admin()::public.user_min_right, public.get_identity_org_appid('{all}'::public.key_mode[], apps.owner_org, apps.app_id), apps.owner_org, apps.app_id, NULL::bigint)
+              OR
+              public.user_has_app_update_user_roles(public.get_identity_org_appid('{all}'::public.key_mode[], apps.owner_org, apps.app_id), apps.id)
+            )
         ))
-        OR
-        -- Users with app.update_user_roles permission can update app-scoped bindings
-        (scope_type = public.rbac_scope_app() AND public.user_has_app_update_user_roles(auth_user.uid, app_id))
         OR
         -- Channel admin for channel-scoped bindings
         (scope_type = public.rbac_scope_channel() AND EXISTS (
           SELECT 1 FROM public.channels
           JOIN public.apps ON apps.app_id = channels.app_id
           WHERE channels.rbac_id = role_bindings.channel_id
-            AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth_user.uid, apps.owner_org, channels.app_id, channels.id)
+            AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, public.get_identity_org_appid('{all}'::public.key_mode[], apps.owner_org, apps.app_id), apps.owner_org, channels.app_id, channels.id)
         ))
     )
   );
