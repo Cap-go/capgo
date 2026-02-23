@@ -332,6 +332,11 @@ BEGIN
   WHERE principal_type = public.rbac_principal_group()
     AND principal_id = group_id;
 
+
+  -- Clean up channel permission overrides for this group
+  DELETE FROM public.channel_permission_overrides
+  WHERE principal_type = public.rbac_principal_group()
+    AND principal_id = group_id;
   DELETE FROM public.groups
   WHERE id = group_id;
 END;

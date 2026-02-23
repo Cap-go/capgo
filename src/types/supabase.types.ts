@@ -612,6 +612,51 @@ export type Database = {
           },
         ]
       }
+      channel_permission_overrides: {
+        Row: {
+          channel_id: number
+          created_at: string
+          id: string
+          is_allowed: boolean
+          permission_key: string
+          principal_id: string
+          principal_type: string
+        }
+        Insert: {
+          channel_id: number
+          created_at?: string
+          id?: string
+          is_allowed: boolean
+          permission_key: string
+          principal_id: string
+          principal_type: string
+        }
+        Update: {
+          channel_id?: number
+          created_at?: string
+          id?: string
+          is_allowed?: boolean
+          permission_key?: string
+          principal_id?: string
+          principal_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "channel_permission_overrides_channel_id_fkey"
+            columns: ["channel_id"]
+            isOneToOne: false
+            referencedRelation: "channels"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "channel_permission_overrides_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "permissions"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
       channels: {
         Row: {
           allow_dev: boolean
@@ -2863,6 +2908,7 @@ export type Database = {
           deleted_user_ids: string[]
         }[]
       }
+      delete_group_with_bindings: { Args: { group_id: string }; Returns: undefined }
       delete_http_response: { Args: { request_id: number }; Returns: undefined }
       delete_non_compliant_bundles: {
         Args: { org_id: string; required_key?: string }
@@ -4027,7 +4073,6 @@ export type Database = {
         | "reset"
         | "set"
         | "get"
-        | "customIdBlocked"
         | "set_fail"
         | "update_fail"
         | "download_fail"
@@ -4087,6 +4132,7 @@ export type Database = {
         | "disableProdBuild"
         | "disableDevice"
         | "disablePlatformElectron"
+        | "customIdBlocked"
       stripe_status:
         | "created"
         | "succeeded"
@@ -4282,7 +4328,6 @@ export const Constants = {
         "reset",
         "set",
         "get",
-        "customIdBlocked",
         "set_fail",
         "update_fail",
         "download_fail",
@@ -4342,6 +4387,7 @@ export const Constants = {
         "disableProdBuild",
         "disableDevice",
         "disablePlatformElectron",
+        "customIdBlocked",
       ],
       stripe_status: [
         "created",
