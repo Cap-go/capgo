@@ -10,7 +10,12 @@
       "Bash(git checkout:*)",
       "Bash(git commit:*)",
       "Bash(psql:*)",
-      "Bash(supabase gen types:*)"
+      "Bash(supabase gen types:*)",
+      "Bash(grep:*)",
+      "Bash(git -C /Users/jordanlorho/Capgo/capgo log --oneline -15)",
+      "Bash(git -C /Users/jordanlorho/Capgo/capgo diff main...HEAD --name-only)",
+      "Bash(git -C /Users/jordanlorho/Capgo/capgo diff main...HEAD -- src/pages/settings/organization/Members.vue)",
+      "Bash(git -C /Users/jordanlorho/Capgo/capgo diff main...HEAD -- supabase/functions/_backend/private/role_bindings.ts)"
     ]
   }
 }

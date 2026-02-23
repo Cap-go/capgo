@@ -1,0 +1,28 @@
+# Task 3: Domain Check Endpoint - Evidence
+
+## Test Case: Non-SSO Domain
+- Email: test@example.com
+- Domain extracted: example.com
+- Query: SELECT id, org_id, provider_id FROM sso_providers WHERE domain = 'example.com' AND status = 'active'
+- Result: No rows found (PGRST116 error code)
+- Response: {"has_sso":false}
+- Status: ✓ PASS
+
+## Endpoint Details
+- Path: POST /private/sso/check-domain
+- Authentication: JWT (middlewareAuth)
+- Input validation: Zod email validation
+- Response fields: has_sso (boolean), provider_id (optional), org_id (optional)
+- Sensitive fields NOT returned: metadata_url, dns_verification_token, attribute_mapping
+
+## Implementation
+- File: supabase/functions/_backend/private/sso/check-domain.ts
+- Registered in: supabase/functions/private/index.ts
+- Route: appGlobal.route('/sso/check-domain', sso_check_domain)
+
+## Code Quality
+- No semicolons (ESLint @antfu/eslint-config)
+- Single quotes
+- Zod validation with .check(z.email())
+- Proper error handling with cloudlog
+- PGRST116 error code handling for "no rows found"

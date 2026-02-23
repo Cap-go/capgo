@@ -250,3 +250,27 @@ GRANT ALL ON FUNCTION "public"."rbac_perm_org_manage_sso"() TO "service_role";
 GRANT ALL ON FUNCTION "public"."update_sso_providers_updated_at"() TO "anon";
 GRANT ALL ON FUNCTION "public"."update_sso_providers_updated_at"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."update_sso_providers_updated_at"() TO "service_role";
+
+
+-- =============================================================================
+-- 10) SQL function to check if a domain has active SSO
+-- =============================================================================
+CREATE OR REPLACE FUNCTION "public"."check_domain_sso"("p_domain" text)
+RETURNS TABLE("has_sso" boolean, "provider_id" text, "org_id" uuid)
+LANGUAGE "sql"
+STABLE
+SET "search_path" TO ''
+AS $$
+  SELECT
+    true AS has_sso,
+    sp.provider_id,
+    sp.org_id
+  FROM "public"."sso_providers" sp
+  WHERE sp.domain = p_domain
+    AND sp.status = 'active'
+  LIMIT 1;
+$$;
+
+GRANT ALL ON FUNCTION "public"."check_domain_sso"(text) TO "anon";
+GRANT ALL ON FUNCTION "public"."check_domain_sso"(text) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."check_domain_sso"(text) TO "service_role";
