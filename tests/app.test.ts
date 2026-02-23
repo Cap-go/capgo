@@ -101,8 +101,21 @@ describe('[GET] /app operations with subkey', () => {
       }),
     })
     if (createApp.status !== 200) {
-      const body = await createApp.json().catch(() => null) as any
-      const isDuplicate = body?.error === 'cannot_create_app' && body?.supabaseError?.code === '23505'
+      const body = await createApp.json().catch(() => null) as {
+        error?: string
+        message?: string
+        moreInfo?: unknown
+      } | null
+      const duplicateCode = (
+        typeof body?.moreInfo === 'object'
+        && body?.moreInfo !== null
+        && 'supabaseError' in body.moreInfo
+        && typeof (body.moreInfo as { supabaseError?: { code?: string } }).supabaseError?.code === 'string'
+      )
+        ? (body.moreInfo as { supabaseError?: { code?: string } }).supabaseError?.code
+        : null
+      const isDuplicate = body?.error === 'cannot_create_app'
+        && (duplicateCode === '23505' || body?.message?.includes('duplicate') === true)
       if (!isDuplicate) {
         expect(createApp.status, JSON.stringify(body)).toBe(200)
       }
@@ -130,9 +143,17 @@ describe('[GET] /app operations with subkey', () => {
         }),
       })
     }
-    expect(createSubkey.status).toBe(200)
-    const subkeyData = await createSubkey.json() as { id: number }
-    subkey = subkeyData.id
+    const subkeyBody = await createSubkey.json().catch(() => null) as {
+      id?: number
+      error?: string
+      message?: string
+      moreInfo?: unknown
+    } | null
+    expect(createSubkey.status, JSON.stringify(subkeyBody)).toBe(200)
+    if (!subkeyBody?.id) {
+      throw new Error(`Missing subkey id in response: ${JSON.stringify(subkeyBody)}`)
+    }
+    subkey = subkeyBody.id
   })
 
   it('should access app with subkey', async () => {
