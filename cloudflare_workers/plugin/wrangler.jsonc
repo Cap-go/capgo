@@ -138,12 +138,8 @@
           "id": "fa2ed838065042f7a193948fd96629cf"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_GG_ME_OLD",
-          "id": "a9f9162a9245492886f4190f69a22e0e"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_GG_ME",
-          "id": "b7eecf0158dd4964915a3423f9f35833"
+          "id": "a9f9162a9245492886f4190f69a22e0e"
         }
       ]
     },
@@ -157,7 +153,7 @@
         "enabled": true
       },
       "placement": {
-        "region": "gcp:me-west1"
+        "region": "gcp:me-central1"
       },
       "routes": [
         {
@@ -240,12 +236,8 @@
           "id": "fa2ed838065042f7a193948fd96629cf"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_GG_ME_OLD",
-          "id": "a9f9162a9245492886f4190f69a22e0e"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_GG_ME",
-          "id": "b7eecf0158dd4964915a3423f9f35833"
+          "id": "a9f9162a9245492886f4190f69a22e0e"
         }
       ]
     },
@@ -342,12 +334,8 @@
           "id": "fa2ed838065042f7a193948fd96629cf"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_GG_ME_OLD",
-          "id": "a9f9162a9245492886f4190f69a22e0e"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_GG_ME",
-          "id": "b7eecf0158dd4964915a3423f9f35833"
+          "id": "a9f9162a9245492886f4190f69a22e0e"
         }
       ]
     },
@@ -444,12 +432,8 @@
           "id": "fa2ed838065042f7a193948fd96629cf"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_GG_ME_OLD",
-          "id": "a9f9162a9245492886f4190f69a22e0e"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_GG_ME",
-          "id": "b7eecf0158dd4964915a3423f9f35833"
+          "id": "a9f9162a9245492886f4190f69a22e0e"
         }
       ]
     },
@@ -546,12 +530,8 @@
           "id": "fa2ed838065042f7a193948fd96629cf"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_GG_ME_OLD",
-          "id": "a9f9162a9245492886f4190f69a22e0e"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_GG_ME",
-          "id": "b7eecf0158dd4964915a3423f9f35833"
+          "id": "a9f9162a9245492886f4190f69a22e0e"
         }
       ]
     },
@@ -648,12 +628,8 @@
           "id": "fa2ed838065042f7a193948fd96629cf"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_GG_ME_OLD",
-          "id": "a9f9162a9245492886f4190f69a22e0e"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_GG_ME",
-          "id": "b7eecf0158dd4964915a3423f9f35833"
+          "id": "a9f9162a9245492886f4190f69a22e0e"
         }
       ]
     },
@@ -750,12 +726,8 @@
           "id": "fa2ed838065042f7a193948fd96629cf"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_GG_ME_OLD",
-          "id": "a9f9162a9245492886f4190f69a22e0e"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_GG_ME",
-          "id": "b7eecf0158dd4964915a3423f9f35833"
+          "id": "a9f9162a9245492886f4190f69a22e0e"
         }
       ]
     },
@@ -852,12 +824,8 @@
           "id": "fa2ed838065042f7a193948fd96629cf"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_GG_ME_OLD",
-          "id": "a9f9162a9245492886f4190f69a22e0e"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_GG_ME",
-          "id": "b7eecf0158dd4964915a3423f9f35833"
+          "id": "a9f9162a9245492886f4190f69a22e0e"
         }
       ]
     },
@@ -1033,12 +1001,8 @@
           "id": "fa2ed838065042f7a193948fd96629cf"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_GG_ME_OLD",
-          "id": "a9f9162a9245492886f4190f69a22e0e"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_GG_ME",
-          "id": "b7eecf0158dd4964915a3423f9f35833"
+          "id": "a9f9162a9245492886f4190f69a22e0e"
         }
       ],
       "placement": {
@@ -1135,12 +1099,8 @@
           "id": "fa2ed838065042f7a193948fd96629cf"
         },
         {
-          "binding": "HYPERDRIVE_CAPGO_GG_ME_OLD",
-          "id": "a9f9162a9245492886f4190f69a22e0e"
-        },
-        {
           "binding": "HYPERDRIVE_CAPGO_GG_ME",
-          "id": "b7eecf0158dd4964915a3423f9f35833"
+          "id": "a9f9162a9245492886f4190f69a22e0e"
         }
       ],
       "placement": {
