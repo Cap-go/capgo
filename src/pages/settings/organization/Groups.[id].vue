@@ -76,7 +76,7 @@ const { currentOrganization } = storeToRefs(organizationStore)
 const displayStore = useDisplayStore()
 const dialogStore = useDialogV2Store()
 
-const groupId = computed(() => route.params['id'] as string)
+const groupId = computed(() => (route.params as { id: string }).id)
 const isCreateMode = computed(() => groupId.value === 'new')
 
 const isLoading = ref(false)
