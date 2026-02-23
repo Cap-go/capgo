@@ -227,7 +227,7 @@ async function loadAll() {
   }
   catch (error) {
     console.error('Error loading group data:', error)
-    toast.error(t('error-fetching-members'))
+    toast.error(t('error-loading-group-data', 'Error loading group data'))
   }
   finally {
     isLoading.value = false
@@ -290,7 +290,7 @@ async function fetchRoleBindings() {
 
   selectedOrgRole.value = groupOrgBinding.value?.role_name ?? ''
 
-  // Sync pending app bindings from DB (preserves any pending user changes if partial reload)
+  // Reset pending app bindings to match current DB state
   const map: Record<string, string> = {}
   groupAppBindings.value.forEach((b: RoleBinding) => {
     if (b.app_id)
@@ -457,7 +457,7 @@ async function saveGroup() {
   }
   catch (error) {
     console.error('Error saving group:', error)
-    toast.error(t('error-creating-group', 'Error updating group'))
+    toast.error(t('error-updating-group', 'Error updating group'))
   }
   finally {
     isSubmitting.value = false
@@ -571,13 +571,13 @@ function openAddMembersModal() {
   modalMemberSearch.value = ''
   dialogStore.openDialog({
     id: 'add-group-members',
-    title: t('add-members', 'Ajouter des membres'),
+    title: t('add-members', 'Add members'),
     description: '',
     size: 'xl',
     buttons: [
       { text: t('button-cancel'), role: 'cancel' },
       {
-        text: t('add-members', 'Ajouter des membres'),
+        text: t('add-members', 'Add members'),
         role: 'primary',
         preventClose: true,
         handler: addSelectedMembersToGroup,
@@ -719,7 +719,7 @@ async function removeMemberFromGroup(userId: string) {
                 <input
                   v-model="selectedOrgRole"
                   type="radio"
-                  class="radio radio-primary radio-sm"
+                  class="d-radio d-radio-primary d-radio-sm"
                   name="org-role"
                   value=""
                   :disabled="isSubmitting"
@@ -734,7 +734,7 @@ async function removeMemberFromGroup(userId: string) {
                 <input
                   v-model="selectedOrgRole"
                   type="radio"
-                  class="radio radio-primary radio-sm"
+                  class="d-radio d-radio-primary d-radio-sm"
                   name="org-role"
                   :value="role.name"
                   :disabled="isSubmitting"

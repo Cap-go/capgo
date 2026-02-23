@@ -160,7 +160,7 @@ async function refreshData() {
   }
   catch (error) {
     console.error('Error loading groups:', error)
-    toast.error(t('error-fetching-members'))
+    toast.error(t('error-fetching-groups', 'Error fetching groups'))
   }
   finally {
     isLoading.value = false
