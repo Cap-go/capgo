@@ -261,19 +261,7 @@ async function deleteGroup(group: GroupRow) {
 
   isSubmitting.value = true
   try {
-    const { error: roleBindingsDeleteError } = await supabase
-      .from('role_bindings')
-      .delete()
-      .eq('principal_type', 'group')
-      .eq('principal_id', group.id)
-
-    if (roleBindingsDeleteError)
-      throw roleBindingsDeleteError
-
-    const { error } = await supabase
-      .from('groups')
-      .delete()
-      .eq('id', group.id)
+    const { error } = await supabase.rpc('delete_group_with_bindings', { group_id: group.id })
 
     if (error)
       throw error

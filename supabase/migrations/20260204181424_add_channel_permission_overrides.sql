@@ -299,3 +299,43 @@ $$;
 
 COMMENT ON FUNCTION public.rbac_check_permission_direct(text, uuid, uuid, character varying, bigint, text) IS
   'Direct RBAC permission check with automatic legacy fallback based on org feature flag. Uses channel overrides when present.';
+
+-- Atomically delete a group and all its role_bindings in a single server-side call.
+CREATE OR REPLACE FUNCTION public.delete_group_with_bindings(group_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = ''
+SECURITY DEFINER AS $$
+DECLARE
+  v_org_id uuid;
+BEGIN
+  -- Verify group exists and caller has org.update_user_roles permission.
+  SELECT org_id INTO v_org_id
+  FROM public.groups
+  WHERE id = group_id;
+
+  IF v_org_id IS NULL THEN
+    RAISE EXCEPTION 'Group not found' USING ERRCODE = 'P0002';
+  END IF;
+
+  IF NOT public.rbac_check_permission_direct(
+    public.rbac_perm_org_update_user_roles(),
+    auth.uid(),
+    v_org_id,
+    NULL::varchar,
+    NULL::bigint
+  ) THEN
+    RAISE EXCEPTION 'Forbidden' USING ERRCODE = '42501';
+  END IF;
+
+  DELETE FROM public.role_bindings
+  WHERE principal_type = public.rbac_principal_group()
+    AND principal_id = group_id;
+
+  DELETE FROM public.groups
+  WHERE id = group_id;
+END;
+$$;
+
+COMMENT ON FUNCTION public.delete_group_with_bindings(uuid) IS
+  'Atomically deletes a group and all its role bindings. Requires org.update_user_roles permission.';
