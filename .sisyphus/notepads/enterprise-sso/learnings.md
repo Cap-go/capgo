@@ -311,3 +311,39 @@ deleteSSOProvider(c: Context, providerId: string): Promise<void>
 - Called before password authentication is allowed
 - Respects org_super_admin break-glass bypass
 - Logs all enforcement decisions for audit trail
+
+
+## [2026-02-23] Task 6: SSO Pre-Linking Endpoint
+
+### Implementation: `prelink.ts`
+- **Location**: `supabase/functions/_backend/private/sso/prelink.ts`
+- **Route**: `POST /private/sso/prelink-users`
+- **Authentication**: `middlewareAuth` (JWT required)
+- **Permission**: `org.manage_sso` via `checkPermission()`
+
+### GoTrueAdminApi Limitation — Identity Deletion
+- **CRITICAL**: `GoTrueAdminApi` does NOT have a `deleteUserIdentity()` method
+- Must use direct GoTrue REST API: `DELETE /auth/v1/admin/users/{userId}/identities/{identityId}`
+- Auth headers: `Authorization: Bearer {serviceRoleKey}` + `apikey: {serviceRoleKey}`
+- Helper function pattern: `adminDeleteIdentity(c, userId, identityId): Promise<{ error: string | null }>`
+- Uses `getEnv(c, 'SUPABASE_URL')` and `getEnv(c, 'SUPABASE_SERVICE_ROLE_KEY')`
+
+### User Identity Model
+- `auth.users` = the user record (has UUID)
+- `auth.identities` = login methods linked to a user (email, google, saml, etc.)
+- Password identity: `identity.provider === 'email'`
+- Deleting an identity does NOT delete the user or change their UUID
+- User identities accessible via `admin.auth.admin.getUserById(userId)` → `user.identities[]`
+- Each identity has `.id`, `.provider`, `.identity_data`
+
+### Pagination Pattern for User Listing
+- `admin.auth.admin.listUsers({ page, perPage })` — paginated, 1-indexed
+- Check `users.length < perPage` to detect last page
+- Default `perPage: 1000` for batch processing
+
+### Error Handling Strategy
+- Per-user error handling: failures for one user don't block others
+- Errors collected in string array, returned in response
+- `quickError()` for fatal errors (provider not found, listing failed)
+- `try/catch` per user for graceful degradation
+- All actions logged with requestId for audit trail
