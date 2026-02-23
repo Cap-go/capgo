@@ -317,25 +317,20 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
         app_id,
         channel_id,
       })
-    }
-    else {
-      cloudlogErr({
-        requestId: c.get('requestId'),
-        message: 'role_binding_create_failed',
-        orgId: org_id,
-        principal_type,
-        principal_id,
-        scope_type,
-        app_id,
-        channel_id,
-        error,
-      })
-    }
-
-    // Handle unique constraint errors (SSD)
-    if (error?.code === '23505') {
       return c.json({ error: 'User already has a role in this family at this scope' }, 409)
     }
+
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'role_binding_create_failed',
+      orgId: org_id,
+      principal_type,
+      principal_id,
+      scope_type,
+      app_id,
+      channel_id,
+      error,
+    })
 
     return c.json({ error: 'Internal server error' }, 500)
   }
@@ -399,6 +394,10 @@ app.patch('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
 
     if (!role.is_assignable) {
       return c.json({ error: 'Role is not assignable' }, 403)
+    }
+
+    if (role.scope_type !== binding.scope_type) {
+      return c.json({ error: 'Role scope_type does not match the existing binding scope' }, 400)
     }
 
     const [updated] = await drizzle
