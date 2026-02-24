@@ -180,11 +180,11 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
     // Use admin client - preview is public when allow_preview is enabled
     const supabase = supabaseAdmin(c)
 
-    // Get app settings to check if preview is enabled (case-insensitive since frontend lowercases)
+    // Get app settings to check if preview is enabled (exact app ID match)
     const { data: appData, error: appError } = await supabase
       .from('apps')
       .select('app_id, allow_preview')
-      .ilike('app_id', appId)
+      .eq('app_id', appId)
       .single()
 
     if (appError || !appData) {
