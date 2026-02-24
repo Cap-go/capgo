@@ -1,6 +1,5 @@
 import { sql } from 'drizzle-orm'
-import { honoFactory, useCors } from '../utils/hono.ts'
-import { middlewareKey } from '../utils/hono_middleware.ts'
+import { honoFactory, middlewareAPISecret, useCors } from '../utils/hono.ts'
 import { cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient, logPgError } from '../utils/pg.ts'
 
@@ -143,7 +142,7 @@ export const app = honoFactory.createApp()
 
 app.use('*', useCors)
 
-app.get('/', middlewareKey(['all']), async (c) => {
+app.get('/', middlewareAPISecret, async (c) => {
   const thresholdSeconds = DEFAULT_THRESHOLD_SECONDS
   const thresholdBytes = DEFAULT_THRESHOLD_BYTES
 

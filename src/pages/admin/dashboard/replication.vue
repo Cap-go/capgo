@@ -97,13 +97,21 @@ const checkedAt = computed(() => {
   return formatLocalDateTime(data.value.checked_at)
 })
 
+const internalReplicationSecret = import.meta.env.VITE_REPLICATION_API_SECRET as string | undefined
+
 async function loadReplicationStatus() {
   isLoading.value = true
   errorMessage.value = null
 
   try {
+    if (!internalReplicationSecret)
+      throw new Error('Replication secret is not configured')
+
     const response = await fetch(`${defaultApiHost}/replication`, {
       method: 'GET',
+      headers: {
+        apisecret: internalReplicationSecret,
+      },
     })
 
     const payload = await response.json().catch(() => null) as ReplicationStatusResponse | null
