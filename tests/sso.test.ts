@@ -1,0 +1,118 @@
+import { randomUUID } from 'node:crypto'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { fetchWithRetry, getAuthHeaders, getEndpointUrl, getSupabaseClient, USER_ID } from './test-utils.ts'
+
+const SSO_TEST_ORG_ID = randomUUID()
+const SSO_TEST_CUSTOMER_ID = `cus_sso_test_${randomUUID()}`
+
+let authHeaders: Record<string, string>
+
+beforeAll(async () => {
+  authHeaders = await getAuthHeaders()
+
+  const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
+    customer_id: SSO_TEST_CUSTOMER_ID,
+    status: 'succeeded',
+    product_id: 'prod_LQIregjtNduh4q',
+    subscription_id: `sub_sso_${randomUUID()}`,
+    trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+    is_good_plan: true,
+  })
+  if (stripeError)
+    throw stripeError
+
+  const { error: orgError } = await getSupabaseClient().from('orgs').insert({
+    id: SSO_TEST_ORG_ID,
+    name: `SSO Test Org ${SSO_TEST_ORG_ID}`,
+    management_email: `sso-test-${SSO_TEST_ORG_ID}@capgo.app`,
+    created_by: USER_ID,
+    customer_id: SSO_TEST_CUSTOMER_ID,
+  })
+  if (orgError)
+    throw orgError
+
+  const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+    org_id: SSO_TEST_ORG_ID,
+    user_id: USER_ID,
+    user_right: 'super_admin' as const,
+  })
+  if (orgUserError)
+    throw orgUserError
+})
+
+afterAll(async () => {
+  await getSupabaseClient().from('org_users').delete().eq('org_id', SSO_TEST_ORG_ID)
+  await getSupabaseClient().from('orgs').delete().eq('id', SSO_TEST_ORG_ID)
+  await getSupabaseClient().from('stripe_info').delete().eq('customer_id', SSO_TEST_CUSTOMER_ID)
+})
+
+describe('[POST] /private/sso/check-domain', () => {
+  it.concurrent('should return has_sso=false for non-SSO domain', async () => {
+    const response = await fetchWithRetry(getEndpointUrl('/private/sso/check-domain'), {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ email: 'user@no-sso-configured-domain.com' }),
+    })
+
+    expect(response.status).toBe(200)
+    const data = await response.json() as { has_sso: boolean }
+    expect(data.has_sso).toBe(false)
+  })
+
+  it.concurrent('should return 400 for invalid email', async () => {
+    const response = await fetchWithRetry(getEndpointUrl('/private/sso/check-domain'), {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ email: 'not-a-valid-email' }),
+    })
+
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBeDefined()
+  })
+})
+
+describe('[POST] /private/sso/check-enforcement', () => {
+  it.concurrent('should return allowed=true for password auth when no SSO is configured', async () => {
+    const response = await fetchWithRetry(getEndpointUrl('/private/sso/check-enforcement'), {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        email: 'user@no-sso-enforcement-domain.com',
+        auth_type: 'password',
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const data = await response.json() as { allowed: boolean }
+    expect(data.allowed).toBe(true)
+  })
+})
+
+describe('[GET] /private/sso/providers/:orgId', () => {
+  it.concurrent('should return empty array for org with no SSO providers', async () => {
+    const response = await fetchWithRetry(getEndpointUrl(`/private/sso/providers/${SSO_TEST_ORG_ID}`), {
+      method: 'GET',
+      headers: authHeaders,
+    })
+
+    expect(response.status).toBe(200)
+    const data = await response.json() as unknown[]
+    expect(Array.isArray(data)).toBe(true)
+    expect(data).toHaveLength(0)
+  })
+
+  it.concurrent('should return 401 without authentication', async () => {
+    const response = await fetchWithRetry(getEndpointUrl(`/private/sso/providers/${SSO_TEST_ORG_ID}`), {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        // No Authorization header
+      },
+    })
+
+    expect(response.status).toBe(401)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('no_jwt_apikey_or_subkey')
+  })
+})

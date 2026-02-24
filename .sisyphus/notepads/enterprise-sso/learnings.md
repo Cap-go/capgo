@@ -523,3 +523,17 @@ deleteSSOProvider(c: Context, providerId: string): Promise<void>
 - Cache enforcement check result in sessionStorage for 5 min to avoid per-navigation API calls
 - Fail-open pattern: if API check fails, allow navigation (don't lock users out)
 - `clearSsoEnforcementCache()` exported for use when user signs out or session changes
+
+
+## Task 18: SSO Backend Tests
+
+### Key Findings
+- **File location**: Tests placed at `tests/sso.test.ts` (NOT `tests/backend/sso.test.ts`) because vitest config only includes `tests/*.test.ts` (non-recursive glob)
+- **Auth**: All SSO endpoints use `middlewareAuth` which requires JWT auth (`getAuthHeaders()`). API key headers (`APIKEY_TEST_ALL`) fail with `invalid_jwt` because `getClaimsFromJWT()` can't parse a UUID
+- **check-domain**: Uses `emptySupabase(c)` + `check_domain_sso` RPC. Returns `{ has_sso: false }` when no active SSO provider matches the domain
+- **check-enforcement**: Also needs JWT auth for `auth.userId`. Returns `{ allowed: true }` when no SSO provider exists for the email domain
+- **providers/:orgId**: Requires `org.manage_sso` permission (maps to `admin` legacy right). User with `super_admin` on the org passes the check. Returns `[]` when no providers exist
+- **RBAC**: `org.manage_sso` permission was added in migration `20260223000001_add_sso_providers.sql`, mapped to `admin` legacy right, assigned to `org_admin`, `org_super_admin`, and `platform_super_admin` roles
+- **Isolation pattern**: Created dedicated org with `randomUUID()` per test run. Reused `test@capgo.app` JWT for auth (read-only, safe for parallel execution). Cleanup in `afterAll`
+- **quickError**: Returns `never` (throws HTTPException), so calls without `return` in providers.ts are correct
+- **Route structure**: SSO routes mounted at `/private/sso/*` in `supabase/functions/private/index.ts`
