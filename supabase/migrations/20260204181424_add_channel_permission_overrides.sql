@@ -41,12 +41,13 @@ CREATE POLICY channel_permission_overrides_admin_select ON public.channel_permis
       SELECT 1
       FROM public.channels
       JOIN public.apps ON apps.app_id = channels.app_id
-      WHERE public.rbac_check_permission(
-        public.rbac_perm_app_update_user_roles(),
-        apps.owner_org,
-        apps.app_id,
-        NULL::bigint
-      )
+      WHERE channels.id = channel_permission_overrides.channel_id
+        AND public.rbac_check_permission(
+          public.rbac_perm_app_update_user_roles(),
+          apps.owner_org,
+          apps.app_id,
+          NULL::bigint
+        )
     )
   );
 
@@ -58,12 +59,13 @@ CREATE POLICY channel_permission_overrides_admin_write ON public.channel_permiss
       SELECT 1
       FROM public.channels
       JOIN public.apps ON apps.app_id = channels.app_id
-      WHERE public.rbac_check_permission(
-        public.rbac_perm_app_update_user_roles(),
-        apps.owner_org,
-        apps.app_id,
-        NULL::bigint
-      )
+      WHERE channels.id = channel_permission_overrides.channel_id
+        AND public.rbac_check_permission(
+          public.rbac_perm_app_update_user_roles(),
+          apps.owner_org,
+          apps.app_id,
+          NULL::bigint
+        )
     )
   )
   WITH CHECK (
@@ -71,12 +73,13 @@ CREATE POLICY channel_permission_overrides_admin_write ON public.channel_permiss
       SELECT 1
       FROM public.channels
       JOIN public.apps ON apps.app_id = channels.app_id
-      WHERE public.rbac_check_permission(
-        public.rbac_perm_app_update_user_roles(),
-        apps.owner_org,
-        apps.app_id,
-        NULL::bigint
-      )
+      WHERE channels.id = channel_permission_overrides.channel_id
+        AND public.rbac_check_permission(
+          public.rbac_perm_app_update_user_roles(),
+          apps.owner_org,
+          apps.app_id,
+          NULL::bigint
+        )
     )
   );
 
@@ -115,6 +118,7 @@ DECLARE
   v_channel_scope boolean := false;
   v_org_enforcing_2fa boolean;
   v_password_policy_ok boolean;
+  v_apikey_user_id uuid;
 BEGIN
   -- Validate permission key
   IF p_permission_key IS NULL OR p_permission_key = '' THEN
@@ -141,11 +145,16 @@ BEGIN
     LIMIT 1;
   END IF;
 
-  -- Resolve user from API key when needed (handles hashed keys too).
-  IF v_effective_user_id IS NULL AND p_apikey IS NOT NULL THEN
-    SELECT user_id INTO v_effective_user_id
+  -- Resolve API key once, caching both user_id and rbac_id for reuse below.
+  IF p_apikey IS NOT NULL THEN
+    SELECT user_id, rbac_id INTO v_apikey_user_id, v_apikey_principal
     FROM public.find_apikey_by_value(p_apikey)
     LIMIT 1;
+  END IF;
+
+  -- Resolve user from API key when not provided directly.
+  IF v_effective_user_id IS NULL AND v_apikey_user_id IS NOT NULL THEN
+    v_effective_user_id := v_apikey_user_id;
   END IF;
 
   -- Enforce 2FA if the org requires it.
@@ -235,27 +244,20 @@ BEGIN
     END IF;
 
     -- If user doesn't have permission, check apikey permission
-    IF NOT v_allowed AND p_apikey IS NOT NULL THEN
-      SELECT rbac_id INTO v_apikey_principal
-      FROM public.apikeys
-      WHERE key = p_apikey
-      LIMIT 1;
+    IF NOT v_allowed AND v_apikey_principal IS NOT NULL THEN
+      v_allowed := public.rbac_has_permission(public.rbac_principal_apikey(), v_apikey_principal, p_permission_key, v_effective_org_id, p_app_id, p_channel_id);
 
-      IF v_apikey_principal IS NOT NULL THEN
-        v_allowed := public.rbac_has_permission(public.rbac_principal_apikey(), v_apikey_principal, p_permission_key, v_effective_org_id, p_app_id, p_channel_id);
+      IF v_channel_scope THEN
+        SELECT o.is_allowed INTO v_override
+        FROM public.channel_permission_overrides o
+        WHERE o.principal_type = public.rbac_principal_apikey()
+          AND o.principal_id = v_apikey_principal
+          AND o.channel_id = p_channel_id
+          AND o.permission_key = p_permission_key
+        LIMIT 1;
 
-        IF v_channel_scope THEN
-          SELECT o.is_allowed INTO v_override
-          FROM public.channel_permission_overrides o
-          WHERE o.principal_type = public.rbac_principal_apikey()
-            AND o.principal_id = v_apikey_principal
-            AND o.channel_id = p_channel_id
-            AND o.permission_key = p_permission_key
-          LIMIT 1;
-
-          IF v_override IS NOT NULL THEN
-            v_allowed := v_override;
-          END IF;
+        IF v_override IS NOT NULL THEN
+          v_allowed := v_override;
         END IF;
       END IF;
     END IF;
@@ -297,3 +299,48 @@ $$;
 
 COMMENT ON FUNCTION public.rbac_check_permission_direct(text, uuid, uuid, character varying, bigint, text) IS
   'Direct RBAC permission check with automatic legacy fallback based on org feature flag. Uses channel overrides when present.';
+
+-- Atomically delete a group and all its role_bindings in a single server-side call.
+CREATE OR REPLACE FUNCTION public.delete_group_with_bindings(group_id uuid)
+RETURNS void
+LANGUAGE plpgsql
+SET search_path = ''
+SECURITY DEFINER AS $$
+DECLARE
+  v_org_id uuid;
+BEGIN
+  -- Verify group exists and caller has org.update_user_roles permission.
+  SELECT org_id INTO v_org_id
+  FROM public.groups
+  WHERE id = group_id;
+
+  IF v_org_id IS NULL THEN
+    RAISE EXCEPTION 'Group not found' USING ERRCODE = 'P0002';
+  END IF;
+
+  IF NOT public.rbac_check_permission_direct(
+    public.rbac_perm_org_update_user_roles(),
+    auth.uid(),
+    v_org_id,
+    NULL::varchar,
+    NULL::bigint
+  ) THEN
+    RAISE EXCEPTION 'Forbidden' USING ERRCODE = '42501';
+  END IF;
+
+  DELETE FROM public.role_bindings
+  WHERE principal_type = public.rbac_principal_group()
+    AND principal_id = group_id;
+
+
+  -- Clean up channel permission overrides for this group
+  DELETE FROM public.channel_permission_overrides
+  WHERE principal_type = public.rbac_principal_group()
+    AND principal_id = group_id;
+  DELETE FROM public.groups
+  WHERE id = group_id;
+END;
+$$;
+
+COMMENT ON FUNCTION public.delete_group_with_bindings(uuid) IS
+  'Atomically deletes a group and all its role bindings. Requires org.update_user_roles permission.';

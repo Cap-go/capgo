@@ -266,7 +266,8 @@
     "vite-plugin-webfont-dl": "^3.11.1",
     "vitest": "^4.0.8",
     "vue-tsc": "3.1.8",
-    "wrangler": "^4.67.0"
+    "wrangler": "^4.67.0",
+    "simple-git-hooks": "^2.11.1"
   },
   "gitmoji": {
     "autoAdd": false,
@@ -275,6 +276,9 @@
     "messagePrompt": true,
     "capitalizeTitle": true,
     "gitmojisUrl": "https://gitmoji.dev/api/gitmojis"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "bun typecheck"
   },
   "trustedDependencies": [
     "@sentry/cli",

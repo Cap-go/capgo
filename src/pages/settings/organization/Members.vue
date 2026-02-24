@@ -1372,15 +1372,6 @@ async function handleAppAccessAssign() {
   isAppAccessSubmitting.value = true
   updateAppAccessSaveButton()
   try {
-    const { data: roleData, error: roleError } = await supabase
-      .from('roles')
-      .select('id')
-      .eq('name', appAccessSelectedRole.value)
-      .single()
-
-    if (roleError || !roleData)
-      throw roleError || new Error('Role not found')
-
     const bindingMap = appAccessBindingByAppId.value
     let createdCount = 0
     let updatedCount = 0
@@ -1392,10 +1383,10 @@ async function handleAppAccessAssign() {
       }
 
       if (existingBinding) {
-        const { error: updateError } = await supabase
-          .from('role_bindings')
-          .update({ role_id: roleData.id })
-          .eq('id', existingBinding.id)
+        const { error: updateError } = await supabase.functions.invoke(`private/role_bindings/${existingBinding.id}`, {
+          method: 'PATCH',
+          body: { role_name: appAccessSelectedRole.value },
+        })
 
         if (updateError)
           throw updateError

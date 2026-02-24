@@ -110,6 +110,21 @@ watchEffect(() => {
 
 watchEffect(() => {
   const billingEnabled = stripeEnabled.value
+  const hasOrgRbacEnabled = !!organizationStore.currentOrganization?.use_new_rbac
+
+  const needsGroups = hasOrgRbacEnabled
+  const hasGroups = organizationTabs.value.find(tab => tab.key === '/settings/organization/groups')
+  if (needsGroups && !hasGroups) {
+    const base = baseOrgTabs.find(t => t.key === '/settings/organization/groups')
+    const membersIndex = organizationTabs.value.findIndex(tab => tab.key === '/settings/organization/members')
+    if (base && membersIndex >= 0)
+      organizationTabs.value.splice(membersIndex + 1, 0, { ...base })
+    else if (base)
+      organizationTabs.value.push({ ...base })
+  }
+  if (!needsGroups && hasGroups)
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/groups')
+
   // ensure usage/plans tabs based on permissions (keeps icons from base)
   const needsUsage = billingEnabled && canReadBilling.value
   const hasUsage = organizationTabs.value.find(tab => tab.key === '/settings/organization/usage')
