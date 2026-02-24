@@ -53,6 +53,7 @@ interface GlobalStats {
   success_rate: PromiseLike<number>
   need_upgrade: PromiseLike<number>
   customers: PromiseLike<CustomerCount>
+  paying_orgs_for_conversion: PromiseLike<number>
   plans: PromiseLike<PlanTotal>
   actives: Promise<Actives>
   devices_last_month: PromiseLike<number>
@@ -371,6 +372,18 @@ function getStats(c: Context): GlobalStats {
         cloudlog({ requestId: c.get('requestId'), message: 'get_customer_counts', error: res.error })
       return res.data ?? { total: 0, yearly: 0, monthly: 0 }
     }),
+    paying_orgs_for_conversion: supabase
+      .from('orgs')
+      .select('id, stripe_info!inner(customer_id)', { count: 'exact', head: true })
+      .eq('stripe_info.status', 'succeeded')
+      .eq('stripe_info.is_good_plan', true)
+      .then((res) => {
+        if (res.error) {
+          cloudlog({ requestId: c.get('requestId'), message: 'paying_orgs_for_conversion error', error: res.error })
+          return 0
+        }
+        return res.count ?? 0
+      }),
     onboarded: supabase.rpc('count_all_onboarded').single().then((res) => {
       if (res.error || !res.data)
         cloudlog({ requestId: c.get('requestId'), message: 'count_all_onboarded', error: res.error })
@@ -542,6 +555,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     orgs,
     stars,
     customers,
+    paying_orgs_for_conversion,
     onboarded,
     need_upgrade,
     plans,
@@ -569,6 +583,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     res.orgs,
     res.stars,
     res.customers,
+    res.paying_orgs_for_conversion,
     res.onboarded,
     res.need_upgrade,
     res.plans,
@@ -590,7 +605,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     res.build_stats,
   ])
   const not_paying = users - customers.total - plans.Trial
-  const org_conversion_rate = orgs > 0 ? (customers.total * 100) / orgs : 0
+  const org_conversion_rate = orgs > 0 ? (paying_orgs_for_conversion * 100) / orgs : 0
   cloudlog({
     requestId: c.get('requestId'),
     message: 'All Promises',
@@ -600,6 +615,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     users,
     stars,
     customers,
+    paying_orgs_for_conversion,
     onboarded,
     need_upgrade,
     plans,
