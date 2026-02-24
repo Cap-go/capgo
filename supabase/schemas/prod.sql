@@ -16176,9 +16176,11 @@ GRANT ALL ON FUNCTION "public"."get_orgs_v6"() TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."get_orgs_v6"("userid" "uuid") TO "anon";
-GRANT ALL ON FUNCTION "public"."get_orgs_v6"("userid" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_orgs_v6"("userid" "uuid") TO "service_role";
+REVOKE ALL ON FUNCTION "public"."get_orgs_v6"("userid" "uuid") FROM "anon";
+REVOKE ALL ON FUNCTION "public"."get_orgs_v6"("userid" "uuid") FROM "authenticated";
+REVOKE ALL ON FUNCTION "public"."get_orgs_v6"("userid" "uuid") FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."get_orgs_v6"("userid" "uuid") TO "postgres";
+GRANT EXECUTE ON FUNCTION "public"."get_orgs_v6"("userid" "uuid") TO "service_role";
 
 
 
@@ -17950,7 +17952,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INS
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "service_role";
-
 
 
 
