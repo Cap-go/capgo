@@ -15,7 +15,7 @@ const bodySchema = z.object({
 const memberSchema = z.array(z.object({
   uid: z.uuid(),
   email: z.email(),
-  image_url: z.string(),
+  image_url: z.string().nullable().optional(),
   role: z.enum([
     'invite_read',
     'invite_upload',
@@ -61,8 +61,12 @@ export async function get(c: Context<MiddlewareKeyVariables>, bodyRaw: any, apik
     throw simpleError('cannot_parse_members', 'Cannot parse members', { error: parsed.error })
   }
   const signedMembers = await Promise.all(parsed.data.map(async (member) => {
-    if (!member.image_url)
-      return member
+    if (!member.image_url) {
+      return {
+        ...member,
+        image_url: '',
+      }
+    }
     const signedImage = await createSignedImageUrl(c, member.image_url)
     return {
       ...member,
