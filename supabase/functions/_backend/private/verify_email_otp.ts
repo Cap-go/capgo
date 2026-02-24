@@ -1,7 +1,7 @@
 import { z } from 'zod/mini'
 import { createHono, getClaimsFromJWT, middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { emptySupabase, supabaseClient } from '../utils/supabase.ts'
+import { emptySupabase, supabaseAdmin } from '../utils/supabase.ts'
 import { version } from '../utils/version.ts'
 
 const bodySchema = z.object({
@@ -82,14 +82,19 @@ app.post('/', middlewareAuth, async (c) => {
     return quickError(403, 'otp_user_mismatch', 'OTP does not match current user')
   }
 
-  const otpSupabase = supabaseClient(c, `Bearer ${verifyData.session.access_token}`)
-  const { data: verifiedAt, error: recordError } = await otpSupabase
-    .rpc('record_email_otp_verified')
+  const otpVerifiedAt = new Date().toISOString()
+  const { error: recordError } = await supabaseAdmin(c)
+    .from('user_security')
+    .upsert({
+      user_id: verifyData.user.id,
+      email_otp_verified_at: otpVerifiedAt,
+      updated_at: otpVerifiedAt,
+    }, { onConflict: 'user_id' })
 
-  if (recordError || !verifiedAt) {
+  if (recordError) {
     cloudlog({ requestId: c.get('requestId'), context: 'verify_email_otp - record failed', error: recordError?.message })
     return quickError(500, 'record_failed', 'Failed to record OTP verification')
   }
 
-  return c.json({ verified_at: verifiedAt })
+  return c.json({ verified_at: otpVerifiedAt })
 })
