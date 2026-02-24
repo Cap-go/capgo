@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm'
 import { honoFactory, useCors } from '../utils/hono.ts'
+import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient, logPgError } from '../utils/pg.ts'
 
@@ -24,13 +25,6 @@ interface ReplicationSlotLag {
   reasons: string[]
 }
 
-interface ReplicationErrorInfo {
-  message: string
-  code?: string
-  detail?: string
-  hint?: string
-}
-
 function toNumber(value: unknown): number | null {
   if (value === null || value === undefined)
     return null
@@ -38,19 +32,6 @@ function toNumber(value: unknown): number | null {
   if (!Number.isFinite(num))
     return null
   return num
-}
-
-function getErrorInfo(error: unknown): ReplicationErrorInfo {
-  if (error instanceof Error) {
-    const err = error as Error & { code?: string, detail?: string, hint?: string }
-    return {
-      message: err.message,
-      code: err.code,
-      detail: err.detail,
-      hint: err.hint,
-    }
-  }
-  return { message: String(error) }
 }
 
 function buildReplicationQuery(mode: ReplicationQueryMode) {
@@ -162,7 +143,7 @@ export const app = honoFactory.createApp()
 
 app.use('*', useCors)
 
-app.get('/', async (c) => {
+app.get('/', middlewareKey(['all']), async (c) => {
   const thresholdSeconds = DEFAULT_THRESHOLD_SECONDS
   const thresholdBytes = DEFAULT_THRESHOLD_BYTES
 
@@ -248,16 +229,11 @@ app.get('/', async (c) => {
   }
   catch (error) {
     logPgError(c, 'replication_lag', error)
-    const errorInfo = getErrorInfo(error)
     cloudlogErr({ requestId: c.get('requestId'), message: 'replication_lag_error', error })
     return c.json({
       status: 'ko',
       error: 'replication_lag_error',
-      message: 'Failed to fetch replication slot lag',
-      error_message: errorInfo.message,
-      error_code: errorInfo.code,
-      error_detail: errorInfo.detail,
-      error_hint: errorInfo.hint,
+      message: 'Failed to fetch replication lag',
       threshold_seconds: thresholdSeconds,
       threshold_minutes: Number((thresholdSeconds / 60).toFixed(2)),
       threshold_bytes: thresholdBytes,
