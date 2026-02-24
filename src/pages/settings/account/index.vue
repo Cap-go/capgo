@@ -319,8 +319,10 @@ async function performAccountDeletion(password: string) {
       return false
     }
 
-    // Reload the web page after successful account deletion
-    window.location.reload()
+    // Ensure the deleted account session is cleared to avoid being stuck on /accountDisabled
+    await main.logout()
+    toast.success(t('account-deleted-successfully'))
+    router.replace('/login')
     return true
   }
   catch (error) {
