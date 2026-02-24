@@ -72,6 +72,42 @@ describe('[POST] /apikey operations', () => {
     expect(verifyData.name).toBe(keyName)
   })
 
+  it('app-limited key cannot create another API key', async () => {
+    const limitedCreatorResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'limited-app-key-creator',
+        limited_to_apps: [APPNAME],
+      }),
+    })
+    expect(limitedCreatorResponse.status).toBe(200)
+    const limitedCreatorData = await limitedCreatorResponse.json<{ id: number, key: string }>()
+
+    const limitedHeaders = {
+      'Content-Type': 'application/json',
+      'capgkey': limitedCreatorData.key,
+    }
+
+    const escalationResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers: limitedHeaders,
+      body: JSON.stringify({
+        name: 'blocked-unrestricted-creation',
+        limited_to_orgs: [],
+        limited_to_apps: [],
+      }),
+    })
+    const escalationData = await escalationResponse.json() as { error: string }
+    expect(escalationResponse.status).toBe(400)
+    expect(escalationData).toHaveProperty('error', 'cannot_create_apikey')
+
+    await fetch(`${BASE_URL}/apikey/${limitedCreatorData.id}`, {
+      method: 'DELETE',
+      headers,
+    })
+  })
+
   it('create api key with missing name', async () => {
     const response = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
