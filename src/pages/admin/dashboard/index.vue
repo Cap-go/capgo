@@ -30,6 +30,7 @@ const globalStatsTrendData = ref<Array<{
   users: number
   users_active: number
   paying: number
+  org_conversion_rate: number
   trial: number
   not_paying: number
   updates: number
@@ -120,6 +121,22 @@ const totalUsersTrendSeries = computed(() => {
         value: item.users_active,
       })),
       color: '#14b8a6', // teal
+    },
+  ]
+})
+
+const orgConversionTrendSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Org Conversion Rate (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.org_conversion_rate || 0,
+      })),
+      color: '#f59e0b', // amber
     },
   ]
 })
@@ -428,8 +445,20 @@ displayStore.defaultBack = '/dashboard'
             </ChartCard>
           </div>
 
-          <!-- Storage Trend - Full Width -->
-          <div class="grid grid-cols-1 gap-6">
+          <!-- Conversion + Storage Trends -->
+          <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <!-- Org Conversion Rate Trend -->
+            <ChartCard
+              title="Org Conversion Rate Trend"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="orgConversionTrendSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="orgConversionTrendSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+
             <!-- Bundle Storage Trend -->
             <ChartCard
               :title="t('storage-trend')"

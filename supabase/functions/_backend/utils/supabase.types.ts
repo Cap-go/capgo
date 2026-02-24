@@ -1151,6 +1151,7 @@ export type Database = {
           need_upgrade: number | null
           new_paying_orgs: number
           not_paying: number | null
+          org_conversion_rate: number
           onboarded: number | null
           paying: number | null
           paying_monthly: number | null
@@ -1211,6 +1212,7 @@ export type Database = {
           need_upgrade?: number | null
           new_paying_orgs?: number
           not_paying?: number | null
+          org_conversion_rate?: number
           onboarded?: number | null
           paying?: number | null
           paying_monthly?: number | null
@@ -1271,6 +1273,7 @@ export type Database = {
           need_upgrade?: number | null
           new_paying_orgs?: number
           not_paying?: number | null
+          org_conversion_rate?: number
           onboarded?: number | null
           paying?: number | null
           paying_monthly?: number | null
