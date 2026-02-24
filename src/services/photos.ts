@@ -13,6 +13,18 @@ const supabase = useSupabase()
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
 
+function normalizeImageStoragePath(path?: string | null) {
+  if (!path)
+    return ''
+
+  const pathWithoutQuery = path.split('?')[0]
+  const signedUrlMatch = pathWithoutQuery.match(/\/storage\/v1\/object\/(?:public\/|sign\/)?images\/(.+)$/)
+  if (signedUrlMatch?.[1])
+    return signedUrlMatch[1].replace(/^\/+/, '')
+
+  return pathWithoutQuery.replace(/^images\//, '').replace(/^\/+/, '')
+}
+
 async function uploadPhotoShared(
   data: string,
   storagePath: string,
@@ -51,6 +63,17 @@ async function uploadPhotoUser(formId: string, data: string, fileName: string, c
       return
     }
 
+    let previousImagePath = ''
+    const { data: currentUser, error: currentUserError } = await supabase
+      .from('users')
+      .select('image_url')
+      .eq('id', safeUserId)
+      .maybeSingle()
+    if (currentUserError)
+      console.error('cannot fetch current user image before update', currentUserError)
+    else
+      previousImagePath = normalizeImageStoragePath(currentUser?.image_url)
+
     const { data: usr, error: dbError } = await supabase
       .from('users')
       .update({ image_url: storagePath })
@@ -61,8 +84,24 @@ async function uploadPhotoUser(formId: string, data: string, fileName: string, c
     if (!usr || dbError) {
       setErrors(formId, [wentWrong], {})
       console.error('upload error', dbError)
+      const { error: cleanupUploadError } = await supabase
+        .storage
+        .from('images')
+        .remove([storagePath])
+      if (cleanupUploadError)
+        console.error('cannot cleanup newly uploaded user image after db error', cleanupUploadError)
       return
     }
+
+    if (previousImagePath && previousImagePath !== storagePath) {
+      const { error: deletePreviousImageError } = await supabase
+        .storage
+        .from('images')
+        .remove([previousImagePath])
+      if (deletePreviousImageError)
+        console.error('cannot delete previous user image', deletePreviousImageError)
+    }
+
     usr.image_url = signedUrl
     main.user = usr
   }
