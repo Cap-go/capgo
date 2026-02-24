@@ -26,6 +26,9 @@ const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 const statusAuth: Ref<'login' | '2fa'> = ref('login')
 const mfaLoginFactor: Ref<Factor | null> = ref(null)
 const mfaChallengeId: Ref<string> = ref('')
+const querySessionAccessToken = ref('')
+const querySessionRefreshToken = ref('')
+const hasQuerySession = ref(false)
 const router = useRouter()
 const { t } = useI18n()
 const captchaComponent = ref<InstanceType<typeof VueTurnstile> | null>(null)
@@ -265,15 +268,15 @@ async function checkLogin() {
   const refreshToken = params.get('refresh_token')
 
   if (!!accessToken && !!refreshToken) {
-    const res = await supabase.auth.setSession({
-      access_token: accessToken,
-      refresh_token: refreshToken,
-    })
-    if (res.error) {
-      console.error('Cannot set auth', res.error)
-      return
-    }
-    nextLogin()
+    parsedUrl.searchParams.delete('access_token')
+    parsedUrl.searchParams.delete('refresh_token')
+    window.history.replaceState({}, '', parsedUrl.toString())
+
+    querySessionAccessToken.value = accessToken
+    querySessionRefreshToken.value = refreshToken
+    hasQuerySession.value = true
+    isLoading.value = false
+    hideLoader()
     return
   }
 
@@ -292,6 +295,31 @@ async function checkLogin() {
     isLoading.value = false
     hideLoader()
   }
+}
+
+async function acceptQuerySession() {
+  isLoading.value = true
+  const res = await supabase.auth.setSession({
+    access_token: querySessionAccessToken.value,
+    refresh_token: querySessionRefreshToken.value,
+  })
+  hasQuerySession.value = false
+  querySessionAccessToken.value = ''
+  querySessionRefreshToken.value = ''
+  if (res.error) {
+    console.error('Cannot set auth', res.error)
+    isLoading.value = false
+    return
+  }
+  nextLogin()
+}
+
+function declineQuerySession() {
+  hasQuerySession.value = false
+  querySessionAccessToken.value = ''
+  querySessionRefreshToken.value = ''
+  isLoading.value = false
+  hideLoader()
 }
 
 // eslint-disable-next-line regexp/no-unused-capturing-group
@@ -333,7 +361,28 @@ onMounted(checkLogin)
       </div>
 
       <div v-if="statusAuth === 'login'" class="relative mx-auto mt-8 max-w-md md:mt-4">
-        <div class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
+        <div v-if="hasQuerySession" class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
+          <div class="py-6 px-4 space-y-4 text-gray-500 sm:py-7 sm:px-8">
+            <p class="text-sm">
+              This link contains a login session. Continue to sign in with this session?
+            </p>
+            <button
+              v-if="!isLoading" type="button" data-test="accept-query-session"
+              class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden"
+              @click="acceptQuerySession"
+            >
+              Continue
+            </button>
+            <button
+              v-if="!isLoading" type="button" class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-slate-700 rounded-md border border-slate-300 transition-all duration-200 hover:bg-slate-50 dark:text-slate-200 dark:border-slate-600 dark:hover:bg-slate-700"
+              @click="declineQuerySession"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+
+        <div v-else class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
           <div class="py-6 px-4 text-gray-500 sm:py-7 sm:px-8">
             <FormKit id="login-account" type="form" :actions="false" @submit="submit">
               <div class="space-y-5">
