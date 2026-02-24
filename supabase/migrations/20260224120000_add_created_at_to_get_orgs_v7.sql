@@ -138,7 +138,10 @@ BEGIN
   SELECT
     o.id AS gid,
     o.created_by,
-    o.created_at,
+    CASE
+      WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN NULL::timestamptz
+      ELSE o.created_at
+    END AS created_at,
     o.logo,
     o.name,
     CASE

@@ -13,7 +13,7 @@
  */
 
 import type { ComponentPublicInstance } from 'vue'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -106,20 +106,23 @@ function handleMouseMove(e: MouseEvent) {
   }
 }
 
-// Only attach the mousemove listener when the banner is actually visible.
-// This avoids per-mousemove reactive work for non-trial / paying users.
+// Only attach the mousemove listener and time-tick interval when the banner
+// is actually visible. This avoids unnecessary work for non-trial / paying users.
 watch(showBanner, (visible) => {
-  if (visible)
+  if (visible) {
     window.addEventListener('mousemove', handleMouseMove)
-  else
+    tickInterval = setInterval(() => {
+      nowTick.value = Date.now()
+    }, 60_000)
+  }
+  else {
     window.removeEventListener('mousemove', handleMouseMove)
+    if (tickInterval) {
+      clearInterval(tickInterval)
+      tickInterval = null
+    }
+  }
 }, { immediate: true })
-
-onMounted(() => {
-  tickInterval = setInterval(() => {
-    nowTick.value = Date.now()
-  }, 60_000)
-})
 
 onUnmounted(() => {
   window.removeEventListener('mousemove', handleMouseMove)
