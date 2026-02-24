@@ -41,7 +41,7 @@ RETURNS TABLE (
     enforce_encrypted_bundles boolean,
     required_encryption_key character varying,
     use_new_rbac boolean
-) LANGUAGE plpgsql VOLATILE SECURITY DEFINER
+) LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = '' AS $$
 BEGIN
   RETURN QUERY
