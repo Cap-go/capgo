@@ -468,3 +468,58 @@ deleteSSOProvider(c: Context, providerId: string): Promise<void>
 - `supabase/.env` is a separate file for Supabase CLI config, not function-level vars
 - README documents the pattern: duplicate `.env.example` to `.env`, replace placeholders, use `supabase secrets set --env-file`
 - Functions access env vars via `Deno.env.get()` or `getEnv(c, 'VAR_NAME')` from hono context
+
+## SsoConfiguration.vue Component (Task: Create SSO Config UI)
+
+### Patterns Used
+- Auth headers: `supabase.auth.getSession()` → `access_token` → `Bearer` header (matches DeviceTable, LogTable patterns)
+- API calls: `fetch(${defaultApiHost}/private/sso/...)` with JSON body
+- Imports: `defaultApiHost` and `useSupabase` from `~/services/supabase`
+- Dialog: `useDialogV2Store().openDialog()` with `role: 'danger'` for destructive actions
+- Toast: `vue-sonner` `toast.success()` / `toast.error()` for feedback
+- Icons: `~icons/heroicons/` prefix for Heroicons (auto-imported by unplugin-icons)
+- Spinner: `~/components/Spinner.vue` with `size` and `color` props
+- No DaisyUI `d-` prefix classes actually used in existing security/webhook pages — they use raw Tailwind + custom styling consistently
+
+### Component Structure
+- Props: `{ orgId: string }`
+- No `organizations/` directory existed — created it
+- SSO provider interface mirrors backend: id, org_id, domain, provider_id, status, enforce_sso, metadata_url, dns_verification_token, created_at, updated_at
+- Status values: pending_verification, verified, active, disabled
+- `recentlyCreatedId` pattern to show DNS verification only after creation (not in list view)
+- `getAuthHeaders()` helper extracts auth into reusable function
+
+### API Endpoints Used
+- `GET /private/sso/providers/:orgId` — list providers
+- `POST /private/sso/providers` — create provider (body: org_id, domain, metadata_url)
+- `POST /private/sso/verify-dns` — verify DNS (body: provider_id) — endpoint TBD
+- `DELETE /private/sso/providers/:id` — delete provider
+
+### Key Decisions
+- Used raw Tailwind classes matching Security.vue pattern rather than DaisyUI `d-` prefix components
+- i18n keys prefixed with `sso-` for namespacing
+- DNS token only shown via `recentlyCreatedProvider` computed (not in list view per spec)
+
+
+## verify-dns.ts Endpoint (Task 7)
+- Import order matters: `perfectionist/sort-imports` ESLint rule enforces alphabetical import sorting
+- `dns-verification.ts` must come before `hono.ts` alphabetically
+- Pattern for SSO endpoints needing provider lookup: fetch provider first, then check `org.manage_sso` permission using provider's `org_id`
+- `requireEnterprisePlan` gating added after permission check (same as providers.ts)
+- `verifyDnsTxtRecord()` returns `{ verified, records?, error? }` - check `error` first, then `verified`
+- Router registration in index.ts: import alphabetically sorted among SSO imports, route added after `/sso/prelink-users`
+
+
+## SSO Enforcement Navigation Guard (Router)
+
+- Router guards live in `src/modules/*.ts` — auto-loaded via `import.meta.glob` in `src/main.ts`
+- Module pattern: `export const install: UserModule = ({ router }) => { ... }`
+- Guards run alphabetically by filename, so `sso-enforcement.ts` runs after `auth.ts`
+- `useSupabase()` from `~/services/supabase` returns the singleton Supabase client
+- `defaultApiHost` from same module gives the API base URL for backend calls
+- Auth guard in `auth.ts` only runs for routes with `to.meta.middleware` set
+- SSO guard uses public routes list instead of meta check — simpler and catches all protected routes
+- `session.user.app_metadata?.provider` is `'email'` for password auth, other values for SSO
+- Cache enforcement check result in sessionStorage for 5 min to avoid per-navigation API calls
+- Fail-open pattern: if API check fails, allow navigation (don't lock users out)
+- `clearSsoEnforcementCache()` exported for use when user signs out or session changes

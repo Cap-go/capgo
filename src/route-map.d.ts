@@ -453,6 +453,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/sso-callback': RouteRecordInfo<
+      '/sso-callback',
+      '/sso-callback',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/Webhooks': RouteRecordInfo<
       '/Webhooks',
       '/Webhooks',
@@ -836,6 +843,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/settings/organization/Webhooks.vue': {
       routes:
         | '/settings/organization/Webhooks'
+      views:
+        | never
+    }
+    'src/pages/sso-callback.vue': {
+      routes:
+        | '/sso-callback'
       views:
         | never
     }

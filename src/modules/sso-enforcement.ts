@@ -1,0 +1,102 @@
+import type { UserModule } from '~/types'
+import { defaultApiHost, useSupabase } from '~/services/supabase'
+
+interface SsoEnforcementResponse {
+  allowed: boolean
+  reason?: string
+}
+
+const SSO_CHECK_CACHE_KEY = 'sso_enforcement_checked'
+const SSO_CHECK_CACHE_TTL = 5 * 60 * 1000
+
+const PUBLIC_ROUTES = [
+  '/login',
+  '/register',
+  '/sso-callback',
+  '/confirm-signup',
+  '/forgot-password',
+  '/onboarding',
+  '/accountDisabled',
+]
+
+function isPublicRoute(path: string): boolean {
+  return PUBLIC_ROUTES.some(r => path.startsWith(r))
+}
+
+function isCacheValid(): boolean {
+  try {
+    const cached = sessionStorage.getItem(SSO_CHECK_CACHE_KEY)
+    if (!cached)
+      return false
+    const { timestamp } = JSON.parse(cached)
+    return Date.now() - timestamp < SSO_CHECK_CACHE_TTL
+  }
+  catch {
+    return false
+  }
+}
+
+function setCacheValid(): void {
+  try {
+    sessionStorage.setItem(SSO_CHECK_CACHE_KEY, JSON.stringify({ timestamp: Date.now() }))
+  }
+  catch {}
+}
+
+export function clearSsoEnforcementCache(): void {
+  try {
+    sessionStorage.removeItem(SSO_CHECK_CACHE_KEY)
+  }
+  catch {}
+}
+
+export const install: UserModule = ({ router }) => {
+  router.beforeEach(async (to, _from, next) => {
+    if (isPublicRoute(to.path))
+      return next()
+
+    const supabase = useSupabase()
+    const { data: { session } } = await supabase.auth.getSession()
+
+    if (!session)
+      return next()
+
+    const provider = session.user.app_metadata?.provider
+    if (provider && provider !== 'email')
+      return next()
+
+    if (isCacheValid())
+      return next()
+
+    try {
+      const response = await fetch(`${defaultApiHost}/private/sso/check-enforcement`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          email: session.user.email,
+          auth_type: 'password',
+        }),
+      })
+
+      if (response.ok) {
+        const data: SsoEnforcementResponse = await response.json()
+        if (!data.allowed) {
+          clearSsoEnforcementCache()
+          await supabase.auth.signOut()
+          return next('/login?sso_required=true')
+        }
+      }
+
+      setCacheValid()
+    }
+    catch (e) {
+      // Fail open: don't block users if enforcement check is unreachable
+      console.error('SSO enforcement check failed:', e)
+    }
+
+    return next()
+  })
+}
