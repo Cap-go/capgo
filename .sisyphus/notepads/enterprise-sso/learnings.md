@@ -347,3 +347,48 @@ deleteSSOProvider(c: Context, providerId: string): Promise<void>
 - `quickError()` for fatal errors (provider not found, listing failed)
 - `try/catch` per user for graceful degradation
 - All actions logged with requestId for audit trail
+
+
+## [2026-02-24] Task: Two-Step Login Flow with SSO Routing
+
+### Implementation: `login.vue` Redesign
+- **Flow**: email → domain check → (SSO button | password field) → MFA (if applicable)
+- **State machine**: `statusAuth: 'email' | 'credentials' | '2fa'` (was `'login' | '2fa'`)
+- **New state**: `emailForLogin`, `hasSso`, `isDomainChecking`
+
+### Key Design Decisions
+- **Separate form handlers**: `handleEmailContinue`, `handlePasswordSubmit`, `handleSsoLogin`, `handleMfaSubmit` (replaced single `submit` function)
+- **Domain check graceful degradation**: If no session token available or API fails, defaults to `{ has_sso: false }` (password flow)
+- **SSO redirect**: `supabase.auth.signInWithSSO({ domain, options: { redirectTo: origin + '/sso-callback' } })` → browser redirect to `data.url`
+- **Footer placement**: Moved outside Transition, shown for email + credentials steps (not 2FA), avoids jump during animation
+- **Transition**: Vue `<Transition name="step-slide" mode="out-in">` with 0.25s translateX animation
+
+### Domain Check API Pattern
+- Endpoint: `${defaultApiHost}/private/sso/check-domain` (POST)
+- Uses existing session token if available (login page may have stale session)
+- Falls back to `{ has_sso: false }` on any error (401, network, etc.)
+- Import `defaultApiHost` from `~/services/supabase`
+
+### FormKit Form Splitting
+- Step 1: `id="email-step"` → name="email" → `handleEmailContinue({ email })`
+- Step 2 (password): `id="login-account"` → name="password" → `handlePasswordSubmit({ password })`
+- Step 2 (SSO): No form, just button with `@click="handleSsoLogin"`
+- Step 3 (MFA): `id="2fa-account"` → name="code" → `handleMfaSubmit({ code })`
+- `setErrors('login-account', ...)` still works because password form keeps same ID
+
+### Preserved Features
+- ✓ Turnstile captcha (in password step)
+- ✓ Magic link flow (checkMagicLink on mount, unchanged)
+- ✓ Forgot password link (in password step)
+- ✓ Register link (in email step + password step)
+- ✓ 2FA/MFA (unchanged, separate step)
+- ✓ Review account ban check (unchanged)
+- ✓ Session auto-detection on mount (checkLogin, unchanged)
+- ✓ All data-test attributes preserved
+- ✓ LangSelector, support, scan buttons (footer)
+
+### New i18n Keys Used
+- `continue` - Continue button text (step 1)
+- `sso-detected` - SSO detection message
+- `continue-with-sso` - SSO login button text
+- `go-back` - Already existed (used in MFA step)
