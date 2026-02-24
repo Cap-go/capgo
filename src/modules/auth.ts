@@ -93,6 +93,7 @@ async function guard(
   const hasAuth = !!claimsData?.claims?.sub && !!sessionUser
 
   const main = useMainStore()
+  const needsVerifiedEmail = to.path.startsWith('/settings') || to.path === '/delete_account'
 
   // TOTP means the user was force logged using the "email" tactic
   // In practice this means the user is being spoofed by an admin
@@ -116,6 +117,9 @@ async function guard(
 
   if (hasAuth && sessionUser && !main.auth) {
     main.auth = sessionUser
+    if (!sessionUser.email_confirmed_at && needsVerifiedEmail) {
+      return next('/resend_email')
+    }
 
     // Check if account is disabled (marked for deletion)
     try {
@@ -165,6 +169,10 @@ async function guard(
     // User is already authenticated, but check if account got disabled
     // (only if not already on account disabled page)
     if (to.path !== '/accountDisabled') {
+      if (!main.auth.email_confirmed_at && needsVerifiedEmail) {
+        return next('/resend_email')
+      }
+
       try {
         const { data: isDisabled, error: disabledError } = await supabase
           .rpc('is_account_disabled', { user_id: main.auth.id })
