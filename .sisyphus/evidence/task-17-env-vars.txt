@@ -1,0 +1,21 @@
+# Task 17: Add SSO Management API env vars
+# Date: 2026-02-24
+
+## Files Modified
+- supabase/functions/.env.example (lines 36-41 added)
+
+## Changes Made
+Added two new environment variables:
+1. SUPABASE_MANAGEMENT_API_TOKEN - Token for Supabase Management API (SSO/SAML provider management)
+2. SUPABASE_PROJECT_REF - Project reference for Management API calls
+
+## Files NOT Modified (with reasoning)
+- supabase/config.toml - Only uses env() for Supabase-managed config (S3, Twilio, OpenAI), not function-level env vars
+- supabase/functions/.env - Contains real values, not touched (gitignored)
+- supabase/.env - Separate Supabase config, not function-level env vars
+
+## Verification
+- .env.example now has 45 lines (was 37)
+- Placeholder values used: your-management-api-token-here, your-project-ref-here
+- No actual secrets added
+- Documentation comments included with generation instructions

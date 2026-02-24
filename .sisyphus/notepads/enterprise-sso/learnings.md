@@ -392,3 +392,79 @@ deleteSSOProvider(c: Context, providerId: string): Promise<void>
 - `sso-detected` - SSO detection message
 - `continue-with-sso` - SSO login button text
 - `go-back` - Already existed (used in MFA step)
+
+
+## useSSORouting Composable (Task 4)
+
+- Composable pattern: `useSupabase()` from `~/services/supabase` is the standard way to get the Supabase client
+- `defaultApiHost` from same module provides the API base URL for fetch calls
+- Existing composables don't use lifecycle hooks unless needed (useRealtimeCLIFeed uses onUnmounted, useDeviceUpdateFormat does not)
+- Auth token for private endpoints: get via `supabase.auth.getSession()` → `session.access_token`, pass as Bearer header
+- The `/private/sso/check-domain` endpoint accepts `{ email }` and returns `{ has_sso, provider_id?, org_id? }`
+- `supabase.auth.signInWithSSO({ domain, options: { redirectTo } })` returns `{ data: { url }, error }` — redirect user to data.url
+- SSO callback path is `/sso-callback`
+- login.vue already has inline `checkDomain` and `handleSsoLogin` that can be replaced with composable usage
+
+
+## [2026-02-24] Task: SSO Callback Page
+
+### Implementation: `sso-callback.vue`
+- **Location**: `src/pages/sso-callback.vue`
+- **Route**: `/sso-callback` (file-based routing, auto-generated)
+- **Layout**: `naked` (no sidebar/nav, same as login.vue)
+
+### Key Design Decisions
+- **Separate from confirm-signup.vue**: confirm-signup has URL redirect guardrails for email links; SSO callback uses `exchangeCodeForSession` for PKCE flow
+- **Manual code exchange**: `detectSessionInUrl: false` in supabase.ts means we MUST call `supabase.auth.exchangeCodeForSession(code)` manually
+- **Code source**: `route.query.code` (URL query param from IdP redirect)
+- **Redirect target**: `route.query.to` if present, otherwise `/dashboard` (same pattern as login.vue `nextLogin`)
+- **Error handling**: Shows error message + "Back to Login" link on failure; uses `toast.error()` for notification
+- **Loading state**: Shows spinner (IconLoader from lucide) during code exchange
+
+### Component Patterns Used
+- `useSupabase()` from `~/services/supabase` (singleton pattern)
+- `useRoute()` / `useRouter()` from `vue-router`
+- `toast` from `vue-sonner` (error notifications)
+- `IconLoader` from `~icons/lucide/loader-2` (animated spinner, same as confirm-signup.vue)
+- Dark mode support via `dark:` Tailwind variants
+- DaisyUI-compatible button styling (`bg-muted-blue-700`)
+
+### No Dependencies Added
+- All imports from existing project dependencies
+- No new i18n keys (hardcoded English strings, consistent with confirm-signup.vue)
+
+
+## [2026-02-24] Task: useSSOProvisioning Composable
+
+### Implementation: `src/composables/useSSOProvisioning.ts`
+- **Export**: `useSSOProvisioning()` returning `{ isProvisioning, error, provisionUser }`
+- **Session type**: `import type { Session } from '@supabase/supabase-js'`
+- **Thin client layer**: Most provisioning is server-side via DB triggers
+
+### Composable Pattern Conventions
+- Named export: `export function useXxx()` (not default export)
+- Refs returned in object: `ref()` for reactive state
+- `useSupabase()` from `~/services/supabase` for DB access
+- `defaultApiHost` from `~/services/supabase` for API calls
+- No semicolons, single quotes (@antfu/eslint-config)
+
+### provisionUser Logic Flow
+1. Check `users` table for public user record (server trigger creates this)
+2. Check `org_users` table for existing org membership
+3. If no org: call `/private/sso/check-domain` with email to find SSO provider
+4. Domain check is informational — actual org membership is handled server-side
+5. All errors set `error` ref instead of throwing
+
+### Key Design Decisions
+- **maybeSingle() over single()**: Avoids PGRST116 errors when no rows found
+- **Non-critical domain check**: Wrapped in try/catch, doesn't set error ref on failure
+- **Bearer token from session**: Uses `session.access_token` for authenticated API calls
+- **Graceful degradation**: If any check fails, provisioning continues (server handles it)
+
+
+## Task 17: Env Var Configuration
+- Supabase function env vars go in `supabase/functions/.env.example` (template) and `.env` (actual, gitignored)
+- `config.toml` uses `env()` syntax only for Supabase-managed config (S3, Twilio, auth secrets), NOT for custom function env vars
+- `supabase/.env` is a separate file for Supabase CLI config, not function-level vars
+- README documents the pattern: duplicate `.env.example` to `.env`, replace placeholders, use `supabase secrets set --env-file`
+- Functions access env vars via `Deno.env.get()` or `getEnv(c, 'VAR_NAME')` from hono context
