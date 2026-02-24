@@ -1,7 +1,8 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
+import { HTTPException } from 'hono/http-exception'
 import { SignJWT } from 'jose'
-import { simpleError } from '../../utils/hono.ts'
+import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
@@ -76,28 +77,18 @@ async function markBuildAsFailed(
 export async function startBuild(
   c: Context,
   jobId: string,
-  appId: string,
   apikey: Database['public']['Tables']['apikeys']['Row'],
 ): Promise<Response> {
   let alreadyMarkedAsFailed = false
   const apikeyKey = apikey.key ?? c.get('capgkey') ?? apikey.key_hash ?? null
 
   try {
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'Start build request',
-      job_id: jobId,
-      app_id: appId,
-      user_id: apikey.user_id,
-    })
-
     if (!apikeyKey) {
       const errorMsg = 'No API key available to start build'
       cloudlogErr({
         requestId: c.get('requestId'),
         message: 'Missing API key for start build',
         job_id: jobId,
-        app_id: appId,
         user_id: apikey.user_id,
       })
       throw simpleError('not_authorized', errorMsg)
@@ -122,32 +113,30 @@ export async function startBuild(
       throw simpleError('internal_error', 'Failed to fetch build request')
     }
 
-    if (!buildRequest || buildRequest.app_id !== appId) {
-      const errorMsg = 'You do not have permission to start builds for this app'
-      cloudlogErr({
-        requestId: c.get('requestId'),
-        message: 'Unauthorized start build (job/app mismatch or not accessible)',
-        job_id: jobId,
-        app_id: appId,
-        user_id: apikey.user_id,
-      })
-      await markBuildAsFailed(c, jobId, errorMsg, apikeyKey)
-      alreadyMarkedAsFailed = true
-      throw simpleError('unauthorized', errorMsg)
+    if (!buildRequest) {
+      throw quickError(404, 'build_request_not_found', 'Build request not found')
     }
 
+    const boundAppId = buildRequest.app_id
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Start build request',
+      job_id: jobId,
+      app_id: boundAppId,
+      user_id: apikey.user_id,
+    })
+
     // Security: Check if user has permission to manage builds (auth context set by middlewareKey)
-    if (!(await checkPermission(c, 'app.build_native', { appId: buildRequest.app_id }))) {
+    if (!(await checkPermission(c, 'app.build_native', { appId: boundAppId }))) {
       const errorMsg = 'You do not have permission to start builds for this app'
       cloudlogErr({
         requestId: c.get('requestId'),
         message: 'Unauthorized start build',
         job_id: jobId,
-        app_id: appId,
+        app_id: boundAppId,
         user_id: apikey.user_id,
       })
-      await markBuildAsFailed(c, jobId, errorMsg, apikeyKey)
-      alreadyMarkedAsFailed = true
       throw simpleError('unauthorized', errorMsg)
     }
 
@@ -194,7 +183,7 @@ export async function startBuild(
         updated_at: new Date().toISOString(),
       })
       .eq('builder_job_id', jobId)
-      .eq('app_id', buildRequest.app_id)
+      .eq('app_id', boundAppId)
 
     if (updateError) {
       cloudlogErr({
@@ -221,7 +210,7 @@ export async function startBuild(
         //   - Authorize access to live build logs for the given jobId/appId/user
         //   - Stream logs directly to the CLI without going through this API as a proxy
         // If the direct URL and token are not provided, the CLI fails to get the logs of the build.
-        logsToken = await generateLogStreamToken(jobId, apikey.user_id, appId, jwtSecret)
+        logsToken = await generateLogStreamToken(jobId, apikey.user_id, boundAppId, jwtSecret)
         logsUrl = `${publicUrl}/build_logs_direct/${jobId}`
 
         cloudlog({
@@ -257,7 +246,7 @@ export async function startBuild(
   }
   catch (error) {
     // Mark build as failed for any unexpected error (but only if not already marked)
-    if (!alreadyMarkedAsFailed && apikeyKey) {
+    if (!alreadyMarkedAsFailed && apikeyKey && !(error instanceof HTTPException)) {
       const errorMsg = error instanceof Error ? error.message : String(error)
       await markBuildAsFailed(c, jobId, errorMsg, apikeyKey)
     }

@@ -31,12 +31,8 @@ app.post('/request', middlewareKey(['all', 'write']), async (c) => {
 // POST /build/start/:jobId - Start a build after uploading bundle
 app.post('/start/:jobId', middlewareKey(['all', 'write']), async (c) => {
   const jobId = c.req.param('jobId')
-  const body = await getBodyOrQuery<{ app_id: string }>(c)
-  if (!body.app_id) {
-    throw new Error('app_id is required in request body')
-  }
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-  return startBuild(c, jobId, body.app_id, apikey)
+  return startBuild(c, jobId, apikey)
 })
 
 // GET /build/status - Get build status and record billing
@@ -60,12 +56,8 @@ app.get('/logs/:jobId', middlewareKey(['all', 'read']), async (c) => {
 // POST /build/cancel/:jobId - Cancel a running build
 app.post('/cancel/:jobId', middlewareKey(['all', 'write']), async (c) => {
   const jobId = c.req.param('jobId')
-  const body = await getBodyOrQuery<{ app_id: string }>(c)
-  if (!body.app_id) {
-    throw new Error('app_id is required in request body')
-  }
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-  return cancelBuild(c, jobId, body.app_id, apikey)
+  return cancelBuild(c, jobId, apikey)
 })
 
 function tusOptionsResponse() {
