@@ -41,7 +41,7 @@ RETURNS TABLE (
     enforce_encrypted_bundles boolean,
     required_encryption_key character varying,
     use_new_rbac boolean
-) LANGUAGE plpgsql STABLE SECURITY DEFINER
+) LANGUAGE plpgsql VOLATILE SECURITY DEFINER
 SET search_path = '' AS $$
 BEGIN
   RETURN QUERY
@@ -151,7 +151,7 @@ BEGIN
     END AS role,
     CASE
       WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN false
-      ELSE (si.status = 'succeeded')
+      ELSE COALESCE(si.status = 'succeeded', false)
     END AS paying,
     CASE
       WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN 0
@@ -159,13 +159,13 @@ BEGIN
     END AS trial_left,
     CASE
       WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN false
-      ELSE ((si.status = 'succeeded' AND si.is_good_plan = true)
+      ELSE COALESCE((si.status = 'succeeded' AND si.is_good_plan = true)
         OR (si.trial_at::date - NOW()::date > 0)
-        OR COALESCE(ucb.available_credits, 0) > 0)
+        OR COALESCE(ucb.available_credits, 0) > 0, false)
     END AS can_use_more,
     CASE
       WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN false
-      ELSE (si.status = 'canceled')
+      ELSE COALESCE(si.status = 'canceled', false)
     END AS is_canceled,
     CASE
       WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN 0::bigint

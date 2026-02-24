@@ -60,7 +60,7 @@ const showBanner = computed(() => {
   return isTrial.value && isAccountOldEnough.value && hasApps.value
 })
 
-const MAX_TRAVEL = 4 // How far the pupil can move from center (px)
+const maxTravel = 4 // How far the pupil can move from center (px)
 
 function calcOffset(eye: HTMLElement | null, ev: MouseEvent) {
   if (!eye)
@@ -78,7 +78,7 @@ function calcOffset(eye: HTMLElement | null, ev: MouseEvent) {
     return { x: 0, y: 0 }
 
   // Easing factor so they don't jump to the edge instantly
-  const easedDist = Math.min(dist * 0.1, MAX_TRAVEL)
+  const easedDist = Math.min(dist * 0.1, maxTravel)
 
   return {
     x: (dx / dist) * easedDist,
@@ -86,7 +86,7 @@ function calcOffset(eye: HTMLElement | null, ev: MouseEvent) {
   }
 }
 
-const EXCITE_DISTANCE = 80 // px from CTA edge to trigger excitement
+const exciteDistance = 80 // px from CTA edge to trigger excitement
 
 function distToRect(x: number, y: number, rect: DOMRect): number {
   const dx = Math.max(rect.left - x, 0, x - rect.right)
@@ -102,7 +102,7 @@ function handleMouseMove(e: MouseEvent) {
   if (ctaRef.value) {
     const el = ctaRef.value.$el ?? ctaRef.value
     const ctaRect = (el as HTMLElement).getBoundingClientRect()
-    excited.value = distToRect(e.clientX, e.clientY, ctaRect) < EXCITE_DISTANCE
+    excited.value = distToRect(e.clientX, e.clientY, ctaRect) < exciteDistance
   }
 }
 
@@ -163,7 +163,7 @@ onUnmounted(() => {
       <router-link
         ref="ctaRef"
         to="/settings/organization/plans"
-        class="cta-button cta-sparkle"
+        class="d-btn cta-button cta-sparkle"
       >
         {{ t('trial-banner-cta') }}
       </router-link>
