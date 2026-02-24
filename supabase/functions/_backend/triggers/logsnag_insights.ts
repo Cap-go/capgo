@@ -590,6 +590,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     res.build_stats,
   ])
   const not_paying = users - customers.total - plans.Trial
+  const org_conversion_rate = orgs > 0 ? (customers.total * 100) / orgs : 0
   cloudlog({
     requestId: c.get('requestId'),
     message: 'All Promises',
@@ -622,6 +623,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     users_active: actives.users,
     stars,
     paying: customers.total,
+    org_conversion_rate,
     paying_yearly: customers.yearly,
     paying_monthly: customers.monthly,
     onboarded,
@@ -691,6 +693,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       success_rate,
       registers_today,
       storage_gb: bundle_storage_gb,
+      org_conversion_rate: Number(org_conversion_rate.toFixed(2)),
     },
     icon: '📲',
   }).catch((e: any) => {
@@ -761,6 +764,11 @@ app.post('/', middlewareAPISecret, async (c) => {
       title: 'Orgs paying',
       value: customers.total,
       icon: '💰',
+    },
+    {
+      title: 'Org conversion rate',
+      value: `${org_conversion_rate.toFixed(2)}%`,
+      icon: '🎯',
     },
     {
       title: 'Orgs yearly',
