@@ -8,12 +8,12 @@
  *
  * Visibility conditions:
  * - User is on trial (not paying, trial_left > 0)
- * - Account is 3+ hours old (based on subscription_start)
+ * - Account is 3+ hours old (based on org created_at)
  * - Organization has at least 1 app
  */
 
 import type { ComponentPublicInstance } from 'vue'
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -30,6 +30,11 @@ const rightPupil = ref({ x: 0, y: 0 })
 
 const currentOrg = computed(() => organizationStore.currentOrganization)
 
+// Reactive time tick so the 3-hour age check re-evaluates without needing a page reload.
+// Updates every 60s — plenty for a 3-hour threshold.
+const nowTick = ref(Date.now())
+let tickInterval: ReturnType<typeof setInterval> | null = null
+
 const isTrial = computed(() => {
   const org = currentOrg.value
   if (!org)
@@ -39,11 +44,11 @@ const isTrial = computed(() => {
 
 const isAccountOldEnough = computed(() => {
   const org = currentOrg.value
-  if (!org?.subscription_start)
+  if (!org?.created_at)
     return false
-  const subscriptionStart = new Date(org.subscription_start)
-  const threeHoursAgo = new Date(Date.now() - 3 * 60 * 60 * 1000)
-  return subscriptionStart < threeHoursAgo
+  const createdAt = new Date(org.created_at)
+  const threeHoursAgo = new Date(nowTick.value - 3 * 60 * 60 * 1000)
+  return createdAt < threeHoursAgo
 })
 
 const hasApps = computed(() => {
@@ -90,6 +95,8 @@ function distToRect(x: number, y: number, rect: DOMRect): number {
 }
 
 function handleMouseMove(e: MouseEvent) {
+  if (!showBanner.value)
+    return
   leftPupil.value = calcOffset(leftEye.value, e)
   rightPupil.value = calcOffset(rightEye.value, e)
   if (ctaRef.value) {
@@ -99,12 +106,25 @@ function handleMouseMove(e: MouseEvent) {
   }
 }
 
+// Only attach the mousemove listener when the banner is actually visible.
+// This avoids per-mousemove reactive work for non-trial / paying users.
+watch(showBanner, (visible) => {
+  if (visible)
+    window.addEventListener('mousemove', handleMouseMove)
+  else
+    window.removeEventListener('mousemove', handleMouseMove)
+}, { immediate: true })
+
 onMounted(() => {
-  window.addEventListener('mousemove', handleMouseMove)
+  tickInterval = setInterval(() => {
+    nowTick.value = Date.now()
+  }, 60_000)
 })
 
 onUnmounted(() => {
   window.removeEventListener('mousemove', handleMouseMove)
+  if (tickInterval)
+    clearInterval(tickInterval)
 })
 </script>
 
