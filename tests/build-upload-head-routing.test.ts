@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { app } from '../supabase/functions/_backend/public/build/index.ts'
 
+// Intentionally uses app.request() as a lightweight routing smoke test:
+// this validates Hono HEAD-via-GET matching and guard ordering before worker/binding setup.
 describe('build upload HEAD routing', () => {
   it.concurrent('routes HEAD /upload/:jobId/* through auth middleware', async () => {
     const response = await app.request(new Request('http://localhost/upload/test-job/file.zip', {
