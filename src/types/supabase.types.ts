@@ -3250,6 +3250,7 @@ export type Database = {
               "2fa_has_access": boolean
               app_count: number
               can_use_more: boolean
+              created_at: string
               created_by: string
               credit_available: number
               credit_next_expiration: string
@@ -3284,6 +3285,7 @@ export type Database = {
               "2fa_has_access": boolean
               app_count: number
               can_use_more: boolean
+              created_at: string
               created_by: string
               credit_available: number
               credit_next_expiration: string

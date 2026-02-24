@@ -1469,6 +1469,8 @@
   "transfer-app-ownership": "转让应用程序所有权",
   "transfer-app-ownership-requirements": "要在组织间传输应用程序，您必须在源组织和目标组织中都拥有 super_admin 权限。这可确保所有权的安全转移，并防止未经授权的访问。",
   "transfer-app-ownership-too-soon": "每 32 天只能传输一次应用程序",
+  "trial-banner-cta": "查看计划",
+  "trial-banner-message": "享受您的 Capgo 试用版？订阅计划。",
   "trial-end-date": "试用结束日期",
   "trial-left": "剩余天数",
   "trial-organizations-list": "试用组织列表",

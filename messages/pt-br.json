@@ -1469,6 +1469,8 @@
   "transfer-app-ownership": "Transferir propriedade do aplicativo",
   "transfer-app-ownership-requirements": "Para transferir um aplicativo entre organizações, você deve ter privilégios de super_administrador em ambas as organizações de origem e destino. Isso garante a transferência segura da propriedade e evita o acesso não autorizado.",
   "transfer-app-ownership-too-soon": "Você só pode transferir aplicativos a cada 32 dias.",
+  "trial-banner-cta": "Exibir planos",
+  "trial-banner-message": "Está gostando do teste do Capgo? Assine um plano.",
   "trial-end-date": "Data de término do teste",
   "trial-left": "dias restantes",
   "trial-organizations-list": "Lista de organizações em teste",

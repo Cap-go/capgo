@@ -1469,6 +1469,8 @@
   "transfer-app-ownership": "Chuyển quyền sở hữu ứng dụng",
   "transfer-app-ownership-requirements": "Để chuyển một ứng dụng giữa các tổ chức, bạn phải có quyền super_admin trong cả tổ chức nguồn và đích. Điều này đảm bảo việc chuyển giao sở hữu an toàn và ngăn chặn truy cập không được phép.",
   "transfer-app-ownership-too-soon": "Bạn chỉ có thể chuyển ứng dụng mỗi 32 ngày",
+  "trial-banner-cta": "Xem các gói",
+  "trial-banner-message": "Bạn đang trải nghiệm bản dùng thử Capgo? Hãy đăng ký gói dịch vụ.",
   "trial-end-date": "Ngày kết thúc dùng thử",
   "trial-left": "còn lại các ngày",
   "trial-organizations-list": "Danh sách tổ chức dùng thử",
