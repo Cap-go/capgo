@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import { computedAsync } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
@@ -384,12 +385,27 @@ async function save2faEnforcement(value: boolean) {
   isSaving.value = true
 
   try {
-    const { error } = await supabase
-      .from('orgs')
-      .update({ enforcing_2fa: value })
-      .eq('id', currentOrganization.value.gid)
+    const { error } = await supabase.functions.invoke('organization', {
+      method: 'PUT',
+      body: {
+        orgId: currentOrganization.value.gid,
+        enforcing_2fa: value,
+      },
+    })
 
     if (error) {
+      if (error instanceof FunctionsHttpError && error.context instanceof Response) {
+        try {
+          const payload = await error.context.clone().json<{ error?: string }>()
+          if (payload.error === 'requires_2fa_to_enforce_2fa') {
+            toast.error(t('2fa-enforcement-self-2fa-required'))
+            return
+          }
+        }
+        catch {
+          console.warn('Could not parse org security function error payload')
+        }
+      }
       console.error('Error updating 2FA enforcement:', error)
       toast.error(t('error-saving-settings'))
       return
