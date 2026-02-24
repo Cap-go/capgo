@@ -5,7 +5,7 @@ import { z } from 'zod/mini'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { createSignedImageUrl, normalizeImagePath } from '../../utils/storage.ts'
-import { apikeyHasOrgRightWithPolicy, supabaseApikey } from '../../utils/supabase.ts'
+import { apikeyHasOrgRightWithPolicy, supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
   orgId: z.string(),
@@ -15,6 +15,7 @@ const bodySchema = z.object({
   require_apikey_expiration: z.optional(z.boolean()),
   max_apikey_expiration_days: z.optional(z.nullable(z.number())),
   enforce_hashed_api_keys: z.optional(z.boolean()),
+  enforcing_2fa: z.optional(z.boolean()),
 })
 
 function parseBody(bodyRaw: unknown) {
@@ -68,7 +69,21 @@ function buildUpdateFields(body: z.infer<typeof bodySchema>) {
     updateFields.max_apikey_expiration_days = body.max_apikey_expiration_days
   if (body.enforce_hashed_api_keys !== undefined)
     updateFields.enforce_hashed_api_keys = body.enforce_hashed_api_keys
+  if (body.enforcing_2fa !== undefined)
+    updateFields.enforcing_2fa = body.enforcing_2fa
   return updateFields
+}
+
+async function enforceSelf2faRequirement(authUserId: string, c: Context<MiddlewareKeyVariables>) {
+  const { data: has2faEnabled, error } = await supabaseAdmin(c)
+    .rpc('has_2fa_enabled', { user_id: authUserId })
+
+  if (error) {
+    throw quickError(500, 'cannot_check_2fa', 'Cannot verify your 2FA status', { error: error.message })
+  }
+  if (!has2faEnabled) {
+    throw simpleError('requires_2fa_to_enforce_2fa', 'You must enable 2FA before enforcing it for your organization')
+  }
 }
 
 async function updateOrg(
@@ -93,9 +108,18 @@ async function updateOrg(
 export async function put(c: Context<MiddlewareKeyVariables>, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
   const body = parseBody(bodyRaw)
   const supabase = supabaseApikey(c, apikey.key)
+  const authUserId = c.get('auth')?.userId
 
   // Auth context is already set by middlewareKey
   await ensureOrgAccess(c, apikey, body.orgId, supabase)
+
+  if (body.enforcing_2fa && authUserId) {
+    await enforceSelf2faRequirement(authUserId, c)
+  }
+  else if (body.enforcing_2fa) {
+    throw simpleError('cannot_access_organization', 'You can\\'t access this organization', { orgId: body.orgId })
+  }
+
   validateMaxExpirationDays(body.max_apikey_expiration_days)
   const updateFields = buildUpdateFields(body)
   const dataOrg = await updateOrg(supabase, body.orgId, updateFields)
