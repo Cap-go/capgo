@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import Stripe from 'stripe'
+import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { getEnv, isStripeConfigured } from './utils.ts'
@@ -239,9 +240,10 @@ export async function syncSubscriptionData(c: Context, customerId: string, subsc
 export async function createPortal(c: Context, customerId: string, callbackUrl: string) {
   if (!isStripeConfigured(c))
     return { url: '' }
+  const allowedReturnUrl = getAllowedRedirectUrl(c, callbackUrl, 'return_url')
   const session = await getStripe(c).billingPortal.sessions.create({
     customer: customerId,
-    return_url: callbackUrl,
+    return_url: allowedReturnUrl,
   })
   return { url: session.url }
 }
@@ -324,12 +326,14 @@ export async function createCheckout(c: Context, customerId: string, recurrence:
   if (!prices.priceId)
     return Promise.reject(new Error('Cannot find price'))
   const metadata = attributionId ? { attribution_id: attributionId } : undefined
+  const allowedSuccessUrl = getAllowedRedirectUrl(c, successUrl, 'success_url')
+  const allowedCancelUrl = getAllowedRedirectUrl(c, cancelUrl, 'cancel_url')
   const session = await getStripe(c).checkout.sessions.create({
     billing_address_collection: 'auto',
     mode: 'subscription',
     customer: customerId,
-    success_url: `${successUrl}?success=true`,
-    cancel_url: cancelUrl,
+    success_url: `${allowedSuccessUrl}?success=true`,
+    cancel_url: allowedCancelUrl,
     automatic_tax: { enabled: true },
     client_reference_id: clientReferenceId,
     metadata,
@@ -383,14 +387,16 @@ export async function createOneTimeCheckout(
   if (!priceId)
     throw new Error(`Cannot find one-time price for product ${productId}`)
 
-  const successUrlWithFlag = successUrl.includes('?') ? `${successUrl}&success=true` : `${successUrl}?success=true`
+  const allowedSuccessUrl = getAllowedRedirectUrl(c, successUrl, 'success_url')
+  const allowedCancelUrl = getAllowedRedirectUrl(c, cancelUrl, 'cancel_url')
+  const successUrlWithFlag = allowedSuccessUrl.includes('?') ? `${allowedSuccessUrl}&success=true` : `${allowedSuccessUrl}?success=true`
 
   const session = await getStripe(c).checkout.sessions.create({
     billing_address_collection: 'auto',
     mode: 'payment',
     customer: customerId,
     success_url: successUrlWithFlag,
-    cancel_url: cancelUrl,
+    cancel_url: allowedCancelUrl,
     automatic_tax: { enabled: true },
     client_reference_id: clientReferenceId,
     customer_update: {
@@ -416,6 +422,27 @@ export async function createOneTimeCheckout(
     },
   })
   return { url: session.url }
+}
+
+function getAllowedRedirectUrl(c: Context, value: string, field: 'return_url' | 'success_url' | 'cancel_url') {
+  const baseWebAppUrl = getEnv(c, 'WEBAPP_URL')
+  if (!baseWebAppUrl)
+    throw simpleError('invalid_redirect_url', 'WEBAPP_URL is not configured', { field })
+
+  let baseUrl: URL
+  let redirectUrl: URL
+  try {
+    baseUrl = new URL(baseWebAppUrl)
+    redirectUrl = new URL(value, baseUrl)
+  }
+  catch {
+    throw simpleError('invalid_redirect_url', `Invalid ${field}`, { field, value })
+  }
+
+  if (baseUrl.origin !== redirectUrl.origin)
+    throw simpleError('invalid_redirect_url', `Invalid ${field}`, { field, value, expectedOrigin: baseUrl.origin })
+
+  return redirectUrl.toString()
 }
 
 export interface StripeCustomer {
