@@ -537,3 +537,26 @@ deleteSSOProvider(c: Context, providerId: string): Promise<void>
 - **Isolation pattern**: Created dedicated org with `randomUUID()` per test run. Reused `test@capgo.app` JWT for auth (read-only, safe for parallel execution). Cleanup in `afterAll`
 - **quickError**: Returns `never` (throws HTTPException), so calls without `return` in providers.ts are correct
 - **Route structure**: SSO routes mounted at `/private/sso/*` in `supabase/functions/private/index.ts`
+
+
+## SSO Test Files (Task 8)
+
+### Playwright E2E Tests (`playwright/e2e/sso-login.spec.ts`)
+- Import `test` and `expect` from `../support/commands` (not directly from `@playwright/test`)
+- The `commands.ts` extends the base test with a `page.login()` helper
+- Existing tests use `data-test` attributes as selectors exclusively
+- The login.vue two-step flow: Step 1 (email + Continue) → Step 2 (password or SSO)
+- `statusAuth` ref controls which step is shown: `'email'` | `'credentials'` | `'2fa'`
+- Go-back button has no `data-test` attr — use `p` element with `←` text filter
+- Non-SSO domains fall through to password step; `checkDomain()` returns `{ has_sso: false }` on failure
+
+### Backend Tests (`tests/sso-verify-dns.test.ts`)
+- Follow exact pattern from `tests/sso.test.ts`: `getAuthHeaders()`, `fetchWithRetry()`, `getEndpointUrl()`
+- verify-dns endpoint uses `middlewareAuth` — returns 401 with `no_jwt_apikey_or_subkey` without auth
+- Non-existent provider_id returns 404 with `provider_not_found` error code
+- Use `it.concurrent()` for parallel test execution within file
+- No shared seed data needed — tests only read (non-existent) data
+
+### Existing auth.spec.ts Observation
+- The existing `auth.spec.ts` tests reference `[data-test="password"]` and `[data-test="submit"]` directly
+  which are Step 2 elements in the new two-step flow. These tests may need updating for the new flow.
