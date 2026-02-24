@@ -19,7 +19,7 @@ BEGIN
   v_user_id := public.get_identity('{read,upload,write,all}'::public.key_mode[]);
   v_is_service_role := (
     ((SELECT auth.jwt() ->> 'role') = 'service_role')
-    OR ((SELECT current_user) IS NOT DISTINCT FROM 'postgres')
+    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
   );
 
   IF NOT v_is_service_role THEN
@@ -58,7 +58,7 @@ DECLARE
 BEGIN
   v_is_service_role := (
     ((SELECT auth.jwt() ->> 'role') = 'service_role')
-    OR ((SELECT current_user) IS NOT DISTINCT FROM 'postgres')
+    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
   );
 
   IF NOT v_is_service_role THEN
@@ -86,11 +86,10 @@ BEGIN
     FROM public.org_users o
     JOIN public.users ON users.id = o.user_id
     WHERE o.org_id = get_org_members.guild_id
-    AND public.is_member_of_org(users.id, o.org_id)
   UNION
     -- Get pending invitations from tmp_users
     SELECT
-      ((SELECT COALESCE(MAX(id), 0) FROM public.org_users) + tmp.id)::bigint AS aid,
+      (-tmp.id)::bigint AS aid,
       tmp.future_uuid AS uid,
       tmp.email::varchar,
       ''::varchar AS image_url,
@@ -108,7 +107,6 @@ ALTER FUNCTION "public"."get_org_members" ("guild_id" "uuid") OWNER TO "postgres
 
 GRANT EXECUTE ON FUNCTION "public"."get_org_members" ("guild_id" "uuid") TO "authenticated";
 GRANT EXECUTE ON FUNCTION "public"."get_org_members" ("guild_id" "uuid") TO "service_role";
-GRANT EXECUTE ON FUNCTION "public"."get_org_members" ("user_id" uuid, "guild_id" uuid) TO "authenticated";
 GRANT EXECUTE ON FUNCTION "public"."get_org_members" ("user_id" uuid, "guild_id" uuid) TO "service_role";
 REVOKE ALL ON FUNCTION "public"."get_org_members" ("guild_id" "uuid") FROM PUBLIC;
 REVOKE ALL ON FUNCTION "public"."get_org_members" ("user_id" uuid, "guild_id" uuid) FROM PUBLIC;
@@ -128,11 +126,11 @@ DECLARE
     v_user_id uuid;
     v_is_service_role boolean;
 BEGIN
-    v_user_id := public.get_identity('{read,upload,write,all}'::public.key_mode[]);
-    v_is_service_role := (
-      ((SELECT auth.jwt() ->> 'role') = 'service_role')
-      OR ((SELECT current_user) IS NOT DISTINCT FROM 'postgres')
-    );
+  v_user_id := public.get_identity('{read,upload,write,all}'::public.key_mode[]);
+  v_is_service_role := (
+    ((SELECT auth.jwt() ->> 'role') = 'service_role')
+    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
+  );
 
     IF NOT v_is_service_role THEN
       IF v_user_id IS NULL OR NOT (
@@ -144,6 +142,7 @@ BEGIN
           NULL::bigint
         )
       ) THEN
+        PERFORM public.pg_log('deny: NO_RIGHTS', jsonb_build_object('org_id', check_org_members_password_policy.org_id, 'uid', v_user_id));
         RAISE EXCEPTION 'NO_RIGHTS';
       END IF;
     END IF;
