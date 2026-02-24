@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
+import { isUploadReplicationEvent, showUploadReplicationToast } from '~/services/updateReplicationToast'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -94,13 +95,25 @@ export function useRealtimeCLIFeed() {
     const title = `${icon} ${payload.event}`
     const description = payload.description
       ?? (payload.app_id ? `App: ${payload.app_id}` : undefined)
+    const actionLabel = t('view')
+    const onAction = route ? () => router.push(route) : undefined
+
+    if (isUploadReplicationEvent(payload.event)) {
+      showUploadReplicationToast({
+        eventLabel: payload.event,
+        route,
+        actionLabel,
+        onAction,
+      })
+      return
+    }
 
     if (route) {
       toast(title, {
         description,
         duration: 15000,
         action: {
-          label: t('view'),
+          label: actionLabel,
           onClick: () => router.push(route),
         },
       })
