@@ -138,6 +138,20 @@ Capgo relies on two layered caches for plugin endpoints (`/updates`, `/stats`, `
 - **Docker** - Required for Supabase local development
 - **Supabase CLI** - Database and functions management
 
+### Command phrasing
+
+1. Front-facing instructions (docs, onboarding, tooltips, demos, and customer-facing help):
+   - Use `npx` for runnable command examples and keep `npx` in those public snippets.
+   - Do not mention internal execution tooling preferences in this customer-facing context.
+
+2. Internal tooling and internal documentation:
+   - Prefer Bun tooling (`bun`/`bunx`) for repository maintenance, scripts, and internal workflows.
+
+3. Capgo CLI references:
+   - When explicitly discussing the Capgo CLI command itself, always use `@latest`.
+   - Use the public shape like `npx @capgo/cli@latest ...` for customer-facing command examples.
+   - Use internal execution equivalents (for example, `bunx @capgo/cli@latest ...`) only in internal tooling context.
+
 ### Environment Setup
 
 1. Install dependencies: `bun install`
