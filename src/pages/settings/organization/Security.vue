@@ -13,6 +13,7 @@ import IconLock from '~icons/heroicons/lock-closed'
 import IconShield from '~icons/heroicons/shield-check'
 import IconUser from '~icons/heroicons/user'
 import { checkPermissions } from '~/services/permissions'
+import SsoConfiguration from '~/components/organizations/SsoConfiguration.vue'
 import { createSignedImageUrl } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -1389,6 +1390,24 @@ onMounted(async () => {
                 </div>
               </div>
             </div>
+          </section>
+
+          <!-- SSO Configuration Section (Enterprise only) -->
+          <section v-if="hasOrgPerm" class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
+            <div class="flex items-start gap-4 mb-6">
+              <div class="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30">
+                <IconShield class="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <h3 class="text-lg font-semibold dark:text-white text-slate-800">
+                  SSO Configuration
+                </h3>
+                <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                  Configure SAML 2.0 Single Sign-On for your organization. Requires Enterprise plan.
+                </p>
+              </div>
+            </div>
+            <SsoConfiguration v-if="currentOrganization?.gid" :org-id="currentOrganization.gid" />
           </section>
 
           <!-- Permission notice for non-super-admins -->
