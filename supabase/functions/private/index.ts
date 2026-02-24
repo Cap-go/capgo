@@ -23,6 +23,7 @@ import { app as sso_check_domain } from '../_backend/private/sso/check-domain.ts
 import { app as sso_check_enforcement } from '../_backend/private/sso/check-enforcement.ts'
 import { app as sso_prelink } from '../_backend/private/sso/prelink.ts'
 import { app as sso_providers } from '../_backend/private/sso/providers.ts'
+import { app as sso_verify_dns } from '../_backend/private/sso/verify-dns.ts'
 import { app as stats_priv } from '../_backend/private/stats.ts'
 import { app as storeTop } from '../_backend/private/store_top.ts'
 import { app as stripe_checkout } from '../_backend/private/stripe_checkout.ts'
@@ -69,6 +70,7 @@ appGlobal.route('/sso/check-domain', sso_check_domain)
 appGlobal.route('/sso/check-enforcement', sso_check_enforcement)
 appGlobal.route('/sso/providers', sso_providers)
 appGlobal.route('/sso/prelink-users', sso_prelink)
+appGlobal.route('/sso/verify-dns', sso_verify_dns)
 
 createAllCatch(appGlobal, functionName)
 Deno.serve(appGlobal.fetch)
