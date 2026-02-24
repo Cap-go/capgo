@@ -1393,6 +1393,8 @@
   "transfer-app-ownership": "Trasferisci la proprietà dell'app",
   "transfer-app-ownership-requirements": "Per trasferire un'app tra organizzazioni, devi avere privilegi di super_admin sia nell'organizzazione di origine che in quella di destinazione. Questo garantisce un trasferimento sicuro della proprietà e previene l'accesso non autorizzato.",
   "transfer-app-ownership-too-soon": "Puoi trasferire le app solo ogni 32 giorni",
+  "trial-banner-cta": "Visualizza i piani",
+  "trial-banner-message": "Vi piace la prova di Capgo? Abbonatevi a un piano.",
   "trial-end-date": "Data fine prova",
   "trial-left": "giorni rimanenti",
   "trial-organizations-list": "Elenco organizzazioni in prova",

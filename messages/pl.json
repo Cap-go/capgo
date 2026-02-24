@@ -1393,6 +1393,8 @@
   "transfer-app-ownership": "Przenieś własność aplikacji",
   "transfer-app-ownership-requirements": "Aby przenieść aplikację między organizacjami, musisz mieć uprawnienia super_admina zarówno w organizacji źródłowej, jak i docelowej. Zapewnia to bezpieczne przeniesienie własności i zapobiega nieautoryzowanemu dostępowi.",
   "transfer-app-ownership-too-soon": "Możesz przenosić aplikacje tylko co 32 dni.",
+  "trial-banner-cta": "Wyświetl plany",
+  "trial-banner-message": "Korzystasz z okresu próbnego Capgo? Subskrybuj plan.",
   "trial-end-date": "Data zakończenia okresu próbnego",
   "trial-left": "pozostałe dni",
   "trial-organizations-list": "Lista organizacji w okresie próbnym",

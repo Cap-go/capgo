@@ -1393,6 +1393,8 @@
   "transfer-app-ownership": "앱 소유권 이전",
   "transfer-app-ownership-requirements": "앱을 조직 간에 전송하려면 소스 및 대상 조직에서 모두 super_admin 권한이 있어야 합니다. 이는 소유권의 안전한 전송을 보장하고 무단 접근을 방지합니다.",
   "transfer-app-ownership-too-soon": "앱을 32일마다 한 번만 이전할 수 있습니다.",
+  "trial-banner-cta": "요금제 보기",
+  "trial-banner-message": "Capgo 체험을 즐기고 계신가요? 요금제를 구독하세요.",
   "trial-end-date": "체험 종료일",
   "trial-left": "남은 날들",
   "trial-organizations-list": "체험 조직 목록",

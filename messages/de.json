@@ -1393,6 +1393,8 @@
   "transfer-app-ownership": "Übertragung der App-Besitzrechte",
   "transfer-app-ownership-requirements": "Um eine App zwischen Organisationen zu übertragen, müssen Sie in beiden Quell- und Zielorganisationen Super-Admin-Berechtigungen haben. Dies gewährleistet eine sichere Übertragung des Eigentums und verhindert unbefugten Zugriff.",
   "transfer-app-ownership-too-soon": "Sie können Apps nur alle 32 Tage übertragen.",
+  "trial-banner-cta": "Pläne ansehen",
+  "trial-banner-message": "Gefällt Ihnen Ihre Capgo-Testversion? Abonnieren Sie einen Plan.",
   "trial-end-date": "Enddatum der Testphase",
   "trial-left": "verbleibende Tage",
   "trial-organizations-list": "Liste der Test-Organisationen",

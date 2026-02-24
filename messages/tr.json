@@ -1393,6 +1393,8 @@
   "transfer-app-ownership": "Uygulama sahipliğini aktar",
   "transfer-app-ownership-requirements": "Bir uygulamayı organizasyonlar arasında aktarmak için, hem kaynak hem de hedef organizasyonlarda super_admin ayrıcalıklarına sahip olmanız gerekir. Bu, mülkiyetin güvenli bir şekilde aktarılmasını sağlar ve yetkisiz erişimi önler.",
   "transfer-app-ownership-too-soon": "Yalnızca her 32 günde bir uygulamaları aktarabilirsiniz.",
+  "trial-banner-cta": "Planları görüntüle",
+  "trial-banner-message": "Capgo deneme sürümünüzü beğendiniz mi? Bir plana abone olun.",
   "trial-end-date": "Deneme Bitiş Tarihi",
   "trial-left": "kalan günler",
   "trial-organizations-list": "Deneme Organizasyonları Listesi",

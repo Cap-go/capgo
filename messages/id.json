@@ -1393,6 +1393,8 @@
   "transfer-app-ownership": "Transfer kepemilikan aplikasi",
   "transfer-app-ownership-requirements": "Untuk mentransfer aplikasi antara organisasi, Anda harus memiliki hak istimewa super_admin di kedua organisasi sumber dan tujuan. Ini memastikan transfer kepemilikan yang aman dan mencegah akses tidak sah.",
   "transfer-app-ownership-too-soon": "Anda hanya dapat mentransfer aplikasi setiap 32 hari",
+  "trial-banner-cta": "Lihat paket",
+  "trial-banner-message": "Menikmati uji coba Capgo Anda? Berlangganan ke sebuah paket.",
   "trial-end-date": "Tanggal akhir uji coba",
   "trial-left": "sisa hari",
   "trial-organizations-list": "Daftar organisasi uji coba",
