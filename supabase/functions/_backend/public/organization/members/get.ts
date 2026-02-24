@@ -15,7 +15,7 @@ const bodySchema = z.object({
 const memberSchema = z.array(z.object({
   uid: z.uuid(),
   email: z.email(),
-  image_url: z.string().nullable().optional(),
+  image_url: z.nullable(z.optional(z.string())),
   role: z.enum([
     'invite_read',
     'invite_upload',
