@@ -42,40 +42,6 @@ export interface JWTClaims {
 }
 
 /**
- * Decode JWT claims without verifying the signature.
- * WARNING: Only use for non-security-critical reads (e.g. logging, display).
- * For authentication, always use {@link verifyJWT} instead.
- */
-export function getClaimsFromJWT(jwt: string): JWTClaims | null {
-  try {
-    // Remove "Bearer " prefix if present
-    const token = jwt.startsWith('Bearer ') ? jwt.slice(7) : jwt
-
-    const parts = token.split('.')
-    if (parts.length !== 3) {
-      return null
-    }
-
-    // Decode the payload (second part)
-    // Handle base64url encoding (replace - with + and _ with /)
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-    // Add padding if needed
-    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4)
-    const payload = JSON.parse(atob(padded))
-
-    // Check if token is expired
-    if (payload.exp && payload.exp * 1000 < Date.now()) {
-      return null
-    }
-
-    return payload as JWTClaims
-  }
-  catch {
-    return null
-  }
-}
-
-/**
  * Verify JWT signature against the project JWKS and return decoded claims.
  * Uses the Supabase JWKS endpoint to cryptographically verify the token.
  * The JWKS is cached per cold start so subsequent calls are fast.
