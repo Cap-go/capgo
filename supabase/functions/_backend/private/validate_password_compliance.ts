@@ -1,12 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
-import { parseBody, quickError, simpleError, simpleRateLimit, useCors } from '../utils/hono.ts'
+import { verifyCaptchaToken } from '../utils/captcha.ts'
+import { getClaimsFromJWT, parseBody, quickError, simpleError, simpleRateLimit, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { clearFailedAuth, isIPRateLimited, recordFailedAuth } from '../utils/rate_limit.ts'
+import { isIPRateLimited, recordFailedAuth } from '../utils/rate_limit.ts'
 import { buildRateLimitInfo } from '../utils/rateLimitInfo.ts'
 import { emptySupabase, supabaseClient, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
@@ -30,10 +30,6 @@ const bodySchema = z.object({
   password: z.string().check(z.minLength(1)),
   org_id: z.string().check(z.uuid()),
   captcha_token: z.optional(z.string().check(z.minLength(1))),
-})
-
-const captchaSchema = z.object({
-  success: z.boolean(),
 })
 
 // Check if password meets the policy requirements
@@ -109,7 +105,11 @@ app.post('/', async (c) => {
   cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance raw body', rawBody: bodyWithoutPassword })
 
   const captchaSecret = getEnv(c, 'CAPTCHA_SECRET_KEY')
-  if (captchaSecret.length > 0) {
+  const authorization = c.req.header('authorization')
+  const sessionClaims = authorization ? getClaimsFromJWT(authorization) : null
+  const isAuthenticatedCaller = Boolean(sessionClaims?.sub && sessionClaims.email)
+
+  if (captchaSecret.length > 0 && !isAuthenticatedCaller) {
     if (!body.captcha_token) {
       throw simpleError('invalid_request', 'Captcha token is required')
     }
@@ -133,8 +133,6 @@ app.post('/', async (c) => {
     cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - login failed', error: signInError?.message })
     return quickError(401, 'invalid_credentials', 'Invalid email or password')
   }
-
-  await clearFailedAuth(c)
 
   const userId = signInData.user.id
   const userClient = supabaseClient(c, `Bearer ${signInData.session.access_token}`)
@@ -229,27 +227,3 @@ app.post('/', async (c) => {
     message: 'Password verified and meets organization requirements',
   })
 })
-
-async function verifyCaptchaToken(c: Context, token: string, captchaSecret: string) {
-  const url = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
-  const result = await fetch(url, {
-    body: new URLSearchParams({
-      secret: captchaSecret,
-      response: token,
-    }),
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-  })
-
-  const captchaResult = await result.json()
-  const captchaResultData = captchaSchema.safeParse(captchaResult)
-  if (!captchaResultData.success) {
-    throw simpleError('invalid_captcha', 'Invalid captcha result')
-  }
-  cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance captcha_result', captchaResultData })
-  if (captchaResultData.data.success !== true) {
-    throw simpleError('invalid_captcha', 'Invalid captcha result')
-  }
-}
