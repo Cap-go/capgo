@@ -6,11 +6,25 @@ import { supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
+function normalizeImageStoragePath(path?: string | null) {
+  if (!path)
+    return ''
+
+  const pathWithoutQuery = path.split('?')[0]
+  const signedUrlRegex = /\/storage\/v1\/object\/(?:public\/|sign\/)?images\/(.+)$/
+  const signedUrlMatch = signedUrlRegex.exec(pathWithoutQuery)
+  if (signedUrlMatch?.[1])
+    return signedUrlMatch[1].replace(/^\/+/, '')
+
+  return pathWithoutQuery.replace(/^images\//, '').replace(/^\/+/, '')
+}
+
 // This CRON job cleans up orphaned images from storage
 // - User avatars stored at: images/{user_id}/*
 // - App icons stored at: images/org/{org_id}/{app_id}/icon
 // Images become orphaned when their associated user, org, or app is deleted
 // but the image cleanup failed or was not implemented at deletion time.
+// It also removes stale user avatar files not linked by users.image_url.
 app.post('/', middlewareAPISecret, async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: 'starting cron_clean_orphan_images' })
 
@@ -43,7 +57,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         // Check if user exists
         const { data: user, error: userError } = await supabase
           .from('users')
-          .select('id')
+          .select('id, image_url')
           .eq('id', userId)
           .maybeSingle()
 
@@ -53,7 +67,7 @@ app.post('/', middlewareAPISecret, async (c) => {
           continue
         }
 
-        // If user doesn't exist, delete their images
+        // If user doesn't exist, delete all images in their folder
         if (!user) {
           try {
             const { data: files } = await supabase
@@ -75,6 +89,52 @@ app.post('/', middlewareAPISecret, async (c) => {
             cloudlogErr({ requestId: c.get('requestId'), message: 'error deleting orphaned user images', error, userId })
             errors++
           }
+          continue
+        }
+
+        // User exists: delete stale avatar files not referenced by users.image_url
+        try {
+          const linkedImagePath = normalizeImageStoragePath(user.image_url)
+          const { data: files, error: filesListError } = await supabase
+            .storage
+            .from('images')
+            .list(userId)
+
+          if (filesListError) {
+            cloudlogErr({ requestId: c.get('requestId'), message: 'error listing user images', error: filesListError, userId })
+            errors++
+            continue
+          }
+
+          const filePaths = (files ?? [])
+            .filter(file => file.id !== null)
+            .map(file => `${userId}/${file.name}`)
+          const staleFilePaths = filePaths.filter(path => path !== linkedImagePath)
+
+          if (staleFilePaths.length > 0) {
+            const { error: removeError } = await supabase
+              .storage
+              .from('images')
+              .remove(staleFilePaths)
+
+            if (removeError) {
+              cloudlogErr({ requestId: c.get('requestId'), message: 'error deleting stale user images', error: removeError, userId })
+              errors++
+              continue
+            }
+
+            deletedUserImages += staleFilePaths.length
+            cloudlog({
+              requestId: c.get('requestId'),
+              message: 'deleted stale user images not linked in profile',
+              count: staleFilePaths.length,
+              userId,
+            })
+          }
+        }
+        catch (error) {
+          cloudlogErr({ requestId: c.get('requestId'), message: 'error deleting stale user images', error, userId })
+          errors++
         }
       }
     }
