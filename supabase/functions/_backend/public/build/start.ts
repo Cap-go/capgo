@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
+import { HTTPException } from 'hono/http-exception'
 import { SignJWT } from 'jose'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
@@ -83,21 +84,12 @@ export async function startBuild(
   const apikeyKey = apikey.key ?? c.get('capgkey') ?? apikey.key_hash ?? null
 
   try {
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'Start build request',
-      job_id: jobId,
-      app_id: appId,
-      user_id: apikey.user_id,
-    })
-
     if (!apikeyKey) {
       const errorMsg = 'No API key available to start build'
       cloudlogErr({
         requestId: c.get('requestId'),
         message: 'Missing API key for start build',
         job_id: jobId,
-        app_id: appId,
         user_id: apikey.user_id,
       })
       throw simpleError('not_authorized', errorMsg)
@@ -106,10 +98,26 @@ export async function startBuild(
     // Bind jobId to appId under RLS before calling the builder.
     // This prevents cross-app access by mixing an allowed app_id with another app's jobId.
     const supabase = supabaseApikey(c, apikeyKey)
+
+    // Security: Check if user has permission to manage builds for the supplied app
+    // before validating builder job ownership.
+    if (!(await checkPermission(c, 'app.build_native', { appId }))) {
+      const errorMsg = 'You do not have permission to start builds for this app'
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'Unauthorized start build',
+        job_id: jobId,
+        app_id: appId,
+        user_id: apikey.user_id,
+      })
+      throw simpleError('unauthorized', errorMsg)
+    }
+
     const { data: buildRequest, error: buildRequestError } = await supabase
       .from('build_requests')
       .select('app_id')
       .eq('builder_job_id', jobId)
+      .eq('app_id', appId)
       .maybeSingle()
 
     if (buildRequestError) {
@@ -122,34 +130,27 @@ export async function startBuild(
       throw simpleError('internal_error', 'Failed to fetch build request')
     }
 
-    if (!buildRequest || buildRequest.app_id !== appId) {
+    if (!buildRequest) {
       const errorMsg = 'You do not have permission to start builds for this app'
       cloudlogErr({
         requestId: c.get('requestId'),
-        message: 'Unauthorized start build (job/app mismatch or not accessible)',
+        message: 'Unauthorized start build (job/app mismatch or missing)',
         job_id: jobId,
         app_id: appId,
         user_id: apikey.user_id,
       })
-      await markBuildAsFailed(c, jobId, errorMsg, apikeyKey)
-      alreadyMarkedAsFailed = true
       throw simpleError('unauthorized', errorMsg)
     }
 
-    // Security: Check if user has permission to manage builds (auth context set by middlewareKey)
-    if (!(await checkPermission(c, 'app.build_native', { appId: buildRequest.app_id }))) {
-      const errorMsg = 'You do not have permission to start builds for this app'
-      cloudlogErr({
-        requestId: c.get('requestId'),
-        message: 'Unauthorized start build',
-        job_id: jobId,
-        app_id: appId,
-        user_id: apikey.user_id,
-      })
-      await markBuildAsFailed(c, jobId, errorMsg, apikeyKey)
-      alreadyMarkedAsFailed = true
-      throw simpleError('unauthorized', errorMsg)
-    }
+    const boundAppId = appId
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Start build request',
+      job_id: jobId,
+      app_id: boundAppId,
+      user_id: apikey.user_id,
+    })
 
     // Call builder to start the job
     const builderResponse = await fetch(`${getEnv(c, 'BUILDER_URL')}/jobs/${jobId}/start`, {
@@ -194,7 +195,7 @@ export async function startBuild(
         updated_at: new Date().toISOString(),
       })
       .eq('builder_job_id', jobId)
-      .eq('app_id', buildRequest.app_id)
+      .eq('app_id', boundAppId)
 
     if (updateError) {
       cloudlogErr({
@@ -221,7 +222,7 @@ export async function startBuild(
         //   - Authorize access to live build logs for the given jobId/appId/user
         //   - Stream logs directly to the CLI without going through this API as a proxy
         // If the direct URL and token are not provided, the CLI fails to get the logs of the build.
-        logsToken = await generateLogStreamToken(jobId, apikey.user_id, appId, jwtSecret)
+        logsToken = await generateLogStreamToken(jobId, apikey.user_id, boundAppId, jwtSecret)
         logsUrl = `${publicUrl}/build_logs_direct/${jobId}`
 
         cloudlog({
@@ -257,7 +258,7 @@ export async function startBuild(
   }
   catch (error) {
     // Mark build as failed for any unexpected error (but only if not already marked)
-    if (!alreadyMarkedAsFailed && apikeyKey) {
+    if (!alreadyMarkedAsFailed && apikeyKey && !(error instanceof HTTPException)) {
       const errorMsg = error instanceof Error ? error.message : String(error)
       await markBuildAsFailed(c, jobId, errorMsg, apikeyKey)
     }
