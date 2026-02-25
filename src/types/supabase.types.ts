@@ -2911,6 +2911,10 @@ export type Database = {
           deleted_user_ids: string[]
         }[]
       }
+      delete_group_with_bindings: {
+        Args: { group_id: string }
+        Returns: undefined
+      }
       delete_http_response: { Args: { request_id: number }; Returns: undefined }
       delete_non_compliant_bundles: {
         Args: { org_id: string; required_key?: string }
@@ -3879,7 +3883,10 @@ export type Database = {
         }
         Returns: string
       }
-      record_email_otp_verified: { Args: never; Returns: string }
+      record_email_otp_verified: {
+        Args: { user_id: string }
+        Returns: string
+      }
       refresh_orgs_has_usage_credits: { Args: never; Returns: undefined }
       regenerate_hashed_apikey: {
         Args: { p_apikey_id: number }
