@@ -465,8 +465,8 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
 async function foundJWT(c: Context, jwt: string) {
   cloudlog({ requestId: c.get('requestId'), message: 'JWT provided', jwtPrefix: maskSecret(jwt) })
 
-  // Decode JWT claims without network call (much faster than getUser())
-  const claims = getClaimsFromJWT(jwt)
+  // Decode JWT claims via Supabase Auth `getClaims()`.
+  const claims = await getClaimsFromJWT(c, jwt)
   if (!claims || !claims.sub) {
     cloudlog({ requestId: c.get('requestId'), message: 'Invalid JWT claims' })
     // Record failed auth attempt - await to ensure accurate counting
