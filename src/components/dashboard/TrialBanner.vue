@@ -75,6 +75,12 @@ const showBanner = computed(() => {
   return isTrial.value && isAccountOldEnough.value && hasApps.value
 })
 
+// Whether we need the time tick running — true when the account-age check
+// could still flip (trial user with apps but not yet 3 hours old).
+const needsTick = computed(() => {
+  return isTrial.value && hasApps.value && !isAccountOldEnough.value
+})
+
 const maxTravel = 4 // How far the pupil can move from center (px)
 
 function calcOffset(eye: HTMLElement | null, ev: MouseEvent) {
@@ -121,22 +127,29 @@ function handleMouseMove(e: MouseEvent) {
   }
 }
 
-// Only attach the mousemove listener and time-tick interval when the banner
-// is actually visible. This avoids unnecessary work for non-trial / paying users.
-watch(showBanner, (visible) => {
-  if (visible) {
-    trackBannerEvent('trial_banner_shown')
-    window.addEventListener('mousemove', handleMouseMove)
+// Start the time tick whenever the account-age check could still flip (trial
+// user with apps, but not yet 3 hours old). This lets showBanner turn true
+// without requiring a page reload.
+watch(needsTick, (needed) => {
+  if (needed) {
     tickInterval = setInterval(() => {
       nowTick.value = Date.now()
     }, 60_000)
   }
+  else if (tickInterval) {
+    clearInterval(tickInterval)
+    tickInterval = null
+  }
+}, { immediate: true })
+
+// Only attach the mousemove listener (expensive) when the banner is visible.
+watch(showBanner, (visible) => {
+  if (visible) {
+    trackBannerEvent('trial_banner_shown')
+    window.addEventListener('mousemove', handleMouseMove)
+  }
   else {
     window.removeEventListener('mousemove', handleMouseMove)
-    if (tickInterval) {
-      clearInterval(tickInterval)
-      tickInterval = null
-    }
   }
 }, { immediate: true })
 

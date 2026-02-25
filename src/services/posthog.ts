@@ -54,7 +54,10 @@ export function posthogLoader(supaHost: string) {
   })
 }
 
-export function pushEvent(nameEvent: string, supaHost: string, properties?: Record<string, any>): void {
+type JsonPrimitive = string | number | boolean | null
+type PostHogProperties = Record<string, JsonPrimitive>
+
+export function pushEvent(nameEvent: string, supaHost: string, properties?: PostHogProperties): void {
   if (isLocal(supaHost))
     return
   posthog.capture(nameEvent, properties)
