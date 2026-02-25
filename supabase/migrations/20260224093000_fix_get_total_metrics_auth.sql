@@ -1,7 +1,8 @@
 -- Harden get_total_metrics RPC access:
--- - block anonymous callers entirely
--- - require authenticated org membership for user callers
--- - retain service role/internal access without a JWT-backed user identity
+-- - provide admin-only UUID overloads for explicit org lookup
+-- - provide authenticated user overload without UUID that resolves org from caller context
+
+DROP FUNCTION IF EXISTS public.get_total_metrics();
 
 DROP FUNCTION IF EXISTS public.get_total_metrics(uuid, date, date);
 DROP FUNCTION IF EXISTS public.get_total_metrics(uuid);
@@ -24,29 +25,8 @@ SET search_path = '' AS $function$
 DECLARE
   cache_entry public.org_metrics_cache%ROWTYPE;
   cache_ttl interval := '5 minutes'::interval;
-  v_request_user uuid;
-  v_request_role text;
 BEGIN
   IF start_date IS NULL OR end_date IS NULL THEN
-    RETURN;
-  END IF;
-
-  v_request_user := (SELECT auth.uid());
-  SELECT auth.role() INTO v_request_role;
-  IF v_request_role IS NULL OR v_request_role = '' THEN
-    SELECT current_setting('request.jwt.claim.role', true) INTO v_request_role;
-  END IF;
-
-  IF v_request_user IS NULL THEN
-    IF v_request_role IS DISTINCT FROM 'service_role' AND session_user NOT IN ('postgres', 'service_role', 'supabase_admin', 'supabase_auth_admin', 'supabase_storage_admin', 'supabase_realtime_admin') THEN
-      RETURN;
-    END IF;
-  ELSIF NOT EXISTS (
-    SELECT 1
-    FROM public.org_users ou
-    WHERE ou.org_id = get_total_metrics.org_id
-      AND ou.user_id = v_request_user
-  ) THEN
     RETURN;
   END IF;
 
@@ -73,7 +53,7 @@ BEGIN
     )
     AND (n_tup_ins > 0 OR n_tup_upd > 0 OR n_tup_del > 0)
   ) THEN
-    cache_entry := public.seed_org_metrics_cache(org_id, start_date, end_date);
+    cache_entry := public.seed_org_metrics_cache(get_total_metrics.org_id, start_date, end_date);
 
     RETURN QUERY SELECT
       cache_entry.mau,
@@ -108,7 +88,7 @@ BEGIN
     RETURN;
   END IF;
 
-  cache_entry := public.seed_org_metrics_cache(org_id, start_date, end_date);
+  cache_entry := public.seed_org_metrics_cache(get_total_metrics.org_id, start_date, end_date);
 
   RETURN QUERY SELECT
     cache_entry.mau,
@@ -126,7 +106,6 @@ ALTER FUNCTION public.get_total_metrics(uuid, date, date) OWNER TO "postgres";
 
 REVOKE ALL ON FUNCTION public.get_total_metrics(uuid, date, date) FROM anon;
 REVOKE ALL ON FUNCTION public.get_total_metrics(uuid, date, date) FROM public;
-GRANT ALL ON FUNCTION public.get_total_metrics(uuid, date, date) TO authenticated;
 GRANT ALL ON FUNCTION public.get_total_metrics(uuid, date, date) TO service_role;
 
 CREATE FUNCTION public.get_total_metrics(org_id uuid) RETURNS TABLE (
@@ -144,28 +123,7 @@ DECLARE
   v_start_date date;
   v_end_date date;
   v_anchor_day interval;
-  v_request_user uuid;
-  v_request_role text;
 BEGIN
-  v_request_user := (SELECT auth.uid());
-  SELECT auth.role() INTO v_request_role;
-  IF v_request_role IS NULL OR v_request_role = '' THEN
-    SELECT current_setting('request.jwt.claim.role', true) INTO v_request_role;
-  END IF;
-
-  IF v_request_user IS NULL THEN
-    IF v_request_role IS DISTINCT FROM 'service_role' AND session_user NOT IN ('postgres', 'service_role', 'supabase_auth_admin', 'supabase_realtime_admin', 'supabase_storage_admin', 'supabase_admin') THEN
-      RETURN;
-    END IF;
-  ELSIF NOT EXISTS (
-    SELECT 1
-    FROM public.org_users ou
-    WHERE ou.org_id = get_total_metrics.org_id
-      AND ou.user_id = v_request_user
-  ) THEN
-    RETURN;
-  END IF;
-
   SELECT
     COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
   INTO v_anchor_day
@@ -201,6 +159,67 @@ $function$;
 ALTER FUNCTION public.get_total_metrics(uuid) OWNER TO "postgres";
 
 REVOKE ALL ON FUNCTION public.get_total_metrics(uuid) FROM anon;
+REVOKE ALL ON FUNCTION public.get_total_metrics(uuid) FROM authenticated;
 REVOKE ALL ON FUNCTION public.get_total_metrics(uuid) FROM public;
-GRANT ALL ON FUNCTION public.get_total_metrics(uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.get_total_metrics(uuid) TO service_role;
+
+CREATE FUNCTION public.get_total_metrics() RETURNS TABLE (
+  mau bigint,
+  storage bigint,
+  bandwidth bigint,
+  build_time_unit bigint,
+  get bigint,
+  fail bigint,
+  install bigint,
+  uninstall bigint
+) LANGUAGE plpgsql VOLATILE SECURITY DEFINER
+SET search_path = '' AS $function$
+DECLARE
+  v_request_user uuid;
+  v_request_org_id uuid;
+BEGIN
+  SELECT public.get_identity() INTO v_request_user;
+
+  IF v_request_user IS NULL THEN
+    RETURN;
+  END IF;
+
+  SELECT current_setting('request.jwt.claim.org_id', true) INTO v_request_org_id;
+
+  IF v_request_org_id IS NULL OR v_request_org_id = '' THEN
+    SELECT org_users.org_id
+    INTO v_request_org_id
+    FROM public.org_users
+    WHERE org_users.user_id = v_request_user
+    ORDER BY org_users.org_id
+    LIMIT 1;
+  END IF;
+
+  IF v_request_org_id IS NULL OR NOT EXISTS (
+    SELECT 1
+    FROM public.org_users
+    WHERE org_users.org_id = v_request_org_id
+      AND org_users.user_id = v_request_user
+  ) THEN
+    RETURN;
+  END IF;
+
+  RETURN QUERY
+  SELECT
+    metrics.mau,
+    metrics.storage,
+    metrics.bandwidth,
+    metrics.build_time_unit,
+    metrics.get,
+    metrics.fail,
+    metrics.install,
+    metrics.uninstall
+  FROM public.get_total_metrics(v_request_org_id) AS metrics;
+END;
+$function$;
+
+ALTER FUNCTION public.get_total_metrics() OWNER TO "postgres";
+
+REVOKE ALL ON FUNCTION public.get_total_metrics() FROM anon;
+REVOKE ALL ON FUNCTION public.get_total_metrics() FROM public;
+GRANT ALL ON FUNCTION public.get_total_metrics() TO authenticated;
