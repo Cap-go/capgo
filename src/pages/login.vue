@@ -303,14 +303,15 @@ async function acceptQuerySession() {
     access_token: querySessionAccessToken.value,
     refresh_token: querySessionRefreshToken.value,
   })
-  hasQuerySession.value = false
-  querySessionAccessToken.value = ''
-  querySessionRefreshToken.value = ''
   if (res.error) {
     console.error('Cannot set auth', res.error)
     isLoading.value = false
     return
   }
+
+  hasQuerySession.value = false
+  querySessionAccessToken.value = ''
+  querySessionRefreshToken.value = ''
   nextLogin()
 }
 
