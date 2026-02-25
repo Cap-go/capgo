@@ -11,7 +11,8 @@ function normalizeImageStoragePath(path?: string | null) {
     return ''
 
   const pathWithoutQuery = path.split('?')[0]
-  const signedUrlMatch = pathWithoutQuery.match(/\/storage\/v1\/object\/(?:public\/|sign\/)?images\/(.+)$/)
+  const signedUrlRegex = /\/storage\/v1\/object\/(?:public\/|sign\/)?images\/(.+)$/
+  const signedUrlMatch = signedUrlRegex.exec(pathWithoutQuery)
   if (signedUrlMatch?.[1])
     return signedUrlMatch[1].replace(/^\/+/, '')
 
