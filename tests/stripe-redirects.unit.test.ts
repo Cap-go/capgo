@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import * as stripe from '../supabase/functions/_backend/utils/stripe.ts'
 
 vi.mock('hono/adapter', () => ({
-  env: () => ({ WEBAPP_URL: 'https://capgo.test' }),
+  env: () => ({
+    WEBAPP_URL: 'https://capgo.test',
+    STRIPE_SECRET_KEY: 'sk_test_123',
+  }),
 }))
-
-import * as stripe from '../supabase/functions/_backend/utils/stripe.ts'
 
 function createContext() {
   return {
@@ -41,7 +43,6 @@ describe('stripe redirect URL allowlist', () => {
       },
     } as any
 
-    vi.spyOn(stripe, 'isStripeConfigured').mockReturnValue(true)
     vi.spyOn(stripe, 'getStripe').mockReturnValue(stripeClient)
 
     const result = await stripe.createPortal(createContext(), 'cus_123', '/app/usage')
@@ -63,11 +64,11 @@ describe('stripe redirect URL allowlist', () => {
       },
     } as any
 
-    vi.spyOn(stripe, 'isStripeConfigured').mockReturnValue(true)
     vi.spyOn(stripe, 'getStripe').mockReturnValue(stripeClient)
 
     const response = await stripe.createPortal(createContext(), 'cus_123', 'https://example.com/phishing').catch(error => error)
 
+    expect(response).toBeInstanceOf(Error)
     expect(response.cause).toMatchObject({ error: 'invalid_redirect_url' })
     expect(response.status).toBe(400)
     expect(createSession).not.toHaveBeenCalled()
@@ -86,7 +87,6 @@ describe('stripe redirect URL allowlist', () => {
       },
     } as any
 
-    vi.spyOn(stripe, 'isStripeConfigured').mockReturnValue(true)
     vi.spyOn(stripe, 'getStripe').mockReturnValue(stripeClient)
 
     const result = await stripe.createCheckout(
@@ -118,7 +118,6 @@ describe('stripe redirect URL allowlist', () => {
       },
     } as any
 
-    vi.spyOn(stripe, 'isStripeConfigured').mockReturnValue(true)
     vi.spyOn(stripe, 'getStripe').mockReturnValue(stripeClient)
 
     const response = await stripe.createCheckout(
@@ -148,7 +147,6 @@ describe('stripe redirect URL allowlist', () => {
       },
     } as any
 
-    vi.spyOn(stripe, 'isStripeConfigured').mockReturnValue(true)
     vi.spyOn(stripe, 'getStripe').mockReturnValue(stripeClient)
 
     const response = await stripe.createOneTimeCheckout(
@@ -160,6 +158,7 @@ describe('stripe redirect URL allowlist', () => {
       'https://example.com/phishing',
     ).catch(error => error)
 
+    expect(response).toBeInstanceOf(Error)
     expect(response.cause).toMatchObject({ error: 'invalid_redirect_url' })
     expect(response.status).toBe(400)
     expect(createSession).not.toHaveBeenCalled()
