@@ -105,17 +105,18 @@ async function loadReplicationStatus() {
 
   try {
     const headers: Record<string, string> = {}
-    if (internalReplicationSecret)
+    if (internalReplicationSecret) {
       headers.apisecret = internalReplicationSecret
+    }
+    else {
+      const supabase = useSupabase()
+      const { data: { session } } = await supabase.auth.getSession()
 
-    const supabase = useSupabase()
-    const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token)
+        throw new Error('No session available and replication secret is not configured')
 
-    if (!headers.apisecret && !session?.access_token)
-      throw new Error('No session available and replication secret is not configured')
-
-    if (session?.access_token)
       headers.Authorization = `Bearer ${session.access_token}`
+    }
 
     const response = await fetch(`${defaultApiHost}/replication`, {
       method: 'GET',
