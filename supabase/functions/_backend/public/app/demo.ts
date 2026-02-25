@@ -1,9 +1,11 @@
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
-import { simpleError } from '../../utils/hono.ts'
+import { DEMO_APP_PREFIX } from '../../utils/demo.ts'
+import { quickError, simpleError, simpleRateLimit } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
-import { hasOrgRight, supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
+import { hasOrgRight, isAllowedActionOrg, isPayingOrg, supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
+import { getEnv } from '../../utils/utils.ts'
 
 /** Request body for creating a demo app */
 export interface CreateDemoApp {
@@ -30,6 +32,32 @@ interface DemoManifestEntry {
   s3_path: string
   file_hash: string
   file_size: number
+}
+
+const DEFAULT_DEMO_APP_MAX_ACTIVE_PER_ORG = 3
+const DEFAULT_DEMO_APP_MAX_PER_USER_24H = 1
+const DEFAULT_DEMO_APP_MAX_PER_ORG_24H = 3
+const DEFAULT_DEMO_APP_MAX_PER_USER_1H = 1
+const DEFAULT_DEMO_APP_MAX_PER_ORG_1H = 1
+const DEFAULT_DEMO_APP_MAX_PER_USER_24H_FREE = 1
+const DEFAULT_DEMO_APP_MAX_PER_ORG_24H_FREE = 1
+const DEFAULT_DEMO_APP_ACTIVE_WINDOW_DAYS = 14
+
+interface DemoRateLimits {
+  userPerHour: number
+  orgPerHour: number
+  userPer24h: number
+  orgPer24h: number
+}
+
+interface DemoAppCreationDecision {
+  created: boolean
+  reason?: string
+  limit?: number
+  count?: number
+  retry_after_seconds?: number
+  window_seconds?: number
+  app?: Database['public']['Tables']['apps']['Row']
 }
 
 /**
@@ -215,6 +243,167 @@ function generateDeviceId(): string {
   return crypto.randomUUID()
 }
 
+function getPositiveEnvInt(c: Context, key: string, defaultValue: number): number {
+  const rawValue = getEnv(c, key)
+  if (!rawValue) {
+    return defaultValue
+  }
+
+  const parsed = Number.parseInt(rawValue, 10)
+  if (Number.isNaN(parsed) || parsed <= 0) {
+    return defaultValue
+  }
+
+  return parsed
+}
+
+async function getDemoRateLimits(c: Context<MiddlewareKeyVariables>, ownerOrg: string): Promise<DemoRateLimits> {
+  const payingOrg = await isPayingOrg(c, ownerOrg)
+
+  const userPerHourLimit = getPositiveEnvInt(c, 'RATE_LIMIT_DEMO_APP_PER_USER_1H', DEFAULT_DEMO_APP_MAX_PER_USER_1H)
+  const orgPerHourLimit = getPositiveEnvInt(c, 'RATE_LIMIT_DEMO_APP_PER_ORG_1H', DEFAULT_DEMO_APP_MAX_PER_ORG_1H)
+
+  // Keep free-tier stricter by default unless explicitly overridden.
+  const userPer24hLimit = getPositiveEnvInt(
+    c,
+    'RATE_LIMIT_DEMO_APP_PER_USER_24H',
+    payingOrg
+      ? DEFAULT_DEMO_APP_MAX_PER_USER_24H
+      : DEFAULT_DEMO_APP_MAX_PER_USER_24H_FREE,
+  )
+  const orgPer24hLimit = getPositiveEnvInt(
+    c,
+    'RATE_LIMIT_DEMO_APP_PER_ORG_24H',
+    payingOrg
+      ? DEFAULT_DEMO_APP_MAX_PER_ORG_24H
+      : DEFAULT_DEMO_APP_MAX_PER_ORG_24H_FREE,
+  )
+
+  return {
+    userPerHour: userPerHourLimit,
+    orgPerHour: orgPerHourLimit,
+    userPer24h: userPer24hLimit,
+    orgPer24h: orgPer24hLimit,
+  }
+}
+
+async function assertDemoAppCreationLimits(
+  c: Context<MiddlewareKeyVariables>,
+  supabase: ReturnType<typeof supabaseAdmin>,
+  ownerOrg: string,
+  userId: string,
+  appId: string,
+  appDefaults: {
+    retention: number
+    defaultUploadChannel: string
+    lastVersion: string
+    name: string
+    iconUrl: string
+  },
+): Promise<Database['public']['Tables']['apps']['Row']> {
+  const canUseMore = await isAllowedActionOrg(c, ownerOrg)
+  if (!canUseMore) {
+    throw quickError(402, 'need_plan_upgrade', 'Cannot create demo app, upgrade plan to continue', { owner_org: ownerOrg })
+  }
+
+  const activeWindowDays = getPositiveEnvInt(c, 'DEMO_APP_ACTIVE_WINDOW_DAYS', DEFAULT_DEMO_APP_ACTIVE_WINDOW_DAYS)
+  const maxActiveDemoApps = getPositiveEnvInt(c, 'DEMO_APP_MAX_ACTIVE_PER_ORG', DEFAULT_DEMO_APP_MAX_ACTIVE_PER_ORG)
+  const limits = await getDemoRateLimits(c, ownerOrg)
+
+  const rpcArgs = {
+    p_owner_org: ownerOrg,
+    p_user_id: userId,
+    p_app_id: appId,
+    p_name: appDefaults.name,
+    p_icon_url: appDefaults.iconUrl,
+    p_retention: appDefaults.retention,
+    p_default_upload_channel: appDefaults.defaultUploadChannel,
+    p_last_version: appDefaults.lastVersion,
+    p_active_window_days: activeWindowDays,
+    p_user_per_hour: limits.userPerHour,
+    p_org_per_hour: limits.orgPerHour,
+    p_user_per_24h: limits.userPer24h,
+    p_org_per_24h: limits.orgPer24h,
+    p_max_active_per_org: maxActiveDemoApps,
+  }
+
+  const { data, error } = await supabase
+    .rpc('create_demo_app_with_limits', rpcArgs)
+    .single()
+
+  if (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Error reserving demo app slot', error, owner_org: ownerOrg })
+    throw simpleError('cannot_create_demo_app', 'Cannot create demo app', { supabaseError: error })
+  }
+
+  const decision = data as DemoAppCreationDecision | null
+  if (!decision?.created) {
+    if (decision?.reason === 'demo_app_quota_exceeded') {
+      throw quickError(
+        429,
+        'demo_app_quota_exceeded',
+        'Demo app quota reached for this organization',
+        {
+          owner_org: ownerOrg,
+          active_demo_apps: decision.count,
+          max_active_demo_apps: decision.limit,
+        },
+      )
+    }
+
+    if (decision?.reason === 'demo_app_user_rate_limit_exceeded') {
+      simpleRateLimit({
+        reason: decision.reason,
+        owner_org: ownerOrg,
+        user_id: userId,
+        retryAfterSeconds: decision.retry_after_seconds,
+        window_seconds: decision.window_seconds,
+        limit: decision.limit,
+        count: decision.count,
+      })
+    }
+
+    if (decision?.reason === 'demo_app_org_rate_limit_exceeded') {
+      simpleRateLimit({
+        reason: decision.reason,
+        owner_org: ownerOrg,
+        retryAfterSeconds: decision.retry_after_seconds,
+        window_seconds: decision.window_seconds,
+        limit: decision.limit,
+        count: decision.count,
+      })
+    }
+
+    throw simpleError('demo_app_limit_enforcement_failed', 'Demo app limit enforcement failed', {
+      owner_org: ownerOrg,
+      reason: decision?.reason,
+    })
+  }
+
+  if (!decision.app) {
+    throw simpleError('cannot_create_demo_app', 'Cannot create demo app', { owner_org: ownerOrg })
+  }
+
+  return decision.app
+}
+
+/** Ensure quota checks are enforced atomically at write time. */
+async function createDemoAppRecord(
+  c: Context<MiddlewareKeyVariables>,
+  supabase: ReturnType<typeof supabaseAdmin>,
+  ownerOrg: string,
+  userId: string,
+  appId: string,
+) {
+  return assertDemoAppCreationLimits(c, supabase, ownerOrg, userId, appId, {
+    retention: 2592000,
+    defaultUploadChannel: 'production',
+    lastVersion: '1.2.0',
+    name: 'Demo App',
+    iconUrl: '',
+  })
+}
+
 /**
  * Creates a demo app for non-technical users during onboarding.
  * Demo apps are identified by the 'com.capdemo.' prefix in their app_id
@@ -248,9 +437,11 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
     throw simpleError('cannot_access_organization', 'You can\'t access this organization', { org_id: body.owner_org })
   }
 
+  const supabase = supabaseAdmin(c)
   // Generate a unique demo app_id with com.capdemo. prefix
   const shortId = crypto.randomUUID().slice(0, 8)
-  const appId = `com.capdemo.${shortId}.app`
+  const appId = `${DEMO_APP_PREFIX}${shortId}.app`
+  const appData = await createDemoAppRecord(c, supabase, body.owner_org, auth.userId, appId)
 
   cloudlog({ requestId, message: 'Creating demo app with demo data', appId, owner_org: body.owner_org })
 
@@ -258,30 +449,8 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
   // channels, devices, daily_mau, daily_bandwidth, daily_storage, daily_version, build_requests,
   // manifest, deploy_history) where RLS policies may not grant direct user insert access.
   // Authorization is enforced at endpoint level via hasOrgRight check above.
-  const supabase = supabaseAdmin(c)
 
   // Create the demo app
-  const appInsert: Database['public']['Tables']['apps']['Insert'] = {
-    owner_org: body.owner_org,
-    app_id: appId,
-    icon_url: '',
-    name: 'Demo App',
-    retention: 2592000,
-    default_upload_channel: 'production',
-    last_version: '1.2.0',
-  }
-
-  const { data: appData, error: appError } = await supabase
-    .from('apps')
-    .insert(appInsert)
-    .select()
-    .single()
-
-  if (appError) {
-    cloudlog({ requestId, message: 'Error creating demo app', error: appError })
-    throw simpleError('cannot_create_demo_app', 'Cannot create demo app', { supabaseError: appError })
-  }
-
   cloudlog({ requestId, message: 'Demo app created', appData })
 
   // Demo versions to create - simulates app development lifecycle
