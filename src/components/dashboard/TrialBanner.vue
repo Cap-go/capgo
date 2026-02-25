@@ -15,9 +15,9 @@
 import type { ComponentPublicInstance } from 'vue'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useOrganizationStore } from '~/stores/organization'
 import { pushEvent } from '~/services/posthog'
 import { getLocalConfig } from '~/services/supabase'
+import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
