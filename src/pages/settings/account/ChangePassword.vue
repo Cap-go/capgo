@@ -4,6 +4,7 @@ import { FormKit, FormKitMessages } from '@formkit/vue'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
+import VueTurnstile from 'vue-turnstile'
 import iconPassword from '~icons/heroicons/key?raw'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -21,6 +22,9 @@ const organizationStore = useOrganizationStore()
 const mainStore = useMainStore()
 const mfaCode = ref('')
 const needsReauthentication = ref(false)
+const turnstileToken = ref('')
+const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
+const captchaComponent = ref<InstanceType<typeof VueTurnstile> | null>(null)
 const { t } = useI18n()
 displayStore.NavTitle = t('password')
 
@@ -106,14 +110,20 @@ async function verifyPassword(form: { current_password: string }) {
         email: user.email,
         password: form.current_password,
         org_id: orgId,
+        captcha_token: turnstileToken.value,
       }),
     })
 
     const result: { error?: string, message?: string } = await response.json()
 
     if (!response.ok) {
-      if (result.error === 'invalid_credentials') {
+      if (result.error === 'captcha_failed') {
+        toast.error(t('captcha-fail'))
+        captchaComponent.value?.reset()
+      }
+      else if (result.error === 'invalid_credentials') {
         setErrors('verify-password', [t('invalid-password')], {})
+        captchaComponent.value?.reset()
       }
       else if (result.error === 'password_does_not_meet_policy') {
         setErrors('verify-password', [t('password-does-not-meet-requirements')], {})
@@ -146,6 +156,9 @@ async function verifyCurrentPassword(currentPassword: string) {
   const { error: signInError } = await supabase.auth.signInWithPassword({
     email: user.email,
     password: currentPassword,
+    options: {
+      captchaToken: turnstileToken.value,
+    },
   })
 
   if (signInError?.code === 'mfa_required') {
@@ -153,7 +166,13 @@ async function verifyCurrentPassword(currentPassword: string) {
   }
 
   if (signInError) {
-    setErrors('change-pass', [t('invalid-password')], {})
+    captchaComponent.value?.reset()
+    if (signInError.message.includes('captcha')) {
+      toast.error(t('captcha-fail'))
+    }
+    else {
+      setErrors('change-pass', [t('invalid-password')], {})
+    }
     return false
   }
 
@@ -419,6 +438,10 @@ async function submit(form: { current_password?: string, password: string, passw
           </footer>
         </div>
       </FormKit>
+    </div>
+
+    <div v-if="!!captchaKey" class="mt-4">
+      <VueTurnstile ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
     </div>
 
     <!-- Teleport Content for 2FA Input -->

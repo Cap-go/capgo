@@ -3,13 +3,11 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
-import { verifyCaptchaToken } from '../utils/captcha.ts'
-import { getClaimsFromJWT, parseBody, quickError, simpleError, simpleRateLimit, useCors } from '../utils/hono.ts'
+import { parseBody, quickError, simpleError, simpleRateLimit, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { isIPRateLimited, recordFailedAuth } from '../utils/rate_limit.ts'
 import { buildRateLimitInfo } from '../utils/rateLimitInfo.ts'
 import { emptySupabase, supabaseClient, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
-import { getEnv } from '../utils/utils.ts'
 
 interface ValidatePasswordCompliance {
   email: string
@@ -104,18 +102,6 @@ app.post('/', async (c) => {
   const { password: _password, captcha_token: _captchaToken, ...bodyWithoutPassword } = body
   cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance raw body', rawBody: bodyWithoutPassword })
 
-  const captchaSecret = getEnv(c, 'CAPTCHA_SECRET_KEY')
-  const authorization = c.req.header('authorization')
-  const sessionClaims = authorization ? getClaimsFromJWT(authorization) : null
-  const isAuthenticatedCaller = Boolean(sessionClaims?.sub && sessionClaims.email)
-
-  if (captchaSecret.length > 0 && !isAuthenticatedCaller) {
-    if (!body.captcha_token) {
-      throw simpleError('invalid_request', 'Captcha token is required')
-    }
-    await verifyCaptchaToken(c, body.captcha_token, captchaSecret)
-  }
-
   const adminClient = useSupabaseAdmin(c)
 
   // Authenticate first to avoid leaking org existence to unauthenticated callers.
@@ -123,14 +109,20 @@ app.post('/', async (c) => {
   const { data: signInData, error: signInError } = await loginClient.auth.signInWithPassword({
     email: body.email,
     password: body.password,
-    options: captchaSecret.length > 0 && body.captcha_token
+    options: body.captcha_token
       ? { captchaToken: body.captcha_token }
       : undefined,
   })
 
   if (signInError || !signInData.user || !signInData.session) {
     await recordFailedAuth(c)
-    cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - login failed', error: signInError?.message })
+    const errorMessage = signInError?.message ?? 'Unknown error'
+    cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - login failed', error: errorMessage })
+
+    if (errorMessage.toLowerCase().includes('captcha')) {
+      return quickError(401, 'captcha_failed', 'Captcha verification failed')
+    }
+
     return quickError(401, 'invalid_credentials', 'Invalid email or password')
   }
 
