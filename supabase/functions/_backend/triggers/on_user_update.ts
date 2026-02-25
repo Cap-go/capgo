@@ -2,6 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
+import { cleanStoredImageMetadata } from '../utils/image.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { createApiKey } from '../utils/supabase.ts'
 import { syncUserPreferenceTags } from '../utils/user_preferences.ts'
@@ -22,5 +23,12 @@ app.post('/', middlewareAPISecret, triggerValidator('users', 'UPDATE'), async (c
   }
   await createApiKey(c, record.id)
   await syncUserPreferenceTags(c, record.email, record, oldRecord, oldRecord?.email)
+
+  const newImagePath = record.image_url
+  const oldImagePath = oldRecord?.image_url
+  if (newImagePath && newImagePath !== oldImagePath) {
+    await cleanStoredImageMetadata(c, newImagePath)
+  }
+
   return c.json(BRES)
 })
