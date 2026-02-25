@@ -1,5 +1,5 @@
 import { z } from 'zod/mini'
-import { createHono, getClaimsFromJWT, middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { createHono, middlewareAuth, parseBody, quickError, simpleError, useCors, verifyJWT } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { emptySupabase, supabaseAdmin } from '../utils/supabase.ts'
 import { version } from '../utils/version.ts'
@@ -47,7 +47,7 @@ app.post('/', middlewareAuth, async (c) => {
     return quickError(401, 'no_authorization', 'No authorization header provided')
   }
 
-  const claims = getClaimsFromJWT(authorization)
+  const claims = await verifyJWT(c, authorization)
   const email = claims?.email
   if (!email && token) {
     return quickError(400, 'missing_email', 'Email is required to verify OTP')

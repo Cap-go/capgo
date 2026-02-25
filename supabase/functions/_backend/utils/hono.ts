@@ -12,11 +12,25 @@ import { logger } from 'hono/logger'
 import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
 import { timingSafeEqual } from 'hono/utils/buffer'
+import { createRemoteJWKSet, jwtVerify } from 'jose'
 import { cloudlog } from './logging.ts'
 import { onError } from './on_error.ts'
 import { getEnv } from './utils.ts'
 
 import { version as CapgoVersion } from './version.ts'
+
+/** Cached JWKS instance — created once per cold start, shared across requests. */
+let _jwks: ReturnType<typeof createRemoteJWKSet> | null = null
+
+function getJWKS(c: Context): ReturnType<typeof createRemoteJWKSet> {
+  if (!_jwks) {
+    const supabaseUrl = getEnv(c, 'SUPABASE_URL')
+    _jwks = createRemoteJWKSet(
+      new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`),
+    )
+  }
+  return _jwks
+}
 
 export interface JWTClaims {
   sub: string
@@ -28,9 +42,9 @@ export interface JWTClaims {
 }
 
 /**
- * Decode JWT claims without making a network call.
- * This is much faster than getUser() which makes a network request.
- * The JWT signature is still verified by Supabase when used with RLS policies.
+ * Decode JWT claims without verifying the signature.
+ * WARNING: Only use for non-security-critical reads (e.g. logging, display).
+ * For authentication, always use {@link verifyJWT} instead.
  */
 export function getClaimsFromJWT(jwt: string): JWTClaims | null {
   try {
@@ -55,6 +69,26 @@ export function getClaimsFromJWT(jwt: string): JWTClaims | null {
     }
 
     return payload as JWTClaims
+  }
+  catch {
+    return null
+  }
+}
+
+/**
+ * Verify JWT signature against the project JWKS and return decoded claims.
+ * Uses the Supabase JWKS endpoint to cryptographically verify the token.
+ * The JWKS is cached per cold start so subsequent calls are fast.
+ */
+export async function verifyJWT(
+  c: Context<MiddlewareKeyVariables>,
+  jwt: string,
+): Promise<JWTClaims | null> {
+  try {
+    const token = jwt.startsWith('Bearer ') ? jwt.slice(7) : jwt
+    const jwks = getJWKS(c)
+    const { payload } = await jwtVerify(token, jwks)
+    return payload as unknown as JWTClaims
   }
   catch {
     return null
@@ -160,8 +194,8 @@ export const middlewareAuth = honoFactory.createMiddleware(async (c, next) => {
   }
   c.set('authorization', authorization)
 
-  // Decode JWT claims without network call (much faster than getUser())
-  const claims = getClaimsFromJWT(authorization)
+  // Verify JWT signature via JWKS and decode claims
+  const claims = await verifyJWT(c, authorization)
   if (!claims || !claims.sub) {
     cloudlog({ requestId: c.get('requestId'), message: 'Invalid JWT claims' })
     throw simpleError('invalid_jwt', 'Invalid JWT')

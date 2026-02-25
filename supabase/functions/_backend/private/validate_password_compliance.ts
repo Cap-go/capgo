@@ -4,7 +4,7 @@ import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { verifyCaptchaToken } from '../utils/captcha.ts'
-import { getClaimsFromJWT, parseBody, quickError, simpleError, simpleRateLimit, useCors } from '../utils/hono.ts'
+import { parseBody, quickError, simpleError, simpleRateLimit, useCors, verifyJWT } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { isIPRateLimited, recordFailedAuth } from '../utils/rate_limit.ts'
 import { buildRateLimitInfo } from '../utils/rateLimitInfo.ts'
@@ -106,7 +106,7 @@ app.post('/', async (c) => {
 
   const captchaSecret = getEnv(c, 'CAPTCHA_SECRET_KEY')
   const authorization = c.req.header('authorization')
-  const sessionClaims = authorization ? getClaimsFromJWT(authorization) : null
+  const sessionClaims = authorization ? await verifyJWT(c, authorization) : null
   const isAuthenticatedCaller = Boolean(sessionClaims?.sub && sessionClaims.email)
 
   if (captchaSecret.length > 0 && !isAuthenticatedCaller) {

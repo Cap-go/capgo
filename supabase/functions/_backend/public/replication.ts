@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { sql } from 'drizzle-orm'
-import { getClaimsFromJWT, honoFactory, middlewareAPISecret, quickError, useCors } from '../utils/hono.ts'
+import { honoFactory, middlewareAPISecret, quickError, useCors, verifyJWT } from '../utils/hono.ts'
 import { cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient, logPgError } from '../utils/pg.ts'
 import { supabaseClient } from '../utils/supabase.ts'
@@ -160,7 +160,7 @@ async function validateReplicationAccess(c: ReplicationContext) {
     throw quickError(401, 'no_authorization', 'Authorization header or apisecret is required')
   }
 
-  const claims = getClaimsFromJWT(authorization)
+  const claims = await verifyJWT(c, authorization)
   if (!claims?.sub) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'replication_invalid_jwt' })
     throw quickError(401, 'invalid_jwt', 'Invalid JWT')

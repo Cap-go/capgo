@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
-import { getClaimsFromJWT, honoFactory, quickError, simpleRateLimit } from './hono.ts'
+import { honoFactory, quickError, simpleRateLimit, verifyJWT } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
@@ -465,8 +465,8 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
 async function foundJWT(c: Context, jwt: string) {
   cloudlog({ requestId: c.get('requestId'), message: 'JWT provided', jwtPrefix: maskSecret(jwt) })
 
-  // Decode JWT claims without network call (much faster than getUser())
-  const claims = getClaimsFromJWT(jwt)
+  // Verify JWT signature via JWKS and decode claims
+  const claims = await verifyJWT(c, jwt)
   if (!claims || !claims.sub) {
     cloudlog({ requestId: c.get('requestId'), message: 'Invalid JWT claims' })
     // Record failed auth attempt - await to ensure accurate counting
