@@ -33,6 +33,5 @@ GRANT EXECUTE ON FUNCTION "public"."record_email_otp_verified"(uuid) TO "postgre
 REVOKE EXECUTE ON FUNCTION "public"."record_email_otp_verified"(uuid) FROM "public";
 REVOKE EXECUTE ON FUNCTION "public"."record_email_otp_verified"(uuid) FROM "authenticated";
 
--- Backward compatibility: remove grants on the previous vulnerable zero-arg signature.
-REVOKE EXECUTE ON FUNCTION "public"."record_email_otp_verified"() FROM "public";
-REVOKE EXECUTE ON FUNCTION "public"."record_email_otp_verified"() FROM "authenticated";
+-- Remove the legacy zero-arg function overload now that callers are migrated.
+DROP FUNCTION IF EXISTS "public"."record_email_otp_verified"();
