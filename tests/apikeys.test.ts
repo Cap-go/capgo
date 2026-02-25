@@ -309,12 +309,12 @@ describe('[PUT] /apikey/:id operations', () => {
     expect(regenerateData.key).not.toBe(oldKey)
 
     // Old key must no longer authenticate.
-    const oldAuthHeaders = { 'Content-Type': 'application/json', Authorization: oldKey }
+    const oldAuthHeaders = { 'Content-Type': 'application/json', 'Authorization': oldKey }
     const oldAuthResponse = await fetch(`${BASE_URL}/apikey`, { method: 'GET', headers: oldAuthHeaders })
     expect(oldAuthResponse.status).toBe(401)
 
     // New key must authenticate.
-    const newAuthHeaders = { 'Content-Type': 'application/json', Authorization: regenerateData.key }
+    const newAuthHeaders = { 'Content-Type': 'application/json', 'Authorization': regenerateData.key }
     const newAuthResponse = await fetch(`${BASE_URL}/apikey`, { method: 'GET', headers: newAuthHeaders })
     expect(newAuthResponse.status).toBe(200)
 
@@ -351,12 +351,12 @@ describe('[PUT] /apikey/:id operations', () => {
     expect(verifyData.key_hash).toBe(regenerateData.key_hash)
 
     // Old key must no longer authenticate.
-    const oldAuthHeaders = { 'Content-Type': 'application/json', Authorization: oldKey }
+    const oldAuthHeaders = { 'Content-Type': 'application/json', 'Authorization': oldKey }
     const oldAuthResponse = await fetch(`${BASE_URL}/apikey`, { method: 'GET', headers: oldAuthHeaders })
     expect(oldAuthResponse.status).toBe(401)
 
     // New key must authenticate.
-    const newAuthHeaders = { 'Content-Type': 'application/json', Authorization: regenerateData.key }
+    const newAuthHeaders = { 'Content-Type': 'application/json', 'Authorization': regenerateData.key }
     const newAuthResponse = await fetch(`${BASE_URL}/apikey`, { method: 'GET', headers: newAuthHeaders })
     expect(newAuthResponse.status).toBe(200)
 
@@ -671,9 +671,7 @@ describe('[POST] /apikey hashed key with expiration', () => {
     expect(createResponse.status).toBe(200)
 
     // Manually set the key to expired via direct DB update
-    const { error } = await getSupabaseClient().from('apikeys')
-      .update({ expires_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() })
-      .eq('id', createData.id)
+    const { error } = await getSupabaseClient().from('apikeys').update({ expires_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() }).eq('id', createData.id)
     expect(error).toBeNull()
 
     // Try to use the expired hashed key for authentication
