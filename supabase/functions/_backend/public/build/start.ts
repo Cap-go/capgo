@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { HTTPException } from 'hono/http-exception'
 import { SignJWT } from 'jose'
-import { quickError, simpleError } from '../../utils/hono.ts'
+import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
@@ -77,6 +77,7 @@ async function markBuildAsFailed(
 export async function startBuild(
   c: Context,
   jobId: string,
+  appId: string,
   apikey: Database['public']['Tables']['apikeys']['Row'],
 ): Promise<Response> {
   let alreadyMarkedAsFailed = false
@@ -97,10 +98,26 @@ export async function startBuild(
     // Bind jobId to appId under RLS before calling the builder.
     // This prevents cross-app access by mixing an allowed app_id with another app's jobId.
     const supabase = supabaseApikey(c, apikeyKey)
+
+    // Security: Check if user has permission to manage builds for the supplied app
+    // before validating builder job ownership.
+    if (!(await checkPermission(c, 'app.build_native', { appId }))) {
+      const errorMsg = 'You do not have permission to start builds for this app'
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'Unauthorized start build',
+        job_id: jobId,
+        app_id: appId,
+        user_id: apikey.user_id,
+      })
+      throw simpleError('unauthorized', errorMsg)
+    }
+
     const { data: buildRequest, error: buildRequestError } = await supabase
       .from('build_requests')
       .select('app_id')
       .eq('builder_job_id', jobId)
+      .eq('app_id', appId)
       .maybeSingle()
 
     if (buildRequestError) {
@@ -114,10 +131,18 @@ export async function startBuild(
     }
 
     if (!buildRequest) {
-      throw quickError(404, 'build_request_not_found', 'Build request not found')
+      const errorMsg = 'You do not have permission to start builds for this app'
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'Unauthorized start build (job/app mismatch or missing)',
+        job_id: jobId,
+        app_id: appId,
+        user_id: apikey.user_id,
+      })
+      throw simpleError('unauthorized', errorMsg)
     }
 
-    const boundAppId = buildRequest.app_id
+    const boundAppId = appId
 
     cloudlog({
       requestId: c.get('requestId'),
@@ -126,19 +151,6 @@ export async function startBuild(
       app_id: boundAppId,
       user_id: apikey.user_id,
     })
-
-    // Security: Check if user has permission to manage builds (auth context set by middlewareKey)
-    if (!(await checkPermission(c, 'app.build_native', { appId: boundAppId }))) {
-      const errorMsg = 'You do not have permission to start builds for this app'
-      cloudlogErr({
-        requestId: c.get('requestId'),
-        message: 'Unauthorized start build',
-        job_id: jobId,
-        app_id: boundAppId,
-        user_id: apikey.user_id,
-      })
-      throw simpleError('unauthorized', errorMsg)
-    }
 
     // Call builder to start the job
     const builderResponse = await fetch(`${getEnv(c, 'BUILDER_URL')}/jobs/${jobId}/start`, {

@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { quickError, simpleError } from '../../utils/hono.ts'
+import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
@@ -9,14 +9,28 @@ import { getEnv } from '../../utils/utils.ts'
 export async function cancelBuild(
   c: Context,
   jobId: string,
+  appId: string,
   apikey: Database['public']['Tables']['apikeys']['Row'],
 ): Promise<Response> {
+  if (!(await checkPermission(c, 'app.build_native', { appId }))) {
+    const errorMsg = 'You do not have permission to cancel builds for this app'
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Unauthorized cancel build',
+      job_id: jobId,
+      app_id: appId,
+      user_id: apikey.user_id,
+    })
+    throw simpleError('unauthorized', errorMsg)
+  }
+
   // Bind jobId to its request owner before calling the builder.
   const supabase = supabaseApikey(c, apikey.key)
   const { data: buildRequest, error: buildRequestError } = await supabase
     .from('build_requests')
     .select('app_id')
     .eq('builder_job_id', jobId)
+    .eq('app_id', appId)
     .maybeSingle()
 
   if (buildRequestError) {
@@ -30,30 +44,24 @@ export async function cancelBuild(
   }
 
   if (!buildRequest) {
-    throw quickError(404, 'build_request_not_found', 'Build request not found')
+    const errorMsg = 'You do not have permission to cancel builds for this app'
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Unauthorized cancel build (job/app mismatch or missing)',
+      job_id: jobId,
+      app_id: appId,
+      user_id: apikey.user_id,
+    })
+    throw simpleError('unauthorized', errorMsg)
   }
-
-  const boundAppId = buildRequest.app_id
 
   cloudlog({
     requestId: c.get('requestId'),
     message: 'Cancel build request',
     job_id: jobId,
-    app_id: boundAppId,
+    app_id: appId,
     user_id: apikey.user_id,
   })
-
-  // Security: Check if user has permission to manage builds (auth context set by middlewareKey)
-  if (!(await checkPermission(c, 'app.build_native', { appId: boundAppId }))) {
-    cloudlogErr({
-      requestId: c.get('requestId'),
-      message: 'Unauthorized cancel build',
-      job_id: jobId,
-      app_id: boundAppId,
-      user_id: apikey.user_id,
-    })
-    throw simpleError('unauthorized', 'You do not have permission to cancel builds for this app')
-  }
 
   // Call builder to cancel the job
   const builderResponse = await fetch(`${getEnv(c, 'BUILDER_URL')}/jobs/${jobId}/cancel`, {
@@ -93,7 +101,7 @@ export async function cancelBuild(
       updated_at: new Date().toISOString(),
     })
     .eq('builder_job_id', jobId)
-    .eq('app_id', boundAppId)
+    .eq('app_id', appId)
 
   if (updateError) {
     cloudlogErr({
