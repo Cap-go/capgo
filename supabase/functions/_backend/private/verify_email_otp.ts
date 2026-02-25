@@ -47,7 +47,7 @@ app.post('/', middlewareAuth, async (c) => {
     return quickError(401, 'no_authorization', 'No authorization header provided')
   }
 
-  const claims = getClaimsFromJWT(authorization)
+  const claims = await getClaimsFromJWT(c, authorization)
   const email = claims?.email
   if (!email && token) {
     return quickError(400, 'missing_email', 'Email is required to verify OTP')

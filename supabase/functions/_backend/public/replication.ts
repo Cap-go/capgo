@@ -160,7 +160,7 @@ async function validateReplicationAccess(c: ReplicationContext) {
     throw quickError(401, 'no_authorization', 'Authorization header or apisecret is required')
   }
 
-  const claims = getClaimsFromJWT(authorization)
+  const claims = await getClaimsFromJWT(c, authorization)
   if (!claims?.sub) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'replication_invalid_jwt' })
     throw quickError(401, 'invalid_jwt', 'Invalid JWT')

@@ -1,17 +1,16 @@
 -- ============================================================================
 -- Fix auth checks and execution privileges for org RPCs
 -- ============================================================================
-
 CREATE OR REPLACE FUNCTION "public"."get_org_members" ("guild_id" "uuid") RETURNS TABLE (
-    "aid" bigint,
-    "uid" "uuid",
-    "email" "varchar",
-    "image_url" "varchar",
-    "role" "public"."user_min_right",
-    "is_tmp" boolean
+  "aid" bigint,
+  "uid" "uuid",
+  "email" "varchar",
+  "image_url" "varchar",
+  "role" "public"."user_min_right",
+  "is_tmp" boolean
 ) LANGUAGE plpgsql SECURITY DEFINER
 SET
-search_path = '' AS $$
+  search_path = '' AS $$
 DECLARE
   v_user_id uuid;
   v_is_service_role boolean;
@@ -39,19 +38,16 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION "public"."get_org_members" (
-    "user_id" uuid,
-    "guild_id" uuid
-) RETURNS TABLE (
-    aid bigint,
-    uid uuid,
-    email varchar,
-    image_url varchar,
-    role public.user_min_right,
-    is_tmp boolean
+CREATE OR REPLACE FUNCTION "public"."get_org_members" ("user_id" uuid, "guild_id" uuid) RETURNS TABLE (
+  aid bigint,
+  uid uuid,
+  email varchar,
+  image_url varchar,
+  role public.user_min_right,
+  is_tmp boolean
 ) LANGUAGE plpgsql SECURITY DEFINER
 SET
-search_path = '' AS $$
+  search_path = '' AS $$
 DECLARE
   v_user_id uuid;
   v_is_service_role boolean;
@@ -103,25 +99,35 @@ END;
 $$;
 
 ALTER FUNCTION "public"."get_org_members" ("user_id" uuid, "guild_id" uuid) OWNER TO "postgres";
+
 ALTER FUNCTION "public"."get_org_members" ("guild_id" "uuid") OWNER TO "postgres";
 
-GRANT EXECUTE ON FUNCTION "public"."get_org_members" ("guild_id" "uuid") TO "authenticated";
-GRANT EXECUTE ON FUNCTION "public"."get_org_members" ("guild_id" "uuid") TO "service_role";
-GRANT EXECUTE ON FUNCTION "public"."get_org_members" ("user_id" uuid, "guild_id" uuid) TO "service_role";
-REVOKE ALL ON FUNCTION "public"."get_org_members" ("guild_id" "uuid") FROM PUBLIC;
-REVOKE ALL ON FUNCTION "public"."get_org_members" ("user_id" uuid, "guild_id" uuid) FROM PUBLIC;
+GRANT
+EXECUTE ON FUNCTION "public"."get_org_members" ("guild_id" "uuid") TO "authenticated";
 
-CREATE OR REPLACE FUNCTION "public"."check_org_members_password_policy"("org_id" "uuid")
-    RETURNS TABLE (
-        "user_id" "uuid",
-        "email" text,
-        "first_name" text,
-        "last_name" text,
-        "password_policy_compliant" boolean
-    )
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
+GRANT
+EXECUTE ON FUNCTION "public"."get_org_members" ("guild_id" "uuid") TO "service_role";
+
+GRANT
+EXECUTE ON FUNCTION "public"."get_org_members" ("user_id" uuid, "guild_id" uuid) TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."get_org_members" ("guild_id" "uuid")
+FROM
+  PUBLIC;
+
+REVOKE ALL ON FUNCTION "public"."get_org_members" ("user_id" uuid, "guild_id" uuid)
+FROM
+  PUBLIC;
+
+CREATE OR REPLACE FUNCTION "public"."check_org_members_password_policy" ("org_id" "uuid") RETURNS TABLE (
+  "user_id" "uuid",
+  "email" text,
+  "first_name" text,
+  "last_name" text,
+  "password_policy_compliant" boolean
+) LANGUAGE "plpgsql" SECURITY DEFINER
+SET
+  "search_path" TO '' AS $$
 DECLARE
     v_user_id uuid;
     v_is_service_role boolean;
@@ -166,7 +172,14 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION "public"."check_org_members_password_policy"("org_id" "uuid") OWNER TO "postgres";
-GRANT EXECUTE ON FUNCTION "public"."check_org_members_password_policy"("org_id" "uuid") TO "authenticated";
-GRANT EXECUTE ON FUNCTION "public"."check_org_members_password_policy"("org_id" "uuid") TO "service_role";
-REVOKE ALL ON FUNCTION "public"."check_org_members_password_policy"("org_id" "uuid") FROM PUBLIC;
+ALTER FUNCTION "public"."check_org_members_password_policy" ("org_id" "uuid") OWNER TO "postgres";
+
+GRANT
+EXECUTE ON FUNCTION "public"."check_org_members_password_policy" ("org_id" "uuid") TO "authenticated";
+
+GRANT
+EXECUTE ON FUNCTION "public"."check_org_members_password_policy" ("org_id" "uuid") TO "service_role";
+
+REVOKE ALL ON FUNCTION "public"."check_org_members_password_policy" ("org_id" "uuid")
+FROM
+  PUBLIC;
