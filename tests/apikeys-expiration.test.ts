@@ -370,6 +370,10 @@ describe('[PUT] /organization with API key policy', () => {
         max_apikey_expiration_days: 90,
       }),
     })
+    if (response.status !== 200) {
+      const body = await response.text()
+      console.error('PUT /organization failed:', response.status, body)
+    }
     expect(response.status).toBe(200)
 
     // Verify the update
@@ -387,6 +391,10 @@ describe('[PUT] /organization with API key policy', () => {
         max_apikey_expiration_days: null,
       }),
     })
+    if (response.status !== 200) {
+      const body = await response.text()
+      console.error('PUT /organization (remove max) failed:', response.status, body)
+    }
     expect(response.status).toBe(200)
 
     // Verify the update
@@ -430,6 +438,10 @@ describe('[PUT] /organization with API key policy', () => {
         require_apikey_expiration: true,
       }),
     })
+    if (response.status !== 200) {
+      const body = await response.text()
+      console.error('PUT /organization (require expiration) failed:', response.status, body)
+    }
     expect(response.status).toBe(200)
 
     // Verify the update
