@@ -87,7 +87,7 @@ app.post('/', middlewareAuth, async (c) => {
 
   const otpVerifiedAt = new Date().toISOString()
   const { error: recordError } = await supabaseAdmin(c).rpc('record_email_otp_verified', {
-    user_id: verifyData.user.id,
+    p_user_id: verifyData.user.id,
   })
 
   if (recordError) {

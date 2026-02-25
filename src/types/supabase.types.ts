@@ -3884,7 +3884,7 @@ export type Database = {
         Returns: string
       }
       record_email_otp_verified: {
-        Args: { user_id: string }
+        Args: { p_user_id: string }
         Returns: string
       }
       refresh_orgs_has_usage_credits: { Args: never; Returns: undefined }
