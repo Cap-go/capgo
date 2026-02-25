@@ -12,7 +12,7 @@ import { logger } from 'hono/logger'
 import { requestId } from 'hono/request-id'
 import { Hono } from 'hono/tiny'
 import { timingSafeEqual } from 'hono/utils/buffer'
-import { createRemoteJWKSet, jwtVerify } from 'jose'
+import { createRemoteJWKSet, decodeProtectedHeader, jwtVerify } from 'jose'
 import { cloudlog } from './logging.ts'
 import { onError } from './on_error.ts'
 import { getEnv } from './utils.ts'
@@ -22,6 +22,8 @@ import { version as CapgoVersion } from './version.ts'
 /** Cached JWKS instance — created once per cold start, shared across requests. */
 let _jwks: ReturnType<typeof createRemoteJWKSet> | null = null
 
+const LOCAL_SUPABASE_DEFAULT_JWT_SECRET = 'super-secret-jwt-token-with-at-least-32-characters-long'
+
 function getJWKS(c: Context): ReturnType<typeof createRemoteJWKSet> {
   if (!_jwks) {
     const supabaseUrl = getEnv(c, 'SUPABASE_URL')
@@ -30,6 +32,56 @@ function getJWKS(c: Context): ReturnType<typeof createRemoteJWKSet> {
     )
   }
   return _jwks
+}
+
+function normalizeSupabaseBaseUrl(raw: string): string {
+  const parsed = new URL(raw)
+  if (parsed.hostname === 'localhost')
+    parsed.hostname = '127.0.0.1'
+  return parsed.toString().replace(/\/$/, '')
+}
+
+function getAcceptedIssuers(rawSupabaseUrl: string): string[] {
+  const issuers = new Set<string>()
+
+  try {
+    const normalized = normalizeSupabaseBaseUrl(rawSupabaseUrl)
+    issuers.add(`${normalized}/auth/v1`)
+
+    const parsed = new URL(normalized)
+    if (parsed.hostname === '127.0.0.1') {
+      const alt = new URL(normalized)
+      alt.hostname = 'localhost'
+      issuers.add(`${alt.toString().replace(/\/$/, '')}/auth/v1`)
+    }
+
+    if (parsed.hostname === 'kong') {
+      issuers.add('http://127.0.0.1:54321/auth/v1')
+      issuers.add('http://localhost:54321/auth/v1')
+    }
+  }
+  catch {
+    issuers.add(`${rawSupabaseUrl.replace(/\/$/, '')}/auth/v1`)
+  }
+
+  return [...issuers]
+}
+
+function getSharedJwtSecret(c: Context<MiddlewareKeyVariables>, rawSupabaseUrl: string): string {
+  const configuredSecret = getEnv(c, 'SUPABASE_JWT_SECRET') || getEnv(c, 'JWT_SECRET')
+  if (configuredSecret)
+    return configuredSecret
+
+  try {
+    const normalized = normalizeSupabaseBaseUrl(rawSupabaseUrl)
+    const host = new URL(normalized).hostname
+    if (host === '127.0.0.1' || host === 'localhost' || host === 'kong')
+      return LOCAL_SUPABASE_DEFAULT_JWT_SECRET
+  }
+  catch {
+  }
+
+  return ''
 }
 
 export interface JWTClaims {
@@ -50,18 +102,38 @@ export async function verifyJWT(
   c: Context<MiddlewareKeyVariables>,
   jwt: string,
 ): Promise<JWTClaims | null> {
+  const token = jwt.startsWith('Bearer ') ? jwt.slice(7) : jwt
+  const rawSupabaseUrl = getEnv(c, 'SUPABASE_URL')
+  const issuer = getAcceptedIssuers(rawSupabaseUrl)
+  const audience = 'authenticated'
+
   try {
-    const token = jwt.startsWith('Bearer ') ? jwt.slice(7) : jwt
     const jwks = getJWKS(c)
-    const supabaseUrl = getEnv(c, 'SUPABASE_URL')
     const { payload } = await jwtVerify(token, jwks, {
-      issuer: `${supabaseUrl}/auth/v1`,
-      audience: 'authenticated',
+      issuer,
+      audience,
     })
     return payload as unknown as JWTClaims
   }
   catch {
-    return null
+    try {
+      const { alg } = decodeProtectedHeader(token)
+      if (!alg || !alg.startsWith('HS'))
+        return null
+
+      const sharedSecret = getSharedJwtSecret(c, rawSupabaseUrl)
+      if (!sharedSecret)
+        return null
+
+      const { payload } = await jwtVerify(token, new TextEncoder().encode(sharedSecret), {
+        issuer,
+        audience,
+      })
+      return payload as unknown as JWTClaims
+    }
+    catch {
+      return null
+    }
   }
 }
 
