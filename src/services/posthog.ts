@@ -54,10 +54,10 @@ export function posthogLoader(supaHost: string) {
   })
 }
 
-export function pushEvent(nameEvent: string, supaHost: string): void {
+export function pushEvent(nameEvent: string, supaHost: string, properties?: Record<string, any>): void {
   if (isLocal(supaHost))
     return
-  posthog.capture(nameEvent)
+  posthog.capture(nameEvent, properties)
 }
 
 export function setUser(uuid: string, data: {
