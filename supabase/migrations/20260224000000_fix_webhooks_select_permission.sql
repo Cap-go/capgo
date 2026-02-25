@@ -18,11 +18,9 @@ TO authenticated, anon
 USING (
     public.check_min_rights(
         'admin'::public.user_min_right,
-        (
-            SELECT
-                public.get_identity(
-                    '{read,upload,write,all}'::public.key_mode []
-                )
+        public.get_identity_org_allowed(
+            '{read,upload,write,all}'::public.key_mode [],
+            org_id
         ),
         org_id,
         null::character varying,
