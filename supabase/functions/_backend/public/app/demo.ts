@@ -328,7 +328,7 @@ async function assertDemoAppCreationLimits(
   }
 
   const { data, error } = await supabase
-    .rpc('create_demo_app_with_limits', rpcArgs)
+    .rpc('create_demo_app_with_limits' as any, rpcArgs)
     .single()
 
   if (error) {
