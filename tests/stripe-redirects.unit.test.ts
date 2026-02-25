@@ -1,28 +1,30 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import * as stripe from '../supabase/functions/_backend/utils/stripe.ts'
 
 // Shared mock functions that can be accessed by tests
 const mockBillingPortalSessionsCreate = vi.fn()
 const mockCheckoutSessionsCreate = vi.fn()
 const mockPricesSearch = vi.fn()
 
-// Must mock stripe BEFORE importing the stripe module
-// This is needed because stripe.ts calls Stripe.createFetchHttpClient() in getStripe
+// vi.mock calls are hoisted by Vitest, so the import above works correctly
 vi.mock('stripe', () => {
   return {
     __esModule: true,
     default: class MockStripe {
       static createFetchHttpClient = vi.fn().mockReturnValue({})
-      
+
       billingPortal = {
         sessions: {
           create: mockBillingPortalSessionsCreate,
         },
       }
+
       checkout = {
         sessions: {
           create: mockCheckoutSessionsCreate,
         },
       }
+
       prices = {
         search: mockPricesSearch,
       }
@@ -37,8 +39,6 @@ vi.mock('hono/adapter', () => ({
   }),
   getRuntimeKey: () => 'node',
 }))
-
-import * as stripe from '../supabase/functions/_backend/utils/stripe.ts'
 
 function createContext() {
   return {
