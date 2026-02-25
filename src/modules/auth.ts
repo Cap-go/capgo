@@ -87,13 +87,20 @@ async function guard(
   from: RouteLocationNormalized,
 ) {
   const supabase = useSupabase()
+  const main = useMainStore()
   const { data: claimsData } = await supabase.auth.getClaims()
   const { data: sessionData } = await supabase.auth.getSession()
   const sessionUser = sessionData?.session?.user ?? null
   const hasAuth = !!claimsData?.claims?.sub && !!sessionUser
-
-  const main = useMainStore()
+  const hadAuth = !!main.auth
   const needsVerifiedEmail = to.path.startsWith('/settings') || to.path === '/delete_account'
+
+  if (hasAuth && sessionUser) {
+    const authConfirmedAt = main.auth?.email_confirmed_at
+    if (!main.auth || main.auth.id !== sessionUser.id || authConfirmedAt !== sessionUser.email_confirmed_at) {
+      main.auth = sessionUser
+    }
+  }
 
   // TOTP means the user was force logged using the "email" tactic
   // In practice this means the user is being spoofed by an admin
@@ -115,8 +122,7 @@ async function guard(
     return next(`/login?to=${to.path}`)
   }
 
-  if (hasAuth && sessionUser && !main.auth) {
-    main.auth = sessionUser
+  if (hasAuth && sessionUser && !hadAuth) {
     if (!sessionUser.email_confirmed_at && needsVerifiedEmail) {
       return next('/resend_email')
     }
@@ -169,7 +175,7 @@ async function guard(
     // User is already authenticated, but check if account got disabled
     // (only if not already on account disabled page)
     if (to.path !== '/accountDisabled') {
-      if (!main.auth.email_confirmed_at && needsVerifiedEmail) {
+      if (!sessionUser?.email_confirmed_at && needsVerifiedEmail) {
         return next('/resend_email')
       }
 
