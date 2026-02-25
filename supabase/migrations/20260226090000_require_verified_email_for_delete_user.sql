@@ -67,7 +67,8 @@ BEGIN
     user_id_fn,
     NOW() + INTERVAL '30 days',
     "jsonb_build_object"('email', user_email, 'apikeys', COALESCE((SELECT "jsonb_agg"("to_jsonb"(a.*)) FROM "public"."apikeys" a WHERE a."user_id" = user_id_fn), '[]'::jsonb))
-  );
+  )
+  ON CONFLICT ("account_id") DO NOTHING;
 
   -- Delete the API keys
   DELETE FROM "public"."apikeys" WHERE "public"."apikeys"."user_id" = user_id_fn;
