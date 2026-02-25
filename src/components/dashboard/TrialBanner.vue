@@ -16,6 +16,8 @@ import type { ComponentPublicInstance } from 'vue'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useOrganizationStore } from '~/stores/organization'
+import { pushEvent } from '~/services/posthog'
+import { getLocalConfig } from '~/services/supabase'
 
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
@@ -29,6 +31,19 @@ const leftPupil = ref({ x: 0, y: 0 })
 const rightPupil = ref({ x: 0, y: 0 })
 
 const currentOrg = computed(() => organizationStore.currentOrganization)
+const config = getLocalConfig()
+
+function trackBannerEvent(eventName: string) {
+  const org = currentOrg.value
+  pushEvent(eventName, config.supaHost, {
+    trial_days_left: org?.trial_left ?? 0,
+    org_gid: org?.gid ?? '',
+  })
+}
+
+function handleCtaClick() {
+  trackBannerEvent('trial_banner_cta_clicked')
+}
 
 // Reactive time tick so the 3-hour age check re-evaluates without needing a page reload.
 // Updates every 60s — plenty for a 3-hour threshold.
@@ -110,6 +125,7 @@ function handleMouseMove(e: MouseEvent) {
 // is actually visible. This avoids unnecessary work for non-trial / paying users.
 watch(showBanner, (visible) => {
   if (visible) {
+    trackBannerEvent('trial_banner_shown')
     window.addEventListener('mousemove', handleMouseMove)
     tickInterval = setInterval(() => {
       nowTick.value = Date.now()
@@ -164,6 +180,7 @@ onUnmounted(() => {
         ref="ctaRef"
         to="/settings/organization/plans"
         class="d-btn cta-button cta-sparkle"
+        @click="handleCtaClick"
       >
         {{ t('trial-banner-cta') }}
       </router-link>
