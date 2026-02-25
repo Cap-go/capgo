@@ -83,13 +83,9 @@ app.post('/', middlewareAuth, async (c) => {
   }
 
   const otpVerifiedAt = new Date().toISOString()
-  const { error: recordError } = await supabaseAdmin(c)
-    .from('user_security')
-    .upsert({
-      user_id: verifyData.user.id,
-      email_otp_verified_at: otpVerifiedAt,
-      updated_at: otpVerifiedAt,
-    }, { onConflict: 'user_id' })
+  const { error: recordError } = await supabaseAdmin(c).rpc('record_email_otp_verified', {
+    user_id: verifyData.user.id,
+  })
 
   if (recordError) {
     cloudlog({ requestId: c.get('requestId'), context: 'verify_email_otp - record failed', error: recordError?.message })
