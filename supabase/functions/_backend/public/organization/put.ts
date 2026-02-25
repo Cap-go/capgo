@@ -5,7 +5,7 @@ import { z } from 'zod/mini'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { createSignedImageUrl, normalizeImagePath } from '../../utils/storage.ts'
-import { apikeyHasOrgRightWithPolicy, supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
+import { apikeyHasOrgRightWithPolicy, supabaseAdmin, supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
 
 const bodySchema = z.object({
   orgId: z.string(),
@@ -28,12 +28,16 @@ function parseBody(bodyRaw: unknown) {
 
 async function ensureOrgAccess(
   c: Context<MiddlewareKeyVariables>,
-  apikey: Database['public']['Tables']['apikeys']['Row'],
+  apikey: Database['public']['Tables']['apikeys']['Row'] | null | undefined,
   orgId: string,
   supabase: ReturnType<typeof supabaseApikey>,
 ) {
   if (!(await checkPermission(c, 'org.update_settings', { orgId }))) {
     throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId })
+  }
+
+  if (!apikey) {
+    return
   }
 
   const orgCheck = await apikeyHasOrgRightWithPolicy(c, apikey, orgId, supabase)
@@ -105,19 +109,27 @@ async function updateOrg(
   return data
 }
 
-export async function put(c: Context<MiddlewareKeyVariables>, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function put(
+  c: Context<MiddlewareKeyVariables>,
+  bodyRaw: any,
+  apikey: Database['public']['Tables']['apikeys']['Row'] | null | undefined,
+): Promise<Response> {
   const body = parseBody(bodyRaw)
-  const supabase = supabaseApikey(c, apikey.key)
-  const authUserId = c.get('auth')?.userId
+  const auth = c.get('auth')
+  if (!auth?.userId) {
+    throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
+  }
 
-  // Auth context is already set by middlewareKey
+  const supabase = auth.authType === 'jwt' && auth.jwt
+    ? supabaseClient(c, auth.jwt)
+    : supabaseApikey(c, apikey?.key)
+  const authUserId = auth.userId
+
+  // Auth context is already set by middlewareV2
   await ensureOrgAccess(c, apikey, body.orgId, supabase)
 
-  if (body.enforcing_2fa && authUserId) {
+  if (body.enforcing_2fa) {
     await enforceSelf2faRequirement(authUserId, c)
-  }
-  else if (body.enforcing_2fa) {
-    throw simpleError('cannot_access_organization', 'You can\\'t access this organization', { orgId: body.orgId })
   }
 
   validateMaxExpirationDays(body.max_apikey_expiration_days)
