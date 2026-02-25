@@ -180,12 +180,35 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
     // Use admin client - preview is public when allow_preview is enabled
     const supabase = supabaseAdmin(c)
 
-    // Get app settings to check if preview is enabled (case-insensitive since frontend lowercases)
-    const { data: appData, error: appError } = await supabase
+    // Get app settings to check if preview is enabled.
+    // Try exact match first (prevents wildcard collisions), then fallback to
+    // case-insensitive match for preview URLs that were lowercased.
+    const exactLookup = await supabase
       .from('apps')
       .select('app_id, allow_preview')
-      .ilike('app_id', appId)
-      .single()
+      .eq('app_id', appId)
+      .maybeSingle()
+
+    let appData = exactLookup.data
+    let appError = exactLookup.error
+
+    if (!appData && !appError) {
+      const escapedAppId = appId
+        .toLowerCase()
+        .replace(/\\/g, '\\\\')
+        .replace(/%/g, '\\%')
+        .replace(/_/g, '\\_')
+
+      const fallbackLookup = await supabase
+        .from('apps')
+        .select('app_id, allow_preview')
+        .ilike('app_id', escapedAppId)
+        .limit(1)
+        .maybeSingle()
+
+      appData = fallbackLookup.data
+      appError = fallbackLookup.error
+    }
 
     if (appError || !appData) {
       throw simpleError('app_not_found', 'App not found', { appId })
