@@ -25,15 +25,20 @@ DECLARE
   cache_entry public.org_metrics_cache%ROWTYPE;
   cache_ttl interval := '5 minutes'::interval;
   v_request_user uuid;
+  v_request_role text;
 BEGIN
   IF start_date IS NULL OR end_date IS NULL THEN
     RETURN;
   END IF;
 
   v_request_user := (SELECT auth.uid());
+  SELECT auth.role() INTO v_request_role;
+  IF v_request_role IS NULL OR v_request_role = '' THEN
+    SELECT current_setting('request.jwt.claim.role', true) INTO v_request_role;
+  END IF;
 
   IF v_request_user IS NULL THEN
-    IF COALESCE(current_setting('role', true), '') NOT IN ('service_role', 'postgres') THEN
+    IF v_request_role IS DISTINCT FROM 'service_role' AND session_user NOT IN ('postgres', 'service_role', 'supabase_admin', 'supabase_auth_admin', 'supabase_storage_admin', 'supabase_realtime_admin') THEN
       RETURN;
     END IF;
   ELSIF NOT EXISTS (
@@ -140,11 +145,16 @@ DECLARE
   v_end_date date;
   v_anchor_day interval;
   v_request_user uuid;
+  v_request_role text;
 BEGIN
   v_request_user := (SELECT auth.uid());
+  SELECT auth.role() INTO v_request_role;
+  IF v_request_role IS NULL OR v_request_role = '' THEN
+    SELECT current_setting('request.jwt.claim.role', true) INTO v_request_role;
+  END IF;
 
   IF v_request_user IS NULL THEN
-    IF COALESCE(current_setting('role', true), '') NOT IN ('service_role', 'postgres') THEN
+    IF v_request_role IS DISTINCT FROM 'service_role' AND session_user NOT IN ('postgres', 'service_role', 'supabase_auth_admin', 'supabase_realtime_admin', 'supabase_storage_admin', 'supabase_admin') THEN
       RETURN;
     END IF;
   ELSIF NOT EXISTS (
@@ -161,7 +171,7 @@ BEGIN
   INTO v_anchor_day
   FROM public.orgs o
   LEFT JOIN public.stripe_info si ON o.customer_id = si.customer_id
-  WHERE o.id = org_id;
+  WHERE o.id = get_total_metrics.org_id;
 
   IF NOT FOUND THEN
     RETURN;
