@@ -72,6 +72,42 @@ describe('[POST] /apikey operations', () => {
     expect(verifyData.name).toBe(keyName)
   })
 
+  it('app-limited key cannot create another API key', async () => {
+    const limitedCreatorResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: 'limited-app-key-creator',
+        limited_to_apps: [APPNAME],
+      }),
+    })
+    expect(limitedCreatorResponse.status).toBe(200)
+    const limitedCreatorData = await limitedCreatorResponse.json<{ id: number, key: string }>()
+
+    const limitedHeaders = {
+      'Content-Type': 'application/json',
+      'capgkey': limitedCreatorData.key,
+    }
+
+    const escalationResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers: limitedHeaders,
+      body: JSON.stringify({
+        name: 'blocked-unrestricted-creation',
+        limited_to_orgs: [],
+        limited_to_apps: [],
+      }),
+    })
+    const escalationData = await escalationResponse.json() as { error: string }
+    expect(escalationResponse.status).toBe(400)
+    expect(escalationData).toHaveProperty('error', 'cannot_create_apikey')
+
+    await fetch(`${BASE_URL}/apikey/${limitedCreatorData.id}`, {
+      method: 'DELETE',
+      headers,
+    })
+  })
+
   it('create api key with missing name', async () => {
     const response = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
@@ -273,12 +309,12 @@ describe('[PUT] /apikey/:id operations', () => {
     expect(regenerateData.key).not.toBe(oldKey)
 
     // Old key must no longer authenticate.
-    const oldAuthHeaders = { 'Content-Type': 'application/json', Authorization: oldKey }
+    const oldAuthHeaders = { 'Content-Type': 'application/json', 'Authorization': oldKey }
     const oldAuthResponse = await fetch(`${BASE_URL}/apikey`, { method: 'GET', headers: oldAuthHeaders })
     expect(oldAuthResponse.status).toBe(401)
 
     // New key must authenticate.
-    const newAuthHeaders = { 'Content-Type': 'application/json', Authorization: regenerateData.key }
+    const newAuthHeaders = { 'Content-Type': 'application/json', 'Authorization': regenerateData.key }
     const newAuthResponse = await fetch(`${BASE_URL}/apikey`, { method: 'GET', headers: newAuthHeaders })
     expect(newAuthResponse.status).toBe(200)
 
@@ -315,12 +351,12 @@ describe('[PUT] /apikey/:id operations', () => {
     expect(verifyData.key_hash).toBe(regenerateData.key_hash)
 
     // Old key must no longer authenticate.
-    const oldAuthHeaders = { 'Content-Type': 'application/json', Authorization: oldKey }
+    const oldAuthHeaders = { 'Content-Type': 'application/json', 'Authorization': oldKey }
     const oldAuthResponse = await fetch(`${BASE_URL}/apikey`, { method: 'GET', headers: oldAuthHeaders })
     expect(oldAuthResponse.status).toBe(401)
 
     // New key must authenticate.
-    const newAuthHeaders = { 'Content-Type': 'application/json', Authorization: regenerateData.key }
+    const newAuthHeaders = { 'Content-Type': 'application/json', 'Authorization': regenerateData.key }
     const newAuthResponse = await fetch(`${BASE_URL}/apikey`, { method: 'GET', headers: newAuthHeaders })
     expect(newAuthResponse.status).toBe(200)
 
@@ -635,9 +671,7 @@ describe('[POST] /apikey hashed key with expiration', () => {
     expect(createResponse.status).toBe(200)
 
     // Manually set the key to expired via direct DB update
-    const { error } = await getSupabaseClient().from('apikeys')
-      .update({ expires_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() })
-      .eq('id', createData.id)
+    const { error } = await getSupabaseClient().from('apikeys').update({ expires_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() }).eq('id', createData.id)
     expect(error).toBeNull()
 
     // Try to use the expired hashed key for authentication

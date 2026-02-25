@@ -11,8 +11,9 @@ app.post('/', middlewareV2(['all']), async (c) => {
   const auth = c.get('auth') as AuthInfo
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
 
-  // Only check limited_to_orgs constraint for API key auth (not JWT)
-  if (auth.authType === 'apikey' && apikey?.limited_to_orgs?.length) {
+  // Limit API key creation for constrained caller keys (not JWT).
+  const callerHasLimitedScope = (apikey?.limited_to_orgs?.length ?? 0) > 0 || (apikey?.limited_to_apps?.length ?? 0) > 0
+  if (auth.authType === 'apikey' && callerHasLimitedScope) {
     throw simpleError('cannot_create_apikey', 'You cannot do that as a limited API key', { apikey })
   }
 
