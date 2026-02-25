@@ -1,12 +1,22 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import * as stripe from '../supabase/functions/_backend/utils/stripe.ts'
+import Stripe from 'stripe'
 
-vi.mock('hono/adapter', () => ({
-  env: () => ({
-    WEBAPP_URL: 'https://capgo.test',
-    STRIPE_SECRET_KEY: 'sk_test_123',
-  }),
-}))
+vi.mock('hono/adapter', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('hono/adapter')>()
+  return {
+    ...actual,
+    env: () => ({
+      WEBAPP_URL: 'https://capgo.test',
+      STRIPE_SECRET_KEY: 'sk_test_123',
+    }),
+  }
+})
+
+vi.mock('stripe', () => {
+  const MockStripe: any = vi.fn()
+  MockStripe.createFetchHttpClient = vi.fn()
+  return { default: MockStripe }
+})
 
 function createContext() {
   return {
@@ -43,9 +53,10 @@ describe('stripe redirect URL allowlist', () => {
       },
     } as any
 
-    vi.spyOn(stripe, 'getStripe').mockReturnValue(stripeClient)
+    vi.mocked(Stripe).mockImplementation(function () { return stripeClient } as any)
 
-    const result = await stripe.createPortal(createContext(), 'cus_123', '/app/usage')
+    const { createPortal } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    const result = await createPortal(createContext(), 'cus_123', '/app/usage')
 
     expect(result.url).toBe('https://pay.capgo.test/p/session')
     expect(createSession).toHaveBeenCalledWith({
@@ -64,9 +75,10 @@ describe('stripe redirect URL allowlist', () => {
       },
     } as any
 
-    vi.spyOn(stripe, 'getStripe').mockReturnValue(stripeClient)
+    vi.mocked(Stripe).mockImplementation(function () { return stripeClient } as any)
 
-    const response = await stripe.createPortal(createContext(), 'cus_123', 'https://example.com/phishing').catch(error => error)
+    const { createPortal } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    const response = await createPortal(createContext(), 'cus_123', 'https://example.com/phishing').catch(error => error)
 
     expect(response).toBeInstanceOf(Error)
     expect(response.cause).toMatchObject({ error: 'invalid_redirect_url' })
@@ -87,9 +99,10 @@ describe('stripe redirect URL allowlist', () => {
       },
     } as any
 
-    vi.spyOn(stripe, 'getStripe').mockReturnValue(stripeClient)
+    vi.mocked(Stripe).mockImplementation(function () { return stripeClient } as any)
 
-    const result = await stripe.createCheckout(
+    const { createCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    const result = await createCheckout(
       createContext(),
       'cus_123',
       'month',
@@ -118,9 +131,10 @@ describe('stripe redirect URL allowlist', () => {
       },
     } as any
 
-    vi.spyOn(stripe, 'getStripe').mockReturnValue(stripeClient)
+    vi.mocked(Stripe).mockImplementation(function () { return stripeClient } as any)
 
-    const response = await stripe.createCheckout(
+    const { createCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    const response = await createCheckout(
       createContext(),
       'cus_123',
       'month',
@@ -147,9 +161,10 @@ describe('stripe redirect URL allowlist', () => {
       },
     } as any
 
-    vi.spyOn(stripe, 'getStripe').mockReturnValue(stripeClient)
+    vi.mocked(Stripe).mockImplementation(function () { return stripeClient } as any)
 
-    const response = await stripe.createOneTimeCheckout(
+    const { createOneTimeCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    const response = await createOneTimeCheckout(
       createContext(),
       'cus_123',
       'prod_123',
