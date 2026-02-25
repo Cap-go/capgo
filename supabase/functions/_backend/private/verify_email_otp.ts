@@ -81,6 +81,9 @@ app.post('/', middlewareAuth, async (c) => {
   if (verifyData.user?.id && verifyData.user.id !== auth.userId) {
     return quickError(403, 'otp_user_mismatch', 'OTP does not match current user')
   }
+  if (!verifyData.user?.id) {
+    return quickError(500, 'no_user', 'No user associated with OTP')
+  }
 
   const otpVerifiedAt = new Date().toISOString()
   const { error: recordError } = await supabaseAdmin(c).rpc('record_email_otp_verified', {
