@@ -6,6 +6,20 @@ import { supabaseAdmin } from './supabase.ts'
 const JPEG_SIGNATURE = [0xFF, 0xD8]
 const PNG_SIGNATURE = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]
 
+function mimeFromFileBytes(bytes: Uint8Array): string | null {
+  if (bytes.length >= 2 && bytes[0] === JPEG_SIGNATURE[0] && bytes[1] === JPEG_SIGNATURE[1]) {
+    return 'image/jpeg'
+  }
+
+  if (bytes.length >= PNG_SIGNATURE.length) {
+    const isPng = PNG_SIGNATURE.every((signatureByte, index) => bytes[index] === signatureByte)
+    if (isPng)
+      return 'image/png'
+  }
+
+  return null
+}
+
 function readUint32(bytes: Uint8Array, offset: number): number {
   return ((bytes[offset] << 24)
     | (bytes[offset + 1] << 16)
@@ -177,10 +191,10 @@ export async function cleanStoredImageMetadata(c: Context, rawImagePath: string)
     return
   }
 
-  const contentType = mimeFromFilePath(normalizedPath)
+  const contentType = fileBlob.type || mimeFromFileBytes(original) || mimeFromFilePath(normalizedPath) || undefined
   const { error: uploadError } = await supabase.storage.from('images').upload(normalizedPath, sanitized, {
     upsert: true,
-    contentType,
+    ...(contentType ? { contentType } : {}),
   })
 
   if (uploadError) {
