@@ -53,7 +53,11 @@ export async function verifyJWT(
   try {
     const token = jwt.startsWith('Bearer ') ? jwt.slice(7) : jwt
     const jwks = getJWKS(c)
-    const { payload } = await jwtVerify(token, jwks)
+    const supabaseUrl = getEnv(c, 'SUPABASE_URL')
+    const { payload } = await jwtVerify(token, jwks, {
+      issuer: `${supabaseUrl}/auth/v1`,
+      audience: 'authenticated',
+    })
     return payload as unknown as JWTClaims
   }
   catch {
