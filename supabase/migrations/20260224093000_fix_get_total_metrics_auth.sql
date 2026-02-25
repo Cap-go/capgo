@@ -177,6 +177,7 @@ SET search_path = '' AS $function$
 DECLARE
   v_request_user uuid;
   v_request_org_id uuid;
+  v_org_id_text text;
 BEGIN
   SELECT public.get_identity() INTO v_request_user;
 
@@ -184,9 +185,13 @@ BEGIN
     RETURN;
   END IF;
 
-  SELECT current_setting('request.jwt.claim.org_id', true) INTO v_request_org_id;
+  SELECT current_setting('request.jwt.claim.org_id', true) INTO v_org_id_text;
 
-  IF v_request_org_id IS NULL OR v_request_org_id = '' THEN
+  IF v_org_id_text IS NOT NULL AND v_org_id_text <> '' THEN
+    v_request_org_id := v_org_id_text::uuid;
+  END IF;
+
+  IF v_request_org_id IS NULL THEN
     SELECT org_users.org_id
     INTO v_request_org_id
     FROM public.org_users
