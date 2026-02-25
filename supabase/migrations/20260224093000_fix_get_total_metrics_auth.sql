@@ -188,7 +188,12 @@ BEGIN
   SELECT current_setting('request.jwt.claim.org_id', true) INTO v_org_id_text;
 
   IF v_org_id_text IS NOT NULL AND v_org_id_text <> '' THEN
-    v_request_org_id := v_org_id_text::uuid;
+    BEGIN
+      v_request_org_id := v_org_id_text::uuid;
+    EXCEPTION WHEN invalid_text_representation THEN
+      -- Malformed org_id in JWT; fall through to org_users lookup
+      v_request_org_id := NULL;
+    END;
   END IF;
 
   IF v_request_org_id IS NULL THEN
