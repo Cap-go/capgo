@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import Stripe from 'stripe'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('hono/adapter', async (importOriginal) => {
   const actual = await importOriginal<typeof import('hono/adapter')>()
@@ -53,7 +53,7 @@ describe('stripe redirect URL allowlist', () => {
       },
     } as any
 
-    vi.mocked(Stripe).mockImplementation(function () { return stripeClient } as any)
+    vi.mocked(Stripe).mockImplementation(() => stripeClient as any)
 
     const { createPortal } = await import('../supabase/functions/_backend/utils/stripe.ts')
     const result = await createPortal(createContext(), 'cus_123', '/app/usage')
@@ -75,7 +75,7 @@ describe('stripe redirect URL allowlist', () => {
       },
     } as any
 
-    vi.mocked(Stripe).mockImplementation(function () { return stripeClient } as any)
+    vi.mocked(Stripe).mockImplementation(() => stripeClient as any)
 
     const { createPortal } = await import('../supabase/functions/_backend/utils/stripe.ts')
     const response = await createPortal(createContext(), 'cus_123', 'https://example.com/phishing').catch(error => error)
@@ -99,7 +99,7 @@ describe('stripe redirect URL allowlist', () => {
       },
     } as any
 
-    vi.mocked(Stripe).mockImplementation(function () { return stripeClient } as any)
+    vi.mocked(Stripe).mockImplementation(() => stripeClient as any)
 
     const { createCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
     const result = await createCheckout(
@@ -131,7 +131,7 @@ describe('stripe redirect URL allowlist', () => {
       },
     } as any
 
-    vi.mocked(Stripe).mockImplementation(function () { return stripeClient } as any)
+    vi.mocked(Stripe).mockImplementation(() => stripeClient as any)
 
     const { createCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
     const response = await createCheckout(
@@ -161,7 +161,7 @@ describe('stripe redirect URL allowlist', () => {
       },
     } as any
 
-    vi.mocked(Stripe).mockImplementation(function () { return stripeClient } as any)
+    vi.mocked(Stripe).mockImplementation(() => stripeClient as any)
 
     const { createOneTimeCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
     const response = await createOneTimeCheckout(
