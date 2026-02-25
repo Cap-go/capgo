@@ -124,7 +124,13 @@ async function guard(
 
   if (hasAuth && sessionUser && !hadAuth) {
     if (!sessionUser.email_confirmed_at && needsVerifiedEmail) {
-      return next('/resend_email')
+      return next({
+        path: '/resend_email',
+        query: {
+          reason: 'email_not_verified',
+          return_to: to.path,
+        },
+      })
     }
 
     // Check if account is disabled (marked for deletion)
@@ -176,7 +182,13 @@ async function guard(
     // (only if not already on account disabled page)
     if (to.path !== '/accountDisabled') {
       if (!sessionUser?.email_confirmed_at && needsVerifiedEmail) {
-        return next('/resend_email')
+        return next({
+          path: '/resend_email',
+          query: {
+            reason: 'email_not_verified',
+            return_to: to.path,
+          },
+        })
       }
 
       try {

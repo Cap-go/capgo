@@ -2,16 +2,20 @@
 <script setup lang="ts">
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { toast } from 'vue-sonner'
 import iconEmail from '~icons/oui/email?raw'
 import { useSupabase } from '~/services/supabase'
 
 const { t } = useI18n()
 const supabase = useSupabase()
+const route = useRoute()
 const isLoading = ref(false)
 const isLoadingMain = ref(false)
+const emailVerificationBlockingReason = computed(() => route.query.reason === 'email_not_verified')
+const returnTo = computed(() => (typeof route.query.return_to === 'string' ? route.query.return_to : ''))
 
 async function submit(form: { email: string, password: string }) {
   isLoading.value = true
@@ -43,6 +47,17 @@ async function submit(form: { email: string, password: string }) {
         <div class="relative mx-auto mt-8 max-w-md md:mt-4">
           <div class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
             <div class="py-6 px-4 sm:py-7 sm:px-8">
+              <div v-if="emailVerificationBlockingReason" class="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-100">
+                <p class="mb-1">
+                  You cannot access this action right now because your email is not verified yet.
+                </p>
+                <p class="text-xs leading-5">
+                  Verify your email to continue. If you were trying to access account settings or delete your account, please confirm your email first.
+                </p>
+                <p v-if="returnTo" class="mt-2 text-xs font-medium">
+                  Attempted destination: {{ returnTo }}
+                </p>
+              </div>
               <FormKit id="resend-email" type="form" :actions="false" @submit="submit">
                 <div class="space-y-5 text-gray-500">
                   <FormKit
