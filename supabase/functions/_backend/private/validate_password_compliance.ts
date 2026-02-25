@@ -3,14 +3,19 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
-import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { verifyCaptchaToken } from '../utils/captcha.ts'
+import { getClaimsFromJWT, parseBody, quickError, simpleError, simpleRateLimit, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { isIPRateLimited, recordFailedAuth } from '../utils/rate_limit.ts'
+import { buildRateLimitInfo } from '../utils/rateLimitInfo.ts'
 import { emptySupabase, supabaseClient, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
+import { getEnv } from '../utils/utils.ts'
 
 interface ValidatePasswordCompliance {
   email: string
   password: string
   org_id: string
+  captcha_token?: string
 }
 
 type RpcClient = Pick<SupabaseClient<Database>, 'rpc'>
@@ -24,6 +29,7 @@ const bodySchema = z.object({
   email: z.string().check(z.email()),
   password: z.string().check(z.minLength(1)),
   org_id: z.string().check(z.uuid()),
+  captcha_token: z.optional(z.string().check(z.minLength(1))),
 })
 
 // Check if password meets the policy requirements
@@ -83,6 +89,11 @@ app.use('/', useCors)
 app.post('/', async (c) => {
   const rawBody = await parseBody<ValidatePasswordCompliance>(c)
 
+  const ipRateLimitStatus = await isIPRateLimited(c)
+  if (ipRateLimitStatus.limited) {
+    return simpleRateLimit({ reason: 'too_many_failed_auth_attempts', ...buildRateLimitInfo(ipRateLimitStatus.resetAt) })
+  }
+
   // Validate request body
   const validationResult = bodySchema.safeParse(rawBody)
   if (!validationResult.success) {
@@ -90,8 +101,21 @@ app.post('/', async (c) => {
   }
 
   const body = validationResult.data
-  const { password: _password, ...bodyWithoutPassword } = body
+  const { password: _password, captcha_token: _captchaToken, ...bodyWithoutPassword } = body
   cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance raw body', rawBody: bodyWithoutPassword })
+
+  const captchaSecret = getEnv(c, 'CAPTCHA_SECRET_KEY')
+  const authorization = c.req.header('authorization')
+  const sessionClaims = authorization ? getClaimsFromJWT(authorization) : null
+  const isAuthenticatedCaller = Boolean(sessionClaims?.sub && sessionClaims.email)
+
+  if (captchaSecret.length > 0 && !isAuthenticatedCaller) {
+    if (!body.captcha_token) {
+      throw simpleError('invalid_request', 'Captcha token is required')
+    }
+    await verifyCaptchaToken(c, body.captcha_token, captchaSecret)
+  }
+
   const adminClient = useSupabaseAdmin(c)
 
   // Authenticate first to avoid leaking org existence to unauthenticated callers.
@@ -99,9 +123,13 @@ app.post('/', async (c) => {
   const { data: signInData, error: signInError } = await loginClient.auth.signInWithPassword({
     email: body.email,
     password: body.password,
+    options: captchaSecret.length > 0 && body.captcha_token
+      ? { captchaToken: body.captcha_token }
+      : undefined,
   })
 
   if (signInError || !signInData.user || !signInData.session) {
+    await recordFailedAuth(c)
     cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - login failed', error: signInError?.message })
     return quickError(401, 'invalid_credentials', 'Invalid email or password')
   }
