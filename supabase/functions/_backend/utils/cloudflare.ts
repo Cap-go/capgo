@@ -10,6 +10,11 @@ import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
 import { DEFAULT_LIMIT } from './types.ts'
 import { getEnv } from './utils.ts'
 
+/** Escape a value for safe interpolation into an Analytics Engine SQL string. */
+function escapeSqlString(value: string): string {
+  return value.replace(/'/g, "''").replace(/\\/g, '\\\\')
+}
+
 // type is require for the bindings no interface
 // eslint-disable-next-line ts/consistent-type-definitions
 export type Bindings = {
@@ -559,10 +564,10 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
   if (params.deviceIds?.length) {
     cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds: params.deviceIds })
     if (params.deviceIds.length === 1) {
-      conditions.push(`blob1 = '${params.deviceIds[0]}'`)
+      conditions.push(`blob1 = '${escapeSqlString(params.deviceIds[0])}'`)
     }
     else {
-      const devicesList = params.deviceIds.map(id => `'${id}'`).join(', ')
+      const devicesList = params.deviceIds.map(id => `'${escapeSqlString(id)}'`).join(', ')
       conditions.push(`blob1 IN (${devicesList})`)
     }
   }
@@ -571,16 +576,16 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
     cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
     const searchLower = params.search.toLowerCase()
     if (params.deviceIds?.length) {
-      conditions.push(`position('${searchLower}' IN toLower(blob5)) > 0`)
+      conditions.push(`position('${escapeSqlString(searchLower)}' IN toLower(blob5)) > 0`)
     }
     else {
       // Search in device_id, custom_id, or version_name
-      conditions.push(`(position('${searchLower}' IN toLower(blob1)) > 0 OR position('${searchLower}' IN toLower(blob5)) > 0 OR position('${searchLower}' IN toLower(blob2)) > 0)`)
+      conditions.push(`(position('${escapeSqlString(searchLower)}' IN toLower(blob1)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob5)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob2)) > 0)`)
     }
   }
 
   if (params.version_name) {
-    conditions.push(`blob2 = '${params.version_name}'`)
+    conditions.push(`blob2 = '${escapeSqlString(params.version_name)}'`)
   }
 
   // Cursor-based pagination using timestamp
@@ -589,7 +594,7 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
     // Cursor format: "timestamp|device_id"
     const [cursorTime, cursorDeviceId] = params.cursor.split('|')
     if (cursorTime && cursorDeviceId) {
-      cursorFilter = `AND (timestamp < toDateTime('${cursorTime}') OR (timestamp = toDateTime('${cursorTime}') AND blob1 > '${cursorDeviceId}'))`
+      cursorFilter = `AND (timestamp < toDateTime('${escapeSqlString(cursorTime)}') OR (timestamp = toDateTime('${escapeSqlString(cursorTime)}') AND blob1 > '${escapeSqlString(cursorDeviceId)}'))`
     }
   }
 
@@ -662,10 +667,10 @@ export async function readStatsCF(c: Context, params: ReadStatsParams) {
   if (params.deviceIds?.length) {
     cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds: params.deviceIds })
     if (params.deviceIds.length === 1) {
-      deviceFilter = `AND device_id = '${params.deviceIds[0]}'`
+      deviceFilter = `AND device_id = '${escapeSqlString(params.deviceIds[0])}'`
     }
     else {
-      const devicesList = params.deviceIds.join(',')
+      const devicesList = params.deviceIds.map(id => `'${escapeSqlString(id)}'`).join(',')
       deviceFilter = `AND device_id IN (${devicesList})`
     }
   }
@@ -674,10 +679,10 @@ export async function readStatsCF(c: Context, params: ReadStatsParams) {
   if (params.actions?.length) {
     cloudlog({ requestId: c.get('requestId'), message: 'actions filter', actions: params.actions })
     if (params.actions.length === 1) {
-      actionsFilter = `AND action = '${params.actions[0]}'`
+      actionsFilter = `AND action = '${escapeSqlString(params.actions[0])}'`
     }
     else {
-      const actionsList = params.actions.map(a => `'${a}'`).join(',')
+      const actionsList = params.actions.map(a => `'${escapeSqlString(a)}'`).join(',')
       actionsFilter = `AND action IN (${actionsList})`
     }
   }
@@ -686,9 +691,9 @@ export async function readStatsCF(c: Context, params: ReadStatsParams) {
   if (params.search) {
     const searchLower = params.search.toLowerCase()
     if (params.deviceIds?.length)
-      searchFilter = `AND (position('${searchLower}' IN toLower(action)) > 0 OR position('${searchLower}' IN toLower(blob3)) > 0)`
+      searchFilter = `AND (position('${escapeSqlString(searchLower)}' IN toLower(action)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob3)) > 0)`
     else
-      searchFilter = `AND (position('${searchLower}' IN toLower(device_id)) > 0 OR position('${searchLower}' IN toLower(action)) > 0 OR position('${searchLower}' IN toLower(blob3)) > 0)`
+      searchFilter = `AND (position('${escapeSqlString(searchLower)}' IN toLower(device_id)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(action)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob3)) > 0)`
   }
   const orderFilters: string[] = []
   const allowedOrderKeys = new Set(['created_at', 'app_id', 'device_id', 'action', 'version_name'])
