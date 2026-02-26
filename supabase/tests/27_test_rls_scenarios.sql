@@ -70,9 +70,6 @@ SET
 SET
   LOCAL request.jwt.claims TO '{"sub": "6aa76066-55ef-4238-ade6-0b32334a4097"}';
 
-SET
-  LOCAL request.jwt.claims TO '{"sub": "6aa76066-55ef-4238-ade6-0b32334a4097"}';
-
 SELECT
   is (
     (
