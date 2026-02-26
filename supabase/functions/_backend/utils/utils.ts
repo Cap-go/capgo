@@ -175,7 +175,7 @@ export function getBaseUrl(c: Context): string {
       throw simpleError('missing_web_app_url', 'Web app URL is required')
     }
     const baseUrlParsed = new URL(baseUrl)
-    if (baseUrlParsed.hostname !== 'localhost' && baseUrlParsed.hostname !== '127.0.0.1' && baseUrlParsed.protocol === 'https:') {
+    if (baseUrlParsed.hostname !== 'localhost' && baseUrlParsed.hostname !== '127.0.0.1' && baseUrlParsed.protocol === 'http:') {
       baseUrlParsed.protocol = 'https:'
     }
     return baseUrlParsed.toString()
