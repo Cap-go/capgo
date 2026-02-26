@@ -250,6 +250,7 @@
     "eslint": "9.39.3",
     "eslint-plugin-format": "^1.0.2",
     "sass": "1.97.3",
+    "simple-git-hooks": "^2.11.1",
     "tailwindcss": "^4.1.17",
     "typescript": "5.9.3",
     "unplugin-auto-import": "^20.2.0",
@@ -266,8 +267,7 @@
     "vite-plugin-webfont-dl": "^3.11.1",
     "vitest": "^4.0.8",
     "vue-tsc": "3.1.8",
-    "wrangler": "^4.67.0",
-    "simple-git-hooks": "^2.11.1"
+    "wrangler": "^4.67.0"
   },
   "gitmoji": {
     "autoAdd": false,
