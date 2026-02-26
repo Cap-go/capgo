@@ -64,7 +64,6 @@ SELECT
     'Anonymous users should not be able to select from global_stats'
   );
 
--- Test 4b: Authenticated users should not be able to read global_stats
 SET
   LOCAL role TO authenticated;
 SET
@@ -80,7 +79,7 @@ SELECT
     ),
     0::bigint,
     'Authenticated non-admin users should see no rows in global_stats'
-  );
+    );
 
 -- Test 4c: Non-admin can be replaced with admin and still query this table
 SET
