@@ -4,7 +4,7 @@ import Stripe from 'stripe'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { supabaseAdmin } from './supabase.ts'
-import { getEnv, isStripeConfigured } from './utils.ts'
+import { getBaseUrl, getEnv, isStripeConfigured } from './utils.ts'
 
 // Checks if SUPABASE_URL points to a local instance
 function isLocalSupabase(c: Context): boolean {
@@ -425,7 +425,7 @@ export async function createOneTimeCheckout(
 }
 
 function getAllowedRedirectUrl(c: Context, value: string, field: 'return_url' | 'success_url' | 'cancel_url') {
-  const baseWebAppUrl = getEnv(c, 'WEBAPP_URL')
+  const baseWebAppUrl = getBaseUrl(c)
   if (!baseWebAppUrl)
     throw simpleError('invalid_redirect_url', 'WEBAPP_URL is not configured', { field })
 
@@ -459,7 +459,7 @@ export interface StripeCustomer {
 
 export async function createCustomer(c: Context, email: string, userId: string, orgId: string, name: string) {
   cloudlog({ requestId: c.get('requestId'), message: 'createCustomer', email, userId, orgId, name })
-  const baseConsoleUrl = (getEnv(c, 'WEBAPP_URL') || '').replace(/\/+$/, '')
+  const baseConsoleUrl = (getBaseUrl(c) || '').replace(/\/+$/, '')
   const metadata: Record<string, string> = {
     user_id: userId,
     org_id: orgId,
@@ -493,7 +493,7 @@ export async function ensureCustomerMetadata(c: Context, customerId: string, org
   if (!isStripeConfigured(c))
     return
 
-  const baseConsoleUrl = (getEnv(c, 'WEBAPP_URL') || '').replace(/\/+$/, '')
+  const baseConsoleUrl = (getBaseUrl(c) || '').replace(/\/+$/, '')
   const metadata: Record<string, string> = {
     org_id: orgId,
   }
