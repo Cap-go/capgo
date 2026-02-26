@@ -7,6 +7,8 @@ import {
   parse,
 } from '@std/semver'
 import { env, getRuntimeKey } from 'hono/adapter'
+import { simpleError } from './hono.ts'
+import { cloudlogErr } from './logging.ts'
 
 declare const EdgeRuntime: { waitUntil?: (promise: Promise<any>) => void } | undefined
 
@@ -159,6 +161,33 @@ export function backgroundTask(c: Context, p: any) {
 
 export function existInEnv(c: Context, key: string): boolean {
   return key in env(c)
+}
+
+export function getBaseUrl(c: Context): string {
+  try {
+    const baseUrl = getEnv(c, 'WEBAPP_URL')
+    if (!baseUrl) {
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'missing_web_app_url',
+        baseUrl,
+      })
+      throw simpleError('missing_web_app_url', 'Web app URL is required')
+    }
+    const baseUrlParsed = new URL(baseUrl)
+    if (baseUrlParsed.hostname !== 'localhost' && baseUrlParsed.hostname !== '127.0.0.1' && baseUrlParsed.protocol === 'https:') {
+      baseUrlParsed.protocol = 'https:'
+    }
+    return baseUrlParsed.toString()
+  }
+  catch (e) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'invalid_web_app_url',
+      error: e,
+    })
+    throw simpleError('invalid_web_app_url', 'Invalid web app URL')
+  }
 }
 
 export function getEnv(c: Context, key: string): string {

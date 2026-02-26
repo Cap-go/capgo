@@ -5,7 +5,7 @@ import { cloudlog } from '../utils/logging.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { createCheckout } from '../utils/stripe.ts'
 import { supabaseClient } from '../utils/supabase.ts'
-import { getEnv } from '../utils/utils.ts'
+import { getBaseUrl } from '../utils/utils.ts'
 
 interface CheckoutData {
   priceId: string
@@ -55,6 +55,7 @@ app.post('/', middlewareAuth, async (c) => {
     throw simpleError('not_authorize', 'Not authorize')
 
   cloudlog({ requestId: c.get('requestId'), message: 'user', org })
-  const checkout = await createCheckout(c, org.customer_id, body.recurrence ?? 'month', body.priceId ?? 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.cancelUrl ?? `${getEnv(c, 'WEBAPP_URL')}/app/usage`, body.clientReferenceId, body.attributionId)
+  const checkout = await createCheckout(c, org.customer_id, body.recurrence ?? 'month', body.priceId ?? 'price_1KkINoGH46eYKnWwwEi97h1B', body.successUrl ?? `${getBaseUrl(c)}/app/usage`, body.cancelUrl ?? `${getBaseUrl(c)}/app/usage`, body.clientReferenceId, body.attributionId)
+
   return c.json({ url: checkout.url })
 })

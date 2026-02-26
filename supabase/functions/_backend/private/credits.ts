@@ -7,7 +7,7 @@ import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { createOneTimeCheckout, getStripe } from '../utils/stripe.ts'
 import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
-import { getEnv } from '../utils/utils.ts'
+import { getBaseUrl } from '../utils/utils.ts'
 
 interface CreditStep {
   id: number
@@ -300,7 +300,8 @@ app.post('/start-top-up', middlewareAuth, async (c) => {
 
   const { customerId, token } = await resolveOrgStripeContext(c, body.orgId)
 
-  const baseUrl = getEnv(c, 'WEBAPP_URL')
+  const baseUrl = getBaseUrl(c)
+
   const successUrl = `${baseUrl}/settings/organization/credits?creditCheckout=success&session_id={CHECKOUT_SESSION_ID}`
   const cancelUrl = `${baseUrl}/settings/organization/credits?creditCheckout=cancelled`
 
