@@ -10,7 +10,7 @@ import { BRES, middlewareAuth, parseBody, quickError, simpleError, useCors } fro
 import { cloudlog } from '../utils/logging.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
-import { getBaseUrl, getEnv } from '../utils/utils.ts'
+import { getEnv } from '../utils/utils.ts'
 
 // Define the schema for the invite user request
 const inviteUserSchema = z.object({
@@ -262,7 +262,7 @@ app.post('/', middlewareAuth, async (c) => {
   const bentoEvent = await trackBentoEvent(c, body.email, {
     org_admin_name: `${inviteCreatorUser.first_name} ${inviteCreatorUser.last_name}`,
     org_name: org.name,
-    invite_link: `${getBaseUrl(c)}/invitation?invite_magic_string=${newInvitation?.invite_magic_string}`,
+    invite_link: `${getEnv(c, 'WEBAPP_URL')}/invitation?invite_magic_string=${newInvitation?.invite_magic_string}`,
     invited_first_name: `${newInvitation?.first_name ?? body.first_name}`,
     invited_last_name: `${newInvitation?.last_name ?? body.last_name}`,
   }, 'org:invite_new_capgo_user_to_org')
