@@ -41,7 +41,7 @@ SELECT
     policies_are(
         'public',
         'global_stats',
-        ARRAY['Allow anon to select'],
+        ARRAY['Allow admin users to select global_stats'],
         'global_stats should have correct policies'
     );
 

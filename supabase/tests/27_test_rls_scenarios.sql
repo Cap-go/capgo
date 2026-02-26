@@ -13,7 +13,7 @@ BEGIN;
 -- 'com.demoadmin.app', 'com.demo.app'
 -- Plan tests
 SELECT
-  plan (6);
+  plan (8);
 
 -- Test 1: Users can see organizations they belong to
 SET
@@ -55,11 +55,37 @@ SELECT
     'Anonymous users should be able to select from plans table'
   );
 
--- Test 4: Global stats is accessible to anonymous
+-- Test 4: Anonymous users should not access global_stats
+SELECT
+  throws_ok (
+    'SELECT COUNT(*) FROM public.global_stats',
+    '42501',
+    'permission denied',
+    'Anonymous users should not be able to select from global_stats'
+  );
+
+-- Test 4b: Authenticated users should not be able to read global_stats
+SET
+  LOCAL role TO authenticated;
+
+SELECT
+  throws_ok (
+    'SELECT COUNT(*) FROM public.global_stats',
+    '42501',
+    'permission denied',
+    'Authenticated non-admin users should not be able to select from global_stats'
+  );
+
+-- Test 4c: Non-admin can be replaced with admin and still query this table
+SET
+  LOCAL role TO authenticated;
+SET
+  LOCAL request.jwt.claims TO '{"sub": "c591b04e-cf29-4945-b9a0-776d0672061a"}';
+
 SELECT
   lives_ok (
     'SELECT COUNT(*) FROM public.global_stats',
-    'Anonymous users should be able to select from global_stats'
+    'Admin users should be able to select from global_stats'
   );
 
 -- Test 5: Users table has RLS enabled
