@@ -1,7 +1,9 @@
 -- Security hardening: remove API key identity oracle and enforce org RPC caller checks
 
--- Identity helpers are needed by RLS, so keep `anon`/`authenticated` execute
--- for org helpers while blocking external API-key identity oracle access.
+-- Identity helpers must remain internal to RLS/auth logic.
+-- get_identity_apikey_only should not be callable from public API roles,
+-- but get_identity_org_allowed/appid must remain executable by anon/authenticated
+-- for RLS policy evaluation.
 REVOKE ALL ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode"[]) FROM "public";
 REVOKE ALL ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode"[]) FROM "anon";
 REVOKE ALL ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode"[]) FROM "authenticated";
@@ -11,8 +13,6 @@ REVOKE ALL ON FUNCTION "public"."get_identity_org_appid" (
   "org_id" "uuid",
   "app_id" character varying
 ) FROM "public";
-
--- Keep these helpers available where needed by RLS and trusted internal services.
 
 -- Keep these helpers available where needed by RLS and trusted internal services.
 GRANT EXECUTE ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode"[]) TO "postgres";
