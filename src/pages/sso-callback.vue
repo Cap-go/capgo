@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconLoader from '~icons/lucide/loader-2'
+import { useSSOProvisioning } from '~/composables/useSSOProvisioning'
 import { useSupabase } from '~/services/supabase'
 
 const route = useRoute()
@@ -10,6 +11,7 @@ const router = useRouter()
 const supabase = useSupabase()
 const isLoading = ref(true)
 const errorMessage = ref('')
+const { provisionUser } = useSSOProvisioning()
 
 async function exchangeCode() {
   const code = route.query.code as string | undefined
@@ -21,13 +23,18 @@ async function exchangeCode() {
   }
 
   try {
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (error) {
       isLoading.value = false
       errorMessage.value = error.message || 'Failed to authenticate with SSO'
       toast.error(errorMessage.value)
       return
+    }
+
+    // Auto-provision user on first SSO login
+    if (data.session) {
+      await provisionUser(data.session)
     }
 
     const redirectTo = route.query.to as string | undefined

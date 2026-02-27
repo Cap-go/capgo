@@ -9,7 +9,7 @@ beforeAll(async () => {
 })
 
 describe('[POST] /private/sso/verify-dns', () => {
-  it.concurrent('should return 404 for non-existent provider', async () => {
+  it('should return 404 for non-existent provider', async () => {
     const response = await fetchWithRetry(getEndpointUrl('/private/sso/verify-dns'), {
       method: 'POST',
       headers: authHeaders,
@@ -21,7 +21,7 @@ describe('[POST] /private/sso/verify-dns', () => {
     expect(data.error).toBe('provider_not_found')
   })
 
-  it.concurrent('should return 401 without authentication', async () => {
+  it('should return 401 without authentication', async () => {
     const response = await fetchWithRetry(getEndpointUrl('/private/sso/verify-dns'), {
       method: 'POST',
       headers: {

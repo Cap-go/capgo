@@ -245,6 +245,8 @@ declare global {
   const useResizeObserver: typeof import('@vueuse/core').useResizeObserver
   const useRoute: typeof import('vue-router').useRoute
   const useRouter: typeof import('vue-router').useRouter
+  const useSSOProvisioning: typeof import('./composables/useSSOProvisioning').useSSOProvisioning
+  const useSSORouting: typeof import('./composables/useSSORouting').useSSORouting
   const useSSRWidth: typeof import('@vueuse/core').useSSRWidth
   const useScreenOrientation: typeof import('@vueuse/core').useScreenOrientation
   const useScreenSafeArea: typeof import('@vueuse/core').useScreenSafeArea

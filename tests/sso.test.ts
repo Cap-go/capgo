@@ -47,7 +47,7 @@ afterAll(async () => {
 })
 
 describe('[POST] /private/sso/check-domain', () => {
-  it.concurrent('should return has_sso=false for non-SSO domain', async () => {
+  it('should return has_sso=false for non-SSO domain', async () => {
     const response = await fetchWithRetry(getEndpointUrl('/private/sso/check-domain'), {
       method: 'POST',
       headers: authHeaders,
@@ -59,7 +59,7 @@ describe('[POST] /private/sso/check-domain', () => {
     expect(data.has_sso).toBe(false)
   })
 
-  it.concurrent('should return 400 for invalid email', async () => {
+  it('should return 400 for invalid email', async () => {
     const response = await fetchWithRetry(getEndpointUrl('/private/sso/check-domain'), {
       method: 'POST',
       headers: authHeaders,
@@ -73,7 +73,7 @@ describe('[POST] /private/sso/check-domain', () => {
 })
 
 describe('[POST] /private/sso/check-enforcement', () => {
-  it.concurrent('should return allowed=true for password auth when no SSO is configured', async () => {
+  it('should return allowed=true for password auth when no SSO is configured', async () => {
     const response = await fetchWithRetry(getEndpointUrl('/private/sso/check-enforcement'), {
       method: 'POST',
       headers: authHeaders,
@@ -90,7 +90,7 @@ describe('[POST] /private/sso/check-enforcement', () => {
 })
 
 describe('[GET] /private/sso/providers/:orgId', () => {
-  it.concurrent('should return empty array for org with no SSO providers', async () => {
+  it('should return empty array for org with no SSO providers', async () => {
     const response = await fetchWithRetry(getEndpointUrl(`/private/sso/providers/${SSO_TEST_ORG_ID}`), {
       method: 'GET',
       headers: authHeaders,
@@ -102,7 +102,7 @@ describe('[GET] /private/sso/providers/:orgId', () => {
     expect(data).toHaveLength(0)
   })
 
-  it.concurrent('should return 401 without authentication', async () => {
+  it('should return 401 without authentication', async () => {
     const response = await fetchWithRetry(getEndpointUrl(`/private/sso/providers/${SSO_TEST_ORG_ID}`), {
       method: 'GET',
       headers: {

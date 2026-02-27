@@ -207,10 +207,15 @@ async function handleSsoLogin() {
   const domain = emailForLogin.value.split('@')[1]
 
   try {
+    const redirectUrl = new URL('/sso-callback', window.location.origin)
+    if (route.query.to && typeof route.query.to === 'string') {
+      redirectUrl.searchParams.set('to', route.query.to)
+    }
+
     const { data, error } = await supabase.auth.signInWithSSO({
       domain,
       options: {
-        redirectTo: `${window.location.origin}/sso-callback`,
+        redirectTo: redirectUrl.toString(),
       },
     })
 
