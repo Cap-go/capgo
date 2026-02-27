@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { simpleError } from '../../utils/hono.ts'
+import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
@@ -129,7 +129,7 @@ export async function requestBuild(
       builder_url_configured: !!builderUrl,
       builder_api_key_configured: !!builderApiKey,
     })
-    throw simpleError('service_unavailable', 'Build service unavailable (builder not configured)')
+    throw quickError(503, 'service_unavailable', 'Build service unavailable (builder not configured)')
   }
 
   try {
@@ -186,7 +186,7 @@ export async function requestBuild(
         app_id,
         platform,
       })
-      throw simpleError('service_unavailable', 'Build service unavailable (builder error)')
+      throw quickError(503, 'service_unavailable', 'Build service unavailable (builder error)')
     }
   }
   catch (error) {
@@ -201,7 +201,7 @@ export async function requestBuild(
       app_id,
       platform,
     })
-    throw simpleError('service_unavailable', 'Build service unavailable (builder call failed)')
+    throw quickError(503, 'service_unavailable', 'Build service unavailable (builder call failed)')
   }
 
   const upload_expires_at = new Date(Date.now() + 60 * 60 * 1000)
@@ -214,7 +214,7 @@ export async function requestBuild(
       builder_url: builderUrl,
       builder_api_key_present: !!builderApiKey,
     })
-    throw simpleError('service_unavailable', 'Build service unavailable (upload URL missing)')
+    throw quickError(503, 'service_unavailable', 'Build service unavailable (upload URL missing)')
   }
 
   const upload_url = `${getEnv(c, 'PUBLIC_URL') || 'https://api.capgo.app'}/build/upload/${builderJob.jobId}`
