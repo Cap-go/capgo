@@ -43,10 +43,18 @@ const newMetadataUrl = ref('')
 // Track recently created provider to show DNS token
 const recentlyCreatedId = ref<string | null>(null)
 
-const recentlyCreatedProvider = computed(() => {
-  if (!recentlyCreatedId.value)
-    return null
-  return providers.value.find(p => p.id === recentlyCreatedId.value) ?? null
+// Track pending verification provider to show DNS token
+const pendingVerificationProvider = computed(() => {
+  // First, check if there's a recently created provider
+  if (recentlyCreatedId.value) {
+    const recent = providers.value.find(p => p.id === recentlyCreatedId.value)
+    if (recent && recent.status === 'pending_verification' && recent.dns_verification_token)
+      return recent
+  }
+  // Otherwise, find the first pending verification provider
+  return providers.value.find(p =>
+    p.status === 'pending_verification' && p.dns_verification_token,
+  ) ?? null
 })
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
@@ -333,7 +341,7 @@ onMounted(fetchProviders)
 
     <!-- DNS Verification Instructions (shown after creation) -->
     <div
-      v-if="recentlyCreatedProvider && recentlyCreatedProvider.dns_verification_token"
+      v-if="pendingVerificationProvider"
       class="p-4 mb-6 border rounded-lg border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20"
     >
       <h4 class="mb-2 font-semibold text-blue-800 dark:text-blue-200">
@@ -347,19 +355,19 @@ onMounted(fetchProviders)
           {{ t('sso-dns-record-type') }}: <span class="font-semibold text-slate-800 dark:text-white">TXT</span>
         </p>
         <p class="text-slate-600 dark:text-slate-400">
-          {{ t('sso-dns-record-name') }}: <span class="font-semibold text-slate-800 dark:text-white">_capgo-sso.{{ recentlyCreatedProvider.domain }}</span>
+          {{ t('sso-dns-record-name') }}: <span class="font-semibold text-slate-800 dark:text-white">_capgo-sso.{{ pendingVerificationProvider.domain }}</span>
         </p>
         <p class="text-slate-600 dark:text-slate-400">
-          {{ t('sso-dns-record-value') }}: <span class="font-semibold text-slate-800 dark:text-white">{{ recentlyCreatedProvider.dns_verification_token }}</span>
+          {{ t('sso-dns-record-value') }}: <span class="font-semibold text-slate-800 dark:text-white">{{ pendingVerificationProvider.dns_verification_token }}</span>
         </p>
       </div>
       <div class="flex items-center gap-3">
         <button
-          :disabled="isVerifying === recentlyCreatedProvider.id"
+          :disabled="isVerifying === pendingVerificationProvider.id"
           class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
-          @click="verifyDns(recentlyCreatedProvider.id)"
+          @click="verifyDns(pendingVerificationProvider.id)"
         >
-          <span v-if="isVerifying === recentlyCreatedProvider.id" class="flex items-center gap-2">
+          <span v-if="isVerifying === pendingVerificationProvider.id" class="flex items-center gap-2">
             <Spinner size="w-4 h-4" />
             {{ t('sso-verifying') }}
           </span>
