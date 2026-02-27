@@ -12,7 +12,7 @@ import { getEnv } from './utils.ts'
 
 /** Escape a value for safe interpolation into an Analytics Engine SQL string. */
 function escapeSqlString(value: string): string {
-  return value.replace(/'/g, "''").replace(/\\/g, '\\\\')
+  return value.replace(/'/g, '\'\'').replace(/\\/g, '\\\\')
 }
 
 // type is require for the bindings no interface
