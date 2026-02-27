@@ -13,7 +13,6 @@ REVOKE ALL ON FUNCTION "public"."get_identity_org_appid" (
 ) FROM "public";
 
 -- Keep these helpers available where needed by RLS and trusted internal services.
-
 -- Keep these helpers available where needed by RLS and trusted internal services.
 GRANT EXECUTE ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode"[]) TO "postgres";
 GRANT EXECUTE ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode"[]) TO "service_role";
@@ -49,6 +48,7 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE ALL ON FU
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE ALL ON TABLES FROM "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE ALL ON TABLES FROM "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE ALL ON TABLES FROM "public";
+
 
 -- Harden direct org lookup by user id: callable only when caller identity matches the requested user.
 DROP FUNCTION IF EXISTS public.get_orgs_v6(userid uuid);
