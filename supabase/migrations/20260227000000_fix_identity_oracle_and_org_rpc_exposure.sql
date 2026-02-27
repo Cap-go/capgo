@@ -13,7 +13,6 @@ REVOKE ALL ON FUNCTION "public"."get_identity_org_appid" (
   "org_id" "uuid",
   "app_id" character varying
 ) FROM "public";
-);
 
 -- Keep these helpers available where needed by RLS and trusted internal services.
 GRANT EXECUTE ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode"[]) TO "postgres";
