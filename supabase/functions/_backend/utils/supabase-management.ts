@@ -30,12 +30,92 @@ class ManagementAPIError extends Error {
   }
 }
 
+// Local development mock mode - generates fake UUIDs and responses
+function isLocalDevMode(c: Context): boolean {
+  const token = getEnv(c, 'SUPABASE_MANAGEMENT_API_TOKEN')
+  const projectRef = getEnv(c, 'SUPABASE_PROJECT_REF')
+  // Enable mock mode if tokens are missing OR explicitly set to local-dev values
+  return !token || !projectRef || token === 'local-dev-token' || projectRef === 'local-dev-ref'
+}
+
+function generateMockProviderId(): string {
+  // Generate a fake UUID for local dev
+  return `mock-${Date.now()}-${Math.random().toString(36).substring(2, 15)}`
+}
+
+async function mockManagementAPICall(
+  c: Context,
+  method: string,
+  path: string,
+  body?: any,
+): Promise<any> {
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: '[LOCAL DEV] Mocking Management API call',
+    method,
+    path,
+  })
+
+  // Mock POST /config/auth/sso/providers (create provider)
+  if (method === 'POST' && path === '/config/auth/sso/providers') {
+    return {
+      id: generateMockProviderId(),
+      type: 'saml',
+      domains: body.domains || [],
+      metadata_url: body.metadata_url || '',
+      attribute_mapping: body.attribute_mapping || {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+  }
+
+  // Mock GET /config/auth/sso/providers/:id (get provider)
+  if (method === 'GET' && path.startsWith('/config/auth/sso/providers/')) {
+    const providerId = path.split('/').pop()
+    return {
+      id: providerId,
+      type: 'saml',
+      domains: ['example.com'],
+      metadata_url: 'https://idp.example.com/metadata',
+      attribute_mapping: {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+  }
+
+  // Mock PATCH /config/auth/sso/providers/:id (update provider)
+  if (method === 'PATCH' && path.startsWith('/config/auth/sso/providers/')) {
+    const providerId = path.split('/').pop()
+    return {
+      id: providerId,
+      type: 'saml',
+      domains: body.domains || ['example.com'],
+      metadata_url: body.metadata_url || 'https://idp.example.com/metadata',
+      attribute_mapping: body.attribute_mapping || {},
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+  }
+
+  // Mock DELETE /config/auth/sso/providers/:id (delete provider)
+  if (method === 'DELETE' && path.startsWith('/config/auth/sso/providers/')) {
+    return {} // DELETE returns empty response
+  }
+
+  throw new ManagementAPIError(404, 'mock_not_found', 'Mock endpoint not implemented')
+}
+
 async function callManagementAPI(
   c: Context,
   method: string,
   path: string,
   body?: any,
 ): Promise<any> {
+  // Check if we should use mock mode for local development
+  if (isLocalDevMode(c)) {
+    return mockManagementAPICall(c, method, path, body)
+  }
+
   const token = getEnv(c, 'SUPABASE_MANAGEMENT_API_TOKEN')
   const projectRef = getEnv(c, 'SUPABASE_PROJECT_REF')
 

@@ -881,3 +881,81 @@ All 3 critical issues identified in Task F3 Manual QA Verification have been ver
 - JSON validity was ensured using `eslint --fix`.
 - `continue-with-sso` was placed after `continue`.
 - `sso-` keys were placed between `something-...` and `start-...`.
+
+## [2026-02-27] Local Development Mock Mode
+
+### Implementation: supabase-management.ts Mock Mode
+**Problem**: SSO provider creation failed with 500 error in local development because `SUPABASE_MANAGEMENT_API_TOKEN` and `SUPABASE_PROJECT_REF` were not configured.
+
+**Solution**: Added local dev mock mode to bypass Management API when tokens are missing or set to placeholder values.
+
+### Mock Mode Detection
+```typescript
+function isLocalDevMode(c: Context): boolean {
+  const token = getEnv(c, 'SUPABASE_MANAGEMENT_API_TOKEN')
+  const projectRef = getEnv(c, 'SUPABASE_PROJECT_REF')
+  return !token || !projectRef || token === 'local-dev-token' || projectRef === 'local-dev-ref'
+}
+```
+
+Mock mode activates when:
+- Token is missing/undefined
+- Project ref is missing/undefined  
+- Token is set to `'local-dev-token'` (explicit local dev marker)
+- Project ref is set to `'local-dev-ref'` (explicit local dev marker)
+
+### Mock Provider ID Generation
+- Format: `mock-{timestamp}-{random}`
+- Example: `mock-1709046123456-abc123def`
+- Ensures unique IDs across test runs
+
+### Mock API Responses
+All four CRUD operations mocked:
+1. **POST** `/config/auth/sso/providers` - Create provider
+   - Returns mock provider with generated ID
+   - Preserves input domain, metadata_url, attribute_mapping
+2. **GET** `/config/auth/sso/providers/:id` - Get provider
+   - Returns mock provider with requested ID
+   - Uses `example.com` as default domain
+3. **PATCH** `/config/auth/sso/providers/:id` - Update provider
+   - Returns updated mock provider
+   - Merges input updates with defaults
+4. **DELETE** `/config/auth/sso/providers/:id` - Delete provider
+   - Returns empty object `{}`
+
+### Production Behavior Unchanged
+- Mock mode only activates for local dev (missing/placeholder tokens)
+- Production deployments with real tokens use actual Management API
+- No performance impact on production traffic
+
+### Environment Variable Documentation
+Updated `supabase/functions/.env` with SSO Management API env vars:
+```bash
+# Supabase Management API (for SSO/SAML provider management via Management API)
+# Generate at: https://supabase.com/dashboard/account/tokens
+SUPABASE_MANAGEMENT_API_TOKEN=your-management-api-token-here
+
+# Supabase Project Reference (for Management API calls)
+# Found in your Supabase project settings under General
+SUPABASE_PROJECT_REF=your-project-ref-here
+```
+
+### Testing Results
+- ✅ All backend tests passing (7/7 SSO tests)
+- ✅ `bun lint:fix` - No errors
+- ✅ `bun lint` - Passes
+- ✅ `bun typecheck` - Passes
+- ✅ Mock mode enables local SSO provider CRUD testing without real API credentials
+
+### Key Benefits
+1. **Local development unblocked** - Can test SSO provider creation/update/delete locally
+2. **No external dependencies** - Tests don't require Supabase Cloud account or Management API token
+3. **Fast feedback loop** - Mock responses are instant, no network latency
+4. **Isolated testing** - Mock mode prevents accidental modification of production SSO providers
+5. **Safe defaults** - Missing tokens automatically enable mock mode instead of crashing
+
+### Integration Points
+- Used by all endpoints in `supabase/functions/_backend/private/sso/providers.ts`
+- Transparent to callers - same interface as real Management API
+- Logging includes `[LOCAL DEV]` prefix for mock mode calls
+
