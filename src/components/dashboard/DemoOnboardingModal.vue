@@ -631,7 +631,7 @@ onUnmounted(() => {
             </div>
 
             <div class="flex-1 space-y-4">
-            <div v-if="isCreateStep" class="grid grid-cols-3 gap-2 xl:gap-3">
+              <div v-if="isCreateStep" class="grid grid-cols-3 gap-2 xl:gap-3">
                 <button
                   v-for="app in appChoices"
                   :key="app.id"
@@ -657,7 +657,7 @@ onUnmounted(() => {
                 </p>
               </div>
 
-            <div v-else-if="isUploadStep" class="grid grid-cols-3 gap-2 xl:gap-3">
+              <div v-else-if="isUploadStep" class="grid grid-cols-3 gap-2 xl:gap-3">
                 <button
                   v-for="choice in updateChoices"
                   :key="choice.id"
