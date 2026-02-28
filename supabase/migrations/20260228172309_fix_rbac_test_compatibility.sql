@@ -11,13 +11,7 @@ AS $$
 DECLARE
   v_remaining_count integer;
   v_org_exists boolean;
-  v_current_role text;
 BEGIN
-  -- Allow service_role to bypass this check (for tests and admin operations)
-  SELECT current_setting('role', true) INTO v_current_role;
-  IF v_current_role = 'service_role' THEN
-    RETURN OLD;
-  END IF;
 
   -- Only check org-level super_admin bindings
   IF OLD.scope_type != public.rbac_scope_org() THEN

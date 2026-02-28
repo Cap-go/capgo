@@ -145,7 +145,7 @@ async function getCallerMaxPriorityRank(
   principalId: string,
   orgId: string,
 ): Promise<number> {
-  const principalType = authType === 'apikey' ? 'api_key' : 'user'
+  const principalType = authType === 'apikey' ? 'apikey' : 'user'
   const result = await drizzle
     .select({ max_rank: sql<number>`MAX(${schema.roles.priority_rank})` })
     .from(schema.role_bindings)
@@ -287,7 +287,8 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     }
 
     // Prevent privilege escalation: caller cannot assign a role with higher priority than their own
-    const callerMaxRank = await getCallerMaxPriorityRank(drizzle, auth.authType, auth.userId, org_id)
+    const callerPrincipalId = auth.authType === 'apikey' ? auth.apikey!.rbac_id : auth.userId
+    const callerMaxRank = await getCallerMaxPriorityRank(drizzle, auth.authType, callerPrincipalId, org_id)
     if (role.priority_rank > callerMaxRank) {
       return c.json({ error: 'Cannot assign a role with higher privileges than your own' }, 403)
     }
@@ -432,7 +433,8 @@ app.patch('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
     }
 
     // Prevent privilege escalation: caller cannot assign a role with higher priority than their own
-    const callerMaxRank = await getCallerMaxPriorityRank(drizzle, auth!.authType, auth!.userId, binding.org_id!)
+    const callerPrincipalId = auth!.authType === 'apikey' ? auth!.apikey!.rbac_id : auth!.userId
+    const callerMaxRank = await getCallerMaxPriorityRank(drizzle, auth!.authType, callerPrincipalId, binding.org_id!)
     if (role.priority_rank > callerMaxRank) {
       return c.json({ error: 'Cannot assign a role with higher privileges than your own' }, 403)
     }
