@@ -24,6 +24,16 @@ BEGIN
     RETURN OLD;
   END IF;
 
+  -- Lock all super_admin bindings in this org to prevent write-skew under concurrent deletes
+  PERFORM 1
+  FROM public.role_bindings rb
+  INNER JOIN public.roles r ON rb.role_id = r.id
+  WHERE rb.scope_type = public.rbac_scope_org()
+    AND rb.org_id = OLD.org_id
+    AND rb.principal_type = public.rbac_principal_user()
+    AND r.name = public.rbac_role_org_super_admin()
+  FOR UPDATE;
+
   -- Count remaining super_admin bindings in this org (excluding the one being deleted)
   SELECT COUNT(*) INTO v_remaining_count
   FROM public.role_bindings rb
