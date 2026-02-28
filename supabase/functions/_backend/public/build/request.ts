@@ -11,6 +11,7 @@ export interface RequestBuildBody {
   platform: 'ios' | 'android'
   build_mode?: 'release' | 'debug'
   build_config?: Record<string, any>
+  /** @deprecated Use build_credentials instead. Rejected at runtime. */
   credentials?: Record<string, string>
   build_options?: Record<string, unknown>
   build_credentials?: Record<string, string>
@@ -67,7 +68,22 @@ export async function requestBuild(
     build_config = {},
     build_options = {},
     build_credentials = {},
+    credentials,
   } = body
+
+  // Reject deprecated `credentials` field — old CLIs must upgrade
+  if (credentials && Object.keys(credentials).length > 0) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Deprecated credentials field received',
+      app_id,
+      platform,
+    })
+    throw simpleError(
+      'invalid_parameter',
+      '`credentials` field is deprecated. Please update your CLI and use `build_credentials` instead.',
+    )
+  }
 
   cloudlog({
     requestId: c.get('requestId'),
