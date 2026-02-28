@@ -11,12 +11,6 @@ app.post('/', middlewareV2(['all']), async (c) => {
   const auth = c.get('auth') as AuthInfo
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
 
-  // Limit API key creation for constrained caller keys (not JWT).
-  const callerHasLimitedScope = (apikey?.limited_to_orgs?.length ?? 0) > 0 || (apikey?.limited_to_apps?.length ?? 0) > 0
-  if (auth.authType === 'apikey' && callerHasLimitedScope) {
-    throw simpleError('cannot_create_apikey', 'You cannot do that as a limited API key', { apikey })
-  }
-
   const body = await parseBody<any>(c)
 
   const orgId = body.org_id
@@ -35,6 +29,16 @@ app.post('/', middlewareV2(['all']), async (c) => {
   }
   if (!limitedToOrgs.every(item => typeof item === 'string')) {
     throw simpleError('invalid_limited_to_orgs', 'limited_to_orgs must be an array of org ids')
+  }
+
+  // Limit API key creation for constrained caller keys (not JWT).
+  const callerHasLimitedScope = (apikey?.limited_to_orgs?.length ?? 0) > 0 || (apikey?.limited_to_apps?.length ?? 0) > 0
+  if (auth.authType === 'apikey' && callerHasLimitedScope) {
+    // A limited key cannot create an unlimited key (privilege escalation)
+    const newKeyIsUnlimited = (limitedToOrgs.length === 0 && limitedToApps.length === 0)
+    if (newKeyIsUnlimited) {
+      throw simpleError('cannot_create_apikey', 'You cannot create an unlimited API key with a limited API key', { apikey })
+    }
   }
   const expiresAt = body.expires_at ?? null
   const isHashed = body.hashed === true
