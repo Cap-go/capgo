@@ -1,5 +1,5 @@
 import { z } from 'zod/mini'
-import { createHono, middlewareAuth, parseBody, quickError, simpleError, useCors } from '../../utils/hono.ts'
+import { createHono, parseBody, quickError, simpleError, useCors } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
 import { emptySupabase } from '../../utils/supabase.ts'
 import { version } from '../../utils/version.ts'
@@ -12,7 +12,7 @@ export const app = createHono('', version)
 
 app.use('/', useCors)
 
-app.post('/', middlewareAuth, async (c) => {
+app.post('/', async (c) => {
   const rawBody = await parseBody<{ email?: string }>(c)
 
   const validation = bodySchema.safeParse({ email: rawBody.email })
