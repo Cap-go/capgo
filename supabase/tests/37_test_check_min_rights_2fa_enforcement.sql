@@ -40,13 +40,13 @@ BEGIN
     test_unverified_2fa_user_id := tests.get_supabase_uid('test_unverified_2fa_user');
     test_admin_id := tests.get_supabase_uid('test_admin');
 
-    -- Create org WITH 2FA enforcement
-    INSERT INTO public.orgs (id, created_by, name, management_email, enforcing_2fa)
-    VALUES (org_with_2fa_enforcement_id, test_admin_id, '2FA Enforced Org', '2fa@org.com', true);
+    -- Create org WITH 2FA enforcement (use_new_rbac=false: these tests cover legacy 2FA enforcement)
+    INSERT INTO public.orgs (id, created_by, name, management_email, enforcing_2fa, use_new_rbac)
+    VALUES (org_with_2fa_enforcement_id, test_admin_id, '2FA Enforced Org', '2fa@org.com', true, false);
 
-    -- Create org WITHOUT 2FA enforcement
-    INSERT INTO public.orgs (id, created_by, name, management_email, enforcing_2fa)
-    VALUES (org_without_2fa_enforcement_id, test_admin_id, 'No 2FA Org', 'no2fa@org.com', false);
+    -- Create org WITHOUT 2FA enforcement (use_new_rbac=false: these tests cover legacy 2FA enforcement)
+    INSERT INTO public.orgs (id, created_by, name, management_email, enforcing_2fa, use_new_rbac)
+    VALUES (org_without_2fa_enforcement_id, test_admin_id, 'No 2FA Org', 'no2fa@org.com', false, false);
 
     -- Add members to org WITH 2FA enforcement
     -- Give test_2fa_user admin permission (which covers read, write, and admin checks)
