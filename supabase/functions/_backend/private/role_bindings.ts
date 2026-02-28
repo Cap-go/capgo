@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import { and, eq } from 'drizzle-orm'
+import { and, desc, eq, sql } from 'drizzle-orm'
 import { createHono, middlewareAuth, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
@@ -139,6 +139,27 @@ async function validatePrincipalAccess(
   return { ok: true, data: null }
 }
 
+async function getCallerMaxPriorityRank(
+  drizzle: ReturnType<typeof getDrizzleClient>,
+  userId: string,
+  orgId: string,
+): Promise<number> {
+  const result = await drizzle
+    .select({ max_rank: sql<number>`MAX(${schema.roles.priority_rank})` })
+    .from(schema.role_bindings)
+    .innerJoin(schema.roles, eq(schema.role_bindings.role_id, schema.roles.id))
+    .where(
+      and(
+        eq(schema.role_bindings.principal_type, 'user'),
+        eq(schema.role_bindings.principal_id, userId),
+        eq(schema.role_bindings.org_id, orgId),
+      ),
+    )
+    .limit(1)
+
+  return result[0]?.max_rank ?? 0
+}
+
 // GET /private/role_bindings/:org_id - List role bindings for an org
 app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
   const orgId = c.req.param('org_id')
@@ -260,6 +281,12 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
 
     if (!role.is_assignable) {
       return c.json({ error: 'Role is not assignable' }, 403)
+    }
+
+    // Prevent privilege escalation: caller cannot assign a role with higher priority than their own
+    const callerMaxRank = await getCallerMaxPriorityRank(drizzle, userId, org_id)
+    if (role.priority_rank > callerMaxRank) {
+      return c.json({ error: 'Cannot assign a role with higher privileges than your own' }, 403)
     }
 
     const scopeValidation = validateScope(scope_type, app_id, channel_id)
@@ -398,6 +425,12 @@ app.patch('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
 
     if (role.scope_type !== binding.scope_type) {
       return c.json({ error: 'Role scope_type does not match the existing binding scope' }, 400)
+    }
+
+    // Prevent privilege escalation: caller cannot assign a role with higher priority than their own
+    const callerMaxRank = await getCallerMaxPriorityRank(drizzle, userId, binding.org_id!)
+    if (role.priority_rank > callerMaxRank) {
+      return c.json({ error: 'Cannot assign a role with higher privileges than your own' }, 403)
     }
 
     const [updated] = await drizzle
