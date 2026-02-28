@@ -19,6 +19,7 @@ const updateBodySchema = z.object({
   metadata_url: z.optional(z.string().check(z.url())),
   attribute_mapping: z.optional(z.unknown()),
   enforce_sso: z.optional(z.boolean()),
+  status: z.optional(z.enum(['verified', 'active', 'disabled'])),
 })
 
 const uuidSchema = z.string().check(z.uuid())
@@ -113,7 +114,9 @@ app.post('/', async (c) => {
     quickError(500, 'provider_create_failed', 'Failed to create SSO provider', { error })
   }
 
-  return c.json(sanitizeProvider(data))
+  // Return the full provider including dns_verification_token for the DNS verification flow
+
+  return c.json(data)
 })
 
 app.get('/:orgId', async (c) => {
@@ -173,7 +176,7 @@ app.patch('/:id', async (c) => {
   const supabase = supabaseWithAuth(c, auth) as any
   const { data: provider, error: providerError } = await supabase
     .from('sso_providers')
-    .select('id, org_id')
+    .select('id, org_id, status')
     .eq('id', id)
     .single()
 
@@ -192,6 +195,25 @@ app.patch('/:id', async (c) => {
   }
   if (body.enforce_sso !== undefined) {
     updates.enforce_sso = body.enforce_sso
+  }
+  if (body.status !== undefined) {
+    // Validate status transitions
+    const currentStatus = provider.status
+    const newStatus = body.status
+
+    // Only allow certain transitions
+    const validTransitions: Record<string, string[]> = {
+      pending_verification: [], // Cannot change status until verified
+      verified: ['active'], // Can activate
+      active: ['disabled'], // Can disable
+      disabled: ['active'], // Can re-enable
+    }
+
+    if (!validTransitions[currentStatus]?.includes(newStatus)) {
+      throw simpleError('invalid_status_transition', `Cannot transition from ${currentStatus} to ${newStatus}`)
+    }
+
+    updates.status = body.status
   }
 
   if (Object.keys(updates).length === 0) {
