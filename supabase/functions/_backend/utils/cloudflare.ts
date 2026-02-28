@@ -10,6 +10,11 @@ import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
 import { DEFAULT_LIMIT } from './types.ts'
 import { getEnv } from './utils.ts'
 
+/** Escape a value for safe interpolation into an Analytics Engine SQL string. */
+function escapeSqlString(value: string): string {
+  return value.replace(/'/g, '\'\'').replace(/\\/g, '\\\\')
+}
+
 // type is require for the bindings no interface
 // eslint-disable-next-line ts/consistent-type-definitions
 export type Bindings = {
@@ -337,7 +342,7 @@ export async function readDeviceUsageCF(c: Context, app_id: string, period_start
     blob2 AS org_id
   FROM device_usage
   WHERE
-    app_id = '${app_id}'
+    app_id = '${escapeSqlString(app_id)}'
     AND timestamp >= toDateTime('${formatDateCF(period_start)}')
     AND timestamp < toDateTime('${formatDateCF(period_end)}')
   GROUP BY device_id, app_id, org_id
@@ -398,7 +403,7 @@ FROM bandwidth_usage
 WHERE
   timestamp >= toDateTime('${formatDateCF(period_start)}')
   AND timestamp < toDateTime('${formatDateCF(period_end)}')
-  AND app_id = '${app_id}'
+  AND app_id = '${escapeSqlString(app_id)}'
 GROUP BY date, app_id
 ORDER BY date, app_id`
 
@@ -457,7 +462,7 @@ export async function readStatsVersionCF(c: Context, app_id: string, period_star
   sum(if(blob3 = 'uninstall', 1, 0)) AS uninstall
 FROM version_usage
 WHERE
-  app_id = '${app_id}'
+  app_id = '${escapeSqlString(app_id)}'
   AND timestamp >= toDateTime('${formatDateCF(period_start)}')
   AND timestamp < toDateTime('${formatDateCF(period_end)}')
 GROUP BY date, app_id, version_name
@@ -489,7 +494,7 @@ FROM (
     argMax(blob7, timestamp) AS default_channel,
     blob1 AS device_id
   FROM device_info
-  WHERE index1 = '${app_id}'
+  WHERE index1 = '${escapeSqlString(app_id)}'
   GROUP BY blob1
 )
 WHERE version_name != '' ${channelFilter}
@@ -514,7 +519,7 @@ export async function countDevicesCF(c: Context, app_id: string, customIdMode: b
   const customIdFilter = customIdMode ? `AND blob5 != ''` : ''
   const query = `SELECT COUNT(DISTINCT blob1) AS total
 FROM device_info
-WHERE index1 = '${app_id}' ${customIdFilter}`
+WHERE index1 = '${escapeSqlString(app_id)}' ${customIdFilter}`
 
   cloudlog({ requestId: c.get('requestId'), message: 'countDevicesCF query', query })
   try {
@@ -550,7 +555,7 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
   //         index1=app_id, timestamp=updated_at
 
   const limit = params.limit ?? DEFAULT_LIMIT
-  const conditions: string[] = [`index1 = '${params.app_id}'`]
+  const conditions: string[] = [`index1 = '${escapeSqlString(params.app_id)}'`]
 
   if (customIdMode) {
     conditions.push(`blob5 != ''`)
@@ -559,10 +564,10 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
   if (params.deviceIds?.length) {
     cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds: params.deviceIds })
     if (params.deviceIds.length === 1) {
-      conditions.push(`blob1 = '${params.deviceIds[0]}'`)
+      conditions.push(`blob1 = '${escapeSqlString(params.deviceIds[0])}'`)
     }
     else {
-      const devicesList = params.deviceIds.map(id => `'${id}'`).join(', ')
+      const devicesList = params.deviceIds.map(id => `'${escapeSqlString(id)}'`).join(', ')
       conditions.push(`blob1 IN (${devicesList})`)
     }
   }
@@ -571,16 +576,16 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
     cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
     const searchLower = params.search.toLowerCase()
     if (params.deviceIds?.length) {
-      conditions.push(`position('${searchLower}' IN toLower(blob5)) > 0`)
+      conditions.push(`position('${escapeSqlString(searchLower)}' IN toLower(blob5)) > 0`)
     }
     else {
       // Search in device_id, custom_id, or version_name
-      conditions.push(`(position('${searchLower}' IN toLower(blob1)) > 0 OR position('${searchLower}' IN toLower(blob5)) > 0 OR position('${searchLower}' IN toLower(blob2)) > 0)`)
+      conditions.push(`(position('${escapeSqlString(searchLower)}' IN toLower(blob1)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob5)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob2)) > 0)`)
     }
   }
 
   if (params.version_name) {
-    conditions.push(`blob2 = '${params.version_name}'`)
+    conditions.push(`blob2 = '${escapeSqlString(params.version_name)}'`)
   }
 
   // Cursor-based pagination using timestamp
@@ -589,7 +594,7 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
     // Cursor format: "timestamp|device_id"
     const [cursorTime, cursorDeviceId] = params.cursor.split('|')
     if (cursorTime && cursorDeviceId) {
-      cursorFilter = `AND (timestamp < toDateTime('${cursorTime}') OR (timestamp = toDateTime('${cursorTime}') AND blob1 > '${cursorDeviceId}'))`
+      cursorFilter = `AND (timestamp < toDateTime('${escapeSqlString(cursorTime)}') OR (timestamp = toDateTime('${escapeSqlString(cursorTime)}') AND blob1 > '${escapeSqlString(cursorDeviceId)}'))`
     }
   }
 
@@ -662,10 +667,10 @@ export async function readStatsCF(c: Context, params: ReadStatsParams) {
   if (params.deviceIds?.length) {
     cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds: params.deviceIds })
     if (params.deviceIds.length === 1) {
-      deviceFilter = `AND device_id = '${params.deviceIds[0]}'`
+      deviceFilter = `AND device_id = '${escapeSqlString(params.deviceIds[0])}'`
     }
     else {
-      const devicesList = params.deviceIds.join(',')
+      const devicesList = params.deviceIds.map(id => `'${escapeSqlString(id)}'`).join(',')
       deviceFilter = `AND device_id IN (${devicesList})`
     }
   }
@@ -674,10 +679,10 @@ export async function readStatsCF(c: Context, params: ReadStatsParams) {
   if (params.actions?.length) {
     cloudlog({ requestId: c.get('requestId'), message: 'actions filter', actions: params.actions })
     if (params.actions.length === 1) {
-      actionsFilter = `AND action = '${params.actions[0]}'`
+      actionsFilter = `AND action = '${escapeSqlString(params.actions[0])}'`
     }
     else {
-      const actionsList = params.actions.map(a => `'${a}'`).join(',')
+      const actionsList = params.actions.map(a => `'${escapeSqlString(a)}'`).join(',')
       actionsFilter = `AND action IN (${actionsList})`
     }
   }
@@ -686,9 +691,9 @@ export async function readStatsCF(c: Context, params: ReadStatsParams) {
   if (params.search) {
     const searchLower = params.search.toLowerCase()
     if (params.deviceIds?.length)
-      searchFilter = `AND (position('${searchLower}' IN toLower(action)) > 0 OR position('${searchLower}' IN toLower(blob3)) > 0)`
+      searchFilter = `AND (position('${escapeSqlString(searchLower)}' IN toLower(action)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob3)) > 0)`
     else
-      searchFilter = `AND (position('${searchLower}' IN toLower(device_id)) > 0 OR position('${searchLower}' IN toLower(action)) > 0 OR position('${searchLower}' IN toLower(blob3)) > 0)`
+      searchFilter = `AND (position('${escapeSqlString(searchLower)}' IN toLower(device_id)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(action)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob3)) > 0)`
   }
   const orderFilters: string[] = []
   const allowedOrderKeys = new Set(['created_at', 'app_id', 'device_id', 'action', 'version_name'])
@@ -713,7 +718,7 @@ export async function readStatsCF(c: Context, params: ReadStatsParams) {
   timestamp as created_at
 FROM app_log
 WHERE
-  app_id = '${params.app_id}' ${deviceFilter} ${actionsFilter} ${searchFilter} ${startFilter} ${endFilter}
+  app_id = '${escapeSqlString(params.app_id)}' ${deviceFilter} ${actionsFilter} ${searchFilter} ${startFilter} ${endFilter}
 GROUP BY app_id, created_at, action, device_id, version_name
 ${orderFilter}
 LIMIT ${params.limit ?? DEFAULT_LIMIT}`
@@ -1295,7 +1300,7 @@ export async function getAdminUploadMetrics(
   if (!c.env.VERSION_USAGE)
     return []
 
-  const appFilter = app_id ? `AND blob1 = '${app_id}'` : ''
+  const appFilter = app_id ? `AND blob1 = '${escapeSqlString(app_id)}'` : ''
 
   const query = `SELECT
     formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
@@ -1332,7 +1337,7 @@ export async function getAdminDistributionMetrics(
   if (!c.env.VERSION_USAGE)
     return []
 
-  const appFilter = app_id ? `AND blob1 = '${app_id}'` : ''
+  const appFilter = app_id ? `AND blob1 = '${escapeSqlString(app_id)}'` : ''
 
   const query = `SELECT
     formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
@@ -1370,7 +1375,7 @@ export async function getAdminFailureMetrics(
   if (!c.env.VERSION_USAGE)
     return []
 
-  const appFilter = app_id ? `AND blob1 = '${app_id}'` : ''
+  const appFilter = app_id ? `AND blob1 = '${escapeSqlString(app_id)}'` : ''
 
   const query = `SELECT
     formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
@@ -1409,7 +1414,7 @@ export async function getAdminSuccessRate(
   if (!c.env.VERSION_USAGE)
     return null
 
-  const appFilter = app_id ? `AND blob1 = '${app_id}'` : ''
+  const appFilter = app_id ? `AND blob1 = '${escapeSqlString(app_id)}'` : ''
 
   const query = `SELECT
     sum(if(blob3 = 'install', 1, 0)) AS installs,
@@ -1663,7 +1668,7 @@ export async function getAdminSuccessRateTrend(
   if (!c.env.VERSION_USAGE)
     return []
 
-  const appFilter = app_id ? `AND blob1 = '${app_id}'` : ''
+  const appFilter = app_id ? `AND blob1 = '${escapeSqlString(app_id)}'` : ''
 
   const query = `SELECT
     formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
@@ -1780,7 +1785,7 @@ export async function getAdminStorageTrend(
   if (!c.env.BANDWIDTH_USAGE)
     return []
 
-  const appFilter = app_id ? `AND index1 = '${app_id}'` : ''
+  const appFilter = app_id ? `AND index1 = '${escapeSqlString(app_id)}'` : ''
 
   const query = `SELECT
   formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
@@ -1822,7 +1827,7 @@ export async function getAdminBandwidthTrend(
   if (!c.env.BANDWIDTH_USAGE)
     return []
 
-  const appFilter = app_id ? `AND index1 = '${app_id}'` : ''
+  const appFilter = app_id ? `AND index1 = '${escapeSqlString(app_id)}'` : ''
 
   const query = `SELECT
   formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
