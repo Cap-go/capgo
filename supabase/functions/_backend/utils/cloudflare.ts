@@ -1008,12 +1008,13 @@ export async function getTotalAppsByModeCF(c: Context, mode: string) {
 export async function getStoreAppByIdCF(c: Context, appId: string): Promise<StoreApp> {
   if (!c.env.DB_STOREAPPS)
     return Promise.resolve({} as StoreApp)
-  const query = `SELECT * FROM store_apps WHERE app_id = '${appId}' LIMIT 1`
+  const query = `SELECT * FROM store_apps WHERE app_id = ? LIMIT 1`
 
   cloudlog({ requestId: c.get('requestId'), message: 'getStoreAppByIdCF query', query })
   try {
     const readD1 = getD1ReadStoreAppSession(c)
       .prepare(query)
+      .bind(appId)
       .first()
     const res = await readD1
     return res
