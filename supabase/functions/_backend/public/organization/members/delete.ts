@@ -48,6 +48,19 @@ export async function deleteMember(c: Context<MiddlewareKeyVariables>, bodyRaw: 
   if (error) {
     throw simpleError('error_deleting_user_from_organization', 'Error deleting user from organization', { error })
   }
+
+  // Clean up RBAC role bindings for the removed user in this org (all scopes)
+  const { error: rbacError } = await supabaseAdmin(c)
+    .from('role_bindings')
+    .delete()
+    .eq('principal_type', 'user')
+    .eq('principal_id', userData.id)
+    .eq('org_id', body.orgId)
+
+  if (rbacError) {
+    throw simpleError('error_deleting_role_bindings', 'Error deleting role bindings for user', { error: rbacError })
+  }
+
   cloudlog({ requestId: c.get('requestId'), message: 'User deleted from organization', data: { user_id: userData.id, org_id: body.orgId } })
   return c.json(BRES)
 }
