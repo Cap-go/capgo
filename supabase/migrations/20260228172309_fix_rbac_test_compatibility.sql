@@ -1,6 +1,6 @@
--- Fix RBAC test compatibility
--- Tests need to manipulate role_bindings directly for setup/teardown
--- Allow service_role to bypass the last super_admin protection trigger
+-- Fix RBAC test compatibility: enforce last super_admin protection trigger for all roles
+-- The trigger prevents deletion of the last org-level super_admin binding to protect org access.
+-- SERVICE_ROLE IS NOT EXEMPT: All roles (including service_role) must respect this guard.
 
 CREATE OR REPLACE FUNCTION "public"."prevent_last_super_admin_binding_delete"()
 RETURNS TRIGGER
@@ -36,15 +36,9 @@ BEGIN
     RETURN OLD;
   END IF;
 
-  -- Lock all super_admin bindings in this org to prevent write-skew under concurrent deletes
-  PERFORM 1
-  FROM public.role_bindings rb
-  INNER JOIN public.roles r ON rb.role_id = r.id
-  WHERE rb.scope_type = public.rbac_scope_org()
-    AND rb.org_id = OLD.org_id
-    AND rb.principal_type = public.rbac_principal_user()
-    AND r.name = public.rbac_role_org_super_admin()
-  FOR UPDATE;
+  -- Serialize operations on this org's super_admin bindings using advisory lock
+  -- This prevents write-skew anomalies under concurrent deletes without FOR UPDATE deadlocks
+  PERFORM pg_advisory_xact_lock(hashtext(OLD.org_id::text));
 
   -- Count remaining super_admin bindings in this org (excluding the one being deleted)
   SELECT COUNT(*) INTO v_remaining_count

@@ -505,8 +505,20 @@ app.delete('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
     if (!(await checkPermission(c, 'org.update_user_roles', { orgId: binding.org_id ?? undefined }))) {
       return c.json({ error: 'Forbidden - Admin rights required' }, 403)
     }
+    // Prevent privilege escalation: caller cannot delete a binding for a role with higher priority than their own
+    const auth = c.get('auth')!
+    const callerPrincipalId = auth.authType === 'apikey' ? auth.apikey!.rbac_id : auth.userId
+    const callerMaxRank = await getCallerMaxPriorityRank(drizzle, auth.authType, callerPrincipalId, binding.org_id!)
 
-    // Delete the binding
+    const [targetRole] = await drizzle
+      .select({ priority_rank: schema.roles.priority_rank })
+      .from(schema.roles)
+      .where(eq(schema.roles.id, binding.role_id!))
+      .limit(1)
+
+    if (targetRole && targetRole.priority_rank > callerMaxRank) {
+      return c.json({ error: 'Cannot delete a binding for a role with higher privileges than your own' }, 403)
+    }
     await drizzle
       .delete(schema.role_bindings)
       .where(eq(schema.role_bindings.id, bindingId))
