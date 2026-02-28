@@ -12,6 +12,8 @@ export interface RequestBuildBody {
   build_mode?: 'release' | 'debug'
   build_config?: Record<string, any>
   credentials?: Record<string, string>
+  buildOptions?: Record<string, unknown>
+  buildCredentials?: Record<string, string>
 }
 
 export interface RequestBuildResponse {
@@ -40,7 +42,8 @@ export async function requestBuild(
     platform,
     build_mode = 'release',
     build_config = {},
-    credentials = {},
+    buildOptions = {},
+    buildCredentials = {},
   } = body
 
   cloudlog({
@@ -155,7 +158,8 @@ export async function requestBuild(
         fastlane: {
           lane: platform,
         },
-        credentials: credentials || {},
+        buildOptions,
+        buildCredentials,
       }),
     })
 
