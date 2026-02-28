@@ -174,6 +174,7 @@ export async function requestBuild(
     throw quickError(503, 'service_unavailable', 'Build service unavailable (builder not configured)')
   }
 
+  let builderResponse: Response
   try {
     cloudlog({
       requestId: c.get('requestId'),
@@ -185,7 +186,7 @@ export async function requestBuild(
       artifact_key: upload_path,
     })
 
-    const builderResponse = await fetch(`${builderUrl}/jobs`, {
+    builderResponse = await fetch(`${builderUrl}/jobs`, {
       method: 'POST',
       headers: {
         'x-api-key': builderApiKey,
@@ -199,36 +200,6 @@ export async function requestBuild(
         buildCredentials: build_credentials,
       })),
     })
-
-    if (builderResponse.ok) {
-      builderJob = await builderResponse.json() as BuilderJobResponse
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: 'Builder job created successfully',
-        job_id: builderJob.jobId,
-        upload_url: builderJob.uploadUrl,
-      })
-    }
-    else {
-      const errorText = await builderResponse.text()
-      const responseHeaders: Record<string, string> = {}
-      builderResponse.headers.forEach((value, key) => {
-        responseHeaders[key] = value
-      })
-      cloudlogErr({
-        requestId: c.get('requestId'),
-        message: 'Builder API returned error',
-        builder_url: builderUrl,
-        status: builderResponse.status,
-        status_text: builderResponse.statusText,
-        error_body: errorText,
-        response_headers: responseHeaders,
-        org_id,
-        app_id,
-        platform,
-      })
-      throw quickError(503, 'service_unavailable', 'Build service unavailable (builder error)')
-    }
   }
   catch (error) {
     cloudlogErr({
@@ -242,7 +213,40 @@ export async function requestBuild(
       app_id,
       platform,
     })
-    throw quickError(503, 'service_unavailable', 'Build service unavailable (builder call failed)')
+    throw quickError(503, 'service_unavailable', 'Build service unavailable (network error)')
+  }
+
+  if (builderResponse.ok) {
+    builderJob = await builderResponse.json() as BuilderJobResponse
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Builder job created successfully',
+      job_id: builderJob.jobId,
+      upload_url: builderJob.uploadUrl,
+    })
+  }
+  else {
+    const errorText = await builderResponse.text()
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Builder API returned error',
+      builder_url: builderUrl,
+      status: builderResponse.status,
+      status_text: builderResponse.statusText,
+      error_body: errorText,
+      org_id,
+      app_id,
+      platform,
+    })
+    // Surface the builder's actual error message to the user
+    let builderMessage = `Build service error (${builderResponse.status})`
+    try {
+      const parsed = JSON.parse(errorText)
+      if (parsed?.error)
+        builderMessage = parsed.error
+    }
+    catch { /* use default message */ }
+    throw quickError(builderResponse.status as any, 'builder_error', builderMessage)
   }
 
   const upload_expires_at = new Date(Date.now() + 60 * 60 * 1000)
