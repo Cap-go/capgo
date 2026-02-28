@@ -37,7 +37,7 @@ app.post('/', middlewareV2(['all']), async (c) => {
     // A limited key cannot create an unlimited key (privilege escalation)
     const newKeyIsUnlimited = (limitedToOrgs.length === 0 && limitedToApps.length === 0)
     if (newKeyIsUnlimited) {
-      throw simpleError('cannot_create_apikey', 'You cannot create an unlimited API key with a limited API key', { apikey })
+      throw simpleError('cannot_create_apikey', 'You cannot create an unlimited API key with a limited API key', { keyId: apikey?.id })
     }
   }
   const expiresAt = body.expires_at ?? null

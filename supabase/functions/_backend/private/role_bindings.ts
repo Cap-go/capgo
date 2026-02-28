@@ -141,17 +141,19 @@ async function validatePrincipalAccess(
 
 async function getCallerMaxPriorityRank(
   drizzle: ReturnType<typeof getDrizzleClient>,
-  userId: string,
+  authType: 'apikey' | 'jwt',
+  principalId: string,
   orgId: string,
 ): Promise<number> {
+  const principalType = authType === 'apikey' ? 'api_key' : 'user'
   const result = await drizzle
     .select({ max_rank: sql<number>`MAX(${schema.roles.priority_rank})` })
     .from(schema.role_bindings)
     .innerJoin(schema.roles, eq(schema.role_bindings.role_id, schema.roles.id))
     .where(
       and(
-        eq(schema.role_bindings.principal_type, 'user'),
-        eq(schema.role_bindings.principal_id, userId),
+        eq(schema.role_bindings.principal_type, principalType),
+        eq(schema.role_bindings.principal_id, principalId),
         eq(schema.role_bindings.org_id, orgId),
       ),
     )
@@ -229,7 +231,8 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
 
 // POST /private/role_bindings - Assign a role
 app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
-  const userId = c.get('auth')?.userId
+  const auth = c.get('auth')
+  const userId = auth?.userId
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
@@ -284,7 +287,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     }
 
     // Prevent privilege escalation: caller cannot assign a role with higher priority than their own
-    const callerMaxRank = await getCallerMaxPriorityRank(drizzle, userId, org_id)
+    const callerMaxRank = await getCallerMaxPriorityRank(drizzle, auth.authType, auth.userId, org_id)
     if (role.priority_rank > callerMaxRank) {
       return c.json({ error: 'Cannot assign a role with higher privileges than your own' }, 403)
     }
@@ -371,7 +374,8 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
 // PATCH /private/role_bindings/:binding_id - Update a role binding
 app.patch('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
   const bindingId = c.req.param('binding_id')
-  const userId = c.get('auth')?.userId
+  const auth = c.get('auth')
+  const userId = auth?.userId
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
@@ -428,7 +432,7 @@ app.patch('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
     }
 
     // Prevent privilege escalation: caller cannot assign a role with higher priority than their own
-    const callerMaxRank = await getCallerMaxPriorityRank(drizzle, userId, binding.org_id!)
+    const callerMaxRank = await getCallerMaxPriorityRank(drizzle, auth!.authType, auth!.userId, binding.org_id!)
     if (role.priority_rank > callerMaxRank) {
       return c.json({ error: 'Cannot assign a role with higher privileges than your own' }, 403)
     }
