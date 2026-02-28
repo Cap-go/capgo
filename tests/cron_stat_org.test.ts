@@ -42,6 +42,7 @@ beforeAll(async () => {
     name: `Test Org Cron Stat ${id}`,
     created_by: USER_ID,
     management_email: TEST_EMAIL,
+    use_new_rbac: false,
   })
   if (orgError)
     throw orgError

@@ -26,6 +26,7 @@ beforeAll(async () => {
     name: `Test App ID Validation Org ${id}`,
     management_email: TEST_EMAIL,
     created_by: USER_ID,
+    use_new_rbac: false,
   }).select().single()
 
   if (orgError)

@@ -29,6 +29,7 @@ beforeAll(async () => {
     management_email: TEST_EMAIL,
     created_by: USER_ID,
     customer_id: customerId,
+    use_new_rbac: false,
   })
   if (error)
     throw error
@@ -380,6 +381,7 @@ describe('[POST] /private/validate_password_compliance', () => {
         require_number: true,
         require_special: true,
       },
+      use_new_rbac: false,
     })
 
     try {
@@ -492,6 +494,7 @@ describe('password Policy Enforcement Integration', () => {
         require_number: true,
         require_special: true,
       },
+      use_new_rbac: false,
     })
 
     // Add user as member

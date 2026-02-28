@@ -33,6 +33,7 @@ beforeAll(async () => {
     customer_id: POLICY_ORG_CUSTOMER_ID,
     require_apikey_expiration: true,
     max_apikey_expiration_days: 30,
+    use_new_rbac: false,
   })
   if (orgError)
     throw orgError
@@ -341,6 +342,7 @@ describe('[PUT] /organization with API key policy', () => {
       management_email: TEST_EMAIL,
       created_by: USER_ID,
       customer_id: updateOrgCustomerId,
+      use_new_rbac: false,
     })
     if (orgError)
       throw orgError

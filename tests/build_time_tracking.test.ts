@@ -45,6 +45,7 @@ beforeAll(async () => {
     name: `Build Time Test Org ${testRunId.slice(0, 8)}`,
     created_by: USER_ID,
     management_email: TEST_EMAIL,
+    use_new_rbac: false,
   })
   if (orgError)
     throw orgError

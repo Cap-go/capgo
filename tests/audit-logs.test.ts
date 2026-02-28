@@ -54,6 +54,7 @@ beforeAll(async () => {
     management_email: TEST_EMAIL,
     created_by: USER_ID,
     customer_id: customerId,
+    use_new_rbac: false,
   })
   if (error)
     throw error

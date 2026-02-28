@@ -28,6 +28,7 @@ beforeAll(async () => {
     management_email: TEST_EMAIL,
     created_by: USER_ID,
     customer_id: customerId,
+    use_new_rbac: false,
   })
   if (error)
     throw error
@@ -526,6 +527,7 @@ describe('[DELETE] /organization', () => {
       management_email: TEST_EMAIL,
       created_by: USER_ID,
       customer_id: customerId,
+      use_new_rbac: false,
     })
     expect(error).toBeNull()
 
@@ -612,6 +614,7 @@ describe('[DELETE] /organization', () => {
       management_email: `not-owned-${id}@example.com`,
       created_by: differentOwnerId, // Use an existing user ID
       customer_id: customerId,
+      use_new_rbac: false,
     })
     expect(error).toBeNull()
 

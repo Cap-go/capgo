@@ -8,10 +8,7 @@ const APPNAME = `com.private.error.${id}`
 const testOrgId = randomUUID()
 const testOrgEmail = `test-private-error-${id}@capgo.app`
 const testCustomerId = `cus_test_${id}`
-const testHeaders = {
-  'Content-Type': 'application/json',
-  'Authorization': '',  // Will be set in beforeAll
-}
+
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
 
@@ -34,6 +31,7 @@ beforeAll(async () => {
     management_email: testOrgEmail,
     created_by: USER_ID,
     customer_id: testCustomerId,
+    use_new_rbac: false,  // Use legacy permissions for this test
   })
 
   if (orgError)
@@ -47,26 +45,6 @@ beforeAll(async () => {
   })
   if (orgUserError)
     throw orgUserError
-  
-  // Create a dedicated API key for this test org
-  const { data: apikeyData, error: apikeyError } = await getSupabaseClient()
-    .from('apikeys')
-    .insert({
-      id: Math.floor(Math.random() * 1000000),
-      user_id: USER_ID,
-      mode: 'all',
-      name: 'private-error-cases test key',
-      limited_to_orgs: [testOrgId],
-    })
-    .select('key')
-    .single()
-  
-  if (apikeyError || !apikeyData?.key) {
-    console.error('Failed to create API key:', apikeyError)
-    throw apikeyError || new Error('No API key returned')
-  }
-  
-  testHeaders.Authorization = apikeyData.key
 })
 
 afterAll(async () => {
@@ -114,7 +92,7 @@ describe('[POST] /private/create_device - Error Cases', () => {
     // Use testOrgId where user has super_admin rights to properly test app not found
     const response = await fetch(getEndpointUrl('/private/create_device'), {
       method: 'POST',
-      headers: testHeaders,
+      headers,
       body: JSON.stringify({
         app_id: 'nonexistent.app',
         org_id: testOrgId,
@@ -393,7 +371,7 @@ describe('[POST] /private/set_org_email - Error Cases', () => {
 
     const response = await fetch(getEndpointUrl('/private/set_org_email'), {
       method: 'POST',
-      headers: testHeaders,
+      headers,
       body: JSON.stringify({
         org_id: testOrgId,
         email: 'test@example.com',
