@@ -1,29 +1,35 @@
 import { cwd } from 'node:process'
+import { config } from 'dotenv'
 import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
 
-export default defineConfig(({ mode }) => ({
-  test: {
-    include: ['tests/*.test.ts'],
-    environment: 'node',
-    watch: false,
-    // NOTE: With retry enabled, bail>0 can mark the run failed even if a test
-    // passes on retry (Vitest cancels the remaining queue on the first failure).
-    // This was causing CI to exit 1 with "passed" summary but canceled test files.
-    bail: 0,
-    testTimeout: 30_000, // Increased from 20s to handle slow edge function responses
-    hookTimeout: 15_000, // Increased from 8s to handle slow setup/teardown
-    retry: 3, // Increased retries for network flakiness
-    maxConcurrency: 5, // Reduced to prevent connection exhaustion
-    // Vitest 4: pool options are now top-level
-    isolate: true,
-    fileParallelism: true,
-    // Allow graceful shutdown of workers
-    teardownTimeout: 15_000,
-    // Sequence to reduce parallel load on edge functions
-    sequence: {
-      shuffle: false, // Run in predictable order
+export default defineConfig(({ mode }) => {
+  // Load .env.test file explicitly for test environment
+  config({ path: '.env.test' })
+  
+  return {
+    test: {
+      include: ['tests/*.test.ts'],
+      environment: 'node',
+      watch: false,
+      // NOTE: With retry enabled, bail>0 can mark the run failed even if a test
+      // passes on retry (Vitest cancels the remaining queue on the first failure).
+      // This was causing CI to exit 1 with "passed" summary but canceled test files.
+      bail: 0,
+      testTimeout: 30_000, // Increased from 20s to handle slow edge function responses
+      hookTimeout: 15_000, // Increased from 8s to handle slow setup/teardown
+      retry: 3, // Increased retries for network flakiness
+      maxConcurrency: 5, // Reduced to prevent connection exhaustion
+      // Vitest 4: pool options are now top-level
+      isolate: true,
+      fileParallelism: true,
+      // Allow graceful shutdown of workers
+      teardownTimeout: 15_000,
+      // Sequence to reduce parallel load on edge functions
+      sequence: {
+        shuffle: false, // Run in predictable order
+      },
+      env: loadEnv(mode, cwd(), ''),
     },
-    env: loadEnv(mode, cwd(), ''),
-  },
-}))
+  }
+})
