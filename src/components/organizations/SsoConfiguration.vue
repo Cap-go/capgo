@@ -2,8 +2,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
+import IconCopy from '~icons/heroicons/document-duplicate'
 import IconGlobeAlt from '~icons/heroicons/globe-alt'
-import IconPlus from '~icons/heroicons/plus'
 import IconTrash from '~icons/heroicons/trash'
 import Spinner from '~/components/Spinner.vue'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
@@ -65,6 +65,16 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
   return {
     'Content-Type': 'application/json',
     'authorization': `Bearer ${currentSession.session.access_token}`,
+  }
+}
+async function copyToClipboard(text: string, label: string) {
+  try {
+    await navigator.clipboard.writeText(text)
+    toast.success(t('sso-copied-to-clipboard', { label }))
+  }
+  catch (error) {
+    console.error('Failed to copy to clipboard:', error)
+    toast.error(t('sso-copy-failed'))
   }
 }
 
@@ -210,6 +220,64 @@ async function deleteProvider(provider: SsoProvider) {
   })
 }
 
+async function updateProviderStatus(providerId: string, status: 'active' | 'disabled') {
+  try {
+    const headers = await getAuthHeaders()
+    const response = await fetch(`${defaultApiHost}/private/sso/providers/${providerId}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ status }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({})) as { error?: string }
+      toast.error(errorData.error || t('sso-error-updating'))
+      return false
+    }
+
+    const updated = await response.json() as SsoProvider
+    const index = providers.value.findIndex(p => p.id === providerId)
+    if (index !== -1)
+      providers.value[index] = updated
+
+    toast.success(status === 'active' ? t('sso-activated') : t('sso-deactivated'))
+    return true
+  }
+  catch (error) {
+    console.error('Error updating SSO provider status:', error)
+    toast.error(t('sso-error-updating'))
+    return false
+  }
+}
+
+async function toggleEnforceSso(provider: SsoProvider) {
+  try {
+    const headers = await getAuthHeaders()
+    const newValue = !provider.enforce_sso
+    const response = await fetch(`${defaultApiHost}/private/sso/providers/${provider.id}`, {
+      method: 'PATCH',
+      headers,
+      body: JSON.stringify({ enforce_sso: newValue }),
+    })
+
+    if (!response.ok) {
+      toast.error(t('sso-error-updating'))
+      return
+    }
+
+    const updated = await response.json() as SsoProvider
+    const index = providers.value.findIndex(p => p.id === provider.id)
+    if (index !== -1)
+      providers.value[index] = updated
+
+    toast.success(newValue ? t('sso-enforcement-enabled') : t('sso-enforcement-disabled'))
+  }
+  catch (error) {
+    console.error('Error toggling SSO enforcement:', error)
+    toast.error(t('sso-error-updating'))
+  }
+}
+
 function getStatusBadgeClass(status: SsoProvider['status']): string {
   switch (status) {
     case 'active':
@@ -248,208 +316,259 @@ function formatDate(dateString: string): string {
   })
 }
 
-onMounted(fetchProviders)
+onMounted(async () => {
+  await fetchProviders()
+})
+
+// Expose showAddForm so parent can control it
+defineExpose({
+  showAddForm,
+})
 </script>
 
 <template>
-  <section class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
-    <!-- Header -->
-    <div class="flex flex-col gap-4 mb-6 sm:flex-row sm:items-center sm:justify-between">
-      <div class="flex items-start gap-4">
-        <div class="p-3 rounded-lg bg-indigo-50 dark:bg-indigo-900/30">
-          <IconGlobeAlt class="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
-        </div>
-        <div>
-          <h3 class="text-lg font-semibold dark:text-white text-slate-800">
-            {{ t('sso-configuration') }}
-          </h3>
-          <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            {{ t('sso-configuration-description') }}
-          </p>
-        </div>
-      </div>
-      <button
-        class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800"
-        @click="showAddForm = !showAddForm"
-      >
-        <IconPlus class="w-5 h-5" />
-        {{ t('sso-add-provider') }}
-      </button>
-    </div>
-
-    <!-- Add Provider Form -->
-    <div
-      v-if="showAddForm"
-      class="p-4 mb-6 border rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50"
-    >
-      <h4 class="mb-4 text-base font-semibold dark:text-white text-slate-800">
-        {{ t('sso-new-provider') }}
-      </h4>
-      <div class="space-y-4">
-        <div>
-          <label class="block mb-1 text-sm font-medium dark:text-white text-slate-700">
-            {{ t('sso-domain') }}
-          </label>
-          <input
-            v-model="newDomain"
-            type="text"
-            :placeholder="t('sso-domain-placeholder')"
-            :disabled="isSubmitting"
-            class="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white disabled:opacity-50"
-          >
-          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            {{ t('sso-domain-help') }}
-          </p>
-        </div>
-        <div>
-          <label class="block mb-1 text-sm font-medium dark:text-white text-slate-700">
-            {{ t('sso-metadata-url') }}
-          </label>
-          <input
-            v-model="newMetadataUrl"
-            type="url"
-            :placeholder="t('sso-metadata-url-placeholder')"
-            :disabled="isSubmitting"
-            class="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white disabled:opacity-50"
-          >
-          <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-            {{ t('sso-metadata-url-help') }}
-          </p>
-        </div>
-        <div class="flex items-center gap-3">
-          <button
-            :disabled="isSubmitting"
-            class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
-            @click="addProvider"
-          >
-            <span v-if="isSubmitting" class="flex items-center gap-2">
-              <Spinner size="w-4 h-4" />
-              {{ t('sso-creating') }}
-            </span>
-            <span v-else>{{ t('sso-create-provider') }}</span>
-          </button>
-          <button
-            :disabled="isSubmitting"
-            class="px-4 py-2 text-sm font-medium border rounded-lg text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50"
-            @click="showAddForm = false"
-          >
-            {{ t('button-cancel') }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- DNS Verification Instructions (shown after creation) -->
-    <div
-      v-if="pendingVerificationProvider"
-      class="p-4 mb-6 border rounded-lg border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20"
-    >
-      <h4 class="mb-2 font-semibold text-blue-800 dark:text-blue-200">
-        {{ t('sso-dns-verification-required') }}
-      </h4>
-      <p class="mb-3 text-sm text-blue-700 dark:text-blue-300">
-        {{ t('sso-dns-verification-instructions') }}
-      </p>
-      <div class="p-3 mb-3 font-mono text-sm bg-white border border-blue-200 rounded dark:bg-gray-800 dark:border-blue-700">
-        <p class="text-slate-600 dark:text-slate-400">
-          {{ t('sso-dns-record-type') }}: <span class="font-semibold text-slate-800 dark:text-white">TXT</span>
+  <!-- Add Provider Form -->
+  <div
+    v-if="showAddForm"
+    class="p-4 mb-6 border rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50"
+  >
+    <h4 class="mb-4 text-base font-semibold dark:text-white text-slate-800">
+      {{ t('sso-new-provider') }}
+    </h4>
+    <div class="space-y-4">
+      <div>
+        <label class="block mb-1 text-sm font-medium dark:text-white text-slate-700">
+          {{ t('sso-domain') }}
+        </label>
+        <input
+          v-model="newDomain"
+          type="text"
+          :placeholder="t('sso-domain-placeholder')"
+          :disabled="isSubmitting"
+          class="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white disabled:opacity-50"
+        >
+        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          {{ t('sso-domain-help') }}
         </p>
-        <p class="text-slate-600 dark:text-slate-400">
-          {{ t('sso-dns-record-name') }}: <span class="font-semibold text-slate-800 dark:text-white">_capgo-sso.{{ pendingVerificationProvider.domain }}</span>
-        </p>
-        <p class="text-slate-600 dark:text-slate-400">
-          {{ t('sso-dns-record-value') }}: <span class="font-semibold text-slate-800 dark:text-white">{{ pendingVerificationProvider.dns_verification_token }}</span>
+      </div>
+      <div>
+        <label class="block mb-1 text-sm font-medium dark:text-white text-slate-700">
+          {{ t('sso-metadata-url') }}
+        </label>
+        <input
+          v-model="newMetadataUrl"
+          type="url"
+          :placeholder="t('sso-metadata-url-placeholder')"
+          :disabled="isSubmitting"
+          class="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white disabled:opacity-50"
+        >
+        <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+          {{ t('sso-metadata-url-help') }}
         </p>
       </div>
       <div class="flex items-center gap-3">
         <button
-          :disabled="isVerifying === pendingVerificationProvider.id"
+          :disabled="isSubmitting"
           class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
-          @click="verifyDns(pendingVerificationProvider.id)"
+          @click="addProvider"
         >
-          <span v-if="isVerifying === pendingVerificationProvider.id" class="flex items-center gap-2">
+          <span v-if="isSubmitting" class="flex items-center gap-2">
             <Spinner size="w-4 h-4" />
-            {{ t('sso-verifying') }}
+            {{ t('sso-creating') }}
           </span>
-          <span v-else>{{ t('sso-verify-dns') }}</span>
+          <span v-else>{{ t('sso-create-provider') }}</span>
         </button>
         <button
-          class="px-3 py-2 text-sm font-medium border rounded-lg text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700"
-          @click="recentlyCreatedId = null"
+          :disabled="isSubmitting"
+          class="px-4 py-2 text-sm font-medium border rounded-lg text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50"
+          @click="showAddForm = false"
         >
-          {{ t('sso-dismiss') }}
+          {{ t('button-cancel') }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DNS Verification Instructions (shown after creation) -->
+  <div
+    v-if="pendingVerificationProvider"
+    class="p-4 mb-6 border rounded-lg border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-900/20"
+  >
+    <h4 class="mb-2 font-semibold text-blue-800 dark:text-blue-200">
+      {{ t('sso-dns-verification-required') }}
+    </h4>
+    <p class="mb-3 text-sm text-blue-700 dark:text-blue-300">
+      {{ t('sso-dns-verification-instructions') }}
+    </p>
+    <div class="p-3 mb-3 space-y-2 font-mono text-sm bg-white border border-blue-200 rounded dark:bg-gray-800 dark:border-blue-700">
+      <p class="text-slate-600 dark:text-slate-400">
+        {{ t('sso-dns-record-type') }}: <span class="font-semibold text-slate-800 dark:text-white">TXT</span>
+      </p>
+      <div class="flex items-center justify-between gap-2">
+        <p class="text-slate-600 dark:text-slate-400">
+          {{ t('sso-dns-record-name') }}: <span class="font-semibold text-slate-800 dark:text-white">_capgo-sso.{{ pendingVerificationProvider.domain }}</span>
+        </p>
+        <button
+          class="p-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors"
+          :title="t('sso-copy')"
+          @click="copyToClipboard(`_capgo-sso.${pendingVerificationProvider.domain}`, t('sso-dns-record-name'))"
+        >
+          <IconCopy class="w-4 h-4" />
+        </button>
+      </div>
+      <div class="flex items-center justify-between gap-2">
+        <p class="text-slate-600 dark:text-slate-400 break-all">
+          {{ t('sso-dns-record-value') }}: <span class="font-semibold text-slate-800 dark:text-white">{{ pendingVerificationProvider.dns_verification_token }}</span>
+        </p>
+        <button
+          class="p-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors flex-shrink-0"
+          :title="t('sso-copy')"
+          @click="copyToClipboard(pendingVerificationProvider.dns_verification_token!, t('sso-dns-record-value'))"
+        >
+          <IconCopy class="w-4 h-4" />
         </button>
       </div>
     </div>
 
-    <!-- Loading State -->
-    <div v-if="isLoading" class="flex items-center justify-center py-12">
-      <Spinner size="w-8 h-8" color="fill-blue-500 text-gray-200 dark:text-gray-600" />
-    </div>
-
-    <!-- Empty State -->
-    <div
-      v-else-if="providers.length === 0"
-      class="py-12 text-center"
-    >
-      <div class="flex justify-center mb-4">
-        <div class="p-4 bg-gray-100 rounded-full dark:bg-gray-700">
-          <IconGlobeAlt class="w-12 h-12 text-gray-400" />
-        </div>
-      </div>
-      <h4 class="text-lg font-medium text-gray-900 dark:text-white">
-        {{ t('sso-no-providers') }}
-      </h4>
-      <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-        {{ t('sso-no-providers-description') }}
-      </p>
-    </div>
-
-    <!-- Providers List -->
-    <div v-else class="space-y-3">
-      <div
-        v-for="provider in providers"
-        :key="provider.id"
-        class="flex flex-col gap-3 p-4 border rounded-lg sm:flex-row sm:items-center sm:justify-between border-slate-200 dark:border-slate-700"
+    <div class="flex items-center gap-3">
+      <button
+        :disabled="isVerifying === pendingVerificationProvider.id"
+        class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+        @click="verifyDns(pendingVerificationProvider.id)"
       >
-        <div class="flex-1 min-w-0">
-          <div class="flex items-center gap-3">
-            <h4 class="text-sm font-semibold truncate dark:text-white text-slate-800">
-              {{ provider.domain }}
-            </h4>
-            <span
-              class="px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap"
-              :class="getStatusBadgeClass(provider.status)"
-            >
-              {{ getStatusLabel(provider.status) }}
-            </span>
-          </div>
-          <p class="mt-1 text-xs truncate text-slate-500 dark:text-slate-400">
-            {{ provider.metadata_url }}
-          </p>
-          <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">
-            {{ t('created-at') }}: {{ formatDate(provider.created_at) }}
-          </p>
-        </div>
-        <div class="flex items-center gap-2 shrink-0">
-          <button
-            v-if="provider.status === 'pending_verification'"
-            :disabled="isVerifying === provider.id"
-            class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-700 bg-white border border-blue-300 rounded-lg hover:bg-blue-50 dark:bg-gray-800 dark:text-blue-400 dark:border-blue-600 dark:hover:bg-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
-            @click="verifyDns(provider.id)"
-          >
-            <Spinner v-if="isVerifying === provider.id" size="w-4 h-4" />
-            <span>{{ t('sso-verify-dns') }}</span>
-          </button>
-          <button
-            class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-lg hover:bg-red-50 dark:bg-gray-800 dark:border-red-600 dark:hover:bg-red-900/20"
-            @click="deleteProvider(provider)"
-          >
-            <IconTrash class="w-4 h-4" />
-            {{ t('delete') }}
-          </button>
-        </div>
+        <span v-if="isVerifying === pendingVerificationProvider.id" class="flex items-center gap-2">
+          <Spinner size="w-4 h-4" />
+          {{ t('sso-verifying') }}
+        </span>
+        <span v-else>{{ t('sso-verify-dns') }}</span>
+      </button>
+      <button
+        class="px-3 py-2 text-sm font-medium border rounded-lg text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700"
+        @click="recentlyCreatedId = null"
+      >
+        {{ t('sso-dismiss') }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div v-if="isLoading" class="flex items-center justify-center py-12">
+    <Spinner size="w-8 h-8" color="fill-blue-500 text-gray-200 dark:text-gray-600" />
+  </div>
+
+  <!-- Empty State -->
+  <div
+    v-else-if="providers.length === 0"
+    class="py-12 text-center"
+  >
+    <div class="flex justify-center mb-4">
+      <div class="p-4 bg-gray-100 rounded-full dark:bg-gray-700">
+        <IconGlobeAlt class="w-12 h-12 text-gray-400" />
       </div>
     </div>
-  </section>
+    <h4 class="text-lg font-medium text-gray-900 dark:text-white">
+      {{ t('sso-no-providers') }}
+    </h4>
+    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+      {{ t('sso-no-providers-description') }}
+    </p>
+    <button
+      class="px-4 py-2 mt-4 text-sm font-medium text-white transition-colors bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800"
+      @click="showAddForm = true"
+    >
+      {{ t('sso-add-provider') }}
+    </button>
+  </div>
+
+  <!-- Providers List -->
+  <div v-else class="space-y-3">
+    <div
+      v-for="provider in providers"
+      :key="provider.id"
+      class="flex flex-col gap-3 p-4 border rounded-lg sm:flex-row sm:items-center sm:justify-between border-slate-200 dark:border-slate-700"
+    >
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-3">
+          <h4 class="text-sm font-semibold truncate dark:text-white text-slate-800">
+            {{ provider.domain }}
+          </h4>
+          <span
+            class="px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap"
+            :class="getStatusBadgeClass(provider.status)"
+          >
+            {{ getStatusLabel(provider.status) }}
+          </span>
+        </div>
+        <p class="mt-1 text-xs truncate text-slate-500 dark:text-slate-400">
+          {{ provider.metadata_url }}
+        </p>
+        <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">
+          {{ t('created-at') }}: {{ formatDate(provider.created_at) }}
+        </p>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <!-- Verify DNS button (pending_verification) -->
+        <button
+          v-if="provider.status === 'pending_verification'"
+          :disabled="isVerifying === provider.id"
+          class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-700 bg-white border border-blue-300 rounded-lg hover:bg-blue-50 dark:bg-gray-800 dark:text-blue-400 dark:border-blue-600 dark:hover:bg-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+          @click="verifyDns(provider.id)"
+        >
+          <Spinner v-if="isVerifying === provider.id" size="w-4 h-4" />
+          <span>{{ t('sso-verify-dns') }}</span>
+        </button>
+
+        <!-- Activate button (verified) -->
+        <button
+          v-if="provider.status === 'verified'"
+          class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-green-600 border border-green-600 rounded-lg hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800"
+          @click="updateProviderStatus(provider.id, 'active')"
+        >
+          {{ t('sso-activate') }}
+        </button>
+
+        <!-- Deactivate button (active) -->
+        <button
+          v-if="provider.status === 'active'"
+          class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-orange-700 bg-white border border-orange-300 rounded-lg hover:bg-orange-50 dark:bg-gray-800 dark:text-orange-400 dark:border-orange-600 dark:hover:bg-orange-900/20"
+          @click="updateProviderStatus(provider.id, 'disabled')"
+        >
+          {{ t('sso-deactivate') }}
+        </button>
+
+        <!-- Re-activate button (disabled) -->
+        <button
+          v-if="provider.status === 'disabled'"
+          class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-green-700 bg-white border border-green-300 rounded-lg hover:bg-green-50 dark:bg-gray-800 dark:text-green-400 dark:border-green-600 dark:hover:bg-green-900/20"
+          @click="updateProviderStatus(provider.id, 'active')"
+        >
+          {{ t('sso-reactivate') }}
+        </button>
+
+        <!-- Enforce SSO toggle (active only) -->
+        <label
+          v-if="provider.status === 'active'"
+          class="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer"
+          :title="t('sso-enforce-tooltip')"
+        >
+          <input
+            type="checkbox"
+            :checked="provider.enforce_sso"
+            class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+            @change="toggleEnforceSso(provider)"
+          >
+          <span class="text-slate-700 dark:text-slate-300">{{ t('sso-enforce') }}</span>
+        </label>
+
+        <!-- Delete button (always visible) -->
+        <button
+          class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-lg hover:bg-red-50 dark:bg-gray-800 dark:border-red-600 dark:hover:bg-red-900/20"
+          @click="deleteProvider(provider)"
+        >
+          <IconTrash class="w-4 h-4" />
+          {{ t('delete') }}
+        </button>
+      </div>
+    </div>
+  </div>
 </template>
