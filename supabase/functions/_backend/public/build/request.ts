@@ -32,6 +32,29 @@ interface BuilderJobResponse {
   status: string
 }
 
+/**
+ * Construct the JSON body forwarded to the builder's POST /jobs endpoint.
+ * Extracted for testability — the handler calls this, and unit tests assert the shape.
+ */
+export function buildBuilderPayload(input: {
+  orgId: string
+  uploadPath: string
+  platform: string
+  buildOptions: Record<string, unknown>
+  buildCredentials: Record<string, string>
+}) {
+  return {
+    userId: input.orgId,
+    artifactKey: input.uploadPath,
+    fastlane: { lane: input.platform },
+    buildOptions: input.buildOptions,
+    buildCredentials: input.buildCredentials,
+  }
+}
+
+/** Exported for unit tests — follows bundleUsageTestUtils pattern. */
+export const builderPayloadTestUtils = { buildBuilderPayload }
+
 export async function requestBuild(
   c: Context,
   body: RequestBuildBody,
@@ -152,15 +175,13 @@ export async function requestBuild(
         'x-api-key': builderApiKey,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        userId: org_id, // Use org_id as anonymized identifier
-        artifactKey: upload_path, // Pass the artifact key to builder
-        fastlane: {
-          lane: platform,
-        },
+      body: JSON.stringify(buildBuilderPayload({
+        orgId: org_id,
+        uploadPath: upload_path,
+        platform,
         buildOptions: build_options,
         buildCredentials: build_credentials,
-      }),
+      })),
     })
 
     if (builderResponse.ok) {
