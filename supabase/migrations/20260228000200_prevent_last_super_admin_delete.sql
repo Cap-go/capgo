@@ -1,5 +1,5 @@
 -- Add a trigger to prevent deleting the last org super_admin role binding
--- This protects against direct PostgREST DELETEs that bypass the SQL function guards
+-- This protects against direct PostgREST DELETE operations that bypass the SQL function guards
 
 CREATE OR REPLACE FUNCTION "public"."prevent_last_super_admin_binding_delete"()
 RETURNS TRIGGER
