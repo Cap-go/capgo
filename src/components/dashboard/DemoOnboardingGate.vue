@@ -54,10 +54,8 @@ const shouldShowDemoOnNoApps = computed(() => {
   if (path === '/login' || path === '/register' || path === '/forgot_password' || path === '/resend_email' || path === '/onboarding' || path === '/scan')
     return false
 
-  if (shouldForceShowDemoOnboarding.value)
-    return true
-
-  return shouldShowDemoOnboarding.value && !isDemoOnboardingClosed.value
+  // Only show when explicitly requested via query param
+  return shouldForceShowDemoOnboarding.value
 })
 
 function updateDemoOnboardingState() {
