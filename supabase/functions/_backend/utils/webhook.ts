@@ -48,6 +48,31 @@ export type WebhookEventType = typeof WEBHOOK_EVENT_TYPES[number]
 const LOCALHOST_SUFFIX = '.localhost'
 const IPV4_REGEX = /^\d{1,3}(?:\.\d{1,3}){3}$/
 
+// Known domains that resolve to localhost (SSRF bypass vectors)
+const BLOCKED_LOCALHOST_DOMAINS = new Set([
+  'localtest.me',
+  'vcap.me',
+  'lvh.me',
+  'lacolhost.com',
+  'yoogle.com',
+])
+
+// DNS rebinding service suffixes (SSRF bypass vectors)
+const BLOCKED_DNS_REBINDING_SUFFIXES = [
+  '.nip.io',
+  '.xip.io',
+  '.sslip.io',
+  '.traefik.me',
+]
+
+// Cloud metadata hostnames (SSRF targets)
+const BLOCKED_METADATA_HOSTNAMES = new Set([
+  'metadata.google.internal',
+  'metadata.goog',
+  'metadata',
+  'instance-data',
+])
+
 function allowLocalWebhookUrls(c: Context): boolean {
   return getEnv(c, 'CAPGO_ALLOW_LOCAL_WEBHOOK_URLS') === 'true'
 }
@@ -64,6 +89,28 @@ function isIpLiteral(hostname: string): boolean {
   return IPV4_REGEX.test(hostname) || hostname.includes(':')
 }
 
+function isBlockedLocalhostDomain(hostname: string): boolean {
+  if (BLOCKED_LOCALHOST_DOMAINS.has(hostname))
+    return true
+  for (const domain of BLOCKED_LOCALHOST_DOMAINS) {
+    if (hostname.endsWith(`.${domain}`))
+      return true
+  }
+  return false
+}
+
+function isDnsRebindingService(hostname: string): boolean {
+  for (const suffix of BLOCKED_DNS_REBINDING_SUFFIXES) {
+    if (hostname.endsWith(suffix))
+      return true
+  }
+  return false
+}
+
+function isCloudMetadataHostname(hostname: string): boolean {
+  return BLOCKED_METADATA_HOSTNAMES.has(hostname)
+}
+
 export function getWebhookUrlValidationError(c: Context, urlString: string): string | null {
   let url: URL
   try {
@@ -77,11 +124,24 @@ export function getWebhookUrlValidationError(c: Context, urlString: string): str
     return null
 
   const hostname = normalizeHostname(url.hostname)
+
   if (isLocalhostHostname(hostname))
     return 'Webhook URL must point to a public host'
 
   if (isIpLiteral(hostname))
     return 'Webhook URL must use a hostname, not an IP address'
+
+  // Block known localhost domains (SSRF bypass prevention)
+  if (isBlockedLocalhostDomain(hostname))
+    return 'Webhook URL must point to a public host'
+
+  // Block DNS rebinding services (SSRF bypass prevention)
+  if (isDnsRebindingService(hostname))
+    return 'Webhook URL must not use DNS rebinding services'
+
+  // Block cloud metadata endpoints (SSRF target prevention)
+  if (isCloudMetadataHostname(hostname))
+    return 'Webhook URL must point to a public host'
 
   if (url.protocol !== 'https:')
     return 'Webhook URL must use HTTPS'
