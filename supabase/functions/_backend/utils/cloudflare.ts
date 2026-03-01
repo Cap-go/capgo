@@ -482,7 +482,7 @@ export async function readDeviceVersionCountsCF(c: Context, app_id: string, chan
   if (!c.env.DEVICE_INFO)
     return {}
 
-  const safeChannel = channelName ? channelName.replace(/'/g, `''`) : ''
+  const safeChannel = channelName ? escapeSqlString(channelName) : ''
   const channelFilter = safeChannel ? `AND default_channel = '${safeChannel}'` : ''
 
   const query = `SELECT
