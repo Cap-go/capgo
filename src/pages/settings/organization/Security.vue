@@ -139,6 +139,16 @@ function acronym(email: string) {
   return res
 }
 
+async function hasVerified2faFactor() {
+  const { data: mfaFactors, error } = await supabase.auth.mfa.listFactors()
+  if (error) {
+    console.error('Error checking your 2FA status:', error)
+    return null
+  }
+  const verifiedFactor = mfaFactors?.all.find(factor => factor.status === 'verified')
+  return !!verifiedFactor
+}
+
 // Load current password policy settings
 function loadPolicyFromOrg() {
   const config = currentOrganization.value?.password_policy_config
@@ -347,6 +357,18 @@ async function toggle2faEnforcement() {
   }
 
   const newValue = !enforcing2fa.value
+
+  if (newValue) {
+    const hasSelf2fa = await hasVerified2faFactor()
+    if (hasSelf2fa === null) {
+      toast.error(t('error-loading-settings'))
+      return
+    }
+    if (!hasSelf2fa) {
+      toast.error(t('2fa-enforcement-self-2fa-required'))
+      return
+    }
+  }
 
   if (newValue && impactedMembers.value.length > 0) {
     // Show warning dialog with impacted members
