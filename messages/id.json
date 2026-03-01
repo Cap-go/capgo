@@ -10,6 +10,7 @@
   "2fa-enforcement-disabled": "Penegakan 2FA telah dinonaktifkan.",
   "2fa-enforcement-enable-anyway": "Aktifkan Saja",
   "2fa-enforcement-enabled": "Penegakan 2FA telah diaktifkan untuk organisasi ini.",
+  "2fa-enforcement-self-2fa-required": "Aktifkan otentikasi dua faktor pada akun Anda sebelum menerapkan penegakan 2FA di seluruh organisasi.",
   "2fa-enforcement-title": "Wajibkan 2FA untuk Semua Anggota",
   "2fa-enforcement-warning-description": "Beberapa anggota organisasi belum mengaktifkan 2FA. Setelah Anda mengaktifkan penegakan, mereka akan dikunci dari organisasi hingga mereka mengaktifkan 2FA.",
   "2fa-enforcement-warning-title": "Anggota Akan Terpengaruh",

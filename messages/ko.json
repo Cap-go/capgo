@@ -10,6 +10,7 @@
   "2fa-enforcement-disabled": "2FA 적용이 비활성화되었습니다.",
   "2fa-enforcement-enable-anyway": "그래도 활성화",
   "2fa-enforcement-enabled": "이 조직에 대해 2FA 적용이 활성화되었습니다.",
+  "2fa-enforcement-self-2fa-required": "계정에 2단계 인증을 활성화한 후 조직 전체 2FA 강제 적용을 진행하십시오.",
   "2fa-enforcement-title": "모든 구성원에게 2FA 요구",
   "2fa-enforcement-warning-description": "일부 조직 구성원이 2FA를 활성화하지 않았습니다. 적용을 활성화하면 2FA를 활성화할 때까지 조직에서 잠깁니다.",
   "2fa-enforcement-warning-title": "구성원이 영향을 받습니다",

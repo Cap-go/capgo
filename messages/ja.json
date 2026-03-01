@@ -10,6 +10,7 @@
   "2fa-enforcement-disabled": "2FAの強制が無効化されました。",
   "2fa-enforcement-enable-anyway": "とにかく有効にする",
   "2fa-enforcement-enabled": "この組織で2FAの強制が有効化されました。",
+  "2fa-enforcement-self-2fa-required": "あなたのアカウントに二要素認証を有効にしてから、組織全体の2FA強制適用を行ってください。",
   "2fa-enforcement-title": "すべてのメンバーに2FAを要求",
   "2fa-enforcement-warning-description": "一部の組織メンバーが2FAを有効にしていません。強制を有効にすると、2FAを有効にするまで組織からロックアウトされます。",
   "2fa-enforcement-warning-title": "影響を受けるメンバー",

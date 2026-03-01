@@ -10,6 +10,7 @@
   "2fa-enforcement-disabled": "Die 2FA-Durchsetzung wurde deaktiviert.",
   "2fa-enforcement-enable-anyway": "Trotzdem aktivieren",
   "2fa-enforcement-enabled": "Die 2FA-Durchsetzung wurde für diese Organisation aktiviert.",
+  "2fa-enforcement-self-2fa-required": "Aktivieren Sie die Zwei-Faktor-Authentifizierung für Ihr Konto, bevor Sie eine unternehmensweite 2FA-Durchsetzung anwenden.",
   "2fa-enforcement-title": "2FA für alle Mitglieder erforderlich",
   "2fa-enforcement-warning-description": "Einige Organisationsmitglieder haben 2FA nicht aktiviert. Sobald Sie die Durchsetzung aktivieren, werden sie aus der Organisation ausgesperrt, bis sie 2FA aktivieren.",
   "2fa-enforcement-warning-title": "Mitglieder werden betroffen sein",

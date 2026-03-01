@@ -10,6 +10,7 @@
   "2fa-enforcement-disabled": "已禁用2FA强制执行。",
   "2fa-enforcement-enable-anyway": "仍然启用",
   "2fa-enforcement-enabled": "已为此组织启用2FA强制执行。",
+  "2fa-enforcement-self-2fa-required": "在应用全组织范围的2FA强制性之前，先在您的账户上启用两因素身份验证。",
   "2fa-enforcement-title": "要求所有成员使用2FA",
   "2fa-enforcement-warning-description": "部分组织成员尚未启用2FA。一旦启用强制执行，他们将被锁定在组织之外，直到他们启用2FA。",
   "2fa-enforcement-warning-title": "成员将受到影响",

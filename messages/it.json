@@ -10,6 +10,7 @@
   "2fa-enforcement-disabled": "L'applicazione della 2FA è stata disabilitata.",
   "2fa-enforcement-enable-anyway": "Abilita Comunque",
   "2fa-enforcement-enabled": "L'applicazione della 2FA è stata abilitata per questa organizzazione.",
+  "2fa-enforcement-self-2fa-required": "Abilita l'autenticazione a due fattori sul tuo account prima di applicare l'applicazione dell'2FA a livello di organizzazione.",
   "2fa-enforcement-title": "Richiedi 2FA per Tutti i Membri",
   "2fa-enforcement-warning-description": "Alcuni membri dell'organizzazione non hanno la 2FA abilitata. Una volta abilitata l'applicazione, saranno bloccati dall'organizzazione fino a quando non abilitano la 2FA.",
   "2fa-enforcement-warning-title": "I Membri Saranno Interessati",

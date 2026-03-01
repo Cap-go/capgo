@@ -10,6 +10,7 @@
   "2fa-enforcement-disabled": "2FA zorlaması devre dışı bırakıldı.",
   "2fa-enforcement-enable-anyway": "Yine de Etkinleştir",
   "2fa-enforcement-enabled": "Bu organizasyon için 2FA zorlaması etkinleştirildi.",
+  "2fa-enforcement-self-2fa-required": "Hesabınızda iki faktörlü kimlik doğrulamayı etkinleştirin, daha sonra tüm organizasyon genelinde 2FA uygulamasına geçin.",
   "2fa-enforcement-title": "Tüm Üyeler için 2FA Gerektir",
   "2fa-enforcement-warning-description": "Bazı organizasyon üyelerinin 2FA'sı etkin değil. Zorlamayı etkinleştirdiğinizde, 2FA'yı etkinleştirene kadar organizasyondan kilitlenecekler.",
   "2fa-enforcement-warning-title": "Üyeler Etkilenecek",
