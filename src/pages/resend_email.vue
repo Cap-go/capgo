@@ -49,13 +49,13 @@ async function submit(form: { email: string, password: string }) {
             <div class="py-6 px-4 sm:py-7 sm:px-8">
               <div v-if="emailVerificationBlockingReason" class="mb-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-100">
                 <p class="mb-1">
-                  You cannot access this action right now because your email is not verified yet.
+                  {{ t('email-not-verified-banner-title', 'You cannot access this action right now because your email is not verified yet.') }}
                 </p>
                 <p class="text-xs leading-5">
-                  Verify your email to continue. If you were trying to access account settings or delete your account, please confirm your email first.
+                  {{ t('email-not-verified-banner-body', 'Verify your email to continue. If you were trying to access account settings or delete your account, please confirm your email first.') }}
                 </p>
                 <p v-if="returnTo" class="mt-2 text-xs font-medium">
-                  Attempted destination: {{ returnTo }}
+                  {{ t('attempted-destination', 'Attempted destination:') }} {{ returnTo }}
                 </p>
               </div>
               <FormKit id="resend-email" type="form" :actions="false" @submit="submit">

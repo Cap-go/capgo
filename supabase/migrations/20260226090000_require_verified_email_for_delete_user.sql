@@ -9,6 +9,7 @@ DECLARE
   old_record_json jsonb;
   last_sign_in_at_ts timestamptz;
   email_confirmed_at_ts timestamptz;
+  did_schedule integer;
 BEGIN
   -- Get the current user ID and email details
   SELECT "auth"."uid"() INTO user_id_fn;
@@ -43,6 +44,25 @@ BEGIN
     RAISE EXCEPTION 'user_not_found' USING ERRCODE = 'P0002';
   END IF;
 
+  -- Mark the user for deletion
+  INSERT INTO "public"."to_delete_accounts" (
+    "account_id",
+    "removal_date",
+    "removed_data"
+  ) VALUES
+  (
+    user_id_fn,
+    NOW() + INTERVAL '30 days',
+    "jsonb_build_object"('email', user_email, 'apikeys', COALESCE((SELECT "jsonb_agg"("to_jsonb"(a.*)) FROM "public"."apikeys" a WHERE a."user_id" = user_id_fn), '[]'::jsonb))
+  )
+  ON CONFLICT ("account_id") DO NOTHING
+  RETURNING 1 INTO did_schedule;
+
+  -- Retry-safe: only enqueue cleanup actions when this is a new delete request.
+  IF did_schedule IS NULL THEN
+    RETURN;
+  END IF;
+
   -- Trigger the queue-based deletion process
   -- This cancels the subscriptions of the user's organizations
   PERFORM "pgmq"."send"(
@@ -56,19 +76,6 @@ BEGIN
       'function_name', 'on_user_delete'
     )
   );
-
-  -- Mark the user for deletion
-  INSERT INTO "public"."to_delete_accounts" (
-    "account_id",
-    "removal_date",
-    "removed_data"
-  ) VALUES
-  (
-    user_id_fn,
-    NOW() + INTERVAL '30 days',
-    "jsonb_build_object"('email', user_email, 'apikeys', COALESCE((SELECT "jsonb_agg"("to_jsonb"(a.*)) FROM "public"."apikeys" a WHERE a."user_id" = user_id_fn), '[]'::jsonb))
-  )
-  ON CONFLICT ("account_id") DO NOTHING;
 
   -- Delete the API keys
   DELETE FROM "public"."apikeys" WHERE "public"."apikeys"."user_id" = user_id_fn;
