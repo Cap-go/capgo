@@ -1,27 +1,26 @@
 -- Security hardening: remove API key identity oracle and enforce org RPC caller checks
 
--- Identity helpers must remain internal to RLS/auth logic and should not be directly callable
--- via PostgREST anonymous/authenticated roles.
+-- Identity helpers must remain internal to RLS/auth logic.
+-- get_identity_apikey_only should not be callable from public API roles,
+-- but get_identity_org_allowed/appid must remain executable by anon/authenticated
+-- for RLS policy evaluation.
+REVOKE ALL ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode"[]) FROM "public";
 REVOKE ALL ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode"[]) FROM "anon";
 REVOKE ALL ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode"[]) FROM "authenticated";
-REVOKE ALL ON FUNCTION "public"."get_identity_org_allowed" ("keymode" "public"."key_mode"[], "org_id" "uuid") FROM "anon";
-REVOKE ALL ON FUNCTION "public"."get_identity_org_allowed" ("keymode" "public"."key_mode"[], "org_id" "uuid") FROM "authenticated";
+REVOKE ALL ON FUNCTION "public"."get_identity_org_allowed" ("keymode" "public"."key_mode"[], "org_id" "uuid") FROM "public";
 REVOKE ALL ON FUNCTION "public"."get_identity_org_appid" (
   "keymode" "public"."key_mode"[],
   "org_id" "uuid",
   "app_id" character varying
-) FROM "anon";
-REVOKE ALL ON FUNCTION "public"."get_identity_org_appid" (
-  "keymode" "public"."key_mode"[],
-  "org_id" "uuid",
-  "app_id" character varying
-) FROM "authenticated";
+) FROM "public";
 
--- Keep these helpers available for internal background/job contexts.
+-- Keep these helpers available where needed by RLS and trusted internal services.
 GRANT EXECUTE ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode"[]) TO "postgres";
 GRANT EXECUTE ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode"[]) TO "service_role";
 GRANT EXECUTE ON FUNCTION "public"."get_identity_org_allowed" ("keymode" "public"."key_mode"[], "org_id" "uuid") TO "postgres";
 GRANT EXECUTE ON FUNCTION "public"."get_identity_org_allowed" ("keymode" "public"."key_mode"[], "org_id" "uuid") TO "service_role";
+GRANT EXECUTE ON FUNCTION "public"."get_identity_org_allowed" ("keymode" "public"."key_mode"[], "org_id" "uuid") TO "anon";
+GRANT EXECUTE ON FUNCTION "public"."get_identity_org_allowed" ("keymode" "public"."key_mode"[], "org_id" "uuid") TO "authenticated";
 GRANT EXECUTE ON FUNCTION "public"."get_identity_org_appid" (
   "keymode" "public"."key_mode"[],
   "org_id" "uuid",
@@ -32,12 +31,24 @@ GRANT EXECUTE ON FUNCTION "public"."get_identity_org_appid" (
   "org_id" "uuid",
   "app_id" character varying
 ) TO "service_role";
+GRANT EXECUTE ON FUNCTION "public"."get_identity_org_appid" (
+  "keymode" "public"."key_mode"[],
+  "org_id" "uuid",
+  "app_id" character varying
+) TO "anon";
+GRANT EXECUTE ON FUNCTION "public"."get_identity_org_appid" (
+  "keymode" "public"."key_mode"[],
+  "org_id" "uuid",
+  "app_id" character varying
+) TO "authenticated";
 
 -- Remove broad default privileges so future objects do not inherit anonymous/authenticated access.
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE ALL ON FUNCTIONS FROM "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE ALL ON FUNCTIONS FROM "authenticated";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE ALL ON FUNCTIONS FROM "public";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE ALL ON TABLES FROM "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE ALL ON TABLES FROM "authenticated";
+ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE ALL ON TABLES FROM "public";
 
 -- Harden direct org lookup by user id: callable only when caller identity matches the requested user.
 DROP FUNCTION IF EXISTS public.get_orgs_v6(userid uuid);
