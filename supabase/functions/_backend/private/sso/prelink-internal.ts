@@ -130,7 +130,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     return quickError(400, 'domain_mismatch', 'Requested domain does not match provider domain')
   }
 
-  const errors: string[] = []
+  let errorCount = 0
   let processed = 0
   let linked = 0
 
@@ -169,7 +169,8 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
         const { data: fullUser, error: userError } = await admin.auth.admin.getUserById(user.id)
 
         if (userError || !fullUser?.user) {
-          errors.push(`Failed to get user ${user.id}: ${userError?.message ?? 'unknown error'}`)
+          cloudlogErr({ requestId, message: 'Failed to get user for prelink', userId: user.id, error: userError?.message ?? 'unknown error' })
+          errorCount++
           continue
         }
 
@@ -196,7 +197,8 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
         )
 
         if (deleteError) {
-          errors.push(`Failed to unlink password identity for user ${user.id}: ${deleteError}`)
+          cloudlogErr({ requestId, message: 'Failed to unlink password identity', userId: user.id, error: deleteError })
+          errorCount++
           continue
         }
 
@@ -212,7 +214,8 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       }
       catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err)
-        errors.push(`Error processing user ${user.id}: ${errMsg}`)
+        cloudlogErr({ requestId, message: 'Error processing user during prelink', userId: user.id, error: errMsg })
+        errorCount++
       }
     }
 
@@ -226,12 +229,12 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     domain,
     processed,
     linked,
-    errorCount: errors.length,
+    errorCount,
   })
 
   return c.json({
     processed,
     linked,
-    errors,
+    error_count: errorCount,
   })
 })
