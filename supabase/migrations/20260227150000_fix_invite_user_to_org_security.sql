@@ -59,8 +59,8 @@ BEGIN
         RETURN 'NO_RIGHTS';
       END IF;
 
-      IF org.enforcing_2fa AND NOT public.has_2fa_enabled(auth.uid()) THEN
-        PERFORM public.pg_log('deny: SUPER_ADMIN_2FA_REQUIRED', jsonb_build_object('org_id', invite_user_to_org.org_id, 'invite_type', invite_user_to_org.invite_type, 'uid', auth.uid()));
+      IF org.enforcing_2fa AND NOT public.has_2fa_enabled(calling_user_id) THEN
+        PERFORM public.pg_log('deny: SUPER_ADMIN_2FA_REQUIRED', jsonb_build_object('org_id', invite_user_to_org.org_id, 'invite_type', invite_user_to_org.invite_type, 'uid', calling_user_id));
         RETURN 'NO_RIGHTS';
       END IF;
     ELSE
@@ -120,7 +120,13 @@ REVOKE EXECUTE ON FUNCTION public.invite_user_to_org(
   character varying,
   uuid,
   public.user_min_right
-) FROM "anon";
+) FROM PUBLIC;
+
+GRANT EXECUTE ON FUNCTION public.invite_user_to_org(
+  character varying,
+  uuid,
+  public.user_min_right
+) TO "anon";
 
 GRANT EXECUTE ON FUNCTION public.invite_user_to_org(
   character varying,
