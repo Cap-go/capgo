@@ -5729,6 +5729,8 @@ GRANT ALL ON FUNCTION "public"."get_org_owner_id" ("apikey" "text", "app_id" "te
 
 GRANT ALL ON FUNCTION "public"."get_org_owner_id" ("apikey" "text", "app_id" "text") TO "service_role";
 
+GRANT ALL ON FUNCTION "public"."get_org_perm_for_apikey" ("apikey" "text", "app_id" "text") TO "anon";
+
 GRANT ALL ON FUNCTION "public"."get_org_perm_for_apikey" ("apikey" "text", "app_id" "text") TO "authenticated";
 
 GRANT ALL ON FUNCTION "public"."get_org_perm_for_apikey" ("apikey" "text", "app_id" "text") TO "service_role";
@@ -5819,9 +5821,13 @@ GRANT ALL ON FUNCTION "public"."get_update_stats" () TO "authenticated";
 
 GRANT ALL ON FUNCTION "public"."get_update_stats" () TO "service_role";
 
+GRANT ALL ON FUNCTION "public"."get_user_id" ("apikey" "text") TO "anon";
+
 GRANT ALL ON FUNCTION "public"."get_user_id" ("apikey" "text") TO "authenticated";
 
 GRANT ALL ON FUNCTION "public"."get_user_id" ("apikey" "text") TO "service_role";
+
+GRANT ALL ON FUNCTION "public"."get_user_id" ("apikey" "text", "app_id" "text") TO "anon";
 
 GRANT ALL ON FUNCTION "public"."get_user_id" ("apikey" "text", "app_id" "text") TO "authenticated";
 
