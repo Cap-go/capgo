@@ -88,9 +88,9 @@ export const install: UserModule = ({ router }) => {
           await supabase.auth.signOut()
           return next('/login?sso_required=true')
         }
+        // Only cache when response is OK and user is allowed
+        setCacheValid()
       }
-
-      setCacheValid()
     }
     catch (e) {
       // Fail open: don't block users if enforcement check is unreachable
