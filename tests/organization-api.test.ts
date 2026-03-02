@@ -321,22 +321,22 @@ describe('[DELETE] /organization/members', () => {
     const { error } = await getSupabaseClient().from('org_users').insert({
       org_id: ORG_ID,
       user_id: userData!.id,
-      user_right: 'invite_read',
+      user_right: 'read',
     })
     expect(error).toBeNull()
 
-    // Seed a role_binding to verify it gets cleaned up on member removal
-    const { data: roleData } = await getSupabaseClient().from('roles').select('id').eq('name', 'org_member').single()
-    expect(roleData).toBeTruthy()
-    const { error: rbacInsertError } = await getSupabaseClient().from('role_bindings').insert({
-      principal_type: 'user',
-      principal_id: userData!.id,
-      role_id: roleData!.id,
-      scope_type: 'org',
-      org_id: ORG_ID,
-      granted_by: USER_ID,
-    })
-    expect(rbacInsertError).toBeNull()
+
+    // The sync_org_user_to_role_binding_on_insert trigger automatically creates role_bindings
+    // when a user is added to org_users. Verify the trigger created the binding.
+    const { data: rbacData, error: rbacFetchError } = await getSupabaseClient()
+      .from('role_bindings')
+      .select()
+      .eq('principal_type', 'user')
+      .eq('principal_id', userData!.id)
+      .eq('org_id', ORG_ID)
+    expect(rbacFetchError).toBeNull()
+    expect(rbacData).toBeTruthy()
+    expect(rbacData!.length).toBeGreaterThan(0)
 
     const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID}&email=${USER_ADMIN_EMAIL}`, {
       headers,
@@ -355,8 +355,8 @@ describe('[DELETE] /organization/members', () => {
     expect(data).toBeNull()
 
     // Verify role_bindings were also cleaned up
-    const { data: rbacData } = await getSupabaseClient().from('role_bindings').select().eq('principal_type', 'user').eq('principal_id', userData!.id).eq('org_id', ORG_ID)
-    expect(rbacData).toHaveLength(0)
+    const { data: rbacDataAfterDelete } = await getSupabaseClient().from('role_bindings').select().eq('principal_type', 'user').eq('principal_id', userData!.id).eq('org_id', ORG_ID)
+    expect(rbacDataAfterDelete).toHaveLength(0)
   })
 
   it('delete organization member with invalid body', async () => {

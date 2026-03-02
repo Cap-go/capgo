@@ -96,16 +96,8 @@ SELECT ok(
 );
 
 -- 8) User cannot see role_bindings from other orgs
-SELECT tests.authenticate_as('test_admin');
-DELETE FROM public.role_bindings
-WHERE principal_type = 'user'
-  AND principal_id = 'c591b04e-cf29-4945-b9a0-776d0672061a'
-  AND scope_type = 'org'
-  AND org_id = '22dbad8a-b885-4309-9b3b-a09f8460fb6d';
-
-INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, granted_by)
-VALUES ('user', 'c591b04e-cf29-4945-b9a0-776d0672061a', '11111111-1111-1111-1111-111111111111', 'org', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a');
-
+-- Note: We don't delete/recreate bindings because of super_admin protection trigger
+-- Instead, we verify test_user (different org) cannot see test_admin's bindings
 SELECT tests.authenticate_as('test_user');
 SELECT ok(
     NOT EXISTS (

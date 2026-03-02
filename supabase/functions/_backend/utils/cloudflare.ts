@@ -1005,25 +1005,6 @@ export async function getTotalAppsByModeCF(c: Context, mode: string) {
   return 0
 }
 
-export async function getStoreAppByIdCF(c: Context, appId: string): Promise<StoreApp> {
-  if (!c.env.DB_STOREAPPS)
-    return Promise.resolve({} as StoreApp)
-  const query = `SELECT * FROM store_apps WHERE app_id = '${appId}' LIMIT 1`
-
-  cloudlog({ requestId: c.get('requestId'), message: 'getStoreAppByIdCF query', query })
-  try {
-    const readD1 = getD1ReadStoreAppSession(c)
-      .prepare(query)
-      .first()
-    const res = await readD1
-    return res
-  }
-  catch (e) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Error getting store app by id', error: serializeError(e) })
-  }
-  return {} as StoreApp
-}
-
 // add function createIfNotExistStoreInfo
 
 export async function createIfNotExistStoreInfo(c: Context, app: Partial<StoreApp>) {
