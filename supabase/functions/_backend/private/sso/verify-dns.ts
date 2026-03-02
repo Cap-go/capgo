@@ -46,7 +46,7 @@ app.post('/', middlewareAuth, async (c) => {
   }
 
   // Check permission
-  const allowed = await checkPermission(c, 'org.manage_sso' as any, { orgId: provider.org_id })
+  const allowed = await checkPermission(c, 'org.update_settings' as any, { orgId: provider.org_id })
   if (!allowed) {
     quickError(403, 'not_authorized', 'Not authorized')
   }

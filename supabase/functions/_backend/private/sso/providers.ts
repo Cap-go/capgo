@@ -56,7 +56,7 @@ function parseAttributeMapping(value: unknown): Record<string, string> | undefin
 }
 
 async function requireManageSsoPermission(c: Context<MiddlewareKeyVariables>, orgId: string) {
-  const allowed = await checkPermission(c, 'org.manage_sso' as any, { orgId })
+  const allowed = await checkPermission(c, 'org.update_settings' as any, { orgId })
   if (!allowed) {
     quickError(403, 'not_authorized', 'Not authorized')
   }
