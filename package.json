@@ -124,7 +124,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.931.0",
-    "@bradenmacdonald/s3-lite-client": "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.4",
+    "@bradenmacdonald/s3-lite-client": "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.5",
     "@capacitor/action-sheet": "^8.0.0",
     "@capacitor/android": "^8.0.0",
     "@capacitor/app": "^8.0.0",
