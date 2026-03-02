@@ -15,7 +15,7 @@ import IconUser from '~icons/heroicons/user'
 import SsoConfiguration from '~/components/organizations/SsoConfiguration.vue'
 import { checkPermissions } from '~/services/permissions'
 import { createSignedImageUrl } from '~/services/storage'
-import { useSupabase } from '~/services/supabase'
+import { getCurrentPlanNameOrg, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
@@ -83,6 +83,10 @@ const nonCompliantPasswordMembers = ref<MemberWithPasswordPolicyStatus[]>([])
 // API key expiration policy state
 const requireApikeyExpiration = ref(false)
 const maxApikeyExpirationDays = ref<number | null>(null)
+
+// Current plan name for feature gating
+const currentPlanName = ref<string | null>(null)
+const isEnterprisePlan = computed(() => currentPlanName.value === 'Enterprise')
 
 const hasOrgPerm = computedAsync(async () => {
   const orgId = currentOrganization.value?.gid
@@ -203,6 +207,15 @@ async function loadData() {
 
     // Load API key expiration policy settings
     loadApikeyPolicyFromOrg()
+
+    // Load current plan name for feature gating
+    try {
+      currentPlanName.value = await getCurrentPlanNameOrg(currentOrganization.value.gid)
+    }
+    catch (planError) {
+      console.error('Error loading plan name:', planError)
+      currentPlanName.value = null
+    }
 
     // Load members with their password policy compliance status
     await loadMembersWithPasswordPolicyStatus()
@@ -1394,20 +1407,49 @@ onMounted(async () => {
 
           <!-- SSO Configuration Section (Enterprise only) -->
           <section v-if="hasOrgPerm" class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
-            <div class="flex items-start gap-4 mb-6">
-              <div class="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30">
-                <IconShield class="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            <!-- Enterprise Plan: Show SSO Configuration -->
+            <template v-if="isEnterprisePlan">
+              <div class="flex items-start gap-4 mb-6">
+                <div class="p-3 rounded-lg bg-blue-50 dark:bg-blue-900/30">
+                  <IconShield class="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <h3 class="text-lg font-semibold dark:text-white text-slate-800">
+                    SSO Configuration
+                  </h3>
+                  <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                    Configure SAML 2.0 Single Sign-On for your organization.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 class="text-lg font-semibold dark:text-white text-slate-800">
-                  SSO Configuration
-                </h3>
-                <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                  Configure SAML 2.0 Single Sign-On for your organization. Requires Enterprise plan.
-                </p>
+              <SsoConfiguration v-if="currentOrganization?.gid" :org-id="currentOrganization.gid" />
+            </template>
+
+            <!-- Non-Enterprise Plan: Show Upgrade Prompt -->
+            <template v-else>
+              <div class="flex items-start gap-4">
+                <div class="p-3 rounded-lg bg-slate-100 dark:bg-slate-700/50">
+                  <IconShield class="w-6 h-6 text-slate-400 dark:text-slate-500" />
+                </div>
+                <div class="flex-1">
+                  <h3 class="text-lg font-semibold dark:text-white text-slate-800">
+                    SSO Configuration
+                  </h3>
+                  <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
+                    SAML 2.0 Single Sign-On is available exclusively on the Enterprise plan. Upgrade to enable SSO for your organization.
+                  </p>
+                  <div class="mt-4">
+                    <button
+                      type="button"
+                      class="d-btn d-btn-primary d-btn-sm"
+                      @click="router.push('/settings/organization/plans')"
+                    >
+                      Upgrade to Enterprise
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-            <SsoConfiguration v-if="currentOrganization?.gid" :org-id="currentOrganization.gid" />
+            </template>
           </section>
 
           <!-- Permission notice for non-super-admins -->

@@ -101,12 +101,24 @@ async function callManagementAPI(
       )
     }
 
-    const data = await response.json()
+    // Handle empty responses (e.g., 204 No Content) - don't attempt to parse JSON
+    const contentType = response.headers.get('content-type') || ''
+    const hasBody = response.status !== 204
+      && response.headers.get('content-length') !== '0'
+      && contentType.includes('application/json')
+
+    let data: any = null
+    if (hasBody) {
+      data = await response.json()
+    }
+
     cloudlog({
       requestId: c.get('requestId'),
       message: 'Management API call successful',
       method,
       path,
+      status: response.status,
+      hasBody,
     })
     return data
   }
