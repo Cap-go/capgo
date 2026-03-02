@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { fetchWithRetry, getEndpointUrl, getSupabaseClient, PRODUCT_ID, resetAppData, resetAppDataStats, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
@@ -341,6 +342,26 @@ describe('build Time Tracking System', () => {
       p_platform: 'windows' as any,
       p_build_time_unit: 600,
     })
+    expect(error).toBeTruthy()
+  })
+
+  it('should reject record_build_time calls from anonymous clients', async () => {
+    const supabaseAnon = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_ANON_KEY!,
+      {
+        auth: { persistSession: false },
+      },
+    )
+
+    const { error } = await supabaseAnon.rpc('record_build_time', {
+      p_org_id: ORG_ID,
+      p_user_id: USER_ID,
+      p_build_id: randomUUID(),
+      p_platform: 'ios',
+      p_build_time_unit: 60,
+    })
+
     expect(error).toBeTruthy()
   })
 
