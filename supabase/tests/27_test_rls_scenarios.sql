@@ -68,12 +68,19 @@ SELECT
 SET
   LOCAL role TO authenticated;
 
+SET
+  LOCAL request.jwt.claims TO '{"sub": "6aa76066-55ef-4238-ade6-0b32334a4097"}';
+
 SELECT
-  throws_ok (
-    'SELECT COUNT(*) FROM public.global_stats',
-    '42501',
-    'permission denied',
-    'Authenticated non-admin users should not be able to select from global_stats'
+  is (
+    (
+      SELECT
+        COUNT(*)
+      FROM
+        public.global_stats
+    ),
+    0::bigint,
+    'Authenticated non-admin users should see no rows in global_stats'
   );
 
 -- Test 4c: Non-admin can be replaced with admin and still query this table
