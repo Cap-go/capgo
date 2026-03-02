@@ -853,7 +853,7 @@ BEGIN
     build_time_exceeded = EXCLUDED.build_time_exceeded,
     updated_at = NOW();
 
-  INSERT INTO public.orgs (id, created_by, created_at, updated_at, logo, name, management_email, customer_id)
+  INSERT INTO public.orgs (id, created_by, created_at, updated_at, logo, name, management_email, customer_id, use_new_rbac)
   VALUES (
     org_id,
     user_id,
@@ -862,12 +862,14 @@ BEGIN
     '',
     org_name,
     'test@capgo.app',
-    stripe_customer_id
+    stripe_customer_id,
+    false
   )
   ON CONFLICT (id) DO UPDATE SET
     customer_id = EXCLUDED.customer_id,
     management_email = EXCLUDED.management_email,
     name = EXCLUDED.name,
+    use_new_rbac = EXCLUDED.use_new_rbac,
     updated_at = NOW();
 
   EXECUTE $sql$
