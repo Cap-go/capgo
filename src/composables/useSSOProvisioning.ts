@@ -40,26 +40,10 @@ export function useSSOProvisioning() {
         console.log('SSO provisioning: user record not yet created, backend trigger will handle it')
       }
 
-      // Check if user belongs to an org
-      const { data: orgMembership, error: orgError } = await supabase
-        .from('org_users')
-        .select('org_id')
-        .eq('user_id', userId)
-        .limit(1)
-        .maybeSingle()
-
-      if (orgError) {
-        console.error('SSO provisioning: failed to check org membership', orgError)
-        error.value = 'Failed to verify organization membership'
-        return
-      }
-
-      if (orgMembership) {
-        // User already belongs to an org, no provisioning needed
-        return
-      }
-
-      // Provision user server-side — the server resolves the provider from the user's email domain
+      // Always call the server-side provisioning endpoint — it resolves the
+      // SSO provider org from the user's email domain and checks membership
+      // against that specific org. A client-side check would be too broad
+      // (the user may belong to a different org but not the SSO target org).
       try {
         const provisionResponse = await fetch(`${defaultApiHost}/private/sso/provision-user`, {
           method: 'POST',
