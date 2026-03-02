@@ -85,11 +85,36 @@ export function useSSOProvisioning() {
 
         const data = await response.json() as { has_sso: boolean, provider_id?: string, org_id?: string }
 
-        if (data.has_sso && data.org_id) {
-          // SSO provider found for this domain
-          // Org membership should be handled server-side via triggers
-          // Log for observability
-          console.log('SSO provisioning: user domain has active SSO provider, org membership will be handled server-side')
+        if (data.has_sso && data.org_id && data.provider_id) {
+          // SSO provider found for this domain - provision user to the org
+          console.log('SSO provisioning: user domain has active SSO provider, provisioning to org', data.org_id)
+
+          try {
+            const provisionResponse = await fetch(`${defaultApiHost}/private/sso/provision-user`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                provider_id: data.provider_id,
+              }),
+            })
+
+            if (!provisionResponse.ok) {
+              const errorData = await provisionResponse.json().catch(() => ({ error: 'Unknown error' }))
+              console.error('SSO provisioning: provision request failed', provisionResponse.status, errorData)
+              // Non-critical - log error but don't fail the auth flow
+            }
+            else {
+              const provisionData = await provisionResponse.json()
+              console.log('SSO provisioning: user provisioned successfully', provisionData)
+            }
+          }
+          catch (provisionError) {
+            // Non-critical - provisioning failure shouldn't block login
+            console.error('SSO provisioning: provision request error', provisionError)
+          }
         }
       }
       catch (fetchError) {
