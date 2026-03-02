@@ -4,44 +4,13 @@ import { z } from 'zod/mini'
 import { createHono, middlewareAuth, parseBody, quickError, simpleError, useCors } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
-import { supabaseAdmin } from '../../utils/supabase.ts'
+import { supabaseClient } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
 import { version } from '../../utils/version.ts'
 
 const bodySchema = z.object({
   provider_id: z.string().check(z.uuid()),
 })
-
-/**
- * Remove a specific identity from a user via the GoTrue admin REST API.
- * The Supabase JS SDK GoTrueAdminApi does not expose identity deletion,
- * so we call the endpoint directly with the service role key.
- */
-async function adminDeleteIdentity(c: Context<MiddlewareKeyVariables>, userId: string, identityId: string): Promise<{ error: string | null }> {
-  const supabaseUrl = getEnv(c, 'SUPABASE_URL')
-  const serviceRoleKey = getEnv(c, 'SUPABASE_SERVICE_ROLE_KEY')
-  const url = `${supabaseUrl}/auth/v1/admin/users/${userId}/identities/${identityId}`
-
-  try {
-    const res = await fetch(url, {
-      method: 'DELETE',
-      headers: {
-        Authorization: `Bearer ${serviceRoleKey}`,
-        apikey: serviceRoleKey,
-      },
-    })
-
-    if (!res.ok) {
-      const body = await res.text().catch(() => 'unknown')
-      return { error: `HTTP ${res.status}: ${body}` }
-    }
-
-    return { error: null }
-  }
-  catch (err) {
-    return { error: err instanceof Error ? err.message : String(err) }
-  }
-}
 
 export const app = createHono('', version)
 
@@ -51,7 +20,7 @@ app.use('*', middlewareAuth)
 app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
   const auth = c.get('auth')
   if (!auth) {
-    quickError(401, 'not_authorized', 'Not authorized')
+    return quickError(401, 'not_authorized', 'Not authorized')
   }
 
   const rawBody = await parseBody<{ provider_id?: string }>(c)
@@ -62,128 +31,78 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
 
   const { provider_id } = validation.data
 
-  // Get provider details from sso_providers table
-  const admin = supabaseAdmin(c)
-  const { data: provider, error: providerError } = await (admin as any)
+  if (!auth.jwt) {
+    return quickError(401, 'not_authorized', 'No JWT token found')
+  }
+
+  // Use authenticated client for DB read (RLS-enforced)
+  const supabase = supabaseClient(c, auth.jwt)
+  const { data: provider, error: providerError } = await (supabase as any)
     .from('sso_providers')
     .select('id, org_id, domain, provider_id, status')
     .eq('id', provider_id)
     .single()
 
   if (providerError || !provider) {
-    quickError(404, 'provider_not_found', 'SSO provider not found')
+    return quickError(404, 'provider_not_found', 'SSO provider not found')
   }
 
   // Validate permission for this org
   const allowed = await checkPermission(c, 'org.update_settings' as any, { orgId: provider.org_id })
   if (!allowed) {
-    quickError(403, 'not_authorized', 'Not authorized to manage SSO for this organization')
+    return quickError(403, 'not_authorized', 'Not authorized to manage SSO for this organization')
   }
 
-  // Find all auth.users with email matching the provider domain
-  const domain = provider.domain as string
-  const errors: string[] = []
-  let processed = 0
-  let linked = 0
+  // Call internal endpoint for admin operations
+  const requestId = c.get('requestId')
+  const apiSecret = getEnv(c, 'API_SECRET')
+  const supabaseUrl = getEnv(c, 'SUPABASE_URL')
 
-  // Paginate through all users to find matching emails
-  let page = 1
-  const perPage = 1000
-  let hasMore = true
-
-  while (hasMore) {
-    const { data: listData, error: listError } = await admin.auth.admin.listUsers({
-      page,
-      perPage,
+  try {
+    const internalUrl = `${supabaseUrl}/functions/v1/private/sso/prelink-internal`
+    const response = await fetch(internalUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiSecret}`,
+      },
+      body: JSON.stringify({
+        provider_id,
+        org_id: provider.org_id,
+        domain: provider.domain,
+      }),
     })
 
-    if (listError) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to list users', error: listError })
-      quickError(500, 'user_list_failed', 'Failed to list users')
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+      cloudlogErr({
+        requestId,
+        message: 'SSO prelink internal endpoint failed',
+        status: response.status,
+        error: errorData,
+      })
+      return quickError(500, 'prelink_failed', 'Failed to prelink users')
     }
 
-    const users = listData?.users ?? []
-    if (users.length < perPage) {
-      hasMore = false
-    }
+    const result = await response.json() as { processed: number, linked: number, errors: string[] }
+    cloudlog({
+      requestId,
+      message: 'SSO pre-linking complete via internal endpoint',
+      providerId: provider_id,
+      domain: provider.domain,
+      processed: result.processed,
+      linked: result.linked,
+      errorCount: result.errors?.length ?? 0,
+    })
 
-    for (const user of users) {
-      if (!user.email?.endsWith(`@${domain}`)) {
-        continue
-      }
-
-      processed++
-
-      try {
-        // Get full user with identities
-        const { data: fullUser, error: userError } = await admin.auth.admin.getUserById(user.id)
-
-        if (userError || !fullUser?.user) {
-          errors.push(`Failed to get user ${user.id}: ${userError?.message ?? 'unknown error'}`)
-          continue
-        }
-
-        // Find the email (password) identity
-        const emailIdentity = fullUser.user.identities?.find(
-          (identity: any) => identity.provider === 'email',
-        )
-
-        if (!emailIdentity) {
-          // User has no password identity, skip
-          cloudlog({
-            requestId: c.get('requestId'),
-            message: 'User has no email identity, skipping',
-            userId: user.id,
-            email: user.email,
-          })
-          continue
-        }
-
-        // Delete the password identity so the user must use SSO
-        // IMPORTANT: This does NOT delete the user or change their UUID
-        const { error: deleteError } = await adminDeleteIdentity(
-          c,
-          user.id,
-          emailIdentity.id,
-        )
-
-        if (deleteError) {
-          errors.push(`Failed to unlink password identity for ${user.email}: ${deleteError}`)
-          continue
-        }
-
-        linked++
-        cloudlog({
-          requestId: c.get('requestId'),
-          message: 'Unlinked password identity for SSO migration',
-          userId: user.id,
-          email: user.email,
-          domain,
-          providerId: provider_id,
-        })
-      }
-      catch (err) {
-        const errMsg = err instanceof Error ? err.message : String(err)
-        errors.push(`Error processing user ${user.email ?? user.id}: ${errMsg}`)
-      }
-    }
-
-    page++
+    return c.json(result)
   }
-
-  cloudlog({
-    requestId: c.get('requestId'),
-    message: 'SSO pre-linking complete',
-    providerId: provider_id,
-    domain,
-    processed,
-    linked,
-    errorCount: errors.length,
-  })
-
-  return c.json({
-    processed,
-    linked,
-    errors,
-  })
+  catch (fetchError) {
+    cloudlogErr({
+      requestId,
+      message: 'Failed to call SSO prelink internal endpoint',
+      error: fetchError,
+    })
+    return quickError(500, 'prelink_failed', 'Failed to prelink users')
+  }
 })

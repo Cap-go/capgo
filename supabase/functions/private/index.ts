@@ -21,6 +21,7 @@ import { app as roles } from '../_backend/private/roles.ts'
 import { app as set_org_email } from '../_backend/private/set_org_email.ts'
 import { app as sso_check_domain } from '../_backend/private/sso/check-domain.ts'
 import { app as sso_check_enforcement } from '../_backend/private/sso/check-enforcement.ts'
+import { app as sso_prelink_internal } from '../_backend/private/sso/prelink-internal.ts'
 import { app as sso_prelink } from '../_backend/private/sso/prelink.ts'
 import { app as sso_providers } from '../_backend/private/sso/providers.ts'
 import { app as sso_provision_user } from '../_backend/private/sso/provision-user.ts'
@@ -71,6 +72,7 @@ appGlobal.route('/sso/check-domain', sso_check_domain)
 appGlobal.route('/sso/check-enforcement', sso_check_enforcement)
 appGlobal.route('/sso/providers', sso_providers)
 appGlobal.route('/sso/prelink-users', sso_prelink)
+appGlobal.route('/sso/prelink-internal', sso_prelink_internal)
 appGlobal.route('/sso/provision-user', sso_provision_user)
 appGlobal.route('/sso/verify-dns', sso_verify_dns)
 
