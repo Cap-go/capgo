@@ -270,17 +270,25 @@ app.delete('/:id', async (c) => {
 
   await requireManageSsoPermission(c, provider.org_id)
 
+  // First delete the external provider (if exists) to avoid orphaning
+  if (provider.provider_id) {
+    try {
+      await deleteSSOProvider(c, provider.provider_id)
+    }
+    catch (externalDeleteError) {
+      const errorMsg = externalDeleteError instanceof Error ? externalDeleteError.message : String(externalDeleteError)
+      return quickError(500, 'provider_delete_failed', 'Failed to delete external SSO provider', { error: errorMsg })
+    }
+  }
+
+  // Then delete the database row
   const { error: deleteError } = await supabase
     .from('sso_providers')
     .delete()
     .eq('id', id)
 
   if (deleteError) {
-    quickError(500, 'provider_delete_failed', 'Failed to delete SSO provider', { error: deleteError })
-  }
-
-  if (provider.provider_id) {
-    await deleteSSOProvider(c, provider.provider_id)
+    return quickError(500, 'provider_delete_failed', 'Failed to delete SSO provider', { error: deleteError })
   }
 
   return c.json(BRES)
