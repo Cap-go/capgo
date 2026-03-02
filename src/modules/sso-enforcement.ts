@@ -20,25 +20,26 @@ const PUBLIC_ROUTES = [
 ]
 
 function isPublicRoute(path: string): boolean {
-  return PUBLIC_ROUTES.some(r => path.startsWith(r))
+  return PUBLIC_ROUTES.some(r => path === r || path.startsWith(`${r}/`))
 }
 
-function isCacheValid(): boolean {
+function isCacheValid(userId: string): boolean {
   try {
     const cached = sessionStorage.getItem(SSO_CHECK_CACHE_KEY)
     if (!cached)
       return false
-    const { timestamp } = JSON.parse(cached)
-    return Date.now() - timestamp < SSO_CHECK_CACHE_TTL
+    const { timestamp, cachedUserId } = JSON.parse(cached)
+    // Verify cache is fresh AND belongs to the current user
+    return Date.now() - timestamp < SSO_CHECK_CACHE_TTL && cachedUserId === userId
   }
   catch {
     return false
   }
 }
 
-function setCacheValid(): void {
+function setCacheValid(userId: string): void {
   try {
-    sessionStorage.setItem(SSO_CHECK_CACHE_KEY, JSON.stringify({ timestamp: Date.now() }))
+    sessionStorage.setItem(SSO_CHECK_CACHE_KEY, JSON.stringify({ timestamp: Date.now(), cachedUserId: userId }))
   }
   catch {}
 }
@@ -65,7 +66,11 @@ export const install: UserModule = ({ router }) => {
     if (provider && provider !== 'email')
       return next()
 
-    if (isCacheValid())
+    const userId = session.user.id
+    if (!userId)
+      return next()
+
+    if (isCacheValid(userId))
       return next()
 
     try {
@@ -89,12 +94,15 @@ export const install: UserModule = ({ router }) => {
           return next('/login?sso_required=true')
         }
         // Only cache when response is OK and user is allowed
-        setCacheValid()
+        setCacheValid(userId)
       }
     }
     catch (e) {
-      // Fail open: don't block users if enforcement check is unreachable
-      console.error('SSO enforcement check failed:', e)
+      // Fail closed: if enforcement check is unreachable, sign user out for safety
+      console.error('SSO enforcement check failed, signing out for security:', e)
+      clearSsoEnforcementCache()
+      await supabase.auth.signOut()
+      return next('/login?sso_error=enforcement_check_failed')
     }
 
     return next()
