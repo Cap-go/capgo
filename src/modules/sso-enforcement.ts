@@ -86,16 +86,21 @@ export const install: UserModule = ({ router }) => {
         }),
       })
 
-      if (response.ok) {
-        const data: SsoEnforcementResponse = await response.json()
-        if (!data.allowed) {
-          clearSsoEnforcementCache()
-          await supabase.auth.signOut()
-          return next('/login?sso_required=true')
-        }
-        // Only cache when response is OK and user is allowed
-        setCacheValid(userId)
+      if (!response.ok) {
+        console.error('SSO enforcement check returned error status:', response.status)
+        clearSsoEnforcementCache()
+        await supabase.auth.signOut()
+        return next('/login?sso_required=true')
       }
+
+      const data: SsoEnforcementResponse = await response.json()
+      if (!data.allowed) {
+        clearSsoEnforcementCache()
+        await supabase.auth.signOut()
+        return next('/login?sso_required=true')
+      }
+
+      setCacheValid(userId)
     }
     catch (e) {
       // Fail closed: if enforcement check is unreachable, sign user out for safety
