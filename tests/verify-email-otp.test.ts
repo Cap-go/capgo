@@ -51,7 +51,7 @@ describe('[POST] /private/verify_email_otp', () => {
     expect(securityRow?.email_otp_verified_at).toBeTruthy()
   })
 
-  it.concurrent('returns 400 for invalid token format', async () => {
+  it('returns 400 for invalid token format', async () => {
     const response = await fetch(getEndpointUrl(OTP_ENDPOINT), {
       method: 'POST',
       headers: authHeaders,
@@ -63,7 +63,7 @@ describe('[POST] /private/verify_email_otp', () => {
     expect(data.error).toBe('invalid_body')
   })
 
-  it.concurrent('returns 401 when authorization header is missing', async () => {
+  it('returns 401 when authorization header is missing', async () => {
     const response = await fetch(getEndpointUrl(OTP_ENDPOINT), {
       method: 'POST',
       headers: {
@@ -77,7 +77,7 @@ describe('[POST] /private/verify_email_otp', () => {
     expect(data.error).toBe('no_jwt_apikey_or_subkey')
   })
 
-  it.concurrent('returns 401 for invalid or expired OTP', async () => {
+  it('returns 401 for invalid or expired OTP', async () => {
     const response = await fetch(getEndpointUrl(OTP_ENDPOINT), {
       method: 'POST',
       headers: authHeaders,
@@ -89,7 +89,7 @@ describe('[POST] /private/verify_email_otp', () => {
     expect(data.error).toBe('invalid_otp')
   })
 
-  it.concurrent('returns 403 when OTP user mismatches JWT user', async () => {
+  it('returns 403 when OTP user mismatches JWT user', async () => {
     const { tokenHash } = await generateEmailOtp(OTHER_USER_EMAIL)
 
     const response = await fetch(getEndpointUrl(OTP_ENDPOINT), {
