@@ -142,7 +142,7 @@ app.post('/', async (c) => {
       return quickError(500, 'provider_create_failed', 'Failed to create SSO provider', { error })
     }
 
-    return c.json(data)
+    return c.json(sanitizeProvider(data))
   }
   catch (err) {
     // Rollback on any exception
