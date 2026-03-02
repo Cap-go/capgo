@@ -47,17 +47,35 @@ export async function verifyDnsTxtRecord(
     const cleanToken = expectedToken.trim()
     const recordName = `_capgo-sso.${cleanDomain}`
 
-    // Query Cloudflare DoH API
+    // Query Cloudflare DoH API with timeout
     const url = new URL('https://cloudflare-dns.com/dns-query')
     url.searchParams.set('name', recordName)
     url.searchParams.set('type', 'TXT')
 
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: {
-        Accept: 'application/dns-json',
-      },
-    })
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+    let response: Response
+    try {
+      response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          Accept: 'application/dns-json',
+        },
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+    }
+    catch (fetchError) {
+      clearTimeout(timeoutId)
+      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
+        return {
+          verified: false,
+          error: 'DNS lookup timed out after 5 seconds',
+        }
+      }
+      throw fetchError
+    }
 
     if (!response.ok) {
       return {
