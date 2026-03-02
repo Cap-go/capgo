@@ -19,8 +19,6 @@ interface RateLimitCounter {
 
 async function checkDomainRateLimit(c: Context): Promise<boolean> {
   const ip = getClientIP(c)
-  if (ip === 'unknown')
-    return false
 
   const cacheHelper = new CacheHelper(c)
   const cacheKey = cacheHelper.buildRequest(RATE_LIMIT_CACHE_PATH, { ip })
