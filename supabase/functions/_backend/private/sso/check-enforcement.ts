@@ -1,7 +1,7 @@
 import { z } from 'zod/mini'
 import { createHono, middlewareAuth, parseBody, quickError, simpleError, useCors } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
-import { emptySupabase } from '../../utils/supabase.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
 import { version } from '../../utils/version.ts'
 
 const bodySchema = z.object({
@@ -36,7 +36,7 @@ app.post('/', middlewareAuth, async (c) => {
     return quickError(400, 'invalid_email', 'Email must contain a domain')
   }
 
-  const supabase = emptySupabase(c)
+  const admin = supabaseAdmin(c)
   const auth = c.get('auth')
   const userId = auth?.userId
 
@@ -47,7 +47,7 @@ app.post('/', middlewareAuth, async (c) => {
 
   try {
     // Query for active SSO provider with enforcement enabled
-    const { data: providerData, error: providerError } = await (supabase.rpc as any)('check_domain_sso', { p_domain: domain })
+    const { data: providerData, error: providerError } = await (admin.rpc as any)('check_domain_sso', { p_domain: domain })
     if (providerError) {
       cloudlog({ requestId, context: 'check_enforcement - provider query error', error: providerError.message, domain })
       return quickError(500, 'query_error', 'Failed to check SSO enforcement')
@@ -63,7 +63,7 @@ app.post('/', middlewareAuth, async (c) => {
     const orgId = provider.org_id
 
     // Check if SSO enforcement is enabled for this provider
-    const { data: enforcementData, error: enforcementError } = await (supabase.from as any)('sso_providers')
+    const { data: enforcementData, error: enforcementError } = await (admin.from as any)('sso_providers')
       .select('enforce_sso')
       .eq('id', provider.id)
       .eq('status', 'active')
@@ -81,7 +81,7 @@ app.post('/', middlewareAuth, async (c) => {
     }
 
     // SSO is enforced - check if user is org_super_admin (break-glass bypass)
-    const { data: roleData, error: roleError } = await (supabase.from as any)('org_users')
+    const { data: roleData, error: roleError } = await (admin.from as any)('org_users')
       .select('role')
       .eq('org_id', orgId)
       .eq('user_id', userId)
