@@ -55,8 +55,10 @@ export function useSSOProvisioning() {
         })
 
         if (!provisionResponse.ok) {
-          const errorData = await provisionResponse.json().catch(() => ({ error: 'Unknown error' }))
+          const errorData = await provisionResponse.json().catch(() => ({ error: 'Unknown error' })) as Record<string, unknown>
           console.error('SSO provisioning: provision request failed', provisionResponse.status, errorData)
+          const errorMsg = typeof errorData.error === 'string' ? errorData.error : typeof errorData.message === 'string' ? errorData.message : null
+          error.value = errorMsg ?? `Provisioning failed (${provisionResponse.status})`
         }
         else {
           const provisionData = await provisionResponse.json()
@@ -65,6 +67,7 @@ export function useSSOProvisioning() {
       }
       catch (provisionError) {
         console.error('SSO provisioning: provision request error', provisionError)
+        error.value = provisionError instanceof Error ? provisionError.message : 'Provisioning request failed'
       }
     }
     catch (err) {
