@@ -35,6 +35,18 @@ function generateDnsVerificationToken(): string {
   return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
 }
 
+const ALLOWED_ATTRIBUTE_KEYS = new Set([
+  'email',
+  'first_name',
+  'last_name',
+  'display_name',
+  'groups',
+  'role',
+  'phone',
+])
+
+const MAX_ATTRIBUTE_VALUE_LENGTH = 256
+
 function parseAttributeMapping(value: unknown): Record<string, string> | undefined {
   if (value === undefined) {
     return undefined
@@ -44,10 +56,21 @@ function parseAttributeMapping(value: unknown): Record<string, string> | undefin
     throw simpleError('invalid_body', 'attribute_mapping must be an object')
   }
 
+  const entries = Object.entries(value)
+  if (entries.length > ALLOWED_ATTRIBUTE_KEYS.size) {
+    throw simpleError('invalid_body', `attribute_mapping cannot have more than ${ALLOWED_ATTRIBUTE_KEYS.size} keys`)
+  }
+
   const result: Record<string, string> = {}
-  for (const [key, mappedValue] of Object.entries(value)) {
+  for (const [key, mappedValue] of entries) {
+    if (!ALLOWED_ATTRIBUTE_KEYS.has(key)) {
+      throw simpleError('invalid_body', `attribute_mapping key '${key}' is not allowed. Allowed keys: ${[...ALLOWED_ATTRIBUTE_KEYS].join(', ')}`)
+    }
     if (typeof mappedValue !== 'string') {
       throw simpleError('invalid_body', 'attribute_mapping values must be strings')
+    }
+    if (mappedValue.length === 0 || mappedValue.length > MAX_ATTRIBUTE_VALUE_LENGTH) {
+      throw simpleError('invalid_body', `attribute_mapping value for '${key}' must be between 1 and ${MAX_ATTRIBUTE_VALUE_LENGTH} characters`)
     }
     result[key] = mappedValue
   }
