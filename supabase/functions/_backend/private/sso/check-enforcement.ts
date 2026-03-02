@@ -1,71 +1,70 @@
-import { z } from 'zod/mini'
-import { createHono, middlewareAuth, parseBody, quickError, simpleError, useCors } from '../../utils/hono.ts'
+import { createHono, getClaimsFromJWT, middlewareAuth, parseBody, quickError, useCors } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 import { version } from '../../utils/version.ts'
-
-const bodySchema = z.object({
-  email: z.string().check(z.email()),
-  auth_type: z.enum(['password', 'sso']),
-})
 
 export const app = createHono('', version)
 
 app.use('/', useCors)
 
 app.post('/', middlewareAuth, async (c) => {
-  const rawBody = await parseBody<{ email?: string, auth_type?: string }>(c)
+  // Accept body for backward compatibility but ignore it for enforcement decisions
+  await parseBody<{ email?: string, auth_type?: string }>(c)
 
-  const validation = bodySchema.safeParse({ email: rawBody.email, auth_type: rawBody.auth_type })
-  if (!validation.success) {
-    throw simpleError('invalid_body', 'Invalid request body', { errors: z.prettifyError(validation.error) })
+  const requestId = c.get('requestId')
+  const auth = c.get('auth')
+  const userId = auth?.userId
+
+  if (!userId) {
+    cloudlog({ requestId, context: 'check_enforcement - no user ID in auth' })
+    return quickError(401, 'no_user_id', 'User ID not found in auth context')
   }
 
-  const { email, auth_type } = validation.data
-  const requestId = c.get('requestId')
+  // Derive email and auth provider from JWT claims — never trust the body
+  const authorization = c.get('authorization')
+  const claims = authorization ? getClaimsFromJWT(authorization) : null
+  const email = claims?.email
+
+  if (!email) {
+    cloudlog({ requestId, context: 'check_enforcement - no email in JWT claims', userId })
+    return quickError(400, 'no_email', 'Email not found in authentication token')
+  }
+
+  // Determine auth type from JWT app_metadata.provider
+  const provider = claims?.app_metadata?.provider
+  const isSsoAuth = !!provider && provider !== 'email'
 
   // SSO authentication is always allowed
-  if (auth_type === 'sso') {
-    cloudlog({ requestId, context: 'check_enforcement - SSO auth always allowed', email })
+  if (isSsoAuth) {
+    cloudlog({ requestId, context: 'check_enforcement - SSO auth always allowed', email, provider })
     return c.json({ allowed: true })
   }
 
-  // Extract domain from email
   const domain = email.split('@')[1]
   if (!domain) {
     return quickError(400, 'invalid_email', 'Email must contain a domain')
   }
 
   const admin = supabaseAdmin(c)
-  const auth = c.get('auth')
-  const userId = auth?.userId
-
-  if (!userId) {
-    cloudlog({ requestId, context: 'check_enforcement - no user ID in auth', email })
-    return quickError(401, 'no_user_id', 'User ID not found in auth context')
-  }
 
   try {
-    // Query for active SSO provider with enforcement enabled
     const { data: providerData, error: providerError } = await (admin.rpc as any)('check_domain_sso', { p_domain: domain })
     if (providerError) {
       cloudlog({ requestId, context: 'check_enforcement - provider query error', error: providerError.message, domain })
       return quickError(500, 'query_error', 'Failed to check SSO enforcement')
     }
 
-    // No SSO provider for this domain = no enforcement
     if (!providerData || (Array.isArray(providerData) && providerData.length === 0)) {
       cloudlog({ requestId, context: 'check_enforcement - no SSO provider found', domain })
       return c.json({ allowed: true })
     }
 
-    const provider = Array.isArray(providerData) ? providerData[0] : providerData
-    const orgId = provider.org_id
+    const ssoProvider = Array.isArray(providerData) ? providerData[0] : providerData
+    const orgId = ssoProvider.org_id
 
-    // Check if SSO enforcement is enabled for this provider
     const { data: enforcementData, error: enforcementError } = await (admin.from as any)('sso_providers')
       .select('enforce_sso')
-      .eq('id', provider.id)
+      .eq('id', ssoProvider.id)
       .eq('status', 'active')
       .single()
 

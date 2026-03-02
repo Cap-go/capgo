@@ -25,6 +25,10 @@ export interface JWTClaims {
   exp?: number
   iat?: number
   aud?: string
+  app_metadata?: {
+    provider?: string
+    [key: string]: unknown
+  }
 }
 
 /**
