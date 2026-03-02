@@ -37,10 +37,35 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
 
   const admin = supabaseAdmin(c)
 
+  // Verify the user actually authenticated via SSO (not email/password)
+  const { data: userAuth, error: userAuthError } = await admin.auth.admin.getUserById(userId)
+
+  if (userAuthError || !userAuth?.user) {
+    cloudlogErr({ requestId, message: 'Failed to retrieve user auth data for SSO verification', userId, error: userAuthError })
+    return quickError(500, 'user_auth_check_failed', 'Failed to verify authentication method')
+  }
+
+  const userProvider = userAuth.user.app_metadata?.provider
+  if (!userProvider || userProvider === 'email') {
+    cloudlog({ requestId, message: 'User did not authenticate via SSO, rejecting provisioning', userId, provider: userProvider })
+    return quickError(403, 'sso_auth_required', 'User must authenticate via SSO to be provisioned')
+  }
+
+  // Verify the user has an SSO identity matching the requested provider
+  const userIdentities = userAuth.user.identities ?? []
+  const hasSsoIdentity = userIdentities.some(
+    (identity: any) => identity.provider === 'sso' || (identity.provider !== 'email' && identity.provider !== 'phone'),
+  )
+
+  if (!hasSsoIdentity) {
+    cloudlog({ requestId, message: 'User has no SSO identity, rejecting provisioning', userId })
+    return quickError(403, 'sso_identity_required', 'User must have an SSO identity to be provisioned')
+  }
+
   // Get provider details to find the org_id
   const { data: provider, error: providerError } = await (admin as any)
     .from('sso_providers')
-    .select('id, org_id, domain, status')
+    .select('id, org_id, domain, status, provider_id')
     .eq('id', provider_id)
     .single()
 
@@ -49,8 +74,8 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     return quickError(404, 'provider_not_found', 'SSO provider not found')
   }
 
-  // Verify provider is active or verified (not pending)
-  if (provider.status !== 'active' && provider.status !== 'verified') {
+  // Verify provider is active (must be explicitly activated, not just verified)
+  if (provider.status !== 'active') {
     cloudlog({ requestId, message: 'SSO provider not active, cannot provision', providerId: provider_id, status: provider.status })
     return quickError(400, 'provider_not_active', 'SSO provider must be active to provision users')
   }
@@ -86,10 +111,12 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     return quickError(500, 'user_lookup_failed', 'Failed to verify user email')
   }
 
-  // Verify email domain matches provider domain
-  const userDomain = userRecord.email.split('@')[1]
-  if (userDomain !== provider.domain) {
-    cloudlog({ requestId, message: 'User email domain does not match provider domain', userId, userDomain, providerDomain: provider.domain })
+  // Verify email domain matches provider domain (case-insensitive)
+  const userDomainRaw = userRecord.email.split('@')[1]
+  const userDomain = userDomainRaw?.toLowerCase().trim()
+  const providerDomain = provider.domain?.toLowerCase().trim()
+  if (userDomain !== providerDomain) {
+    cloudlog({ requestId, message: 'User email domain does not match provider domain', userId, userDomain, providerDomain })
     return quickError(403, 'domain_mismatch', 'User email domain does not match SSO provider domain')
   }
 
