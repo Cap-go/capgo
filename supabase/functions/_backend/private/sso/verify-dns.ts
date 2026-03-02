@@ -62,12 +62,19 @@ app.post('/', middlewareAuth, async (c) => {
   }
 
   if (result.verified) {
-    // Update provider status to verified
-    const { error: updateError } = await supabase
-      .from('sso_providers')
-      .update({ status: 'verified', dns_verified_at: new Date().toISOString() })
-      .eq('id', provider_id)
+    // Only transition pending_verification -> verified
+    if (provider.status === 'pending_verification') {
+      const { error: updateError } = await supabase
+        .from('sso_providers')
+        .update({ status: 'verified', dns_verified_at: new Date().toISOString() })
+        .eq('id', provider_id)
+        .eq('status', 'pending_verification')
 
+      if (updateError) {
+        cloudlog({ requestId, context: 'verify-dns - update error', error: updateError.message, provider_id })
+        quickError(500, 'update_failed', 'DNS verified but failed to update provider status')
+      }
+    }
     if (updateError) {
       cloudlog({ requestId, context: 'verify-dns - update error', error: updateError.message, provider_id })
       quickError(500, 'update_failed', 'DNS verified but failed to update provider status')
