@@ -93,30 +93,41 @@ app.post('/', async (c) => {
 
   const managementProvider = await createSSOProvider(c, body.domain, body.metadata_url, attributeMapping)
 
-  const supabase = supabaseWithAuth(c, auth) as any
-  const dnsVerificationToken = generateDnsVerificationToken()
+  try {
+    const supabase = supabaseWithAuth(c, auth) as any
+    const dnsVerificationToken = generateDnsVerificationToken()
 
-  const { data, error } = await supabase
-    .from('sso_providers')
-    .insert({
-      org_id: body.org_id,
-      domain: body.domain,
-      provider_id: managementProvider.id,
-      status: 'pending_verification',
-      dns_verification_token: dnsVerificationToken,
-      metadata_url: body.metadata_url,
-      attribute_mapping: attributeMapping ?? null,
-    })
-    .select('*')
-    .single()
+    const { data, error } = await supabase
+      .from('sso_providers')
+      .insert({
+        org_id: body.org_id,
+        domain: body.domain,
+        provider_id: managementProvider.id,
+        status: 'pending_verification',
+        dns_verification_token: dnsVerificationToken,
+        metadata_url: body.metadata_url,
+        attribute_mapping: attributeMapping ?? null,
+      })
+      .select('*')
+      .single()
 
-  if (error || !data) {
-    quickError(500, 'provider_create_failed', 'Failed to create SSO provider', { error })
+    if (error || !data) {
+      // Rollback: delete the external provider to avoid orphan
+      await deleteSSOProvider(c, managementProvider.id).catch((cleanupError) => {
+        console.error('Failed to cleanup external SSO provider after DB insert failure:', cleanupError)
+      })
+      return quickError(500, 'provider_create_failed', 'Failed to create SSO provider', { error })
+    }
+
+    return c.json(data)
   }
-
-  // Return the full provider including dns_verification_token for the DNS verification flow
-
-  return c.json(data)
+  catch (err) {
+    // Rollback on any exception
+    await deleteSSOProvider(c, managementProvider.id).catch((cleanupError) => {
+      console.error('Failed to cleanup external SSO provider after exception:', cleanupError)
+    })
+    throw err
+  }
 })
 
 app.get('/:orgId', async (c) => {
