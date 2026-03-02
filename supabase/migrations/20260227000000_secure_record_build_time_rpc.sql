@@ -31,11 +31,20 @@ DECLARE
   v_multiplier numeric;
   v_billable_seconds bigint;
   v_caller_user_id uuid;
+  v_invoking_role text;
 BEGIN
-  v_caller_user_id := public.get_identity_org_allowed(
-    '{read,upload,write,all}'::public.key_mode[],
-    p_org_id
-  );
+  SELECT NULLIF(current_setting('role', true), '') INTO v_invoking_role;
+
+  -- Service-role callers do not have JWT/API key context and pass p_user_id directly.
+  -- Keep this path for internal calls from backend services.
+  IF v_invoking_role = 'service_role' THEN
+    v_caller_user_id := p_user_id;
+  ELSE
+    v_caller_user_id := public.get_identity_org_allowed(
+      '{read,upload,write,all}'::public.key_mode[],
+      p_org_id
+    );
+  END IF;
 
   IF v_caller_user_id IS NULL THEN
     RAISE EXCEPTION 'NO_RIGHTS';
