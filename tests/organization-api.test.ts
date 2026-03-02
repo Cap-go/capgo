@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_ADMIN_EMAIL, USER_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, testBothRbacModes, USER_ADMIN_EMAIL, USER_EMAIL, USER_ID } from './test-utils.ts'
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
@@ -393,7 +393,7 @@ describe('[DELETE] /organization/members', () => {
   })
 })
 
-describe('[POST] /organization', () => {
+testBothRbacModes('[POST] /organization', () => {
   it('create organization', async () => {
     const name = `Created Organization ${new Date().toISOString()}`
     const response = await fetch(`${BASE_URL}/organization`, {

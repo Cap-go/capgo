@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../src/types/supabase.types'
 import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
+import { afterAll, beforeAll, describe } from 'vitest'
 import { Pool } from 'pg'
 
 export const POSTGRES_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
@@ -712,4 +713,110 @@ export async function cleanupPostgresClient(): Promise<void> {
     await pool.end()
     pool = null
   }
+}
+
+/**
+ * Helper to run tests in both Legacy RBAC mode (use_new_rbac = false) and New RBAC mode (use_new_rbac = true).
+ * This ensures tests work regardless of the RBAC mode configuration.
+ *
+ * Usage:
+ *   testBothRbacModes('[GET] /organization', (testOrgId) => {
+ *     it('should get organization', async () => {
+ *       // Test code using testOrgId
+ *     })
+ *   })
+ */
+export function testBothRbacModes(
+  name: string,
+  fn: (orgId: string) => void,
+): void {
+  describe(`${name} (Legacy RBAC)`, () => {
+    const LEGACY_ORG_ID = 'e1f2a3b4-c5d6-4e7f-8a9b-0c1d2e3f4a5b'
+    const LEGACY_STRIPE_CUSTOMER_ID = 'cus_legacy_rbac_test_123'
+
+    beforeAll(async () => {
+      // Create stripe_info
+      const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
+        customer_id: LEGACY_STRIPE_CUSTOMER_ID,
+        status: 'succeeded',
+        subscription_id: `sub_${LEGACY_ORG_ID}`,
+        product_id: 'prod_LQIregjtNduh4q',
+        trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+        is_good_plan: true,
+      })
+      if (stripeError) throw stripeError
+
+      // Create org with legacy RBAC
+      const { error } = await getSupabaseClient().from('orgs').insert({
+        id: LEGACY_ORG_ID,
+        name: `Legacy RBAC Test Org ${Date.now()}`,
+        management_email: TEST_EMAIL,
+        created_by: USER_ID,
+        customer_id: LEGACY_STRIPE_CUSTOMER_ID,
+        use_new_rbac: false,
+      })
+      if (error) throw error
+
+      // Add user as super_admin
+      const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+        org_id: LEGACY_ORG_ID,
+        user_id: USER_ID,
+        user_right: 'super_admin',
+      })
+      if (orgUserError) throw orgUserError
+    })
+
+    afterAll(async () => {
+      await getSupabaseClient().from('org_users').delete().eq('org_id', LEGACY_ORG_ID)
+      await getSupabaseClient().from('orgs').delete().eq('id', LEGACY_ORG_ID)
+      await getSupabaseClient().from('stripe_info').delete().eq('customer_id', LEGACY_STRIPE_CUSTOMER_ID)
+    })
+
+    fn(LEGACY_ORG_ID)
+  })
+
+  describe(`${name} (New RBAC)`, () => {
+    const NEW_RBAC_ORG_ID = 'f2a3b4c5-d6e7-4f8a-9b0c-1d2e3f4a5b6c'
+    const NEW_RBAC_STRIPE_CUSTOMER_ID = 'cus_new_rbac_test_123'
+
+    beforeAll(async () => {
+      // Create stripe_info
+      const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
+        customer_id: NEW_RBAC_STRIPE_CUSTOMER_ID,
+        status: 'succeeded',
+        subscription_id: `sub_${NEW_RBAC_ORG_ID}`,
+        product_id: 'prod_LQIregjtNduh4q',
+        trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+        is_good_plan: true,
+      })
+      if (stripeError) throw stripeError
+
+      // Create org with new RBAC
+      const { error } = await getSupabaseClient().from('orgs').insert({
+        id: NEW_RBAC_ORG_ID,
+        name: `New RBAC Test Org ${Date.now()}`,
+        management_email: TEST_EMAIL,
+        created_by: USER_ID,
+        customer_id: NEW_RBAC_STRIPE_CUSTOMER_ID,
+        use_new_rbac: true,
+      })
+      if (error) throw error
+
+      // Add user with invite_super_admin role for new RBAC
+      const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+        org_id: NEW_RBAC_ORG_ID,
+        user_id: USER_ID,
+        user_right: 'invite_super_admin',
+      })
+      if (orgUserError) throw orgUserError
+    })
+
+    afterAll(async () => {
+      await getSupabaseClient().from('org_users').delete().eq('org_id', NEW_RBAC_ORG_ID)
+      await getSupabaseClient().from('orgs').delete().eq('id', NEW_RBAC_ORG_ID)
+      await getSupabaseClient().from('stripe_info').delete().eq('customer_id', NEW_RBAC_STRIPE_CUSTOMER_ID)
+    })
+
+    fn(NEW_RBAC_ORG_ID)
+  })
 }
