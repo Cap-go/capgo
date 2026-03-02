@@ -12,6 +12,47 @@ interface PrelinkUsersRequest {
   domain: string
 }
 
+const PUBLIC_EMAIL_DOMAINS = new Set([
+  'gmail.com',
+  'googlemail.com',
+  'yahoo.com',
+  'yahoo.fr',
+  'yahoo.co.uk',
+  'outlook.com',
+  'hotmail.com',
+  'hotmail.fr',
+  'live.com',
+  'msn.com',
+  'aol.com',
+  'icloud.com',
+  'me.com',
+  'mac.com',
+  'protonmail.com',
+  'proton.me',
+  'mail.com',
+  'zoho.com',
+  'yandex.com',
+  'gmx.com',
+  'gmx.de',
+  'fastmail.com',
+  'tutanota.com',
+  'hey.com',
+])
+
+/**
+ * Masks an email address for logging purposes, showing only the first character
+ * of the local part and the domain. Example: "j***@example.com"
+ */
+function maskEmail(email: string | undefined | null): string | undefined {
+  if (!email || !email.includes('@'))
+    return undefined
+  const [localPart, domainPart] = email.split('@')
+  if (!localPart || !domainPart)
+    return undefined
+  const maskedLocal = `${localPart.charAt(0)}***`
+  return `${maskedLocal}@${domainPart}`
+}
+
 /**
  * Remove a specific identity from a user via the GoTrue admin REST API.
  * The Supabase JS SDK GoTrueAdminApi does not expose identity deletion,
@@ -58,7 +99,37 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
   const { provider_id, domain } = rawBody
   const requestId = c.get('requestId')
 
+  const normalizedDomain = domain.toLowerCase().trim()
+
+  if (PUBLIC_EMAIL_DOMAINS.has(normalizedDomain)) {
+    cloudlogErr({ requestId, message: 'BLOCKED: prelink attempted on public email domain', domain: normalizedDomain, providerId: provider_id })
+    return quickError(400, 'public_domain_blocked', 'Cannot prelink users on public email domains')
+  }
+
   const admin = supabaseAdmin(c)
+
+  // Verify the provider actually exists and is active before destructive operation
+  const { data: providerCheck, error: providerCheckError } = await (admin as any)
+    .from('sso_providers')
+    .select('id, org_id, domain, status')
+    .eq('id', provider_id)
+    .single()
+
+  if (providerCheckError || !providerCheck) {
+    cloudlogErr({ requestId, message: 'Provider not found for prelink', providerId: provider_id, error: providerCheckError })
+    return quickError(404, 'provider_not_found', 'SSO provider not found')
+  }
+
+  if (providerCheck.status !== 'active') {
+    cloudlog({ requestId, message: 'Provider not active, cannot prelink', providerId: provider_id, status: providerCheck.status })
+    return quickError(400, 'provider_not_active', 'SSO provider must be active before prelinking users')
+  }
+
+  if (providerCheck.domain?.toLowerCase().trim() !== normalizedDomain) {
+    cloudlogErr({ requestId, message: 'Domain mismatch between request and provider', requestDomain: normalizedDomain, providerDomain: providerCheck.domain })
+    return quickError(400, 'domain_mismatch', 'Requested domain does not match provider domain')
+  }
+
   const errors: string[] = []
   let processed = 0
   let linked = 0
@@ -85,7 +156,9 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     }
 
     for (const user of users) {
-      if (!user.email?.endsWith(`@${domain}`)) {
+      const userEmail = user.email?.toLowerCase() ?? ''
+      const normalizedDomain = domain.toLowerCase()
+      if (!userEmail.endsWith(`@${normalizedDomain}`)) {
         continue
       }
 
@@ -110,7 +183,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
             requestId,
             message: 'User has no email identity, skipping',
             userId: user.id,
-            email: user.email,
+            emailMasked: maskEmail(user.email),
           })
           continue
         }
@@ -123,7 +196,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
         )
 
         if (deleteError) {
-          errors.push(`Failed to unlink password identity for ${user.email}: ${deleteError}`)
+          errors.push(`Failed to unlink password identity for user ${user.id}: ${deleteError}`)
           continue
         }
 
@@ -132,14 +205,14 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
           requestId,
           message: 'Unlinked password identity for SSO migration',
           userId: user.id,
-          email: user.email,
+          emailMasked: maskEmail(user.email),
           domain,
           providerId: provider_id,
         })
       }
       catch (err) {
         const errMsg = err instanceof Error ? err.message : String(err)
-        errors.push(`Error processing user ${user.email ?? user.id}: ${errMsg}`)
+        errors.push(`Error processing user ${user.id}: ${errMsg}`)
       }
     }
 
