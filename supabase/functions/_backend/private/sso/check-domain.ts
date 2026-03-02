@@ -43,12 +43,9 @@ app.post('/', async (c) => {
       return c.json({ has_sso: false })
     }
 
-    const result = Array.isArray(data) ? data[0] : data
-    cloudlog({ requestId, context: 'check_domain - SSO provider found', domain, provider_id: result.provider_id })
+    cloudlog({ requestId, context: 'check_domain - SSO provider found', domain })
     return c.json({
       has_sso: true,
-      provider_id: result.provider_id,
-      org_id: result.org_id,
     })
   }
   catch (err) {
