@@ -13,6 +13,25 @@ const isLoading = ref(true)
 const errorMessage = ref('')
 const { provisionUser } = useSSOProvisioning()
 
+function validateRedirectPath(path: string | undefined): string {
+  // Default fallback
+  if (!path) {
+    return '/dashboard'
+  }
+
+  // Only allow relative paths starting with / but not //
+  if (!path.startsWith('/') || path.startsWith('//')) {
+    return '/dashboard'
+  }
+
+  // Reject paths containing scheme-like patterns (http:, https:, javascript:, etc.)
+  if (/^[a-z][a-z0-9+.-]*:/i.test(path)) {
+    return '/dashboard'
+  }
+
+  return path
+}
+
 async function exchangeCode() {
   const code = route.query.code as string | undefined
 
@@ -37,8 +56,10 @@ async function exchangeCode() {
       await provisionUser(data.session)
     }
 
+    // Validate redirect path to prevent open redirect
     const redirectTo = route.query.to as string | undefined
-    router.replace(redirectTo || '/dashboard')
+    const validatedPath = validateRedirectPath(redirectTo)
+    router.replace(validatedPath)
   }
   catch (err) {
     isLoading.value = false
