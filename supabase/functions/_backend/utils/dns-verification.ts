@@ -35,7 +35,16 @@ export async function verifyDnsTxtRecord(
       }
     }
 
+    // Validate expectedToken is non-empty string
+    if (!expectedToken || typeof expectedToken !== 'string' || expectedToken.trim().length === 0) {
+      return {
+        verified: false,
+        error: 'Invalid expected token',
+      }
+    }
+
     const cleanDomain = domain.trim()
+    const cleanToken = expectedToken.trim()
     const recordName = `_capgo-sso.${cleanDomain}`
 
     // Query Cloudflare DoH API
@@ -79,8 +88,8 @@ export async function verifyDnsTxtRecord(
           const recordValue = answer.data.replace(/^"(.*)"$/, '$1')
           records.push(recordValue)
 
-          // Check if this record contains the expected token
-          if (recordValue.includes(expectedToken)) {
+          // Check if this record matches the expected token (exact match)
+          if (recordValue === cleanToken) {
             verified = true
           }
         }
