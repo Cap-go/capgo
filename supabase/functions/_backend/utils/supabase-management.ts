@@ -34,8 +34,18 @@ class ManagementAPIError extends Error {
 function isLocalDevMode(c: Context): boolean {
   const token = getEnv(c, 'SUPABASE_MANAGEMENT_API_TOKEN')
   const projectRef = getEnv(c, 'SUPABASE_PROJECT_REF')
-  // Enable mock mode if tokens are missing OR explicitly set to local-dev values
-  return !token || !projectRef || token === 'local-dev-token' || projectRef === 'local-dev-ref'
+
+  // Explicit local-dev values enable mock mode
+  if (token === 'local-dev-token' || projectRef === 'local-dev-ref') {
+    return true
+  }
+
+  // Fail closed: missing configuration should throw, not enable mock mode
+  if (!token || !projectRef) {
+    throw new Error('Missing required environment variables: SUPABASE_MANAGEMENT_API_TOKEN and SUPABASE_PROJECT_REF must be set')
+  }
+
+  return false
 }
 
 function generateMockProviderId(): string {
