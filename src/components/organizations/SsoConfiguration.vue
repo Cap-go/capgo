@@ -345,7 +345,7 @@ defineExpose({
           type="text"
           :placeholder="t('sso-domain-placeholder')"
           :disabled="isSubmitting"
-          class="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white disabled:opacity-50"
+          class="d-input d-input-bordered w-full"
         >
         <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
           {{ t('sso-domain-help') }}
@@ -360,7 +360,7 @@ defineExpose({
           type="url"
           :placeholder="t('sso-metadata-url-placeholder')"
           :disabled="isSubmitting"
-          class="w-full px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white disabled:opacity-50"
+          class="d-input d-input-bordered w-full"
         >
         <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
           {{ t('sso-metadata-url-help') }}
@@ -369,7 +369,8 @@ defineExpose({
       <div class="flex items-center gap-3">
         <button
           :disabled="isSubmitting"
-          class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="d-btn d-btn-primary d-btn-sm"
+          :class="{ 'd-btn-disabled': isSubmitting }"
           @click="addProvider"
         >
           <span v-if="isSubmitting" class="flex items-center gap-2">
@@ -380,7 +381,7 @@ defineExpose({
         </button>
         <button
           :disabled="isSubmitting"
-          class="px-4 py-2 text-sm font-medium border rounded-lg text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700 disabled:opacity-50"
+          class="d-btn d-btn-outline d-btn-sm"
           @click="showAddForm = false"
         >
           {{ t('button-cancel') }}
@@ -409,7 +410,7 @@ defineExpose({
           {{ t('sso-dns-record-name') }}: <span class="font-semibold text-slate-800 dark:text-white">_capgo-sso.{{ pendingVerificationProvider.domain }}</span>
         </p>
         <button
-          class="p-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors"
+          class="d-btn d-btn-ghost d-btn-xs"
           :title="t('sso-copy')"
           @click="copyToClipboard(`_capgo-sso.${pendingVerificationProvider.domain}`, t('sso-dns-record-name'))"
         >
@@ -421,7 +422,7 @@ defineExpose({
           {{ t('sso-dns-record-value') }}: <span class="font-semibold text-slate-800 dark:text-white">{{ pendingVerificationProvider.dns_verification_token }}</span>
         </p>
         <button
-          class="p-1.5 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded transition-colors flex-shrink-0"
+          class="d-btn d-btn-ghost d-btn-xs flex-shrink-0"
           :title="t('sso-copy')"
           @click="copyToClipboard(pendingVerificationProvider.dns_verification_token!, t('sso-dns-record-value'))"
         >
@@ -433,7 +434,8 @@ defineExpose({
     <div class="flex items-center gap-3">
       <button
         :disabled="isVerifying === pendingVerificationProvider.id"
-        class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800 disabled:opacity-50 disabled:cursor-not-allowed"
+        class="d-btn d-btn-primary d-btn-sm"
+        :class="{ 'd-btn-disabled': isVerifying === pendingVerificationProvider.id }"
         @click="verifyDns(pendingVerificationProvider.id)"
       >
         <span v-if="isVerifying === pendingVerificationProvider.id" class="flex items-center gap-2">
@@ -443,7 +445,7 @@ defineExpose({
         <span v-else>{{ t('sso-verify-dns') }}</span>
       </button>
       <button
-        class="px-3 py-2 text-sm font-medium border rounded-lg text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-700"
+        class="d-btn d-btn-outline d-btn-sm"
         @click="recentlyCreatedId = null"
       >
         {{ t('sso-dismiss') }}
@@ -473,7 +475,7 @@ defineExpose({
       {{ t('sso-no-providers-description') }}
     </p>
     <button
-      class="px-4 py-2 mt-4 text-sm font-medium text-white transition-colors bg-blue-600 rounded-lg hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 dark:focus:ring-blue-800"
+      class="d-btn d-btn-primary d-btn-sm mt-4"
       @click="showAddForm = true"
     >
       {{ t('sso-add-provider') }}
@@ -485,89 +487,92 @@ defineExpose({
     <div
       v-for="provider in providers"
       :key="provider.id"
-      class="flex flex-col gap-3 p-4 border rounded-lg sm:flex-row sm:items-center sm:justify-between border-slate-200 dark:border-slate-700"
+      class="d-card d-card-bordered"
     >
-      <div class="flex-1 min-w-0">
-        <div class="flex items-center gap-3">
-          <h4 class="text-sm font-semibold truncate dark:text-white text-slate-800">
-            {{ provider.domain }}
-          </h4>
-          <span
-            class="px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap"
-            :class="getStatusBadgeClass(provider.status)"
-          >
-            {{ getStatusLabel(provider.status) }}
-          </span>
+      <div class="d-card-body p-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-3">
+            <h4 class="text-sm font-semibold truncate dark:text-white text-slate-800">
+              {{ provider.domain }}
+            </h4>
+            <span
+              class="px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap"
+              :class="getStatusBadgeClass(provider.status)"
+            >
+              {{ getStatusLabel(provider.status) }}
+            </span>
+          </div>
+          <p class="mt-1 text-xs truncate text-slate-500 dark:text-slate-400">
+            {{ provider.metadata_url }}
+          </p>
+          <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">
+            {{ t('created-at') }}: {{ formatDate(provider.created_at) }}
+          </p>
         </div>
-        <p class="mt-1 text-xs truncate text-slate-500 dark:text-slate-400">
-          {{ provider.metadata_url }}
-        </p>
-        <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">
-          {{ t('created-at') }}: {{ formatDate(provider.created_at) }}
-        </p>
-      </div>
-      <div class="flex items-center gap-2 shrink-0">
-        <!-- Verify DNS button (pending_verification) -->
-        <button
-          v-if="provider.status === 'pending_verification'"
-          :disabled="isVerifying === provider.id"
-          class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-700 bg-white border border-blue-300 rounded-lg hover:bg-blue-50 dark:bg-gray-800 dark:text-blue-400 dark:border-blue-600 dark:hover:bg-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
-          @click="verifyDns(provider.id)"
-        >
-          <Spinner v-if="isVerifying === provider.id" size="w-4 h-4" />
-          <span>{{ t('sso-verify-dns') }}</span>
-        </button>
-
-        <!-- Activate button (verified) -->
-        <button
-          v-if="provider.status === 'verified'"
-          class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-green-600 border border-green-600 rounded-lg hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800"
-          @click="updateProviderStatus(provider.id, 'active')"
-        >
-          {{ t('sso-activate') }}
-        </button>
-
-        <!-- Deactivate button (active) -->
-        <button
-          v-if="provider.status === 'active'"
-          class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-orange-700 bg-white border border-orange-300 rounded-lg hover:bg-orange-50 dark:bg-gray-800 dark:text-orange-400 dark:border-orange-600 dark:hover:bg-orange-900/20"
-          @click="updateProviderStatus(provider.id, 'disabled')"
-        >
-          {{ t('sso-deactivate') }}
-        </button>
-
-        <!-- Re-activate button (disabled) -->
-        <button
-          v-if="provider.status === 'disabled'"
-          class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-green-700 bg-white border border-green-300 rounded-lg hover:bg-green-50 dark:bg-gray-800 dark:text-green-400 dark:border-green-600 dark:hover:bg-green-900/20"
-          @click="updateProviderStatus(provider.id, 'active')"
-        >
-          {{ t('sso-reactivate') }}
-        </button>
-
-        <!-- Enforce SSO toggle (active only) -->
-        <label
-          v-if="provider.status === 'active'"
-          class="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer"
-          :title="t('sso-enforce-tooltip')"
-        >
-          <input
-            type="checkbox"
-            :checked="provider.enforce_sso"
-            class="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-            @change="toggleEnforceSso(provider)"
+        <div class="flex items-center gap-2 shrink-0">
+          <!-- Verify DNS button (pending_verification) -->
+          <button
+            v-if="provider.status === 'pending_verification'"
+            :disabled="isVerifying === provider.id"
+            class="d-btn d-btn-primary d-btn-sm"
+            :class="{ 'd-btn-disabled': isVerifying === provider.id }"
+            @click="verifyDns(provider.id)"
           >
-          <span class="text-slate-700 dark:text-slate-300">{{ t('sso-enforce') }}</span>
-        </label>
+            <Spinner v-if="isVerifying === provider.id" size="w-4 h-4" />
+            <span>{{ t('sso-verify-dns') }}</span>
+          </button>
 
-        <!-- Delete button (always visible) -->
-        <button
-          class="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-red-600 bg-white border border-red-300 rounded-lg hover:bg-red-50 dark:bg-gray-800 dark:border-red-600 dark:hover:bg-red-900/20"
-          @click="deleteProvider(provider)"
-        >
-          <IconTrash class="w-4 h-4" />
-          {{ t('delete') }}
-        </button>
+          <!-- Activate button (verified) -->
+          <button
+            v-if="provider.status === 'verified'"
+            class="d-btn d-btn-success d-btn-sm"
+            @click="updateProviderStatus(provider.id, 'active')"
+          >
+            {{ t('sso-activate') }}
+          </button>
+
+          <!-- Deactivate button (active) -->
+          <button
+            v-if="provider.status === 'active'"
+            class="d-btn d-btn-warning d-btn-outline d-btn-sm"
+            @click="updateProviderStatus(provider.id, 'disabled')"
+          >
+            {{ t('sso-deactivate') }}
+          </button>
+
+          <!-- Re-activate button (disabled) -->
+          <button
+            v-if="provider.status === 'disabled'"
+            class="d-btn d-btn-success d-btn-outline d-btn-sm"
+            @click="updateProviderStatus(provider.id, 'active')"
+          >
+            {{ t('sso-reactivate') }}
+          </button>
+
+          <!-- Enforce SSO toggle (active only) -->
+          <label
+            v-if="provider.status === 'active'"
+            class="flex items-center gap-2 px-3 py-1.5 text-sm cursor-pointer"
+            :title="t('sso-enforce-tooltip')"
+          >
+            <input
+              type="checkbox"
+              :checked="provider.enforce_sso"
+              class="d-toggle d-toggle-primary"
+              @change="toggleEnforceSso(provider)"
+            >
+            <span class="text-slate-700 dark:text-slate-300">{{ t('sso-enforce') }}</span>
+          </label>
+
+          <!-- Delete button (always visible) -->
+          <button
+            class="d-btn d-btn-error d-btn-outline d-btn-sm"
+            @click="deleteProvider(provider)"
+          >
+            <IconTrash class="w-4 h-4" />
+            {{ t('delete') }}
+          </button>
+        </div>
       </div>
     </div>
   </div>
