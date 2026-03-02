@@ -1,7 +1,9 @@
 -- Security hardening: remove API key identity oracle and enforce org RPC caller checks
 
--- Identity helpers are needed by RLS, so keep `anon`/`authenticated` execute
--- for org helpers while blocking external API-key identity oracle access.
+-- Identity helpers must remain internal to RLS/auth logic.
+-- get_identity_apikey_only should not be callable from public API roles,
+-- but get_identity_org_allowed/appid must remain executable by anon/authenticated
+-- for RLS policy evaluation.
 REVOKE ALL ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode"[]) FROM "public";
 REVOKE ALL ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode"[]) FROM "anon";
 REVOKE ALL ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode"[]) FROM "authenticated";
@@ -12,7 +14,6 @@ REVOKE ALL ON FUNCTION "public"."get_identity_org_appid" (
   "app_id" character varying
 ) FROM "public";
 
--- Keep these helpers available where needed by RLS and trusted internal services.
 -- Keep these helpers available where needed by RLS and trusted internal services.
 GRANT EXECUTE ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode"[]) TO "postgres";
 GRANT EXECUTE ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode"[]) TO "service_role";
@@ -48,7 +49,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE ALL ON FU
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE ALL ON TABLES FROM "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE ALL ON TABLES FROM "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" REVOKE ALL ON TABLES FROM "public";
-
 
 -- Harden direct org lookup by user id: callable only when caller identity matches the requested user.
 DROP FUNCTION IF EXISTS public.get_orgs_v6(userid uuid);
