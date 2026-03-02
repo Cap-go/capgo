@@ -10,6 +10,7 @@
   "2fa-enforcement-disabled": "Wymuszanie 2FA zostało wyłączone.",
   "2fa-enforcement-enable-anyway": "Włącz mimo wszystko",
   "2fa-enforcement-enabled": "Wymuszanie 2FA zostało włączone dla tej organizacji.",
+  "2fa-enforcement-self-2fa-required": "Włącz uwierzytelnianie dwuskładnikowe na swoim koncie przed zastosowaniem wymuszenia 2FA na poziomie całej organizacji.",
   "2fa-enforcement-title": "Wymagaj 2FA dla wszystkich członków",
   "2fa-enforcement-warning-description": "Niektórzy członkowie organizacji nie mają włączonej 2FA. Po włączeniu wymuszania zostaną zablokowani w organizacji, dopóki nie włączą 2FA.",
   "2fa-enforcement-warning-title": "Członkowie zostaną dotknięci",

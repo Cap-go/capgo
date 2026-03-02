@@ -10,6 +10,7 @@
   "2fa-enforcement-disabled": "2FA प्रवर्तन अक्षम कर दिया गया है।",
   "2fa-enforcement-enable-anyway": "फिर भी सक्षम करें",
   "2fa-enforcement-enabled": "इस संगठन के लिए 2FA प्रवर्तन सक्षम किया गया है।",
+  "2fa-enforcement-self-2fa-required": "अपने खाते पर दो-कारक प्रमाणीकरण सक्षम करें, इससे पहले कि आप संगठन-व्यापी 2FA प्रतिबंध का निमंत्रण करें।",
   "2fa-enforcement-title": "सभी सदस्यों के लिए 2FA की आवश्यकता",
   "2fa-enforcement-warning-description": "कुछ संगठन सदस्यों ने 2FA सक्षम नहीं किया है। एक बार जब आप प्रवर्तन सक्षम करते हैं, तो उन्हें संगठन से बाहर कर दिया जाएगा जब तक वे 2FA सक्षम नहीं करते।",
   "2fa-enforcement-warning-title": "सदस्य प्रभावित होंगे",

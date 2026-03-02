@@ -10,6 +10,7 @@
   "2fa-enforcement-disabled": "A imposição de 2FA foi desativada.",
   "2fa-enforcement-enable-anyway": "Ativar Mesmo Assim",
   "2fa-enforcement-enabled": "A imposição de 2FA foi ativada para esta organização.",
+  "2fa-enforcement-self-2fa-required": "Ative a autenticação de dois fatores em sua conta antes de aplicar a imposição de 2FA em toda a organização.",
   "2fa-enforcement-title": "Exigir 2FA para Todos os Membros",
   "2fa-enforcement-warning-description": "Alguns membros da organização não têm 2FA ativado. Depois de ativar a imposição, eles serão bloqueados da organização até que ativem o 2FA.",
   "2fa-enforcement-warning-title": "Membros Serão Impactados",

@@ -10,6 +10,7 @@
   "2fa-enforcement-disabled": "Đã tắt thực thi 2FA.",
   "2fa-enforcement-enable-anyway": "Vẫn Bật",
   "2fa-enforcement-enabled": "Đã bật thực thi 2FA cho tổ chức này.",
+  "2fa-enforcement-self-2fa-required": "Kích hoạt xác thực hai yếu tố trên tài khoản của bạn trước khi áp dụng việc thực thi 2FA toàn tổ chức.",
   "2fa-enforcement-title": "Yêu Cầu 2FA Cho Tất Cả Thành Viên",
   "2fa-enforcement-warning-description": "Một số thành viên tổ chức chưa bật 2FA. Sau khi bạn bật thực thi, họ sẽ bị khóa khỏi tổ chức cho đến khi họ bật 2FA.",
   "2fa-enforcement-warning-title": "Thành Viên Sẽ Bị Ảnh Hưởng",
