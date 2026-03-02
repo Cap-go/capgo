@@ -1389,6 +1389,8 @@
   "sso-status-verified": "已验证",
   "sso-verify-dns": "验证 DNS",
   "sso-verifying": "正在验证...",
+  "sso-enterprise-upgrade-description": "SAML 2.0 Single Sign-On is available exclusively on the Enterprise plan. Upgrade to enable SSO for your organization.",
+  "sso-upgrade-to-enterprise": "Upgrade to Enterprise",
   "start-using-capgo": "开始使用：",
   "start-your-first-build": "开始你的第一个本地构建",
   "statistics": "统计",

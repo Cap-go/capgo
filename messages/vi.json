@@ -1389,6 +1389,8 @@
   "sso-status-verified": "Đã xác minh",
   "sso-verify-dns": "Xác minh DNS",
   "sso-verifying": "Đang xác minh...",
+  "sso-enterprise-upgrade-description": "SAML 2.0 Single Sign-On is available exclusively on the Enterprise plan. Upgrade to enable SSO for your organization.",
+  "sso-upgrade-to-enterprise": "Upgrade to Enterprise",
   "start-using-capgo": "Bắt đầu sử dụng:",
   "start-your-first-build": "Bắt đầu xây dựng bản địa đầu tiên của bạn",
   "statistics": "Thống kê",

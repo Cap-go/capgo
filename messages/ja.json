@@ -1389,6 +1389,8 @@
   "sso-status-verified": "検証済み",
   "sso-verify-dns": "DNSを検証",
   "sso-verifying": "検証中...",
+  "sso-enterprise-upgrade-description": "SAML 2.0 Single Sign-On is available exclusively on the Enterprise plan. Upgrade to enable SSO for your organization.",
+  "sso-upgrade-to-enterprise": "Upgrade to Enterprise",
   "start-using-capgo": "使用を開始する：",
   "start-your-first-build": "あなたの最初のネイティブビルドを開始してください",
   "statistics": "統計",

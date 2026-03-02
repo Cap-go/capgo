@@ -1389,6 +1389,8 @@
   "sso-status-verified": "Doğrulandı",
   "sso-verify-dns": "DNS'i Doğrula",
   "sso-verifying": "Doğrulanıyor...",
+  "sso-enterprise-upgrade-description": "SAML 2.0 Single Sign-On is available exclusively on the Enterprise plan. Upgrade to enable SSO for your organization.",
+  "sso-upgrade-to-enterprise": "Upgrade to Enterprise",
   "start-using-capgo": "Kullanmaya başla:",
   "start-your-first-build": "İlk yerel yapınızı başlatın",
   "statistics": "İstatistikler",

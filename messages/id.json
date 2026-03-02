@@ -1389,6 +1389,8 @@
   "sso-status-verified": "Terverifikasi",
   "sso-verify-dns": "Verifikasi DNS",
   "sso-verifying": "Memverifikasi...",
+  "sso-enterprise-upgrade-description": "SAML 2.0 Single Sign-On is available exclusively on the Enterprise plan. Upgrade to enable SSO for your organization.",
+  "sso-upgrade-to-enterprise": "Upgrade to Enterprise",
   "start-using-capgo": "Mulai menggunakan:",
   "start-your-first-build": "Mulai bangunan asli pertama Anda",
   "statistics": "Statistik",

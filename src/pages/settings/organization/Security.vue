@@ -1415,10 +1415,10 @@ onMounted(async () => {
                 </div>
                 <div>
                   <h3 class="text-lg font-semibold dark:text-white text-slate-800">
-                    SSO Configuration
+                    {{ t('sso-configuration') }}
                   </h3>
                   <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    Configure SAML 2.0 Single Sign-On for your organization.
+                    {{ t('sso-configuration-description') }}
                   </p>
                 </div>
               </div>
@@ -1433,10 +1433,10 @@ onMounted(async () => {
                 </div>
                 <div class="flex-1">
                   <h3 class="text-lg font-semibold dark:text-white text-slate-800">
-                    SSO Configuration
+                    {{ t('sso-configuration') }}
                   </h3>
                   <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">
-                    SAML 2.0 Single Sign-On is available exclusively on the Enterprise plan. Upgrade to enable SSO for your organization.
+                    {{ t('sso-enterprise-upgrade-description') }}
                   </p>
                   <div class="mt-4">
                     <button
@@ -1444,7 +1444,7 @@ onMounted(async () => {
                       class="d-btn d-btn-primary d-btn-sm"
                       @click="router.push('/settings/organization/plans')"
                     >
-                      Upgrade to Enterprise
+                      {{ t('sso-upgrade-to-enterprise') }}
                     </button>
                   </div>
                 </div>
