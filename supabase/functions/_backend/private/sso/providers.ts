@@ -205,6 +205,9 @@ app.patch('/:id', async (c) => {
     updates.attribute_mapping = attributeMapping
   }
   if (body.enforce_sso !== undefined) {
+    if (body.enforce_sso === true && provider.status !== 'active') {
+      throw simpleError('invalid_enforce_sso', 'Cannot enable SSO enforcement on a provider that is not active')
+    }
     updates.enforce_sso = body.enforce_sso
   }
   if (body.status !== undefined) {
@@ -225,6 +228,11 @@ app.patch('/:id', async (c) => {
     }
 
     updates.status = body.status
+
+    // Auto-reset enforce_sso when disabling provider
+    if (newStatus === 'disabled') {
+      updates.enforce_sso = false
+    }
   }
 
   if (Object.keys(updates).length === 0) {
