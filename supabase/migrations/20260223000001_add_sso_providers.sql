@@ -2,13 +2,16 @@
 -- Purpose: Enterprise SSO support (SAML 2.0) with DNS domain verification
 -- SSO management uses org.update_settings permission
 
+-- Enable citext extension for case-insensitive text
+CREATE EXTENSION IF NOT EXISTS citext;
+
 -- =============================================================================
 -- 1) Create sso_providers table
 -- =============================================================================
 CREATE TABLE public.sso_providers (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     org_id uuid NOT NULL REFERENCES public.orgs(id) ON DELETE CASCADE,
-    domain text NOT NULL UNIQUE,
+    domain citext NOT NULL UNIQUE,
     provider_id text,
     status text NOT NULL DEFAULT 'pending_verification' CHECK (status IN ('pending_verification', 'verified', 'active', 'disabled')),
     enforce_sso boolean NOT NULL DEFAULT false,
@@ -19,9 +22,6 @@ CREATE TABLE public.sso_providers (
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now()
 );
-
--- Index on domain for fast lookups
-CREATE INDEX idx_sso_providers_domain ON public.sso_providers (domain);
 
 -- Index on org_id for org-scoped queries
 CREATE INDEX idx_sso_providers_org_id ON public.sso_providers (org_id);
