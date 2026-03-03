@@ -99,25 +99,10 @@ export async function startBuild(
     // This prevents cross-app access by mixing an allowed app_id with another app's jobId.
     const supabase = supabaseApikey(c, apikeyKey)
 
-    // Security: Check if user has permission to manage builds for the supplied app
-    // before validating builder job ownership.
-    if (!(await checkPermission(c, 'app.build_native', { appId }))) {
-      const errorMsg = 'You do not have permission to start builds for this app'
-      cloudlogErr({
-        requestId: c.get('requestId'),
-        message: 'Unauthorized start build',
-        job_id: jobId,
-        app_id: appId,
-        user_id: apikey.user_id,
-      })
-      throw simpleError('unauthorized', errorMsg)
-    }
-
     const { data: buildRequest, error: buildRequestError } = await supabase
       .from('build_requests')
       .select('app_id')
       .eq('builder_job_id', jobId)
-      .eq('app_id', appId)
       .maybeSingle()
 
     if (buildRequestError) {
@@ -142,7 +127,33 @@ export async function startBuild(
       throw simpleError('unauthorized', errorMsg)
     }
 
-    const boundAppId = appId
+    if (buildRequest.app_id !== appId) {
+      const errorMsg = 'You do not have permission to start builds for this app'
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'Unauthorized start build (app mismatch)',
+        job_id: jobId,
+        requested_app_id: appId,
+        build_request_app_id: buildRequest.app_id,
+        user_id: apikey.user_id,
+      })
+      throw simpleError('unauthorized', errorMsg)
+    }
+
+    // Security: Check if user has permission to manage builds for the requested build request app
+    if (!(await checkPermission(c, 'app.build_native', { appId: buildRequest.app_id }))) {
+      const errorMsg = 'You do not have permission to start builds for this app'
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'Unauthorized start build',
+        job_id: jobId,
+        app_id: buildRequest.app_id,
+        user_id: apikey.user_id,
+      })
+      throw simpleError('unauthorized', errorMsg)
+    }
+
+    const boundAppId = buildRequest.app_id
 
     cloudlog({
       requestId: c.get('requestId'),

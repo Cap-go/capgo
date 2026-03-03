@@ -12,25 +12,12 @@ export async function cancelBuild(
   appId: string,
   apikey: Database['public']['Tables']['apikeys']['Row'],
 ): Promise<Response> {
-  if (!(await checkPermission(c, 'app.build_native', { appId }))) {
-    const errorMsg = 'You do not have permission to cancel builds for this app'
-    cloudlogErr({
-      requestId: c.get('requestId'),
-      message: 'Unauthorized cancel build',
-      job_id: jobId,
-      app_id: appId,
-      user_id: apikey.user_id,
-    })
-    throw simpleError('unauthorized', errorMsg)
-  }
-
   // Bind jobId to its request owner before calling the builder.
   const supabase = supabaseApikey(c, apikey.key)
   const { data: buildRequest, error: buildRequestError } = await supabase
     .from('build_requests')
     .select('app_id')
     .eq('builder_job_id', jobId)
-    .eq('app_id', appId)
     .maybeSingle()
 
   if (buildRequestError) {
@@ -55,11 +42,36 @@ export async function cancelBuild(
     throw simpleError('unauthorized', errorMsg)
   }
 
+  if (buildRequest.app_id !== appId) {
+    const errorMsg = 'You do not have permission to cancel builds for this app'
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Unauthorized cancel build (app mismatch)',
+      job_id: jobId,
+      requested_app_id: appId,
+      build_request_app_id: buildRequest.app_id,
+      user_id: apikey.user_id,
+    })
+    throw simpleError('unauthorized', errorMsg)
+  }
+
+  if (!(await checkPermission(c, 'app.build_native', { appId: buildRequest.app_id }))) {
+    const errorMsg = 'You do not have permission to cancel builds for this app'
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Unauthorized cancel build',
+      job_id: jobId,
+      app_id: buildRequest.app_id,
+      user_id: apikey.user_id,
+    })
+    throw simpleError('unauthorized', errorMsg)
+  }
+
   cloudlog({
     requestId: c.get('requestId'),
     message: 'Cancel build request',
     job_id: jobId,
-    app_id: appId,
+    app_id: buildRequest.app_id,
     user_id: apikey.user_id,
   })
 
@@ -101,7 +113,7 @@ export async function cancelBuild(
       updated_at: new Date().toISOString(),
     })
     .eq('builder_job_id', jobId)
-    .eq('app_id', appId)
+    .eq('app_id', buildRequest.app_id)
 
   if (updateError) {
     cloudlogErr({
