@@ -8,6 +8,7 @@ import { createI18n } from 'vue-i18n'
 // Don't need this? Try vitesse-lite: https://github.com/antfu/vitesse-lite
 export const i18n = createI18n({
   legacy: false,
+  fallbackLocale: 'en',
   locale: '',
   messages: {},
 })
