@@ -167,27 +167,7 @@ CREATE OR REPLACE FUNCTION public.get_global_metrics(
 ) LANGUAGE plpgsql
 SET
 search_path = '' AS $function$
-DECLARE
-    v_user_id uuid;
-    v_is_service_role boolean;
 BEGIN
-    v_is_service_role := ((SELECT auth.jwt() ->> 'role') = 'service_role') OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres');
-
-    IF NOT v_is_service_role THEN
-        v_user_id := public.get_identity('{read,upload,write,all}'::public.key_mode[]);
-
-        IF v_user_id IS NULL OR NOT public.check_min_rights(
-            'read'::public.user_min_right,
-            v_user_id,
-            p_org_id,
-            NULL::character varying,
-            NULL::bigint
-        ) THEN
-            PERFORM public.pg_log('deny: NO_RIGHTS', jsonb_build_object('org_id', p_org_id, 'uid', v_user_id, 'rpc', 'get_global_metrics'));
-            RETURN;
-        END IF;
-    END IF;
-
     RETURN QUERY
     SELECT
         metrics.date,
