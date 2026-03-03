@@ -1,7 +1,7 @@
 BEGIN;
 
 
-SELECT plan(26);
+SELECT plan(29);
 
 -- Test upsert_version_meta function
 -- First insert a positive size
@@ -225,6 +225,27 @@ SELECT
         ),
         'NO_RIGHTS',
         'rescind_invitation - non-admin user gets NO_RIGHTS'
+    );
+
+SELECT
+    is(
+        rescind_invitation(
+            'test@example.com',
+            '00000000-0000-0000-0000-000000000000'
+        ),
+        'NO_RIGHTS',
+        'rescind_invitation - non-admin user gets NO_RIGHTS for non-existent org'
+    );
+
+-- Verify anon callers cannot execute rescind_invitation
+SELECT tests.clear_authentication();
+
+SELECT
+    throws_ok(
+        'SELECT rescind_invitation(''test@example.com'', ''22dbad8a-b885-4309-9b3b-a09f8460fb6d'')',
+        '42501',
+        'permission denied for function rescind_invitation',
+        'rescind_invitation - anonymous call throws permission denied'
     );
 
 -- Test super admin privilege escalation prevention
