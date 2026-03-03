@@ -28,6 +28,7 @@ beforeAll(async () => {
     management_email: TEST_EMAIL,
     created_by: USER_ID,
     customer_id: customerId,
+    use_new_rbac: false, // Explicitly legacy — this suite tests the legacy permission path
   })
   if (error)
     throw error
@@ -412,6 +413,8 @@ describe('[POST] /organization', () => {
     expect(error).toBeNull()
     expect(data).toBeTruthy()
     expect(data?.name).toBe(name)
+    // New orgs should default to RBAC enabled
+    expect(data?.use_new_rbac).toBe(true)
   })
 
   it('create organization with missing name', async () => {
@@ -720,6 +723,155 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
 
     // Reset
     await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false }).eq('id', ORG_ID)
+  })
+})
+
+// ─── RBAC mode coverage ──────────────────────────────────────────────────────
+// New orgs default to use_new_rbac = true. The suite below runs the same key
+// member operations against an explicitly RBAC-enabled org so that the RBAC
+// permission path (role_bindings) is exercised alongside the legacy tests above.
+
+const ORG_ID_RBAC = randomUUID()
+const globalIdRbac = randomUUID()
+const nameRbac = `RBAC Test Organization ${globalIdRbac}`
+const customerIdRbac = `cus_test_rbac_${ORG_ID_RBAC}`
+
+describe('RBAC mode - organization member operations', () => {
+  beforeAll(async () => {
+    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
+      customer_id: customerIdRbac,
+      status: 'succeeded',
+      product_id: 'prod_LQIregjtNduh4q',
+      subscription_id: `sub_${globalIdRbac}`,
+      trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+      is_good_plan: true,
+    })
+    if (stripeError)
+      throw stripeError
+
+    const { error } = await getSupabaseClient().from('orgs').insert({
+      id: ORG_ID_RBAC,
+      name: nameRbac,
+      management_email: TEST_EMAIL,
+      created_by: USER_ID,
+      customer_id: customerIdRbac,
+      use_new_rbac: true, // Explicitly RBAC — tests the RBAC permission path
+    })
+    if (error)
+      throw error
+
+    // The generate_org_user_on_org_create trigger creates org_users(super_admin)
+    // and role_bindings(org_super_admin) for created_by automatically.
+  })
+
+  afterAll(async () => {
+    await getSupabaseClient().from('role_bindings').delete().eq('org_id', ORG_ID_RBAC)
+    await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID_RBAC)
+    await getSupabaseClient().from('orgs').delete().eq('id', ORG_ID_RBAC)
+    await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerIdRbac)
+  })
+
+  it('[GET] /organization - get RBAC org by id', async () => {
+    const response = await fetch(`${BASE_URL}/organization?orgId=${ORG_ID_RBAC}`, {
+      headers,
+    })
+    expect(response.status).toBe(200)
+    const type = z.object({ id: z.string(), name: z.string() })
+    const safe = type.safeParse(await response.json())
+    expect(safe.success).toBe(true)
+    expect(safe.data).toEqual({ id: ORG_ID_RBAC, name: nameRbac })
+  })
+
+  it('[GET] /organization/members - returns members via role_bindings (RBAC path)', async () => {
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID_RBAC}`, {
+      headers,
+    })
+    expect(response.status).toBe(200)
+    const type = z.array(z.object({
+      uid: z.string(),
+      email: z.string(),
+      image_url: z.string(),
+      role: z.string(),
+    }))
+    const safe = type.safeParse(await response.json())
+    expect(safe.success).toBe(true)
+
+    const testUser = safe.data?.find(m => m.uid === USER_ID)
+    expect(testUser).toBeTruthy()
+    expect(testUser?.email).toBe(USER_EMAIL)
+    expect(testUser?.role).toBe('super_admin')
+  })
+
+  it('[PUT] /organization - update RBAC org name', async () => {
+    const updatedName = `RBAC Updated ${new Date().toISOString()}`
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'PUT',
+      body: JSON.stringify({ orgId: ORG_ID_RBAC, name: updatedName }),
+    })
+    expect(response.status).toBe(200)
+    const type = z.object({ id: z.uuid(), data: z.any() })
+    const safe = type.safeParse(await response.json())
+    expect(safe.success).toBe(true)
+    expect(safe.data?.id).toBe(ORG_ID_RBAC)
+  })
+
+  it('[POST] /organization/members - add member in RBAC mode (sync trigger creates role_binding)', async () => {
+    const response = await fetch(`${BASE_URL}/organization/members`, {
+      headers,
+      method: 'POST',
+      body: JSON.stringify({
+        orgId: ORG_ID_RBAC,
+        email: USER_ADMIN_EMAIL,
+        invite_type: 'read',
+      }),
+    })
+    expect(response.status).toBe(200)
+
+    const { data: userData } = await getSupabaseClient().from('users').select().eq('email', USER_ADMIN_EMAIL).single()
+    expect(userData).toBeTruthy()
+
+    // Verify org_users entry exists
+    const { data: orgUser } = await getSupabaseClient().from('org_users').select().eq('org_id', ORG_ID_RBAC).eq('user_id', userData!.id).single()
+    expect(orgUser).toBeTruthy()
+    expect(orgUser?.user_right).toBe('invite_read')
+
+    // Verify role_binding was created by sync trigger
+    const { data: binding } = await getSupabaseClient().from('role_bindings').select().eq('principal_type', 'user').eq('principal_id', userData!.id).eq('org_id', ORG_ID_RBAC)
+    expect(binding).toBeTruthy()
+    expect(binding!.length).toBeGreaterThan(0)
+
+    // Cleanup
+    await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID_RBAC).eq('user_id', userData!.id)
+  })
+
+  it('[DELETE] /organization/members - remove member in RBAC mode cleans up role_bindings', async () => {
+    const { data: userData } = await getSupabaseClient().from('users').select().eq('email', USER_ADMIN_EMAIL).single()
+    expect(userData).toBeTruthy()
+
+    // Add member (sync trigger creates role_binding)
+    await getSupabaseClient().from('org_users').insert({
+      org_id: ORG_ID_RBAC,
+      user_id: userData!.id,
+      user_right: 'read',
+    })
+
+    const { data: bindingsBefore } = await getSupabaseClient().from('role_bindings').select().eq('principal_type', 'user').eq('principal_id', userData!.id).eq('org_id', ORG_ID_RBAC)
+    expect(bindingsBefore!.length).toBeGreaterThan(0)
+
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID_RBAC}&email=${USER_ADMIN_EMAIL}`, {
+      headers,
+      method: 'DELETE',
+    })
+    expect(response.status).toBe(200)
+
+    // org_users removed
+    const { data: orgUserAfter } = await getSupabaseClient().from('org_users').select().eq('org_id', ORG_ID_RBAC).eq('user_id', userData!.id)
+    expect(orgUserAfter).toHaveLength(0)
+
+    // role_bindings also cleaned up
+    const { data: bindingsAfter } = await getSupabaseClient().from('role_bindings').select().eq('principal_type', 'user').eq('principal_id', userData!.id).eq('org_id', ORG_ID_RBAC)
+    expect(bindingsAfter).toHaveLength(0)
   })
 })
 

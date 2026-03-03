@@ -12611,7 +12611,7 @@ CREATE TABLE IF NOT EXISTS "public"."orgs" (
     "max_apikey_expiration_days" integer,
     "enforce_encrypted_bundles" boolean DEFAULT false NOT NULL,
     "required_encryption_key" character varying(21) DEFAULT NULL::character varying,
-    "use_new_rbac" boolean DEFAULT false NOT NULL,
+    "use_new_rbac" boolean DEFAULT true NOT NULL,
     "has_usage_credits" boolean DEFAULT false NOT NULL
 );
 
