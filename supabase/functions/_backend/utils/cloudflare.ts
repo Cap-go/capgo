@@ -482,7 +482,7 @@ export async function readDeviceVersionCountsCF(c: Context, app_id: string, chan
   if (!c.env.DEVICE_INFO)
     return {}
 
-  const safeChannel = channelName ? channelName.replace(/'/g, `''`) : ''
+  const safeChannel = channelName ? escapeSqlString(channelName) : ''
   const channelFilter = safeChannel ? `AND default_channel = '${safeChannel}'` : ''
 
   const query = `SELECT
@@ -1430,7 +1430,7 @@ export async function getAdminPlatformOverview(
   org_id?: string,
 ): Promise<AdminPlatformOverview | null> {
   try {
-    const orgFilter = org_id ? `AND blob2 = '${org_id}'` : ''
+    const orgFilter = org_id ? `AND blob2 = '${escapeSqlString(org_id)}'` : ''
 
     // Query 1: MAU from DEVICE_USAGE
     const mauQuery = `SELECT COUNT(DISTINCT blob1) AS mau
@@ -1612,7 +1612,7 @@ export async function getAdminMauTrend(
   if (!c.env.DEVICE_USAGE)
     return []
 
-  const orgFilter = org_id ? `AND blob2 = '${org_id}'` : ''
+  const orgFilter = org_id ? `AND blob2 = '${escapeSqlString(org_id)}'` : ''
 
   const query = `SELECT
     formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
