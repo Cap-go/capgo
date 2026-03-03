@@ -2845,6 +2845,25 @@ export type Database = {
           wrong_key_count: number
         }[]
       }
+      create_demo_app_with_limits: {
+        Args: {
+          p_active_window_days: number
+          p_app_id: string
+          p_default_upload_channel: string
+          p_icon_url: string
+          p_last_version: string
+          p_max_active_per_org: number
+          p_name: string
+          p_org_per_24h: number
+          p_org_per_hour: number
+          p_owner_org: string
+          p_retention: number
+          p_user_id: string
+          p_user_per_24h: number
+          p_user_per_hour: number
+        }
+        Returns: Json
+      }
       create_hashed_apikey: {
         Args: {
           p_expires_at: string
@@ -2910,10 +2929,6 @@ export type Database = {
           deleted_count: number
           deleted_user_ids: string[]
         }[]
-      }
-      delete_group_with_bindings: {
-        Args: { group_id: string }
-        Returns: undefined
       }
       delete_http_response: { Args: { request_id: number }; Returns: undefined }
       delete_non_compliant_bundles: {
@@ -3372,6 +3387,19 @@ export type Database = {
         Returns: number
       }
       get_total_metrics:
+        | {
+            Args: never
+            Returns: {
+              bandwidth: number
+              build_time_unit: number
+              fail: number
+              get: number
+              install: number
+              mau: number
+              storage: number
+              uninstall: number
+            }[]
+          }
         | {
             Args: { org_id: string }
             Returns: {
