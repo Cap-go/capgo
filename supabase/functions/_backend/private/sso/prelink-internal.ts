@@ -106,7 +106,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     throw simpleError('invalid_body', 'Missing required fields: provider_id, org_id, domain')
   }
 
-  const { provider_id, domain } = rawBody
+  const { provider_id, org_id, domain } = rawBody
   const requestId = c.get('requestId')
 
   const normalizedDomain = domain.toLowerCase().trim()
@@ -128,6 +128,11 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
   if (providerCheckError || !providerCheck) {
     cloudlogErr({ requestId, message: 'Provider not found for prelink', providerId: provider_id, error: providerCheckError })
     return quickError(404, 'provider_not_found', 'SSO provider not found')
+  }
+
+  if (providerCheck.org_id !== org_id) {
+    cloudlogErr({ requestId, message: 'Org mismatch: provider does not belong to requested org', providerId: provider_id, requestOrgId: org_id, providerOrgId: providerCheck.org_id })
+    return quickError(403, 'org_mismatch', 'SSO provider does not belong to the specified organization')
   }
 
   if (providerCheck.status !== 'active') {
