@@ -29,9 +29,7 @@ export function useSSOProvisioning() {
         .maybeSingle()
 
       if (userError) {
-        console.error('SSO provisioning: failed to check user record', userError)
-        error.value = 'Failed to verify user account'
-        return
+        console.error('SSO provisioning: failed to check user record (non-blocking)', userError)
       }
 
       if (!userRecord) {
