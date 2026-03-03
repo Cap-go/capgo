@@ -19,6 +19,21 @@ describe('Build Endpoints Job/App Binding', () => {
 
   let buildRequestId: string | null = null
 
+  const fetchBuildRequestState = async () => {
+    const supabase = getSupabaseClient()
+    const { data, error } = await supabase
+      .from('build_requests')
+      .select('status, app_id, last_error')
+      .eq('id', buildRequestId)
+      .single()
+
+    if (error) {
+      throw error
+    }
+
+    return data
+  }
+
   beforeAll(async () => {
     // Seed sequentially to avoid unique constraint races (orgs/stripe_info share IDs).
     await resetAndSeedAppData(appA, { orgId, userId, stripeCustomerId })
@@ -154,6 +169,8 @@ describe('Build Endpoints Job/App Binding', () => {
   })
 
   it.concurrent('POST /build/cancel/:jobId denies cross-app jobId with allowed app_id', async () => {
+    const initialState = await fetchBuildRequestState()
+
     const response = await fetch(`${BASE_URL}/build/cancel/${jobIdB}`, {
       method: 'POST',
       headers: {
@@ -166,9 +183,14 @@ describe('Build Endpoints Job/App Binding', () => {
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
     expect(data).toHaveProperty('error', 'unauthorized')
+
+    const afterState = await fetchBuildRequestState()
+    expect(afterState).toEqual(initialState)
   })
 
   it.concurrent('POST /build/start/:jobId denies cross-app jobId with allowed app_id', async () => {
+    const initialState = await fetchBuildRequestState()
+
     const response = await fetch(`${BASE_URL}/build/start/${jobIdB}`, {
       method: 'POST',
       headers: {
@@ -181,5 +203,8 @@ describe('Build Endpoints Job/App Binding', () => {
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
     expect(data).toHaveProperty('error', 'unauthorized')
+
+    const afterState = await fetchBuildRequestState()
+    expect(afterState).toEqual(initialState)
   })
 })
