@@ -17,7 +17,6 @@ export interface CapgoConfig {
   host: string
   hostWeb: string
   stripeEnabled?: boolean
-  ssoEnabled?: boolean
 }
 
 export function isLocal(supaHost: string) {
@@ -26,7 +25,6 @@ export function isLocal(supaHost: string) {
 
 export function getLocalConfig() {
   const stripeEnabledEnv = import.meta.env.VITE_STRIPE_ENABLED as string | undefined
-  const ssoEnabledEnv = import.meta.env.VITE_ENABLE_SSO as string | undefined
   return {
     supaHost: import.meta.env.VITE_SUPABASE_URL as string,
     supaKey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
@@ -34,13 +32,11 @@ export function getLocalConfig() {
     host: import.meta.env.VITE_APP_URL as string,
     hostWeb: import.meta.env.LANDING_URL as string,
     stripeEnabled: stripeEnabledEnv === undefined ? true : stripeEnabledEnv !== 'false',
-    ssoEnabled: ssoEnabledEnv === 'true',
   } as CapgoConfig
 }
 
 let config: CapgoConfig = getLocalConfig()
 export const stripeEnabled = ref<boolean>(config.stripeEnabled ?? true)
-export const ssoEnabled = ref<boolean>(config.ssoEnabled ?? false)
 
 export async function getRemoteConfig() {
   const localConfig = getLocalConfig()
@@ -52,20 +48,17 @@ export async function getRemoteConfig() {
     if (!response.ok) {
       console.log('Local config', localConfig)
       stripeEnabled.value = localConfig.stripeEnabled ?? stripeEnabled.value
-      ssoEnabled.value = localConfig.ssoEnabled ?? ssoEnabled.value
       return localConfig as CapgoConfig
     }
     const data = await response.json() as CapgoConfig
     const merged = { ...localConfig, ...data } as CapgoConfig
     config = merged
     stripeEnabled.value = merged.stripeEnabled ?? stripeEnabled.value
-    ssoEnabled.value = merged.ssoEnabled ?? ssoEnabled.value
     return merged
   }
   catch {
     console.log('Local config', localConfig)
     stripeEnabled.value = localConfig.stripeEnabled ?? stripeEnabled.value
-    ssoEnabled.value = localConfig.ssoEnabled ?? ssoEnabled.value
     return localConfig as CapgoConfig
   }
 }

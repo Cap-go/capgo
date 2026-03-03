@@ -27,6 +27,7 @@ beforeAll(async () => {
     management_email: `sso-test-${SSO_TEST_ORG_ID}@capgo.app`,
     created_by: USER_ID,
     customer_id: SSO_TEST_CUSTOMER_ID,
+    sso_enabled: true,
   })
   if (orgError)
     throw orgError
