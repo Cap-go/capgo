@@ -98,6 +98,12 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     })
 
   if (insertError) {
+    // SQLSTATE 23505 = unique_violation — user was inserted between our check and insert (race condition)
+    const isDuplicate = insertError.code === '23505' || insertError.message?.toLowerCase().includes('duplicate')
+    if (isDuplicate) {
+      cloudlog({ requestId, message: 'User already member (concurrent insert)', userId, orgId: provider.org_id })
+      return c.json({ success: true, already_member: true })
+    }
     cloudlogErr({ requestId, message: 'Failed to insert user into org_users', userId, orgId: provider.org_id, error: insertError })
     return quickError(500, 'provision_failed', 'Failed to provision user to organization')
   }
