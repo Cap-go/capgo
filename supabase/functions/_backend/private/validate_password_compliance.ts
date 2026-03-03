@@ -120,10 +120,12 @@ app.post('/', async (c) => {
     cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - login failed', error: errorMessage })
 
     if (errorMessage.toLowerCase().includes('captcha')) {
-      return quickError(401, 'captcha_failed', 'Captcha verification failed')
+      // Security fix: use generic error to prevent credential oracle
+      return quickError(400, 'validation_failed', 'Unable to validate password compliance')
     }
 
-    return quickError(401, 'invalid_credentials', 'Invalid email or password')
+    // Security fix: use same generic error for invalid credentials to prevent credential oracle
+    return quickError(400, 'validation_failed', 'Unable to validate password compliance')
   }
 
   const userId = signInData.user.id
@@ -137,7 +139,8 @@ app.post('/', async (c) => {
   }
 
   if (!orgAccess.allowed) {
-    return quickError(403, 'not_member', 'You are not a member of this organization')
+    // Security fix: use same generic error to prevent org membership oracle after successful auth
+    return quickError(400, 'validation_failed', 'Unable to validate password compliance')
   }
 
   // Fetch the org's password policy after membership verification.
