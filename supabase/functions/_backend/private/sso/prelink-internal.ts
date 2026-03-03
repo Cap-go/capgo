@@ -63,6 +63,9 @@ async function adminDeleteIdentity(c: Context<MiddlewareKeyVariables>, userId: s
   const serviceRoleKey = getEnv(c, 'SUPABASE_SERVICE_ROLE_KEY')
   const url = `${supabaseUrl}/auth/v1/admin/users/${userId}/identities/${identityId}`
 
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 5000)
+
   try {
     const res = await fetch(url, {
       method: 'DELETE',
@@ -70,6 +73,7 @@ async function adminDeleteIdentity(c: Context<MiddlewareKeyVariables>, userId: s
         Authorization: `Bearer ${serviceRoleKey}`,
         apikey: serviceRoleKey,
       },
+      signal: controller.signal,
     })
 
     if (!res.ok) {
@@ -80,7 +84,13 @@ async function adminDeleteIdentity(c: Context<MiddlewareKeyVariables>, userId: s
     return { error: null }
   }
   catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') {
+      return { error: 'Request timed out after 5s' }
+    }
     return { error: err instanceof Error ? err.message : String(err) }
+  }
+  finally {
+    clearTimeout(timeout)
   }
 }
 
