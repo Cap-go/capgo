@@ -1,5 +1,6 @@
 import { BRES, getBodyOrQuery, honoFactory, simpleError } from '../../utils/hono.ts'
 import { middlewareKey } from '../../utils/hono_middleware.ts'
+import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
 import { isValidAppId } from '../../utils/utils.ts'
 
@@ -15,7 +16,6 @@ interface UpdateMetadataBody {
 app.post('/', middlewareKey(['all', 'write']), async (c) => {
   const body = await getBodyOrQuery<UpdateMetadataBody>(c)
   const apikey = c.get('apikey')!
-  // We don't need apikey for this endpoint as middleware handles permission checks
 
   if (!body.app_id || !body.version_id) {
     throw simpleError('missing_required_fields', 'Missing required fields', { app_id: body.app_id, version_id: body.version_id })
@@ -23,6 +23,10 @@ app.post('/', middlewareKey(['all', 'write']), async (c) => {
 
   if (!isValidAppId(body.app_id)) {
     throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
+  }
+
+  if (!(await checkPermission(c, 'app.upload_bundle', { appId: body.app_id }))) {
+    throw simpleError('no_permission', 'You do not have permission to update bundle metadata for this app', { app_id: body.app_id })
   }
 
   const { data: version, error: versionError } = await supabaseApikey(c, apikey.key)
