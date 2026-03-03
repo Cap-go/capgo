@@ -393,7 +393,6 @@ describe('build Time Tracking System', () => {
   })
 
   it.concurrent('should reject negative build time', async () => {
-  it.concurrent('should reject negative build time', async () => {
     const supabase = getSupabaseClient()
     const buildId = randomUUID()
 
