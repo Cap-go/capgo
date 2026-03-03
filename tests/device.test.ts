@@ -7,7 +7,7 @@ const APPNAME_DEVICE = `${APP_NAME}.d.${id}`
 
 beforeAll(async () => {
   await Promise.all([resetAndSeedAppData(APPNAME_DEVICE), resetAndSeedAppDataStats(APPNAME_DEVICE)])
-})
+}, 60_000)
 afterAll(async () => {
   await resetAppData(APPNAME_DEVICE)
   await resetAppDataStats(APPNAME_DEVICE)

@@ -522,7 +522,7 @@
   "credits-load-error": "No pudimos cargar tu historial de créditos. Inténtalo de nuevo.",
   "credits-next-expiration": "Próximo vencimiento de créditos",
   "credits-only-info-description": "Actualmente no estás suscrito a ningún plan.",
-  "credits-only-info-link": "Gestiona tu uso del crédito",
+  "credits-only-info-link": "Gestiona tu uso de créditos",
   "credits-only-info-title": "Utilizar créditos en lugar de un plan",
   "credits-pagination-label": "Página {current} / {total}",
   "credits-pricing-bandwidth-subtitle": "Por GiB entregado más allá de lo incluido en tu plan.",
