@@ -11,17 +11,7 @@ CREATE OR REPLACE FUNCTION "public"."upsert_version_meta"(
 AS $$
 DECLARE
   existing_count integer;
-  v_is_service_role boolean;
 BEGIN
-  v_is_service_role := (
-    ((SELECT auth.jwt() ->> 'role') = 'service_role')
-    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
-  );
-
-  IF NOT v_is_service_role THEN
-    RETURN FALSE;
-  END IF;
-
   IF p_size > 0 THEN
     -- Check for existing positive size
     SELECT COUNT(*) INTO existing_count
