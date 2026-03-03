@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { simpleError } from '../../utils/hono.ts'
+import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
@@ -33,7 +33,7 @@ export async function tusProxy(
       message: 'Builder not configured for TUS proxy',
       job_id: jobId,
     })
-    throw simpleError('service_unavailable', 'Builder service not configured')
+    throw quickError(503, 'service_unavailable', 'Builder service not configured')
   }
 
   // Use authenticated client for data queries - RLS will enforce access

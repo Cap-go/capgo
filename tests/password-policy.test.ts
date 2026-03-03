@@ -1,4 +1,3 @@
-import type { PostgrestError } from '@supabase/supabase-js'
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
@@ -29,6 +28,7 @@ beforeAll(async () => {
     management_email: TEST_EMAIL,
     created_by: USER_ID,
     customer_id: customerId,
+    use_new_rbac: false, // Explicitly legacy — preserves legacy check_min_rights coverage
   })
   if (error)
     throw error
@@ -278,7 +278,7 @@ describe('[POST] /private/validate_password_compliance', () => {
     if (disableError)
       throw disableError
 
-    let restoreError: PostgrestError | null = null
+    let testError: Error | null = null
     try {
       const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
         headers,
@@ -294,15 +294,26 @@ describe('[POST] /private/validate_password_compliance', () => {
       const responseData = await response.json() as { error: string }
       expect(responseData.error).toBe('no_policy')
     }
+    catch (error) {
+      testError = error as Error
+    }
     finally {
-      const { error } = await getSupabaseClient()
+      const { error: restoreError } = await getSupabaseClient()
         .from('orgs')
         .update({ password_policy_config: policyConfig })
         .eq('id', ORG_ID)
-      restoreError = error ?? null
+
+      // If restore failed, throw it (but preserve test failure if there was one)
+      if (restoreError) {
+        if (testError)
+          throw new Error(`Test failed AND restore failed: ${testError.message} | Restore error: ${restoreError.message}`)
+        throw restoreError
+      }
+
+      // Re-throw original test error if any
+      if (testError)
+        throw testError
     }
-    if (restoreError)
-      throw restoreError
   })
 
   it('reject request with invalid credentials', async () => {
@@ -409,7 +420,7 @@ describe('[POST] /private/validate_password_compliance', () => {
       method: 'POST',
       body: 'invalid json',
     })
-    expect(response.status).toBeGreaterThanOrEqual(400)
+    expect(response.status).toBe(400)
   })
 })
 
@@ -478,13 +489,14 @@ describe('password Policy Enforcement Integration', () => {
       is_good_plan: true,
     })
 
-    // Create org with password policy enabled
+    // Create org with password policy enabled (legacy mode — preserves legacy check_min_rights coverage)
     await getSupabaseClient().from('orgs').insert({
       id: orgWithPolicyId,
       name: orgWithPolicyName,
       management_email: TEST_EMAIL,
       created_by: USER_ID,
       customer_id: orgWithPolicyCustomerId,
+      use_new_rbac: false,
       password_policy_config: {
         enabled: true,
         min_length: 10,
@@ -509,8 +521,8 @@ describe('password Policy Enforcement Integration', () => {
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', orgWithPolicyCustomerId)
   })
 
-  it('check_min_rights respects password policy', async () => {
-    // Directly test the check_min_rights function via RPC
+  it('check_min_rights respects password policy (legacy mode)', async () => {
+    // Directly test the check_min_rights function via RPC in legacy mode
     const { data, error } = await getSupabaseClient().rpc('check_min_rights', {
       min_right: 'read',
       user_id: USER_ID,
@@ -523,6 +535,67 @@ describe('password Policy Enforcement Integration', () => {
     // We're testing that the function works, not the specific result
     expect(error).toBeNull()
     expect(typeof data).toBe('boolean')
+  })
+
+  it('check_min_rights respects password policy (RBAC mode)', async () => {
+    // Create a dedicated RBAC org with password policy to test the RBAC path
+    const orgRbacId = randomUUID()
+    const orgRbacCustomerId = `cus_pwd_rbac_${orgRbacId}`
+
+    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
+      customer_id: orgRbacCustomerId,
+      status: 'succeeded',
+      product_id: 'prod_LQIregjtNduh4q',
+      subscription_id: `sub_rbac_${orgRbacId}`,
+      trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+      is_good_plan: true,
+    })
+    expect(stripeError).toBeNull()
+
+    const { error: orgError } = await getSupabaseClient().from('orgs').insert({
+      id: orgRbacId,
+      name: `RBAC Pwd Policy Org ${orgRbacId}`,
+      management_email: TEST_EMAIL,
+      created_by: USER_ID,
+      customer_id: orgRbacCustomerId,
+      use_new_rbac: true, // RBAC path
+      password_policy_config: {
+        enabled: true,
+        min_length: 10,
+        require_uppercase: true,
+        require_number: true,
+        require_special: true,
+      },
+    })
+    expect(orgError).toBeNull()
+
+    // org_users + role_bindings are created by triggers on org + org_users insert
+    const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+      org_id: orgRbacId,
+      user_id: USER_ID,
+      user_right: 'super_admin',
+    })
+    expect(orgUserError).toBeNull()
+
+    try {
+      // check_min_rights routes through RBAC path. Password policy is checked
+      // before the RBAC/legacy fork, so it should still be enforced.
+      const { data, error } = await getSupabaseClient().rpc('check_min_rights', {
+        min_right: 'read',
+        user_id: USER_ID,
+        org_id: orgRbacId,
+        app_id: '' as any,
+        channel_id: 0 as any,
+      })
+      expect(error).toBeNull()
+      expect(typeof data).toBe('boolean')
+    }
+    finally {
+      await getSupabaseClient().from('role_bindings').delete().eq('org_id', orgRbacId)
+      await getSupabaseClient().from('org_users').delete().eq('org_id', orgRbacId)
+      await getSupabaseClient().from('orgs').delete().eq('id', orgRbacId)
+      await getSupabaseClient().from('stripe_info').delete().eq('customer_id', orgRbacCustomerId)
+    }
   })
 
   it('get_orgs_v7 includes password policy fields', async () => {
@@ -548,16 +621,28 @@ describe('password Policy Enforcement Integration', () => {
 describe('user_password_compliance table', () => {
   it('can insert compliance record via service role', async () => {
     // Get the policy hash
-    const { data: org } = await getSupabaseClient()
+    const { data: org, error: orgError } = await getSupabaseClient()
       .from('orgs')
       .select('password_policy_config')
       .eq('id', ORG_ID)
       .single()
 
-    const policyHash = org?.password_policy_config
-      // eslint-disable-next-line node/prefer-global/buffer
-      ? Buffer.from(JSON.stringify(org.password_policy_config)).toString('base64').substring(0, 32)
-      : 'test_hash'
+    expect(orgError).toBeNull()
+    expect(org?.password_policy_config).not.toBeNull()
+    const policyConfig = org?.password_policy_config
+    if (policyConfig == null)
+      throw new Error('Expected password_policy_config to be set for test org')
+
+    // Use the same RPC that production uses to compute the password policy hash
+    const { data: rpcResult, error: rpcError } = await getSupabaseClient().rpc('get_password_policy_hash', {
+      policy_config: policyConfig,
+    })
+
+    expect(rpcError).toBeNull()
+    expect(rpcResult).not.toBeNull()
+    expect(typeof rpcResult).toBe('string')
+
+    const policyHash = rpcResult as string
 
     const { error } = await getSupabaseClient()
       .from('user_password_compliance')

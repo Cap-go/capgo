@@ -27,6 +27,10 @@ export interface JWTClaims {
   iat?: number
   aud?: string | string[]
   iss?: string
+  app_metadata?: {
+    provider?: string
+    [key: string]: unknown
+  }
 }
 
 const claimsClients = new Map<string, ReturnType<typeof createClient<Database>>>()

@@ -35,6 +35,8 @@ SELECT ok(
 );
 
 -- 5) Grant platform_super_admin role to test_admin
+-- Note: Use service_role to bypass RLS for test setup
+SET LOCAL ROLE service_role;
 INSERT INTO public.role_bindings (
     principal_type,
     principal_id,
@@ -50,7 +52,7 @@ SELECT
     'c591b04e-cf29-4945-b9a0-776d0672061a'
 FROM public.roles r
 WHERE r.name = 'platform_super_admin';
-
+RESET ROLE;
 SELECT ok(
     EXISTS (
         SELECT 1 FROM public.role_bindings rb

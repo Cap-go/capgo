@@ -245,6 +245,8 @@ declare global {
   const useResizeObserver: typeof import('@vueuse/core').useResizeObserver
   const useRoute: typeof import('vue-router').useRoute
   const useRouter: typeof import('vue-router').useRouter
+  const useSSOProvisioning: typeof import('./composables/useSSOProvisioning').useSSOProvisioning
+  const useSSORouting: typeof import('./composables/useSSORouting').useSSORouting
   const useSSRWidth: typeof import('@vueuse/core').useSSRWidth
   const useScreenOrientation: typeof import('@vueuse/core').useScreenOrientation
   const useScreenSafeArea: typeof import('@vueuse/core').useScreenSafeArea
@@ -323,6 +325,9 @@ declare global {
   // @ts-ignore
   export type { UpdateEndpointRequest } from './composables/useDeviceUpdateFormat'
   import('./composables/useDeviceUpdateFormat')
+  // @ts-ignore
+  export type { CheckDomainResponse } from './composables/useSSORouting'
+  import('./composables/useSSORouting')
   // @ts-ignore
   export type { MetricCategory, DateRangeMode } from './stores/adminDashboard'
   import('./stores/adminDashboard')
@@ -583,6 +588,8 @@ declare module 'vue' {
     readonly useResizeObserver: UnwrapRef<typeof import('@vueuse/core')['useResizeObserver']>
     readonly useRoute: UnwrapRef<typeof import('vue-router')['useRoute']>
     readonly useRouter: UnwrapRef<typeof import('vue-router')['useRouter']>
+    readonly useSSOProvisioning: UnwrapRef<typeof import('./composables/useSSOProvisioning')['useSSOProvisioning']>
+    readonly useSSORouting: UnwrapRef<typeof import('./composables/useSSORouting')['useSSORouting']>
     readonly useSSRWidth: UnwrapRef<typeof import('@vueuse/core')['useSSRWidth']>
     readonly useScreenOrientation: UnwrapRef<typeof import('@vueuse/core')['useScreenOrientation']>
     readonly useScreenSafeArea: UnwrapRef<typeof import('@vueuse/core')['useScreenSafeArea']>

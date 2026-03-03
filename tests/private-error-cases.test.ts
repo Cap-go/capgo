@@ -25,12 +25,15 @@ beforeAll(async () => {
     throw stripeError
 
   // Create unique test organization (WITH a customer_id so RLS allows access)
+  // use_new_rbac: false — this test checks error handling (404 for missing app).
+  // In RBAC mode check_min_rights fails for non-existent apps before the app lookup.
   const { error: orgError } = await getSupabaseClient().from('orgs').insert({
     id: testOrgId,
     name: `Test Private Error Org ${id}`,
     management_email: testOrgEmail,
     created_by: USER_ID,
     customer_id: testCustomerId,
+    use_new_rbac: false,
   })
 
   if (orgError)
