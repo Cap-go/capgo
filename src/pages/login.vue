@@ -14,7 +14,7 @@ import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import mfaIcon from '~icons/simple-icons/2fas?raw'
 import { hideLoader } from '~/services/loader'
-import { autoAuth, defaultApiHost, hashEmail, useSupabase } from '~/services/supabase'
+import { autoAuth, defaultApiHost, hashEmail, ssoEnabled, useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 
 const route = useRoute('/login')
@@ -193,8 +193,13 @@ async function handleEmailContinue(form: { email: string }) {
   isDomainChecking.value = true
   emailForLogin.value = form.email
 
-  const result = await checkDomain(form.email)
-  hasSso.value = result.has_sso
+  if (ssoEnabled.value) {
+    const result = await checkDomain(form.email)
+    hasSso.value = result.has_sso
+  }
+  else {
+    hasSso.value = false
+  }
 
   isDomainChecking.value = false
   statusAuth.value = 'credentials'

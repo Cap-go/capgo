@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconLoader from '~icons/lucide/loader-2'
 import { useSSOProvisioning } from '~/composables/useSSOProvisioning'
-import { useSupabase } from '~/services/supabase'
+import { ssoEnabled, useSupabase } from '~/services/supabase'
 
 const route = useRoute()
 const router = useRouter()
@@ -33,6 +33,11 @@ function validateRedirectPath(path: string | undefined): string {
 }
 
 async function exchangeCode() {
+  if (!ssoEnabled.value) {
+    router.replace('/login')
+    return
+  }
+
   const code = route.query.code as string | undefined
 
   if (!code) {

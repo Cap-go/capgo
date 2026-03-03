@@ -61,6 +61,7 @@ import { app as on_version_update } from '../../supabase/functions/_backend/trig
 import { app as queue_consumer } from '../../supabase/functions/_backend/triggers/queue_consumer.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
 import { createAllCatch, createHono } from '../../supabase/functions/_backend/utils/hono.ts'
+import { getEnv } from '../../supabase/functions/_backend/utils/utils.ts'
 import { version } from '../../supabase/functions/_backend/utils/version.ts'
 
 // Public API
@@ -104,6 +105,12 @@ appPrivate.route('/create_device', create_device)
 appPrivate.route('/latency', latency)
 appPrivate.route('/events', events)
 appPrivate.route('/groups', groups)
+// SSO feature flag: return 404 for all SSO routes when disabled
+appPrivate.use('/sso/*', async (c, next) => {
+  if (getEnv(c, 'ENABLE_SSO') !== 'true')
+    return c.json({ error: 'not_found' }, 404)
+  await next()
+})
 appPrivate.route('/sso/check-domain', sso_check_domain)
 appPrivate.route('/sso/check-enforcement', sso_check_enforcement)
 appPrivate.route('/sso/providers', sso_providers)

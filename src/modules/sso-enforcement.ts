@@ -1,5 +1,5 @@
 import type { UserModule } from '~/types'
-import { defaultApiHost, useSupabase } from '~/services/supabase'
+import { defaultApiHost, ssoEnabled, useSupabase } from '~/services/supabase'
 
 interface SsoEnforcementResponse {
   allowed: boolean
@@ -52,6 +52,10 @@ export function clearSsoEnforcementCache(): void {
 }
 
 export const install: UserModule = ({ router }) => {
+  // SSO feature flag: skip enforcement when SSO is disabled
+  if (!ssoEnabled.value)
+    return
+
   router.beforeEach(async (to, _from, next) => {
     if (isPublicRoute(to.path))
       return next()

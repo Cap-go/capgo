@@ -16,7 +16,7 @@ import IconUser from '~icons/heroicons/user'
 import SsoConfiguration from '~/components/organizations/SsoConfiguration.vue'
 import { checkPermissions } from '~/services/permissions'
 import { createSignedImageUrl } from '~/services/storage'
-import { getCurrentPlanNameOrg, useSupabase } from '~/services/supabase'
+import { getCurrentPlanNameOrg, ssoEnabled, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
@@ -1444,7 +1444,7 @@ onMounted(async () => {
           </section>
 
           <!-- SSO Configuration Section (Enterprise only) -->
-          <section v-if="hasOrgPerm" class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
+          <section v-if="hasOrgPerm && ssoEnabled" class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
             <!-- Enterprise Plan: Show SSO Configuration -->
             <template v-if="isEnterprisePlan">
               <div class="flex items-start gap-4 mb-6">
