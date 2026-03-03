@@ -140,12 +140,16 @@ export async function updateOrCreateChannel(c: Context, update: Database['public
     .select('*')
     .eq('app_id', update.app_id)
     .eq('name', update.name)
-    .eq('created_by', update.created_by)
     .single()
 
+  const upsertPayload = {
+    ...update,
+    created_by: existingChannel?.created_by || update.created_by,
+  }
+
   if (existingChannel) {
-    const fieldsDiffer = Object.keys(update).some(key =>
-      (update as any)[key] !== (existingChannel as any)[key] && key !== 'created_at' && key !== 'updated_at',
+    const fieldsDiffer = Object.keys(upsertPayload).some(key =>
+      (upsertPayload as any)[key] !== (existingChannel as any)[key] && key !== 'created_at' && key !== 'updated_at',
     )
     if (!fieldsDiffer) {
       cloudlog({ requestId: c.get('requestId'), message: 'No fields differ, no update needed' })
@@ -155,7 +159,7 @@ export async function updateOrCreateChannel(c: Context, update: Database['public
 
   return supabaseAdmin(c)
     .from('channels')
-    .upsert(update, { onConflict: 'app_id, name' })
+    .upsert(upsertPayload, { onConflict: 'app_id, name' })
     .throwOnError()
 }
 
