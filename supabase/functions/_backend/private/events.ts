@@ -17,7 +17,8 @@ app.use('/', useCors)
 app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   const body = await parseBody<TrackOptions & { notifyConsole?: boolean }>(c)
 
-  const orgId = body.user_id ?? c.get('auth')?.userId ?? ''
+  // Security fix: always use authenticated identity to prevent cross-org event injection (IDOR)
+  const orgId = c.get('auth')?.userId ?? ''
 
   // notifyConsole: broadcast to Supabase Realtime only, skip all tracking
   if (body.notifyConsole) {
@@ -49,13 +50,13 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     description: body.description,
     ip,
   }))
-  if (body.user_id && body.tags && typeof body.tags['app-id'] === 'string' && body.event === 'onboarding-step-done') {
+  if (orgId && body.tags && typeof body.tags['app-id'] === 'string' && body.event === 'onboarding-step-done') {
     const appId = body.tags['app-id']
     await backgroundTask(c, Promise.all([
       supabase
         .from('orgs')
         .select('*')
-        .eq('id', body.user_id)
+        .eq('id', orgId)
         .single(),
       supabase
         .from('apps')
