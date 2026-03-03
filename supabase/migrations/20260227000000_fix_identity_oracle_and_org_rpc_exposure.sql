@@ -13,8 +13,6 @@ REVOKE ALL ON FUNCTION "public"."get_identity_org_appid" (
 ) FROM "public";
 
 -- Keep these helpers available where needed by RLS and trusted internal services.
-
--- Keep these helpers available where needed by RLS and trusted internal services.
 GRANT EXECUTE ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode"[]) TO "postgres";
 GRANT EXECUTE ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode"[]) TO "service_role";
 GRANT EXECUTE ON FUNCTION "public"."get_identity_org_allowed" ("keymode" "public"."key_mode"[], "org_id" "uuid") TO "postgres";
