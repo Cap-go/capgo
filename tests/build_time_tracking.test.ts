@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { fetchWithRetry, getEndpointUrl, getSupabaseClient, PRODUCT_ID, resetAppData, resetAppDataStats, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { USER_PASSWORD, fetchWithRetry, getEndpointUrl, getSupabaseClient, PRODUCT_ID, resetAppData, resetAppDataStats, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 // Generate unique IDs per test run to avoid conflicts with parallel test runs
 const testRunId = randomUUID()
@@ -135,7 +135,7 @@ afterAll(async () => {
 })
 
 describe('build Time Tracking System', () => {
-  it('should handle too big build time correctly', async () => {
+  it.concurrent('should handle too big build time correctly', async () => {
     const supabase = getSupabaseClient()
 
     // Insert high build time usage directly into daily_build_time
@@ -198,7 +198,7 @@ describe('build Time Tracking System', () => {
     expect(isAllowedActionBuildTime).toBe(false) // Build time should be blocked
   })
 
-  it('should correctly reset build_time_exceeded flag directly', async () => {
+  it.concurrent('should correctly reset build_time_exceeded flag directly', async () => {
     const supabase = getSupabaseClient()
 
     // First set high build time using build_logs
@@ -251,7 +251,7 @@ describe('build Time Tracking System', () => {
   // These tests verify record_build_time inserts into build_logs correctly (tested below).
   // Testing get_total_metrics requires inserting into daily_build_time directly.
 
-  it('should correctly record build time using RPC function (iOS 2x multiplier)', async () => {
+  it.concurrent('should correctly record build time using RPC function (iOS 2x multiplier)', async () => {
     const supabase = getSupabaseClient()
     const buildId = randomUUID()
 
@@ -274,7 +274,7 @@ describe('build Time Tracking System', () => {
     expect(buildLog?.billable_seconds).toBe(1200) // iOS 2x multiplier
   })
 
-  it('should correctly apply Android 1x multiplier', async () => {
+  it.concurrent('should correctly apply Android 1x multiplier', async () => {
     const supabase = getSupabaseClient()
     const buildId = randomUUID()
 
@@ -297,7 +297,7 @@ describe('build Time Tracking System', () => {
     expect(buildLog?.billable_seconds).toBe(150) // Android 1x multiplier
   })
 
-  it('should upsert on duplicate build_id', async () => {
+  it.concurrent('should upsert on duplicate build_id', async () => {
     const supabase = getSupabaseClient()
     const buildId = randomUUID()
 
@@ -331,7 +331,7 @@ describe('build Time Tracking System', () => {
     expect(logs?.[0]?.billable_seconds).toBe(1400)
   })
 
-  it('should reject invalid platform', async () => {
+  it.concurrent('should reject invalid platform', async () => {
     const supabase = getSupabaseClient()
     const buildId = randomUUID()
 
@@ -345,7 +345,7 @@ describe('build Time Tracking System', () => {
     expect(error).toBeTruthy()
   })
 
-  it('should reject record_build_time calls from anonymous clients', async () => {
+  it.concurrent('should reject record_build_time calls from anonymous clients', async () => {
     const supabaseAnon = createClient(
       process.env.SUPABASE_URL!,
       process.env.SUPABASE_ANON_KEY!,
@@ -365,7 +365,34 @@ describe('build Time Tracking System', () => {
     expect(error).toBeTruthy()
   })
 
-  it('should reject negative build time', async () => {
+  it.concurrent('should reject record_build_time calls from authenticated clients', async () => {
+    const supabaseAuth = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_ANON_KEY!,
+      {
+        auth: { persistSession: false },
+      },
+    )
+
+    const { error: signInError } = await supabaseAuth.auth.signInWithPassword({
+      email: TEST_EMAIL,
+      password: USER_PASSWORD,
+    })
+
+    expect(signInError).toBeNull()
+
+    const { error } = await supabaseAuth.rpc('record_build_time', {
+      p_org_id: ORG_ID,
+      p_user_id: USER_ID,
+      p_build_id: randomUUID(),
+      p_platform: 'ios',
+      p_build_time_unit: 60,
+    })
+
+    expect(error).toBeTruthy()
+  })
+
+  it.concurrent('should reject negative build time', async () => {
     const supabase = getSupabaseClient()
     const buildId = randomUUID()
 
