@@ -49,7 +49,7 @@ app.post('/members', middlewareKey(['all', 'write']), async (c) => {
   return inviteUser(c, body, apikey)
 })
 
-app.delete('/members', middlewareKey(['all', 'write']), async (c) => {
+app.delete('/members', middlewareKey(['all']), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return deleteMember(c, body, apikey)
