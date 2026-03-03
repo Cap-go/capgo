@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import { z } from 'zod/mini'
 import { BRES, createHono, middlewareAuth, parseBody, quickError, simpleError, useCors } from '../../utils/hono.ts'
+import { cloudlogErr } from '../../utils/logging.ts'
 import { requireEnterprisePlan } from '../../utils/plan-gating.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { createSSOProvider, deleteSSOProvider } from '../../utils/supabase-management.ts'
@@ -137,7 +138,7 @@ app.post('/', async (c) => {
     if (error || !data) {
       // Rollback: delete the external provider to avoid orphan
       await deleteSSOProvider(c, managementProvider.id).catch((cleanupError) => {
-        console.error('Failed to cleanup external SSO provider after DB insert failure:', cleanupError)
+        cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to cleanup external SSO provider after DB insert failure', error: cleanupError })
       })
       return quickError(500, 'provider_create_failed', 'Failed to create SSO provider', { error })
     }
@@ -147,7 +148,7 @@ app.post('/', async (c) => {
   catch (err) {
     // Rollback on any exception
     await deleteSSOProvider(c, managementProvider.id).catch((cleanupError) => {
-      console.error('Failed to cleanup external SSO provider after exception:', cleanupError)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to cleanup external SSO provider after exception', error: cleanupError })
     })
     throw err
   }
