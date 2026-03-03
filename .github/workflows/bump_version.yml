@@ -65,3 +65,57 @@ jobs:
           remote_repo="https://${GITHUB_ACTOR}:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git"
           git pull $remote_repo $CURRENT_BRANCH
           git push $remote_repo HEAD:$CURRENT_BRANCH --follow-tags --tags
+
+  sync_schema_types:
+    needs: bump-version
+    if: ${{ github.ref == 'refs/heads/main' && !startsWith(github.event.head_commit.message, 'chore(release):') && !startsWith(github.event.head_commit.message, 'chore(auto-sync):') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
+          fetch-depth: 0
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Sync generated schema and types
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+        run: |
+          if ! git rev-parse -q --verify HEAD^ >/dev/null 2>&1; then
+            echo "No parent commit for HEAD, skipping schema/types sync."
+            exit 0
+          fi
+
+          if ! git diff --name-only HEAD^ HEAD | grep -q '^supabase/migrations/'; then
+            echo "No migration changes in latest commit, skipping schema/types sync."
+            exit 0
+          fi
+
+          if [ -z "${{ secrets.SUPABASE_PROJECT_ID_PROD }}" ]; then
+            echo "SUPABASE_PROJECT_ID_PROD is required for schema/types sync" >&2
+            exit 1
+          fi
+
+          bunx supabase --version
+          bunx supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_ID_PROD }}
+          bun schemas
+          BRANCH=main bun types
+
+          if git diff --quiet supabase/schemas/prod.sql src/types/supabase.types.ts supabase/functions/_backend/utils/supabase.types.ts; then
+            echo "No schema/types drift detected."
+            exit 0
+          fi
+
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git add supabase/schemas/prod.sql src/types/supabase.types.ts supabase/functions/_backend/utils/supabase.types.ts
+          git commit -m "chore(auto-sync): update supabase schema and generated types [skip ci]"
+
+          remote_repo="https://x-access-token:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git"
+          git push "$remote_repo" HEAD:main
