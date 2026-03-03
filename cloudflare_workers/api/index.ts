@@ -22,6 +22,13 @@ import { app as stripe_checkout } from '../../supabase/functions/_backend/privat
 import { app as stripe_portal } from '../../supabase/functions/_backend/private/stripe_portal.ts'
 import { app as validate_password_compliance } from '../../supabase/functions/_backend/private/validate_password_compliance.ts'
 import { app as verify_email_otp } from '../../supabase/functions/_backend/private/verify_email_otp.ts'
+import { app as sso_check_domain } from '../../supabase/functions/_backend/private/sso/check-domain.ts'
+import { app as sso_check_enforcement } from '../../supabase/functions/_backend/private/sso/check-enforcement.ts'
+import { app as sso_prelink_internal } from '../../supabase/functions/_backend/private/sso/prelink-internal.ts'
+import { app as sso_prelink } from '../../supabase/functions/_backend/private/sso/prelink.ts'
+import { app as sso_providers } from '../../supabase/functions/_backend/private/sso/providers.ts'
+import { app as sso_provision_user } from '../../supabase/functions/_backend/private/sso/provision-user.ts'
+import { app as sso_verify_dns } from '../../supabase/functions/_backend/private/sso/verify-dns.ts'
 import { app as apikey } from '../../supabase/functions/_backend/public/apikey/index.ts'
 import { app as appEndpoint } from '../../supabase/functions/_backend/public/app/index.ts'
 import { app as build } from '../../supabase/functions/_backend/public/build/index.ts'
@@ -97,6 +104,13 @@ appPrivate.route('/create_device', create_device)
 appPrivate.route('/latency', latency)
 appPrivate.route('/events', events)
 appPrivate.route('/groups', groups)
+appPrivate.route('/sso/check-domain', sso_check_domain)
+appPrivate.route('/sso/check-enforcement', sso_check_enforcement)
+appPrivate.route('/sso/providers', sso_providers)
+appPrivate.route('/sso/prelink-users', sso_prelink)
+appPrivate.route('/sso/prelink-internal', sso_prelink_internal)
+appPrivate.route('/sso/provision-user', sso_provision_user)
+appPrivate.route('/sso/verify-dns', sso_verify_dns)
 
 // Triggers
 const functionNameTriggers = 'triggers'

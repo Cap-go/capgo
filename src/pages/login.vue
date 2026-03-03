@@ -14,7 +14,7 @@ import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import mfaIcon from '~icons/simple-icons/2fas?raw'
 import { hideLoader } from '~/services/loader'
-import { autoAuth, hashEmail, useSupabase } from '~/services/supabase'
+import { autoAuth, defaultApiHost, hashEmail, useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 
 const route = useRoute('/login')
@@ -23,7 +23,7 @@ const isLoading = ref(false)
 const isMobile = ref(Capacitor.isNativePlatform())
 const turnstileToken = ref('')
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
-const statusAuth: Ref<'login' | '2fa'> = ref('login')
+const statusAuth: Ref<'email' | 'credentials' | '2fa'> = ref('email')
 const mfaLoginFactor: Ref<Factor | null> = ref(null)
 const mfaChallengeId: Ref<string> = ref('')
 const querySessionAccessToken = ref('')
@@ -32,6 +32,11 @@ const hasQuerySession = ref(false)
 const router = useRouter()
 const { t } = useI18n()
 const captchaComponent = ref<InstanceType<typeof VueTurnstile> | null>(null)
+
+// Two-step login state
+const emailForLogin = ref('')
+const hasSso = ref(false)
+const isDomainChecking = ref(false)
 
 const version = import.meta.env.VITE_APP_VERSION
 
@@ -155,29 +160,108 @@ async function login(form: { email: string, password: string }) {
   await checkMfa()
 }
 
-async function submit(form: { email: string, password: string, code: string }) {
-  isLoading.value = true
-  if (statusAuth.value === 'login') {
-    await login(form)
-  }
-  else {
-    // http://localhost:5173/app
-    const verify = await supabase.auth.mfa.verify({
-      factorId: mfaLoginFactor.value!.id!,
-      challengeId: mfaChallengeId.value!,
-      code: form.code.replaceAll(' ', ''),
+async function checkDomain(email: string): Promise<{ has_sso: boolean, provider_id?: string, org_id?: string }> {
+  try {
+    const { data: sessionData } = await supabase.auth.getSession()
+    const token = sessionData?.session?.access_token
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+    if (token) {
+      headers.Authorization = `Bearer ${token}`
+    }
+
+    const response = await fetch(`${defaultApiHost}/private/sso/check-domain`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ email }),
     })
 
-    if (verify.error) {
-      toast.error(t('invalid-mfa-code'))
-      console.error('verify error', verify.error)
-      isLoading.value = false
+    if (!response.ok) {
+      return { has_sso: false }
     }
-    else {
-      await nextLogin()
+
+    return await response.json()
+  }
+  catch {
+    return { has_sso: false }
+  }
+}
+
+async function handleEmailContinue(form: { email: string }) {
+  isDomainChecking.value = true
+  emailForLogin.value = form.email
+
+  const result = await checkDomain(form.email)
+  hasSso.value = result.has_sso
+
+  isDomainChecking.value = false
+  statusAuth.value = 'credentials'
+}
+
+async function handlePasswordSubmit(form: { password: string }) {
+  isLoading.value = true
+  await login({ email: emailForLogin.value, password: form.password })
+}
+
+async function handleSsoLogin() {
+  isLoading.value = true
+  const domain = emailForLogin.value.split('@')[1]
+
+  try {
+    const redirectUrl = new URL('/sso-callback', window.location.origin)
+    if (route.query.to && typeof route.query.to === 'string') {
+      redirectUrl.searchParams.set('to', route.query.to)
+    }
+
+    const { data, error } = await supabase.auth.signInWithSSO({
+      domain,
+      options: {
+        redirectTo: redirectUrl.toString(),
+      },
+    })
+
+    if (error) {
+      console.error('SSO login error', error)
+      toast.error(t('invalid-auth'))
       isLoading.value = false
+      return
+    }
+
+    if (data?.url) {
+      window.location.href = data.url
     }
   }
+  catch (err) {
+    console.error('SSO login error', err)
+    toast.error(t('invalid-auth'))
+    isLoading.value = false
+  }
+}
+
+async function handleMfaSubmit(form: { code: string }) {
+  isLoading.value = true
+  const verify = await supabase.auth.mfa.verify({
+    factorId: mfaLoginFactor.value!.id!,
+    challengeId: mfaChallengeId.value!,
+    code: form.code.replaceAll(' ', ''),
+  })
+
+  if (verify.error) {
+    toast.error(t('invalid-mfa-code'))
+    console.error('verify error', verify.error)
+    isLoading.value = false
+  }
+  else {
+    await nextLogin()
+    isLoading.value = false
+  }
+}
+
+function goBackToEmail() {
+  statusAuth.value = 'email'
+  hasSso.value = false
 }
 
 async function checkAuthUser() {
@@ -340,7 +424,7 @@ async function goback() {
 
   mfaChallengeId.value = ''
   mfaLoginFactor.value = null
-  statusAuth.value = 'login'
+  statusAuth.value = 'email'
 }
 onMounted(checkLogin)
 </script>
@@ -361,7 +445,7 @@ onMounted(checkLogin)
         </p>
       </div>
 
-      <div v-if="statusAuth === 'login'" class="relative mx-auto mt-8 max-w-md md:mt-4">
+      <div class="relative mx-auto mt-8 max-w-md md:mt-4">
         <div v-if="hasQuerySession" class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
           <div class="py-6 px-4 space-y-4 text-gray-500 sm:py-7 sm:px-8">
             <p class="text-sm">
@@ -383,28 +467,71 @@ onMounted(checkLogin)
           </div>
         </div>
 
-        <div v-else class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
-          <div class="py-6 px-4 text-gray-500 sm:py-7 sm:px-8">
-            <FormKit id="login-account" type="form" :actions="false" @submit="submit">
-              <div class="space-y-5">
-                <FormKit
-                  type="email" name="email" :disabled="isLoading" enterkeyhint="next" :placeholder="t('email')"
-                  :prefix-icon="iconEmail" inputmode="email" :label="t('email')" autocomplete="email"
-                  validation="required:trim" data-test="email"
-                />
-
-                <div>
+        <Transition v-else name="step-slide" mode="out-in">
+          <!-- Step 1: Email -->
+          <div v-if="statusAuth === 'email'" key="step-email" class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
+            <div class="py-6 px-4 text-gray-500 sm:py-7 sm:px-8">
+              <FormKit id="email-step" type="form" :actions="false" @submit="handleEmailContinue">
+                <div class="space-y-5">
                   <FormKit
-                    id="passwordInput" type="password" :placeholder="t('password')"
-                    name="password" :label="t('password')" :prefix-icon="iconPassword" :disabled="isLoading"
-                    validation="required:trim" enterkeyhint="send" autocomplete="current-password"
-                    data-test="password"
+                    type="email" name="email" :disabled="isDomainChecking" enterkeyhint="next" :placeholder="t('email')"
+                    :prefix-icon="iconEmail" inputmode="email" :label="t('email')" autocomplete="email"
+                    validation="required:trim" data-test="email"
                   />
+                  <FormKitMessages data-test="form-error" />
+                  <div>
+                    <div class="inline-flex justify-center items-center w-full">
+                      <svg
+                        v-if="isDomainChecking" class="inline-block mr-3 -ml-1 w-5 h-5 text-gray-900 align-middle animate-spin dark:text-white"
+                        xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading"
+                      >
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                        <path
+                          class="opacity-75" fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                      <button
+                        v-if="!isDomainChecking" type="submit" data-test="continue"
+                        class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden"
+                      >
+                        {{ t('continue') }}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="text-center">
+                    <p class="pt-2 text-gray-300">
+                      {{ version }}
+                    </p>
+                    <div>
+                      <a
+                        :href="registerUrl"
+                        data-test="register"
+                        class="text-sm font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline focus:text-orange-600"
+                      >
+                        {{ t('create-a-free-account') }}
+                      </a>
+                    </div>
+                  </div>
                 </div>
-                <div v-if="!!captchaKey">
-                  <VueTurnstile ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
-                </div>
-                <FormKitMessages data-test="form-error" />
+              </FormKit>
+            </div>
+          </div>
+
+          <!-- Step 2: Credentials (SSO or Password) -->
+          <div v-else-if="statusAuth === 'credentials'" key="step-credentials" class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
+            <div class="py-6 px-4 text-gray-500 sm:py-7 sm:px-8">
+              <!-- Show email context -->
+              <p class="mb-4 text-sm text-gray-400 truncate">
+                {{ emailForLogin }}
+              </p>
+
+              <!-- SSO path -->
+              <div v-if="hasSso" class="space-y-5">
+                <p class="text-sm text-gray-600 dark:text-gray-300">
+                  {{ t('sso-detected') }}
+                </p>
                 <div>
                   <div class="inline-flex justify-center items-center w-full">
                     <svg
@@ -418,42 +545,150 @@ onMounted(checkLogin)
                       />
                     </svg>
                     <button
-                      v-if="!isLoading" type="submit" data-test="submit"
+                      v-if="!isLoading"
+                      type="button" data-test="sso-login"
                       class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden"
+                      @click="handleSsoLogin"
                     >
-                      {{ t('log-in') }}
+                      {{ t('continue-with-sso') }}
                     </button>
                   </div>
                 </div>
-
                 <div class="text-center">
-                  <p class="pt-2 text-gray-300">
-                    {{ version }}
+                  <p class="font-medium text-orange-500 transition-all duration-200 cursor-pointer hover:text-orange-600 hover:underline" @click="goBackToEmail()">
+                    ← {{ t('go-back') }}
                   </p>
-                  <div class="">
-                    <a
-                      :href="registerUrl"
-                      data-test="register"
-                      class="text-sm font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline focus:text-orange-600"
-                    >
-                      {{ t('create-a-free-account') }}
-                    </a>
-                  </div>
-                  <div class="">
-                    <router-link
-                      to="/forgot_password"
-                      data-test="forgot-password"
-                      class="text-sm font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline focus:text-orange-600"
-                    >
-                      {{ t('forgot') }} {{ t('password') }} ?
-                    </router-link>
-                  </div>
                 </div>
               </div>
-            </FormKit>
+
+              <!-- Password path -->
+              <div v-else>
+                <FormKit id="login-account" type="form" :actions="false" @submit="handlePasswordSubmit">
+                  <div class="space-y-5">
+                    <div>
+                      <FormKit
+                        id="passwordInput" type="password" :placeholder="t('password')"
+                        name="password" :label="t('password')" :prefix-icon="iconPassword" :disabled="isLoading"
+                        validation="required:trim" enterkeyhint="send" autocomplete="current-password"
+                        data-test="password"
+                      />
+                    </div>
+                    <div v-if="!!captchaKey">
+                      <VueTurnstile ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
+                    </div>
+                    <FormKitMessages data-test="form-error" />
+                    <div>
+                      <div class="inline-flex justify-center items-center w-full">
+                        <svg
+                          v-if="isLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-gray-900 align-middle animate-spin dark:text-white"
+                          xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading"
+                        >
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                          <path
+                            class="opacity-75" fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
+                        <button
+                          v-if="!isLoading" type="submit" data-test="submit"
+                          class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden"
+                        >
+                          {{ t('log-in') }}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="text-center">
+                      <p class="pt-2 text-gray-300">
+                        {{ version }}
+                      </p>
+                      <div>
+                        <p class="font-medium text-orange-500 transition-all duration-200 cursor-pointer hover:text-orange-600 hover:underline" @click="goBackToEmail()">
+                          ← {{ t('go-back') }}
+                        </p>
+                      </div>
+                      <div>
+                        <a
+                          :href="registerUrl"
+                          data-test="register"
+                          class="text-sm font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline focus:text-orange-600"
+                        >
+                          {{ t('create-a-free-account') }}
+                        </a>
+                      </div>
+                      <div>
+                        <router-link
+                          to="/forgot_password"
+                          data-test="forgot-password"
+                          class="text-sm font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline focus:text-orange-600"
+                        >
+                          {{ t('forgot') }} {{ t('password') }} ?
+                        </router-link>
+                      </div>
+                    </div>
+                  </div>
+                </FormKit>
+              </div>
+            </div>
           </div>
-        </div>
-        <section class="flex flex-col items-center mt-6">
+
+          <!-- Step 3: 2FA -->
+          <div v-else key="step-2fa" class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
+            <div class="py-6 px-4 sm:py-7 sm:px-8">
+              <FormKit id="2fa-account" type="form" :actions="false" autocapitalize="off" data-test="2fa-form" @submit="handleMfaSubmit">
+                <div class="space-y-5 text-gray-500">
+                  <FormKit
+                    type="text" name="code" :disabled="isLoading"
+                    :prefix-icon="mfaIcon" inputmode="text" :label="t('2fa-code')"
+                    :validation-rules="{ mfa_code_validation }"
+                    :validation-messages="{
+                      mfa_code_validation: '2FA authentication code is not formatted properly',
+                    }"
+                    placeholder="xxx xxx"
+                    autocomplete="off"
+                    validation="required|mfa_code_validation"
+                    validation-visibility="live"
+                    data-test="2fa-code"
+                  />
+                  <FormKitMessages />
+                  <div>
+                    <div class="inline-flex justify-center items-center w-full">
+                      <svg
+                        v-if="isLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-gray-900 align-middle animate-spin dark:text-white"
+                        xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+                      >
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                        <path
+                          class="opacity-75" fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
+                      <button
+                        v-if="!isLoading" type="submit" data-test="verify"
+                        class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden"
+                      >
+                        {{ t('verify') }}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div class="text-center">
+                    <p class="text-base text-gray-600" />
+                    <p class="font-medium text-orange-500 transition-all duration-200 cursor-pointer hover:text-orange-600 hover:underline" @click="goback()">
+                      {{ t('go-back') }}
+                    </p>
+                    <p class="pt-2 text-gray-300">
+                      {{ version }}
+                    </p>
+                  </div>
+                </div>
+              </FormKit>
+            </div>
+          </div>
+        </Transition>
+
+        <!-- Footer (visible for email and credentials steps) -->
+        <section v-if="statusAuth !== '2fa'" class="flex flex-col items-center mt-6">
           <div class="mx-auto">
             <LangSelector />
           </div>
@@ -465,63 +700,24 @@ onMounted(checkLogin)
           </button>
         </section>
       </div>
-      <div v-else class="relative mx-auto mt-8 max-w-md md:mt-4">
-        <div class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
-          <div class="py-6 px-4 sm:py-7 sm:px-8">
-            <FormKit id="2fa-account" type="form" :actions="false" autocapitalize="off" data-test="2fa-form" @submit="submit">
-              <div class="space-y-5 text-gray-500">
-                <FormKit
-                  type="text" name="code" :disabled="isLoading"
-                  :prefix-icon="mfaIcon" inputmode="text" :label="t('2fa-code')"
-                  :validation-rules="{ mfa_code_validation }"
-                  :validation-messages="{
-                    mfa_code_validation: '2FA authentication code is not formatted properly',
-                  }"
-                  placeholder="xxx xxx"
-                  autocomplete="off"
-                  validation="required|mfa_code_validation"
-                  validation-visibility="live"
-                  data-test="2fa-code"
-                />
-                <FormKitMessages />
-                <div>
-                  <div class="inline-flex justify-center items-center w-full">
-                    <svg
-                      v-if="isLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-gray-900 align-middle animate-spin dark:text-white"
-                      xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                    >
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                      <path
-                        class="opacity-75" fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                    <button
-                      v-if="!isLoading" type="submit" data-test="verify"
-                      class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden"
-                    >
-                      {{ t('verify') }}
-                    </button>
-                  </div>
-                </div>
-
-                <div class="text-center">
-                  <p class="text-base text-gray-600" />
-                  <p class="font-medium text-orange-500 transition-all duration-200 cursor-pointer hover:text-orange-600 hover:underline" @click="goback()">
-                    {{ t('go-back') }}
-                  </p>
-                  <p class="pt-2 text-gray-300">
-                    {{ version }}
-                  </p>
-                </div>
-              </div>
-            </FormKit>
-          </div>
-        </div>
-      </div>
     </div>
   </section>
 </template>
+
+<style scoped>
+.step-slide-enter-active,
+.step-slide-leave-active {
+  transition: all 0.25s ease;
+}
+.step-slide-enter-from {
+  opacity: 0;
+  transform: translateX(24px);
+}
+.step-slide-leave-to {
+  opacity: 0;
+  transform: translateX(-24px);
+}
+</style>
 
 <route lang="yaml">
 meta:
