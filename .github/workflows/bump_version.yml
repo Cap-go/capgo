@@ -11,7 +11,7 @@ permissions: {}
 jobs:
   # Run all tests first before creating any tags
   test:
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') && !startsWith(github.event.head_commit.message, 'chore(auto-sync):') }}
     uses: ./.github/workflows/tests.yml
     permissions:
       contents: read
@@ -20,11 +20,11 @@ jobs:
   # Only bump version and create tag if all tests pass
   bump-version:
     needs: [test]
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') && !startsWith(github.event.head_commit.message, 'chore(auto-sync):') }}
     runs-on: ubuntu-latest
     name: Bump version and create tag
     permissions:
-      contents: read
+      contents: write
     steps:
       - name: Check out
         uses: actions/checkout@v6
@@ -44,7 +44,7 @@ jobs:
       - name: Create version bump development
         if: github.ref != 'refs/heads/main'
         run: bun x standard-version --prerelease alpha --skip.changelog
-      - name: Add version.ts to commit
+      - name: Add release artifacts to commit
         run: |
           git add supabase/functions/_backend/utils/version.ts
           if ! git diff --cached --quiet; then
