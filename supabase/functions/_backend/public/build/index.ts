@@ -19,6 +19,7 @@ import { getBuildStatus } from './status.ts'
 import { tusProxy } from './upload.ts'
 
 export const app = honoFactory.createApp()
+const uploadWriteMiddleware = middlewareKey(['all', 'write'])
 
 // POST /build/request - Request a new native build
 app.post('/request', middlewareKey(['all', 'write']), async (c) => {
@@ -89,11 +90,22 @@ app.post('/upload/:jobId', middlewareKey(['all', 'write']), async (c) => {
 })
 
 // HEAD /build/upload/:jobId/* - Check TUS upload progress (proxied to builder)
-app.on('HEAD', '/upload/:jobId/*', middlewareKey(['all', 'write']), async (c) => {
-  const jobId = c.req.param('jobId')
-  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-  return tusProxy(c, jobId, apikey)
-})
+// Hono resolves HEAD via GET route matching, so we gate by request method here.
+app.get(
+  '/upload/:jobId/*',
+  async (c, next) => {
+    if (c.req.method !== 'HEAD') {
+      return c.notFound()
+    }
+    return next()
+  },
+  uploadWriteMiddleware,
+  async (c) => {
+    const jobId = c.req.param('jobId')
+    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+    return tusProxy(c, jobId, apikey)
+  },
+)
 
 // PATCH /build/upload/:jobId/* - Upload TUS chunk (proxied to builder)
 app.patch('/upload/:jobId/*', middlewareKey(['all', 'write']), async (c) => {

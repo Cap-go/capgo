@@ -8,7 +8,7 @@ import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readDeviceVersionCountsSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
 import { DEFAULT_LIMIT } from './types.ts'
-import { backgroundTask, isInternalVersionName } from './utils.ts'
+import { backgroundTask, getEnv, isInternalVersionName } from './utils.ts'
 
 export function createStatsMau(c: Context, device_id: string, app_id: string, org_id: string, platform: string) {
   const lowerDeviceId = device_id
@@ -131,8 +131,17 @@ export function readStatsVersion(c: Context, app_id: string, start_date: string,
   return readStatsVersionCF(c, app_id, start_date, end_date)
 }
 
+function shouldUseAnalyticsEngine(c: Context): boolean {
+  if (getRuntimeKey() !== 'workerd' || !c.env.DEVICE_INFO)
+    return false
+  // Analytics reads require API access; fall back to Supabase when tokens are missing.
+  const token = getEnv(c, 'CF_ANALYTICS_TOKEN')
+  const accountId = getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID')
+  return Boolean(token && accountId)
+}
+
 export function readDeviceVersionCounts(c: Context, app_id: string, channelName?: string): Promise<Record<string, number>> {
-  if (!c.env.DEVICE_INFO)
+  if (!shouldUseAnalyticsEngine(c))
     return readDeviceVersionCountsSB(c, app_id, channelName)
   return readDeviceVersionCountsCF(c, app_id, channelName)
 }
@@ -285,7 +294,7 @@ export function countDevices(c: Context, app_id: string, customIdMode: boolean) 
   // Use Analytics Engine DEVICE_INFO when available in Cloudflare Workers.
   // In local Cloudflare testing these bindings are often absent, so fall back
   // to the Postgres/Supabase path.
-  if (getRuntimeKey() === 'workerd' && c.env.DEVICE_INFO)
+  if (shouldUseAnalyticsEngine(c))
     return countDevicesCF(c, app_id, customIdMode)
   return countDevicesSB(c, app_id, customIdMode)
 }
@@ -295,7 +304,7 @@ export async function readDevices(c: Context, params: ReadDevicesParams, customI
   // Use Analytics Engine DEVICE_INFO when available in Cloudflare Workers.
   // In local Cloudflare testing these bindings are often absent, so fall back
   // to the Postgres/Supabase path.
-  if (getRuntimeKey() === 'workerd' && c.env.DEVICE_INFO)
+  if (shouldUseAnalyticsEngine(c))
     results = await readDevicesCF(c, params, customIdMode)
   else
     results = await readDevicesSB(c, params, customIdMode)

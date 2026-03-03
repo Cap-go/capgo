@@ -9,9 +9,11 @@ import { app as cron_sync_sub } from '../_backend/triggers/cron_sync_sub.ts'
 import { app as logsnag_insights } from '../_backend/triggers/logsnag_insights.ts'
 import { app as on_app_create } from '../_backend/triggers/on_app_create.ts'
 import { app as on_app_delete } from '../_backend/triggers/on_app_delete.ts'
+import { app as on_app_update } from '../_backend/triggers/on_app_update.ts'
 import { app as on_channel_update } from '../_backend/triggers/on_channel_update.ts'
 import { app as on_deploy_history_create } from '../_backend/triggers/on_deploy_history_create.ts'
 import { app as on_manifest_create } from '../_backend/triggers/on_manifest_create.ts'
+import { app as on_org_update } from '../_backend/triggers/on_org_update.ts'
 import { app as on_organization_create } from '../_backend/triggers/on_organization_create.ts'
 import { app as on_organization_delete } from '../_backend/triggers/on_organization_delete.ts'
 import { app as on_user_create } from '../_backend/triggers/on_user_create.ts'
@@ -38,12 +40,14 @@ appGlobal.route('/on_user_update', on_user_update)
 appGlobal.route('/on_user_delete', on_user_delete)
 appGlobal.route('/on_app_create', on_app_create)
 appGlobal.route('/on_app_delete', on_app_delete)
+appGlobal.route('/on_app_update', on_app_update)
 appGlobal.route('/on_version_create', on_version_create)
 appGlobal.route('/on_version_update', on_version_update)
 appGlobal.route('/on_version_delete', on_version_delete)
 appGlobal.route('/on_manifest_create', on_manifest_create)
 appGlobal.route('/stripe_event', stripe_event)
 appGlobal.route('/on_organization_create', on_organization_create)
+appGlobal.route('/on_org_update', on_org_update)
 appGlobal.route('/cron_stat_app', cron_stat_app)
 appGlobal.route('/cron_stat_org', cron_stat_org)
 appGlobal.route('/cron_sync_sub', cron_sync_sub)

@@ -321,9 +321,22 @@ describe('[DELETE] /organization/members', () => {
     const { error } = await getSupabaseClient().from('org_users').insert({
       org_id: ORG_ID,
       user_id: userData!.id,
-      user_right: 'invite_read',
+      user_right: 'read',
     })
     expect(error).toBeNull()
+
+
+    // The sync_org_user_to_role_binding_on_insert trigger automatically creates role_bindings
+    // when a user is added to org_users. Verify the trigger created the binding.
+    const { data: rbacData, error: rbacFetchError } = await getSupabaseClient()
+      .from('role_bindings')
+      .select()
+      .eq('principal_type', 'user')
+      .eq('principal_id', userData!.id)
+      .eq('org_id', ORG_ID)
+    expect(rbacFetchError).toBeNull()
+    expect(rbacData).toBeTruthy()
+    expect(rbacData!.length).toBeGreaterThan(0)
 
     const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID}&email=${USER_ADMIN_EMAIL}`, {
       headers,
@@ -340,6 +353,10 @@ describe('[DELETE] /organization/members', () => {
     const { data, error: orgUserError } = await getSupabaseClient().from('org_users').select().eq('org_id', ORG_ID).eq('user_id', userData!.id).single()
     expect(orgUserError).toBeTruthy()
     expect(data).toBeNull()
+
+    // Verify role_bindings were also cleaned up
+    const { data: rbacDataAfterDelete } = await getSupabaseClient().from('role_bindings').select().eq('principal_type', 'user').eq('principal_id', userData!.id).eq('org_id', ORG_ID)
+    expect(rbacDataAfterDelete).toHaveLength(0)
   })
 
   it('delete organization member with invalid body', async () => {

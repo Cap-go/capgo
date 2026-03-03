@@ -22,7 +22,7 @@ app.post('/', middlewareAuth, async (c) => {
 
   // Derive email and auth provider from JWT claims — never trust the body
   const authorization = c.get('authorization')
-  const claims = authorization ? getClaimsFromJWT(authorization) : null
+  const claims = authorization ? await getClaimsFromJWT(c, authorization) : null
   const email = claims?.email
 
   if (!email) {

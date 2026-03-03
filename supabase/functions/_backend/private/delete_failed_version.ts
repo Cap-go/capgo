@@ -29,12 +29,6 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
       mode: (apikey as { mode?: string }).mode,
     })
   }
-  const { data: _userId, error: _errorUserId } = await supabaseApikey(c, capgkey)
-    .rpc('get_user_id', { apikey: capgkey, app_id: body.app_id })
-  if (_errorUserId) {
-    return quickError(404, 'user_not_found', 'Error User not found', { _errorUserId })
-  }
-
   // Auth context is already set by middlewareKey
   if (!(await checkPermission(c, 'bundle.delete', { appId: body.app_id }))) {
     return quickError(401, 'not_authorized', 'You can\'t access this app', { app_id: body.app_id })

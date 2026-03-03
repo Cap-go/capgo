@@ -29,12 +29,6 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     userId: apikey.user_id,
     mode: apikey.mode,
   })
-  const { data: _userId, error: _errorUserId } = await supabaseApikey(c, capgkey)
-    .rpc('get_user_id', { apikey: capgkey, app_id: body.app_id })
-  if (_errorUserId) {
-    return quickError(404, 'user_not_found', 'Error User not found', { _errorUserId })
-  }
-
   // Auth context is already set by middlewareKey
   if (!(await checkPermission(c, 'app.upload_bundle', { appId: body.app_id }))) {
     throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.app_id })

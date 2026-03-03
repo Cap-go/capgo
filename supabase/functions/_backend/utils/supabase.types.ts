@@ -1152,6 +1152,7 @@ export type Database = {
           new_paying_orgs: number
           not_paying: number | null
           onboarded: number | null
+          org_conversion_rate: number
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
@@ -1212,6 +1213,7 @@ export type Database = {
           new_paying_orgs?: number
           not_paying?: number | null
           onboarded?: number | null
+          org_conversion_rate?: number
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
@@ -1272,6 +1274,7 @@ export type Database = {
           new_paying_orgs?: number
           not_paying?: number | null
           onboarded?: number | null
+          org_conversion_rate?: number
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
@@ -2908,6 +2911,10 @@ export type Database = {
           deleted_user_ids: string[]
         }[]
       }
+      delete_group_with_bindings: {
+        Args: { group_id: string }
+        Returns: undefined
+      }
       delete_http_response: { Args: { request_id: number }; Returns: undefined }
       delete_non_compliant_bundles: {
         Args: { org_id: string; required_key?: string }
@@ -3249,6 +3256,7 @@ export type Database = {
               "2fa_has_access": boolean
               app_count: number
               can_use_more: boolean
+              created_at: string
               created_by: string
               credit_available: number
               credit_next_expiration: string
@@ -3283,6 +3291,7 @@ export type Database = {
               "2fa_has_access": boolean
               app_count: number
               can_use_more: boolean
+              created_at: string
               created_by: string
               credit_available: number
               credit_next_expiration: string
@@ -3874,7 +3883,10 @@ export type Database = {
         }
         Returns: string
       }
-      record_email_otp_verified: { Args: never; Returns: string }
+      record_email_otp_verified: {
+        Args: { p_user_id: string }
+        Returns: string
+      }
       refresh_orgs_has_usage_credits: { Args: never; Returns: undefined }
       regenerate_hashed_apikey: {
         Args: { p_apikey_id: number }

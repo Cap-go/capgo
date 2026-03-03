@@ -10,7 +10,7 @@ import { useRouter } from 'vue-router'
 import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
 import Spinner from '~/components/Spinner.vue'
 import { formatLocalDateTime } from '~/services/date'
-import { defaultApiHost } from '~/services/supabase'
+import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 
@@ -97,13 +97,30 @@ const checkedAt = computed(() => {
   return formatLocalDateTime(data.value.checked_at)
 })
 
+const internalReplicationSecret = import.meta.env.VITE_REPLICATION_API_SECRET as string | undefined
+
 async function loadReplicationStatus() {
   isLoading.value = true
   errorMessage.value = null
 
   try {
+    const headers: Record<string, string> = {}
+    if (internalReplicationSecret) {
+      headers.apisecret = internalReplicationSecret
+    }
+    else {
+      const supabase = useSupabase()
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token)
+        throw new Error('No session available and replication secret is not configured')
+
+      headers.Authorization = `Bearer ${session.access_token}`
+    }
+
     const response = await fetch(`${defaultApiHost}/replication`, {
       method: 'GET',
+      headers,
     })
 
     const payload = await response.json().catch(() => null) as ReplicationStatusResponse | null

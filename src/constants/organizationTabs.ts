@@ -11,6 +11,7 @@ import IconUsers from '~icons/heroicons/users'
 export const organizationTabs: Tab[] = [
   { label: 'general', key: '/settings/organization', icon: IconInfo },
   { label: 'members', key: '/settings/organization/members', icon: IconUsers },
+  { label: 'groups', key: '/settings/organization/groups', icon: IconUsers },
   { label: 'plans', key: '/settings/organization/plans', icon: IconPlan },
   { label: 'credits', key: '/settings/organization/credits', icon: IconCredits },
   { label: 'security', key: '/settings/organization/security', icon: IconSecurity },

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
 import { storeToRefs } from 'pinia'
-import { computed, ref, watch, watchEffect } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { createSignedImageUrl } from '~/services/storage'
@@ -22,6 +22,8 @@ const currentPage = ref(1)
 const pageSize = 10
 const totalApps = ref(0)
 const searchQuery = ref('')
+const onboardingQueryParam = 'show-onboarding-demo'
+const isMobileView = ref(false)
 
 const { currentOrganization } = storeToRefs(organizationStore)
 
@@ -32,6 +34,23 @@ const lacksSecurityAccess = computed(() => {
   const lacksPassword = org?.password_policy_config?.enabled && org?.password_has_access === false
   return lacks2FA || lacksPassword
 })
+
+function updateMobileView() {
+  if (typeof window === 'undefined')
+    return
+
+  isMobileView.value = window.innerWidth < 768
+}
+
+function openOnboardingDemo() {
+  router.replace({
+    path: '/apps',
+    query: {
+      ...route.query,
+      [onboardingQueryParam]: '1',
+    },
+  })
+}
 
 async function getMyApps() {
   isTableLoading.value = true
@@ -118,6 +137,16 @@ watchEffect(async () => {
     isLoading.value = false
   }
 })
+
+onMounted(() => {
+  updateMobileView()
+  window.addEventListener('resize', updateMobileView)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updateMobileView)
+})
+
 displayStore.NavTitle = t('apps')
 displayStore.defaultBack = '/apps'
 </script>
@@ -125,28 +154,41 @@ displayStore.defaultBack = '/apps'
 <template>
   <div>
     <!-- Show FailedCard when user lacks security access -->
-    <div v-if="lacksSecurityAccess" class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+    <div v-if="lacksSecurityAccess" class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
       <FailedCard />
     </div>
     <div v-else-if="!isLoading">
-      <div class="relative overflow-hidden pb-4 h-full">
-        <div class="overflow-y-auto px-0 pt-0 mx-auto mb-8 w-full h-full sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+      <div class="relative h-full pb-4 overflow-hidden">
+        <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
           <div
             v-if="totalApps === 0 && !searchQuery"
-            class="p-6 mb-6 bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900"
+            class="relative p-8 mb-6 overflow-hidden bg-white border shadow-lg rounded-2xl border-violet-200/70 dark:border-slate-900 dark:bg-gray-900"
           >
-            <h2 class="text-xl font-semibold text-slate-900 dark:text-slate-50">
+            <span class="inline-flex rounded-full bg-violet-50 px-3 py-1 text-[11px] font-semibold tracking-[0.08em] text-violet-700 dark:bg-violet-900/30 dark:text-violet-200 dark:border-violet-800">
+              {{ t('get-started') }}
+            </span>
+            <h2 class="mt-4 text-2xl font-semibold md:text-3xl text-slate-900 dark:text-slate-50">
               {{ t('start-using-capgo') }} <span class="font-prompt">Capgo</span> !
             </h2>
-            <p class="mt-2 text-slate-600 dark:text-slate-200">
+            <p class="max-w-2xl mt-3 text-slate-700 dark:text-slate-200">
               {{ t('add-your-first-app-t') }}
             </p>
-            <button class="mt-4 d-btn d-btn-primary" @click="router.push('/app/new')">
-              {{ t('add-app') }}
-            </button>
+            <div class="flex flex-col gap-3 mt-5 sm:flex-row sm:items-center">
+              <button class="d-btn d-btn-primary" @click="router.push('/app/new')">
+                {{ t('start-onboarding') }}
+              </button>
+              <button
+                v-if="!isMobileView"
+                class="d-btn d-btn-secondary"
+                type="button"
+                @click="openOnboardingDemo"
+              >
+                {{ t('demo-onboarding') }}
+              </button>
+            </div>
           </div>
           <!-- App table - always visible even when payment failed -->
-          <div class="flex overflow-hidden overflow-y-auto flex-col bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
             <AppTable
               :current-page="currentPage"
               :search="searchQuery"
@@ -165,7 +207,7 @@ displayStore.defaultBack = '/apps'
         </div>
       </div>
     </div>
-    <div v-else class="flex flex-col justify-center items-center h-full">
+    <div v-else class="flex flex-col items-center justify-center h-full">
       <Spinner size="w-40 h-40" />
     </div>
   </div>

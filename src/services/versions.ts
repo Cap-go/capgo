@@ -30,7 +30,7 @@ export async function openVersion(app: Database['public']['Tables']['app_version
     window.location.assign(signedURL)
     return
   }
-  // native platform test the budnle in the app
+  // native platform test the bundle in the app
   showLoader()
   try {
     const newBundle = await CapacitorUpdater.download({

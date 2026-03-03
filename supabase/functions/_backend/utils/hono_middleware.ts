@@ -5,10 +5,9 @@ import { getClaimsFromJWT, honoFactory, quickError, simpleRateLimit } from './ho
 import { cloudlog } from './logging.ts'
 import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
-import { clearFailedAuth, isAPIKeyRateLimited, isIPRateLimited, recordAPIKeyUsage, recordFailedAuth } from './rate_limit.ts'
+import { isAPIKeyRateLimited, isIPRateLimited, recordAPIKeyUsage, recordFailedAuth } from './rate_limit.ts'
 import { buildRateLimitInfo } from './rateLimitInfo.ts'
 import { checkKey, checkKeyById, supabaseAdmin } from './supabase.ts'
-import { backgroundTask } from './utils.ts'
 
 // =============================================================================
 // RBAC Context Middleware
@@ -426,9 +425,6 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
     return quickError(401, 'invalid_apikey', 'Invalid apikey')
   }
 
-  // Clear failed auth attempts on successful auth
-  backgroundTask(c, clearFailedAuth(c))
-
   // Record API usage first, then check if rate limited
   await recordAPIKeyUsage(c, apikey.id)
 
@@ -469,17 +465,14 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
 async function foundJWT(c: Context, jwt: string) {
   cloudlog({ requestId: c.get('requestId'), message: 'JWT provided', jwtPrefix: maskSecret(jwt) })
 
-  // Decode JWT claims without network call (much faster than getUser())
-  const claims = getClaimsFromJWT(jwt)
+  // Decode JWT claims via Supabase Auth `getClaims()`.
+  const claims = await getClaimsFromJWT(c, jwt)
   if (!claims || !claims.sub) {
     cloudlog({ requestId: c.get('requestId'), message: 'Invalid JWT claims' })
     // Record failed auth attempt - await to ensure accurate counting
     await recordFailedAuth(c)
     return quickError(401, 'invalid_jwt', 'Invalid JWT')
   }
-
-  // Clear failed auth attempts on successful JWT auth (background is fine for clearing)
-  backgroundTask(c, clearFailedAuth(c))
 
   c.set('auth', {
     userId: claims.sub,
@@ -556,9 +549,6 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
       await recordFailedAuth(c)
       return quickError(401, 'invalid_apikey', 'Invalid apikey')
     }
-
-    // Clear failed auth attempts on successful auth (background is fine for clearing)
-    backgroundTask(c, clearFailedAuth(c))
 
     // Record API usage first, then check if rate limited
     await recordAPIKeyUsage(c, apikey.id)

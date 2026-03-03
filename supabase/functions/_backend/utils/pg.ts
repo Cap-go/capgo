@@ -960,6 +960,7 @@ export interface AdminGlobalStatsTrend {
   users: number
   users_active: number
   paying: number
+  org_conversion_rate: number
   trial: number
   not_paying: number
   updates: number
@@ -1022,6 +1023,7 @@ export async function getAdminGlobalStatsTrend(
         users::int,
         users_active::int,
         paying::int,
+        org_conversion_rate::float,
         trial::int,
         not_paying::int,
         updates::int,
@@ -1074,6 +1076,7 @@ export async function getAdminGlobalStatsTrend(
       users: Number(row.users) || 0,
       users_active: Number(row.users_active) || 0,
       paying: Number(row.paying) || 0,
+      org_conversion_rate: Number(row.org_conversion_rate) || 0,
       trial: Number(row.trial) || 0,
       not_paying: Number(row.not_paying) || 0,
       updates: Number(row.updates) || 0,

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import { computedAsync } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
@@ -141,6 +142,16 @@ function acronym(email: string) {
     res = (`${prefix[0]}X`).toUpperCase()
   }
   return res
+}
+
+async function hasVerified2faFactor() {
+  const { data: mfaFactors, error } = await supabase.auth.mfa.listFactors()
+  if (error) {
+    console.error('Error checking your 2FA status:', error)
+    return null
+  }
+  const verifiedFactor = mfaFactors?.all.find(factor => factor.status === 'verified')
+  return !!verifiedFactor
 }
 
 // Load current password policy settings
@@ -361,6 +372,18 @@ async function toggle2faEnforcement() {
 
   const newValue = !enforcing2fa.value
 
+  if (newValue) {
+    const hasSelf2fa = await hasVerified2faFactor()
+    if (hasSelf2fa === null) {
+      toast.error(t('error-loading-settings'))
+      return
+    }
+    if (!hasSelf2fa) {
+      toast.error(t('2fa-enforcement-self-2fa-required'))
+      return
+    }
+  }
+
   if (newValue && impactedMembers.value.length > 0) {
     // Show warning dialog with impacted members
     dialogStore.openDialog({
@@ -398,12 +421,27 @@ async function save2faEnforcement(value: boolean) {
   isSaving.value = true
 
   try {
-    const { error } = await supabase
-      .from('orgs')
-      .update({ enforcing_2fa: value })
-      .eq('id', currentOrganization.value.gid)
+    const { error } = await supabase.functions.invoke('organization', {
+      method: 'PUT',
+      body: {
+        orgId: currentOrganization.value.gid,
+        enforcing_2fa: value,
+      },
+    })
 
     if (error) {
+      if (error instanceof FunctionsHttpError && error.context instanceof Response) {
+        try {
+          const payload = await error.context.clone().json<{ error?: string }>()
+          if (payload.error === 'requires_2fa_to_enforce_2fa') {
+            toast.error(t('2fa-enforcement-self-2fa-required'))
+            return
+          }
+        }
+        catch {
+          console.warn('Could not parse org security function error payload')
+        }
+      }
       console.error('Error updating 2FA enforcement:', error)
       toast.error(t('error-saving-settings'))
       return

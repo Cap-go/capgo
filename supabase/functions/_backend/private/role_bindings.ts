@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { createHono, middlewareAuth, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
@@ -139,6 +139,29 @@ async function validatePrincipalAccess(
   return { ok: true, data: null }
 }
 
+async function getCallerMaxPriorityRank(
+  drizzle: ReturnType<typeof getDrizzleClient>,
+  authType: 'apikey' | 'jwt',
+  principalId: string,
+  orgId: string,
+): Promise<number> {
+  const principalType = authType === 'apikey' ? 'apikey' : 'user'
+  const result = await drizzle
+    .select({ max_rank: sql<number>`MAX(${schema.roles.priority_rank})` })
+    .from(schema.role_bindings)
+    .innerJoin(schema.roles, eq(schema.role_bindings.role_id, schema.roles.id))
+    .where(
+      and(
+        eq(schema.role_bindings.principal_type, principalType),
+        eq(schema.role_bindings.principal_id, principalId),
+        eq(schema.role_bindings.org_id, orgId),
+      ),
+    )
+    .limit(1)
+
+  return result[0]?.max_rank ?? 0
+}
+
 // GET /private/role_bindings/:org_id - List role bindings for an org
 app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
   const orgId = c.req.param('org_id')
@@ -208,7 +231,8 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
 
 // POST /private/role_bindings - Assign a role
 app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
-  const userId = c.get('auth')?.userId
+  const auth = c.get('auth')
+  const userId = auth?.userId
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
@@ -260,6 +284,13 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
 
     if (!role.is_assignable) {
       return c.json({ error: 'Role is not assignable' }, 403)
+    }
+
+    // Prevent privilege escalation: caller cannot assign a role with higher priority than their own
+    const callerPrincipalId = auth.authType === 'apikey' ? auth.apikey!.rbac_id : auth.userId
+    const callerMaxRank = await getCallerMaxPriorityRank(drizzle, auth.authType, callerPrincipalId, org_id)
+    if (role.priority_rank > callerMaxRank) {
+      return c.json({ error: 'Cannot assign a role with higher privileges than your own' }, 403)
     }
 
     const scopeValidation = validateScope(scope_type, app_id, channel_id)
@@ -317,26 +348,126 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
         app_id,
         channel_id,
       })
-    }
-    else {
-      cloudlogErr({
-        requestId: c.get('requestId'),
-        message: 'role_binding_create_failed',
-        orgId: org_id,
-        principal_type,
-        principal_id,
-        scope_type,
-        app_id,
-        channel_id,
-        error,
-      })
-    }
-
-    // Handle unique constraint errors (SSD)
-    if (error?.code === '23505') {
       return c.json({ error: 'User already has a role in this family at this scope' }, 409)
     }
 
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'role_binding_create_failed',
+      orgId: org_id,
+      principal_type,
+      principal_id,
+      scope_type,
+      app_id,
+      channel_id,
+      error,
+    })
+
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
+  }
+})
+
+// PATCH /private/role_bindings/:binding_id - Update a role binding
+app.patch('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
+  const bindingId = c.req.param('binding_id')
+  const auth = c.get('auth')
+  const userId = auth?.userId
+
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  let body
+  try {
+    body = await c.req.json()
+  }
+  catch {
+    return c.json({ error: 'Invalid JSON' }, 400)
+  }
+
+  const { role_name } = body ?? {}
+  if (!role_name) {
+    return c.json({ error: 'role_name is required' }, 400)
+  }
+
+  let pgClient
+  try {
+    pgClient = getPgClient(c)
+    const drizzle = getDrizzleClient(pgClient)
+
+    const [binding] = await drizzle
+      .select()
+      .from(schema.role_bindings)
+      .where(eq(schema.role_bindings.id, bindingId))
+      .limit(1)
+
+    if (!binding) {
+      return c.json({ error: 'Role binding not found' }, 404)
+    }
+
+    if (!(await checkPermission(c, 'org.update_user_roles', { orgId: binding.org_id ?? undefined }))) {
+      return c.json({ error: 'Forbidden - Admin rights required' }, 403)
+    }
+
+    const [role] = await drizzle
+      .select()
+      .from(schema.roles)
+      .where(eq(schema.roles.name, role_name))
+      .limit(1)
+
+    if (!role) {
+      return c.json({ error: 'Role not found' }, 404)
+    }
+
+    if (!role.is_assignable) {
+      return c.json({ error: 'Role is not assignable' }, 403)
+    }
+
+    if (role.scope_type !== binding.scope_type) {
+      return c.json({ error: 'Role scope_type does not match the existing binding scope' }, 400)
+    }
+
+    // Prevent privilege escalation: caller cannot assign a role with higher priority than their own
+    const callerPrincipalId = auth!.authType === 'apikey' ? auth!.apikey!.rbac_id : auth!.userId
+    const callerMaxRank = await getCallerMaxPriorityRank(drizzle, auth!.authType, callerPrincipalId, binding.org_id!)
+    if (role.priority_rank > callerMaxRank) {
+      return c.json({ error: 'Cannot assign a role with higher privileges than your own' }, 403)
+    }
+
+    const [updated] = await drizzle
+      .update(schema.role_bindings)
+      .set({ role_id: role.id })
+      .where(eq(schema.role_bindings.id, bindingId))
+      .returning()
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'role_binding_updated',
+      bindingId,
+      orgId: binding.org_id,
+      principal_type: binding.principal_type,
+      principal_id: binding.principal_id,
+      old_role_id: binding.role_id,
+      new_role_id: role.id,
+      scope_type: binding.scope_type,
+      app_id: binding.app_id,
+      channel_id: binding.channel_id,
+    })
+
+    return c.json(updated)
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'role_binding_update_failed',
+      bindingId,
+      error,
+    })
     return c.json({ error: 'Internal server error' }, 500)
   }
   finally {
@@ -374,8 +505,20 @@ app.delete('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
     if (!(await checkPermission(c, 'org.update_user_roles', { orgId: binding.org_id ?? undefined }))) {
       return c.json({ error: 'Forbidden - Admin rights required' }, 403)
     }
+    // Prevent privilege escalation: caller cannot delete a binding for a role with higher priority than their own
+    const auth = c.get('auth')!
+    const callerPrincipalId = auth.authType === 'apikey' ? auth.apikey!.rbac_id : auth.userId
+    const callerMaxRank = await getCallerMaxPriorityRank(drizzle, auth.authType, callerPrincipalId, binding.org_id!)
 
-    // Delete the binding
+    const [targetRole] = await drizzle
+      .select({ priority_rank: schema.roles.priority_rank })
+      .from(schema.roles)
+      .where(eq(schema.roles.id, binding.role_id!))
+      .limit(1)
+
+    if (targetRole && targetRole.priority_rank > callerMaxRank) {
+      return c.json({ error: 'Cannot delete a binding for a role with higher privileges than your own' }, 403)
+    }
     await drizzle
       .delete(schema.role_bindings)
       .where(eq(schema.role_bindings.id, bindingId))

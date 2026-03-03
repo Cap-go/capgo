@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { defineAsyncComponent, watch } from 'vue'
+import { defineAsyncComponent, onMounted, ref, watch } from 'vue'
 
 const Toast = defineAsyncComponent(() => import('~/components/Toast.vue'))
 const DialogV2 = defineAsyncComponent(() => import('~/components/DialogV2.vue'))
+const DemoOnboardingGate = defineAsyncComponent(() => import('~/components/dashboard/DemoOnboardingGate.vue'))
+const showDemoOnboardingGate = ref(false)
 
 const route = useRoute()
 const display = useDisplayStore()
@@ -14,11 +16,16 @@ watch(
   },
   { immediate: true },
 )
+
+onMounted(() => {
+  showDemoOnboardingGate.value = true
+})
 </script>
 
 <template>
   <div class="h-full overflow-hidden bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-300">
     <RouterView class="h-full overflow-hidden" />
+    <DemoOnboardingGate v-if="showDemoOnboardingGate" />
     <Toast />
     <DialogV2 />
   </div>

@@ -4,6 +4,7 @@ import { FormKit, FormKitMessages } from '@formkit/vue'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
+import VueTurnstile from 'vue-turnstile'
 import iconPassword from '~icons/heroicons/key?raw'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -21,7 +22,15 @@ const organizationStore = useOrganizationStore()
 const mainStore = useMainStore()
 const mfaCode = ref('')
 const needsReauthentication = ref(false)
+const turnstileToken = ref('')
+const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
+const captchaComponent = ref<InstanceType<typeof VueTurnstile> | null>(null)
 const { t } = useI18n()
+
+function resetCaptcha() {
+  captchaComponent.value?.reset()
+  turnstileToken.value = ''
+}
 displayStore.NavTitle = t('password')
 
 // Check if user needs to verify password for current org
@@ -106,14 +115,20 @@ async function verifyPassword(form: { current_password: string }) {
         email: user.email,
         password: form.current_password,
         org_id: orgId,
+        ...(turnstileToken.value ? { captcha_token: turnstileToken.value } : {}),
       }),
     })
 
     const result: { error?: string, message?: string } = await response.json()
 
     if (!response.ok) {
-      if (result.error === 'invalid_credentials') {
+      if (result.error === 'captcha_failed') {
+        toast.error(t('captcha-fail'))
+        resetCaptcha()
+      }
+      else if (result.error === 'invalid_credentials') {
         setErrors('verify-password', [t('invalid-password')], {})
+        resetCaptcha()
       }
       else if (result.error === 'password_does_not_meet_policy') {
         setErrors('verify-password', [t('password-does-not-meet-requirements')], {})
@@ -125,6 +140,7 @@ async function verifyPassword(form: { current_password: string }) {
     }
 
     toast.success(t('password-verified-successfully'))
+    resetCaptcha()
 
     // Refresh org data to update access status
     await organizationStore.fetchOrganizations()
@@ -146,6 +162,9 @@ async function verifyCurrentPassword(currentPassword: string) {
   const { error: signInError } = await supabase.auth.signInWithPassword({
     email: user.email,
     password: currentPassword,
+    options: turnstileToken.value
+      ? { captchaToken: turnstileToken.value }
+      : undefined,
   })
 
   if (signInError?.code === 'mfa_required') {
@@ -153,7 +172,13 @@ async function verifyCurrentPassword(currentPassword: string) {
   }
 
   if (signInError) {
-    setErrors('change-pass', [t('invalid-password')], {})
+    resetCaptcha()
+    if (signInError.message.includes('captcha')) {
+      toast.error(t('captcha-fail'))
+    }
+    else {
+      setErrors('change-pass', [t('invalid-password')], {})
+    }
     return false
   }
 
@@ -247,6 +272,7 @@ async function submit(form: { current_password?: string, password: string, passw
   }
   else {
     needsReauthentication.value = false
+    resetCaptcha()
     toast.success(t('changed-password-suc'))
 
     // If user was locked out due to password policy, refresh org data to regain access
@@ -419,6 +445,10 @@ async function submit(form: { current_password?: string, password: string, passw
           </footer>
         </div>
       </FormKit>
+    </div>
+
+    <div v-if="!!captchaKey" class="mt-4">
+      <VueTurnstile ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
     </div>
 
     <!-- Teleport Content for 2FA Input -->

@@ -4,6 +4,7 @@ import type { Bindings } from './cloudflare.ts'
 import type { DeletePayload, InsertPayload, UpdatePayload } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
 import { sentry } from '@hono/sentry'
+import { createClient } from '@supabase/supabase-js'
 import { getRuntimeKey } from 'hono/adapter'
 import { cors } from 'hono/cors'
 import { createFactory } from 'hono/factory'
@@ -24,41 +25,50 @@ export interface JWTClaims {
   role?: string
   exp?: number
   iat?: number
-  aud?: string
+  aud?: string | string[]
+  iss?: string
   app_metadata?: {
     provider?: string
     [key: string]: unknown
   }
 }
 
+const claimsClients = new Map<string, ReturnType<typeof createClient<Database>>>()
+
+function getClaimsClient(supabaseUrl: string, supabaseAnonKey: string) {
+  const cacheKey = `${supabaseUrl}|${supabaseAnonKey.substring(0, 8)}`
+  const cached = claimsClients.get(cacheKey)
+  if (cached) {
+    return cached
+  }
+
+  const client = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+      detectSessionInUrl: false,
+    },
+  })
+  claimsClients.set(cacheKey, client)
+  return client
+}
+
 /**
- * Decode JWT claims without making a network call.
- * This is much faster than getUser() which makes a network request.
- * The JWT signature is still verified by Supabase when used with RLS policies.
+ * Decode JWT claims through Supabase Auth `getClaims()`.
  */
-export function getClaimsFromJWT(jwt: string): JWTClaims | null {
+export async function getClaimsFromJWT(c: Context, jwt: string): Promise<JWTClaims | null> {
   try {
-    // Remove "Bearer " prefix if present
     const token = jwt.startsWith('Bearer ') ? jwt.slice(7) : jwt
+    const supabaseUrl = getEnv(c, 'SUPABASE_URL').replace(/\/$/, '')
+    const supabaseAnonKey = getEnv(c, 'SUPABASE_ANON_KEY')
 
-    const parts = token.split('.')
-    if (parts.length !== 3) {
+    const authClient = getClaimsClient(supabaseUrl, supabaseAnonKey).auth
+    const { data, error } = await authClient.getClaims(token)
+    if (error || !data?.claims) {
       return null
     }
 
-    // Decode the payload (second part)
-    // Handle base64url encoding (replace - with + and _ with /)
-    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-    // Add padding if needed
-    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4)
-    const payload = JSON.parse(atob(padded))
-
-    // Check if token is expired
-    if (payload.exp && payload.exp * 1000 < Date.now()) {
-      return null
-    }
-
-    return payload as JWTClaims
+    return data.claims as JWTClaims
   }
   catch {
     return null
@@ -164,8 +174,8 @@ export const middlewareAuth = honoFactory.createMiddleware(async (c, next) => {
   }
   c.set('authorization', authorization)
 
-  // Decode JWT claims without network call (much faster than getUser())
-  const claims = getClaimsFromJWT(authorization)
+  // Decode JWT claims via Supabase Auth `getClaims()`.
+  const claims = await getClaimsFromJWT(c, authorization)
   if (!claims || !claims.sub) {
     cloudlog({ requestId: c.get('requestId'), message: 'Invalid JWT claims' })
     throw simpleError('invalid_jwt', 'Invalid JWT')
