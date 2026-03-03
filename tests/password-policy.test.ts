@@ -532,7 +532,7 @@ describe('password Policy Enforcement Integration', () => {
     const orgRbacId = randomUUID()
     const orgRbacCustomerId = `cus_pwd_rbac_${orgRbacId}`
 
-    await getSupabaseClient().from('stripe_info').insert({
+    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
       customer_id: orgRbacCustomerId,
       status: 'succeeded',
       product_id: 'prod_LQIregjtNduh4q',
@@ -540,8 +540,9 @@ describe('password Policy Enforcement Integration', () => {
       trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
       is_good_plan: true,
     })
+    expect(stripeError).toBeNull()
 
-    await getSupabaseClient().from('orgs').insert({
+    const { error: orgError } = await getSupabaseClient().from('orgs').insert({
       id: orgRbacId,
       name: `RBAC Pwd Policy Org ${orgRbacId}`,
       management_email: TEST_EMAIL,
@@ -556,13 +557,15 @@ describe('password Policy Enforcement Integration', () => {
         require_special: true,
       },
     })
+    expect(orgError).toBeNull()
 
     // org_users + role_bindings are created by triggers on org + org_users insert
-    await getSupabaseClient().from('org_users').insert({
+    const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
       org_id: orgRbacId,
       user_id: USER_ID,
       user_right: 'super_admin',
-    }).select() // ignore conflict
+    })
+    expect(orgUserError).toBeNull()
 
     try {
       // check_min_rights routes through RBAC path. Password policy is checked
