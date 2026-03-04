@@ -5,7 +5,7 @@ import { BRES, createHono, middlewareAuth, parseBody, quickError, simpleError, u
 import { cloudlogErr } from '../../utils/logging.ts'
 import { requireEnterprisePlan } from '../../utils/plan-gating.ts'
 import { checkPermission } from '../../utils/rbac.ts'
-import { ManagementAPIError, createSSOProvider, deleteSSOProvider } from '../../utils/supabase-management.ts'
+import { createSSOProvider, deleteSSOProvider, ManagementAPIError } from '../../utils/supabase-management.ts'
 import { supabaseAdmin, supabaseWithAuth } from '../../utils/supabase.ts'
 import { version } from '../../utils/version.ts'
 
