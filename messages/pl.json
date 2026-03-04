@@ -1477,7 +1477,7 @@
   "sso-enterprise-upgrade-description": "SAML 2.0 Single Sign-On is available exclusively on the Enterprise plan. Upgrade to enable SSO for your organization.",
   "sso-upgrade-to-enterprise": "Upgrade to Enterprise",
   "sso-enterprise-required": "Wymagany plan Enterprise",
-  "sso-enterprise-required-description": "Konfiguracja SSO jest dostępna tylko dla klientów planu Enterprise. Proszę ulepszyć swój plan, aby włączyć Single Sign-On.",
+  "sso-enterprise-required-description": "Konfiguracja SSO jest dostępna tylko dla klientów planu Enterprise. Proszę ulepszyć swój plan, aby włączyć logowanie jednokrotne (SSO).",
   "sso-service-provider-metadata": "Metadane dostawcy usług",
   "sso-metadata-description": "Podaj te wartości swojemu dostawcy tożsamości (IdP) podczas konfigurowania SAML SSO.",
   "sso-acs-url": "URL ACS (Assertion Consumer Service)",

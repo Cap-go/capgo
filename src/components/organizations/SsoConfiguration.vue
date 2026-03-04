@@ -364,6 +364,7 @@ defineExpose({
         <button
           class="d-btn d-btn-ghost d-btn-xs flex-shrink-0"
           :title="t('sso-copy')"
+          :aria-label="`${t('sso-copy')} ${t('sso-acs-url')}`"
           @click="copyToClipboard(spMetadata!.acs_url, t('sso-acs-url'))"
         >
           <IconCopy class="w-4 h-4" />
@@ -377,6 +378,7 @@ defineExpose({
         <button
           class="d-btn d-btn-ghost d-btn-xs flex-shrink-0"
           :title="t('sso-copy')"
+          :aria-label="`${t('sso-copy')} ${t('sso-entity-id')}`"
           @click="copyToClipboard(spMetadata!.entity_id, t('sso-entity-id'))"
         >
           <IconCopy class="w-4 h-4" />
@@ -390,6 +392,7 @@ defineExpose({
         <button
           class="d-btn d-btn-ghost d-btn-xs flex-shrink-0"
           :title="t('sso-copy')"
+          :aria-label="`${t('sso-copy')} ${t('sso-sp-metadata-url')}`"
           @click="copyToClipboard(spMetadata!.sp_metadata_url, t('sso-sp-metadata-url'))"
         >
           <IconCopy class="w-4 h-4" />
@@ -403,6 +406,7 @@ defineExpose({
         <button
           class="d-btn d-btn-ghost d-btn-xs flex-shrink-0"
           :title="t('sso-copy')"
+          :aria-label="`${t('sso-copy')} ${t('sso-nameid-format')}`"
           @click="copyToClipboard(spMetadata!.nameid_format, t('sso-nameid-format'))"
         >
           <IconCopy class="w-4 h-4" />
