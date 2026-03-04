@@ -38,8 +38,10 @@ interface SpMetadata {
 }
 
 const providers = ref<SsoProvider[]>([])
-const spMetadata = computed<SpMetadata>(() => {
+const spMetadata = computed<SpMetadata | null>(() => {
   const base = getSupabaseHost()
+  if (!base)
+    return null
   const metadataUrl = `${base}/auth/v1/sso/saml/metadata`
   return {
     acs_url: `${base}/auth/v1/sso/saml/acs`,
@@ -365,7 +367,7 @@ defineExpose({
           class="d-btn d-btn-ghost d-btn-xs flex-shrink-0"
           :title="t('sso-copy')"
           :aria-label="`${t('sso-copy')} ${t('sso-acs-url')}`"
-          @click="copyToClipboard(spMetadata!.acs_url, t('sso-acs-url'))"
+          @click="copyToClipboard(spMetadata.acs_url, t('sso-acs-url'))"
         >
           <IconCopy class="w-4 h-4" />
         </button>
@@ -379,7 +381,7 @@ defineExpose({
           class="d-btn d-btn-ghost d-btn-xs flex-shrink-0"
           :title="t('sso-copy')"
           :aria-label="`${t('sso-copy')} ${t('sso-entity-id')}`"
-          @click="copyToClipboard(spMetadata!.entity_id, t('sso-entity-id'))"
+          @click="copyToClipboard(spMetadata.entity_id, t('sso-entity-id'))"
         >
           <IconCopy class="w-4 h-4" />
         </button>
@@ -393,7 +395,7 @@ defineExpose({
           class="d-btn d-btn-ghost d-btn-xs flex-shrink-0"
           :title="t('sso-copy')"
           :aria-label="`${t('sso-copy')} ${t('sso-sp-metadata-url')}`"
-          @click="copyToClipboard(spMetadata!.sp_metadata_url, t('sso-sp-metadata-url'))"
+          @click="copyToClipboard(spMetadata.sp_metadata_url, t('sso-sp-metadata-url'))"
         >
           <IconCopy class="w-4 h-4" />
         </button>
@@ -407,7 +409,7 @@ defineExpose({
           class="d-btn d-btn-ghost d-btn-xs flex-shrink-0"
           :title="t('sso-copy')"
           :aria-label="`${t('sso-copy')} ${t('sso-nameid-format')}`"
-          @click="copyToClipboard(spMetadata!.nameid_format, t('sso-nameid-format'))"
+          @click="copyToClipboard(spMetadata.nameid_format, t('sso-nameid-format'))"
         >
           <IconCopy class="w-4 h-4" />
         </button>
