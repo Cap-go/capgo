@@ -5,7 +5,7 @@ import { BRES, createHono, middlewareAuth, parseBody, quickError, simpleError, u
 import { cloudlogErr } from '../../utils/logging.ts'
 import { requireEnterprisePlan } from '../../utils/plan-gating.ts'
 import { checkPermission } from '../../utils/rbac.ts'
-import { createSSOProvider, deleteSSOProvider } from '../../utils/supabase-management.ts'
+import { createSSOProvider, deleteSSOProvider, ManagementAPIError } from '../../utils/supabase-management.ts'
 import { supabaseAdmin, supabaseWithAuth } from '../../utils/supabase.ts'
 import { version } from '../../utils/version.ts'
 
@@ -130,7 +130,16 @@ app.post('/', async (c) => {
     return quickError(403, 'sso_not_enabled', 'SSO is not enabled for this organization')
   }
 
-  const managementProvider = await createSSOProvider(c, body.domain, body.metadata_url, attributeMapping)
+  let managementProvider: Awaited<ReturnType<typeof createSSOProvider>>
+  try {
+    managementProvider = await createSSOProvider(c, body.domain, body.metadata_url, attributeMapping)
+  }
+  catch (err) {
+    if (err instanceof ManagementAPIError) {
+      return quickError(err.status >= 400 ? err.status : 500, 'provider_creation_failed', err.message, { management_error_code: err.code })
+    }
+    throw err
+  }
 
   try {
     const supabase = supabaseWithAuth(c, auth) as any

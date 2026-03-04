@@ -18,7 +18,7 @@ export interface SSOProviderUpdate {
   attribute_mapping?: Record<string, string>
 }
 
-class ManagementAPIError extends Error {
+export class ManagementAPIError extends Error {
   constructor(
     public status: number,
     public code: string,

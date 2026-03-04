@@ -25,6 +25,7 @@ import { app as sso_prelink_internal } from '../_backend/private/sso/prelink-int
 import { app as sso_prelink } from '../_backend/private/sso/prelink.ts'
 import { app as sso_providers } from '../_backend/private/sso/providers.ts'
 import { app as sso_provision_user } from '../_backend/private/sso/provision-user.ts'
+import { app as sso_sp_metadata } from '../_backend/private/sso/sp-metadata.ts'
 import { app as sso_verify_dns } from '../_backend/private/sso/verify-dns.ts'
 import { app as stats_priv } from '../_backend/private/stats.ts'
 import { app as storeTop } from '../_backend/private/store_top.ts'
@@ -74,6 +75,7 @@ appGlobal.route('/sso/providers', sso_providers)
 appGlobal.route('/sso/prelink-users', sso_prelink)
 appGlobal.route('/sso/prelink-internal', sso_prelink_internal)
 appGlobal.route('/sso/provision-user', sso_provision_user)
+appGlobal.route('/sso/sp-metadata', sso_sp_metadata)
 appGlobal.route('/sso/verify-dns', sso_verify_dns)
 
 createAllCatch(appGlobal, functionName)

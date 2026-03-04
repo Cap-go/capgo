@@ -1,0 +1,23 @@
+import { createHono, middlewareAuth, quickError, useCors } from '../../utils/hono.ts'
+import { getEnv } from '../../utils/utils.ts'
+import { version } from '../../utils/version.ts'
+
+export const app = createHono('', version)
+
+app.use('*', useCors)
+app.use('*', middlewareAuth)
+
+app.get('/', (c) => {
+  const auth = c.get('auth')
+  if (!auth) {
+    quickError(401, 'not_authorized', 'Not authorized')
+  }
+
+  const supabaseUrl = getEnv(c, 'SUPABASE_URL').replace(/\/$/, '')
+
+  return c.json({
+    acs_url: `${supabaseUrl}/auth/v1/sso/saml/acs`,
+    entity_id: `${supabaseUrl}/auth/v1/sso/saml/metadata`,
+    nameid_format: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+  })
+})
