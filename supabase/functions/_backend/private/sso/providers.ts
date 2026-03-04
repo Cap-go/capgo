@@ -136,7 +136,7 @@ app.post('/', async (c) => {
   }
   catch (err) {
     if (err instanceof ManagementAPIError) {
-      return quickError(err.status >= 400 ? err.status : 500, err.code, err.message)
+      return quickError(err.status >= 400 ? err.status : 500, 'provider_creation_failed', err.message, { management_error_code: err.code })
     }
     throw err
   }
