@@ -13,6 +13,7 @@ import IconVersion from '~icons/heroicons/arrow-path'
 import iconEmail from '~icons/heroicons/envelope?raw'
 import iconFlag from '~icons/heroicons/flag?raw'
 import iconName from '~icons/heroicons/user?raw'
+import iconPassword from '~icons/heroicons/key?raw'
 import { pickPhoto, takePhoto } from '~/services/photos'
 import { getCurrentPlanNameOrg, isPayingOrg, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -399,7 +400,7 @@ async function presentActionSheet() {
   return dialogStore.onDialogDismiss()
 }
 
-async function submit(form: { first_name: string, last_name: string, email: string, country: string }) {
+async function submit(form: { first_name: string, last_name: string, email: string, country: string, current_password?: string }) {
   if (isLoading.value || !main.user?.id)
     return
   if (form.first_name === main.user?.first_name
@@ -419,6 +420,28 @@ async function submit(form: { first_name: string, last_name: string, email: stri
   }
 
   if (main.user?.email !== form.email) {
+    if (!form.current_password?.trim()) {
+      isLoading.value = false
+      setErrors('update-account', ['Current password is required to change your email.'], {})
+      return
+    }
+
+    const { error: verifyError } = await supabase.auth.signInWithPassword({
+      email: main.user.email,
+      password: form.current_password,
+    })
+
+    if (verifyError) {
+      isLoading.value = false
+      if (verifyError.code === 'mfa_required') {
+        setErrors('update-account', ['Complete your 2FA challenge, then try again.'], {})
+      }
+      else {
+        setErrors('update-account', [t('invalid-password')], {})
+      }
+      return
+    }
+
     const data = await supabase.auth.updateUser({ email: form.email })
     reset('update-account', useMainStore().user)
     if (data.error && data.error.name === 'AuthApiError') {
@@ -539,9 +562,23 @@ onMounted(async () => {
                   :prefix-icon="iconFlag"
                   :disabled="isLoading"
                   :value="main.user?.country ?? ''"
-                  enterkeyhint="send"
+                  enterkeyhint="next"
                   validation="required:trim"
                   :label="t('country')"
+                />
+              </div>
+            </div>
+            <div class="mt-5 space-y-4 sm:flex sm:items-center sm:space-y-0 sm:space-x-4">
+              <div class="sm:w-1/2">
+                <FormKit
+                  type="password"
+                  name="current_password"
+                  :prefix-icon="iconPassword"
+                  :disabled="isLoading"
+                  autocomplete="current-password"
+                  enterkeyhint="send"
+                  :label="t('current-password')"
+                  help="Required only when changing your email"
                 />
               </div>
             </div>
