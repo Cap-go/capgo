@@ -39,7 +39,7 @@ interface SpMetadata {
 
 const providers = ref<SsoProvider[]>([])
 const spMetadata = computed<SpMetadata>(() => {
-  const base = getSupabaseHost().replace(/\/$/, '')
+  const base = getSupabaseHost()
   const metadataUrl = `${base}/auth/v1/sso/saml/metadata`
   return {
     acs_url: `${base}/auth/v1/sso/saml/acs`,
