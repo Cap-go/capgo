@@ -1485,6 +1485,7 @@
   "sso-metadata-description": "Provide these values to your Identity Provider (IdP) when configuring SAML SSO.",
   "sso-acs-url": "ACS URL (Assertion Consumer Service)",
   "sso-entity-id": "Entity ID (Audience URI)",
+  "sso-sp-metadata-url": "SP Metadata URL (auto-configuration)",
   "sso-nameid-format": "NameID Format",
   "sso-copy": "Copy",
   "sso-copied-to-clipboard": "{label} copied to clipboard",

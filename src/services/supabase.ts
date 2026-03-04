@@ -63,6 +63,10 @@ export async function getRemoteConfig() {
   }
 }
 
+export function getSupabaseHost(): string {
+  return config.supaHost
+}
+
 export function useSupabase() {
   const options = {
     auth: {

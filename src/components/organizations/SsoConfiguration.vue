@@ -6,7 +6,7 @@ import IconCopy from '~icons/heroicons/document-duplicate'
 import IconGlobeAlt from '~icons/heroicons/globe-alt'
 import IconTrash from '~icons/heroicons/trash'
 import Spinner from '~/components/Spinner.vue'
-import { defaultApiHost, useSupabase } from '~/services/supabase'
+import { defaultApiHost, getSupabaseHost, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
 interface SsoProvider {
@@ -30,7 +30,24 @@ const { t } = useI18n()
 const supabase = useSupabase()
 const dialogStore = useDialogV2Store()
 
+interface SpMetadata {
+  acs_url: string
+  entity_id: string
+  sp_metadata_url: string
+  nameid_format: string
+}
+
 const providers = ref<SsoProvider[]>([])
+const spMetadata = computed<SpMetadata>(() => {
+  const base = getSupabaseHost().replace(/\/$/, '')
+  const metadataUrl = `${base}/auth/v1/sso/saml/metadata`
+  return {
+    acs_url: `${base}/auth/v1/sso/saml/acs`,
+    entity_id: metadataUrl,
+    sp_metadata_url: metadataUrl,
+    nameid_format: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+  }
+})
 const isLoading = ref(true)
 const isSubmitting = ref(false)
 const isVerifying = ref<string | null>(null)
@@ -327,6 +344,73 @@ defineExpose({
 </script>
 
 <template>
+  <!-- Service Provider Metadata (shown when available) -->
+  <div
+    v-if="spMetadata"
+    class="p-4 mb-6 border rounded-lg border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50"
+  >
+    <h4 class="mb-1 text-base font-semibold dark:text-white text-slate-800">
+      {{ t('sso-service-provider-metadata') }}
+    </h4>
+    <p class="mb-3 text-sm text-slate-500 dark:text-slate-400">
+      {{ t('sso-metadata-description') }}
+    </p>
+    <div class="p-3 space-y-2 font-mono text-sm bg-white border border-slate-200 rounded dark:bg-gray-800 dark:border-slate-700">
+      <div class="flex items-center justify-between gap-2">
+        <p class="text-slate-600 dark:text-slate-400 min-w-0">
+          <span class="font-semibold text-slate-800 dark:text-white">{{ t('sso-acs-url') }}:</span>
+          <span class="ml-1 break-all">{{ spMetadata.acs_url }}</span>
+        </p>
+        <button
+          class="d-btn d-btn-ghost d-btn-xs flex-shrink-0"
+          :title="t('sso-copy')"
+          @click="copyToClipboard(spMetadata!.acs_url, t('sso-acs-url'))"
+        >
+          <IconCopy class="w-4 h-4" />
+        </button>
+      </div>
+      <div class="flex items-center justify-between gap-2">
+        <p class="text-slate-600 dark:text-slate-400 min-w-0">
+          <span class="font-semibold text-slate-800 dark:text-white">{{ t('sso-entity-id') }}:</span>
+          <span class="ml-1 break-all">{{ spMetadata.entity_id }}</span>
+        </p>
+        <button
+          class="d-btn d-btn-ghost d-btn-xs flex-shrink-0"
+          :title="t('sso-copy')"
+          @click="copyToClipboard(spMetadata!.entity_id, t('sso-entity-id'))"
+        >
+          <IconCopy class="w-4 h-4" />
+        </button>
+      </div>
+      <div class="flex items-center justify-between gap-2">
+        <p class="text-slate-600 dark:text-slate-400 min-w-0">
+          <span class="font-semibold text-slate-800 dark:text-white">{{ t('sso-sp-metadata-url') }}:</span>
+          <span class="ml-1 break-all">{{ spMetadata.sp_metadata_url }}</span>
+        </p>
+        <button
+          class="d-btn d-btn-ghost d-btn-xs flex-shrink-0"
+          :title="t('sso-copy')"
+          @click="copyToClipboard(spMetadata!.sp_metadata_url, t('sso-sp-metadata-url'))"
+        >
+          <IconCopy class="w-4 h-4" />
+        </button>
+      </div>
+      <div class="flex items-center justify-between gap-2">
+        <p class="text-slate-600 dark:text-slate-400 min-w-0">
+          <span class="font-semibold text-slate-800 dark:text-white">{{ t('sso-nameid-format') }}:</span>
+          <span class="ml-1 break-all">{{ spMetadata.nameid_format }}</span>
+        </p>
+        <button
+          class="d-btn d-btn-ghost d-btn-xs flex-shrink-0"
+          :title="t('sso-copy')"
+          @click="copyToClipboard(spMetadata!.nameid_format, t('sso-nameid-format'))"
+        >
+          <IconCopy class="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Add Provider Form -->
   <div
     v-if="showAddForm"
@@ -460,7 +544,7 @@ defineExpose({
 
   <!-- Empty State -->
   <div
-    v-else-if="providers.length === 0"
+    v-else-if="providers.length === 0 && !showAddForm"
     class="py-12 text-center"
   >
     <div class="flex justify-center mb-4">
