@@ -64,7 +64,10 @@ export async function getRemoteConfig() {
 }
 
 export function getSupabaseHost(): string {
-  return config.supaHost.replace(/\/+$/, '')
+  let host = config.supaHost
+  while (host.endsWith('/'))
+    host = host.slice(0, -1)
+  return host
 }
 
 export function useSupabase() {
