@@ -32,6 +32,84 @@ jobs:
         uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3 # v2
         with:
           bun-version: latest
+      - name: Validate migration timestamps
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+
+          extract_timestamp() {
+            local file_name="$1"
+            local base_name
+            base_name="$(basename "$file_name")"
+
+            if [[ "$base_name" =~ ^([0-9]{14})_ ]]; then
+              echo "${BASH_REMATCH[1]}"
+            else
+              return 1
+            fi
+          }
+
+          git fetch --depth=1 origin main
+          BASE_REF="origin/main"
+
+          declare -A base_timestamp_to_file
+          while IFS= read -r file; do
+            ts="$(extract_timestamp "$file" || true)"
+            [ -z "$ts" ] && continue
+            base_timestamp_to_file["$ts"]="$file"
+          done < <(git ls-tree -r --name-only "$BASE_REF" -- 'supabase/migrations/*.sql')
+
+          latest_base_timestamp="00000000000000"
+          for ts in "${!base_timestamp_to_file[@]}"; do
+            if [[ "$ts" > "$latest_base_timestamp" ]]; then
+              latest_base_timestamp="$ts"
+            fi
+          done
+
+          added_files="$(git diff --name-only --diff-filter=A "${BASE_REF}...HEAD" -- 'supabase/migrations/*.sql')"
+          duplicate_timestamps=0
+
+          if [ -n "$added_files" ]; then
+            declare -A added_timestamp_count
+            declare -A added_timestamp_files
+
+            while IFS= read -r file; do
+              [ -z "$file" ] && continue
+              ts="$(extract_timestamp "$file" || true)"
+              [ -z "$ts" ] && continue
+
+              if [[ -n "${base_timestamp_to_file["$ts"]+x}" ]]; then
+                echo "❌ Duplicate migration timestamp: ${ts}"
+                echo "  PR file: $file"
+                echo "  Existing file on main: ${base_timestamp_to_file["$ts"]}"
+                duplicate_timestamps=1
+              fi
+
+              if [ -n "${added_timestamp_count["$ts"]+x}" ]; then
+                echo "❌ Duplicate migration timestamp in PR: ${ts}"
+                echo "  Previous file: ${added_timestamp_files["$ts"]}"
+                echo "  Additional file: ${file}"
+                duplicate_timestamps=1
+              else
+                added_timestamp_count["$ts"]=1
+                added_timestamp_files["$ts"]="$file"
+              fi
+
+              if [[ "$ts" < "$latest_base_timestamp" ]]; then
+                echo "❌ Migration timestamp regression detected"
+                echo "  Last migration timestamp on main: ${latest_base_timestamp}"
+                echo "  New migration file: $file"
+                echo "  New migration timestamp: ${ts}"
+                duplicate_timestamps=1
+              fi
+            done <<< "$added_files"
+          fi
+
+          if [ "$duplicate_timestamps" -ne 0 ]; then
+            exit 1
+          fi
+
+          echo "✅ Migration filename timestamps are unique and strictly newer than main."
       - name: Check for typos
         uses: crate-ci/typos@57b11c6b7e54c402ccd9cda953f1072ec4f78e33 # v1.43.5
       - name: Show bun version
