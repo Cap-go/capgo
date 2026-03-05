@@ -423,7 +423,7 @@ export async function update(c: Context, body: AppInfos) {
   await setReplicationLagHeader(c, pgClient)
 
   const drizzlePg = pgClient ? getDrizzleClient(pgClient) : (null as any)
-  // Lazily create D1 client inside updateWithPG when actually used
+  // Use the active DB client only when needed
   const res = await updateWithPG(c, body, drizzlePg)
   if (pgClient)
     await closeClient(c, pgClient)

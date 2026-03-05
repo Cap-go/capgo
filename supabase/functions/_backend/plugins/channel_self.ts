@@ -589,7 +589,7 @@ app.post('/', async (c) => {
     return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, ...buildRateLimitInfo(rateLimitStatus.resetAt) })
   }
 
-  // POST has writes, so always create PG client (even if using D1 for reads)
+  // POST has writes, so always create PG client
   const pgClient = getPgClient(c)
 
   return await runChannelSelfWithPgClient(
@@ -649,7 +649,7 @@ app.delete('/', async (c) => {
     return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, ...buildRateLimitInfo(rateLimitStatus.resetAt) })
   }
 
-  // DELETE has writes, so always create PG client (even if using D1 for reads)
+  // DELETE has writes, so always create PG client
   const pgClient = getPgClient(c)
 
   return await runChannelSelfWithPgClient(

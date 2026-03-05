@@ -157,11 +157,11 @@ export function trackLogsCFExternal(c: Context, app_id: string, device_id: strin
   return Promise.resolve()
 }
 
-function getD1WriteStoreAppSession(c: Context) {
+function getReplicaWriteStoreAppSession(c: Context) {
   return c.env.DB_STOREAPPS
 }
 
-function getD1ReadStoreAppSession(c: Context) {
+function getReplicaReadStoreAppSession(c: Context) {
   return c.env.DB_STOREAPPS.withSession('first-unconstrained')
 }
 
@@ -741,10 +741,10 @@ export async function getAppsFromCF(c: Context): Promise<{ app_id: string }[]> {
   cloudlog({ requestId: c.get('requestId'), message: 'getAppsFromCF query', query })
   // use c.env.DB_STORE_APPS and table store_apps
   try {
-    const readD1 = getD1ReadStoreAppSession(c)
+    const storeAppSession = getReplicaReadStoreAppSession(c)
       .prepare(query)
       .all()
-    const res = await readD1
+    const res = await storeAppSession
     if (res.error || !res.results || !res.success)
       cloudlogErr({ requestId: c.get('requestId'), message: 'getAppsFromCF error', error: res.error })
     return res.results as { app_id: string }[]
@@ -763,10 +763,10 @@ export async function countUpdatesFromStoreAppsCF(c: Context): Promise<number> {
 
   cloudlog({ requestId: c.get('requestId'), message: 'countUpdatesFromStoreAppsCF query', query })
   try {
-    const readD1 = getD1ReadStoreAppSession(c)
+    const storeAppSession = getReplicaReadStoreAppSession(c)
       .prepare(query)
       .first('count')
-    const res = await readD1
+    const res = await storeAppSession
     return res
   }
   catch (e) {
@@ -911,10 +911,10 @@ export async function getAppsToProcessCF(c: Context, flag: 'to_get_framework' | 
 
   cloudlog({ requestId: c.get('requestId'), message: 'getAppsToProcessCF query', query })
   try {
-    const readD1 = getD1ReadStoreAppSession(c)
+    const storeAppSession = getReplicaReadStoreAppSession(c)
       .prepare(query)
       .all()
-    const res = await readD1
+    const res = await storeAppSession
     return res.results as StoreApp[]
   }
   catch (e) {
@@ -956,10 +956,10 @@ export async function getTopAppsCF(c: Context, mode: string, limit: number): Pro
 
   cloudlog({ requestId: c.get('requestId'), message: 'getTopAppsCF query', query })
   try {
-    const readD1 = getD1ReadStoreAppSession(c)
+    const storeAppSession = getReplicaReadStoreAppSession(c)
       .prepare(query)
       .all()
-    const res = await readD1
+    const res = await storeAppSession
     return res.results as StoreApp[]
   }
   catch (e) {
@@ -993,10 +993,10 @@ export async function getTotalAppsByModeCF(c: Context, mode: string) {
 
   cloudlog({ requestId: c.get('requestId'), message: 'getTotalAppsByModeCF query', query })
   try {
-    const readD1 = getD1ReadStoreAppSession(c)
+    const storeAppSession = getReplicaReadStoreAppSession(c)
       .prepare(query)
       .first('total')
-    const res = await readD1
+    const res = await storeAppSession
     return res
   }
   catch (e) {
@@ -1013,7 +1013,7 @@ export async function createIfNotExistStoreInfo(c: Context, app: Partial<StoreAp
 
   try {
     // Check if app exists
-    const existingApp = await getD1ReadStoreAppSession(c)
+    const existingApp = await getReplicaReadStoreAppSession(c)
       .prepare('SELECT app_id FROM store_apps WHERE app_id = ?')
       .bind(app.app_id)
       .first()
@@ -1027,7 +1027,7 @@ export async function createIfNotExistStoreInfo(c: Context, app: Partial<StoreAp
 
     const query = `INSERT INTO store_apps (${columns.join(', ')}) VALUES (${placeholders})`
     cloudlog({ requestId: c.get('requestId'), message: 'createIfNotExistStoreInfo query', query, placeholders, values })
-    const res = await getD1WriteStoreAppSession(c)
+    const res = await getReplicaWriteStoreAppSession(c)
       .prepare(query)
       .bind(...values)
       .run()
@@ -1055,7 +1055,7 @@ export async function saveStoreInfoCF(c: Context, app: Partial<StoreApp>) {
   const query = `INSERT INTO store_apps (app_id, ${columns.join(', ')}) VALUES (?, ${placeholders}) ON CONFLICT(app_id) DO UPDATE SET ${updates}`
 
   try {
-    const res = await getD1WriteStoreAppSession(c)
+    const res = await getReplicaWriteStoreAppSession(c)
       .prepare(query)
       .bind(app.app_id, ...values)
       .run()
@@ -1090,7 +1090,7 @@ export async function updateStoreApp(c: Context, appId: string, updates: number)
   const query = `INSERT INTO store_apps (app_id, updates, updated_at) VALUES (?, ?, datetime('now')) ON CONFLICT(app_id) DO UPDATE SET updates = updates + ?, updated_at = datetime('now')`
 
   try {
-    const res = await getD1WriteStoreAppSession(c)
+    const res = await getReplicaWriteStoreAppSession(c)
       .prepare(query)
       .bind(appId, updates, updates)
       .run()

@@ -7,7 +7,7 @@ import { createAppVersions, fetchWithRetry, getBaseData, getSupabaseClient, getV
 const id = randomUUID().substring(0, 8)
 const APP_NAME_DOWNLOAD_STATS = `com.download.${id}`
 
-// Check if we're using Cloudflare Workers (which requires sequential tests due to D1 sync)
+// Check if we're using Cloudflare Workers (which may serialize paths for consistency)
 interface StatsRes {
   error?: string
   message?: string

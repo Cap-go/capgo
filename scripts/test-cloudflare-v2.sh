@@ -1,15 +1,10 @@
 #!/usr/bin/env bash
 
 # Complete workflow for testing Cloudflare Workers locally.
-#
-# Note: Despite the "V2/D1" naming, this script currently validates the Cloudflare
-# Workers runtime integration (API/Plugin/Files) against the local Supabase
-# database. If/when a D1 sync worker is reintroduced, extend this script to run
-# the sync step before tests.
 
 set -e
 
-echo "🧪 Cloudflare V2 (D1) Testing Workflow"
+echo "🧪 Cloudflare Workers Testing Workflow"
 echo "======================================"
 
 # Colors

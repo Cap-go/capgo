@@ -418,7 +418,6 @@ export async function resetAndSeedAppData(appId: string, options?: SeedAppOption
           updatedSet.add(optionKey)
           seededApps.set(appId, updatedSet)
 
-          // Trigger D1 sync for Cloudflare Workers tests
           break
         }
         catch (error: any) {
@@ -486,7 +485,6 @@ export async function resetAndSeedAppDataStats(appId: string): Promise<void> {
           throw error
         }
 
-        // Trigger D1 sync for Cloudflare Workers tests
         break
       }
       catch (error: any) {

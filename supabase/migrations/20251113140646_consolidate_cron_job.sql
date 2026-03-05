@@ -409,7 +409,7 @@ SELECT
 -- process_all_cron_tasks (1 seconds) - Runs every second and intelligently handles ALL tasks:
 --
 --   Every second:
---     - D1 replication batch processing
+--     - replica queue batch processing
 --
 --   Every 10 seconds:
 --     - 9 high-frequency queues (on_channel_update, on_user_create, on_user_update,
