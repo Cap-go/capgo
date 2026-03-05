@@ -11,8 +11,8 @@ export default defineConfig(({ mode }) => ({
     testTimeout: 30_000, // Increased timeout for Cloudflare Workers
     hookTimeout: 10_000,
     retry: 2,
-    maxConcurrency: 10, // Reduced for D1 sync reliability
-    maxWorkers: 5, // Reduced for D1 sync reliability
+    maxConcurrency: 10, // Reduced for replica sync reliability
+    maxWorkers: 5, // Reduced for replica sync reliability
     env: {
       ...loadEnv(mode, cwd(), ''),
       // Override to use Cloudflare Workers instead of Supabase Edge Functions

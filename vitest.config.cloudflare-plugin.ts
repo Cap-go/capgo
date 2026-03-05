@@ -11,7 +11,7 @@ export default defineConfig(({ mode }) => ({
     testTimeout: process.env.CI ? 60_000 : 30_000, // 60s in CI, 30s locally
     hookTimeout: 10_000,
     retry: 2,
-    // Very low concurrency for plugin tests that need D1 sync
+    // Very low concurrency for plugin tests that hit shared replica state
     maxConcurrency: 1, // Run tests sequentially
     maxWorkers: 1, // Single worker
     env: {

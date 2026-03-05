@@ -9,7 +9,7 @@ import { APP_NAME, createAppVersions, getBaseData, getSupabaseClient, getVersion
 const id = randomUUID()
 const APP_NAME_STATS = `${APP_NAME}.${id}`
 
-// Check if we're using Cloudflare Workers (which requires sequential tests due to D1 sync)
+// Check if we're using Cloudflare Workers (which serializes some test paths)
 const USE_CLOUDFLARE = env.USE_CLOUDFLARE_WORKERS === 'true'
 
 interface StatsRes {
@@ -298,8 +298,7 @@ describe('[POST] /stats', () => {
     await resetAppDataStats(appId)
   })
 
-  // Test each stats action - concurrent for Supabase, sequential for Cloudflare (due to D1 sync)
-  // Cloudflare Workers use D1 which requires sequential sync, Supabase can run concurrently
+  // Test each stats action - concurrent for Supabase, sequential for Cloudflare
   const testDescribe = USE_CLOUDFLARE ? describe : describe.concurrent
   const testIt = USE_CLOUDFLARE ? it : it.concurrent
 
@@ -529,7 +528,7 @@ interface BatchStatsRes {
   }>
 }
 
-// Test batch operations - concurrent for Supabase, sequential for Cloudflare (due to D1 sync)
+// Test batch operations - concurrent for Supabase, sequential for Cloudflare
 const batchTestDescribe = USE_CLOUDFLARE ? describe : describe.concurrent
 const batchTestIt = USE_CLOUDFLARE ? it : it.concurrent
 

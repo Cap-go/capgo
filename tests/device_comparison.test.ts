@@ -9,9 +9,9 @@ import {
   toComparableExisting,
 } from '../supabase/functions/_backend/utils/deviceComparison.ts'
 
-// Helper to simulate D1 storage behavior
-// This matches what cloudflare.ts writes to D1
-function simulateD1Storage(device: DeviceWithoutCreatedAt): DeviceExistingRowLike {
+// Helper to simulate replica storage behavior
+// This matches what cloudflare.ts writes to the replica store
+function simulateReplicaStorage(device: DeviceWithoutCreatedAt): DeviceExistingRowLike {
   const comparable = toComparableDevice(device)
 
   // Write the comparable values directly - defaults are already applied in toComparableDevice()
@@ -84,7 +84,7 @@ describe('deviceComparison utilities', () => {
       })
     })
 
-    it('should normalize empty strings and apply D1 defaults', () => {
+    it('should normalize empty strings and apply replica defaults', () => {
       const device: DeviceWithoutCreatedAt = {
         device_id: 'test-device',
         app_id: 'test-app',
@@ -103,19 +103,19 @@ describe('deviceComparison utilities', () => {
 
       expect(comparable).toEqual({
         platform: 'ios',
-        plugin_version: '', // D1 NOT NULL
-        os_version: '', // D1 NOT NULL
-        version_build: 'builtin', // D1 DEFAULT 'builtin'
-        custom_id: '', // D1 DEFAULT '' NOT NULL
-        version_name: null, // D1 NULLABLE
+        plugin_version: '', // replica NOT NULL
+        os_version: '', // replica NOT NULL
+        version_build: 'builtin', // replica DEFAULT 'builtin'
+        custom_id: '', // replica DEFAULT '' NOT NULL
+        version_name: null, // replica NULLABLE
         is_prod: false,
         is_emulator: false,
-        default_channel: null, // D1 NULLABLE
+        default_channel: null, // replica NULLABLE
         key_id: null,
       })
     })
 
-    it('should handle undefined/null fields and apply D1 defaults', () => {
+    it('should handle undefined/null fields and apply replica defaults', () => {
       const device = {
         device_id: 'test-device',
         app_id: 'test-app',
@@ -135,14 +135,14 @@ describe('deviceComparison utilities', () => {
 
       expect(comparable).toEqual({
         platform: null,
-        plugin_version: '', // D1 NOT NULL
-        os_version: '', // D1 NOT NULL
-        version_build: 'builtin', // D1 DEFAULT 'builtin'
-        custom_id: '', // D1 DEFAULT '' NOT NULL
-        version_name: null, // D1 NULLABLE
+        plugin_version: '', // replica NOT NULL
+        os_version: '', // replica NOT NULL
+        version_build: 'builtin', // replica DEFAULT 'builtin'
+        custom_id: '', // replica DEFAULT '' NOT NULL
+        version_name: null, // replica NULLABLE
         is_prod: false,
         is_emulator: false,
-        default_channel: null, // D1 NULLABLE
+        default_channel: null, // replica NULLABLE
         key_id: null,
       })
     })
@@ -204,36 +204,36 @@ describe('deviceComparison utilities', () => {
       expect(comparable.is_emulator).toBe(false)
     })
 
-    it('should handle null existing device with D1 defaults', () => {
+    it('should handle null existing device with replica defaults', () => {
       const comparable = toComparableExisting(null)
 
       expect(comparable).toEqual({
         platform: null,
-        plugin_version: '', // D1 NOT NULL
-        os_version: '', // D1 NOT NULL
-        version_build: 'builtin', // D1 DEFAULT 'builtin'
-        custom_id: '', // D1 DEFAULT '' NOT NULL
-        version_name: null, // D1 NULLABLE
+        plugin_version: '', // replica NOT NULL
+        os_version: '', // replica NOT NULL
+        version_build: 'builtin', // replica DEFAULT 'builtin'
+        custom_id: '', // replica DEFAULT '' NOT NULL
+        version_name: null, // replica NULLABLE
         is_prod: false,
         is_emulator: false,
-        default_channel: null, // D1 NULLABLE
+        default_channel: null, // replica NULLABLE
         key_id: null,
       })
     })
 
-    it('should handle undefined existing device with D1 defaults', () => {
+    it('should handle undefined existing device with replica defaults', () => {
       const comparable = toComparableExisting(undefined)
 
       expect(comparable).toEqual({
         platform: null,
-        plugin_version: '', // D1 NOT NULL
-        os_version: '', // D1 NOT NULL
-        version_build: 'builtin', // D1 DEFAULT 'builtin'
-        custom_id: '', // D1 DEFAULT '' NOT NULL
-        version_name: null, // D1 NULLABLE
+        plugin_version: '', // replica NOT NULL
+        os_version: '', // replica NOT NULL
+        version_build: 'builtin', // replica DEFAULT 'builtin'
+        custom_id: '', // replica DEFAULT '' NOT NULL
+        version_name: null, // replica NULLABLE
         is_prod: false,
         is_emulator: false,
-        default_channel: null, // D1 NULLABLE
+        default_channel: null, // replica NULLABLE
         key_id: null,
       })
     })
@@ -579,7 +579,7 @@ describe('deviceComparison utilities', () => {
       })
     })
 
-    it('should normalize empty strings and apply D1 defaults', () => {
+    it('should normalize empty strings and apply replica defaults', () => {
       const device: DeviceWithoutCreatedAt = {
         device_id: 'test-device',
         app_id: 'test-app',
@@ -596,12 +596,12 @@ describe('deviceComparison utilities', () => {
       const normalized = buildNormalizedDeviceForWrite(device)
 
       expect(normalized).toEqual({
-        version_name: null, // D1 NULLABLE
+        version_name: null, // replica NULLABLE
         platform: 'ios',
-        plugin_version: '', // D1 NOT NULL
-        os_version: '', // D1 NOT NULL
-        version_build: 'builtin', // D1 DEFAULT 'builtin'
-        custom_id: '', // D1 DEFAULT '' NOT NULL
+        plugin_version: '', // replica NOT NULL
+        os_version: '', // replica NOT NULL
+        version_build: 'builtin', // replica DEFAULT 'builtin'
+        custom_id: '', // replica DEFAULT '' NOT NULL
         is_prod: false,
         is_emulator: false,
         key_id: null,
@@ -639,8 +639,8 @@ describe('deviceComparison utilities', () => {
     })
   })
 
-  describe('d1 write/read cycle simulation - real world scenarios', () => {
-    it('should NOT detect change after D1 write/read cycle with null values', () => {
+  describe('replica write/read cycle simulation - real world scenarios', () => {
+    it('should NOT detect change after replica write/read cycle with null values', () => {
       // Initial device from client with null/undefined values
       const deviceFromClient: DeviceWithoutCreatedAt = {
         device_id: 'test-device-1',
@@ -656,8 +656,8 @@ describe('deviceComparison utilities', () => {
         default_channel: undefined, // Client doesn't send
       }
 
-      // Simulate what D1 stores (based on cloudflare.ts lines 167-181)
-      const storedInD1 = simulateD1Storage(deviceFromClient)
+      // Simulate what the replica stores (based on cloudflare.ts lines 167-181)
+      const storedInReplica = simulateReplicaStorage(deviceFromClient)
 
       // Next request: same device from client
       const deviceFromClientAgain: DeviceWithoutCreatedAt = {
@@ -675,7 +675,7 @@ describe('deviceComparison utilities', () => {
       }
 
       // This should be FALSE (no change) to avoid unnecessary writes
-      const changed = hasComparableDeviceChanged(storedInD1, deviceFromClientAgain)
+      const changed = hasComparableDeviceChanged(storedInReplica, deviceFromClientAgain)
       expect(changed).toBe(false)
     })
 
@@ -689,7 +689,7 @@ describe('deviceComparison utilities', () => {
         is_emulator: false,
       }
 
-      const storedInD1 = simulateD1Storage(deviceFromClient)
+      const storedInReplica = simulateReplicaStorage(deviceFromClient)
 
       // Next request with undefined
       const deviceAgain: DeviceWithoutCreatedAt = {
@@ -701,7 +701,7 @@ describe('deviceComparison utilities', () => {
         is_emulator: false,
       }
 
-      expect(hasComparableDeviceChanged(storedInD1, deviceAgain)).toBe(false)
+      expect(hasComparableDeviceChanged(storedInReplica, deviceAgain)).toBe(false)
     })
 
     it('should NOT detect change with typical production device payload', () => {
@@ -720,7 +720,7 @@ describe('deviceComparison utilities', () => {
         default_channel: 'production',
       }
 
-      const storedInD1 = simulateD1Storage(typicalDevice)
+      const storedInReplica = simulateReplicaStorage(typicalDevice)
 
       // Same device on next update check
       const sameDeviceAgain: DeviceWithoutCreatedAt = {
@@ -737,7 +737,7 @@ describe('deviceComparison utilities', () => {
         default_channel: 'production',
       }
 
-      expect(hasComparableDeviceChanged(storedInD1, sameDeviceAgain)).toBe(false)
+      expect(hasComparableDeviceChanged(storedInReplica, sameDeviceAgain)).toBe(false)
     })
 
     it('should DETECT change when plugin_version actually changes', () => {
@@ -750,7 +750,7 @@ describe('deviceComparison utilities', () => {
         is_emulator: false,
       }
 
-      const storedInD1 = simulateD1Storage(device)
+      const storedInReplica = simulateReplicaStorage(device)
 
       // Plugin updated
       const updatedDevice: DeviceWithoutCreatedAt = {
@@ -762,7 +762,7 @@ describe('deviceComparison utilities', () => {
         is_emulator: false,
       }
 
-      expect(hasComparableDeviceChanged(storedInD1, updatedDevice)).toBe(true)
+      expect(hasComparableDeviceChanged(storedInReplica, updatedDevice)).toBe(true)
     })
 
     it('should DETECT change when os_version changes', () => {
@@ -775,7 +775,7 @@ describe('deviceComparison utilities', () => {
         is_emulator: false,
       }
 
-      const storedInD1 = simulateD1Storage(device)
+      const storedInReplica = simulateReplicaStorage(device)
 
       // OS updated
       const updatedDevice: DeviceWithoutCreatedAt = {
@@ -787,7 +787,7 @@ describe('deviceComparison utilities', () => {
         is_emulator: false,
       }
 
-      expect(hasComparableDeviceChanged(storedInD1, updatedDevice)).toBe(true)
+      expect(hasComparableDeviceChanged(storedInReplica, updatedDevice)).toBe(true)
     })
 
     it('should DETECT change when switching from prod to dev', () => {
@@ -799,7 +799,7 @@ describe('deviceComparison utilities', () => {
         is_emulator: false,
       }
 
-      const storedInD1 = simulateD1Storage(device)
+      const storedInReplica = simulateReplicaStorage(device)
 
       // Switched to dev build
       const devDevice: DeviceWithoutCreatedAt = {
@@ -810,7 +810,7 @@ describe('deviceComparison utilities', () => {
         is_emulator: false,
       }
 
-      expect(hasComparableDeviceChanged(storedInD1, devDevice)).toBe(true)
+      expect(hasComparableDeviceChanged(storedInReplica, devDevice)).toBe(true)
     })
 
     it('should expose bug: default_channel empty string vs null causes false positive', () => {
@@ -825,8 +825,8 @@ describe('deviceComparison utilities', () => {
         default_channel: '', // Empty string from client
       }
 
-      const storedInD1 = simulateD1Storage(device)
-      // D1 stores: default_channel = '' (from device.default_channel ?? null)
+      const storedInReplica = simulateReplicaStorage(device)
+      // replica stores: default_channel = '' (from device.default_channel ?? null)
 
       // Next request: undefined
       const deviceAgain: DeviceWithoutCreatedAt = {
@@ -840,14 +840,14 @@ describe('deviceComparison utilities', () => {
       }
 
       // What gets stored: undefined ?? null = null
-      // But D1 has '' from first write
+      // But replica has '' from first write
       // Comparison: toComparableExisting('') = null, toComparableDevice(undefined) = null
       // Should be FALSE (no change)
 
-      const changed = hasComparableDeviceChanged(storedInD1, deviceAgain)
+      const changed = hasComparableDeviceChanged(storedInReplica, deviceAgain)
 
       // BUG: This might be TRUE because:
-      // storedInD1.default_channel = '' (from device.default_channel ?? null when device had '')
+      // storedInReplica.default_channel = '' (from device.default_channel ?? null when device had '')
       // But when compared, both normalize to null, so should be false
       expect(changed).toBe(false)
     })
@@ -1160,8 +1160,8 @@ describe('deviceComparison utilities', () => {
       })
     })
 
-    describe('D1 write/read cycle simulation with key_id', () => {
-      it('should NOT detect change after D1 write/read cycle with key_id', () => {
+    describe('replica write/read cycle simulation with key_id', () => {
+      it('should NOT detect change after replica write/read cycle with key_id', () => {
         const deviceFromClient: DeviceWithoutCreatedAt = {
           device_id: 'test-device-key',
           app_id: 'test-app',
@@ -1177,8 +1177,8 @@ describe('deviceComparison utilities', () => {
           key_id: 'my-encryption-key',
         }
 
-        // Simulate D1 storage
-        const storedInD1 = simulateD1Storage(deviceFromClient)
+        // Simulate replica storage
+        const storedInReplica = simulateReplicaStorage(deviceFromClient)
 
         // Next request: same device
         const deviceFromClientAgain: DeviceWithoutCreatedAt = {
@@ -1196,7 +1196,7 @@ describe('deviceComparison utilities', () => {
           key_id: 'my-encryption-key',
         }
 
-        const changed = hasComparableDeviceChanged(storedInD1, deviceFromClientAgain)
+        const changed = hasComparableDeviceChanged(storedInReplica, deviceFromClientAgain)
         expect(changed).toBe(false)
       })
 
@@ -1211,7 +1211,7 @@ describe('deviceComparison utilities', () => {
           key_id: null,
         }
 
-        const storedInD1 = simulateD1Storage(deviceFromClient)
+        const storedInReplica = simulateReplicaStorage(deviceFromClient)
 
         // Next request with empty string
         const deviceAgain: DeviceWithoutCreatedAt = {
@@ -1224,7 +1224,7 @@ describe('deviceComparison utilities', () => {
           key_id: '',
         }
 
-        expect(hasComparableDeviceChanged(storedInD1, deviceAgain)).toBe(false)
+        expect(hasComparableDeviceChanged(storedInReplica, deviceAgain)).toBe(false)
       })
 
       it('should NOT detect change when key_id transitions from undefined to null', () => {
@@ -1238,7 +1238,7 @@ describe('deviceComparison utilities', () => {
           key_id: undefined,
         }
 
-        const storedInD1 = simulateD1Storage(deviceFromClient)
+        const storedInReplica = simulateReplicaStorage(deviceFromClient)
 
         // Next request with null
         const deviceAgain: DeviceWithoutCreatedAt = {
@@ -1251,7 +1251,7 @@ describe('deviceComparison utilities', () => {
           key_id: null,
         }
 
-        expect(hasComparableDeviceChanged(storedInD1, deviceAgain)).toBe(false)
+        expect(hasComparableDeviceChanged(storedInReplica, deviceAgain)).toBe(false)
       })
 
       it('should DETECT change when key_id rotates', () => {
@@ -1265,7 +1265,7 @@ describe('deviceComparison utilities', () => {
           key_id: 'encryption-key-v1',
         }
 
-        const storedInD1 = simulateD1Storage(deviceFromClient)
+        const storedInReplica = simulateReplicaStorage(deviceFromClient)
 
         // Key rotation happens
         const deviceAfterRotation: DeviceWithoutCreatedAt = {
@@ -1278,7 +1278,7 @@ describe('deviceComparison utilities', () => {
           key_id: 'encryption-key-v2',
         }
 
-        expect(hasComparableDeviceChanged(storedInD1, deviceAfterRotation)).toBe(true)
+        expect(hasComparableDeviceChanged(storedInReplica, deviceAfterRotation)).toBe(true)
       })
 
       it('should handle typical production device with key_id', () => {
@@ -1297,7 +1297,7 @@ describe('deviceComparison utilities', () => {
           key_id: 'prod-encryption-key',
         }
 
-        const storedInD1 = simulateD1Storage(typicalDevice)
+        const storedInReplica = simulateReplicaStorage(typicalDevice)
 
         // Same device on next update check
         const sameDeviceAgain: DeviceWithoutCreatedAt = {
@@ -1315,7 +1315,7 @@ describe('deviceComparison utilities', () => {
           key_id: 'prod-encryption-key',
         }
 
-        expect(hasComparableDeviceChanged(storedInD1, sameDeviceAgain)).toBe(false)
+        expect(hasComparableDeviceChanged(storedInReplica, sameDeviceAgain)).toBe(false)
       })
     })
 
@@ -1374,8 +1374,8 @@ describe('deviceComparison utilities', () => {
       })
     })
 
-    it('should handle D1 NOT NULL constraints correctly', () => {
-      // D1 requires plugin_version, os_version, default_channel as NOT NULL
+    it('should handle replica NOT NULL constraints correctly', () => {
+      // storage requires plugin_version, os_version, custom_id as NOT NULL
       const device: DeviceWithoutCreatedAt = {
         device_id: 'test-device',
         app_id: 'test-app',
@@ -1387,13 +1387,13 @@ describe('deviceComparison utilities', () => {
         is_emulator: false,
       }
 
-      const storedInD1 = simulateD1Storage(device)
+      const storedInReplica = simulateReplicaStorage(device)
 
-      // D1 schema: plugin_version & os_version are NOT NULL → ''
-      // D1 schema: default_channel is NULLABLE → null
-      expect(storedInD1.plugin_version).toBe('')
-      expect(storedInD1.os_version).toBe('')
-      expect(storedInD1.default_channel).toBe(null)
+      // storage schema: plugin_version & os_version are NOT NULL → ''
+      // storage schema: custom_id is NOT NULL, default_channel is NULLABLE → null
+      expect(storedInReplica.plugin_version).toBe('')
+      expect(storedInReplica.os_version).toBe('')
+      expect(storedInReplica.default_channel).toBe(null)
     })
 
     it('should handle typical update check scenario without false positives', () => {
@@ -1413,7 +1413,7 @@ describe('deviceComparison utilities', () => {
       }
 
       // First write
-      const storedInD1 = simulateD1Storage(device)
+      const storedInReplica = simulateReplicaStorage(device)
 
       // Next 99 requests should NOT trigger writes
       for (let i = 0; i < 99; i++) {
@@ -1431,7 +1431,7 @@ describe('deviceComparison utilities', () => {
           default_channel: 'production',
         }
 
-        const changed = hasComparableDeviceChanged(storedInD1, sameDevice)
+        const changed = hasComparableDeviceChanged(storedInReplica, sameDevice)
         expect(changed).toBe(false) // Should NEVER trigger write
       }
     })

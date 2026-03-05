@@ -6,14 +6,14 @@ const normalizeOptionalString = (value: string | null | undefined) => (value ===
 export interface DeviceComparable {
   // version: number | null
   platform: DeviceWithoutCreatedAt['platform'] | null
-  plugin_version: string // D1 schema: NOT NULL
-  os_version: string // D1 schema: NOT NULL
-  version_build: string // D1 schema: DEFAULT 'builtin'
-  custom_id: string // D1 schema: DEFAULT '' NOT NULL
-  version_name: string | null // D1 schema: text (NULLABLE)
+  plugin_version: string // DB schema: NOT NULL
+  os_version: string // DB schema: NOT NULL
+  version_build: string // DB schema: DEFAULT 'builtin'
+  custom_id: string // DB schema: DEFAULT '' NOT NULL
+  version_name: string | null // DB schema: text (NULLABLE)
   is_prod: boolean
   is_emulator: boolean
-  default_channel: string | null // D1 schema: TEXT (NULLABLE)
+  default_channel: string | null // DB schema: TEXT (NULLABLE)
   key_id: string | null
 }
 
@@ -32,8 +32,8 @@ export type DeviceExistingRowLike = {
 } | null | undefined
 
 export function toComparableDevice(device: DeviceWithoutCreatedAt): DeviceComparable {
-  // Apply D1 schema defaults/constraints to ensure consistency between writes and comparisons
-  // D1 schema has NOT NULL constraints on many fields that require handling
+  // Apply DB schema defaults/constraints to ensure consistency between writes and comparisons
+  // Schema has NOT NULL constraints on many fields that require handling
   const normalizedVersionName = normalizeOptionalString(device.version_name)
   const normalizedCustomId = normalizeOptionalString(device.custom_id)
   const normalizedPluginVersion = normalizeOptionalString(device.plugin_version)
@@ -45,26 +45,26 @@ export function toComparableDevice(device: DeviceWithoutCreatedAt): DeviceCompar
   return {
     // version: device.version ?? null,
     platform: device.platform ?? null,
-    // D1 schema: plugin_version NOT NULL (no default, must provide empty string)
+    // DB schema: plugin_version NOT NULL (must provide empty string)
     plugin_version: normalizedPluginVersion ?? '',
-    // D1 schema: os_version NOT NULL (no default, must provide empty string)
+    // DB schema: os_version NOT NULL (must provide empty string)
     os_version: normalizedOsVersion ?? '',
-    // D1 schema: version_build DEFAULT 'builtin' (nullable)
+    // DB schema: version_build DEFAULT 'builtin' (nullable)
     version_build: normalizedVersionBuild ?? 'builtin',
-    // D1 schema: custom_id DEFAULT '' NOT NULL
+    // DB schema: custom_id DEFAULT '' NOT NULL
     custom_id: normalizedCustomId ?? '',
-    // D1 schema: version_name text (NULLABLE - allows NULL!)
+    // DB schema: version_name text (NULLABLE - allows NULL!)
     version_name: normalizedVersionName,
     is_prod: device.is_prod ?? false,
     is_emulator: device.is_emulator ?? false,
-    // D1 schema: default_channel TEXT (NULLABLE - allows NULL!)
+    // DB schema: default_channel TEXT (NULLABLE - allows NULL!)
     default_channel: normalizedDefaultChannel,
     key_id: normalizedKeyId,
   }
 }
 
 export function toComparableExisting(existing: DeviceExistingRowLike): DeviceComparable {
-  // Apply D1 schema defaults/constraints to ensure consistency
+  // Apply DB schema defaults/constraints to ensure consistency
   const normalizedVersionName = normalizeOptionalString(existing?.version_name as string | null | undefined)
   const normalizedCustomId = normalizeOptionalString(existing?.custom_id as string | null | undefined)
   const normalizedPluginVersion = normalizeOptionalString(existing?.plugin_version as string | null | undefined)
@@ -76,19 +76,19 @@ export function toComparableExisting(existing: DeviceExistingRowLike): DeviceCom
   return {
     // version: existing?.version ?? null,
     platform: existing?.platform ?? null,
-    // D1 schema: plugin_version NOT NULL (no default, must provide empty string)
+    // DB schema: plugin_version NOT NULL (no default, must provide empty string)
     plugin_version: normalizedPluginVersion ?? '',
-    // D1 schema: os_version NOT NULL (no default, must provide empty string)
+    // DB schema: os_version NOT NULL (must provide empty string)
     os_version: normalizedOsVersion ?? '',
-    // D1 schema: version_build DEFAULT 'builtin' (nullable)
+    // DB schema: version_build DEFAULT 'builtin' (nullable)
     version_build: normalizedVersionBuild ?? 'builtin',
-    // D1 schema: custom_id DEFAULT '' NOT NULL
+    // DB schema: custom_id DEFAULT '' NOT NULL
     custom_id: normalizedCustomId ?? '',
-    // D1 schema: version_name text (NULLABLE - allows NULL!)
+    // DB schema: version_name text (NULLABLE - allows NULL!)
     version_name: normalizedVersionName,
     is_prod: existing?.is_prod === undefined || existing?.is_prod === null ? false : Boolean(existing.is_prod),
     is_emulator: existing?.is_emulator === undefined || existing?.is_emulator === null ? false : Boolean(existing.is_emulator),
-    // D1 schema: default_channel TEXT (NULLABLE - allows NULL!)
+    // DB schema: default_channel TEXT (NULLABLE - allows NULL!)
     default_channel: normalizedDefaultChannel,
     key_id: normalizedKeyId,
   }
