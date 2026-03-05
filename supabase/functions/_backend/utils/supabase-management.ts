@@ -99,6 +99,7 @@ async function callManagementAPI(
         path,
         method,
         errorCode: errorData?.error_code || 'unknown',
+        errorData,
       })
       throw new ManagementAPIError(
         response.status,
