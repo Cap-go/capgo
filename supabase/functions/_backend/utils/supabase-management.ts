@@ -30,6 +30,13 @@ export class ManagementAPIError extends Error {
   }
 }
 
+function getProjectRef(c: Context): string | null {
+  const supabaseUrl = getEnv(c, 'SUPABASE_URL')
+  if (!supabaseUrl)
+    return null
+  return supabaseUrl.split('//')[1]?.split('.')[0]?.split(':')[0] || null
+}
+
 async function callManagementAPI(
   c: Context,
   method: string,
@@ -37,7 +44,7 @@ async function callManagementAPI(
   body?: any,
 ): Promise<any> {
   const token = getEnv(c, 'SUPABASE_MANAGEMENT_API_TOKEN')
-  const projectRef = getEnv(c, 'SUPABASE_PROJECT_REF')
+  const projectRef = getProjectRef(c)
 
   if (!token) {
     cloudlogErr({
@@ -50,7 +57,7 @@ async function callManagementAPI(
   if (!projectRef) {
     cloudlogErr({
       requestId: c.get('requestId'),
-      message: 'SUPABASE_PROJECT_REF not configured',
+      message: 'SUPABASE_URL not configured or invalid',
     })
     throw new ManagementAPIError(500, 'project_ref_not_configured', 'Project reference not configured')
   }
