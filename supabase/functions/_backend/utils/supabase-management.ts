@@ -149,6 +149,14 @@ async function callManagementAPI(
   }
 }
 
+function toManagementAttributeMapping(mapping: Record<string, string>): { keys: Record<string, { name: string }> } {
+  const keys: Record<string, { name: string }> = {}
+  for (const [key, name] of Object.entries(mapping)) {
+    keys[key] = { name }
+  }
+  return { keys }
+}
+
 export async function createSSOProvider(
   c: Context,
   domain: string,
@@ -159,7 +167,7 @@ export async function createSSOProvider(
     type: 'saml',
     domains: [domain],
     metadata_url: metadataUrl,
-    ...(attributeMapping && { attribute_mapping: attributeMapping }),
+    ...(attributeMapping && { attribute_mapping: toManagementAttributeMapping(attributeMapping) }),
   }
 
   const response = await callManagementAPI(c, 'POST', '/config/auth/sso/providers', body)
@@ -188,7 +196,7 @@ export async function updateSSOProvider(
     body.metadata_url = updates.metadata_url
   }
   if (updates.attribute_mapping) {
-    body.attribute_mapping = updates.attribute_mapping
+    body.attribute_mapping = toManagementAttributeMapping(updates.attribute_mapping)
   }
 
   const response = await callManagementAPI(c, 'PATCH', `/config/auth/sso/providers/${providerId}`, body)
