@@ -54,10 +54,13 @@ export function posthogLoader(supaHost: string) {
   })
 }
 
-export function pushEvent(nameEvent: string, supaHost: string): void {
+type JsonPrimitive = string | number | boolean | null
+type PostHogProperties = Record<string, JsonPrimitive>
+
+export function pushEvent(nameEvent: string, supaHost: string, properties?: PostHogProperties): void {
   if (isLocal(supaHost))
     return
-  posthog.capture(nameEvent)
+  posthog.capture(nameEvent, properties)
 }
 
 export function setUser(uuid: string, data: {
