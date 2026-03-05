@@ -15,12 +15,25 @@ function isLocalSupabase(c: Context): boolean {
 }
 
 // Extracts the Supabase project ID from SUPABASE_URL
-// e.g., "https://xvwzpoazmxkqosrdewyv.supabase.co" -> "xvwzpoazmxkqosrdewyv"
+// e.g., "https://sb.capgo.app" -> "xvwzpoazmxkqosrdewyv"
 function getSupabaseProjectId(c: Context): string | null {
   const supabaseUrl = getEnv(c, 'SUPABASE_URL')
   if (!supabaseUrl)
     return null
-  return supabaseUrl.split('//')[1]?.split('.')[0]?.split(':')[0] || null
+
+  const legacySupabaseProjectRef = 'xvwzpoazmxkqosrdewyv'
+  let host = ''
+  try {
+    host = new URL(supabaseUrl).hostname
+  }
+  catch {
+    host = supabaseUrl.replace(/^https?:\/\//, '').split('/')[0]
+  }
+
+  if (host === 'sb.capgo.app')
+    return legacySupabaseProjectRef
+
+  return host.split('.')[0] || null
 }
 
 // Builds a Supabase dashboard link to the orgs table filtered by customer_id

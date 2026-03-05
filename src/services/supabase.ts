@@ -19,8 +19,29 @@ export interface CapgoConfig {
   stripeEnabled?: boolean
 }
 
+const productionSupaHosts = [
+  'https://xvwzpoazmxkqosrdewyv-all.supabase.co',
+  'https://xvwzpoazmxkqosrdewyv.supabase.co',
+  'https://sb.capgo.app',
+]
+
+const legacySupabaseProjectRef = 'xvwzpoazmxkqosrdewyv'
+
+function getSupabaseIdFromHost(supaHost: string): string {
+  const host = supaHost
+    .replace(/^https?:\/\//, '')
+    .replace(/\/$/, '')
+    .split('/')[0]
+    .split(':')[0]
+
+  if (host === 'sb.capgo.app')
+    return legacySupabaseProjectRef
+
+  return host.split('.')[0]
+}
+
 export function isLocal(supaHost: string) {
-  return supaHost !== 'https://xvwzpoazmxkqosrdewyv-all.supabase.co' && supaHost !== 'https://xvwzpoazmxkqosrdewyv.supabase.co'
+  return !productionSupaHosts.includes(supaHost.replace(/\/$/, ''))
 }
 
 export function getLocalConfig() {
@@ -28,7 +49,7 @@ export function getLocalConfig() {
   return {
     supaHost: import.meta.env.VITE_SUPABASE_URL as string,
     supaKey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
-    supbaseId: import.meta.env.VITE_SUPABASE_URL?.split('//')[1].split('.')[0].split(':')[0] as string,
+    supbaseId: getSupabaseIdFromHost(import.meta.env.VITE_SUPABASE_URL || ''),
     host: import.meta.env.VITE_APP_URL as string,
     hostWeb: import.meta.env.LANDING_URL as string,
     stripeEnabled: stripeEnabledEnv === undefined ? true : stripeEnabledEnv !== 'false',
