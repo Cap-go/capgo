@@ -162,7 +162,7 @@ displayStore.defaultBack = '/apps'
         <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
           <!-- Empty state: no apps yet -->
           <div
-            v-if="totalApps === 0 && !searchQuery"
+            v-if="totalApps === 0 && !searchQuery && !isTableLoading"
             class="flex flex-col items-center justify-center px-6 py-16 mx-auto text-center md:py-24"
           >
             <div class="flex items-center justify-center w-16 h-16 mb-6 rounded-2xl bg-violet-100 dark:bg-violet-900/30">

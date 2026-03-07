@@ -1491,7 +1491,7 @@
   "sso-no-providers-description": "Add an SSO provider to enable Single Sign-On for your organization",
   "sso-provider-created": "SSO provider created successfully",
   "sso-provider-deleted": "SSO provider deleted successfully",
-  "sso-reactivate": "Re-activate",
+  "sso-reactivate": "Reactivate",
   "sso-service-provider-metadata": "Service Provider Metadata",
   "sso-sp-metadata-url": "SP Metadata URL (auto-configuration)",
   "sso-status-active": "Active",
