@@ -25,6 +25,9 @@ interface OrgReadAccessResult {
   error?: string
 }
 
+/**
+ * Normalize and validate a request origin string to a stable origin value.
+ */
 function normalizeOrigin(origin: string): string {
   try {
     return new URL(origin).origin
@@ -34,14 +37,48 @@ function normalizeOrigin(origin: string): string {
   }
 }
 
+/**
+ * Build the explicit origin allowlist for this endpoint.
+ * Includes configured webapp origin plus optional custom allowed origins.
+ */
 function getAllowedOrigins(c: Context): Set<string> {
   const webappUrl = normalizeOrigin(getEnv(c, 'WEBAPP_URL'))
+  const configuredOrigins = getEnv(c, 'PASSWORD_COMPLIANCE_ALLOWED_ORIGINS')
+    .split(',')
+    .map(origin => normalizeOrigin(origin.trim()))
+    .filter(Boolean)
+
   const allowed = new Set<string>()
   if (webappUrl)
     allowed.add(webappUrl)
+
+  for (const origin of configuredOrigins) {
+    allowed.add(origin)
+  }
+
   return allowed
 }
 
+/**
+ * Return true for native/webview origins that are expected for first-party clients.
+ */
+function isNativeOrLocalOrigin(origin: string): boolean {
+  try {
+    const parsed = new URL(origin)
+    if (parsed.protocol === 'capacitor:')
+      return parsed.hostname === 'localhost'
+    if (!(['http:', 'https:'].includes(parsed.protocol)))
+      return false
+    return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1'
+  }
+  catch {
+    return false
+  }
+}
+
+/**
+ * Validate incoming Origin header before processing the password compliance payload.
+ */
 async function validateOrigin(c: Context, next: () => Promise<void>) {
   const origin = c.req.header('origin')
   if (!origin)
@@ -49,7 +86,7 @@ async function validateOrigin(c: Context, next: () => Promise<void>) {
 
   const requestOrigin = normalizeOrigin(origin)
   const allowedOrigins = getAllowedOrigins(c)
-  if (!requestOrigin || !allowedOrigins.has(requestOrigin)) {
+  if (!requestOrigin || (!allowedOrigins.has(requestOrigin) && !isNativeOrLocalOrigin(requestOrigin))) {
     cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - forbidden origin', origin })
     return quickError(403, 'forbidden_origin', 'Origin is not allowed for this endpoint')
   }
