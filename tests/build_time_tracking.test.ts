@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { fetchWithRetry, getEndpointUrl, getSupabaseClient, PRODUCT_ID, resetAppData, resetAppDataStats, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
@@ -134,6 +135,28 @@ afterAll(async () => {
 })
 
 describe('build Time Tracking System', () => {
+  it('should reject unauthenticated calls to record_build_time RPC', async () => {
+    const supabaseUrl = process.env.SUPABASE_URL
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
+    if (!supabaseUrl || !supabaseAnonKey)
+      throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY are required for this test')
+
+    const publicSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+      },
+    })
+
+    const { error } = await publicSupabase.rpc('record_build_time', {
+      p_org_id: ORG_ID,
+      p_user_id: USER_ID,
+      p_build_id: randomUUID(),
+      p_platform: 'ios',
+      p_build_time_unit: 30,
+    })
+    expect(error).toBeTruthy()
+  })
+
   it('should handle too big build time correctly', async () => {
     const supabase = getSupabaseClient()
 
