@@ -18,8 +18,14 @@ SET
 DECLARE
   cycle_start timestamptz;
   cycle_end timestamptz;
+  v_is_service_role boolean;
 BEGIN
-  IF session_user <> 'service_role' AND NOT public.check_min_rights(
+  v_is_service_role := (
+    ((SELECT auth.jwt() ->> 'role') = 'service_role')
+    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
+  );
+
+  IF NOT v_is_service_role AND NOT public.check_min_rights(
       'read'::public.user_min_right,
       public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_app_metrics.org_id),
       get_app_metrics.org_id,
@@ -58,8 +64,14 @@ SET
 DECLARE
   cache_entry public.app_metrics_cache%ROWTYPE;
   org_exists boolean;
+  v_is_service_role boolean;
 BEGIN
-  IF session_user <> 'service_role' AND NOT public.check_min_rights(
+  v_is_service_role := (
+    ((SELECT auth.jwt() ->> 'role') = 'service_role')
+    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
+  );
+
+  IF NOT v_is_service_role AND NOT public.check_min_rights(
       'read'::public.user_min_right,
       public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_app_metrics.org_id),
       get_app_metrics.org_id,
@@ -141,8 +153,14 @@ SET
 DECLARE
   cycle_start timestamptz;
   cycle_end timestamptz;
+  v_is_service_role boolean;
 BEGIN
-  IF session_user <> 'service_role' AND NOT public.check_min_rights(
+  v_is_service_role := (
+    ((SELECT auth.jwt() ->> 'role') = 'service_role')
+    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
+  );
+
+  IF NOT v_is_service_role AND NOT public.check_min_rights(
       'read'::public.user_min_right,
       public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_global_metrics.org_id),
       get_global_metrics.org_id,
@@ -177,8 +195,15 @@ CREATE OR REPLACE FUNCTION public.get_global_metrics(
 ) LANGUAGE plpgsql
 SET
   search_path = '' AS $$
+DECLARE
+  v_is_service_role boolean;
 BEGIN
-  IF session_user <> 'service_role' AND NOT public.check_min_rights(
+  v_is_service_role := (
+    ((SELECT auth.jwt() ->> 'role') = 'service_role')
+    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
+  );
+
+  IF NOT v_is_service_role AND NOT public.check_min_rights(
       'read'::public.user_min_right,
       public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_global_metrics.org_id),
       get_global_metrics.org_id,
@@ -215,8 +240,15 @@ RETURNS TABLE (
     build_time_unit bigint
 ) LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = '' AS $$
+DECLARE
+  v_is_service_role boolean;
 BEGIN
-  IF session_user <> 'service_role' AND NOT public.check_min_rights(
+  v_is_service_role := (
+    ((SELECT auth.jwt() ->> 'role') = 'service_role')
+    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
+  );
+
+  IF NOT v_is_service_role AND NOT public.check_min_rights(
       'read'::public.user_min_right,
       public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_current_plan_max_org.orgid),
       get_current_plan_max_org.orgid,
@@ -240,8 +272,15 @@ RETURNS character varying
 LANGUAGE plpgsql
 SET
   search_path = '' AS $$
+DECLARE
+  v_is_service_role boolean;
 BEGIN
-  IF session_user <> 'service_role' AND NOT public.check_min_rights(
+  v_is_service_role := (
+    ((SELECT auth.jwt() ->> 'role') = 'service_role')
+    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
+  );
+
+  IF NOT v_is_service_role AND NOT public.check_min_rights(
       'read'::public.user_min_right,
       public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_current_plan_name_org.orgid),
       get_current_plan_name_org.orgid,
@@ -274,8 +313,14 @@ DECLARE
   anchor_day INTERVAL;
   start_date timestamp with time zone;
   end_date timestamp with time zone;
+  v_is_service_role boolean;
 BEGIN
-  IF session_user <> 'service_role' AND NOT public.check_min_rights(
+  v_is_service_role := (
+    ((SELECT auth.jwt() ->> 'role') = 'service_role')
+    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
+  );
+
+  IF NOT v_is_service_role AND NOT public.check_min_rights(
       'read'::public.user_min_right,
       public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_cycle_info_org.orgid),
       get_cycle_info_org.orgid,
@@ -326,8 +371,14 @@ DECLARE
   percent_bandwidth double precision;
   percent_storage double precision;
   percent_build_time double precision;
+  v_is_service_role boolean;
 BEGIN
-  IF session_user <> 'service_role' AND NOT public.check_min_rights(
+  v_is_service_role := (
+    ((SELECT auth.jwt() ->> 'role') = 'service_role')
+    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
+  );
+
+  IF NOT v_is_service_role AND NOT public.check_min_rights(
       'read'::public.user_min_right,
       public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_plan_usage_percent_detailed.orgid),
       get_plan_usage_percent_detailed.orgid,
@@ -395,8 +446,14 @@ DECLARE
   percent_bandwidth double precision;
   percent_storage double precision;
   percent_build_time double precision;
+  v_is_service_role boolean;
 BEGIN
-  IF session_user <> 'service_role' AND NOT public.check_min_rights(
+  v_is_service_role := (
+    ((SELECT auth.jwt() ->> 'role') = 'service_role')
+    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
+  );
+
+  IF NOT v_is_service_role AND NOT public.check_min_rights(
       'read'::public.user_min_right,
       public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_plan_usage_percent_detailed.orgid),
       get_plan_usage_percent_detailed.orgid,
