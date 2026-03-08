@@ -18,16 +18,20 @@ RETURNS TABLE(
 SET search_path TO '' AS $function$
 DECLARE
     cache_entry public.app_metrics_cache%ROWTYPE;
+    request_role text;
     org_exists boolean;
 BEGIN
-    IF NOT public.check_min_rights(
-        'read'::public.user_min_right,
-        public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_app_metrics.org_id),
-        get_app_metrics.org_id,
-        NULL::CHARACTER VARYING,
-        NULL::BIGINT
-    ) THEN
-        RETURN;
+    request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
+    IF request_role IS NOT NULL AND request_role <> 'service_role' THEN
+        IF NOT public.check_min_rights(
+            'read'::public.user_min_right,
+            public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_app_metrics.org_id),
+            get_app_metrics.org_id,
+            NULL::CHARACTER VARYING,
+            NULL::BIGINT
+        ) THEN
+            RETURN;
+        END IF;
     END IF;
 
     SELECT EXISTS (
@@ -101,17 +105,21 @@ RETURNS TABLE(
 ) LANGUAGE plpgsql STABLE
 SET search_path TO '' AS $function$
 DECLARE
+  request_role text;
   cycle_start timestamptz;
   cycle_end timestamptz;
 BEGIN
-    IF NOT public.check_min_rights(
-        'read'::public.user_min_right,
-        public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_app_metrics.org_id),
-        get_app_metrics.org_id,
-        NULL::CHARACTER VARYING,
-        NULL::BIGINT
-    ) THEN
-        RETURN;
+    request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
+    IF request_role IS NOT NULL AND request_role <> 'service_role' THEN
+        IF NOT public.check_min_rights(
+            'read'::public.user_min_right,
+            public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_app_metrics.org_id),
+            get_app_metrics.org_id,
+            NULL::CHARACTER VARYING,
+            NULL::BIGINT
+        ) THEN
+            RETURN;
+        END IF;
     END IF;
 
     SELECT subscription_anchor_start, subscription_anchor_end INTO cycle_start, cycle_end
@@ -135,15 +143,20 @@ RETURNS TABLE(
     uninstall bigint
 ) LANGUAGE plpgsql
 SET search_path TO '' AS $function$
+DECLARE
+  request_role text;
 BEGIN
-    IF NOT public.check_min_rights(
-        'read'::public.user_min_right,
-        public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_global_metrics.org_id),
-        get_global_metrics.org_id,
-        NULL::CHARACTER VARYING,
-        NULL::BIGINT
-    ) THEN
-        RETURN;
+    request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
+    IF request_role IS NOT NULL AND request_role <> 'service_role' THEN
+        IF NOT public.check_min_rights(
+            'read'::public.user_min_right,
+            public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_global_metrics.org_id),
+            get_global_metrics.org_id,
+            NULL::CHARACTER VARYING,
+            NULL::BIGINT
+        ) THEN
+            RETURN;
+        END IF;
     END IF;
 
     RETURN QUERY
@@ -181,17 +194,21 @@ RETURNS TABLE(
 ) LANGUAGE plpgsql
 SET search_path TO '' AS $function$
 DECLARE
+    request_role text;
     cycle_start timestamptz;
     cycle_end timestamptz;
 BEGIN
-    IF NOT public.check_min_rights(
-        'read'::public.user_min_right,
-        public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_global_metrics.org_id),
-        get_global_metrics.org_id,
-        NULL::CHARACTER VARYING,
-        NULL::BIGINT
-    ) THEN
-        RETURN;
+    request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
+    IF request_role IS NOT NULL AND request_role <> 'service_role' THEN
+        IF NOT public.check_min_rights(
+            'read'::public.user_min_right,
+            public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_global_metrics.org_id),
+            get_global_metrics.org_id,
+            NULL::CHARACTER VARYING,
+            NULL::BIGINT
+        ) THEN
+            RETURN;
+        END IF;
     END IF;
 
     SELECT subscription_anchor_start, subscription_anchor_end
