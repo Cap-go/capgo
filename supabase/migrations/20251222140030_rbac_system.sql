@@ -3489,12 +3489,7 @@ SET search_path = ''
 AS $$
 BEGIN
   -- Check if user has permission to view org or if it's their own bindings
-  IF auth.uid() IS NULL THEN
-    RAISE EXCEPTION 'NO_PERMISSION_TO_VIEW_BINDINGS';
-  END IF;
-
-  -- Check if user has permission to view org or if it's their own bindings
-  IF auth.uid() IS DISTINCT FROM p_user_id AND NOT public.rbac_check_permission_direct(public.rbac_perm_org_read(), auth.uid(), p_org_id, NULL::text, NULL::bigint) THEN
+  IF auth.uid() != p_user_id AND NOT public.rbac_check_permission_direct(public.rbac_perm_org_read(), auth.uid(), p_org_id, NULL::text, NULL::bigint) THEN
     RAISE EXCEPTION 'NO_PERMISSION_TO_VIEW_BINDINGS';
   END IF;
 
