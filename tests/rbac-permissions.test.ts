@@ -4,19 +4,35 @@
  * Tests the checkPermission function with both legacy and RBAC modes
  * to ensure feature flag routing works correctly.
  */
-import { Pool, type PoolClient } from 'pg'
+import type { PoolClient } from 'pg'
+import { Pool } from 'pg'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { ORG_ID, POSTGRES_URL, USER_ID } from './test-utils'
 
 // Test constants
 const TEST_APP_ID = 'com.demo.app'
 
-describe('RBAC Permission System', () => {
+describe('rbac permission system', () => {
   let pool: Pool
   let client: PoolClient
 
   const query = (text: string, params?: Array<string | number | null>) => {
     return client.query(text, params)
+  }
+
+  const withAuthClaim = async (userId: string) => {
+    await query(`SELECT set_config($1, $2, true)`, [
+      'request.jwt.claim.sub',
+      userId,
+    ])
+    await query(`SELECT set_config($1, $2, true)`, [
+      'request.jwt.claims',
+      JSON.stringify({
+        sub: userId,
+        role: 'authenticated',
+        aud: 'authenticated',
+      }),
+    ])
   }
 
   beforeAll(async () => {
@@ -44,7 +60,7 @@ describe('RBAC Permission System', () => {
   })
 
   describe('rbac_check_permission_direct SQL function', () => {
-    describe('Legacy mode (use_new_rbac = false)', () => {
+    describe('legacy mode (use_new_rbac = false)', () => {
       beforeEach(async () => {
         await query(`UPDATE public.rbac_settings SET use_new_rbac = false WHERE id = 1`)
         await query(`UPDATE public.orgs SET use_new_rbac = false WHERE id = $1`, [ORG_ID])
@@ -112,7 +128,7 @@ describe('RBAC Permission System', () => {
       })
     })
 
-    describe('RBAC mode (use_new_rbac = true)', () => {
+    describe('rbac mode (use_new_rbac = true)', () => {
       beforeEach(async () => {
         // Enable RBAC globally for tests
         await query(`
@@ -145,7 +161,7 @@ describe('RBAC Permission System', () => {
       })
     })
 
-    describe('Feature flag routing', () => {
+    describe('feature flag routing', () => {
       it('should use legacy for orgs without RBAC flag', async () => {
         await query(`UPDATE public.orgs SET use_new_rbac = false WHERE id = $1`, [ORG_ID])
         await query(`UPDATE public.rbac_settings SET use_new_rbac = false WHERE id = 1`)
@@ -262,6 +278,31 @@ describe('RBAC Permission System', () => {
 
         expect(result.rows[0].enabled).toBe(false)
       })
+    })
+
+    it('should reject unauthenticated access to get_org_user_access_rbac', async () => {
+      let caught: unknown
+      try {
+        await query(`
+          SELECT * FROM public.get_org_user_access_rbac($1::uuid, $2::uuid)
+        `, [USER_ID, ORG_ID])
+      }
+      catch (error) {
+        caught = error
+      }
+
+      expect(caught).toBeTruthy()
+      expect((caught as { message?: string })?.message).toContain('NO_PERMISSION_TO_VIEW_BINDINGS')
+    })
+
+    it('should allow authenticated user when requesting their own bindings', async () => {
+      await withAuthClaim(USER_ID)
+
+      const result = await query(`
+        SELECT * FROM public.get_org_user_access_rbac($1::uuid, $2::uuid)
+      `, [USER_ID, ORG_ID])
+
+      expect(Array.isArray(result.rows)).toBe(true)
     })
   })
 })
