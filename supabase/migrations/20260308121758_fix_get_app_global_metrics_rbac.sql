@@ -21,7 +21,7 @@ DECLARE
     request_role text;
     org_exists boolean;
 BEGIN
-    request_role := pg_catalog.nullif(pg_catalog.current_setting('request.jwt.claim.role', true), '');
+    request_role := NULLIF(pg_catalog.current_setting('request.jwt.claim.role', true), '');
     IF request_role IS NOT NULL AND request_role <> 'service_role' THEN
         IF NOT public.check_min_rights(
             'read'::public.user_min_right,
@@ -109,7 +109,7 @@ DECLARE
   cycle_start timestamptz;
   cycle_end timestamptz;
 BEGIN
-    request_role := pg_catalog.nullif(pg_catalog.current_setting('request.jwt.claim.role', true), '');
+    request_role := NULLIF(pg_catalog.current_setting('request.jwt.claim.role', true), '');
     IF request_role IS NOT NULL AND request_role <> 'service_role' THEN
         IF NOT public.check_min_rights(
             'read'::public.user_min_right,
@@ -146,7 +146,7 @@ SET search_path TO '' AS $function$
 DECLARE
   request_role text;
 BEGIN
-    request_role := pg_catalog.nullif(pg_catalog.current_setting('request.jwt.claim.role', true), '');
+    request_role := NULLIF(pg_catalog.current_setting('request.jwt.claim.role', true), '');
     IF request_role IS NOT NULL AND request_role <> 'service_role' THEN
         IF NOT public.check_min_rights(
             'read'::public.user_min_right,
@@ -198,7 +198,7 @@ DECLARE
     cycle_start timestamptz;
     cycle_end timestamptz;
 BEGIN
-    request_role := pg_catalog.nullif(pg_catalog.current_setting('request.jwt.claim.role', true), '');
+    request_role := NULLIF(pg_catalog.current_setting('request.jwt.claim.role', true), '');
     IF request_role IS NOT NULL AND request_role <> 'service_role' THEN
         IF NOT public.check_min_rights(
             'read'::public.user_min_right,
