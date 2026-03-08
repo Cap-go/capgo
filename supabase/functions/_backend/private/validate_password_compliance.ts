@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
@@ -8,6 +9,7 @@ import { cloudlog } from '../utils/logging.ts'
 import { isIPRateLimited, recordFailedAuth } from '../utils/rate_limit.ts'
 import { buildRateLimitInfo } from '../utils/rateLimitInfo.ts'
 import { emptySupabase, supabaseClient, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
+import { getEnv } from '../utils/utils.ts'
 
 interface ValidatePasswordCompliance {
   email: string
@@ -21,6 +23,38 @@ type RpcClient = Pick<SupabaseClient<Database>, 'rpc'>
 interface OrgReadAccessResult {
   allowed: boolean
   error?: string
+}
+
+function normalizeOrigin(origin: string): string {
+  try {
+    return new URL(origin).origin
+  }
+  catch {
+    return ''
+  }
+}
+
+function getAllowedOrigins(c: Context): Set<string> {
+  const webappUrl = normalizeOrigin(getEnv(c, 'WEBAPP_URL'))
+  const allowed = new Set<string>()
+  if (webappUrl)
+    allowed.add(webappUrl)
+  return allowed
+}
+
+async function validateOrigin(c: Context, next: () => Promise<void>) {
+  const origin = c.req.header('origin')
+  if (!origin)
+    return next()
+
+  const requestOrigin = normalizeOrigin(origin)
+  const allowedOrigins = getAllowedOrigins(c)
+  if (!requestOrigin || !allowedOrigins.has(requestOrigin)) {
+    cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - forbidden origin', origin })
+    return quickError(403, 'forbidden_origin', 'Origin is not allowed for this endpoint')
+  }
+
+  return next()
 }
 
 const bodySchema = z.object({
@@ -82,6 +116,7 @@ export async function checkOrgReadAccess(
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
+app.use('*', validateOrigin)
 app.use('/', useCors)
 
 app.post('/', async (c) => {
