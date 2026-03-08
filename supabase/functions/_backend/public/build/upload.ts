@@ -116,20 +116,58 @@ export async function tusProxy(
   // Extract the path after /upload/:jobId/ and forward to builder
   // Example: /build/upload/abc123/myfile.zip -> /upload/myfile.zip
   // Example: /build/upload/abc123 -> /upload/
-  const originalPath = c.req.path
+  const originalPath = new URL(c.req.url).pathname
   const uploadPrefix = `/build/upload/${jobId}`
-  let tusPath = originalPath.startsWith(uploadPrefix)
-    ? originalPath.slice(uploadPrefix.length)
-    : '/'
+  const tusPath = originalPath === uploadPrefix
+    ? '/'
+    : originalPath.startsWith(`${uploadPrefix}/`)
+      ? originalPath.slice(uploadPrefix.length)
+      : '/'
 
-  // For POST requests (creating upload), ensure trailing slash to match /upload/ route
-  // For PATCH/HEAD requests (with filename), keep the path as-is (e.g., /capgo.zip)
-  if (c.req.method === 'POST' && (tusPath === '' || tusPath === '/')) {
-    tusPath = '/'
+  let decodedTusPath: string
+  try {
+    decodedTusPath = decodeURIComponent(tusPath)
+  }
+  catch {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Invalid URL encoding in upload path',
+      job_id: jobId,
+      original_path: originalPath,
+      upload_path: tusPath,
+    })
+    throw quickError(400, 'invalid_path', 'Invalid upload path encoding.')
   }
 
+  if (decodedTusPath.includes('\0') || decodedTusPath.includes('..')) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Rejected upload path traversal attempt',
+      job_id: jobId,
+      original_path: originalPath,
+      upload_path: decodedTusPath,
+    })
+    throw quickError(400, 'invalid_path', 'Invalid upload path')
+  }
+
+  const baseUploadUrl = new URL(`${builderUrl}/upload`)
+  const resolvedTusUrl = new URL(`${builderUrl}/upload${decodedTusPath}`)
+  if (!resolvedTusUrl.pathname.startsWith(baseUploadUrl.pathname)) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Rejected upload path escape attempt',
+      job_id: jobId,
+      original_path: originalPath,
+      resolved_path: resolvedTusUrl.pathname,
+      builder_path: baseUploadUrl.pathname,
+    })
+    throw quickError(400, 'invalid_path', 'Resolved upload path escapes upload directory.')
+  }
+
+  const safeTusPath = decodedTusPath
+
   // Construct builder TUS URL with the path
-  const builderTusUrl = `${builderUrl}/upload${tusPath}`
+  const builderTusUrl = `${builderUrl}/upload${safeTusPath}`
 
   cloudlog({
     requestId: c.get('requestId'),
@@ -138,7 +176,7 @@ export async function tusProxy(
     method: c.req.method,
     original_path: originalPath,
     upload_prefix: uploadPrefix,
-    tus_path: tusPath,
+    tus_path: safeTusPath,
     builder_url: builderTusUrl,
     has_api_key: !!builderApiKey,
   })
