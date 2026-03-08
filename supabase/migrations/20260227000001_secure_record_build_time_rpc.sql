@@ -8,13 +8,6 @@ REVOKE ALL ON FUNCTION public.record_build_time(
   character varying,
   bigint
 ) FROM anon, authenticated;
-REVOKE ALL ON FUNCTION public.record_build_time(
-  uuid,
-  uuid,
-  character varying,
-  character varying,
-  bigint
-) FROM public;
 
 GRANT EXECUTE ON FUNCTION public.record_build_time(
   uuid,
