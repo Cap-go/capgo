@@ -270,9 +270,6 @@ Then in your test file, use ONLY these dedicated resources for modifications.
 - Keep amending the same migration file while the pull request is still open.
 - Never create a second migration file for the same schema change set. If not yet merged, do not split work into multiple migration files for one change.
 - Use CLI for migrations. Never manually create migration files.
-- Use CLI for migrations. Never manually create migration files.
-- Use CLI for migrations. Never manually create migration files.
-- Use CLI for migrations. Never manually create migration files.
 - Updating `supabase/seed.sql` to back new or evolved tests is expected; keep
   fixtures focused on current behavior while leaving committed migrations
   unchanged.

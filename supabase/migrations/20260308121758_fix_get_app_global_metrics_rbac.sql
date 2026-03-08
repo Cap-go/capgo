@@ -14,14 +14,14 @@ RETURNS TABLE(
     fail bigint,
     install bigint,
     uninstall bigint
-) LANGUAGE plpgsql STABLE
+) LANGUAGE plpgsql SECURITY DEFINER
 SET search_path TO '' AS $function$
 DECLARE
     cache_entry public.app_metrics_cache%ROWTYPE;
     request_role text;
     org_exists boolean;
 BEGIN
-    request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
+    request_role := pg_catalog.nullif(pg_catalog.current_setting('request.jwt.claim.role', true), '');
     IF request_role IS NOT NULL AND request_role <> 'service_role' THEN
         IF NOT public.check_min_rights(
             'read'::public.user_min_right,
@@ -51,7 +51,7 @@ BEGIN
         OR cache_entry.start_date IS DISTINCT FROM get_app_metrics.start_date
         OR cache_entry.end_date IS DISTINCT FROM get_app_metrics.end_date
         OR cache_entry.cached_at IS NULL
-        OR cache_entry.cached_at < (NOW() - interval '5 minutes') THEN
+        OR cache_entry.cached_at < (pg_catalog.now() - interval '5 minutes') THEN
         cache_entry := public.seed_get_app_metrics_caches(get_app_metrics.org_id, get_app_metrics.start_date, get_app_metrics.end_date);
     END IF;
 
@@ -71,7 +71,7 @@ BEGIN
         metrics.fail,
         metrics.install,
         metrics.uninstall
-    FROM jsonb_to_recordset(cache_entry.response) AS metrics(
+    FROM pg_catalog.jsonb_to_recordset(cache_entry.response) AS metrics(
         app_id character varying,
         date date,
         mau bigint,
@@ -102,14 +102,14 @@ RETURNS TABLE(
     fail bigint,
     install bigint,
     uninstall bigint
-) LANGUAGE plpgsql STABLE
+) LANGUAGE plpgsql SECURITY DEFINER
 SET search_path TO '' AS $function$
 DECLARE
   request_role text;
   cycle_start timestamptz;
   cycle_end timestamptz;
 BEGIN
-    request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
+    request_role := pg_catalog.nullif(pg_catalog.current_setting('request.jwt.claim.role', true), '');
     IF request_role IS NOT NULL AND request_role <> 'service_role' THEN
         IF NOT public.check_min_rights(
             'read'::public.user_min_right,
@@ -146,7 +146,7 @@ SET search_path TO '' AS $function$
 DECLARE
   request_role text;
 BEGIN
-    request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
+    request_role := pg_catalog.nullif(pg_catalog.current_setting('request.jwt.claim.role', true), '');
     IF request_role IS NOT NULL AND request_role <> 'service_role' THEN
         IF NOT public.check_min_rights(
             'read'::public.user_min_right,
@@ -198,7 +198,7 @@ DECLARE
     cycle_start timestamptz;
     cycle_end timestamptz;
 BEGIN
-    request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
+    request_role := pg_catalog.nullif(pg_catalog.current_setting('request.jwt.claim.role', true), '');
     IF request_role IS NOT NULL AND request_role <> 'service_role' THEN
         IF NOT public.check_min_rights(
             'read'::public.user_min_right,
