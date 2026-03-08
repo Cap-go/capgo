@@ -13,7 +13,7 @@ BEGIN;
 -- 'com.demoadmin.app', 'com.demo.app'
 -- Plan tests
 SELECT
-  plan (6);
+  plan (7);
 
 -- Test 1: Users can see organizations they belong to
 SET
@@ -55,11 +55,18 @@ SELECT
     'Anonymous users should be able to select from plans table'
   );
 
--- Test 4: Global stats is accessible to anonymous
+-- Test 4: Global stats should not be directly readable by anonymous users
 SELECT
-  lives_ok (
-    'SELECT COUNT(*) FROM public.global_stats',
-    'Anonymous users should be able to select from global_stats'
+  ok (
+    NOT has_table_privilege('anon', 'public.global_stats', 'SELECT'),
+    'Anonymous users should not be able to select from global_stats'
+  );
+
+-- Test 5: Global stats should not be directly readable by authenticated users
+SELECT
+  ok (
+    NOT has_table_privilege('authenticated', 'public.global_stats', 'SELECT'),
+    'Authenticated users should not be able to select from global_stats'
   );
 
 -- Test 5: Users table has RLS enabled
