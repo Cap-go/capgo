@@ -23,7 +23,6 @@ AS $$
 DECLARE
   v_owner_org uuid;
   v_caller_id uuid;
-  v_version_exists boolean;
   v_existing_count integer;
 BEGIN
   IF p_size = 0 THEN
@@ -40,20 +39,7 @@ BEGIN
     RETURN FALSE;
   END IF;
 
-  SELECT EXISTS (
-    SELECT 1
-    FROM public.app_versions
-    WHERE public.app_versions.app_id = p_app_id
-      AND public.app_versions.id = p_version_id
-      AND public.app_versions.deleted = false
-  )
-  INTO v_version_exists;
-
-  IF v_version_exists IS DISTINCT FROM TRUE THEN
-    RETURN FALSE;
-  END IF;
-
-  IF COALESCE(current_setting('role', true), '') IS DISTINCT FROM 'service_role' THEN
+  IF COALESCE(current_setting('role', true), '') NOT IN ('service_role', 'postgres') THEN
     SELECT public.get_identity_org_appid('{write,all}'::public.key_mode[], v_owner_org, p_app_id)
       INTO v_caller_id;
 
