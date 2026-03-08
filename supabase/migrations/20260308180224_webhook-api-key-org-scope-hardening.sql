@@ -21,7 +21,7 @@ USING (
         CASE
             WHEN public.get_apikey_header() IS NOT NULL
                 THEN public.get_identity_org_allowed(
-                    '{read,upload,write,all}'::public.key_mode[],
+                    '{all,write,upload}'::public.key_mode[],
                     org_id
                 )
             ELSE auth.uid()
@@ -125,7 +125,7 @@ USING (
         CASE
             WHEN public.get_apikey_header() IS NOT NULL
                 THEN public.get_identity_org_allowed(
-                    '{read,upload,write,all}'::public.key_mode[],
+                    '{all,write,upload}'::public.key_mode[],
                     org_id
                 )
             ELSE auth.uid()
@@ -162,6 +162,22 @@ ON public.webhook_deliveries
 FOR UPDATE
 TO authenticated, anon
 USING (
+    public.check_min_rights(
+        'admin'::public.user_min_right,
+        CASE
+            WHEN public.get_apikey_header() IS NOT NULL
+                THEN public.get_identity_org_allowed(
+                    '{all,write,upload}'::public.key_mode[],
+                    org_id
+                )
+            ELSE auth.uid()
+        END,
+        org_id,
+        null::character varying,
+        null::bigint
+    )
+)
+WITH CHECK (
     public.check_min_rights(
         'admin'::public.user_min_right,
         CASE
