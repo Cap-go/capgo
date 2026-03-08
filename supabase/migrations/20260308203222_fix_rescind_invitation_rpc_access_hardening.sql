@@ -37,7 +37,8 @@ BEGIN
   SELECT * INTO tmp_user
   FROM public.tmp_users
   WHERE public.tmp_users.email = rescind_invitation.email
-    AND public.tmp_users.org_id = rescind_invitation.org_id;
+    AND public.tmp_users.org_id = rescind_invitation.org_id
+  FOR UPDATE;
   IF NOT FOUND THEN
     RETURN 'NO_INVITATION';
   END IF;

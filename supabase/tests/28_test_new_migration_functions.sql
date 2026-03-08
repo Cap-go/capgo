@@ -1,7 +1,7 @@
 BEGIN;
 
 
-SELECT plan(28);
+SELECT plan(30);
 
 -- Test upsert_version_meta function
 -- First insert a positive size
