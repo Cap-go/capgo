@@ -2,7 +2,7 @@
 BEGIN;
 
 
-SELECT plan(13);
+SELECT plan(14);
 
 -- Test get_current_plan_max_org
 SELECT
@@ -40,6 +40,18 @@ SELECT
             get_current_plan_max_org('00000000-0000-0000-0000-000000000000')
         ).mau IS NOT NULL,
         'get_current_plan_max_org test - non-existent org returns valid plan'
+    );
+
+SELECT tests.clear_authentication();
+
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM get_current_plan_max_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d')
+        ),
+        0,
+        'get_current_plan_max_org test - anonymous call cannot read org plan limits'
     );
 
 -- Test get_current_plan_name_org
