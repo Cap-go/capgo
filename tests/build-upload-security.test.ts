@@ -1,5 +1,5 @@
 import { HTTPException } from 'hono/http-exception'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { tusProxy } from '../supabase/functions/_backend/public/build/upload.ts'
 
 const mockSupabaseApikey = vi.fn()
@@ -33,11 +33,12 @@ describe('build upload proxy security', () => {
     error: null,
   }
 
-  const queryBuilder = {
+  const createQueryBuilder = () => ({
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     single: vi.fn().mockResolvedValue(buildRequestQuery),
-  }
+  })
+  let queryBuilder: ReturnType<typeof createQueryBuilder>
 
   const fakeContext = (url: string, method = 'POST') => {
     const request = new Request(url, {
@@ -58,14 +59,12 @@ describe('build upload proxy security', () => {
     }
   }
 
-  afterEach(() => {
+  beforeEach(() => {
     vi.clearAllMocks()
-    queryBuilder.select.mockClear()
-    queryBuilder.eq.mockClear()
-    queryBuilder.single.mockClear()
-  })
-
-  it('rejects path traversal attempts before forwarding to builder', async () => {
+    queryBuilder = createQueryBuilder()
+    mockSupabaseApikey.mockReturnValue({
+      from: vi.fn().mockReturnValue(queryBuilder),
+    })
     mockGetEnv.mockImplementation((_, key: string) => {
       if (key === 'BUILDER_URL') {
         return 'https://builder.capgo.app'
@@ -76,62 +75,40 @@ describe('build upload proxy security', () => {
       return null
     })
     mockCheckPermission.mockResolvedValue(true)
-    mockSupabaseApikey.mockReturnValue({
-      from: vi.fn().mockReturnValue(queryBuilder),
-    })
+  })
 
-    const context = fakeContext(`http://localhost/build/upload/${jobId}/../jobs`, 'PATCH')
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.clearAllMocks()
+  })
 
-    const responsePromise = tusProxy(context as any, jobId, { user_id: 'user-test', key: 'api-test' } as any)
-    const error = await expect(responsePromise).rejects.toBeInstanceOf(HTTPException)
+  it.concurrent('rejects path traversal attempts before forwarding to builder', async () => {
+    const context = fakeContext(`http://localhost/build/upload/${jobId}/%2e%2e/jobs`, 'PATCH')
 
+    const error = await tusProxy(context as any, jobId, { user_id: 'user-test', key: 'api-test' } as any)
+      .catch(err => err as HTTPException)
+
+    expect(error).toBeInstanceOf(HTTPException)
     expect(error.cause).toMatchObject({
       error: 'invalid_path',
       message: 'Invalid upload path',
     })
   })
 
-  it('rejects invalidly encoded paths before forwarding to builder', async () => {
-    mockGetEnv.mockImplementation((_, key: string) => {
-      if (key === 'BUILDER_URL') {
-        return 'https://builder.capgo.app'
-      }
-      if (key === 'BUILDER_API_KEY') {
-        return 'builder-secret'
-      }
-      return null
-    })
-    mockCheckPermission.mockResolvedValue(true)
-    mockSupabaseApikey.mockReturnValue({
-      from: vi.fn().mockReturnValue(queryBuilder),
-    })
-
+  it.concurrent('rejects invalidly encoded paths before forwarding to builder', async () => {
     const context = fakeContext(`http://localhost/build/upload/${jobId}/%`, 'PATCH')
 
-    const responsePromise = tusProxy(context as any, jobId, { user_id: 'user-test', key: 'api-test' } as any)
-    const error = await expect(responsePromise).rejects.toBeInstanceOf(HTTPException)
+    const error = await tusProxy(context as any, jobId, { user_id: 'user-test', key: 'api-test' } as any)
+      .catch(err => err as HTTPException)
 
+    expect(error).toBeInstanceOf(HTTPException)
     expect(error.cause).toMatchObject({
       error: 'invalid_path',
       message: 'Invalid upload path encoding.',
     })
   })
 
-  it('does not reject canonical upload suffixes', async () => {
-    mockGetEnv.mockImplementation((_, key: string) => {
-      if (key === 'BUILDER_URL') {
-        return 'https://builder.capgo.app'
-      }
-      if (key === 'BUILDER_API_KEY') {
-        return 'builder-secret'
-      }
-      return null
-    })
-    mockCheckPermission.mockResolvedValue(true)
-    mockSupabaseApikey.mockReturnValue({
-      from: vi.fn().mockReturnValue(queryBuilder),
-    })
-
+  it.concurrent('does not reject canonical upload suffixes', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, {
       status: 201,
       headers: {

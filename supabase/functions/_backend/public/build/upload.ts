@@ -139,7 +139,11 @@ export async function tusProxy(
     throw quickError(400, 'invalid_path', 'Invalid upload path encoding.')
   }
 
-  if (decodedTusPath.includes('\0') || decodedTusPath.includes('..')) {
+  const hasDotSegment = decodedTusPath
+    .split('/')
+    .some(segment => segment === '.' || segment === '..')
+
+  if (decodedTusPath.includes('\0') || hasDotSegment) {
     cloudlogErr({
       requestId: c.get('requestId'),
       message: 'Rejected upload path traversal attempt',
@@ -150,8 +154,8 @@ export async function tusProxy(
     throw quickError(400, 'invalid_path', 'Invalid upload path')
   }
 
-  const baseUploadUrl = new URL(`${builderUrl}/upload`)
-  const resolvedTusUrl = new URL(`${builderUrl}/upload${decodedTusPath}`)
+  const baseUploadUrl = new URL(`${builderUrl}/upload/`)
+  const resolvedTusUrl = new URL(`.${tusPath}`, baseUploadUrl)
   if (!resolvedTusUrl.pathname.startsWith(baseUploadUrl.pathname)) {
     cloudlogErr({
       requestId: c.get('requestId'),
@@ -164,10 +168,9 @@ export async function tusProxy(
     throw quickError(400, 'invalid_path', 'Resolved upload path escapes upload directory.')
   }
 
-  const safeTusPath = decodedTusPath
-
   // Construct builder TUS URL with the path
-  const builderTusUrl = `${builderUrl}/upload${safeTusPath}`
+  const safeTusPath = resolvedTusUrl.pathname.slice(baseUploadUrl.pathname.length - 1)
+  const builderTusUrl = resolvedTusUrl.toString()
 
   cloudlog({
     requestId: c.get('requestId'),
