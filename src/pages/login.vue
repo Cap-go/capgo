@@ -219,11 +219,13 @@ async function handleSsoLogin() {
       domain,
       options: {
         redirectTo: redirectUrl.toString(),
+        captchaToken: turnstileToken.value,
       },
     })
 
     if (error) {
       console.error('SSO login error', error)
+      captchaComponent.value?.reset()
       toast.error(t('invalid-auth'))
       isLoading.value = false
       return
@@ -532,6 +534,9 @@ onMounted(checkLogin)
                 <p class="text-sm text-gray-600 dark:text-gray-300">
                   {{ t('sso-detected') }}
                 </p>
+                <div v-if="!!captchaKey">
+                  <VueTurnstile ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
+                </div>
                 <div>
                   <div class="inline-flex justify-center items-center w-full">
                     <svg
