@@ -298,8 +298,8 @@ SELECT
 -- Test is_trial_org negative case
 SELECT
     ok(
-        is_trial_org('00000000-0000-0000-0000-000000000000') IS NULL,
-        'is_trial_org test - non-existent org returns null'
+        is_trial_org('00000000-0000-0000-0000-000000000000') = 0,
+        'is_trial_org test - non-existent org returns 0'
     );
 
 -- TODO: fix this test

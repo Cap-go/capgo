@@ -50,9 +50,9 @@ BEGIN
     END IF;
   END IF;
 
-  RETURN (SELECT GREATEST((trial_at::date - (NOW())::date), 0) AS days
+  RETURN COALESCE((SELECT GREATEST((trial_at::date - (NOW())::date), 0)
   FROM public.stripe_info
-  WHERE customer_id=(SELECT customer_id FROM public.orgs WHERE id=orgid));
+  WHERE customer_id=(SELECT customer_id FROM public.orgs WHERE id=orgid)), 0);
 END;
 $$;
 

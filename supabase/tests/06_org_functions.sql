@@ -50,7 +50,7 @@ SELECT
 SELECT
     is(
         is_trial_org('22dbad8a-b885-4309-9b3b-a09f8460fb6e'),
-        null,
+        0,
         'is_trial_org test - org does not exist'
     );
 
