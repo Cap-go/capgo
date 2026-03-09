@@ -6,6 +6,38 @@ import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { getPath, s3 } from '../utils/s3.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
+async function resolveOwnerOrg(c: Context, appId: string | null): Promise<string | null> {
+  if (!appId)
+    return null
+
+  const { data, error } = await supabaseAdmin(c)
+    .from('apps')
+    .select('owner_org')
+    .eq('app_id', appId)
+    .maybeSingle()
+
+  if (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'error resolveOwnerOrg', error, app_id: appId })
+    return null
+  }
+
+  if (data?.owner_org)
+    return data.owner_org
+
+  const { data: deletedApp, error: deletedError } = await supabaseAdmin(c)
+    .from('deleted_apps')
+    .select('owner_org')
+    .eq('app_id', appId)
+    .maybeSingle()
+
+  if (deletedError) {
+    cloudlog({ requestId: c.get('requestId'), message: 'error resolveOwnerOrg from deleted_apps', error: deletedError, app_id: appId })
+    return null
+  }
+
+  return deletedApp?.owner_org ?? null
+}
+
 export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', middlewareAPISecret, async (c) => {
   // unsafe parse the body
@@ -85,7 +117,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         app_id: version.app_id,
         checksum: checksum ?? '',
         size,
-        owner_org: version.owner_org,
+        owner_org: version.owner_org ?? (await resolveOwnerOrg(c, version.app_id)),
       }, { onConflict: 'id' })
   }
   catch (errorSize) {

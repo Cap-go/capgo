@@ -34,7 +34,21 @@ async function resolveOwnerOrg(c: Context, record: Database['public']['Tables'][
     return null
   }
 
-  return data?.owner_org ?? null
+  if (data?.owner_org)
+    return data.owner_org
+
+  const { data: deletedApp, error: deletedError } = await supabaseAdmin(c)
+    .from('deleted_apps')
+    .select('owner_org')
+    .eq('app_id', record.app_id)
+    .maybeSingle()
+
+  if (deletedError) {
+    cloudlog({ requestId: c.get('requestId'), message: 'error resolveOwnerOrg from deleted_apps', error: deletedError, app_id: record.app_id })
+    return null
+  }
+
+  return deletedApp?.owner_org ?? null
 }
 
 /**
