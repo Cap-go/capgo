@@ -69,7 +69,7 @@ async function execWithAuthAndCapgkey(
 
       const result = await client.query(sql, params)
       await client.query('COMMIT')
-      return { rows: result.rows, rowCount: result.rowCount }
+      return { rows: result.rows, rowCount: result.rowCount ?? 0 }
     }
     catch (error) {
       try {
