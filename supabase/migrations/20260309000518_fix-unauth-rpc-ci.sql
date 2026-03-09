@@ -44,7 +44,7 @@ BEGIN
   INTO cycle_start, cycle_end
   FROM public.get_cycle_info_org(org_id);
 
-  RETURN QUERY SELECT * FROM public.get_app_metrics(org_id, cycle_start::date, cycle_end::date);
+  RETURN QUERY SELECT * FROM public.get_app_metrics(org_id, cycle_start::date, (cycle_end::date - 1));
 END;
 $$;
 
@@ -188,7 +188,7 @@ BEGIN
   FROM public.get_cycle_info_org(org_id);
 
   RETURN QUERY
-  SELECT * FROM public.get_global_metrics(org_id, cycle_start::date, cycle_end::date);
+  SELECT * FROM public.get_global_metrics(org_id, cycle_start::date, (cycle_end::date - 1));
 END;
 $$;
 
