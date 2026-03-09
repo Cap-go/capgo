@@ -253,7 +253,7 @@
     "adm-zip": "^0.5.16",
     "cross-env": "^10.1.0",
     "discord-api-types": "^0.38.33",
-    "eslint": "9.39.3",
+    "eslint": "9.39.4",
     "eslint-plugin-format": "^1.0.2",
     "sass": "1.97.3",
     "simple-git-hooks": "^2.11.1",
