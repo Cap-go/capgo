@@ -24,6 +24,8 @@ SELECT
         'is_member_of_org test - user is not member'
     );
 
+SELECT tests.authenticate_as('test_admin');
+
 -- Test is_paying_org
 SELECT
     is(

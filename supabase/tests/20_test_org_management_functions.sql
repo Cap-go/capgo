@@ -273,6 +273,8 @@ SELECT
     );
 
 -- Test is_paying_org (based on seed data, orgs have stripe_info so they are paying)
+SELECT tests.authenticate_as_service_role();
+
 SELECT
     is(
         is_paying_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
