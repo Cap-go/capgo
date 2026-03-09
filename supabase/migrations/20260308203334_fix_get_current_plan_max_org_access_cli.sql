@@ -1,7 +1,9 @@
 -- Restrict get_current_plan_max_org to authorized org callers
 -- Security fix for GHSA-v3jp-r95g-x4mm
 
-CREATE OR REPLACE FUNCTION public.get_current_plan_max_org(orgid uuid) RETURNS TABLE (
+CREATE OR REPLACE FUNCTION public.get_current_plan_max_org(
+    orgid uuid
+) RETURNS TABLE (
     mau bigint,
     bandwidth bigint,
     storage bigint,
@@ -18,7 +20,10 @@ BEGIN
   );
 
   IF NOT v_is_service_role THEN
-    v_request_user := public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_current_plan_max_org.orgid);
+    v_request_user := public.get_identity_org_allowed(
+      '{read,upload,write,all}'::public.key_mode[],
+      get_current_plan_max_org.orgid
+    );
 
     IF v_request_user IS NULL OR NOT public.check_min_rights(
       'read'::public.user_min_right,
@@ -27,7 +32,15 @@ BEGIN
       NULL::varchar,
       NULL::bigint
     ) THEN
-      PERFORM public.pg_log('deny: NO_RIGHTS', jsonb_build_object('orgid', get_current_plan_max_org.orgid, 'uid', v_request_user));
+      PERFORM public.pg_log(
+        'deny: NO_RIGHTS',
+        jsonb_build_object(
+          'orgid',
+          get_current_plan_max_org.orgid,
+          'uid',
+          v_request_user
+        )
+      );
       RETURN;
     END IF;
   END IF;
@@ -44,5 +57,6 @@ $$;
 ALTER FUNCTION public.get_current_plan_max_org(uuid) OWNER TO "postgres";
 
 REVOKE ALL ON FUNCTION public.get_current_plan_max_org(uuid) FROM anon;
-GRANT EXECUTE ON FUNCTION public.get_current_plan_max_org(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_current_plan_max_org(uuid)
+TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_current_plan_max_org(uuid) TO service_role;
