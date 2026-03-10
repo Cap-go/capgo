@@ -1474,6 +1474,7 @@ export type Database = {
           app_id: string | null
           completed_at: string | null
           created_at: string
+          created_by_user_id: string | null
           id: string
           org_id: string
           source: string
@@ -1486,6 +1487,7 @@ export type Database = {
           app_id?: string | null
           completed_at?: string | null
           created_at?: string
+          created_by_user_id?: string | null
           id?: string
           org_id: string
           source?: string
@@ -1498,6 +1500,7 @@ export type Database = {
           app_id?: string | null
           completed_at?: string | null
           created_at?: string
+          created_by_user_id?: string | null
           id?: string
           org_id?: string
           source?: string
@@ -1507,6 +1510,20 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "onboarding_steps_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
+          {
+            foreignKeyName: "onboarding_steps_created_by_user_id_fkey"
+            columns: ["created_by_user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "onboarding_steps_org_id_fkey"
             columns: ["org_id"]

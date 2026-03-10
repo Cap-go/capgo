@@ -9,6 +9,7 @@ CREATE TABLE public.onboarding_steps (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id UUID NOT NULL REFERENCES public.orgs(id) ON DELETE CASCADE,
   app_id CHARACTER VARYING REFERENCES public.apps(app_id) ON DELETE SET NULL,  -- nullable; set once CLI creates the app (step 2 of 13)
+  created_by_user_id UUID REFERENCES public.users(id) ON DELETE SET NULL,  -- the user who initiated the onboarding session
   source TEXT NOT NULL DEFAULT 'cli'
     CONSTRAINT onboarding_steps_source_check CHECK (source IN ('cli', 'web', 'demo')),
   step_done SMALLINT NOT NULL DEFAULT 0,
@@ -18,7 +19,9 @@ CREATE TABLE public.onboarding_steps (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT onboarding_steps_progress_check CHECK (
-    step_done >= 0 AND total_steps >= 1 AND step_done <= total_steps
+    step_done BETWEEN 0 AND 13
+    AND total_steps BETWEEN 1 AND 13
+    AND step_done <= total_steps
   )
 );
 
@@ -41,37 +44,23 @@ EXECUTE FUNCTION "extensions"."moddatetime" ('updated_at');
 ALTER TABLE public.onboarding_steps ENABLE ROW LEVEL SECURITY;
 
 -- SELECT: any org member with at least read access.
--- When app_id is set, scope to that app; otherwise fall back to org-level check.
+-- Always use get_identity_org_appid (handles NULL app_id internally).
 CREATE POLICY "Allow org members to select onboarding_steps"
 ON public.onboarding_steps
 FOR SELECT
 TO authenticated, anon
 USING (
-    CASE
-        WHEN app_id IS NOT NULL THEN
-            public.check_min_rights(
-                'read'::public.user_min_right,
-                public.get_identity_org_appid(
-                    '{read,upload,write,all}'::public.key_mode [],
-                    org_id,
-                    app_id
-                ),
-                org_id,
-                app_id,
-                NULL::bigint
-            )
-        ELSE
-            public.check_min_rights(
-                'read'::public.user_min_right,
-                public.get_identity_org_allowed(
-                    '{read,upload,write,all}'::public.key_mode [],
-                    org_id
-                ),
-                org_id,
-                NULL::character varying,
-                NULL::bigint
-            )
-    END
+    public.check_min_rights(
+        'read'::public.user_min_right,
+        public.get_identity_org_appid(
+            '{read,upload,write,all}'::public.key_mode [],
+            org_id,
+            app_id
+        ),
+        org_id,
+        app_id,
+        NULL::bigint
+    )
 );
 
 -- INSERT: org members with write access.
@@ -80,31 +69,17 @@ ON public.onboarding_steps
 FOR INSERT
 TO authenticated, anon
 WITH CHECK (
-    CASE
-        WHEN app_id IS NOT NULL THEN
-            public.check_min_rights(
-                'write'::public.user_min_right,
-                public.get_identity_org_appid(
-                    '{write,all}'::public.key_mode [],
-                    org_id,
-                    app_id
-                ),
-                org_id,
-                app_id,
-                NULL::bigint
-            )
-        ELSE
-            public.check_min_rights(
-                'write'::public.user_min_right,
-                public.get_identity_org_allowed(
-                    '{write,all}'::public.key_mode [],
-                    org_id
-                ),
-                org_id,
-                NULL::character varying,
-                NULL::bigint
-            )
-    END
+    public.check_min_rights(
+        'write'::public.user_min_right,
+        public.get_identity_org_appid(
+            '{write,all}'::public.key_mode [],
+            org_id,
+            app_id
+        ),
+        org_id,
+        app_id,
+        NULL::bigint
+    )
 );
 
 -- UPDATE: org members with write access.
@@ -113,58 +88,30 @@ ON public.onboarding_steps
 FOR UPDATE
 TO authenticated, anon
 USING (
-    CASE
-        WHEN app_id IS NOT NULL THEN
-            public.check_min_rights(
-                'write'::public.user_min_right,
-                public.get_identity_org_appid(
-                    '{write,all}'::public.key_mode [],
-                    org_id,
-                    app_id
-                ),
-                org_id,
-                app_id,
-                NULL::bigint
-            )
-        ELSE
-            public.check_min_rights(
-                'write'::public.user_min_right,
-                public.get_identity_org_allowed(
-                    '{write,all}'::public.key_mode [],
-                    org_id
-                ),
-                org_id,
-                NULL::character varying,
-                NULL::bigint
-            )
-    END
+    public.check_min_rights(
+        'write'::public.user_min_right,
+        public.get_identity_org_appid(
+            '{write,all}'::public.key_mode [],
+            org_id,
+            app_id
+        ),
+        org_id,
+        app_id,
+        NULL::bigint
+    )
 )
 WITH CHECK (
-    CASE
-        WHEN app_id IS NOT NULL THEN
-            public.check_min_rights(
-                'write'::public.user_min_right,
-                public.get_identity_org_appid(
-                    '{write,all}'::public.key_mode [],
-                    org_id,
-                    app_id
-                ),
-                org_id,
-                app_id,
-                NULL::bigint
-            )
-        ELSE
-            public.check_min_rights(
-                'write'::public.user_min_right,
-                public.get_identity_org_allowed(
-                    '{write,all}'::public.key_mode [],
-                    org_id
-                ),
-                org_id,
-                NULL::character varying,
-                NULL::bigint
-            )
-    END
+    public.check_min_rights(
+        'write'::public.user_min_right,
+        public.get_identity_org_appid(
+            '{write,all}'::public.key_mode [],
+            org_id,
+            app_id
+        ),
+        org_id,
+        app_id,
+        NULL::bigint
+    )
 );
 
 -- DELETE: org members with write access.
@@ -173,31 +120,17 @@ ON public.onboarding_steps
 FOR DELETE
 TO authenticated, anon
 USING (
-    CASE
-        WHEN app_id IS NOT NULL THEN
-            public.check_min_rights(
-                'write'::public.user_min_right,
-                public.get_identity_org_appid(
-                    '{write,all}'::public.key_mode [],
-                    org_id,
-                    app_id
-                ),
-                org_id,
-                app_id,
-                NULL::bigint
-            )
-        ELSE
-            public.check_min_rights(
-                'write'::public.user_min_right,
-                public.get_identity_org_allowed(
-                    '{write,all}'::public.key_mode [],
-                    org_id
-                ),
-                org_id,
-                NULL::character varying,
-                NULL::bigint
-            )
-    END
+    public.check_min_rights(
+        'write'::public.user_min_right,
+        public.get_identity_org_appid(
+            '{write,all}'::public.key_mode [],
+            org_id,
+            app_id
+        ),
+        org_id,
+        app_id,
+        NULL::bigint
+    )
 );
 
 -- =============================================================================
