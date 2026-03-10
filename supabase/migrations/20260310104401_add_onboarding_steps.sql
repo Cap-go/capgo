@@ -167,8 +167,43 @@ WITH CHECK (
     END
 );
 
+-- DELETE: org members with write access.
+CREATE POLICY "Allow org members to delete onboarding_steps"
+ON public.onboarding_steps
+FOR DELETE
+TO authenticated, anon
+USING (
+    CASE
+        WHEN app_id IS NOT NULL THEN
+            public.check_min_rights(
+                'write'::public.user_min_right,
+                public.get_identity_org_appid(
+                    '{write,all}'::public.key_mode [],
+                    org_id,
+                    app_id
+                ),
+                org_id,
+                app_id,
+                NULL::bigint
+            )
+        ELSE
+            public.check_min_rights(
+                'write'::public.user_min_right,
+                public.get_identity_org_allowed(
+                    '{write,all}'::public.key_mode [],
+                    org_id
+                ),
+                org_id,
+                NULL::character varying,
+                NULL::bigint
+            )
+    END
+);
+
 -- =============================================================================
 -- 5) Grants
 -- =============================================================================
+GRANT ALL ON TABLE public.onboarding_steps TO anon;
+GRANT ALL ON TABLE public.onboarding_steps TO authenticated;
 GRANT ALL ON TABLE public.onboarding_steps TO service_role;
 GRANT ALL ON TABLE public.onboarding_steps TO postgres;
