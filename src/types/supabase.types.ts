@@ -1469,6 +1469,53 @@ export type Database = {
           },
         ]
       }
+      onboarding_steps: {
+        Row: {
+          app_id: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          org_id: string
+          source: string
+          step_done: number
+          step_payload: Json | null
+          total_steps: number
+          updated_at: string
+        }
+        Insert: {
+          app_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          org_id: string
+          source?: string
+          step_done?: number
+          step_payload?: Json | null
+          total_steps?: number
+          updated_at?: string
+        }
+        Update: {
+          app_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          org_id?: string
+          source?: string
+          step_done?: number
+          step_payload?: Json | null
+          total_steps?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "onboarding_steps_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       org_metrics_cache: {
         Row: {
           bandwidth: number
@@ -1606,10 +1653,10 @@ export type Database = {
           password_policy_config: Json | null
           require_apikey_expiration: boolean
           required_encryption_key: string | null
+          sso_enabled: boolean
           stats_updated_at: string | null
           updated_at: string | null
           use_new_rbac: boolean
-          sso_enabled: boolean
         }
         Insert: {
           created_at?: string | null
@@ -1629,10 +1676,10 @@ export type Database = {
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
+          sso_enabled?: boolean
           stats_updated_at?: string | null
           updated_at?: string | null
           use_new_rbac?: boolean
-          sso_enabled?: boolean
         }
         Update: {
           created_at?: string | null
@@ -1652,10 +1699,10 @@ export type Database = {
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
+          sso_enabled?: boolean
           stats_updated_at?: string | null
           updated_at?: string | null
           use_new_rbac?: boolean
-          sso_enabled?: boolean
         }
         Relationships: [
           {
@@ -1981,6 +2028,59 @@ export type Database = {
           mfa_email_otp_enforced_at?: string
         }
         Relationships: []
+      }
+      sso_providers: {
+        Row: {
+          attribute_mapping: Json | null
+          created_at: string
+          dns_verification_token: string
+          dns_verified_at: string | null
+          domain: string
+          enforce_sso: boolean
+          id: string
+          metadata_url: string | null
+          org_id: string
+          provider_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attribute_mapping?: Json | null
+          created_at?: string
+          dns_verification_token: string
+          dns_verified_at?: string | null
+          domain: string
+          enforce_sso?: boolean
+          id?: string
+          metadata_url?: string | null
+          org_id: string
+          provider_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attribute_mapping?: Json | null
+          created_at?: string
+          dns_verification_token?: string
+          dns_verified_at?: string | null
+          domain?: string
+          enforce_sso?: boolean
+          id?: string
+          metadata_url?: string | null
+          org_id?: string
+          provider_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sso_providers_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       stats: {
         Row: {
@@ -2753,6 +2853,14 @@ export type Database = {
           credits_required: number
         }[]
       }
+      check_domain_sso: {
+        Args: { p_domain: string }
+        Returns: {
+          has_sso: boolean
+          org_id: string
+          provider_id: string
+        }[]
+      }
       check_min_rights:
         | {
             Args: {
@@ -3324,12 +3432,12 @@ export type Database = {
               require_apikey_expiration: boolean
               required_encryption_key: string
               role: string
+              sso_enabled: boolean
               stats_updated_at: string
               subscription_end: string
               subscription_start: string
               trial_left: number
               use_new_rbac: boolean
-              sso_enabled: boolean
             }[]
           }
         | {
@@ -3360,12 +3468,12 @@ export type Database = {
               require_apikey_expiration: boolean
               required_encryption_key: string
               role: string
+              sso_enabled: boolean
               stats_updated_at: string
               subscription_end: string
               subscription_start: string
               trial_left: number
               use_new_rbac: boolean
-              sso_enabled: boolean
             }[]
           }
       get_password_policy_hash: {
