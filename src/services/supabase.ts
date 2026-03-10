@@ -76,6 +76,7 @@ export function useSupabase() {
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: false,
+      flowType: 'pkce' as const,
     },
   }
   if (supaClient)
