@@ -109,7 +109,14 @@ async function completeSsoLogin() {
     }
 
     if (session) {
-      await provisionUser(session)
+      const { merged } = await provisionUser(session)
+      if (merged) {
+        // The duplicate SSO user was merged into the existing account.
+        // The current session is now invalid — sign out and redirect to login.
+        await supabase.auth.signOut()
+        router.replace('/login?message=sso_account_linked')
+        return
+      }
     }
 
     // Validate redirect path to prevent open redirect

@@ -372,6 +372,7 @@
   "cannot-rollback-to-current-version": "Cannot rollback to current bundle",
   "cannot-set-this-vers": "Cannot set this version",
   "cannot-sign-off": "Cannot log of",
+  "sso-account-linked": "Your SSO account has been linked to your existing account. Please sign in again.",
   "cannot-test-app-some": "Cannot test app something wrong happened",
   "cannot-transfer-app": "Cannot transfer organization. Please check the browser console and report the error to <a href='https://support.capgo.app/' target='_blank' class='text-blue-500 underline hover:text-blue-600'>Capgo support</a>.",
   "cannot-view-plans": "Cannot view the plans page",

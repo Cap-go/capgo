@@ -79,9 +79,9 @@ app.post('/', middlewareAuth, async (c) => {
       return c.json({ allowed: true })
     }
 
-    // SSO is enforced - check if user is org_super_admin (break-glass bypass)
+    // SSO is enforced - check if user is super_admin (break-glass bypass)
     const { data: roleData, error: roleError } = await (admin.from as any)('org_users')
-      .select('role')
+      .select('user_right')
       .eq('org_id', orgId)
       .eq('user_id', userId)
       .single()
@@ -92,8 +92,8 @@ app.post('/', middlewareAuth, async (c) => {
       return quickError(500, 'query_error', 'Failed to check user role')
     }
 
-    // Check if user has org_super_admin role
-    const isSuperAdmin = roleData?.role === 'org_super_admin'
+    // Check if user has super_admin right (break-glass: super admins bypass SSO enforcement)
+    const isSuperAdmin = roleData?.user_right === 'super_admin'
 
     if (isSuperAdmin) {
       cloudlog({ requestId, context: 'check_enforcement - super admin bypass', email, orgId })
