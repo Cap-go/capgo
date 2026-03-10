@@ -5,7 +5,6 @@ import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
-import { sendEmailToOrgMembers } from '../utils/org_email_notifications.ts'
 import { findBestPlan } from '../utils/plans.ts'
 import { readStatsVersion } from '../utils/stats.ts'
 import { getCurrentPlanNameOrg, supabaseAdmin } from '../utils/supabase.ts'
@@ -120,10 +119,8 @@ app.post('/', middlewareAPISecret, async (c) => {
     totalFails,
     failPercentage,
     reportDate,
-    daysBefore,
-    deletionDate,
   } = await parseBody<{
-    email?: string
+    email: string
     appId?: string
     orgId?: string
     type: string
@@ -141,24 +138,10 @@ app.post('/', middlewareAPISecret, async (c) => {
     totalFails?: number
     failPercentage?: number
     reportDate?: string
-    daysBefore?: number
-    deletionDate?: string
   }>(c)
 
-  if (!type) {
-    throw simpleError('missing_type', 'Missing type', { type })
-  }
-
-  // storage_deletion_warning sends to all org admins via sendEmailToOrgMembers
-  if (type === 'storage_deletion_warning') {
-    if (!orgId) {
-      throw simpleError('missing_orgId', 'Missing orgId for storage_deletion_warning', { orgId, type })
-    }
-    return await handleStorageDeletionWarning(c, orgId, daysBefore, deletionDate)
-  }
-
-  if (!email) {
-    throw simpleError('missing_email', 'Missing email', { email, type })
+  if (!email || !type) {
+    throw simpleError('missing_email_type', 'Missing email or type', { email, type })
   }
 
   // billing_period_stats uses orgId instead of appId
@@ -622,34 +605,6 @@ async function handleBillingPeriodStats(c: Context, email: string, orgId: string
   }
 
   await trackBentoEvent(c, email, metadata, 'org:billing_period_stats')
-
-  return c.json(BRES)
-}
-
-async function handleStorageDeletionWarning(
-  c: Context,
-  orgId: string,
-  daysBefore?: number,
-  deletionDate?: string,
-) {
-  const { data: org, error: orgError } = await supabaseAdmin(c)
-    .from('orgs')
-    .select('id, name')
-    .eq('id', orgId)
-    .single()
-
-  if (orgError || !org) {
-    throw simpleError('org_not_found', 'Organization not found', { orgId, orgError })
-  }
-
-  const metadata = {
-    org_id: orgId,
-    org_name: org.name ?? '',
-    days_before: (daysBefore ?? 7).toString(),
-    deletion_date: deletionDate ?? '',
-  }
-
-  await sendEmailToOrgMembers(c, 'org:storage_deletion_warning', 'storage_deletion_warning', metadata, orgId)
 
   return c.json(BRES)
 }

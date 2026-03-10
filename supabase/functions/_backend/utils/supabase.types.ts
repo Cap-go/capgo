@@ -2109,47 +2109,6 @@ export type Database = {
         }
         Relationships: []
       }
-      storage_deletion_queue: {
-        Row: {
-          created_at: string
-          id: string
-          org_id: string
-          scheduled_deletion_date: string
-          storage_deleted: boolean
-          warning_1d_sent: boolean
-          warning_3d_sent: boolean
-          warning_7d_sent: boolean
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          org_id: string
-          scheduled_deletion_date: string
-          storage_deleted?: boolean
-          warning_1d_sent?: boolean
-          warning_3d_sent?: boolean
-          warning_7d_sent?: boolean
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          org_id?: string
-          scheduled_deletion_date?: string
-          storage_deleted?: boolean
-          warning_1d_sent?: boolean
-          warning_3d_sent?: boolean
-          warning_7d_sent?: boolean
-        }
-        Relationships: [
-          {
-            foreignKeyName: "storage_deletion_queue_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       storage_usage: {
         Row: {
           app_id: string
@@ -3842,7 +3801,6 @@ export type Database = {
           }
       process_stats_email_monthly: { Args: never; Returns: undefined }
       process_stats_email_weekly: { Args: never; Returns: undefined }
-      process_storage_deletion_non_paying: { Args: never; Returns: undefined }
       process_subscribed_orgs: { Args: never; Returns: undefined }
       queue_cron_stat_org_for_org: {
         Args: { customer_id: string; org_id: string }
