@@ -350,6 +350,13 @@ async function openScan() {
 async function checkLogin() {
   const parsedUrl = new URL(route.fullPath, window.location.origin)
   const params = new URLSearchParams(parsedUrl.search)
+
+  if (params.get('message') === 'sso_account_linked') {
+    parsedUrl.searchParams.delete('message')
+    window.history.replaceState({}, '', parsedUrl.toString())
+    toast.success(t('sso-account-linked'))
+  }
+
   const accessToken = params.get('access_token')
   const refreshToken = params.get('refresh_token')
 

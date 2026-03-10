@@ -59,6 +59,71 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     return quickError(400, 'invalid_email', 'User email has no domain')
   }
 
+  // Detect pre-existing user with the same email (different UUID).
+  // This happens when SSO is enabled for a domain where users already had email/password accounts.
+  // Supabase Auth creates a new auth.users record instead of linking — we fix this by merging.
+  const { data: existingUser, error: existingUserError } = await (admin as any)
+    .from('users')
+    .select('id')
+    .eq('email', userEmail)
+    .neq('id', userId)
+    .maybeSingle()
+
+  if (existingUserError) {
+    cloudlogErr({ requestId, message: 'Failed to check for pre-existing user by email', userId, email: userEmail, error: existingUserError })
+    return quickError(500, 'user_lookup_failed', 'Failed to check for existing user')
+  }
+
+  if (existingUser) {
+    const originalUserId = existingUser.id
+    cloudlog({ requestId, message: 'Pre-existing user found with same email — merging SSO identity', userId, originalUserId, email: userEmail })
+
+    // Step 1: Resolve the SSO provider org so we can ensure the original user is a member
+    const { data: mergeProvider, error: mergeProviderError } = await (admin as any)
+      .from('sso_providers')
+      .select('id, org_id')
+      .eq('domain', userDomain)
+      .eq('status', 'active')
+      .single()
+
+    if (!mergeProviderError && mergeProvider) {
+      const { data: existingMembership } = await (admin as any)
+        .from('org_users')
+        .select('id')
+        .eq('user_id', originalUserId)
+        .eq('org_id', mergeProvider.org_id)
+        .maybeSingle()
+
+      if (!existingMembership) {
+        await (admin as any)
+          .from('org_users')
+          .insert({ user_id: originalUserId, org_id: mergeProvider.org_id, user_right: 'read' })
+      }
+    }
+
+    // Step 2: Transfer SSO identity from duplicate user (userId) → original user (originalUserId)
+    const { error: identityTransferError } = await (admin as any)
+      .schema('auth')
+      .from('identities')
+      .update({ user_id: originalUserId })
+      .eq('user_id', userId)
+
+    if (identityTransferError) {
+      cloudlogErr({ requestId, message: 'Failed to transfer SSO identity during merge', userId, originalUserId, error: identityTransferError })
+      return quickError(500, 'identity_transfer_failed', 'Failed to merge SSO identity with existing account')
+    }
+
+    // Step 3: Delete the duplicate auth user (cascades to public.users, orgs, org_users)
+    const { error: deleteError } = await admin.auth.admin.deleteUser(userId)
+    if (deleteError) {
+      cloudlogErr({ requestId, message: 'Failed to delete duplicate SSO user after identity transfer', userId, originalUserId, error: deleteError })
+      // Identity already transferred — log but still return merged so frontend redirects to login
+    }
+
+    cloudlog({ requestId, message: 'SSO account merged successfully — user must re-login', userId, originalUserId })
+    return c.json({ success: true, merged: true })
+  }
+
   // Resolve the provider from the user's email domain server-side
   const { data: provider, error: providerError } = await (admin as any)
     .from('sso_providers')
