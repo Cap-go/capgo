@@ -20,7 +20,7 @@ export interface CapgoConfig {
 }
 
 export function isLocal(supaHost: string) {
-  return supaHost !== 'https://xvwzpoazmxkqosrdewyv-all.supabase.co' && supaHost !== 'https://xvwzpoazmxkqosrdewyv.supabase.co'
+  return supaHost !== 'https://sb.capgo.app'
 }
 
 export function getLocalConfig() {

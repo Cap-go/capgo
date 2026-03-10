@@ -15,7 +15,7 @@ function isLocalSupabase(c: Context): boolean {
 }
 
 // Extracts the Supabase project ID from SUPABASE_URL
-// e.g., "https://xvwzpoazmxkqosrdewyv.supabase.co" -> "xvwzpoazmxkqosrdewyv"
+// e.g., "https://sb.capgo.app" -> "sb.capgo.app"
 function getSupabaseProjectId(c: Context): string | null {
   const supabaseUrl = getEnv(c, 'SUPABASE_URL')
   if (!supabaseUrl)

@@ -448,7 +448,7 @@ All configuration keys from `configs.json` can be overridden by setting their up
 |---------------------|-------------|----------------|--------------------------|
 | `BASE_DOMAIN` | Console domain | `console.capgo.app` | ✅ Yes |
 | `SUPA_ANON` | Supabase anonymous key | Capgo production key | ✅ Yes |
-| `SUPA_URL` | Supabase URL | `https://xvwzpoazmxkqosrdewyv.supabase.co` | ✅ Yes |
+| `SUPA_URL` | Supabase URL | `https://sb.capgo.app` | ✅ Yes |
 | `API_DOMAIN` | API domain | `api.capgo.app` | ✅ Yes |
 | `CAPTCHA_KEY` | Turnstile captcha key | Capgo production key | ⚠️ Optional |
 
