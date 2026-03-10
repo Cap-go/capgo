@@ -14,6 +14,7 @@ import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
 import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
 import Spinner from '~/components/Spinner.vue'
+import { formatLocalDate } from '~/services/date'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -67,7 +68,10 @@ async function loadPluginBreakdown() {
 const devicesTotal = computed(() => pluginBreakdown.value?.devices_last_month || 0)
 const devicesIos = computed(() => pluginBreakdown.value?.devices_last_month_ios || 0)
 const devicesAndroid = computed(() => pluginBreakdown.value?.devices_last_month_android || 0)
-const snapshotDate = computed(() => pluginBreakdown.value?.date || '-')
+const snapshotDate = computed(() => {
+  const date = pluginBreakdown.value?.date
+  return date ? formatLocalDate(date) || date : '-'
+})
 
 const thresholdValue = computed(() => {
   const raw = thresholdSelection.value === 'custom' ? customThreshold.value : Number(thresholdSelection.value)
