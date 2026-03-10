@@ -9,13 +9,17 @@ CREATE TABLE public.onboarding_steps (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id UUID NOT NULL REFERENCES public.orgs(id) ON DELETE CASCADE,
   app_id CHARACTER VARYING,  -- nullable; set once CLI creates the app (step 2 of 13)
-  source TEXT NOT NULL DEFAULT 'cli',  -- 'cli' | 'web' | 'demo'
+  source TEXT NOT NULL DEFAULT 'cli'
+    CONSTRAINT onboarding_steps_source_check CHECK (source IN ('cli', 'web', 'demo')),
   step_done SMALLINT NOT NULL DEFAULT 0,
   total_steps SMALLINT NOT NULL DEFAULT 13,
   step_payload JSONB DEFAULT '{}'::jsonb,  -- per-step metadata (pathToPackageJson, platform, etc.)
   completed_at TIMESTAMPTZ,  -- set when step_done >= total_steps
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT onboarding_steps_progress_check CHECK (
+    step_done >= 0 AND total_steps >= 1 AND step_done <= total_steps
+  )
 );
 
 -- =============================================================================
@@ -36,70 +40,131 @@ EXECUTE FUNCTION "extensions"."moddatetime" ('updated_at');
 -- =============================================================================
 ALTER TABLE public.onboarding_steps ENABLE ROW LEVEL SECURITY;
 
--- SELECT: any org member with at least read access
+-- SELECT: any org member with at least read access.
+-- When app_id is set, scope to that app; otherwise fall back to org-level check.
 CREATE POLICY "Allow org members to select onboarding_steps"
 ON public.onboarding_steps
 FOR SELECT
 TO authenticated, anon
 USING (
-    public.check_min_rights(
-        'read'::public.user_min_right,
-        public.get_identity_org_allowed(
-            '{read,upload,write,all}'::public.key_mode [],
-            org_id
-        ),
-        org_id,
-        NULL::character varying,
-        NULL::bigint
-    )
+    CASE
+        WHEN app_id IS NOT NULL THEN
+            public.check_min_rights(
+                'read'::public.user_min_right,
+                public.get_identity_org_appid(
+                    '{read,upload,write,all}'::public.key_mode [],
+                    org_id,
+                    app_id
+                ),
+                org_id,
+                app_id,
+                NULL::bigint
+            )
+        ELSE
+            public.check_min_rights(
+                'read'::public.user_min_right,
+                public.get_identity_org_allowed(
+                    '{read,upload,write,all}'::public.key_mode [],
+                    org_id
+                ),
+                org_id,
+                NULL::character varying,
+                NULL::bigint
+            )
+    END
 );
 
--- INSERT: org members with write access
+-- INSERT: org members with write access.
 CREATE POLICY "Allow org members to insert onboarding_steps"
 ON public.onboarding_steps
 FOR INSERT
 TO authenticated, anon
 WITH CHECK (
-    public.check_min_rights(
-        'write'::public.user_min_right,
-        public.get_identity_org_allowed(
-            '{write,all}'::public.key_mode [],
-            org_id
-        ),
-        org_id,
-        NULL::character varying,
-        NULL::bigint
-    )
+    CASE
+        WHEN app_id IS NOT NULL THEN
+            public.check_min_rights(
+                'write'::public.user_min_right,
+                public.get_identity_org_appid(
+                    '{write,all}'::public.key_mode [],
+                    org_id,
+                    app_id
+                ),
+                org_id,
+                app_id,
+                NULL::bigint
+            )
+        ELSE
+            public.check_min_rights(
+                'write'::public.user_min_right,
+                public.get_identity_org_allowed(
+                    '{write,all}'::public.key_mode [],
+                    org_id
+                ),
+                org_id,
+                NULL::character varying,
+                NULL::bigint
+            )
+    END
 );
 
--- UPDATE: org members with write access
+-- UPDATE: org members with write access.
 CREATE POLICY "Allow org members to update onboarding_steps"
 ON public.onboarding_steps
 FOR UPDATE
 TO authenticated, anon
 USING (
-    public.check_min_rights(
-        'write'::public.user_min_right,
-        public.get_identity_org_allowed(
-            '{write,all}'::public.key_mode [],
-            org_id
-        ),
-        org_id,
-        NULL::character varying,
-        NULL::bigint
-    )
+    CASE
+        WHEN app_id IS NOT NULL THEN
+            public.check_min_rights(
+                'write'::public.user_min_right,
+                public.get_identity_org_appid(
+                    '{write,all}'::public.key_mode [],
+                    org_id,
+                    app_id
+                ),
+                org_id,
+                app_id,
+                NULL::bigint
+            )
+        ELSE
+            public.check_min_rights(
+                'write'::public.user_min_right,
+                public.get_identity_org_allowed(
+                    '{write,all}'::public.key_mode [],
+                    org_id
+                ),
+                org_id,
+                NULL::character varying,
+                NULL::bigint
+            )
+    END
 )
 WITH CHECK (
-    public.check_min_rights(
-        'write'::public.user_min_right,
-        public.get_identity_org_allowed(
-            '{write,all}'::public.key_mode [],
-            org_id
-        ),
-        org_id,
-        NULL::character varying,
-        NULL::bigint
-    )
+    CASE
+        WHEN app_id IS NOT NULL THEN
+            public.check_min_rights(
+                'write'::public.user_min_right,
+                public.get_identity_org_appid(
+                    '{write,all}'::public.key_mode [],
+                    org_id,
+                    app_id
+                ),
+                org_id,
+                app_id,
+                NULL::bigint
+            )
+        ELSE
+            public.check_min_rights(
+                'write'::public.user_min_right,
+                public.get_identity_org_allowed(
+                    '{write,all}'::public.key_mode [],
+                    org_id
+                ),
+                org_id,
+                NULL::character varying,
+                NULL::bigint
+            )
+    END
 );
 
 -- =============================================================================
