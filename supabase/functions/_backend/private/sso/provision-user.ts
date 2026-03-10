@@ -62,6 +62,12 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
   // Detect pre-existing user with the same email (different UUID).
   // This happens when SSO is enabled for a domain where users already had email/password accounts.
   // Supabase Auth creates a new auth.users record instead of linking — we fix this by merging.
+  //
+  // Security note: merging on email match is safe here because we only reach this point after
+  // Supabase has verified the SAML assertion's cryptographic signature from the trusted IdP
+  // (configured by an org admin). The email claim therefore carries the same trust as the IdP's
+  // signing certificate — not standard email verification. This merge must NOT be replicated in
+  // contexts where the email claim is unverified (e.g., OAuth without verified_email, magic links).
   const { data: existingUser, error: existingUserError } = await (admin as any)
     .from('users')
     .select('id')
