@@ -10,12 +10,13 @@
 --
 -- Fix:
 -- Keep a single SELECT policy, but allow either:
--- 1. org-scoped read access, or
--- 2. app-scoped read access.
+-- 1. org-scoped read access for JWT-authenticated users, or
+-- 2. app-scoped read access for JWT users and API keys.
 --
--- The org-scoped branch avoids the self-reference problem for newly inserted
--- apps, while the app-scoped branch preserves access for principals that only
--- hold app-level roles.
+-- The org-scoped JWT branch avoids the self-reference problem for newly
+-- inserted apps without bypassing limited_to_apps restrictions on API keys.
+-- The app-scoped branch preserves access for principals that only hold
+-- app-level roles and keeps limited_to_apps enforcement intact.
 
 DROP POLICY IF EXISTS "Allow for auth, api keys (read+)" ON public.apps;
 
@@ -23,15 +24,20 @@ CREATE POLICY "Allow for auth, api keys (read+)" ON public.apps
 FOR SELECT
 TO authenticated, anon
 USING (
-    public.check_min_rights(
-        'read'::public.user_min_right,
-        public.get_identity_org_allowed(
-            '{read,upload,write,all}'::public.key_mode [],
-            owner_org
-        ),
-        owner_org,
-        NULL::character varying,
-        NULL::bigint
+    EXISTS (
+        SELECT 1
+        FROM (
+            SELECT auth.uid() AS uid
+        ) AS auth_user
+        WHERE
+            auth_user.uid IS NOT NULL
+            AND public.check_min_rights(
+                'read'::public.user_min_right,
+                auth_user.uid,
+                public.apps.owner_org,
+                NULL::character varying,
+                NULL::bigint
+            )
     )
     OR
     public.check_min_rights(
