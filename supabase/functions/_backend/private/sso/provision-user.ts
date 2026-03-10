@@ -105,9 +105,16 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
         .maybeSingle()
 
       if (!existingMembership) {
-        await (admin as any)
+        const { error: mergeInsertError } = await (admin as any)
           .from('org_users')
           .insert({ user_id: originalUserId, org_id: mergeProvider.org_id, user_right: 'read' })
+
+        if (mergeInsertError) {
+          const isDuplicate = mergeInsertError.code === '23505' || mergeInsertError.message?.toLowerCase().includes('duplicate')
+          if (!isDuplicate) {
+            cloudlogErr({ requestId, message: 'Failed to insert original user into org_users during merge', originalUserId, orgId: mergeProvider.org_id, error: mergeInsertError })
+          }
+        }
       }
     }
 
