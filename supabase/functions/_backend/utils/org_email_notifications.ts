@@ -76,6 +76,7 @@ export type EmailPreferenceKey
     | 'channel_self_rejected'
     | 'daily_fail_ratio'
     | 'cli_realtime_feed'
+    | 'storage_deletion_warning'
 
 export interface EmailPreferences {
   usage_limit?: boolean
@@ -91,6 +92,7 @@ export interface EmailPreferences {
   channel_self_rejected?: boolean
   daily_fail_ratio?: boolean
   cli_realtime_feed?: boolean
+  storage_deletion_warning?: boolean
 }
 
 interface OrgWithPreferences {
