@@ -43,8 +43,15 @@ EXECUTE FUNCTION "extensions"."moddatetime" ('updated_at');
 -- =============================================================================
 ALTER TABLE public.onboarding_steps ENABLE ROW LEVEL SECURITY;
 
--- SELECT: any org member with at least read access.
--- Always use get_identity_org_appid (handles NULL app_id internally).
+-- onboarding_steps is org-scoped. All policies use get_identity_org_allowed()
+-- (not get_identity_org_appid) so that:
+--   1. The permission check is always org-scoped — no app_id involvement in auth.
+--   2. check_min_rights() routes through the RBAC system for RBAC orgs and the
+--      legacy org_users check for non-RBAC orgs. No implicit NULL magic.
+--   3. Works for both dashboard users (authenticated + auth.uid()) and CLI API
+--      key users (anon + capgkey header).
+
+-- SELECT: any org member with read access or above.
 CREATE POLICY "Allow org members to select onboarding_steps"
 ON public.onboarding_steps
 FOR SELECT
@@ -52,13 +59,12 @@ TO authenticated, anon
 USING (
     public.check_min_rights(
         'read'::public.user_min_right,
-        public.get_identity_org_appid(
+        public.get_identity_org_allowed(
             '{read,upload,write,all}'::public.key_mode [],
-            org_id,
-            app_id
+            org_id
         ),
         org_id,
-        app_id,
+        NULL::character varying,
         NULL::bigint
     )
 );
@@ -71,13 +77,12 @@ TO authenticated, anon
 WITH CHECK (
     public.check_min_rights(
         'write'::public.user_min_right,
-        public.get_identity_org_appid(
+        public.get_identity_org_allowed(
             '{write,all}'::public.key_mode [],
-            org_id,
-            app_id
+            org_id
         ),
         org_id,
-        app_id,
+        NULL::character varying,
         NULL::bigint
     )
 );
@@ -90,26 +95,24 @@ TO authenticated, anon
 USING (
     public.check_min_rights(
         'write'::public.user_min_right,
-        public.get_identity_org_appid(
+        public.get_identity_org_allowed(
             '{write,all}'::public.key_mode [],
-            org_id,
-            app_id
+            org_id
         ),
         org_id,
-        app_id,
+        NULL::character varying,
         NULL::bigint
     )
 )
 WITH CHECK (
     public.check_min_rights(
         'write'::public.user_min_right,
-        public.get_identity_org_appid(
+        public.get_identity_org_allowed(
             '{write,all}'::public.key_mode [],
-            org_id,
-            app_id
+            org_id
         ),
         org_id,
-        app_id,
+        NULL::character varying,
         NULL::bigint
     )
 );
@@ -122,13 +125,12 @@ TO authenticated, anon
 USING (
     public.check_min_rights(
         'write'::public.user_min_right,
-        public.get_identity_org_appid(
+        public.get_identity_org_allowed(
             '{write,all}'::public.key_mode [],
-            org_id,
-            app_id
+            org_id
         ),
         org_id,
-        app_id,
+        NULL::character varying,
         NULL::bigint
     )
 );
