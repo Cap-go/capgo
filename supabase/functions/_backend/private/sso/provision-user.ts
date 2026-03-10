@@ -92,6 +92,10 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       .eq('status', 'active')
       .single()
 
+    if (mergeProviderError) {
+      cloudlogErr({ requestId, message: 'Failed to resolve SSO provider during merge — skipping org membership insert', originalUserId, domain: userDomain, error: mergeProviderError })
+    }
+
     if (!mergeProviderError && mergeProvider) {
       const { data: existingMembership } = await (admin as any)
         .from('org_users')
