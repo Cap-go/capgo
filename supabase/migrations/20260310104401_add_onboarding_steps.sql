@@ -8,7 +8,7 @@
 CREATE TABLE public.onboarding_steps (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   org_id UUID NOT NULL REFERENCES public.orgs(id) ON DELETE CASCADE,
-  app_id CHARACTER VARYING,  -- nullable; set once CLI creates the app (step 2 of 13)
+  app_id CHARACTER VARYING REFERENCES public.apps(app_id) ON DELETE SET NULL,  -- nullable; set once CLI creates the app (step 2 of 13)
   source TEXT NOT NULL DEFAULT 'cli'
     CONSTRAINT onboarding_steps_source_check CHECK (source IN ('cli', 'web', 'demo')),
   step_done SMALLINT NOT NULL DEFAULT 0,
