@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Session } from '@supabase/supabase-js'
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -32,28 +33,83 @@ function validateRedirectPath(path: string | undefined): string {
   return path
 }
 
-async function exchangeCode() {
-  const code = route.query.code as string | undefined
+function getSsoCallbackParams() {
+  const hashParams = new URLSearchParams(globalThis.location.hash.replace('#', ''))
+  const queryParams = new URLSearchParams(globalThis.location.search)
 
-  if (!code) {
+  return {
+    accessToken: hashParams.get('access_token') ?? queryParams.get('access_token') ?? '',
+    refreshToken: hashParams.get('refresh_token') ?? queryParams.get('refresh_token') ?? '',
+    code: queryParams.get('code') ?? hashParams.get('code') ?? '',
+    error: queryParams.get('error') ?? hashParams.get('error') ?? '',
+    errorDescription: queryParams.get('error_description') ?? hashParams.get('error_description') ?? '',
+  }
+}
+
+function clearAuthParamsFromUrl() {
+  const parsedUrl = new URL(globalThis.location.href)
+  const hashParams = new URLSearchParams(parsedUrl.hash.replace('#', ''))
+
+  parsedUrl.searchParams.delete('access_token')
+  parsedUrl.searchParams.delete('refresh_token')
+  hashParams.delete('access_token')
+  hashParams.delete('refresh_token')
+
+  const nextHash = hashParams.toString()
+  parsedUrl.hash = nextHash ? `#${nextHash}` : ''
+
+  globalThis.history.replaceState({}, '', parsedUrl.toString())
+}
+
+async function completeSsoLogin() {
+  const { accessToken, refreshToken, code, error, errorDescription } = getSsoCallbackParams()
+  clearAuthParamsFromUrl()
+
+  if (error) {
     isLoading.value = false
-    errorMessage.value = 'No authentication code found'
+    errorMessage.value = errorDescription || error
+    toast.error(errorMessage.value)
     return
   }
 
   try {
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+    let session: Session | null = null
 
-    if (error) {
+    if (accessToken && refreshToken) {
+      const { data, error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      })
+
+      if (error) {
+        isLoading.value = false
+        errorMessage.value = error.message || 'Failed to authenticate with SSO'
+        toast.error(errorMessage.value)
+        return
+      }
+
+      session = data.session
+    }
+    else if (code) {
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+
+      if (error) {
+        isLoading.value = false
+        errorMessage.value = error.message || 'Failed to authenticate with SSO'
+        toast.error(errorMessage.value)
+        return
+      }
+
+      session = data.session
+    }
+    else {
       isLoading.value = false
-      errorMessage.value = error.message || 'Failed to authenticate with SSO'
-      toast.error(errorMessage.value)
+      errorMessage.value = 'No authentication data found'
       return
     }
 
-    // Auto-provision user on first SSO login
-    if (data.session) {
-      await provisionUser(data.session)
+    if (session) {
+      await provisionUser(session)
     }
 
     // Validate redirect path to prevent open redirect
@@ -68,7 +124,7 @@ async function exchangeCode() {
   }
 }
 
-onMounted(exchangeCode)
+onMounted(completeSsoLogin)
 </script>
 
 <template>

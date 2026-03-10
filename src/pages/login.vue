@@ -374,6 +374,16 @@ async function checkLogin() {
   if (hasUser) {
     await checkAuthUser()
   }
+  else if (!session && route.query.code && typeof route.query.code === 'string') {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(route.query.code)
+    if (!error && data.session) {
+      await nextLogin()
+    }
+    else {
+      isLoading.value = false
+      hideLoader()
+    }
+  }
   else if (!session && route.hash) {
     await checkMagicLink()
   }
