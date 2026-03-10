@@ -5579,11 +5579,17 @@ BEGIN
 
   -- Check for API key first
   IF api_key_text IS NOT NULL THEN
-    SELECT * FROM public.apikeys WHERE key=api_key_text into api_key;
+    SELECT * FROM public.find_apikey_by_value(api_key_text) into api_key;
 
     IF api_key IS NULL THEN
       PERFORM public.pg_log('deny: INVALID_API_KEY', jsonb_build_object('source', 'header'));
       RAISE EXCEPTION 'Invalid API key provided';
+    END IF;
+
+    -- Reject expired API keys (parity with get_orgs_v6/get_identity_*)
+    IF public.is_apikey_expired(api_key.expires_at) THEN
+      PERFORM public.pg_log('deny: API_KEY_EXPIRED', jsonb_build_object('key_id', api_key.id));
+      RAISE EXCEPTION 'API key has expired';
     END IF;
 
     v_user_id := api_key.user_id;

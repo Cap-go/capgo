@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(22);
+SELECT plan(24);
 
 -- =============================================================================
 -- Test is_apikey_expired() function
@@ -402,6 +402,36 @@ SELECT
             WHERE id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'
         ),
         'Org policy columns have correct defaults (require_apikey_expiration=false, max_apikey_expiration_days=NULL)'
+    );
+
+-- =============================================================================
+-- Test get_user_org_ids with expired API key
+-- =============================================================================
+
+-- Test 23: get_user_org_ids should raise exception for expired key
+DO $$
+BEGIN
+    PERFORM set_config('request.headers', '{"capgkey": "test-key-orgs-expired"}', true);
+END $$;
+
+SELECT
+    throws_ok(
+        'SELECT * FROM get_user_org_ids()',
+        'P0001',
+        'API key has expired',
+        'get_user_org_ids: Raises exception for expired API key'
+    );
+
+-- Test 24: get_user_org_ids should return results for valid key
+DO $$
+BEGIN
+    PERFORM set_config('request.headers', '{"capgkey": "test-key-orgs-valid"}', true);
+END $$;
+
+SELECT
+    ok(
+        (SELECT count(*) > 0 FROM get_user_org_ids()),
+        'get_user_org_ids: Returns results for valid (not expired) API key'
     );
 
 SELECT *
