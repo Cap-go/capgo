@@ -1,11 +1,12 @@
 BEGIN;
 
-SELECT plan(4);
+SELECT plan(5);
 
 DO $$
 DECLARE
   v_org_id uuid := gen_random_uuid();
   v_limited_key text := gen_random_uuid()::text;
+  v_unrestricted_key text := gen_random_uuid()::text;
 BEGIN
   PERFORM set_config(
     'test.apps_returning_rbac_allowed_app_id',
@@ -35,6 +36,11 @@ BEGIN
 
   PERFORM set_config('test.apps_returning_rbac_org_id', v_org_id::text, false);
   PERFORM set_config('test.apps_returning_rbac_key', v_limited_key, false);
+  PERFORM set_config(
+    'test.apps_returning_rbac_unrestricted_key',
+    v_unrestricted_key,
+    false
+  );
 
   INSERT INTO public.apps (
     owner_org,
@@ -68,6 +74,21 @@ BEGIN
     'RBAC apps returning limited key',
     ARRAY[v_org_id]::uuid [],
     ARRAY[current_setting('test.apps_returning_rbac_allowed_app_id')]::character varying []
+  );
+
+  INSERT INTO public.apikeys (
+    user_id,
+    key,
+    mode,
+    name,
+    limited_to_orgs
+  )
+  VALUES (
+    tests.get_supabase_uid('test_user'),
+    v_unrestricted_key,
+    'all',
+    'RBAC apps returning unrestricted key',
+    ARRAY[v_org_id]::uuid []
   );
 END $$;
 
@@ -108,6 +129,41 @@ SELECT is(
 );
 
 SELECT tests.clear_authentication();
+
+DO $$
+BEGIN
+  PERFORM set_config(
+    'request.headers',
+    json_build_object(
+      'capgkey',
+      current_setting('test.apps_returning_rbac_unrestricted_key')
+    )::text,
+    true
+  );
+END $$;
+
+SELECT lives_ok(
+    $sql$
+    INSERT INTO public.apps (
+      owner_org,
+      app_id,
+      icon_url,
+      name,
+      retention,
+      default_upload_channel
+    )
+    VALUES (
+      current_setting('test.apps_returning_rbac_org_id')::uuid,
+      'com.rbac.insert.unrestricted',
+      '',
+      'RBAC unrestricted insert returning',
+      2592000,
+      'dev'
+    )
+    RETURNING app_id
+  $sql$,
+    'Unrestricted org API key can create an app with INSERT ... RETURNING'
+);
 
 DO $$
 BEGIN
