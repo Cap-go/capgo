@@ -1,9 +1,9 @@
 BEGIN;
 
 
-SELECT plan(15);
+SELECT plan(19);
 
--- Test is_admin
+-- Test is_admin / is_platform_admin wrappers
 SELECT tests.authenticate_as('test_admin');
 
 SELECT
@@ -11,6 +11,13 @@ SELECT
         is_admin(),
         true,
         'is_admin test - user is admin'
+    );
+
+SELECT
+    is(
+        is_platform_admin(),
+        true,
+        'is_platform_admin test - user is platform admin in legacy mode'
     );
 
 SELECT tests.clear_authentication();
@@ -24,7 +31,53 @@ SELECT
         'is_admin test - user is not admin'
     );
 
+SELECT
+    is(
+        is_platform_admin(),
+        false,
+        'is_platform_admin test - user is not platform admin in legacy mode'
+    );
+
 SELECT tests.clear_authentication();
+
+-- Test split behavior when RBAC is enabled and platform role exists
+SET LOCAL ROLE service_role;
+INSERT INTO public.role_bindings (
+    principal_type,
+    principal_id,
+    role_id,
+    scope_type,
+    granted_by
+)
+SELECT
+    'user',
+    '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5',
+    r.id,
+    'platform',
+    'c591b04e-cf29-4945-b9a0-776d0672061a'
+FROM public.roles r
+WHERE r.name = 'platform_super_admin';
+RESET ROLE;
+
+UPDATE public.rbac_settings SET use_new_rbac = true WHERE id = 1;
+SELECT tests.authenticate_as('test_user');
+
+SELECT
+    is(
+        is_admin(),
+        false,
+        'is_admin wrapper test - platform role does not grant legacy admin'
+    );
+
+SELECT
+    is(
+        is_platform_admin(),
+        true,
+        'is_platform_admin wrapper test - platform role is recognized'
+    );
+
+SELECT tests.clear_authentication();
+UPDATE public.rbac_settings SET use_new_rbac = false WHERE id = 1;
 
 -- Test is_allowed_capgkey
 SELECT
