@@ -175,6 +175,7 @@ BEGIN
         v_policy.schemaname,
         v_policy.tablename,
         v_roles_sql,
+        v_using,
         v_with_check
       );
     ELSE
