@@ -7,7 +7,7 @@ SET search_path = ''
 AS $$
 DECLARE
   admin_ids_jsonb jsonb;
-  is_platform_admin_legacy boolean;
+  is_platform_admin_from_secret boolean;
   mfa_verified boolean;
 BEGIN
   SELECT public.verify_mfa() INTO mfa_verified;
@@ -19,9 +19,9 @@ BEGIN
   FROM vault.decrypted_secrets
   WHERE name = 'admin_users';
 
-  is_platform_admin_legacy := COALESCE(admin_ids_jsonb ? userid::text, false);
+  is_platform_admin_from_secret := COALESCE(admin_ids_jsonb ? userid::text, false);
 
-  RETURN is_platform_admin_legacy;
+  RETURN is_platform_admin_from_secret;
 END;
 $$;
 
@@ -47,7 +47,7 @@ GRANT ALL ON FUNCTION public.is_platform_admin() TO "anon";
 GRANT ALL ON FUNCTION public.is_platform_admin() TO "authenticated";
 GRANT ALL ON FUNCTION public.is_platform_admin() TO "service_role";
 
-COMMENT ON FUNCTION public.is_platform_admin(uuid) IS 'Checks if a user is platform admin using admin_users secret. Always requires MFA.';
+COMMENT ON FUNCTION public.is_platform_admin(uuid) IS 'Checks if a user is platform admin from admin_users secret. Always requires MFA.';
 
 CREATE OR REPLACE FUNCTION public.is_admin(userid uuid)
 RETURNS boolean
@@ -57,7 +57,7 @@ SET search_path = ''
 AS $$
 DECLARE
   admin_ids_jsonb jsonb;
-  is_admin_legacy boolean;
+  is_admin_from_secret boolean;
   mfa_verified boolean;
 BEGIN
   SELECT public.verify_mfa() INTO mfa_verified;
@@ -69,13 +69,13 @@ BEGIN
   FROM vault.decrypted_secrets
   WHERE name = 'admin_users';
 
-  is_admin_legacy := COALESCE(admin_ids_jsonb ? userid::text, false);
+  is_admin_from_secret := COALESCE(admin_ids_jsonb ? userid::text, false);
 
-  RETURN is_admin_legacy;
+  RETURN is_admin_from_secret;
 END;
 $$;
 
-COMMENT ON FUNCTION public.is_admin(uuid) IS 'Checks if a user is listed in legacy platform admin secret. Always requires MFA.';
+COMMENT ON FUNCTION public.is_admin(uuid) IS 'Checks if a user is listed in admin_users secret. Always requires MFA.';
 
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS boolean

@@ -35,7 +35,7 @@ SELECT
     is(
         is_platform_admin(),
         false,
-        'is_platform_admin test - user is not platform admin in legacy mode'
+        'is_platform_admin test - user is not platform admin without admin_users secret'
     );
 
 SELECT tests.clear_authentication();
@@ -65,7 +65,7 @@ SELECT
     is(
         is_admin(),
         false,
-        'is_admin wrapper test - platform role does not grant legacy admin'
+        'is_admin wrapper test - platform role does not grant admin_users admin'
     );
 
 SELECT
