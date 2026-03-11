@@ -40,7 +40,6 @@ $$;
 
 ALTER FUNCTION public.is_platform_admin() OWNER TO "postgres";
 
-GRANT ALL ON FUNCTION public.is_platform_admin(userid uuid) TO "authenticated";
 GRANT ALL ON FUNCTION public.is_platform_admin(userid uuid) TO "service_role";
 GRANT ALL ON FUNCTION public.is_platform_admin() TO "authenticated";
 GRANT ALL ON FUNCTION public.is_platform_admin() TO "service_role";
@@ -90,7 +89,6 @@ $$;
 ALTER FUNCTION public.is_admin(userid uuid) OWNER TO "postgres";
 ALTER FUNCTION public.is_admin() OWNER TO "postgres";
 
-GRANT ALL ON FUNCTION public.is_admin(userid uuid) TO "authenticated";
 GRANT ALL ON FUNCTION public.is_admin(userid uuid) TO "service_role";
 GRANT ALL ON FUNCTION public.is_admin() TO "authenticated";
 GRANT ALL ON FUNCTION public.is_admin() TO "service_role";
