@@ -16,8 +16,8 @@ SELECT
 SELECT
     is(
         is_platform_admin(),
-        false,
-        'is_platform_admin test - user has no platform role'
+        true,
+        'is_platform_admin test - user is platform admin via admin secret'
     );
 
 SELECT tests.clear_authentication();
@@ -40,7 +40,7 @@ SELECT
 
 SELECT tests.clear_authentication();
 
--- Test split behavior when a platform role exists
+-- Test split behavior when platform role exists (platform role should not affect is_platform_admin)
 SET LOCAL ROLE service_role;
 INSERT INTO public.role_bindings (
     principal_type,
@@ -71,8 +71,8 @@ SELECT
 SELECT
     is(
         is_platform_admin(),
-        true,
-        'is_platform_admin wrapper test - platform role is recognized'
+        false,
+        'is_platform_admin wrapper test - platform role is not checked in admin secret function'
     );
 
 SELECT tests.clear_authentication();
