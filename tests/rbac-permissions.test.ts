@@ -7,7 +7,7 @@ import type { PoolClient } from 'pg'
  */
 import { Pool } from 'pg'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { ORG_ID, POSTGRES_URL, USER_ID } from './test-utils'
+import { APIKEY_TEST_ALL, ORG_ID, POSTGRES_URL, USER_ID } from './test-utils'
 
 // Test constants
 const TEST_APP_ID = 'com.demo.app'
@@ -174,6 +174,21 @@ describe('rBAC Permission System', () => {
         expect(result.rows[0].app_missing).toBe(true)
         expect(result.rows[0].app_permission_allowed).toBe(true)
         expect(result.rows[0].write_allowed).toBe(true)
+      })
+
+      it('should derive coarse app permission from RBAC when legacy org_users.user_right is null', async () => {
+        await query(`
+          UPDATE public.org_users
+          SET user_right = NULL
+          WHERE user_id = $1::uuid
+            AND org_id = $2::uuid
+        `, [USER_ID, ORG_ID])
+
+        const result = await query(`
+          SELECT public.get_org_perm_for_apikey($1, $2) AS perm
+        `, [APIKEY_TEST_ALL, TEST_APP_ID])
+
+        expect(result.rows[0].perm).toBe('perm_owner')
       })
     })
 
