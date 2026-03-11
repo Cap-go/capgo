@@ -3571,6 +3571,9 @@ export type Database = {
       is_admin:
         | { Args: never; Returns: boolean }
         | { Args: { userid: string }; Returns: boolean }
+      is_platform_admin:
+        | { Args: never; Returns: boolean }
+        | { Args: { userid: string }; Returns: boolean }
       is_allowed_action: {
         Args: { apikey: string; appid: string }
         Returns: boolean
@@ -4508,4 +4511,3 @@ export const Constants = {
     },
   },
 } as const
-

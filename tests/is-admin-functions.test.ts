@@ -72,7 +72,7 @@ describe('is_admin / is_platform_admin SQL functions', () => {
     expect(regular.rows[0].is_platform_admin).toBe(false)
   })
 
-  it('moves RBAC platform super-admin checks into is_platform_admin only', async () => {
+  it('keeps is_platform_admin tied to admin_users (no RBAC role check)', async () => {
     const rbacUserId = randomUUID()
     const normalUserId = randomUUID()
 
@@ -109,7 +109,7 @@ describe('is_admin / is_platform_admin SQL functions', () => {
     )
 
     expect(rbacUserResults.rows[0].is_admin).toBe(false)
-    expect(rbacUserResults.rows[0].is_platform_admin).toBe(true)
+    expect(rbacUserResults.rows[0].is_platform_admin).toBe(false)
     expect(regularUserResults.rows[0].is_admin).toBe(false)
     expect(regularUserResults.rows[0].is_platform_admin).toBe(false)
   })

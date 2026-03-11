@@ -7,7 +7,7 @@ import { createSignedImageUrl } from '~/services/storage'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
-import { getPlans, isAdmin } from './../services/supabase'
+import { getPlans, isPlatformAdmin } from './../services/supabase'
 
 async function updateUser(
   main: ReturnType<typeof useMainStore>,
@@ -158,7 +158,7 @@ async function guard(
       main.plans = pls
     })
 
-    isAdmin(main.auth?.id).then((res) => {
+    isPlatformAdmin(main.auth?.id).then((res) => {
       main.isAdmin = res
     })
 
@@ -212,7 +212,7 @@ async function guard(
     if (to.path.startsWith('/admin')) {
       // Ensure isAdmin is loaded before checking
       if (main.isAdmin === undefined) {
-        const adminStatus = await isAdmin(main.auth.id)
+        const adminStatus = await isPlatformAdmin(main.auth.id)
         main.isAdmin = adminStatus
       }
 

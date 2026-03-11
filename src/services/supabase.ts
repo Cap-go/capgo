@@ -348,6 +348,18 @@ export async function isAdmin(userid?: string): Promise<boolean> {
   return data ?? false
 }
 
+export async function isPlatformAdmin(userid?: string): Promise<boolean> {
+  if (!userid)
+    return false
+  const { data, error } = await useSupabase()
+    .rpc('is_platform_admin', { userid })
+    .single()
+  if (error)
+    throw new Error(error.message)
+
+  return data ?? false
+}
+
 export async function isCanceled(orgId?: string): Promise<boolean> {
   if (!orgId)
     return false
