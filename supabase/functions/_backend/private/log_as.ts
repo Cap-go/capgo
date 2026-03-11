@@ -27,6 +27,8 @@ app.post('/', middlewareAuth, async (c) => {
   const supabaseAdmin = await useSupabaseAdmin(c)
   const supabaseClient = useSupabaseClient(c, authToken)
 
+  // Canonical platform-admin check for impersonation.
+  // This endpoint must only use is_platform_admin for user-facing platform-rights.
   const { data: isAdmin, error: adminError } = await supabaseClient.rpc('is_platform_admin')
   if (adminError) {
     throw simpleError('is_admin_error', 'Is admin error', { adminError })

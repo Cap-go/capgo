@@ -5,12 +5,33 @@ SELECT plan(19);
 
 -- Test is_admin / is_platform_admin wrappers
 SELECT tests.authenticate_as('test_admin');
+SET LOCAL ROLE service_role;
+INSERT INTO public.role_bindings (
+    principal_type,
+    principal_id,
+    role_id,
+    scope_type,
+    granted_by
+)
+SELECT
+    'user',
+    'c591b04e-cf29-4945-b9a0-776d0672061a',
+    r.id,
+    'platform',
+    'c591b04e-cf29-4945-b9a0-776d0672061a'
+FROM public.roles r
+WHERE r.name = 'platform_super_admin';
+RESET ROLE;
+
+UPDATE public.rbac_settings
+SET use_new_rbac = true
+WHERE id = 1;
 
 SELECT
     is(
         is_admin(),
         true,
-        'is_admin test - user is admin'
+        'is_admin test - user is RBAC platform admin'
     );
 
 SELECT
@@ -64,8 +85,8 @@ SELECT tests.authenticate_as('test_user');
 SELECT
     is(
         is_admin(),
-        false,
-        'is_admin wrapper test - platform role does not grant admin_users admin'
+        true,
+        'is_admin wrapper test - platform role grants RBAC admin'
     );
 
 SELECT

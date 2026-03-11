@@ -728,16 +728,6 @@ export async function isTrialOrg(c: Context, orgId: string): Promise<number> {
   return 0
 }
 
-export async function isAdmin(c: Context, userId: string): Promise<boolean> {
-  const { data, error } = await supabaseAdmin(c)
-    .rpc('is_admin', { userid: userId })
-    .single()
-  if (error)
-    throw new Error(error.message)
-
-  return data ?? false
-}
-
 export async function isAllowedActionOrg(c: Context, orgId: string): Promise<boolean> {
   try {
     const { data } = await supabaseAdmin(c)

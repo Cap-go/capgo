@@ -159,6 +159,7 @@ async function guard(
     })
 
     try {
+      // isPlatformAdmin() is the only frontend admin-rights source.
       main.isAdmin = await isPlatformAdmin()
     }
     catch (error) {
@@ -217,6 +218,7 @@ async function guard(
       // Ensure isAdmin is loaded before checking
       if (main.isAdmin === undefined) {
         try {
+          // Re-check via the single approved frontend path for admin-rights.
           main.isAdmin = await isPlatformAdmin()
         }
         catch (error) {
