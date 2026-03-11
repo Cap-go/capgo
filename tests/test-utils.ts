@@ -155,6 +155,67 @@ export const headers = {
 let cachedAuthHeaders: Record<string, string> | null = null
 let authHeadersPromise: Promise<Record<string, string>> | null = null
 
+async function signInAndBuildAuthHeaders(email: string, password: string): Promise<Record<string, string>> {
+  if (!env.SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    throw new Error('SUPABASE_URL or SUPABASE_ANON_KEY is missing for auth headers')
+  }
+
+  const supabaseFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
+    const maxRetries = 3
+    let lastError: unknown
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const response = await fetch(url, options)
+        if (response.status === 503 && attempt < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)))
+          continue
+        }
+        return response
+      }
+      catch (error) {
+        lastError = error
+        if (attempt < maxRetries - 1) {
+          await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)))
+          continue
+        }
+      }
+    }
+    throw lastError ?? new Error('Supabase fetch failed')
+  }
+
+  const supabase = createClient<Database>(SUPABASE_BASE_URL, SUPABASE_ANON_KEY, {
+    global: {
+      fetch: supabaseFetch,
+    },
+    auth: {
+      persistSession: false,
+    },
+  })
+
+  const maxLoginRetries = 3
+  let data: any
+  let error: any
+  for (let attempt = 0; attempt < maxLoginRetries; attempt++) {
+    ({ data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    }))
+    if (!error && data?.session?.access_token)
+      break
+    if (attempt < maxLoginRetries - 1)
+      await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1) + Math.random() * 100))
+  }
+
+  if (error || !data.session?.access_token) {
+    throw error ?? new Error('Unable to obtain JWT for tests')
+  }
+
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${data.session.access_token}`,
+  }
+}
+
 export async function getAuthHeaders(): Promise<Record<string, string>> {
   if (cachedAuthHeaders) {
     return cachedAuthHeaders
@@ -165,64 +226,7 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
 
   authHeadersPromise = (async () => {
     try {
-      if (!env.SUPABASE_URL || !SUPABASE_ANON_KEY) {
-        throw new Error('SUPABASE_URL or SUPABASE_ANON_KEY is missing for auth headers')
-      }
-
-      const supabaseFetch = async (url: RequestInfo | URL, options?: RequestInit) => {
-        const maxRetries = 3
-        let lastError: unknown
-        for (let attempt = 0; attempt < maxRetries; attempt++) {
-          try {
-            const response = await fetch(url, options)
-            if (response.status === 503 && attempt < maxRetries - 1) {
-              await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)))
-              continue
-            }
-            return response
-          }
-          catch (error) {
-            lastError = error
-            if (attempt < maxRetries - 1) {
-              await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)))
-              continue
-            }
-          }
-        }
-        throw lastError ?? new Error('Supabase fetch failed')
-      }
-
-      const supabase = createClient<Database>(SUPABASE_BASE_URL, SUPABASE_ANON_KEY, {
-        global: {
-          fetch: supabaseFetch,
-        },
-        auth: {
-          persistSession: false,
-        },
-      })
-
-      const maxLoginRetries = 3
-      let data: any
-      let error: any
-      for (let attempt = 0; attempt < maxLoginRetries; attempt++) {
-        ({ data, error } = await supabase.auth.signInWithPassword({
-          email: USER_EMAIL,
-          password: USER_PASSWORD,
-        }))
-        if (!error && data?.session?.access_token)
-          break
-        if (attempt < maxLoginRetries - 1)
-          await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1) + Math.random() * 100))
-      }
-
-      if (error || !data.session?.access_token) {
-        throw error ?? new Error('Unable to obtain JWT for tests')
-      }
-
-      cachedAuthHeaders = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${data.session.access_token}`,
-      }
+      cachedAuthHeaders = await signInAndBuildAuthHeaders(USER_EMAIL, USER_PASSWORD)
       return cachedAuthHeaders
     }
     catch (err) {
@@ -233,6 +237,10 @@ export async function getAuthHeaders(): Promise<Record<string, string>> {
   })()
 
   return authHeadersPromise
+}
+
+export async function getAuthHeadersForCredentials(email: string, password: string): Promise<Record<string, string>> {
+  return signInAndBuildAuthHeaders(email, password)
 }
 export const headersStats = {
   'Content-Type': 'application/json',
