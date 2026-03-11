@@ -80,6 +80,7 @@ COMMENT ON FUNCTION public.is_admin(uuid) IS 'Checks if a user is listed in admi
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS boolean
 LANGUAGE plpgsql
+SECURITY DEFINER
 SET
   search_path = ''
 AS $$
@@ -87,5 +88,15 @@ BEGIN
   RETURN public.is_admin((SELECT auth.uid()));
 END;
 $$;
+
+ALTER FUNCTION public.is_admin(userid uuid) OWNER TO "postgres";
+ALTER FUNCTION public.is_admin() OWNER TO "postgres";
+
+GRANT ALL ON FUNCTION public.is_admin(userid uuid) TO "anon";
+GRANT ALL ON FUNCTION public.is_admin(userid uuid) TO "authenticated";
+GRANT ALL ON FUNCTION public.is_admin(userid uuid) TO "service_role";
+GRANT ALL ON FUNCTION public.is_admin() TO "anon";
+GRANT ALL ON FUNCTION public.is_admin() TO "authenticated";
+GRANT ALL ON FUNCTION public.is_admin() TO "service_role";
 
 COMMENT ON FUNCTION public.is_admin() IS 'Legacy platform admin helper. Checks if the current user is listed in admin_users.';
