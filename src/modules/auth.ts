@@ -159,7 +159,7 @@ async function guard(
     })
 
     try {
-      main.isAdmin = await isPlatformAdmin(main.auth?.id)
+      main.isAdmin = await isPlatformAdmin()
     }
     catch (error) {
       console.error('Failed to resolve platform admin status:', error)
@@ -217,7 +217,7 @@ async function guard(
       // Ensure isAdmin is loaded before checking
       if (main.isAdmin === undefined) {
         try {
-          main.isAdmin = await isPlatformAdmin(main.auth.id)
+          main.isAdmin = await isPlatformAdmin()
         }
         catch (error) {
           console.error('Failed to resolve platform admin status:', error)
