@@ -20,7 +20,6 @@ jobs:
     permissions:
       contents: read
       actions: write
-      packages: read
     steps:
       - name: Cache Deno dependencies
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
@@ -145,29 +144,8 @@ jobs:
         run: supabase --version
       - name: Run Supabase Start
         run: supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,studio,logflare,vector,realtime
-      - name: Login to GHCR
-        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
       - name: Run Supabase Test DB
-        run: |
-          set -euo pipefail
-          for attempt in 1 2 3; do
-            if supabase test db; then
-              exit 0
-            fi
-
-            if [ "$attempt" -eq 3 ]; then
-              echo "❌ supabase test db failed after ${attempt} attempts"
-              exit 1
-            fi
-
-            delay=$((attempt * 10))
-            echo "Retrying supabase test db in ${delay}s..."
-            sleep "$delay"
-          done
+        run: supabase test db
       - name: Lint SQL
         run: supabase db lint -s public --fail-on warning
       - uses: JarvusInnovations/background-action@2428e7b970a846423095c79d43f759abf979a635 # v1
