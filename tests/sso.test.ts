@@ -1,13 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { fetchWithRetry, getAuthHeaders, getEndpointUrl, getSupabaseClient, USER_ID } from './test-utils.ts'
+import { fetchWithRetry, getAuthHeaders, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, USER_ID } from './test-utils.ts'
 
 const SSO_TEST_ORG_ID = randomUUID()
 const SSO_TEST_CUSTOMER_ID = `cus_sso_test_${randomUUID()}`
-const SSO_ENFORCEMENT_ORG_ID = randomUUID()
-const SSO_ENFORCEMENT_CUSTOMER_ID = `cus_sso_enforcement_${randomUUID()}`
-const SSO_TEST_PROVIDER_ID = randomUUID()
-const SSO_TEST_EXTERNAL_PROVIDER_ID = randomUUID()
 
 let authHeaders: Record<string, string>
 
@@ -43,47 +39,10 @@ beforeAll(async () => {
   })
   if (orgUserError)
     throw orgUserError
-
-  const { error: enforcementStripeError } = await getSupabaseClient().from('stripe_info').insert({
-    customer_id: SSO_ENFORCEMENT_CUSTOMER_ID,
-    status: 'succeeded',
-    product_id: 'prod_LQIregjtNduh4q',
-    subscription_id: `sub_sso_enforcement_${randomUUID()}`,
-    trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-    is_good_plan: true,
-  })
-  if (enforcementStripeError)
-    throw enforcementStripeError
-
-  const { error: enforcementOrgError } = await getSupabaseClient().from('orgs').insert({
-    id: SSO_ENFORCEMENT_ORG_ID,
-    name: `SSO Enforcement Org ${SSO_ENFORCEMENT_ORG_ID}`,
-    management_email: `sso-enforcement-${SSO_ENFORCEMENT_ORG_ID}@capgo.app`,
-    created_by: USER_ID,
-    customer_id: SSO_ENFORCEMENT_CUSTOMER_ID,
-    sso_enabled: true,
-  })
-  if (enforcementOrgError)
-    throw enforcementOrgError
-
-  const { error: providerError } = await (getSupabaseClient().from as any)('sso_providers').insert({
-    id: SSO_TEST_PROVIDER_ID,
-    org_id: SSO_ENFORCEMENT_ORG_ID,
-    domain: 'capgo.app',
-    provider_id: SSO_TEST_EXTERNAL_PROVIDER_ID,
-    status: 'active',
-    enforce_sso: false,
-    dns_verification_token: `dns-${randomUUID()}`,
-  })
-  if (providerError)
-    throw providerError
 })
 
 afterAll(async () => {
-  await (getSupabaseClient().from as any)('sso_providers').delete().eq('id', SSO_TEST_PROVIDER_ID)
   await getSupabaseClient().from('org_users').delete().eq('org_id', SSO_TEST_ORG_ID)
-  await getSupabaseClient().from('orgs').delete().eq('id', SSO_ENFORCEMENT_ORG_ID)
-  await getSupabaseClient().from('stripe_info').delete().eq('customer_id', SSO_ENFORCEMENT_CUSTOMER_ID)
   await getSupabaseClient().from('orgs').delete().eq('id', SSO_TEST_ORG_ID)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', SSO_TEST_CUSTOMER_ID)
 })
@@ -115,19 +74,82 @@ describe('[POST] /private/sso/check-domain', () => {
 })
 
 describe('[POST] /private/sso/check-enforcement', () => {
-  it('should return allowed=true when a matching SSO provider exists but enforcement is disabled', async () => {
-    const response = await fetchWithRetry(getEndpointUrl('/private/sso/check-enforcement'), {
-      method: 'POST',
-      headers: authHeaders,
-      body: JSON.stringify({
-        email: 'ignored@example.com',
-        auth_type: 'password',
-      }),
-    })
+  it.concurrent('should return allowed=true when a matching SSO provider exists but enforcement is disabled', async () => {
+    const enforcementOrgId = randomUUID()
+    const enforcementCustomerId = `cus_sso_enforcement_${randomUUID()}`
+    const providerId = randomUUID()
+    const externalProviderId = randomUUID()
+    const domain = `${randomUUID()}.sso.test`
+    const email = `user@${domain}`
+    const password = 'testtest'
 
-    expect(response.status).toBe(200)
-    const data = await response.json() as { allowed: boolean }
-    expect(data.allowed).toBe(true)
+    const { data: createdUser, error: createUserError } = await getSupabaseClient().auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    })
+    if (createUserError || !createdUser.user) {
+      throw createUserError ?? new Error('Failed to create dedicated SSO enforcement auth user')
+    }
+
+    try {
+      const { error: enforcementStripeError } = await getSupabaseClient().from('stripe_info').insert({
+        customer_id: enforcementCustomerId,
+        status: 'succeeded',
+        product_id: 'prod_LQIregjtNduh4q',
+        subscription_id: `sub_sso_enforcement_${randomUUID()}`,
+        trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+        is_good_plan: true,
+      })
+      if (enforcementStripeError)
+        throw enforcementStripeError
+
+      const { error: enforcementOrgError } = await getSupabaseClient().from('orgs').insert({
+        id: enforcementOrgId,
+        name: `SSO Enforcement Org ${enforcementOrgId}`,
+        management_email: `sso-enforcement-${enforcementOrgId}@capgo.app`,
+        created_by: USER_ID,
+        customer_id: enforcementCustomerId,
+        sso_enabled: true,
+      })
+      if (enforcementOrgError)
+        throw enforcementOrgError
+
+      const { error: providerError } = await (getSupabaseClient().from as any)('sso_providers').insert({
+        id: providerId,
+        org_id: enforcementOrgId,
+        domain,
+        provider_id: externalProviderId,
+        status: 'active',
+        enforce_sso: false,
+        dns_verification_token: `dns-${randomUUID()}`,
+      })
+      if (providerError)
+        throw providerError
+
+      const isolatedAuthHeaders = await getAuthHeadersForCredentials(email, password)
+
+      const response = await fetchWithRetry(getEndpointUrl('/private/sso/check-enforcement'), {
+        method: 'POST',
+        headers: isolatedAuthHeaders,
+        body: JSON.stringify({
+          email: 'ignored@example.com',
+          auth_type: 'password',
+        }),
+      })
+
+      expect(response.status).toBe(200)
+      const data = await response.json() as { allowed: boolean }
+      expect(data.allowed).toBe(true)
+    }
+    finally {
+      await Promise.allSettled([
+        (getSupabaseClient().from as any)('sso_providers').delete().eq('id', providerId),
+        getSupabaseClient().from('orgs').delete().eq('id', enforcementOrgId),
+        getSupabaseClient().from('stripe_info').delete().eq('customer_id', enforcementCustomerId),
+        getSupabaseClient().auth.admin.deleteUser(createdUser.user.id),
+      ])
+    }
   })
 
   it('should return allowed=true for password auth when no SSO is configured', async () => {
