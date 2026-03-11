@@ -160,20 +160,23 @@ displayStore.defaultBack = '/apps'
     <div v-else-if="!isLoading">
       <div class="relative h-full pb-4 overflow-hidden">
         <div class="w-full h-full px-0 pt-0 mx-auto mb-8 overflow-y-auto sm:px-6 md:pt-8 lg:px-8 max-w-9xl max-h-fit">
+          <!-- Empty state: no apps yet -->
           <div
-            v-if="totalApps === 0 && !searchQuery"
-            class="relative p-8 mb-6 overflow-hidden bg-white border shadow-lg rounded-2xl border-violet-200/70 dark:border-slate-900 dark:bg-gray-900"
+            v-if="totalApps === 0 && !searchQuery && !isTableLoading"
+            class="flex flex-col items-center justify-center px-6 py-16 mx-auto text-center md:py-24"
           >
-            <span class="inline-flex rounded-full bg-violet-50 px-3 py-1 text-[11px] font-semibold tracking-[0.08em] text-violet-700 dark:bg-violet-900/30 dark:text-violet-200 dark:border-violet-800">
-              {{ t('get-started') }}
-            </span>
-            <h2 class="mt-4 text-2xl font-semibold md:text-3xl text-slate-900 dark:text-slate-50">
-              {{ t('start-using-capgo') }} <span class="font-prompt">Capgo</span> !
+            <div class="flex items-center justify-center w-16 h-16 mb-6 rounded-2xl bg-violet-100 dark:bg-violet-900/30">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-violet-600 dark:text-violet-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+            </div>
+            <h2 class="text-2xl font-semibold md:text-3xl text-slate-900 dark:text-slate-50">
+              {{ t('add-your-first-app') }}
             </h2>
-            <p class="max-w-2xl mt-3 text-slate-700 dark:text-slate-200">
+            <p class="max-w-md mt-3 text-base text-slate-600 dark:text-slate-300">
               {{ t('add-your-first-app-t') }}
             </p>
-            <div class="flex flex-col gap-3 mt-5 sm:flex-row sm:items-center">
+            <div class="flex flex-col gap-3 mt-8 sm:flex-row sm:items-center">
               <button class="d-btn d-btn-primary" @click="router.push('/app/new')">
                 {{ t('start-onboarding') }}
               </button>
@@ -187,8 +190,8 @@ displayStore.defaultBack = '/apps'
               </button>
             </div>
           </div>
-          <!-- App table - always visible even when payment failed -->
-          <div class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+          <!-- App table - only shown when apps exist -->
+          <div v-else class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
             <AppTable
               :current-page="currentPage"
               :search="searchQuery"
