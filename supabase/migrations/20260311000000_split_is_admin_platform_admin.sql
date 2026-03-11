@@ -6,10 +6,7 @@ SECURITY DEFINER
 SET search_path = ''
 AS $$
 DECLARE
-  admin_ids_jsonb jsonb;
-  is_admin_legacy boolean := false;
   mfa_verified boolean;
-  rbac_enabled boolean;
   has_platform_admin boolean := false;
 BEGIN
   SELECT public.verify_mfa() INTO mfa_verified;
@@ -17,29 +14,17 @@ BEGIN
     RETURN false;
   END IF;
 
-  SELECT decrypted_secret::jsonb INTO admin_ids_jsonb
-  FROM vault.decrypted_secrets
-  WHERE name = 'admin_users';
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.role_bindings rb
+    JOIN public.roles r ON r.id = rb.role_id
+    WHERE rb.principal_type = public.rbac_principal_user()
+      AND rb.principal_id = userid
+      AND rb.scope_type = public.rbac_scope_platform()
+      AND r.name = public.rbac_role_platform_super_admin()
+  ) INTO has_platform_admin;
 
-  is_admin_legacy := COALESCE(admin_ids_jsonb ? userid::text, false);
-
-  SELECT use_new_rbac INTO rbac_enabled
-  FROM public.rbac_settings
-  WHERE id = 1;
-
-  IF COALESCE(rbac_enabled, false) THEN
-    SELECT EXISTS (
-      SELECT 1
-      FROM public.role_bindings rb
-      JOIN public.roles r ON r.id = rb.role_id
-      WHERE rb.principal_type = public.rbac_principal_user()
-        AND rb.principal_id = userid
-        AND rb.scope_type = public.rbac_scope_platform()
-        AND r.name = public.rbac_role_platform_super_admin()
-    ) INTO has_platform_admin;
-  END IF;
-
-  RETURN is_admin_legacy OR has_platform_admin;
+  RETURN has_platform_admin;
 END;
 $$;
 
@@ -65,7 +50,7 @@ GRANT ALL ON FUNCTION public.is_platform_admin() TO "anon";
 GRANT ALL ON FUNCTION public.is_platform_admin() TO "authenticated";
 GRANT ALL ON FUNCTION public.is_platform_admin() TO "service_role";
 
-COMMENT ON FUNCTION public.is_platform_admin(uuid) IS 'Checks if a user is a platform admin. In RBAC mode, accepts legacy vault list or platform_super_admin role. In legacy mode, only accepts legacy vault list. Always requires MFA.';
+COMMENT ON FUNCTION public.is_platform_admin(uuid) IS 'Checks if a user is a platform admin by role binding. Always requires MFA.';
 
 CREATE OR REPLACE FUNCTION public.is_admin(userid uuid)
 RETURNS boolean

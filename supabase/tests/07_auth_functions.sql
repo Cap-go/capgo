@@ -16,8 +16,8 @@ SELECT
 SELECT
     is(
         is_platform_admin(),
-        true,
-        'is_platform_admin test - user is platform admin in legacy mode'
+        false,
+        'is_platform_admin test - user has no platform role'
     );
 
 SELECT tests.clear_authentication();
@@ -40,7 +40,7 @@ SELECT
 
 SELECT tests.clear_authentication();
 
--- Test split behavior when RBAC is enabled and platform role exists
+-- Test split behavior when a platform role exists
 SET LOCAL ROLE service_role;
 INSERT INTO public.role_bindings (
     principal_type,
@@ -59,7 +59,6 @@ FROM public.roles r
 WHERE r.name = 'platform_super_admin';
 RESET ROLE;
 
-UPDATE public.rbac_settings SET use_new_rbac = true WHERE id = 1;
 SELECT tests.authenticate_as('test_user');
 
 SELECT
@@ -77,7 +76,6 @@ SELECT
     );
 
 SELECT tests.clear_authentication();
-UPDATE public.rbac_settings SET use_new_rbac = false WHERE id = 1;
 
 -- Test is_allowed_capgkey
 SELECT
