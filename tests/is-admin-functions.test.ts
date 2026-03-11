@@ -28,8 +28,12 @@ describe('is_admin / is_platform_admin SQL functions', () => {
     try {
       await query('ROLLBACK')
     }
+    catch {
+      // Ignore rollback failures to keep test teardown resilient.
+    }
     finally {
       client.release()
+      client = null as any
     }
   })
 
@@ -38,7 +42,7 @@ describe('is_admin / is_platform_admin SQL functions', () => {
   })
 
   it.concurrent('is_platform_admin remains vault-based while is_admin is RBAC-only', async () => {
-    const legacyAdmin = randomUUID()
+    const legacyAdmin = 'c591b04e-cf29-4945-b9a0-776d0672061a'
     const nonAdmin = randomUUID()
 
     await query(`
@@ -46,15 +50,6 @@ describe('is_admin / is_platform_admin SQL functions', () => {
       SET use_new_rbac = false
       WHERE id = 1;
     `)
-
-    await query(`
-      UPDATE vault.decrypted_secrets
-      SET decrypted_secret = (
-        COALESCE(decrypted_secret::jsonb, '{}'::jsonb)
-        || $1::jsonb
-      )::text
-      WHERE name = 'admin_users';
-    `, [JSON.stringify({ [legacyAdmin]: true })])
 
     const legacy = await query(
       'SELECT public.is_admin($1::uuid) as is_admin, public.is_platform_admin($1::uuid) as is_platform_admin',
