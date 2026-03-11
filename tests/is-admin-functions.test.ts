@@ -1,5 +1,6 @@
+import type { PoolClient } from 'pg'
 import { randomUUID } from 'node:crypto'
-import { Pool, type PoolClient } from 'pg'
+import { Pool } from 'pg'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { POSTGRES_URL } from './test-utils.ts'
 
