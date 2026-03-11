@@ -349,11 +349,10 @@ export async function isAdmin(userid?: string): Promise<boolean> {
 }
 
 export async function isPlatformAdmin(userid?: string): Promise<boolean> {
-  if (!userid)
-    return false
-  const { data, error } = await useSupabase()
-    .rpc('is_platform_admin', { userid })
-    .single()
+  const rpc = userid
+    ? useSupabase().rpc('is_platform_admin', { userid })
+    : useSupabase().rpc('is_platform_admin')
+  const { data, error } = await rpc.single()
   if (error)
     throw new Error(error.message)
 

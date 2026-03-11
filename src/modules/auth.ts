@@ -158,9 +158,13 @@ async function guard(
       main.plans = pls
     })
 
-    isPlatformAdmin(main.auth?.id).then((res) => {
-      main.isAdmin = res
-    })
+    try {
+      main.isAdmin = await isPlatformAdmin(main.auth?.id)
+    }
+    catch (error) {
+      console.error('Failed to resolve platform admin status:', error)
+      main.isAdmin = false
+    }
 
     sendEvent({
       channel: 'user-login',
@@ -212,8 +216,13 @@ async function guard(
     if (to.path.startsWith('/admin')) {
       // Ensure isAdmin is loaded before checking
       if (main.isAdmin === undefined) {
-        const adminStatus = await isPlatformAdmin(main.auth.id)
-        main.isAdmin = adminStatus
+        try {
+          main.isAdmin = await isPlatformAdmin(main.auth.id)
+        }
+        catch (error) {
+          console.error('Failed to resolve platform admin status:', error)
+          main.isAdmin = false
+        }
       }
 
       // Redirect non-admin users to dashboard
