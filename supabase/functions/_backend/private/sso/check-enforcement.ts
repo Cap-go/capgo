@@ -64,7 +64,8 @@ app.post('/', middlewareAuth, async (c) => {
 
     const { data: enforcementData, error: enforcementError } = await (admin.from as any)('sso_providers')
       .select('enforce_sso')
-      .eq('id', ssoProvider.id)
+      .eq('org_id', orgId)
+      .eq('domain', domain)
       .eq('status', 'active')
       .single()
 
