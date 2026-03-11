@@ -80,7 +80,7 @@ app.post('/', middlewareAuth, async (c) => {
 
   // Verify user is admin
   const supabaseClient = useSupabaseClient(c, authToken)
-  const { data: isAdmin, error: adminError } = await supabaseClient.rpc('is_admin')
+  const { data: isAdmin, error: adminError } = await supabaseClient.rpc('is_platform_admin')
 
   if (adminError) {
     cloudlog({ requestId: c.get('requestId'), message: 'is_admin_error', error: adminError })

@@ -27,7 +27,7 @@ app.post('/', middlewareAuth, async (c) => {
   const supabaseAdmin = await useSupabaseAdmin(c)
   const supabaseClient = useSupabaseClient(c, authToken)
 
-  const { data: isAdmin, error: adminError } = await supabaseClient.rpc('is_admin')
+  const { data: isAdmin, error: adminError } = await supabaseClient.rpc('is_platform_admin')
   if (adminError) {
     throw simpleError('is_admin_error', 'Is admin error', { adminError })
   }
