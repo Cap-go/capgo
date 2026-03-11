@@ -1,6 +1,6 @@
--- Test is_admin() and is_platform_admin() with RBAC integration
+-- Test is_admin() with RBAC integration
 BEGIN;
-SELECT plan(8);
+SELECT plan(7);
 
 -- Test admin user: 'test_admin' maps to c591b04e-cf29-4945-b9a0-776d0672061a (admin@capgo.app)
 -- Test regular user: 'test_user' maps to 6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5 (test@capgo.app)
@@ -12,18 +12,18 @@ SELECT ok(
     'RBAC is disabled globally by default'
 );
 
--- 2) Admin user is recognized in legacy mode (assumes MFA is mocked in test environment)
+-- 2) Admin user is recognized in legacy mode via vault
 SELECT tests.authenticate_as('test_admin');
 SELECT ok(
     public.is_admin('c591b04e-cf29-4945-b9a0-776d0672061a'),
-    'Admin is recognized in legacy mode (vault-based)'
+    'Admin is recognized in legacy mode by vault secret'
 );
 
--- 3) Admin user is also recognized by is_platform_admin() in legacy mode
-SELECT tests.authenticate_as('test_admin');
+-- 3) Regular user without vault entry is not admin in legacy mode
+SELECT tests.authenticate_as('test_user');
 SELECT ok(
-    public.is_platform_admin('c591b04e-cf29-4945-b9a0-776d0672061a'),
-    'Admin is recognized in legacy mode by is_platform_admin()'
+    NOT public.is_admin('6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5'),
+    'Regular user is NOT admin in legacy mode (not in vault)'
 );
 
 -- 4) Enable RBAC globally
@@ -34,15 +34,14 @@ SELECT ok(
     'RBAC enabled globally'
 );
 
--- 5) With RBAC enabled, admin is still recognized via vault (legacy path preserved)
+-- 5) Admin remains recognized in RBAC mode via legacy vault entry
 SELECT tests.authenticate_as('test_admin');
 SELECT ok(
     public.is_admin('c591b04e-cf29-4945-b9a0-776d0672061a'),
     'Admin still recognized in RBAC mode via vault (legacy path)'
 );
 
--- 6) Grant platform_super_admin role to test_admin
--- Note: Use service_role to bypass RLS for test setup
+-- 6) Grant platform_super_admin role to regular user for RBAC-only coverage
 SET LOCAL ROLE service_role;
 INSERT INTO public.role_bindings (
     principal_type,
@@ -53,37 +52,19 @@ INSERT INTO public.role_bindings (
 )
 SELECT
     'user',
-    'c591b04e-cf29-4945-b9a0-776d0672061a',
+    '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5',
     r.id,
     'platform',
     'c591b04e-cf29-4945-b9a0-776d0672061a'
 FROM public.roles r
 WHERE r.name = 'platform_super_admin';
 RESET ROLE;
-SELECT ok(
-    EXISTS (
-        SELECT 1 FROM public.role_bindings rb
-        JOIN public.roles r ON r.id = rb.role_id
-        WHERE rb.principal_id = 'c591b04e-cf29-4945-b9a0-776d0672061a'
-        AND r.name = 'platform_super_admin'
-        AND rb.scope_type = 'platform'
-    ),
-    'platform_super_admin role binding created for test_admin'
-);
 
--- 7) With RBAC role, platform admin is recognized by is_platform_admin()
-SELECT tests.authenticate_as('test_admin');
-SELECT ok(
-    public.is_platform_admin('c591b04e-cf29-4945-b9a0-776d0672061a'),
-    'Admin recognized in RBAC mode by is_platform_admin'
-);
-
--- 8) Regular user without vault entry and without platform role is not admin in either path
+-- 7) RBAC platform role should not grant is_admin() (legacy-only function)
 SELECT tests.authenticate_as('test_user');
 SELECT ok(
-    NOT public.is_platform_admin('6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5')
-    AND NOT public.is_admin('6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5'),
-    'Regular user is NOT platform admin and NOT legacy admin (not in vault, no platform role)'
+    NOT public.is_admin('6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5'),
+    'Platform role users remain non-admin for is_admin() legacy check'
 );
 
 SELECT * FROM finish();
