@@ -289,6 +289,14 @@ Then in your test file, use ONLY these dedicated resources for modifications.
   (backend) instead of `getUser()` unless you explicitly need the full user
   record from the Auth API.
 
+### PostgreSQL Extension Policy
+
+- Avoid introducing new PostgreSQL extensions if an existing feature or SQL
+  approach can solve the same requirement.
+- If there is no practical alternative, add a migration with a clear fallback plan.
+- Never enable a new PostgreSQL extension without explicit user consent before
+  applying it.
+
 ### PostgreSQL Function Security
 
 **ALWAYS set an empty search path in every PostgreSQL function.**
