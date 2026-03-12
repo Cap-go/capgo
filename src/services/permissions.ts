@@ -65,15 +65,6 @@ export type Permission
     | 'channel.manage_forced_devices'
     | 'channel.read_forced_devices'
     | 'channel.read_audit'
-  // Platform permissions (internal only, not exposed to users)
-    | 'platform.impersonate_user'
-    | 'platform.manage_orgs_any'
-    | 'platform.manage_apps_any'
-    | 'platform.manage_channels_any'
-    | 'platform.run_maintenance_jobs'
-    | 'platform.delete_orphan_users'
-    | 'platform.read_all_audit'
-    | 'platform.db_break_glass'
 
 /**
  * Scope identifiers for permission checks.
