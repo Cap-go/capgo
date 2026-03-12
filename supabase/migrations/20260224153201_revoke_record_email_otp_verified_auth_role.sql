@@ -2,7 +2,9 @@
 -- Restrict email OTP verification bookkeeping and enforce service-side function usage
 -- ==========================================================================
 
-CREATE OR REPLACE FUNCTION "public"."record_email_otp_verified"("p_user_id" uuid)
+CREATE OR REPLACE FUNCTION public.record_email_otp_verified(
+    "p_user_id" uuid
+)
 RETURNS timestamptz
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -25,13 +27,21 @@ BEGIN
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION "public"."record_email_otp_verified"(uuid) TO "service_role";
-GRANT EXECUTE ON FUNCTION "public"."record_email_otp_verified"(uuid) TO "postgres";
+GRANT EXECUTE ON FUNCTION public.record_email_otp_verified(
+    uuid
+) TO service_role;
+GRANT EXECUTE ON FUNCTION public.record_email_otp_verified(
+    uuid
+) TO postgres;
 
 -- The OTP verification marker must only be written by trusted server-side code
 -- after successful OTP validation.
-REVOKE EXECUTE ON FUNCTION "public"."record_email_otp_verified"(uuid) FROM "public";
-REVOKE EXECUTE ON FUNCTION "public"."record_email_otp_verified"(uuid) FROM "authenticated";
+REVOKE EXECUTE ON FUNCTION public.record_email_otp_verified(
+    uuid
+) FROM public;
+REVOKE EXECUTE ON FUNCTION public.record_email_otp_verified(
+    uuid
+) FROM authenticated;
 
 -- Remove the legacy zero-arg function overload now that callers are migrated.
-DROP FUNCTION IF EXISTS "public"."record_email_otp_verified"();
+DROP FUNCTION IF EXISTS public.record_email_otp_verified();

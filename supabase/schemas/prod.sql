@@ -36,18 +36,6 @@ COMMENT ON SCHEMA "public" IS 'standard public schema';
 
 
 
-CREATE SCHEMA IF NOT EXISTS "test_overrides";
-
-
-ALTER SCHEMA "test_overrides" OWNER TO "postgres";
-
-
-CREATE SCHEMA IF NOT EXISTS "tests";
-
-
-ALTER SCHEMA "tests" OWNER TO "postgres";
-
-
 CREATE EXTENSION IF NOT EXISTS "http" WITH SCHEMA "extensions";
 
 
@@ -1158,6 +1146,26 @@ $$;
 ALTER FUNCTION "public"."calculate_credit_cost"("p_metric" "public"."credit_metric_type", "p_overage_amount" numeric) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."check_domain_sso"("p_domain" "text") RETURNS TABLE("has_sso" boolean, "provider_id" "text", "org_id" "uuid")
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+    SELECT
+        true AS has_sso,
+        sp.provider_id,
+        sp.org_id
+    FROM public.sso_providers AS sp
+    JOIN public.orgs AS o ON o.id = sp.org_id
+    WHERE sp."domain" = lower(btrim(p_domain))
+      AND sp.status = 'active'
+      AND o.sso_enabled = true
+    LIMIT 1;
+$$;
+
+
+ALTER FUNCTION "public"."check_domain_sso"("p_domain" "text") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."check_encrypted_bundle_on_insert"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -1686,29 +1694,42 @@ DECLARE
     v_user_id uuid;
     v_is_service_role boolean;
 BEGIN
-  v_user_id := public.get_identity('{read,upload,write,all}'::public.key_mode[]);
-  v_is_service_role := (
-    ((SELECT auth.jwt() ->> 'role') = 'service_role')
-    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
-  );
+    v_user_id := public.get_identity(
+        '{read,upload,write,all}'::public.key_mode[]
+    );
+    v_is_service_role := (
+        (SELECT auth.jwt() ->> 'role') = 'service_role'
+        OR (SELECT session_user) IS NOT DISTINCT FROM 'postgres'
+    );
 
     IF NOT v_is_service_role THEN
-      IF v_user_id IS NULL OR NOT (
-        public.check_min_rights(
-          'super_admin'::public.user_min_right,
-          (SELECT public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], check_org_members_password_policy.org_id)),
-          check_org_members_password_policy.org_id,
-          NULL::character varying,
-          NULL::bigint
-        )
-      ) THEN
-        PERFORM public.pg_log('deny: NO_RIGHTS', jsonb_build_object('org_id', check_org_members_password_policy.org_id, 'uid', v_user_id));
-        RAISE EXCEPTION 'NO_RIGHTS';
-      END IF;
+        IF v_user_id IS NULL OR NOT public.check_min_rights(
+            'super_admin'::public.user_min_right,
+            public.get_identity_org_allowed(
+                '{read,upload,write,all}'::public.key_mode[],
+                check_org_members_password_policy.org_id
+            ),
+            check_org_members_password_policy.org_id,
+            NULL::character varying,
+            NULL::bigint
+        ) THEN
+            PERFORM public.pg_log(
+                'deny: NO_RIGHTS',
+                jsonb_build_object(
+                    'org_id', check_org_members_password_policy.org_id,
+                    'uid', v_user_id
+                )
+            );
+            RAISE EXCEPTION 'NO_RIGHTS';
+        END IF;
     END IF;
 
     -- Check if org exists
-    IF NOT EXISTS (SELECT 1 FROM public.orgs WHERE public.orgs.id = check_org_members_password_policy.org_id) THEN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM public.orgs
+        WHERE public.orgs.id = check_org_members_password_policy.org_id
+    ) THEN
         RAISE EXCEPTION 'Organization does not exist';
     END IF;
 
@@ -1718,7 +1739,10 @@ BEGIN
         au.email::text,
         u.first_name::text,
         u.last_name::text,
-        public.user_meets_password_policy(ou.user_id, check_org_members_password_policy.org_id) AS "password_policy_compliant"
+        public.user_meets_password_policy(
+            ou.user_id,
+            check_org_members_password_policy.org_id
+        ) AS password_policy_compliant
     FROM public.org_users ou
     JOIN auth.users au ON au.id = ou.user_id
     LEFT JOIN public.users u ON u.id = ou.user_id
@@ -1753,14 +1777,9 @@ BEGIN
       JOIN public.roles r ON r.id = rb.role_id
       WHERE rb.principal_type = public.rbac_principal_user()
         AND rb.principal_id = auth.uid()
-        AND (
-          (rb.scope_type = public.rbac_scope_org()
-            AND rb.org_id = NEW.org_id
-            AND r.name = public.rbac_role_org_super_admin())
-          OR
-          (rb.scope_type = public.rbac_scope_platform()
-            AND r.name = public.rbac_role_platform_super_admin())
-        )
+        AND rb.scope_type = public.rbac_scope_org()
+        AND rb.org_id = NEW.org_id
+        AND r.name = public.rbac_role_org_super_admin()
     ) INTO v_is_super_admin;
 
     IF v_is_super_admin THEN
@@ -3362,7 +3381,9 @@ BEGIN
     WHERE account_id = auth_uid;
 
     IF removal_date IS NULL THEN
-        RAISE EXCEPTION 'Account with ID % is not marked for deletion', auth_uid;
+        RAISE EXCEPTION
+            'Account with ID % is not marked for deletion',
+            auth_uid;
     END IF;
 
     RETURN removal_date;
@@ -4106,29 +4127,39 @@ CREATE OR REPLACE FUNCTION "public"."get_org_members"("guild_id" "uuid") RETURNS
     SET "search_path" TO ''
     AS $$
 DECLARE
-  v_user_id uuid;
-  v_is_service_role boolean;
+    v_user_id uuid;
+    v_is_service_role boolean;
 BEGIN
-  v_user_id := public.get_identity('{read,upload,write,all}'::public.key_mode[]);
-  v_is_service_role := (
-    ((SELECT auth.jwt() ->> 'role') = 'service_role')
-    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
-  );
+    v_user_id := public.get_identity(
+        '{read,upload,write,all}'::public.key_mode[]
+    );
+    v_is_service_role := (
+        (SELECT auth.jwt() ->> 'role') = 'service_role'
+        OR (SELECT session_user) IS NOT DISTINCT FROM 'postgres'
+    );
 
-  IF NOT v_is_service_role THEN
-    IF v_user_id IS NULL OR NOT public.check_min_rights(
-      'read'::public.user_min_right,
-      v_user_id,
-      get_org_members.guild_id,
-      NULL::character varying,
-      NULL::bigint
-    ) THEN
-      PERFORM public.pg_log('deny: NO_RIGHTS', jsonb_build_object('guild_id', get_org_members.guild_id, 'uid', v_user_id));
-      RAISE EXCEPTION 'NO_RIGHTS';
+    IF NOT v_is_service_role THEN
+        IF v_user_id IS NULL OR NOT public.check_min_rights(
+            'read'::public.user_min_right,
+            v_user_id,
+            get_org_members.guild_id,
+            NULL::character varying,
+            NULL::bigint
+        ) THEN
+            PERFORM public.pg_log(
+                'deny: NO_RIGHTS',
+                jsonb_build_object(
+                    'guild_id', get_org_members.guild_id,
+                    'uid', v_user_id
+                )
+            );
+            RAISE EXCEPTION 'NO_RIGHTS';
+        END IF;
     END IF;
-  END IF;
 
-  RETURN QUERY SELECT * FROM public.get_org_members(v_user_id, get_org_members.guild_id);
+    RETURN QUERY
+    SELECT *
+    FROM public.get_org_members(v_user_id, get_org_members.guild_id);
 END;
 $$;
 
@@ -4141,52 +4172,76 @@ CREATE OR REPLACE FUNCTION "public"."get_org_members"("user_id" "uuid", "guild_i
     SET "search_path" TO ''
     AS $$
 DECLARE
-  v_user_id uuid;
-  v_is_service_role boolean;
+    v_user_id uuid;
+    v_is_service_role boolean;
 BEGIN
-  v_is_service_role := (
-    ((SELECT auth.jwt() ->> 'role') = 'service_role')
-    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
-  );
+    v_is_service_role := (
+        (SELECT auth.jwt() ->> 'role') = 'service_role'
+        OR (SELECT session_user) IS NOT DISTINCT FROM 'postgres'
+    );
 
-  IF NOT v_is_service_role THEN
-    v_user_id := public.get_identity('{read,upload,write,all}'::public.key_mode[]);
-    IF v_user_id IS NULL OR v_user_id IS DISTINCT FROM get_org_members.user_id THEN
-      PERFORM public.pg_log('deny: NO_RIGHTS', jsonb_build_object('guild_id', get_org_members.guild_id, 'uid', v_user_id, 'requested_uid', get_org_members.user_id));
-      RAISE EXCEPTION 'NO_RIGHTS';
+    IF NOT v_is_service_role THEN
+        v_user_id := public.get_identity(
+            '{read,upload,write,all}'::public.key_mode[]
+        );
+
+        IF v_user_id IS NULL
+            OR v_user_id IS DISTINCT FROM get_org_members.user_id THEN
+            PERFORM public.pg_log(
+                'deny: NO_RIGHTS',
+                jsonb_build_object(
+                    'guild_id', get_org_members.guild_id,
+                    'uid', v_user_id,
+                    'requested_uid', get_org_members.user_id
+                )
+            );
+            RAISE EXCEPTION 'NO_RIGHTS';
+        END IF;
+
+        IF NOT public.check_min_rights(
+            'read'::public.user_min_right,
+            v_user_id,
+            get_org_members.guild_id,
+            NULL::character varying,
+            NULL::bigint
+        ) THEN
+            PERFORM public.pg_log(
+                'deny: NO_RIGHTS',
+                jsonb_build_object(
+                    'guild_id', get_org_members.guild_id,
+                    'uid', v_user_id
+                )
+            );
+            RAISE EXCEPTION 'NO_RIGHTS';
+        END IF;
     END IF;
 
-    IF NOT public.check_min_rights(
-      'read'::public.user_min_right,
-      v_user_id,
-      get_org_members.guild_id,
-      NULL::character varying,
-      NULL::bigint
-    ) THEN
-      PERFORM public.pg_log('deny: NO_RIGHTS', jsonb_build_object('guild_id', get_org_members.guild_id, 'uid', v_user_id));
-      RAISE EXCEPTION 'NO_RIGHTS';
-    END IF;
-  END IF;
-
-  RETURN QUERY
+    RETURN QUERY
     -- Get existing org members
-    SELECT o.id AS aid, users.id AS uid, users.email, users.image_url, o.user_right AS role, false AS is_tmp
+    SELECT
+        o.id AS aid,
+        users.id AS uid,
+        users.email,
+        users.image_url,
+        o.user_right AS role,
+        false AS is_tmp
     FROM public.org_users o
     JOIN public.users ON users.id = o.user_id
     WHERE o.org_id = get_org_members.guild_id
-  UNION
+    UNION
     -- Get pending invitations from tmp_users
     SELECT
-      (-tmp.id)::bigint AS aid,
-      tmp.future_uuid AS uid,
-      tmp.email::varchar,
-      ''::varchar AS image_url,
-      public.transform_role_to_invite(tmp.role) AS role,
-      true AS is_tmp
+        (-tmp.id)::bigint AS aid,
+        tmp.future_uuid AS uid,
+        tmp.email::varchar,
+        ''::varchar AS image_url,
+        public.transform_role_to_invite(tmp.role) AS role,
+        true AS is_tmp
     FROM public.tmp_users tmp
     WHERE tmp.org_id = get_org_members.guild_id
-    AND tmp.cancelled_at IS NULL
-    AND GREATEST(tmp.updated_at, tmp.created_at) > (CURRENT_TIMESTAMP - INTERVAL '7 days');
+      AND tmp.cancelled_at IS NULL
+      AND GREATEST(tmp.updated_at, tmp.created_at)
+            > (CURRENT_TIMESTAMP - INTERVAL '7 days');
 END;
 $$;
 
@@ -4345,46 +4400,54 @@ CREATE OR REPLACE FUNCTION "public"."get_org_perm_for_apikey"("apikey" "text", "
     SET "search_path" TO ''
     AS $$
 <<get_org_perm_for_apikey>>
-Declare
+DECLARE
   apikey_user_id uuid;
   org_id uuid;
-  user_perm "public"."user_min_right";
+  api_key record;
 BEGIN
-  SELECT public.get_user_id(apikey) into apikey_user_id;
+  SELECT * FROM public.find_apikey_by_value(apikey) INTO api_key;
+  apikey_user_id := api_key.user_id;
 
   IF apikey_user_id IS NULL THEN
     PERFORM public.pg_log('deny: INVALID_APIKEY', jsonb_build_object('app_id', get_org_perm_for_apikey.app_id));
-    return 'INVALID_APIKEY';
+    RETURN 'INVALID_APIKEY';
   END IF;
 
-  SELECT owner_org FROM public.apps
+  SELECT owner_org
   INTO org_id
-  WHERE apps.app_id=get_org_perm_for_apikey.app_id
-  limit 1;
+  FROM public.apps
+  WHERE apps.app_id = get_org_perm_for_apikey.app_id
+  LIMIT 1;
 
   IF org_id IS NULL THEN
     PERFORM public.pg_log('deny: NO_APP', jsonb_build_object('app_id', get_org_perm_for_apikey.app_id));
-    return 'NO_APP';
+    RETURN 'NO_APP';
   END IF;
 
-  SELECT user_right FROM public.org_users
-  INTO user_perm
-  WHERE user_id=apikey_user_id
-  AND org_users.org_id=get_org_perm_for_apikey.org_id;
-
-  IF user_perm IS NULL THEN
-    PERFORM public.pg_log('deny: perm_none', jsonb_build_object('org_id', org_id, 'apikey_user_id', apikey_user_id));
-    return 'perm_none';
+  IF public.rbac_check_permission_direct(public.rbac_perm_app_transfer(), apikey_user_id, org_id, get_org_perm_for_apikey.app_id, NULL::bigint, apikey) THEN
+    RETURN 'perm_owner';
   END IF;
 
-  -- For compatibility reasons if you are a super_admin we will return "owner"
-  -- The old cli relies on this behaviour, on get_org_perm_for_apikey_v2 we will change that
-  IF user_perm='super_admin'::"public"."user_min_right" THEN
-    return 'perm_owner';
+  IF public.rbac_check_permission_direct(public.rbac_perm_app_delete(), apikey_user_id, org_id, get_org_perm_for_apikey.app_id, NULL::bigint, apikey) THEN
+    RETURN 'perm_admin';
   END IF;
 
-  RETURN format('perm_%s', user_perm);
-END;$$;
+  IF public.rbac_check_permission_direct(public.rbac_perm_app_update_settings(), apikey_user_id, org_id, get_org_perm_for_apikey.app_id, NULL::bigint, apikey) THEN
+    RETURN 'perm_write';
+  END IF;
+
+  IF public.rbac_check_permission_direct(public.rbac_perm_app_upload_bundle(), apikey_user_id, org_id, get_org_perm_for_apikey.app_id, NULL::bigint, apikey) THEN
+    RETURN 'perm_upload';
+  END IF;
+
+  IF public.rbac_check_permission_direct(public.rbac_perm_app_read(), apikey_user_id, org_id, get_org_perm_for_apikey.app_id, NULL::bigint, apikey) THEN
+    RETURN 'perm_read';
+  END IF;
+
+  PERFORM public.pg_log('deny: perm_none', jsonb_build_object('org_id', org_id, 'apikey_user_id', apikey_user_id));
+  RETURN 'perm_none';
+END;
+$$;
 
 
 ALTER FUNCTION "public"."get_org_perm_for_apikey"("apikey" "text", "app_id" "text") OWNER TO "postgres";
@@ -4643,7 +4706,7 @@ $$;
 ALTER FUNCTION "public"."get_orgs_v6"("userid" "uuid") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."get_orgs_v7"() RETURNS TABLE("gid" "uuid", "created_by" "uuid", "created_at" timestamp with time zone, "logo" "text", "name" "text", "role" character varying, "paying" boolean, "trial_left" integer, "can_use_more" boolean, "is_canceled" boolean, "app_count" bigint, "subscription_start" timestamp with time zone, "subscription_end" timestamp with time zone, "management_email" "text", "is_yearly" boolean, "stats_updated_at" timestamp without time zone, "next_stats_update_at" timestamp with time zone, "credit_available" numeric, "credit_total" numeric, "credit_next_expiration" timestamp with time zone, "enforcing_2fa" boolean, "2fa_has_access" boolean, "enforce_hashed_api_keys" boolean, "password_policy_config" "jsonb", "password_has_access" boolean, "require_apikey_expiration" boolean, "max_apikey_expiration_days" integer, "enforce_encrypted_bundles" boolean, "required_encryption_key" character varying, "use_new_rbac" boolean)
+CREATE OR REPLACE FUNCTION "public"."get_orgs_v7"() RETURNS TABLE("gid" "uuid", "created_by" "uuid", "created_at" timestamp with time zone, "logo" "text", "name" "text", "role" character varying, "paying" boolean, "trial_left" integer, "can_use_more" boolean, "is_canceled" boolean, "app_count" bigint, "subscription_start" timestamp with time zone, "subscription_end" timestamp with time zone, "management_email" "text", "is_yearly" boolean, "stats_updated_at" timestamp without time zone, "next_stats_update_at" timestamp with time zone, "credit_available" numeric, "credit_total" numeric, "credit_next_expiration" timestamp with time zone, "enforcing_2fa" boolean, "2fa_has_access" boolean, "enforce_hashed_api_keys" boolean, "password_policy_config" "jsonb", "password_has_access" boolean, "require_apikey_expiration" boolean, "max_apikey_expiration_days" integer, "enforce_encrypted_bundles" boolean, "required_encryption_key" character varying, "use_new_rbac" boolean, "sso_enabled" boolean)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
@@ -4663,7 +4726,6 @@ BEGIN
       RAISE EXCEPTION 'Invalid API key provided';
     END IF;
 
-    -- Check if API key is expired
     IF public.is_apikey_expired(api_key.expires_at) THEN
       PERFORM public.pg_log('deny: API_KEY_EXPIRED', jsonb_build_object('key_id', api_key.id));
       RAISE EXCEPTION 'API key has expired';
@@ -4697,7 +4759,7 @@ $$;
 ALTER FUNCTION "public"."get_orgs_v7"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."get_orgs_v7"("userid" "uuid") RETURNS TABLE("gid" "uuid", "created_by" "uuid", "created_at" timestamp with time zone, "logo" "text", "name" "text", "role" character varying, "paying" boolean, "trial_left" integer, "can_use_more" boolean, "is_canceled" boolean, "app_count" bigint, "subscription_start" timestamp with time zone, "subscription_end" timestamp with time zone, "management_email" "text", "is_yearly" boolean, "stats_updated_at" timestamp without time zone, "next_stats_update_at" timestamp with time zone, "credit_available" numeric, "credit_total" numeric, "credit_next_expiration" timestamp with time zone, "enforcing_2fa" boolean, "2fa_has_access" boolean, "enforce_hashed_api_keys" boolean, "password_policy_config" "jsonb", "password_has_access" boolean, "require_apikey_expiration" boolean, "max_apikey_expiration_days" integer, "enforce_encrypted_bundles" boolean, "required_encryption_key" character varying, "use_new_rbac" boolean)
+CREATE OR REPLACE FUNCTION "public"."get_orgs_v7"("userid" "uuid") RETURNS TABLE("gid" "uuid", "created_by" "uuid", "created_at" timestamp with time zone, "logo" "text", "name" "text", "role" character varying, "paying" boolean, "trial_left" integer, "can_use_more" boolean, "is_canceled" boolean, "app_count" bigint, "subscription_start" timestamp with time zone, "subscription_end" timestamp with time zone, "management_email" "text", "is_yearly" boolean, "stats_updated_at" timestamp without time zone, "next_stats_update_at" timestamp with time zone, "credit_available" numeric, "credit_total" numeric, "credit_next_expiration" timestamp with time zone, "enforcing_2fa" boolean, "2fa_has_access" boolean, "enforce_hashed_api_keys" boolean, "password_policy_config" "jsonb", "password_has_access" boolean, "require_apikey_expiration" boolean, "max_apikey_expiration_days" integer, "enforce_encrypted_bundles" boolean, "required_encryption_key" character varying, "use_new_rbac" boolean, "sso_enabled" boolean)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
@@ -4741,7 +4803,6 @@ BEGIN
     SELECT rbac_org_roles.org_id
     FROM rbac_org_roles
   ),
-  -- Compute next stats update info for all paying orgs at once
   paying_orgs_ordered AS (
     SELECT
       o.id,
@@ -4755,7 +4816,6 @@ BEGIN
       OR si.trial_at > NOW()
     )
   ),
-  -- Calculate current billing cycle for each org
   billing_cycles AS (
     SELECT
       o.id AS org_id,
@@ -4770,7 +4830,6 @@ BEGIN
     FROM public.orgs o
     LEFT JOIN public.stripe_info si ON o.customer_id = si.customer_id
   ),
-  -- Calculate 2FA access status for user/org combinations
   two_fa_access AS (
     SELECT
       o.id AS org_id,
@@ -4783,7 +4842,6 @@ BEGIN
     FROM public.orgs o
     JOIN user_orgs uo ON uo.org_id = o.id
   ),
-  -- Calculate password policy access status for user/org combinations
   password_policy_access AS (
     SELECT
       o.id AS org_id,
@@ -4872,7 +4930,8 @@ BEGIN
     o.max_apikey_expiration_days,
     o.enforce_encrypted_bundles,
     o.required_encryption_key,
-    o.use_new_rbac
+    o.use_new_rbac,
+    o.sso_enabled
   FROM public.orgs o
   JOIN user_orgs uo ON uo.org_id = o.id
   LEFT JOIN public.org_users ou ON ou.user_id = userid AND o.id = ou.org_id
@@ -5161,6 +5220,25 @@ $$;
 
 
 ALTER FUNCTION "public"."get_plan_usage_percent_detailed"("orgid" "uuid", "cycle_start" "date", "cycle_end" "date") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."get_sso_enforcement_by_domain"("p_domain" "text") RETURNS TABLE("org_id" "uuid", "enforce_sso" boolean)
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  SELECT
+    sp.org_id,
+    sp.enforce_sso
+  FROM "public"."sso_providers" sp
+  JOIN "public"."orgs" o ON o.id = sp.org_id
+  WHERE sp.domain = lower(btrim(p_domain))
+    AND sp.status = 'active'
+    AND o.sso_enabled = true
+  LIMIT 1;
+$$;
+
+
+ALTER FUNCTION "public"."get_sso_enforcement_by_domain"("p_domain" "text") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."get_total_app_storage_size_orgs"("org_id" "uuid", "app_id" character varying) RETURNS double precision
@@ -5932,7 +6010,7 @@ BEGIN
   INTO calling_user_id;
 
   -- Treat missing orgs as unauthorized to avoid org existence enumeration.
-  SELECT * INTO org FROM public.orgs WHERE public.orgs.id=invite_user_to_org.org_id;
+  SELECT * INTO org FROM public.orgs WHERE public.orgs.id = invite_user_to_org.org_id;
   IF org IS NULL OR calling_user_id IS NULL THEN
     RETURN 'NO_RIGHTS';
   END IF;
@@ -5954,14 +6032,9 @@ BEGIN
         JOIN public.roles r ON r.id = rb.role_id
         WHERE rb.principal_type = public.rbac_principal_user()
           AND rb.principal_id = calling_user_id
-          AND (
-            (rb.scope_type = public.rbac_scope_org()
-              AND rb.org_id = invite_user_to_org.org_id
-              AND r.name = public.rbac_role_org_super_admin())
-            OR
-            (rb.scope_type = public.rbac_scope_platform()
-              AND r.name = public.rbac_role_platform_super_admin())
-          )
+          AND rb.scope_type = public.rbac_scope_org()
+          AND rb.org_id = invite_user_to_org.org_id
+          AND r.name = public.rbac_role_org_super_admin()
       ) INTO v_is_super_admin;
 
       IF NOT v_is_super_admin THEN
@@ -5982,14 +6055,14 @@ BEGIN
   END IF;
 
   -- Check if user already exists.
-  SELECT public.users.id INTO invited_user FROM public.users WHERE public.users.email=invite_user_to_org.email;
+  SELECT public.users.id INTO invited_user FROM public.users WHERE public.users.email = invite_user_to_org.email;
 
   IF invited_user IS NOT NULL THEN
     -- User exists, check if already in org.
     SELECT public.org_users.id INTO current_record
     FROM public.org_users
-    WHERE public.org_users.user_id=invited_user.id
-    AND public.org_users.org_id=invite_user_to_org.org_id;
+    WHERE public.org_users.user_id = invited_user.id
+      AND public.org_users.org_id = invite_user_to_org.org_id;
 
     IF current_record IS NOT NULL THEN
       RETURN 'ALREADY_INVITED';
@@ -6003,8 +6076,8 @@ BEGIN
     -- User doesn't exist, check tmp_users for pending invitations.
     SELECT * INTO current_tmp_user
     FROM public.tmp_users
-    WHERE public.tmp_users.email=invite_user_to_org.email
-    AND public.tmp_users.org_id=invite_user_to_org.org_id;
+    WHERE public.tmp_users.email = invite_user_to_org.email
+      AND public.tmp_users.org_id = invite_user_to_org.org_id;
 
     IF current_tmp_user IS NOT NULL THEN
       -- Invitation already exists.
@@ -6047,6 +6120,7 @@ DECLARE
   legacy_right public.user_min_right;
   invite_right public.user_min_right;
   api_key_text text;
+  v_granted_by uuid;
 BEGIN
   SELECT * INTO org FROM public.orgs WHERE public.orgs.id = invite_user_to_org_rbac.org_id;
   IF org IS NULL THEN
@@ -6082,6 +6156,7 @@ BEGIN
 
   legacy_right := public.rbac_legacy_right_for_org_role(invite_user_to_org_rbac.role_name);
   invite_right := public.transform_role_to_invite(legacy_right);
+  v_granted_by := COALESCE(auth.uid(), (SELECT user_id FROM public.find_apikey_by_value(api_key_text) LIMIT 1));
 
   SELECT public.users.id INTO invited_user FROM public.users WHERE public.users.email = invite_user_to_org_rbac.email;
 
@@ -6096,6 +6171,15 @@ BEGIN
     ELSE
       INSERT INTO public.org_users (user_id, org_id, user_right, rbac_role_name)
       VALUES (invited_user.id, invite_user_to_org_rbac.org_id, invite_right, invite_user_to_org_rbac.role_name);
+
+      INSERT INTO public.role_bindings (
+        principal_type, principal_id, role_id, scope_type, org_id,
+        granted_by, granted_at, reason, is_direct
+      ) VALUES (
+        public.rbac_principal_user(), invited_user.id, role_id, public.rbac_scope_org(), invite_user_to_org_rbac.org_id,
+        COALESCE(v_granted_by, invited_user.id), now(), 'Invited via invite_user_to_org_rbac', true
+      ) ON CONFLICT DO NOTHING;
+
       RETURN 'OK';
     END IF;
   ELSE
@@ -6148,73 +6232,6 @@ $$;
 
 
 ALTER FUNCTION "public"."is_account_disabled"("user_id" "uuid") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."is_admin"() RETURNS boolean
-    LANGUAGE "plpgsql"
-    SET "search_path" TO ''
-    AS $$
-BEGIN
-    RETURN public.is_admin((SELECT auth.uid()));
-END;
-$$;
-
-
-ALTER FUNCTION "public"."is_admin"() OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."is_admin"("userid" "uuid") RETURNS boolean
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
-DECLARE
-  admin_ids_jsonb jsonb;
-  is_admin_legacy boolean := false;
-  mfa_verified boolean;
-  rbac_enabled boolean;
-  has_platform_admin boolean := false;
-BEGIN
-  -- Always check MFA first
-  SELECT public.verify_mfa() INTO mfa_verified;
-  IF NOT mfa_verified THEN
-    RETURN false;
-  END IF;
-
-  -- Always check legacy vault list (for bootstrapping and backward compatibility)
-  SELECT decrypted_secret::jsonb INTO admin_ids_jsonb
-  FROM vault.decrypted_secrets WHERE name = 'admin_users';
-  is_admin_legacy := (admin_ids_jsonb ? userid::text);
-
-  -- Check if RBAC is enabled globally
-  SELECT use_new_rbac INTO rbac_enabled FROM public.rbac_settings WHERE id = 1;
-
-  IF COALESCE(rbac_enabled, false) THEN
-    -- RBAC mode: also check for platform_super_admin role binding
-    SELECT EXISTS (
-      SELECT 1
-      FROM public.role_bindings rb
-      JOIN public.roles r ON r.id = rb.role_id
-      WHERE rb.principal_type = public.rbac_principal_user()
-        AND rb.principal_id = userid
-        AND rb.scope_type = public.rbac_scope_platform()
-        AND r.name = public.rbac_role_platform_super_admin()
-    ) INTO has_platform_admin;
-
-    -- In RBAC mode: admin if EITHER in vault list OR has platform role
-    RETURN is_admin_legacy OR has_platform_admin;
-  ELSE
-    -- Legacy mode: only use vault secret list
-    RETURN is_admin_legacy;
-  END IF;
-END;
-$$;
-
-
-ALTER FUNCTION "public"."is_admin"("userid" "uuid") OWNER TO "postgres";
-
-
-COMMENT ON FUNCTION "public"."is_admin"("userid" "uuid") IS 'Check if user is platform admin. In RBAC mode: checks vault list OR platform_super_admin role (allows bootstrapping). In legacy mode: only checks vault list. Always requires MFA.';
-
 
 
 CREATE OR REPLACE FUNCTION "public"."is_allowed_action"("apikey" "text", "appid" "text") RETURNS boolean
@@ -6696,7 +6713,52 @@ $$;
 ALTER FUNCTION "public"."is_paying_org"("orgid" "uuid") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."is_recent_email_otp_verified"("user_id" "uuid") RETURNS boolean
+CREATE OR REPLACE FUNCTION "public"."is_platform_admin"() RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+  RETURN public.is_platform_admin((SELECT auth.uid()));
+END;
+$$;
+
+
+ALTER FUNCTION "public"."is_platform_admin"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."is_platform_admin"("userid" "uuid") RETURNS boolean
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  admin_ids_jsonb jsonb;
+  is_platform_admin_from_secret boolean;
+  mfa_verified boolean;
+BEGIN
+  SELECT public.verify_mfa() INTO mfa_verified;
+  IF NOT mfa_verified THEN
+    RETURN false;
+  END IF;
+
+  SELECT decrypted_secret::jsonb INTO admin_ids_jsonb
+  FROM vault.decrypted_secrets
+  WHERE name = 'admin_users';
+
+  is_platform_admin_from_secret := COALESCE(admin_ids_jsonb ? userid::text, false);
+
+  RETURN is_platform_admin_from_secret;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."is_platform_admin"("userid" "uuid") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."is_platform_admin"("userid" "uuid") IS 'Checks platform admin status from admin_users and requires MFA.';
+
+
+
+CREATE OR REPLACE FUNCTION "public"."is_recent_email_otp_verified"("p_user_id" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" STABLE
     SET "search_path" TO ''
     AS $$
@@ -6706,14 +6768,15 @@ BEGIN
     SELECT public.user_security.email_otp_verified_at
     INTO verified_at
     FROM public.user_security
-    WHERE public.user_security.user_id = is_recent_email_otp_verified.user_id;
+    WHERE public.user_security.user_id = p_user_id;
 
-    RETURN verified_at IS NOT NULL AND verified_at > (NOW() - interval '1 hour');
+    RETURN verified_at IS NOT NULL
+        AND verified_at > (NOW() - INTERVAL '1 hour');
 END;
 $$;
 
 
-ALTER FUNCTION "public"."is_recent_email_otp_verified"("user_id" "uuid") OWNER TO "postgres";
+ALTER FUNCTION "public"."is_recent_email_otp_verified"("p_user_id" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."is_storage_exceeded_by_org"("org_id" "uuid") RETURNS boolean
@@ -6753,7 +6816,6 @@ CREATE OR REPLACE FUNCTION "public"."is_user_app_admin"("p_user_id" "uuid", "p_a
 DECLARE
   v_org_id uuid;
 BEGIN
-  -- Get the org that owns the app
   SELECT owner_org INTO v_org_id
   FROM public.apps
   WHERE id = p_app_id
@@ -6763,7 +6825,6 @@ BEGIN
     RETURN false;
   END IF;
 
-  -- Check for app-scoped admin roles OR org-scoped admin roles (inheritance)
   RETURN EXISTS (
     SELECT 1
     FROM public.role_bindings rb
@@ -6771,13 +6832,10 @@ BEGIN
     WHERE rb.principal_type = public.rbac_principal_user()
       AND rb.principal_id = p_user_id
       AND (
-        -- App-scoped bindings
         (rb.scope_type = public.rbac_scope_app() AND rb.app_id = p_app_id)
-        OR
-        -- Org-scoped bindings (inherit org admin to app)
-        (rb.scope_type = public.rbac_scope_org() AND rb.org_id = v_org_id)
+        OR (rb.scope_type = public.rbac_scope_org() AND rb.org_id = v_org_id)
       )
-      AND r.name IN (public.rbac_role_app_admin(), public.rbac_role_org_super_admin(), public.rbac_role_org_admin(), public.rbac_role_platform_super_admin())
+      AND r.name IN (public.rbac_role_app_admin(), public.rbac_role_org_super_admin(), public.rbac_role_org_admin())
   );
 END;
 $$;
@@ -6802,7 +6860,7 @@ CREATE OR REPLACE FUNCTION "public"."is_user_org_admin"("p_user_id" "uuid", "p_o
       AND rb.principal_id = p_user_id
       AND rb.org_id = p_org_id
       AND rb.scope_type = public.rbac_scope_org()
-      AND r.name IN (public.rbac_role_platform_super_admin(), public.rbac_role_org_super_admin(), public.rbac_role_org_admin())
+      AND r.name IN (public.rbac_role_org_super_admin(), public.rbac_role_org_admin())
   );
 $$;
 
@@ -6887,6 +6945,20 @@ $$;
 
 
 ALTER FUNCTION "public"."modify_permissions_tmp"("email" "text", "org_id" "uuid", "new_role" "public"."user_min_right") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."normalize_sso_provider_domain"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+  NEW.domain := lower(btrim(NEW.domain));
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."normalize_sso_provider_domain"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."noupdate"() RETURNS "trigger"
@@ -7942,16 +8014,16 @@ BEGIN
   v_use_rbac := public.rbac_is_enabled_for_org(v_effective_org_id);
 
   IF v_use_rbac THEN
-    -- RBAC path: Check user permission directly
-    IF p_user_id IS NOT NULL THEN
-      v_allowed := public.rbac_has_permission(public.rbac_principal_user(), p_user_id, p_permission_key, v_effective_org_id, p_app_id, p_channel_id);
+    -- RBAC path: Check user permission directly (use v_effective_user_id, NOT p_user_id)
+    IF v_effective_user_id IS NOT NULL THEN
+      v_allowed := public.rbac_has_permission(public.rbac_principal_user(), v_effective_user_id, p_permission_key, v_effective_org_id, p_app_id, p_channel_id);
 
       IF v_channel_scope THEN
         -- Direct user override
         SELECT o.is_allowed INTO v_override
         FROM public.channel_permission_overrides o
         WHERE o.principal_type = public.rbac_principal_user()
-          AND o.principal_id = p_user_id
+          AND o.principal_id = v_effective_user_id
           AND o.channel_id = p_channel_id
           AND o.permission_key = p_permission_key
         LIMIT 1;
@@ -7963,7 +8035,7 @@ BEGIN
           IF EXISTS (
             SELECT 1
             FROM public.channel_permission_overrides o
-            JOIN public.group_members gm ON gm.group_id = o.principal_id AND gm.user_id = p_user_id
+            JOIN public.group_members gm ON gm.group_id = o.principal_id AND gm.user_id = v_effective_user_id
             JOIN public.groups g ON g.id = gm.group_id
             WHERE o.principal_type = public.rbac_principal_group()
               AND o.channel_id = p_channel_id
@@ -7975,7 +8047,7 @@ BEGIN
           ELSIF EXISTS (
             SELECT 1
             FROM public.channel_permission_overrides o
-            JOIN public.group_members gm ON gm.group_id = o.principal_id AND gm.user_id = p_user_id
+            JOIN public.group_members gm ON gm.group_id = o.principal_id AND gm.user_id = v_effective_user_id
             JOIN public.groups g ON g.id = gm.group_id
             WHERE o.principal_type = public.rbac_principal_group()
               AND o.channel_id = p_channel_id
@@ -7990,7 +8062,6 @@ BEGIN
     END IF;
 
     -- If user doesn't have permission, check apikey permission
-    -- Use find_apikey_by_value to support both plain-text and hashed keys
     IF NOT v_allowed AND p_apikey IS NOT NULL THEN
       SELECT rbac_id INTO v_apikey_principal
       FROM public.find_apikey_by_value(p_apikey)
@@ -8018,7 +8089,7 @@ BEGIN
     IF NOT v_allowed THEN
       PERFORM public.pg_log('deny: RBAC_CHECK_PERM_DIRECT', jsonb_build_object(
         'permission', p_permission_key,
-        'user_id', p_user_id,
+        'user_id', v_effective_user_id,
         'org_id', v_effective_org_id,
         'app_id', p_app_id,
         'channel_id', p_channel_id,
@@ -8256,6 +8327,7 @@ CREATE OR REPLACE FUNCTION "public"."rbac_has_permission"("p_principal_type" "te
 DECLARE
   v_org_id uuid := p_org_id;
   v_app_uuid uuid;
+  v_app_owner_org uuid;
   v_channel_uuid uuid;
   v_channel_app_id text;
   v_channel_org_id uuid;
@@ -8265,12 +8337,16 @@ BEGIN
     RETURN false;
   END IF;
 
-  -- Resolve scope identifiers to UUIDs
+  -- Resolve scope identifiers to UUIDs. Preserve the caller org when the app does not exist yet.
   IF p_app_id IS NOT NULL THEN
-    SELECT id, owner_org INTO v_app_uuid, v_org_id
+    SELECT id, owner_org INTO v_app_uuid, v_app_owner_org
     FROM public.apps
     WHERE app_id = p_app_id
     LIMIT 1;
+
+    IF v_app_owner_org IS NOT NULL THEN
+      v_org_id := v_app_owner_org;
+    END IF;
   END IF;
 
   IF p_channel_id IS NOT NULL THEN
@@ -8290,9 +8366,7 @@ BEGIN
   END IF;
 
   WITH RECURSIVE scope_catalog AS (
-    SELECT public.rbac_scope_platform()::text AS scope_type, NULL::uuid AS org_id, NULL::uuid AS app_id, NULL::uuid AS channel_id
-    UNION ALL
-    SELECT public.rbac_scope_org(), v_org_id, NULL::uuid, NULL::uuid WHERE v_org_id IS NOT NULL
+    SELECT public.rbac_scope_org()::text AS scope_type, v_org_id AS org_id, NULL::uuid AS app_id, NULL::uuid AS channel_id WHERE v_org_id IS NOT NULL
     UNION ALL
     SELECT public.rbac_scope_app(), v_org_id, v_app_uuid, NULL::uuid WHERE v_app_uuid IS NOT NULL
     UNION ALL
@@ -8303,7 +8377,6 @@ BEGIN
     FROM scope_catalog s
     JOIN public.role_bindings rb ON rb.scope_type = s.scope_type
       AND (
-        (rb.scope_type = public.rbac_scope_platform()) OR
         (rb.scope_type = public.rbac_scope_org() AND rb.org_id = s.org_id) OR
         (rb.scope_type = public.rbac_scope_app() AND rb.app_id = s.app_id) OR
         (rb.scope_type = public.rbac_scope_channel() AND rb.channel_id = s.channel_id)
@@ -10216,7 +10289,7 @@ BEGIN
     build_time_exceeded = EXCLUDED.build_time_exceeded,
     updated_at = NOW();
 
-  INSERT INTO public.orgs (id, created_by, created_at, updated_at, logo, name, management_email, customer_id)
+  INSERT INTO public.orgs (id, created_by, created_at, updated_at, logo, name, management_email, customer_id, use_new_rbac)
   VALUES (
     org_id,
     user_id,
@@ -10225,7 +10298,8 @@ BEGIN
     '',
     org_name,
     'test@capgo.app',
-    stripe_customer_id
+    stripe_customer_id,
+    false
   )
   ON CONFLICT (id) DO UPDATE SET
     customer_id = EXCLUDED.customer_id,
@@ -10604,22 +10678,22 @@ BEGIN
     ALTER TABLE public.users ENABLE TRIGGER generate_org_on_user_create;
 
     ALTER TABLE public.orgs DISABLE TRIGGER generate_org_user_stripe_info_on_org_create;
-    INSERT INTO "public"."orgs" ("id", "created_by", "created_at", "updated_at", "logo", "name", "management_email", "customer_id") VALUES
-    ('22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', NOW(), NOW(), '', 'Admin org', 'admin@capgo.app', 'cus_Pa0k8TO6HVln6A'),
-    ('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', NOW(), NOW(), '', 'Demo org', 'test@capgo.app', 'cus_Q38uE91NP8Ufqc'),
-    ('34a8c55d-2d0f-4652-a43f-684c7a9403ac', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', NOW(), NOW(), '', 'Test2 org', 'test2@capgo.app', 'cus_Pa0f3M6UCQ8g5Q'),
-    ('a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', NOW(), NOW(), '', 'Non-Owner Org', 'test2@capgo.app', 'cus_NonOwner'),
-    ('b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d', NOW(), NOW(), '', 'Stats Test Org', 'stats@capgo.app', 'cus_StatsTest'),
-    ('c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f', '8b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e', NOW(), NOW(), '', 'RLS Test Org', 'rls@capgo.app', 'cus_RLSTest'),
-    ('d5e6f7a8-b9c0-4d1e-8f2a-3b4c5d6e7f80', '8b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e', NOW(), NOW(), '', 'RLS 2FA Test Org', 'rls@capgo.app', 'cus_2fa_rls_test_123'),
-    ('f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f7a8b92', 'e5f6a7b8-c9d0-4e1f-8a2b-3c4d5e6f7a81', NOW(), NOW(), '', 'CLI Hashed Test Org', 'cli_hashed@capgo.app', 'cus_cli_hashed_test_123'),
-    ('a7b8c9d0-e1f2-4a3b-9c4d-5e6f7a8b9ca4', 'f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f708193', NOW(), NOW(), '', 'Encrypted Test Org', 'encrypted@capgo.app', 'cus_encrypted_test_123'),
-    ('aa1b2c3d-4e5f-4a60-9b7c-1d2e3f4a5061', '9f1a2b3c-4d5e-4f60-8a7b-1c2d3e4f5061', NOW(), NOW(), '', 'Email Prefs Test Org', 'emailprefs@capgo.app', 'cus_email_prefs_test_123'),
-    ('b1c2d3e4-f5a6-4b70-8c9d-0e1f2a3b4c5d', '6aa76066-55ef-4238-ade6-0b32334a4097', NOW(), NOW(), '', 'Cron App Test Org', 'test@capgo.app', 'cus_cron_app_test_123'),
-    ('c2d3e4f5-a6b7-4c80-9d0e-1f2a3b4c5d6e', '6aa76066-55ef-4238-ade6-0b32334a4097', NOW(), NOW(), '', 'Cron Integration Test Org', 'test@capgo.app', 'cus_cron_integration_test_123'),
-    ('d3e4f5a6-b7c8-4d90-8e1f-2a3b4c5d6e7f', '6aa76066-55ef-4238-ade6-0b32334a4097', NOW(), NOW(), '', 'Cron Queue Test Org', 'test@capgo.app', 'cus_cron_queue_test_123'),
-    ('e4f5a6b7-c8d9-4ea0-9f1a-2b3c4d5e6f70', '6aa76066-55ef-4238-ade6-0b32334a4097', NOW(), NOW(), '', 'Overage Test Org', 'test@capgo.app', 'cus_overage_test_123'),
-    ('e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a82', '6aa76066-55ef-4238-ade6-0b32334a4097', NOW(), NOW(), '', 'Private Error Test Org', 'test@capgo.app', NULL);
+    INSERT INTO "public"."orgs" ("id", "created_by", "created_at", "updated_at", "logo", "name", "management_email", "customer_id", "use_new_rbac") VALUES
+    ('22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'c591b04e-cf29-4945-b9a0-776d0672061a', NOW(), NOW(), '', 'Admin org', 'admin@capgo.app', 'cus_Pa0k8TO6HVln6A', false),
+    ('046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', NOW(), NOW(), '', 'Demo org', 'test@capgo.app', 'cus_Q38uE91NP8Ufqc', false),
+    ('34a8c55d-2d0f-4652-a43f-684c7a9403ac', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', NOW(), NOW(), '', 'Test2 org', 'test2@capgo.app', 'cus_Pa0f3M6UCQ8g5Q', false),
+    ('a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d', '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5', NOW(), NOW(), '', 'Non-Owner Org', 'test2@capgo.app', 'cus_NonOwner', false),
+    ('b2c3d4e5-f6a7-4b8c-9d0e-1f2a3b4c5d6e', '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d', NOW(), NOW(), '', 'Stats Test Org', 'stats@capgo.app', 'cus_StatsTest', false),
+    ('c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f', '8b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e', NOW(), NOW(), '', 'RLS Test Org', 'rls@capgo.app', 'cus_RLSTest', false),
+    ('d5e6f7a8-b9c0-4d1e-8f2a-3b4c5d6e7f80', '8b2c3d4e-5f6a-4b7c-8d9e-0f1a2b3c4d5e', NOW(), NOW(), '', 'RLS 2FA Test Org', 'rls@capgo.app', 'cus_2fa_rls_test_123', false),
+    ('f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f7a8b92', 'e5f6a7b8-c9d0-4e1f-8a2b-3c4d5e6f7a81', NOW(), NOW(), '', 'CLI Hashed Test Org', 'cli_hashed@capgo.app', 'cus_cli_hashed_test_123', false),
+    ('a7b8c9d0-e1f2-4a3b-9c4d-5e6f7a8b9ca4', 'f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f708193', NOW(), NOW(), '', 'Encrypted Test Org', 'encrypted@capgo.app', 'cus_encrypted_test_123', false),
+    ('aa1b2c3d-4e5f-4a60-9b7c-1d2e3f4a5061', '9f1a2b3c-4d5e-4f60-8a7b-1c2d3e4f5061', NOW(), NOW(), '', 'Email Prefs Test Org', 'emailprefs@capgo.app', 'cus_email_prefs_test_123', false),
+    ('b1c2d3e4-f5a6-4b70-8c9d-0e1f2a3b4c5d', '6aa76066-55ef-4238-ade6-0b32334a4097', NOW(), NOW(), '', 'Cron App Test Org', 'test@capgo.app', 'cus_cron_app_test_123', false),
+    ('c2d3e4f5-a6b7-4c80-9d0e-1f2a3b4c5d6e', '6aa76066-55ef-4238-ade6-0b32334a4097', NOW(), NOW(), '', 'Cron Integration Test Org', 'test@capgo.app', 'cus_cron_integration_test_123', false),
+    ('d3e4f5a6-b7c8-4d90-8e1f-2a3b4c5d6e7f', '6aa76066-55ef-4238-ade6-0b32334a4097', NOW(), NOW(), '', 'Cron Queue Test Org', 'test@capgo.app', 'cus_cron_queue_test_123', false),
+    ('e4f5a6b7-c8d9-4ea0-9f1a-2b3c4d5e6f70', '6aa76066-55ef-4238-ade6-0b32334a4097', NOW(), NOW(), '', 'Overage Test Org', 'test@capgo.app', 'cus_overage_test_123', false),
+    ('e5f6a7b8-c9d0-4e1f-9a2b-3c4d5e6f7a82', '6aa76066-55ef-4238-ade6-0b32334a4097', NOW(), NOW(), '', 'Private Error Test Org', 'test@capgo.app', NULL, false);
     ALTER TABLE public.orgs ENABLE TRIGGER generate_org_user_stripe_info_on_org_create;
 
     UPDATE public.orgs SET use_new_rbac = true WHERE id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8';
@@ -11134,6 +11208,177 @@ $$;
 ALTER FUNCTION "public"."reset_app_stats_data"("p_app_id" character varying) OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."resync_org_user_role_bindings"("p_user_id" "uuid", "p_org_id" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_org_user "public"."org_users"%ROWTYPE;
+  role_name_to_bind text;
+  role_id_to_bind uuid;
+  org_member_role_id uuid;
+  app_role_name text;
+  app_role_id uuid;
+  v_app RECORD;
+  v_app_uuid uuid;
+  v_channel_uuid uuid;
+  v_granted_by uuid;
+  v_sync_reason text := 'Synced from org_users';
+BEGIN
+  DELETE FROM "public"."role_bindings"
+  WHERE "principal_type" = "public"."rbac_principal_user"()
+    AND "principal_id" = p_user_id
+    AND "org_id" = p_org_id
+    AND "reason" IN (
+      'Synced from org_users',
+      'Updated from org_users',
+      'Migrated from org_users (legacy)'
+    );
+
+  FOR v_org_user IN
+    SELECT *
+    FROM "public"."org_users"
+    WHERE "user_id" = p_user_id
+      AND "org_id" = p_org_id
+  LOOP
+    v_granted_by := COALESCE("auth"."uid"(), v_org_user.user_id);
+
+    IF v_org_user.app_id IS NULL AND v_org_user.channel_id IS NULL THEN
+      IF v_org_user.user_right IN ("public"."rbac_right_super_admin"(), "public"."rbac_right_admin"()) THEN
+        CASE v_org_user.user_right
+          WHEN "public"."rbac_right_super_admin"() THEN role_name_to_bind := "public"."rbac_role_org_super_admin"();
+          WHEN "public"."rbac_right_admin"() THEN role_name_to_bind := "public"."rbac_role_org_admin"();
+        END CASE;
+
+        SELECT id INTO role_id_to_bind
+        FROM "public"."roles"
+        WHERE "name" = role_name_to_bind
+        LIMIT 1;
+
+        IF role_id_to_bind IS NOT NULL THEN
+          INSERT INTO "public"."role_bindings" (
+            "principal_type", "principal_id", "role_id", "scope_type", "org_id",
+            "granted_by", "granted_at", "reason", "is_direct"
+          ) VALUES (
+            "public"."rbac_principal_user"(), v_org_user.user_id, role_id_to_bind, "public"."rbac_scope_org"(), v_org_user.org_id,
+            v_granted_by, now(), v_sync_reason, true
+          ) ON CONFLICT DO NOTHING;
+        END IF;
+      ELSIF v_org_user.user_right IN ("public"."rbac_right_read"(), "public"."rbac_right_upload"(), "public"."rbac_right_write"()) THEN
+        SELECT id INTO org_member_role_id
+        FROM "public"."roles"
+        WHERE "name" = "public"."rbac_role_org_member"()
+        LIMIT 1;
+
+        IF org_member_role_id IS NOT NULL THEN
+          INSERT INTO "public"."role_bindings" (
+            "principal_type", "principal_id", "role_id", "scope_type", "org_id",
+            "granted_by", "granted_at", "reason", "is_direct"
+          ) VALUES (
+            "public"."rbac_principal_user"(), v_org_user.user_id, org_member_role_id, "public"."rbac_scope_org"(), v_org_user.org_id,
+            v_granted_by, now(), v_sync_reason, true
+          ) ON CONFLICT DO NOTHING;
+        END IF;
+
+        CASE v_org_user.user_right
+          WHEN "public"."rbac_right_read"() THEN app_role_name := "public"."rbac_role_app_reader"();
+          WHEN "public"."rbac_right_upload"() THEN app_role_name := "public"."rbac_role_app_uploader"();
+          WHEN "public"."rbac_right_write"() THEN app_role_name := "public"."rbac_role_app_developer"();
+        END CASE;
+
+        SELECT id INTO app_role_id
+        FROM "public"."roles"
+        WHERE "name" = app_role_name
+        LIMIT 1;
+
+        IF app_role_id IS NOT NULL THEN
+          FOR v_app IN
+            SELECT id
+            FROM "public"."apps"
+            WHERE "owner_org" = v_org_user.org_id
+          LOOP
+            INSERT INTO "public"."role_bindings" (
+              "principal_type", "principal_id", "role_id", "scope_type", "org_id", "app_id",
+              "granted_by", "granted_at", "reason", "is_direct"
+            ) VALUES (
+              "public"."rbac_principal_user"(), v_org_user.user_id, app_role_id, "public"."rbac_scope_app"(), v_org_user.org_id, v_app.id,
+              v_granted_by, now(), v_sync_reason, true
+            ) ON CONFLICT DO NOTHING;
+          END LOOP;
+        END IF;
+      END IF;
+    ELSIF v_org_user.app_id IS NOT NULL AND v_org_user.channel_id IS NULL THEN
+      CASE v_org_user.user_right
+        WHEN "public"."rbac_right_super_admin"() THEN role_name_to_bind := "public"."rbac_role_app_admin"();
+        WHEN "public"."rbac_right_admin"() THEN role_name_to_bind := "public"."rbac_role_app_admin"();
+        WHEN "public"."rbac_right_write"() THEN role_name_to_bind := "public"."rbac_role_app_developer"();
+        WHEN "public"."rbac_right_upload"() THEN role_name_to_bind := "public"."rbac_role_app_uploader"();
+        WHEN "public"."rbac_right_read"() THEN role_name_to_bind := "public"."rbac_role_app_reader"();
+        ELSE role_name_to_bind := "public"."rbac_role_app_reader"();
+      END CASE;
+
+      SELECT id INTO role_id_to_bind
+      FROM "public"."roles"
+      WHERE "name" = role_name_to_bind
+      LIMIT 1;
+
+      SELECT id INTO v_app_uuid
+      FROM "public"."apps"
+      WHERE "app_id" = v_org_user.app_id
+      LIMIT 1;
+
+      IF role_id_to_bind IS NOT NULL AND v_app_uuid IS NOT NULL THEN
+        INSERT INTO "public"."role_bindings" (
+          "principal_type", "principal_id", "role_id", "scope_type", "org_id", "app_id",
+          "granted_by", "granted_at", "reason", "is_direct"
+        ) VALUES (
+          "public"."rbac_principal_user"(), v_org_user.user_id, role_id_to_bind, "public"."rbac_scope_app"(), v_org_user.org_id, v_app_uuid,
+          v_granted_by, now(), v_sync_reason, true
+        ) ON CONFLICT DO NOTHING;
+      END IF;
+    ELSIF v_org_user.app_id IS NOT NULL AND v_org_user.channel_id IS NOT NULL THEN
+      CASE v_org_user.user_right
+        WHEN "public"."rbac_right_super_admin"() THEN role_name_to_bind := "public"."rbac_role_channel_admin"();
+        WHEN "public"."rbac_right_admin"() THEN role_name_to_bind := "public"."rbac_role_channel_admin"();
+        WHEN "public"."rbac_right_write"() THEN role_name_to_bind := 'channel_developer';
+        WHEN "public"."rbac_right_upload"() THEN role_name_to_bind := 'channel_uploader';
+        WHEN "public"."rbac_right_read"() THEN role_name_to_bind := "public"."rbac_role_channel_reader"();
+        ELSE role_name_to_bind := "public"."rbac_role_channel_reader"();
+      END CASE;
+
+      SELECT id INTO role_id_to_bind
+      FROM "public"."roles"
+      WHERE "name" = role_name_to_bind
+      LIMIT 1;
+
+      SELECT id INTO v_app_uuid
+      FROM "public"."apps"
+      WHERE "app_id" = v_org_user.app_id
+      LIMIT 1;
+
+      SELECT "rbac_id" INTO v_channel_uuid
+      FROM "public"."channels"
+      WHERE "id" = v_org_user.channel_id
+      LIMIT 1;
+
+      IF role_id_to_bind IS NOT NULL AND v_app_uuid IS NOT NULL AND v_channel_uuid IS NOT NULL THEN
+        INSERT INTO "public"."role_bindings" (
+          "principal_type", "principal_id", "role_id", "scope_type", "org_id", "app_id", "channel_id",
+          "granted_by", "granted_at", "reason", "is_direct"
+        ) VALUES (
+          "public"."rbac_principal_user"(), v_org_user.user_id, role_id_to_bind, "public"."rbac_scope_channel"(), v_org_user.org_id, v_app_uuid, v_channel_uuid,
+          v_granted_by, now(), v_sync_reason, true
+        ) ON CONFLICT DO NOTHING;
+      END IF;
+    END IF;
+  END LOOP;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."resync_org_user_role_bindings"("p_user_id" "uuid", "p_org_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."sanitize_apps_text_fields"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -11516,6 +11761,20 @@ $$;
 
 
 ALTER FUNCTION "public"."sync_org_has_usage_credits_from_grants"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."sync_org_user_role_binding_on_delete"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+  PERFORM "public"."resync_org_user_role_bindings"(OLD.user_id, OLD.org_id);
+  RETURN OLD;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."sync_org_user_role_binding_on_delete"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."sync_org_user_role_binding_on_update"() RETURNS "trigger"
@@ -12475,6 +12734,20 @@ COMMENT ON FUNCTION "public"."update_org_member_role"("p_org_id" "uuid", "p_user
 
 
 
+CREATE OR REPLACE FUNCTION "public"."update_sso_providers_updated_at"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."update_sso_providers_updated_at"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."update_tmp_invite_role_rbac"("p_org_id" "uuid", "p_email" "text", "p_new_role_name" "text") RETURNS "text"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -12785,239 +13058,6 @@ $$;
 
 
 ALTER FUNCTION "public"."verify_mfa"() OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "test_overrides"."now"() RETURNS timestamp with time zone
-    LANGUAGE "plpgsql"
-    AS $$
-BEGIN
-
-
-    -- check if a frozen time is set
-    IF nullif(current_setting('tests.frozen_time'), '') IS NOT NULL THEN
-        RETURN current_setting('tests.frozen_time')::timestamptz;
-    END IF;
-
-    RETURN pg_catalog.NOW();
-END
-$$;
-
-
-ALTER FUNCTION "test_overrides"."now"() OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "tests"."authenticate_as"("identifier" "text") RETURNS "void"
-    LANGUAGE "plpgsql"
-    AS $$
-        DECLARE
-                user_data json;
-                original_auth_data text;
-        BEGIN
-            -- store the request.jwt.claims in a variable in case we need it
-            original_auth_data := current_setting('request.jwt.claims', true);
-            user_data := tests.get_supabase_user(identifier);
-
-            if user_data is null OR user_data ->> 'id' IS NULL then
-                RAISE EXCEPTION 'User with identifier % not found', identifier;
-            end if;
-
-
-            perform set_config('role', 'authenticated', true);
-            perform set_config('request.jwt.claim.role', 'authenticated', true);
-            perform set_config('request.jwt.claim.email', user_data ->> 'email', true);
-            perform set_config('request.jwt.claims', json_build_object(
-                'sub', user_data ->> 'id',
-                'email', user_data ->> 'email',
-                'phone', user_data ->> 'phone',
-                'user_metadata', user_data -> 'raw_user_meta_data',
-                'app_metadata', user_data -> 'raw_app_meta_data'
-            )::text, true);
-
-        EXCEPTION
-            -- revert back to original auth data
-            WHEN OTHERS THEN
-                set local role authenticated;
-                set local "request.jwt.claims" to original_auth_data;
-                RAISE;
-        END
-    $$;
-
-
-ALTER FUNCTION "tests"."authenticate_as"("identifier" "text") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "tests"."authenticate_as_service_role"() RETURNS "void"
-    LANGUAGE "plpgsql"
-    AS $$
-        BEGIN
-            perform set_config('role', 'service_role', true);
-            perform set_config('request.jwt.claims', null, true);
-        END
-    $$;
-
-
-ALTER FUNCTION "tests"."authenticate_as_service_role"() OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "tests"."clear_authentication"() RETURNS "void"
-    LANGUAGE "plpgsql"
-    AS $$
-BEGIN
-    perform set_config('role', 'anon', true);
-    perform set_config('request.jwt.claims', null, true);
-    perform set_config('request.jwt.claim.role', null, true);
-    perform set_config('request.jwt.claim.email', null, true);
-END
-$$;
-
-
-ALTER FUNCTION "tests"."clear_authentication"() OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "tests"."create_supabase_user"("identifier" "text", "email" "text" DEFAULT NULL::"text", "phone" "text" DEFAULT NULL::"text", "metadata" "jsonb" DEFAULT NULL::"jsonb") RETURNS "uuid"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'auth', 'pg_temp'
-    AS $$
-DECLARE
-    user_id uuid;
-BEGIN
-
-    -- create the user
-    user_id := gen_random_uuid();
-    INSERT INTO auth.users (id, email, phone, raw_user_meta_data, raw_app_meta_data, created_at, updated_at)
-    VALUES (user_id, coalesce(email, concat(user_id, '@test.com')), phone, jsonb_build_object('test_identifier', identifier) || coalesce(metadata, '{}'::jsonb), '{}'::jsonb, NOW(), NOW())
-    RETURNING id INTO user_id;
-
-    RETURN user_id;
-END;
-$$;
-
-
-ALTER FUNCTION "tests"."create_supabase_user"("identifier" "text", "email" "text", "phone" "text", "metadata" "jsonb") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "tests"."freeze_time"("frozen_time" timestamp with time zone) RETURNS "void"
-    LANGUAGE "plpgsql"
-    AS $$
-BEGIN
-
-    -- Add test_overrides to search path if needed
-    IF current_setting('search_path') NOT LIKE 'test_overrides,%' THEN
-        -- store search path for later
-        PERFORM set_config('tests.original_search_path', current_setting('search_path'), true);
-        
-        -- add tests schema to start of search path
-        PERFORM set_config('search_path', 'test_overrides,' || current_setting('tests.original_search_path') || ',pg_catalog', true);
-    END IF;
-
-    -- create an overwriting now function
-    PERFORM set_config('tests.frozen_time', frozen_time::text, true);
-
-END
-$$;
-
-
-ALTER FUNCTION "tests"."freeze_time"("frozen_time" timestamp with time zone) OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "tests"."get_supabase_uid"("identifier" "text") RETURNS "uuid"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'auth', 'pg_temp'
-    AS $$
-DECLARE
-    supabase_user uuid;
-BEGIN
-    SELECT id into supabase_user FROM auth.users WHERE raw_user_meta_data ->> 'test_identifier' = identifier limit 1;
-    if supabase_user is null then
-        RAISE EXCEPTION 'User with identifier % not found', identifier;
-    end if;
-    RETURN supabase_user;
-END;
-$$;
-
-
-ALTER FUNCTION "tests"."get_supabase_uid"("identifier" "text") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "tests"."get_supabase_user"("identifier" "text") RETURNS json
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO 'auth', 'pg_temp'
-    AS $$
-    DECLARE
-        supabase_user json;
-    BEGIN
-        SELECT json_build_object(
-        'id', id,
-        'email', email,
-        'phone', phone,
-        'raw_user_meta_data', raw_user_meta_data,
-        'raw_app_meta_data', raw_app_meta_data
-        ) into supabase_user
-        FROM auth.users
-        WHERE raw_user_meta_data ->> 'test_identifier' = identifier limit 1;
-        
-        if supabase_user is null OR supabase_user -> 'id' IS NULL then
-            RAISE EXCEPTION 'User with identifier % not found', identifier;
-        end if;
-        RETURN supabase_user;
-    END;
-$$;
-
-
-ALTER FUNCTION "tests"."get_supabase_user"("identifier" "text") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "tests"."rls_enabled"("testing_schema" "text") RETURNS "text"
-    LANGUAGE "sql"
-    AS $$
-    select is(
-        (select
-           	count(pc.relname)::integer
-           from pg_class pc
-           join pg_namespace pn on pn.oid = pc.relnamespace and pn.nspname = rls_enabled.testing_schema
-           join pg_type pt on pt.oid = pc.reltype
-           where relrowsecurity = FALSE)
-        ,
-        0,
-        'All tables in the' || testing_schema || ' schema should have row level security enabled');
-$$;
-
-
-ALTER FUNCTION "tests"."rls_enabled"("testing_schema" "text") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "tests"."rls_enabled"("testing_schema" "text", "testing_table" "text") RETURNS "text"
-    LANGUAGE "sql"
-    AS $$
-    select is(
-        (select
-           	count(*)::integer
-           from pg_class pc
-           join pg_namespace pn on pn.oid = pc.relnamespace and pn.nspname = rls_enabled.testing_schema and pc.relname = rls_enabled.testing_table
-           join pg_type pt on pt.oid = pc.reltype
-           where relrowsecurity = TRUE),
-        1,
-        testing_table || 'table in the' || testing_schema || ' schema should have row level security enabled'
-    );
-$$;
-
-
-ALTER FUNCTION "tests"."rls_enabled"("testing_schema" "text", "testing_table" "text") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "tests"."unfreeze_time"() RETURNS "void"
-    LANGUAGE "plpgsql"
-    AS $$
-BEGIN
-    -- restore the original now function
-    PERFORM set_config('tests.frozen_time', null, true);
-    -- restore the original search path
-    PERFORM set_config('search_path', current_setting('tests.original_search_path'), true);
-END
-$$;
-
-
-ALTER FUNCTION "tests"."unfreeze_time"() OWNER TO "postgres";
 
 
 ALTER TABLE "public"."apikeys" ALTER COLUMN "id" ADD GENERATED BY DEFAULT AS IDENTITY (
@@ -13743,6 +13783,7 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
     "plan_maker_yearly" integer DEFAULT 0 NOT NULL,
     "plan_team_monthly" integer DEFAULT 0 NOT NULL,
     "plan_team_yearly" integer DEFAULT 0 NOT NULL,
+    "plan_enterprise" integer DEFAULT 0 NOT NULL,
     "plan_enterprise_monthly" integer DEFAULT 0 NOT NULL,
     "plan_enterprise_yearly" integer DEFAULT 0 NOT NULL,
     "new_paying_orgs" integer DEFAULT 0 NOT NULL,
@@ -14014,7 +14055,7 @@ CREATE TABLE IF NOT EXISTS "public"."orgs" (
     "customer_id" character varying,
     "stats_updated_at" timestamp without time zone,
     "last_stats_updated_at" timestamp without time zone,
-    "use_new_rbac" boolean DEFAULT false NOT NULL,
+    "use_new_rbac" boolean DEFAULT true NOT NULL,
     "enforcing_2fa" boolean DEFAULT false NOT NULL,
     "email_preferences" "jsonb" DEFAULT '{"onboarding": true, "usage_limit": true, "credit_usage": true, "device_error": true, "weekly_stats": true, "monthly_stats": true, "bundle_created": true, "bundle_deployed": true, "deploy_stats_24h": true, "billing_period_stats": true, "channel_self_rejected": true}'::"jsonb" NOT NULL,
     "enforce_hashed_api_keys" boolean DEFAULT false NOT NULL,
@@ -14023,7 +14064,8 @@ CREATE TABLE IF NOT EXISTS "public"."orgs" (
     "password_policy_config" "jsonb",
     "enforce_encrypted_bundles" boolean DEFAULT false NOT NULL,
     "required_encryption_key" character varying(21) DEFAULT NULL::character varying,
-    "has_usage_credits" boolean DEFAULT false NOT NULL
+    "has_usage_credits" boolean DEFAULT false NOT NULL,
+    "sso_enabled" boolean DEFAULT false NOT NULL
 );
 
 
@@ -14077,7 +14119,8 @@ CREATE TABLE IF NOT EXISTS "public"."permissions" (
     "bundle_id" bigint,
     "description" "text",
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
-    CONSTRAINT "permissions_scope_type_check" CHECK (("scope_type" = ANY (ARRAY["public"."rbac_scope_platform"(), "public"."rbac_scope_org"(), "public"."rbac_scope_app"(), "public"."rbac_scope_bundle"(), "public"."rbac_scope_channel"()])))
+    CONSTRAINT "permissions_scope_type_check" CHECK (("scope_type" = ANY (ARRAY["public"."rbac_scope_platform"(), "public"."rbac_scope_org"(), "public"."rbac_scope_app"(), "public"."rbac_scope_bundle"(), "public"."rbac_scope_channel"()]))),
+    CONSTRAINT "permissions_scope_type_no_platform" CHECK (("scope_type" <> "public"."rbac_scope_platform"()))
 );
 
 
@@ -14156,7 +14199,8 @@ CREATE TABLE IF NOT EXISTS "public"."role_bindings" (
     "is_direct" boolean DEFAULT true NOT NULL,
     CONSTRAINT "role_bindings_check" CHECK (((("scope_type" = "public"."rbac_scope_platform"()) AND ("org_id" IS NULL) AND ("app_id" IS NULL) AND ("bundle_id" IS NULL) AND ("channel_id" IS NULL)) OR (("scope_type" = "public"."rbac_scope_org"()) AND ("org_id" IS NOT NULL) AND ("app_id" IS NULL) AND ("bundle_id" IS NULL) AND ("channel_id" IS NULL)) OR (("scope_type" = "public"."rbac_scope_app"()) AND ("org_id" IS NOT NULL) AND ("app_id" IS NOT NULL) AND ("bundle_id" IS NULL) AND ("channel_id" IS NULL)) OR (("scope_type" = "public"."rbac_scope_bundle"()) AND ("org_id" IS NOT NULL) AND ("app_id" IS NOT NULL) AND ("bundle_id" IS NOT NULL) AND ("channel_id" IS NULL)) OR (("scope_type" = "public"."rbac_scope_channel"()) AND ("org_id" IS NOT NULL) AND ("app_id" IS NOT NULL) AND ("bundle_id" IS NULL) AND ("channel_id" IS NOT NULL)))),
     CONSTRAINT "role_bindings_principal_type_check" CHECK (("principal_type" = ANY (ARRAY["public"."rbac_principal_user"(), "public"."rbac_principal_group"(), "public"."rbac_principal_apikey"()]))),
-    CONSTRAINT "role_bindings_scope_type_check" CHECK (("scope_type" = ANY (ARRAY["public"."rbac_scope_platform"(), "public"."rbac_scope_org"(), "public"."rbac_scope_app"(), "public"."rbac_scope_bundle"(), "public"."rbac_scope_channel"()])))
+    CONSTRAINT "role_bindings_scope_type_check" CHECK (("scope_type" = ANY (ARRAY["public"."rbac_scope_platform"(), "public"."rbac_scope_org"(), "public"."rbac_scope_app"(), "public"."rbac_scope_bundle"(), "public"."rbac_scope_channel"()]))),
+    CONSTRAINT "role_bindings_scope_type_no_platform" CHECK (("scope_type" <> "public"."rbac_scope_platform"()))
 );
 
 
@@ -14203,7 +14247,8 @@ CREATE TABLE IF NOT EXISTS "public"."roles" (
     "is_assignable" boolean DEFAULT true NOT NULL,
     "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
     "created_by" "uuid",
-    CONSTRAINT "roles_scope_type_check" CHECK (("scope_type" = ANY (ARRAY["public"."rbac_scope_platform"(), "public"."rbac_scope_org"(), "public"."rbac_scope_app"(), "public"."rbac_scope_bundle"(), "public"."rbac_scope_channel"()])))
+    CONSTRAINT "roles_scope_type_check" CHECK (("scope_type" = ANY (ARRAY["public"."rbac_scope_platform"(), "public"."rbac_scope_org"(), "public"."rbac_scope_app"(), "public"."rbac_scope_bundle"(), "public"."rbac_scope_channel"()]))),
+    CONSTRAINT "roles_scope_type_no_platform" CHECK (("scope_type" <> "public"."rbac_scope_platform"()))
 );
 
 
@@ -14225,6 +14270,27 @@ ALTER TABLE "public"."security_settings" OWNER TO "postgres";
 
 COMMENT ON TABLE "public"."security_settings" IS 'Singleton settings table for security feature cutovers';
 
+
+
+CREATE TABLE IF NOT EXISTS "public"."sso_providers" (
+    "id" "uuid" DEFAULT "gen_random_uuid"() NOT NULL,
+    "org_id" "uuid" NOT NULL,
+    "domain" "text" NOT NULL,
+    "provider_id" "text",
+    "status" "text" DEFAULT 'pending_verification'::"text" NOT NULL,
+    "enforce_sso" boolean DEFAULT false NOT NULL,
+    "dns_verification_token" "text" NOT NULL,
+    "dns_verified_at" timestamp with time zone,
+    "metadata_url" "text",
+    "attribute_mapping" "jsonb" DEFAULT '{}'::"jsonb",
+    "created_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    "updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "sso_providers_domain_lowercase_check" CHECK (("domain" = "lower"("btrim"("domain")))),
+    CONSTRAINT "sso_providers_status_check" CHECK (("status" = ANY (ARRAY['pending_verification'::"text", 'verified'::"text", 'active'::"text", 'disabled'::"text"])))
+);
+
+
+ALTER TABLE "public"."sso_providers" OWNER TO "postgres";
 
 
 CREATE TABLE IF NOT EXISTS "public"."stats" (
@@ -14674,11 +14740,11 @@ CREATE TABLE IF NOT EXISTS "public"."user_security" (
 ALTER TABLE "public"."user_security" OWNER TO "postgres";
 
 
-COMMENT ON TABLE "public"."user_security" IS 'Tracks security-related user metadata like email OTP verification for MFA gating';
+COMMENT ON TABLE "public"."user_security" IS 'Tracks email OTP verification state used to gate MFA enrollment';
 
 
 
-COMMENT ON COLUMN "public"."user_security"."email_otp_verified_at" IS 'Timestamp of last successful email OTP verification for MFA enrollment';
+COMMENT ON COLUMN "public"."user_security"."email_otp_verified_at" IS 'Last successful email OTP verification used for MFA enrollment';
 
 
 
@@ -15084,6 +15150,16 @@ ALTER TABLE ONLY "public"."roles"
 
 ALTER TABLE ONLY "public"."security_settings"
     ADD CONSTRAINT "security_settings_pkey" PRIMARY KEY ("id");
+
+
+
+ALTER TABLE ONLY "public"."sso_providers"
+    ADD CONSTRAINT "sso_providers_domain_key" UNIQUE ("domain");
+
+
+
+ALTER TABLE ONLY "public"."sso_providers"
+    ADD CONSTRAINT "sso_providers_pkey" PRIMARY KEY ("id");
 
 
 
@@ -15535,6 +15611,10 @@ CREATE INDEX "idx_orgs_email_preferences" ON "public"."orgs" USING "gin" ("email
 
 
 
+CREATE INDEX "idx_sso_providers_org_id" ON "public"."sso_providers" USING "btree" ("org_id");
+
+
+
 CREATE INDEX "idx_stats_app_id_action" ON "public"."stats" USING "btree" ("app_id", "action");
 
 
@@ -15644,10 +15724,6 @@ CREATE UNIQUE INDEX "role_bindings_channel_scope_uniq" ON "public"."role_binding
 
 
 CREATE UNIQUE INDEX "role_bindings_org_scope_uniq" ON "public"."role_bindings" USING "btree" ("principal_type", "principal_id", "org_id", "scope_type") WHERE ("scope_type" = "public"."rbac_scope_org"());
-
-
-
-CREATE UNIQUE INDEX "role_bindings_platform_scope_uniq" ON "public"."role_bindings" USING "btree" ("principal_type", "principal_id", "scope_type") WHERE ("scope_type" = "public"."rbac_scope_platform"());
 
 
 
@@ -15795,6 +15871,10 @@ CREATE OR REPLACE TRIGGER "handle_build_requests_updated_at" BEFORE UPDATE ON "p
 
 
 
+CREATE OR REPLACE TRIGGER "handle_sso_providers_updated_at" BEFORE UPDATE ON "public"."sso_providers" FOR EACH ROW EXECUTE FUNCTION "public"."update_sso_providers_updated_at"();
+
+
+
 CREATE OR REPLACE TRIGGER "handle_updated_at" BEFORE UPDATE ON "public"."apikeys" FOR EACH ROW EXECUTE FUNCTION "extensions"."moddatetime"('updated_at');
 
 
@@ -15840,6 +15920,10 @@ CREATE OR REPLACE TRIGGER "handle_updated_at" BEFORE INSERT OR UPDATE ON "public
 
 
 CREATE OR REPLACE TRIGGER "handle_updated_at" BEFORE INSERT OR UPDATE ON "public"."users" FOR EACH ROW EXECUTE FUNCTION "public"."sanitize_users_text_fields"();
+
+
+
+CREATE OR REPLACE TRIGGER "normalize_sso_provider_domain_before_upsert" BEFORE INSERT OR UPDATE OF "domain" ON "public"."sso_providers" FOR EACH ROW EXECUTE FUNCTION "public"."normalize_sso_provider_domain"();
 
 
 
@@ -15920,6 +16004,10 @@ CREATE OR REPLACE TRIGGER "sanitize_orgs_text_fields" BEFORE INSERT OR UPDATE ON
 
 
 CREATE OR REPLACE TRIGGER "set_deleted_at_trigger" BEFORE UPDATE ON "public"."app_versions" FOR EACH ROW EXECUTE FUNCTION "public"."set_deleted_at_on_soft_delete"();
+
+
+
+CREATE OR REPLACE TRIGGER "sync_org_user_role_binding_on_delete" AFTER DELETE ON "public"."org_users" FOR EACH ROW EXECUTE FUNCTION "public"."sync_org_user_role_binding_on_delete"();
 
 
 
@@ -16197,6 +16285,11 @@ ALTER TABLE ONLY "public"."role_permissions"
 
 
 
+ALTER TABLE ONLY "public"."sso_providers"
+    ADD CONSTRAINT "sso_providers_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
+
+
+
 ALTER TABLE ONLY "public"."stripe_info"
     ADD CONSTRAINT "stripe_info_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "public"."plans"("stripe_id");
 
@@ -16321,10 +16414,6 @@ CREATE POLICY "Allow all for auth (super_admin+)" ON "public"."app_versions" FOR
 
 
 CREATE POLICY "Allow all for auth (super_admin+)" ON "public"."apps" FOR DELETE TO "authenticated" USING ("public"."check_min_rights"('super_admin'::"public"."user_min_right", "public"."get_identity"(), "owner_org", "app_id", NULL::bigint));
-
-
-
-CREATE POLICY "Allow anon to select" ON "public"."global_stats" FOR SELECT TO "anon" USING (true);
 
 
 
@@ -16712,7 +16801,19 @@ CREATE POLICY "Users can read own password compliance" ON "public"."user_passwor
 
 
 
-CREATE POLICY "Users can read own security status" ON "public"."user_security" FOR SELECT TO "authenticated" USING (("user_id" = ( SELECT "auth"."uid"() AS "uid")));
+CREATE POLICY "allow_org_admins_insert_sso_providers" ON "public"."sso_providers" FOR INSERT TO "authenticated", "anon" WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity_org_allowed"('{write,all}'::"public"."key_mode"[], "org_id"), "org_id", NULL::character varying, NULL::bigint));
+
+
+
+CREATE POLICY "allow_org_admins_select_sso_providers" ON "public"."sso_providers" FOR SELECT TO "authenticated", "anon" USING ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity_org_allowed"('{read,upload,write,all}'::"public"."key_mode"[], "org_id"), "org_id", NULL::character varying, NULL::bigint));
+
+
+
+CREATE POLICY "allow_org_admins_update_sso_providers" ON "public"."sso_providers" FOR UPDATE TO "authenticated", "anon" USING ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity_org_allowed"('{write,all}'::"public"."key_mode"[], "org_id"), "org_id", NULL::character varying, NULL::bigint)) WITH CHECK ("public"."check_min_rights"('admin'::"public"."user_min_right", "public"."get_identity_org_allowed"('{write,all}'::"public"."key_mode"[], "org_id"), "org_id", NULL::character varying, NULL::bigint));
+
+
+
+CREATE POLICY "allow_org_super_admins_delete_sso_providers" ON "public"."sso_providers" FOR DELETE TO "authenticated", "anon" USING ("public"."check_min_rights"('super_admin'::"public"."user_min_right", "public"."get_identity_org_allowed"('{all}'::"public"."key_mode"[], "org_id"), "org_id", NULL::character varying, NULL::bigint));
 
 
 
@@ -16754,17 +16855,17 @@ ALTER TABLE "public"."channel_permission_overrides" ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "channel_permission_overrides_admin_select" ON "public"."channel_permission_overrides" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
    FROM ("public"."channels"
-     JOIN "public"."apps" ON ((("apps"."app_id")::"text" = ("channels"."app_id")::"text")))
+     JOIN "public"."apps" ON ((("channels"."app_id")::"text" = ("apps"."app_id")::"text")))
   WHERE (("channels"."id" = "channel_permission_overrides"."channel_id") AND "public"."rbac_check_permission"("public"."rbac_perm_app_update_user_roles"(), "apps"."owner_org", "apps"."app_id", NULL::bigint)))));
 
 
 
 CREATE POLICY "channel_permission_overrides_admin_write" ON "public"."channel_permission_overrides" TO "authenticated" USING ((EXISTS ( SELECT 1
    FROM ("public"."channels"
-     JOIN "public"."apps" ON ((("apps"."app_id")::"text" = ("channels"."app_id")::"text")))
+     JOIN "public"."apps" ON ((("channels"."app_id")::"text" = ("apps"."app_id")::"text")))
   WHERE (("channels"."id" = "channel_permission_overrides"."channel_id") AND "public"."rbac_check_permission"("public"."rbac_perm_app_update_user_roles"(), "apps"."owner_org", "apps"."app_id", NULL::bigint))))) WITH CHECK ((EXISTS ( SELECT 1
    FROM ("public"."channels"
-     JOIN "public"."apps" ON ((("apps"."app_id")::"text" = ("channels"."app_id")::"text")))
+     JOIN "public"."apps" ON ((("channels"."app_id")::"text" = ("apps"."app_id")::"text")))
   WHERE (("channels"."id" = "channel_permission_overrides"."channel_id") AND "public"."rbac_check_permission"("public"."rbac_perm_app_update_user_roles"(), "apps"."owner_org", "apps"."app_id", NULL::bigint)))));
 
 
@@ -16816,51 +16917,35 @@ ALTER TABLE "public"."group_members" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "group_members_delete" ON "public"."group_members" FOR DELETE TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
+   FROM ( SELECT "auth"."uid"() AS "current_uid") "actor_ref"
   WHERE (EXISTS ( SELECT 1
            FROM "public"."groups"
-          WHERE (("groups"."id" = "group_members"."group_id") AND ("public"."check_min_rights"("public"."rbac_right_admin"(), "auth_user"."uid", "groups"."org_id", NULL::character varying, NULL::bigint) OR "public"."is_admin"("auth_user"."uid"))))))));
-
-
-
-COMMENT ON POLICY "group_members_delete" ON "public"."group_members" IS 'Org admins and platform admins can delete group_members.';
+          WHERE (("groups"."id" = "group_members"."group_id") AND "public"."check_min_rights"("public"."rbac_right_admin"(), "actor_ref"."current_uid", "groups"."org_id", NULL::character varying, NULL::bigint)))))));
 
 
 
 CREATE POLICY "group_members_insert" ON "public"."group_members" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
+   FROM ( SELECT "auth"."uid"() AS "current_uid") "actor_ref"
   WHERE (EXISTS ( SELECT 1
            FROM "public"."groups"
-          WHERE (("groups"."id" = "group_members"."group_id") AND ("public"."check_min_rights"("public"."rbac_right_admin"(), "auth_user"."uid", "groups"."org_id", NULL::character varying, NULL::bigint) OR "public"."is_admin"("auth_user"."uid"))))))));
-
-
-
-COMMENT ON POLICY "group_members_insert" ON "public"."group_members" IS 'Org admins and platform admins can insert group_members.';
+          WHERE (("groups"."id" = "group_members"."group_id") AND "public"."check_min_rights"("public"."rbac_right_admin"(), "actor_ref"."current_uid", "groups"."org_id", NULL::character varying, NULL::bigint)))))));
 
 
 
 CREATE POLICY "group_members_select" ON "public"."group_members" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE ((EXISTS ( SELECT 1
+   FROM ( SELECT "auth"."uid"() AS "current_uid") "actor_ref"
+  WHERE (EXISTS ( SELECT 1
            FROM ("public"."groups"
-             JOIN "public"."org_users" ON (("org_users"."org_id" = "groups"."org_id")))
-          WHERE (("groups"."id" = "group_members"."group_id") AND ("org_users"."user_id" = "auth_user"."uid")))) OR "public"."is_admin"("auth_user"."uid")))));
-
-
-
-COMMENT ON POLICY "group_members_select" ON "public"."group_members" IS 'Org members and platform admins can read group_members. Single SELECT policy with single auth.uid() call.';
+             JOIN "public"."org_users" ON (("groups"."org_id" = "org_users"."org_id")))
+          WHERE (("groups"."id" = "group_members"."group_id") AND ("org_users"."user_id" = "actor_ref"."current_uid")))))));
 
 
 
 CREATE POLICY "group_members_update" ON "public"."group_members" FOR UPDATE TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
+   FROM ( SELECT "auth"."uid"() AS "current_uid") "actor_ref"
   WHERE (EXISTS ( SELECT 1
            FROM "public"."groups"
-          WHERE (("groups"."id" = "group_members"."group_id") AND ("public"."check_min_rights"("public"."rbac_right_admin"(), "auth_user"."uid", "groups"."org_id", NULL::character varying, NULL::bigint) OR "public"."is_admin"("auth_user"."uid"))))))));
-
-
-
-COMMENT ON POLICY "group_members_update" ON "public"."group_members" IS 'Org admins and platform admins can update group_members.';
+          WHERE (("groups"."id" = "group_members"."group_id") AND "public"."check_min_rights"("public"."rbac_right_admin"(), "actor_ref"."current_uid", "groups"."org_id", NULL::character varying, NULL::bigint)))))));
 
 
 
@@ -16868,44 +16953,28 @@ ALTER TABLE "public"."groups" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "groups_delete" ON "public"."groups" FOR DELETE TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE ("public"."check_min_rights"("public"."rbac_right_admin"(), "auth_user"."uid", "groups"."org_id", NULL::character varying, NULL::bigint) OR "public"."is_admin"("auth_user"."uid")))));
-
-
-
-COMMENT ON POLICY "groups_delete" ON "public"."groups" IS 'Org admins and platform admins can delete groups.';
+   FROM ( SELECT "auth"."uid"() AS "current_uid") "actor_ref"
+  WHERE "public"."check_min_rights"("public"."rbac_right_admin"(), "actor_ref"."current_uid", "groups"."org_id", NULL::character varying, NULL::bigint))));
 
 
 
 CREATE POLICY "groups_insert" ON "public"."groups" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE ("public"."check_min_rights"("public"."rbac_right_admin"(), "auth_user"."uid", "groups"."org_id", NULL::character varying, NULL::bigint) OR "public"."is_admin"("auth_user"."uid")))));
-
-
-
-COMMENT ON POLICY "groups_insert" ON "public"."groups" IS 'Org admins and platform admins can insert groups.';
+   FROM ( SELECT "auth"."uid"() AS "current_uid") "actor_ref"
+  WHERE "public"."check_min_rights"("public"."rbac_right_admin"(), "actor_ref"."current_uid", "groups"."org_id", NULL::character varying, NULL::bigint))));
 
 
 
 CREATE POLICY "groups_select" ON "public"."groups" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE ((EXISTS ( SELECT 1
+   FROM ( SELECT "auth"."uid"() AS "current_uid") "actor_ref"
+  WHERE (EXISTS ( SELECT 1
            FROM "public"."org_users"
-          WHERE (("org_users"."org_id" = "groups"."org_id") AND ("org_users"."user_id" = "auth_user"."uid")))) OR "public"."is_admin"("auth_user"."uid")))));
-
-
-
-COMMENT ON POLICY "groups_select" ON "public"."groups" IS 'Org members and platform admins can read groups. Single SELECT policy with single auth.uid() call.';
+          WHERE (("org_users"."org_id" = "groups"."org_id") AND ("org_users"."user_id" = "actor_ref"."current_uid")))))));
 
 
 
 CREATE POLICY "groups_update" ON "public"."groups" FOR UPDATE TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE ("public"."check_min_rights"("public"."rbac_right_admin"(), "auth_user"."uid", "groups"."org_id", NULL::character varying, NULL::bigint) OR "public"."is_admin"("auth_user"."uid")))));
-
-
-
-COMMENT ON POLICY "groups_update" ON "public"."groups" IS 'Org admins and platform admins can update groups.';
+   FROM ( SELECT "auth"."uid"() AS "current_uid") "actor_ref"
+  WHERE "public"."check_min_rights"("public"."rbac_right_admin"(), "actor_ref"."current_uid", "groups"."org_id", NULL::character varying, NULL::bigint))));
 
 
 
@@ -16927,23 +16996,11 @@ ALTER TABLE "public"."orgs" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."permissions" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "permissions_delete" ON "public"."permissions" FOR DELETE TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE "public"."is_admin"("auth_user"."uid"))));
+CREATE POLICY "permissions_delete" ON "public"."permissions" FOR DELETE TO "authenticated" USING (false);
 
 
 
-COMMENT ON POLICY "permissions_delete" ON "public"."permissions" IS 'Only platform admins can delete permissions.';
-
-
-
-CREATE POLICY "permissions_insert" ON "public"."permissions" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE "public"."is_admin"("auth_user"."uid"))));
-
-
-
-COMMENT ON POLICY "permissions_insert" ON "public"."permissions" IS 'Only platform admins can insert permissions.';
+CREATE POLICY "permissions_insert" ON "public"."permissions" FOR INSERT TO "authenticated" WITH CHECK (false);
 
 
 
@@ -16955,13 +17012,7 @@ COMMENT ON POLICY "permissions_select" ON "public"."permissions" IS 'All authent
 
 
 
-CREATE POLICY "permissions_update" ON "public"."permissions" FOR UPDATE TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE "public"."is_admin"("auth_user"."uid"))));
-
-
-
-COMMENT ON POLICY "permissions_update" ON "public"."permissions" IS 'Only platform admins can update permissions.';
+CREATE POLICY "permissions_update" ON "public"."permissions" FOR UPDATE TO "authenticated" USING (false);
 
 
 
@@ -16971,41 +17022,19 @@ ALTER TABLE "public"."plans" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."rbac_settings" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "rbac_settings_delete" ON "public"."rbac_settings" FOR DELETE TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE "public"."is_admin"("auth_user"."uid"))));
+CREATE POLICY "rbac_settings_no_delete" ON "public"."rbac_settings" FOR DELETE USING (false);
 
 
 
-COMMENT ON POLICY "rbac_settings_delete" ON "public"."rbac_settings" IS 'Only platform admins can delete RBAC settings.';
+CREATE POLICY "rbac_settings_no_insert" ON "public"."rbac_settings" FOR INSERT WITH CHECK (false);
 
 
 
-CREATE POLICY "rbac_settings_insert" ON "public"."rbac_settings" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE "public"."is_admin"("auth_user"."uid"))));
+CREATE POLICY "rbac_settings_no_select" ON "public"."rbac_settings" FOR SELECT USING (false);
 
 
 
-COMMENT ON POLICY "rbac_settings_insert" ON "public"."rbac_settings" IS 'Only platform admins can insert RBAC settings.';
-
-
-
-CREATE POLICY "rbac_settings_select" ON "public"."rbac_settings" FOR SELECT TO "authenticated" USING (true);
-
-
-
-COMMENT ON POLICY "rbac_settings_select" ON "public"."rbac_settings" IS 'All authenticated users can read RBAC settings. Single SELECT policy to avoid multiple permissive policies.';
-
-
-
-CREATE POLICY "rbac_settings_update" ON "public"."rbac_settings" FOR UPDATE TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE "public"."is_admin"("auth_user"."uid"))));
-
-
-
-COMMENT ON POLICY "rbac_settings_update" ON "public"."rbac_settings" IS 'Only platform admins can update RBAC settings.';
+CREATE POLICY "rbac_settings_no_update" ON "public"."rbac_settings" FOR UPDATE USING (false) WITH CHECK (false);
 
 
 
@@ -17013,85 +17042,55 @@ ALTER TABLE "public"."role_bindings" ENABLE ROW LEVEL SECURITY;
 
 
 CREATE POLICY "role_bindings_delete" ON "public"."role_bindings" FOR DELETE TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE ("public"."is_admin"("auth_user"."uid") OR (("role_bindings"."scope_type" = "public"."rbac_scope_org"()) AND "public"."check_min_rights"("public"."rbac_right_admin"(), "auth_user"."uid", "role_bindings"."org_id", NULL::character varying, NULL::bigint)) OR (("role_bindings"."scope_type" = "public"."rbac_scope_app"()) AND (EXISTS ( SELECT 1
+   FROM ( SELECT "auth"."uid"() AS "current_uid") "actor_ref"
+  WHERE ((("role_bindings"."scope_type" = "public"."rbac_scope_org"()) AND "public"."check_min_rights"("public"."rbac_right_admin"(), "actor_ref"."current_uid", "role_bindings"."org_id", NULL::character varying, NULL::bigint)) OR (("role_bindings"."scope_type" = "public"."rbac_scope_app"()) AND (EXISTS ( SELECT 1
            FROM "public"."apps"
-          WHERE (("apps"."id" = "role_bindings"."app_id") AND "public"."check_min_rights"("public"."rbac_right_admin"(), "auth_user"."uid", "apps"."owner_org", "apps"."app_id", NULL::bigint))))) OR (("role_bindings"."scope_type" = "public"."rbac_scope_channel"()) AND (EXISTS ( SELECT 1
+          WHERE (("apps"."id" = "role_bindings"."app_id") AND "public"."check_min_rights"("public"."rbac_right_admin"(), "actor_ref"."current_uid", "apps"."owner_org", "apps"."app_id", NULL::bigint))))) OR (("role_bindings"."scope_type" = "public"."rbac_scope_channel"()) AND (EXISTS ( SELECT 1
            FROM ("public"."channels"
-             JOIN "public"."apps" ON ((("apps"."app_id")::"text" = ("channels"."app_id")::"text")))
-          WHERE (("channels"."rbac_id" = "role_bindings"."channel_id") AND "public"."check_min_rights"("public"."rbac_right_admin"(), "auth_user"."uid", "apps"."owner_org", "channels"."app_id", "channels"."id"))))) OR (("role_bindings"."scope_type" = "public"."rbac_scope_app"()) AND "public"."user_has_app_update_user_roles"("auth_user"."uid", "role_bindings"."app_id")) OR (("role_bindings"."scope_type" = "public"."rbac_scope_app"()) AND ("role_bindings"."principal_type" = "public"."rbac_principal_user"()) AND ("role_bindings"."principal_id" = "auth_user"."uid"))))));
+             JOIN "public"."apps" ON ((("channels"."app_id")::"text" = ("apps"."app_id")::"text")))
+          WHERE (("channels"."rbac_id" = "role_bindings"."channel_id") AND "public"."check_min_rights"("public"."rbac_right_admin"(), "actor_ref"."current_uid", "apps"."owner_org", "channels"."app_id", "channels"."id"))))) OR (("role_bindings"."scope_type" = "public"."rbac_scope_app"()) AND "public"."user_has_app_update_user_roles"("actor_ref"."current_uid", "role_bindings"."app_id")) OR (("role_bindings"."scope_type" = "public"."rbac_scope_app"()) AND ("role_bindings"."principal_type" = "public"."rbac_principal_user"()) AND ("role_bindings"."principal_id" = "actor_ref"."current_uid"))))));
 
 
 
-COMMENT ON POLICY "role_bindings_delete" ON "public"."role_bindings" IS 'Consolidated DELETE policy for role_bindings. Scope admins, users with update_user_roles permission, and users deleting their own bindings. Single auth.uid() call for performance.';
-
-
-
-CREATE POLICY "role_bindings_insert" ON "public"."role_bindings" FOR INSERT TO "authenticated" WITH CHECK (((EXISTS ( SELECT 1
-   FROM "public"."roles" "r"
-  WHERE (("r"."id" = "role_bindings"."role_id") AND ("r"."is_assignable" = true)))) AND (EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE ("public"."is_admin"("auth_user"."uid") OR (("role_bindings"."scope_type" = "public"."rbac_scope_org"()) AND "public"."check_min_rights"("public"."rbac_right_admin"(), "auth_user"."uid", "role_bindings"."org_id", NULL::character varying, NULL::bigint)) OR (("role_bindings"."scope_type" = "public"."rbac_scope_app"()) AND (EXISTS ( SELECT 1
+CREATE POLICY "role_bindings_insert" ON "public"."role_bindings" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
+   FROM ( SELECT "auth"."uid"() AS "current_uid") "actor_ref"
+  WHERE ((("role_bindings"."scope_type" = "public"."rbac_scope_org"()) AND "public"."check_min_rights"("public"."rbac_right_admin"(), "actor_ref"."current_uid", "role_bindings"."org_id", NULL::character varying, NULL::bigint)) OR (("role_bindings"."scope_type" = "public"."rbac_scope_app"()) AND (EXISTS ( SELECT 1
            FROM "public"."apps"
           WHERE (("apps"."id" = "role_bindings"."app_id") AND ("public"."check_min_rights"("public"."rbac_right_admin"(), "public"."get_identity_org_appid"('{all}'::"public"."key_mode"[], "apps"."owner_org", "apps"."app_id"), "apps"."owner_org", "apps"."app_id", NULL::bigint) OR "public"."user_has_app_update_user_roles"("public"."get_identity_org_appid"('{all}'::"public"."key_mode"[], "apps"."owner_org", "apps"."app_id"), "apps"."id")))))) OR (("role_bindings"."scope_type" = "public"."rbac_scope_channel"()) AND (EXISTS ( SELECT 1
            FROM ("public"."channels"
-             JOIN "public"."apps" ON ((("apps"."app_id")::"text" = ("channels"."app_id")::"text")))
-          WHERE (("channels"."rbac_id" = "role_bindings"."channel_id") AND "public"."check_min_rights"("public"."rbac_right_admin"(), "public"."get_identity_org_appid"('{all}'::"public"."key_mode"[], "apps"."owner_org", "apps"."app_id"), "apps"."owner_org", "channels"."app_id", "channels"."id"))))))))));
-
-
-
-COMMENT ON POLICY "role_bindings_insert" ON "public"."role_bindings" IS 'Scope admins and users with app.update_user_roles can insert role_bindings within their scope. Role must be assignable.';
-
-
-
-CREATE POLICY "role_bindings_select" ON "public"."role_bindings" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE ("public"."is_admin"("auth_user"."uid") OR "public"."is_user_org_admin"("auth_user"."uid", "role_bindings"."org_id") OR (("role_bindings"."scope_type" = "public"."rbac_scope_app"()) AND "public"."is_user_app_admin"("auth_user"."uid", "role_bindings"."app_id")) OR (("role_bindings"."scope_type" = "public"."rbac_scope_app"()) AND ("role_bindings"."app_id" IS NOT NULL) AND "public"."user_has_role_in_app"("auth_user"."uid", "role_bindings"."app_id")) OR (("role_bindings"."scope_type" = "public"."rbac_scope_channel"()) AND ("role_bindings"."channel_id" IS NOT NULL) AND (EXISTS ( SELECT 1
-           FROM ("public"."channels" "c"
-             JOIN "public"."apps" "a" ON ((("a"."app_id")::"text" = ("c"."app_id")::"text")))
-          WHERE (("c"."rbac_id" = "role_bindings"."channel_id") AND "public"."is_user_app_admin"("auth_user"."uid", "a"."id")))))))));
-
-
-
-COMMENT ON POLICY "role_bindings_select" ON "public"."role_bindings" IS 'Consolidated SELECT policy for role_bindings. Visible to platform admins, org admins, app admins, and users with roles. Single auth.uid() call for performance.';
-
-
-
-CREATE POLICY "role_bindings_update" ON "public"."role_bindings" FOR UPDATE TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE ("public"."is_admin"("auth_user"."uid") OR (("role_bindings"."scope_type" = "public"."rbac_scope_org"()) AND "public"."check_min_rights"("public"."rbac_right_admin"(), "auth_user"."uid", "role_bindings"."org_id", NULL::character varying, NULL::bigint)) OR (("role_bindings"."scope_type" = "public"."rbac_scope_app"()) AND (EXISTS ( SELECT 1
-           FROM "public"."apps"
-          WHERE (("apps"."id" = "role_bindings"."app_id") AND ("public"."check_min_rights"("public"."rbac_right_admin"(), "public"."get_identity_org_appid"('{all}'::"public"."key_mode"[], "apps"."owner_org", "apps"."app_id"), "apps"."owner_org", "apps"."app_id", NULL::bigint) OR "public"."user_has_app_update_user_roles"("public"."get_identity_org_appid"('{all}'::"public"."key_mode"[], "apps"."owner_org", "apps"."app_id"), "apps"."id")))))) OR (("role_bindings"."scope_type" = "public"."rbac_scope_channel"()) AND (EXISTS ( SELECT 1
-           FROM ("public"."channels"
-             JOIN "public"."apps" ON ((("apps"."app_id")::"text" = ("channels"."app_id")::"text")))
+             JOIN "public"."apps" ON ((("channels"."app_id")::"text" = ("apps"."app_id")::"text")))
           WHERE (("channels"."rbac_id" = "role_bindings"."channel_id") AND "public"."check_min_rights"("public"."rbac_right_admin"(), "public"."get_identity_org_appid"('{all}'::"public"."key_mode"[], "apps"."owner_org", "apps"."app_id"), "apps"."owner_org", "channels"."app_id", "channels"."id")))))))));
 
 
 
-COMMENT ON POLICY "role_bindings_update" ON "public"."role_bindings" IS 'Scope admins and users with app.update_user_roles can update role_bindings within their scope.';
+CREATE POLICY "role_bindings_select" ON "public"."role_bindings" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM ( SELECT "auth"."uid"() AS "current_uid") "actor_ref"
+  WHERE ("public"."is_user_org_admin"("actor_ref"."current_uid", "role_bindings"."org_id") OR (("role_bindings"."scope_type" = "public"."rbac_scope_app"()) AND "public"."is_user_app_admin"("actor_ref"."current_uid", "role_bindings"."app_id")) OR (("role_bindings"."scope_type" = "public"."rbac_scope_app"()) AND ("role_bindings"."app_id" IS NOT NULL) AND "public"."user_has_role_in_app"("actor_ref"."current_uid", "role_bindings"."app_id")) OR (("role_bindings"."scope_type" = "public"."rbac_scope_channel"()) AND ("role_bindings"."channel_id" IS NOT NULL) AND (EXISTS ( SELECT 1
+           FROM ("public"."channels" "c"
+             JOIN "public"."apps" "a" ON ((("c"."app_id")::"text" = ("a"."app_id")::"text")))
+          WHERE (("c"."rbac_id" = "role_bindings"."channel_id") AND "public"."is_user_app_admin"("actor_ref"."current_uid", "a"."id")))))))));
+
+
+
+CREATE POLICY "role_bindings_update" ON "public"."role_bindings" FOR UPDATE TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM ( SELECT "auth"."uid"() AS "current_uid") "actor_ref"
+  WHERE ((("role_bindings"."scope_type" = "public"."rbac_scope_org"()) AND "public"."check_min_rights"("public"."rbac_right_admin"(), "actor_ref"."current_uid", "role_bindings"."org_id", NULL::character varying, NULL::bigint)) OR (("role_bindings"."scope_type" = "public"."rbac_scope_app"()) AND (EXISTS ( SELECT 1
+           FROM "public"."apps"
+          WHERE (("apps"."id" = "role_bindings"."app_id") AND ("public"."check_min_rights"("public"."rbac_right_admin"(), "public"."get_identity_org_appid"('{all}'::"public"."key_mode"[], "apps"."owner_org", "apps"."app_id"), "apps"."owner_org", "apps"."app_id", NULL::bigint) OR "public"."user_has_app_update_user_roles"("public"."get_identity_org_appid"('{all}'::"public"."key_mode"[], "apps"."owner_org", "apps"."app_id"), "apps"."id")))))) OR (("role_bindings"."scope_type" = "public"."rbac_scope_channel"()) AND (EXISTS ( SELECT 1
+           FROM ("public"."channels"
+             JOIN "public"."apps" ON ((("channels"."app_id")::"text" = ("apps"."app_id")::"text")))
+          WHERE (("channels"."rbac_id" = "role_bindings"."channel_id") AND "public"."check_min_rights"("public"."rbac_right_admin"(), "public"."get_identity_org_appid"('{all}'::"public"."key_mode"[], "apps"."owner_org", "apps"."app_id"), "apps"."owner_org", "channels"."app_id", "channels"."id")))))))));
 
 
 
 ALTER TABLE "public"."role_hierarchy" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "role_hierarchy_delete" ON "public"."role_hierarchy" FOR DELETE TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE "public"."is_admin"("auth_user"."uid"))));
+CREATE POLICY "role_hierarchy_delete" ON "public"."role_hierarchy" FOR DELETE TO "authenticated" USING (false);
 
 
 
-COMMENT ON POLICY "role_hierarchy_delete" ON "public"."role_hierarchy" IS 'Only platform admins can delete role_hierarchy.';
-
-
-
-CREATE POLICY "role_hierarchy_insert" ON "public"."role_hierarchy" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE "public"."is_admin"("auth_user"."uid"))));
-
-
-
-COMMENT ON POLICY "role_hierarchy_insert" ON "public"."role_hierarchy" IS 'Only platform admins can insert role_hierarchy.';
+CREATE POLICY "role_hierarchy_insert" ON "public"."role_hierarchy" FOR INSERT TO "authenticated" WITH CHECK (false);
 
 
 
@@ -17103,36 +17102,18 @@ COMMENT ON POLICY "role_hierarchy_select" ON "public"."role_hierarchy" IS 'All a
 
 
 
-CREATE POLICY "role_hierarchy_update" ON "public"."role_hierarchy" FOR UPDATE TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE "public"."is_admin"("auth_user"."uid"))));
-
-
-
-COMMENT ON POLICY "role_hierarchy_update" ON "public"."role_hierarchy" IS 'Only platform admins can update role_hierarchy.';
+CREATE POLICY "role_hierarchy_update" ON "public"."role_hierarchy" FOR UPDATE TO "authenticated" USING (false);
 
 
 
 ALTER TABLE "public"."role_permissions" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "role_permissions_delete" ON "public"."role_permissions" FOR DELETE TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE "public"."is_admin"("auth_user"."uid"))));
+CREATE POLICY "role_permissions_delete" ON "public"."role_permissions" FOR DELETE TO "authenticated" USING (false);
 
 
 
-COMMENT ON POLICY "role_permissions_delete" ON "public"."role_permissions" IS 'Only platform admins can delete role_permissions.';
-
-
-
-CREATE POLICY "role_permissions_insert" ON "public"."role_permissions" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE "public"."is_admin"("auth_user"."uid"))));
-
-
-
-COMMENT ON POLICY "role_permissions_insert" ON "public"."role_permissions" IS 'Only platform admins can insert role_permissions.';
+CREATE POLICY "role_permissions_insert" ON "public"."role_permissions" FOR INSERT TO "authenticated" WITH CHECK (false);
 
 
 
@@ -17144,36 +17125,18 @@ COMMENT ON POLICY "role_permissions_select" ON "public"."role_permissions" IS 'A
 
 
 
-CREATE POLICY "role_permissions_update" ON "public"."role_permissions" FOR UPDATE TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE "public"."is_admin"("auth_user"."uid"))));
-
-
-
-COMMENT ON POLICY "role_permissions_update" ON "public"."role_permissions" IS 'Only platform admins can update role_permissions.';
+CREATE POLICY "role_permissions_update" ON "public"."role_permissions" FOR UPDATE TO "authenticated" USING (false);
 
 
 
 ALTER TABLE "public"."roles" ENABLE ROW LEVEL SECURITY;
 
 
-CREATE POLICY "roles_delete" ON "public"."roles" FOR DELETE TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE "public"."is_admin"("auth_user"."uid"))));
+CREATE POLICY "roles_delete" ON "public"."roles" FOR DELETE TO "authenticated" USING (false);
 
 
 
-COMMENT ON POLICY "roles_delete" ON "public"."roles" IS 'Only platform admins can delete roles.';
-
-
-
-CREATE POLICY "roles_insert" ON "public"."roles" FOR INSERT TO "authenticated" WITH CHECK ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE "public"."is_admin"("auth_user"."uid"))));
-
-
-
-COMMENT ON POLICY "roles_insert" ON "public"."roles" IS 'Only platform admins can insert roles.';
+CREATE POLICY "roles_insert" ON "public"."roles" FOR INSERT TO "authenticated" WITH CHECK (false);
 
 
 
@@ -17185,17 +17148,14 @@ COMMENT ON POLICY "roles_select" ON "public"."roles" IS 'All authenticated users
 
 
 
-CREATE POLICY "roles_update" ON "public"."roles" FOR UPDATE TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ( SELECT "auth"."uid"() AS "uid") "auth_user"
-  WHERE "public"."is_admin"("auth_user"."uid"))));
-
-
-
-COMMENT ON POLICY "roles_update" ON "public"."roles" IS 'Only platform admins can update roles.';
+CREATE POLICY "roles_update" ON "public"."roles" FOR UPDATE TO "authenticated" USING (false);
 
 
 
 ALTER TABLE "public"."security_settings" ENABLE ROW LEVEL SECURITY;
+
+
+ALTER TABLE "public"."sso_providers" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER TABLE "public"."stats" ENABLE ROW LEVEL SECURITY;
@@ -17234,6 +17194,10 @@ ALTER TABLE "public"."user_security" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "public"."users" ENABLE ROW LEVEL SECURITY;
 
 
+CREATE POLICY "users_can_read_own_security_status" ON "public"."user_security" FOR SELECT TO "authenticated" USING (("user_id" = ( SELECT "auth"."uid"() AS "uid")));
+
+
+
 ALTER TABLE "public"."version_meta" ENABLE ROW LEVEL SECURITY;
 
 
@@ -17261,18 +17225,6 @@ REVOKE USAGE ON SCHEMA "public" FROM PUBLIC;
 GRANT USAGE ON SCHEMA "public" TO "anon";
 GRANT USAGE ON SCHEMA "public" TO "authenticated";
 GRANT USAGE ON SCHEMA "public" TO "service_role";
-
-
-
-GRANT USAGE ON SCHEMA "test_overrides" TO "anon";
-GRANT USAGE ON SCHEMA "test_overrides" TO "authenticated";
-GRANT USAGE ON SCHEMA "test_overrides" TO "service_role";
-
-
-
-GRANT USAGE ON SCHEMA "tests" TO "anon";
-GRANT USAGE ON SCHEMA "tests" TO "authenticated";
-GRANT USAGE ON SCHEMA "tests" TO "service_role";
 
 
 
@@ -17623,6 +17575,13 @@ REVOKE ALL ON FUNCTION "public"."auto_owner_org_by_app_id"() FROM PUBLIC;
 
 
 REVOKE ALL ON FUNCTION "public"."calculate_credit_cost"("p_metric" "public"."credit_metric_type", "p_overage_amount" numeric) FROM PUBLIC;
+
+
+
+REVOKE ALL ON FUNCTION "public"."check_domain_sso"("p_domain" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."check_domain_sso"("p_domain" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."check_domain_sso"("p_domain" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."check_domain_sso"("p_domain" "text") TO "authenticated";
 
 
 
@@ -18108,12 +18067,9 @@ GRANT ALL ON FUNCTION "public"."get_orgs_v6"("userid" "uuid") TO "service_role";
 
 
 GRANT ALL ON FUNCTION "public"."get_orgs_v7"() TO "service_role";
-GRANT ALL ON FUNCTION "public"."get_orgs_v7"() TO "anon";
-GRANT ALL ON FUNCTION "public"."get_orgs_v7"() TO "authenticated";
 
 
 
-REVOKE ALL ON FUNCTION "public"."get_orgs_v7"("userid" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."get_orgs_v7"("userid" "uuid") TO "service_role";
 
 
@@ -18141,6 +18097,13 @@ GRANT ALL ON FUNCTION "public"."get_plan_usage_percent_detailed"("orgid" "uuid")
 GRANT ALL ON FUNCTION "public"."get_plan_usage_percent_detailed"("orgid" "uuid", "cycle_start" "date", "cycle_end" "date") TO "anon";
 GRANT ALL ON FUNCTION "public"."get_plan_usage_percent_detailed"("orgid" "uuid", "cycle_start" "date", "cycle_end" "date") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_plan_usage_percent_detailed"("orgid" "uuid", "cycle_start" "date", "cycle_end" "date") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."get_sso_enforcement_by_domain"("p_domain" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."get_sso_enforcement_by_domain"("p_domain" "text") TO "service_role";
+GRANT ALL ON FUNCTION "public"."get_sso_enforcement_by_domain"("p_domain" "text") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_sso_enforcement_by_domain"("p_domain" "text") TO "authenticated";
 
 
 
@@ -18266,18 +18229,6 @@ GRANT ALL ON FUNCTION "public"."invite_user_to_org_rbac"("email" character varyi
 GRANT ALL ON FUNCTION "public"."is_account_disabled"("user_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."is_account_disabled"("user_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."is_account_disabled"("user_id" "uuid") TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."is_admin"() TO "anon";
-GRANT ALL ON FUNCTION "public"."is_admin"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."is_admin"() TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."is_admin"("userid" "uuid") TO "anon";
-GRANT ALL ON FUNCTION "public"."is_admin"("userid" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."is_admin"("userid" "uuid") TO "service_role";
 
 
 
@@ -18425,7 +18376,18 @@ GRANT ALL ON FUNCTION "public"."is_paying_org"("orgid" "uuid") TO "service_role"
 
 
 
-GRANT ALL ON FUNCTION "public"."is_recent_email_otp_verified"("user_id" "uuid") TO "service_role";
+REVOKE ALL ON FUNCTION "public"."is_platform_admin"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."is_platform_admin"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."is_platform_admin"() TO "authenticated";
+
+
+
+REVOKE ALL ON FUNCTION "public"."is_platform_admin"("userid" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."is_platform_admin"("userid" "uuid") TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."is_recent_email_otp_verified"("p_user_id" "uuid") TO "service_role";
 
 
 
@@ -18460,6 +18422,11 @@ REVOKE ALL ON FUNCTION "public"."mass_edit_queue_messages_cf_ids"("updates" "pub
 GRANT ALL ON FUNCTION "public"."modify_permissions_tmp"("email" "text", "org_id" "uuid", "new_role" "public"."user_min_right") TO "anon";
 GRANT ALL ON FUNCTION "public"."modify_permissions_tmp"("email" "text", "org_id" "uuid", "new_role" "public"."user_min_right") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."modify_permissions_tmp"("email" "text", "org_id" "uuid", "new_role" "public"."user_min_right") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."normalize_sso_provider_domain"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."normalize_sso_provider_domain"() TO "service_role";
 
 
 
@@ -19208,6 +19175,10 @@ GRANT ALL ON FUNCTION "public"."reset_app_stats_data"("p_app_id" character varyi
 
 
 
+GRANT ALL ON FUNCTION "public"."resync_org_user_role_bindings"("p_user_id" "uuid", "p_org_id" "uuid") TO "service_role";
+
+
+
 GRANT ALL ON FUNCTION "public"."sanitize_apps_text_fields"() TO "anon";
 GRANT ALL ON FUNCTION "public"."sanitize_apps_text_fields"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."sanitize_apps_text_fields"() TO "service_role";
@@ -19270,6 +19241,10 @@ GRANT ALL ON FUNCTION "public"."strip_html"("input" "text") TO "service_role";
 
 
 GRANT ALL ON FUNCTION "public"."sync_org_has_usage_credits_from_grants"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."sync_org_user_role_binding_on_delete"() TO "service_role";
 
 
 
@@ -19337,6 +19312,12 @@ GRANT ALL ON FUNCTION "public"."update_org_member_role"("p_org_id" "uuid", "p_us
 
 
 
+GRANT ALL ON FUNCTION "public"."update_sso_providers_updated_at"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."update_sso_providers_updated_at"() TO "anon";
+GRANT ALL ON FUNCTION "public"."update_sso_providers_updated_at"() TO "authenticated";
+
+
+
 GRANT ALL ON FUNCTION "public"."update_tmp_invite_role_rbac"("p_org_id" "uuid", "p_email" "text", "p_new_role_name" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."update_tmp_invite_role_rbac"("p_org_id" "uuid", "p_email" "text", "p_new_role_name" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."update_tmp_invite_role_rbac"("p_org_id" "uuid", "p_email" "text", "p_new_role_name" "text") TO "service_role";
@@ -19378,72 +19359,6 @@ GRANT ALL ON FUNCTION "public"."verify_api_key_hash"("plain_key" "text", "stored
 GRANT ALL ON FUNCTION "public"."verify_mfa"() TO "anon";
 GRANT ALL ON FUNCTION "public"."verify_mfa"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."verify_mfa"() TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "test_overrides"."now"() TO "anon";
-GRANT ALL ON FUNCTION "test_overrides"."now"() TO "authenticated";
-GRANT ALL ON FUNCTION "test_overrides"."now"() TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "tests"."authenticate_as"("identifier" "text") TO "anon";
-GRANT ALL ON FUNCTION "tests"."authenticate_as"("identifier" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "tests"."authenticate_as"("identifier" "text") TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "tests"."authenticate_as_service_role"() TO "anon";
-GRANT ALL ON FUNCTION "tests"."authenticate_as_service_role"() TO "authenticated";
-GRANT ALL ON FUNCTION "tests"."authenticate_as_service_role"() TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "tests"."clear_authentication"() TO "anon";
-GRANT ALL ON FUNCTION "tests"."clear_authentication"() TO "authenticated";
-GRANT ALL ON FUNCTION "tests"."clear_authentication"() TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "tests"."create_supabase_user"("identifier" "text", "email" "text", "phone" "text", "metadata" "jsonb") TO "anon";
-GRANT ALL ON FUNCTION "tests"."create_supabase_user"("identifier" "text", "email" "text", "phone" "text", "metadata" "jsonb") TO "authenticated";
-GRANT ALL ON FUNCTION "tests"."create_supabase_user"("identifier" "text", "email" "text", "phone" "text", "metadata" "jsonb") TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "tests"."freeze_time"("frozen_time" timestamp with time zone) TO "anon";
-GRANT ALL ON FUNCTION "tests"."freeze_time"("frozen_time" timestamp with time zone) TO "authenticated";
-GRANT ALL ON FUNCTION "tests"."freeze_time"("frozen_time" timestamp with time zone) TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "tests"."get_supabase_uid"("identifier" "text") TO "anon";
-GRANT ALL ON FUNCTION "tests"."get_supabase_uid"("identifier" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "tests"."get_supabase_uid"("identifier" "text") TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "tests"."get_supabase_user"("identifier" "text") TO "anon";
-GRANT ALL ON FUNCTION "tests"."get_supabase_user"("identifier" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "tests"."get_supabase_user"("identifier" "text") TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "tests"."rls_enabled"("testing_schema" "text") TO "anon";
-GRANT ALL ON FUNCTION "tests"."rls_enabled"("testing_schema" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "tests"."rls_enabled"("testing_schema" "text") TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "tests"."rls_enabled"("testing_schema" "text", "testing_table" "text") TO "anon";
-GRANT ALL ON FUNCTION "tests"."rls_enabled"("testing_schema" "text", "testing_table" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "tests"."rls_enabled"("testing_schema" "text", "testing_table" "text") TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "tests"."unfreeze_time"() TO "anon";
-GRANT ALL ON FUNCTION "tests"."unfreeze_time"() TO "authenticated";
-GRANT ALL ON FUNCTION "tests"."unfreeze_time"() TO "service_role";
 
 
 
@@ -19701,8 +19616,6 @@ GRANT ALL ON SEQUENCE "public"."devices_id_seq" TO "service_role";
 
 
 
-GRANT ALL ON TABLE "public"."global_stats" TO "anon";
-GRANT ALL ON TABLE "public"."global_stats" TO "authenticated";
 GRANT ALL ON TABLE "public"."global_stats" TO "service_role";
 
 
@@ -19800,6 +19713,12 @@ GRANT ALL ON TABLE "public"."roles" TO "service_role";
 GRANT ALL ON TABLE "public"."security_settings" TO "anon";
 GRANT ALL ON TABLE "public"."security_settings" TO "authenticated";
 GRANT ALL ON TABLE "public"."security_settings" TO "service_role";
+
+
+
+GRANT ALL ON TABLE "public"."sso_providers" TO "anon";
+GRANT ALL ON TABLE "public"."sso_providers" TO "authenticated";
+GRANT ALL ON TABLE "public"."sso_providers" TO "service_role";
 
 
 
@@ -19990,18 +19909,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT ALL ON TAB
 
 
 
-
-
-
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "test_overrides" GRANT ALL ON FUNCTIONS TO "anon";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "test_overrides" GRANT ALL ON FUNCTIONS TO "authenticated";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "test_overrides" GRANT ALL ON FUNCTIONS TO "service_role";
-
-
-
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "tests" GRANT ALL ON FUNCTIONS TO "anon";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "tests" GRANT ALL ON FUNCTIONS TO "authenticated";
-ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "tests" GRANT ALL ON FUNCTIONS TO "service_role";
 
 
 
