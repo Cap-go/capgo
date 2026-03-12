@@ -23,6 +23,16 @@ function handleButtonClick(button: DialogV2Button, event?: Event) {
     return
   }
 
+  const mouseEvent = event instanceof MouseEvent ? event : undefined
+  const isModifiedLinkClick = !!(
+    button.href
+    && mouseEvent
+    && (mouseEvent.button !== 0 || mouseEvent.metaKey || mouseEvent.ctrlKey || mouseEvent.shiftKey || mouseEvent.altKey)
+  )
+
+  if (isModifiedLinkClick)
+    return
+
   if (button.href)
     event?.preventDefault()
 

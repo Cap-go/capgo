@@ -41,10 +41,12 @@ export const useDialogV2Store = defineStore('dialogv2', () => {
       return
 
     if (button.target === '_blank') {
-      if (button.rel)
-        window.open(button.href, button.target, button.rel)
-      else
-        window.open(button.href, button.target)
+      const relTokens = button.rel ? button.rel.split(/[\s,]+/).filter(Boolean) : []
+      const features = [
+        'noopener',
+        ...(relTokens.includes('noreferrer') ? ['noreferrer'] : []),
+      ]
+      window.open(button.href, button.target, features.join(','))
       return
     }
 
