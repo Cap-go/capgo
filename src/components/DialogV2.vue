@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { DialogV2Button } from '~/stores/dialogv2'
 import { onMounted, watch } from 'vue'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
@@ -14,6 +15,18 @@ const sizeClasses = {
 
 function close(button?: any) {
   dialogStore.closeDialog(button)
+}
+
+function handleButtonClick(button: DialogV2Button, event?: Event) {
+  if (button.disabled) {
+    event?.preventDefault()
+    return
+  }
+
+  if (button.href)
+    event?.preventDefault()
+
+  close(button)
 }
 
 onMounted(() => {
@@ -95,10 +108,10 @@ onMounted(() => {
                   'd-btn d-btn-warning': button.role === 'danger',
                   'd-btn d-btn-outline': button.role === 'cancel',
                   'd-btn': !button.role,
-                  'opacity-70 cursor-not-allowed': button.disabled,
+                  'opacity-70 cursor-not-allowed pointer-events-none': button.disabled,
                 }"
                 :disabled="button.disabled"
-                @click="close(button)"
+                @click="handleButtonClick(button, $event)"
               >
                 {{ button.text }}
               </component>
