@@ -115,7 +115,8 @@ onMounted(() => {
                   'd-btn d-btn-warning': button.role === 'danger',
                   'd-btn d-btn-outline': button.role === 'cancel',
                   'd-btn': !button.role,
-                  'cursor-pointer': !button.disabled,
+                  '!cursor-pointer': !button.disabled,
+                  'cursor-not-allowed': button.disabled,
                   'opacity-70 cursor-not-allowed pointer-events-none': button.disabled,
                 }"
                 :disabled="button.disabled"
@@ -135,7 +136,8 @@ onMounted(() => {
                   'd-btn d-btn-warning': button.role === 'danger',
                   'd-btn d-btn-outline': button.role === 'cancel',
                   'd-btn': !button.role,
-                  'cursor-pointer': !button.disabled,
+                  '!cursor-pointer': !button.disabled,
+                  'cursor-not-allowed': button.disabled,
                   'opacity-70 cursor-not-allowed pointer-events-none': button.disabled,
                 }"
                 @click="handleButtonClick(button, $event)"
