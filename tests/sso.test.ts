@@ -102,7 +102,7 @@ describe('[POST] /private/sso/check-domain', () => {
       expect(rpcError).toBeNull()
       expect(Array.isArray(rpcData)).toBe(true)
       expect(rpcData?.length).toBeGreaterThan(0)
-      expect(rpcData?.[0].provider_id).toBe(providerId)
+      expect(rpcData?.[0].has_sso).toBe(true)
       expect(rpcData?.[0].org_id).toBe(SSO_TEST_ORG_ID)
 
       const { data: normalizedRow, error: normalizedRowError } = await getSupabaseClient()
