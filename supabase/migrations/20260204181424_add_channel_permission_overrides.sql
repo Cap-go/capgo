@@ -1,16 +1,20 @@
 -- Channel permission overrides (delta-only)
 CREATE TABLE IF NOT EXISTS public.channel_permission_overrides (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  principal_type text NOT NULL CHECK (principal_type IN (
-    public.rbac_principal_user(),
-    public.rbac_principal_group(),
-    public.rbac_principal_apikey()
-  )),
-  principal_id uuid NOT NULL,
-  channel_id bigint NOT NULL REFERENCES public.channels(id) ON DELETE CASCADE,
-  permission_key text NOT NULL REFERENCES public.permissions(key) ON DELETE CASCADE,
-  is_allowed boolean NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    principal_type text NOT NULL CHECK (principal_type IN (
+        public.rbac_principal_user(),
+        public.rbac_principal_group(),
+        public.rbac_principal_apikey()
+    )),
+    principal_id uuid NOT NULL,
+    channel_id bigint NOT NULL REFERENCES public.channels (
+        id
+    ) ON DELETE CASCADE,
+    permission_key text NOT NULL REFERENCES public.permissions (
+        key
+    ) ON DELETE CASCADE,
+    is_allowed boolean NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now()
 );
 
 COMMENT ON TABLE public.channel_permission_overrides IS 'Delta-only overrides for channel-scoped permissions (user > group, deny > allow).';
@@ -20,89 +24,97 @@ COMMENT ON COLUMN public.channel_permission_overrides.channel_id IS 'public.chan
 COMMENT ON COLUMN public.channel_permission_overrides.permission_key IS 'RBAC permission key (channel.*).';
 
 CREATE UNIQUE INDEX IF NOT EXISTS channel_permission_overrides_unique
-  ON public.channel_permission_overrides (principal_type, principal_id, channel_id, permission_key);
+ON public.channel_permission_overrides (
+    principal_type, principal_id, channel_id, permission_key
+);
 
 CREATE INDEX IF NOT EXISTS channel_permission_overrides_channel_idx
-  ON public.channel_permission_overrides (channel_id);
+ON public.channel_permission_overrides (channel_id);
 
 CREATE INDEX IF NOT EXISTS channel_permission_overrides_principal_idx
-  ON public.channel_permission_overrides (principal_type, principal_id);
+ON public.channel_permission_overrides (principal_type, principal_id);
 
 CREATE INDEX IF NOT EXISTS channel_permission_overrides_permission_idx
-  ON public.channel_permission_overrides (permission_key);
+ON public.channel_permission_overrides (permission_key);
 
 ALTER TABLE public.channel_permission_overrides ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY channel_permission_overrides_admin_select ON public.channel_permission_overrides
-  FOR SELECT
-  TO authenticated
-  USING (
+FOR SELECT
+TO authenticated
+USING (
     EXISTS (
-      SELECT 1
-      FROM public.channels
-      JOIN public.apps ON apps.app_id = channels.app_id
-      WHERE channels.id = channel_permission_overrides.channel_id
-        AND public.rbac_check_permission(
-          public.rbac_perm_app_update_user_roles(),
-          apps.owner_org,
-          apps.app_id,
-          NULL::bigint
-        )
+        SELECT 1
+        FROM public.channels
+        INNER JOIN public.apps ON channels.app_id = apps.app_id
+        WHERE
+            channels.id = channel_permission_overrides.channel_id
+            AND public.rbac_check_permission(
+                public.rbac_perm_app_update_user_roles(),
+                apps.owner_org,
+                apps.app_id,
+                NULL::bigint
+            )
     )
-  );
+);
 
 CREATE POLICY channel_permission_overrides_admin_write ON public.channel_permission_overrides
-  FOR ALL
-  TO authenticated
-  USING (
+FOR ALL
+TO authenticated
+USING (
     EXISTS (
-      SELECT 1
-      FROM public.channels
-      JOIN public.apps ON apps.app_id = channels.app_id
-      WHERE channels.id = channel_permission_overrides.channel_id
-        AND public.rbac_check_permission(
-          public.rbac_perm_app_update_user_roles(),
-          apps.owner_org,
-          apps.app_id,
-          NULL::bigint
-        )
+        SELECT 1
+        FROM public.channels
+        INNER JOIN public.apps ON channels.app_id = apps.app_id
+        WHERE
+            channels.id = channel_permission_overrides.channel_id
+            AND public.rbac_check_permission(
+                public.rbac_perm_app_update_user_roles(),
+                apps.owner_org,
+                apps.app_id,
+                NULL::bigint
+            )
     )
-  )
-  WITH CHECK (
+)
+WITH CHECK (
     EXISTS (
-      SELECT 1
-      FROM public.channels
-      JOIN public.apps ON apps.app_id = channels.app_id
-      WHERE channels.id = channel_permission_overrides.channel_id
-        AND public.rbac_check_permission(
-          public.rbac_perm_app_update_user_roles(),
-          apps.owner_org,
-          apps.app_id,
-          NULL::bigint
-        )
+        SELECT 1
+        FROM public.channels
+        INNER JOIN public.apps ON channels.app_id = apps.app_id
+        WHERE
+            channels.id = channel_permission_overrides.channel_id
+            AND public.rbac_check_permission(
+                public.rbac_perm_app_update_user_roles(),
+                apps.owner_org,
+                apps.app_id,
+                NULL::bigint
+            )
     )
-  );
+);
 
 -- Extend app_uploader defaults to channel-level permissions
 INSERT INTO public.role_permissions (role_id, permission_id)
-SELECT r.id, p.id
-FROM public.roles r
-JOIN public.permissions p ON p.key IN (
-  public.rbac_perm_channel_read(),
-  public.rbac_perm_channel_read_history(),
-  public.rbac_perm_channel_promote_bundle()
-)
+SELECT
+    r.id,
+    p.id
+FROM public.roles AS r
+INNER JOIN public.permissions AS p
+    ON p.key IN (
+        public.rbac_perm_channel_read(),
+        public.rbac_perm_channel_read_history(),
+        public.rbac_perm_channel_promote_bundle()
+    )
 WHERE r.name = public.rbac_role_app_uploader()
 ON CONFLICT DO NOTHING;
 
 -- Apply channel overrides in RBAC permission checks
 CREATE OR REPLACE FUNCTION public.rbac_check_permission_direct(
-  p_permission_key text,
-  p_user_id uuid,
-  p_org_id uuid,
-  p_app_id character varying,
-  p_channel_id bigint,
-  p_apikey text DEFAULT NULL
+    p_permission_key text,
+    p_user_id uuid,
+    p_org_id uuid,
+    p_app_id character varying,
+    p_channel_id bigint,
+    p_apikey text DEFAULT NULL
 ) RETURNS boolean
 LANGUAGE plpgsql
 SET search_path = ''
@@ -297,8 +309,10 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.rbac_check_permission_direct(text, uuid, uuid, character varying, bigint, text) IS
-  'Direct RBAC permission check with automatic legacy fallback based on org feature flag. Uses channel overrides when present.';
+COMMENT ON FUNCTION public.rbac_check_permission_direct(
+    text, uuid, uuid, character varying, bigint, text
+) IS
+'Direct RBAC permission check with automatic legacy fallback based on org feature flag. Uses channel overrides when present.';
 
 -- Atomically delete a group and all its role_bindings in a single server-side call.
 CREATE OR REPLACE FUNCTION public.delete_group_with_bindings(group_id uuid)
@@ -343,4 +357,4 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.delete_group_with_bindings(uuid) IS
-  'Atomically deletes a group and all its role bindings. Requires org.update_user_roles permission.';
+'Atomically deletes a group and all its role bindings. Requires org.update_user_roles permission.';

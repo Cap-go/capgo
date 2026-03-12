@@ -47,7 +47,7 @@ describe('rBAC Permission System', () => {
   describe('rbac_check_permission_direct SQL function', () => {
     describe('legacy mode (use_new_rbac = false)', () => {
       beforeEach(async () => {
-        await query(`UPDATE public.rbac_settings SET use_new_rbac = false WHERE id = 1`)
+        await query(`SELECT set_config('capgo.rbac_enabled', 'false', true)`)
         await query(`UPDATE public.orgs SET use_new_rbac = false WHERE id = $1`, [ORG_ID])
       })
 
@@ -113,19 +113,15 @@ describe('rBAC Permission System', () => {
       })
     })
 
-    describe('rBAC mode (use_new_rbac = true)', () => {
+      describe('rBAC mode (use_new_rbac = true)', () => {
       beforeEach(async () => {
         // Enable RBAC globally for tests
-        await query(`
-          UPDATE public.rbac_settings SET use_new_rbac = true WHERE id = 1;
-        `)
+        await query(`SELECT set_config('capgo.rbac_enabled', 'true', true)`)
       })
 
       afterEach(async () => {
         // Reset to legacy mode
-        await query(`
-          UPDATE public.rbac_settings SET use_new_rbac = false WHERE id = 1;
-        `)
+        await query(`SELECT set_config('capgo.rbac_enabled', 'false', true)`)
       })
 
       it('should check permissions via RBAC system when enabled', async () => {
@@ -195,7 +191,7 @@ describe('rBAC Permission System', () => {
     describe('feature flag routing', () => {
       it('should use legacy for orgs without RBAC flag', async () => {
         await query(`UPDATE public.orgs SET use_new_rbac = false WHERE id = $1`, [ORG_ID])
-        await query(`UPDATE public.rbac_settings SET use_new_rbac = false WHERE id = 1`)
+        await query(`SELECT set_config('capgo.rbac_enabled', 'false', true)`)
 
         const result = await query(`
           SELECT public.rbac_check_permission_direct(
@@ -276,13 +272,13 @@ describe('rBAC Permission System', () => {
 
     describe('rbac_is_enabled_for_org', () => {
       it('should return true when global flag is enabled', async () => {
-        await query(`UPDATE public.rbac_settings SET use_new_rbac = true WHERE id = 1`)
+        await query(`SELECT set_config('capgo.rbac_enabled', 'true', true)`)
 
         const result = await query(`
           SELECT public.rbac_is_enabled_for_org($1::uuid) as enabled
         `, [ORG_ID])
 
-        await query(`UPDATE public.rbac_settings SET use_new_rbac = false WHERE id = 1`)
+        await query(`SELECT set_config('capgo.rbac_enabled', 'false', true)`)
 
         expect(result.rows[0].enabled).toBe(true)
       })
@@ -300,7 +296,7 @@ describe('rBAC Permission System', () => {
       })
 
       it('should return false when both flags are disabled', async () => {
-        await query(`UPDATE public.rbac_settings SET use_new_rbac = false WHERE id = 1`)
+        await query(`SELECT set_config('capgo.rbac_enabled', 'false', true)`)
         await query(`UPDATE public.orgs SET use_new_rbac = false WHERE id = $1`, [ORG_ID])
 
         const result = await query(`

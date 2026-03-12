@@ -14,8 +14,9 @@ SELECT ok(
     (
         SELECT count(*)::int
         FROM public.cron_tasks
-        WHERE name = 'cleanup_tmp_users'
-            AND enabled = true
+        WHERE
+            name = 'cleanup_tmp_users'
+            AND enabled = TRUE
             AND task_type = 'function'::public.cron_task_type
             AND target = 'public.cleanup_tmp_users()'
             AND minute_interval = 1
