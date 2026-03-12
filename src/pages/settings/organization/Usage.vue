@@ -137,8 +137,18 @@ async function getUsage(orgId: string) {
   const totalMau = relevantUsage.reduce((acc, entry) => acc + (entry.mau ?? 0), 0)
   const totalBandwidthBytes = relevantUsage.reduce((acc, entry) => acc + (entry.bandwidth ?? 0), 0)
   const totalBandwidth = bytesToGb(totalBandwidthBytes)
-  const totalStorage = bytesToGb(await getTotalStorage(orgId))
+  const totalStorageBytes = await getTotalStorage(orgId)
+  const totalStorage = bytesToGb(totalStorageBytes)
   const totalBuildTime = relevantUsage.reduce((acc, entry) => acc + (entry.build_time_unit ?? 0), 0)
+
+  detailPlanUsage = maybeDeriveMissingUsagePercents({
+    detailPlanUsage,
+    currentPlan,
+    totalBandwidth,
+    totalBuildTime,
+    totalMau,
+    totalStorage,
+  })
 
   const basePrice = currentPlan?.price_m ?? 0
 
@@ -195,6 +205,12 @@ function roundNumber(number: number) {
   return Math.round(number * 100) / 100
 }
 
+function percent(usage: number, limit: number) {
+  if (!Number.isFinite(usage) || !Number.isFinite(limit) || limit <= 0)
+    return 0
+  return Math.round((usage / limit) * 100)
+}
+
 function roundUsagePercents(usage: ArrayElement<Database['public']['Functions']['get_plan_usage_percent_detailed']['Returns']>) {
   return {
     ...usage,
@@ -203,6 +219,55 @@ function roundUsagePercents(usage: ArrayElement<Database['public']['Functions'][
     bandwidth_percent: Math.round(usage.bandwidth_percent ?? 0),
     storage_percent: Math.round(usage.storage_percent ?? 0),
     build_time_percent: Math.round(usage.build_time_percent ?? 0),
+  }
+}
+
+function maybeDeriveMissingUsagePercents(params: {
+  detailPlanUsage: ArrayElement<Database['public']['Functions']['get_plan_usage_percent_detailed']['Returns']>
+  currentPlan: Database['public']['Tables']['plans']['Row'] | undefined
+  totalMau: number
+  totalBandwidth: number
+  totalStorage: number
+  totalBuildTime: number
+}) {
+  const {
+    detailPlanUsage,
+    currentPlan,
+    totalBandwidth,
+    totalBuildTime,
+    totalMau,
+    totalStorage,
+  } = params
+
+  if (!currentPlan || (
+    detailPlanUsage.mau_percent !== 0
+    || detailPlanUsage.bandwidth_percent !== 0
+    || detailPlanUsage.storage_percent !== 0
+    || detailPlanUsage.build_time_percent !== 0
+    || (totalMau <= 0 && totalBandwidth <= 0 && totalStorage <= 0 && totalBuildTime <= 0)
+  )) {
+    return detailPlanUsage
+  }
+
+  const fallback = {
+    mau_percent: percent(totalMau, currentPlan.mau),
+    bandwidth_percent: percent(totalBandwidth, currentPlan.bandwidth),
+    storage_percent: percent(totalStorage, currentPlan.storage),
+    build_time_percent: percent(totalBuildTime, currentPlan.build_time_unit),
+  }
+
+  return {
+    ...detailPlanUsage,
+    mau_percent: fallback.mau_percent,
+    bandwidth_percent: fallback.bandwidth_percent,
+    storage_percent: fallback.storage_percent,
+    build_time_percent: fallback.build_time_percent,
+    total_percent: Math.max(
+      fallback.mau_percent,
+      fallback.bandwidth_percent,
+      fallback.storage_percent,
+      fallback.build_time_percent,
+    ),
   }
 }
 

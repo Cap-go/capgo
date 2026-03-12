@@ -8,18 +8,18 @@ DROP FUNCTION IF EXISTS public.get_total_metrics(uuid, date, date);
 DROP FUNCTION IF EXISTS public.get_total_metrics(uuid);
 
 CREATE FUNCTION public.get_total_metrics(
-  org_id uuid,
-  start_date date,
-  end_date date
+    org_id uuid,
+    start_date date,
+    end_date date
 ) RETURNS TABLE (
-  mau bigint,
-  storage bigint,
-  bandwidth bigint,
-  build_time_unit bigint,
-  get bigint,
-  fail bigint,
-  install bigint,
-  uninstall bigint
+    mau bigint,
+    storage bigint,
+    bandwidth bigint,
+    build_time_unit bigint,
+    get bigint,
+    fail bigint,
+    install bigint,
+    uninstall bigint
 ) LANGUAGE plpgsql VOLATILE SECURITY DEFINER
 SET search_path = '' AS $function$
 DECLARE
@@ -106,17 +106,19 @@ ALTER FUNCTION public.get_total_metrics(uuid, date, date) OWNER TO "postgres";
 
 REVOKE ALL ON FUNCTION public.get_total_metrics(uuid, date, date) FROM anon;
 REVOKE ALL ON FUNCTION public.get_total_metrics(uuid, date, date) FROM public;
-GRANT ALL ON FUNCTION public.get_total_metrics(uuid, date, date) TO service_role;
+GRANT ALL ON FUNCTION public.get_total_metrics(
+    uuid, date, date
+) TO service_role;
 
 CREATE FUNCTION public.get_total_metrics(org_id uuid) RETURNS TABLE (
-  mau bigint,
-  storage bigint,
-  bandwidth bigint,
-  build_time_unit bigint,
-  get bigint,
-  fail bigint,
-  install bigint,
-  uninstall bigint
+    mau bigint,
+    storage bigint,
+    bandwidth bigint,
+    build_time_unit bigint,
+    get bigint,
+    fail bigint,
+    install bigint,
+    uninstall bigint
 ) LANGUAGE plpgsql VOLATILE SECURITY DEFINER
 SET search_path = '' AS $function$
 DECLARE
@@ -164,14 +166,14 @@ REVOKE ALL ON FUNCTION public.get_total_metrics(uuid) FROM public;
 GRANT ALL ON FUNCTION public.get_total_metrics(uuid) TO service_role;
 
 CREATE FUNCTION public.get_total_metrics() RETURNS TABLE (
-  mau bigint,
-  storage bigint,
-  bandwidth bigint,
-  build_time_unit bigint,
-  get bigint,
-  fail bigint,
-  install bigint,
-  uninstall bigint
+    mau bigint,
+    storage bigint,
+    bandwidth bigint,
+    build_time_unit bigint,
+    get bigint,
+    fail bigint,
+    install bigint,
+    uninstall bigint
 ) LANGUAGE plpgsql VOLATILE SECURITY DEFINER
 SET search_path = '' AS $function$
 DECLARE
