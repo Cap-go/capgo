@@ -13,7 +13,7 @@ USING (
         public.check_min_rights(
             'super_admin'::public.user_min_right,
             auth_check.uid,
-            auth_check.org_id,
+            audit_logs.org_id,
             NULL::character varying,
             NULL::bigint
         )

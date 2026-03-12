@@ -1103,24 +1103,10 @@ BEGIN
       (public.rbac_perm_channel_rollback_bundle(), public.rbac_scope_channel(), 'Rollback bundle on channel'),
       (public.rbac_perm_channel_manage_forced_devices(), public.rbac_scope_channel(), 'Manage forced devices'),
       (public.rbac_perm_channel_read_forced_devices(), public.rbac_scope_channel(), 'Read forced devices'),
-      (public.rbac_perm_channel_read_audit(), public.rbac_scope_channel(), 'Read channel-level audit'),
-      (public.rbac_perm_platform_impersonate_user(), public.rbac_scope_platform(), 'Support/impersonation'),
-      (public.rbac_perm_platform_manage_orgs_any(), public.rbac_scope_platform(), 'Administer any org'),
-      (public.rbac_perm_platform_manage_apps_any(), public.rbac_scope_platform(), 'Administer any app'),
-      (public.rbac_perm_platform_manage_channels_any(), public.rbac_scope_platform(), 'Administer any channel'),
-      (public.rbac_perm_platform_run_maintenance_jobs(), public.rbac_scope_platform(), 'Run maintenance/ops jobs'),
-      (public.rbac_perm_platform_delete_orphan_users(), public.rbac_scope_platform(), 'Delete orphan users'),
-      (public.rbac_perm_platform_read_all_audit(), public.rbac_scope_platform(), 'Read all audit trails'),
-      (public.rbac_perm_platform_db_break_glass(), public.rbac_scope_platform(), 'Emergency direct DB access')
+      (public.rbac_perm_channel_read_audit(), public.rbac_scope_channel(), 'Read channel-level audit')
     ON CONFLICT (key) DO NOTHING;
 
     -- Attach permissions to roles
-    -- platform_super_admin: full control
-    INSERT INTO public.role_permissions (role_id, permission_id)
-    SELECT r.id, p.id FROM public.roles r JOIN public.permissions p ON TRUE
-    WHERE r.name = public.rbac_role_platform_super_admin()
-    ON CONFLICT DO NOTHING;
-
     -- org_super_admin: full org + app + channel control
     INSERT INTO public.role_permissions (role_id, permission_id)
     SELECT r.id, p.id FROM public.roles r

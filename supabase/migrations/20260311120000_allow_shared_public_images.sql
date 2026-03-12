@@ -60,7 +60,7 @@ USING (
                 SELECT 1
                 FROM public.org_users AS ou
                 WHERE
-                    ou.user_id::text = (storage.foldername(ou.name))[1]
+                    ou.user_id::text = (storage.foldername(storage.objects.name))[1]
                     AND public.check_min_rights(
                         'read'::public.user_min_right,
                         public.get_identity_org_allowed(

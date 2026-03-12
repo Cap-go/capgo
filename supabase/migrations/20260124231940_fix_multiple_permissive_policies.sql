@@ -278,7 +278,7 @@ WITH CHECK (
             public.check_min_rights(
                 public.rbac_right_admin()::public.user_min_right,
                 auth_user.uid,
-                auth_user.org_id,
+                groups.org_id,
                 null::varchar,
                 null::bigint
             )
@@ -296,7 +296,7 @@ USING (
             public.check_min_rights(
                 public.rbac_right_admin()::public.user_min_right,
                 auth_user.uid,
-                auth_user.org_id,
+                groups.org_id,
                 null::varchar,
                 null::bigint
             )
@@ -314,7 +314,7 @@ USING (
             public.check_min_rights(
                 public.rbac_right_admin()::public.user_min_right,
                 auth_user.uid,
-                auth_user.org_id,
+                groups.org_id,
                 null::varchar,
                 null::bigint
             )
@@ -487,17 +487,17 @@ WITH CHECK (
             public.is_admin(auth_user.uid)
             OR
             (
-                auth_user.scope_type = public.rbac_scope_org()
+                role_bindings.scope_type = public.rbac_scope_org()
                 AND public.check_min_rights(
                     public.rbac_right_admin()::public.user_min_right,
                     auth_user.uid,
-                    auth_user.org_id,
+                    role_bindings.org_id,
                     null::varchar,
                     null::bigint
                 )
             )
             OR
-            (auth_user.scope_type = public.rbac_scope_app() AND EXISTS (
+            (role_bindings.scope_type = public.rbac_scope_app() AND EXISTS (
                 SELECT 1 FROM public.apps
                 WHERE
                     apps.id = role_bindings.app_id
@@ -510,7 +510,7 @@ WITH CHECK (
                     )
             ))
             OR
-            (auth_user.scope_type = public.rbac_scope_channel() AND EXISTS (
+            (role_bindings.scope_type = public.rbac_scope_channel() AND EXISTS (
                 SELECT 1 FROM public.channels
                 INNER JOIN public.apps ON channels.app_id = apps.app_id
                 WHERE
@@ -537,17 +537,17 @@ USING (
             public.is_admin(auth_user.uid)
             OR
             (
-                auth_user.scope_type = public.rbac_scope_org()
+                role_bindings.scope_type = public.rbac_scope_org()
                 AND public.check_min_rights(
                     public.rbac_right_admin()::public.user_min_right,
                     auth_user.uid,
-                    auth_user.org_id,
+                    role_bindings.org_id,
                     null::varchar,
                     null::bigint
                 )
             )
             OR
-            (auth_user.scope_type = public.rbac_scope_app() AND EXISTS (
+            (role_bindings.scope_type = public.rbac_scope_app() AND EXISTS (
                 SELECT 1 FROM public.apps
                 WHERE
                     apps.id = role_bindings.app_id
@@ -560,7 +560,7 @@ USING (
                     )
             ))
             OR
-            (auth_user.scope_type = public.rbac_scope_channel() AND EXISTS (
+            (role_bindings.scope_type = public.rbac_scope_channel() AND EXISTS (
                 SELECT 1 FROM public.channels
                 INNER JOIN public.apps ON channels.app_id = apps.app_id
                 WHERE
@@ -589,18 +589,18 @@ USING (
             OR
             -- Org admin for org-scoped bindings
             (
-                auth_user.scope_type = public.rbac_scope_org()
+                role_bindings.scope_type = public.rbac_scope_org()
                 AND public.check_min_rights(
                     public.rbac_right_admin()::public.user_min_right,
                     auth_user.uid,
-                    auth_user.org_id,
+                    role_bindings.org_id,
                     null::varchar,
                     null::bigint
                 )
             )
             OR
             -- App admin for app-scoped bindings
-            (auth_user.scope_type = public.rbac_scope_app() AND EXISTS (
+            (role_bindings.scope_type = public.rbac_scope_app() AND EXISTS (
                 SELECT 1 FROM public.apps
                 WHERE
                     apps.id = role_bindings.app_id
@@ -614,7 +614,7 @@ USING (
             ))
             OR
             -- Channel admin for channel-scoped bindings
-            (auth_user.scope_type = public.rbac_scope_channel() AND EXISTS (
+            (role_bindings.scope_type = public.rbac_scope_channel() AND EXISTS (
                 SELECT 1 FROM public.channels
                 INNER JOIN public.apps ON channels.app_id = apps.app_id
                 WHERE
@@ -630,17 +630,17 @@ USING (
             OR
             -- Users with app.update_user_roles permission can delete app-scoped bindings
             (
-                auth_user.scope_type = public.rbac_scope_app()
+                role_bindings.scope_type = public.rbac_scope_app()
                 AND public.user_has_app_update_user_roles(
-                    auth_user.uid, auth_user.app_id
+                    auth_user.uid, role_bindings.app_id
                 )
             )
             OR
             -- Users can delete their own app-scoped bindings
             (
-                auth_user.scope_type = public.rbac_scope_app()
-                AND auth_user.principal_type = public.rbac_principal_user()
-                AND auth_user.principal_id = auth_user.uid
+                role_bindings.scope_type = public.rbac_scope_app()
+                AND role_bindings.principal_type = public.rbac_principal_user()
+                AND role_bindings.principal_id = auth_user.uid
             )
     )
 );

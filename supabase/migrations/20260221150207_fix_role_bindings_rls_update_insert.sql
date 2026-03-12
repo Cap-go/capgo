@@ -24,18 +24,18 @@ WITH CHECK (
             OR
             -- Org admin for org-scoped bindings
             (
-                auth_user.scope_type = public.rbac_scope_org()
+                role_bindings.scope_type = public.rbac_scope_org()
                 AND public.check_min_rights(
                     public.rbac_right_admin()::public.user_min_right,
                     auth_user.uid,
-                    auth_user.org_id,
+                    role_bindings.org_id,
                     NULL::varchar,
                     NULL::bigint
                 )
             )
             OR
             -- App admin (legacy path) or users with app.update_user_roles permission
-            (auth_user.scope_type = public.rbac_scope_app() AND EXISTS (
+            (role_bindings.scope_type = public.rbac_scope_app() AND EXISTS (
                 SELECT 1 FROM public.apps
                 WHERE
                     apps.id = role_bindings.app_id
@@ -64,7 +64,7 @@ WITH CHECK (
             ))
             OR
             -- Channel admin for channel-scoped bindings
-            (auth_user.scope_type = public.rbac_scope_channel() AND EXISTS (
+            (role_bindings.scope_type = public.rbac_scope_channel() AND EXISTS (
                 SELECT 1 FROM public.channels
                 INNER JOIN public.apps ON channels.app_id = apps.app_id
                 WHERE
@@ -104,18 +104,18 @@ USING (
             OR
             -- Org admin for org-scoped bindings
             (
-                auth_user.scope_type = public.rbac_scope_org()
+                role_bindings.scope_type = public.rbac_scope_org()
                 AND public.check_min_rights(
                     public.rbac_right_admin()::public.user_min_right,
                     auth_user.uid,
-                    auth_user.org_id,
+                    role_bindings.org_id,
                     NULL::varchar,
                     NULL::bigint
                 )
             )
             OR
             -- App admin (legacy path) or users with app.update_user_roles permission
-            (auth_user.scope_type = public.rbac_scope_app() AND EXISTS (
+            (role_bindings.scope_type = public.rbac_scope_app() AND EXISTS (
                 SELECT 1 FROM public.apps
                 WHERE
                     apps.id = role_bindings.app_id
@@ -144,7 +144,7 @@ USING (
             ))
             OR
             -- Channel admin for channel-scoped bindings
-            (auth_user.scope_type = public.rbac_scope_channel() AND EXISTS (
+            (role_bindings.scope_type = public.rbac_scope_channel() AND EXISTS (
                 SELECT 1 FROM public.channels
                 INNER JOIN public.apps ON channels.app_id = apps.app_id
                 WHERE

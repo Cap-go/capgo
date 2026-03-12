@@ -48,7 +48,7 @@ USING (
                 SELECT 1
                 FROM public.org_users AS ou
                 WHERE
-                    ou.user_id::text = (storage.foldername(ou.name))[1]
+                    ou.user_id::text = (storage.foldername(storage.objects.name))[1]
                     AND public.check_min_rights(
                         'read'::public.user_min_right,
                         public.get_identity_org_allowed(
@@ -111,7 +111,7 @@ WITH CHECK (
             WHERE
                 auth_user.uid IS NOT NULL
                 AND auth_user.uid::text
-                = (storage.foldername(auth_user.name))[1]
+                = (storage.foldername(storage.objects.name))[1]
         )
     )
 );
@@ -161,7 +161,7 @@ USING (
             WHERE
                 auth_user.uid IS NOT NULL
                 AND auth_user.uid::text
-                = (storage.foldername(auth_user.name))[1]
+                = (storage.foldername(storage.objects.name))[1]
         )
     )
 )
@@ -204,7 +204,7 @@ WITH CHECK (
             WHERE
                 auth_user.uid IS NOT NULL
                 AND auth_user.uid::text
-                = (storage.foldername(auth_user.name))[1]
+                = (storage.foldername(storage.objects.name))[1]
         )
     )
 );
@@ -254,7 +254,7 @@ USING (
             WHERE
                 auth_user.uid IS NOT NULL
                 AND auth_user.uid::text
-                = (storage.foldername(auth_user.name))[1]
+                = (storage.foldername(storage.objects.name))[1]
         )
     )
 );
