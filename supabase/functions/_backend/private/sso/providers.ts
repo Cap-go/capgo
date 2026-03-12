@@ -112,6 +112,9 @@ app.post('/', async (c) => {
   const body = validation.data
   const attributeMapping = parseAttributeMapping(body.attribute_mapping)
   const domain = body.domain.trim().toLowerCase()
+  if (!domain) {
+    throw simpleError('invalid_body', 'domain must not be empty')
+  }
 
   await requireManageSsoPermission(c, body.org_id)
   await requireEnterprisePlan(c, body.org_id)

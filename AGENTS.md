@@ -293,6 +293,8 @@ Then in your test file, use ONLY these dedicated resources for modifications.
 
 - Avoid introducing new PostgreSQL extensions if an existing feature or SQL
   approach can solve the same requirement.
+- If an extension is truly unavoidable, add it only with explicit user
+  consent and never by default.
 - If there is no practical alternative, add a migration with a clear fallback plan.
 - Never enable a new PostgreSQL extension without explicit user consent before
   applying it.
