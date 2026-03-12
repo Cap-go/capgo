@@ -347,6 +347,29 @@ REVOKE ALL ON FUNCTION public.is_platform_admin(userid uuid) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.is_platform_admin(userid uuid) TO "service_role";
 ```
 
+### Platform Admin Guardrails
+
+Platform admin is **NOT** a general-purpose superuser capability.
+
+- The only allowed platform-admin user action is spoofing/impersonating another
+  user.
+- The admin dashboard must stay read-only and limited to admin statistics,
+  observability, and similar reporting.
+- Never build a platform-admin write path that can change org membership, RBAC
+  bindings, roles, permissions, billing state, app ownership, or any other
+  privilege-bearing state.
+- Never use platform admin as a shortcut around normal auth/RLS for mutating
+  APIs. If an action could cause privilege elevation, do not expose it behind
+  platform admin.
+- Platform admins are defined at runtime from the `admin_users` secret/env var,
+  not from database state.
+- There must be no API, UI, or database path to grant/revoke platform admin
+  dynamically. The only supported way to change platform admins is to publish a
+  new runtime version with updated environment configuration.
+- If a privileged operational action is needed beyond impersonation or reading
+  admin stats, implement it as a strictly internal service-role-only path, not
+  as a platform-admin feature.
+
 ### RLS Policy Optimization Rules
 
 **Rule 1: One policy per table per operation.**
