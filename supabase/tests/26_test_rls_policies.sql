@@ -41,7 +41,7 @@ SELECT
     policies_are(
         'public',
         'global_stats',
-        ARRAY[]::text[],
+        ARRAY[]::text [],
         'global_stats should have correct policies'
     );
 

@@ -1,12 +1,12 @@
 -- Harden invite_user_to_org RPC against anonymous enumeration and disclosure.
 
 CREATE OR REPLACE FUNCTION public.invite_user_to_org(
-  "email" character varying,
-  "org_id" uuid,
-  "invite_type" public.user_min_right
+    "email" character varying,
+    "org_id" uuid,
+    "invite_type" public.user_min_right
 ) RETURNS character varying
-  LANGUAGE plpgsql SECURITY DEFINER
-  SET search_path = ''
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = ''
 AS $$
 DECLARE
   org record;
@@ -117,25 +117,25 @@ END;
 $$;
 
 REVOKE EXECUTE ON FUNCTION public.invite_user_to_org(
-  character varying,
-  uuid,
-  public.user_min_right
-) FROM PUBLIC;
+    character varying,
+    uuid,
+    public.user_min_right
+) FROM public;
 
 GRANT EXECUTE ON FUNCTION public.invite_user_to_org(
-  character varying,
-  uuid,
-  public.user_min_right
-) TO "anon";
+    character varying,
+    uuid,
+    public.user_min_right
+) TO anon;
 
 GRANT EXECUTE ON FUNCTION public.invite_user_to_org(
-  character varying,
-  uuid,
-  public.user_min_right
-) TO "authenticated";
+    character varying,
+    uuid,
+    public.user_min_right
+) TO authenticated;
 
 GRANT EXECUTE ON FUNCTION public.invite_user_to_org(
-  character varying,
-  uuid,
-  public.user_min_right
-) TO "service_role";
+    character varying,
+    uuid,
+    public.user_min_right
+) TO service_role;

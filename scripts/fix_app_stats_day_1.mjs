@@ -1,7 +1,7 @@
 // list all apps in supabase and create version unknown for each
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = 'https://xvwzpoazmxkqosrdewyv.supabase.co'
+const supabaseUrl = 'https://sb.capgo.app'
 const supabaseAnonKey = '***'
 
 export function useSupabase() {
