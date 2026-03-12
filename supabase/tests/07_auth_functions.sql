@@ -62,7 +62,9 @@ SELECT
 SELECT tests.clear_authentication();
 
 -- Test split behavior when platform role exists (platform role should not affect is_platform_admin)
+-- Enable RBAC so is_admin() checks role bindings instead of returning false
 SET LOCAL ROLE service_role;
+UPDATE public.rbac_settings SET use_new_rbac = true WHERE id = 1;
 INSERT INTO public.role_bindings (
     principal_type,
     principal_id,
