@@ -288,6 +288,7 @@
   },
   "trustedDependencies": [
     "@sentry/cli",
+    "supabase",
     "core-js"
   ]
 }
