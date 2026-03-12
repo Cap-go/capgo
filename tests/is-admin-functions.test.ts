@@ -39,9 +39,9 @@ describe('is_admin / is_platform_admin SQL functions', () => {
 
   afterAll(async () => {
     await pool.end()
-  })
+  }, 30000)
 
-  it.concurrent('is_platform_admin remains vault-based while is_admin is RBAC-only', async () => {
+  it('is_platform_admin remains vault-based while is_admin is RBAC-only', async () => {
     const legacyAdmin = 'c591b04e-cf29-4945-b9a0-776d0672061a'
     const nonAdmin = randomUUID()
 
@@ -67,7 +67,7 @@ describe('is_admin / is_platform_admin SQL functions', () => {
     expect(regular.rows[0].is_platform_admin).toBe(false)
   })
 
-  it.concurrent('keeps is_platform_admin tied to admin_users (no RBAC role check)', async () => {
+  it('keeps is_platform_admin tied to admin_users (no RBAC role check)', async () => {
     const rbacUserId = randomUUID()
     const normalUserId = randomUUID()
 
