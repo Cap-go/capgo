@@ -90,7 +90,7 @@ export const install: UserModule = ({ router }) => {
         console.error('SSO enforcement check returned error status:', response.status)
         clearSsoEnforcementCache()
         await supabase.auth.signOut()
-        return next('/login?sso_required=true')
+        return next('/login?sso_error=enforcement_check_failed')
       }
 
       const data: SsoEnforcementResponse = await response.json()
