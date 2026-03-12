@@ -48,7 +48,7 @@ GRANT ALL ON FUNCTION public.is_platform_admin() TO service_role;
 
 COMMENT ON FUNCTION public.is_platform_admin(
     uuid
-) IS 'Checks if a user is platform admin from admin_users secret. Always requires MFA.';
+) IS 'Checks platform admin status from admin_users and requires MFA.';
 
 -- ---------------------------------------------------------------------------
 -- RLS migration:
@@ -215,8 +215,10 @@ WHERE scope_type = public.rbac_scope_platform();
 DROP INDEX IF EXISTS public.role_bindings_platform_scope_uniq;
 
 ALTER TABLE public.roles DROP CONSTRAINT IF EXISTS roles_scope_type_no_platform;
-ALTER TABLE public.permissions DROP CONSTRAINT IF EXISTS permissions_scope_type_no_platform;
-ALTER TABLE public.role_bindings DROP CONSTRAINT IF EXISTS role_bindings_scope_type_no_platform;
+ALTER TABLE public.permissions
+DROP CONSTRAINT IF EXISTS permissions_scope_type_no_platform;
+ALTER TABLE public.role_bindings
+DROP CONSTRAINT IF EXISTS role_bindings_scope_type_no_platform;
 
 ALTER TABLE public.roles
 ADD CONSTRAINT roles_scope_type_no_platform
@@ -579,6 +581,506 @@ BEGIN
   END IF;
 END;
 $$;
+
+-- ---------------------------------------------------------------------------
+-- Explicitly rebuild the known RBAC policies that historically referenced
+-- public.is_admin(). Relying only on pg_policies text replacement is brittle
+-- because PostgreSQL can deparse policy expressions differently across
+-- environments.
+-- ---------------------------------------------------------------------------
+DROP POLICY IF EXISTS roles_insert ON public.roles;
+DROP POLICY IF EXISTS roles_update ON public.roles;
+DROP POLICY IF EXISTS roles_delete ON public.roles;
+
+CREATE POLICY roles_insert ON public.roles
+FOR INSERT
+TO authenticated
+WITH CHECK (false);
+
+CREATE POLICY roles_update ON public.roles
+FOR UPDATE
+TO authenticated
+USING (false);
+
+CREATE POLICY roles_delete ON public.roles
+FOR DELETE
+TO authenticated
+USING (false);
+
+DROP POLICY IF EXISTS permissions_insert ON public.permissions;
+DROP POLICY IF EXISTS permissions_update ON public.permissions;
+DROP POLICY IF EXISTS permissions_delete ON public.permissions;
+
+CREATE POLICY permissions_insert ON public.permissions
+FOR INSERT
+TO authenticated
+WITH CHECK (false);
+
+CREATE POLICY permissions_update ON public.permissions
+FOR UPDATE
+TO authenticated
+USING (false);
+
+CREATE POLICY permissions_delete ON public.permissions
+FOR DELETE
+TO authenticated
+USING (false);
+
+DROP POLICY IF EXISTS role_permissions_insert ON public.role_permissions;
+DROP POLICY IF EXISTS role_permissions_update ON public.role_permissions;
+DROP POLICY IF EXISTS role_permissions_delete ON public.role_permissions;
+
+CREATE POLICY role_permissions_insert ON public.role_permissions
+FOR INSERT
+TO authenticated
+WITH CHECK (false);
+
+CREATE POLICY role_permissions_update ON public.role_permissions
+FOR UPDATE
+TO authenticated
+USING (false);
+
+CREATE POLICY role_permissions_delete ON public.role_permissions
+FOR DELETE
+TO authenticated
+USING (false);
+
+DROP POLICY IF EXISTS role_hierarchy_insert ON public.role_hierarchy;
+DROP POLICY IF EXISTS role_hierarchy_update ON public.role_hierarchy;
+DROP POLICY IF EXISTS role_hierarchy_delete ON public.role_hierarchy;
+
+CREATE POLICY role_hierarchy_insert ON public.role_hierarchy
+FOR INSERT
+TO authenticated
+WITH CHECK (false);
+
+CREATE POLICY role_hierarchy_update ON public.role_hierarchy
+FOR UPDATE
+TO authenticated
+USING (false);
+
+CREATE POLICY role_hierarchy_delete ON public.role_hierarchy
+FOR DELETE
+TO authenticated
+USING (false);
+
+DROP POLICY IF EXISTS groups_select ON public.groups;
+DROP POLICY IF EXISTS groups_insert ON public.groups;
+DROP POLICY IF EXISTS groups_update ON public.groups;
+DROP POLICY IF EXISTS groups_delete ON public.groups;
+
+CREATE POLICY groups_select ON public.groups
+FOR SELECT
+TO authenticated
+USING (
+    EXISTS (
+        SELECT 1 FROM (SELECT auth.uid() AS current_uid) AS actor_ref
+        WHERE EXISTS (
+            SELECT 1 FROM public.org_users
+            WHERE
+                org_users.org_id = groups.org_id
+                AND org_users.user_id = actor_ref.current_uid
+        )
+    )
+);
+
+CREATE POLICY groups_insert ON public.groups
+FOR INSERT
+TO authenticated
+WITH CHECK (
+    EXISTS (
+        SELECT 1 FROM (SELECT auth.uid() AS current_uid) AS actor_ref
+        WHERE public.check_min_rights(
+            public.rbac_right_admin()::public.user_min_right,
+            actor_ref.current_uid,
+            groups.org_id,
+            null::varchar,
+            null::bigint
+        )
+    )
+);
+
+CREATE POLICY groups_update ON public.groups
+FOR UPDATE
+TO authenticated
+USING (
+    EXISTS (
+        SELECT 1 FROM (SELECT auth.uid() AS current_uid) AS actor_ref
+        WHERE public.check_min_rights(
+            public.rbac_right_admin()::public.user_min_right,
+            actor_ref.current_uid,
+            groups.org_id,
+            null::varchar,
+            null::bigint
+        )
+    )
+);
+
+CREATE POLICY groups_delete ON public.groups
+FOR DELETE
+TO authenticated
+USING (
+    EXISTS (
+        SELECT 1 FROM (SELECT auth.uid() AS current_uid) AS actor_ref
+        WHERE public.check_min_rights(
+            public.rbac_right_admin()::public.user_min_right,
+            actor_ref.current_uid,
+            groups.org_id,
+            null::varchar,
+            null::bigint
+        )
+    )
+);
+
+DROP POLICY IF EXISTS group_members_select ON public.group_members;
+DROP POLICY IF EXISTS group_members_insert ON public.group_members;
+DROP POLICY IF EXISTS group_members_update ON public.group_members;
+DROP POLICY IF EXISTS group_members_delete ON public.group_members;
+
+CREATE POLICY group_members_select ON public.group_members
+FOR SELECT
+TO authenticated
+USING (
+    EXISTS (
+        SELECT 1 FROM (SELECT auth.uid() AS current_uid) AS actor_ref
+        WHERE EXISTS (
+            SELECT 1 FROM public.groups
+            INNER JOIN public.org_users ON groups.org_id = org_users.org_id
+            WHERE
+                groups.id = group_members.group_id
+                AND org_users.user_id = actor_ref.current_uid
+        )
+    )
+);
+
+CREATE POLICY group_members_insert ON public.group_members
+FOR INSERT
+TO authenticated
+WITH CHECK (
+    EXISTS (
+        SELECT 1 FROM (SELECT auth.uid() AS current_uid) AS actor_ref
+        WHERE EXISTS (
+            SELECT 1 FROM public.groups
+            WHERE
+                groups.id = group_members.group_id
+                AND public.check_min_rights(
+                    public.rbac_right_admin()::public.user_min_right,
+                    actor_ref.current_uid,
+                    groups.org_id,
+                    null::varchar,
+                    null::bigint
+                )
+        )
+    )
+);
+
+CREATE POLICY group_members_update ON public.group_members
+FOR UPDATE
+TO authenticated
+USING (
+    EXISTS (
+        SELECT 1 FROM (SELECT auth.uid() AS current_uid) AS actor_ref
+        WHERE EXISTS (
+            SELECT 1 FROM public.groups
+            WHERE
+                groups.id = group_members.group_id
+                AND public.check_min_rights(
+                    public.rbac_right_admin()::public.user_min_right,
+                    actor_ref.current_uid,
+                    groups.org_id,
+                    null::varchar,
+                    null::bigint
+                )
+        )
+    )
+);
+
+CREATE POLICY group_members_delete ON public.group_members
+FOR DELETE
+TO authenticated
+USING (
+    EXISTS (
+        SELECT 1 FROM (SELECT auth.uid() AS current_uid) AS actor_ref
+        WHERE EXISTS (
+            SELECT 1 FROM public.groups
+            WHERE
+                groups.id = group_members.group_id
+                AND public.check_min_rights(
+                    public.rbac_right_admin()::public.user_min_right,
+                    actor_ref.current_uid,
+                    groups.org_id,
+                    null::varchar,
+                    null::bigint
+                )
+        )
+    )
+);
+
+DROP POLICY IF EXISTS role_bindings_select ON public.role_bindings;
+DROP POLICY IF EXISTS role_bindings_insert ON public.role_bindings;
+DROP POLICY IF EXISTS role_bindings_update ON public.role_bindings;
+DROP POLICY IF EXISTS role_bindings_delete ON public.role_bindings;
+
+CREATE POLICY role_bindings_select ON public.role_bindings
+FOR SELECT
+TO authenticated
+USING (
+    EXISTS (
+        SELECT 1 FROM (SELECT auth.uid() AS current_uid) AS actor_ref
+        WHERE
+            public.is_user_org_admin(
+                actor_ref.current_uid,
+                role_bindings.org_id
+            )
+            OR
+            (
+                role_bindings.scope_type = public.rbac_scope_app()
+                AND public.is_user_app_admin(
+                    actor_ref.current_uid,
+                    role_bindings.app_id
+                )
+            )
+            OR
+            (
+                role_bindings.scope_type = public.rbac_scope_app()
+                AND role_bindings.app_id IS NOT null
+                AND public.user_has_role_in_app(
+                    actor_ref.current_uid,
+                    role_bindings.app_id
+                )
+            )
+            OR
+            (
+                role_bindings.scope_type = public.rbac_scope_channel()
+                AND role_bindings.channel_id IS NOT null
+                AND EXISTS (
+                    SELECT 1 FROM public.channels AS c
+                    INNER JOIN public.apps AS a ON c.app_id = a.app_id
+                    WHERE
+                        c.rbac_id = role_bindings.channel_id
+                        AND public.is_user_app_admin(
+                            actor_ref.current_uid,
+                            a.id
+                        )
+                )
+            )
+    )
+);
+
+CREATE POLICY role_bindings_insert ON public.role_bindings
+FOR INSERT
+TO authenticated
+WITH CHECK (
+    EXISTS (
+        SELECT 1 FROM (SELECT auth.uid() AS current_uid) AS actor_ref
+        WHERE
+            (
+                role_bindings.scope_type = public.rbac_scope_org()
+                AND public.check_min_rights(
+                    public.rbac_right_admin()::public.user_min_right,
+                    actor_ref.current_uid,
+                    role_bindings.org_id,
+                    null::varchar,
+                    null::bigint
+                )
+            )
+            OR
+            (
+                role_bindings.scope_type = public.rbac_scope_app()
+                AND EXISTS (
+                    SELECT 1 FROM public.apps
+                    WHERE
+                        apps.id = role_bindings.app_id
+                        AND (
+                            public.check_min_rights(
+                                (
+                                    public.rbac_right_admin()
+                                )::public.user_min_right,
+                                public.get_identity_org_appid(
+                                    '{all}'::public.key_mode [],
+                                    apps.owner_org,
+                                    apps.app_id
+                                ),
+                                apps.owner_org,
+                                apps.app_id,
+                                null::bigint
+                            )
+                            OR
+                            public.user_has_app_update_user_roles(
+                                public.get_identity_org_appid(
+                                    '{all}'::public.key_mode [],
+                                    apps.owner_org,
+                                    apps.app_id
+                                ),
+                                apps.id
+                            )
+                        )
+                )
+            )
+            OR
+            (
+                role_bindings.scope_type = public.rbac_scope_channel()
+                AND EXISTS (
+                    SELECT 1 FROM public.channels
+                    INNER JOIN public.apps ON channels.app_id = apps.app_id
+                    WHERE
+                        channels.rbac_id = role_bindings.channel_id
+                        AND public.check_min_rights(
+                            public.rbac_right_admin()::public.user_min_right,
+                            public.get_identity_org_appid(
+                                '{all}'::public.key_mode [],
+                                apps.owner_org,
+                                apps.app_id
+                            ),
+                            apps.owner_org,
+                            channels.app_id,
+                            channels.id
+                        )
+                )
+            )
+    )
+);
+
+CREATE POLICY role_bindings_update ON public.role_bindings
+FOR UPDATE
+TO authenticated
+USING (
+    EXISTS (
+        SELECT 1 FROM (SELECT auth.uid() AS current_uid) AS actor_ref
+        WHERE
+            (
+                role_bindings.scope_type = public.rbac_scope_org()
+                AND public.check_min_rights(
+                    public.rbac_right_admin()::public.user_min_right,
+                    actor_ref.current_uid,
+                    role_bindings.org_id,
+                    null::varchar,
+                    null::bigint
+                )
+            )
+            OR
+            (
+                role_bindings.scope_type = public.rbac_scope_app()
+                AND EXISTS (
+                    SELECT 1 FROM public.apps
+                    WHERE
+                        apps.id = role_bindings.app_id
+                        AND (
+                            public.check_min_rights(
+                                (
+                                    public.rbac_right_admin()
+                                )::public.user_min_right,
+                                public.get_identity_org_appid(
+                                    '{all}'::public.key_mode [],
+                                    apps.owner_org,
+                                    apps.app_id
+                                ),
+                                apps.owner_org,
+                                apps.app_id,
+                                null::bigint
+                            )
+                            OR
+                            public.user_has_app_update_user_roles(
+                                public.get_identity_org_appid(
+                                    '{all}'::public.key_mode [],
+                                    apps.owner_org,
+                                    apps.app_id
+                                ),
+                                apps.id
+                            )
+                        )
+                )
+            )
+            OR
+            (
+                role_bindings.scope_type = public.rbac_scope_channel()
+                AND EXISTS (
+                    SELECT 1 FROM public.channels
+                    INNER JOIN public.apps ON channels.app_id = apps.app_id
+                    WHERE
+                        channels.rbac_id = role_bindings.channel_id
+                        AND public.check_min_rights(
+                            public.rbac_right_admin()::public.user_min_right,
+                            public.get_identity_org_appid(
+                                '{all}'::public.key_mode [],
+                                apps.owner_org,
+                                apps.app_id
+                            ),
+                            apps.owner_org,
+                            channels.app_id,
+                            channels.id
+                        )
+                )
+            )
+    )
+);
+
+CREATE POLICY role_bindings_delete ON public.role_bindings
+FOR DELETE
+TO authenticated
+USING (
+    EXISTS (
+        SELECT 1 FROM (SELECT auth.uid() AS current_uid) AS actor_ref
+        WHERE
+            (
+                role_bindings.scope_type = public.rbac_scope_org()
+                AND public.check_min_rights(
+                    public.rbac_right_admin()::public.user_min_right,
+                    actor_ref.current_uid,
+                    role_bindings.org_id,
+                    null::varchar,
+                    null::bigint
+                )
+            )
+            OR
+            (
+                role_bindings.scope_type = public.rbac_scope_app()
+                AND EXISTS (
+                    SELECT 1 FROM public.apps
+                    WHERE
+                        apps.id = role_bindings.app_id
+                        AND public.check_min_rights(
+                            public.rbac_right_admin()::public.user_min_right,
+                            actor_ref.current_uid,
+                            apps.owner_org,
+                            apps.app_id,
+                            null::bigint
+                        )
+                )
+            )
+            OR
+            (
+                role_bindings.scope_type = public.rbac_scope_channel()
+                AND EXISTS (
+                    SELECT 1 FROM public.channels
+                    INNER JOIN public.apps ON channels.app_id = apps.app_id
+                    WHERE
+                        channels.rbac_id = role_bindings.channel_id
+                        AND public.check_min_rights(
+                            public.rbac_right_admin()::public.user_min_right,
+                            actor_ref.current_uid,
+                            apps.owner_org,
+                            channels.app_id,
+                            channels.id
+                        )
+                )
+            )
+            OR
+            (
+                role_bindings.scope_type = public.rbac_scope_app()
+                AND public.user_has_app_update_user_roles(
+                    actor_ref.current_uid,
+                    role_bindings.app_id
+                )
+            )
+            OR
+            (
+                role_bindings.scope_type = public.rbac_scope_app()
+                AND role_bindings.principal_type = public.rbac_principal_user()
+                AND role_bindings.principal_id = actor_ref.current_uid
+            )
+    )
+);
 
 DROP FUNCTION IF EXISTS public.is_admin(userid uuid);
 DROP FUNCTION IF EXISTS public.is_admin();

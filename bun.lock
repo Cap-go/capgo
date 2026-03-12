@@ -154,6 +154,7 @@
     },
   },
   "trustedDependencies": [
+    "supabase",
     "@sentry/cli",
   ],
   "packages": {
