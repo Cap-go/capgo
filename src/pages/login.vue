@@ -219,11 +219,13 @@ async function handleSsoLogin() {
       domain,
       options: {
         redirectTo: redirectUrl.toString(),
+        captchaToken: turnstileToken.value,
       },
     })
 
     if (error) {
       console.error('SSO login error', error)
+      captchaComponent.value?.reset()
       toast.error(t('invalid-auth'))
       isLoading.value = false
       return
@@ -348,6 +350,13 @@ async function openScan() {
 async function checkLogin() {
   const parsedUrl = new URL(route.fullPath, window.location.origin)
   const params = new URLSearchParams(parsedUrl.search)
+
+  if (params.get('message') === 'sso_account_linked') {
+    parsedUrl.searchParams.delete('message')
+    window.history.replaceState({}, '', parsedUrl.toString())
+    toast.success(t('sso-account-linked'))
+  }
+
   const accessToken = params.get('access_token')
   const refreshToken = params.get('refresh_token')
 
@@ -371,6 +380,16 @@ async function checkLogin() {
   const session = sessionData?.session
   if (hasUser) {
     await checkAuthUser()
+  }
+  else if (!session && route.query.code && typeof route.query.code === 'string') {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(route.query.code)
+    if (!error && data.session) {
+      await nextLogin()
+    }
+    else {
+      isLoading.value = false
+      hideLoader()
+    }
   }
   else if (!session && route.hash) {
     await checkMagicLink()
@@ -532,6 +551,9 @@ onMounted(checkLogin)
                 <p class="text-sm text-gray-600 dark:text-gray-300">
                   {{ t('sso-detected') }}
                 </p>
+                <div v-if="!!captchaKey">
+                  <VueTurnstile ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
+                </div>
                 <div>
                   <div class="inline-flex justify-center items-center w-full">
                     <svg
