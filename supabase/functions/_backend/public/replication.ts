@@ -175,7 +175,7 @@ async function validateReplicationAccess(c: ReplicationContext) {
   })
 
   const userClient = supabaseClient(c, authorization)
-  const { data: isAdmin, error: adminError } = await userClient.rpc('is_admin')
+  const { data: isAdmin, error: adminError } = await userClient.rpc('is_platform_admin')
   if (adminError) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'replication_is_admin_error', error: adminError })
     throw quickError(500, 'is_admin_error', 'Unable to verify admin rights')

@@ -350,6 +350,13 @@ async function openScan() {
 async function checkLogin() {
   const parsedUrl = new URL(route.fullPath, window.location.origin)
   const params = new URLSearchParams(parsedUrl.search)
+
+  if (params.get('message') === 'sso_account_linked') {
+    parsedUrl.searchParams.delete('message')
+    window.history.replaceState({}, '', parsedUrl.toString())
+    toast.success(t('sso-account-linked'))
+  }
+
   const accessToken = params.get('access_token')
   const refreshToken = params.get('refresh_token')
 
@@ -373,6 +380,16 @@ async function checkLogin() {
   const session = sessionData?.session
   if (hasUser) {
     await checkAuthUser()
+  }
+  else if (!session && route.query.code && typeof route.query.code === 'string') {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(route.query.code)
+    if (!error && data.session) {
+      await nextLogin()
+    }
+    else {
+      isLoading.value = false
+      hideLoader()
+    }
   }
   else if (!session && route.hash) {
     await checkMagicLink()

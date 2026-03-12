@@ -321,6 +321,32 @@ END;
 $$;
 ```
 
+### PostgreSQL Function Permissioning (Least Privilege)
+
+For RPCs and helper functions, apply minimum privileges explicitly:
+
+- Start from deny-by-default and grant only required roles.
+- Set `OWNER` explicitly for each new function.
+- Use `REVOKE ALL ... FROM PUBLIC` to prevent public access drift from default ACLs.
+- If `uuid`-based checks exist, do not grant `anon` or `authenticated` unless there is a strict user-facing requirement.
+- Prefer granting only `service_role` for `uuid` overloads and keep user-context variants (`()`) on authenticated access only where needed.
+
+### SQL FUNCTION SECURITY (UPPERCASE RULES)
+
+WHEN ADDING AN ADMIN/PLATFORM-RBAC CHECK FUNCTION:
+- DEFINE ONE SERVICE-ROLE-ONLY `uuid` OVERLOAD FOR INTERNAL LOOKUPS.
+- DEFINE ONE USER-CONTEXT `()` OVERLOAD FOR CLIENT USAGE.
+- APPLY `REVOKE ALL ... FROM PUBLIC` TO EVERY OVERLOAD.
+- GRANT `service_role` TO `uuid` ONLY; GRANT `authenticated` ONLY TO `()` IF NEEDED.
+- KEEP `SET search_path = ''` AND `SECURITY DEFINER` EXPLICIT.
+- COMMENT THE BEHAVIOR (E.G., LEGACY VS PLATFORM SECRET CHECK) TO PREVENT REGRSSION.
+
+```sql
+ALTER FUNCTION public.is_platform_admin(userid uuid) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION public.is_platform_admin(userid uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.is_platform_admin(userid uuid) TO "service_role";
+```
+
 ### RLS Policy Optimization Rules
 
 **Rule 1: One policy per table per operation.**

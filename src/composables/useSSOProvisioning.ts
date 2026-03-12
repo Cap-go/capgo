@@ -6,7 +6,7 @@ export function useSSOProvisioning() {
   const isProvisioning = ref(false)
   const error = ref<string | null>(null)
 
-  async function provisionUser(session: Session): Promise<void> {
+  async function provisionUser(session: Session): Promise<{ merged: boolean }> {
     isProvisioning.value = true
     error.value = null
 
@@ -17,7 +17,7 @@ export function useSSOProvisioning() {
 
       if (!email) {
         error.value = 'No email found in session'
-        return
+        return { merged: false }
       }
 
       // Check if user has a public.users record
@@ -57,21 +57,24 @@ export function useSSOProvisioning() {
           console.error('SSO provisioning: provision request failed', provisionResponse.status, errorData)
           const errorMsg = typeof errorData.error === 'string' ? errorData.error : typeof errorData.message === 'string' ? errorData.message : null
           error.value = errorMsg ?? `Provisioning failed (${provisionResponse.status})`
+          return { merged: false }
         }
-        else {
-          const provisionData = await provisionResponse.json()
-          console.log('SSO provisioning: user provisioned successfully', provisionData)
-        }
+
+        const provisionData = await provisionResponse.json() as { success: boolean, merged?: boolean }
+        console.log('SSO provisioning: user provisioned successfully', provisionData)
+        return { merged: provisionData.merged === true }
       }
       catch (provisionError) {
         console.error('SSO provisioning: provision request error', provisionError)
         error.value = provisionError instanceof Error ? provisionError.message : 'Provisioning request failed'
+        return { merged: false }
       }
     }
     catch (err) {
       const message = err instanceof Error ? err.message : 'SSO provisioning failed'
       console.error('SSO provisioning error:', message)
       error.value = message
+      return { merged: false }
     }
     finally {
       isProvisioning.value = false
