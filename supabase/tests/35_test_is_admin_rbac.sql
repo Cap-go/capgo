@@ -1,6 +1,6 @@
 -- Test is_admin() with RBAC integration
 BEGIN;
-SELECT plan(7);
+SELECT plan(6);
 
 -- Test admin user: 'test_admin' maps to c591b04e-cf29-4945-b9a0-776d0672061a (admin@capgo.app)
 -- Test regular user: 'test_user' maps to 6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5 (test@capgo.app)
