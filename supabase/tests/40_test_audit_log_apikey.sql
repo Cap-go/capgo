@@ -17,11 +17,11 @@ BEGIN
 END $$;
 
 SELECT
-  is(
-    public.audit_logs_allowed_orgs(),
-    '{}'::uuid[],
-    'audit_logs_allowed_orgs returns empty without auth or API key'
-  );
+    is(
+        public.audit_logs_allowed_orgs(),
+        '{}'::uuid [],
+        'audit_logs_allowed_orgs returns empty without auth or API key'
+    );
 
 -- Test 2: audit_logs_allowed_orgs should include the org for a valid API key
 DO $$
@@ -30,27 +30,30 @@ BEGIN
 END $$;
 
 SELECT
-  ok(
-    '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid = ANY(public.audit_logs_allowed_orgs()),
-    'audit_logs_allowed_orgs includes the org for API key requests'
-  );
+    ok(
+        '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid
+        = any(public.audit_logs_allowed_orgs()),
+        'audit_logs_allowed_orgs includes the org for API key requests'
+    );
 
 -- Test 3: policy should be implemented via audit_logs_allowed_orgs (avoid per-row identity resolution)
 SELECT
-  ok(
-    position(
-      'audit_logs_allowed_orgs' in (
-        SELECT pg_get_expr(p.polqual, p.polrelid)
-        FROM pg_policy p
-        JOIN pg_class c ON c.oid = p.polrelid
-        JOIN pg_namespace n ON n.oid = c.relnamespace
-        WHERE n.nspname = 'public'
-          AND c.relname = 'audit_logs'
-          AND p.polname = 'Allow select for auth, api keys (super_admin+)'
-      )
-    ) > 0,
-    'audit_logs SELECT policy uses audit_logs_allowed_orgs()'
-  );
+    ok(
+        position(
+            'audit_logs_allowed_orgs' IN (
+                SELECT pg_get_expr(p.polqual, p.polrelid)
+                FROM pg_policy AS p
+                INNER JOIN pg_class AS c ON p.polrelid = c.oid
+                INNER JOIN pg_namespace AS n ON c.relnamespace = n.oid
+                WHERE
+                    n.nspname = 'public'
+                    AND c.relname = 'audit_logs'
+                    AND p.polname
+                    = 'Allow select for auth, api keys (super_admin+)'
+            )
+        ) > 0,
+        'audit_logs SELECT policy uses audit_logs_allowed_orgs()'
+    );
 
 -- Test 4: Verify get_identity returns user_id when API key header is set
 SELECT
