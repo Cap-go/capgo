@@ -96,25 +96,42 @@ onMounted(() => {
         <div v-if="dialogStore.dialogOptions?.buttons?.length" class="px-6 pb-6">
           <div class="flex justify-end space-x-2">
             <template v-for="(button, i) in dialogStore.dialogOptions.buttons" :key="i">
-              <component
-                :is="button.href ? 'a' : 'button'"
-                :href="button.href"
-                :target="button.target"
-                :rel="button.rel"
-                :type="button.href ? undefined : 'button'"
+              <button
+                v-if="!button.href"
+                type="button"
                 :class="{
                   'd-btn d-btn-primary': button.role === 'primary',
                   'd-btn d-btn-secondary': button.role === 'secondary',
                   'd-btn d-btn-warning': button.role === 'danger',
                   'd-btn d-btn-outline': button.role === 'cancel',
                   'd-btn': !button.role,
+                  'cursor-pointer': !button.disabled,
                   'opacity-70 cursor-not-allowed pointer-events-none': button.disabled,
                 }"
                 :disabled="button.disabled"
                 @click="handleButtonClick(button, $event)"
               >
                 {{ button.text }}
-              </component>
+              </button>
+
+              <a
+                v-else
+                :href="button.href"
+                :target="button.target"
+                :rel="button.rel"
+                :class="{
+                  'd-btn d-btn-primary': button.role === 'primary',
+                  'd-btn d-btn-secondary': button.role === 'secondary',
+                  'd-btn d-btn-warning': button.role === 'danger',
+                  'd-btn d-btn-outline': button.role === 'cancel',
+                  'd-btn': !button.role,
+                  'cursor-pointer': !button.disabled,
+                  'opacity-70 cursor-not-allowed pointer-events-none': button.disabled,
+                }"
+                @click="handleButtonClick(button, $event)"
+              >
+                {{ button.text }}
+              </a>
             </template>
           </div>
         </div>
