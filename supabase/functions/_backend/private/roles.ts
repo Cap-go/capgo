@@ -60,7 +60,7 @@ app.get('/:scope_type', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
-  if (!['platform', 'org', 'app', 'channel'].includes(scopeType)) {
+  if (!['org', 'app', 'channel'].includes(scopeType)) {
     return c.json({ error: 'Invalid scope_type' }, 400)
   }
 

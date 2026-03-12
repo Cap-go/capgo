@@ -30,11 +30,11 @@ INSERT INTO public.cron_tasks (
     null
 )
 ON CONFLICT (name) DO UPDATE SET
-    description = EXCLUDED.description,
-    task_type = EXCLUDED.task_type,
-    target = EXCLUDED.target,
-    minute_interval = EXCLUDED.minute_interval,
-    run_at_second = EXCLUDED.run_at_second,
+    description = excluded.description,
+    task_type = excluded.task_type,
+    target = excluded.target,
+    minute_interval = excluded.minute_interval,
+    run_at_second = excluded.run_at_second,
     updated_at = NOW();
 
 INSERT INTO public.cron_tasks (
@@ -67,9 +67,9 @@ INSERT INTO public.cron_tasks (
     null
 )
 ON CONFLICT (name) DO UPDATE SET
-    description = EXCLUDED.description,
-    task_type = EXCLUDED.task_type,
-    target = EXCLUDED.target,
-    minute_interval = EXCLUDED.minute_interval,
-    run_at_second = EXCLUDED.run_at_second,
+    description = excluded.description,
+    task_type = excluded.task_type,
+    target = excluded.target,
+    minute_interval = excluded.minute_interval,
+    run_at_second = excluded.run_at_second,
     updated_at = NOW();
