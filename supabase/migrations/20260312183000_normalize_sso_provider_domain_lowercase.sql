@@ -22,7 +22,7 @@ LANGUAGE plpgsql
 SET search_path = ''
 AS $$
 BEGIN
-  NEW.domain = lower(trim(NEW.domain))
+  NEW.domain := lower(trim(NEW.domain))
   RETURN NEW;
 END;
 $$;
