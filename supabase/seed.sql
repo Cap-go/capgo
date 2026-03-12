@@ -15,6 +15,16 @@ BEGIN
         PERFORM vault.create_secret('http://kong:8000', 'db_url', 'db url');
     END IF;
 
+    IF NOT EXISTS (SELECT 1 FROM vault.secrets WHERE name = 'CAPGO_RBAC_ENABLED') THEN
+        -- Master feature flag for RBAC. Set to "true" to force RBAC on by default.
+        PERFORM vault.create_secret('false', 'CAPGO_RBAC_ENABLED', 'enable RBAC globally');
+    END IF;
+
+    IF NOT EXISTS (SELECT 1 FROM vault.secrets WHERE name = 'CAPGO_MFA_EMAIL_OTP_ENFORCED_AT') THEN
+        -- RFC3339 cutoff string. Empty means no enforcement cutoff by default.
+        PERFORM vault.create_secret('', 'CAPGO_MFA_EMAIL_OTP_ENFORCED_AT', 'mfa email otp enforcement cutoff');
+    END IF;
+
     IF NOT EXISTS (SELECT 1 FROM vault.secrets WHERE name = 'apikey') THEN
         PERFORM vault.create_secret('testsecret', 'apikey', 'admin user id');
     END IF;
@@ -49,11 +59,6 @@ BEGIN
     TRUNCATE TABLE "public"."role_bindings" RESTART IDENTITY CASCADE;
     TRUNCATE TABLE "public"."group_members" RESTART IDENTITY CASCADE;
     TRUNCATE TABLE "public"."groups" RESTART IDENTITY CASCADE;
-    -- Keep RBAC flags deterministic across test runs
-    INSERT INTO public.rbac_settings (id, use_new_rbac)
-    VALUES (1, false)
-    ON CONFLICT (id) DO UPDATE SET use_new_rbac = EXCLUDED.use_new_rbac, updated_at = now();
-
     -- Insert seed data
     -- (Include all your INSERT statements here)
 
