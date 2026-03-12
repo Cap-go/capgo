@@ -277,6 +277,11 @@ Then in your test file, use ONLY these dedicated resources for modifications.
 - Do not create new cron jobs it's bad pattern instead update
   process_all_cron_tasks function in a new migration file to add your job if
   needed.
+- For runtime feature flags and security-related toggles, use runtime config from
+  Vault-backed settings and avoid mutable singleton tables in application code.
+- Do not store environment-driven behavior in singleton tables.
+- Use Vault-backed configuration values as the source of truth and runtime
+  environment values only for deployment-time overrides.
 - Never use the Supabase admin SDK (with service key) for user-facing APIs.
   Always use the client SDK with user authentication so RLS policies are
   enforced. The admin SDK should only be used when accessing data that is not
@@ -288,6 +293,16 @@ Then in your test file, use ONLY these dedicated resources for modifications.
   `supabase.auth.getClaims()` (frontend) or auth context from middleware
   (backend) instead of `getUser()` unless you explicitly need the full user
   record from the Auth API.
+
+### PostgreSQL Extension Policy
+
+- Avoid introducing new PostgreSQL extensions if an existing feature or SQL
+  approach can solve the same requirement.
+- If an extension is truly unavoidable, add it only with explicit user
+  consent and never by default.
+- If there is no practical alternative, add a migration with a clear fallback plan.
+- Never enable a new PostgreSQL extension without explicit user consent before
+  applying it.
 
 ### PostgreSQL Function Security
 
@@ -320,6 +335,55 @@ BEGIN
 END;
 $$;
 ```
+
+### PostgreSQL Function Permissioning (Least Privilege)
+
+For RPCs and helper functions, apply minimum privileges explicitly:
+
+- Start from deny-by-default and grant only required roles.
+- Set `OWNER` explicitly for each new function.
+- Use `REVOKE ALL ... FROM PUBLIC` to prevent public access drift from default ACLs.
+- If `uuid`-based checks exist, do not grant `anon` or `authenticated` unless there is a strict user-facing requirement.
+- Prefer granting only `service_role` for `uuid` overloads and keep user-context variants (`()`) on authenticated access only where needed.
+
+### SQL FUNCTION SECURITY (UPPERCASE RULES)
+
+WHEN ADDING AN ADMIN/PLATFORM-RBAC CHECK FUNCTION:
+- DEFINE ONE SERVICE-ROLE-ONLY `uuid` OVERLOAD FOR INTERNAL LOOKUPS.
+- DEFINE ONE USER-CONTEXT `()` OVERLOAD FOR CLIENT USAGE.
+- APPLY `REVOKE ALL ... FROM PUBLIC` TO EVERY OVERLOAD.
+- GRANT `service_role` TO `uuid` ONLY; GRANT `authenticated` ONLY TO `()` IF NEEDED.
+- KEEP `SET search_path = ''` AND `SECURITY DEFINER` EXPLICIT.
+- COMMENT THE BEHAVIOR (E.G., LEGACY VS PLATFORM SECRET CHECK) TO PREVENT REGRSSION.
+
+```sql
+ALTER FUNCTION public.is_platform_admin(userid uuid) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION public.is_platform_admin(userid uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.is_platform_admin(userid uuid) TO "service_role";
+```
+
+### Platform Admin Guardrails
+
+Platform admin is **NOT** a general-purpose superuser capability.
+
+- The only allowed platform-admin user action is spoofing/impersonating another
+  user.
+- The admin dashboard must stay read-only and limited to admin statistics,
+  observability, and similar reporting.
+- Never build a platform-admin write path that can change org membership, RBAC
+  bindings, roles, permissions, billing state, app ownership, or any other
+  privilege-bearing state.
+- Never use platform admin as a shortcut around normal auth/RLS for mutating
+  APIs. If an action could cause privilege elevation, do not expose it behind
+  platform admin.
+- Platform admins are defined from runtime Vault-backed configuration, not from
+  mutable database state.
+- There must be no API, UI, or database path to grant/revoke platform admin
+  dynamically. The only supported way to change platform admins is to publish a
+  new runtime version with updated environment configuration.
+- If a privileged operational action is needed beyond impersonation or reading
+  admin stats, implement it as a strictly internal service-role-only path, not
+  as a platform-admin feature.
 
 ### RLS Policy Optimization Rules
 
