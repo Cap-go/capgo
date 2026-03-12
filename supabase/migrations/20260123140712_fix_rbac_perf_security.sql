@@ -15,7 +15,9 @@
 -- =============================================================================
 
 -- Fix is_user_org_admin - add search_path for security
-CREATE OR REPLACE FUNCTION public.is_user_org_admin(p_user_id uuid, p_org_id uuid)
+CREATE OR REPLACE FUNCTION public.is_user_org_admin(
+    p_user_id uuid, p_org_id uuid
+)
 RETURNS boolean
 LANGUAGE sql
 SECURITY DEFINER
@@ -35,10 +37,12 @@ AS $$
 $$;
 
 COMMENT ON FUNCTION public.is_user_org_admin(uuid, uuid) IS
-  'Checks whether a user has an admin role in an organization (bypasses RLS to avoid recursion).';
+'Checks whether a user has an admin role in an organization (bypasses RLS to avoid recursion).';
 
 -- Fix is_user_app_admin - add search_path for security and fix org-level role inheritance
-CREATE OR REPLACE FUNCTION public.is_user_app_admin(p_user_id uuid, p_app_id uuid)
+CREATE OR REPLACE FUNCTION public.is_user_app_admin(
+    p_user_id uuid, p_app_id uuid
+)
 RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -78,20 +82,20 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.is_user_app_admin(uuid, uuid) IS
-  'Checks whether a user has an admin role for an app, including inherited org-level admin roles (bypasses RLS to avoid recursion).';
+'Checks whether a user has an admin role for an app, including inherited org-level admin roles (bypasses RLS to avoid recursion).';
 
 -- =============================================================================
 -- 2. RESTRICT FUNCTION ACCESS: Only authenticated users, not anon/public
 -- =============================================================================
 
 -- Restrict is_user_org_admin
-REVOKE ALL ON FUNCTION public.is_user_org_admin(uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.is_user_org_admin(uuid, uuid) FROM public;
 REVOKE ALL ON FUNCTION public.is_user_org_admin(uuid, uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.is_user_org_admin(uuid, uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.is_user_org_admin(uuid, uuid) TO service_role;
 
 -- Restrict is_user_app_admin
-REVOKE ALL ON FUNCTION public.is_user_app_admin(uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.is_user_app_admin(uuid, uuid) FROM public;
 REVOKE ALL ON FUNCTION public.is_user_app_admin(uuid, uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.is_user_app_admin(uuid, uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.is_user_app_admin(uuid, uuid) TO service_role;
@@ -113,27 +117,39 @@ ON public.role_bindings
 FOR SELECT
 TO authenticated
 USING (
-  -- Use (SELECT auth.uid()) to evaluate once per query, not per row
-  -- Org admins can see all bindings in their org
-  public.is_user_org_admin((SELECT auth.uid()), org_id)
-  OR
-  -- App admins can see app-scoped bindings
-  (scope_type = public.rbac_scope_app() AND public.is_user_app_admin((SELECT auth.uid()), app_id))
-  OR
-  -- Users with a role in the app can see app-scoped bindings
-  (scope_type = public.rbac_scope_app() AND app_id IS NOT NULL AND public.user_has_role_in_app((SELECT auth.uid()), app_id))
-  OR
-  -- Channel-scope bindings: visible to app admins of the parent app
-  (scope_type = public.rbac_scope_channel() AND channel_id IS NOT NULL AND EXISTS (
-    SELECT 1 FROM public.channels c
-    JOIN public.apps a ON a.app_id = c.app_id
-    WHERE c.rbac_id = role_bindings.channel_id
-      AND public.is_user_app_admin((SELECT auth.uid()), a.id)
-  ))
+    -- Use (SELECT auth.uid()) to evaluate once per query, not per row
+    -- Org admins can see all bindings in their org
+    public.is_user_org_admin((SELECT auth.uid()), org_id)
+    OR
+    -- App admins can see app-scoped bindings
+    (
+        scope_type = public.rbac_scope_app()
+        AND public.is_user_app_admin((SELECT auth.uid()), app_id)
+    )
+    OR
+    -- Users with a role in the app can see app-scoped bindings
+    (
+        scope_type = public.rbac_scope_app()
+        AND app_id IS NOT NULL
+        AND public.user_has_role_in_app((SELECT auth.uid()), app_id)
+    )
+    OR
+    -- Channel-scope bindings: visible to app admins of the parent app
+    (
+        scope_type = public.rbac_scope_channel()
+        AND channel_id IS NOT NULL
+        AND EXISTS (
+            SELECT 1 FROM public.channels AS c
+            INNER JOIN public.apps AS a ON c.app_id = a.app_id
+            WHERE
+                c.rbac_id = role_bindings.channel_id
+                AND public.is_user_app_admin((SELECT auth.uid()), a.id)
+        )
+    )
 );
 
 COMMENT ON POLICY "Allow viewing role bindings with permission" ON public.role_bindings IS
-  'Allows viewing role bindings if the user is org admin, app admin, or has a role in the app. Includes channel-scope visibility for app admins. Optimized with (SELECT auth.uid()) pattern.';
+'Allows viewing role bindings if the user is org admin, app admin, or has a role in the app. Includes channel-scope visibility for app admins. Optimized with (SELECT auth.uid()) pattern.';
 
 -- =============================================================================
 -- 4. FIX PERFORMANCE: Optimize RLS policies with (SELECT auth.uid()) pattern
@@ -144,171 +160,251 @@ DROP POLICY IF EXISTS rbac_settings_read_authenticated ON public.rbac_settings;
 DROP POLICY IF EXISTS rbac_settings_admin_all ON public.rbac_settings;
 
 CREATE POLICY rbac_settings_read_authenticated ON public.rbac_settings
-  FOR SELECT
-  TO authenticated
-  USING (true);
+FOR SELECT
+TO authenticated
+USING (TRUE);
 
 CREATE POLICY rbac_settings_admin_all ON public.rbac_settings
-  FOR ALL
-  TO authenticated
-  USING (public.is_admin((SELECT auth.uid())))
-  WITH CHECK (public.is_admin((SELECT auth.uid())));
+FOR ALL
+TO authenticated
+USING (public.is_admin((SELECT auth.uid())))
+WITH CHECK (public.is_admin((SELECT auth.uid())));
 
 -- Fix roles policies
 DROP POLICY IF EXISTS roles_admin_write ON public.roles;
 
 CREATE POLICY roles_admin_write ON public.roles
-  FOR ALL
-  TO authenticated
-  USING (public.is_admin((SELECT auth.uid())))
-  WITH CHECK (public.is_admin((SELECT auth.uid())));
+FOR ALL
+TO authenticated
+USING (public.is_admin((SELECT auth.uid())))
+WITH CHECK (public.is_admin((SELECT auth.uid())));
 
 -- Fix permissions policies
 DROP POLICY IF EXISTS permissions_admin_write ON public.permissions;
 
 CREATE POLICY permissions_admin_write ON public.permissions
-  FOR ALL
-  TO authenticated
-  USING (public.is_admin((SELECT auth.uid())))
-  WITH CHECK (public.is_admin((SELECT auth.uid())));
+FOR ALL
+TO authenticated
+USING (public.is_admin((SELECT auth.uid())))
+WITH CHECK (public.is_admin((SELECT auth.uid())));
 
 -- Fix role_permissions policies
 DROP POLICY IF EXISTS role_permissions_admin_write ON public.role_permissions;
 
 CREATE POLICY role_permissions_admin_write ON public.role_permissions
-  FOR ALL
-  TO authenticated
-  USING (public.is_admin((SELECT auth.uid())))
-  WITH CHECK (public.is_admin((SELECT auth.uid())));
+FOR ALL
+TO authenticated
+USING (public.is_admin((SELECT auth.uid())))
+WITH CHECK (public.is_admin((SELECT auth.uid())));
 
 -- Fix role_hierarchy policies
 DROP POLICY IF EXISTS role_hierarchy_admin_write ON public.role_hierarchy;
 
 CREATE POLICY role_hierarchy_admin_write ON public.role_hierarchy
-  FOR ALL
-  TO authenticated
-  USING (public.is_admin((SELECT auth.uid())))
-  WITH CHECK (public.is_admin((SELECT auth.uid())));
+FOR ALL
+TO authenticated
+USING (public.is_admin((SELECT auth.uid())))
+WITH CHECK (public.is_admin((SELECT auth.uid())));
 
 -- Fix groups policies
 DROP POLICY IF EXISTS groups_read_org_member ON public.groups;
 DROP POLICY IF EXISTS groups_write_org_admin ON public.groups;
 
 CREATE POLICY groups_read_org_member ON public.groups
-  FOR SELECT
-  TO authenticated
-  USING (
+FOR SELECT
+TO authenticated
+USING (
     EXISTS (
-      SELECT 1 FROM public.org_users
-      WHERE org_users.org_id = groups.org_id
-        AND org_users.user_id = (SELECT auth.uid())
+        SELECT 1 FROM public.org_users
+        WHERE
+            org_users.org_id = groups.org_id
+            AND org_users.user_id = (SELECT auth.uid())
     )
     OR
     public.is_admin((SELECT auth.uid()))
-  );
+);
 
 CREATE POLICY groups_write_org_admin ON public.groups
-  FOR ALL
-  TO authenticated
-  USING (
-    public.check_min_rights(public.rbac_right_admin()::public.user_min_right, (SELECT auth.uid()), org_id, NULL::varchar, NULL::bigint)
+FOR ALL
+TO authenticated
+USING (
+    public.check_min_rights(
+        public.rbac_right_admin()::public.user_min_right,
+        (SELECT auth.uid()),
+        org_id,
+        NULL::varchar,
+        NULL::bigint
+    )
     OR
     public.is_admin((SELECT auth.uid()))
-  )
-  WITH CHECK (
-    public.check_min_rights(public.rbac_right_admin()::public.user_min_right, (SELECT auth.uid()), org_id, NULL::varchar, NULL::bigint)
+)
+WITH CHECK (
+    public.check_min_rights(
+        public.rbac_right_admin()::public.user_min_right,
+        (SELECT auth.uid()),
+        org_id,
+        NULL::varchar,
+        NULL::bigint
+    )
     OR
     public.is_admin((SELECT auth.uid()))
-  );
+);
 
 -- Fix group_members policies
 DROP POLICY IF EXISTS group_members_read_org_member ON public.group_members;
 DROP POLICY IF EXISTS group_members_write_org_admin ON public.group_members;
 
 CREATE POLICY group_members_read_org_member ON public.group_members
-  FOR SELECT
-  TO authenticated
-  USING (
+FOR SELECT
+TO authenticated
+USING (
     EXISTS (
-      SELECT 1 FROM public.groups
-      JOIN public.org_users ON org_users.org_id = groups.org_id
-      WHERE groups.id = group_members.group_id
-        AND org_users.user_id = (SELECT auth.uid())
+        SELECT 1 FROM public.groups
+        INNER JOIN public.org_users ON groups.org_id = org_users.org_id
+        WHERE
+            groups.id = group_members.group_id
+            AND org_users.user_id = (SELECT auth.uid())
     )
     OR
     public.is_admin((SELECT auth.uid()))
-  );
+);
 
 CREATE POLICY group_members_write_org_admin ON public.group_members
-  FOR ALL
-  TO authenticated
-  USING (
+FOR ALL
+TO authenticated
+USING (
     EXISTS (
-      SELECT 1 FROM public.groups
-      WHERE groups.id = group_members.group_id
-        AND (
-          public.check_min_rights(public.rbac_right_admin()::public.user_min_right, (SELECT auth.uid()), groups.org_id, NULL::varchar, NULL::bigint)
-          OR public.is_admin((SELECT auth.uid()))
-        )
+        SELECT 1 FROM public.groups
+        WHERE
+            groups.id = group_members.group_id
+            AND (
+                public.check_min_rights(
+                    public.rbac_right_admin()::public.user_min_right,
+                    (SELECT auth.uid()),
+                    groups.org_id,
+                    NULL::varchar,
+                    NULL::bigint
+                )
+                OR public.is_admin((SELECT auth.uid()))
+            )
     )
-  )
-  WITH CHECK (
+)
+WITH CHECK (
     EXISTS (
-      SELECT 1 FROM public.groups
-      WHERE groups.id = group_members.group_id
-        AND (
-          public.check_min_rights(public.rbac_right_admin()::public.user_min_right, (SELECT auth.uid()), groups.org_id, NULL::varchar, NULL::bigint)
-          OR public.is_admin((SELECT auth.uid()))
-        )
+        SELECT 1 FROM public.groups
+        WHERE
+            groups.id = group_members.group_id
+            AND (
+                public.check_min_rights(
+                    public.rbac_right_admin()::public.user_min_right,
+                    (SELECT auth.uid()),
+                    groups.org_id,
+                    NULL::varchar,
+                    NULL::bigint
+                )
+                OR public.is_admin((SELECT auth.uid()))
+            )
     )
-  );
+);
 
 -- Fix role_bindings write policy
 DROP POLICY IF EXISTS role_bindings_write_scope_admin ON public.role_bindings;
 
 CREATE POLICY role_bindings_write_scope_admin ON public.role_bindings
-  FOR ALL
-  TO authenticated
-  USING (
-    (scope_type = public.rbac_scope_platform() AND public.is_admin((SELECT auth.uid())))
+FOR ALL
+TO authenticated
+USING (
+    (
+        scope_type = public.rbac_scope_platform()
+        AND public.is_admin((SELECT auth.uid()))
+    )
     OR
-    (scope_type = public.rbac_scope_org() AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, (SELECT auth.uid()), org_id, NULL::varchar, NULL::bigint))
+    (
+        scope_type = public.rbac_scope_org()
+        AND public.check_min_rights(
+            public.rbac_right_admin()::public.user_min_right,
+            (SELECT auth.uid()),
+            org_id,
+            NULL::varchar,
+            NULL::bigint
+        )
+    )
     OR
     (scope_type = public.rbac_scope_app() AND EXISTS (
-      SELECT 1 FROM public.apps
-      WHERE apps.id = role_bindings.app_id
-        AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, (SELECT auth.uid()), apps.owner_org, apps.app_id, NULL::bigint)
+        SELECT 1 FROM public.apps
+        WHERE
+            apps.id = role_bindings.app_id
+            AND public.check_min_rights(
+                public.rbac_right_admin()::public.user_min_right,
+                (SELECT auth.uid()),
+                apps.owner_org,
+                apps.app_id,
+                NULL::bigint
+            )
     ))
     OR
     (scope_type = public.rbac_scope_channel() AND EXISTS (
-      SELECT 1 FROM public.channels
-      JOIN public.apps ON apps.app_id = channels.app_id
-      WHERE channels.rbac_id = role_bindings.channel_id
-        AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, (SELECT auth.uid()), apps.owner_org, channels.app_id, channels.id)
+        SELECT 1 FROM public.channels
+        INNER JOIN public.apps ON channels.app_id = apps.app_id
+        WHERE
+            channels.rbac_id = role_bindings.channel_id
+            AND public.check_min_rights(
+                public.rbac_right_admin()::public.user_min_right,
+                (SELECT auth.uid()),
+                apps.owner_org,
+                channels.app_id,
+                channels.id
+            )
     ))
     OR
     public.is_admin((SELECT auth.uid()))
-  )
-  WITH CHECK (
-    (scope_type = public.rbac_scope_platform() AND public.is_admin((SELECT auth.uid())))
+)
+WITH CHECK (
+    (
+        scope_type = public.rbac_scope_platform()
+        AND public.is_admin((SELECT auth.uid()))
+    )
     OR
-    (scope_type = public.rbac_scope_org() AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, (SELECT auth.uid()), org_id, NULL::varchar, NULL::bigint))
+    (
+        scope_type = public.rbac_scope_org()
+        AND public.check_min_rights(
+            public.rbac_right_admin()::public.user_min_right,
+            (SELECT auth.uid()),
+            org_id,
+            NULL::varchar,
+            NULL::bigint
+        )
+    )
     OR
     (scope_type = public.rbac_scope_app() AND EXISTS (
-      SELECT 1 FROM public.apps
-      WHERE apps.id = role_bindings.app_id
-        AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, (SELECT auth.uid()), apps.owner_org, apps.app_id, NULL::bigint)
+        SELECT 1 FROM public.apps
+        WHERE
+            apps.id = role_bindings.app_id
+            AND public.check_min_rights(
+                public.rbac_right_admin()::public.user_min_right,
+                (SELECT auth.uid()),
+                apps.owner_org,
+                apps.app_id,
+                NULL::bigint
+            )
     ))
     OR
     (scope_type = public.rbac_scope_channel() AND EXISTS (
-      SELECT 1 FROM public.channels
-      JOIN public.apps ON apps.app_id = channels.app_id
-      WHERE channels.rbac_id = role_bindings.channel_id
-        AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, (SELECT auth.uid()), apps.owner_org, channels.app_id, channels.id)
+        SELECT 1 FROM public.channels
+        INNER JOIN public.apps ON channels.app_id = apps.app_id
+        WHERE
+            channels.rbac_id = role_bindings.channel_id
+            AND public.check_min_rights(
+                public.rbac_right_admin()::public.user_min_right,
+                (SELECT auth.uid()),
+                apps.owner_org,
+                channels.app_id,
+                channels.id
+            )
     ))
     OR
     public.is_admin((SELECT auth.uid()))
-  );
+);
 
 -- Fix role_bindings delete policy
 DROP POLICY IF EXISTS "Allow admins to delete manageable role bindings" ON public.role_bindings;
@@ -318,19 +414,28 @@ ON public.role_bindings
 FOR DELETE
 TO authenticated
 USING (
-  (scope_type = public.rbac_scope_app() AND public.user_has_app_update_user_roles((SELECT auth.uid()), app_id))
-  OR
-  (scope_type = public.rbac_scope_app() AND principal_type = public.rbac_principal_user() AND principal_id = (SELECT auth.uid()))
+    (
+        scope_type = public.rbac_scope_app()
+        AND public.user_has_app_update_user_roles((SELECT auth.uid()), app_id)
+    )
+    OR
+    (
+        scope_type = public.rbac_scope_app()
+        AND principal_type = public.rbac_principal_user()
+        AND principal_id = (SELECT auth.uid())
+    )
 );
 
 COMMENT ON POLICY "Allow admins to delete manageable role bindings" ON public.role_bindings IS
-  'Allows users with app.update_user_roles permission and the user themselves to delete role bindings. Optimized with (SELECT auth.uid()) pattern.';
+'Allows users with app.update_user_roles permission and the user themselves to delete role bindings. Optimized with (SELECT auth.uid()) pattern.';
 
 -- =============================================================================
 -- 5. FIX user_has_role_in_app: Use (SELECT auth.uid()) pattern
 -- =============================================================================
 
-CREATE OR REPLACE FUNCTION public.user_has_role_in_app(p_user_id uuid, p_app_id uuid)
+CREATE OR REPLACE FUNCTION public.user_has_role_in_app(
+    p_user_id uuid, p_app_id uuid
+)
 RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -381,19 +486,25 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.user_has_role_in_app(uuid, uuid) IS
-  'Checks whether a user has a role in an app (bypasses RLS to avoid recursion). Optimized with SELECT auth.uid() pattern.';
+'Checks whether a user has a role in an app (bypasses RLS to avoid recursion). Optimized with SELECT auth.uid() pattern.';
 
 -- Restrict user_has_role_in_app
-REVOKE ALL ON FUNCTION public.user_has_role_in_app(uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.user_has_role_in_app(uuid, uuid) FROM public;
 REVOKE ALL ON FUNCTION public.user_has_role_in_app(uuid, uuid) FROM anon;
-GRANT EXECUTE ON FUNCTION public.user_has_role_in_app(uuid, uuid) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.user_has_role_in_app(uuid, uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.user_has_role_in_app(
+    uuid, uuid
+) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.user_has_role_in_app(
+    uuid, uuid
+) TO service_role;
 
 -- =============================================================================
 -- 6. FIX user_has_app_update_user_roles: Use (SELECT auth.uid()) pattern
 -- =============================================================================
 
-CREATE OR REPLACE FUNCTION public.user_has_app_update_user_roles(p_user_id uuid, p_app_id uuid)
+CREATE OR REPLACE FUNCTION public.user_has_app_update_user_roles(
+    p_user_id uuid, p_app_id uuid
+)
 RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -447,13 +558,21 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) IS
-  'Checks whether a user has app.update_user_roles permission (bypasses RLS to avoid recursion). Optimized with SELECT auth.uid() pattern.';
+'Checks whether a user has app.update_user_roles permission (bypasses RLS to avoid recursion). Optimized with SELECT auth.uid() pattern.';
 
 -- Restrict user_has_app_update_user_roles
-REVOKE ALL ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) FROM anon;
-GRANT EXECUTE ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) TO service_role;
+REVOKE ALL ON FUNCTION public.user_has_app_update_user_roles(
+    uuid, uuid
+) FROM public;
+REVOKE ALL ON FUNCTION public.user_has_app_update_user_roles(
+    uuid, uuid
+) FROM anon;
+GRANT EXECUTE ON FUNCTION public.user_has_app_update_user_roles(
+    uuid, uuid
+) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.user_has_app_update_user_roles(
+    uuid, uuid
+) TO service_role;
 
 -- =============================================================================
 -- 7. RESTRICT ADMIN-ONLY RBAC FUNCTIONS: Prevent access from anon/public
@@ -463,46 +582,78 @@ GRANT EXECUTE ON FUNCTION public.user_has_app_update_user_roles(uuid, uuid) TO s
 -- are public, so we explicitly restrict their execution to service_role here.
 
 -- Restrict rbac_migrate_org_users_to_bindings - admin migration function
-REVOKE ALL ON FUNCTION public.rbac_migrate_org_users_to_bindings(uuid, uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.rbac_migrate_org_users_to_bindings(uuid, uuid) FROM anon;
-GRANT EXECUTE ON FUNCTION public.rbac_migrate_org_users_to_bindings(uuid, uuid) TO service_role;
+REVOKE ALL ON FUNCTION public.rbac_migrate_org_users_to_bindings(
+    uuid, uuid
+) FROM public;
+REVOKE ALL ON FUNCTION public.rbac_migrate_org_users_to_bindings(
+    uuid, uuid
+) FROM anon;
+GRANT EXECUTE ON FUNCTION public.rbac_migrate_org_users_to_bindings(
+    uuid, uuid
+) TO service_role;
 
 -- Restrict rbac_enable_for_org - admin migration function
-REVOKE ALL ON FUNCTION public.rbac_enable_for_org(uuid, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.rbac_enable_for_org(uuid, uuid) FROM public;
 REVOKE ALL ON FUNCTION public.rbac_enable_for_org(uuid, uuid) FROM anon;
-GRANT EXECUTE ON FUNCTION public.rbac_enable_for_org(uuid, uuid) TO service_role;
+GRANT EXECUTE ON FUNCTION public.rbac_enable_for_org(
+    uuid, uuid
+) TO service_role;
 
 -- Restrict rbac_preview_migration - admin preview function
-REVOKE ALL ON FUNCTION public.rbac_preview_migration(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.rbac_preview_migration(uuid) FROM public;
 REVOKE ALL ON FUNCTION public.rbac_preview_migration(uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.rbac_preview_migration(uuid) TO service_role;
 
 -- Restrict rbac_rollback_org - admin rollback function
-REVOKE ALL ON FUNCTION public.rbac_rollback_org(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.rbac_rollback_org(uuid) FROM public;
 REVOKE ALL ON FUNCTION public.rbac_rollback_org(uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.rbac_rollback_org(uuid) TO service_role;
 
 -- Restrict rbac_has_permission - should only be used by authenticated users
 -- and service_role (not anon/apikey access without auth)
-REVOKE ALL ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) FROM anon;
-GRANT EXECUTE ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) TO service_role;
+REVOKE ALL ON FUNCTION public.rbac_has_permission(
+    text, uuid, text, uuid, character varying, bigint
+) FROM public;
+REVOKE ALL ON FUNCTION public.rbac_has_permission(
+    text, uuid, text, uuid, character varying, bigint
+) FROM anon;
+GRANT EXECUTE ON FUNCTION public.rbac_has_permission(
+    text, uuid, text, uuid, character varying, bigint
+) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rbac_has_permission(
+    text, uuid, text, uuid, character varying, bigint
+) TO service_role;
 
 -- Restrict rbac_is_enabled_for_org - helper function
-REVOKE ALL ON FUNCTION public.rbac_is_enabled_for_org(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.rbac_is_enabled_for_org(uuid) FROM public;
 REVOKE ALL ON FUNCTION public.rbac_is_enabled_for_org(uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.rbac_is_enabled_for_org(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.rbac_is_enabled_for_org(uuid) TO service_role;
 
 -- Restrict rbac_permission_for_legacy - internal helper
-REVOKE ALL ON FUNCTION public.rbac_permission_for_legacy(public.user_min_right, text) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.rbac_permission_for_legacy(public.user_min_right, text) FROM anon;
-GRANT EXECUTE ON FUNCTION public.rbac_permission_for_legacy(public.user_min_right, text) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.rbac_permission_for_legacy(public.user_min_right, text) TO service_role;
+REVOKE ALL ON FUNCTION public.rbac_permission_for_legacy(
+    public.user_min_right, text
+) FROM public;
+REVOKE ALL ON FUNCTION public.rbac_permission_for_legacy(
+    public.user_min_right, text
+) FROM anon;
+GRANT EXECUTE ON FUNCTION public.rbac_permission_for_legacy(
+    public.user_min_right, text
+) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rbac_permission_for_legacy(
+    public.user_min_right, text
+) TO service_role;
 
 -- Restrict rbac_legacy_role_hint - internal helper
-REVOKE ALL ON FUNCTION public.rbac_legacy_role_hint(public.user_min_right, character varying, bigint) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.rbac_legacy_role_hint(public.user_min_right, character varying, bigint) FROM anon;
-GRANT EXECUTE ON FUNCTION public.rbac_legacy_role_hint(public.user_min_right, character varying, bigint) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.rbac_legacy_role_hint(public.user_min_right, character varying, bigint) TO service_role;
+REVOKE ALL ON FUNCTION public.rbac_legacy_role_hint(
+    public.user_min_right, character varying, bigint
+) FROM public;
+REVOKE ALL ON FUNCTION public.rbac_legacy_role_hint(
+    public.user_min_right, character varying, bigint
+) FROM anon;
+GRANT EXECUTE ON FUNCTION public.rbac_legacy_role_hint(
+    public.user_min_right, character varying, bigint
+) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rbac_legacy_role_hint(
+    public.user_min_right, character varying, bigint
+) TO service_role;

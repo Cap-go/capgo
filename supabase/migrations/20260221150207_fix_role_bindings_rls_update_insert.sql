@@ -13,41 +13,79 @@
 DROP POLICY IF EXISTS role_bindings_insert ON public.role_bindings;
 
 CREATE POLICY role_bindings_insert ON public.role_bindings
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (
+FOR INSERT
+TO authenticated
+WITH CHECK (
     EXISTS (
-      SELECT 1 FROM (SELECT auth.uid() AS uid) AS auth_user
-      WHERE
+        SELECT 1 FROM (SELECT auth.uid() AS uid) AS auth_user
+        WHERE
         -- Platform admin
-        public.is_admin(auth_user.uid)
-        OR
-        -- Org admin for org-scoped bindings
-        (scope_type = public.rbac_scope_org() AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth_user.uid, org_id, NULL::varchar, NULL::bigint))
-        OR
-        -- App admin (legacy path) or users with app.update_user_roles permission
-        (scope_type = public.rbac_scope_app() AND EXISTS (
-          SELECT 1 FROM public.apps
-          WHERE apps.id = role_bindings.app_id
-            AND (
-              public.check_min_rights(public.rbac_right_admin()::public.user_min_right, public.get_identity_org_appid('{all}'::public.key_mode[], apps.owner_org, apps.app_id), apps.owner_org, apps.app_id, NULL::bigint)
-              OR
-              public.user_has_app_update_user_roles(public.get_identity_org_appid('{all}'::public.key_mode[], apps.owner_org, apps.app_id), apps.id)
+            public.is_admin(auth_user.uid)
+            OR
+            -- Org admin for org-scoped bindings
+            (
+                auth_user.scope_type = public.rbac_scope_org()
+                AND public.check_min_rights(
+                    public.rbac_right_admin()::public.user_min_right,
+                    auth_user.uid,
+                    auth_user.org_id,
+                    NULL::varchar,
+                    NULL::bigint
+                )
             )
-        ))
-        OR
-        -- Channel admin for channel-scoped bindings
-        (scope_type = public.rbac_scope_channel() AND EXISTS (
-          SELECT 1 FROM public.channels
-          JOIN public.apps ON apps.app_id = channels.app_id
-          WHERE channels.rbac_id = role_bindings.channel_id
-            AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, public.get_identity_org_appid('{all}'::public.key_mode[], apps.owner_org, apps.app_id), apps.owner_org, channels.app_id, channels.id)
-        ))
+            OR
+            -- App admin (legacy path) or users with app.update_user_roles permission
+            (auth_user.scope_type = public.rbac_scope_app() AND EXISTS (
+                SELECT 1 FROM public.apps
+                WHERE
+                    apps.id = role_bindings.app_id
+                    AND (
+                        public.check_min_rights(
+                            public.rbac_right_admin()::public.user_min_right,
+                            public.get_identity_org_appid(
+                                '{all}'::public.key_mode [],
+                                apps.owner_org,
+                                apps.app_id
+                            ),
+                            apps.owner_org,
+                            apps.app_id,
+                            NULL::bigint
+                        )
+                        OR
+                        public.user_has_app_update_user_roles(
+                            public.get_identity_org_appid(
+                                '{all}'::public.key_mode [],
+                                apps.owner_org,
+                                apps.app_id
+                            ),
+                            apps.id
+                        )
+                    )
+            ))
+            OR
+            -- Channel admin for channel-scoped bindings
+            (auth_user.scope_type = public.rbac_scope_channel() AND EXISTS (
+                SELECT 1 FROM public.channels
+                INNER JOIN public.apps ON channels.app_id = apps.app_id
+                WHERE
+                    channels.rbac_id = role_bindings.channel_id
+                    AND public.check_min_rights(
+                        public.rbac_right_admin()::public.user_min_right,
+                        public.get_identity_org_appid(
+                            '{all}'::public.key_mode [],
+                            apps.owner_org,
+                            apps.app_id
+                        ),
+                        apps.owner_org,
+                        channels.app_id,
+                        channels.id
+                    )
+            ))
     )
-  );
+);
 
 COMMENT ON POLICY role_bindings_insert ON public.role_bindings IS
-  'Scope admins and users with app.update_user_roles can insert role_bindings within their scope.';
+'Scope admins and users with app.update_user_roles can insert role_bindings within their scope.';
 
 -- =============================================================================
 -- 2. Fix UPDATE policy
@@ -55,38 +93,76 @@ COMMENT ON POLICY role_bindings_insert ON public.role_bindings IS
 DROP POLICY IF EXISTS role_bindings_update ON public.role_bindings;
 
 CREATE POLICY role_bindings_update ON public.role_bindings
-  FOR UPDATE
-  TO authenticated
-  USING (
+FOR UPDATE
+TO authenticated
+USING (
     EXISTS (
-      SELECT 1 FROM (SELECT auth.uid() AS uid) AS auth_user
-      WHERE
+        SELECT 1 FROM (SELECT auth.uid() AS uid) AS auth_user
+        WHERE
         -- Platform admin
-        public.is_admin(auth_user.uid)
-        OR
-        -- Org admin for org-scoped bindings
-        (scope_type = public.rbac_scope_org() AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, auth_user.uid, org_id, NULL::varchar, NULL::bigint))
-        OR
-        -- App admin (legacy path) or users with app.update_user_roles permission
-        (scope_type = public.rbac_scope_app() AND EXISTS (
-          SELECT 1 FROM public.apps
-          WHERE apps.id = role_bindings.app_id
-            AND (
-              public.check_min_rights(public.rbac_right_admin()::public.user_min_right, public.get_identity_org_appid('{all}'::public.key_mode[], apps.owner_org, apps.app_id), apps.owner_org, apps.app_id, NULL::bigint)
-              OR
-              public.user_has_app_update_user_roles(public.get_identity_org_appid('{all}'::public.key_mode[], apps.owner_org, apps.app_id), apps.id)
+            public.is_admin(auth_user.uid)
+            OR
+            -- Org admin for org-scoped bindings
+            (
+                auth_user.scope_type = public.rbac_scope_org()
+                AND public.check_min_rights(
+                    public.rbac_right_admin()::public.user_min_right,
+                    auth_user.uid,
+                    auth_user.org_id,
+                    NULL::varchar,
+                    NULL::bigint
+                )
             )
-        ))
-        OR
-        -- Channel admin for channel-scoped bindings
-        (scope_type = public.rbac_scope_channel() AND EXISTS (
-          SELECT 1 FROM public.channels
-          JOIN public.apps ON apps.app_id = channels.app_id
-          WHERE channels.rbac_id = role_bindings.channel_id
-            AND public.check_min_rights(public.rbac_right_admin()::public.user_min_right, public.get_identity_org_appid('{all}'::public.key_mode[], apps.owner_org, apps.app_id), apps.owner_org, channels.app_id, channels.id)
-        ))
+            OR
+            -- App admin (legacy path) or users with app.update_user_roles permission
+            (auth_user.scope_type = public.rbac_scope_app() AND EXISTS (
+                SELECT 1 FROM public.apps
+                WHERE
+                    apps.id = role_bindings.app_id
+                    AND (
+                        public.check_min_rights(
+                            public.rbac_right_admin()::public.user_min_right,
+                            public.get_identity_org_appid(
+                                '{all}'::public.key_mode [],
+                                apps.owner_org,
+                                apps.app_id
+                            ),
+                            apps.owner_org,
+                            apps.app_id,
+                            NULL::bigint
+                        )
+                        OR
+                        public.user_has_app_update_user_roles(
+                            public.get_identity_org_appid(
+                                '{all}'::public.key_mode [],
+                                apps.owner_org,
+                                apps.app_id
+                            ),
+                            apps.id
+                        )
+                    )
+            ))
+            OR
+            -- Channel admin for channel-scoped bindings
+            (auth_user.scope_type = public.rbac_scope_channel() AND EXISTS (
+                SELECT 1 FROM public.channels
+                INNER JOIN public.apps ON channels.app_id = apps.app_id
+                WHERE
+                    channels.rbac_id = role_bindings.channel_id
+                    AND public.check_min_rights(
+                        public.rbac_right_admin()::public.user_min_right,
+                        public.get_identity_org_appid(
+                            '{all}'::public.key_mode [],
+                            apps.owner_org,
+                            apps.app_id
+                        ),
+                        apps.owner_org,
+                        channels.app_id,
+                        channels.id
+                    )
+            ))
     )
-  );
+);
 
 COMMENT ON POLICY role_bindings_update ON public.role_bindings IS
-  'Scope admins and users with app.update_user_roles can update role_bindings within their scope.';
+'Scope admins and users with app.update_user_roles can update role_bindings within their scope.';

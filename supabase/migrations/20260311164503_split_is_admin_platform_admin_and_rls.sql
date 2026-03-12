@@ -40,13 +40,15 @@ $$;
 
 ALTER FUNCTION public.is_platform_admin() OWNER TO "postgres";
 
-REVOKE ALL ON FUNCTION public.is_platform_admin(userid uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.is_platform_admin() FROM PUBLIC;
-GRANT ALL ON FUNCTION public.is_platform_admin(userid uuid) TO "service_role";
-GRANT ALL ON FUNCTION public.is_platform_admin() TO "authenticated";
-GRANT ALL ON FUNCTION public.is_platform_admin() TO "service_role";
+REVOKE ALL ON FUNCTION public.is_platform_admin(userid uuid) FROM public;
+REVOKE ALL ON FUNCTION public.is_platform_admin() FROM public;
+GRANT ALL ON FUNCTION public.is_platform_admin(userid uuid) TO service_role;
+GRANT ALL ON FUNCTION public.is_platform_admin() TO authenticated;
+GRANT ALL ON FUNCTION public.is_platform_admin() TO service_role;
 
-COMMENT ON FUNCTION public.is_platform_admin(uuid) IS 'Checks if a user is platform admin from admin_users secret. Always requires MFA.';
+COMMENT ON FUNCTION public.is_platform_admin(
+    uuid
+) IS 'Checks if a user is platform admin from admin_users secret. Always requires MFA.';
 
 -- ---------------------------------------------------------------------------
 -- RLS migration:
