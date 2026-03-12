@@ -157,7 +157,7 @@ BEGIN
     v_with_check := replace(v_with_check, 'is_admin(auth.uid())', 'is_platform_admin()');
     v_with_check := replace(v_with_check, 'is_admin((SELECT auth.uid()))', 'is_platform_admin()');
 
-    IF v_using = v_policy.qual AND v_with_check = COALESCE(v_policy.with_check, '') THEN
+    IF v_using = COALESCE(v_policy.qual, '') AND v_with_check = COALESCE(v_policy.with_check, '') THEN
       CONTINUE;
     END IF;
 
@@ -168,9 +168,19 @@ BEGIN
       v_roles_sql := format(' TO %s', v_roles);
     END IF;
 
-    IF v_policy.with_check IS NOT NULL THEN
+    IF v_policy.qual IS NOT NULL AND v_policy.with_check IS NOT NULL THEN
       EXECUTE format(
         'ALTER POLICY %I ON %I.%I%s USING (%s) WITH CHECK (%s)',
+        v_policy.policyname,
+        v_policy.schemaname,
+        v_policy.tablename,
+        v_roles_sql,
+        v_using,
+        v_with_check
+      );
+    ELSIF v_policy.with_check IS NOT NULL THEN
+      EXECUTE format(
+        'ALTER POLICY %I ON %I.%I%s WITH CHECK (%s)',
         v_policy.policyname,
         v_policy.schemaname,
         v_policy.tablename,

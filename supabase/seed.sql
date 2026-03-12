@@ -610,6 +610,17 @@ BEGIN
     (NOW(), '00000000-0000-0000-0000-000000000005', '1.0.0', 'com.stats.app', 'android', '4.15.3', '11', '1.0.0', 'stats-test-device', 't', 'f'),
     (NOW(), '00000000-0000-0000-0000-000000000006', '1.0.0', 'com.demo.app', 'electron', '7.0.0', 'Linux 5.15', '1.0.0', 'electron-test-device', 't', 'f');
 
+    -- Onboarding steps: completed CLI session for Demo org
+    INSERT INTO public.onboarding_steps (org_id, source, step_done, total_steps, step_payload, completed_at)
+    VALUES (
+      '046a36ac-e03c-4590-9257-bd6c9dba9ee8',  -- Demo org
+      'cli',
+      13,
+      13,
+      '{"pathToPackageJson": "/app/package.json", "platform": "android"}'::jsonb,
+      now()
+    );
+
     -- Drop replicated orgs but keet the the seed ones
     DELETE from "public"."orgs" where POSITION('organization' in orgs.name)=1;
     PERFORM setval('public.apikeys_id_seq', 111, false);
