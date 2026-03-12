@@ -88,6 +88,10 @@ testing against Cloudflare Workers.
 - For **schema changes**, always edit or add files under
   `supabase/migrations/` and treat `supabase/schemas/prod.sql` as read-only
   reference.
+  - Migration files must be created via CLI only.
+  - Never create migration files manually.
+  - Always use `bunx supabase migration new <feature_slug>`.
+  - Manual creation of migration files is not allowed.
 - **Supabase admin client + sign-in pitfall:** if you call
   `supabaseAdmin.auth.signInWithPassword(...)`, that client becomes authenticated
   as the user (it is no longer a pure service-role client). Always use a
@@ -262,6 +266,10 @@ Then in your test file, use ONLY these dedicated resources for modifications.
 - When a feature requires schema changes, create a single migration file with
   the Supabase CLI (`bunx supabase migration new <feature_slug>`) and keep editing
   that file until the feature ships; never edit previously committed migrations.
+- If a migration file is newly created and not yet committed, it may be modified.
+- Keep amending the same migration file while the pull request is still open.
+- Never create a second migration file for the same schema change set. If not yet merged, do not split work into multiple migration files for one change.
+- Use CLI for migrations. Never manually create migration files.
 - Updating `supabase/seed.sql` to back new or evolved tests is expected; keep
   fixtures focused on current behavior while leaving committed migrations
   unchanged.
