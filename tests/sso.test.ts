@@ -95,10 +95,15 @@ describe('[POST] /private/sso/check-domain', () => {
       })
 
       expect(response.status).toBe(200)
-      const data = await response.json() as { has_sso: boolean, provider_id?: string, org_id?: string }
+      const data = await response.json() as { has_sso: boolean }
       expect(data.has_sso).toBe(true)
-      expect(data.provider_id).toBeDefined()
-      expect(data.org_id).toBe(SSO_TEST_ORG_ID)
+
+      const { data: rpcData, error: rpcError } = await (getSupabaseClient().rpc as any)('check_domain_sso', { p_domain: `  ${expectedDomain.toUpperCase()}  ` })
+      expect(rpcError).toBeNull()
+      expect(Array.isArray(rpcData)).toBe(true)
+      expect(rpcData?.length).toBeGreaterThan(0)
+      expect(rpcData?.[0].provider_id).toBe(providerId)
+      expect(rpcData?.[0].org_id).toBe(SSO_TEST_ORG_ID)
 
       const { data: normalizedRow, error: normalizedRowError } = await getSupabaseClient()
         .from('sso_providers')
