@@ -1,7 +1,7 @@
 -- Fix: add org-scoped auth checks on sensitive plan/usage RPCs and lock down cleanup RPC
 -- Add service-role detection by JWT role claim for backend caller contexts.
 
-CREATE OR REPLACE FUNCTION public.get_app_metrics(p_org_id uuid)
+CREATE OR REPLACE FUNCTION public.get_app_metrics(org_id uuid)
 RETURNS TABLE (
     app_id character varying,
     date date,
@@ -32,8 +32,8 @@ BEGIN
 
   IF NOT v_is_service_role AND NOT public.check_min_rights(
       'read'::public.user_min_right,
-      public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_app_metrics.p_org_id),
-      get_app_metrics.p_org_id,
+      public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_app_metrics.org_id),
+      get_app_metrics.org_id,
       NULL::character varying,
       NULL::bigint
   ) THEN
@@ -42,9 +42,9 @@ BEGIN
 
   SELECT subscription_anchor_start, subscription_anchor_end
   INTO cycle_start, cycle_end
-  FROM public.get_cycle_info_org(p_org_id);
+  FROM public.get_cycle_info_org(org_id);
 
-  RETURN QUERY SELECT * FROM public.get_app_metrics(p_org_id, cycle_start::date, (cycle_end::date - 1));
+  RETURN QUERY SELECT * FROM public.get_app_metrics(org_id, cycle_start::date, (cycle_end::date - 1));
 END;
 $$;
 
