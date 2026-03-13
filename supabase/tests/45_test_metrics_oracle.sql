@@ -102,6 +102,8 @@ BEGIN
     );
 
     PERFORM tests.clear_authentication();
+    PERFORM set_config('request.jwt.claim.role', '', true);
+    PERFORM set_config('request.jwt.claim.org_id', '', true);
 
     SELECT COUNT(*) INTO v_unauthorized_count
     FROM public.get_app_metrics(v_org_id, v_start_date, v_end_date);
