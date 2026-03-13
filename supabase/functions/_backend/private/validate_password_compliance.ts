@@ -25,6 +25,8 @@ interface OrgReadAccessResult {
   error?: string
 }
 
+type BackendContext = Context<MiddlewareKeyVariables>
+
 /**
  * Normalize and validate a request origin string to a stable origin value.
  */
@@ -41,7 +43,7 @@ function normalizeOrigin(origin: string): string {
  * Build the explicit origin allowlist for this endpoint.
  * Includes configured webapp origin plus optional custom allowed origins.
  */
-function getAllowedOrigins(c: Context): Set<string> {
+function getAllowedOrigins(c: BackendContext): Set<string> {
   const webappUrl = normalizeOrigin(getEnv(c, 'WEBAPP_URL'))
   const configuredOrigins = getEnv(c, 'PASSWORD_COMPLIANCE_ALLOWED_ORIGINS')
     .split(',')
@@ -81,7 +83,7 @@ function isNativeOrLocalOrigin(origin: string): boolean {
 /**
  * Validate incoming Origin header before processing the password compliance payload.
  */
-async function validateOrigin(c: Context, next: () => Promise<void>) {
+async function validateOrigin(c: BackendContext, next: () => Promise<void>) {
   const origin = c.req.header('origin')
   if (!origin)
     return next()
