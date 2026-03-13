@@ -1,14 +1,30 @@
 import type { Database } from '../src/types/supabase.types'
-import { createClient } from '@supabase/supabase-js'
 import { env } from 'node:process'
+import { createClient } from '@supabase/supabase-js'
 import { describe, expect, it } from 'vitest'
-import { APIKEY_TEST_ALL } from './test-utils'
+import { APIKEY_TEST_ALL, getAuthHeadersForCredentials, SUPABASE_BASE_URL, USER_EMAIL, USER_PASSWORD } from './test-utils'
 
-const SUPABASE_URL = env.SUPABASE_URL as string
+const SUPABASE_URL = SUPABASE_BASE_URL || (env.SUPABASE_URL as string)
 const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY as string
 const SUPABASE_SERVICE_KEY = (env.SUPABASE_SERVICE_KEY || env.SUPABASE_SERVICE_ROLE_KEY || env.SERVICE_ROLE_KEY) as string
 
-const keyModes = ['all', 'read', 'write'] as const
+const keyModes: Database['public']['Enums']['key_mode'][] = ['all', 'read', 'write']
+
+async function createAuthenticatedClient() {
+  const authHeaders = await getAuthHeadersForCredentials(USER_EMAIL, USER_PASSWORD)
+
+  return createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    global: {
+      headers: {
+        ...authHeaders,
+        capgkey: APIKEY_TEST_ALL,
+      },
+    },
+    auth: {
+      persistSession: false,
+    },
+  })
+}
 
 describe('get_identity_apikey_only RPC permissions', () => {
   it.concurrent('denies anonymous RPC access', async () => {
@@ -32,7 +48,17 @@ describe('get_identity_apikey_only RPC permissions', () => {
 
     expect(error).toBeNull()
     expect(typeof data).toBe('string')
-    expect((data as string)).toMatch(/^[0-9a-fA-F-]{36}$/)
+    expect((data as string)).toMatch(/^[0-9a-f-]{36}$/i)
+  })
+
+  it.concurrent('denies authenticated RPC access', async () => {
+    const supabaseAuthenticated = await createAuthenticatedClient()
+
+    const { data, error } = await supabaseAuthenticated.rpc('get_identity_apikey_only', { keymode: keyModes })
+
+    expect(data).toBeNull()
+    expect(error).not.toBeNull()
+    expect(error?.message).toContain('permission denied')
   })
 
   it.concurrent('returns null for invalid API key on service role', async () => {
