@@ -1,5 +1,5 @@
 import { HTTPException } from 'hono/http-exception'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { tusProxy } from '../supabase/functions/_backend/public/build/upload.ts'
 
 const mockSupabaseApikey = vi.fn()
@@ -60,7 +60,9 @@ describe('build upload proxy security', () => {
   }
 
   beforeEach(() => {
-    vi.clearAllMocks()
+    mockGetEnv.mockClear()
+    mockCheckPermission.mockClear()
+    mockSupabaseApikey.mockClear()
     queryBuilder = createQueryBuilder()
     mockSupabaseApikey.mockReturnValue({
       from: vi.fn().mockReturnValue(queryBuilder),
@@ -77,17 +79,27 @@ describe('build upload proxy security', () => {
     mockCheckPermission.mockResolvedValue(true)
   })
 
-  afterEach(() => {
-    vi.restoreAllMocks()
-    vi.clearAllMocks()
-  })
-
   it.concurrent('rejects path traversal attempts before forwarding to builder', async () => {
     const context = fakeContext(`http://localhost/build/upload/${jobId}/%2e%2e/jobs`, 'PATCH')
 
-    const error = await tusProxy(context as any, jobId, { user_id: 'user-test', key: 'api-test' } as any)
-      .catch(err => err as HTTPException)
+    let caught = false
+    let error: HTTPException | null = null
+    try {
+      await tusProxy(context as any, jobId, { user_id: 'user-test', key: 'api-test' } as any)
+    }
+    catch (err) {
+      expect(err).toBeInstanceOf(HTTPException)
+      caught = true
+      if (err instanceof HTTPException) {
+        error = err
+      }
+    }
 
+    expect(caught).toBe(true)
+    expect(error).not.toBeNull()
+    if (!error) {
+      return
+    }
     expect(error).toBeInstanceOf(HTTPException)
     expect(error.cause).toMatchObject({
       error: 'invalid_path',
@@ -98,9 +110,24 @@ describe('build upload proxy security', () => {
   it.concurrent('rejects invalidly encoded paths before forwarding to builder', async () => {
     const context = fakeContext(`http://localhost/build/upload/${jobId}/%`, 'PATCH')
 
-    const error = await tusProxy(context as any, jobId, { user_id: 'user-test', key: 'api-test' } as any)
-      .catch(err => err as HTTPException)
+    let caught = false
+    let error: HTTPException | null = null
+    try {
+      await tusProxy(context as any, jobId, { user_id: 'user-test', key: 'api-test' } as any)
+    }
+    catch (err) {
+      expect(err).toBeInstanceOf(HTTPException)
+      caught = true
+      if (err instanceof HTTPException) {
+        error = err
+      }
+    }
 
+    expect(caught).toBe(true)
+    expect(error).not.toBeNull()
+    if (!error) {
+      return
+    }
     expect(error).toBeInstanceOf(HTTPException)
     expect(error.cause).toMatchObject({
       error: 'invalid_path',
@@ -116,13 +143,18 @@ describe('build upload proxy security', () => {
       },
     }))
 
-    const context = fakeContext(`http://localhost/build/upload/${jobId}/artifact.zip`, 'PATCH')
-    const response = await tusProxy(context as any, jobId, { user_id: 'user-test', key: 'api-test' } as any)
+    try {
+      const context = fakeContext(`http://localhost/build/upload/${jobId}/artifact.zip`, 'PATCH')
+      const response = await tusProxy(context as any, jobId, { user_id: 'user-test', key: 'api-test' } as any)
 
-    expect(response.status).toBe(201)
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://builder.capgo.app/upload/artifact.zip',
-      expect.anything(),
-    )
+      expect(response.status).toBe(201)
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://builder.capgo.app/upload/artifact.zip',
+        expect.anything(),
+      )
+    }
+    finally {
+      fetchMock.mockRestore()
+    }
   })
 })
