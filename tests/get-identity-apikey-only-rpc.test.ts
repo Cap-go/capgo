@@ -2,9 +2,23 @@ import type { Database } from '../src/types/supabase.types'
 import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 import { describe, expect, it } from 'vitest'
-import { APIKEY_TEST_ALL, getAuthHeadersForCredentials, SUPABASE_BASE_URL, USER_EMAIL, USER_PASSWORD } from './test-utils'
+import { APIKEY_TEST_ALL, getAuthHeadersForCredentials, USER_EMAIL, USER_PASSWORD } from './test-utils'
 
-const SUPABASE_URL = SUPABASE_BASE_URL || (env.SUPABASE_URL as string)
+function normalizeLocalhostUrl(raw: string | undefined): string {
+  if (!raw)
+    return raw || ''
+  try {
+    const url = new URL(raw)
+    if (url.hostname === 'localhost')
+      url.hostname = '127.0.0.1'
+    return url.toString().replace(/\/$/, '')
+  }
+  catch {
+    return raw.replace('localhost', '127.0.0.1')
+  }
+}
+
+const SUPABASE_URL = normalizeLocalhostUrl(env.SUPABASE_URL)
 const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY as string
 const SUPABASE_SERVICE_KEY = (env.SUPABASE_SERVICE_KEY || env.SUPABASE_SERVICE_ROLE_KEY || env.SERVICE_ROLE_KEY) as string
 
