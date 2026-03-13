@@ -40,7 +40,7 @@ app.post('/', middlewareAuth, async (c) => {
     return c.json({ allowed: true })
   }
 
-  const domain = email.split('@')[1]
+  const domain = email.split('@')[1]?.toLowerCase().trim()
   if (!domain) {
     return quickError(400, 'invalid_email', 'Email must contain a domain')
   }

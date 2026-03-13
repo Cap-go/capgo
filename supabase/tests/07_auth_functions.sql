@@ -1,56 +1,21 @@
 BEGIN;
 
 
-SELECT plan(19);
+SELECT plan(16);
 
--- Test is_admin / is_platform_admin wrappers
+-- Test is_platform_admin wrapper
 SELECT tests.authenticate_as('test_admin');
-SET LOCAL ROLE service_role;
-INSERT INTO public.role_bindings (
-    principal_type,
-    principal_id,
-    role_id,
-    scope_type,
-    granted_by
-)
-SELECT
-    'user',
-    'c591b04e-cf29-4945-b9a0-776d0672061a',
-    r.id,
-    'platform',
-    'c591b04e-cf29-4945-b9a0-776d0672061a'
-FROM public.roles r
-WHERE r.name = 'platform_super_admin';
-RESET ROLE;
-
-UPDATE public.rbac_settings
-SET use_new_rbac = true
-WHERE id = 1;
-
-SELECT
-    is(
-        is_admin(),
-        true,
-        'is_admin test - user is RBAC platform admin'
-    );
 
 SELECT
     is(
         is_platform_admin(),
         true,
-        'is_platform_admin test - user is platform admin via admin secret'
+        'is_platform_admin test - admin secret user is platform admin'
     );
 
 SELECT tests.clear_authentication();
 
 SELECT tests.authenticate_as('test_user');
-
-SELECT
-    is(
-        is_admin(),
-        false,
-        'is_admin test - user is not admin'
-    );
 
 SELECT
     is(
@@ -61,39 +26,50 @@ SELECT
 
 SELECT tests.clear_authentication();
 
--- Test split behavior when platform role exists (platform role should not affect is_platform_admin)
+-- Test split behavior when an RBAC role exists (RBAC roles should not affect is_platform_admin)
 SET LOCAL ROLE service_role;
+INSERT INTO public.orgs (id, created_by, name, management_email)
+VALUES (
+    '55555555-5555-4555-8555-555555555555',
+    tests.get_supabase_uid('test_admin'),
+    'Auth function role test org',
+    'auth-function-role-test@capgo.app'
+)
+ON CONFLICT (id) DO NOTHING;
+
+DELETE FROM public.role_bindings
+WHERE
+    principal_type = 'user'
+    AND principal_id = tests.get_supabase_uid('test_user')
+    AND scope_type = 'org'
+    AND org_id = '55555555-5555-4555-8555-555555555555';
+
 INSERT INTO public.role_bindings (
     principal_type,
     principal_id,
     role_id,
     scope_type,
+    org_id,
     granted_by
 )
 SELECT
     'user',
-    '6f0d1a2e-59ed-4769-b9d7-4d9615b28fe5',
+    tests.get_supabase_uid('test_user'),
     r.id,
-    'platform',
-    'c591b04e-cf29-4945-b9a0-776d0672061a'
-FROM public.roles r
-WHERE r.name = 'platform_super_admin';
+    'org',
+    '55555555-5555-4555-8555-555555555555',
+    tests.get_supabase_uid('test_admin')
+FROM public.roles AS r
+WHERE r.name = public.rbac_role_org_super_admin();
 RESET ROLE;
 
 SELECT tests.authenticate_as('test_user');
 
 SELECT
     is(
-        is_admin(),
-        true,
-        'is_admin wrapper test - platform role grants RBAC admin'
-    );
-
-SELECT
-    is(
         is_platform_admin(),
         false,
-        'is_platform_admin wrapper test - platform role is not checked in admin secret function'
+        'is_platform_admin wrapper test - RBAC roles are not checked in admin secret function'
     );
 
 SELECT tests.clear_authentication();
@@ -201,7 +177,7 @@ SELECT
 SELECT
     is(
         get_user_id('test-hashed-apikey-for-auth-test'),
-        '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
+        tests.get_supabase_uid('test_user'),
         'get_user_id test - hashed key returns correct user_id'
     );
 

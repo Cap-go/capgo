@@ -124,22 +124,24 @@ INSERT INTO public.cron_tasks (
     null   -- run_on_day (any day)
 )
 ON CONFLICT (name) DO UPDATE SET
-    description = EXCLUDED.description,
-    task_type = EXCLUDED.task_type,
-    target = EXCLUDED.target,
-    run_at_hour = EXCLUDED.run_at_hour,
-    run_at_minute = EXCLUDED.run_at_minute,
-    run_at_second = EXCLUDED.run_at_second,
+    description = excluded.description,
+    task_type = excluded.task_type,
+    target = excluded.target,
+    run_at_hour = excluded.run_at_hour,
+    run_at_minute = excluded.run_at_minute,
+    run_at_second = excluded.run_at_second,
     updated_at = NOW();
 
 -- Backfill daily_fail_ratio preference for existing users who have email_preferences set
 UPDATE public.users
 SET email_preferences = email_preferences || '{"daily_fail_ratio": true}'::jsonb
-WHERE email_preferences IS NOT NULL
-  AND NOT (email_preferences ? 'daily_fail_ratio');
+WHERE
+    email_preferences IS NOT null
+    AND NOT (email_preferences ? 'daily_fail_ratio');
 
 -- Backfill daily_fail_ratio preference for existing orgs who have email_preferences set
 UPDATE public.orgs
 SET email_preferences = email_preferences || '{"daily_fail_ratio": true}'::jsonb
-WHERE email_preferences IS NOT NULL
-  AND NOT (email_preferences ? 'daily_fail_ratio');
+WHERE
+    email_preferences IS NOT null
+    AND NOT (email_preferences ? 'daily_fail_ratio');
