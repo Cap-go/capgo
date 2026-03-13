@@ -337,8 +337,8 @@ SELECT
     ok(
         is_onboarding_needed_org(
             '00000000-0000-0000-0000-000000000000'
-        ) IS NULL,
-        'is_onboarding_needed_org test - non-existent org returns null'
+        ) = FALSE,
+        'is_onboarding_needed_org test - non-existent org returns false'
     );
 
 -- Test is_good_plan_v5_org (based on seed data with stripe_info)
