@@ -67,9 +67,11 @@ function isNativeOrLocalOrigin(origin: string): boolean {
     const parsed = new URL(origin)
     if (parsed.protocol === 'capacitor:')
       return parsed.hostname === 'localhost'
+    if (parsed.protocol === 'ionic:')
+      return parsed.hostname === 'localhost'
     if (!(['http:', 'https:'].includes(parsed.protocol)))
       return false
-    return parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1'
+    return ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname)
   }
   catch {
     return false
@@ -133,6 +135,9 @@ function passwordMeetsPolicy(password: string, policy: {
   return { valid: errors.length === 0, errors }
 }
 
+/**
+ * Resolve whether the authenticated user has `org.read` access for the org.
+ */
 export async function checkOrgReadAccess(
   supabase: RpcClient,
   orgId: string,
