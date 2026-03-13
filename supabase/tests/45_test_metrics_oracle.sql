@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(13);
+SELECT plan(12);
 
 CREATE OR REPLACE FUNCTION test_metrics_oracle_access_control() RETURNS SETOF TEXT AS $$
 DECLARE
