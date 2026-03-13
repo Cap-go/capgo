@@ -174,6 +174,8 @@ SELECT
 -- Test get_user_id with hashed API keys
 -- ============================================================================
 
+SELECT tests.authenticate_as_service_role();
+
 SELECT
     is(
         get_user_id('test-hashed-apikey-for-auth-test'),
