@@ -8,8 +8,8 @@
  * IMPORTANT: This test uses a completely isolated user (USER_ID_RLS) with its own
  * org and API key to prevent interference with other tests that create/delete API keys.
  */
-import { createClient } from '@supabase/supabase-js'
 import { randomUUID } from 'node:crypto'
+import { createClient } from '@supabase/supabase-js'
 import { Pool } from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
@@ -53,9 +53,9 @@ async function execWithAuthAndCapgkey(
     await client.query('BEGIN')
     try {
       await client.query('SET LOCAL ROLE authenticated')
-      await client.query("SELECT set_config('request.jwt.claim.sub', $1, true)", [userId])
+      await client.query('SELECT set_config(\'request.jwt.claim.sub\', $1, true)', [userId])
       await client.query(
-        "SELECT set_config('request.jwt.claims', $1, true)",
+        'SELECT set_config(\'request.jwt.claims\', $1, true)',
         [JSON.stringify({
           sub: userId,
           role: 'authenticated',
@@ -63,7 +63,7 @@ async function execWithAuthAndCapgkey(
         })],
       )
       await client.query(
-        "SELECT set_config('request.headers', $1, true)",
+        'SELECT set_config(\'request.headers\', $1, true)',
         [JSON.stringify({ capgkey })],
       )
 
@@ -474,7 +474,7 @@ describe('find_apikey_by_value() function', () => {
   })
 })
 
-describe('RLS policies with hashed API keys (via Supabase SDK)', () => {
+describe('rls policies with hashed api keys (via supabase sdk)', () => {
   let hashedKey: { id: number, key: string, key_hash: string }
 
   beforeAll(async () => {
@@ -640,19 +640,20 @@ describe('webhook and webhook_delivery rls with api-key org scope precedence', (
   })
 
   it('prevents webhook_delivery org_id changes when update payload org_id is unauthorized', async () => {
-    const updatedRows = await execWithAuthAndCapgkey(
-      'UPDATE public.webhook_deliveries SET org_id = $1 WHERE id = $2',
-      USER_ID_RLS,
-      scopedKey.key,
-      [ORG_ID_2, deliveryId],
-    )
+    await expect(
+      execWithAuthAndCapgkey(
+        'UPDATE public.webhook_deliveries SET org_id = $1 WHERE id = $2',
+        USER_ID_RLS,
+        scopedKey.key,
+        [ORG_ID_2, deliveryId],
+      ),
+    ).rejects.toMatchObject({ code: '42501' })
 
     const { rows } = await pool.query(
       'SELECT org_id FROM public.webhook_deliveries WHERE id = $1',
       [deliveryId],
     )
 
-    expect(updatedRows.rowCount).toBe(0)
     expect(rows[0].org_id).toBe(ORG_ID_RLS)
   })
 })
