@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { fetchWithRetry, getEndpointUrl, getSupabaseClient, PRODUCT_ID, resetAppData, resetAppDataStats, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
@@ -134,6 +135,70 @@ afterAll(async () => {
 })
 
 describe('build Time Tracking System', () => {
+  it('should reject unauthenticated calls to record_build_time RPC', async () => {
+    const supabaseUrl = process.env.SUPABASE_URL
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
+    if (!supabaseUrl || !supabaseAnonKey)
+      throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY are required for this test')
+
+    const publicSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+      },
+    })
+
+    const { error } = await publicSupabase.rpc('record_build_time', {
+      p_org_id: ORG_ID,
+      p_user_id: USER_ID,
+      p_build_id: randomUUID(),
+      p_platform: 'ios',
+      p_build_time_unit: 30,
+    })
+    expect(error).toBeTruthy()
+  })
+
+  it('should reject direct REST POST to record_build_time without auth privileges', async () => {
+    const supabaseUrl = process.env.SUPABASE_URL
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
+    if (!supabaseUrl || !supabaseAnonKey)
+      throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY are required for this test')
+
+    const supabase = getSupabaseClient()
+    const before = await supabase
+      .from('build_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', ORG_ID)
+    if (before.error)
+      throw before.error
+    const beforeCount = before.count ?? 0
+
+    const buildId = `poc_buildtime_${randomUUID()}`
+    const response = await fetch(new URL('/rest/v1/rpc/record_build_time', supabaseUrl), {
+      method: 'POST',
+      headers: {
+        'apikey': supabaseAnonKey,
+        'authorization': `Bearer ${supabaseAnonKey}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        p_org_id: ORG_ID,
+        p_user_id: USER_ID,
+        p_build_id: buildId,
+        p_platform: 'ios',
+        p_build_time_unit: 30,
+      }),
+    })
+    const after = await supabase
+      .from('build_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', ORG_ID)
+    if (after.error)
+      throw after.error
+
+    expect(response.status).not.toBe(200)
+    expect(after.count).toBe(beforeCount)
+  })
+
   it('should handle too big build time correctly', async () => {
     const supabase = getSupabaseClient()
 
