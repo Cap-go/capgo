@@ -18,18 +18,27 @@ app.post('/', middlewareAPISecret, async (c) => {
   const version = body.version
   if (!version)
     throw simpleError('no_version', 'No version', { body })
-  if (version.user_id === null) {
-    // find the user_id from the app_id
+
+  let ownerOrg = version.owner_org
+  if (version.user_id === null || ownerOrg === null) {
+    // find user_id and owner_org from the app_id
     const { data: app, error: errorApp } = await supabaseAdmin(c)
       .from('apps')
-      .select('user_id')
+      .select('user_id, owner_org')
       .eq('app_id', version.app_id)
       .single()
     if (errorApp)
-      throw simpleError('cannot_find_user_id', 'Cannot find user_id for app_id', { error: errorApp })
+      throw simpleError('cannot_find_app_data', 'Cannot find app data for app_id', { error: errorApp, app_id: version.app_id })
     if (!app)
-      throw simpleError('cannot_find_user_id', 'Cannot find user_id for app_id', { error: 'no app found' })
-    version.user_id = app.user_id
+      throw simpleError('cannot_find_app_data', 'Cannot find app data for app_id', { error: 'no app found', app_id: version.app_id })
+    if (version.user_id === null)
+      version.user_id = app.user_id
+    if (ownerOrg === null)
+      ownerOrg = app.owner_org
+  }
+
+  if (ownerOrg === null) {
+    throw simpleError('cannot_find_owner_org', 'Cannot find owner_org for app_id', { app_id: version.app_id })
   }
 
   let notFound = false
@@ -85,7 +94,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         app_id: version.app_id,
         checksum: checksum ?? '',
         size,
-        owner_org: version.owner_org,
+        owner_org: ownerOrg,
       }, { onConflict: 'id' })
   }
   catch (errorSize) {
