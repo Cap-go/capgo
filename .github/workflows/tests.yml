@@ -12,6 +12,7 @@ permissions: {}
 
 env:
   DENO_DIR: my_cache_directory
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   test_all:
