@@ -45,12 +45,9 @@ SELECT
 SELECT tests.clear_authentication();
 
 SELECT
-    is(
-        (
-            SELECT count(*)
-            FROM get_current_plan_max_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d')
-        ),
-        0::bigint,
+    throws_like(
+        'SELECT count(*) FROM get_current_plan_max_org(''22dbad8a-b885-4309-9b3b-a09f8460fb6d'')',
+        'permission denied for function get_current_plan_max_org',
         'get_current_plan_max_org test - anonymous call cannot read org plan limits'
     );
 
