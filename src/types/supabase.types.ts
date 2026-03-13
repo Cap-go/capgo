@@ -1606,10 +1606,10 @@ export type Database = {
           password_policy_config: Json | null
           require_apikey_expiration: boolean
           required_encryption_key: string | null
+          sso_enabled: boolean
           stats_updated_at: string | null
           updated_at: string | null
           use_new_rbac: boolean
-          sso_enabled: boolean
         }
         Insert: {
           created_at?: string | null
@@ -1629,10 +1629,10 @@ export type Database = {
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
+          sso_enabled?: boolean
           stats_updated_at?: string | null
           updated_at?: string | null
           use_new_rbac?: boolean
-          sso_enabled?: boolean
         }
         Update: {
           created_at?: string | null
@@ -1652,10 +1652,10 @@ export type Database = {
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
+          sso_enabled?: boolean
           stats_updated_at?: string | null
           updated_at?: string | null
           use_new_rbac?: boolean
-          sso_enabled?: boolean
         }
         Relationships: [
           {
@@ -1763,27 +1763,6 @@ export type Database = {
           storage?: number
           stripe_id?: string
           updated_at?: string
-        }
-        Relationships: []
-      }
-      rbac_settings: {
-        Row: {
-          created_at: string
-          id: number
-          updated_at: string
-          use_new_rbac: boolean
-        }
-        Insert: {
-          created_at?: string
-          id?: number
-          updated_at?: string
-          use_new_rbac?: boolean
-        }
-        Update: {
-          created_at?: string
-          id?: number
-          updated_at?: string
-          use_new_rbac?: boolean
         }
         Relationships: []
       }
@@ -1967,20 +1946,58 @@ export type Database = {
         }
         Relationships: []
       }
-      security_settings: {
+      sso_providers: {
         Row: {
-          id: boolean
-          mfa_email_otp_enforced_at: string
+          attribute_mapping: Json | null
+          created_at: string
+          dns_verification_token: string
+          dns_verified_at: string | null
+          domain: string
+          enforce_sso: boolean
+          id: string
+          metadata_url: string | null
+          org_id: string
+          provider_id: string | null
+          status: string
+          updated_at: string
         }
         Insert: {
-          id?: boolean
-          mfa_email_otp_enforced_at?: string
+          attribute_mapping?: Json | null
+          created_at?: string
+          dns_verification_token: string
+          dns_verified_at?: string | null
+          domain: string
+          enforce_sso?: boolean
+          id?: string
+          metadata_url?: string | null
+          org_id: string
+          provider_id?: string | null
+          status?: string
+          updated_at?: string
         }
         Update: {
-          id?: boolean
-          mfa_email_otp_enforced_at?: string
+          attribute_mapping?: Json | null
+          created_at?: string
+          dns_verification_token?: string
+          dns_verified_at?: string | null
+          domain?: string
+          enforce_sso?: boolean
+          id?: string
+          metadata_url?: string | null
+          org_id?: string
+          provider_id?: string | null
+          status?: string
+          updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sso_providers_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       stats: {
         Row: {
@@ -2753,6 +2770,14 @@ export type Database = {
           credits_required: number
         }[]
       }
+      check_domain_sso: {
+        Args: { p_domain: string }
+        Returns: {
+          has_sso: boolean
+          org_id: string
+          provider_id: string
+        }[]
+      }
       check_min_rights:
         | {
             Args: {
@@ -3153,6 +3178,7 @@ export type Database = {
           role: string
         }[]
       }
+      get_mfa_email_otp_enforced_at: { Args: never; Returns: string }
       get_next_cron_time: {
         Args: { p_schedule: string; p_timestamp: string }
         Returns: string
@@ -3324,12 +3350,12 @@ export type Database = {
               require_apikey_expiration: boolean
               required_encryption_key: string
               role: string
+              sso_enabled: boolean
               stats_updated_at: string
               subscription_end: string
               subscription_start: string
               trial_left: number
               use_new_rbac: boolean
-              sso_enabled: boolean
             }[]
           }
         | {
@@ -3360,12 +3386,12 @@ export type Database = {
               require_apikey_expiration: boolean
               required_encryption_key: string
               role: string
+              sso_enabled: boolean
               stats_updated_at: string
               subscription_end: string
               subscription_start: string
               trial_left: number
               use_new_rbac: boolean
-              sso_enabled: boolean
             }[]
           }
       get_password_policy_hash: {
@@ -3415,6 +3441,13 @@ export type Database = {
               total_percent: number
             }[]
           }
+      get_sso_enforcement_by_domain: {
+        Args: { p_domain: string }
+        Returns: {
+          enforce_sso: boolean
+          org_id: string
+        }[]
+      }
       get_total_app_storage_size_orgs: {
         Args: { app_id: string; org_id: string }
         Returns: number
@@ -3568,9 +3601,6 @@ export type Database = {
         Returns: string
       }
       is_account_disabled: { Args: { user_id: string }; Returns: boolean }
-      is_admin:
-        | { Args: never; Returns: boolean }
-        | { Args: { userid: string }; Returns: boolean }
       is_allowed_action: {
         Args: { apikey: string; appid: string }
         Returns: boolean
@@ -3634,8 +3664,12 @@ export type Database = {
         Returns: boolean
       }
       is_paying_org: { Args: { orgid: string }; Returns: boolean }
+      is_platform_admin:
+        | { Args: never; Returns: boolean }
+        | { Args: { userid: string }; Returns: boolean }
+      is_rbac_enabled_globally: { Args: never; Returns: boolean }
       is_recent_email_otp_verified: {
-        Args: { user_id: string }
+        Args: { p_user_id: string }
         Returns: boolean
       }
       is_storage_exceeded_by_org: { Args: { org_id: string }; Returns: boolean }
@@ -4035,6 +4069,10 @@ export type Database = {
       reset_and_seed_stats_data: { Args: never; Returns: undefined }
       reset_app_data: { Args: { p_app_id: string }; Returns: undefined }
       reset_app_stats_data: { Args: { p_app_id: string }; Returns: undefined }
+      resync_org_user_role_bindings: {
+        Args: { p_org_id: string; p_user_id: string }
+        Returns: undefined
+      }
       seed_get_app_metrics_caches: {
         Args: { p_end_date: string; p_org_id: string; p_start_date: string }
         Returns: {

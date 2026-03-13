@@ -2,9 +2,12 @@
 
 -- Backfill cli_realtime_feed preference for existing users who have email_preferences set
 UPDATE public.users
-SET email_preferences = email_preferences || '{"cli_realtime_feed": true}'::jsonb
-WHERE email_preferences IS NOT NULL
-  AND NOT (email_preferences ? 'cli_realtime_feed');
+SET
+    email_preferences
+    = email_preferences || '{"cli_realtime_feed": true}'::jsonb
+WHERE
+    email_preferences IS NOT NULL
+    AND NOT (email_preferences ? 'cli_realtime_feed');
 
 -- Update the default value for email_preferences on users table
 ALTER TABLE public.users

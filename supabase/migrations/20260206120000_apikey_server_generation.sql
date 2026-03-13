@@ -1,5 +1,5 @@
 ALTER TABLE public.apikeys
-  ALTER COLUMN key DROP DEFAULT;
+ALTER COLUMN key DROP DEFAULT;
 
 DO $$
 BEGIN
@@ -115,12 +115,12 @@ EXECUTE FUNCTION public.apikeys_strip_plain_key_for_hashed();
 -- Internal functions that accept a user_id are intentionally not granted to anon/authenticated.
 -- Public wrappers below derive the caller identity (supports both JWT and capgkey-based auth).
 CREATE OR REPLACE FUNCTION public.create_hashed_apikey_for_user(
-  p_user_id uuid,
-  p_mode public.key_mode,
-  p_name text,
-  p_limited_to_orgs uuid[],
-  p_limited_to_apps text[],
-  p_expires_at timestamptz
+    p_user_id uuid,
+    p_mode public.key_mode,
+    p_name text,
+    p_limited_to_orgs uuid [],
+    p_limited_to_apps text [],
+    p_expires_at timestamptz
 )
 RETURNS public.apikeys
 LANGUAGE plpgsql
@@ -164,8 +164,8 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.regenerate_hashed_apikey_for_user(
-  p_apikey_id bigint,
-  p_user_id uuid
+    p_apikey_id bigint,
+    p_user_id uuid
 )
 RETURNS public.apikeys
 LANGUAGE plpgsql
@@ -199,11 +199,11 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.create_hashed_apikey(
-  p_mode public.key_mode,
-  p_name text,
-  p_limited_to_orgs uuid[],
-  p_limited_to_apps text[],
-  p_expires_at timestamptz
+    p_mode public.key_mode,
+    p_name text,
+    p_limited_to_orgs uuid [],
+    p_limited_to_apps text [],
+    p_expires_at timestamptz
 )
 RETURNS public.apikeys
 LANGUAGE plpgsql
@@ -232,7 +232,7 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.regenerate_hashed_apikey(
-  p_apikey_id bigint
+    p_apikey_id bigint
 )
 RETURNS public.apikeys
 LANGUAGE plpgsql
@@ -253,5 +253,9 @@ AS $$
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.create_hashed_apikey(public.key_mode, text, uuid[], text[], timestamptz) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.regenerate_hashed_apikey(bigint) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.create_hashed_apikey(
+    public.key_mode, text, uuid [], text [], timestamptz
+) TO anon,
+authenticated;
+GRANT EXECUTE ON FUNCTION public.regenerate_hashed_apikey(bigint) TO anon,
+authenticated;

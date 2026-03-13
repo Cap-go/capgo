@@ -6,7 +6,11 @@
 -- This removes any remaining broad execute permissions and keeps service-role
 -- access only so the function cannot be called through unauthenticated RPC.
 
-REVOKE ALL ON FUNCTION "public"."find_apikey_by_value"(text) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION "public"."find_apikey_by_value"(text) FROM "anon";
-REVOKE EXECUTE ON FUNCTION "public"."find_apikey_by_value"(text) FROM "authenticated";
-GRANT EXECUTE ON FUNCTION "public"."find_apikey_by_value"(text) TO "service_role";
+REVOKE ALL ON FUNCTION public.find_apikey_by_value(text) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION public.find_apikey_by_value(text) FROM ANON;
+REVOKE EXECUTE ON FUNCTION public.find_apikey_by_value(
+    text
+) FROM AUTHENTICATED;
+GRANT EXECUTE ON FUNCTION public.find_apikey_by_value(
+    text
+) TO SERVICE_ROLE;

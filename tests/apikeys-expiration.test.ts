@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, headers, ORG_ID, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, fetchWithRetry, getSupabaseClient, headers, ORG_ID, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.app.expiration.${id}`
@@ -9,6 +9,10 @@ const APPNAME = `com.app.expiration.${id}`
 const POLICY_ORG_ID = randomUUID()
 const POLICY_ORG_CUSTOMER_ID = `cus_test_policy_${id}`
 const POLICY_ORG_NAME = `Test Policy Org ${id}`
+
+function apiFetch(path: string, init?: RequestInit) {
+  return fetchWithRetry(`${BASE_URL}${path}`, init)
+}
 
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
@@ -48,7 +52,7 @@ afterAll(async () => {
 describe('[POST] /apikey with expiration', () => {
   it('create api key with valid expiration date', async () => {
     const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days from now
-    const response = await fetch(`${BASE_URL}/apikey`, {
+    const response = await apiFetch('/apikey', {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -65,7 +69,7 @@ describe('[POST] /apikey with expiration', () => {
   })
 
   it('create api key without expiration (null)', async () => {
-    const response = await fetch(`${BASE_URL}/apikey`, {
+    const response = await apiFetch('/apikey', {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -80,7 +84,7 @@ describe('[POST] /apikey with expiration', () => {
 
   it('fail to create api key with past expiration date', async () => {
     const pastDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() // 1 day ago
-    const response = await fetch(`${BASE_URL}/apikey`, {
+    const response = await apiFetch('/apikey', {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -94,7 +98,7 @@ describe('[POST] /apikey with expiration', () => {
   })
 
   it('fail to create api key with invalid expiration date format', async () => {
-    const response = await fetch(`${BASE_URL}/apikey`, {
+    const response = await apiFetch('/apikey', {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -113,20 +117,21 @@ describe('[PUT] /apikey/:id with expiration', () => {
 
   beforeAll(async () => {
     // Create a key to update
-    const response = await fetch(`${BASE_URL}/apikey`, {
+    const response = await apiFetch('/apikey', {
       method: 'POST',
       headers,
       body: JSON.stringify({
         name: 'key-for-update-expiration',
       }),
     })
+    expect(response.status).toBe(200)
     const data = await response.json<{ id: number }>()
     testKeyId = data.id
   })
 
   it('update api key to add expiration date', async () => {
     const futureDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() // 14 days from now
-    const response = await fetch(`${BASE_URL}/apikey/${testKeyId}`, {
+    const response = await apiFetch(`/apikey/${testKeyId}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify({
@@ -141,7 +146,7 @@ describe('[PUT] /apikey/:id with expiration', () => {
 
   it('update api key to change expiration date', async () => {
     const newFutureDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days from now
-    const response = await fetch(`${BASE_URL}/apikey/${testKeyId}`, {
+    const response = await apiFetch(`/apikey/${testKeyId}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify({
@@ -154,7 +159,7 @@ describe('[PUT] /apikey/:id with expiration', () => {
   })
 
   it('update api key to remove expiration (set to null)', async () => {
-    const response = await fetch(`${BASE_URL}/apikey/${testKeyId}`, {
+    const response = await apiFetch(`/apikey/${testKeyId}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify({
@@ -168,7 +173,7 @@ describe('[PUT] /apikey/:id with expiration', () => {
 
   it('fail to update api key with past expiration date', async () => {
     const pastDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-    const response = await fetch(`${BASE_URL}/apikey/${testKeyId}`, {
+    const response = await apiFetch(`/apikey/${testKeyId}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify({
@@ -187,7 +192,7 @@ describe('[GET] /apikey with expiration info', () => {
 
   beforeAll(async () => {
     // Create key with expiration
-    const response1 = await fetch(`${BASE_URL}/apikey`, {
+    const response1 = await apiFetch('/apikey', {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -195,21 +200,23 @@ describe('[GET] /apikey with expiration info', () => {
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       }),
     })
+    expect(response1.status).toBe(200)
     keyWithExpiration = await response1.json()
 
     // Create key without expiration
-    const response2 = await fetch(`${BASE_URL}/apikey`, {
+    const response2 = await apiFetch('/apikey', {
       method: 'POST',
       headers,
       body: JSON.stringify({
         name: 'key-without-exp-get-test',
       }),
     })
+    expect(response2.status).toBe(200)
     keyWithoutExpiration = await response2.json()
   })
 
   it('get api key includes expires_at field when set', async () => {
-    const response = await fetch(`${BASE_URL}/apikey/${keyWithExpiration.id}`, {
+    const response = await apiFetch(`/apikey/${keyWithExpiration.id}`, {
       method: 'GET',
       headers,
     })
@@ -220,7 +227,7 @@ describe('[GET] /apikey with expiration info', () => {
   })
 
   it('get api key includes expires_at as null when not set', async () => {
-    const response = await fetch(`${BASE_URL}/apikey/${keyWithoutExpiration.id}`, {
+    const response = await apiFetch(`/apikey/${keyWithoutExpiration.id}`, {
       method: 'GET',
       headers,
     })
@@ -231,7 +238,7 @@ describe('[GET] /apikey with expiration info', () => {
   })
 
   it('list all api keys includes expires_at field', async () => {
-    const response = await fetch(`${BASE_URL}/apikey`, {
+    const response = await apiFetch('/apikey', {
       method: 'GET',
       headers,
     })
@@ -251,9 +258,9 @@ describe('[GET] /apikey with expiration info', () => {
   })
 })
 
-describe('Organization API key expiration policy', () => {
+describe('organization API key expiration policy', () => {
   it('fail to create api key without expiration for org requiring expiration', async () => {
-    const response = await fetch(`${BASE_URL}/apikey`, {
+    const response = await apiFetch('/apikey', {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -269,7 +276,7 @@ describe('Organization API key expiration policy', () => {
   it('fail to create api key with expiration exceeding org max days', async () => {
     // Org has max 30 days, try to create with 60 days
     const tooFarDate = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString()
-    const response = await fetch(`${BASE_URL}/apikey`, {
+    const response = await apiFetch('/apikey', {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -286,7 +293,7 @@ describe('Organization API key expiration policy', () => {
   it('create api key with valid expiration for org with policy', async () => {
     // Org has max 30 days, create with 15 days
     const validDate = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
-    const response = await fetch(`${BASE_URL}/apikey`, {
+    const response = await apiFetch('/apikey', {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -303,7 +310,7 @@ describe('Organization API key expiration policy', () => {
 
   it('create api key without expiration for org without policy', async () => {
     // Use the default org which doesn't have expiration policy
-    const response = await fetch(`${BASE_URL}/apikey`, {
+    const response = await apiFetch('/apikey', {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -362,7 +369,7 @@ describe('[PUT] /organization with API key policy', () => {
   })
 
   it('update organization to set max API key expiration days', async () => {
-    const response = await fetch(`${BASE_URL}/organization`, {
+    const response = await apiFetch('/organization', {
       method: 'PUT',
       headers,
       body: JSON.stringify({
@@ -379,7 +386,7 @@ describe('[PUT] /organization with API key policy', () => {
   })
 
   it('update organization to remove max expiration (set to null)', async () => {
-    const response = await fetch(`${BASE_URL}/organization`, {
+    const response = await apiFetch('/organization', {
       method: 'PUT',
       headers,
       body: JSON.stringify({
@@ -396,7 +403,7 @@ describe('[PUT] /organization with API key policy', () => {
   })
 
   it('fail to set invalid max expiration days (negative)', async () => {
-    const response = await fetch(`${BASE_URL}/organization`, {
+    const response = await apiFetch('/organization', {
       method: 'PUT',
       headers,
       body: JSON.stringify({
@@ -408,7 +415,7 @@ describe('[PUT] /organization with API key policy', () => {
   })
 
   it('fail to set invalid max expiration days (too large)', async () => {
-    const response = await fetch(`${BASE_URL}/organization`, {
+    const response = await apiFetch('/organization', {
       method: 'PUT',
       headers,
       body: JSON.stringify({
@@ -422,7 +429,7 @@ describe('[PUT] /organization with API key policy', () => {
   // This test must be last because it enables require_apikey_expiration,
   // which would block subsequent tests using a non-expiring API key
   it('update organization to require API key expiration', async () => {
-    const response = await fetch(`${BASE_URL}/organization`, {
+    const response = await apiFetch('/organization', {
       method: 'PUT',
       headers,
       body: JSON.stringify({
@@ -439,13 +446,13 @@ describe('[PUT] /organization with API key policy', () => {
   })
 })
 
-describe('Expired API key rejection', () => {
+describe('expired API key rejection', () => {
   let expiredKeyValue: string
   let validKeyValue: string
 
   beforeAll(async () => {
     // Create an API key with expiration, then manually set it to expired via DB
-    const response1 = await fetch(`${BASE_URL}/apikey`, {
+    const response1 = await apiFetch('/apikey', {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -453,18 +460,19 @@ describe('Expired API key rejection', () => {
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       }),
     })
+    expect(response1.status).toBe(200)
     const data1 = await response1.json<{ id: number, key: string }>()
     expiredKeyValue = data1.key
 
     // Manually set the key to expired (1 day ago)
-    const { error } = await getSupabaseClient().from('apikeys')
-      .update({ expires_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() })
-      .eq('id', data1.id)
+    const { error } = await getSupabaseClient().from('apikeys').update({
+      expires_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+    }).eq('id', data1.id)
     if (error)
       throw error
 
     // Create a valid key for comparison
-    const response2 = await fetch(`${BASE_URL}/apikey`, {
+    const response2 = await apiFetch('/apikey', {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -472,12 +480,13 @@ describe('Expired API key rejection', () => {
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       }),
     })
+    expect(response2.status).toBe(200)
     const data2 = await response2.json<{ key: string }>()
     validKeyValue = data2.key
   })
 
   it('expired API key should be rejected when used for authentication', async () => {
-    const response = await fetch(`${BASE_URL}/apikey`, {
+    const response = await apiFetch('/apikey', {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -489,7 +498,7 @@ describe('Expired API key rejection', () => {
   })
 
   it('valid (non-expired) API key should work for authentication', async () => {
-    const response = await fetch(`${BASE_URL}/apikey`, {
+    const response = await apiFetch('/apikey', {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -500,10 +509,10 @@ describe('Expired API key rejection', () => {
   })
 })
 
-describe('API key expiration boundary conditions', () => {
-  it('API key expiring exactly at current time should be rejected', async () => {
+describe('api key expiration boundary conditions', () => {
+  it('api key expiring exactly at current time should be rejected', async () => {
     // Create an API key with future expiration
-    const response = await fetch(`${BASE_URL}/apikey`, {
+    const response = await apiFetch('/apikey', {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -515,16 +524,16 @@ describe('API key expiration boundary conditions', () => {
     expect(response.status).toBe(200)
 
     // Set expiration to exactly now (should be considered expired since condition is > now)
-    const { error } = await getSupabaseClient().from('apikeys')
-      .update({ expires_at: new Date().toISOString() })
-      .eq('id', data.id)
+    const { error } = await getSupabaseClient().from('apikeys').update({
+      expires_at: new Date().toISOString(),
+    }).eq('id', data.id)
     expect(error).toBeNull()
 
     // Wait a tiny bit to ensure we're past the exact timestamp
     await new Promise(resolve => setTimeout(resolve, 50))
 
     // Try to use the key - should be rejected
-    const authResponse = await fetch(`${BASE_URL}/apikey`, {
+    const authResponse = await apiFetch('/apikey', {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -534,10 +543,10 @@ describe('API key expiration boundary conditions', () => {
     expect(authResponse.status).toBe(401)
   })
 
-  it('API key expiring 1 second in the future should still work', async () => {
+  it('api key expiring 1 second in the future should still work', async () => {
     // Create an API key with 1 second future expiration
     const futureDate = new Date(Date.now() + 5000).toISOString() // 5 seconds from now
-    const response = await fetch(`${BASE_URL}/apikey`, {
+    const response = await apiFetch('/apikey', {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -549,7 +558,7 @@ describe('API key expiration boundary conditions', () => {
     expect(response.status).toBe(200)
 
     // Use the key immediately - should work
-    const authResponse = await fetch(`${BASE_URL}/apikey`, {
+    const authResponse = await apiFetch('/apikey', {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -559,15 +568,15 @@ describe('API key expiration boundary conditions', () => {
     expect(authResponse.status).toBe(200)
 
     // Cleanup
-    await fetch(`${BASE_URL}/apikey/${data.id}`, {
+    await apiFetch(`/apikey/${data.id}`, {
       method: 'DELETE',
       headers,
     })
   })
 
-  it('API key with null expiration should never expire', async () => {
+  it('api key with null expiration should never expire', async () => {
     // Create an API key without expiration
-    const response = await fetch(`${BASE_URL}/apikey`, {
+    const response = await apiFetch('/apikey', {
       method: 'POST',
       headers,
       body: JSON.stringify({
@@ -579,7 +588,7 @@ describe('API key expiration boundary conditions', () => {
     expect(data.expires_at).toBeNull()
 
     // Use the key - should always work
-    const authResponse = await fetch(`${BASE_URL}/apikey`, {
+    const authResponse = await apiFetch('/apikey', {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -589,7 +598,7 @@ describe('API key expiration boundary conditions', () => {
     expect(authResponse.status).toBe(200)
 
     // Cleanup
-    await fetch(`${BASE_URL}/apikey/${data.id}`, {
+    await apiFetch(`/apikey/${data.id}`, {
       method: 'DELETE',
       headers,
     })

@@ -139,12 +139,22 @@ BEGIN
 END;
 $function$;
 
-ALTER FUNCTION public.seed_org_metrics_cache(uuid, date, date) OWNER TO "postgres";
+ALTER FUNCTION public.seed_org_metrics_cache(
+    uuid, date, date
+) OWNER TO "postgres";
 
-REVOKE ALL ON FUNCTION public.seed_org_metrics_cache(uuid, date, date) FROM public;
-REVOKE ALL ON FUNCTION public.seed_org_metrics_cache(uuid, date, date) FROM anon;
-REVOKE ALL ON FUNCTION public.seed_org_metrics_cache(uuid, date, date) FROM authenticated;
-REVOKE ALL ON FUNCTION public.seed_org_metrics_cache(uuid, date, date) FROM service_role;
+REVOKE ALL ON FUNCTION public.seed_org_metrics_cache(
+    uuid, date, date
+) FROM public;
+REVOKE ALL ON FUNCTION public.seed_org_metrics_cache(
+    uuid, date, date
+) FROM anon;
+REVOKE ALL ON FUNCTION public.seed_org_metrics_cache(
+    uuid, date, date
+) FROM authenticated;
+REVOKE ALL ON FUNCTION public.seed_org_metrics_cache(
+    uuid, date, date
+) FROM service_role;
 
 -- Cached get_total_metrics implementation
 DROP FUNCTION IF EXISTS public.get_total_metrics(uuid, date, date);
@@ -246,9 +256,13 @@ $function$;
 
 ALTER FUNCTION public.get_total_metrics(uuid, date, date) OWNER TO "postgres";
 
-GRANT ALL ON FUNCTION public.get_total_metrics(uuid, date, date) TO service_role;
+GRANT ALL ON FUNCTION public.get_total_metrics(
+    uuid, date, date
+) TO service_role;
 REVOKE ALL ON FUNCTION public.get_total_metrics(uuid, date, date) FROM anon;
-REVOKE ALL ON FUNCTION public.get_total_metrics(uuid, date, date) FROM authenticated;
+REVOKE ALL ON FUNCTION public.get_total_metrics(
+    uuid, date, date
+) FROM authenticated;
 
 -- Keep 1-arg get_total_metrics in sync with new column list
 DROP FUNCTION IF EXISTS public.get_total_metrics(uuid);
@@ -467,6 +481,10 @@ $function$;
 
 ALTER FUNCTION public.get_plan_usage_and_fit_uncached(uuid) OWNER TO "postgres";
 
-GRANT ALL ON FUNCTION public.get_plan_usage_and_fit_uncached(uuid) TO service_role;
+GRANT ALL ON FUNCTION public.get_plan_usage_and_fit_uncached(
+    uuid
+) TO service_role;
 REVOKE ALL ON FUNCTION public.get_plan_usage_and_fit_uncached(uuid) FROM anon;
-REVOKE ALL ON FUNCTION public.get_plan_usage_and_fit_uncached(uuid) FROM authenticated;
+REVOKE ALL ON FUNCTION public.get_plan_usage_and_fit_uncached(
+    uuid
+) FROM authenticated;

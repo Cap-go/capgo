@@ -113,6 +113,7 @@ function buildActionButton(actionLabel?: string, onAction?: () => void): VNode |
         'inline-flex h-9 w-fit items-center justify-center rounded-md px-4',
         'bg-slate-900 text-sm font-medium text-white',
         'border border-transparent hover:bg-slate-800',
+        'cursor-pointer',
         'dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100',
         'focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0',
         'transition-none',
