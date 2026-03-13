@@ -1,7 +1,7 @@
 -- Fix: add org-scoped auth checks on sensitive plan/usage RPCs and lock down cleanup RPC
 -- Add service-role detection by JWT role claim for backend caller contexts.
 
-CREATE OR REPLACE FUNCTION public.get_app_metrics(org_id uuid)
+CREATE OR REPLACE FUNCTION public.get_app_metrics(p_org_id uuid)
 RETURNS TABLE (
     app_id character varying,
     date date,
@@ -32,8 +32,8 @@ BEGIN
 
   IF NOT v_is_service_role AND NOT public.check_min_rights(
       'read'::public.user_min_right,
-      public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_app_metrics.org_id),
-      get_app_metrics.org_id,
+      public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_app_metrics.p_org_id),
+      get_app_metrics.p_org_id,
       NULL::character varying,
       NULL::bigint
   ) THEN
@@ -42,16 +42,16 @@ BEGIN
 
   SELECT subscription_anchor_start, subscription_anchor_end
   INTO cycle_start, cycle_end
-  FROM public.get_cycle_info_org(org_id);
+  FROM public.get_cycle_info_org(p_org_id);
 
-  RETURN QUERY SELECT * FROM public.get_app_metrics(org_id, cycle_start::date, (cycle_end::date - 1));
+  RETURN QUERY SELECT * FROM public.get_app_metrics(p_org_id, cycle_start::date, (cycle_end::date - 1));
 END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_app_metrics(
-    org_id uuid,
-    start_date date,
-    end_date date
+    p_org_id uuid,
+    p_start_date date,
+    p_end_date date
 ) RETURNS TABLE (
     app_id character varying,
     date date,
@@ -82,8 +82,8 @@ BEGIN
 
   IF NOT v_is_service_role AND NOT public.check_min_rights(
       'read'::public.user_min_right,
-      public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_app_metrics.org_id),
-      get_app_metrics.org_id,
+      public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_app_metrics.p_org_id),
+      get_app_metrics.p_org_id,
       NULL::character varying,
       NULL::bigint
   ) THEN
@@ -93,7 +93,7 @@ BEGIN
   SELECT EXISTS (
     SELECT 1
     FROM public.orgs
-    WHERE id = get_app_metrics.org_id
+    WHERE id = get_app_metrics.p_org_id
   ) INTO org_exists;
 
   IF NOT org_exists THEN
@@ -103,15 +103,15 @@ BEGIN
   SELECT *
   INTO cache_entry
   FROM public.app_metrics_cache
-  WHERE org_id = get_app_metrics.org_id;
+  WHERE org_id = get_app_metrics.p_org_id;
 
   IF cache_entry.id IS NULL
-    OR cache_entry.start_date IS DISTINCT FROM get_app_metrics.start_date
-    OR cache_entry.end_date IS DISTINCT FROM get_app_metrics.end_date
+    OR cache_entry.start_date IS DISTINCT FROM get_app_metrics.p_start_date
+    OR cache_entry.end_date IS DISTINCT FROM get_app_metrics.p_end_date
     OR cache_entry.cached_at IS NULL
     OR cache_entry.cached_at < (NOW() - interval '5 minutes')
   THEN
-    cache_entry := public.seed_get_app_metrics_caches(get_app_metrics.org_id, get_app_metrics.start_date, get_app_metrics.end_date);
+    cache_entry := public.seed_get_app_metrics_caches(get_app_metrics.p_org_id, get_app_metrics.p_start_date, get_app_metrics.p_end_date);
   END IF;
 
   IF cache_entry.response IS NULL THEN
@@ -290,7 +290,7 @@ $$;
 
 CREATE OR REPLACE FUNCTION public.get_current_plan_name_org(orgid uuid)
 RETURNS character varying
-LANGUAGE plpgsql
+LANGUAGE plpgsql SECURITY DEFINER
 SET
   search_path = '' AS $$
 DECLARE
