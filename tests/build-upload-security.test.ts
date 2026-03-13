@@ -2,9 +2,11 @@ import { HTTPException } from 'hono/http-exception'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { tusProxy } from '../supabase/functions/_backend/public/build/upload.ts'
 
-const mockSupabaseApikey = vi.fn()
-const mockCheckPermission = vi.fn()
-const mockGetEnv = vi.fn()
+const { mockSupabaseApikey, mockCheckPermission, mockGetEnv } = vi.hoisted(() => ({
+  mockSupabaseApikey: vi.fn(),
+  mockCheckPermission: vi.fn(),
+  mockGetEnv: vi.fn(),
+}))
 
 vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
   supabaseApikey: mockSupabaseApikey,
