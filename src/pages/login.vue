@@ -541,13 +541,12 @@ onMounted(checkLogin)
           <!-- Step 2: Credentials (SSO or Password) -->
           <div v-else-if="statusAuth === 'credentials'" key="step-credentials" class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
             <div class="py-6 px-4 text-gray-500 sm:py-7 sm:px-8">
-              <!-- Show email context -->
-              <p class="mb-4 text-sm text-gray-400 truncate">
-                {{ emailForLogin }}
-              </p>
-
               <!-- SSO path -->
               <div v-if="hasSso" class="space-y-5">
+                <!-- Show email context -->
+                <p class="mb-4 text-sm text-gray-400 truncate">
+                  {{ emailForLogin }}
+                </p>
                 <p class="text-sm text-gray-600 dark:text-gray-300">
                   {{ t('sso-detected') }}
                 </p>
@@ -587,6 +586,26 @@ onMounted(checkLogin)
               <div v-else>
                 <FormKit id="login-account" type="form" :actions="false" @submit="handlePasswordSubmit">
                   <div class="space-y-5">
+                    <!--
+                      Hidden email input placed inside the form so browsers and password managers
+                      can associate the password field with the correct account (autocomplete="username").
+                      Uses opacity+absolute positioning instead of display:none so browsers still
+                      detect it for autofill purposes.
+                    -->
+                    <input
+                      type="email"
+                      :value="emailForLogin"
+                      name="username"
+                      autocomplete="username"
+                      readonly
+                      tabindex="-1"
+                      aria-hidden="true"
+                      style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none;"
+                    >
+                    <!-- Show email context -->
+                    <p class="text-sm text-gray-400 truncate">
+                      {{ emailForLogin }}
+                    </p>
                     <div>
                       <FormKit
                         id="passwordInput" type="password" :placeholder="t('password')"
