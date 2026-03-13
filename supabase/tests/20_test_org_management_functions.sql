@@ -425,6 +425,7 @@ SELECT
     );
 
 -- Test get_current_plan_max_org
+SELECT tests.authenticate_as_service_role();
 SELECT
     ok(
         (
@@ -434,6 +435,7 @@ SELECT
         ) = 1,
         'get_current_plan_max_org test - returns plan limits'
     );
+SELECT tests.clear_authentication();
 
 -- Test get_cycle_info_org
 SELECT
