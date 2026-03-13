@@ -4,6 +4,8 @@ BEGIN;
 SELECT plan(30);
 
 -- Test upsert_version_meta function
+SELECT tests.authenticate_as_service_role();
+
 -- First insert a positive size
 SELECT
     is(
