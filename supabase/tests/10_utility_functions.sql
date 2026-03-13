@@ -4,6 +4,8 @@ BEGIN;
 
 SELECT plan(11);
 
+SELECT tests.authenticate_as_service_role();
+
 -- Test get_user_id
 SELECT
     results_eq(
