@@ -19,25 +19,24 @@ SET
 DECLARE
   cycle_start timestamptz;
   cycle_end timestamptz;
-  v_is_service_role boolean;
-  v_request_role text;
+  request_role text;
 BEGIN
-  v_request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
-  v_is_service_role := (
-    (v_request_role = 'service_role')
-    OR ((SELECT auth.jwt() ->> 'role') = 'service_role')
-    OR ((SELECT auth.role()) = 'service_role')
-    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
-  );
+  request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
 
-  IF NOT v_is_service_role AND NOT public.check_min_rights(
-      'read'::public.user_min_right,
-      public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_app_metrics.org_id),
-      get_app_metrics.org_id,
-      NULL::character varying,
-      NULL::bigint
-  ) THEN
-    RAISE EXCEPTION 'NO_RIGHTS';
+  IF request_role IS NULL THEN
+    RETURN;
+  END IF;
+
+  IF request_role <> 'service_role' THEN
+    IF NOT public.check_min_rights(
+        'read'::public.user_min_right,
+        public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_app_metrics.org_id),
+        get_app_metrics.org_id,
+        NULL::character varying,
+        NULL::bigint
+    ) THEN
+      RETURN;
+    END IF;
   END IF;
 
   SELECT subscription_anchor_start, subscription_anchor_end
@@ -69,25 +68,24 @@ SET
 DECLARE
   cache_entry public.app_metrics_cache%ROWTYPE;
   org_exists boolean;
-  v_is_service_role boolean;
-  v_request_role text;
+  request_role text;
 BEGIN
-  v_request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
-  v_is_service_role := (
-    (v_request_role = 'service_role')
-    OR ((SELECT auth.jwt() ->> 'role') = 'service_role')
-    OR ((SELECT auth.role()) = 'service_role')
-    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
-  );
+  request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
 
-  IF NOT v_is_service_role AND NOT public.check_min_rights(
-      'read'::public.user_min_right,
-      public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_app_metrics.org_id),
-      get_app_metrics.org_id,
-      NULL::character varying,
-      NULL::bigint
-  ) THEN
-    RAISE EXCEPTION 'NO_RIGHTS';
+  IF request_role IS NULL THEN
+    RETURN;
+  END IF;
+
+  IF request_role <> 'service_role' THEN
+    IF NOT public.check_min_rights(
+        'read'::public.user_min_right,
+        public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_app_metrics.org_id),
+        get_app_metrics.org_id,
+        NULL::character varying,
+        NULL::bigint
+    ) THEN
+      RETURN;
+    END IF;
   END IF;
 
   SELECT EXISTS (
@@ -103,7 +101,7 @@ BEGIN
   SELECT *
   INTO cache_entry
   FROM public.app_metrics_cache
-  WHERE org_id = get_app_metrics.org_id;
+  WHERE public.app_metrics_cache.org_id = get_app_metrics.org_id;
 
   IF cache_entry.id IS NULL
     OR cache_entry.start_date IS DISTINCT FROM get_app_metrics.start_date
@@ -162,25 +160,24 @@ SET
 DECLARE
   cycle_start timestamptz;
   cycle_end timestamptz;
-  v_is_service_role boolean;
-  v_request_role text;
+  request_role text;
 BEGIN
-  v_request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
-  v_is_service_role := (
-    (v_request_role = 'service_role')
-    OR ((SELECT auth.jwt() ->> 'role') = 'service_role')
-    OR ((SELECT auth.role()) = 'service_role')
-    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
-  );
+  request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
 
-  IF NOT v_is_service_role AND NOT public.check_min_rights(
-      'read'::public.user_min_right,
-      public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_global_metrics.org_id),
-      get_global_metrics.org_id,
-      NULL::character varying,
-      NULL::bigint
-  ) THEN
-    RAISE EXCEPTION 'NO_RIGHTS';
+  IF request_role IS NULL THEN
+    RETURN;
+  END IF;
+
+  IF request_role <> 'service_role' THEN
+    IF NOT public.check_min_rights(
+        'read'::public.user_min_right,
+        public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_global_metrics.org_id),
+        get_global_metrics.org_id,
+        NULL::character varying,
+        NULL::bigint
+    ) THEN
+      RETURN;
+    END IF;
   END IF;
 
   SELECT subscription_anchor_start, subscription_anchor_end
@@ -209,25 +206,24 @@ CREATE OR REPLACE FUNCTION public.get_global_metrics(
 SET
   search_path = '' AS $$
 DECLARE
-  v_is_service_role boolean;
-  v_request_role text;
+  request_role text;
 BEGIN
-  v_request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
-  v_is_service_role := (
-    (v_request_role = 'service_role')
-    OR ((SELECT auth.jwt() ->> 'role') = 'service_role')
-    OR ((SELECT auth.role()) = 'service_role')
-    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
-  );
+  request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
 
-  IF NOT v_is_service_role AND NOT public.check_min_rights(
-      'read'::public.user_min_right,
-      public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_global_metrics.org_id),
-      get_global_metrics.org_id,
-      NULL::character varying,
-      NULL::bigint
-  ) THEN
-    RAISE EXCEPTION 'NO_RIGHTS';
+  IF request_role IS NULL THEN
+    RETURN;
+  END IF;
+
+  IF request_role <> 'service_role' THEN
+    IF NOT public.check_min_rights(
+        'read'::public.user_min_right,
+        public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_global_metrics.org_id),
+        get_global_metrics.org_id,
+        NULL::character varying,
+        NULL::bigint
+    ) THEN
+      RETURN;
+    END IF;
   END IF;
 
   RETURN QUERY
