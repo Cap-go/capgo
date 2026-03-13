@@ -88,7 +88,8 @@ async function validateOrigin(c: Context, next: () => Promise<void>) {
 
   const requestOrigin = normalizeOrigin(origin)
   const allowedOrigins = getAllowedOrigins(c)
-  if (!requestOrigin || (!allowedOrigins.has(requestOrigin) && !isNativeOrLocalOrigin(requestOrigin))) {
+  const isNativeOrLocal = isNativeOrLocalOrigin(origin)
+  if (!isNativeOrLocal && (!requestOrigin || !allowedOrigins.has(requestOrigin))) {
     cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - forbidden origin', origin })
     return quickError(403, 'forbidden_origin', 'Origin is not allowed for this endpoint')
   }
