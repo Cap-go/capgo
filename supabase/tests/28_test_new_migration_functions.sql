@@ -1,7 +1,7 @@
 BEGIN;
 
 
-SELECT plan(28);
+SELECT plan(30);
 
 -- Test upsert_version_meta function
 -- First insert a positive size
@@ -237,6 +237,19 @@ SELECT
         'rescind_invitation - non-admin user gets NO_RIGHTS for non-existent org'
     );
 
+SELECT
+    is(
+        rescind_invitation(
+            'test@example.com',
+            '00000000-0000-0000-0000-000000000000'
+        ),
+        rescind_invitation(
+            'test@example.com',
+            '22dbad8a-b885-4309-9b3b-a09f8460fb6d'
+        ),
+        'rescind_invitation - non-admin user gets consistent NO_RIGHTS'
+    );
+
 -- Verify anon callers cannot execute rescind_invitation
 SELECT tests.clear_authentication();
 
@@ -246,6 +259,17 @@ SELECT
         '42501',
         'permission denied for function rescind_invitation',
         'rescind_invitation - anonymous call throws permission denied'
+    );
+
+SELECT
+    is(
+        has_function_privilege(
+            'anon'::name,
+            'public.rescind_invitation(text, uuid)'::regprocedure,
+            'EXECUTE'
+        ),
+        false,
+        'anon role has no execute privilege on rescind_invitation'
     );
 
 -- Test super admin privilege escalation prevention
