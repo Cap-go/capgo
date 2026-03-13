@@ -565,16 +565,22 @@ describe('RLS policies with hashed API keys (via Supabase SDK)', () => {
   })
 })
 
-describe('Webhook and webhook_delivery RLS with API-key org scope precedence', () => {
+describe('webhook and webhook_delivery rls with api-key org scope precedence', () => {
   let limitedKey: { id: number, key: string, key_hash: string }
+  let scopedKey: { id: number, key: string, key_hash: string }
   let webhookId: string
   let deliveryId: string
 
   beforeAll(async () => {
     limitedKey = await createHashedApiKey('rls-webhook-org-scope-key', 'all')
+    scopedKey = await createHashedApiKey('rls-webhook-org-scope-update-key', 'all')
     await pool.query(
       `UPDATE public.apikeys SET limited_to_orgs = $1 WHERE id = $2`,
       [['00000000-0000-0000-0000-000000000000'], limitedKey.id],
+    )
+    await pool.query(
+      `UPDATE public.apikeys SET limited_to_orgs = $1 WHERE id = $2`,
+      [[ORG_ID_RLS], scopedKey.id],
     )
 
     webhookId = randomUUID()
@@ -611,6 +617,7 @@ describe('Webhook and webhook_delivery RLS with API-key org scope precedence', (
     await pool.query('DELETE FROM public.webhook_deliveries WHERE id = $1', [deliveryId])
     await pool.query('DELETE FROM public.webhooks WHERE id = $1', [webhookId])
     await deleteApiKey(limitedKey.id)
+    await deleteApiKey(scopedKey.id)
   })
 
   it('uses API key org scope when auth context is also present for webhook reads', async () => {
@@ -636,7 +643,7 @@ describe('Webhook and webhook_delivery RLS with API-key org scope precedence', (
     const updatedRows = await execWithAuthAndCapgkey(
       'UPDATE public.webhook_deliveries SET org_id = $1 WHERE id = $2',
       USER_ID_RLS,
-      limitedKey.key,
+      scopedKey.key,
       [ORG_ID_2, deliveryId],
     )
 
