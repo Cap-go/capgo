@@ -1766,27 +1766,6 @@ export type Database = {
         }
         Relationships: []
       }
-      rbac_settings: {
-        Row: {
-          created_at: string
-          id: number
-          updated_at: string
-          use_new_rbac: boolean
-        }
-        Insert: {
-          created_at?: string
-          id?: number
-          updated_at?: string
-          use_new_rbac?: boolean
-        }
-        Update: {
-          created_at?: string
-          id?: number
-          updated_at?: string
-          use_new_rbac?: boolean
-        }
-        Relationships: []
-      }
       role_bindings: {
         Row: {
           app_id: string | null
@@ -1964,21 +1943,6 @@ export type Database = {
           name?: string
           priority_rank?: number
           scope_type?: string
-        }
-        Relationships: []
-      }
-      security_settings: {
-        Row: {
-          id: boolean
-          mfa_email_otp_enforced_at: string
-        }
-        Insert: {
-          id?: boolean
-          mfa_email_otp_enforced_at?: string
-        }
-        Update: {
-          id?: boolean
-          mfa_email_otp_enforced_at?: string
         }
         Relationships: []
       }
@@ -3214,6 +3178,7 @@ export type Database = {
           role: string
         }[]
       }
+      get_mfa_email_otp_enforced_at: { Args: never; Returns: string }
       get_next_cron_time: {
         Args: { p_schedule: string; p_timestamp: string }
         Returns: string
@@ -3702,6 +3667,7 @@ export type Database = {
       is_platform_admin:
         | { Args: never; Returns: boolean }
         | { Args: { userid: string }; Returns: boolean }
+      is_rbac_enabled_globally: { Args: never; Returns: boolean }
       is_recent_email_otp_verified: {
         Args: { p_user_id: string }
         Returns: boolean

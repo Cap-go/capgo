@@ -34,7 +34,7 @@ BEGIN
     ) THEN
       PERFORM public.pg_log(
         'deny: NO_RIGHTS',
-        jsonb_build_object(
+        pg_catalog.jsonb_build_object(
           'orgid',
           get_current_plan_max_org.orgid,
           'uid',
@@ -56,6 +56,7 @@ $$;
 
 ALTER FUNCTION public.get_current_plan_max_org(uuid) OWNER TO "postgres";
 
+REVOKE ALL ON FUNCTION public.get_current_plan_max_org(uuid) FROM public;
 REVOKE ALL ON FUNCTION public.get_current_plan_max_org(uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.get_current_plan_max_org(uuid)
 TO authenticated;
