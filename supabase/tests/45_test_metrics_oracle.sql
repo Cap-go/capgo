@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(10);
+SELECT plan(13);
 
 CREATE OR REPLACE FUNCTION test_metrics_oracle_access_control() RETURNS SETOF TEXT AS $$
 DECLARE
@@ -49,7 +49,7 @@ BEGIN
     INSERT INTO public.daily_version (date, app_id, version_name, get, fail, install, uninstall)
     VALUES (v_start_date, v_target_app_id, '1.0.0', 3, 0, 1, 0);
 
-    SELECT tests.authenticate_as('test-metrics-oracle-owner');
+    PERFORM tests.authenticate_as('test-metrics-oracle-owner');
 
     SELECT COUNT(*) INTO v_authorized_count
     FROM public.get_app_metrics(v_org_id, v_start_date, v_end_date);
@@ -67,7 +67,7 @@ BEGIN
         'Authorized owner can query get_global_metrics for their org'
     );
 
-    SELECT tests.authenticate_as('test-metrics-oracle-attacker');
+    PERFORM tests.authenticate_as('test-metrics-oracle-attacker');
 
     SELECT COUNT(*) INTO v_unauthorized_count
     FROM public.get_app_metrics(v_org_id, v_start_date, v_end_date);
@@ -101,13 +101,31 @@ BEGIN
         'Non-existent org returns empty set for get_global_metrics'
     );
 
+    PERFORM tests.clear_authentication();
+
+    SELECT COUNT(*) INTO v_unauthorized_count
+    FROM public.get_app_metrics(v_org_id, v_start_date, v_end_date);
+    RETURN NEXT is(
+        v_unauthorized_count,
+        0::bigint,
+        'Missing role returns empty set for get_app_metrics'
+    );
+
+    SELECT COUNT(*) INTO v_unauthorized_count
+    FROM public.get_global_metrics(v_org_id, v_start_date, v_end_date);
+    RETURN NEXT is(
+        v_unauthorized_count,
+        0::bigint,
+        'Missing role returns empty set for get_global_metrics'
+    );
+
     PERFORM set_config('request.jwt.claim.org_id', v_org_id::text, true);
     SELECT COUNT(*) INTO v_unauthorized_count
     FROM public.get_total_metrics();
     RETURN NEXT is(
         v_unauthorized_count,
         0::bigint,
-        'Unauthorized caller cannot read target org in get_total_metrics when org_id claim is set'
+        'Missing role still returns empty set for get_total_metrics'
     );
 
     PERFORM set_config('request.jwt.claim.org_id', '', true);
