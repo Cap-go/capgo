@@ -80,7 +80,7 @@ describe('build upload proxy security', () => {
   })
 
   it.concurrent('rejects path traversal attempts before forwarding to builder', async () => {
-    const context = fakeContext(`http://localhost/build/upload/${jobId}/%2e%2e/jobs`, 'PATCH')
+    const context = fakeContext(`http://localhost/build/upload/${jobId}/%2e%2e%2Fjobs`, 'PATCH')
 
     let error: HTTPException | undefined
     try {
