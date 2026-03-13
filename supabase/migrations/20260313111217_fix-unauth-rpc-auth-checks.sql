@@ -49,9 +49,9 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_app_metrics(
-    p_org_id uuid,
-    p_start_date date,
-    p_end_date date
+    org_id uuid,
+    start_date date,
+    end_date date
 ) RETURNS TABLE (
     app_id character varying,
     date date,
@@ -82,8 +82,8 @@ BEGIN
 
   IF NOT v_is_service_role AND NOT public.check_min_rights(
       'read'::public.user_min_right,
-      public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_app_metrics.p_org_id),
-      get_app_metrics.p_org_id,
+      public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_app_metrics.org_id),
+      get_app_metrics.org_id,
       NULL::character varying,
       NULL::bigint
   ) THEN
@@ -93,7 +93,7 @@ BEGIN
   SELECT EXISTS (
     SELECT 1
     FROM public.orgs
-    WHERE id = get_app_metrics.p_org_id
+    WHERE id = get_app_metrics.org_id
   ) INTO org_exists;
 
   IF NOT org_exists THEN
@@ -103,15 +103,15 @@ BEGIN
   SELECT *
   INTO cache_entry
   FROM public.app_metrics_cache
-  WHERE org_id = get_app_metrics.p_org_id;
+  WHERE org_id = get_app_metrics.org_id;
 
   IF cache_entry.id IS NULL
-    OR cache_entry.start_date IS DISTINCT FROM get_app_metrics.p_start_date
-    OR cache_entry.end_date IS DISTINCT FROM get_app_metrics.p_end_date
+    OR cache_entry.start_date IS DISTINCT FROM get_app_metrics.start_date
+    OR cache_entry.end_date IS DISTINCT FROM get_app_metrics.end_date
     OR cache_entry.cached_at IS NULL
     OR cache_entry.cached_at < (NOW() - interval '5 minutes')
   THEN
-    cache_entry := public.seed_get_app_metrics_caches(get_app_metrics.p_org_id, get_app_metrics.p_start_date, get_app_metrics.p_end_date);
+    cache_entry := public.seed_get_app_metrics_caches(get_app_metrics.org_id, get_app_metrics.start_date, get_app_metrics.end_date);
   END IF;
 
   IF cache_entry.response IS NULL THEN
