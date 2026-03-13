@@ -2,6 +2,7 @@
 REVOKE ALL ON FUNCTION "public"."upsert_version_meta"("p_app_id" character varying, "p_version_id" bigint, "p_size" bigint)
 FROM
   "public",
+  "PUBLIC",
   "anon",
   "authenticated";
 
@@ -39,7 +40,8 @@ BEGIN
     RETURN FALSE;
   END IF;
 
-  IF COALESCE(current_setting('role', true), '') NOT IN ('service_role', 'postgres') THEN
+  IF COALESCE(current_setting('role', true), '') NOT IN ('service_role', 'postgres')
+    AND COALESCE(session_user, current_user) NOT IN ('service_role', 'postgres') THEN
     SELECT public.get_identity_org_appid('{write,all}'::public.key_mode[], v_owner_org, p_app_id)
       INTO v_caller_id;
 
