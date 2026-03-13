@@ -164,6 +164,85 @@ describe('[POST] /private/validate_password_compliance', () => {
     expect(responseData.error).toBe('invalid_body')
   })
 
+  it('reject request with disallowed Origin header', async () => {
+    const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
+      headers: {
+        ...headers,
+        Origin: 'https://malicious.example',
+      },
+      method: 'POST',
+      body: JSON.stringify({
+        email: USER_EMAIL,
+        password: USER_PASSWORD,
+        org_id: ORG_ID,
+      }),
+    })
+    expect(response.status).toBe(403)
+
+    const responseData = await response.json() as { error: string }
+    expect(responseData.error).toBe('forbidden_origin')
+  })
+
+  it('allow request from capacitor origin', async () => {
+    const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
+      headers: {
+        ...headers,
+        Origin: 'capacitor://localhost',
+      },
+      method: 'POST',
+      body: JSON.stringify({
+        email: USER_EMAIL,
+        password: USER_PASSWORD,
+        org_id: ORG_ID,
+      }),
+    })
+
+    expect(response.status).toBe(400)
+
+    const responseData = await response.json() as { error: string }
+    expect(responseData.error).toBe('password_does_not_meet_policy')
+  })
+
+  it('allow request from ionic origin', async () => {
+    const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
+      headers: {
+        ...headers,
+        Origin: 'ionic://localhost',
+      },
+      method: 'POST',
+      body: JSON.stringify({
+        email: USER_EMAIL,
+        password: USER_PASSWORD,
+        org_id: ORG_ID,
+      }),
+    })
+
+    expect(response.status).toBe(400)
+
+    const responseData = await response.json() as { error: string }
+    expect(responseData.error).toBe('password_does_not_meet_policy')
+  })
+
+  it('allow request from localhost origin', async () => {
+    const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
+      headers: {
+        ...headers,
+        Origin: 'http://localhost:3000',
+      },
+      method: 'POST',
+      body: JSON.stringify({
+        email: USER_EMAIL,
+        password: USER_PASSWORD,
+        org_id: ORG_ID,
+      }),
+    })
+
+    expect(response.status).toBe(400)
+
+    const responseData = await response.json() as { error: string }
+    expect(responseData.error).toBe('password_does_not_meet_policy')
+  })
+
   it('reject request with missing password', async () => {
     const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
       headers,
