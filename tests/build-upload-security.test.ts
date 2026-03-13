@@ -82,25 +82,21 @@ describe('build upload proxy security', () => {
   it.concurrent('rejects path traversal attempts before forwarding to builder', async () => {
     const context = fakeContext(`http://localhost/build/upload/${jobId}/%2e%2e/jobs`, 'PATCH')
 
-    let caught = false
-    let error: HTTPException | null = null
+    let error: HTTPException | undefined
     try {
       await tusProxy(context as any, jobId, { user_id: 'user-test', key: 'api-test' } as any)
     }
     catch (err) {
       expect(err).toBeInstanceOf(HTTPException)
-      caught = true
-      if (err instanceof HTTPException) {
-        error = err
+      if (!(err instanceof HTTPException)) {
+        throw err
       }
+      error = err
     }
 
-    expect(caught).toBe(true)
-    expect(error).not.toBeNull()
     if (!error) {
-      return
+      throw new Error('Expected tusProxy to reject with HTTPException')
     }
-    expect(error).toBeInstanceOf(HTTPException)
     expect(error.cause).toMatchObject({
       error: 'invalid_path',
       message: 'Invalid upload path',
@@ -110,25 +106,21 @@ describe('build upload proxy security', () => {
   it.concurrent('rejects invalidly encoded paths before forwarding to builder', async () => {
     const context = fakeContext(`http://localhost/build/upload/${jobId}/%`, 'PATCH')
 
-    let caught = false
-    let error: HTTPException | null = null
+    let error: HTTPException | undefined
     try {
       await tusProxy(context as any, jobId, { user_id: 'user-test', key: 'api-test' } as any)
     }
     catch (err) {
       expect(err).toBeInstanceOf(HTTPException)
-      caught = true
-      if (err instanceof HTTPException) {
-        error = err
+      if (!(err instanceof HTTPException)) {
+        throw err
       }
+      error = err
     }
 
-    expect(caught).toBe(true)
-    expect(error).not.toBeNull()
     if (!error) {
-      return
+      throw new Error('Expected tusProxy to reject with HTTPException')
     }
-    expect(error).toBeInstanceOf(HTTPException)
     expect(error.cause).toMatchObject({
       error: 'invalid_path',
       message: 'Invalid upload path encoding.',
