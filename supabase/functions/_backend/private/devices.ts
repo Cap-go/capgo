@@ -34,7 +34,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   }
   const devicesIds = body.devicesId ?? body.deviceIds ?? []
   if (body.count)
-    return c.json({ count: await countDevices(c, body.appId, body.customIdMode ?? false) })
+    return c.json({ count: await countDevices(c, body.appId, body.customIdMode ?? false, devicesIds, body.versionName, body.search?.trim()) })
   return c.json(await readDevices(c, {
     app_id: body.appId,
     version_name: body.versionName,
