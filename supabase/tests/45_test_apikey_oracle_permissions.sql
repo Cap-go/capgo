@@ -60,7 +60,7 @@ SELECT
             'com.demo.app'
         ),
         '42501',
-        'permission denied for function get_user_id with app_id',
+        'permission denied for function get_user_id',
         'authenticated user should not call get_user_id with app_id'
     );
 
