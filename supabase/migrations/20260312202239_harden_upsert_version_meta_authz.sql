@@ -25,6 +25,7 @@ DECLARE
   v_owner_org uuid;
   v_caller_id uuid;
   v_existing_count integer;
+  v_version_exists boolean;
 BEGIN
   IF p_size = 0 THEN
     RETURN FALSE;
@@ -37,6 +38,18 @@ BEGIN
   LIMIT 1;
 
   IF v_owner_org IS NULL THEN
+    RETURN FALSE;
+  END IF;
+
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.app_versions av
+    WHERE av.app_id = p_app_id
+      AND av.id = p_version_id
+  )
+  INTO v_version_exists;
+
+  IF NOT v_version_exists THEN
     RETURN FALSE;
   END IF;
 

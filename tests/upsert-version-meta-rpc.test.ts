@@ -15,7 +15,7 @@ if (!SUPABASE_ANON_KEY)
 
 const APP_ID = `com.versionmeta.rpc.${randomUUID()}`
 const VERSION_NAME = `1.0.0-${randomUUID()}`
-const VERSION_ID = 1_000_000_000
+let versionId: number
 
 const serviceRoleSupabase = getSupabaseClient()
 const anonSupabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -36,13 +36,21 @@ beforeAll(async () => {
   if (appError)
     throw appError
 
-  const { error: versionError } = await serviceRoleSupabase.from('app_versions').insert({
-    app_id: APP_ID,
-    owner_org: ORG_ID,
-    name: VERSION_NAME,
-  })
+  const { data: versionRow, error: versionError } = await serviceRoleSupabase
+    .from('app_versions')
+    .insert({
+      app_id: APP_ID,
+      owner_org: ORG_ID,
+      name: VERSION_NAME,
+    })
+    .select('id')
+    .single()
   if (versionError)
     throw versionError
+  if (!versionRow)
+    throw new Error('Failed to create app version for test')
+
+  versionId = versionRow.id
 })
 
 afterAll(async () => {
@@ -55,7 +63,7 @@ describe('upsert_version_meta RPC authorization', () => {
   it('must reject unauthenticated (anon) execution', async () => {
     const { data, error } = await anonSupabase.rpc('upsert_version_meta', {
       p_app_id: APP_ID,
-      p_version_id: VERSION_ID,
+      p_version_id: versionId,
       p_size: 123456,
     })
 
@@ -67,7 +75,7 @@ describe('upsert_version_meta RPC authorization', () => {
   it('returns false for unknown app ids', async () => {
     const { data, error } = await serviceRoleSupabase.rpc('upsert_version_meta', {
       p_app_id: `com.versionmeta.missing.${randomUUID()}`,
-      p_version_id: VERSION_ID,
+      p_version_id: versionId,
       p_size: 123456,
     })
 
@@ -89,7 +97,7 @@ describe('upsert_version_meta RPC authorization', () => {
   it('upserts only once per app/version/size sign', async () => {
     const { data, error } = await serviceRoleSupabase.rpc('upsert_version_meta', {
       p_app_id: APP_ID,
-      p_version_id: VERSION_ID,
+      p_version_id: versionId,
       p_size: 123456,
     })
 
@@ -100,7 +108,7 @@ describe('upsert_version_meta RPC authorization', () => {
       .from('version_meta')
       .select('id')
       .eq('app_id', APP_ID)
-      .eq('version_id', VERSION_ID)
+      .eq('version_id', versionId)
       .limit(2)
 
     expect(readError).toBeNull()
@@ -108,7 +116,7 @@ describe('upsert_version_meta RPC authorization', () => {
 
     const { data: duplicateData, error: duplicateError } = await serviceRoleSupabase.rpc('upsert_version_meta', {
       p_app_id: APP_ID,
-      p_version_id: VERSION_ID,
+      p_version_id: versionId,
       p_size: 123456,
     })
 
