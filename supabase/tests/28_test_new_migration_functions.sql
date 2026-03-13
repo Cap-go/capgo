@@ -6,10 +6,29 @@ SELECT plan(30);
 -- Test upsert_version_meta function
 SELECT tests.authenticate_as_service_role();
 
+SELECT
+    set_config(
+        'tests.demo_app_version_id',
+        (
+            SELECT id::text
+            FROM public.app_versions
+            WHERE
+                app_id = 'com.demo.app'
+                AND name = '1.0.0'
+            ORDER BY id
+            LIMIT 1
+        ),
+        true
+    );
+
 -- First insert a positive size
 SELECT
     is(
-        upsert_version_meta('com.demo.app', 999, 1000),
+        upsert_version_meta(
+            'com.demo.app',
+            current_setting('tests.demo_app_version_id')::bigint,
+            1000
+        ),
         true,
         'upsert_version_meta - first positive insert returns true'
     );
@@ -17,7 +36,11 @@ SELECT
 -- Try to insert the same positive size again (should return false)
 SELECT
     is(
-        upsert_version_meta('com.demo.app', 999, 2000),
+        upsert_version_meta(
+            'com.demo.app',
+            current_setting('tests.demo_app_version_id')::bigint,
+            2000
+        ),
         false,
         'upsert_version_meta - duplicate positive insert returns false'
     );
@@ -25,7 +48,11 @@ SELECT
 -- Insert a negative size for same app/version (should work)
 SELECT
     is(
-        upsert_version_meta('com.demo.app', 999, -500),
+        upsert_version_meta(
+            'com.demo.app',
+            current_setting('tests.demo_app_version_id')::bigint,
+            -500
+        ),
         true,
         'upsert_version_meta - negative size insert returns true'
     );
@@ -33,7 +60,11 @@ SELECT
 -- Try to insert another negative size (should return false)
 SELECT
     is(
-        upsert_version_meta('com.demo.app', 999, -600),
+        upsert_version_meta(
+            'com.demo.app',
+            current_setting('tests.demo_app_version_id')::bigint,
+            -600
+        ),
         false,
         'upsert_version_meta - duplicate negative insert returns false'
     );
