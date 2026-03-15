@@ -283,6 +283,7 @@ END $$;
 -- =============================================================================
 -- Test get_orgs_v6 with expired API key
 -- =============================================================================
+SELECT tests.authenticate_as_service_role();
 
 -- Create test API keys for get_orgs_v6 tests
 INSERT INTO apikeys (id, user_id, key, mode, name, expires_at)
