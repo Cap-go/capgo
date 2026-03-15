@@ -225,6 +225,8 @@ VALUES
 );
 
 -- Set up request headers with expired key
+SELECT tests.authenticate_as_service_role();
+
 DO $$
 BEGIN
     PERFORM set_config('request.headers', '{"capgkey": "test-key-for-identity-expired"}', true);
@@ -267,6 +269,8 @@ SELECT
         '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
         'get_identity_apikey_only: Returns user_id for valid (not expired) API key'
     );
+
+SELECT tests.clear_authentication();
 
 -- Reset headers
 DO $$

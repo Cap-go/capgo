@@ -452,6 +452,8 @@ SELECT
 
 -- Test get_organization_cli_warnings with proper API key setup
 -- Test 1: Set up valid API key and test normal scenario (good plan)
+SELECT tests.authenticate_as_service_role();
+
 SELECT
     set_config(
         'request.headers',
