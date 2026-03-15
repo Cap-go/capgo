@@ -49,7 +49,7 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
 </script>
 
 <template>
-  <div class="flex flex-col col-span-full bg-white rounded-lg border shadow-lg sm:col-span-6 xl:col-span-4 dark:bg-gray-800 border-slate-300 h-[460px] dark:border-slate-900">
+  <div class="flex flex-col col-span-full overflow-hidden bg-white rounded-lg border shadow-lg sm:col-span-6 xl:col-span-4 dark:bg-gray-800 border-slate-300 h-[460px] dark:border-slate-900">
     <!-- Header with title and stats -->
     <div class="flex gap-2 justify-between items-start px-4 pt-4">
       <!-- Custom header slot or default header -->
@@ -59,7 +59,7 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
         </h2>
       </slot>
 
-      <div v-if="total !== undefined" class="flex flex-col items-end text-right shrink-0">
+      <div v-if="total !== undefined" class="flex flex-col items-end text-right shrink-0 min-w-0">
         <!-- Evolution badge -->
         <div
           v-if="showEvolutionBadge"
@@ -71,8 +71,8 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
         <div v-else class="inline-flex py-1 px-2 text-xs font-semibold rounded-full opacity-0" aria-hidden="true" />
 
         <!-- Total value -->
-        <div class="text-3xl font-bold dark:text-white text-slate-600">
-          {{ total?.toLocaleString() }}<span v-if="unit" class="text-2xl font-normal"> {{ unit }}</span>
+        <div class="text-2xl font-bold whitespace-nowrap dark:text-white text-slate-600 sm:text-3xl">
+          {{ total?.toLocaleString() }}<span v-if="unit" class="text-xl font-normal sm:text-2xl"> {{ unit }}</span>
         </div>
       </div>
     </div>

@@ -71,6 +71,14 @@ function capitalize(text: string) {
   return text.charAt(0).toUpperCase() + text.slice(1)
 }
 
+function formatCompactNumber(value: number): string {
+  if (value >= 1_000_000)
+    return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`
+  if (value >= 1_000)
+    return `${(value / 1_000).toFixed(1).replace(/\.0$/, '')}K`
+  return value.toLocaleString()
+}
+
 const chartUpdateData = computed(() => updateData.value.map(v => v ?? 0))
 const chartUpdateDataByAction = computed(() => {
   const result: { [action: string]: number[] } = {}
@@ -383,39 +391,39 @@ onMounted(async () => {
     :is-demo-data="isDemoMode"
   >
     <template #header>
-      <div class="flex flex-col gap-2 justify-between items-start">
+      <div class="flex flex-col gap-2 justify-between items-start min-w-0">
         <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight dark:text-white text text-slate-600">
           {{ t('update_statistics') }}
         </h2>
-        <div class="flex flex-wrap gap-3 items-center sm:flex-nowrap sm:gap-4">
-          <div class="flex gap-2 items-center">
-            <div class="w-3 h-3 rounded-full" style="background-color: hsl(210, 65%, 55%)" />
+        <div class="flex flex-nowrap gap-2 items-center sm:gap-3">
+          <div class="flex gap-1.5 items-center">
+            <div class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: hsl(210, 65%, 55%)" />
             <div
-              class="flex gap-1 items-center text-sm text-slate-600 dark:text-slate-300"
+              class="flex gap-0.5 items-center text-xs whitespace-nowrap text-slate-600 dark:text-slate-300"
               :aria-label="`${actionDisplayNames.requested}: ${effectiveTotalRequested.toLocaleString()}`"
             >
-              <GlobeAltIcon class="w-4 h-4" aria-hidden="true" />
-              <span>{{ effectiveTotalRequested.toLocaleString() }}</span>
+              <GlobeAltIcon class="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              <span>{{ formatCompactNumber(effectiveTotalRequested) }}</span>
             </div>
           </div>
-          <div class="flex gap-2 items-center">
-            <div class="w-3 h-3 rounded-full" style="background-color: hsl(135, 55%, 50%)" />
+          <div class="flex gap-1.5 items-center">
+            <div class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: hsl(135, 55%, 50%)" />
             <div
-              class="flex gap-1 items-center text-sm text-slate-600 dark:text-slate-300"
+              class="flex gap-0.5 items-center text-xs whitespace-nowrap text-slate-600 dark:text-slate-300"
               :aria-label="`${actionDisplayNames.install}: ${effectiveTotalInstalled.toLocaleString()}`"
             >
-              <ArrowDownOnSquareIcon class="w-4 h-4" aria-hidden="true" />
-              <span>{{ effectiveTotalInstalled.toLocaleString() }}</span>
+              <ArrowDownOnSquareIcon class="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              <span>{{ formatCompactNumber(effectiveTotalInstalled) }}</span>
             </div>
           </div>
-          <div class="flex gap-2 items-center">
-            <div class="w-3 h-3 rounded-full" style="background-color: hsl(0, 50%, 60%)" />
+          <div class="flex gap-1.5 items-center">
+            <div class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: hsl(0, 50%, 60%)" />
             <div
-              class="flex gap-1 items-center text-sm text-slate-600 dark:text-slate-300"
+              class="flex gap-0.5 items-center text-xs whitespace-nowrap text-slate-600 dark:text-slate-300"
               :aria-label="`${actionDisplayNames.fail}: ${effectiveTotalFailed.toLocaleString()}`"
             >
-              <XCircleIcon class="w-4 h-4" aria-hidden="true" />
-              <span>{{ effectiveTotalFailed.toLocaleString() }}</span>
+              <XCircleIcon class="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+              <span>{{ formatCompactNumber(effectiveTotalFailed) }}</span>
             </div>
           </div>
         </div>
