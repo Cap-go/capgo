@@ -130,7 +130,9 @@ SELECT
     );
 
 -- Run cleanup
+SELECT set_config('role', 'postgres', TRUE);
 SELECT cleanup_expired_apikeys();
+SELECT tests.authenticate_as_service_role();
 
 -- Test 8: Keys expired > 30 days ago should be deleted
 SELECT
