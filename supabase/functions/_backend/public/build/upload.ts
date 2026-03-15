@@ -124,11 +124,10 @@ export async function tusProxy(
     ? requestUrl.slice(requestPathStart).split('?')[0].split('#')[0]
     : '/'
   const uploadPrefix = `/build/upload/${jobId}`
-  const tusPath = originalPath === uploadPrefix
-    ? '/'
-    : originalPath.startsWith(`${uploadPrefix}/`)
-      ? originalPath.slice(uploadPrefix.length)
-      : '/'
+  let tusPath = '/'
+  if (originalPath.startsWith(`${uploadPrefix}/`)) {
+    tusPath = originalPath.slice(uploadPrefix.length)
+  }
 
   let decodedTusPath: string
   try {

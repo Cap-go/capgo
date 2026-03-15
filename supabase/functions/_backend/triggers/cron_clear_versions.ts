@@ -32,10 +32,8 @@ app.post('/', middlewareAPISecret, async (c) => {
       throw simpleError('cannot_find_app_data', 'Cannot find app data for app_id', { error: errorApp, app_id: version.app_id })
     if (!app)
       throw simpleError('cannot_find_app_data', 'Cannot find app data for app_id', { error: 'no app found', app_id: version.app_id })
-    if (version.user_id == null)
-      version.user_id = app.user_id
-    if (ownerOrg == null)
-      ownerOrg = app.owner_org ?? null
+    version.user_id ??= app.user_id
+    ownerOrg ??= app.owner_org ?? null
   }
 
   if (ownerOrg == null) {
