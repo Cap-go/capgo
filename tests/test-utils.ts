@@ -41,11 +41,11 @@ export const CLOUDFLARE_PLUGIN_URL = env.CLOUDFLARE_PLUGIN_URL ?? 'http://127.0.
 export const CLOUDFLARE_FILES_URL = env.CLOUDFLARE_FILES_URL ?? 'http://127.0.0.1:8789'
 
 // Default to Supabase Edge Functions for backward compatibility
-const SUPABASE_BASE_URL = normalizeLocalhostUrl(env.SUPABASE_URL) ?? ''
+export const SUPABASE_BASE_URL = normalizeLocalhostUrl(env.SUPABASE_URL) ?? ''
 export const BASE_URL = USE_CLOUDFLARE ? CLOUDFLARE_API_URL : `${SUPABASE_BASE_URL}/functions/v1`
 export const PLUGIN_BASE_URL = USE_CLOUDFLARE ? CLOUDFLARE_PLUGIN_URL : `${SUPABASE_BASE_URL}/functions/v1`
 export const API_SECRET = 'testsecret'
-const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY ?? ''
+export const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY ?? ''
 
 /**
  * Get the correct base URL for an endpoint based on whether it's a plugin endpoint or API endpoint

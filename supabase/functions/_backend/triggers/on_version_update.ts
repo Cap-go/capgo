@@ -34,7 +34,41 @@ async function resolveOwnerOrg(c: Context, record: Database['public']['Tables'][
     return null
   }
 
-  return data?.owner_org ?? null
+  if (data?.owner_org)
+    return data.owner_org
+
+  const { data: deletedApp, error: deletedError } = await supabaseAdmin(c)
+    .from('deleted_apps')
+    .select('owner_org')
+    .eq('app_id', record.app_id)
+    .maybeSingle()
+
+  if (deletedError) {
+    cloudlog({ requestId: c.get('requestId'), message: 'error resolveOwnerOrg from deleted_apps', error: deletedError, app_id: record.app_id })
+    return null
+  }
+
+  return deletedApp?.owner_org ?? null
+}
+
+/**
+ * `app_versions_meta` is keyed to `app_versions.id`, so queued trigger work must no-op
+ * once the parent version row has already been deleted.
+ */
+async function hasVersionParent(c: Context, record: Database['public']['Tables']['app_versions']['Row']): Promise<boolean> {
+  const { data, error } = await supabaseAdmin(c)
+    .from('app_versions')
+    .select('id')
+    .eq('id', record.id)
+    .eq('app_id', record.app_id)
+    .maybeSingle()
+
+  if (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'error checking app_versions parent', error, id: record.id, app_id: record.app_id })
+    return false
+  }
+
+  return Boolean(data?.id)
 }
 
 /**
@@ -57,6 +91,10 @@ async function v2PathSize(c: Context, record: Database['public']['Tables']['app_
     cloudlog({ requestId: c.get('requestId'), message: 'missing owner_org for app_versions_meta upsert', id: record.id, app_id: record.app_id })
     return false
   }
+  if (!await hasVersionParent(c, record)) {
+    cloudlog({ requestId: c.get('requestId'), message: 'missing app_versions parent for app_versions_meta upsert', id: record.id, app_id: record.app_id })
+    return false
+  }
 
   // allow to update even without checksum, to prevent bad actor to remove checksum to get free storage
   const { error: errorUpdate } = await supabaseAdmin(c)
@@ -70,7 +108,6 @@ async function v2PathSize(c: Context, record: Database['public']['Tables']['app_
     }, {
       onConflict: 'id',
     })
-    .eq('id', record.id)
   if (errorUpdate)
     cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate })
   const { error } = await createStatsMeta(c, record.app_id, record.id, size)
@@ -168,6 +205,10 @@ async function updateIt(c: Context, record: Database['public']['Tables']['app_ve
       cloudlog({ requestId: c.get('requestId'), message: 'missing owner_org for app_versions_meta upsert', id: record.id, app_id: record.app_id })
       return c.json(BRES)
     }
+    if (!await hasVersionParent(c, record)) {
+      cloudlog({ requestId: c.get('requestId'), message: 'missing app_versions parent for app_versions_meta upsert', id: record.id, app_id: record.app_id })
+      return c.json(BRES)
+    }
     const { error: errorUpdate } = await supabaseAdmin(c)
       .from('app_versions_meta')
       .upsert({
@@ -179,7 +220,6 @@ async function updateIt(c: Context, record: Database['public']['Tables']['app_ve
       }, {
         onConflict: 'id',
       })
-      .eq('id', record.id)
     if (errorUpdate)
       cloudlog({ requestId: c.get('requestId'), message: 'errorUpdate', error: errorUpdate })
   }
