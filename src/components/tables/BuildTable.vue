@@ -222,6 +222,33 @@ columns.value = [
     },
   },
   {
+    label: t('build-time'),
+    key: 'build_time',
+    class: 'truncate max-w-24',
+    displayFunction: (elem: Element) => {
+      if (!elem.created_at || !elem.updated_at)
+        return '-'
+      const terminalStatuses = ['completed', 'succeeded', 'failed']
+      if (!terminalStatuses.includes(elem.status))
+        return '-'
+      const start = new Date(elem.created_at).getTime()
+      const end = new Date(elem.updated_at).getTime()
+      const diffMs = end - start
+      if (diffMs < 0)
+        return '-'
+      const totalSeconds = Math.floor(diffMs / 1000)
+      if (totalSeconds < 60)
+        return `${totalSeconds}s`
+      const minutes = Math.floor(totalSeconds / 60)
+      const seconds = totalSeconds % 60
+      if (minutes < 60)
+        return `${minutes}m ${seconds}s`
+      const hours = Math.floor(minutes / 60)
+      const remainingMinutes = minutes % 60
+      return `${hours}h ${remainingMinutes}m`
+    },
+  },
+  {
     label: t('updated-at'),
     key: 'updated_at',
     class: 'truncate max-w-32',
