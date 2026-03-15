@@ -6,7 +6,7 @@ import { APIKEY_TEST_ALL, getAuthHeadersForCredentials, USER_EMAIL, USER_PASSWOR
 
 function normalizeLocalhostUrl(raw: string | undefined): string {
   if (!raw)
-    return raw || ''
+    return ''
   try {
     const url = new URL(raw)
     if (url.hostname === 'localhost')
