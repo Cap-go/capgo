@@ -12,16 +12,20 @@ import { createStatsMeta } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
+interface AppVersionContext {
+  appExists: boolean
+  ownerOrg: string | null
+}
+
 /**
- * Resolves `owner_org` for an app version row.
+ * Resolves `owner_org` for an app version row and confirms whether the app still exists.
  *
- * Falls back to the owning app when the trigger payload does not include it.
+ * Queue processing can race with app deletion, so `record.owner_org` alone is not enough
+ * to decide whether an `app_versions_meta` upsert is still valid.
  */
-async function resolveOwnerOrg(c: Context, record: Database['public']['Tables']['app_versions']['Row']): Promise<string | null> {
-  if (record.owner_org)
-    return record.owner_org
+async function resolveAppVersionContext(c: Context, record: Database['public']['Tables']['app_versions']['Row']): Promise<AppVersionContext> {
   if (!record.app_id)
-    return null
+    return { appExists: false, ownerOrg: null }
 
   const { data, error } = await supabaseAdmin(c)
     .from('apps')
@@ -30,11 +34,17 @@ async function resolveOwnerOrg(c: Context, record: Database['public']['Tables'][
     .maybeSingle()
 
   if (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'error resolveOwnerOrg', error, app_id: record.app_id })
-    return null
+    cloudlog({ requestId: c.get('requestId'), message: 'error resolveAppVersionContext', error, app_id: record.app_id })
+    return { appExists: false, ownerOrg: null }
   }
 
-  return data?.owner_org ?? null
+  if (!data)
+    return { appExists: false, ownerOrg: null }
+
+  return {
+    appExists: true,
+    ownerOrg: data.owner_org ?? record.owner_org ?? null,
+  }
 }
 
 /**
@@ -52,7 +62,11 @@ async function v2PathSize(c: Context, record: Database['public']['Tables']['app_
     return true
   }
 
-  const ownerOrg = await resolveOwnerOrg(c, record)
+  const { appExists, ownerOrg } = await resolveAppVersionContext(c, record)
+  if (!appExists) {
+    cloudlog({ requestId: c.get('requestId'), message: 'app missing, skipping app_versions_meta upsert', id: record.id, app_id: record.app_id })
+    return false
+  }
   if (!ownerOrg) {
     cloudlog({ requestId: c.get('requestId'), message: 'missing owner_org for app_versions_meta upsert', id: record.id, app_id: record.app_id })
     return false
@@ -163,7 +177,11 @@ async function updateIt(c: Context, record: Database['public']['Tables']['app_ve
   }
   else {
     cloudlog({ requestId: c.get('requestId'), message: 'no v2 path' })
-    const ownerOrg = await resolveOwnerOrg(c, record)
+    const { appExists, ownerOrg } = await resolveAppVersionContext(c, record)
+    if (!appExists) {
+      cloudlog({ requestId: c.get('requestId'), message: 'app missing, skipping app_versions_meta upsert', id: record.id, app_id: record.app_id })
+      return c.json(BRES)
+    }
     if (!ownerOrg) {
       cloudlog({ requestId: c.get('requestId'), message: 'missing owner_org for app_versions_meta upsert', id: record.id, app_id: record.app_id })
       return c.json(BRES)
