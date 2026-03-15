@@ -1,4 +1,3 @@
-import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
@@ -6,38 +5,6 @@ import { BRES, middlewareAPISecret, parseBody, quickError, simpleError } from '.
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { getPath, s3 } from '../utils/s3.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
-
-async function resolveOwnerOrg(c: Context, appId: string | null): Promise<string | null> {
-  if (!appId)
-    return null
-
-  const { data, error } = await supabaseAdmin(c)
-    .from('apps')
-    .select('owner_org')
-    .eq('app_id', appId)
-    .maybeSingle()
-
-  if (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'error resolveOwnerOrg', error, app_id: appId })
-    return null
-  }
-
-  if (data?.owner_org)
-    return data.owner_org
-
-  const { data: deletedApp, error: deletedError } = await supabaseAdmin(c)
-    .from('deleted_apps')
-    .select('owner_org')
-    .eq('app_id', appId)
-    .maybeSingle()
-
-  if (deletedError) {
-    cloudlog({ requestId: c.get('requestId'), message: 'error resolveOwnerOrg from deleted_apps', error: deletedError, app_id: appId })
-    return null
-  }
-
-  return deletedApp?.owner_org ?? null
-}
 
 export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', middlewareAPISecret, async (c) => {
@@ -51,18 +18,26 @@ app.post('/', middlewareAPISecret, async (c) => {
   const version = body.version
   if (!version)
     throw simpleError('no_version', 'No version', { body })
-  if (version.user_id === null) {
-    // find the user_id from the app_id
+
+  let ownerOrg = version.owner_org ?? null
+  const isUserIdMissing = version.user_id == null
+  if (isUserIdMissing || ownerOrg == null) {
+    // find user_id and owner_org from the app_id
     const { data: app, error: errorApp } = await supabaseAdmin(c)
       .from('apps')
-      .select('user_id')
+      .select('user_id, owner_org')
       .eq('app_id', version.app_id)
       .single()
     if (errorApp)
-      throw simpleError('cannot_find_user_id', 'Cannot find user_id for app_id', { error: errorApp })
+      throw simpleError('cannot_find_app_data', 'Cannot find app data for app_id', { error: errorApp, app_id: version.app_id })
     if (!app)
-      throw simpleError('cannot_find_user_id', 'Cannot find user_id for app_id', { error: 'no app found' })
-    version.user_id = app.user_id
+      throw simpleError('cannot_find_app_data', 'Cannot find app data for app_id', { error: 'no app found', app_id: version.app_id })
+    version.user_id ??= app.user_id
+    ownerOrg ??= app.owner_org ?? null
+  }
+
+  if (ownerOrg == null) {
+    throw simpleError('cannot_find_owner_org', 'Cannot find owner_org for app_id', { app_id: version.app_id })
   }
 
   let notFound = false
@@ -118,7 +93,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         app_id: version.app_id,
         checksum: checksum ?? '',
         size,
-        owner_org: version.owner_org ?? (await resolveOwnerOrg(c, version.app_id)),
+        owner_org: ownerOrg,
       }, { onConflict: 'id' })
   }
   catch (errorSize) {
