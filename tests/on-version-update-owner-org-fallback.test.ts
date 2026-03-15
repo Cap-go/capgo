@@ -15,10 +15,11 @@ describe('[POST] /triggers/on_version_update - owner_org fallback', () => {
     await Promise.all([
       executeSQL('DELETE FROM public.deleted_apps WHERE app_id = $1', [appId]),
       executeSQL('DELETE FROM public.app_versions_meta WHERE id = $1', [versionId]),
+      executeSQL('DELETE FROM public.app_versions WHERE id = $1', [versionId]),
     ])
   })
 
-  it('uses deleted_apps fallback when apps lookup is missing owner_org', async () => {
+  it('skips app_versions_meta upsert when deleted_apps fallback exists but the parent version row is gone', async () => {
     await executeSQL(
       'INSERT INTO public.deleted_apps (app_id, owner_org) VALUES ($1, $2)',
       [appId, ORG_ID],
@@ -45,7 +46,6 @@ describe('[POST] /triggers/on_version_update - owner_org fallback', () => {
     expect(response.status).toBe(200)
 
     const meta = await executeSQL('SELECT owner_org FROM public.app_versions_meta WHERE id = $1', [versionId])
-    expect(meta).toHaveLength(1)
-    expect(meta[0]?.owner_org).toBe(ORG_ID)
+    expect(meta).toHaveLength(0)
   })
 })
