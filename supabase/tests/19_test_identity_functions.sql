@@ -103,6 +103,8 @@ BEGIN
     PERFORM set_config('request.headers', '{}', true);
 END $$;
 
+SELECT tests.authenticate_as_service_role();
+
 -- Test get_user_id with apikey
 SELECT
     is(
