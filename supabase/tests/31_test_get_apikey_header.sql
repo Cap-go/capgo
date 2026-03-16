@@ -22,12 +22,16 @@ SELECT
     );
 
 -- Also ensure apikey-only identity does not pick up JWT Authorization
+SELECT tests.authenticate_as_service_role();
+
 SELECT
     is(
         public.get_identity_apikey_only('{read,all}'),
         null,
         'get_identity_apikey_only returns NULL when only JWT Authorization present'
     );
+
+SELECT tests.authenticate_as('test_user');
 
 -- But get_identity should still use real auth uid
 SELECT

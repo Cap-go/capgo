@@ -12,12 +12,27 @@ import { APIKEY_TEST_ALL, ORG_ID, POSTGRES_URL, USER_ID } from './test-utils'
 // Test constants
 const TEST_APP_ID = 'com.demo.app'
 
-describe('rBAC Permission System', () => {
+describe('rbac permission system', () => {
   let pool: Pool
   let client: PoolClient
 
   const query = (text: string, params?: Array<string | number | null>) => {
     return client.query(text, params)
+  }
+
+  const withAuthClaim = async (userId: string) => {
+    await query(`SELECT set_config($1, $2, true)`, [
+      'request.jwt.claim.sub',
+      userId,
+    ])
+    await query(`SELECT set_config($1, $2, true)`, [
+      'request.jwt.claims',
+      JSON.stringify({
+        sub: userId,
+        role: 'authenticated',
+        aud: 'authenticated',
+      }),
+    ])
   }
 
   beforeAll(async () => {
@@ -113,7 +128,7 @@ describe('rBAC Permission System', () => {
       })
     })
 
-      describe('rBAC mode (use_new_rbac = true)', () => {
+    describe('rbac mode (use_new_rbac = true)', () => {
       beforeEach(async () => {
         // Enable RBAC globally for tests
         await query(`SELECT set_config('capgo.rbac_enabled', 'true', true)`)
@@ -305,6 +320,31 @@ describe('rBAC Permission System', () => {
 
         expect(result.rows[0].enabled).toBe(false)
       })
+    })
+
+    it('should reject unauthenticated access to get_org_user_access_rbac', async () => {
+      let caught: unknown
+      try {
+        await query(`
+          SELECT * FROM public.get_org_user_access_rbac($1::uuid, $2::uuid)
+        `, [USER_ID, ORG_ID])
+      }
+      catch (error) {
+        caught = error
+      }
+
+      expect(caught).toBeTruthy()
+      expect((caught as { message?: string })?.message).toContain('NO_PERMISSION_TO_VIEW_BINDINGS')
+    })
+
+    it('should allow authenticated user when requesting their own bindings', async () => {
+      await withAuthClaim(USER_ID)
+
+      const result = await query(`
+        SELECT * FROM public.get_org_user_access_rbac($1::uuid, $2::uuid)
+      `, [USER_ID, ORG_ID])
+
+      expect(Array.isArray(result.rows)).toBe(true)
     })
   })
 })
