@@ -50,4 +50,36 @@ describe('mfa email otp trigger wiring', () => {
 
     expect(rows[0]?.exists).toBe(false)
   })
+
+  it.concurrent('does not expose direct execute privileges on the trigger helper', async () => {
+    const { rows } = await pool.query<{
+      anon_execute: boolean
+      authenticated_execute: boolean
+      public_execute: boolean
+      service_role_execute: boolean
+    }>(`
+      SELECT
+        has_function_privilege('anon', 'public.enforce_email_otp_for_mfa()', 'EXECUTE') AS anon_execute,
+        has_function_privilege('authenticated', 'public.enforce_email_otp_for_mfa()', 'EXECUTE') AS authenticated_execute,
+        has_function_privilege('service_role', 'public.enforce_email_otp_for_mfa()', 'EXECUTE') AS service_role_execute,
+        EXISTS (
+          SELECT 1
+          FROM pg_proc proc
+          JOIN pg_namespace ns ON ns.oid = proc.pronamespace
+          CROSS JOIN LATERAL aclexplode(coalesce(proc.proacl, acldefault('f', proc.proowner))) acl
+          WHERE ns.nspname = 'public'
+            AND proc.proname = 'enforce_email_otp_for_mfa'
+            AND pg_get_function_identity_arguments(proc.oid) = ''
+            AND acl.grantee = 0
+            AND acl.privilege_type = 'EXECUTE'
+        ) AS public_execute
+    `)
+
+    expect(rows[0]).toEqual({
+      anon_execute: false,
+      authenticated_execute: false,
+      public_execute: false,
+      service_role_execute: false,
+    })
+  })
 })

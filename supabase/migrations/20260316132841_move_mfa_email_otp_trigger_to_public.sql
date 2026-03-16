@@ -48,21 +48,57 @@ END;
 $$;
 
 ALTER FUNCTION public.enforce_email_otp_for_mfa() OWNER TO postgres;
-
-DROP TRIGGER IF EXISTS trg_enforce_email_otp_for_mfa ON auth.mfa_factors;
-
-CREATE TRIGGER trg_enforce_email_otp_for_mfa
-BEFORE INSERT OR UPDATE ON auth.mfa_factors
-FOR EACH ROW
-EXECUTE FUNCTION public.enforce_email_otp_for_mfa();
+REVOKE ALL ON FUNCTION public.enforce_email_otp_for_mfa() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.enforce_email_otp_for_mfa() FROM anon;
+REVOKE ALL ON FUNCTION public.enforce_email_otp_for_mfa() FROM authenticated;
+REVOKE ALL ON FUNCTION public.enforce_email_otp_for_mfa() FROM service_role;
+GRANT EXECUTE ON FUNCTION public.enforce_email_otp_for_mfa() TO postgres;
 
 DO $$
+DECLARE
+  v_can_manage_auth_trigger boolean := has_schema_privilege(current_user, 'auth', 'USAGE')
+    AND has_table_privilege(current_user, 'auth.mfa_factors', 'TRIGGER');
 BEGIN
-  BEGIN
-    EXECUTE 'DROP FUNCTION IF EXISTS auth.enforce_email_otp_for_mfa()';
-  EXCEPTION
-    WHEN insufficient_privilege THEN
-      RAISE NOTICE 'Skipping cleanup of auth.enforce_email_otp_for_mfa() (insufficient privileges)';
-  END;
+  IF NOT v_can_manage_auth_trigger THEN
+    RAISE NOTICE 'Skipping auth.mfa_factors trigger rewrite (insufficient privileges)';
+    RETURN;
+  END IF;
+
+  EXECUTE 'DROP TRIGGER IF EXISTS trg_enforce_email_otp_for_mfa ON auth.mfa_factors';
+  EXECUTE 'CREATE TRIGGER trg_enforce_email_otp_for_mfa BEFORE INSERT OR UPDATE ON auth.mfa_factors FOR EACH ROW EXECUTE FUNCTION public.enforce_email_otp_for_mfa()';
+END;
+$$;
+
+DO $$
+DECLARE
+  v_has_legacy_auth_function boolean := EXISTS (
+    SELECT 1
+    FROM pg_proc proc
+    JOIN pg_namespace ns ON ns.oid = proc.pronamespace
+    WHERE ns.nspname = 'auth'
+      AND proc.proname = 'enforce_email_otp_for_mfa'
+      AND pg_get_function_identity_arguments(proc.oid) = ''
+  );
+  v_can_drop_legacy_auth_function boolean := has_schema_privilege(current_user, 'auth', 'USAGE')
+    AND EXISTS (
+      SELECT 1
+      FROM pg_proc proc
+      JOIN pg_namespace ns ON ns.oid = proc.pronamespace
+      WHERE ns.nspname = 'auth'
+        AND proc.proname = 'enforce_email_otp_for_mfa'
+        AND pg_get_function_identity_arguments(proc.oid) = ''
+        AND pg_get_userbyid(proc.proowner) = current_user
+    );
+BEGIN
+  IF NOT v_has_legacy_auth_function THEN
+    RETURN;
+  END IF;
+
+  IF NOT v_can_drop_legacy_auth_function THEN
+    RAISE NOTICE 'Skipping cleanup of auth.enforce_email_otp_for_mfa() (insufficient privileges)';
+    RETURN;
+  END IF;
+
+  EXECUTE 'DROP FUNCTION auth.enforce_email_otp_for_mfa()';
 END;
 $$;
