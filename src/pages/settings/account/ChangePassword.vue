@@ -273,8 +273,18 @@ async function submit(form: { current_password?: string, password: string, passw
   else {
     needsReauthentication.value = false
     resetCaptcha()
+
+    if (!organizationStore.currentOrganization?.password_has_access) {
+      await organizationStore.fetchOrganizations()
+    }
+
+    const { error: signOutError } = await supabase.auth.signOut({ scope: 'others' })
+    if (signOutError) {
+      setErrors('change-pass', [signOutError.message], {})
+      return
+    }
+
     toast.success(t('changed-password-suc'))
-    await supabase.auth.signOut({ scope: 'others' })
   }
   if (!updateError) {
     form.password = ''

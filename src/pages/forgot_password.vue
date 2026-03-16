@@ -138,8 +138,12 @@ async function step2(form: { password: string, password_confirm: string }) {
   }
   form.password = ''
   form.password_confirm = ''
+  const { error: signOutError } = await supabase.auth.signOut({ scope: 'others' })
+  if (signOutError) {
+    setErrors('forgot-password', [signOutError.message], {})
+    return
+  }
   toast.success(t('forgot-success'))
-  await supabase.auth.signOut({ scope: 'others' })
   router.push('/dashboard')
 }
 
