@@ -9,6 +9,7 @@ SET "search_path" TO ''
 AS $$
 DECLARE
   v_org_id uuid;
+  v_user_id uuid;
 BEGIN
   SELECT owner_org
   INTO v_org_id
@@ -20,9 +21,12 @@ BEGIN
     RETURN NULL;
   END IF;
 
+  SELECT public.get_user_id(get_app_versions.apikey)
+  INTO v_user_id;
+
   IF NOT public.rbac_check_permission_direct(
     public.rbac_perm_app_read_bundles(),
-    NULL::uuid,
+    v_user_id,
     v_org_id,
     get_app_versions.appid,
     NULL::bigint,
