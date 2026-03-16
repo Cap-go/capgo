@@ -3626,14 +3626,14 @@ BEGIN
   SELECT public.get_user_id(get_app_versions.apikey)
   INTO v_user_id;
 
-  IF NOT public.rbac_check_permission_direct(
+  IF public.rbac_check_permission_direct(
     public.rbac_perm_app_read_bundles(),
     v_user_id,
     v_org_id,
     get_app_versions.appid,
     NULL::bigint,
     get_app_versions.apikey
-  ) THEN
+  ) IS NOT TRUE THEN
     RETURN NULL;
   END IF;
 
@@ -17088,9 +17088,10 @@ GRANT ALL ON FUNCTION "public"."get_app_metrics"("org_id" "uuid", "start_date" "
 
 
 
-GRANT ALL ON FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "service_role";
+REVOKE ALL ON FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "anon";
+GRANT EXECUTE ON FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "service_role";
 
 
 
@@ -19055,7 +19056,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INS
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "service_role";
-
 
 
 
