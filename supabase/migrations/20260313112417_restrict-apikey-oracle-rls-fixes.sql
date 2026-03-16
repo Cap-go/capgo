@@ -4,9 +4,6 @@
 REVOKE ALL ON FUNCTION "public"."get_user_id" ("apikey" "text") FROM "anon";
 REVOKE ALL ON FUNCTION "public"."get_user_id" ("apikey" "text", "app_id" "text") FROM "anon";
 REVOKE ALL ON FUNCTION "public"."get_org_perm_for_apikey" ("apikey" "text", "app_id" "text") FROM "anon";
-REVOKE ALL ON FUNCTION "public"."get_user_id" ("apikey" "text") FROM "authenticated";
-REVOKE ALL ON FUNCTION "public"."get_user_id" ("apikey" "text", "app_id" "text") FROM "authenticated";
-REVOKE ALL ON FUNCTION "public"."get_org_perm_for_apikey" ("apikey" "text", "app_id" "text") FROM "authenticated";
 REVOKE ALL ON FUNCTION "public"."get_user_id" ("apikey" "text") FROM "public";
 REVOKE ALL ON FUNCTION "public"."get_user_id" ("apikey" "text", "app_id" "text") FROM "public";
 REVOKE ALL ON FUNCTION "public"."get_org_perm_for_apikey" ("apikey" "text", "app_id" "text") FROM "public";
@@ -14,10 +11,9 @@ REVOKE ALL ON FUNCTION "public"."get_org_perm_for_apikey" ("apikey" "text", "app
 GRANT EXECUTE ON FUNCTION "public"."get_user_id" ("apikey" "text") TO "service_role";
 GRANT EXECUTE ON FUNCTION "public"."get_user_id" ("apikey" "text", "app_id" "text") TO "service_role";
 GRANT EXECUTE ON FUNCTION "public"."get_org_perm_for_apikey" ("apikey" "text", "app_id" "text") TO "service_role";
--- Keep the apikey identity helper callable from storage RLS because the
--- policies below invoke it for anon/authenticated access checks.
-GRANT EXECUTE ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode" []) TO "anon";
-GRANT EXECUTE ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode" []) TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."get_user_id" ("apikey" "text") TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."get_user_id" ("apikey" "text", "app_id" "text") TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."get_org_perm_for_apikey" ("apikey" "text", "app_id" "text") TO "authenticated";
 
 -- Fix is_allowed_action to validate api keys instead of returning organization access
 -- for any provided app id, which allowed invalid-key oracle responses.
@@ -50,8 +46,7 @@ BEGIN
 END;
 $$;
 
--- Remove legacy apps bucket policies that still call get_user_id in policy expressions,
--- because function ACL is now service-role-only.
+-- Keep apps bucket policies aligned with existing API-key auth helpers.
 DROP POLICY IF EXISTS "Allow user or apikey to delete they own folder in apps" ON "storage"."objects";
 CREATE POLICY "Allow user or apikey to delete they own folder in apps" ON "storage"."objects"
 FOR DELETE
@@ -63,8 +58,11 @@ FOR DELETE
                 (SELECT "auth"."uid" ())::text = ("storage"."foldername" ("name")) [0]
             )
             OR (
-                public.get_identity_apikey_only(
-                    '{all}'::"public"."key_mode" []
+                public.get_user_id(
+                    (
+                        SELECT
+                            "public"."get_apikey_header" ()
+                    )
                 )::text = ("storage"."foldername" ("name")) [0]
                 AND public.is_allowed_capgkey(
                     (
@@ -89,8 +87,11 @@ FOR UPDATE
                 (SELECT "auth"."uid" ())::text = ("storage"."foldername" ("name")) [0]
             )
             OR (
-                public.get_identity_apikey_only(
-                    '{write,all}'::"public"."key_mode" []
+                public.get_user_id(
+                    (
+                        SELECT
+                            "public"."get_apikey_header" ()
+                    )
                 )::text = ("storage"."foldername" ("name")) [0]
                 AND public.is_allowed_capgkey(
                     (
@@ -116,8 +117,11 @@ FOR INSERT
                 (SELECT "auth"."uid" ())::text = ("storage"."foldername" ("name")) [0]
             )
             OR (
-                public.get_identity_apikey_only(
-                    '{write,all}'::"public"."key_mode" []
+                public.get_user_id(
+                    (
+                        SELECT
+                            "public"."get_apikey_header" ()
+                    )
                 )::text = ("storage"."foldername" ("name")) [0]
                 AND public.is_allowed_capgkey(
                     (
@@ -142,8 +146,11 @@ FOR SELECT
                 (SELECT "auth"."uid" ())::text = ("storage"."foldername" ("name")) [0]
             )
             OR (
-                public.get_identity_apikey_only(
-                    '{read,all}'::"public"."key_mode" []
+                public.get_user_id(
+                    (
+                        SELECT
+                            "public"."get_apikey_header" ()
+                    )
                 )::text = ("storage"."foldername" ("name")) [0]
                 AND public.is_allowed_capgkey(
                     (
