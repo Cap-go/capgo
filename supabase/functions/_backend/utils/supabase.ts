@@ -13,6 +13,14 @@ import { getEnv, isStripeConfigured } from './utils.ts'
 const DEFAULT_LIMIT = 1000
 // Import Supabase client
 
+function quotePostgrestFilterValue(value: string): string {
+  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`
+}
+
+function buildIlikePrefixPattern(value: string): string {
+  return quotePostgrestFilterValue(`${value}%`)
+}
+
 export interface InsertPayload<T extends keyof Database['public']['Tables']> {
   type: 'INSERT'
   table: string
@@ -1152,10 +1160,11 @@ export async function readStatsSB(c: Context, params: ReadStatsParams) {
 
   if (params.search) {
     cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
+    const searchPattern = buildIlikePrefixPattern(params.search)
     if (params.deviceIds?.length)
-      query = query.or(`version_build.ilike.${params.search}%,version_name.ilike.${params.search}%`)
+      query = query.or(`version_build.ilike.${searchPattern},version_name.ilike.${searchPattern}`)
     else
-      query = query.or(`device_id.ilike.${params.search}%,version_build.ilike.${params.search}%,version_name.ilike.${params.search}%`)
+      query = query.or(`device_id.ilike.${searchPattern},version_build.ilike.${searchPattern},version_name.ilike.${searchPattern}`)
   }
 
   if (params.order?.length) {
@@ -1204,10 +1213,11 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
 
   if (params.search) {
     cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
+    const searchPattern = buildIlikePrefixPattern(params.search)
     if (params.deviceIds?.length)
-      query = query.or(`custom_id.ilike.${params.search}%,version_name.ilike.${params.search}%`)
+      query = query.or(`custom_id.ilike.${searchPattern},version_name.ilike.${searchPattern}`)
     else
-      query = query.or(`device_id.ilike.${params.search}%,custom_id.ilike.${params.search}%,version_name.ilike.${params.search}%`)
+      query = query.or(`device_id.ilike.${searchPattern},custom_id.ilike.${searchPattern},version_name.ilike.${searchPattern}`)
   }
 
   if (params.version_name)
@@ -1219,7 +1229,9 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
     const [cursorTime, cursorDeviceId] = params.cursor.split('|')
     if (cursorTime && cursorDeviceId) {
       // For DESC order: get records older than cursor or same time with device_id > cursor
-      query = query.or(`updated_at.lt.${cursorTime},and(updated_at.eq.${cursorTime},device_id.gt.${cursorDeviceId})`)
+      const quotedCursorTime = quotePostgrestFilterValue(cursorTime)
+      const quotedCursorDeviceId = quotePostgrestFilterValue(cursorDeviceId)
+      query = query.or(`updated_at.lt.${quotedCursorTime},and(updated_at.eq.${quotedCursorTime},device_id.gt.${quotedCursorDeviceId})`)
     }
   }
 
@@ -1266,7 +1278,7 @@ export async function countDevicesSB(
   }
 
   if (search) {
-    const normalizedSearch = `${search}%`
+    const normalizedSearch = buildIlikePrefixPattern(search)
     if (deviceIds.length)
       req = req.or(`custom_id.ilike.${normalizedSearch},version_name.ilike.${normalizedSearch}`)
     else

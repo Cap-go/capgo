@@ -5,9 +5,9 @@ import { z } from 'zod/mini'
 import { parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { appIdSchema, cursorSchema, deviceIdSchema, hasUnsafeDevicesQueryText, queryLimitSchema, safeQueryTextSchema } from '../utils/privateAnalyticsValidation.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { countDevices, readDevices } from '../utils/stats.ts'
-import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, NON_STRING_APP_ID, reverseDomainRegex } from '../utils/utils.ts'
 
 interface DataDevice {
   appId: string
@@ -24,22 +24,6 @@ interface DataDevice {
   limit?: number
 }
 
-const MAX_QUERY_TEXT_LENGTH = 512
-const MAX_QUERY_LIMIT = 50_000
-
-const appIdSchema = z.string({
-  error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,
-}).check(z.regex(reverseDomainRegex, { message: INVALID_STRING_APP_ID }))
-
-const deviceIdSchema = z.string().check(
-  z.maxLength(36),
-  z.regex(deviceIdRegex, { message: INVALID_STRING_DEVICE_ID }),
-)
-
-const safeQueryTextSchema = z.string().check(z.maxLength(MAX_QUERY_TEXT_LENGTH))
-
-const cursorSchema = z.string().check(z.maxLength(128))
-
 const devicesBodySchema = z.object({
   appId: appIdSchema,
   count: z.optional(z.boolean()),
@@ -53,23 +37,8 @@ const devicesBodySchema = z.object({
     sortable: z.optional(z.enum(['asc', 'desc'])),
   }))),
   cursor: z.optional(cursorSchema),
-  limit: z.optional(z.coerce.number().check(z.minimum(1), z.maximum(MAX_QUERY_LIMIT))),
+  limit: z.optional(queryLimitSchema),
 })
-
-function hasControlChars(value: string): boolean {
-  for (let i = 0; i < value.length; i++) {
-    const code = value.charCodeAt(i)
-    if ((code >= 0 && code <= 31) || code === 127)
-      return true
-  }
-  return false
-}
-
-function hasUnsafeQueryText(value: string | undefined, maxLength = MAX_QUERY_TEXT_LENGTH): boolean {
-  if (value === undefined)
-    return false
-  return value.length > maxLength || hasControlChars(value)
-}
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
@@ -82,12 +51,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     throw simpleError('invalid_body', 'Invalid body', { error: parsed.error })
   }
   const body = parsed.data
-  if (
-    hasUnsafeQueryText(body.versionName)
-    || hasUnsafeQueryText(body.search)
-    || hasUnsafeQueryText(body.cursor, 128)
-    || body.order?.some(item => hasUnsafeQueryText(item.key, 64))
-  ) {
+  if (hasUnsafeDevicesQueryText(body)) {
     throw simpleError('invalid_body', 'Invalid body')
   }
   cloudlog({ requestId: c.get('requestId'), message: 'post devices body', body })

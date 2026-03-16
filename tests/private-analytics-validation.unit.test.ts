@@ -69,6 +69,17 @@ describe('private analytics route validation', () => {
     expect(readStatsMock).not.toHaveBeenCalled()
   })
 
+  it('accepts backend_refusal on /private/stats', async () => {
+    const response = await statsApp.request(postJson('http://local/', {
+      appId: 'com.example.app',
+      actions: ['backend_refusal'],
+    }))
+
+    expect(response.status).toBe(200)
+    expect(checkPermissionMock).toHaveBeenCalledTimes(1)
+    expect(readStatsMock).toHaveBeenCalledTimes(1)
+  })
+
   it('rejects non-numeric limits on /private/stats', async () => {
     const response = await statsApp.request(postJson('http://local/', {
       appId: 'com.example.app',
