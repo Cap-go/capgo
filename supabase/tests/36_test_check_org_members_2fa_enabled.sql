@@ -9,6 +9,9 @@ BEGIN
   PERFORM tests.create_supabase_user('test_org_member_2', 'member2@test.com');
   PERFORM tests.create_supabase_user('test_org_member_3', 'member3@test.com');
   PERFORM tests.create_supabase_user('test_org_member_4', 'member4@test.com');
+  PERFORM tests.mark_email_otp_verified('test_org_member_1');
+  PERFORM tests.mark_email_otp_verified('test_org_member_2');
+  PERFORM tests.mark_email_otp_verified('test_org_member_4');
 END $$;
 
 -- Create entries in public.users for the test members
