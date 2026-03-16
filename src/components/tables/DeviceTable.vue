@@ -31,6 +31,9 @@ const isLoading = ref(true)
 const currentPage = ref(1)
 const nextCursor = ref<string | undefined>(undefined)
 const hasMore = ref(false)
+const pageStartCursor = ref<Map<number, string | null | undefined>>(new Map([[1, undefined]]))
+const activeLoadId = ref(0)
+const lastQuerySignature = ref('')
 const filters = ref({
   Override: false,
   CustomId: false,
@@ -77,6 +80,22 @@ const columns = ref<TableColumn[]>([
   },
 ])
 
+function getSearchTerm() {
+  const trimmed = search.value.trim()
+  return trimmed.length ? trimmed : undefined
+}
+
+function getQuerySignature() {
+  return JSON.stringify({
+    appId: props.appId,
+    versionName: props.versionName,
+    search: getSearchTerm(),
+    override: filters.value.Override,
+    customIdMode: filters.value.CustomId,
+    ids: props.ids ? [...props.ids].sort().join(',') : '',
+  })
+}
+
 async function getDevicesID() {
   let req = supabase
     .from('channel_devices')
@@ -92,14 +111,22 @@ async function getDevicesID() {
   return [...channelDev]
 }
 
+async function resolveDeviceIds() {
+  if (filters.value.Override)
+    return await getDevicesID()
+  if (props.ids)
+    return props.ids
+  return []
+}
+
 async function countDevices() {
   const { data: currentSession } = await supabase.auth.getSession()!
   if (!currentSession.session)
     return 0
-  if (props.ids && props.ids.length > 0)
-    return props.ids.length
 
   const currentJwt = currentSession.session.access_token
+  const deviceIds = await resolveDeviceIds()
+  const searchTerm = getSearchTerm()
 
   try {
     const response = await fetch(`${defaultApiHost}/private/devices`, {
@@ -110,8 +137,10 @@ async function countDevices() {
       },
       body: JSON.stringify({
         count: true,
-        // devicesId: props.ids?.length ? props.ids : undefined,
         appId: props.appId,
+        versionName: props.versionName,
+        devicesId: deviceIds.length > 0 ? deviceIds : undefined,
+        search: searchTerm,
         customIdMode: filters.value.CustomId,
       }),
     })
@@ -136,97 +165,169 @@ interface DevicesResponse {
   hasMore: boolean
 }
 
-async function getData() {
-  isLoading.value = true
-  try {
-    let ids: string[] = []
-    if (filters.value.Override)
-      ids = await getDevicesID()
-    else if (props.ids)
-      ids = props.ids
-
-    const { data: currentSession } = await supabase.auth.getSession()!
-    if (!currentSession.session)
-      return
-    const currentJwt = currentSession.session.access_token
-
-    try {
-      const response = await fetch(`${defaultApiHost}/private/devices`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'authorization': `Bearer ${currentJwt ?? ''}`,
-        },
-        body: JSON.stringify({
-          appId: props.appId,
-          versionName: props.versionName,
-          devicesId: ids.length ? ids : undefined,
-          search: search.value ? search.value : undefined,
-          cursor: nextCursor.value,
-          limit: offset,
-          customIdMode: filters.value.CustomId,
-        }),
-      })
-
-      if (!response.ok) {
-        console.log('Cannot get devices', response.status)
-        return
-      }
-
-      const dataD = await response.json() as DevicesResponse
-
-      await ensureVersionNames(dataD.data)
-
-      elements.value.push(...dataD.data)
-      nextCursor.value = dataD.nextCursor
-      hasMore.value = dataD.hasMore
-    }
-    catch (err) {
-      console.log('Cannot get devices', err)
-    }
-  }
-  catch (error) {
-    console.error(error)
-  }
-  isLoading.value = false
+function clearPaginationState() {
+  pageStartCursor.value = new Map([[1, undefined]])
+  nextCursor.value = undefined
+  hasMore.value = false
 }
 
 async function reload() {
+  const loadId = ++activeLoadId.value
   isLoading.value = true
   try {
-    elements.value.length = 0
-    nextCursor.value = undefined
-    hasMore.value = false
-    total.value = await countDevices()
-    await getData()
+    const querySignature = getQuerySignature()
+    if (lastQuerySignature.value !== querySignature) {
+      lastQuerySignature.value = querySignature
+      currentPage.value = 1
+      clearPaginationState()
+      elements.value.length = 0
+    }
+
+    const newTotal = await countDevices()
+    if (loadId !== activeLoadId.value)
+      return
+
+    total.value = newTotal
+    await getData(loadId)
   }
   catch (error) {
     console.error(error)
   }
   finally {
-    // getData normally resets this, but safeguard to cover early failures
-    isLoading.value = false
+    if (loadId === activeLoadId.value)
+      isLoading.value = false
   }
 }
 
 async function refreshData() {
+  const loadId = ++activeLoadId.value
   isLoading.value = true
   try {
     currentPage.value = 1
+    lastQuerySignature.value = getQuerySignature()
+    clearPaginationState()
     elements.value.length = 0
-    nextCursor.value = undefined
-    hasMore.value = false
-    total.value = await countDevices()
-    await getData()
+    const newTotal = await countDevices()
+    if (loadId !== activeLoadId.value)
+      return
+
+    total.value = newTotal
+    await getData(loadId)
   }
   catch (error) {
     console.error(error)
   }
   finally {
-    // getData normally resets this, but safeguard to cover early failures
-    isLoading.value = false
+    if (loadId === activeLoadId.value)
+      isLoading.value = false
   }
 }
+
+async function fetchDevicesPage(cursor: string | undefined | null) {
+  const ids = await resolveDeviceIds()
+  const searchTerm = getSearchTerm()
+
+  const { data: currentSession } = await supabase.auth.getSession()!
+  if (!currentSession.session)
+    return
+  const currentJwt = currentSession.session.access_token
+
+  const response = await fetch(`${defaultApiHost}/private/devices`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'authorization': `Bearer ${currentJwt ?? ''}`,
+    },
+    body: JSON.stringify({
+      appId: props.appId,
+      versionName: props.versionName,
+      devicesId: ids.length ? ids : undefined,
+      search: searchTerm,
+      cursor: cursor ?? undefined,
+      limit: offset,
+      customIdMode: filters.value.CustomId,
+    }),
+  })
+
+  if (!response.ok) {
+    console.log('Cannot get devices', response.status)
+    return
+  }
+
+  return await response.json() as DevicesResponse
+}
+
+async function getCursorForPageWithLoadId(page: number, loadId: number) {
+  const target = Math.max(1, page)
+  if (pageStartCursor.value.has(target))
+    return pageStartCursor.value.get(target)
+
+  while (!pageStartCursor.value.has(target)) {
+    const knownPages = Array.from(pageStartCursor.value.keys())
+    const lastKnownPage = Math.max(...knownPages)
+    const cursor = pageStartCursor.value.get(lastKnownPage)
+    if (cursor === null)
+      return null
+    const data = await fetchDevicesPage(cursor)
+    if (loadId !== activeLoadId.value)
+      return undefined
+    if (!data)
+      throw new Error(`Failed to resolve cursor for page ${lastKnownPage + 1}`)
+    if (loadId === activeLoadId.value)
+      pageStartCursor.value.set(lastKnownPage + 1, data.nextCursor ?? null)
+  }
+
+  return pageStartCursor.value.get(target)
+}
+
+async function getData(loadId: number) {
+  try {
+    const requestedPage = Math.max(1, currentPage.value)
+    const maxPage = Math.max(1, Math.ceil(total.value / offset))
+    const targetPage = Math.min(requestedPage, maxPage)
+
+    if (targetPage !== requestedPage) {
+      currentPage.value = targetPage
+    }
+
+    const cursor = await getCursorForPageWithLoadId(targetPage, loadId)
+
+    if (loadId !== activeLoadId.value)
+      return
+
+    if (!cursor && targetPage > 1) {
+      elements.value = []
+      hasMore.value = false
+      nextCursor.value = undefined
+      return
+    }
+
+    const dataD = await fetchDevicesPage(cursor)
+    if (!dataD) {
+      throw new Error('Failed to fetch devices page')
+    }
+    if (loadId !== activeLoadId.value)
+      return
+
+    await ensureVersionNames(dataD.data)
+    if (loadId !== activeLoadId.value)
+      return
+
+    elements.value = dataD.data
+    pageStartCursor.value.set(targetPage + 1, dataD.nextCursor ?? null)
+    nextCursor.value = dataD.nextCursor
+    hasMore.value = dataD.hasMore
+  }
+  catch (error) {
+    console.error(error)
+    if (loadId === activeLoadId.value) {
+      elements.value = []
+      hasMore.value = false
+      nextCursor.value = undefined
+    }
+  }
+}
+
 async function openOne(one: Device) {
   router.push(`/app/${props.appId}/device/${one.device_id}`)
 }

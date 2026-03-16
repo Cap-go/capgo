@@ -2,20 +2,20 @@
 -- This avoids check-then-act race conditions when multiple users create demo apps
 -- concurrently in the same organization.
 CREATE OR REPLACE FUNCTION public.create_demo_app_with_limits(
-  p_owner_org uuid,
-  p_user_id uuid,
-  p_app_id text,
-  p_name text,
-  p_icon_url text,
-  p_retention bigint,
-  p_default_upload_channel text,
-  p_last_version text,
-  p_active_window_days integer,
-  p_user_per_hour integer,
-  p_org_per_hour integer,
-  p_user_per_24h integer,
-  p_org_per_24h integer,
-  p_max_active_per_org integer
+    p_owner_org uuid,
+    p_user_id uuid,
+    p_app_id text,
+    p_name text,
+    p_icon_url text,
+    p_retention bigint,
+    p_default_upload_channel text,
+    p_last_version text,
+    p_active_window_days integer,
+    p_user_per_hour integer,
+    p_org_per_hour integer,
+    p_user_per_24h integer,
+    p_org_per_24h integer,
+    p_max_active_per_org integer
 ) RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER

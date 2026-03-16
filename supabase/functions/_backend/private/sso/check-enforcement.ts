@@ -1,6 +1,6 @@
 import { createHono, getClaimsFromJWT, middlewareAuth, parseBody, quickError, useCors } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
-import { supabaseAdmin } from '../../utils/supabase.ts'
+import { supabaseWithAuth } from '../../utils/supabase.ts'
 import { version } from '../../utils/version.ts'
 
 export const app = createHono('', version)
@@ -40,15 +40,15 @@ app.post('/', middlewareAuth, async (c) => {
     return c.json({ allowed: true })
   }
 
-  const domain = email.split('@')[1]
+  const domain = email.split('@')[1]?.toLowerCase().trim()
   if (!domain) {
     return quickError(400, 'invalid_email', 'Email must contain a domain')
   }
 
-  const admin = supabaseAdmin(c)
+  const supabase = supabaseWithAuth(c, auth)
 
   try {
-    const { data: providerData, error: providerError } = await (admin.rpc as any)('check_domain_sso', { p_domain: domain })
+    const { data: providerData, error: providerError } = await (supabase.rpc as any)('check_domain_sso', { p_domain: domain })
     if (providerError) {
       cloudlog({ requestId, context: 'check_enforcement - provider query error', error: providerError.message, domain })
       return quickError(500, 'query_error', 'Failed to check SSO enforcement')
@@ -59,28 +59,31 @@ app.post('/', middlewareAuth, async (c) => {
       return c.json({ allowed: true })
     }
 
-    const ssoProvider = Array.isArray(providerData) ? providerData[0] : providerData
-    const orgId = ssoProvider.org_id
-
-    const { data: enforcementData, error: enforcementError } = await (admin.from as any)('sso_providers')
-      .select('enforce_sso')
-      .eq('id', ssoProvider.id)
-      .eq('status', 'active')
-      .single()
+    const { data: enforcementData, error: enforcementError } = await (supabase.rpc as any)('get_sso_enforcement_by_domain', {
+      p_domain: domain,
+    })
 
     if (enforcementError) {
       cloudlog({ requestId, context: 'check_enforcement - enforcement query error', error: enforcementError.message, domain })
       return quickError(500, 'query_error', 'Failed to check SSO enforcement')
     }
 
+    if (!enforcementData || (Array.isArray(enforcementData) && enforcementData.length === 0)) {
+      cloudlog({ requestId, context: 'check_enforcement - no SSO enforcement data found', domain })
+      return c.json({ allowed: true })
+    }
+
+    const enforcementRow = Array.isArray(enforcementData) ? enforcementData[0] : enforcementData
+    const orgId = enforcementRow.org_id
+
     // If enforcement is not enabled, allow password auth
-    if (!enforcementData?.enforce_sso) {
+    if (!enforcementRow.enforce_sso) {
       cloudlog({ requestId, context: 'check_enforcement - SSO not enforced', domain })
       return c.json({ allowed: true })
     }
 
     // SSO is enforced - check if user is super_admin (break-glass bypass)
-    const { data: roleData, error: roleError } = await (admin.from as any)('org_users')
+    const { data: roleData, error: roleError } = await (supabase.from as any)('org_users')
       .select('user_right')
       .eq('org_id', orgId)
       .eq('user_id', userId)

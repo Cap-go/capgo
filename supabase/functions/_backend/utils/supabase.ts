@@ -1239,17 +1239,42 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
   return data ?? []
 }
 
-export async function countDevicesSB(c: Context, app_id: string, customIdMode: boolean) {
-  const req = supabaseAdmin(c)
+export async function countDevicesSB(
+  c: Context,
+  app_id: string,
+  customIdMode: boolean,
+  deviceIds: string[] = [],
+  versionName?: string,
+  search?: string,
+) {
+  let req = supabaseAdmin(c)
     .from('devices')
     .select('device_id', { count: 'exact', head: true })
     .eq('app_id', app_id)
 
   if (customIdMode) {
-    req
+    req = req
       .not('custom_id', 'is', null)
       .neq('custom_id', '')
   }
+
+  if (deviceIds.length) {
+    if (deviceIds.length === 1)
+      req = req.eq('device_id', deviceIds[0])
+    else
+      req = req.in('device_id', deviceIds)
+  }
+
+  if (search) {
+    const normalizedSearch = `${search}%`
+    if (deviceIds.length)
+      req = req.or(`custom_id.ilike.${normalizedSearch},version_name.ilike.${normalizedSearch}`)
+    else
+      req = req.or(`device_id.ilike.${normalizedSearch},custom_id.ilike.${normalizedSearch},version_name.ilike.${normalizedSearch}`)
+  }
+
+  if (versionName)
+    req = req.eq('version_name', versionName)
 
   const { count, error } = await req
 
