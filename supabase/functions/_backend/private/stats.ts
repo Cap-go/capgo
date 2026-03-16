@@ -2,12 +2,14 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Order } from '../utils/types.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
+import { ALLOWED_STATS_ACTIONS } from '../plugins/stats_actions.ts'
 import { toCsv } from '../utils/csv.ts'
 import { parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { readStats } from '../utils/stats.ts'
+import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, NON_STRING_APP_ID, reverseDomainRegex } from '../utils/utils.ts'
 
 interface DataStats {
   appId: string
@@ -22,6 +24,52 @@ interface DataStats {
 
 const ORDER_KEYS = ['created_at', 'app_id', 'device_id', 'action', 'version_name'] as const
 const EXPORT_FORMATS = ['csv', 'json'] as const
+const MAX_QUERY_TEXT_LENGTH = 512
+const MAX_QUERY_LIMIT = 50_000
+
+const appIdSchema = z.string({
+  error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,
+}).check(z.regex(reverseDomainRegex, { message: INVALID_STRING_APP_ID }))
+
+const deviceIdSchema = z.string().check(
+  z.maxLength(36),
+  z.regex(deviceIdRegex, { message: INVALID_STRING_DEVICE_ID }),
+)
+
+const safeQueryTextSchema = z.string().check(z.maxLength(MAX_QUERY_TEXT_LENGTH))
+
+const safeQueryDateSchema = z.string().check(z.maxLength(128))
+
+const statsBodyShape = {
+  appId: appIdSchema,
+  devicesId: z.optional(z.array(deviceIdSchema)),
+  search: z.optional(safeQueryTextSchema),
+  order: z.optional(z.array(z.object({
+    key: z.enum(ORDER_KEYS),
+    sortable: z.enum(['asc', 'desc']),
+  }))),
+  rangeStart: z.optional(z.union([safeQueryDateSchema, z.coerce.number()])),
+  rangeEnd: z.optional(z.union([safeQueryDateSchema, z.coerce.number()])),
+  limit: z.optional(z.coerce.number().check(z.minimum(1), z.maximum(MAX_QUERY_LIMIT))),
+  actions: z.optional(z.array(z.enum(ALLOWED_STATS_ACTIONS))),
+} as const
+
+const statsBodySchema = z.object(statsBodyShape)
+
+function hasControlChars(value: string): boolean {
+  for (let i = 0; i < value.length; i++) {
+    const code = value.charCodeAt(i)
+    if ((code >= 0 && code <= 31) || code === 127)
+      return true
+  }
+  return false
+}
+
+function hasUnsafeQueryText(value: string | undefined, maxLength = MAX_QUERY_TEXT_LENGTH): boolean {
+  if (value === undefined)
+    return false
+  return value.length > maxLength || hasControlChars(value)
+}
 
 function stripControlChars(input: string): string {
   const out: string[] = []
@@ -56,17 +104,7 @@ function sanitizeFilename(input: string | undefined, extension: 'csv' | 'json'):
 }
 
 const exportSchema = z.object({
-  appId: z.string(),
-  devicesId: z.optional(z.array(z.string())),
-  search: z.optional(z.string()),
-  order: z.optional(z.array(z.object({
-    key: z.enum(ORDER_KEYS),
-    sortable: z.enum(['asc', 'desc']),
-  }))),
-  rangeStart: z.optional(z.union([z.string(), z.number()])),
-  rangeEnd: z.optional(z.union([z.string(), z.number()])),
-  limit: z.optional(z.coerce.number()),
-  actions: z.optional(z.array(z.string())),
+  ...statsBodyShape,
   format: z.optional(z.enum(EXPORT_FORMATS)),
   filename: z.optional(z.string()),
 })
@@ -78,7 +116,19 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.use('*', useCors)
 
 app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
-  const body = await parseBody<DataStats>(c)
+  const bodyRaw = await parseBody<DataStats>(c)
+  const parsed = statsBodySchema.safeParse(bodyRaw)
+  if (!parsed.success) {
+    throw simpleError('invalid_body', 'Invalid body', { error: parsed.error })
+  }
+  const body = parsed.data
+  if (
+    hasUnsafeQueryText(body.search)
+    || (typeof body.rangeStart === 'string' && hasUnsafeQueryText(body.rangeStart, 128))
+    || (typeof body.rangeEnd === 'string' && hasUnsafeQueryText(body.rangeEnd, 128))
+  ) {
+    throw simpleError('invalid_body', 'Invalid body')
+  }
   cloudlog({ requestId: c.get('requestId'), message: 'post private/stats body', body })
   if (!(await checkPermission(c, 'app.read_logs', { appId: body.appId }))) {
     throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.appId })
@@ -102,6 +152,13 @@ app.post('/export', middlewareV2(['read', 'write', 'all', 'upload']), async (c) 
     throw simpleError('invalid_body', 'Invalid body', { error: parsed.error })
   }
   const body = parsed.data
+  if (
+    hasUnsafeQueryText(body.search)
+    || (typeof body.rangeStart === 'string' && hasUnsafeQueryText(body.rangeStart, 128))
+    || (typeof body.rangeEnd === 'string' && hasUnsafeQueryText(body.rangeEnd, 128))
+  ) {
+    throw simpleError('invalid_body', 'Invalid body')
+  }
   cloudlog({ requestId: c.get('requestId'), message: 'post private/stats/export body', body })
 
   if (!(await checkPermission(c, 'app.read_logs', { appId: body.appId }))) {
