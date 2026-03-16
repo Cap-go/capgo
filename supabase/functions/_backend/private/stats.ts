@@ -95,7 +95,8 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     throw simpleError('invalid_body', 'Invalid body')
   }
   cloudlog({ requestId: c.get('requestId'), message: 'post private/stats body', body })
-  if (!(await checkPermission(c, 'app.read_logs', { appId: body.appId }))) {
+  const hasAppReadLogsPermission = await checkPermission(c, 'app.read_logs', { appId: body.appId })
+  if (!hasAppReadLogsPermission) {
     throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.appId })
   }
   const startDate = body.rangeStart !== undefined ? String(body.rangeStart) : undefined
@@ -124,7 +125,8 @@ app.post('/export', middlewareV2(['read', 'write', 'all', 'upload']), async (c) 
   }
   cloudlog({ requestId: c.get('requestId'), message: 'post private/stats/export body', body })
 
-  if (!(await checkPermission(c, 'app.read_logs', { appId: body.appId }))) {
+  const hasAppReadLogsPermission = await checkPermission(c, 'app.read_logs', { appId: body.appId })
+  if (!hasAppReadLogsPermission) {
     throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.appId })
   }
 

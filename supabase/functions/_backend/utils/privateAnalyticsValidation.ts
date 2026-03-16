@@ -22,7 +22,7 @@ export const statsActionSchema = z.enum(Constants.public.Enums.stats_action)
 
 export function hasControlChars(value: string): boolean {
   for (let i = 0; i < value.length; i++) {
-    const code = value.charCodeAt(i)
+    const code = value.codePointAt(i) ?? 0
     if ((code >= 0 && code <= 31) || code === 127)
       return true
   }

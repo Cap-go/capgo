@@ -38,6 +38,29 @@ async function expectInvalidBody(response: Response) {
   expect(await response.text()).toContain('Invalid body')
 }
 
+async function expectRejectedStatsBody(body: Record<string, unknown>, url = 'http://local/') {
+  const response = await statsApp.request(postJson(url, {
+    appId: 'com.example.app',
+    ...body,
+  }))
+
+  await expectInvalidBody(response)
+  expect(checkPermissionMock).not.toHaveBeenCalled()
+  expect(readStatsMock).not.toHaveBeenCalled()
+}
+
+async function expectRejectedDevicesBody(body: Record<string, unknown>) {
+  const response = await devicesApp.request(postJson('http://local/', {
+    appId: 'com.example.app',
+    ...body,
+  }))
+
+  await expectInvalidBody(response)
+  expect(checkPermissionMock).not.toHaveBeenCalled()
+  expect(readDevicesMock).not.toHaveBeenCalled()
+  expect(countDevicesMock).not.toHaveBeenCalled()
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   checkPermissionMock.mockResolvedValue(true)
@@ -47,26 +70,13 @@ beforeEach(() => {
 })
 
 describe('private analytics route validation', () => {
-  it('rejects malformed deviceIds on /private/stats', async () => {
-    const response = await statsApp.request(postJson('http://local/', {
-      appId: 'com.example.app',
-      devicesId: ['1) OR 1=1 --'],
-    }))
-
-    await expectInvalidBody(response)
-    expect(checkPermissionMock).not.toHaveBeenCalled()
-    expect(readStatsMock).not.toHaveBeenCalled()
-  })
-
-  it('rejects malformed actions on /private/stats', async () => {
-    const response = await statsApp.request(postJson('http://local/', {
-      appId: 'com.example.app',
-      actions: ['get', '\' OR 1=1 --'],
-    }))
-
-    await expectInvalidBody(response)
-    expect(checkPermissionMock).not.toHaveBeenCalled()
-    expect(readStatsMock).not.toHaveBeenCalled()
+  it.each([
+    ['malformed deviceIds', { devicesId: ['1) OR 1=1 --'] }],
+    ['malformed actions', { actions: ['get', '\' OR 1=1 --'] }],
+    ['non-numeric limits', { limit: '1 UNION SELECT 1' }],
+    ['control characters in search', { search: 'bad\u0000query' }],
+  ])('rejects %s on /private/stats', async (_label, body) => {
+    await expectRejectedStatsBody(body)
   })
 
   it('accepts backend_refusal on /private/stats', async () => {
@@ -80,61 +90,17 @@ describe('private analytics route validation', () => {
     expect(readStatsMock).toHaveBeenCalledTimes(1)
   })
 
-  it('rejects non-numeric limits on /private/stats', async () => {
-    const response = await statsApp.request(postJson('http://local/', {
-      appId: 'com.example.app',
-      limit: '1 UNION SELECT 1',
-    }))
-
-    await expectInvalidBody(response)
-    expect(checkPermissionMock).not.toHaveBeenCalled()
-    expect(readStatsMock).not.toHaveBeenCalled()
-  })
-
-  it('rejects control characters in /private/stats search', async () => {
-    const response = await statsApp.request(postJson('http://local/', {
-      appId: 'com.example.app',
-      search: 'bad\u0000query',
-    }))
-
-    await expectInvalidBody(response)
-    expect(checkPermissionMock).not.toHaveBeenCalled()
-    expect(readStatsMock).not.toHaveBeenCalled()
-  })
-
   it('rejects malformed deviceIds on /private/stats/export', async () => {
-    const response = await statsApp.request(postJson('http://local/export', {
-      appId: 'com.example.app',
+    await expectRejectedStatsBody({
       devicesId: ['1) OR 1=1 --'],
       format: 'json',
-    }))
-
-    await expectInvalidBody(response)
-    expect(checkPermissionMock).not.toHaveBeenCalled()
-    expect(readStatsMock).not.toHaveBeenCalled()
+    }, 'http://local/export')
   })
 
-  it('rejects malformed deviceIds on /private/devices', async () => {
-    const response = await devicesApp.request(postJson('http://local/', {
-      appId: 'com.example.app',
-      devicesId: ['1) OR 1=1 --'],
-    }))
-
-    await expectInvalidBody(response)
-    expect(checkPermissionMock).not.toHaveBeenCalled()
-    expect(readDevicesMock).not.toHaveBeenCalled()
-    expect(countDevicesMock).not.toHaveBeenCalled()
-  })
-
-  it('rejects non-numeric limits on /private/devices', async () => {
-    const response = await devicesApp.request(postJson('http://local/', {
-      appId: 'com.example.app',
-      limit: '1 UNION SELECT 1',
-    }))
-
-    await expectInvalidBody(response)
-    expect(checkPermissionMock).not.toHaveBeenCalled()
-    expect(readDevicesMock).not.toHaveBeenCalled()
-    expect(countDevicesMock).not.toHaveBeenCalled()
+  it.each([
+    ['malformed deviceIds', { devicesId: ['1) OR 1=1 --'] }],
+    ['non-numeric limits', { limit: '1 UNION SELECT 1' }],
+  ])('rejects %s on /private/devices', async (_label, body) => {
+    await expectRejectedDevicesBody(body)
   })
 })
