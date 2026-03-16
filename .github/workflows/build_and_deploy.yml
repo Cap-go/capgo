@@ -11,6 +11,9 @@ on:
 
 permissions: {}
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   # Tests already passed before tag was created, so just build and deploy
   supabase_deploy:
