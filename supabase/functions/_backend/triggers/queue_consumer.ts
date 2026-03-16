@@ -12,6 +12,7 @@ import { backgroundTask, getEnv } from '../utils/utils.ts'
 // Define constants
 const DEFAULT_BATCH_SIZE = 950 // Default batch size for queue reads limit of CF is 1000 fetches so we take a safe margin
 const DISCORD_IGNORED_ERROR_CODES = new Set(['version_not_found', 'no_channel'])
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 // Zod schema for a message object
 export const messageSchema = z.object({
@@ -41,7 +42,61 @@ function generateUUID(): string {
   return crypto.randomUUID()
 }
 
-async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE) {
+function getCronRunId(value: unknown): string | null {
+  if (typeof value !== 'string' || !UUID_REGEX.test(value))
+    return null
+  return value
+}
+
+function stripCronMetadata<T>(payload: T): T {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload))
+    return payload
+
+  const { __cron_run_id: _cronRunId, __cron_task_name: _cronTaskName, ...rest } = payload as Record<string, unknown>
+  return rest as T
+}
+
+async function updateCronTaskRunBatch(
+  db: ReturnType<typeof getPgClient>,
+  runId: string,
+  succeeded: boolean,
+  errorMessage?: string,
+) {
+  await db.query(`
+    UPDATE public.cron_task_runs
+    SET
+      completed_batches = completed_batches + CASE WHEN $2 THEN 1 ELSE 0 END,
+      failed_batches = failed_batches + CASE WHEN $2 THEN 0 ELSE 1 END,
+      status = CASE
+        WHEN NOT $2 THEN 'failed'
+        WHEN (completed_batches + 1) >= expected_batches AND failed_batches = 0 THEN 'success'
+        ELSE status
+      END,
+      finished_at = CASE
+        WHEN NOT $2 THEN NOW()
+        WHEN (completed_batches + 1) >= expected_batches AND failed_batches = 0 THEN NOW()
+        ELSE finished_at
+      END,
+      last_error = CASE
+        WHEN NOT $2 THEN COALESCE($3, last_error)
+        ELSE last_error
+      END,
+      updated_at = NOW()
+    WHERE id = $1::uuid AND status = 'running'
+  `, [runId, succeeded, errorMessage ?? null])
+
+  if (succeeded) {
+    await db.query('SELECT public.queue_cron_success_report($1::uuid)', [runId])
+  }
+}
+
+async function processQueue(
+  c: Context,
+  db: ReturnType<typeof getPgClient>,
+  queueName: string,
+  batchSize: number = DEFAULT_BATCH_SIZE,
+  cronRunId?: string | null,
+) {
   const messages = await readQueue(c, db, queueName, batchSize)
 
   if (!messages) {
@@ -68,8 +123,28 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
     const function_type = message.message?.function_type ?? 'supabase'
     const body = message.message?.payload ?? {}
     const cfId = generateUUID()
-    const httpResponse = await http_post_helper(c, function_name, function_type, body, cfId)
-    const errorCode = await extractErrorCode(httpResponse)
+    let httpResponse: Response
+    let errorCode: string | null
+
+    try {
+      httpResponse = await http_post_helper(c, function_name, function_type, stripCronMetadata(body), cfId)
+      errorCode = await extractErrorCode(httpResponse)
+    }
+    catch (error) {
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: `[${queueName}] queue message processing failed before response`,
+        function_name,
+        error,
+      })
+      httpResponse = new Response(JSON.stringify({ error: 'queue_request_failed' }), {
+        status: 500,
+        headers: {
+          'content-type': 'application/json',
+        },
+      })
+      errorCode = 'queue_request_failed'
+    }
 
     return {
       httpResponse,
@@ -185,6 +260,46 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
       cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Suppressed Discord alert for ignored error codes.`, ignoredErrors: Array.from(DISCORD_IGNORED_ERROR_CODES) })
     }
     // set visibility timeout to random number to prevent Auto DDOS
+  }
+
+  const batchSucceeded = messagesToSkip.length === 0 && messagesFailed.length === 0
+
+  if (cronRunId) {
+    await updateCronTaskRunBatch(
+      db,
+      cronRunId,
+      batchSucceeded,
+      batchSucceeded ? undefined : `${queueName} batch failed`,
+    )
+  }
+
+  const messageRunIds = new Set<string>()
+  for (const message of results) {
+    const runId = getCronRunId(message.message?.payload?.__cron_run_id)
+    if (runId) {
+      messageRunIds.add(runId)
+    }
+  }
+  for (const message of messagesToSkip) {
+    const runId = getCronRunId(message.message?.payload?.__cron_run_id)
+    if (runId) {
+      messageRunIds.add(runId)
+    }
+  }
+
+  for (const runId of messageRunIds) {
+    const relatedResults = results.filter(result => getCronRunId(result.message?.payload?.__cron_run_id) === runId)
+    const relatedSkipped = messagesToSkip.filter(message => getCronRunId(message.message?.payload?.__cron_run_id) === runId)
+    const succeeded = relatedSkipped.length === 0
+      && relatedResults.length > 0
+      && relatedResults.every(result => result.httpResponse.status >= 200 && result.httpResponse.status < 300)
+
+    await updateCronTaskRunBatch(
+      db,
+      runId,
+      succeeded,
+      succeeded ? undefined : `${queueName} message failed`,
+    )
   }
 
   if (successMessages.length !== messagesToProcess.length) {
@@ -422,9 +537,10 @@ app.post('/sync', async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: `[Sync Request] Received trigger to process queue.` })
 
   // Require JSON body with queue_name and optional batch_size
-  const body = await parseBody<{ queue_name: string, batch_size?: number }>(c)
+  const body = await parseBody<{ queue_name: string, batch_size?: number, cron_run_id?: string }>(c)
   const queueName = body?.queue_name
   const batchSize = body?.batch_size
+  const cronRunId = getCronRunId(body?.cron_run_id)
 
   if (!queueName || typeof queueName !== 'string') {
     throw simpleError('missing_or_invalid_queue_name', 'Missing or invalid queue_name in body', { body })
@@ -445,7 +561,7 @@ app.post('/sync', async (c) => {
     let db: ReturnType<typeof getPgClient> | null = null
     try {
       db = getPgClient(c)
-      await processQueue(c, db, queueName, finalBatchSize)
+      await processQueue(c, db, queueName, finalBatchSize, cronRunId)
       cloudlog({ requestId: c.get('requestId'), message: `[Background Queue Sync] Background execution finished successfully.` })
     }
     finally {
