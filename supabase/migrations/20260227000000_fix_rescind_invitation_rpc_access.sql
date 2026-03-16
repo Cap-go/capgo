@@ -1,7 +1,9 @@
 -- Fix rescind_invitation RPC: remove anonymous access and avoid org existence enumeration.
-CREATE OR REPLACE FUNCTION "public"."rescind_invitation" ("email" TEXT, "org_id" UUID) RETURNS varchar LANGUAGE plpgsql SECURITY DEFINER
+CREATE OR REPLACE FUNCTION public.rescind_invitation(
+    "email" TEXT, "org_id" UUID
+) RETURNS VARCHAR LANGUAGE plpgsql SECURITY DEFINER
 SET
-  search_path = '' AS $$
+search_path = '' AS $$
 DECLARE
   tmp_user record;
 BEGIN
@@ -28,8 +30,14 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION "public"."rescind_invitation" (TEXT, UUID) FROM PUBLIC;
-REVOKE ALL ON FUNCTION "public"."rescind_invitation" (TEXT, UUID) FROM "anon";
-REVOKE ALL ON FUNCTION "public"."rescind_invitation" (TEXT, UUID) FROM "authenticated";
-GRANT EXECUTE ON FUNCTION "public"."rescind_invitation" (TEXT, UUID) TO "authenticated";
-GRANT EXECUTE ON FUNCTION "public"."rescind_invitation" (TEXT, UUID) TO "service_role";
+REVOKE ALL ON FUNCTION public.rescind_invitation(TEXT, UUID) FROM public;
+REVOKE ALL ON FUNCTION public.rescind_invitation(TEXT, UUID) FROM anon;
+REVOKE ALL ON FUNCTION public.rescind_invitation(
+    TEXT, UUID
+) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.rescind_invitation(
+    TEXT, UUID
+) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rescind_invitation(
+    TEXT, UUID
+) TO service_role;

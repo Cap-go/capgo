@@ -514,12 +514,44 @@ GROUP BY version_name`
   return {}
 }
 
-export async function countDevicesCF(c: Context, app_id: string, customIdMode: boolean) {
+export async function countDevicesCF(
+  c: Context,
+  app_id: string,
+  customIdMode: boolean,
+  deviceIds: string[] = [],
+  versionName?: string,
+  search?: string,
+) {
   // Use Analytics Engine DEVICE_INFO for counting devices
-  const customIdFilter = customIdMode ? `AND blob5 != ''` : ''
+  const conditions = [`index1 = '${escapeSqlString(app_id)}'`]
+
+  if (customIdMode)
+    conditions.push(`blob5 != ''`)
+
+  if (deviceIds.length) {
+    if (deviceIds.length === 1)
+      conditions.push(`blob1 = '${escapeSqlString(deviceIds[0])}'`)
+    else
+      conditions.push(`blob1 IN (${deviceIds.map(id => `'${escapeSqlString(id)}'`).join(', ')})`)
+  }
+
+  if (search) {
+    const searchLower = search.toLowerCase()
+    if (deviceIds.length) {
+      conditions.push(`position('${escapeSqlString(searchLower)}' IN toLower(blob5)) > 0`)
+    }
+    else {
+      // Search in device_id, custom_id, or version_name
+      conditions.push(`(position('${escapeSqlString(searchLower)}' IN toLower(blob1)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob5)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob2)) > 0)`)
+    }
+  }
+
+  if (versionName)
+    conditions.push(`blob2 = '${escapeSqlString(versionName)}'`)
+
   const query = `SELECT COUNT(DISTINCT blob1) AS total
 FROM device_info
-WHERE index1 = '${escapeSqlString(app_id)}' ${customIdFilter}`
+WHERE ${conditions.join(' AND ')}`
 
   cloudlog({ requestId: c.get('requestId'), message: 'countDevicesCF query', query })
   try {
