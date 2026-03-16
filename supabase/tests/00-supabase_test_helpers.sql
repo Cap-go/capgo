@@ -151,6 +151,47 @@ END;
 $$ LANGUAGE plpgsql;
 
 /**
+    * ### tests.mark_email_otp_verified(identifier text, verified_at timestamptz)
+    *
+    * Marks a test user as having recently completed email OTP verification.
+    *
+    * Parameters:
+    * - `identifier` - The unique identifier for the user
+    * - `verified_at` - (Optional) Timestamp to store, defaults to now()
+    *
+    * Returns:
+    * - `void`
+ */
+CREATE OR REPLACE FUNCTION tests.mark_email_otp_verified(
+    identifier text,
+    verified_at timestamptz DEFAULT NOW()
+)
+RETURNS void
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+DECLARE
+    v_user_id uuid;
+    v_now timestamptz;
+BEGIN
+    v_user_id := tests.get_supabase_uid(identifier);
+    v_now := NOW();
+
+    INSERT INTO public.user_security (
+        user_id,
+        email_otp_verified_at,
+        created_at,
+        updated_at
+    )
+    VALUES (v_user_id, verified_at, v_now, v_now)
+    ON CONFLICT (user_id) DO UPDATE
+    SET
+        email_otp_verified_at = EXCLUDED.email_otp_verified_at,
+        updated_at = EXCLUDED.updated_at;
+END;
+$$ LANGUAGE plpgsql;
+
+/**
     * ### tests.authenticate_as(identifier text)
     *   Authenticates as a user created with `tests.create_supabase_user`.
     *
