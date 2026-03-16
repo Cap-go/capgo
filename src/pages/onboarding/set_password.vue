@@ -38,10 +38,13 @@ async function submit(form: { password: string }) {
 
   const { error: updateError } = await supabase.auth.updateUser({ password: form.password })
   isLoading.value = false
-  if (updateError)
+  if (updateError) {
     setErrors('set-password', [updateError.message], {})
-  else
-    toast.success(t('changed-password-suc'))
+    return
+  }
+
+  toast.success(t('changed-password-suc'))
+  await supabase.auth.signOut({ scope: 'others' })
   router.replace('/dashboard')
 }
 watchEffect(async () => {

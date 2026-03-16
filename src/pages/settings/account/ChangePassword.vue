@@ -274,11 +274,7 @@ async function submit(form: { current_password?: string, password: string, passw
     needsReauthentication.value = false
     resetCaptcha()
     toast.success(t('changed-password-suc'))
-
-    // If user was locked out due to password policy, refresh org data to regain access
-    if (!organizationStore.currentOrganization?.password_has_access) {
-      await organizationStore.fetchOrganizations()
-    }
+    await supabase.auth.signOut({ scope: 'others' })
   }
   if (!updateError) {
     form.password = ''
