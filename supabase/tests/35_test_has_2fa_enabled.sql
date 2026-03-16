@@ -6,6 +6,8 @@ SELECT plan(11);
 SELECT tests.create_supabase_user('test_user_with_2fa');
 SELECT tests.create_supabase_user('test_user_without_2fa');
 SELECT tests.create_supabase_user('test_user_with_unverified_2fa');
+SELECT tests.mark_email_otp_verified('test_user_with_2fa');
+SELECT tests.mark_email_otp_verified('test_user_with_unverified_2fa');
 
 -- Get user IDs
 DO $$
