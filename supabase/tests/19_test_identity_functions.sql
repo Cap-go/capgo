@@ -14,6 +14,7 @@ SELECT
     );
 
 SELECT tests.clear_authentication();
+SELECT tests.authenticate_as_service_role();
 
 -- Test get_identity_apikey_only without any headers
 SELECT
