@@ -9,6 +9,9 @@ on:
 
 permissions: {}
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   release_android:
     runs-on: ubuntu-latest

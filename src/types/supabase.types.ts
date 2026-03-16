@@ -7,30 +7,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.1"
   }
   public: {
     Tables: {
@@ -454,7 +434,15 @@ export type Database = {
           platform?: string
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "build_logs_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       build_requests: {
         Row: {
@@ -1168,7 +1156,7 @@ export type Database = {
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
-          plan_enterprise: number
+          plan_enterprise: number | null
           plan_enterprise_monthly: number
           plan_enterprise_yearly: number
           plan_maker: number | null
@@ -1229,7 +1217,7 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
-          plan_enterprise?: number
+          plan_enterprise?: number | null
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
           plan_maker?: number | null
@@ -1290,7 +1278,7 @@ export type Database = {
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
-          plan_enterprise?: number
+          plan_enterprise?: number | null
           plan_enterprise_monthly?: number
           plan_enterprise_yearly?: number
           plan_maker?: number | null
@@ -1830,27 +1818,6 @@ export type Database = {
         }
         Relationships: []
       }
-      rbac_settings: {
-        Row: {
-          created_at: string
-          id: number
-          updated_at: string
-          use_new_rbac: boolean
-        }
-        Insert: {
-          created_at?: string
-          id?: number
-          updated_at?: string
-          use_new_rbac?: boolean
-        }
-        Update: {
-          created_at?: string
-          id?: number
-          updated_at?: string
-          use_new_rbac?: boolean
-        }
-        Relationships: []
-      }
       role_bindings: {
         Row: {
           app_id: string | null
@@ -2031,20 +1998,58 @@ export type Database = {
         }
         Relationships: []
       }
-      security_settings: {
+      sso_providers: {
         Row: {
-          id: boolean
-          mfa_email_otp_enforced_at: string
+          attribute_mapping: Json | null
+          created_at: string
+          dns_verification_token: string
+          dns_verified_at: string | null
+          domain: string
+          enforce_sso: boolean
+          id: string
+          metadata_url: string | null
+          org_id: string
+          provider_id: string | null
+          status: string
+          updated_at: string
         }
         Insert: {
-          id?: boolean
-          mfa_email_otp_enforced_at?: string
+          attribute_mapping?: Json | null
+          created_at?: string
+          dns_verification_token: string
+          dns_verified_at?: string | null
+          domain: string
+          enforce_sso?: boolean
+          id?: string
+          metadata_url?: string | null
+          org_id: string
+          provider_id?: string | null
+          status?: string
+          updated_at?: string
         }
         Update: {
-          id?: boolean
-          mfa_email_otp_enforced_at?: string
+          attribute_mapping?: Json | null
+          created_at?: string
+          dns_verification_token?: string
+          dns_verified_at?: string | null
+          domain?: string
+          enforce_sso?: boolean
+          id?: string
+          metadata_url?: string | null
+          org_id?: string
+          provider_id?: string | null
+          status?: string
+          updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sso_providers_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sso_providers: {
         Row: {
@@ -3262,6 +3267,13 @@ export type Database = {
         }
         Returns: string
       }
+      get_identity_org_allowed_apikey_only: {
+        Args: {
+          keymode: Database["public"]["Enums"]["key_mode"][]
+          org_id: string
+        }
+        Returns: string
+      }
       get_identity_org_appid: {
         Args: {
           app_id: string
@@ -3278,6 +3290,7 @@ export type Database = {
           role: string
         }[]
       }
+      get_mfa_email_otp_enforced_at: { Args: never; Returns: string }
       get_next_cron_time: {
         Args: { p_schedule: string; p_timestamp: string }
         Returns: string
@@ -3374,24 +3387,18 @@ export type Database = {
               app_count: number
               can_use_more: boolean
               created_by: string
-              credit_available: number
-              credit_next_expiration: string
-              credit_total: number
               gid: string
               is_canceled: boolean
               is_yearly: boolean
               logo: string
               management_email: string
-              max_apikey_expiration_days: number
               name: string
-              next_stats_update_at: string
               paying: boolean
-              require_apikey_expiration: boolean
               role: string
-              stats_updated_at: string
               subscription_end: string
               subscription_start: string
               trial_left: number
+              use_new_rbac: boolean
             }[]
           }
         | {
@@ -3400,24 +3407,18 @@ export type Database = {
               app_count: number
               can_use_more: boolean
               created_by: string
-              credit_available: number
-              credit_next_expiration: string
-              credit_total: number
               gid: string
               is_canceled: boolean
               is_yearly: boolean
               logo: string
               management_email: string
-              max_apikey_expiration_days: number
               name: string
-              next_stats_update_at: string
               paying: boolean
-              require_apikey_expiration: boolean
               role: string
-              stats_updated_at: string
               subscription_end: string
               subscription_start: string
               trial_left: number
+              use_new_rbac: boolean
             }[]
           }
       get_orgs_v7:
@@ -3540,6 +3541,13 @@ export type Database = {
               total_percent: number
             }[]
           }
+      get_sso_enforcement_by_domain: {
+        Args: { p_domain: string }
+        Returns: {
+          enforce_sso: boolean
+          org_id: string
+        }[]
+      }
       get_total_app_storage_size_orgs: {
         Args: { app_id: string; org_id: string }
         Returns: number
@@ -3693,12 +3701,6 @@ export type Database = {
         Returns: string
       }
       is_account_disabled: { Args: { user_id: string }; Returns: boolean }
-      is_admin:
-        | { Args: never; Returns: boolean }
-        | { Args: { userid: string }; Returns: boolean }
-      is_platform_admin:
-        | { Args: never; Returns: boolean }
-        | { Args: { userid: string }; Returns: boolean }
       is_allowed_action: {
         Args: { apikey: string; appid: string }
         Returns: boolean
@@ -3762,6 +3764,10 @@ export type Database = {
         Returns: boolean
       }
       is_paying_org: { Args: { orgid: string }; Returns: boolean }
+      is_platform_admin:
+        | { Args: never; Returns: boolean }
+        | { Args: { userid: string }; Returns: boolean }
+      is_rbac_enabled_globally: { Args: never; Returns: boolean }
       is_recent_email_otp_verified: {
         Args: { user_id: string }
         Returns: boolean
@@ -4144,25 +4150,10 @@ export type Database = {
         Args: { email: string; org_id: string }
         Returns: string
       }
-      reset_and_seed_app_data: {
-        Args: {
-          p_admin_user_id?: string
-          p_app_id: string
-          p_org_id?: string
-          p_plan_product_id?: string
-          p_stripe_customer_id?: string
-          p_user_id?: string
-        }
+      resync_org_user_role_bindings: {
+        Args: { p_org_id: string; p_user_id: string }
         Returns: undefined
       }
-      reset_and_seed_app_stats_data: {
-        Args: { p_app_id: string }
-        Returns: undefined
-      }
-      reset_and_seed_data: { Args: never; Returns: undefined }
-      reset_and_seed_stats_data: { Args: never; Returns: undefined }
-      reset_app_data: { Args: { p_app_id: string }; Returns: undefined }
-      reset_app_stats_data: { Args: { p_app_id: string }; Returns: undefined }
       seed_get_app_metrics_caches: {
         Args: { p_end_date: string; p_org_id: string; p_start_date: string }
         Returns: {
@@ -4327,9 +4318,7 @@ export type Database = {
         | "disableAutoUpdateMetadata"
         | "disableAutoUpdateUnderNative"
         | "disableDevBuild"
-        | "disableProdBuild"
         | "disableEmulator"
-        | "disableDevice"
         | "cannotGetBundle"
         | "checksum_fail"
         | "NoChannelOrOverride"
@@ -4350,6 +4339,8 @@ export type Database = {
         | "download_manifest_brotli_fail"
         | "backend_refusal"
         | "download_0"
+        | "disableProdBuild"
+        | "disableDevice"
         | "disablePlatformElectron"
         | "customIdBlocked"
       stripe_status:
@@ -4526,9 +4517,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       action_type: ["mau", "storage", "bandwidth", "build_time"],
@@ -4585,9 +4573,7 @@ export const Constants = {
         "disableAutoUpdateMetadata",
         "disableAutoUpdateUnderNative",
         "disableDevBuild",
-        "disableProdBuild",
         "disableEmulator",
-        "disableDevice",
         "cannotGetBundle",
         "checksum_fail",
         "NoChannelOrOverride",
@@ -4608,6 +4594,8 @@ export const Constants = {
         "download_manifest_brotli_fail",
         "backend_refusal",
         "download_0",
+        "disableProdBuild",
+        "disableDevice",
         "disablePlatformElectron",
         "customIdBlocked",
       ],

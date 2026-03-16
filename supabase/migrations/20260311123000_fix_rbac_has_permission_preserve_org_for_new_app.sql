@@ -1,10 +1,10 @@
 CREATE OR REPLACE FUNCTION public.rbac_has_permission(
-  p_principal_type text,
-  p_principal_id uuid,
-  p_permission_key text,
-  p_org_id uuid,
-  p_app_id character varying,
-  p_channel_id bigint
+    p_principal_type text,
+    p_principal_id uuid,
+    p_permission_key text,
+    p_org_id uuid,
+    p_app_id character varying,
+    p_channel_id bigint
 ) RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER

@@ -71,6 +71,53 @@ describe('[POST] /private/sso/check-domain', () => {
     const data = await response.json() as { error: string }
     expect(data.error).toBeDefined()
   })
+
+  it('normalizes domain casing and whitespace for existing providers and lookups', async () => {
+    const providerId = randomUUID()
+    const providerDomainInput = `  ${randomUUID().slice(0, 8)}.SSO.Test  `
+    const expectedDomain = providerDomainInput.trim().toLowerCase()
+
+    await getSupabaseClient().from('sso_providers').insert({
+      id: providerId,
+      org_id: SSO_TEST_ORG_ID,
+      domain: providerDomainInput,
+      provider_id: randomUUID(),
+      status: 'active',
+      enforce_sso: false,
+      dns_verification_token: `dns-${randomUUID()}`,
+    } as any)
+
+    try {
+      const response = await fetchWithRetry(getEndpointUrl('/private/sso/check-domain'), {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ email: `user@${expectedDomain.toUpperCase()}` }),
+      })
+
+      expect(response.status).toBe(200)
+      const data = await response.json() as { has_sso: boolean }
+      expect(data.has_sso).toBe(true)
+
+      const { data: rpcData, error: rpcError } = await (getSupabaseClient().rpc as any)('check_domain_sso', { p_domain: `  ${expectedDomain.toUpperCase()}  ` })
+      expect(rpcError).toBeNull()
+      expect(Array.isArray(rpcData)).toBe(true)
+      expect(rpcData?.length).toBeGreaterThan(0)
+      expect(rpcData?.[0].has_sso).toBe(true)
+      expect(rpcData?.[0].org_id).toBe(SSO_TEST_ORG_ID)
+
+      const { data: normalizedRow, error: normalizedRowError } = await getSupabaseClient()
+        .from('sso_providers')
+        .select('domain')
+        .eq('id', providerId)
+        .single()
+
+      expect(normalizedRowError).toBeNull()
+      expect(normalizedRow?.domain).toBe(expectedDomain)
+    }
+    finally {
+      await getSupabaseClient().from('sso_providers').delete().eq('id', providerId)
+    }
+  })
 })
 
 describe('[POST] /private/sso/check-enforcement', () => {
