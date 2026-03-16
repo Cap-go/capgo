@@ -133,10 +133,12 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   if (!(await checkPermission(c, 'app.read_logs', { appId: body.appId }))) {
     throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.appId })
   }
+  const startDate = body.rangeStart !== undefined ? String(body.rangeStart) : undefined
+  const endDate = body.rangeEnd !== undefined ? String(body.rangeEnd) : undefined
   return c.json(await readStats(c, {
     app_id: body.appId,
-    start_date: body.rangeStart,
-    end_date: body.rangeEnd,
+    start_date: startDate,
+    end_date: endDate,
     deviceIds: body.devicesId,
     search: body.search,
     order: body.order,
