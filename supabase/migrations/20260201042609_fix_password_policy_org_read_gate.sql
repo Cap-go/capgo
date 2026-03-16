@@ -1,11 +1,11 @@
 -- Allow org.read checks without enforcing password policy for password verification flow
 
 CREATE OR REPLACE FUNCTION public.check_min_rights_legacy_no_password_policy(
-  min_right public.user_min_right,
-  user_id uuid,
-  org_id uuid,
-  app_id character varying,
-  channel_id bigint
+    min_right public.user_min_right,
+    user_id uuid,
+    org_id uuid,
+    app_id character varying,
+    channel_id bigint
 ) RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -53,19 +53,29 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION public.check_min_rights_legacy_no_password_policy(public.user_min_right, uuid, uuid, character varying, bigint) OWNER TO postgres;
-REVOKE ALL ON FUNCTION public.check_min_rights_legacy_no_password_policy(public.user_min_right, uuid, uuid, character varying, bigint) FROM public;
-REVOKE ALL ON FUNCTION public.check_min_rights_legacy_no_password_policy(public.user_min_right, uuid, uuid, character varying, bigint) FROM anon;
-REVOKE ALL ON FUNCTION public.check_min_rights_legacy_no_password_policy(public.user_min_right, uuid, uuid, character varying, bigint) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.check_min_rights_legacy_no_password_policy(public.user_min_right, uuid, uuid, character varying, bigint) TO service_role;
+ALTER FUNCTION public.check_min_rights_legacy_no_password_policy(
+    public.user_min_right, uuid, uuid, character varying, bigint
+) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.check_min_rights_legacy_no_password_policy(
+    public.user_min_right, uuid, uuid, character varying, bigint
+) FROM public;
+REVOKE ALL ON FUNCTION public.check_min_rights_legacy_no_password_policy(
+    public.user_min_right, uuid, uuid, character varying, bigint
+) FROM anon;
+REVOKE ALL ON FUNCTION public.check_min_rights_legacy_no_password_policy(
+    public.user_min_right, uuid, uuid, character varying, bigint
+) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.check_min_rights_legacy_no_password_policy(
+    public.user_min_right, uuid, uuid, character varying, bigint
+) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.rbac_check_permission_direct_no_password_policy(
-  p_permission_key text,
-  p_user_id uuid,
-  p_org_id uuid,
-  p_app_id character varying,
-  p_channel_id bigint,
-  p_apikey text DEFAULT NULL
+    p_permission_key text,
+    p_user_id uuid,
+    p_org_id uuid,
+    p_app_id character varying,
+    p_channel_id bigint,
+    p_apikey text DEFAULT NULL
 ) RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -184,17 +194,27 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION public.rbac_check_permission_direct_no_password_policy(text, uuid, uuid, character varying, bigint, text) OWNER TO postgres;
-REVOKE ALL ON FUNCTION public.rbac_check_permission_direct_no_password_policy(text, uuid, uuid, character varying, bigint, text) FROM public;
-REVOKE ALL ON FUNCTION public.rbac_check_permission_direct_no_password_policy(text, uuid, uuid, character varying, bigint, text) FROM anon;
-REVOKE ALL ON FUNCTION public.rbac_check_permission_direct_no_password_policy(text, uuid, uuid, character varying, bigint, text) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.rbac_check_permission_direct_no_password_policy(text, uuid, uuid, character varying, bigint, text) TO service_role;
+ALTER FUNCTION public.rbac_check_permission_direct_no_password_policy(
+    text, uuid, uuid, character varying, bigint, text
+) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.rbac_check_permission_direct_no_password_policy(
+    text, uuid, uuid, character varying, bigint, text
+) FROM public;
+REVOKE ALL ON FUNCTION public.rbac_check_permission_direct_no_password_policy(
+    text, uuid, uuid, character varying, bigint, text
+) FROM anon;
+REVOKE ALL ON FUNCTION public.rbac_check_permission_direct_no_password_policy(
+    text, uuid, uuid, character varying, bigint, text
+) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.rbac_check_permission_direct_no_password_policy(
+    text, uuid, uuid, character varying, bigint, text
+) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.rbac_check_permission_no_password_policy(
-  p_permission_key text,
-  p_org_id uuid DEFAULT NULL,
-  p_app_id character varying DEFAULT NULL,
-  p_channel_id bigint DEFAULT NULL
+    p_permission_key text,
+    p_org_id uuid DEFAULT NULL,
+    p_app_id character varying DEFAULT NULL,
+    p_channel_id bigint DEFAULT NULL
 ) RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -215,8 +235,14 @@ BEGIN
 END;
 $$;
 
-COMMENT ON FUNCTION public.rbac_check_permission_no_password_policy(text, uuid, character varying, bigint) IS
-  'RBAC permission check without password policy enforcement. Uses auth.uid() and delegates to rbac_check_permission_direct_no_password_policy.';
+COMMENT ON FUNCTION public.rbac_check_permission_no_password_policy(
+    text, uuid, character varying, bigint
+) IS
+'RBAC permission check without password policy enforcement. Uses auth.uid() and delegates to rbac_check_permission_direct_no_password_policy.';
 
-ALTER FUNCTION public.rbac_check_permission_no_password_policy(text, uuid, character varying, bigint) OWNER TO postgres;
-GRANT EXECUTE ON FUNCTION public.rbac_check_permission_no_password_policy(text, uuid, character varying, bigint) TO authenticated;
+ALTER FUNCTION public.rbac_check_permission_no_password_policy(
+    text, uuid, character varying, bigint
+) OWNER TO postgres;
+GRANT EXECUTE ON FUNCTION public.rbac_check_permission_no_password_policy(
+    text, uuid, character varying, bigint
+) TO authenticated;

@@ -2,19 +2,19 @@
 -- Keep the existing parameter signature for backward compatibility.
 
 REVOKE ALL ON FUNCTION public.record_build_time(
-  uuid,
-  uuid,
-  character varying,
-  character varying,
-  bigint
+    uuid,
+    uuid,
+    character varying,
+    character varying,
+    bigint
 ) FROM anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION public.record_build_time(
-  uuid,
-  uuid,
-  character varying,
-  character varying,
-  bigint
+    uuid,
+    uuid,
+    character varying,
+    character varying,
+    bigint
 ) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.record_build_time(
