@@ -14,15 +14,33 @@ function hasSupabaseCli(): boolean {
 }
 
 /**
+ * Resolve the repo-local Supabase CLI binary installed by the npm package's postinstall.
+ */
+function getLocalSupabaseCli(repoRoot: string): string | null {
+  const binName = process.platform === 'win32' ? 'supabase.exe' : 'supabase'
+  const localBin = resolve(repoRoot, 'node_modules', 'supabase', 'bin', binName)
+  return existsSync(localBin) ? localBin : null
+}
+
+/**
  * Resolve the Supabase CLI invocation.
  *
- * Prefers the globally installed `supabase` binary (CI), otherwise falls back to `bunx supabase` (local dev).
+ * Prefer the repo-local binary to avoid shelling out through `bunx` on every command.
+ * Fall back to a globally installed `supabase` binary when present.
  */
-function getSupabaseCmd(): SupabaseCmd {
-  // In CI we may have `supabase` installed; locally we usually rely on `bunx supabase`.
+function getSupabaseCmd(repoRoot: string): SupabaseCmd {
+  const localBin = getLocalSupabaseCli(repoRoot)
+  if (localBin)
+    return { cmd: localBin, argsPrefix: [] }
+
   if (hasSupabaseCli())
     return { cmd: 'supabase', argsPrefix: [] }
-  return { cmd: 'bunx', argsPrefix: ['supabase'] }
+
+  if (existsSync(resolve(repoRoot, 'node_modules', 'supabase', 'package.json'))) {
+    throw new Error('Supabase CLI is installed without its binary. Run `bun pm trust supabase && bun install` so Bun can execute the package postinstall.')
+  }
+
+  throw new Error('Supabase CLI not found. Run `bun install` or install the standalone `supabase` binary.')
 }
 
 /**
@@ -217,7 +235,7 @@ function parseInlineEnvAssignments(args: string[]): { env: Record<string, string
  */
 function runSupabase(args: string[], repoRoot: string): number {
   const { workdir } = ensureWorktreeSupabaseDir(repoRoot)
-  const supa = getSupabaseCmd()
+  const supa = getSupabaseCmd(repoRoot)
   const res = spawnSync(supa.cmd, [...supa.argsPrefix, ...args, '--workdir', workdir], {
     stdio: 'inherit',
     env: process.env,
@@ -233,7 +251,7 @@ function runSupabase(args: string[], repoRoot: string): number {
  */
 function runWithEnv(cmdArgs: string[], repoRoot: string): number {
   const { workdir } = ensureWorktreeSupabaseDir(repoRoot)
-  const supa = getSupabaseCmd()
+  const supa = getSupabaseCmd(repoRoot)
 
   const { env: inlineEnv, rest: commandArgs } = parseInlineEnvAssignments(cmdArgs)
   if (commandArgs.length === 0) {
@@ -276,24 +294,30 @@ function runWithEnv(cmdArgs: string[], repoRoot: string): number {
  * - `bun scripts/supabase-worktree.ts with-env <command...>`
  */
 function main(): number {
-  const repoRoot = process.cwd()
-  const args = process.argv.slice(2)
+  try {
+    const repoRoot = process.cwd()
+    const args = process.argv.slice(2)
 
-  if (args.length === 0) {
-    console.error('Usage: bun scripts/supabase-worktree.ts <supabase-subcommand...>\n       bun scripts/supabase-worktree.ts with-env <command...>')
-    return 2
-  }
-
-  if (args[0] === 'with-env') {
-    const cmdArgs = args.slice(1)
-    if (cmdArgs.length === 0) {
-      console.error('Usage: bun scripts/supabase-worktree.ts with-env <command...>')
+    if (args.length === 0) {
+      console.error('Usage: bun scripts/supabase-worktree.ts <supabase-subcommand...>\n       bun scripts/supabase-worktree.ts with-env <command...>')
       return 2
     }
-    return runWithEnv(cmdArgs, repoRoot)
-  }
 
-  return runSupabase(args, repoRoot)
+    if (args[0] === 'with-env') {
+      const cmdArgs = args.slice(1)
+      if (cmdArgs.length === 0) {
+        console.error('Usage: bun scripts/supabase-worktree.ts with-env <command...>')
+        return 2
+      }
+      return runWithEnv(cmdArgs, repoRoot)
+    }
+
+    return runSupabase(args, repoRoot)
+  }
+  catch (error) {
+    console.error(error instanceof Error ? error.message : String(error))
+    return 1
+  }
 }
 
 process.exitCode = main()
