@@ -38,7 +38,18 @@ const deleteAccountCaptchaRef = ref<InstanceType<typeof VueTurnstile> | null>(nu
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 const organizationsToDelete = ref<string[]>([])
 const paidOrganizationsToDelete = ref<Array<{ name: string, planName: string }>>([])
+const isEmailVerified = computed(() => !!main.auth?.email_confirmed_at)
 displayStore.NavTitle = t('account')
+
+async function redirectToEmailVerification() {
+  await router.push({
+    path: '/resend_email',
+    query: {
+      reason: 'email_not_verified',
+      return_to: '/settings/account',
+    },
+  })
+}
 
 async function checkOrganizationImpact() {
   // Wait for organizations and main store to load
@@ -125,6 +136,11 @@ async function checkOrganizationImpact() {
 }
 
 async function deleteAccount() {
+  if (!isEmailVerified.value) {
+    await redirectToEmailVerification()
+    return
+  }
+
   // First, check organization impact
   const { orgsToBeDeleted, paidOrgsToBeDeleted, canProceed } = await checkOrganizationImpact()
 
@@ -239,6 +255,11 @@ async function performAccountDeletion(password: string) {
     return false
   const supabaseClient = useSupabase()
 
+  if (!isEmailVerified.value) {
+    await redirectToEmailVerification()
+    return false
+  }
+
   if (!password) {
     toast.error(t('password-placeholder'))
     return false
@@ -309,6 +330,10 @@ async function performAccountDeletion(password: string) {
 
     if (deleteError) {
       console.error('Delete error:', deleteError)
+      if (deleteError.message?.includes('email_not_verified')) {
+        await redirectToEmailVerification()
+        return false
+      }
       if (deleteError.message?.includes('reauth_required')) {
         deleteAccountCaptchaToken.value = ''
         deleteAccountCaptchaRef.value?.reset()
