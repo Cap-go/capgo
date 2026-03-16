@@ -52,13 +52,6 @@ const router = useRouter()
 const supabase = useSupabase()
 const dialogStore = useDialogV2Store()
 
-// Generated Supabase RPC types can lag behind migrations. Keep this call typed
-// locally until the next type generation includes delete_group_with_bindings.
-const deleteGroupWithBindings = supabase.rpc as unknown as (
-  fn: string,
-  args: { group_id: string },
-) => Promise<{ error: unknown }>
-
 const isLoading = ref(false)
 const isSubmitting = ref(false)
 const groups = ref<Group[]>([])
@@ -268,7 +261,7 @@ async function deleteGroup(group: GroupRow) {
 
   isSubmitting.value = true
   try {
-    const { error } = await deleteGroupWithBindings('delete_group_with_bindings', { group_id: group.id })
+    const { error } = await supabase.rpc('delete_group_with_bindings', { group_id: group.id })
 
     if (error)
       throw error
