@@ -77,7 +77,7 @@ DECLARE
     JOIN pg_namespace ns ON ns.oid = proc.pronamespace
     WHERE ns.nspname = 'auth'
       AND proc.proname = 'enforce_email_otp_for_mfa'
-      AND pg_get_function_identity_arguments(proc.oid) = ''
+      AND COALESCE(pg_get_function_identity_arguments(proc.oid), '') = ''
   );
   v_can_drop_legacy_auth_function boolean := has_schema_privilege(current_user, 'auth', 'USAGE')
     AND EXISTS (
@@ -86,7 +86,7 @@ DECLARE
       JOIN pg_namespace ns ON ns.oid = proc.pronamespace
       WHERE ns.nspname = 'auth'
         AND proc.proname = 'enforce_email_otp_for_mfa'
-        AND pg_get_function_identity_arguments(proc.oid) = ''
+        AND COALESCE(pg_get_function_identity_arguments(proc.oid), '') = ''
         AND pg_get_userbyid(proc.proowner) = current_user
     );
 BEGIN
