@@ -14,7 +14,7 @@ if (!SUPABASE_ANON_KEY)
   throw new Error('SUPABASE_ANON_KEY is required for version_meta RPC tests')
 
 const APP_ID = `com.versionmeta.rpc.${randomUUID()}`
-const VERSION_NAME = `1.0.0-${randomUUID()}`
+const APP_VERSION_NAME = `1.0.0-${randomUUID()}`
 let versionId: number
 
 const serviceRoleSupabase = getSupabaseClient()
@@ -26,9 +26,15 @@ const anonSupabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
   },
 })
 
-beforeAll(async () => {
+async function createAppVersionTarget(options?: {
+  appId?: string
+  versionName?: string
+}) {
+  const appId = options?.appId ?? `com.versionmeta.rpc.${randomUUID()}`
+  const versionName = options?.versionName ?? `1.0.0-${randomUUID()}`
+
   const { error: appError } = await serviceRoleSupabase.from('apps').insert({
-    app_id: APP_ID,
+    app_id: appId,
     owner_org: ORG_ID,
     name: 'RPC Security Test App',
     icon_url: 'https://example.com/icon.png',
@@ -39,9 +45,9 @@ beforeAll(async () => {
   const { data: versionRow, error: versionError } = await serviceRoleSupabase
     .from('app_versions')
     .insert({
-      app_id: APP_ID,
+      app_id: appId,
       owner_org: ORG_ID,
-      name: VERSION_NAME,
+      name: versionName,
     })
     .select('id')
     .single()
@@ -50,7 +56,17 @@ beforeAll(async () => {
   if (!versionRow)
     throw new Error('Failed to create app version for test')
 
-  versionId = versionRow.id
+  return {
+    appId,
+    versionId: versionRow.id,
+  }
+}
+
+beforeAll(async () => {
+  ({ versionId } = await createAppVersionTarget({
+    appId: APP_ID,
+    versionName: APP_VERSION_NAME,
+  }))
 })
 
 afterAll(async () => {
@@ -95,32 +111,46 @@ describe('upsert_version_meta RPC authorization', () => {
   })
 
   it('upserts only once per app/version/size sign', async () => {
-    const { data, error } = await serviceRoleSupabase.rpc('upsert_version_meta', {
-      p_app_id: APP_ID,
-      p_version_id: versionId,
-      p_size: 123456,
-    })
+    const { appId, versionId: isolatedVersionId } = await createAppVersionTarget()
 
-    expect(error).toBeNull()
-    expect(data).toBe(true)
+    try {
+      const { data, error } = await serviceRoleSupabase.rpc('upsert_version_meta', {
+        p_app_id: appId,
+        p_version_id: isolatedVersionId,
+        p_size: 123456,
+      })
 
-    const { data: rows, error: readError } = await serviceRoleSupabase
-      .from('version_meta')
-      .select('id')
-      .eq('app_id', APP_ID)
-      .eq('version_id', versionId)
-      .limit(2)
+      expect(error).toBeNull()
+      expect(data).toBe(true)
 
-    expect(readError).toBeNull()
-    expect(rows).toHaveLength(1)
+      const { data: rows, error: readError } = await serviceRoleSupabase
+        .from('version_meta')
+        .select('app_id,version_id,size')
+        .eq('app_id', appId)
+        .eq('version_id', isolatedVersionId)
+        .limit(2)
 
-    const { data: duplicateData, error: duplicateError } = await serviceRoleSupabase.rpc('upsert_version_meta', {
-      p_app_id: APP_ID,
-      p_version_id: versionId,
-      p_size: 123456,
-    })
+      expect(readError).toBeNull()
+      expect(rows).toHaveLength(1)
+      expect(rows?.[0]).toMatchObject({
+        app_id: appId,
+        version_id: isolatedVersionId,
+        size: 123456,
+      })
 
-    expect(duplicateError).toBeNull()
-    expect(duplicateData).toBe(false)
+      const { data: duplicateData, error: duplicateError } = await serviceRoleSupabase.rpc('upsert_version_meta', {
+        p_app_id: appId,
+        p_version_id: isolatedVersionId,
+        p_size: 123456,
+      })
+
+      expect(duplicateError).toBeNull()
+      expect(duplicateData).toBe(false)
+    }
+    finally {
+      await serviceRoleSupabase.from('version_meta').delete().eq('app_id', appId)
+      await serviceRoleSupabase.from('app_versions').delete().eq('app_id', appId)
+      await serviceRoleSupabase.from('apps').delete().eq('app_id', appId)
+    }
   })
 })
