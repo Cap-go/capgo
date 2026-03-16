@@ -111,6 +111,10 @@ app.post('/', async (c) => {
 
   const body = validation.data
   const attributeMapping = parseAttributeMapping(body.attribute_mapping)
+  const domain = body.domain.trim().toLowerCase()
+  if (!domain) {
+    throw simpleError('invalid_body', 'domain must not be empty')
+  }
 
   await requireManageSsoPermission(c, body.org_id)
   await requireEnterprisePlan(c, body.org_id)
@@ -132,7 +136,7 @@ app.post('/', async (c) => {
 
   let managementProvider: Awaited<ReturnType<typeof createSSOProvider>>
   try {
-    managementProvider = await createSSOProvider(c, body.domain, body.metadata_url, attributeMapping)
+    managementProvider = await createSSOProvider(c, domain, body.metadata_url, attributeMapping)
   }
   catch (err) {
     if (err instanceof ManagementAPIError) {
@@ -149,7 +153,7 @@ app.post('/', async (c) => {
       .from('sso_providers')
       .insert({
         org_id: body.org_id,
-        domain: body.domain,
+        domain,
         provider_id: managementProvider.id,
         status: 'pending_verification',
         dns_verification_token: dnsVerificationToken,

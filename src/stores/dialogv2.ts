@@ -33,6 +33,29 @@ export const useDialogV2Store = defineStore('dialogv2', () => {
     dialogCanceled.value = false
   }
 
+  const openButtonHref = (button: DialogV2Button) => {
+    if (!button.href)
+      return
+
+    if (typeof window === 'undefined')
+      return
+
+    if (button.target === '_blank') {
+      const relTokens = button.rel ? button.rel.split(/[\s,]+/).filter(Boolean) : []
+      const features = [
+        'noopener',
+        ...(relTokens.includes('noreferrer') ? ['noreferrer'] : []),
+      ]
+      window.open(button.href, button.target, features.join(','))
+      return
+    }
+
+    if (button.target && button.target !== '_self')
+      window.open(button.href, button.target)
+    else
+      window.location.assign(button.href)
+  }
+
   const closeDialog = async (button?: DialogV2Button) => {
     if (button) {
       lastButtonRole.value = button.id ?? button.role ?? ''
@@ -50,15 +73,18 @@ export const useDialogV2Store = defineStore('dialogv2', () => {
           return
         }
       }
-    }
-    else {
-      // Dialog was dismissed without a button (ESC, backdrop, X button)
-      dialogCanceled.value = true
+
+      if (!button.preventClose) {
+        showDialog.value = false
+      }
+
+      if (!button.preventClose && button.href)
+        openButtonHref(button)
+      return
     }
 
-    if (!button?.preventClose) {
-      showDialog.value = false
-    }
+    // Modal dismissed without a button action (overlay, escape, close icon)
+    showDialog.value = false
   }
 
   const onDialogDismiss = (): Promise<boolean> => {
@@ -71,7 +97,6 @@ export const useDialogV2Store = defineStore('dialogv2', () => {
       })
     })
   }
-
   return {
     showDialog,
     dialogOptions,

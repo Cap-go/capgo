@@ -18,7 +18,7 @@ async function main() {
                 console.log(`[on_organization_create] → sending org ${orgId}`)
 
                 const res = await fetch(
-                    'https://xvwzpoazmxkqosrdewyv.supabase.co/functions/v1/triggers/on_organization_create',
+                    'https://sb.capgo.app/functions/v1/triggers/on_organization_create',
                     {
                         method: 'POST',
                         body: JSON.stringify({

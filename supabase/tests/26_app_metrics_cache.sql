@@ -17,6 +17,8 @@ DECLARE
   cache_time_3 timestamp with time zone;
   nonexistent_count bigint;
 BEGIN
+  PERFORM set_config('role', 'service_role', true);
+  PERFORM set_config('request.jwt.claim.role', 'service_role', true);
   -- Reset relevant tables to provide a clean slate for cache assertions
   TRUNCATE TABLE public.app_metrics_cache;
   TRUNCATE TABLE public.daily_mau;

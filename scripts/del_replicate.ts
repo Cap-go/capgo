@@ -2,7 +2,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js'
 import type { Database } from '../supabase/functions/_backend/utils/supabase.types.ts'
 
-const supabaseUrl = 'https://xvwzpoazmxkqosrdewyv.supabase.co'
+const supabaseUrl = 'https://sb.capgo.app'
 const supabaseServiceRole = '***'
 const ids = []
 

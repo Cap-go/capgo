@@ -6,29 +6,35 @@
 -- =============================================================================
 -- 1) Add sso_enabled column to orgs table
 -- =============================================================================
-ALTER TABLE "public"."orgs" ADD COLUMN "sso_enabled" boolean NOT NULL DEFAULT false;
+ALTER TABLE public.orgs
+ADD COLUMN sso_enabled boolean NOT NULL DEFAULT false;
 
 -- =============================================================================
 -- 2) Update check_domain_sso to join orgs.sso_enabled
---    Only returns has_sso=true if the org has SSO enabled AND provider is active
+--    Only returns has_sso=true when the org has SSO enabled and provider
+--    is active
 -- =============================================================================
-CREATE OR REPLACE FUNCTION "public"."check_domain_sso"("p_domain" text)
-RETURNS TABLE("has_sso" boolean, "provider_id" text, "org_id" uuid)
-LANGUAGE "sql"
+CREATE OR REPLACE FUNCTION public.check_domain_sso(p_domain text)
+RETURNS TABLE (
+    has_sso boolean,
+    provider_id text,
+    org_id uuid
+)
+LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET "search_path" TO ''
+SET search_path = ''
 AS $$
-  SELECT
-    true AS has_sso,
-    sp.provider_id,
-    sp.org_id
-  FROM "public"."sso_providers" sp
-  JOIN "public"."orgs" o ON o.id = sp.org_id
-  WHERE sp.domain = p_domain
-    AND sp.status = 'active'
-    AND o.sso_enabled = true
-  LIMIT 1;
+    SELECT
+        true AS has_sso,
+        sp.provider_id,
+        sp.org_id
+    FROM public.sso_providers AS sp
+    JOIN public.orgs AS o ON o.id = sp.org_id
+    WHERE sp."domain" = p_domain
+      AND sp.status = 'active'
+      AND o.sso_enabled = true
+    LIMIT 1;
 $$;
 
 -- =============================================================================
@@ -36,13 +42,47 @@ $$;
 --    Must DROP first because CREATE OR REPLACE cannot change return type.
 --    Drop no-args overload first (it depends on the with-args overload).
 -- =============================================================================
-DROP FUNCTION IF EXISTS "public"."get_orgs_v7"();
-DROP FUNCTION IF EXISTS "public"."get_orgs_v7"("uuid");
+DROP FUNCTION IF EXISTS public.get_orgs_v7();
+DROP FUNCTION IF EXISTS public.get_orgs_v7(uuid);
 
-CREATE OR REPLACE FUNCTION "public"."get_orgs_v7"("userid" "uuid") RETURNS TABLE("gid" "uuid", "created_by" "uuid", "created_at" timestamp with time zone, "logo" "text", "name" "text", "role" character varying, "paying" boolean, "trial_left" integer, "can_use_more" boolean, "is_canceled" boolean, "app_count" bigint, "subscription_start" timestamp with time zone, "subscription_end" timestamp with time zone, "management_email" "text", "is_yearly" boolean, "stats_updated_at" timestamp without time zone, "next_stats_update_at" timestamp with time zone, "credit_available" numeric, "credit_total" numeric, "credit_next_expiration" timestamp with time zone, "enforcing_2fa" boolean, "2fa_has_access" boolean, "enforce_hashed_api_keys" boolean, "password_policy_config" "jsonb", "password_has_access" boolean, "require_apikey_expiration" boolean, "max_apikey_expiration_days" integer, "enforce_encrypted_bundles" boolean, "required_encryption_key" character varying, "use_new_rbac" boolean, "sso_enabled" boolean)
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
+CREATE OR REPLACE FUNCTION public.get_orgs_v7(userid uuid)
+RETURNS TABLE (
+    gid uuid,
+    created_by uuid,
+    created_at timestamptz,
+    logo text,
+    name text,
+    role character varying,
+    paying boolean,
+    trial_left integer,
+    can_use_more boolean,
+    is_canceled boolean,
+    app_count bigint,
+    subscription_start timestamptz,
+    subscription_end timestamptz,
+    management_email text,
+    is_yearly boolean,
+    stats_updated_at timestamp without time zone,
+    next_stats_update_at timestamptz,
+    credit_available numeric,
+    credit_total numeric,
+    credit_next_expiration timestamptz,
+    enforcing_2fa boolean,
+    "2fa_has_access" boolean,
+    enforce_hashed_api_keys boolean,
+    password_policy_config jsonb,
+    password_has_access boolean,
+    require_apikey_expiration boolean,
+    max_apikey_expiration_days integer,
+    enforce_encrypted_bundles boolean,
+    required_encryption_key character varying,
+    use_new_rbac boolean,
+    sso_enabled boolean
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 BEGIN
   RETURN QUERY
   WITH app_counts AS (
@@ -230,10 +270,44 @@ $$;
 -- =============================================================================
 -- 4) Update get_orgs_v7() (no args) wrapper to match new return type
 -- =============================================================================
-CREATE OR REPLACE FUNCTION "public"."get_orgs_v7"() RETURNS TABLE("gid" "uuid", "created_by" "uuid", "created_at" timestamp with time zone, "logo" "text", "name" "text", "role" character varying, "paying" boolean, "trial_left" integer, "can_use_more" boolean, "is_canceled" boolean, "app_count" bigint, "subscription_start" timestamp with time zone, "subscription_end" timestamp with time zone, "management_email" "text", "is_yearly" boolean, "stats_updated_at" timestamp without time zone, "next_stats_update_at" timestamp with time zone, "credit_available" numeric, "credit_total" numeric, "credit_next_expiration" timestamp with time zone, "enforcing_2fa" boolean, "2fa_has_access" boolean, "enforce_hashed_api_keys" boolean, "password_policy_config" "jsonb", "password_has_access" boolean, "require_apikey_expiration" boolean, "max_apikey_expiration_days" integer, "enforce_encrypted_bundles" boolean, "required_encryption_key" character varying, "use_new_rbac" boolean, "sso_enabled" boolean)
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    SET "search_path" TO ''
-    AS $$
+CREATE OR REPLACE FUNCTION public.get_orgs_v7()
+RETURNS TABLE (
+    gid uuid,
+    created_by uuid,
+    created_at timestamptz,
+    logo text,
+    name text,
+    role character varying,
+    paying boolean,
+    trial_left integer,
+    can_use_more boolean,
+    is_canceled boolean,
+    app_count bigint,
+    subscription_start timestamptz,
+    subscription_end timestamptz,
+    management_email text,
+    is_yearly boolean,
+    stats_updated_at timestamp without time zone,
+    next_stats_update_at timestamptz,
+    credit_available numeric,
+    credit_total numeric,
+    credit_next_expiration timestamptz,
+    enforcing_2fa boolean,
+    "2fa_has_access" boolean,
+    enforce_hashed_api_keys boolean,
+    password_policy_config jsonb,
+    password_has_access boolean,
+    require_apikey_expiration boolean,
+    max_apikey_expiration_days integer,
+    enforce_encrypted_bundles boolean,
+    required_encryption_key character varying,
+    use_new_rbac boolean,
+    sso_enabled boolean
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $$
 DECLARE
   api_key_text text;
   api_key record;

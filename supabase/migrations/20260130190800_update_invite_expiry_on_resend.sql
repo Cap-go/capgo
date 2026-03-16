@@ -61,17 +61,17 @@ END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.get_org_members_rbac(p_org_id uuid)
-RETURNS TABLE(
-  user_id uuid,
-  email character varying,
-  image_url character varying,
-  role_name text,
-  role_id uuid,
-  binding_id uuid,
-  granted_at timestamp with time zone,
-  is_invite boolean,
-  is_tmp boolean,
-  org_user_id bigint
+RETURNS TABLE (
+    user_id uuid,
+    email character varying,
+    image_url character varying,
+    role_name text,
+    role_id uuid,
+    binding_id uuid,
+    granted_at timestamp with time zone,
+    is_invite boolean,
+    is_tmp boolean,
+    org_user_id bigint
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
