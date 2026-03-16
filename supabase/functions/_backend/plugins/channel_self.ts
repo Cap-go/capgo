@@ -163,7 +163,7 @@ export const jsonRequestSchema = z.looseObject({
   key_id: z.optional(z.string().check(z.maxLength(20))),
 })
 
-// TODO: delete when all mirgrated to jsonRequestSchema
+// TODO: delete when all migrated to jsonRequestSchema
 export const jsonRequestSchemaGet = z.looseObject({
   app_id: z.string({
     error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,

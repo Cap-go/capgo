@@ -2,6 +2,8 @@ BEGIN;
 
 SELECT plan(24);
 
+SELECT tests.authenticate_as_service_role();
+
 -- =============================================================================
 -- Test is_apikey_expired() function
 -- =============================================================================
@@ -128,7 +130,9 @@ SELECT
     );
 
 -- Run cleanup
+SELECT set_config('role', 'postgres', TRUE);
 SELECT cleanup_expired_apikeys();
+SELECT tests.authenticate_as_service_role();
 
 -- Test 8: Keys expired > 30 days ago should be deleted
 SELECT
@@ -225,6 +229,8 @@ VALUES
 );
 
 -- Set up request headers with expired key
+SELECT tests.authenticate_as_service_role();
+
 DO $$
 BEGIN
     PERFORM set_config('request.headers', '{"capgkey": "test-key-for-identity-expired"}', true);
@@ -268,6 +274,8 @@ SELECT
         'get_identity_apikey_only: Returns user_id for valid (not expired) API key'
     );
 
+SELECT tests.clear_authentication();
+
 -- Reset headers
 DO $$
 BEGIN
@@ -277,6 +285,7 @@ END $$;
 -- =============================================================================
 -- Test get_orgs_v6 with expired API key
 -- =============================================================================
+SELECT tests.authenticate_as_service_role();
 
 -- Create test API keys for get_orgs_v6 tests
 INSERT INTO apikeys (id, user_id, key, mode, name, expires_at)

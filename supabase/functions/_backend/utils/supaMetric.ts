@@ -45,15 +45,15 @@ function newCore() {
   }
 }
 // lines
-// node_cpu_seconds_total{supabase_project_ref="db.xvwzpoazmxkqosrdewyv.supabase.co",service_type="db",cpu="0",mode="idle"} 7916.94
-// node_cpu_seconds_total{supabase_project_ref="db.xvwzpoazmxkqosrdewyv.supabase.co",service_type="db",cpu="0",mode="iowait"} 519.04
-// node_cpu_seconds_total{supabase_project_ref="db.xvwzpoazmxkqosrdewyv.supabase.co",service_type="db",cpu="0",mode="irq"} 0
-// node_cpu_seconds_total{supabase_project_ref="db.xvwzpoazmxkqosrdewyv.supabase.co",service_type="db",cpu="0",mode="nice"} 0
-// node_cpu_seconds_total{supabase_project_ref="db.xvwzpoazmxkqosrdewyv.supabase.co",service_type="db",cpu="0",mode="softirq"} 57.68
-// node_cpu_seconds_total{supabase_project_ref="db.xvwzpoazmxkqosrdewyv.supabase.co",service_type="db",cpu="0",mode="steal"} 0
-// node_cpu_seconds_total{supabase_project_ref="db.xvwzpoazmxkqosrdewyv.supabase.co",service_type="db",cpu="0",mode="system"} 166.3
-// node_cpu_seconds_total{supabase_project_ref="db.xvwzpoazmxkqosrdewyv.supabase.co",service_type="db",cpu="0",mode="user"} 728.28
-// node_cpu_seconds_total{supabase_project_ref="db.xvwzpoazmxkqosrdewyv.supabase.co",service_type="db",cpu="1",mode="idle"} 8226.95
+// node_cpu_seconds_total{supabase_project_ref="db.sb.capgo.app",service_type="db",cpu="0",mode="idle"} 7916.94
+// node_cpu_seconds_total{supabase_project_ref="db.sb.capgo.app",service_type="db",cpu="0",mode="iowait"} 519.04
+// node_cpu_seconds_total{supabase_project_ref="db.sb.capgo.app",service_type="db",cpu="0",mode="irq"} 0
+// node_cpu_seconds_total{supabase_project_ref="db.sb.capgo.app",service_type="db",cpu="0",mode="nice"} 0
+// node_cpu_seconds_total{supabase_project_ref="db.sb.capgo.app",service_type="db",cpu="0",mode="softirq"} 57.68
+// node_cpu_seconds_total{supabase_project_ref="db.sb.capgo.app",service_type="db",cpu="0",mode="steal"} 0
+// node_cpu_seconds_total{supabase_project_ref="db.sb.capgo.app",service_type="db",cpu="0",mode="system"} 166.3
+// node_cpu_seconds_total{supabase_project_ref="db.sb.capgo.app",service_type="db",cpu="0",mode="user"} 728.28
+// node_cpu_seconds_total{supabase_project_ref="db.sb.capgo.app",service_type="db",cpu="1",mode="idle"} 8226.95
 
 function getPartCpuInfo(parts: string[], name: string) {
   const part = parts.find(part => part.startsWith(name))

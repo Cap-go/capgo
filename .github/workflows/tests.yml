@@ -12,6 +12,7 @@ permissions: {}
 
 env:
   DENO_DIR: my_cache_directory
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   test_all:
@@ -28,6 +29,8 @@ jobs:
           key: my_cache_key
       - name: Checkout capgo
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 2
       - name: Setup bun
         uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3 # v2
         with:
@@ -49,8 +52,7 @@ jobs:
             fi
           }
 
-          git fetch --depth=1 origin main
-          BASE_REF="origin/main"
+          BASE_REF="HEAD^1"
 
           declare -A base_timestamp_to_file
           while IFS= read -r file; do
@@ -66,7 +68,7 @@ jobs:
             fi
           done
 
-          added_files="$(git diff --name-only --diff-filter=A "${BASE_REF}...HEAD" -- 'supabase/migrations/*.sql')"
+          added_files="$(git diff --name-only --diff-filter=A "${BASE_REF}" HEAD -- 'supabase/migrations/*.sql')"
           duplicate_timestamps=0
 
           if [ -n "$added_files" ]; then
@@ -111,7 +113,7 @@ jobs:
 
           echo "✅ Migration filename timestamps are unique and strictly newer than main."
       - name: Check for typos
-        uses: crate-ci/typos@57b11c6b7e54c402ccd9cda953f1072ec4f78e33 # v1.43.5
+        uses: crate-ci/typos@631208b7aac2daa8b707f55e7331f9112b0e062d # v1.44.0
       - name: Show bun version
         run: bun --version
       - name: Show capgo version
