@@ -31,6 +31,16 @@ const isLoadingSession = ref(true)
 const isEmailVerified = ref(true)
 const isDeleteBlocked = computed(() => !isEmailVerified.value)
 
+async function redirectToEmailVerification() {
+  await router.push({
+    path: '/resend_email',
+    query: {
+      reason: 'email_not_verified',
+      return_to: '/delete_account',
+    },
+  })
+}
+
 async function checkEmailVerification() {
   isLoadingSession.value = true
   const { data: sessionResult, error: sessionError } = await supabase.auth.getSession()
@@ -103,6 +113,11 @@ async function deleteAccount() {
 
             if (deleteError) {
               console.error('Delete error:', deleteError)
+              if (deleteError.message?.includes('email_not_verified')) {
+                isLoading.value = false
+                await redirectToEmailVerification()
+                return false
+              }
               if (deleteError.message?.includes('reauth_required')) {
                 isLoading.value = false
                 return setErrors('delete-account', [t('invalid-auth')], {})
