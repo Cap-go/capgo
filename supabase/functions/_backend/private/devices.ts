@@ -5,7 +5,7 @@ import { z } from 'zod/mini'
 import { parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { appIdSchema, cursorSchema, deviceIdSchema, hasUnsafeDevicesQueryText, queryLimitSchema, safeQueryTextSchema } from '../utils/privateAnalyticsValidation.ts'
+import { appIdSchema, cursorSchema, deviceIdSchema, hasInvalidQueryLimitInput, hasUnsafeDevicesQueryText, queryLimitSchema, safeQueryTextSchema } from '../utils/privateAnalyticsValidation.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { countDevices, readDevices } from '../utils/stats.ts'
 
@@ -46,6 +46,8 @@ app.use('/', useCors)
 
 app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   const bodyRaw = await parseBody<DataDevice>(c)
+  if (hasInvalidQueryLimitInput(bodyRaw.limit))
+    throw simpleError('invalid_body', 'Invalid body')
   const parsed = devicesBodySchema.safeParse(bodyRaw)
   if (!parsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: parsed.error })

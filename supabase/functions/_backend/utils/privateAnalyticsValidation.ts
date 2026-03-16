@@ -17,7 +17,7 @@ export const deviceIdSchema = z.string().check(
 export const safeQueryTextSchema = z.string().check(z.maxLength(MAX_QUERY_TEXT_LENGTH))
 export const safeQueryDateSchema = z.string().check(z.maxLength(128))
 export const cursorSchema = z.string().check(z.maxLength(128))
-export const queryLimitSchema = z.coerce.number().check(z.minimum(1), z.maximum(MAX_QUERY_LIMIT))
+export const queryLimitSchema = z.coerce.number().check(z.int(), z.minimum(1), z.maximum(MAX_QUERY_LIMIT))
 export const statsActionSchema = z.enum(Constants.public.Enums.stats_action)
 
 export function hasControlChars(value: string): boolean {
@@ -33,6 +33,10 @@ export function hasUnsafeQueryText(value: string | undefined, maxLength = MAX_QU
   if (value === undefined)
     return false
   return value.length > maxLength || hasControlChars(value)
+}
+
+export function hasInvalidQueryLimitInput(value: unknown): boolean {
+  return value !== undefined && typeof value !== 'number' && typeof value !== 'string'
 }
 
 export function hasUnsafeStatsQueryText(body: {

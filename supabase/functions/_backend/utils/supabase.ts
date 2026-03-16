@@ -14,7 +14,8 @@ const DEFAULT_LIMIT = 1000
 // Import Supabase client
 
 function quotePostgrestFilterValue(value: string): string {
-  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`
+  const escapedValue = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+  return `"${escapedValue}"`
 }
 
 function buildIlikePrefixPattern(value: string): string {

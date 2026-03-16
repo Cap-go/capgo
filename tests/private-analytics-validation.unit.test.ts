@@ -74,7 +74,10 @@ describe('private analytics route validation', () => {
     ['malformed deviceIds', { devicesId: ['1) OR 1=1 --'] }],
     ['malformed actions', { actions: ['get', '\' OR 1=1 --'] }],
     ['non-numeric limits', { limit: '1 UNION SELECT 1' }],
+    ['decimal limits', { limit: 1.5 }],
+    ['boolean limits', { limit: true }],
     ['control characters in search', { search: 'bad\u0000query' }],
+    ['invalid rangeStart dates', { rangeStart: 'not-a-date' }],
   ])('rejects %s on /private/stats', async (_label, body) => {
     await expectRejectedStatsBody(body)
   })
@@ -90,6 +93,20 @@ describe('private analytics route validation', () => {
     expect(readStatsMock).toHaveBeenCalledTimes(1)
   })
 
+  it('normalizes epoch range dates on /private/stats', async () => {
+    const response = await statsApp.request(postJson('http://local/', {
+      appId: 'com.example.app',
+      rangeStart: '1704067200000',
+      rangeEnd: 1704153600000,
+    }))
+
+    expect(response.status).toBe(200)
+    expect(readStatsMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      start_date: '2024-01-01T00:00:00.000Z',
+      end_date: '2024-01-02T00:00:00.000Z',
+    }))
+  })
+
   it('rejects malformed deviceIds on /private/stats/export', async () => {
     await expectRejectedStatsBody({
       devicesId: ['1) OR 1=1 --'],
@@ -100,6 +117,8 @@ describe('private analytics route validation', () => {
   it.each([
     ['malformed deviceIds', { devicesId: ['1) OR 1=1 --'] }],
     ['non-numeric limits', { limit: '1 UNION SELECT 1' }],
+    ['decimal limits', { limit: 1.5 }],
+    ['boolean limits', { limit: true }],
   ])('rejects %s on /private/devices', async (_label, body) => {
     await expectRejectedDevicesBody(body)
   })
