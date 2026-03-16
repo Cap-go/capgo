@@ -16,11 +16,23 @@ const USER_EMAIL_DELETE_USER_UNVERIFIED = 'delete-user-unverified@capgo.app'
 const USER_PASSWORD_DELETE_USER_UNVERIFIED = 'testtest'
 let userIdDeleteUserUnverified = ''
 
+function normalizeLocalhostUrl(raw: string): string {
+  try {
+    const url = new URL(raw)
+    if (url.hostname === 'localhost')
+      url.hostname = '127.0.0.1'
+    return url.toString().replace(/\/$/, '')
+  }
+  catch {
+    return raw.replace('localhost', '127.0.0.1')
+  }
+}
+
 function createAnonSupabaseClient() {
   if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY)
     throw new Error('SUPABASE_URL or SUPABASE_ANON_KEY is missing for delete-user SDK test')
 
-  return createClient<Database>(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+  return createClient<Database>(normalizeLocalhostUrl(env.SUPABASE_URL), env.SUPABASE_ANON_KEY, {
     auth: {
       persistSession: false,
     },
