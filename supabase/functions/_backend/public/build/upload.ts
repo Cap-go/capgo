@@ -116,13 +116,18 @@ export async function tusProxy(
   // Extract the path after /upload/:jobId/ and forward to builder
   // Example: /build/upload/abc123/myfile.zip -> /upload/myfile.zip
   // Example: /build/upload/abc123 -> /upload/
-  const originalPath = new URL(c.req.url).pathname
+  const requestUrl = c.req.raw.url
+  const requestPathStart = requestUrl.includes('://')
+    ? requestUrl.indexOf('/', requestUrl.indexOf('://') + 3)
+    : requestUrl.indexOf('/')
+  const originalPath = requestPathStart >= 0
+    ? requestUrl.slice(requestPathStart).split('?')[0].split('#')[0]
+    : '/'
   const uploadPrefix = `/build/upload/${jobId}`
-  const tusPath = originalPath === uploadPrefix
-    ? '/'
-    : originalPath.startsWith(`${uploadPrefix}/`)
-      ? originalPath.slice(uploadPrefix.length)
-      : '/'
+  let tusPath = '/'
+  if (originalPath.startsWith(`${uploadPrefix}/`)) {
+    tusPath = originalPath.slice(uploadPrefix.length)
+  }
 
   let decodedTusPath: string
   try {
@@ -265,7 +270,12 @@ export async function tusProxy(
       // Check if this is a builder URL
       if (locationUrl.host === builderUrlObj.host) {
         // Extract path after /upload/
-        const uploadPath = locationUrl.pathname.replace(/^\/upload/, '')
+        const builderUploadPath = baseUploadUrl.pathname.endsWith('/')
+          ? baseUploadUrl.pathname.slice(0, -1)
+          : baseUploadUrl.pathname
+        const uploadPath = locationUrl.pathname.startsWith(builderUploadPath)
+          ? locationUrl.pathname.slice(builderUploadPath.length) || '/'
+          : locationUrl.pathname
 
         // Construct proxy URL
         const publicUrl = getEnv(c, 'PUBLIC_URL') || 'https://api.capgo.app'
