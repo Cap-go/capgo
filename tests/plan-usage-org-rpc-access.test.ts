@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { getSupabaseClient, POSTGRES_URL } from './test-utils.ts'
 
 const SUPABASE_URL = (env.SUPABASE_URL ?? '').replace(/\/$/, '')
-const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY
+const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY ?? ''
 
 if (!SUPABASE_URL)
   throw new Error('SUPABASE_URL is required for plan usage RPC authorization tests')
@@ -33,8 +33,8 @@ let ownerUserId: string
 let attackerUserId: string
 let orgId: string
 let planName: string
-let ownerSupabase: ReturnType<typeof createClient<Database>>
-let attackerSupabase: ReturnType<typeof createClient<Database>>
+let ownerSupabase: Awaited<ReturnType<typeof createAuthenticatedClient>>
+let attackerSupabase: Awaited<ReturnType<typeof createAuthenticatedClient>>
 
 async function createAuthenticatedClient(email: string, password: string) {
   const client = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
