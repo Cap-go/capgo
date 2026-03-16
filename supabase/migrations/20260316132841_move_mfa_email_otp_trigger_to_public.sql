@@ -57,7 +57,8 @@ GRANT EXECUTE ON FUNCTION public.enforce_email_otp_for_mfa() TO postgres;
 DO $$
 DECLARE
   v_can_manage_auth_trigger boolean := has_schema_privilege(current_user, 'auth', 'USAGE')
-    AND has_table_privilege(current_user, 'auth.mfa_factors', 'TRIGGER');
+    AND has_table_privilege(current_user, 'auth.mfa_factors', 'TRIGGER')
+    AND has_function_privilege(current_user, 'public.enforce_email_otp_for_mfa()', 'EXECUTE');
 BEGIN
   IF NOT v_can_manage_auth_trigger THEN
     RAISE NOTICE 'Skipping auth.mfa_factors trigger rewrite (insufficient privileges)';
@@ -89,6 +90,17 @@ DECLARE
         AND COALESCE(pg_get_function_identity_arguments(proc.oid), '') = ''
         AND pg_get_userbyid(proc.proowner) = current_user
     );
+  v_legacy_auth_function_has_dependents boolean := EXISTS (
+    SELECT 1
+    FROM pg_depend dep
+    JOIN pg_proc proc ON proc.oid = dep.refobjid
+    JOIN pg_namespace ns ON ns.oid = proc.pronamespace
+    WHERE ns.nspname = 'auth'
+      AND proc.proname = 'enforce_email_otp_for_mfa'
+      AND COALESCE(pg_get_function_identity_arguments(proc.oid), '') = ''
+      AND dep.deptype IN ('n', 'a', 'i')
+      AND dep.classid <> 'pg_proc'::regclass
+  );
 BEGIN
   IF NOT v_has_legacy_auth_function THEN
     RETURN;
@@ -96,6 +108,11 @@ BEGIN
 
   IF NOT v_can_drop_legacy_auth_function THEN
     RAISE NOTICE 'Skipping cleanup of auth.enforce_email_otp_for_mfa() (insufficient privileges)';
+    RETURN;
+  END IF;
+
+  IF v_legacy_auth_function_has_dependents THEN
+    RAISE NOTICE 'Skipping cleanup of auth.enforce_email_otp_for_mfa() (still referenced by another object)';
     RETURN;
   END IF;
 
