@@ -7,7 +7,7 @@ import { createSignedImageUrl } from '~/services/storage'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
-import { getPlans, isAdmin } from './../services/supabase'
+import { getPlans, isPlatformAdmin } from './../services/supabase'
 
 async function updateUser(
   main: ReturnType<typeof useMainStore>,
@@ -87,12 +87,20 @@ async function guard(
   from: RouteLocationNormalized,
 ) {
   const supabase = useSupabase()
+  const main = useMainStore()
   const { data: claimsData } = await supabase.auth.getClaims()
   const { data: sessionData } = await supabase.auth.getSession()
   const sessionUser = sessionData?.session?.user ?? null
   const hasAuth = !!claimsData?.claims?.sub && !!sessionUser
+  const hadAuth = !!main.auth
+  const needsVerifiedEmail = to.path.startsWith('/settings') || to.path === '/delete_account'
 
-  const main = useMainStore()
+  if (hasAuth && sessionUser) {
+    const authConfirmedAt = main.auth?.email_confirmed_at
+    if (!main.auth || main.auth.id !== sessionUser.id || authConfirmedAt !== sessionUser.email_confirmed_at) {
+      main.auth = sessionUser
+    }
+  }
 
   // TOTP means the user was force logged using the "email" tactic
   // In practice this means the user is being spoofed by an admin
@@ -114,8 +122,16 @@ async function guard(
     return next(`/login?to=${to.path}`)
   }
 
-  if (hasAuth && sessionUser && !main.auth) {
-    main.auth = sessionUser
+  if (hasAuth && sessionUser && !hadAuth) {
+    if (!sessionUser.email_confirmed_at && needsVerifiedEmail) {
+      return next({
+        path: '/resend_email',
+        query: {
+          reason: 'email_not_verified',
+          return_to: to.path,
+        },
+      })
+    }
 
     // Check if account is disabled (marked for deletion)
     try {
@@ -142,9 +158,14 @@ async function guard(
       main.plans = pls
     })
 
-    isAdmin(main.auth?.id).then((res) => {
-      main.isAdmin = res
-    })
+    try {
+      // isPlatformAdmin() is the only frontend admin-rights source.
+      main.isAdmin = await isPlatformAdmin()
+    }
+    catch (error) {
+      console.error('Failed to resolve platform admin status:', error)
+      main.isAdmin = false
+    }
 
     sendEvent({
       channel: 'user-login',
@@ -165,6 +186,16 @@ async function guard(
     // User is already authenticated, but check if account got disabled
     // (only if not already on account disabled page)
     if (to.path !== '/accountDisabled') {
+      if (!sessionUser?.email_confirmed_at && needsVerifiedEmail) {
+        return next({
+          path: '/resend_email',
+          query: {
+            reason: 'email_not_verified',
+            return_to: to.path,
+          },
+        })
+      }
+
       try {
         const { data: isDisabled, error: disabledError } = await supabase
           .rpc('is_account_disabled', { user_id: main.auth.id })
@@ -186,8 +217,14 @@ async function guard(
     if (to.path.startsWith('/admin')) {
       // Ensure isAdmin is loaded before checking
       if (main.isAdmin === undefined) {
-        const adminStatus = await isAdmin(main.auth.id)
-        main.isAdmin = adminStatus
+        try {
+          // Re-check via the single approved frontend path for admin-rights.
+          main.isAdmin = await isPlatformAdmin()
+        }
+        catch (error) {
+          console.error('Failed to resolve platform admin status:', error)
+          main.isAdmin = false
+        }
       }
 
       // Redirect non-admin users to dashboard

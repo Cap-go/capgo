@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { simpleError } from '../../utils/hono.ts'
+import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
@@ -11,7 +11,10 @@ export interface RequestBuildBody {
   platform: 'ios' | 'android'
   build_mode?: 'release' | 'debug'
   build_config?: Record<string, any>
+  /** @deprecated Use build_credentials instead. Rejected at runtime. */
   credentials?: Record<string, string>
+  build_options?: Record<string, unknown>
+  build_credentials?: Record<string, string>
 }
 
 export interface RequestBuildResponse {
@@ -30,6 +33,29 @@ interface BuilderJobResponse {
   status: string
 }
 
+/**
+ * Construct the JSON body forwarded to the builder's POST /jobs endpoint.
+ * Extracted for testability — the handler calls this, and unit tests assert the shape.
+ */
+export function buildBuilderPayload(input: {
+  orgId: string
+  uploadPath: string
+  platform: string
+  buildOptions: Record<string, unknown>
+  buildCredentials: Record<string, string>
+}) {
+  return {
+    userId: input.orgId,
+    artifactKey: input.uploadPath,
+    fastlane: { lane: input.platform },
+    buildOptions: input.buildOptions,
+    buildCredentials: input.buildCredentials,
+  }
+}
+
+/** Exported for unit tests — follows bundleUsageTestUtils pattern. */
+export const builderPayloadTestUtils = { buildBuilderPayload }
+
 export async function requestBuild(
   c: Context,
   body: RequestBuildBody,
@@ -40,8 +66,24 @@ export async function requestBuild(
     platform,
     build_mode = 'release',
     build_config = {},
-    credentials = {},
+    build_options = {},
+    build_credentials = {},
+    credentials,
   } = body
+
+  // Reject deprecated `credentials` field — old CLIs must upgrade
+  if (credentials && Object.keys(credentials).length > 0) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Deprecated credentials field received',
+      app_id,
+      platform,
+    })
+    throw simpleError(
+      'invalid_parameter',
+      '`credentials` field is deprecated. Please update your CLI and use `build_credentials` instead.',
+    )
+  }
 
   cloudlog({
     requestId: c.get('requestId'),
@@ -129,7 +171,7 @@ export async function requestBuild(
       builder_url_configured: !!builderUrl,
       builder_api_key_configured: !!builderApiKey,
     })
-    throw simpleError('service_unavailable', 'Build service unavailable (builder not configured)')
+    throw quickError(503, 'service_unavailable', 'Build service unavailable (builder not configured)')
   }
 
   try {
@@ -149,14 +191,13 @@ export async function requestBuild(
         'x-api-key': builderApiKey,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        userId: org_id, // Use org_id as anonymized identifier
-        artifactKey: upload_path, // Pass the artifact key to builder
-        fastlane: {
-          lane: platform,
-        },
-        credentials: credentials || {},
-      }),
+      body: JSON.stringify(buildBuilderPayload({
+        orgId: org_id,
+        uploadPath: upload_path,
+        platform,
+        buildOptions: build_options,
+        buildCredentials: build_credentials,
+      })),
     })
 
     if (builderResponse.ok) {
@@ -186,7 +227,7 @@ export async function requestBuild(
         app_id,
         platform,
       })
-      throw simpleError('service_unavailable', 'Build service unavailable (builder error)')
+      throw quickError(503, 'service_unavailable', 'Build service unavailable (builder error)')
     }
   }
   catch (error) {
@@ -201,7 +242,7 @@ export async function requestBuild(
       app_id,
       platform,
     })
-    throw simpleError('service_unavailable', 'Build service unavailable (builder call failed)')
+    throw quickError(503, 'service_unavailable', 'Build service unavailable (builder call failed)')
   }
 
   const upload_expires_at = new Date(Date.now() + 60 * 60 * 1000)
@@ -214,7 +255,7 @@ export async function requestBuild(
       builder_url: builderUrl,
       builder_api_key_present: !!builderApiKey,
     })
-    throw simpleError('service_unavailable', 'Build service unavailable (upload URL missing)')
+    throw quickError(503, 'service_unavailable', 'Build service unavailable (upload URL missing)')
   }
 
   const upload_url = `${getEnv(c, 'PUBLIC_URL') || 'https://api.capgo.app'}/build/upload/${builderJob.jobId}`

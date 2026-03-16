@@ -1,6 +1,5 @@
 -- Add revenue metrics columns to global_stats table
 -- These will store MRR (Monthly Recurring Revenue) and ARR (Annual Recurring Revenue) per plan
-
 -- Revenue metrics (in dollars)
 ALTER TABLE public.global_stats
 ADD COLUMN mrr double precision DEFAULT 0 NOT NULL;
@@ -40,6 +39,9 @@ ALTER TABLE public.global_stats
 ADD COLUMN plan_team_yearly integer DEFAULT 0 NOT NULL;
 
 ALTER TABLE public.global_stats
+ADD COLUMN plan_enterprise integer DEFAULT 0 NOT NULL;
+
+ALTER TABLE public.global_stats
 ADD COLUMN plan_enterprise_monthly integer DEFAULT 0 NOT NULL;
 
 ALTER TABLE public.global_stats
@@ -61,20 +63,37 @@ ADD COLUMN credits_consumed bigint DEFAULT 0 NOT NULL;
 
 -- Comments
 COMMENT ON COLUMN public.global_stats.mrr IS 'Total Monthly Recurring Revenue in dollars';
+
 COMMENT ON COLUMN public.global_stats.total_revenue IS 'Total Annual Recurring Revenue (ARR) in dollars';
+
 COMMENT ON COLUMN public.global_stats.revenue_solo IS 'Solo plan ARR in dollars';
+
 COMMENT ON COLUMN public.global_stats.revenue_maker IS 'Maker plan ARR in dollars';
+
 COMMENT ON COLUMN public.global_stats.revenue_team IS 'Team plan ARR in dollars';
+
 COMMENT ON COLUMN public.global_stats.plan_solo_monthly IS 'Number of Solo plan monthly subscriptions';
+
 COMMENT ON COLUMN public.global_stats.plan_solo_yearly IS 'Number of Solo plan yearly subscriptions';
+
 COMMENT ON COLUMN public.global_stats.plan_maker_monthly IS 'Number of Maker plan monthly subscriptions';
+
 COMMENT ON COLUMN public.global_stats.plan_maker_yearly IS 'Number of Maker plan yearly subscriptions';
+
 COMMENT ON COLUMN public.global_stats.plan_team_monthly IS 'Number of Team plan monthly subscriptions';
+
 COMMENT ON COLUMN public.global_stats.plan_team_yearly IS 'Number of Team plan yearly subscriptions';
+
 COMMENT ON COLUMN public.global_stats.plan_enterprise_monthly IS 'Number of Enterprise plan monthly subscriptions';
+
 COMMENT ON COLUMN public.global_stats.plan_enterprise_yearly IS 'Number of Enterprise plan yearly subscriptions';
+
 COMMENT ON COLUMN public.global_stats.revenue_enterprise IS 'Enterprise plan ARR in dollars';
+
 COMMENT ON COLUMN public.global_stats.new_paying_orgs IS 'Number of new paying organizations today';
+
 COMMENT ON COLUMN public.global_stats.canceled_orgs IS 'Number of canceled subscriptions today';
+
 COMMENT ON COLUMN public.global_stats.credits_bought IS 'Total credits purchased today';
+
 COMMENT ON COLUMN public.global_stats.credits_consumed IS 'Total credits consumed today';

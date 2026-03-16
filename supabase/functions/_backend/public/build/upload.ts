@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { simpleError } from '../../utils/hono.ts'
+import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
@@ -33,7 +33,7 @@ export async function tusProxy(
       message: 'Builder not configured for TUS proxy',
       job_id: jobId,
     })
-    throw simpleError('service_unavailable', 'Builder service not configured')
+    throw quickError(503, 'service_unavailable', 'Builder service not configured')
   }
 
   // Use authenticated client for data queries - RLS will enforce access
@@ -116,20 +116,66 @@ export async function tusProxy(
   // Extract the path after /upload/:jobId/ and forward to builder
   // Example: /build/upload/abc123/myfile.zip -> /upload/myfile.zip
   // Example: /build/upload/abc123 -> /upload/
-  const originalPath = c.req.path
-  const uploadPrefix = `/build/upload/${jobId}`
-  let tusPath = originalPath.startsWith(uploadPrefix)
-    ? originalPath.slice(uploadPrefix.length)
+  const requestUrl = c.req.raw.url
+  const requestPathStart = requestUrl.includes('://')
+    ? requestUrl.indexOf('/', requestUrl.indexOf('://') + 3)
+    : requestUrl.indexOf('/')
+  const originalPath = requestPathStart >= 0
+    ? requestUrl.slice(requestPathStart).split('?')[0].split('#')[0]
     : '/'
+  const uploadPrefix = `/build/upload/${jobId}`
+  let tusPath = '/'
+  if (originalPath.startsWith(`${uploadPrefix}/`)) {
+    tusPath = originalPath.slice(uploadPrefix.length)
+  }
 
-  // For POST requests (creating upload), ensure trailing slash to match /upload/ route
-  // For PATCH/HEAD requests (with filename), keep the path as-is (e.g., /capgo.zip)
-  if (c.req.method === 'POST' && (tusPath === '' || tusPath === '/')) {
-    tusPath = '/'
+  let decodedTusPath: string
+  try {
+    decodedTusPath = decodeURIComponent(tusPath)
+  }
+  catch {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Invalid URL encoding in upload path',
+      job_id: jobId,
+      original_path: originalPath,
+      upload_path: tusPath,
+    })
+    throw quickError(400, 'invalid_path', 'Invalid upload path encoding.')
+  }
+
+  const hasDotSegment = decodedTusPath
+    .split('/')
+    .some(segment => segment === '.' || segment === '..')
+
+  if (decodedTusPath.includes('\0') || hasDotSegment) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Rejected upload path traversal attempt',
+      job_id: jobId,
+      original_path: originalPath,
+      upload_path: decodedTusPath,
+    })
+    throw quickError(400, 'invalid_path', 'Invalid upload path')
+  }
+
+  const baseUploadUrl = new URL(`${builderUrl}/upload/`)
+  const resolvedTusUrl = new URL(`.${tusPath}`, baseUploadUrl)
+  if (!resolvedTusUrl.pathname.startsWith(baseUploadUrl.pathname)) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Rejected upload path escape attempt',
+      job_id: jobId,
+      original_path: originalPath,
+      resolved_path: resolvedTusUrl.pathname,
+      builder_path: baseUploadUrl.pathname,
+    })
+    throw quickError(400, 'invalid_path', 'Resolved upload path escapes upload directory.')
   }
 
   // Construct builder TUS URL with the path
-  const builderTusUrl = `${builderUrl}/upload${tusPath}`
+  const safeTusPath = resolvedTusUrl.pathname.slice(baseUploadUrl.pathname.length - 1)
+  const builderTusUrl = resolvedTusUrl.toString()
 
   cloudlog({
     requestId: c.get('requestId'),
@@ -138,7 +184,7 @@ export async function tusProxy(
     method: c.req.method,
     original_path: originalPath,
     upload_prefix: uploadPrefix,
-    tus_path: tusPath,
+    tus_path: safeTusPath,
     builder_url: builderTusUrl,
     has_api_key: !!builderApiKey,
   })
@@ -224,7 +270,12 @@ export async function tusProxy(
       // Check if this is a builder URL
       if (locationUrl.host === builderUrlObj.host) {
         // Extract path after /upload/
-        const uploadPath = locationUrl.pathname.replace(/^\/upload/, '')
+        const builderUploadPath = baseUploadUrl.pathname.endsWith('/')
+          ? baseUploadUrl.pathname.slice(0, -1)
+          : baseUploadUrl.pathname
+        const uploadPath = locationUrl.pathname.startsWith(builderUploadPath)
+          ? locationUrl.pathname.slice(builderUploadPath.length) || '/'
+          : locationUrl.pathname
 
         // Construct proxy URL
         const publicUrl = getEnv(c, 'PUBLIC_URL') || 'https://api.capgo.app'

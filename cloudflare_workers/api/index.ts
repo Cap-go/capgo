@@ -16,6 +16,13 @@ import { app as log_as } from '../../supabase/functions/_backend/private/log_as.
 import { app as plans } from '../../supabase/functions/_backend/private/plans.ts'
 import { app as publicStats } from '../../supabase/functions/_backend/private/public_stats.ts'
 import { app as set_org_email } from '../../supabase/functions/_backend/private/set_org_email.ts'
+import { app as sso_check_domain } from '../../supabase/functions/_backend/private/sso/check-domain.ts'
+import { app as sso_check_enforcement } from '../../supabase/functions/_backend/private/sso/check-enforcement.ts'
+import { app as sso_prelink_internal } from '../../supabase/functions/_backend/private/sso/prelink-internal.ts'
+import { app as sso_prelink } from '../../supabase/functions/_backend/private/sso/prelink.ts'
+import { app as sso_providers } from '../../supabase/functions/_backend/private/sso/providers.ts'
+import { app as sso_provision_user } from '../../supabase/functions/_backend/private/sso/provision-user.ts'
+import { app as sso_verify_dns } from '../../supabase/functions/_backend/private/sso/verify-dns.ts'
 import { app as stats_priv } from '../../supabase/functions/_backend/private/stats.ts'
 import { app as storeTop } from '../../supabase/functions/_backend/private/store_top.ts'
 import { app as stripe_checkout } from '../../supabase/functions/_backend/private/stripe_checkout.ts'
@@ -97,6 +104,13 @@ appPrivate.route('/create_device', create_device)
 appPrivate.route('/latency', latency)
 appPrivate.route('/events', events)
 appPrivate.route('/groups', groups)
+appPrivate.route('/sso/check-domain', sso_check_domain)
+appPrivate.route('/sso/check-enforcement', sso_check_enforcement)
+appPrivate.route('/sso/providers', sso_providers)
+appPrivate.route('/sso/prelink-users', sso_prelink)
+appPrivate.route('/sso/prelink-internal', sso_prelink_internal)
+appPrivate.route('/sso/provision-user', sso_provision_user)
+appPrivate.route('/sso/verify-dns', sso_verify_dns)
 
 // Triggers
 const functionNameTriggers = 'triggers'

@@ -18,7 +18,6 @@ const BLOCKED_SENDERS = [
   'coveralls',
   'circleci',
   'travis-ci',
-  'netlify',
   'vercel',
 ]
 
@@ -31,7 +30,6 @@ const BLOCKED_CONTENT_PATTERNS = [
   /quality\s+gate/i,
   /socket\s+security/i,
   /linear\s+issue/i,
-  /netlify\s+deploy/i,
   /vercel\s+deploy/i,
 ]
 

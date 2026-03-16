@@ -1,13 +1,34 @@
 BEGIN;
 
 
-SELECT plan(26);
+SELECT plan(30);
 
 -- Test upsert_version_meta function
+SELECT tests.authenticate_as_service_role();
+
+SELECT
+    set_config(
+        'tests.demo_app_version_id',
+        (
+            SELECT id::text
+            FROM public.app_versions
+            WHERE
+                app_id = 'com.demo.app'
+                AND name = '1.0.0'
+            ORDER BY id
+            LIMIT 1
+        ),
+        true
+    );
+
 -- First insert a positive size
 SELECT
     is(
-        upsert_version_meta('com.demo.app', 999, 1000),
+        upsert_version_meta(
+            'com.demo.app',
+            current_setting('tests.demo_app_version_id')::bigint,
+            1000
+        ),
         true,
         'upsert_version_meta - first positive insert returns true'
     );
@@ -15,7 +36,11 @@ SELECT
 -- Try to insert the same positive size again (should return false)
 SELECT
     is(
-        upsert_version_meta('com.demo.app', 999, 2000),
+        upsert_version_meta(
+            'com.demo.app',
+            current_setting('tests.demo_app_version_id')::bigint,
+            2000
+        ),
         false,
         'upsert_version_meta - duplicate positive insert returns false'
     );
@@ -23,7 +48,11 @@ SELECT
 -- Insert a negative size for same app/version (should work)
 SELECT
     is(
-        upsert_version_meta('com.demo.app', 999, -500),
+        upsert_version_meta(
+            'com.demo.app',
+            current_setting('tests.demo_app_version_id')::bigint,
+            -500
+        ),
         true,
         'upsert_version_meta - negative size insert returns true'
     );
@@ -31,7 +60,11 @@ SELECT
 -- Try to insert another negative size (should return false)
 SELECT
     is(
-        upsert_version_meta('com.demo.app', 999, -600),
+        upsert_version_meta(
+            'com.demo.app',
+            current_setting('tests.demo_app_version_id')::bigint,
+            -600
+        ),
         false,
         'upsert_version_meta - duplicate negative insert returns false'
     );
@@ -225,6 +258,51 @@ SELECT
         ),
         'NO_RIGHTS',
         'rescind_invitation - non-admin user gets NO_RIGHTS'
+    );
+
+SELECT
+    is(
+        rescind_invitation(
+            'test@example.com',
+            '00000000-0000-0000-0000-000000000000'
+        ),
+        'NO_RIGHTS',
+        'rescind_invitation - non-admin user gets NO_RIGHTS for non-existent org'
+    );
+
+SELECT
+    is(
+        rescind_invitation(
+            'test@example.com',
+            '00000000-0000-0000-0000-000000000000'
+        ),
+        rescind_invitation(
+            'test@example.com',
+            '22dbad8a-b885-4309-9b3b-a09f8460fb6d'
+        ),
+        'rescind_invitation - non-admin user gets consistent NO_RIGHTS'
+    );
+
+-- Verify anon callers cannot execute rescind_invitation
+SELECT tests.clear_authentication();
+
+SELECT
+    throws_ok(
+        'SELECT rescind_invitation(''test@example.com'', ''22dbad8a-b885-4309-9b3b-a09f8460fb6d'')',
+        '42501',
+        'permission denied for function rescind_invitation',
+        'rescind_invitation - anonymous call throws permission denied'
+    );
+
+SELECT
+    is(
+        has_function_privilege(
+            'anon'::name,
+            'public.rescind_invitation(text, uuid)'::regprocedure,
+            'EXECUTE'
+        ),
+        false,
+        'anon role has no execute privilege on rescind_invitation'
     );
 
 -- Test super admin privilege escalation prevention

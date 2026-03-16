@@ -585,7 +585,7 @@ onUnmounted(() => {
   <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" />
     <div
-      class="relative z-10 w-full max-w-6xl overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl"
+      class="relative z-10 w-full max-w-6xl max-h-[90vh] overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl"
       role="dialog"
       aria-modal="true"
     >
@@ -598,275 +598,277 @@ onUnmounted(() => {
         <i-heroicons-x-mark class="w-4 h-4" />
       </button>
 
-      <div class="grid gap-0 overflow-hidden md:grid-cols-[1.08fr,0.92fr]">
-        <div class="flex flex-col h-full gap-6 p-6 bg-white md:p-10">
-          <div>
-            <p class="inline-flex rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-semibold tracking-[0.08em] text-violet-700">
-              START WITH CAPGO
-            </p>
-            <div class="p-2 mt-4 border rounded-2xl border-slate-200 bg-slate-50">
-              <div class="grid grid-cols-3 gap-2">
-                <div
-                  v-for="entry in onboardingSteps"
-                  :key="entry.id"
-                  class="px-3 py-2 transition-colors duration-200 border rounded-xl"
-                  :class="currentStepText(entry.id)"
-                >
-                  <p class="text-[11px] font-semibold tracking-wide">
-                    {{ entry.id }}. {{ entry.label }}
-                  </p>
-                  <p class="mt-1 text-[11px]" :class="entry.id <= step ? 'opacity-80' : 'text-slate-400'">
-                    {{ entry.caption }}
-                  </p>
+      <div class="overflow-y-auto max-h-[90vh]">
+        <div class="grid gap-0 overflow-hidden md:grid-cols-[1.08fr,0.92fr]">
+          <div class="flex flex-col h-full gap-6 p-6 bg-white md:p-10">
+            <div>
+              <p class="inline-flex rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-semibold tracking-[0.08em] text-violet-700">
+                START WITH CAPGO
+              </p>
+              <div class="p-2 mt-4 border rounded-2xl border-slate-200 bg-slate-50">
+                <div class="grid grid-cols-3 gap-2">
+                  <div
+                    v-for="entry in onboardingSteps"
+                    :key="entry.id"
+                    class="px-3 py-2 transition-colors duration-200 border rounded-xl"
+                    :class="currentStepText(entry.id)"
+                  >
+                    <p class="text-[11px] font-semibold tracking-wide">
+                      {{ entry.id }}. {{ entry.label }}
+                    </p>
+                    <p class="mt-1 text-[11px]" :class="entry.id <= step ? 'opacity-80' : 'text-slate-400'">
+                      {{ entry.caption }}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-            <h2 class="mt-4 text-3xl font-semibold text-slate-900">
-              {{ stepTitle }}
-            </h2>
-            <p class="max-w-2xl mt-3 text-sm leading-relaxed text-slate-600">
-              {{ stepDescription }}
-            </p>
-          </div>
-
-          <div class="flex-1 space-y-4">
-            <div v-if="isCreateStep" class="space-y-3">
-              <button
-                v-for="app in appChoices"
-                :key="app.id"
-                class="relative flex items-start w-full gap-3 p-4 text-left transition bg-white border shadow-sm rounded-2xl border-slate-200 hover:border-violet-300 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-60"
-                type="button"
-                :disabled="isCreatingApp"
-                @click="selectApp(app)"
-              >
-                <span
-                  class="inline-flex items-center justify-center w-10 h-10 text-lg shrink-0 rounded-2xl"
-                  :style="{ backgroundColor: app.iconBg, color: app.iconColor }"
-                >
-                  {{ app.icon }}
-                </span>
-                <span class="flex-1">
-                  <span class="font-semibold text-slate-900">{{ app.name }}</span>
-                  <span class="block mt-1 text-xs text-slate-500">{{ isCreatingApp ? 'Creating…' : 'Use this app' }}</span>
-                </span>
-                <span class="text-xs text-slate-400">{{ selectedAppId === app.id ? 'Selected' : 'Choose' }}</span>
-              </button>
-              <p v-if="isCreatingApp" class="text-xs text-slate-500">
-                Running <span class="font-mono text-emerald-600">{{ CAPGO_CLI_COMMAND }} app add</span> ...
+              <h2 class="mt-4 text-3xl font-semibold text-slate-900">
+                {{ stepTitle }}
+              </h2>
+              <p class="max-w-2xl mt-3 text-sm leading-relaxed text-slate-600">
+                {{ stepDescription }}
               </p>
             </div>
 
-            <div v-else-if="isUploadStep" class="space-y-3">
-              <button
-                v-for="choice in updateChoices"
-                :key="choice.id"
-                class="w-full p-4 text-left transition bg-white border rounded-2xl border-slate-200 hover:border-violet-300 hover:bg-violet-50"
-                type="button"
-                :disabled="isUploading"
-                :class="isUploading ? 'opacity-60 cursor-not-allowed' : ''"
-                @click="triggerUpload(choice)"
-              >
-                <p class="text-sm font-semibold text-slate-900">
-                  {{ choice.label }}
+            <div class="flex-1 space-y-4">
+              <div v-if="isCreateStep" class="grid grid-cols-3 gap-2 xl:gap-3">
+                <button
+                  v-for="app in appChoices"
+                  :key="app.id"
+                  class="relative flex items-start gap-2 p-3 text-left transition bg-white border shadow-sm rounded-xl border-slate-200 hover:border-violet-300 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-60 sm:gap-3 sm:p-4 sm:rounded-2xl"
+                  type="button"
+                  :disabled="isCreatingApp"
+                  @click="selectApp(app)"
+                >
+                  <span
+                    class="inline-flex items-center justify-center w-8 h-8 text-base shrink-0 rounded-xl sm:w-10 sm:h-10 sm:text-lg"
+                    :style="{ backgroundColor: app.iconBg, color: app.iconColor }"
+                  >
+                    {{ app.icon }}
+                  </span>
+                  <span class="flex-1">
+                    <span class="font-semibold text-slate-900">{{ app.name }}</span>
+                    <span class="block mt-1 text-xs text-slate-500">{{ isCreatingApp ? 'Creating…' : 'Use this app' }}</span>
+                  </span>
+                  <span class="text-xs text-slate-400">{{ selectedAppId === app.id ? 'Selected' : 'Choose' }}</span>
+                </button>
+                <p v-if="isCreatingApp" class="text-xs text-slate-500">
+                  Running <span class="font-mono text-emerald-600">{{ CAPGO_CLI_COMMAND }} app add</span> ...
                 </p>
-                <p class="mt-1 text-xs text-slate-500">
-                  Result: {{ choice.result }}
-                </p>
-              </button>
-            </div>
+              </div>
 
-            <div v-else class="flex flex-col h-full space-y-3">
-              <article class="p-4 bg-white border shadow-sm rounded-2xl border-slate-200">
-                <p class="text-sm text-slate-600">
-                  {{ phoneStatusMessage }}
-                </p>
-                <p class="mt-2 text-xl font-semibold text-slate-900">
-                  {{ selectedActionResult }}
-                </p>
-              </article>
+              <div v-else-if="isUploadStep" class="grid grid-cols-3 gap-2 xl:gap-3">
+                <button
+                  v-for="choice in updateChoices"
+                  :key="choice.id"
+                  class="h-full p-3 text-left transition bg-white border rounded-xl border-slate-200 hover:border-violet-300 hover:bg-violet-50 sm:p-4 sm:rounded-2xl"
+                  type="button"
+                  :disabled="isUploading"
+                  :class="isUploading ? 'opacity-60 cursor-not-allowed' : ''"
+                  @click="triggerUpload(choice)"
+                >
+                  <p class="text-sm font-semibold text-slate-900">
+                    {{ choice.label }}
+                  </p>
+                  <p class="mt-1 text-xs text-slate-500">
+                    Result: {{ choice.result }}
+                  </p>
+                </button>
+              </div>
+
+              <div v-else class="flex flex-col h-full space-y-3">
+                <article class="p-4 bg-white border shadow-sm rounded-2xl border-slate-200">
+                  <p class="text-sm text-slate-600">
+                    {{ phoneStatusMessage }}
+                  </p>
+                  <p class="mt-2 text-xl font-semibold text-slate-900">
+                    {{ selectedActionResult }}
+                  </p>
+                </article>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div class="relative flex items-center justify-center p-6 border-l border-slate-100 bg-gradient-to-b from-white to-slate-100">
-          <div class="w-full max-w-[56rem] space-y-3">
-            <div class="flex flex-col items-center gap-3 md:flex-row">
-              <div class="flex-1 w-full p-4 border rounded-xl border-slate-800 bg-slate-950 md:flex-[2.2]">
-                <div class="mb-3 inline-flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1 text-[11px] text-slate-100">
-                  <span class="inline-block w-2 h-2 rounded-full bg-emerald-400" />
-                  Demo Terminal
+          <div class="relative flex items-center justify-center p-6 border-l border-slate-100 bg-gradient-to-b from-white to-slate-100">
+            <div class="w-full max-w-[56rem] space-y-3">
+              <div class="flex flex-col items-center gap-3 md:flex-row">
+                <div class="flex-1 w-full p-4 border rounded-xl border-slate-800 bg-slate-950 md:flex-[2.2]">
+                  <div class="mb-3 inline-flex items-center gap-2 rounded-full bg-slate-900 px-3 py-1 text-[11px] text-slate-100">
+                    <span class="inline-block w-2 h-2 rounded-full bg-emerald-400" />
+                    Demo Terminal
+                  </div>
+                  <div class="h-64 p-2 space-y-1 overflow-hidden font-mono text-xs leading-snug rounded-lg bg-black/70 text-emerald-200">
+                    <p v-for="(line, index) in terminalLines" :key="`${line}-${index}`">
+                      {{ line }}
+                    </p>
+                    <p v-if="terminalLiveMessage" class="text-cyan-300">
+                      {{ terminalLiveMessage }}
+                    </p>
+                    <p v-else-if="!terminalLines.length" class="text-slate-400">
+                      {{ terminalIdleMessage }}
+                    </p>
+                    <p v-else class="text-slate-400">
+                      {{ terminalDoneMessage }}
+                    </p>
+                  </div>
                 </div>
-                <div class="h-64 p-2 space-y-1 overflow-hidden font-mono text-xs leading-snug rounded-lg bg-black/70 text-emerald-200">
-                  <p v-for="(line, index) in terminalLines" :key="`${line}-${index}`">
-                    {{ line }}
-                  </p>
-                  <p v-if="terminalLiveMessage" class="text-cyan-300">
-                    {{ terminalLiveMessage }}
-                  </p>
-                  <p v-else-if="!terminalLines.length" class="text-slate-400">
-                    {{ terminalIdleMessage }}
-                  </p>
-                  <p v-else class="text-slate-400">
-                    {{ terminalDoneMessage }}
-                  </p>
+
+                <div class="relative h-[10px] min-h-[10px] w-full rounded-full bg-slate-900/10 md:h-full md:w-20 md:flex-none">
+                  <span class="absolute inset-x-2 top-1/2 h-[2px] -translate-y-1/2 bg-slate-300" />
+                  <span
+                    class="absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 -translate-x-1/2 rounded-full transition-all duration-150"
+                    :class="transferDotClass"
+                    :style="wireStyle"
+                  />
                 </div>
-              </div>
 
-              <div class="relative h-[10px] min-h-[10px] w-full rounded-full bg-slate-900/10 md:h-full md:w-20 md:flex-none">
-                <span class="absolute inset-x-2 top-1/2 h-[2px] -translate-y-1/2 bg-slate-300" />
-                <span
-                  class="absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 -translate-x-1/2 rounded-full transition-all duration-150"
-                  :class="transferDotClass"
-                  :style="wireStyle"
-                />
-              </div>
-
-              <div class="flex flex-col items-center">
-                <div class="relative mx-auto h-[470px] w-[250px] rounded-[42px] border-[4px] border-slate-900 bg-slate-900 p-[4px] shadow-2xl">
-                  <div class="relative h-full rounded-[34px] overflow-hidden bg-slate-900 p-[3px]">
-                    <div class="relative h-full rounded-[28px] bg-gradient-to-b p-4" :class="phoneBackgroundClass">
-                      <div class="absolute top-0 w-20 h-4 -translate-x-1/2 pointer-events-none left-1/2 rounded-b-2xl bg-slate-900/80" />
-                      <div class="mx-auto mb-3 flex h-4 w-full items-center justify-between text-[9px] font-semibold text-slate-600">
-                        <span>9:41</span>
-                        <span>◉◉◉ 100%</span>
-                      </div>
-                      <transition name="app-zoom">
-                        <div v-if="showPhoneLauncher" class="absolute z-10 overflow-hidden bg-white inset-[6px] rounded-[24px]">
-                          <div v-if="phoneStage === 'launching'" class="absolute inset-0 flex flex-col items-center justify-center bg-white">
-                            <span
-                              class="relative inline-flex h-20 w-20 items-center justify-center rounded-[2rem] text-3xl shadow-lg"
-                              :style="selectedAppIconStyle"
-                            >
-                              {{ selectedAppVisual.icon }}
-                            </span>
-                          </div>
-                          <div v-else-if="phoneStage === 'app'" class="absolute inset-0 flex flex-col transition-colors duration-500" :class="isBgColorUpdateApplied ? 'bg-indigo-900 text-white' : 'bg-white text-slate-900'">
-                            <div class="flex items-center gap-3 px-4 pt-8 pb-4 border-b" :class="isBgColorUpdateApplied ? 'border-indigo-800' : 'border-slate-100'">
+                <div class="flex flex-col items-center">
+                  <div class="relative mx-auto h-[470px] w-[250px] rounded-[42px] border-[4px] border-slate-900 bg-slate-900 p-[4px] shadow-2xl">
+                    <div class="relative h-full rounded-[34px] overflow-hidden bg-slate-900 p-[3px]">
+                      <div class="relative h-full rounded-[28px] bg-gradient-to-b p-4" :class="phoneBackgroundClass">
+                        <div class="absolute top-0 w-20 h-4 -translate-x-1/2 pointer-events-none left-1/2 rounded-b-2xl bg-slate-900/80" />
+                        <div class="mx-auto mb-3 flex h-4 w-full items-center justify-between text-[9px] font-semibold text-slate-600">
+                          <span>9:41</span>
+                          <span>◉◉◉ 100%</span>
+                        </div>
+                        <transition name="app-zoom">
+                          <div v-if="showPhoneLauncher" class="absolute z-10 overflow-hidden bg-white inset-[6px] rounded-[24px]">
+                            <div v-if="phoneStage === 'launching'" class="absolute inset-0 flex flex-col items-center justify-center bg-white">
                               <span
-                                class="inline-flex items-center justify-center w-10 h-10 text-lg shadow-sm rounded-2xl"
+                                class="relative inline-flex h-20 w-20 items-center justify-center rounded-[2rem] text-3xl shadow-lg"
                                 :style="selectedAppIconStyle"
                               >
                                 {{ selectedAppVisual.icon }}
                               </span>
-                              <div>
-                                <p class="text-sm font-bold">
-                                  {{ phoneAppTitle }}
-                                </p>
-                                <p class="text-[11px] opacity-70">
-                                  v{{ hasOpenedUpdatedApp ? '1.0.1' : '1.0.0' }}
-                                </p>
-                              </div>
                             </div>
-
-                            <div class="flex flex-col items-center justify-center flex-1 p-4 text-center">
-                              <template v-if="isConfettiUpdateApplied">
-                                <button type="button" class="px-6 py-3 font-bold text-white transition-transform rounded-full shadow-lg bg-violet-600 active:scale-95" @click="triggerConfetti">
-                                  🎉 Show Confetti
-                                </button>
-                              </template>
-                              <template v-else>
-                                <div
-                                  class="flex items-center justify-center w-16 h-16 mb-4 text-3xl shadow-inner rounded-2xl"
+                            <div v-else-if="phoneStage === 'app'" class="absolute inset-0 flex flex-col transition-colors duration-500" :class="isBgColorUpdateApplied ? 'bg-indigo-900 text-white' : 'bg-white text-slate-900'">
+                              <div class="flex items-center gap-3 px-4 pt-8 pb-4 border-b" :class="isBgColorUpdateApplied ? 'border-indigo-800' : 'border-slate-100'">
+                                <span
+                                  class="inline-flex items-center justify-center w-10 h-10 text-lg shadow-sm rounded-2xl"
                                   :style="selectedAppIconStyle"
                                 >
                                   {{ selectedAppVisual.icon }}
+                                </span>
+                                <div>
+                                  <p class="text-sm font-bold">
+                                    {{ phoneAppTitle }}
+                                  </p>
+                                  <p class="text-[11px] opacity-70">
+                                    v{{ hasOpenedUpdatedApp ? '1.0.1' : '1.0.0' }}
+                                  </p>
                                 </div>
-                                <p class="text-sm opacity-70 max-w-[180px]">
-                                  {{ hasOpenedUpdatedApp ? 'Update successfully applied via Capgo!' : 'This is the initial version of your app.' }}
-                                </p>
-                              </template>
-                            </div>
-
-                            <div v-if="showConfetti" class="absolute inset-0 z-20 overflow-hidden pointer-events-none">
-                              <div
-                                v-for="piece in confettiPieces"
-                                :key="piece.id"
-                                class="absolute confetti-piece -top-5"
-                                :style="`--left:${piece.left}%; --dur:${piece.duration}s; --delay:${piece.delay}s; --color:${piece.color};`"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      </transition>
-                      <template v-if="showPhoneHome">
-                        <div class="grid grid-cols-4 px-2 mt-4 gap-x-3 gap-y-4">
-                          <div
-                            v-for="homeApp in springboardApps"
-                            :key="homeApp.id"
-                            class="flex flex-col items-center"
-                          >
-                            <button
-                              type="button"
-                              class="relative flex h-10 w-10 items-center justify-center rounded-2xl text-[16px] shadow-sm overflow-hidden transition-transform active:scale-95"
-                              :style="getSpringboardIconStyle(homeApp)"
-                              @click="homeApp.isDemo && installedAppId && phoneStage === 'home' ? openAppFromPhoneHome(true) : undefined"
-                            >
-                              {{ homeApp.icon }}
-                              <div v-if="showSpringboardInstallOverlay(homeApp)" class="absolute inset-0 flex items-center justify-center bg-black/40">
-                                <svg class="w-6 h-6 -rotate-90" viewBox="0 0 36 36">
-                                  <circle cx="18" cy="18" r="16" fill="none" class="stroke-white/30" stroke-width="2" />
-                                  <circle cx="18" cy="18" r="8" fill="none" class="stroke-white" stroke-width="16" stroke-dasharray="50.26" stroke-dashoffset="50.26" style="animation: ios-install 0.9s linear forwards;" />
-                                </svg>
                               </div>
-                            </button>
-                            <p class="mt-1 text-[8px] font-medium leading-[1.05] text-slate-800 truncate w-full text-center drop-shadow-sm">
-                              {{ homeApp.name }}
-                            </p>
+
+                              <div class="flex flex-col items-center justify-center flex-1 p-4 text-center">
+                                <template v-if="isConfettiUpdateApplied">
+                                  <button type="button" class="px-6 py-3 font-bold text-white transition-transform rounded-full shadow-lg bg-violet-600 active:scale-95" @click="triggerConfetti">
+                                    🎉 Show Confetti
+                                  </button>
+                                </template>
+                                <template v-else>
+                                  <div
+                                    class="flex items-center justify-center w-16 h-16 mb-4 text-3xl shadow-inner rounded-2xl"
+                                    :style="selectedAppIconStyle"
+                                  >
+                                    {{ selectedAppVisual.icon }}
+                                  </div>
+                                  <p class="text-sm opacity-70 max-w-[180px]">
+                                    {{ hasOpenedUpdatedApp ? 'Update successfully applied via Capgo!' : 'This is the initial version of your app.' }}
+                                  </p>
+                                </template>
+                              </div>
+
+                              <div v-if="showConfetti" class="absolute inset-0 z-20 overflow-hidden pointer-events-none">
+                                <div
+                                  v-for="piece in confettiPieces"
+                                  :key="piece.id"
+                                  class="absolute confetti-piece -top-5"
+                                  :style="`--left:${piece.left}%; --dur:${piece.duration}s; --delay:${piece.delay}s; --color:${piece.color};`"
+                                />
+                              </div>
+                            </div>
                           </div>
-                        </div>
-
-                        <div class="flex items-center justify-center gap-1 mt-2">
-                          <span class="h-1.5 w-1.5 rounded-full bg-violet-500" />
-                          <span class="h-1.5 w-1.5 rounded-full bg-slate-300" />
-                        </div>
-
-                        <div class="absolute inset-x-3 bottom-3 rounded-[24px] bg-white/40 backdrop-blur-md p-2.5">
-                          <div class="grid grid-cols-4 gap-2">
+                        </transition>
+                        <template v-if="showPhoneHome">
+                          <div class="grid grid-cols-4 px-2 mt-4 gap-x-3 gap-y-4">
                             <div
-                              v-for="dockApp in springboardDockApps"
-                              :key="`dock-large-${dockApp.id}`"
-                              class="relative flex h-10 w-10 mx-auto items-center justify-center rounded-2xl text-[16px] shadow-sm overflow-hidden"
-                              :class="dockApp.isDemo ? '' : 'bg-white/60 text-slate-500'"
-                              :style="getSpringboardIconStyle(dockApp)"
+                              v-for="homeApp in springboardApps"
+                              :key="homeApp.id"
+                              class="flex flex-col items-center"
                             >
-                              {{ dockApp.icon }}
-                              <div v-if="showSpringboardInstallOverlay(dockApp)" class="absolute inset-0 flex items-center justify-center bg-black/40">
-                                <svg class="w-6 h-6 -rotate-90" viewBox="0 0 36 36">
-                                  <circle cx="18" cy="18" r="16" fill="none" class="stroke-white/30" stroke-width="2" />
-                                  <circle cx="18" cy="18" r="8" fill="none" class="stroke-white" stroke-width="16" stroke-dasharray="50.26" stroke-dashoffset="50.26" style="animation: ios-install 0.9s linear forwards;" />
-                                </svg>
+                              <button
+                                type="button"
+                                class="relative flex h-10 w-10 items-center justify-center rounded-2xl text-[16px] shadow-sm overflow-hidden transition-transform active:scale-95"
+                                :style="getSpringboardIconStyle(homeApp)"
+                                @click="homeApp.isDemo && installedAppId && phoneStage === 'home' ? openAppFromPhoneHome(true) : undefined"
+                              >
+                                {{ homeApp.icon }}
+                                <div v-if="showSpringboardInstallOverlay(homeApp)" class="absolute inset-0 flex items-center justify-center bg-black/40">
+                                  <svg class="w-6 h-6 -rotate-90" viewBox="0 0 36 36">
+                                    <circle cx="18" cy="18" r="16" fill="none" class="stroke-white/30" stroke-width="2" />
+                                    <circle cx="18" cy="18" r="8" fill="none" class="stroke-white" stroke-width="16" stroke-dasharray="50.26" stroke-dashoffset="50.26" style="animation: ios-install 0.9s linear forwards;" />
+                                  </svg>
+                                </div>
+                              </button>
+                              <p class="mt-1 text-[8px] font-medium leading-[1.05] text-slate-800 truncate w-full text-center drop-shadow-sm">
+                                {{ homeApp.name }}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div class="flex items-center justify-center gap-1 mt-2">
+                            <span class="h-1.5 w-1.5 rounded-full bg-violet-500" />
+                            <span class="h-1.5 w-1.5 rounded-full bg-slate-300" />
+                          </div>
+
+                          <div class="absolute inset-x-3 bottom-3 rounded-[24px] bg-white/40 backdrop-blur-md p-2.5">
+                            <div class="grid grid-cols-4 gap-2">
+                              <div
+                                v-for="dockApp in springboardDockApps"
+                                :key="`dock-large-${dockApp.id}`"
+                                class="relative flex h-10 w-10 mx-auto items-center justify-center rounded-2xl text-[16px] shadow-sm overflow-hidden"
+                                :class="dockApp.isDemo ? '' : 'bg-white/60 text-slate-500'"
+                                :style="getSpringboardIconStyle(dockApp)"
+                              >
+                                {{ dockApp.icon }}
+                                <div v-if="showSpringboardInstallOverlay(dockApp)" class="absolute inset-0 flex items-center justify-center bg-black/40">
+                                  <svg class="w-6 h-6 -rotate-90" viewBox="0 0 36 36">
+                                    <circle cx="18" cy="18" r="16" fill="none" class="stroke-white/30" stroke-width="2" />
+                                    <circle cx="18" cy="18" r="8" fill="none" class="stroke-white" stroke-width="16" stroke-dasharray="50.26" stroke-dashoffset="50.26" style="animation: ios-install 0.9s linear forwards;" />
+                                  </svg>
+                                </div>
                               </div>
                             </div>
                           </div>
-                        </div>
-                        <div class="absolute w-12 h-1 -translate-x-1/2 rounded-full bottom-1 left-1/2 bg-black/20" />
-                      </template>
+                          <div class="absolute w-12 h-1 -translate-x-1/2 rounded-full bottom-1 left-1/2 bg-black/20" />
+                        </template>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div class="flex items-center justify-center w-full mt-4 h-14">
-                  <button
-                    v-if="showReopenButton"
-                    class="px-6 py-3 font-bold text-white transition-colors rounded-full shadow-lg bg-violet-600 hover:bg-violet-700 animate-bounce"
-                    type="button"
-                    @click="restartApp"
-                  >
-                    Background & Reopen App
-                  </button>
+                  <div class="flex items-center justify-center w-full mt-4 h-14">
+                    <button
+                      v-if="showReopenButton"
+                      class="px-6 py-3 font-bold text-white transition-colors rounded-full shadow-lg bg-violet-600 hover:bg-violet-700 animate-bounce"
+                      type="button"
+                      @click="restartApp"
+                    >
+                      Background & Reopen App
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div v-if="isReopenStep" class="flex justify-center pt-2">
-              <button
-                class="w-auto px-6 d-btn d-btn-primary"
-                type="button"
-                :disabled="!canContinueOnboarding"
-                :class="!canContinueOnboarding ? 'opacity-50 cursor-not-allowed' : ''"
-                @click="openOnboarding"
-              >
-                Create app now
-              </button>
+              <div v-if="isReopenStep" class="flex justify-center pt-2">
+                <button
+                  class="w-auto px-6 d-btn d-btn-primary"
+                  type="button"
+                  :disabled="!canContinueOnboarding"
+                  :class="!canContinueOnboarding ? 'opacity-50 cursor-not-allowed' : ''"
+                  @click="openOnboarding"
+                >
+                  Create app now
+                </button>
+              </div>
             </div>
           </div>
         </div>

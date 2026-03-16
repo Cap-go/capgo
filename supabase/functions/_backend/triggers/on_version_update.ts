@@ -12,22 +12,59 @@ import { createStatsMeta } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
-async function v2PathSize(c: Context, record: Database['public']['Tables']['app_versions']['Row'], v2Path: string) {
+/**
+ * Resolves `owner_org` for an app version row.
+ *
+ * Falls back to the owning app when the trigger payload does not include it.
+ */
+async function resolveOwnerOrg(c: Context, record: Database['public']['Tables']['app_versions']['Row']): Promise<string | null> {
+  if (record.owner_org)
+    return record.owner_org
+  if (!record.app_id)
+    return null
+
+  const { data, error } = await supabaseAdmin(c)
+    .from('apps')
+    .select('owner_org')
+    .eq('app_id', record.app_id)
+    .maybeSingle()
+
+  if (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'error resolveOwnerOrg', error, app_id: record.app_id })
+    return null
+  }
+
+  return data?.owner_org ?? null
+}
+
+/**
+ * Handles v2 storage metadata updates (size/checksum/stats) for R2-backed bundles.
+ *
+ * Returns `false` only when processing must stop (e.g. missing owner org).
+ */
+async function v2PathSize(c: Context, record: Database['public']['Tables']['app_versions']['Row'], v2Path: string): Promise<boolean> {
   // pdate size and checksum
   cloudlog({ requestId: c.get('requestId'), message: 'V2', r2_path: record.r2_path })
   // set checksum in s3
   const size = await s3.getSize(c, v2Path)
   if (!size) {
     cloudlog({ requestId: c.get('requestId'), message: 'no size found for r2_path', r2_path: record.r2_path })
-    return
+    return true
   }
+
+  const ownerOrg = await resolveOwnerOrg(c, record)
+  if (!ownerOrg) {
+    cloudlog({ requestId: c.get('requestId'), message: 'missing owner_org for app_versions_meta upsert', id: record.id, app_id: record.app_id })
+    return false
+  }
+
   // allow to update even without checksum, to prevent bad actor to remove checksum to get free storage
   const { error: errorUpdate } = await supabaseAdmin(c)
     .from('app_versions_meta')
     .upsert({
       id: record.id,
       app_id: record.app_id,
-      owner_org: record.owner_org,
+      owner_org: ownerOrg,
       size,
       checksum: record.checksum ?? '',
     }, {
@@ -39,8 +76,12 @@ async function v2PathSize(c: Context, record: Database['public']['Tables']['app_
   const { error } = await createStatsMeta(c, record.app_id, record.id, size)
   if (error)
     cloudlog({ requestId: c.get('requestId'), message: 'error createStatsMeta', error })
+  return true
 }
 
+/**
+ * Persists manifest rows and updates aggregate counters when a version includes a manifest payload.
+ */
 async function handleManifest(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
   cloudlog({ requestId: c.get('requestId'), message: 'manifest', manifest: record.manifest })
   const manifestEntries = record.manifest as Database['public']['CompositeTypes']['manifest_entry'][]
@@ -109,20 +150,30 @@ async function handleManifest(c: Context, record: Database['public']['Tables']['
     cloudlog({ requestId: c.get('requestId'), message: 'error delete manifest in app_versions', error: deleteError })
 }
 
+/**
+ * Handles app version metadata updates after insert/update trigger execution.
+ */
 async function updateIt(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
   const v2Path = await getPath(c, record)
 
   if (v2Path && record.storage_provider === 'r2') {
-    await v2PathSize(c, record, v2Path)
+    const shouldContinue = await v2PathSize(c, record, v2Path)
+    if (!shouldContinue)
+      return c.json(BRES)
   }
   else {
     cloudlog({ requestId: c.get('requestId'), message: 'no v2 path' })
+    const ownerOrg = await resolveOwnerOrg(c, record)
+    if (!ownerOrg) {
+      cloudlog({ requestId: c.get('requestId'), message: 'missing owner_org for app_versions_meta upsert', id: record.id, app_id: record.app_id })
+      return c.json(BRES)
+    }
     const { error: errorUpdate } = await supabaseAdmin(c)
       .from('app_versions_meta')
       .upsert({
         id: record.id,
         app_id: record.app_id,
-        owner_org: record.owner_org,
+        owner_org: ownerOrg,
         size: 0,
         checksum: record.checksum ?? '',
       }, {
@@ -141,6 +192,9 @@ async function updateIt(c: Context, record: Database['public']['Tables']['app_ve
   return c.json(BRES)
 }
 
+/**
+ * Deletes manifest rows and orphaned S3 assets for a removed app version.
+ */
 async function deleteManifest(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
   // Delete manifest entries - first get them to delete from S3
   const pgClient = getPgClient(c, true) // READ-ONLY: deletes use SDK, not Drizzle

@@ -27,6 +27,10 @@ export interface JWTClaims {
   iat?: number
   aud?: string | string[]
   iss?: string
+  app_metadata?: {
+    provider?: string
+    [key: string]: unknown
+  }
 }
 
 const claimsClients = new Map<string, ReturnType<typeof createClient<Database>>>()
@@ -100,7 +104,7 @@ export interface MiddlewareKeyVariables {
 export const useCors = cors({
   origin: '*',
   allowHeaders: ['Content-Type', 'Authorization', 'capgkey', 'capgo_api', 'x-api-key', 'x-limited-key-id', 'apisecret', 'apikey', 'x-client-info'],
-  allowMethods: ['POST', 'GET', 'PUT', 'DELETE', 'OPTIONS'],
+  allowMethods: ['POST', 'GET', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 })
 
 export const honoFactory = createFactory<MiddlewareKeyVariables>()

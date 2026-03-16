@@ -1,13 +1,13 @@
 -- =============================================================================
--- Migration: Restrict webhooks read access to admin keys only
+-- Migration: Restrict webhook secret exposure to admin readers
 --
--- Previously, org members with read permissions could query the webhooks table
--- through Supabase REST and retrieve the signing `secret`, which allows spoofed
--- webhook events. This keeps non-admin clients from reading secrets while still
--- allowing admin-managed access through existing authenticated flows.
+-- Reverts the org-reader regression introduced in
+-- 20260224153200_fix_webhook_rls_org_scoping.sql. Non-admin/API-key users
+-- with read-only rights were able to query `public.webhooks` directly and read
+-- signing `secret` values.
 -- =============================================================================
 
--- Ensure previous webhook SELECT policies are replaced with admin-only access.
+-- Ensure only admin users can SELECT webhook rows.
 DROP POLICY IF EXISTS "Allow org members to select webhooks" ON public.webhooks;
 DROP POLICY IF EXISTS "Allow admin to select webhooks" ON public.webhooks;
 

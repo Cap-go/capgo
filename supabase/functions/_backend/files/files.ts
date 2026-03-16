@@ -29,6 +29,34 @@ const ATTACHMENT_PREFIX = 'attachments'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
+function getExternalBaseUrl(c: Context): string {
+  const protoHeader = c.req.header('X-Forwarded-Proto')
+  const proto = protoHeader?.split(',')[0]?.trim() || new URL(c.req.url).protocol.replace(':', '') || 'http'
+
+  const forwardedHost = c.req.header('X-Forwarded-Host')
+  const forwardedPort = c.req.header('X-Forwarded-Port')
+  const hostHeader = c.req.header('Host') || 'localhost:54321'
+
+  let host: string
+  if (forwardedHost) {
+    if (forwardedHost.includes(':')) {
+      host = forwardedHost
+    }
+    else if (forwardedPort) {
+      host = `${forwardedHost}:${forwardedPort}`
+    }
+    else {
+      // Prefer Host header in local/worktree setups where it usually includes the mapped port.
+      host = hostHeader
+    }
+  }
+  else {
+    host = hostHeader
+  }
+
+  return `${proto}://${host}`
+}
+
 async function saveBandwidthUsage(c: Context, fileSize: number | null | undefined) {
   cloudlog({ requestId: c.get('requestId'), message: 'saveBandwidthUsage', fileSize })
   if (!fileSize || fileSize <= 0)
@@ -55,7 +83,13 @@ async function getHandler(c: Context): Promise<Response> {
     const { data } = supabaseAdmin(c).storage.from('capgo').getPublicUrl(fileId)
 
     // cloudlog('publicUrl', data.publicUrl)
-    const url = data.publicUrl.replace('http://kong:8000', 'http://localhost:54321')
+    // `data.publicUrl` points to the internal Supabase gateway (Kong) on local stacks.
+    // Rewrite the origin using the externally visible base URL derived from forwarded headers.
+    const internalUrl = new URL(data.publicUrl)
+    const externalBase = new URL(getExternalBaseUrl(c))
+    internalUrl.protocol = externalBase.protocol
+    internalUrl.host = externalBase.host
+    const url = internalUrl.toString()
     // cloudlog('url', url)
     return c.redirect(url)
   }

@@ -15,7 +15,7 @@ function isLocalSupabase(c: Context): boolean {
 }
 
 // Extracts the Supabase project ID from SUPABASE_URL
-// e.g., "https://xvwzpoazmxkqosrdewyv.supabase.co" -> "xvwzpoazmxkqosrdewyv"
+// e.g., "https://sb.capgo.app" -> "sb.capgo.app"
 function getSupabaseProjectId(c: Context): string | null {
   const supabaseUrl = getEnv(c, 'SUPABASE_URL')
   if (!supabaseUrl)
@@ -29,9 +29,18 @@ function buildSupabaseDashboardLink(c: Context, customerId: string): string | nu
   if (!supabaseUrl)
     return null
 
-  // Local Supabase Studio runs on port 54323
-  if (isLocalSupabase(c))
-    return `http://127.0.0.1:54323/project/default/editor/445780?schema=public&filter=customer_id%3Aeq%3A${customerId}`
+  // Local Supabase Studio runs on API port + 2 (default: 54321 -> 54323).
+  if (isLocalSupabase(c)) {
+    try {
+      const api = new URL(supabaseUrl)
+      const apiPort = Number.parseInt(api.port || '54321', 10)
+      const studioPort = apiPort + 2
+      return `${api.protocol}//${api.hostname}:${studioPort}/project/default/editor/445780?schema=public&filter=customer_id%3Aeq%3A${customerId}`
+    }
+    catch {
+      return `http://127.0.0.1:54323/project/default/editor/445780?schema=public&filter=customer_id%3Aeq%3A${customerId}`
+    }
+  }
 
   const projectId = getSupabaseProjectId(c)
   if (!projectId)

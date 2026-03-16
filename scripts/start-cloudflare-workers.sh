@@ -15,12 +15,18 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Use the installed Supabase CLI in CI, fall back to bunx locally.
-if command -v supabase >/dev/null 2>&1; then
-  SUPABASE_CLI="supabase"
-else
-  SUPABASE_CLI="bunx supabase"
-fi
+run_supabase_status_env() {
+  # Prefer the repo wrapper so worktrees get isolated Supabase stacks.
+  if command -v bun >/dev/null 2>&1; then
+    bun run supabase:status -- -o env 2>/dev/null && return 0
+  fi
+  # Fall back to raw CLI (CI uses this by default).
+  if command -v supabase >/dev/null 2>&1; then
+    supabase status -o env 2>/dev/null && return 0
+  fi
+  bunx supabase status -o env 2>/dev/null && return 0
+  return 1
+}
 
 # Extract a single variable from `supabase status -o env`, preserving any '=' in values (JWT padding).
 get_supabase_status_var() {
@@ -43,7 +49,7 @@ else
   echo -e "${YELLOW}Warning: ${BASE_ENV_FILE} not found - starting with empty base env${NC}"
 fi
 
-SUPA_ENV="$(${SUPABASE_CLI} status -o env 2>/dev/null || true)"
+SUPA_ENV="$(run_supabase_status_env || true)"
 SUPABASE_URL_FROM_STATUS="$(get_supabase_status_var 'API_URL')"
 # Supabase CLI has historically emitted either SERVICE_ROLE_KEY/ANON_KEY or SECRET_KEY/PUBLISHABLE_KEY.
 SUPABASE_SERVICE_ROLE_KEY_FROM_STATUS="$(get_supabase_status_var 'SERVICE_ROLE_KEY|SECRET_KEY')"

@@ -19,6 +19,14 @@ import { app as publicStats } from '../_backend/private/public_stats.ts'
 import { app as role_bindings } from '../_backend/private/role_bindings.ts'
 import { app as roles } from '../_backend/private/roles.ts'
 import { app as set_org_email } from '../_backend/private/set_org_email.ts'
+import { app as sso_check_domain } from '../_backend/private/sso/check-domain.ts'
+import { app as sso_check_enforcement } from '../_backend/private/sso/check-enforcement.ts'
+import { app as sso_prelink_internal } from '../_backend/private/sso/prelink-internal.ts'
+import { app as sso_prelink } from '../_backend/private/sso/prelink.ts'
+import { app as sso_providers } from '../_backend/private/sso/providers.ts'
+import { app as sso_provision_user } from '../_backend/private/sso/provision-user.ts'
+import { app as sso_sp_metadata } from '../_backend/private/sso/sp-metadata.ts'
+import { app as sso_verify_dns } from '../_backend/private/sso/verify-dns.ts'
 import { app as stats_priv } from '../_backend/private/stats.ts'
 import { app as storeTop } from '../_backend/private/store_top.ts'
 import { app as stripe_checkout } from '../_backend/private/stripe_checkout.ts'
@@ -61,6 +69,14 @@ appGlobal.route('/invite_new_user_to_org', invite_new_user_to_org)
 appGlobal.route('/accept_invitation', accept_invitation)
 appGlobal.route('/validate_password_compliance', validate_password_compliance)
 appGlobal.route('/verify_email_otp', verify_email_otp)
+appGlobal.route('/sso/check-domain', sso_check_domain)
+appGlobal.route('/sso/check-enforcement', sso_check_enforcement)
+appGlobal.route('/sso/providers', sso_providers)
+appGlobal.route('/sso/prelink-users', sso_prelink)
+appGlobal.route('/sso/prelink-internal', sso_prelink_internal)
+appGlobal.route('/sso/provision-user', sso_provision_user)
+appGlobal.route('/sso/sp-metadata', sso_sp_metadata)
+appGlobal.route('/sso/verify-dns', sso_verify_dns)
 
 createAllCatch(appGlobal, functionName)
 Deno.serve(appGlobal.fetch)
