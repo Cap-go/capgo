@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { SimpleErrorResponse } from './hono.ts'
 import { DrizzleError, entityKind, TransactionRollbackError } from 'drizzle-orm'
 import { sendDiscordAlert500 } from './discord.ts'
-import { cloudlogErr, serializeError } from './logging.ts'
+import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
 import { backgroundTask } from './utils.ts'
 
 const drizzleErrorNames = new Set(['DrizzleError', 'DrizzleQueryError', 'TransactionRollbackError'])
@@ -87,8 +87,7 @@ export function onError(functionName: string) {
       catch {
         // ignore errors; fall back to default
       }
-      // Single, structured error log entry
-      cloudlogErr({
+      const httpExceptionLog = {
         requestId: c.get('requestId'),
         functionName,
         kind: 'http_exception',
@@ -99,7 +98,14 @@ export function onError(functionName: string) {
         errorMessage: res.message,
         moreInfo: res.moreInfo,
         stack: serializeError(e)?.stack ?? 'N/A',
-      })
+      }
+
+      if (e.status >= 500) {
+        cloudlogErr(httpExceptionLog)
+      }
+      else {
+        cloudlog(httpExceptionLog)
+      }
       if (e.status === 429) {
         const rateLimitResetAt = typeof res.moreInfo?.rateLimitResetAt === 'number' ? res.moreInfo.rateLimitResetAt : undefined
         let retryAfterSeconds = typeof res.moreInfo?.retryAfterSeconds === 'number' ? res.moreInfo.retryAfterSeconds : undefined
