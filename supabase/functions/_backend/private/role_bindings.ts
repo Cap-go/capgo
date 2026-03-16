@@ -9,7 +9,7 @@ import { checkPermission } from '../utils/rbac.ts'
 import { version } from '../utils/version.ts'
 
 const PRINCIPAL_TYPES = ['user', 'group', 'apikey'] as const
-const SCOPE_TYPES = ['platform', 'org', 'app', 'channel'] as const
+const SCOPE_TYPES = ['org', 'app', 'channel'] as const
 
 interface RoleBindingBody {
   principal_type: (typeof PRINCIPAL_TYPES)[number]

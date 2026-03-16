@@ -7,7 +7,8 @@
 -- =============================================================================
 
 -- Remove the permissive policy that allowed anonymous reads.
-DROP POLICY IF EXISTS "Allow anon to select" ON "public"."global_stats";
+DROP POLICY IF EXISTS "Allow anon to select" ON public.global_stats;
 
 -- Ensure non-service roles cannot query global_stats directly.
-REVOKE ALL PRIVILEGES ON TABLE "public"."global_stats" FROM "anon", "authenticated";
+REVOKE ALL PRIVILEGES ON TABLE public.global_stats FROM anon,
+authenticated;

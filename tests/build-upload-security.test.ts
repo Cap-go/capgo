@@ -1,10 +1,12 @@
 import { HTTPException } from 'hono/http-exception'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { tusProxy } from '../supabase/functions/_backend/public/build/upload.ts'
 
-const mockSupabaseApikey = vi.fn()
-const mockCheckPermission = vi.fn()
-const mockGetEnv = vi.fn()
+const { mockSupabaseApikey, mockCheckPermission, mockGetEnv } = vi.hoisted(() => ({
+  mockSupabaseApikey: vi.fn(),
+  mockCheckPermission: vi.fn(),
+  mockGetEnv: vi.fn(),
+}))
 
 vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
   supabaseApikey: mockSupabaseApikey,
@@ -33,11 +35,12 @@ describe('build upload proxy security', () => {
     error: null,
   }
 
-  const queryBuilder = {
+  const createQueryBuilder = () => ({
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     single: vi.fn().mockResolvedValue(buildRequestQuery),
-  }
+  })
+  let queryBuilder: ReturnType<typeof createQueryBuilder>
 
   const fakeContext = (url: string, method = 'POST') => {
     const request = new Request(url, {
@@ -58,14 +61,14 @@ describe('build upload proxy security', () => {
     }
   }
 
-  afterEach(() => {
-    vi.clearAllMocks()
-    queryBuilder.select.mockClear()
-    queryBuilder.eq.mockClear()
-    queryBuilder.single.mockClear()
-  })
-
-  it('rejects path traversal attempts before forwarding to builder', async () => {
+  beforeEach(() => {
+    mockGetEnv.mockClear()
+    mockCheckPermission.mockClear()
+    mockSupabaseApikey.mockClear()
+    queryBuilder = createQueryBuilder()
+    mockSupabaseApikey.mockReturnValue({
+      from: vi.fn().mockReturnValue(queryBuilder),
+    })
     mockGetEnv.mockImplementation((_, key: string) => {
       if (key === 'BUILDER_URL') {
         return 'https://builder.capgo.app'
@@ -76,62 +79,57 @@ describe('build upload proxy security', () => {
       return null
     })
     mockCheckPermission.mockResolvedValue(true)
-    mockSupabaseApikey.mockReturnValue({
-      from: vi.fn().mockReturnValue(queryBuilder),
-    })
+  })
 
-    const context = fakeContext(`http://localhost/build/upload/${jobId}/../jobs`, 'PATCH')
+  it.concurrent('rejects path traversal attempts before forwarding to builder', async () => {
+    const context = fakeContext(`http://localhost/build/upload/${jobId}/%2e%2e%2Fjobs`, 'PATCH')
 
-    const responsePromise = tusProxy(context as any, jobId, { user_id: 'user-test', key: 'api-test' } as any)
-    const error = await expect(responsePromise).rejects.toBeInstanceOf(HTTPException)
+    let error: HTTPException | undefined
+    try {
+      await tusProxy(context as any, jobId, { user_id: 'user-test', key: 'api-test' } as any)
+    }
+    catch (err) {
+      expect(err).toBeInstanceOf(HTTPException)
+      if (!(err instanceof HTTPException)) {
+        throw err
+      }
+      error = err
+    }
 
+    if (!error) {
+      throw new Error('Expected tusProxy to reject with HTTPException')
+    }
     expect(error.cause).toMatchObject({
       error: 'invalid_path',
       message: 'Invalid upload path',
     })
   })
 
-  it('rejects invalidly encoded paths before forwarding to builder', async () => {
-    mockGetEnv.mockImplementation((_, key: string) => {
-      if (key === 'BUILDER_URL') {
-        return 'https://builder.capgo.app'
-      }
-      if (key === 'BUILDER_API_KEY') {
-        return 'builder-secret'
-      }
-      return null
-    })
-    mockCheckPermission.mockResolvedValue(true)
-    mockSupabaseApikey.mockReturnValue({
-      from: vi.fn().mockReturnValue(queryBuilder),
-    })
-
+  it.concurrent('rejects invalidly encoded paths before forwarding to builder', async () => {
     const context = fakeContext(`http://localhost/build/upload/${jobId}/%`, 'PATCH')
 
-    const responsePromise = tusProxy(context as any, jobId, { user_id: 'user-test', key: 'api-test' } as any)
-    const error = await expect(responsePromise).rejects.toBeInstanceOf(HTTPException)
+    let error: HTTPException | undefined
+    try {
+      await tusProxy(context as any, jobId, { user_id: 'user-test', key: 'api-test' } as any)
+    }
+    catch (err) {
+      expect(err).toBeInstanceOf(HTTPException)
+      if (!(err instanceof HTTPException)) {
+        throw err
+      }
+      error = err
+    }
 
+    if (!error) {
+      throw new Error('Expected tusProxy to reject with HTTPException')
+    }
     expect(error.cause).toMatchObject({
       error: 'invalid_path',
       message: 'Invalid upload path encoding.',
     })
   })
 
-  it('does not reject canonical upload suffixes', async () => {
-    mockGetEnv.mockImplementation((_, key: string) => {
-      if (key === 'BUILDER_URL') {
-        return 'https://builder.capgo.app'
-      }
-      if (key === 'BUILDER_API_KEY') {
-        return 'builder-secret'
-      }
-      return null
-    })
-    mockCheckPermission.mockResolvedValue(true)
-    mockSupabaseApikey.mockReturnValue({
-      from: vi.fn().mockReturnValue(queryBuilder),
-    })
-
+  it.concurrent('does not reject canonical upload suffixes', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, {
       status: 201,
       headers: {
@@ -139,13 +137,18 @@ describe('build upload proxy security', () => {
       },
     }))
 
-    const context = fakeContext(`http://localhost/build/upload/${jobId}/artifact.zip`, 'PATCH')
-    const response = await tusProxy(context as any, jobId, { user_id: 'user-test', key: 'api-test' } as any)
+    try {
+      const context = fakeContext(`http://localhost/build/upload/${jobId}/artifact.zip`, 'PATCH')
+      const response = await tusProxy(context as any, jobId, { user_id: 'user-test', key: 'api-test' } as any)
 
-    expect(response.status).toBe(201)
-    expect(fetchMock).toHaveBeenCalledWith(
-      'https://builder.capgo.app/upload/artifact.zip',
-      expect.anything(),
-    )
+      expect(response.status).toBe(201)
+      expect(fetchMock).toHaveBeenCalledWith(
+        'https://builder.capgo.app/upload/artifact.zip',
+        expect.anything(),
+      )
+    }
+    finally {
+      fetchMock.mockRestore()
+    }
   })
 })

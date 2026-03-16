@@ -13,6 +13,7 @@ import {
 } from 'chart.js'
 import { computed } from 'vue'
 import { Line } from 'vue-chartjs'
+import { formatLocalDate } from '~/services/date'
 
 const props = defineProps({
   data: {
@@ -35,6 +36,10 @@ const props = defineProps({
 
 const isDark = useDark()
 
+function formatChartDate(date: string) {
+  return formatLocalDate(date) || date
+}
+
 Chart.register(
   Tooltip,
   LineController,
@@ -47,6 +52,7 @@ Chart.register(
 
 const chartData = computed<ChartData<'line'>>(() => {
   const labels = props.data.map(item => item.date)
+    .map(item => formatChartDate(item))
   const values = props.data.map(item => item.value)
 
   return {
