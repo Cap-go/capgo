@@ -290,13 +290,21 @@ export async function readStats(c: Context, params: ReadStatsParams) {
   return readStatsCF(c, params)
 }
 
-export function countDevices(c: Context, app_id: string, customIdMode: boolean) {
+export function countDevices(
+  c: Context,
+  app_id: string,
+  customIdMode: boolean,
+  deviceIds: string[] = [],
+  versionName?: string,
+  search?: string,
+) {
   // Use Analytics Engine DEVICE_INFO when available in Cloudflare Workers.
   // In local Cloudflare testing these bindings are often absent, so fall back
   // to the Postgres/Supabase path.
+  const trimmedSearch = search?.trim()
   if (shouldUseAnalyticsEngine(c))
-    return countDevicesCF(c, app_id, customIdMode)
-  return countDevicesSB(c, app_id, customIdMode)
+    return countDevicesCF(c, app_id, customIdMode, deviceIds, versionName, trimmedSearch)
+  return countDevicesSB(c, app_id, customIdMode, deviceIds, versionName, trimmedSearch)
 }
 
 export async function readDevices(c: Context, params: ReadDevicesParams, customIdMode: boolean): Promise<ReadDevicesResponse> {

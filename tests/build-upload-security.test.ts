@@ -2,9 +2,11 @@ import { HTTPException } from 'hono/http-exception'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { tusProxy } from '../supabase/functions/_backend/public/build/upload.ts'
 
-const mockSupabaseApikey = vi.fn()
-const mockCheckPermission = vi.fn()
-const mockGetEnv = vi.fn()
+const { mockSupabaseApikey, mockCheckPermission, mockGetEnv } = vi.hoisted(() => ({
+  mockSupabaseApikey: vi.fn(),
+  mockCheckPermission: vi.fn(),
+  mockGetEnv: vi.fn(),
+}))
 
 vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
   supabaseApikey: mockSupabaseApikey,
@@ -80,7 +82,7 @@ describe('build upload proxy security', () => {
   })
 
   it.concurrent('rejects path traversal attempts before forwarding to builder', async () => {
-    const context = fakeContext(`http://localhost/build/upload/${jobId}/%2e%2e/jobs`, 'PATCH')
+    const context = fakeContext(`http://localhost/build/upload/${jobId}/%2e%2e%2Fjobs`, 'PATCH')
 
     let error: HTTPException | undefined
     try {
