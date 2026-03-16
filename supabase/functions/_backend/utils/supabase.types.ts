@@ -2969,6 +2969,10 @@ export type Database = {
         Args: { p_org_id: string; p_user_id: string }
         Returns: string
       }
+      delete_group_with_bindings: {
+        Args: { group_id: string }
+        Returns: undefined
+      }
       delete_user: { Args: never; Returns: undefined }
       exist_app_v2: { Args: { appid: string }; Returns: boolean }
       exist_app_versions:
