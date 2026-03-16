@@ -13,7 +13,8 @@ RETURNS TABLE (
     fail bigint,
     install bigint,
     uninstall bigint
-) LANGUAGE plpgsql STABLE
+) LANGUAGE plpgsql
+SECURITY DEFINER
 SET
   search_path = '' AS $$
 DECLARE

@@ -101,8 +101,15 @@ function getAnonClient() {
 function getApiKeyClient(apiKey: string) {
   if (!SUPABASE_BASE_URL)
     throw new Error('SUPABASE_BASE_URL is missing for plan RPC auth tests')
+  if (!SUPABASE_ANON_KEY)
+    throw new Error('SUPABASE_ANON_KEY is missing for plan RPC auth tests')
 
-  return createClient<Database>(SUPABASE_BASE_URL, apiKey, {
+  return createClient<Database>(SUPABASE_BASE_URL, SUPABASE_ANON_KEY, {
+    global: {
+      headers: {
+        capgkey: apiKey,
+      },
+    },
     auth: {
       persistSession: false,
       autoRefreshToken: false,
