@@ -219,11 +219,13 @@ async function handleSsoLogin() {
       domain,
       options: {
         redirectTo: redirectUrl.toString(),
+        captchaToken: turnstileToken.value,
       },
     })
 
     if (error) {
       console.error('SSO login error', error)
+      captchaComponent.value?.reset()
       toast.error(t('invalid-auth'))
       isLoading.value = false
       return
@@ -348,6 +350,13 @@ async function openScan() {
 async function checkLogin() {
   const parsedUrl = new URL(route.fullPath, window.location.origin)
   const params = new URLSearchParams(parsedUrl.search)
+
+  if (params.get('message') === 'sso_account_linked') {
+    parsedUrl.searchParams.delete('message')
+    window.history.replaceState({}, '', parsedUrl.toString())
+    toast.success(t('sso-account-linked'))
+  }
+
   const accessToken = params.get('access_token')
   const refreshToken = params.get('refresh_token')
 
@@ -371,6 +380,16 @@ async function checkLogin() {
   const session = sessionData?.session
   if (hasUser) {
     await checkAuthUser()
+  }
+  else if (!session && route.query.code && typeof route.query.code === 'string') {
+    const { data, error } = await supabase.auth.exchangeCodeForSession(route.query.code)
+    if (!error && data.session) {
+      await nextLogin()
+    }
+    else {
+      isLoading.value = false
+      hideLoader()
+    }
   }
   else if (!session && route.hash) {
     await checkMagicLink()
@@ -522,16 +541,18 @@ onMounted(checkLogin)
           <!-- Step 2: Credentials (SSO or Password) -->
           <div v-else-if="statusAuth === 'credentials'" key="step-credentials" class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
             <div class="py-6 px-4 text-gray-500 sm:py-7 sm:px-8">
-              <!-- Show email context -->
-              <p class="mb-4 text-sm text-gray-400 truncate">
-                {{ emailForLogin }}
-              </p>
-
               <!-- SSO path -->
               <div v-if="hasSso" class="space-y-5">
+                <!-- Show email context -->
+                <p class="mb-4 text-sm text-gray-400 truncate">
+                  {{ emailForLogin }}
+                </p>
                 <p class="text-sm text-gray-600 dark:text-gray-300">
                   {{ t('sso-detected') }}
                 </p>
+                <div v-if="!!captchaKey">
+                  <VueTurnstile ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
+                </div>
                 <div>
                   <div class="inline-flex justify-center items-center w-full">
                     <svg
@@ -565,6 +586,26 @@ onMounted(checkLogin)
               <div v-else>
                 <FormKit id="login-account" type="form" :actions="false" @submit="handlePasswordSubmit">
                   <div class="space-y-5">
+                    <!--
+                      Hidden email input placed inside the form so browsers and password managers
+                      can associate the password field with the correct account (autocomplete="username").
+                      Uses opacity+absolute positioning instead of display:none so browsers still
+                      detect it for autofill purposes.
+                    -->
+                    <input
+                      type="email"
+                      :value="emailForLogin"
+                      name="username"
+                      autocomplete="username"
+                      readonly
+                      tabindex="-1"
+                      aria-hidden="true"
+                      style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none;"
+                    >
+                    <!-- Show email context -->
+                    <p class="text-sm text-gray-400 truncate">
+                      {{ emailForLogin }}
+                    </p>
                     <div>
                       <FormKit
                         id="passwordInput" type="password" :placeholder="t('password')"

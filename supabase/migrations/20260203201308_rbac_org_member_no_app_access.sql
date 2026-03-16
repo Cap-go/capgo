@@ -30,8 +30,8 @@ END $$;
 
 -- Prevent admin privilege escalation when RBAC is enabled
 CREATE OR REPLACE FUNCTION public.check_org_user_privileges() RETURNS trigger
-  LANGUAGE plpgsql
-  SET search_path = ''
+LANGUAGE plpgsql
+SET search_path = ''
 AS $$
 DECLARE
   v_is_super_admin boolean := false;
@@ -102,13 +102,13 @@ $$;
 
 -- Support hashed keys and RBAC fallback for app access checks
 CREATE OR REPLACE FUNCTION public.has_app_right_apikey(
-  "appid" character varying,
-  "right" public.user_min_right,
-  "userid" uuid,
-  "apikey" text
+    "appid" character varying,
+    "right" public.user_min_right,
+    "userid" uuid,
+    "apikey" text
 ) RETURNS boolean
-  LANGUAGE plpgsql SECURITY DEFINER
-  SET search_path = ''
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = ''
 AS $$
 DECLARE
   org_id uuid;
@@ -183,12 +183,12 @@ $$;
 
 -- Ensure super_admin invites require super_admin role even in RBAC mode
 CREATE OR REPLACE FUNCTION public.invite_user_to_org(
-  "email" character varying,
-  "org_id" uuid,
-  "invite_type" public.user_min_right
+    "email" character varying,
+    "org_id" uuid,
+    "invite_type" public.user_min_right
 ) RETURNS character varying
-  LANGUAGE plpgsql SECURITY DEFINER
-  SET search_path = ''
+LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = ''
 AS $$
 DECLARE
   org record;
@@ -302,19 +302,19 @@ $$;
 -- Original bug: checked app-level permissions but app_id doesn't exist during INSERT
 -- Solution: Check org-level 'write' permission which admins/super_admins have
 
-DROP POLICY IF EXISTS "Allow insert for apikey (write,all) (admin+)" ON "public"."apps";
+DROP POLICY IF EXISTS "Allow insert for apikey (write,all) (admin+)" ON public.apps;
 
-CREATE POLICY "Allow insert for apikey (write,all) (admin+)" ON "public"."apps"
-FOR INSERT TO "anon", "authenticated"
+CREATE POLICY "Allow insert for apikey (write,all) (admin+)" ON public.apps
+FOR INSERT TO anon, authenticated
 WITH CHECK (
-  "public"."check_min_rights" (
-    'write'::"public"."user_min_right",
-    "public"."get_identity_org_allowed" (
-      '{write,all}'::"public"."key_mode" [],
-      "owner_org"
-    ),
-    "owner_org",
-    NULL::character varying,  -- NULL for org-level check
-    NULL::bigint
-  )
+    public.check_min_rights(
+        'write'::public.user_min_right,
+        public.get_identity_org_allowed(
+            '{write,all}'::public.key_mode [],
+            owner_org
+        ),
+        owner_org,
+        NULL::character varying,  -- NULL for org-level check
+        NULL::bigint
+    )
 );

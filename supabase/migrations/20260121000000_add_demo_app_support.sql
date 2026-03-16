@@ -56,10 +56,10 @@ INSERT INTO public.cron_tasks (
     null
 )
 ON CONFLICT (name) DO UPDATE SET
-    description = EXCLUDED.description,
-    task_type = EXCLUDED.task_type,
-    target = EXCLUDED.target,
-    run_at_hour = EXCLUDED.run_at_hour,
-    run_at_minute = EXCLUDED.run_at_minute,
-    run_at_second = EXCLUDED.run_at_second,
+    description = excluded.description,
+    task_type = excluded.task_type,
+    target = excluded.target,
+    run_at_hour = excluded.run_at_hour,
+    run_at_minute = excluded.run_at_minute,
+    run_at_second = excluded.run_at_second,
     updated_at = NOW();
