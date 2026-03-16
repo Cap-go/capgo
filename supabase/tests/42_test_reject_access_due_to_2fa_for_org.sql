@@ -9,6 +9,7 @@ DO $$
 BEGIN
   PERFORM tests.create_supabase_user('test_2fa_user_org', '2fa_org@test.com');
   PERFORM tests.create_supabase_user('test_no_2fa_user_org', 'no2fa_org@test.com');
+  PERFORM tests.mark_email_otp_verified('test_2fa_user_org');
 END $$;
 
 -- Create entries in public.users for the test members
