@@ -1,4 +1,6 @@
-CREATE OR REPLACE FUNCTION public.get_org_perm_for_apikey(apikey text, app_id text)
+CREATE OR REPLACE FUNCTION public.get_org_perm_for_apikey(
+    apikey text, app_id text
+)
 RETURNS text
 LANGUAGE plpgsql
 SECURITY DEFINER
