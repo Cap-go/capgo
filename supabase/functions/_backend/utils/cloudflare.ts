@@ -260,8 +260,22 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
   }
 }
 
-export function formatDateCF(date: string | undefined) {
-  return dayjs(date).format('YYYY-MM-DD HH:mm:ss')
+export function formatDateCF(date: string | Date | undefined) {
+  if (!date)
+    return dayjs(date).format('YYYY-MM-DD HH:mm:ss')
+
+  const normalizedDate = date instanceof Date ? date : new Date(date)
+  if (Number.isNaN(normalizedDate.getTime()))
+    return dayjs(date).format('YYYY-MM-DD HH:mm:ss')
+
+  const year = normalizedDate.getUTCFullYear()
+  const month = String(normalizedDate.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(normalizedDate.getUTCDate()).padStart(2, '0')
+  const hours = String(normalizedDate.getUTCHours()).padStart(2, '0')
+  const minutes = String(normalizedDate.getUTCMinutes()).padStart(2, '0')
+  const seconds = String(normalizedDate.getUTCSeconds()).padStart(2, '0')
+
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }
 
 interface AnalyticsApiResponse {
@@ -681,7 +695,7 @@ LIMIT ${limit + 1}`
       is_prod: Boolean(row.is_prod),
       is_emulator: Boolean(row.is_emulator),
       custom_id: row.custom_id,
-      updated_at: row.updated_at,
+      updated_at: formatDateCF(row.updated_at),
       default_channel: row.default_channel || null,
       created_at: null, // Not stored in Analytics Engine
       key_id: row.key_id || null,
