@@ -34,7 +34,7 @@ BEGIN
             NULL::CHARACTER VARYING,
             NULL::BIGINT
         ) THEN
-            RETURN;
+            RAISE EXCEPTION 'NO_RIGHTS';
         END IF;
     END IF;
 
@@ -126,7 +126,7 @@ BEGIN
             NULL::CHARACTER VARYING,
             NULL::BIGINT
         ) THEN
-            RETURN;
+            RAISE EXCEPTION 'NO_RIGHTS';
         END IF;
     END IF;
 
@@ -167,7 +167,7 @@ BEGIN
             NULL::CHARACTER VARYING,
             NULL::BIGINT
         ) THEN
-            RETURN;
+            RAISE EXCEPTION 'NO_RIGHTS';
         END IF;
     END IF;
 
@@ -223,7 +223,7 @@ BEGIN
             NULL::CHARACTER VARYING,
             NULL::BIGINT
         ) THEN
-            RETURN;
+            RAISE EXCEPTION 'NO_RIGHTS';
         END IF;
     END IF;
 
