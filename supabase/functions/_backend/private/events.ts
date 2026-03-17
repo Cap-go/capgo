@@ -28,12 +28,16 @@ async function canAccessRequestedOrg(c: Context<MiddlewareKeyVariables>, orgId: 
 
 app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   const body = await parseBody<TrackOptions & { notifyConsole?: boolean }>(c)
-  const requestedOrgId = typeof body.user_id === 'string' && body.user_id.length > 0 ? body.user_id : undefined
+  const requestedOrgId = body.notifyConsole && typeof body.user_id === 'string' && body.user_id.length > 0
+    ? body.user_id
+    : undefined
 
   if (requestedOrgId && !(await canAccessRequestedOrg(c, requestedOrgId)))
     return c.json({ error: 'Forbidden' }, 403)
 
-  const orgId = requestedOrgId ?? c.get('auth')?.userId ?? ''
+  const orgId = typeof body.user_id === 'string' && body.user_id.length > 0
+    ? body.user_id
+    : c.get('auth')?.userId ?? ''
 
   // notifyConsole: broadcast to Supabase Realtime only, skip all tracking
   if (body.notifyConsole) {
