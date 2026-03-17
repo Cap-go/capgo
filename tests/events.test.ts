@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APP_NAME, BASE_URL, headers, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { APP_NAME, BASE_URL, headers, ORG_ID, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME_EVENT = `${APP_NAME}.e.${id}`
@@ -120,5 +120,46 @@ describe('[POST] /private/events operations', () => {
 
     await response.arrayBuffer()
     expect(response.status).toBe(400)
+  })
+
+  it('broadcasts console event for an authorized org', async () => {
+    const response = await fetch(`${BASE_URL}/private/events`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        channel: 'test',
+        event: 'test_event',
+        description: 'Testing console event tracking',
+        notifyConsole: true,
+        user_id: ORG_ID,
+        tags: {
+          'app-id': APPNAME_EVENT,
+          'channel': 'production',
+          'bundle': '1.0.0',
+        },
+      }),
+    })
+
+    const data = await response.json() as { status: string }
+    expect(response.status).toBe(200)
+    expect(data.status).toBe('ok')
+  })
+
+  it('rejects console event broadcast for a foreign org', async () => {
+    const response = await fetch(`${BASE_URL}/private/events`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        channel: 'test',
+        event: 'test_event',
+        description: 'Testing console event tracking',
+        notifyConsole: true,
+        user_id: randomUUID(),
+      }),
+    })
+
+    const data = await response.json() as { error: string }
+    expect(response.status).toBe(400)
+    expect(data.error).toBe('cannot_access_organization')
   })
 })

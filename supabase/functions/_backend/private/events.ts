@@ -6,6 +6,7 @@ import { BRES, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { trackPosthogEvent } from '../utils/posthog.ts'
+import { checkPermission } from '../utils/rbac.ts'
 import { broadcastCLIEvent } from '../utils/realtime_broadcast.ts'
 import { supabaseWithAuth } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
@@ -21,6 +22,12 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
 
   // notifyConsole: broadcast to Supabase Realtime only, skip all tracking
   if (body.notifyConsole) {
+    if (!body.user_id) {
+      throw simpleError('missing_org_id', 'Missing org ID for console notification')
+    }
+    if (!(await checkPermission(c, 'org.read', { orgId: body.user_id }))) {
+      throw simpleError('cannot_access_organization', 'You can\'t access this organization', { org_id: body.user_id })
+    }
     if (orgId) {
       await backgroundTask(c, broadcastCLIEvent(c, {
         event: body.event,
