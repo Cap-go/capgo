@@ -14,8 +14,10 @@ REVOKE ALL ON FUNCTION "public"."get_org_perm_for_apikey" ("apikey" "text", "app
 GRANT EXECUTE ON FUNCTION "public"."get_user_id" ("apikey" "text") TO "service_role";
 GRANT EXECUTE ON FUNCTION "public"."get_user_id" ("apikey" "text", "app_id" "text") TO "service_role";
 GRANT EXECUTE ON FUNCTION "public"."get_org_perm_for_apikey" ("apikey" "text", "app_id" "text") TO "service_role";
--- Keep get_identity_apikey_only locked down (service-role only). Public RPC
--- exposure is managed by 20260312202155_hardening_get_identity_apikey_only_rpcs.sql.
+-- Keep the apikey identity helper callable from storage RLS because the
+-- policies below invoke it for anon/authenticated access checks.
+GRANT EXECUTE ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode" []) TO "anon";
+GRANT EXECUTE ON FUNCTION "public"."get_identity_apikey_only" ("keymode" "public"."key_mode" []) TO "authenticated";
 
 -- Fix is_allowed_action to validate api keys instead of returning organization access
 -- for any provided app id, which allowed invalid-key oracle responses.
