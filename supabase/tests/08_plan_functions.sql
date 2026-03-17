@@ -52,6 +52,7 @@ SELECT
     );
 
 -- Test get_current_plan_name_org
+SELECT tests.authenticate_as('test_admin');
 SELECT
     is(
         get_current_plan_name_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
@@ -65,6 +66,7 @@ SELECT
         NULL,
         'get_current_plan_name_org test - org does not exist'
     );
+SELECT tests.clear_authentication();
 
 -- Test get_current_plan_name_org negative cases
 SELECT
