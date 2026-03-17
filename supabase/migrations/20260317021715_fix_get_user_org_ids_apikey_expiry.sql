@@ -116,3 +116,6 @@ $$;
 
 COMMENT ON FUNCTION "public"."get_user_org_ids"() IS
   'RBAC/legacy-aware org id list for authenticated user or API key (includes org_users and role_bindings membership).';
+
+REVOKE ALL ON FUNCTION "public"."get_user_org_ids"() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."get_user_org_ids"() TO "authenticated";
