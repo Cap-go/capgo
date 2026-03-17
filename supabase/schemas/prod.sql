@@ -3609,15 +3609,43 @@ CREATE OR REPLACE FUNCTION "public"."get_app_versions"("appid" character varying
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
+DECLARE
+  v_org_id uuid;
+  v_user_id uuid;
 BEGIN
-  RETURN (SELECT id
-  FROM public.app_versions
-  WHERE app_id=appid
-  AND name=name_version
-  AND owner_org=(SELECT public.get_user_main_org_id_by_app_id(appid))
-  AND public.is_member_of_org(public.get_user_id(apikey), (SELECT public.get_user_main_org_id_by_app_id(appid)))
+  SELECT owner_org
+  INTO v_org_id
+  FROM public.apps
+  WHERE app_id = get_app_versions.appid
+  LIMIT 1;
+
+  IF v_org_id IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT public.get_user_id(get_app_versions.apikey)
+  INTO v_user_id;
+
+  IF public.rbac_check_permission_direct(
+    public.rbac_perm_app_read_bundles(),
+    v_user_id,
+    v_org_id,
+    get_app_versions.appid,
+    NULL::bigint,
+    get_app_versions.apikey
+  ) IS NOT TRUE THEN
+    RETURN NULL;
+  END IF;
+
+  RETURN (
+    SELECT id
+    FROM public.app_versions
+    WHERE app_id = get_app_versions.appid
+      AND name = get_app_versions.name_version
+      AND owner_org = v_org_id
+    LIMIT 1
   );
-END;  
+END;
 $$;
 
 
@@ -17066,9 +17094,10 @@ GRANT ALL ON FUNCTION "public"."get_app_metrics"("org_id" "uuid", "start_date" "
 
 
 
-GRANT ALL ON FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "anon";
-GRANT ALL ON FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "service_role";
+REVOKE ALL ON FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "anon";
+GRANT EXECUTE ON FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") TO "service_role";
 
 
 
@@ -19033,9 +19062,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INS
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "anon";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "authenticated";
 ALTER DEFAULT PRIVILEGES FOR ROLE "postgres" IN SCHEMA "public" GRANT SELECT,INSERT,REFERENCES,DELETE,TRIGGER,TRUNCATE,UPDATE ON TABLES TO "service_role";
-
-
-
 
 
 
