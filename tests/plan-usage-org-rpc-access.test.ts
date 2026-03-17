@@ -192,11 +192,11 @@ describe('plan usage org RPC authorization', () => {
     expect(cycleData?.[0]?.subscription_anchor_start).toBeTruthy()
     expect(cycleData?.[0]?.subscription_anchor_end).toBeTruthy()
 
-    const usageResult = await pgPool.query(
-      'select * from public.get_plan_usage_percent_detailed($1::uuid)',
-      [orgId],
-    )
-    expect(usageResult.rowCount).toBe(1)
+    const { data: usageData, error: usageError } = await ownerSupabase.rpc('get_plan_usage_percent_detailed', {
+      orgid: orgId,
+    })
+    expect(usageError).toBeNull()
+    expect(usageData).toHaveLength(1)
   })
 
   it('returns no cross-tenant data to unauthorized authenticated users', async () => {
