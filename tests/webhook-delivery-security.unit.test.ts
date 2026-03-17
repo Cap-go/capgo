@@ -32,7 +32,7 @@ afterEach(() => {
 })
 
 describe('webhook delivery redirect handling', () => {
-  it.concurrent('sends webhook requests with manual redirect handling', async () => {
+  it('sends webhook requests with manual redirect handling', async () => {
     mockGetEnv.mockReturnValue('')
     const fetchMock = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
@@ -67,7 +67,7 @@ describe('webhook delivery redirect handling', () => {
     })
   })
 
-  it.concurrent('does not treat redirect responses as successful deliveries', async () => {
+  it('does not treat redirect responses as successful deliveries', async () => {
     mockGetEnv.mockReturnValue('')
     const fetchMock = vi.fn().mockResolvedValue(new Response('', {
       status: 302,
