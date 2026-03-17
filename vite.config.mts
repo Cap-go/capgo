@@ -161,6 +161,7 @@ export default defineConfig({
   ],
 
   server: {
+    allowedHosts: true,
     fs: {
       strict: true,
     },
