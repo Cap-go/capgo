@@ -127,6 +127,17 @@ describe('read-mode API keys cannot access destructive organization routes', () 
 
     expect(response.status).toBe(401)
   })
+
+  it.concurrent('allows GET /organization for accessible organizations', async () => {
+    const response = await fetch(`${BASE_URL}/organization?orgId=${ORG_ID}`, {
+      headers: readOnlyHeaders,
+      method: 'GET',
+    })
+
+    expect(response.status).toBe(200)
+    const type = z.object({ id: z.string(), name: z.string() })
+    expect(type.parse(await response.json())).toEqual({ id: ORG_ID, name })
+  })
 })
 
 describe('[GET] /organization', () => {
