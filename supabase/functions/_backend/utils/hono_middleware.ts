@@ -1,13 +1,15 @@
 import type { Context } from 'hono'
 import type { Database } from './supabase.types.ts'
 import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm'
+import { SignJWT } from 'jose'
 import { getClaimsFromJWT, honoFactory, quickError, simpleRateLimit } from './hono.ts'
-import { cloudlog } from './logging.ts'
+import { cloudlog, cloudlogErr } from './logging.ts'
 import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
 import { isAPIKeyRateLimited, isIPRateLimited, recordAPIKeyUsage, recordFailedAuth } from './rate_limit.ts'
 import { buildRateLimitInfo } from './rateLimitInfo.ts'
 import { checkKey, checkKeyById, supabaseAdmin } from './supabase.ts'
+import { getEnv } from './utils.ts'
 
 // =============================================================================
 // RBAC Context Middleware
@@ -413,6 +415,166 @@ async function resolveSubkey(
   }
 }
 
+// =============================================================================
+// Service Principal Provisioning (Phase 2)
+// =============================================================================
+
+/**
+ * Row returned by the get_service_principal_info() SQL function.
+ * Used to drive lazy service-principal provisioning in the middleware.
+ */
+interface ServicePrincipalInfoRow extends Record<string, unknown> {
+  apikey_id: number
+  service_principal_id: string
+  owner_user_id: string
+  is_provisioned: boolean
+  key_mode: Database['public']['Enums']['key_mode']
+  is_expired: boolean
+  limited_to_orgs: string[] | null
+  limited_to_apps: string[] | null
+}
+
+/**
+ * Fetches service-principal metadata for the given API key value.
+ * Returns null when the key is not found (already validated upstream).
+ */
+async function fetchServicePrincipalInfo(
+  c: Context,
+  keyString: string,
+): Promise<ServicePrincipalInfoRow | null> {
+  let pgClient: ReturnType<typeof getPgClient> | null = null
+  try {
+    pgClient = getPgClient(c, true)
+    const drizzle = getDrizzleClient(pgClient)
+    const result = await drizzle.execute<ServicePrincipalInfoRow>(
+      sql`SELECT * FROM public.get_service_principal_info(${keyString})`,
+    )
+    return result.rows[0] ?? null
+  }
+  catch (e) {
+    logPgError(c, 'fetchServicePrincipalInfo', e)
+    return null
+  }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
+  }
+}
+
+/**
+ * Creates an auth.users entry for the service principal (id = rbacId) and
+ * marks the API key as provisioned.  Idempotent: if the user already exists
+ * the error is silently ignored so the mark still runs.
+ */
+async function provisionServicePrincipal(
+  c: Context,
+  apikeyId: number,
+  rbacId: string,
+): Promise<void> {
+  // Use a dedicated admin client for the createUser call (per AGENTS.md pitfall warning)
+  const adminClient = supabaseAdmin(c)
+
+  const { error: createError } = await adminClient.auth.admin.createUser({
+    id: rbacId,
+    // Service principals never sign in via email/password; the address is
+    // stable but non-deliverable and only kept for auth system uniqueness.
+    email: `sp-${rbacId}@service.capgo.internal`,
+    email_confirm: true,
+  })
+
+  if (createError && !createError.message.includes('already been registered')) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'provisionServicePrincipal: createUser failed',
+      rbacId,
+      error: createError.message,
+    })
+    // Non-fatal: return without marking provisioned; next request will retry
+    return
+  }
+
+  // Mark provisioned via a separate PG client (keeps admin client clean)
+  let pgClient: ReturnType<typeof getPgClient> | null = null
+  try {
+    pgClient = getPgClient(c, true)
+    const drizzle = getDrizzleClient(pgClient)
+    await drizzle.execute(
+      sql`SELECT public.mark_service_principal_provisioned(${apikeyId}::bigint, ${rbacId}::uuid)`,
+    )
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'provisionServicePrincipal: provisioned',
+      apikeyId,
+      rbacId,
+    })
+  }
+  catch (e) {
+    logPgError(c, 'provisionServicePrincipal:markProvisioned', e)
+  }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
+  }
+}
+
+/**
+ * Signs a short-lived Supabase-compatible JWT with sub = rbacId.
+ * The JWT is stored in context so handlers can opt in to the
+ * service-principal auth path (Phase 3 will flip the default).
+ */
+async function signServicePrincipalJwt(c: Context, rbacId: string): Promise<string | null> {
+  try {
+    const jwtSecret = getEnv(c, 'JWT_SECRET')
+    const secret = new TextEncoder().encode(jwtSecret)
+    return await new SignJWT({ role: 'authenticated' })
+      .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
+      .setIssuer('supabase')
+      .setSubject(rbacId)
+      .setIssuedAt()
+      .setExpirationTime('1h')
+      .sign(secret)
+  }
+  catch (e) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'signServicePrincipalJwt: failed to sign JWT',
+      rbacId,
+      error: String(e),
+    })
+    return null
+  }
+}
+
+/**
+ * Orchestrates lazy service-principal provisioning for an API key request.
+ * On first use: creates auth.users entry + marks key as provisioned.
+ * Every request: signs a short-lived JWT and stores it in context.
+ * Non-fatal: any failure is logged and the request continues normally.
+ */
+async function applyServicePrincipal(c: Context, keyString: string): Promise<void> {
+  const info = await fetchServicePrincipalInfo(c, keyString)
+  if (!info) {
+    return
+  }
+
+  if (!info.is_provisioned) {
+    await provisionServicePrincipal(c, info.apikey_id, info.service_principal_id)
+  }
+
+  const jwt = await signServicePrincipalJwt(c, info.service_principal_id)
+  if (jwt) {
+    c.set('servicePrincipalJwt', jwt)
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'applyServicePrincipal: service principal JWT set',
+      servicePrincipalId: info.service_principal_id,
+      wasProvisioned: info.is_provisioned,
+    })
+  }
+}
+
 async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['public']['Enums']['key_mode'][]) {
   const subkey_id = getSubkeyId(c)
 
@@ -437,6 +599,12 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
   // Store the original key string for hashed key authentication
   // This is needed because hashed keys have key=null in the database
   setApiKeyAuthContext(c, apikey, capgkeyString)
+
+  // Phase 2: lazily provision service principal and set JWT in context.
+  // Non-fatal — any failure is logged and the request continues with the
+  // existing capgkey-based auth path.
+  await applyServicePrincipal(c, capgkeyString)
+
   if (subkey_id) {
     cloudlog({ requestId: c.get('requestId'), message: 'Subkey id provided', subkey_id })
     const subkey = await resolveSubkey(c, subkey_id, rights, false, apikey.user_id)

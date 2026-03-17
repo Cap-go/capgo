@@ -176,6 +176,7 @@ export const apikeys = pgTable('apikeys', {
   limited_to_apps: varchar('limited_to_apps').array(),
   expires_at: timestamp('expires_at', { withTimezone: true }),
   rbac_id: uuid('rbac_id').notNull(),
+  service_principal_provisioned: boolean('service_principal_provisioned').default(false).notNull(),
 })
 
 export const org_users = pgTable('org_users', {

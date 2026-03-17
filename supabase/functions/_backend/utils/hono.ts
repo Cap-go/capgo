@@ -98,6 +98,8 @@ export interface MiddlewareKeyVariables {
     // RBAC context variables
     rbacEnabled?: boolean
     resolvedOrgId?: string
+    // Service principal context (Phase 2: set when API key has a provisioned service principal)
+    servicePrincipalJwt?: string
   }
 }
 

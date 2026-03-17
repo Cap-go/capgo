@@ -69,6 +69,28 @@ export function supabaseWithAuth(c: Context, auth: AuthInfo) {
   }
 }
 
+/**
+ * Returns a Supabase client authenticated as the service principal when
+ * one has been provisioned for the current API key request (Phase 2+).
+ * Falls back to the standard capgkey-based client for unprovisioned keys
+ * or non-API-key requests.
+ *
+ * Usage: prefer this over supabaseWithAuth() in handlers that should use
+ * the service-principal identity path instead of the legacy capgkey path.
+ * Phase 3 will make this the default for all API key requests.
+ */
+export function supabaseServicePrincipal(c: Context) {
+  const spJwt = c.get('servicePrincipalJwt')
+  if (spJwt) {
+    return supabaseClient(c, spJwt)
+  }
+  const auth = c.get('auth')
+  if (!auth) {
+    throw simpleError('not_authorized', 'Not authorized')
+  }
+  return supabaseWithAuth(c, auth)
+}
+
 export function emptySupabase(c: Context) {
   const options = {
     auth: {
