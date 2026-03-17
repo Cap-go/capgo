@@ -122,7 +122,7 @@ describe('[POST] /private/events operations', () => {
     expect(response.status).toBe(400)
   })
 
-  it('broadcasts console event for an authorized org', async () => {
+  it.concurrent('broadcasts console event for an authorized org', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers,
@@ -145,7 +145,7 @@ describe('[POST] /private/events operations', () => {
     expect(data.status).toBe('ok')
   })
 
-  it('rejects console event broadcast for a foreign org', async () => {
+  it.concurrent('rejects console event broadcast for a foreign org', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers,
