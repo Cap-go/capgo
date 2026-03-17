@@ -50,6 +50,85 @@ afterAll(async () => {
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
 })
 
+describe('read-mode API keys cannot access destructive organization routes', () => {
+  const readOnlyKey = `org-read-only-${randomUUID()}`
+  const readOnlyHeaders = {
+    'Content-Type': 'application/json',
+    'Authorization': readOnlyKey,
+  }
+
+  beforeAll(async () => {
+    const { error } = await getSupabaseClient().from('apikeys').insert({
+      user_id: USER_ID,
+      key: readOnlyKey,
+      mode: 'read',
+      name: `Organization read-only regression ${randomUUID()}`,
+    })
+    expect(error).toBeNull()
+  })
+
+  afterAll(async () => {
+    await getSupabaseClient().from('apikeys').delete().eq('key', readOnlyKey)
+  })
+
+  it('rejects POST /organization/members', async () => {
+    const response = await fetch(`${BASE_URL}/organization/members`, {
+      headers: readOnlyHeaders,
+      method: 'POST',
+      body: JSON.stringify({
+        orgId: ORG_ID,
+        email: USER_ADMIN_EMAIL,
+        invite_type: 'read',
+      }),
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+  it('rejects DELETE /organization/members', async () => {
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID}&email=${USER_ADMIN_EMAIL}`, {
+      headers: readOnlyHeaders,
+      method: 'DELETE',
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+  it('rejects PUT /organization', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers: readOnlyHeaders,
+      method: 'PUT',
+      body: JSON.stringify({
+        orgId: ORG_ID,
+        name: `Blocked update ${randomUUID()}`,
+      }),
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+  it('rejects POST /organization', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers: readOnlyHeaders,
+      method: 'POST',
+      body: JSON.stringify({
+        name: `Blocked create ${randomUUID()}`,
+      }),
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+  it('rejects DELETE /organization', async () => {
+    const response = await fetch(`${BASE_URL}/organization?orgId=${ORG_ID}`, {
+      headers: readOnlyHeaders,
+      method: 'DELETE',
+    })
+
+    expect(response.status).toBe(401)
+  })
+})
+
 describe('[GET] /organization', () => {
   it('get organization', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
@@ -97,7 +176,7 @@ describe('[GET] /organization/members', () => {
     const safe = type.safeParse(await response.json())
     expect(safe.success).toBe(true)
     expect(safe.data?.length).toBeGreaterThanOrEqual(1)
-    
+
     const testUser = safe.data?.find(m => m.uid === USER_ID)
     expect(testUser).toBeTruthy()
     expect(testUser?.email).toBe(USER_EMAIL)
@@ -325,7 +404,6 @@ describe('[DELETE] /organization/members', () => {
       user_right: 'read',
     })
     expect(error).toBeNull()
-
 
     // The sync_org_user_to_role_binding_on_insert trigger automatically creates role_bindings
     // when a user is added to org_users. Verify the trigger created the binding.
@@ -736,7 +814,7 @@ const globalIdRbac = randomUUID()
 const nameRbac = `RBAC Test Organization ${globalIdRbac}`
 const customerIdRbac = `cus_test_rbac_${ORG_ID_RBAC}`
 
-describe('RBAC mode - organization member operations', () => {
+describe('rbac mode - organization member operations', () => {
   beforeAll(async () => {
     const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
       customer_id: customerIdRbac,
@@ -875,7 +953,7 @@ describe('RBAC mode - organization member operations', () => {
   })
 })
 
-describe('Hashed API key enforcement integration', () => {
+describe('hashed API key enforcement integration', () => {
   it('find_apikey_by_value finds hashed key', async () => {
     // Create a hashed API key via API
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
