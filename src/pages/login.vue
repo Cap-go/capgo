@@ -208,6 +208,10 @@ async function handlePasswordSubmit(form: { password: string }) {
 }
 
 async function handleSsoLogin() {
+  if (isLoading.value) {
+    return
+  }
+
   isLoading.value = true
   const domain = emailForLogin.value.split('@')[1]
 
@@ -612,7 +616,9 @@ onMounted(checkLogin)
                     <div v-if="hasSso && !enforceSso">
                       <button
                         type="button" data-test="sso-login"
-                        class="inline-flex justify-center items-center py-3 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden"
+                        :disabled="isLoading"
+                        :aria-busy="isLoading ? 'true' : 'false'"
+                        class="inline-flex justify-center items-center py-3 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-60"
                         @click="handleSsoLogin"
                       >
                         {{ t('continue-with-sso') }}

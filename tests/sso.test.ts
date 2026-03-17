@@ -75,6 +75,7 @@ describe('[POST] /private/sso/check-domain', () => {
 
   it('normalizes domain casing and whitespace for existing providers and lookups', async () => {
     const providerId = randomUUID()
+    const externalProviderId = randomUUID()
     const providerDomainInput = `  ${randomUUID().slice(0, 8)}.SSO.Test  `
     const expectedDomain = providerDomainInput.trim().toLowerCase()
 
@@ -82,7 +83,7 @@ describe('[POST] /private/sso/check-domain', () => {
       id: providerId,
       org_id: SSO_TEST_ORG_ID,
       domain: providerDomainInput,
-      provider_id: randomUUID(),
+      provider_id: externalProviderId,
       status: 'active',
       enforce_sso: false,
       dns_verification_token: `dns-${randomUUID()}`,
@@ -96,8 +97,16 @@ describe('[POST] /private/sso/check-domain', () => {
       })
 
       expect(response.status).toBe(200)
-      const data = await response.json() as { has_sso: boolean }
+      const data = await response.json() as {
+        has_sso: boolean
+        enforce_sso?: boolean
+        provider_id?: string
+        org_id?: string
+      }
       expect(data.has_sso).toBe(true)
+      expect(data.enforce_sso).toBe(false)
+      expect(data.provider_id).toBe(externalProviderId)
+      expect(data.org_id).toBe(SSO_TEST_ORG_ID)
 
       const { data: rpcData, error: rpcError } = await (getSupabaseClient().rpc as any)('check_domain_sso', { p_domain: `  ${expectedDomain.toUpperCase()}  ` })
       expect(rpcError).toBeNull()
@@ -431,6 +440,7 @@ describe('[POST] /private/sso/provision-user', () => {
     const password = 'testtest'
     const identityProvider = `sso:${providerId}`
     const identityProviderId = `nameid-${randomUUID()}`
+    const unrelatedProviderId = `github-${randomUUID()}`
     const originalAuthEmail = `stored-original-${randomUUID()}@${domain}`
     const pool = new Pool({ connectionString: POSTGRES_URL })
 
@@ -534,6 +544,13 @@ describe('[POST] /private/sso/provision-user', () => {
         'update auth.identities set provider = $1, provider_id = $2, identity_data = jsonb_build_object($$sub$$, $2::text, $$email$$, $3::text, $$email_verified$$, true) where user_id = $4',
         [identityProvider, identityProviderId, targetEmail, duplicateUser.user.id],
       )
+      await pool.query(
+        `
+          insert into auth.identities (id, user_id, identity_data, provider, provider_id, created_at, updated_at, last_sign_in_at)
+          values ($1, $2, jsonb_build_object($$sub$$, $3::text, $$email$$, $4::text, $$email_verified$$, true), 'github', $3, now(), now(), now())
+        `,
+        [randomUUID(), duplicateUser.user.id, unrelatedProviderId, targetEmail],
+      )
 
       const response = await fetchWithRetry(getEndpointUrl('/private/sso/provision-user'), {
         method: 'POST',
@@ -568,6 +585,10 @@ describe('[POST] /private/sso/provision-user', () => {
         && row.user_id === originalUser.user.id
         && row.email === targetEmail,
       )).toBe(true)
+      expect(identitiesAfterMerge.rows.some(row =>
+        row.provider === 'github'
+        && row.provider_id === unrelatedProviderId,
+      )).toBe(false)
     }
     finally {
       await Promise.allSettled([
