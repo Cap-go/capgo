@@ -34,7 +34,25 @@ async function findAuthUserIdByEmail(c: Context<MiddlewareKeyVariables>, email: 
   }
 }
 
-async function transferSsoIdentities(c: Context<MiddlewareKeyVariables>, originalUserId: string, duplicateUserId: string): Promise<number> {
+function getTrustedSsoProviders(userProvider: string, userIdentities: any[]): string[] {
+  const trustedProviders = new Set<string>()
+  const isTrustedSsoProvider = (provider: string) => provider === 'sso' || provider.startsWith('sso:') || provider === userProvider
+
+  if (isTrustedSsoProvider(userProvider)) {
+    trustedProviders.add(userProvider)
+  }
+
+  for (const identity of userIdentities) {
+    const provider = identity?.provider
+    if (provider && isTrustedSsoProvider(provider)) {
+      trustedProviders.add(provider)
+    }
+  }
+
+  return [...trustedProviders]
+}
+
+async function transferSsoIdentities(c: Context<MiddlewareKeyVariables>, originalUserId: string, duplicateUserId: string, trustedProviders: string[]): Promise<number> {
   let pgClient
   try {
     pgClient = getPgClient(c)
@@ -44,10 +62,9 @@ async function transferSsoIdentities(c: Context<MiddlewareKeyVariables>, origina
         set user_id = $1,
             updated_at = now()
         where user_id = $2
-          and provider <> 'email'
-          and provider <> 'phone'
+          and provider = any($3::text[])
       `,
-      [originalUserId, duplicateUserId],
+      [originalUserId, duplicateUserId, trustedProviders],
     )
 
     return result.rowCount ?? 0
@@ -107,6 +124,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
   }
 
   const userIdentities = userAuth.user.identities ?? []
+  const trustedSsoProviders = getTrustedSsoProviders(userProvider, userIdentities)
   const hasSsoIdentity = userIdentities.some(
     (identity: any) => identity.provider === 'sso' || (identity.provider !== 'email' && identity.provider !== 'phone'),
   )
@@ -169,6 +187,11 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     const originalUserId = resolvedExistingUserId
     cloudlog({ requestId, message: 'Pre-existing user found with same email — merging SSO identity', userId, originalUserId, email: userEmail })
 
+    if (trustedSsoProviders.length === 0) {
+      cloudlog({ requestId, message: 'User has no trusted SSO provider to transfer during merge', userId, originalUserId, provider: userProvider })
+      return quickError(403, 'sso_identity_required', 'User must have a trusted SSO identity to be provisioned')
+    }
+
     // Step 1: Resolve the SSO provider org so we can ensure the original user is a member
     const { data: mergeProvider, error: mergeProviderError } = await (admin as any)
       .from('sso_providers')
@@ -205,7 +228,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
 
     // Step 2: Transfer SSO identity from duplicate user (userId) → original user (originalUserId)
     try {
-      const transferredIdentityCount = await transferSsoIdentities(c, originalUserId, userId)
+      const transferredIdentityCount = await transferSsoIdentities(c, originalUserId, userId, trustedSsoProviders)
       if (transferredIdentityCount === 0) {
         cloudlogErr({ requestId, message: 'No SSO identities were transferred during merge', userId, originalUserId })
         return quickError(500, 'identity_transfer_failed', 'Failed to merge SSO identity with existing account')
@@ -225,7 +248,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       }
       catch (ssoFlagError) {
         cloudlogErr({ requestId, message: 'Failed to set is_sso_user on original user during merge', originalUserId, error: ssoFlagError })
-        // Non-fatal — proceed with merge
+        return quickError(500, 'sso_flag_update_failed', 'Failed to enforce SSO on merged account')
       }
     }
 
