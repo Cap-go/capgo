@@ -71,7 +71,7 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     await getSupabaseClient().from('apikeys').delete().eq('key', readOnlyKey)
   })
 
-  it('rejects POST /organization/members', async () => {
+  it.concurrent('rejects POST /organization/members', async () => {
     const response = await fetch(`${BASE_URL}/organization/members`, {
       headers: readOnlyHeaders,
       method: 'POST',
@@ -85,7 +85,7 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     expect(response.status).toBe(401)
   })
 
-  it('rejects DELETE /organization/members', async () => {
+  it.concurrent('rejects DELETE /organization/members', async () => {
     const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID}&email=${USER_ADMIN_EMAIL}`, {
       headers: readOnlyHeaders,
       method: 'DELETE',
@@ -94,7 +94,7 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     expect(response.status).toBe(401)
   })
 
-  it('rejects PUT /organization', async () => {
+  it.concurrent('rejects PUT /organization', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
       headers: readOnlyHeaders,
       method: 'PUT',
@@ -107,7 +107,7 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     expect(response.status).toBe(401)
   })
 
-  it('rejects POST /organization', async () => {
+  it.concurrent('rejects POST /organization', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
       headers: readOnlyHeaders,
       method: 'POST',
@@ -119,7 +119,7 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     expect(response.status).toBe(401)
   })
 
-  it('rejects DELETE /organization', async () => {
+  it.concurrent('rejects DELETE /organization', async () => {
     const response = await fetch(`${BASE_URL}/organization?orgId=${ORG_ID}`, {
       headers: readOnlyHeaders,
       method: 'DELETE',
