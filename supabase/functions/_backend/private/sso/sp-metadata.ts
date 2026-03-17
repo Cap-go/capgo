@@ -10,6 +10,32 @@ export const app = createHono('', version)
 app.use('*', useCors)
 app.use('*', middlewareAuth)
 
+function getPublicSupabaseUrl(c: Context<MiddlewareKeyVariables>): string {
+  const supabaseUrl = getEnv(c, 'SUPABASE_URL').replace(/\/$/, '')
+  const isLocalDev = supabaseUrl.includes('kong:8000')
+  let forwardedHost = c.req.header('X-Forwarded-Host')
+  const forwardedPort = c.req.header('X-Forwarded-Port')
+  const forwardedProto = c.req.header('X-Forwarded-Proto')?.split(',')[0]?.trim()
+  const hostHeader = c.req.header('Host')
+
+  if (isLocalDev && forwardedHost && !forwardedHost.includes(':')) {
+    const hostPort = hostHeader?.includes(':') ? hostHeader.split(':').pop() : undefined
+    const portToUse = forwardedPort || hostPort
+    if (portToUse)
+      forwardedHost = `${forwardedHost}:${portToUse}`
+  }
+
+  if (forwardedHost) {
+    return `${forwardedProto || (isLocalDev ? 'http' : 'https')}://${forwardedHost}`
+  }
+
+  if (hostHeader) {
+    return `${isLocalDev ? 'http' : 'https'}://${hostHeader}`
+  }
+
+  return supabaseUrl
+}
+
 app.get('/', (c: Context<MiddlewareKeyVariables>) => {
   const auth = c.get('auth')
   const requestId = c.get('requestId')
@@ -18,7 +44,7 @@ app.get('/', (c: Context<MiddlewareKeyVariables>) => {
     return quickError(401, 'not_authorized', 'Not authorized')
   }
 
-  const supabaseUrl = getEnv(c, 'SUPABASE_URL').replace(/\/$/, '')
+  const supabaseUrl = getPublicSupabaseUrl(c)
 
   const metadataUrl = `${supabaseUrl}/auth/v1/sso/saml/metadata`
   return c.json({
