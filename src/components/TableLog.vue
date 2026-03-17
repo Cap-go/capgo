@@ -151,6 +151,12 @@ function sortClick(key: number) {
   else
     sortable = 'asc'
   const newColumns = [...props.columns]
+
+  newColumns.forEach((col, index) => {
+    if (index !== key && col.sortable && typeof col.sortable === 'string')
+      newColumns[index] = { ...col, sortable: true }
+  })
+
   newColumns[key].sortable = sortable
   emit('update:columns', newColumns)
 }
@@ -397,8 +403,6 @@ onUnmounted(() => {
 // Add watches
 watch(() => props.columns, useDebounceFn(() => {
   updateUrlParams()
-  if (props.autoReload === false)
-    return
   emit('reload')
 }, 500), { deep: true })
 
@@ -407,8 +411,6 @@ watch(preciseDates, useDebounceFn(() => {
   // Only emit if the range actually changed from the prop value
   if (!rangesEqual(preciseDates.value, props.range)) {
     emit('update:range', preciseDates.value)
-    if (props.autoReload === false)
-      return
     emit('reload')
   }
 }, 500))
@@ -416,8 +418,6 @@ watch(preciseDates, useDebounceFn(() => {
 watch(searchVal, useDebounceFn(() => {
   updateUrlParams()
   emit('update:search', searchVal.value)
-  if (props.autoReload === false)
-    return
   emit('reload')
 }, 500))
 

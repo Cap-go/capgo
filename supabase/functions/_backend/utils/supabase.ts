@@ -7,6 +7,7 @@ import { createClient } from '@supabase/supabase-js'
 import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged, nullableString } from './deviceComparison.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
+import { Constants } from './supabase.types.ts'
 import { createCustomer } from './stripe.ts'
 import { getEnv, isStripeConfigured } from './utils.ts'
 
@@ -18,8 +19,18 @@ function quotePostgrestFilterValue(value: string): string {
   return `"${escapedValue}"`
 }
 
-function buildIlikePrefixPattern(value: string): string {
-  return quotePostgrestFilterValue(`${value}%`)
+function buildIlikeContainsPattern(value: string): string {
+  return quotePostgrestFilterValue(`%${value}%`)
+}
+
+function getDevicesOrder(order?: Order[]) {
+  const activeOrder = order?.find(
+    col => col.key === 'updated_at' && typeof col.sortable === 'string',
+  )
+
+  return {
+    ascending: activeOrder?.sortable === 'asc',
+  }
 }
 
 export interface InsertPayload<T extends keyof Database['public']['Tables']> {
@@ -1161,11 +1172,16 @@ export async function readStatsSB(c: Context, params: ReadStatsParams) {
 
   if (params.search) {
     cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
-    const searchPattern = buildIlikePrefixPattern(params.search)
-    if (params.deviceIds?.length)
-      query = query.or(`version_build.ilike.${searchPattern},version_name.ilike.${searchPattern}`)
-    else
-      query = query.or(`device_id.ilike.${searchPattern},version_build.ilike.${searchPattern},version_name.ilike.${searchPattern}`)
+    const searchPattern = buildIlikeContainsPattern(params.search)
+    const orFilters = params.deviceIds?.length
+      ? [`version_name.ilike.${searchPattern}`]
+      : [`device_id.ilike.${searchPattern}`, `version_name.ilike.${searchPattern}`]
+
+    const matchedActions = Constants.public.Enums.stats_action
+      .filter(action => action.toLowerCase().includes(params.search!.toLowerCase()))
+      .map(action => `action.eq.${action}`)
+
+    query = query.or([...orFilters, ...matchedActions].join(','))
   }
 
   if (params.order?.length) {
@@ -1214,7 +1230,7 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
 
   if (params.search) {
     cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
-    const searchPattern = buildIlikePrefixPattern(params.search)
+    const searchPattern = buildIlikeContainsPattern(params.search)
     if (params.deviceIds?.length)
       query = query.or(`custom_id.ilike.${searchPattern},version_name.ilike.${searchPattern}`)
     else
@@ -1224,21 +1240,24 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
   if (params.version_name)
     query = query.eq('version_name', params.version_name)
 
+  const devicesOrder = getDevicesOrder(params.order)
+
   // Cursor-based pagination
   if (params.cursor) {
     // Cursor format: "updated_at|device_id"
     const [cursorTime, cursorDeviceId] = params.cursor.split('|')
     if (cursorTime && cursorDeviceId) {
-      // For DESC order: get records older than cursor or same time with device_id > cursor
       const quotedCursorTime = quotePostgrestFilterValue(cursorTime)
       const quotedCursorDeviceId = quotePostgrestFilterValue(cursorDeviceId)
-      query = query.or(`updated_at.lt.${quotedCursorTime},and(updated_at.eq.${quotedCursorTime},device_id.gt.${quotedCursorDeviceId})`)
+      if (devicesOrder.ascending)
+        query = query.or(`updated_at.gt.${quotedCursorTime},and(updated_at.eq.${quotedCursorTime},device_id.gt.${quotedCursorDeviceId})`)
+      else
+        query = query.or(`updated_at.lt.${quotedCursorTime},and(updated_at.eq.${quotedCursorTime},device_id.gt.${quotedCursorDeviceId})`)
     }
   }
 
-  // Always order by updated_at DESC, device_id ASC for stable cursor pagination
   query = query
-    .order('updated_at', { ascending: false })
+    .order('updated_at', { ascending: devicesOrder.ascending })
     .order('device_id', { ascending: true })
     .limit(limit + 1) // Fetch one extra to check if there are more results
 
@@ -1279,7 +1298,7 @@ export async function countDevicesSB(
   }
 
   if (search) {
-    const normalizedSearch = buildIlikePrefixPattern(search)
+    const normalizedSearch = buildIlikeContainsPattern(search)
     if (deviceIds.length)
       req = req.or(`custom_id.ilike.${normalizedSearch},version_name.ilike.${normalizedSearch}`)
     else
