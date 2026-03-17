@@ -177,7 +177,7 @@ afterAll(async () => {
 })
 
 describe('plan usage org RPC authorization', () => {
-  it('allows authorized org members to read plan usage RPCs', async () => {
+  it.concurrent('allows authorized org members to read plan usage RPCs', async () => {
     const { data: planNameData, error: planNameError } = await ownerSupabase.rpc('get_current_plan_name_org', {
       orgid: orgId,
     })
@@ -199,7 +199,7 @@ describe('plan usage org RPC authorization', () => {
     expect(usageData).toHaveLength(1)
   })
 
-  it('returns no cross-tenant data to unauthorized authenticated users', async () => {
+  it.concurrent('returns no cross-tenant data to unauthorized authenticated users', async () => {
     const { data: planNameData, error: planNameError } = await attackerSupabase.rpc('get_current_plan_name_org', {
       orgid: orgId,
     })
@@ -219,7 +219,7 @@ describe('plan usage org RPC authorization', () => {
     expect(usageData).toEqual([])
   })
 
-  it('rejects anonymous execution of the hardened RPCs', async () => {
+  it.concurrent('rejects anonymous execution of the hardened RPCs', async () => {
     const { data: planNameData, error: planNameError } = await anonSupabase.rpc('get_current_plan_name_org', {
       orgid: orgId,
     })
