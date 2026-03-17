@@ -15,6 +15,8 @@
 import type { ComponentPublicInstance } from 'vue'
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { pushEvent } from '~/services/posthog'
+import { getLocalConfig } from '~/services/supabase'
 import { useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
@@ -29,6 +31,19 @@ const leftPupil = ref({ x: 0, y: 0 })
 const rightPupil = ref({ x: 0, y: 0 })
 
 const currentOrg = computed(() => organizationStore.currentOrganization)
+const config = getLocalConfig()
+
+function trackBannerEvent(eventName: string) {
+  const org = currentOrg.value
+  pushEvent(eventName, config.supaHost, {
+    trial_days_left: org?.trial_left ?? 0,
+    org_gid: org?.gid ?? '',
+  })
+}
+
+function handleCtaClick() {
+  trackBannerEvent('trial_banner_cta_clicked')
+}
 
 // Reactive time tick so the 3-hour age check re-evaluates without needing a page reload.
 // Updates every 60s — plenty for a 3-hour threshold.
@@ -58,6 +73,12 @@ const hasApps = computed(() => {
 
 const showBanner = computed(() => {
   return isTrial.value && isAccountOldEnough.value && hasApps.value
+})
+
+// Whether we need the time tick running — true when the account-age check
+// could still flip (trial user with apps but not yet 3 hours old).
+const needsTick = computed(() => {
+  return isTrial.value && hasApps.value && !isAccountOldEnough.value
 })
 
 const maxTravel = 4 // How far the pupil can move from center (px)
@@ -106,21 +127,29 @@ function handleMouseMove(e: MouseEvent) {
   }
 }
 
-// Only attach the mousemove listener and time-tick interval when the banner
-// is actually visible. This avoids unnecessary work for non-trial / paying users.
-watch(showBanner, (visible) => {
-  if (visible) {
-    window.addEventListener('mousemove', handleMouseMove)
+// Start the time tick whenever the account-age check could still flip (trial
+// user with apps, but not yet 3 hours old). This lets showBanner turn true
+// without requiring a page reload.
+watch(needsTick, (needed) => {
+  if (needed) {
     tickInterval = setInterval(() => {
       nowTick.value = Date.now()
     }, 60_000)
   }
+  else if (tickInterval) {
+    clearInterval(tickInterval)
+    tickInterval = null
+  }
+}, { immediate: true })
+
+// Only attach the mousemove listener (expensive) when the banner is visible.
+watch(showBanner, (visible) => {
+  if (visible) {
+    trackBannerEvent('trial_banner_shown')
+    window.addEventListener('mousemove', handleMouseMove)
+  }
   else {
     window.removeEventListener('mousemove', handleMouseMove)
-    if (tickInterval) {
-      clearInterval(tickInterval)
-      tickInterval = null
-    }
   }
 }, { immediate: true })
 
@@ -164,6 +193,7 @@ onUnmounted(() => {
         ref="ctaRef"
         to="/settings/organization/plans"
         class="d-btn cta-button cta-sparkle"
+        @click="handleCtaClick"
       >
         {{ t('trial-banner-cta') }}
       </router-link>
