@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APP_NAME, BASE_URL, headers, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { APP_NAME, BASE_URL, headers, NON_OWNER_ORG_ID, ORG_ID, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME_EVENT = `${APP_NAME}.e.${id}`
@@ -29,6 +29,56 @@ describe('[POST] /private/events operations', () => {
         tags: {
           app_id: APPNAME_EVENT,
           test: true,
+        },
+      }),
+    })
+
+    const data = await response.json() as { status: string }
+    expect(response.status).toBe(200)
+    expect(data.status).toBe('ok')
+  })
+
+  it('rejects notifyConsole broadcasts for foreign organizations', async () => {
+    const response = await fetch(`${BASE_URL}/private/events`, {
+      method: 'POST',
+      headers: {
+        capgkey: headers.Authorization,
+      },
+      body: JSON.stringify({
+        channel: 'test',
+        event: 'test_event',
+        description: 'Cross-org spoof attempt',
+        icon: '🧪',
+        notifyConsole: true,
+        user_id: NON_OWNER_ORG_ID,
+        tags: {
+          'app-id': APPNAME_EVENT,
+          'test': true,
+        },
+      }),
+    })
+
+    const data = await response.json() as { error: string }
+    expect(response.status).toBe(403)
+    expect(data.error).toBe('no_permission')
+  })
+
+  it('allows notifyConsole broadcasts for the caller organization', async () => {
+    const response = await fetch(`${BASE_URL}/private/events`, {
+      method: 'POST',
+      headers: {
+        capgkey: headers.Authorization,
+      },
+      body: JSON.stringify({
+        channel: 'test',
+        event: 'test_event',
+        description: 'Valid org broadcast',
+        icon: '🧪',
+        notifyConsole: true,
+        user_id: ORG_ID,
+        tags: {
+          'app-id': APPNAME_EVENT,
+          'test': true,
         },
       }),
     })
