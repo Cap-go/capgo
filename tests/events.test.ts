@@ -79,6 +79,25 @@ describe('[POST] /private/events operations', () => {
     expect(data.status).toBe('ok')
   })
 
+  it('allows jwt broadcasts for an authorized org', async () => {
+    const authHeaders = await getAuthHeaders()
+    const response = await fetch(`${BASE_URL}/private/events`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        channel: 'test',
+        event: 'test_event',
+        description: 'Testing event tracking',
+        notifyConsole: true,
+        user_id: ORG_ID,
+      }),
+    })
+
+    const data = await response.json() as { status: string }
+    expect(response.status).toBe(200)
+    expect(data.status).toBe('ok')
+  })
+
   // Skip JWT test as it requires auth infrastructure that may not be reliably available
   // The important test is that API key auth works, which is covered above
   it.skip('track event with authorization jwt', async () => {
