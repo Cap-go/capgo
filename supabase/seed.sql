@@ -615,6 +615,14 @@ BEGIN
     (NOW(), '00000000-0000-0000-0000-000000000005', '1.0.0', 'com.stats.app', 'android', '4.15.3', '11', '1.0.0', 'stats-test-device', 't', 'f'),
     (NOW(), '00000000-0000-0000-0000-000000000006', '1.0.0', 'com.demo.app', 'electron', '7.0.0', 'Linux 5.15', '1.0.0', 'electron-test-device', 't', 'f');
 
+    -- Seed build_requests for the demo app
+    INSERT INTO "public"."build_requests" ("created_at", "updated_at", "app_id", "owner_org", "requested_by", "platform", "build_mode", "status", "build_time_seconds", "upload_session_key", "upload_path", "upload_url", "upload_expires_at") VALUES
+    (NOW() - interval '1 hour', NOW() - interval '1 hour', 'com.demo.app', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'android', 'release', 'pending', NULL, 'sess-1', '/uploads/1', 'https://example.com/upload/1', NOW() + interval '1 hour'),
+    (NOW() - interval '2 hours', NOW() - interval '1 hour 58 minutes', 'com.demo.app', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'ios', 'release', 'failed', 120, 'sess-2', '/uploads/2', 'https://example.com/upload/2', NOW() + interval '1 hour'),
+    (NOW() - interval '3 hours', NOW() - interval '2 hours 57 minutes 30 seconds', 'com.demo.app', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'ios', 'release', 'succeeded', 150, 'sess-3', '/uploads/3', 'https://example.com/upload/3', NOW() + interval '1 hour'),
+    (NOW() - interval '4 hours', NOW() - interval '3 hours 52 minutes', 'com.demo.app', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'android', 'release', 'completed', 480, 'sess-4', '/uploads/4', 'https://example.com/upload/4', NOW() + interval '1 hour'),
+    (NOW() - interval '5 hours', NOW() - interval '4 hours 45 minutes', 'com.demo.app', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'ios', 'release', 'succeeded', 900, 'sess-5', '/uploads/5', 'https://example.com/upload/5', NOW() + interval '1 hour');
+
     -- Drop replicated orgs but keet the the seed ones
     DELETE from "public"."orgs" where POSITION('organization' in orgs.name)=1;
     PERFORM setval('public.apikeys_id_seq', 111, false);

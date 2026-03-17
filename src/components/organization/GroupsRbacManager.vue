@@ -261,7 +261,7 @@ async function deleteGroup(group: GroupRow) {
 
   isSubmitting.value = true
   try {
-    const { error } = await supabase.rpc('delete_group_with_bindings' as any, { group_id: group.id })
+    const { error } = await supabase.rpc('delete_group_with_bindings', { group_id: group.id })
 
     if (error)
       throw error

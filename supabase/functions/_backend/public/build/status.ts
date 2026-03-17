@@ -101,13 +101,20 @@ export async function getBuildStatus(
   // Use admin client: access was already verified above (RLS SELECT + checkPermission).
   // The data written comes from the trusted builder API, not from user input.
   // An RLS UPDATE policy would let API-key holders forge status/build-time, so we bypass RLS here.
+  const updatePayload: Record<string, unknown> = {
+    status: builderJob.job.status,
+    last_error: builderJob.job.error || null,
+    updated_at: new Date().toISOString(),
+  }
+
+  // Store build_time_seconds from the builder's own timestamps (accurate, not poll-dependent)
+  if (builderJob.job.started_at && builderJob.job.completed_at) {
+    updatePayload.build_time_seconds = Math.floor((builderJob.job.completed_at - builderJob.job.started_at) / 1000)
+  }
+
   const { error: updateError } = await supabaseAdmin(c)
     .from('build_requests')
-    .update({
-      status: builderJob.job.status,
-      last_error: builderJob.job.error || null,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updatePayload)
     .eq('builder_job_id', job_id)
     .eq('app_id', buildRequest.app_id)
 
