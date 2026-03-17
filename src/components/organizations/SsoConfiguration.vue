@@ -49,12 +49,14 @@ async function fetchSpMetadata() {
     })
     if (!response.ok) {
       console.error('Failed to fetch SP metadata:', response.status)
+      toast.error(t('sso-error-loading-sp-metadata'))
       return
     }
     spMetadata.value = await response.json() as SpMetadata
   }
   catch (error) {
     console.error('Error fetching SP metadata:', error)
+    toast.error(t('sso-error-loading-sp-metadata'))
   }
 }
 const isLoading = ref(true)

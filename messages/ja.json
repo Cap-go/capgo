@@ -1478,6 +1478,7 @@
   "sso-error-creating": "SSOプロバイダーの作成に失敗しました",
   "sso-error-deleting": "SSOプロバイダーの削除に失敗しました",
   "sso-error-loading": "SSOプロバイダーの読み込みに失敗しました",
+  "sso-error-loading-sp-metadata": "SPメタデータの読み込みに失敗しました",
   "sso-error-updating": "SSOプロバイダーの更新に失敗しました",
   "sso-fill-all-fields": "すべての必須項目を入力してください",
   "sso-metadata-description": "SAML SSOを設定する際、これらの値をIDプロバイダー（IdP）に提供してください。",

@@ -1478,6 +1478,7 @@
   "sso-error-creating": "创建 SSO 提供商失败",
   "sso-error-deleting": "删除 SSO 提供商失败",
   "sso-error-loading": "加载 SSO 提供商失败",
+  "sso-error-loading-sp-metadata": "加载 SP 元数据失败",
   "sso-error-updating": "更新SSO提供商失败",
   "sso-fill-all-fields": "请填写所有必填字段",
   "sso-metadata-description": "配置SAML SSO时，请将这些值提供给您的身份提供商（IdP）。",

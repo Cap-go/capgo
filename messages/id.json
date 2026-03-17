@@ -1478,6 +1478,7 @@
   "sso-error-creating": "Gagal membuat penyedia SSO",
   "sso-error-deleting": "Gagal menghapus penyedia SSO",
   "sso-error-loading": "Gagal memuat penyedia SSO",
+  "sso-error-loading-sp-metadata": "Gagal memuat metadata SP",
   "sso-error-updating": "Gagal memperbarui penyedia SSO",
   "sso-fill-all-fields": "Harap isi semua bidang yang diperlukan",
   "sso-metadata-description": "Berikan nilai-nilai ini ke Penyedia Identitas (IdP) Anda saat mengonfigurasi SAML SSO.",
