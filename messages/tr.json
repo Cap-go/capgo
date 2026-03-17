@@ -1478,6 +1478,7 @@
   "sso-error-creating": "SSO sağlayıcısı oluşturulamadı",
   "sso-error-deleting": "SSO sağlayıcısı silinemedi",
   "sso-error-loading": "SSO sağlayıcıları yüklenemedi",
+  "sso-error-loading-sp-metadata": "SP meta verileri yüklenemedi",
   "sso-error-updating": "SSO sağlayıcısı güncellenemedi",
   "sso-fill-all-fields": "Lütfen tüm gerekli alanları doldurun",
   "sso-metadata-description": "SAML SSO yapılandırırken bu değerleri Kimlik Sağlayıcınıza (IdP) sağlayın.",

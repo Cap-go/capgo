@@ -1478,6 +1478,7 @@
   "sso-error-creating": "SSO प्रदाता बनाने में विफल",
   "sso-error-deleting": "SSO प्रदाता को हटाने में विफल",
   "sso-error-loading": "SSO प्रदाताओं को लोड करने में विफल",
+  "sso-error-loading-sp-metadata": "SP मेटाडेटा लोड करने में विफल",
   "sso-error-updating": "SSO provider को अपडेट करने में विफल",
   "sso-fill-all-fields": "कृपया सभी आवश्यक फ़ील्ड भरें",
   "sso-metadata-description": "SAML SSO कॉन्फ़िगर करते समय ये मान अपने Identity Provider (IdP) को प्रदान करें।",

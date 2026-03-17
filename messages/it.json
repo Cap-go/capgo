@@ -1478,6 +1478,7 @@
   "sso-error-creating": "Impossibile creare il fornitore SSO",
   "sso-error-deleting": "Impossibile eliminare il fornitore SSO",
   "sso-error-loading": "Impossibile caricare i fornitori SSO",
+  "sso-error-loading-sp-metadata": "Impossibile caricare i metadati SP",
   "sso-error-updating": "Impossibile aggiornare il provider SSO",
   "sso-fill-all-fields": "Si prega di compilare tutti i campi obbligatori",
   "sso-metadata-description": "Fornisci questi valori al tuo Identity Provider (IdP) durante la configurazione di SAML SSO.",

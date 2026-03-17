@@ -1478,6 +1478,7 @@
   "sso-error-creating": "Не удалось создать провайдера SSO",
   "sso-error-deleting": "Не удалось удалить провайдера SSO",
   "sso-error-loading": "Не удалось загрузить провайдеров SSO",
+  "sso-error-loading-sp-metadata": "Не удалось загрузить метаданные SP",
   "sso-error-updating": "Не удалось обновить поставщика SSO",
   "sso-fill-all-fields": "Пожалуйста, заполните все обязательные поля",
   "sso-metadata-description": "Предоставьте эти значения вашему поставщику удостоверений (IdP) при настройке SAML SSO.",

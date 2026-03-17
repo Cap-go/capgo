@@ -1478,6 +1478,7 @@
   "sso-error-creating": "Nie udało się utworzyć dostawcy SSO",
   "sso-error-deleting": "Nie udało się usunąć dostawcy SSO",
   "sso-error-loading": "Nie udało się załadować dostawców SSO",
+  "sso-error-loading-sp-metadata": "Nie udało się załadować metadanych SP",
   "sso-error-updating": "Nie udało się zaktualizować dostawcy SSO",
   "sso-fill-all-fields": "Proszę wypełnić wszystkie wymagane pola",
   "sso-metadata-description": "Podaj te wartości swojemu dostawcy tożsamości (IdP) podczas konfigurowania SAML SSO.",
