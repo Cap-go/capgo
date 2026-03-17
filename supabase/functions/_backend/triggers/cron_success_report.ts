@@ -1,7 +1,6 @@
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import { Hono } from 'hono/tiny'
-import { BRES, middlewareAPISecret, parseBody, quickError, simpleError } from '../utils/hono.ts'
+import { BRES, createHono, middlewareAPISecret, parseBody, quickError, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { version } from '../utils/version.ts'
 
 interface CronSuccessReportPayload {
   runId: string
@@ -9,7 +8,7 @@ interface CronSuccessReportPayload {
   url: string
 }
 
-export const app = new Hono<MiddlewareKeyVariables>()
+export const app = createHono('', version)
 
 app.post('/', middlewareAPISecret, async (c) => {
   const payload = await parseBody<CronSuccessReportPayload>(c)
@@ -68,7 +67,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       url,
       status: response.status,
     })
-    quickError(502, 'cron_success_report_failed', 'Failed to deliver cron success report')
+    throw quickError(502, 'cron_success_report_failed', 'Failed to deliver cron success report')
   }
 
   cloudlog({

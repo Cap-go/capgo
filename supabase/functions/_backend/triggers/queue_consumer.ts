@@ -265,15 +265,21 @@ async function processQueue(
     // set visibility timeout to random number to prevent Auto DDOS
   }
 
-  const batchSucceeded = messagesToSkip.length === 0 && messagesFailed.length === 0
-
   if (cronRunId) {
-    await updateCronTaskRunBatch(
-      db,
-      cronRunId,
-      batchSucceeded,
-      batchSucceeded ? undefined : `${queueName} batch failed`,
-    )
+    const relatedResults = results.filter(result => getCronRunId(result.message?.payload?.__cron_run_id) === cronRunId)
+    const relatedFailures = messagesFailed.filter(message => getCronRunId(message.message?.payload?.__cron_run_id) === cronRunId)
+    const relatedSkipped = messagesToSkip.filter(message => getCronRunId(message.message?.payload?.__cron_run_id) === cronRunId)
+
+    if (relatedResults.length > 0 || relatedSkipped.length > 0) {
+      const batchSucceeded = relatedSkipped.length === 0 && relatedFailures.length === 0
+
+      await updateCronTaskRunBatch(
+        db,
+        cronRunId,
+        batchSucceeded,
+        batchSucceeded ? undefined : `${queueName} batch failed`,
+      )
+    }
   }
 
   const messageRunIds = new Set<string>()
@@ -543,10 +549,15 @@ app.post('/sync', async (c) => {
   const body = await parseBody<{ queue_name: string, batch_size?: number, cron_run_id?: string }>(c)
   const queueName = body?.queue_name
   const batchSize = body?.batch_size
-  const cronRunId = getCronRunId(body?.cron_run_id)
+  const rawCronRunId = body?.cron_run_id
+  const cronRunId = rawCronRunId === undefined ? null : getCronRunId(rawCronRunId)
 
   if (!queueName || typeof queueName !== 'string') {
     throw simpleError('missing_or_invalid_queue_name', 'Missing or invalid queue_name in body', { body })
+  }
+
+  if (rawCronRunId !== undefined && !cronRunId) {
+    throw simpleError('invalid_cron_run_id', 'cron_run_id must be a valid UUID', { cron_run_id: rawCronRunId })
   }
 
   // Only validate when batchSize is explicitly provided
