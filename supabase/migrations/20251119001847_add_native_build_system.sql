@@ -658,14 +658,27 @@ BEGIN
     INTO metrics_json
     FROM metrics;
 
-    INSERT INTO public.app_metrics_cache (org_id, start_date, end_date, response, cached_at)
-    VALUES (p_org_id, p_start_date, p_end_date, metrics_json, clock_timestamp())
-    ON CONFLICT (org_id) DO UPDATE
-        SET start_date = EXCLUDED.start_date,
-            end_date = EXCLUDED.end_date,
-            response = EXCLUDED.response,
-            cached_at = EXCLUDED.cached_at
-    RETURNING * INTO cache_record;
+    BEGIN
+        INSERT INTO public.app_metrics_cache (org_id, start_date, end_date, response, cached_at)
+        VALUES (p_org_id, p_start_date, p_end_date, metrics_json, clock_timestamp())
+        ON CONFLICT (org_id) DO UPDATE
+            SET start_date = EXCLUDED.start_date,
+                end_date = EXCLUDED.end_date,
+                response = EXCLUDED.response,
+                cached_at = EXCLUDED.cached_at
+        RETURNING * INTO cache_record;
+    EXCEPTION
+        WHEN read_only_sql_transaction THEN
+            cache_record := (
+                SELECT
+                    0::bigint,
+                    p_org_id,
+                    p_start_date,
+                    p_end_date,
+                    metrics_json,
+                    clock_timestamp()
+            )::public.app_metrics_cache;
+    END;
 
     RETURN cache_record;
 END;
