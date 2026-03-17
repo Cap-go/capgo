@@ -145,6 +145,23 @@ describe('[POST] /private/events operations', () => {
     expect(data.status).toBe('ok')
   })
 
+  it.concurrent('rejects console event broadcast without an org id', async () => {
+    const response = await fetch(`${BASE_URL}/private/events`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        channel: 'test',
+        event: 'test_event',
+        description: 'Testing console event tracking',
+        notifyConsole: true,
+      }),
+    })
+
+    const data = await response.json() as { error: string }
+    expect(response.status).toBe(400)
+    expect(data.error).toBe('missing_org_id')
+  })
+
   it.concurrent('rejects console event broadcast for a foreign org', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
