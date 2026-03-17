@@ -1,4 +1,7 @@
+import type { Context } from 'hono'
+import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import { createHono, middlewareAuth, quickError, useCors } from '../../utils/hono.ts'
+import { cloudlog } from '../../utils/logging.ts'
 import { getEnv } from '../../utils/utils.ts'
 import { version } from '../../utils/version.ts'
 
@@ -7,9 +10,11 @@ export const app = createHono('', version)
 app.use('*', useCors)
 app.use('*', middlewareAuth)
 
-app.get('/', (c) => {
+app.get('/', (c: Context<MiddlewareKeyVariables>) => {
   const auth = c.get('auth')
+  const requestId = c.get('requestId')
   if (!auth) {
+    cloudlog({ requestId, message: 'Unauthorized request to sp-metadata — no auth context', auth })
     return quickError(401, 'not_authorized', 'Not authorized')
   }
 
