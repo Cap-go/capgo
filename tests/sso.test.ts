@@ -690,3 +690,82 @@ describe('[GET] /private/sso/providers/:orgId', () => {
     expect(data.error).toBe('no_jwt_apikey_or_subkey')
   })
 })
+
+describe('[PATCH] /private/sso/providers/:id', () => {
+  it('syncs auth.users.is_sso_user when enforce_sso is toggled', async () => {
+    const providerId = randomUUID()
+    const domain = `${randomUUID()}.sso.test`
+    const email = `toggle-user-${randomUUID()}@${domain}`
+    const password = 'testtest'
+    const pool = new Pool({ connectionString: POSTGRES_URL })
+
+    const { data: createdUser, error: createUserError } = await getSupabaseClient().auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    })
+    if (createUserError || !createdUser.user) {
+      await pool.end()
+      throw createUserError ?? new Error('Failed to create auth user for provider enforcement sync test')
+    }
+
+    try {
+      const { error: providerError } = await (getSupabaseClient().from as any)('sso_providers').insert({
+        id: providerId,
+        org_id: SSO_TEST_ORG_ID,
+        domain,
+        provider_id: randomUUID(),
+        status: 'active',
+        enforce_sso: false,
+        dns_verification_token: `dns-${randomUUID()}`,
+      })
+      if (providerError)
+        throw providerError
+
+      const initialUser = await pool.query<{ is_sso_user: boolean }>(
+        'select is_sso_user from auth.users where id = $1',
+        [createdUser.user.id],
+      )
+      expect(initialUser.rows[0]?.is_sso_user).toBe(false)
+
+      const enableResponse = await fetchWithRetry(getEndpointUrl(`/private/sso/providers/${providerId}`), {
+        method: 'PATCH',
+        headers: authHeaders,
+        body: JSON.stringify({ enforce_sso: true }),
+      })
+
+      expect(enableResponse.status).toBe(200)
+      const enabledProvider = await enableResponse.json() as { enforce_sso: boolean }
+      expect(enabledProvider.enforce_sso).toBe(true)
+
+      const enabledUser = await pool.query<{ is_sso_user: boolean }>(
+        'select is_sso_user from auth.users where id = $1',
+        [createdUser.user.id],
+      )
+      expect(enabledUser.rows[0]?.is_sso_user).toBe(true)
+
+      const disableResponse = await fetchWithRetry(getEndpointUrl(`/private/sso/providers/${providerId}`), {
+        method: 'PATCH',
+        headers: authHeaders,
+        body: JSON.stringify({ enforce_sso: false }),
+      })
+
+      expect(disableResponse.status).toBe(200)
+      const disabledProvider = await disableResponse.json() as { enforce_sso: boolean }
+      expect(disabledProvider.enforce_sso).toBe(false)
+
+      const disabledUser = await pool.query<{ is_sso_user: boolean }>(
+        'select is_sso_user from auth.users where id = $1',
+        [createdUser.user.id],
+      )
+      expect(disabledUser.rows[0]?.is_sso_user).toBe(false)
+    }
+    finally {
+      await Promise.allSettled([
+        (getSupabaseClient().from as any)('sso_providers').delete().eq('id', providerId),
+        getSupabaseClient().auth.admin.deleteUser(createdUser.user.id),
+        pool.end(),
+      ])
+    }
+  })
+})
