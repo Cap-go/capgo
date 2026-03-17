@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(6);
+SELECT plan(7);
 
 -- Test fixtures - DEDICATED DATA FOR TEST ISOLATION (parallel test execution)
 -- Create dedicated test users to avoid conflicts with other parallel tests
@@ -156,6 +156,22 @@ SELECT
     1,
     org_rbac,
     admin_user
+FROM seed_data
+ON CONFLICT (id) DO NOTHING;
+
+WITH seed_data AS (
+    SELECT
+        '22222222-2222-4222-8222-222222222222'::uuid AS org_rbac,
+        'com.rbac.new'::text AS app_rbac
+)
+INSERT INTO public.app_versions (id, name, app_id, owner_org, storage_provider)
+OVERRIDING SYSTEM VALUE
+SELECT
+    987650002,
+    '1.0.0',
+    app_rbac,
+    org_rbac,
+    'r2'
 FROM seed_data
 ON CONFLICT (id) DO NOTHING;
 
@@ -344,6 +360,20 @@ SELECT
             null::varchar
         ),
         'RBAC-disabled org falls back to legacy (no rights without org_users row)'
+    );
+
+UPDATE public.orgs SET use_new_rbac = true
+WHERE id = '22222222-2222-4222-8222-222222222222';
+
+SELECT
+    is(
+        public.get_app_versions(
+            'com.rbac.new',
+            '1.0.0',
+            'rbac-test-key-phase1'
+        ),
+        987650002,
+        'RBAC app-scoped apikey can resolve version ids for its app'
     );
 
 SELECT * FROM finish();
