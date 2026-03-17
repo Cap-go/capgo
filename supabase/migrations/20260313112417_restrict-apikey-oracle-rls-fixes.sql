@@ -59,17 +59,23 @@ FOR DELETE
             )
             OR (
                 SELECT
-                    public.get_user_id(_apikey)::text = ("storage"."foldername" ("name")) [0]
-                    AND public.is_allowed_capgkey(
-                        _apikey,
-                        '{all}'::"public"."key_mode" [],
-                        ("storage"."foldername" ("name")) [1]
+                    EXISTS (
+                        SELECT 1
+                        FROM "public"."apps" AS "app"
+                        WHERE
+                            "app"."app_id" = ("storage"."foldername" ("name")) [1]
+                            AND "app"."user_id"::text = ("storage"."foldername" ("name")) [0]
+                            AND public.is_allowed_capgkey(
+                                _apikey,
+                                '{all}'::"public"."key_mode" [],
+                                ("storage"."foldername" ("name")) [1]
+                            )
                     )
                 FROM (
                     SELECT
                         "public"."get_apikey_header" () AS _apikey
                 ) AS _header
-                WHERE _apikey IS NOT NULL
+                WHERE _apikey IS NOT NULL AND _apikey <> ''
             )
         )
     );
@@ -86,17 +92,23 @@ FOR UPDATE
             )
             OR (
                 SELECT
-                    public.get_user_id(_apikey)::text = ("storage"."foldername" ("name")) [0]
-                    AND public.is_allowed_capgkey(
-                        _apikey,
-                        '{write,all}'::"public"."key_mode" [],
-                        ("storage"."foldername" ("name")) [1]
+                    EXISTS (
+                        SELECT 1
+                        FROM "public"."apps" AS "app"
+                        WHERE
+                            "app"."app_id" = ("storage"."foldername" ("name")) [1]
+                            AND "app"."user_id"::text = ("storage"."foldername" ("name")) [0]
+                            AND public.is_allowed_capgkey(
+                                _apikey,
+                                '{write,all}'::"public"."key_mode" [],
+                                ("storage"."foldername" ("name")) [1]
+                            )
                     )
                 FROM (
                     SELECT
                         "public"."get_apikey_header" () AS _apikey
                 ) AS _header
-                WHERE _apikey IS NOT NULL
+                WHERE _apikey IS NOT NULL AND _apikey <> ''
             )
         )
     );
@@ -114,17 +126,23 @@ FOR INSERT
             )
             OR (
                 SELECT
-                    public.get_user_id(_apikey)::text = ("storage"."foldername" ("name")) [0]
-                    AND public.is_allowed_capgkey(
-                        _apikey,
-                        '{write,all}'::"public"."key_mode" [],
-                        ("storage"."foldername" ("name")) [1]
+                    EXISTS (
+                        SELECT 1
+                        FROM "public"."apps" AS "app"
+                        WHERE
+                            "app"."app_id" = ("storage"."foldername" ("name")) [1]
+                            AND "app"."user_id"::text = ("storage"."foldername" ("name")) [0]
+                            AND public.is_allowed_capgkey(
+                                _apikey,
+                                '{write,all}'::"public"."key_mode" [],
+                                ("storage"."foldername" ("name")) [1]
+                            )
                     )
                 FROM (
                     SELECT
                         "public"."get_apikey_header" () AS _apikey
                 ) AS _header
-                WHERE _apikey IS NOT NULL
+                WHERE _apikey IS NOT NULL AND _apikey <> ''
             )
         )
     );
@@ -141,17 +159,23 @@ FOR SELECT
             )
             OR (
                 SELECT
-                    public.get_user_id(_apikey)::text = ("storage"."foldername" ("name")) [0]
-                    AND public.is_allowed_capgkey(
-                        _apikey,
-                        '{read,all}'::"public"."key_mode" [],
-                        ("storage"."foldername" ("name")) [1]
+                    EXISTS (
+                        SELECT 1
+                        FROM "public"."apps" AS "app"
+                        WHERE
+                            "app"."app_id" = ("storage"."foldername" ("name")) [1]
+                            AND "app"."user_id"::text = ("storage"."foldername" ("name")) [0]
+                            AND public.is_allowed_capgkey(
+                                _apikey,
+                                '{read,all}'::"public"."key_mode" [],
+                                ("storage"."foldername" ("name")) [1]
+                            )
                     )
                 FROM (
                     SELECT
                         "public"."get_apikey_header" () AS _apikey
                 ) AS _header
-                WHERE _apikey IS NOT NULL
+                WHERE _apikey IS NOT NULL AND _apikey <> ''
             )
         )
     );
