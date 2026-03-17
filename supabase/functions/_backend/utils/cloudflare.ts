@@ -15,6 +15,19 @@ function escapeSqlString(value: string): string {
   return value.replace(/'/g, '\'\'').replace(/\\/g, '\\\\')
 }
 
+const MAX_ANALYTICS_QUERY_LIMIT = 50_000
+
+function normalizeAnalyticsLimit(limit?: number): number {
+  if (typeof limit !== 'number' || !Number.isFinite(limit))
+    return DEFAULT_LIMIT
+
+  const integerLimit = Math.trunc(limit)
+  if (integerLimit < 1)
+    return DEFAULT_LIMIT
+
+  return Math.min(integerLimit, MAX_ANALYTICS_QUERY_LIMIT)
+}
+
 // type is require for the bindings no interface
 // eslint-disable-next-line ts/consistent-type-definitions
 export type Bindings = {
@@ -586,7 +599,7 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
   //         double1=platform (0=android, 1=ios), double2=is_prod, double3=is_emulator
   //         index1=app_id, timestamp=updated_at
 
-  const limit = params.limit ?? DEFAULT_LIMIT
+  const limit = normalizeAnalyticsLimit(params.limit)
   const conditions: string[] = [`index1 = '${escapeSqlString(params.app_id)}'`]
 
   if (customIdMode) {
@@ -694,6 +707,8 @@ export async function readStatsCF(c: Context, params: ReadStatsParams) {
   if (!c.env.APP_LOG)
     return [] as StatRowCF[]
 
+  const limit = normalizeAnalyticsLimit(params.limit)
+
   let deviceFilter = ''
 
   if (params.deviceIds?.length) {
@@ -753,7 +768,7 @@ WHERE
   app_id = '${escapeSqlString(params.app_id)}' ${deviceFilter} ${actionsFilter} ${searchFilter} ${startFilter} ${endFilter}
 GROUP BY app_id, created_at, action, device_id, version_name
 ${orderFilter}
-LIMIT ${params.limit ?? DEFAULT_LIMIT}`
+LIMIT ${limit}`
 
   cloudlog({ requestId: c.get('requestId'), message: 'readStatsCF query', query })
   try {
