@@ -20,20 +20,12 @@ DECLARE
   has_sso boolean;
   user_provider text;
 BEGIN
-    -- Only suppress org creation for users who actually authenticated via SSO.
-    -- Email/password signups with a corporate domain should still get a personal org;
-    -- provision-user.ts will reject them anyway (requires SSO identity).
     SELECT raw_app_meta_data->>'provider'
     INTO user_provider
     FROM auth.users
     WHERE id = NEW.id;
 
-    IF user_provider IS NULL OR user_provider = 'email' OR user_provider = 'phone' THEN
-      INSERT INTO public.orgs (created_by, name, management_email) values (NEW.id, format('%s organization', NEW.first_name), NEW.email) RETURNING * INTO org_record;
-      RETURN NEW;
-    END IF;
-
-    -- Skip auto-org for SSO-managed domains; provision-user.ts assigns the correct org.
+    -- Compute has_sso first so it can be combined with the provider check below.
     -- Mirror the sso_enabled guard from check_domain_sso to stay consistent.
     SELECT EXISTS (
       SELECT 1 FROM public.sso_providers sp
@@ -42,11 +34,13 @@ BEGIN
       AND sp.status = 'active'
     ) INTO has_sso;
 
-    IF has_sso THEN
-      RETURN NEW;
+    -- Skip org creation only for genuine SAML SSO logins on SSO-managed domains.
+    -- Supabase sets app_metadata.provider to 'sso:<provider_uuid>' for SAML sessions.
+    -- Email, phone, and OAuth providers (e.g. google, github) always get a personal org,
+    -- even when their email domain matches an active SSO provider.
+    IF NOT (user_provider ~ '^sso:' AND has_sso) THEN
+      INSERT INTO public.orgs (created_by, name, management_email) values (NEW.id, format('%s organization', NEW.first_name), NEW.email) RETURNING * INTO org_record;
     END IF;
-
-    INSERT INTO public.orgs (created_by, name, management_email) values (NEW.id, format('%s organization', NEW.first_name), NEW.email) RETURNING * INTO org_record;
 
     RETURN NEW;
 END $$;
