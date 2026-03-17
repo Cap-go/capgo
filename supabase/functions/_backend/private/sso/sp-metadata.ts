@@ -10,6 +10,10 @@ export const app = createHono('', version)
 app.use('*', useCors)
 app.use('*', middlewareAuth)
 
+function isLocalHost(host: string | undefined): boolean {
+  return !!host && /^(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::\d+)?$/i.test(host)
+}
+
 function getPublicSupabaseUrl(c: Context<MiddlewareKeyVariables>): string {
   const supabaseUrl = getEnv(c, 'SUPABASE_URL').replace(/\/$/, '')
   const isLocalDev = supabaseUrl.includes('kong:8000')
@@ -17,6 +21,7 @@ function getPublicSupabaseUrl(c: Context<MiddlewareKeyVariables>): string {
   const forwardedPort = c.req.header('X-Forwarded-Port')
   const forwardedProto = c.req.header('X-Forwarded-Proto')?.split(',')[0]?.trim()
   const hostHeader = c.req.header('Host')
+  const isLocalRequest = isLocalDev || isLocalHost(forwardedHost) || isLocalHost(hostHeader)
 
   if (isLocalDev && forwardedHost && !forwardedHost.includes(':')) {
     const hostPort = hostHeader?.includes(':') ? hostHeader.split(':').pop() : undefined
@@ -26,11 +31,11 @@ function getPublicSupabaseUrl(c: Context<MiddlewareKeyVariables>): string {
   }
 
   if (forwardedHost) {
-    return `${forwardedProto || (isLocalDev ? 'http' : 'https')}://${forwardedHost}`
+    return `${forwardedProto || (isLocalRequest ? 'http' : 'https')}://${forwardedHost}`
   }
 
   if (hostHeader) {
-    return `${isLocalDev ? 'http' : 'https'}://${hostHeader}`
+    return `${isLocalRequest ? 'http' : 'https'}://${hostHeader}`
   }
 
   return supabaseUrl

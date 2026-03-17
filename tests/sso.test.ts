@@ -430,6 +430,66 @@ describe('generate_org_on_user_create', () => {
 })
 
 describe('[POST] /private/sso/provision-user', () => {
+  it('rejects non-SAML providers even when they are non-email identities', async () => {
+    const email = `oauth-user-${randomUUID()}@capgo.app`
+    const password = 'testtest'
+    const oauthProviderId = `google-${randomUUID()}`
+    const pool = new Pool({ connectionString: POSTGRES_URL })
+
+    const { data: createdUser, error: createUserError } = await getSupabaseClient().auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        first_name: 'OAuth',
+        last_name: 'User',
+      },
+    })
+    if (createUserError || !createdUser.user) {
+      await pool.end()
+      throw createUserError ?? new Error('Failed to create OAuth-like auth user for SSO provider validation test')
+    }
+
+    try {
+      const oauthAuthHeaders = await getAuthHeadersForCredentials(email, password)
+
+      const { error: appMetadataError } = await getSupabaseClient().auth.admin.updateUserById(createdUser.user.id, {
+        app_metadata: {
+          provider: 'google',
+        },
+      })
+      if (appMetadataError)
+        throw appMetadataError
+
+      await pool.query(
+        `
+          update auth.identities
+          set provider = 'google',
+              provider_id = $1,
+              identity_data = jsonb_build_object($$sub$$, $1::text, $$email$$, $2::text, $$email_verified$$, true)
+          where user_id = $3
+        `,
+        [oauthProviderId, email, createdUser.user.id],
+      )
+
+      const response = await fetchWithRetry(getEndpointUrl('/private/sso/provision-user'), {
+        method: 'POST',
+        headers: oauthAuthHeaders,
+        body: JSON.stringify({}),
+      })
+
+      expect(response.status).toBe(403)
+      const responseBody = await response.json() as { error: string }
+      expect(responseBody.error).toBe('sso_auth_required')
+    }
+    finally {
+      await Promise.allSettled([
+        getSupabaseClient().auth.admin.deleteUser(createdUser.user.id),
+        pool.end(),
+      ])
+    }
+  })
+
   it('merges an existing password account when a new SSO auth user arrives with the same email', async () => {
     const managedOrgId = randomUUID()
     const managedCustomerId = `cus_sso_merge_${randomUUID()}`
