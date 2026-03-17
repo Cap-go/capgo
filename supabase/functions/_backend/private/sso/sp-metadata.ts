@@ -10,7 +10,7 @@ app.use('*', middlewareAuth)
 app.get('/', (c) => {
   const auth = c.get('auth')
   if (!auth) {
-    quickError(401, 'not_authorized', 'Not authorized')
+    return quickError(401, 'not_authorized', 'Not authorized')
   }
 
   const supabaseUrl = getEnv(c, 'SUPABASE_URL').replace(/\/$/, '')
