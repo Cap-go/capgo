@@ -2,7 +2,7 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import { createHono, middlewareAuth, quickError, useCors } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
-import { closeClient, getPgClient } from '../../utils/pg.ts'
+import { getPgClient } from '../../utils/pg.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 import { version } from '../../utils/version.ts'
 
@@ -311,7 +311,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
   }
   finally {
     if (pgClient) {
-      await closeClient(c, pgClient)
+      await pgClient.end()
     }
   }
 })
