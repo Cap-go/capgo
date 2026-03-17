@@ -48,7 +48,12 @@ app.post('/', middlewareAPISecret, async (c) => {
     if (error instanceof Error && error.name === 'AbortError') {
       throw quickError(504, 'cron_success_report_timeout', 'Success report request timed out')
     }
-    throw error
+    throw quickError(
+      502,
+      'cron_success_report_failed',
+      `Success report request failed: ${error instanceof Error ? error.message : String(error)}`,
+      { error },
+    )
   }
   finally {
     clearTimeout(timeoutId)
@@ -63,7 +68,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       url,
       status: response.status,
     })
-    return quickError(502, 'cron_success_report_failed', 'Failed to deliver cron success report')
+    quickError(502, 'cron_success_report_failed', 'Failed to deliver cron success report')
   }
 
   cloudlog({

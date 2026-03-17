@@ -12,7 +12,7 @@ import { backgroundTask, getEnv } from '../utils/utils.ts'
 // Define constants
 const DEFAULT_BATCH_SIZE = 950 // Default batch size for queue reads limit of CF is 1000 fetches so we take a safe margin
 const DISCORD_IGNORED_ERROR_CODES = new Set(['version_not_found', 'no_channel'])
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
 // Zod schema for a message object
 export const messageSchema = z.object({
@@ -62,7 +62,9 @@ async function updateCronTaskRunBatch(
   succeeded: boolean,
   errorMessage?: string,
 ) {
-  await db.query(`
+  const { rows } = await db.query<{
+    status: string
+  }>(`
     UPDATE public.cron_task_runs
     SET
       completed_batches = completed_batches + CASE WHEN $2 THEN 1 ELSE 0 END,
@@ -83,9 +85,10 @@ async function updateCronTaskRunBatch(
       END,
       updated_at = NOW()
     WHERE id = $1::uuid AND status = 'running'
+    RETURNING status
   `, [runId, succeeded, errorMessage ?? null])
 
-  if (succeeded) {
+  if (rows[0]?.status === 'success') {
     await db.query('SELECT public.queue_cron_success_report($1::uuid)', [runId])
   }
 }
