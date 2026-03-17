@@ -287,7 +287,9 @@ async function getData() {
           appId: props.appId,
           devicesId: props.deviceId ? [props.deviceId] : undefined,
           search: search.value ? search.value : undefined,
-          order: columns.value.filter(elem => elem.sortable).map(elem => ({ key: elem.key as string, sortable: elem.sortable })),
+          order: columns.value
+            .filter(elem => typeof elem.sortable === 'string')
+            .map(elem => ({ key: elem.key as string, sortable: elem.sortable as 'asc' | 'desc' })),
           rangeStart: paginatedRange.value.rangeStart,
           rangeEnd: paginatedRange.value.rangeEnd,
           actions: activeActions.value,
