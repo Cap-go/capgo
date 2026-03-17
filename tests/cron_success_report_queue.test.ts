@@ -45,7 +45,7 @@ afterAll(async () => {
 })
 
 describe('cron success report queue', () => {
-  it('queues a success report only once per successful run', async () => {
+  it.concurrent('queues a success report only once per successful run', async () => {
     const runId = randomUUID()
 
     await pool.query(`
@@ -76,7 +76,7 @@ describe('cron success report queue', () => {
     expect(rows[0].count).toBe(1)
   })
 
-  it('does not queue a success report for failed runs', async () => {
+  it.concurrent('does not queue a success report for failed runs', async () => {
     const runId = randomUUID()
 
     await pool.query(`
@@ -97,7 +97,11 @@ describe('cron success report queue', () => {
 
     await pool.query('SELECT public.queue_cron_success_report($1::uuid)', [runId])
 
-    const { rows } = await pool.query('SELECT count(*)::int AS count FROM pgmq.q_cron_success_report')
+    const { rows } = await pool.query(`
+      SELECT count(*)::int AS count
+      FROM pgmq.q_cron_success_report
+      WHERE message->>'runId' = $1
+    `, [runId])
     expect(rows[0].count).toBe(0)
   })
 })

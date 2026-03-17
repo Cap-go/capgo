@@ -276,13 +276,13 @@ async function processQueue(
   const messageRunIds = new Set<string>()
   for (const message of results) {
     const runId = getCronRunId(message.message?.payload?.__cron_run_id)
-    if (runId) {
+    if (runId && runId !== cronRunId) {
       messageRunIds.add(runId)
     }
   }
   for (const message of messagesToSkip) {
     const runId = getCronRunId(message.message?.payload?.__cron_run_id)
-    if (runId) {
+    if (runId && runId !== cronRunId) {
       messageRunIds.add(runId)
     }
   }

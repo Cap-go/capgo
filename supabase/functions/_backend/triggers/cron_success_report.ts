@@ -31,12 +31,28 @@ app.post('/', middlewareAPISecret, async (c) => {
     throw simpleError('invalid_url_protocol', 'Success report URL must use HTTPS', { url })
   }
 
-  const response = await fetch(parsedUrl, {
-    method: 'GET',
-    headers: {
-      'User-Agent': 'Capgo-Cron-Health/1.0',
-    },
-  })
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 8000)
+
+  let response: Response
+  try {
+    response = await fetch(parsedUrl, {
+      method: 'GET',
+      headers: {
+        'User-Agent': 'Capgo-Cron-Health/1.0',
+      },
+      signal: controller.signal,
+    })
+  }
+  catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw quickError(504, 'cron_success_report_timeout', 'Success report request timed out')
+    }
+    throw error
+  }
+  finally {
+    clearTimeout(timeoutId)
+  }
 
   if (!response.ok) {
     cloudlog({
