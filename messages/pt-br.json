@@ -1478,6 +1478,7 @@
   "sso-error-creating": "Falha ao criar provedor SSO",
   "sso-error-deleting": "Falha ao excluir provedor SSO",
   "sso-error-loading": "Falha ao carregar provedores SSO",
+  "sso-error-loading-sp-metadata": "Falha ao carregar metadados do SP",
   "sso-error-updating": "Falha ao atualizar o provedor SSO",
   "sso-fill-all-fields": "Por favor, preencha todos os campos obrigatórios",
   "sso-metadata-description": "Forneça estes valores ao seu Provedor de Identidade (IdP) ao configurar o SAML SSO.",

@@ -1478,6 +1478,7 @@
   "sso-error-creating": "Échec de la création du fournisseur SSO",
   "sso-error-deleting": "Échec de la suppression du fournisseur SSO",
   "sso-error-loading": "Échec du chargement des fournisseurs SSO",
+  "sso-error-loading-sp-metadata": "Impossible de charger les métadonnées SP",
   "sso-error-updating": "Échec de la mise à jour du fournisseur SSO",
   "sso-fill-all-fields": "Veuillez remplir tous les champs obligatoires",
   "sso-metadata-description": "Fournissez ces valeurs à votre fournisseur d'identité (IdP) lors de la configuration du SSO SAML.",

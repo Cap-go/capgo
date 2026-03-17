@@ -1478,6 +1478,7 @@
   "sso-error-creating": "Tạo nhà cung cấp SSO thất bại",
   "sso-error-deleting": "Xóa nhà cung cấp SSO thất bại",
   "sso-error-loading": "Tải nhà cung cấp SSO thất bại",
+  "sso-error-loading-sp-metadata": "Tải siêu dữ liệu SP thất bại",
   "sso-error-updating": "Không thể cập nhật nhà cung cấp SSO",
   "sso-fill-all-fields": "Vui lòng điền vào tất cả các trường bắt buộc",
   "sso-metadata-description": "Cung cấp các giá trị này cho Nhà cung cấp Danh tính (IdP) của bạn khi cấu hình SAML SSO.",

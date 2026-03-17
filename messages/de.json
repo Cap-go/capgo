@@ -1478,6 +1478,7 @@
   "sso-error-creating": "SSO-Anbieter konnte nicht erstellt werden",
   "sso-error-deleting": "SSO-Anbieter konnte nicht gelöscht werden",
   "sso-error-loading": "SSO-Anbieter konnten nicht geladen werden",
+  "sso-error-loading-sp-metadata": "SP-Metadaten konnten nicht geladen werden",
   "sso-error-updating": "Aktualisierung des SSO-Anbieters fehlgeschlagen",
   "sso-fill-all-fields": "Bitte füllen Sie alle erforderlichen Felder aus",
   "sso-metadata-description": "Geben Sie diese Werte Ihrem Identity Provider (IdP) bei der Konfiguration von SAML SSO an.",
