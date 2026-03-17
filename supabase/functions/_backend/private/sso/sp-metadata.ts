@@ -15,9 +15,11 @@ app.get('/', (c) => {
 
   const supabaseUrl = getEnv(c, 'SUPABASE_URL').replace(/\/$/, '')
 
+  const metadataUrl = `${supabaseUrl}/auth/v1/sso/saml/metadata`
   return c.json({
     acs_url: `${supabaseUrl}/auth/v1/sso/saml/acs`,
-    entity_id: `${supabaseUrl}/auth/v1/sso/saml/metadata`,
+    entity_id: metadataUrl,
+    sp_metadata_url: metadataUrl,
     nameid_format: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
   })
 })
