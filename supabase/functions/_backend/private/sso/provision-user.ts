@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import { createHono, middlewareAuth, quickError, useCors } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
+import { closeClient, getPgClient } from '../../utils/pg.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 import { version } from '../../utils/version.ts'
 
@@ -9,6 +10,72 @@ export const app = createHono('', version)
 
 app.use('*', useCors)
 app.use('*', middlewareAuth)
+
+async function findAuthUserIdByEmail(c: Context<MiddlewareKeyVariables>, email: string, excludedUserId: string): Promise<string | null> {
+  let pgClient
+  try {
+    pgClient = getPgClient(c)
+    const result = await pgClient.query<{ id: string }>(
+      `
+        select id
+        from auth.users
+        where lower(email) = lower($1)
+          and id <> $2
+        limit 1
+      `,
+      [email, excludedUserId],
+    )
+
+    return result.rows[0]?.id ?? null
+  }
+  finally {
+    if (pgClient)
+      await closeClient(c, pgClient)
+  }
+}
+
+async function transferSsoIdentities(c: Context<MiddlewareKeyVariables>, originalUserId: string, duplicateUserId: string): Promise<number> {
+  let pgClient
+  try {
+    pgClient = getPgClient(c)
+    const result = await pgClient.query(
+      `
+        update auth.identities
+        set user_id = $1,
+            updated_at = now()
+        where user_id = $2
+          and provider <> 'email'
+          and provider <> 'phone'
+      `,
+      [originalUserId, duplicateUserId],
+    )
+
+    return result.rowCount ?? 0
+  }
+  finally {
+    if (pgClient)
+      await closeClient(c, pgClient)
+  }
+}
+
+async function setAuthUserSsoOnly(c: Context<MiddlewareKeyVariables>, userId: string): Promise<void> {
+  let pgClient
+  try {
+    pgClient = getPgClient(c)
+    await pgClient.query(
+      `
+        update auth.users
+        set is_sso_user = true
+        where id = $1
+      `,
+      [userId],
+    )
+  }
+  finally {
+    if (pgClient)
+      await closeClient(c, pgClient)
+  }
+}
 
 app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
   const auth = c.get('auth')
@@ -80,14 +147,32 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     return quickError(500, 'user_lookup_failed', 'Failed to check for existing user')
   }
 
-  if (existingUser) {
-    const originalUserId = existingUser.id
+  // Fallback: check auth.users directly in case the existing account has no public.users row yet.
+  // This covers cases where the original user authenticated via SSO (with a now-deleted provider)
+  // and their public.users was never created, or was cleaned up.
+  let resolvedExistingUserId: string | null = existingUser?.id ?? null
+  if (!resolvedExistingUserId) {
+    try {
+      const existingAuthUserId = await findAuthUserIdByEmail(c, userEmail, userId)
+      if (existingAuthUserId) {
+        cloudlog({ requestId, message: 'Pre-existing auth account found (no public.users row yet) — will merge SSO identity', userId, originalUserId: existingAuthUserId, email: userEmail })
+        resolvedExistingUserId = existingAuthUserId
+      }
+    }
+    catch (existingAuthUserError) {
+      cloudlogErr({ requestId, message: 'Failed to check auth.users for pre-existing account by email', userId, email: userEmail, error: existingAuthUserError })
+      // Non-fatal — fall through to normal provisioning
+    }
+  }
+
+  if (resolvedExistingUserId) {
+    const originalUserId = resolvedExistingUserId
     cloudlog({ requestId, message: 'Pre-existing user found with same email — merging SSO identity', userId, originalUserId, email: userEmail })
 
     // Step 1: Resolve the SSO provider org so we can ensure the original user is a member
     const { data: mergeProvider, error: mergeProviderError } = await (admin as any)
       .from('sso_providers')
-      .select('id, org_id')
+      .select('id, org_id, enforce_sso')
       .eq('domain', userDomain)
       .eq('status', 'active')
       .single()
@@ -119,15 +204,29 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     }
 
     // Step 2: Transfer SSO identity from duplicate user (userId) → original user (originalUserId)
-    const { error: identityTransferError } = await (admin as any)
-      .schema('auth')
-      .from('identities')
-      .update({ user_id: originalUserId })
-      .eq('user_id', userId)
-
-    if (identityTransferError) {
+    try {
+      const transferredIdentityCount = await transferSsoIdentities(c, originalUserId, userId)
+      if (transferredIdentityCount === 0) {
+        cloudlogErr({ requestId, message: 'No SSO identities were transferred during merge', userId, originalUserId })
+        return quickError(500, 'identity_transfer_failed', 'Failed to merge SSO identity with existing account')
+      }
+    }
+    catch (identityTransferError) {
       cloudlogErr({ requestId, message: 'Failed to transfer SSO identity during merge', userId, originalUserId, error: identityTransferError })
       return quickError(500, 'identity_transfer_failed', 'Failed to merge SSO identity with existing account')
+    }
+
+    // Step 2b: Mark the original user as SSO-only when enforce_sso is active.
+    // is_sso_user=true disables email/password login in Supabase — only set it when the
+    // provider enforces SSO. Without enforce_sso the user can still log in with either method.
+    if (mergeProvider?.enforce_sso === true) {
+      try {
+        await setAuthUserSsoOnly(c, originalUserId)
+      }
+      catch (ssoFlagError) {
+        cloudlogErr({ requestId, message: 'Failed to set is_sso_user on original user during merge', originalUserId, error: ssoFlagError })
+        // Non-fatal — proceed with merge
+      }
     }
 
     // Step 3: Delete the duplicate auth user (cascades to public.users, orgs, org_users)

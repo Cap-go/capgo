@@ -72,20 +72,22 @@ app.post('/', async (c) => {
   const requestId = c.get('requestId')
 
   try {
-    const { data, error } = await (supabase.rpc as any)('check_domain_sso', { p_domain: domain })
+    const { data, error } = await (supabase.rpc as any)('get_sso_enforcement_by_domain', { p_domain: domain })
     if (error) {
       cloudlog({ requestId, context: 'check_domain - query error', error: error.message, domain })
       return quickError(500, 'query_error', 'Failed to check domain')
     }
 
-    if (!data || (Array.isArray(data) && data.length === 0)) {
+    const row = Array.isArray(data) ? data[0] : data
+    if (!row) {
       cloudlog({ requestId, context: 'check_domain - no SSO provider found', domain })
       return c.json({ has_sso: false })
     }
 
-    cloudlog({ requestId, context: 'check_domain - SSO provider found', domain })
+    cloudlog({ requestId, context: 'check_domain - SSO provider found', domain, enforce_sso: row.enforce_sso })
     return c.json({
       has_sso: true,
+      enforce_sso: row.enforce_sso === true,
     })
   }
   catch (err) {

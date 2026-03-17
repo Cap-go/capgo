@@ -38,7 +38,9 @@ BEGIN
     -- Supabase sets app_metadata.provider to 'sso:<provider_uuid>' for SAML sessions.
     -- Email, phone, and OAuth providers (e.g. google, github) always get a personal org,
     -- even when their email domain matches an active SSO provider.
-    IF NOT (user_provider ~ '^sso:' AND has_sso) THEN
+    -- NULL-safe: if user_provider is NULL (e.g. raw_app_meta_data not yet set),
+    -- treat it as a non-SSO login so the personal org is created as normal.
+    IF NOT (user_provider IS NOT NULL AND user_provider ~ '^sso:' AND has_sso) THEN
       INSERT INTO public.orgs (created_by, name, management_email) values (NEW.id, format('%s organization', NEW.first_name), NEW.email) RETURNING * INTO org_record;
     END IF;
 
