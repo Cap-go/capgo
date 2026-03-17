@@ -9,7 +9,7 @@ afterAll(async () => {
 })
 
 describe('cleanup_expired_demo_apps RPC authorization', () => {
-  it('keeps execute privilege only for service-role callers', async () => {
+  it.concurrent('keeps execute privilege only for service-role callers', async () => {
     const { rows } = await pgPool.query<{
       service_role_can_execute: boolean
       anon_can_execute: boolean
