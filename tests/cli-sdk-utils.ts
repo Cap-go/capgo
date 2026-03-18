@@ -155,6 +155,7 @@ export async function uploadBundleSDK(
   version: string,
   channel?: string,
   additionalOptions?: Partial<UploadOptions>,
+  refreshBundleContent = false,
 ) {
   const sdk = createTestSDK()
 
@@ -176,9 +177,11 @@ export async function uploadBundleSDK(
   const originalCwd = cwd()
 
   try {
-    // Rewrite the bundle contents before each upload so repeated uploads of the
-    // same version produce a fresh checksum.
-    await writeDistIndexHtml(tempFileFolder(appId))
+    if (refreshBundleContent) {
+      // Rewrite the bundle contents before upload when a test needs a fresh
+      // checksum for the same app/version pair.
+      await writeDistIndexHtml(tempFileFolder(appId))
+    }
     process.chdir(tempFileFolder(appId))
     return await sdk.uploadBundle(options)
   }

@@ -190,7 +190,7 @@ describe.concurrent('tests CLI encryption encrypt/upload/download/decrypt', () =
         ignoreCompatibilityCheck: true,
         encrypt: true,
         encryptionKey: join(tempFileFolder(APPNAME), '.capgo_key_v2'),
-      })
+      }, true)
       expect(result.success).toBe(true)
 
       await testEncryption(publicKeyFile, semver, APPNAME)
@@ -223,7 +223,7 @@ describe.concurrent('tests CLI encryption encrypt/upload/download/decrypt', () =
         ignoreCompatibilityCheck: true,
         encrypt: true,
         encryptionKey: privateKeyPath,
-      })
+      }, true)
       expect(result.success).toBe(true)
 
       await testEncryption(publicKeyFile, semver, APPNAME)
@@ -261,7 +261,7 @@ describe.concurrent('tests CLI encryption encrypt/upload/download/decrypt', () =
         ignoreCompatibilityCheck: true,
         encrypt: true,
         encryptionKey: join(tempFileFolder(APPNAME), 'weird_file'),
-      })
+      }, true)
       expect(result.success).toBe(true)
 
       await testEncryption(publicKeyFile, semver, APPNAME)
@@ -296,7 +296,7 @@ describe.concurrent('tests CLI upload no encryption', () => {
       const result = await uploadBundleSDK(APPNAME, semver, 'production', {
         ignoreCompatibilityCheck: true,
         encrypt: false,
-      })
+      }, true)
       expect(result.success).toBe(true)
 
       const supabase = getSupabaseClient()
