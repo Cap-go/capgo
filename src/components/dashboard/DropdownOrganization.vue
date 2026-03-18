@@ -222,7 +222,7 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
           <img
             v-if="signedCurrentOrganizationLogo"
             :src="signedCurrentOrganizationLogo"
-            :alt="`${currentOrganization.name} logo`"
+            :alt="`${currentOrganization?.name ?? ''} logo`"
             class="object-cover w-6 h-6 mr-2 rounded-sm d-mask d-mask-squircle shrink-0"
           >
           <div
