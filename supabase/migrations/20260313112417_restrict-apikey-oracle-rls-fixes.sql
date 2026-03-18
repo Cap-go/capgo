@@ -45,6 +45,10 @@ BEGIN
     RETURN public.is_allowed_action_org(_org_id);
 END;
 $$;
+REVOKE ALL ON FUNCTION "public"."is_allowed_action" ("apikey" "text", "appid" "text") FROM "anon";
+REVOKE ALL ON FUNCTION "public"."is_allowed_action" ("apikey" "text", "appid" "text") FROM "authenticated";
+REVOKE ALL ON FUNCTION "public"."is_allowed_action" ("apikey" "text", "appid" "text") FROM "public";
+GRANT EXECUTE ON FUNCTION "public"."is_allowed_action" ("apikey" "text", "appid" "text") TO "service_role";
 
 -- Keep apps bucket policies aligned with existing API-key auth helpers.
 DROP POLICY IF EXISTS "Allow user or apikey to delete they own folder in apps" ON "storage"."objects";
@@ -55,7 +59,7 @@ FOR DELETE
         ("bucket_id" = 'apps'::"text")
         AND (
             (
-                (SELECT "auth"."uid" ())::text = ("storage"."foldername" ("name")) [0]
+                (SELECT "auth"."uid" ())::text = ("storage"."foldername" ("name")) [1]
             )
             OR (
                 SELECT
@@ -63,12 +67,12 @@ FOR DELETE
                         SELECT 1
                         FROM "public"."apps" AS "app"
                         WHERE
-                            "app"."app_id" = ("storage"."foldername" ("name")) [1]
-                            AND "app"."user_id"::text = ("storage"."foldername" ("name")) [0]
+                            "app"."app_id" = ("storage"."foldername" ("name")) [2]
+                            AND "app"."user_id"::text = ("storage"."foldername" ("name")) [1]
                             AND public.is_allowed_capgkey(
                                 _apikey,
                                 '{all}'::"public"."key_mode" [],
-                                ("storage"."foldername" ("name")) [1]
+                                ("storage"."foldername" ("name")) [2]
                             )
                     )
                 FROM (
@@ -88,7 +92,7 @@ FOR UPDATE
         ("bucket_id" = 'apps'::"text")
         AND (
             (
-                (SELECT "auth"."uid" ())::text = ("storage"."foldername" ("name")) [0]
+                (SELECT "auth"."uid" ())::text = ("storage"."foldername" ("name")) [1]
             )
             OR (
                 SELECT
@@ -96,12 +100,12 @@ FOR UPDATE
                         SELECT 1
                         FROM "public"."apps" AS "app"
                         WHERE
-                            "app"."app_id" = ("storage"."foldername" ("name")) [1]
-                            AND "app"."user_id"::text = ("storage"."foldername" ("name")) [0]
+                            "app"."app_id" = ("storage"."foldername" ("name")) [2]
+                            AND "app"."user_id"::text = ("storage"."foldername" ("name")) [1]
                             AND public.is_allowed_capgkey(
                                 _apikey,
                                 '{write,all}'::"public"."key_mode" [],
-                                ("storage"."foldername" ("name")) [1]
+                                ("storage"."foldername" ("name")) [2]
                             )
                     )
                 FROM (
@@ -122,7 +126,7 @@ FOR INSERT
         ("bucket_id" = 'apps'::"text")
         AND (
             (
-                (SELECT "auth"."uid" ())::text = ("storage"."foldername" ("name")) [0]
+                (SELECT "auth"."uid" ())::text = ("storage"."foldername" ("name")) [1]
             )
             OR (
                 SELECT
@@ -130,12 +134,12 @@ FOR INSERT
                         SELECT 1
                         FROM "public"."apps" AS "app"
                         WHERE
-                            "app"."app_id" = ("storage"."foldername" ("name")) [1]
-                            AND "app"."user_id"::text = ("storage"."foldername" ("name")) [0]
+                            "app"."app_id" = ("storage"."foldername" ("name")) [2]
+                            AND "app"."user_id"::text = ("storage"."foldername" ("name")) [1]
                             AND public.is_allowed_capgkey(
                                 _apikey,
                                 '{write,all}'::"public"."key_mode" [],
-                                ("storage"."foldername" ("name")) [1]
+                                ("storage"."foldername" ("name")) [2]
                             )
                     )
                 FROM (
@@ -155,7 +159,7 @@ FOR SELECT
         ("bucket_id" = 'apps'::"text")
         AND (
             (
-                (SELECT "auth"."uid" ())::text = ("storage"."foldername" ("name")) [0]
+                (SELECT "auth"."uid" ())::text = ("storage"."foldername" ("name")) [1]
             )
             OR (
                 SELECT
@@ -163,12 +167,12 @@ FOR SELECT
                         SELECT 1
                         FROM "public"."apps" AS "app"
                         WHERE
-                            "app"."app_id" = ("storage"."foldername" ("name")) [1]
-                            AND "app"."user_id"::text = ("storage"."foldername" ("name")) [0]
+                            "app"."app_id" = ("storage"."foldername" ("name")) [2]
+                            AND "app"."user_id"::text = ("storage"."foldername" ("name")) [1]
                             AND public.is_allowed_capgkey(
                                 _apikey,
                                 '{read,all}'::"public"."key_mode" [],
-                                ("storage"."foldername" ("name")) [1]
+                                ("storage"."foldername" ("name")) [2]
                             )
                     )
                 FROM (
