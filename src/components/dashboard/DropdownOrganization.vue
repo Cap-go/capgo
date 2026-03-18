@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { Organization } from '~/stores/organization'
+import { computedAsync } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
-import { onMounted } from 'vue'
+import { onMounted, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
+import { createSignedImageUrl } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
@@ -20,6 +22,11 @@ const main = useMainStore()
 const dropdown = useTemplateRef('dropdown')
 const hasNewInvitation = ref(false)
 const orgNameInput = ref('')
+const orgLogoUrls = ref(new Map<string, string>())
+const signedCurrentOrganizationLogo = computedAsync(async () => {
+  const logo = currentOrganization.value?.logo
+  return logo ? await createSignedImageUrl(logo) : ''
+}, '')
 
 onClickOutside(dropdown, () => closeDropdown())
 
@@ -28,8 +35,19 @@ onMounted(async () => {
     .catch((error) => {
       console.error('Cannot get orgs!', error)
       createNewOrg()
-    })
+  })
   hasNewInvitation.value = organizationStore.organizations.some(org => org.role.startsWith('invite'))
+})
+
+watchEffect(async () => {
+  const organizations = organizationStore.organizations
+  const resolved = new Map<string, string>()
+
+  await Promise.all(organizations.map(async (org) => {
+    resolved.set(org.gid, org.logo ? await createSignedImageUrl(org.logo) : '')
+  }))
+
+  orgLogoUrls.value = resolved
 })
 
 async function handleOrganizationInvitation(org: Organization) {
@@ -202,8 +220,8 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
       <summary class="justify-between shadow-none w-full d-btn d-btn-sm border border-gray-700 text-white bg-[#1a1d24] hover:bg-gray-700 hover:text-white active:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-800">
         <div class="flex items-center w-4/5 text-left">
           <img
-            v-if="currentOrganization?.logo"
-            :src="currentOrganization.logo"
+            v-if="signedCurrentOrganizationLogo"
+            :src="signedCurrentOrganizationLogo"
             :alt="`${currentOrganization.name} logo`"
             class="object-cover w-6 h-6 mr-2 rounded-sm d-mask d-mask-squircle shrink-0"
           >
@@ -230,12 +248,12 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
               class="flex items-center justify-between px-3 py-3 text-white rounded-md"
               :class="isSelected(org) ? 'cursor-default' : 'cursor-pointer'"
               :aria-current="isSelected(org) ? 'true' : undefined"
-              @click="onOrgItemClick(org, $event)"
-            >
+            @click="onOrgItemClick(org, $event)"
+          >
               <div class="flex items-center min-w-0">
                 <img
-                  v-if="org.logo"
-                  :src="org.logo"
+                  v-if="orgLogoUrls.get(org.gid)"
+                  :src="orgLogoUrls.get(org.gid)"
                   :alt="`${org.name} logo`"
                   class="object-cover w-6 h-6 mr-2 rounded-sm d-mask d-mask-squircle shrink-0"
                 >

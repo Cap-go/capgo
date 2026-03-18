@@ -14,6 +14,7 @@ import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
+import { createSignedImageUrl } from '~/services/storage'
 import DeleteOrgDialog from './DeleteOrgDialog.vue'
 
 const { t } = useI18n()
@@ -32,6 +33,10 @@ onMounted(async () => {
 const { currentOrganization } = storeToRefs(organizationStore)
 const orgName = ref(currentOrganization.value?.name ?? '')
 const email = ref(currentOrganization.value?.management_email ?? '')
+const signedOrganizationLogo = computedAsync(async () => {
+  const logo = currentOrganization.value?.logo
+  return logo ? await createSignedImageUrl(logo) : ''
+}, '')
 
 watch(currentOrganization, (newOrg) => {
   if (newOrg) {
@@ -232,9 +237,11 @@ async function copyOrganizationId() {
             <div class="flex items-center">
               <div class="mr-4">
                 <img
-                  v-if="!!currentOrganization?.logo"
-                  id="org-avatar" class="object-cover w-20 h-20 d-mask d-mask-squircle" :src="currentOrganization.logo"
-                  width="80" height="80" alt="User upload"
+                  v-if="signedOrganizationLogo"
+                  :src="signedOrganizationLogo"
+                  id="org-avatar"
+                  class="object-cover w-20 h-20 d-mask d-mask-squircle"
+                  width="80" height="80" alt="organization logo"
                 >
                 <div v-else class="p-6 text-xl bg-gray-700 d-mask d-mask-squircle">
                   <span class="font-medium text-gray-300">

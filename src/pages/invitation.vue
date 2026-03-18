@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
+import { computedAsync } from '@vueuse/core'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import VueTurnstile from 'vue-turnstile'
 import Toggle from '~/components/Toggle.vue'
+import { createSignedImageUrl } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 
 const { t } = useI18n()
@@ -20,6 +22,10 @@ const inviteRow = ref<Database['public']['Functions']['get_invite_by_magic_looku
 const isLoading = ref(true)
 const isError = ref(null) as Ref<string | null>
 const supabase = useSupabase()
+const signedInviteLogo = computedAsync(async () => {
+  const logo = inviteRow.value?.org_logo
+  return logo ? await createSignedImageUrl(logo) : ''
+}, '')
 
 // Terms and marketing acceptance
 const acceptTerms = ref(false)
@@ -179,7 +185,7 @@ function openPrivacy() {
                     Organization
                   </h2>
                   <div class="flex flex-col items-center mb-4">
-                    <img v-if="inviteRow.org_logo" :src="inviteRow.org_logo" alt="organization logo" class="w-16 h-16 mb-2 rounded-sm">
+                    <img v-if="signedInviteLogo" :src="signedInviteLogo" alt="organization logo" class="w-16 h-16 mb-2 rounded-sm">
                     <div v-else class="p-6 mb-3 text-xl bg-gray-700 d-mask d-mask-squircle">
                       <span class="font-medium text-gray-300">
                         N/A
