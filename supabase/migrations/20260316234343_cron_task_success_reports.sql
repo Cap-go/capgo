@@ -62,6 +62,7 @@ BEGIN
     'cron_success_report',
     jsonb_build_object(
       'function_name', 'cron_success_report',
+      'function_type', 'supabase',
       'payload', jsonb_build_object(
         'runId', run_record.id,
         'taskName', run_record.task_name,

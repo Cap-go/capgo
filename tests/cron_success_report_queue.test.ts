@@ -68,12 +68,20 @@ describe('cron success report queue', () => {
     await pool.query('SELECT public.queue_cron_success_report($1::uuid)', [runId])
 
     const { rows } = await pool.query(`
-      SELECT count(*)::int AS count
-      FROM pgmq.q_cron_success_report
-      WHERE message->>'runId' = $1
+      WITH live AS (
+        SELECT count(*)::int AS count
+        FROM pgmq.q_cron_success_report
+        WHERE message->>'runId' = $1
+      ),
+      archived AS (
+        SELECT count(*)::int AS count
+        FROM pgmq.a_cron_success_report
+        WHERE message->>'runId' = $1
+      )
+      SELECT (SELECT count FROM live) + (SELECT count FROM archived) AS total
     `, [runId])
 
-    expect(rows[0].count).toBe(1)
+    expect(rows[0].total).toBe(1)
   })
 
   it('does not queue a success report for failed runs', async () => {
@@ -98,10 +106,18 @@ describe('cron success report queue', () => {
     await pool.query('SELECT public.queue_cron_success_report($1::uuid)', [runId])
 
     const { rows } = await pool.query(`
-      SELECT count(*)::int AS count
-      FROM pgmq.q_cron_success_report
-      WHERE message->>'runId' = $1
+      WITH live AS (
+        SELECT count(*)::int AS count
+        FROM pgmq.q_cron_success_report
+        WHERE message->>'runId' = $1
+      ),
+      archived AS (
+        SELECT count(*)::int AS count
+        FROM pgmq.a_cron_success_report
+        WHERE message->>'runId' = $1
+      )
+      SELECT (SELECT count FROM live) + (SELECT count FROM archived) AS total
     `, [runId])
-    expect(rows[0].count).toBe(0)
+    expect(rows[0].total).toBe(0)
   })
 })

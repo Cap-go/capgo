@@ -21,7 +21,7 @@ export const messageSchema = z.object({
   message: z.object({
     payload: z.unknown(),
     function_name: z.string(),
-    function_type: z.nullable(z.optional(z.enum(['cloudflare', 'cloudflare_pp', '']))),
+    function_type: z.nullable(z.optional(z.enum(['cloudflare', 'cloudflare_pp', '', 'supabase']))),
   }),
 })
 
@@ -31,7 +31,7 @@ interface Message {
   message: {
     payload: any
     function_name: string
-    function_type: 'cloudflare' | 'cloudflare_pp' | '' | null | undefined
+    function_type: 'cloudflare' | 'cloudflare_pp' | 'supabase' | '' | null | undefined
   }
 }
 
@@ -423,6 +423,9 @@ export async function http_post_helper(
   }
   else if (normalizedType === 'cloudflare' && cfUrl) {
     url = `${cfUrl}/triggers/${function_name}`
+  }
+  else if ((normalizedType === 'supabase') || !cfUrl) {
+    url = `${getEnv(c, 'SUPABASE_URL')}/functions/v1/triggers/${function_name}`
   }
   else if (normalizedType === '' && cfUrl) {
     // Backward compatibility: older queue messages may not have function_type set.
