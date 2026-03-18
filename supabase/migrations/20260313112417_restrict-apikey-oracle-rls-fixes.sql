@@ -50,6 +50,11 @@ REVOKE ALL ON FUNCTION "public"."is_allowed_action" ("apikey" "text", "appid" "t
 REVOKE ALL ON FUNCTION "public"."is_allowed_action" ("apikey" "text", "appid" "text") FROM "public";
 GRANT EXECUTE ON FUNCTION "public"."is_allowed_action" ("apikey" "text", "appid" "text") TO "service_role";
 
+REVOKE ALL ON FUNCTION "public"."is_allowed_action" ("apikey" "text", "appid" "text") FROM "anon";
+REVOKE ALL ON FUNCTION "public"."is_allowed_action" ("apikey" "text", "appid" "text") FROM "authenticated";
+REVOKE ALL ON FUNCTION "public"."is_allowed_action" ("apikey" "text", "appid" "text") FROM "public";
+GRANT EXECUTE ON FUNCTION "public"."is_allowed_action" ("apikey" "text", "appid" "text") TO "service_role";
+
 -- Keep apps bucket policies aligned with existing API-key auth helpers.
 DROP POLICY IF EXISTS "Allow user or apikey to delete they own folder in apps" ON "storage"."objects";
 CREATE POLICY "Allow user or apikey to delete they own folder in apps" ON "storage"."objects"
@@ -70,16 +75,16 @@ FOR DELETE
                             "app"."app_id" = ("storage"."foldername" ("name")) [2]
                             AND "app"."user_id"::text = ("storage"."foldername" ("name")) [1]
                             AND public.is_allowed_capgkey(
-                                _apikey,
+                                _lookup.apikey,
                                 '{all}'::"public"."key_mode" [],
                                 ("storage"."foldername" ("name")) [2]
                             )
                     )
                 FROM (
                     SELECT
-                        "public"."get_apikey_header" () AS _apikey
-                ) AS _header
-                WHERE _apikey IS NOT NULL AND _apikey <> ''
+                        "public"."get_apikey_header" () AS apikey
+                ) AS _lookup
+                WHERE _lookup.apikey IS NOT NULL AND _lookup.apikey <> ''
             )
         )
     );
@@ -103,16 +108,16 @@ FOR UPDATE
                             "app"."app_id" = ("storage"."foldername" ("name")) [2]
                             AND "app"."user_id"::text = ("storage"."foldername" ("name")) [1]
                             AND public.is_allowed_capgkey(
-                                _apikey,
+                                _lookup.apikey,
                                 '{write,all}'::"public"."key_mode" [],
                                 ("storage"."foldername" ("name")) [2]
                             )
                     )
                 FROM (
                     SELECT
-                        "public"."get_apikey_header" () AS _apikey
-                ) AS _header
-                WHERE _apikey IS NOT NULL AND _apikey <> ''
+                        "public"."get_apikey_header" () AS apikey
+                ) AS _lookup
+                WHERE _lookup.apikey IS NOT NULL AND _lookup.apikey <> ''
             )
         )
     );
@@ -137,16 +142,16 @@ FOR INSERT
                             "app"."app_id" = ("storage"."foldername" ("name")) [2]
                             AND "app"."user_id"::text = ("storage"."foldername" ("name")) [1]
                             AND public.is_allowed_capgkey(
-                                _apikey,
+                                _lookup.apikey,
                                 '{write,all}'::"public"."key_mode" [],
                                 ("storage"."foldername" ("name")) [2]
                             )
                     )
                 FROM (
                     SELECT
-                        "public"."get_apikey_header" () AS _apikey
-                ) AS _header
-                WHERE _apikey IS NOT NULL AND _apikey <> ''
+                        "public"."get_apikey_header" () AS apikey
+                ) AS _lookup
+                WHERE _lookup.apikey IS NOT NULL AND _lookup.apikey <> ''
             )
         )
     );
@@ -170,16 +175,16 @@ FOR SELECT
                             "app"."app_id" = ("storage"."foldername" ("name")) [2]
                             AND "app"."user_id"::text = ("storage"."foldername" ("name")) [1]
                             AND public.is_allowed_capgkey(
-                                _apikey,
+                                _lookup.apikey,
                                 '{read,all}'::"public"."key_mode" [],
                                 ("storage"."foldername" ("name")) [2]
                             )
                     )
                 FROM (
                     SELECT
-                        "public"."get_apikey_header" () AS _apikey
-                ) AS _header
-                WHERE _apikey IS NOT NULL AND _apikey <> ''
+                        "public"."get_apikey_header" () AS apikey
+                ) AS _lookup
+                WHERE _lookup.apikey IS NOT NULL AND _lookup.apikey <> ''
             )
         )
     );
