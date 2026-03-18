@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
@@ -723,6 +724,26 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
 
     // Reset
     await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false }).eq('id', ORG_ID)
+  })
+
+  it('rejects public RPC access to get_orgs_v7(userid)', async () => {
+    const supabaseUrl = process.env.SUPABASE_URL
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
+    if (!supabaseUrl || !supabaseAnonKey)
+      throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY are required for this test')
+
+    const publicSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+      },
+    })
+
+    const { data, error } = await publicSupabase.rpc('get_orgs_v7', {
+      userid: USER_ID,
+    })
+
+    expect(data).toBeNull()
+    expect(error).toBeTruthy()
   })
 })
 
