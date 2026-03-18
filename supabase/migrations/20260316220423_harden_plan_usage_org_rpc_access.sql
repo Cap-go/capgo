@@ -11,6 +11,7 @@ AS $$
 DECLARE
   v_request_user uuid;
   v_is_service_role boolean;
+  v_tx_read_only boolean := current_setting('transaction_read_only') = 'on';
 BEGIN
   v_is_service_role := (
     ((SELECT auth.jwt() ->> 'role') = 'service_role')
@@ -198,9 +199,18 @@ BEGIN
   END IF;
   v_end_date := (v_start_date + interval '1 MONTH')::date;
 
-  SELECT *
-  INTO total_stats
-  FROM public.get_total_metrics(orgid, v_start_date, v_end_date);
+  IF v_tx_read_only THEN
+    -- User-facing RPCs must stay read-only so they work from the hardened
+    -- read-only test harness and replica paths. Internal cache refreshes still
+    -- happen through get_total_metrics()/get_plan_usage_and_fit().
+    SELECT *
+    INTO total_stats
+    FROM public.calculate_org_metrics_cache_entry(orgid, v_start_date, v_end_date);
+  ELSE
+    SELECT *
+    INTO total_stats
+    FROM public.get_total_metrics(orgid, v_start_date, v_end_date);
+  END IF;
 
   percent_mau := public.convert_number_to_percent(total_stats.mau, v_plan_mau);
   percent_bandwidth := public.convert_number_to_percent(total_stats.bandwidth, v_plan_bandwidth);
@@ -248,6 +258,7 @@ DECLARE
   percent_build_time double precision;
   v_request_user uuid;
   v_is_service_role boolean;
+  v_tx_read_only boolean := current_setting('transaction_read_only') = 'on';
 BEGIN
   v_is_service_role := (
     ((SELECT auth.jwt() ->> 'role') = 'service_role')
@@ -278,9 +289,17 @@ BEGIN
   JOIN public.plans p ON si.product_id = p.stripe_id
   WHERE o.id = orgid;
 
-  SELECT *
-  INTO total_stats
-  FROM public.get_total_metrics(orgid, cycle_start, cycle_end);
+  IF v_tx_read_only THEN
+    -- Keep this RPC read-only for authenticated callers. Cache refreshes are
+    -- handled by the internal metrics helpers instead of this public entrypoint.
+    SELECT *
+    INTO total_stats
+    FROM public.calculate_org_metrics_cache_entry(orgid, cycle_start, cycle_end);
+  ELSE
+    SELECT *
+    INTO total_stats
+    FROM public.get_total_metrics(orgid, cycle_start, cycle_end);
+  END IF;
 
   percent_mau := public.convert_number_to_percent(total_stats.mau, v_plan_mau);
   percent_bandwidth := public.convert_number_to_percent(total_stats.bandwidth, v_plan_bandwidth);
