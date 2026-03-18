@@ -61,6 +61,9 @@ BEGIN
   PERFORM pgmq.send(
     'cron_success_report',
     jsonb_build_object(
+      'runId', run_record.id,
+      'taskName', run_record.task_name,
+      'url', run_record.success_report_url,
       'function_name', 'cron_success_report',
       'payload', jsonb_build_object(
         'runId', run_record.id,
