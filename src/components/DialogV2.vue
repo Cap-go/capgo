@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { onMounted, onUnmounted, watch } from 'vue'
 import type { WatchStopHandle } from 'vue'
 import type { DialogV2Button } from '~/stores/dialogv2'
-import { onMounted, onUnmounted, watch } from 'vue'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
 const dialogStore = useDialogV2Store()

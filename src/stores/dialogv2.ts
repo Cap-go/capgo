@@ -44,10 +44,12 @@ export const useDialogV2Store = defineStore('dialogv2', () => {
       return
 
     if (button.target === '_blank') {
-      const relTokens = button.rel ? button.rel.split(/[\s,]+/).filter(Boolean) : []
-      const relSet = new Set(relTokens)
+      const relTokens = button.rel
+        ? button.rel.split(/[\s,]+/).map(token => token.toLowerCase())
+        : []
+      const relSet = new Set<string>()
       relSet.add('noopener')
-      if (relTokens.some(token => token.toLowerCase() === 'noreferrer'))
+      if (relTokens.includes('noreferrer'))
         relSet.add('noreferrer')
       const relFeatures = Array.from(relSet).join(',')
       window.open(button.href, button.target, relFeatures)
