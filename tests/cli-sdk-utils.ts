@@ -1,4 +1,5 @@
 import type { UploadOptions } from '@capgo/cli/sdk'
+import { randomUUID } from 'node:crypto'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { cwd, env } from 'node:process'
@@ -69,14 +70,12 @@ async function createPackageJson(appId: string, folderPath: string, dependencies
   await writeFile(packageJsonPath, packageJsonContent)
 }
 
-/**
- * Create dist folder with a simple index.html
- */
-async function createDistFolder(folderPath: string) {
+async function writeDistIndexHtml(folderPath: string) {
   const distPath = join(folderPath, 'dist')
   await mkdir(distPath, { recursive: true })
 
   const indexHtmlPath = join(distPath, 'index.html')
+  const buildId = randomUUID()
   const indexHtmlContent = `<!DOCTYPE html>
 <html>
 <head>
@@ -84,6 +83,7 @@ async function createDistFolder(folderPath: string) {
   <title>Test App</title>
 </head>
 <body>
+  <p hidden data-build-id="${buildId}"></p>
   <h1>Test App v1.0.0</h1>
   <script>
     // Call notifyAppReady() as required by Capgo
@@ -95,6 +95,13 @@ async function createDistFolder(folderPath: string) {
 </html>`
 
   await writeFile(indexHtmlPath, indexHtmlContent)
+}
+
+/**
+ * Create dist folder with a simple index.html
+ */
+async function createDistFolder(folderPath: string) {
+  await writeDistIndexHtml(folderPath)
 }
 
 /**
@@ -169,6 +176,9 @@ export async function uploadBundleSDK(
   const originalCwd = cwd()
 
   try {
+    // Rewrite the bundle contents before each upload so repeated uploads of the
+    // same version produce a fresh checksum.
+    await writeDistIndexHtml(tempFileFolder(appId))
     process.chdir(tempFileFolder(appId))
     return await sdk.uploadBundle(options)
   }
