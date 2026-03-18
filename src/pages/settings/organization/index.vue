@@ -10,11 +10,11 @@ import iconEmail from '~icons/heroicons/envelope?raw'
 import iconName from '~icons/heroicons/user?raw'
 import { checkPermissions } from '~/services/permissions'
 import { pickPhoto, takePhoto } from '~/services/photos'
+import { createSignedImageUrl } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
-import { createSignedImageUrl } from '~/services/storage'
 import DeleteOrgDialog from './DeleteOrgDialog.vue'
 
 const { t } = useI18n()
@@ -238,8 +238,8 @@ async function copyOrganizationId() {
               <div class="mr-4">
                 <img
                   v-if="signedOrganizationLogo"
-                  :src="signedOrganizationLogo"
                   id="org-avatar"
+                  :src="signedOrganizationLogo"
                   class="object-cover w-20 h-20 d-mask d-mask-squircle"
                   width="80" height="80" alt="organization logo"
                 >

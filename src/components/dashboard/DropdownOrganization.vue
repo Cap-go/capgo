@@ -35,7 +35,7 @@ onMounted(async () => {
     .catch((error) => {
       console.error('Cannot get orgs!', error)
       createNewOrg()
-  })
+    })
   hasNewInvitation.value = organizationStore.organizations.some(org => org.role.startsWith('invite'))
 })
 
@@ -248,8 +248,8 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
               class="flex items-center justify-between px-3 py-3 text-white rounded-md"
               :class="isSelected(org) ? 'cursor-default' : 'cursor-pointer'"
               :aria-current="isSelected(org) ? 'true' : undefined"
-            @click="onOrgItemClick(org, $event)"
-          >
+              @click="onOrgItemClick(org, $event)"
+            >
               <div class="flex items-center min-w-0">
                 <img
                   v-if="orgLogoUrls.get(org.gid)"
