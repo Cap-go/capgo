@@ -288,7 +288,20 @@ async function checkKeyByIdPg(
 
 function getSubkeyId(c: Context) {
   const headerValue = c.req.header('x-limited-key-id')
-  return headerValue ? Number(headerValue) : null
+  if (!headerValue) {
+    return { subkeyId: null, error: null }
+  }
+
+  if (!/^[1-9]\d*$/.test(headerValue)) {
+    return { subkeyId: null, error: quickError(401, 'invalid_subkey', 'Invalid x-limited-key-id') }
+  }
+
+  const subkeyId = Number(headerValue)
+  if (!Number.isSafeInteger(subkeyId)) {
+    return { subkeyId: null, error: quickError(401, 'invalid_subkey', 'Invalid x-limited-key-id') }
+  }
+
+  return { subkeyId, error: null }
 }
 
 function setApiKeyAuthContext(c: Context, apikey: Database['public']['Tables']['apikeys']['Row'], keyString: string) {
@@ -414,7 +427,10 @@ async function resolveSubkey(
 }
 
 async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['public']['Enums']['key_mode'][]) {
-  const subkey_id = getSubkeyId(c)
+  const { subkeyId: subkey_id, error: subkeyError } = getSubkeyId(c)
+  if (subkeyError) {
+    return subkeyError
+  }
 
   cloudlog({ requestId: c.get('requestId'), message: 'Capgkey provided', capgkeyPrefix: maskSecret(capgkeyString) })
   const apikey = await resolveApiKey(c, capgkeyString, rights, false)
@@ -437,7 +453,7 @@ async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['
   // Store the original key string for hashed key authentication
   // This is needed because hashed keys have key=null in the database
   setApiKeyAuthContext(c, apikey, capgkeyString)
-  if (subkey_id) {
+  if (subkey_id !== null) {
     cloudlog({ requestId: c.get('requestId'), message: 'Subkey id provided', subkey_id })
     const subkey = await resolveSubkey(c, subkey_id, rights, false, apikey.user_id)
     if (!subkey) {
@@ -522,7 +538,10 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
     }
 
     const { capgkeyString, apikeyString, key } = resolveKeyHeaders(c)
-    const subkey_id = getSubkeyId(c)
+    const { subkeyId: subkey_id, error: subkeyError } = getSubkeyId(c)
+    if (subkeyError) {
+      return subkeyError
+    }
 
     cloudlog({
       requestId: c.get('requestId'),
@@ -562,7 +581,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
     // Set auth context for RBAC (can be overridden by subkey below)
     setApiKeyAuthContext(c, apikey, key)
 
-    if (subkey_id) {
+    if (subkey_id !== null) {
       const subkey = await resolveSubkey(c, subkey_id, rights, usePostgres, apikey.user_id)
 
       if (!subkey) {
