@@ -86,6 +86,41 @@ async function execWithAuthAndCapgkey(
   }
 }
 
+async function execWithServiceRoleAndCapgkey(
+  sql: string,
+  capgkey: string,
+  params: unknown[] = [],
+): Promise<any[]> {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    try {
+      await client.query('SELECT set_config(\'role\', \'service_role\', true)')
+      await client.query('SELECT set_config(\'request.jwt.claims\', null, true)')
+      await client.query(
+        'SELECT set_config(\'request.headers\', $1, true)',
+        [JSON.stringify({ capgkey })],
+      )
+
+      const result = await client.query(sql, params)
+      await client.query('COMMIT')
+      return result.rows
+    }
+    catch (error) {
+      try {
+        await client.query('ROLLBACK')
+      }
+      catch {
+        // Ignore rollback failures for clearer root error handling.
+      }
+      throw error
+    }
+  }
+  finally {
+    client.release()
+  }
+}
+
 // Helper to create a hashed API key via the API
 async function createHashedApiKey(
   name: string,
@@ -293,7 +328,7 @@ describe('get_identity_apikey_only() with hashed API keys', () => {
   })
 
   it('returns user_id for hashed API key', async () => {
-    const rows = await execWithCapgkey(
+    const rows = await execWithServiceRoleAndCapgkey(
       `SELECT get_identity_apikey_only('{all,write,read,upload}'::key_mode[]) as user_id`,
       hashedKey.key,
     )
@@ -301,7 +336,7 @@ describe('get_identity_apikey_only() with hashed API keys', () => {
   })
 
   it('returns NULL for invalid API key', async () => {
-    const rows = await execWithCapgkey(
+    const rows = await execWithServiceRoleAndCapgkey(
       `SELECT get_identity_apikey_only('{all,write,read,upload}'::key_mode[]) as user_id`,
       'invalid-key',
     )
