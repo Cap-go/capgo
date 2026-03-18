@@ -11,6 +11,7 @@ export interface DialogV2Button {
   role?: 'primary' | 'secondary' | 'danger' | 'cancel'
   preventClose?: boolean
   disabled?: boolean
+  skipNavigation?: boolean
 }
 
 export interface DialogV2Options {
@@ -79,7 +80,7 @@ export const useDialogV2Store = defineStore('dialogv2', () => {
 
       if (!button.preventClose) {
         showDialog.value = false
-        if (button.href)
+        if (button.href && !button.skipNavigation)
           openButtonHref(button)
       }
       return

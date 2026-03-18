@@ -10,6 +10,16 @@ const route = useRoute()
 let escapeHandler: ((event: KeyboardEvent) => void) | null = null
 let stopRouteWatch: WatchStopHandle | undefined
 
+function normalizeRel(rel?: string, target?: string) {
+  const tokens = rel ? rel.split(/[\s,]+/).filter(Boolean) : []
+  const relSet = new Set(tokens)
+  if (target === '_blank')
+    relSet.add('noopener')
+  if (relSet.size === 0)
+    return undefined
+  return Array.from(relSet).join(' ')
+}
+
 const sizeClasses = {
   sm: 'max-w-sm',
   md: 'max-w-md',
@@ -17,7 +27,7 @@ const sizeClasses = {
   xl: 'max-w-xl',
 }
 
-function close(button?: any) {
+function close(button?: DialogV2Button) {
   dialogStore.closeDialog(button)
 }
 
@@ -27,18 +37,25 @@ function handleButtonClick(button: DialogV2Button, event?: Event) {
     return
   }
 
+  const safeButton: DialogV2Button = {
+    ...button,
+    rel: normalizeRel(button.rel, button.target),
+  }
+
   const mouseEvent = event instanceof MouseEvent ? event : undefined
   const hasModifier = !!(mouseEvent && (mouseEvent.metaKey || mouseEvent.ctrlKey || mouseEvent.shiftKey || mouseEvent.altKey))
   const isModifiedLinkClick = !!(button.href && mouseEvent && (mouseEvent.button !== 0 || hasModifier))
 
-  if (isModifiedLinkClick)
+  if (isModifiedLinkClick) {
+    close({ ...safeButton, skipNavigation: true })
     return
+  }
 
   const shouldPreventNavigation = button.href && (!mouseEvent || (mouseEvent.button === 0 && !hasModifier))
   if (shouldPreventNavigation)
     event?.preventDefault()
 
-  close(button)
+  close(safeButton)
 }
 
 onMounted(() => {
@@ -141,7 +158,7 @@ onUnmounted(() => {
                 v-else
                 :href="button.href"
                 :target="button.target"
-                :rel="button.rel"
+                :rel="normalizeRel(button.rel, button.target)"
                 :class="{
                   'd-btn d-btn-primary': button.role === 'primary',
                   'd-btn d-btn-secondary': button.role === 'secondary',
