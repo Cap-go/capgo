@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import type { DialogV2Button } from '~/stores/dialogv2'
-import { onMounted, watch } from 'vue'
+import { onMounted, onUnmounted, watch } from 'vue'
+import type { WatchStopHandle } from 'vue'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
 const dialogStore = useDialogV2Store()
 const route = useRoute()
+
+let escapeHandler: ((event: KeyboardEvent) => void) | null = null
+let stopRouteWatch: WatchStopHandle | undefined
 
 const sizeClasses = {
   sm: 'max-w-sm',
@@ -24,16 +28,14 @@ function handleButtonClick(button: DialogV2Button, event?: Event) {
   }
 
   const mouseEvent = event instanceof MouseEvent ? event : undefined
-  const isModifiedLinkClick = !!(
-    button.href
-    && mouseEvent
-    && (mouseEvent.button !== 0 || mouseEvent.metaKey || mouseEvent.ctrlKey || mouseEvent.shiftKey || mouseEvent.altKey)
-  )
+  const hasModifier = !!(mouseEvent && (mouseEvent.metaKey || mouseEvent.ctrlKey || mouseEvent.shiftKey || mouseEvent.altKey))
+  const isModifiedLinkClick = !!(button.href && mouseEvent && (mouseEvent.button !== 0 || hasModifier))
 
   if (isModifiedLinkClick)
     return
 
-  if (button.href)
+  const shouldPreventNavigation = button.href && (!mouseEvent || (mouseEvent.button === 0 && !hasModifier))
+  if (shouldPreventNavigation)
     event?.preventDefault()
 
   close(button)
@@ -41,18 +43,29 @@ function handleButtonClick(button: DialogV2Button, event?: Event) {
 
 onMounted(() => {
   // Close dialog on route change
-  watch(route, () => {
+  stopRouteWatch = watch(route, () => {
     if (dialogStore.showDialog) {
       dialogStore.closeDialog()
     }
   })
 
   // Close dialog on Escape key
-  addEventListener('keydown', (event: KeyboardEvent) => {
+  escapeHandler = (event: KeyboardEvent) => {
     if (event.key === 'Escape' && dialogStore.showDialog && !dialogStore.dialogOptions?.preventAccidentalClose) {
       dialogStore.closeDialog()
     }
-  })
+  }
+  addEventListener('keydown', escapeHandler)
+})
+
+onUnmounted(() => {
+  stopRouteWatch?.()
+  stopRouteWatch = undefined
+
+  if (escapeHandler) {
+    removeEventListener('keydown', escapeHandler)
+    escapeHandler = null
+  }
 })
 </script>
 
@@ -116,8 +129,7 @@ onMounted(() => {
                   'd-btn d-btn-outline': button.role === 'cancel',
                   'd-btn': !button.role,
                   '!cursor-pointer': !button.disabled,
-                  'cursor-not-allowed': button.disabled,
-                  'opacity-70 cursor-not-allowed pointer-events-none': button.disabled,
+                  'opacity-70 cursor-not-allowed': button.disabled,
                 }"
                 :disabled="button.disabled"
                 @click="handleButtonClick(button, $event)"
@@ -137,9 +149,11 @@ onMounted(() => {
                   'd-btn d-btn-outline': button.role === 'cancel',
                   'd-btn': !button.role,
                   '!cursor-pointer': !button.disabled,
-                  'cursor-not-allowed': button.disabled,
-                  'opacity-70 cursor-not-allowed pointer-events-none': button.disabled,
+                  'opacity-70 cursor-not-allowed': button.disabled,
+                  'pointer-events-none': button.disabled,
                 }"
+                :aria-disabled="button.disabled || undefined"
+                :tabindex="button.disabled ? -1 : undefined"
                 @click="handleButtonClick(button, $event)"
               >
                 {{ button.text }}
