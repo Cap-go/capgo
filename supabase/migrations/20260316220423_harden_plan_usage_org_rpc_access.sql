@@ -11,7 +11,6 @@ AS $$
 DECLARE
   v_request_user uuid;
   v_is_service_role boolean;
-  v_tx_read_only boolean := current_setting('transaction_read_only') = 'on';
 BEGIN
   v_is_service_role := (
     ((SELECT auth.jwt() ->> 'role') = 'service_role')
@@ -71,6 +70,7 @@ DECLARE
   end_date timestamptz;
   v_request_user uuid;
   v_is_service_role boolean;
+  v_tx_read_only boolean := current_setting('transaction_read_only') = 'on';
 BEGIN
   v_is_service_role := (
     ((SELECT auth.jwt() ->> 'role') = 'service_role')
@@ -157,6 +157,7 @@ DECLARE
   percent_build_time double precision;
   v_request_user uuid;
   v_is_service_role boolean;
+  v_tx_read_only boolean := current_setting('transaction_read_only') = 'on';
 BEGIN
   v_is_service_role := (
     ((SELECT auth.jwt() ->> 'role') = 'service_role')
