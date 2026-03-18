@@ -25,10 +25,11 @@ describe('cleanup_expired_demo_apps RPC authorization', () => {
 
     expect(rows).toHaveLength(1)
     const row = rows[0]
-    expect(row).toBeDefined()
-    expect(row?.service_role_can_execute).toBe(true)
-    expect(row?.anon_can_execute).toBe(false)
-    expect(row?.authenticated_can_execute).toBe(false)
-    expect(row?.public_can_execute).toBe(false)
+    if (!row) throw new Error('Expected exactly one privilege row')
+
+    expect(row.service_role_can_execute).toBe(true)
+    expect(row.anon_can_execute).toBe(false)
+    expect(row.authenticated_can_execute).toBe(false)
+    expect(row.public_can_execute).toBe(false)
   })
 })
