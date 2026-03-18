@@ -1,4 +1,5 @@
 import { acceptHMRUpdate, defineStore } from 'pinia'
+import { ref, watch } from 'vue'
 
 export interface DialogV2Button {
   text: string
@@ -10,6 +11,7 @@ export interface DialogV2Button {
   role?: 'primary' | 'secondary' | 'danger' | 'cancel'
   preventClose?: boolean
   disabled?: boolean
+  skipNavigation?: boolean
 }
 
 export interface DialogV2Options {
@@ -31,6 +33,7 @@ export const useDialogV2Store = defineStore('dialogv2', () => {
     dialogOptions.value = options
     showDialog.value = true
     dialogCanceled.value = false
+    lastButtonRole.value = ''
   }
 
   const openButtonHref = (button: DialogV2Button) => {
@@ -41,12 +44,15 @@ export const useDialogV2Store = defineStore('dialogv2', () => {
       return
 
     if (button.target === '_blank') {
-      const relTokens = button.rel ? button.rel.split(/[\s,]+/).filter(Boolean) : []
-      const features = [
-        'noopener',
-        ...(relTokens.includes('noreferrer') ? ['noreferrer'] : []),
-      ]
-      window.open(button.href, button.target, features.join(','))
+      const relTokens = button.rel
+        ? button.rel.split(/[\s,]+/).map(token => token.toLowerCase())
+        : []
+      const relSet = new Set<string>()
+      relSet.add('noopener')
+      if (relTokens.includes('noreferrer'))
+        relSet.add('noreferrer')
+      const relFeatures = Array.from(relSet).join(',')
+      window.open(button.href, button.target, relFeatures)
       return
     }
 
@@ -76,14 +82,15 @@ export const useDialogV2Store = defineStore('dialogv2', () => {
 
       if (!button.preventClose) {
         showDialog.value = false
+        if (button.href && !button.skipNavigation)
+          openButtonHref(button)
       }
-
-      if (!button.preventClose && button.href)
-        openButtonHref(button)
       return
     }
 
     // Modal dismissed without a button action (overlay, escape, close icon)
+    dialogCanceled.value = true
+    lastButtonRole.value = ''
     showDialog.value = false
   }
 
