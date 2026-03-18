@@ -50,6 +50,13 @@ BEGIN
 END;
 $$;
 
+REVOKE ALL ON FUNCTION "public"."is_allowed_action" ("apikey" "text", "appid" "text") FROM "anon";
+REVOKE ALL ON FUNCTION "public"."is_allowed_action" ("apikey" "text", "appid" "text") FROM "authenticated";
+REVOKE ALL ON FUNCTION "public"."is_allowed_action" ("apikey" "text", "appid" "text") FROM "public";
+
+GRANT EXECUTE ON FUNCTION "public"."is_allowed_action" ("apikey" "text", "appid" "text") TO "service_role";
+ALTER FUNCTION "public"."is_allowed_action" ("apikey" "text", "appid" "text") OWNER TO "postgres";
+
 -- Remove legacy apps bucket policies that still call get_user_id in policy expressions,
 -- because function ACL is now service-role-only.
 DROP POLICY IF EXISTS "Allow user or apikey to delete they own folder in apps" ON "storage"."objects";
