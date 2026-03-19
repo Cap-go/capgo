@@ -287,27 +287,32 @@ async function checkKeyByIdPg(
 }
 
 /**
- * Parses the x-limited-key-id header and returns either a validated subkey ID or a quickError response.
+ * Parses and validates the x-limited-key-id header.
  *
- * @param c - Hono context used to read headers.
- * @returns The parsed subkey id when valid or a quickError entry when the header is invalid.
+ * Empty or malformed header values are treated as failed auth attempts so they
+ * participate in the IP throttling flow like other invalid credentials.
+ *
+ * @param c - Hono context used to read headers and record failed auth attempts.
+ * @returns The parsed subkey id when present and valid, otherwise null.
  */
-function getSubkeyId(c: Context) {
-  const headerValue = c.req.header('x-limited-key-id')
-  if (!headerValue) {
-    return { subkeyId: null, error: null }
+async function getSubkeyId(c: Context) {
+  if (!c.req.raw.headers.has('x-limited-key-id')) {
+    return null
   }
 
+  const headerValue = c.req.header('x-limited-key-id') ?? ''
   if (!/^[1-9]\d*$/.test(headerValue)) {
-    return { subkeyId: null, error: quickError(401, 'invalid_subkey', 'Invalid x-limited-key-id') }
+    await recordFailedAuth(c)
+    return quickError(401, 'invalid_subkey', 'Invalid x-limited-key-id')
   }
 
   const subkeyId = Number(headerValue)
   if (!Number.isSafeInteger(subkeyId)) {
-    return { subkeyId: null, error: quickError(401, 'invalid_subkey', 'Invalid x-limited-key-id') }
+    await recordFailedAuth(c)
+    return quickError(401, 'invalid_subkey', 'Invalid x-limited-key-id')
   }
 
-  return { subkeyId, error: null }
+  return subkeyId
 }
 
 /**
@@ -476,10 +481,7 @@ async function resolveSubkey(
  * @returns quickError when authentication fails or undefined when authentication succeeds.
  */
 async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['public']['Enums']['key_mode'][]) {
-  const { subkeyId: subkey_id, error: subkeyError } = getSubkeyId(c)
-  if (subkeyError) {
-    return subkeyError
-  }
+  const subkey_id = await getSubkeyId(c)
 
   cloudlog({ requestId: c.get('requestId'), message: 'Capgkey provided', capgkeyPrefix: maskSecret(capgkeyString) })
   const apikey = await resolveApiKey(c, capgkeyString, rights, false)
@@ -593,10 +595,7 @@ export function middlewareKey(rights: Database['public']['Enums']['key_mode'][],
     }
 
     const { capgkeyString, apikeyString, key } = resolveKeyHeaders(c)
-    const { subkeyId: subkey_id, error: subkeyError } = getSubkeyId(c)
-    if (subkeyError) {
-      return subkeyError
-    }
+    const subkey_id = await getSubkeyId(c)
 
     cloudlog({
       requestId: c.get('requestId'),
