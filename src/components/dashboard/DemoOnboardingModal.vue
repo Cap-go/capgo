@@ -90,6 +90,7 @@ const appChoices: AppChoice[] = [
     iconColor: '#0f766e',
   },
 ]
+const customAppChoice = ref<AppChoice | null>(null)
 
 const fakeSpringboardApps: SpringboardApp[] = [
   { id: 'mail', name: 'Mail', icon: '✉️', iconBg: '#dbeafe', iconColor: '#1d4ed8' },
@@ -210,7 +211,6 @@ const defaultDemoApp: SpringboardApp = {
 
 const isCreateStep = computed(() => step.value === 1)
 const isUploadStep = computed(() => step.value === 2)
-const isReopenStep = computed(() => step.value === 3)
 const isPhoneInstalling = computed(() => phoneStage.value === 'installing')
 const isBgColorUpdateApplied = computed(() => hasOpenedUpdatedApp.value && selectedAction.value?.id === 'bg-color')
 const isTitleUpdateApplied = computed(() => hasOpenedUpdatedApp.value && selectedAction.value?.id === 'title')
@@ -223,8 +223,9 @@ const stepContent = computed(() => stepContentMap[step.value])
 const stepTitle = computed(() => stepContent.value.title)
 const stepDescription = computed(() => stepContent.value.description)
 
-const selectedApp = computed(() => appChoices.find(choice => choice.id === selectedAppId.value))
-const installedApp = computed(() => appChoices.find(choice => choice.id === installedAppId.value))
+const availableAppChoices = computed(() => customAppChoice.value ? [customAppChoice.value, ...appChoices] : appChoices)
+const selectedApp = computed(() => availableAppChoices.value.find(choice => choice.id === selectedAppId.value))
+const installedApp = computed(() => availableAppChoices.value.find(choice => choice.id === installedAppId.value))
 const springboardDemoApp = computed<SpringboardApp>(() => {
   if (!installedApp.value)
     return defaultDemoApp
@@ -362,8 +363,10 @@ function closeModal() {
 const showConfetti = ref(false)
 const confettiPieces = ref<ConfettiPiece[]>([])
 
-async function triggerConfetti() {
-  trackNoAppDemoStepEvent(step.value, 'confetti-clicked', { step: step.value })
+async function triggerConfetti(trackClickOrEvent: boolean | Event = true) {
+  const trackClick = typeof trackClickOrEvent === 'boolean' ? trackClickOrEvent : true
+  if (trackClick)
+    trackNoAppDemoStepEvent(step.value, 'confetti-clicked', { step: step.value })
   if (confettiTimer.value !== null) {
     window.clearTimeout(confettiTimer.value)
     confettiTimer.value = null
@@ -386,6 +389,7 @@ async function triggerConfetti() {
 
 function resetDemo() {
   appName.value = ''
+  customAppChoice.value = null
   selectedAppId.value = ''
   installedAppId.value = ''
   step.value = 1
@@ -438,13 +442,15 @@ function submitAppName() {
   const name = appName.value.trim()
   if (!name || isCreatingApp.value)
     return
-  selectApp({
+  const choice = {
     id: formatDemoAppId(name).replace(/\./g, '-'),
     name,
     icon: '📱',
     iconBg: '#ede9fe',
     iconColor: '#6d28d9',
-  })
+  }
+  customAppChoice.value = choice
+  selectApp(choice)
 }
 
 function selectApp(choice: AppChoice) {
@@ -583,7 +589,7 @@ watch(
 
 watch(hasOpenedUpdatedApp, (opened) => {
   if (opened && selectedAction.value?.id === 'confetti')
-    triggerConfetti()
+    triggerConfetti(false)
 })
 
 watch(step, (newStep, oldStep) => {
@@ -652,7 +658,9 @@ onUnmounted(() => {
             <div class="flex-1 space-y-4">
               <div v-if="isCreateStep" class="flex flex-col gap-3">
                 <form class="flex gap-2" @submit.prevent="submitAppName">
+                  <label for="demo-app-name" class="sr-only">App name</label>
                   <input
+                    id="demo-app-name"
                     v-model="appName"
                     type="text"
                     placeholder="App Name"
@@ -874,7 +882,7 @@ onUnmounted(() => {
                   </div>
                 </div>
               </div>
-              <div v-if="isReopenStep" class="flex justify-center pt-2">
+              <div v-if="canContinueOnboarding" class="flex justify-center pt-2">
                 <button
                   class="w-auto px-6 d-btn d-btn-primary"
                   type="button"
