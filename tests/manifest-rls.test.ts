@@ -7,6 +7,9 @@ import {
   USER_ID_2,
   USER_PASSWORD_NONMEMBER,
   USER_PASSWORD,
+  APIKEY_TEST2_ALL,
+  APIKEY_TEST_ALL,
+  headers,
   getAuthHeaders,
   getAuthHeadersForCredentials,
   getSupabaseClient,
@@ -125,7 +128,7 @@ afterAll(async () => {
 })
 
 describe('manifest RLS', () => {
-  it('allows an authenticated user to read manifest entries for their own org', async () => {
+  it.concurrent('allows an authenticated user to read manifest entries for their own org', async () => {
     const { response, data } = await fetchManifestRows(authHeadersUser1, ownVersionId)
 
     expect(response.status).toBe(200)
@@ -133,18 +136,39 @@ describe('manifest RLS', () => {
     expect(data[0]?.file_name).toBe('own-entry.js')
   })
 
-  it('prevents an authenticated user from reading manifest entries for another org', async () => {
+  it.concurrent('prevents an authenticated user from reading manifest entries for another org', async () => {
     const { response, data } = await fetchManifestRows(authHeadersNonMember, otherVersionId)
 
     expect(response.status).toBe(200)
     expect(data).toHaveLength(0)
   })
 
-  it('still allows the other org owner to read their own manifest entries', async () => {
+  it.concurrent('still allows the other org owner to read their own manifest entries', async () => {
     const { response, data } = await fetchManifestRows(authHeadersUser2, otherVersionId)
 
     expect(response.status).toBe(200)
     expect(data).toHaveLength(1)
     expect(data[0]?.file_name).toBe('other-entry.js')
+  })
+
+  it.concurrent('allows an API key for the owning org to read manifest entries', async () => {
+    const { response, data } = await fetchManifestRows({
+      ...headers,
+      Authorization: APIKEY_TEST_ALL,
+    }, ownVersionId)
+
+    expect(response.status).toBe(200)
+    expect(data).toHaveLength(1)
+    expect(data[0]?.file_name).toBe('own-entry.js')
+  })
+
+  it.concurrent('prevents an API key from reading another org', async () => {
+    const { response, data } = await fetchManifestRows({
+      ...headers,
+      Authorization: APIKEY_TEST2_ALL,
+    }, otherVersionId)
+
+    expect(response.status).toBe(200)
+    expect(data).toHaveLength(0)
   })
 })
