@@ -1068,20 +1068,8 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(builds_last_month_android, 0)::int AS builds_last_month_android,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'build_minutes_day_ios', '')::float, 0)::float AS build_minutes_day_ios,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'build_minutes_day_android', '')::float, 0)::float AS build_minutes_day_android,
-        GREATEST(
-          COALESCE(
-            COALESCE(gs.builds_ios, 0) - LAG(COALESCE(gs.builds_ios, 0)) OVER (ORDER BY gs.date_id),
-            0
-          ),
-          0
-        )::int AS builds_day_ios,
-        GREATEST(
-          COALESCE(
-            COALESCE(gs.builds_android, 0) - LAG(COALESCE(gs.builds_android, 0)) OVER (ORDER BY gs.date_id),
-            0
-          ),
-          0
-        )::int AS builds_day_android
+        COALESCE(gs.builds_day_ios, 0)::int AS builds_day_ios,
+        COALESCE(gs.builds_day_android, 0)::int AS builds_day_android
       FROM global_stats gs
       WHERE date_id <= ${endDateOnly}
       )

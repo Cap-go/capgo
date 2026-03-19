@@ -1135,6 +1135,8 @@ export type Database = {
           builds_last_month_ios: number | null
           build_minutes_day_android: number
           build_minutes_day_ios: number
+          builds_day_android: number
+          builds_day_ios: number
           builds_success_android: number | null
           builds_success_ios: number | null
           builds_success_total: number | null
@@ -1198,6 +1200,8 @@ export type Database = {
           builds_last_month_ios?: number | null
           build_minutes_day_android?: number
           build_minutes_day_ios?: number
+          builds_day_android?: number
+          builds_day_ios?: number
           builds_success_android?: number | null
           builds_success_ios?: number | null
           builds_success_total?: number | null

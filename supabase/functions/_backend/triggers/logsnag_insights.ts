@@ -30,6 +30,12 @@ interface BuildStats {
   success_android: number
   minutes_day_ios: number
   minutes_day_android: number
+  builds_day_ios: number
+  builds_day_android: number
+}
+interface DailyBuildMetrics {
+  minutes: number
+  builds: number
 }
 interface PlanRevenue {
   mrr: number
@@ -292,7 +298,7 @@ async function getBuildStats(c: Context, range: DailyWindow): Promise<BuildStats
       successTotalResult,
       successIosResult,
       successAndroidResult,
-      dailyMinutesByPlatform,
+      dailyBuildMetrics,
     ] = await Promise.all([
       // Count total builds (all time)
       supabase.from('build_logs').select('*', { count: 'exact', head: true }),
@@ -312,7 +318,7 @@ async function getBuildStats(c: Context, range: DailyWindow): Promise<BuildStats
       supabase.from('build_requests').select('*', { count: 'exact', head: true }).eq('platform', 'ios').eq('status', 'succeeded'),
       // Count successful Android builds (all time)
       supabase.from('build_requests').select('*', { count: 'exact', head: true }).eq('platform', 'android').eq('status', 'succeeded'),
-      aggregateDailyBuildMinutes(c, range.start, range.end),
+      aggregateDailyBuildMetrics(c, range.start, range.end),
     ])
 
     // Log any errors
@@ -335,19 +341,21 @@ async function getBuildStats(c: Context, range: DailyWindow): Promise<BuildStats
     if (successAndroidResult.error)
       cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats successAndroid error', error: successAndroidResult.error })
 
-    return {
-      total: totalResult.count ?? 0,
-      ios: iosResult.count ?? 0,
-      android: androidResult.count ?? 0,
-      last_month: lastMonthTotalResult.count ?? 0,
-      last_month_ios: lastMonthIosResult.count ?? 0,
-      last_month_android: lastMonthAndroidResult.count ?? 0,
-      success_total: successTotalResult.count ?? 0,
-      success_ios: successIosResult.count ?? 0,
-      success_android: successAndroidResult.count ?? 0,
-      minutes_day_ios: Number(dailyMinutesByPlatform.ios.toFixed(2)),
-      minutes_day_android: Number(dailyMinutesByPlatform.android.toFixed(2)),
-    }
+      return {
+        total: totalResult.count ?? 0,
+        ios: iosResult.count ?? 0,
+        android: androidResult.count ?? 0,
+        last_month: lastMonthTotalResult.count ?? 0,
+        last_month_ios: lastMonthIosResult.count ?? 0,
+        last_month_android: lastMonthAndroidResult.count ?? 0,
+        success_total: successTotalResult.count ?? 0,
+        success_ios: successIosResult.count ?? 0,
+        success_android: successAndroidResult.count ?? 0,
+        minutes_day_ios: Number(dailyBuildMetrics.ios.minutes.toFixed(2)),
+        minutes_day_android: Number(dailyBuildMetrics.android.minutes.toFixed(2)),
+        builds_day_ios: dailyBuildMetrics.ios.builds,
+        builds_day_android: dailyBuildMetrics.android.builds,
+      }
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats error', error: e })
@@ -363,45 +371,54 @@ async function getBuildStats(c: Context, range: DailyWindow): Promise<BuildStats
       success_android: 0,
       minutes_day_ios: 0,
       minutes_day_android: 0,
+      builds_day_ios: 0,
+      builds_day_android: 0,
     }
   }
 }
 
-async function aggregateDailyBuildMinutes(
+async function aggregateDailyBuildMetrics(
   c: Context,
   start: Date,
   end: Date,
-): Promise<Record<'ios' | 'android', number>> {
-  const pgClient = getPgClient(c, true)
+): Promise<Record<'ios' | 'android', DailyBuildMetrics>> {
+  const pgClient = getPgClient(c)
   const drizzleClient = getDrizzleClient(pgClient)
-  const minutesByPlatform: Record<'ios' | 'android', number> = { ios: 0, android: 0 }
+  const metricsByPlatform: Record<'ios' | 'android', DailyBuildMetrics> = {
+    ios: { minutes: 0, builds: 0 },
+    android: { minutes: 0, builds: 0 },
+  }
 
   try {
     const query = sql`
       SELECT
         platform,
-        SUM(build_time_unit)::float AS total_seconds
+        SUM(build_time_unit)::float AS total_seconds,
+        COUNT(*)::int AS total_builds
       FROM build_logs
       WHERE created_at >= ${start}
         AND created_at < ${end}
         AND platform IN ('ios', 'android')
       GROUP BY platform
     `
-    const result = await drizzleClient.execute<{ platform: string, total_seconds: number }>(query)
+    const result = await drizzleClient.execute<{ platform: string, total_seconds: number, total_builds: number }>(query)
     for (const row of result.rows ?? []) {
       if (row.platform === 'ios' || row.platform === 'android') {
-        minutesByPlatform[row.platform] = (Number(row.total_seconds) || 0) / 60
+        metricsByPlatform[row.platform] = {
+          minutes: (Number(row.total_seconds) || 0) / 60,
+          builds: Number(row.total_builds) || 0,
+        }
       }
     }
   }
   catch (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'aggregateDailyBuildMinutes error', error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'aggregateDailyBuildMetrics error', error })
   }
   finally {
     closeClient(c, pgClient)
   }
 
-  return minutesByPlatform
+  return metricsByPlatform
 }
 
 function getStats(c: Context, range: DailyWindow): GlobalStats {
@@ -757,23 +774,25 @@ app.post('/', middlewareAPISecret, async (c) => {
     .upsert(newData)
   if (error)
     cloudlogErr({ requestId: c.get('requestId'), message: 'insert global_stats error', error })
-  const buildMinutesPayload = {
+  const dailyBuildMetricsPayload = {
     date_id: prevDayDateId,
     build_minutes_day_ios: build_stats.minutes_day_ios,
     build_minutes_day_android: build_stats.minutes_day_android,
+    builds_day_ios: build_stats.builds_day_ios,
+    builds_day_android: build_stats.builds_day_android,
   }
-  const { error: buildMinutesError } = await supabaseAdmin(c)
+  const { error: dailyBuildMetricsError } = await supabaseAdmin(c)
     .from('global_stats')
-    .upsert(buildMinutesPayload)
-  if (buildMinutesError) {
-    const errorCode = String((buildMinutesError as any)?.code ?? '').toUpperCase()
-    const message = String((buildMinutesError as any)?.message ?? '')
+    .upsert(dailyBuildMetricsPayload)
+  if (dailyBuildMetricsError) {
+    const errorCode = String((dailyBuildMetricsError as any)?.code ?? '').toUpperCase()
+    const message = String((dailyBuildMetricsError as any)?.message ?? '')
     if (
       errorCode !== 'PGRST204'
       && errorCode !== '42703'
       && !message.toLowerCase().includes('build_minutes_day')
     ) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'insert build minutes error', error: buildMinutesError })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'insert build minutes error', error: dailyBuildMetricsError })
     }
   }
   await logsnag(c).track({

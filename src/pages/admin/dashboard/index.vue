@@ -290,7 +290,11 @@ const buildMinutesTrendSeries = computed(() => {
 })
 
 const periodBuildAverages = computed(() => {
-  const totals = globalStatsTrendData.value.reduce((acc, item) => {
+  const rowsForAverages = globalStatsTrendData.value.length > 1
+    ? globalStatsTrendData.value.slice(0, -1)
+    : globalStatsTrendData.value
+
+  const totals = rowsForAverages.reduce((acc, item) => {
     acc.iosMinutes += item.build_minutes_day_ios || 0
     acc.androidMinutes += item.build_minutes_day_android || 0
     acc.iosBuilds += item.builds_day_ios || 0
