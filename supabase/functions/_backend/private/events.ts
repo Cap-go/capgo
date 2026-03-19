@@ -91,7 +91,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     ip,
   }))
   if (trackedBody.user_id && trackedBody.tags && typeof trackedBody.tags['app-id'] === 'string' && trackedBody.event === 'onboarding-step-done') {
-    const appId = trackedBody.tags['app-id']
+    const onboardingAppId = trackedBody.tags['app-id']
     await backgroundTask(c, Promise.all([
       supabase
         .from('orgs')
@@ -101,7 +101,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
       supabase
         .from('apps')
         .select('*')
-        .eq('app_id', appId)
+        .eq('app_id', onboardingAppId)
         .single(),
     ])
       .then(([orgResult, appResult]) => {

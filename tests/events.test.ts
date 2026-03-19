@@ -14,7 +14,7 @@ afterAll(async () => {
 })
 
 describe('[POST] /private/events operations', () => {
-  it('track event with apikey', async () => {
+  it.concurrent('track event with apikey', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers: {
@@ -38,7 +38,7 @@ describe('[POST] /private/events operations', () => {
     expect(data.status).toBe('ok')
   })
 
-  it('rejects notifyConsole broadcasts for foreign organizations', async () => {
+  it.concurrent('rejects notifyConsole broadcasts for foreign organizations', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers: {
@@ -63,7 +63,7 @@ describe('[POST] /private/events operations', () => {
     expect(data.error).toBe('no_permission')
   })
 
-  it('allows notifyConsole broadcasts for the caller organization', async () => {
+  it.concurrent('allows notifyConsole broadcasts for the caller organization', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers: {
@@ -96,7 +96,7 @@ describe('[POST] /private/events operations', () => {
     // the main authentication path.
   })
 
-  it('track event without authentication', async () => {
+  it.concurrent('track event without authentication', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers: {
@@ -119,7 +119,7 @@ describe('[POST] /private/events operations', () => {
     expect(response.status).toBe(401)
   })
 
-  it('track event with invalid apikey', async () => {
+  it.concurrent('track event with invalid apikey', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers: {
@@ -140,7 +140,7 @@ describe('[POST] /private/events operations', () => {
     expect(response.status).toBe(401)
   })
 
-  it('track event with invalid authorization', async () => {
+  it.concurrent('track event with invalid authorization', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers: {
@@ -161,7 +161,7 @@ describe('[POST] /private/events operations', () => {
     expect(response.status).toBe(401)
   })
 
-  it('track event with malformed body', async () => {
+  it.concurrent('track event with malformed body', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers,
