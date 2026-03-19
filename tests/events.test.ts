@@ -1,9 +1,21 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APP_NAME, BASE_URL, headers, NON_OWNER_ORG_ID, ORG_ID, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
+import {
+  APP_NAME,
+  BASE_URL,
+  getAuthHeaders,
+  headers,
+  NON_OWNER_ORG_ID,
+  ORG_ID,
+  resetAndSeedAppData,
+  resetAndSeedAppDataStats,
+  resetAppData,
+  resetAppDataStats,
+} from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME_EVENT = `${APP_NAME}.e.${id}`
+const FOREIGN_ORG_ID = randomUUID()
 
 beforeAll(async () => {
   await Promise.all([resetAndSeedAppData(APPNAME_EVENT), resetAndSeedAppDataStats(APPNAME_EVENT)])
@@ -14,7 +26,7 @@ afterAll(async () => {
 })
 
 describe('[POST] /private/events operations', () => {
-  it.concurrent('track event with apikey', async () => {
+  it('track event with apikey', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers: {
@@ -38,7 +50,7 @@ describe('[POST] /private/events operations', () => {
     expect(data.status).toBe('ok')
   })
 
-  it.concurrent('rejects notifyConsole broadcasts for foreign organizations', async () => {
+  it('rejects notifyConsole broadcasts for foreign organizations', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers: {
@@ -53,17 +65,17 @@ describe('[POST] /private/events operations', () => {
         user_id: NON_OWNER_ORG_ID,
         tags: {
           'app-id': APPNAME_EVENT,
-          'test': true,
+          test: true,
         },
       }),
     })
 
     const data = await response.json() as { error: string }
     expect(response.status).toBe(403)
-    expect(data.error).toBe('no_permission')
+    expect(data.error).toBe('Forbidden')
   })
 
-  it.concurrent('allows notifyConsole broadcasts for the caller organization', async () => {
+  it('allows notifyConsole broadcasts for the caller organization', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers: {
@@ -78,8 +90,27 @@ describe('[POST] /private/events operations', () => {
         user_id: ORG_ID,
         tags: {
           'app-id': APPNAME_EVENT,
-          'test': true,
+          test: true,
         },
+      }),
+    })
+
+    const data = await response.json() as { status: string }
+    expect(response.status).toBe(200)
+    expect(data.status).toBe('ok')
+  })
+
+  it('allows jwt broadcasts for an authorized org', async () => {
+    const authHeaders = await getAuthHeaders()
+    const response = await fetch(`${BASE_URL}/private/events`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        channel: 'test',
+        event: 'test_event',
+        description: 'Testing event tracking',
+        notifyConsole: true,
+        user_id: ORG_ID,
       }),
     })
 
@@ -96,7 +127,26 @@ describe('[POST] /private/events operations', () => {
     // the main authentication path.
   })
 
-  it.concurrent('track event without authentication', async () => {
+  it('rejects jwt attempts to broadcast events to a foreign org', async () => {
+    const authHeaders = await getAuthHeaders()
+    const response = await fetch(`${BASE_URL}/private/events`, {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        channel: 'test',
+        event: 'test_event',
+        description: 'Testing event tracking',
+        notifyConsole: true,
+        user_id: FOREIGN_ORG_ID,
+      }),
+    })
+
+    const data = await response.json() as { error: string }
+    expect(response.status).toBe(403)
+    expect(data.error).toBe('Forbidden')
+  })
+
+  it('track event without authentication', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers: {
@@ -119,12 +169,12 @@ describe('[POST] /private/events operations', () => {
     expect(response.status).toBe(401)
   })
 
-  it.concurrent('track event with invalid apikey', async () => {
+  it('track event with invalid apikey', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'capgkey': 'invalid_key',
+        capgkey: 'invalid_key',
       },
       body: JSON.stringify({
         channel: 'test',
@@ -140,12 +190,12 @@ describe('[POST] /private/events operations', () => {
     expect(response.status).toBe(401)
   })
 
-  it.concurrent('track event with invalid authorization', async () => {
+  it('track event with invalid authorization', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'authorization': 'Bearer invalid_token',
+        authorization: 'Bearer invalid_token',
       },
       body: JSON.stringify({
         channel: 'test',
@@ -161,7 +211,7 @@ describe('[POST] /private/events operations', () => {
     expect(response.status).toBe(401)
   })
 
-  it.concurrent('track event with malformed body', async () => {
+  it('track event with malformed body', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers,
