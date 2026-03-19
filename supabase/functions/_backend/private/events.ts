@@ -20,7 +20,9 @@ async function resolveTrackingUserId(
   c: Context<MiddlewareKeyVariables>,
   requestedUserId: string | undefined,
   appId: string | undefined,
+  notifyConsole = false,
 ) {
+  const forbiddenError = notifyConsole ? 'Forbidden' : 'no_permission'
   const authUserId = c.get('auth')?.userId ?? ''
 
   if (!requestedUserId || requestedUserId === authUserId) {
@@ -29,7 +31,7 @@ async function resolveTrackingUserId(
 
   if (appId) {
     if (!(await checkPermission(c, 'app.read', { appId }))) {
-      throw quickError(403, 'no_permission', 'You cannot send events for this organization')
+      throw quickError(403, forbiddenError, 'You cannot send events for this organization')
     }
 
     const supabase = supabaseWithAuth(c, c.get('auth')!)
@@ -40,7 +42,7 @@ async function resolveTrackingUserId(
       .single()
 
     if (error || !app || app.owner_org !== requestedUserId) {
-      throw quickError(403, 'no_permission', 'You cannot send events for this organization')
+      throw quickError(403, forbiddenError, 'You cannot send events for this organization')
     }
 
     return requestedUserId
@@ -50,7 +52,7 @@ async function resolveTrackingUserId(
     return requestedUserId
   }
 
-  throw quickError(403, 'no_permission', 'You cannot send events for this organization')
+  throw quickError(403, forbiddenError, 'You cannot send events for this organization')
 }
 
 async function canAccessRequestedOrg(c: Context<MiddlewareKeyVariables>, orgId: string) {
@@ -75,7 +77,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
 
   const requestedUserId = typeof body.user_id === 'string' ? body.user_id : undefined
   const appId = typeof body.tags?.['app-id'] === 'string' ? body.tags['app-id'] : undefined
-  const trackingUserId = await resolveTrackingUserId(c, requestedUserId, appId)
+  const trackingUserId = await resolveTrackingUserId(c, requestedUserId, appId, Boolean(body.notifyConsole))
   const trackedBody = requestedUserId ? { ...body, user_id: trackingUserId } : body
 
   // notifyConsole: broadcast to Supabase Realtime only, skip all tracking
