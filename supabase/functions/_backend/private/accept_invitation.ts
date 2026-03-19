@@ -3,6 +3,7 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { getEffectivePasswordMinLength, getPasswordPolicyValidationErrors } from '../utils/password_policy.ts'
 import { emptySupabase, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 import { syncUserPreferenceTags } from '../utils/user_preferences.ts'
 import { getEnv } from '../utils/utils.ts'
@@ -22,8 +23,6 @@ interface PasswordPolicy {
   require_special: boolean
 }
 
-const SUPABASE_MAX_PASSWORD_LENGTH = 72
-
 const rbacRoleToLegacy: Record<string, 'read' | 'admin' | 'super_admin'> = {
   org_member: 'read',
   org_billing_admin: 'read',
@@ -42,7 +41,7 @@ const DEFAULT_PASSWORD_POLICY: PasswordPolicy = {
 
 // Build dynamic password validation schema based on org's policy
 function buildPasswordSchema(policy: PasswordPolicy) {
-  const effectiveMinLength = Math.min(Math.max(policy.min_length, 6), SUPABASE_MAX_PASSWORD_LENGTH)
+  const effectiveMinLength = getEffectivePasswordMinLength(policy.min_length)
   let schema = z.string().check(
     z.minLength(effectiveMinLength, `Password must be at least ${effectiveMinLength} characters`),
   )
@@ -372,16 +371,19 @@ app.post('/', async (c) => {
   const passwordPolicy: PasswordPolicy = policyConfig?.enabled
     ? {
         ...policyConfig,
-        min_length: Math.min(Math.max(policyConfig.min_length, 6), SUPABASE_MAX_PASSWORD_LENGTH),
+        min_length: getEffectivePasswordMinLength(policyConfig.min_length),
       }
     : DEFAULT_PASSWORD_POLICY
 
   // Validate password against the policy (new user only)
   const passwordSchema = buildPasswordSchema(passwordPolicy)
   const passwordValidationResult = passwordSchema.safeParse(baseBody.password)
-  if (!passwordValidationResult.success) {
+  const passwordPolicyErrors = getPasswordPolicyValidationErrors(baseBody.password, passwordPolicy)
+  if (!passwordValidationResult.success || passwordPolicyErrors.length > 0) {
     throw simpleError('invalid_password', 'Password does not meet requirements', {
-      errors: z.prettifyError(passwordValidationResult.error),
+      errors: passwordValidationResult.success
+        ? passwordPolicyErrors
+        : [z.prettifyError(passwordValidationResult.error), ...passwordPolicyErrors].filter(Boolean),
       policy: {
         min_length: passwordPolicy.min_length,
         require_uppercase: passwordPolicy.require_uppercase,
