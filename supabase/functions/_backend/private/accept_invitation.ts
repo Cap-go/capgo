@@ -22,6 +22,8 @@ interface PasswordPolicy {
   require_special: boolean
 }
 
+const SUPABASE_MAX_PASSWORD_LENGTH = 72
+
 const rbacRoleToLegacy: Record<string, 'read' | 'admin' | 'super_admin'> = {
   org_member: 'read',
   org_billing_admin: 'read',
@@ -40,8 +42,9 @@ const DEFAULT_PASSWORD_POLICY: PasswordPolicy = {
 
 // Build dynamic password validation schema based on org's policy
 function buildPasswordSchema(policy: PasswordPolicy) {
+  const effectiveMinLength = Math.min(Math.max(policy.min_length, 6), SUPABASE_MAX_PASSWORD_LENGTH)
   let schema = z.string().check(
-    z.minLength(policy.min_length, `Password must be at least ${policy.min_length} characters`),
+    z.minLength(effectiveMinLength, `Password must be at least ${effectiveMinLength} characters`),
   )
 
   if (policy.require_uppercase) {
@@ -367,7 +370,10 @@ app.post('/', async (c) => {
   // Use org's password policy if enabled, otherwise use default (new user only)
   const policyConfig = org?.password_policy_config as unknown as PasswordPolicy | null
   const passwordPolicy: PasswordPolicy = policyConfig?.enabled
-    ? policyConfig
+    ? {
+        ...policyConfig,
+        min_length: Math.min(Math.max(policyConfig.min_length, 6), SUPABASE_MAX_PASSWORD_LENGTH),
+      }
     : DEFAULT_PASSWORD_POLICY
 
   // Validate password against the policy (new user only)

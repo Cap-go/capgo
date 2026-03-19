@@ -106,6 +106,12 @@ const bodySchema = z.object({
   captcha_token: z.optional(z.string().check(z.minLength(1))),
 })
 
+const SUPABASE_MAX_PASSWORD_LENGTH = 72
+
+function getEffectivePasswordMinLength(minLength?: number) {
+  return Math.min(Math.max(minLength ?? 6, 6), SUPABASE_MAX_PASSWORD_LENGTH)
+}
+
 // Check if password meets the policy requirements
 function passwordMeetsPolicy(password: string, policy: {
   min_length?: number
@@ -114,10 +120,11 @@ function passwordMeetsPolicy(password: string, policy: {
   require_special?: boolean
 }): { valid: boolean, errors: string[] } {
   const errors: string[] = []
+  const effectiveMinLength = getEffectivePasswordMinLength(policy.min_length)
 
   // Check minimum length
-  if (policy.min_length && password.length < policy.min_length) {
-    errors.push(`Password must be at least ${policy.min_length} characters`)
+  if (password.length < effectiveMinLength) {
+    errors.push(`Password must be at least ${effectiveMinLength} characters`)
   }
 
   // Check uppercase requirement
@@ -251,12 +258,13 @@ app.post('/', async (c) => {
 
   // Check if the password meets the policy requirements
   const policyCheck = passwordMeetsPolicy(body.password, policy)
+  const effectiveMinLength = getEffectivePasswordMinLength(policy.min_length)
 
   if (!policyCheck.valid) {
     throw simpleError('password_does_not_meet_policy', 'Your current password does not meet the organization requirements', {
       errors: policyCheck.errors,
       policy: {
-        min_length: policy.min_length,
+        min_length: effectiveMinLength,
         require_uppercase: policy.require_uppercase,
         require_number: policy.require_number,
         require_special: policy.require_special,
