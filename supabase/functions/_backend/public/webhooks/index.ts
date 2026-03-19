@@ -13,6 +13,19 @@ import { test } from './test.ts'
 
 export const app = honoFactory.createApp()
 
+function assertOrgWebhookScope(
+  orgId: string,
+  apikey: Database['public']['Tables']['apikeys']['Row'],
+): void {
+  if (apikey.limited_to_apps?.length) {
+    throw simpleError('no_permission', 'App-scoped API keys cannot manage organization webhooks', { org_id: orgId })
+  }
+
+  if (!apikeyHasOrgRight(apikey, orgId)) {
+    throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: orgId })
+  }
+}
+
 /**
  * Shared permission check for webhook endpoints (API key auth)
  * Validates admin access to organization
@@ -25,9 +38,8 @@ export async function checkWebhookPermission(
   if (!(await hasOrgRightApikey(c, orgId, apikey.user_id, 'admin', c.get('capgkey') as string))) {
     throw simpleError('no_permission', 'You need admin access to manage webhooks', { org_id: orgId })
   }
-  if (!apikeyHasOrgRight(apikey, orgId)) {
-    throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: orgId })
-  }
+
+  assertOrgWebhookScope(orgId, apikey)
 }
 
 /**
@@ -46,9 +58,7 @@ export async function checkWebhookPermissionV2(
 
   // If using API key, also check the key has org access
   if (auth.authType === 'apikey' && auth.apikey) {
-    if (!apikeyHasOrgRight(auth.apikey, orgId)) {
-      throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: orgId })
-    }
+    assertOrgWebhookScope(orgId, auth.apikey)
   }
 }
 
