@@ -36,6 +36,7 @@ const captchaComponent = ref<InstanceType<typeof VueTurnstile> | null>(null)
 // Two-step login state
 const emailForLogin = ref('')
 const hasSso = ref(false)
+const enforceSso = ref(false)
 const isDomainChecking = ref(false)
 
 const version = import.meta.env.VITE_APP_VERSION
@@ -160,7 +161,7 @@ async function login(form: { email: string, password: string }) {
   await checkMfa()
 }
 
-async function checkDomain(email: string): Promise<{ has_sso: boolean, provider_id?: string, org_id?: string }> {
+async function checkDomain(email: string): Promise<{ has_sso: boolean, enforce_sso?: boolean, provider_id?: string, org_id?: string }> {
   try {
     const { data: sessionData } = await supabase.auth.getSession()
     const token = sessionData?.session?.access_token
@@ -195,6 +196,7 @@ async function handleEmailContinue(form: { email: string }) {
 
   const result = await checkDomain(form.email)
   hasSso.value = result.has_sso
+  enforceSso.value = result.enforce_sso === true
 
   isDomainChecking.value = false
   statusAuth.value = 'credentials'
@@ -206,6 +208,10 @@ async function handlePasswordSubmit(form: { password: string }) {
 }
 
 async function handleSsoLogin() {
+  if (isLoading.value) {
+    return
+  }
+
   isLoading.value = true
   const domain = emailForLogin.value.split('@')[1]
 
@@ -541,8 +547,8 @@ onMounted(checkLogin)
           <!-- Step 2: Credentials (SSO or Password) -->
           <div v-else-if="statusAuth === 'credentials'" key="step-credentials" class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
             <div class="py-6 px-4 text-gray-500 sm:py-7 sm:px-8">
-              <!-- SSO path -->
-              <div v-if="hasSso" class="space-y-5">
+              <!-- SSO path (enforce_sso=true: SSO only) -->
+              <div v-if="hasSso && enforceSso" class="space-y-5">
                 <!-- Show email context -->
                 <p class="mb-4 text-sm text-gray-400 truncate">
                   {{ emailForLogin }}
@@ -582,7 +588,7 @@ onMounted(checkLogin)
                 </div>
               </div>
 
-              <!-- Password path -->
+              <!-- Password path (with optional SSO button when enforce_sso=false) -->
               <div v-else>
                 <FormKit id="login-account" type="form" :actions="false" @submit="handlePasswordSubmit">
                   <div class="space-y-5">
@@ -606,6 +612,23 @@ onMounted(checkLogin)
                     <p class="text-sm text-gray-400 truncate">
                       {{ emailForLogin }}
                     </p>
+                    <!-- Optional SSO button when SSO exists but is not enforced -->
+                    <div v-if="hasSso && !enforceSso">
+                      <button
+                        type="button" data-test="sso-login"
+                        :disabled="isLoading"
+                        :aria-busy="isLoading ? 'true' : 'false'"
+                        class="inline-flex justify-center items-center py-3 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-60"
+                        @click="handleSsoLogin"
+                      >
+                        {{ t('continue-with-sso') }}
+                      </button>
+                      <div class="flex items-center my-4">
+                        <div class="flex-1 h-px bg-gray-200 dark:bg-gray-600" />
+                        <span class="px-3 text-sm text-gray-400">or</span>
+                        <div class="flex-1 h-px bg-gray-200 dark:bg-gray-600" />
+                      </div>
+                    </div>
                     <div>
                       <FormKit
                         id="passwordInput" type="password" :placeholder="t('password')"
