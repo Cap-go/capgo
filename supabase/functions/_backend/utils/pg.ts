@@ -1066,23 +1066,23 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(builds_last_month, 0)::int AS builds_last_month,
         COALESCE(builds_last_month_ios, 0)::int AS builds_last_month_ios,
         COALESCE(builds_last_month_android, 0)::int AS builds_last_month_android,
-        COALESCE(build_minutes_day_ios, 0)::float AS build_minutes_day_ios,
-        COALESCE(build_minutes_day_android, 0)::float AS build_minutes_day_android,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_minutes_day_ios', '')::float, 0)::float AS build_minutes_day_ios,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_minutes_day_android', '')::float, 0)::float AS build_minutes_day_android,
         GREATEST(
           COALESCE(
-            COALESCE(builds_ios, 0) - LAG(COALESCE(builds_ios, 0)) OVER (ORDER BY date_id),
-            COALESCE(builds_ios, 0)
+            COALESCE(gs.builds_ios, 0) - LAG(COALESCE(gs.builds_ios, 0)) OVER (ORDER BY gs.date_id),
+            0
           ),
           0
         )::int AS builds_day_ios,
         GREATEST(
           COALESCE(
-            COALESCE(builds_android, 0) - LAG(COALESCE(builds_android, 0)) OVER (ORDER BY date_id),
-            COALESCE(builds_android, 0)
+            COALESCE(gs.builds_android, 0) - LAG(COALESCE(gs.builds_android, 0)) OVER (ORDER BY gs.date_id),
+            0
           ),
           0
         )::int AS builds_day_android
-      FROM global_stats
+      FROM global_stats gs
       WHERE date_id <= ${endDateOnly}
       )
       SELECT *
