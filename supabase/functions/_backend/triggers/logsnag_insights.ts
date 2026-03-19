@@ -824,7 +824,7 @@ app.post('/', middlewareAPISecret, async (c) => {
             build_minutes_day_android: Math.round(build_stats.total_seconds_day_android / 60),
             builds_day_ios: build_stats.build_count_day_ios,
             builds_day_android: build_stats.build_count_day_android,
-          })
+          } as any)
           .eq('date_id', dailyWindow.prevDayDateId)
 
         if (legacyBuildMetricsError) {
