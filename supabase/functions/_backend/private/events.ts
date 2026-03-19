@@ -22,18 +22,17 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     ? body.user_id
     : undefined
 
-  if (requestedOrgId && !(await checkPermission(c, 'org.read', { orgId: requestedOrgId })))
-    throw simpleError('cannot_access_organization', 'You can\'t access this organization', { org_id: requestedOrgId })
-
   const orgId = typeof body.user_id === 'string' && body.user_id.length > 0
     ? body.user_id
     : c.get('auth')?.userId ?? ''
 
   // notifyConsole: broadcast to Supabase Realtime only, skip all tracking
   if (body.notifyConsole) {
-    if (!body.user_id) {
+    if (!requestedOrgId) {
       throw simpleError('missing_org_id', 'Missing org ID for console notification')
     }
+    if (!(await checkPermission(c, 'org.read', { orgId: requestedOrgId })))
+      throw simpleError('cannot_access_organization', 'You can\'t access this organization', { org_id: requestedOrgId })
     if (orgId) {
       await backgroundTask(c, broadcastCLIEvent(c, {
         event: body.event,
