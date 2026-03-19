@@ -12,6 +12,10 @@ export interface CreateApp {
   name: string
   owner_org: string
   icon?: string
+  need_onboarding?: boolean
+  existing_app?: boolean
+  ios_store_url?: string
+  android_store_url?: string
 }
 
 export async function post(c: Context<MiddlewareKeyVariables>, body: CreateApp, _apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
@@ -38,14 +42,29 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: CreateApp, 
     name: body.name,
     retention: 2592000,
     default_upload_channel: 'dev',
+    need_onboarding: body.need_onboarding ?? false,
+    existing_app: body.existing_app ?? false,
+    ios_store_url: body.ios_store_url ?? null,
+    android_store_url: body.android_store_url ?? null,
   }
   let pgClient
   let data: Record<string, any> | undefined
   try {
     pgClient = getPgClient(c)
     const result = await pgClient.query(
-      `INSERT INTO public.apps (owner_org, app_id, icon_url, name, retention, default_upload_channel)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO public.apps (
+         owner_org,
+         app_id,
+         icon_url,
+         name,
+         retention,
+         default_upload_channel,
+         need_onboarding,
+         existing_app,
+         ios_store_url,
+         android_store_url
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING *`,
       [
         dataInsert.owner_org,
@@ -54,6 +73,10 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: CreateApp, 
         dataInsert.name,
         dataInsert.retention,
         dataInsert.default_upload_channel,
+        dataInsert.need_onboarding,
+        dataInsert.existing_app,
+        dataInsert.ios_store_url,
+        dataInsert.android_store_url,
       ],
     )
     data = result.rows[0]

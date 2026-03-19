@@ -10,6 +10,7 @@ import { getEnv } from '../../utils/utils.ts'
 /** Request body for creating a demo app */
 export interface CreateDemoApp {
   owner_org: string
+  app_id?: string
 }
 
 /** Demo version configuration */
@@ -404,6 +405,27 @@ async function createDemoAppRecord(
   })
 }
 
+async function getExistingPendingApp(
+  c: Context<MiddlewareKeyVariables>,
+  supabase: ReturnType<typeof supabaseAdmin>,
+  ownerOrg: string,
+  appId: string,
+) {
+  const { data, error } = await supabase
+    .from('apps')
+    .select('*')
+    .eq('owner_org', ownerOrg)
+    .eq('app_id', appId)
+    .single()
+
+  if (error || !data) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Error loading onboarding app', error, owner_org: ownerOrg, app_id: appId })
+    throw simpleError('cannot_find_app', 'Cannot find app for demo onboarding', { owner_org: ownerOrg, app_id: appId })
+  }
+
+  return data
+}
+
 /**
  * Creates a demo app for non-technical users during onboarding.
  * Demo apps are identified by the 'com.capdemo.' prefix in their app_id
@@ -438,10 +460,24 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
   }
 
   const supabase = supabaseAdmin(c)
-  // Generate a unique demo app_id with com.capdemo. prefix
-  const shortId = crypto.randomUUID().slice(0, 8)
-  const appId = `${DEMO_APP_PREFIX}${shortId}.app`
-  const appData = await createDemoAppRecord(c, supabase, body.owner_org, auth.userId, appId)
+  let appId = body.app_id?.trim() ?? ''
+  const appData = appId
+    ? await getExistingPendingApp(c, supabase, body.owner_org, appId)
+    : await (async () => {
+        const shortId = crypto.randomUUID().slice(0, 8)
+        appId = `${DEMO_APP_PREFIX}${shortId}.app`
+        return createDemoAppRecord(c, supabase, body.owner_org, auth.userId, appId)
+      })()
+
+  if (appData.id) {
+    const { error: cleanupError } = await supabase
+      .rpc('clear_onboarding_app_data' as any, { p_app_uuid: appData.id })
+
+    if (cleanupError) {
+      cloudlog({ requestId, message: 'Error clearing onboarding data before demo seeding', error: cleanupError, app_id: appId })
+      throw simpleError('cannot_prepare_demo_app', 'Cannot prepare app for demo data', { error: cleanupError })
+    }
+  }
 
   cloudlog({ requestId, message: 'Creating demo app with demo data', appId, owner_org: body.owner_org })
 
@@ -910,7 +946,7 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
   return c.json({
     status: 'ok',
     app_id: appId,
-    name: 'Demo App',
+    name: appData.name ?? 'Demo App',
     message: 'Demo app created successfully with sample data. Explore channels, versions, and analytics!',
   })
 }

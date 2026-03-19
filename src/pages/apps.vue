@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
 import { storeToRefs } from 'pinia'
-import { computed, onBeforeUnmount, onMounted, ref, watch, watchEffect } from 'vue'
+import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { createSignedImageUrl } from '~/services/storage'
@@ -22,9 +22,6 @@ const currentPage = ref(1)
 const pageSize = 10
 const totalApps = ref(0)
 const searchQuery = ref('')
-const onboardingQueryParam = 'show-onboarding-demo'
-const isMobileView = ref(false)
-
 const { currentOrganization } = storeToRefs(organizationStore)
 
 // Check if user lacks security compliance (2FA or password) - don't load data in this case
@@ -34,23 +31,6 @@ const lacksSecurityAccess = computed(() => {
   const lacksPassword = org?.password_policy_config?.enabled && org?.password_has_access === false
   return lacks2FA || lacksPassword
 })
-
-function updateMobileView() {
-  if (typeof window === 'undefined')
-    return
-
-  isMobileView.value = window.innerWidth < 768
-}
-
-function openOnboardingDemo() {
-  router.replace({
-    path: '/apps',
-    query: {
-      ...route.query,
-      [onboardingQueryParam]: '1',
-    },
-  })
-}
 
 async function getMyApps() {
   isTableLoading.value = true
@@ -138,15 +118,6 @@ watchEffect(async () => {
   }
 })
 
-onMounted(() => {
-  updateMobileView()
-  window.addEventListener('resize', updateMobileView)
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', updateMobileView)
-})
-
 displayStore.NavTitle = t('apps')
 displayStore.defaultBack = '/apps'
 </script>
@@ -176,14 +147,6 @@ displayStore.defaultBack = '/apps'
             <div class="flex flex-col gap-3 mt-5 sm:flex-row sm:items-center">
               <button class="d-btn d-btn-primary" @click="router.push('/app/new')">
                 {{ t('start-onboarding') }}
-              </button>
-              <button
-                v-if="!isMobileView"
-                class="d-btn d-btn-secondary"
-                type="button"
-                @click="openOnboardingDemo"
-              >
-                {{ t('demo-onboarding') }}
               </button>
             </div>
           </div>

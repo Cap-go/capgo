@@ -13,6 +13,10 @@ interface UpdateApp {
   retention?: number
   expose_metadata?: boolean
   allow_device_custom_id?: boolean
+  need_onboarding?: boolean
+  existing_app?: boolean
+  ios_store_url?: string | null
+  android_store_url?: string | null
 }
 
 export async function put(c: Context<MiddlewareKeyVariables>, appId: string, body: UpdateApp, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
@@ -43,6 +47,10 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
       retention: body.retention,
       expose_metadata: body.expose_metadata,
       allow_device_custom_id: body.allow_device_custom_id,
+      need_onboarding: body.need_onboarding,
+      existing_app: body.existing_app,
+      ios_store_url: body.ios_store_url,
+      android_store_url: body.android_store_url,
     })
     .eq('app_id', appId)
     .select()
