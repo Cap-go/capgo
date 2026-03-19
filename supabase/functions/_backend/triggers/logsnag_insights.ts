@@ -1,10 +1,10 @@
-import { sql } from 'drizzle-orm'
-import { Hono } from 'hono/tiny'
-
 import type { Context } from 'hono'
 import type { DevicesByPlatform, PluginBreakdownResult } from '../utils/cloudflare.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
+
+import { sql } from 'drizzle-orm'
+import { Hono } from 'hono/tiny'
 
 import { getPluginBreakdownCF, readActiveAppsCF, readLastMonthDevicesByPlatformCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
 import { DEMO_APP_PREFIX } from '../utils/demo.ts'
@@ -747,7 +747,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     builds_last_month_android: build_stats.last_month_android,
   }
   cloudlog({ requestId: c.get('requestId'), message: 'newData', newData })
-  let { error } = await supabaseAdmin(c)
+  const { error } = await supabaseAdmin(c)
     .from('global_stats')
     .upsert(newData)
   if (error)
