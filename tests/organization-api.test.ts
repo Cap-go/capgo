@@ -5,12 +5,12 @@ import { z } from 'zod'
 
 import {
   BASE_URL,
-  SUPABASE_ANON_KEY,
-  SUPABASE_BASE_URL,
-  normalizeLocalhostUrl,
   getAuthHeadersForCredentials,
   getSupabaseClient,
   headers,
+  normalizeLocalhostUrl,
+  SUPABASE_ANON_KEY,
+  SUPABASE_BASE_URL,
   TEST_EMAIL,
   USER_ADMIN_EMAIL,
   USER_EMAIL,
@@ -763,18 +763,21 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
     if (!normalizedSupabaseBaseUrl || !SUPABASE_ANON_KEY)
       throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY are required for this test')
 
+    const authHeaders = await getAuthHeadersForCredentials(USER_EMAIL, USER_PASSWORD)
+    const authorization = authHeaders.Authorization
+    if (!authorization)
+      throw new Error('Unable to obtain authenticated token for tests')
+
     const authClient = createClient(normalizedSupabaseBaseUrl, SUPABASE_ANON_KEY, {
       auth: {
         persistSession: false,
       },
+      global: {
+        headers: {
+          Authorization: authorization,
+        },
+      },
     })
-
-    const authHeaders = await getAuthHeadersForCredentials(USER_EMAIL, USER_PASSWORD)
-    const accessToken = authHeaders.Authorization?.replace('Bearer ', '')
-    if (!accessToken)
-      throw new Error('Unable to obtain authenticated token for tests')
-
-    authClient.auth.setAuth(accessToken)
 
     const { data, error } = await authClient.rpc('get_orgs_v7', {
       userid: USER_ID,
