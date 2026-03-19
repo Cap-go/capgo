@@ -653,15 +653,15 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
   const activeOrder = params.order?.find(
     col => col.key === 'updated_at' && typeof col.sortable === 'string',
   )
-  const ascending = activeOrder?.sortable === 'asc'
+  const devicesOrder = activeOrder ? { ascending: activeOrder.sortable === 'asc' } : null
 
   // Cursor-based pagination using timestamp
   let cursorFilter = ''
-  if (params.cursor) {
+  if (params.cursor && devicesOrder) {
     // Cursor format: "timestamp|device_id"
     const [cursorTime, cursorDeviceId] = params.cursor.split('|')
     if (cursorTime && cursorDeviceId) {
-      cursorFilter = ascending
+      cursorFilter = devicesOrder.ascending
         ? `AND (timestamp > toDateTime('${escapeSqlString(cursorTime)}') OR (timestamp = toDateTime('${escapeSqlString(cursorTime)}') AND blob1 > '${escapeSqlString(cursorDeviceId)}'))`
         : `AND (timestamp < toDateTime('${escapeSqlString(cursorTime)}') OR (timestamp = toDateTime('${escapeSqlString(cursorTime)}') AND blob1 > '${escapeSqlString(cursorDeviceId)}'))`
     }
@@ -684,7 +684,7 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
 FROM device_info
 WHERE ${conditions.join(' AND ')} ${cursorFilter}
 GROUP BY blob1
-ORDER BY updated_at ${ascending ? 'ASC' : 'DESC'}, device_id ASC
+ORDER BY ${devicesOrder ? `updated_at ${devicesOrder.ascending ? 'ASC' : 'DESC'}, device_id ASC` : 'device_id ASC'}
 LIMIT ${limit + 1}`
 
   cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF query', query })

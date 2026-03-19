@@ -32,13 +32,20 @@ function buildIlikeContainsPattern(value: string): string {
 /**
  * Derive whether the device cursor should sort ascending or descending by `updated_at`.
  */
-function getDevicesOrder(order?: Order[]) {
+type DevicesOrder = {
+  ascending: boolean
+} | null
+
+function getDevicesOrder(order?: Order[]): DevicesOrder {
   const activeOrder = order?.find(
     col => col.key === 'updated_at' && typeof col.sortable === 'string',
   )
 
+  if (!activeOrder)
+    return null
+
   return {
-    ascending: activeOrder?.sortable === 'asc',
+    ascending: activeOrder.sortable === 'asc',
   }
 }
 
@@ -1257,8 +1264,8 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
 
   const devicesOrder = getDevicesOrder(params.order)
 
-  // Cursor-based pagination
-  if (params.cursor) {
+  // Cursor-based pagination only works when an updated_at order is active
+  if (params.cursor && devicesOrder) {
     // Cursor format: "updated_at|device_id"
     const [cursorTime, cursorDeviceId] = params.cursor.split('|')
     if (cursorTime && cursorDeviceId) {
@@ -1271,9 +1278,9 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
     }
   }
 
-  query = query
-    .order('updated_at', { ascending: devicesOrder.ascending })
-    .order('device_id', { ascending: true })
+  if (devicesOrder)
+    query = query.order('updated_at', { ascending: devicesOrder.ascending })
+  query = query.order('device_id', { ascending: true })
     .limit(limit + 1) // Fetch one extra to check if there are more results
 
   const { data, error } = await query

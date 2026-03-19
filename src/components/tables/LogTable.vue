@@ -493,7 +493,19 @@ onMounted(async () => {
   initializeActionFilters()
   await refreshData()
 })
-watch(props, async () => {
+watch(() => props.columns, async () => {
+  await refreshData()
+}, { deep: true })
+watch(() => props.search, async () => {
+  await refreshData()
+})
+watch(() => props.appId, async () => {
+  await refreshData()
+})
+watch(() => props.deviceId, async () => {
+  await refreshData()
+})
+watch(() => props.actions, async () => {
   await refreshData()
 })
 watch(actionFilters, async () => {
