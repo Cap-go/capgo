@@ -33,7 +33,10 @@ SELECT
 
 SELECT
     ok(
-        get_total_app_storage_size_orgs('22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'com.demoadmin.app') > 0,
+        get_total_app_storage_size_orgs(
+            '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'com.demoadmin.app'
+        )
+        > 0,
         'get_total_app_storage_size_orgs - authorized org admin can read app storage'
     );
 
@@ -109,14 +112,18 @@ SELECT
 
 SELECT
     is(
-        get_total_app_storage_size_orgs('22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'com.demoadmin.app'),
+        get_total_app_storage_size_orgs(
+            '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'com.demoadmin.app'
+        ),
         0::double precision,
         'get_total_app_storage_size_orgs - anonymous call is non-disclosing'
     );
 
 SELECT
     throws_ok(
-        'SELECT get_user_main_org_id(''' || tests.get_supabase_uid('test_admin') || ''')',
+        'SELECT get_user_main_org_id('''
+        || tests.get_supabase_uid('test_admin')
+        || ''')',
         '42501',
         'permission denied for function get_user_main_org_id',
         'get_user_main_org_id - anonymous execute is blocked'
@@ -124,7 +131,9 @@ SELECT
 
 SELECT
     throws_ok(
-        'SELECT is_account_disabled(''' || tests.get_supabase_uid('test_admin') || ''')',
+        'SELECT is_account_disabled('''
+        || tests.get_supabase_uid('test_admin')
+        || ''')',
         '42501',
         'permission denied for function is_account_disabled',
         'is_account_disabled - anonymous execute is blocked'

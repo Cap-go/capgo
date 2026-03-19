@@ -1,8 +1,10 @@
 -- Restrict org metadata RPCs so anonymous callers cannot enumerate org IDs or infer billing status.
-CREATE OR REPLACE FUNCTION "public"."is_paying_org" ("orgid" "uuid") RETURNS boolean
-  LANGUAGE plpgsql
-  SECURITY DEFINER
-  SET search_path = '' AS $$
+CREATE OR REPLACE FUNCTION public.is_paying_org(
+    "orgid" uuid
+) RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = '' AS $$
 DECLARE
   caller_role text;
 BEGIN
@@ -29,10 +31,12 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION "public"."is_trial_org" ("orgid" "uuid") RETURNS integer
-  LANGUAGE plpgsql
-  SECURITY DEFINER
-  SET search_path = '' AS $$
+CREATE OR REPLACE FUNCTION public.is_trial_org(
+    "orgid" uuid
+) RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = '' AS $$
 DECLARE
   caller_role text;
 BEGIN
@@ -56,14 +60,26 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION "public"."is_paying_org" ("orgid" "uuid") FROM PUBLIC;
-REVOKE ALL ON FUNCTION "public"."is_paying_org" ("orgid" "uuid") FROM "anon";
-REVOKE ALL ON FUNCTION "public"."is_paying_org" ("orgid" "uuid") FROM "authenticated";
-GRANT EXECUTE ON FUNCTION "public"."is_paying_org" ("orgid" "uuid") TO "authenticated";
-GRANT EXECUTE ON FUNCTION "public"."is_paying_org" ("orgid" "uuid") TO "service_role";
+REVOKE ALL ON FUNCTION public.is_paying_org("orgid" uuid) FROM public;
+REVOKE ALL ON FUNCTION public.is_paying_org("orgid" uuid) FROM anon;
+REVOKE ALL ON FUNCTION public.is_paying_org(
+    "orgid" uuid
+) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.is_paying_org(
+    "orgid" uuid
+) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_paying_org(
+    "orgid" uuid
+) TO service_role;
 
-REVOKE ALL ON FUNCTION "public"."is_trial_org" ("orgid" "uuid") FROM PUBLIC;
-REVOKE ALL ON FUNCTION "public"."is_trial_org" ("orgid" "uuid") FROM "anon";
-REVOKE ALL ON FUNCTION "public"."is_trial_org" ("orgid" "uuid") FROM "authenticated";
-GRANT EXECUTE ON FUNCTION "public"."is_trial_org" ("orgid" "uuid") TO "authenticated";
-GRANT EXECUTE ON FUNCTION "public"."is_trial_org" ("orgid" "uuid") TO "service_role";
+REVOKE ALL ON FUNCTION public.is_trial_org("orgid" uuid) FROM public;
+REVOKE ALL ON FUNCTION public.is_trial_org("orgid" uuid) FROM anon;
+REVOKE ALL ON FUNCTION public.is_trial_org(
+    "orgid" uuid
+) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.is_trial_org(
+    "orgid" uuid
+) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.is_trial_org(
+    "orgid" uuid
+) TO service_role;

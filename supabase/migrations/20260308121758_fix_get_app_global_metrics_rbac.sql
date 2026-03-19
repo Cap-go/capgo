@@ -2,8 +2,10 @@
 -- - require org-level read access for all org_id overloads
 -- - keep existing UUID-based signatures for compatibility
 
-CREATE OR REPLACE FUNCTION public.get_app_metrics("org_id" uuid, "start_date" date, "end_date" date)
-RETURNS TABLE(
+CREATE OR REPLACE FUNCTION public.get_app_metrics(
+    "org_id" uuid, "start_date" date, "end_date" date
+)
+RETURNS TABLE (
     app_id character varying,
     date date,
     mau bigint,
@@ -91,11 +93,13 @@ BEGIN
 END;
 $function$;
 
-ALTER FUNCTION public.get_app_metrics("org_id" uuid, "start_date" date, "end_date" date)
-    OWNER TO "postgres";
+ALTER FUNCTION public.get_app_metrics(
+    "org_id" uuid, "start_date" date, "end_date" date
+)
+OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION public.get_app_metrics("org_id" uuid)
-RETURNS TABLE(
+RETURNS TABLE (
     app_id character varying,
     date date,
     mau bigint,
@@ -137,10 +141,12 @@ END;
 $function$;
 
 ALTER FUNCTION public.get_app_metrics("org_id" uuid)
-    OWNER TO "postgres";
+OWNER TO "postgres";
 
-CREATE OR REPLACE FUNCTION public.get_global_metrics("org_id" uuid, "start_date" date, "end_date" date)
-RETURNS TABLE(
+CREATE OR REPLACE FUNCTION public.get_global_metrics(
+    "org_id" uuid, "start_date" date, "end_date" date
+)
+RETURNS TABLE (
     date date,
     mau bigint,
     storage bigint,
@@ -190,11 +196,13 @@ BEGIN
 END;
 $function$;
 
-ALTER FUNCTION public.get_global_metrics("org_id" uuid, "start_date" date, "end_date" date)
-    OWNER TO "postgres";
+ALTER FUNCTION public.get_global_metrics(
+    "org_id" uuid, "start_date" date, "end_date" date
+)
+OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION public.get_global_metrics("org_id" uuid)
-RETURNS TABLE(
+RETURNS TABLE (
     date date,
     mau bigint,
     storage bigint,
@@ -237,4 +245,4 @@ END;
 $function$;
 
 ALTER FUNCTION public.get_global_metrics("org_id" uuid)
-    OWNER TO "postgres";
+OWNER TO "postgres";

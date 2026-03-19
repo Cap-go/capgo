@@ -72,8 +72,7 @@ SELECT
         'is_trial_org - service role can read trial days'
     );
 
-SELECT
-    *
+SELECT *
 FROM
     finish();
 

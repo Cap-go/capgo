@@ -12,7 +12,7 @@ SELECT tests.authenticate_as('test_user');
 SELECT
     ok(
         (
-    SELECT count(*)
+            SELECT count(*)
             FROM
                 public.roles
         ) >= 0,
@@ -25,7 +25,7 @@ SELECT tests.authenticate_as('test_user');
 SELECT
     ok(
         (
-    SELECT count(*)
+            SELECT count(*)
             FROM
                 public.permissions
         ) >= 0,
@@ -58,7 +58,7 @@ SELECT
                 org_id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'
                 AND name = 'Test Group RLS'
         ),
-    'Regular user can read their org groups'
+        'Regular user can read their org groups'
     );
 
 -- 4) Regular user cannot see groups from other orgs
@@ -86,7 +86,7 @@ SELECT
             WHERE
                 org_id = '22dbad8a-b885-4309-9b3b-a09f8460fb6d'
         ),
-    'Regular user cannot see groups from other orgs'
+        'Regular user cannot see groups from other orgs'
     );
 
 -- 5) Admin can see role_bindings for their org
@@ -139,7 +139,7 @@ SELECT
                 AND scope_type = 'org'
                 AND org_id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'
         ),
-    'Admin can see role bindings for their org'
+        'Admin can see role bindings for their org'
     );
 
 -- 6) User cannot see role_bindings from other orgs
@@ -157,7 +157,7 @@ SELECT
                 scope_type = 'org'
                 AND org_id = '22dbad8a-b885-4309-9b3b-a09f8460fb6d'
         ),
-    'User cannot see role bindings from other orgs'
+        'User cannot see role bindings from other orgs'
     );
 
 -- 7) Test admin cannot create roles
