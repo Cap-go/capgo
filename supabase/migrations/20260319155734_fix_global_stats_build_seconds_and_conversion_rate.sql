@@ -38,13 +38,13 @@ SET org_conversion_rate = ROUND(COALESCE(org_conversion_rate, 0)::numeric, 1)::d
 
 WITH daily_build_stats AS (
   SELECT
-    DATE(timezone('UTC', created_at)) AS date_id,
+    to_char(DATE(timezone('UTC', created_at)), 'YYYY-MM-DD') AS date_id,
     COALESCE(SUM(build_time_unit) FILTER (WHERE platform = 'ios'), 0)::bigint AS build_total_seconds_day_ios,
     COALESCE(SUM(build_time_unit) FILTER (WHERE platform = 'android'), 0)::bigint AS build_total_seconds_day_android,
     COALESCE(COUNT(*) FILTER (WHERE platform = 'ios'), 0)::integer AS build_count_day_ios,
     COALESCE(COUNT(*) FILTER (WHERE platform = 'android'), 0)::integer AS build_count_day_android,
-    COALESCE(ROUND(AVG(build_time_unit) FILTER (WHERE platform = 'ios')::numeric, 1), 0)::double precision AS build_avg_seconds_day_ios,
-    COALESCE(ROUND(AVG(build_time_unit) FILTER (WHERE platform = 'android')::numeric, 1), 0)::double precision AS build_avg_seconds_day_android
+    COALESCE(ROUND((AVG(build_time_unit) FILTER (WHERE platform = 'ios'))::numeric, 1), 0)::double precision AS build_avg_seconds_day_ios,
+    COALESCE(ROUND((AVG(build_time_unit) FILTER (WHERE platform = 'android'))::numeric, 1), 0)::double precision AS build_avg_seconds_day_android
   FROM public.build_logs
   WHERE platform IN ('ios', 'android')
   GROUP BY DATE(timezone('UTC', created_at))
