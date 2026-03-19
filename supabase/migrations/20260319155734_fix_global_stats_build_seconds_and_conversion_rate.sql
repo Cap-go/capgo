@@ -15,8 +15,10 @@ ADD COLUMN build_avg_seconds_day_ios double precision DEFAULT 0 NOT NULL,
 ADD COLUMN build_avg_seconds_day_android double precision DEFAULT 0 NOT NULL;
 
 ALTER TABLE public.global_stats
-ALTER COLUMN build_total_seconds_day_ios TYPE bigint USING 0,
-ALTER COLUMN build_total_seconds_day_android TYPE bigint USING 0,
+ALTER COLUMN build_total_seconds_day_ios TYPE bigint
+  USING COALESCE(ROUND(build_total_seconds_day_ios::numeric * 60), 0)::bigint,
+ALTER COLUMN build_total_seconds_day_android TYPE bigint
+  USING COALESCE(ROUND(build_total_seconds_day_android::numeric * 60), 0)::bigint,
 ALTER COLUMN build_count_day_ios TYPE integer USING COALESCE(build_count_day_ios, 0),
 ALTER COLUMN build_count_day_android TYPE integer USING COALESCE(build_count_day_android, 0);
 
