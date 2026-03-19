@@ -259,6 +259,7 @@ ALTER FUNCTION public.get_total_metrics(uuid, date, date) OWNER TO "postgres";
 GRANT ALL ON FUNCTION public.get_total_metrics(
     uuid, date, date
 ) TO service_role;
+REVOKE ALL ON FUNCTION public.get_total_metrics(uuid, date, date) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.get_total_metrics(uuid, date, date) FROM anon;
 REVOKE ALL ON FUNCTION public.get_total_metrics(
     uuid, date, date
@@ -318,6 +319,7 @@ $function$;
 ALTER FUNCTION public.get_total_metrics(uuid) OWNER TO "postgres";
 
 GRANT ALL ON FUNCTION public.get_total_metrics(uuid) TO service_role;
+REVOKE ALL ON FUNCTION public.get_total_metrics(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.get_total_metrics(uuid) FROM anon;
 REVOKE ALL ON FUNCTION public.get_total_metrics(uuid) FROM authenticated;
 
@@ -400,6 +402,7 @@ $function$;
 ALTER FUNCTION public.get_plan_usage_and_fit(uuid) OWNER TO "postgres";
 
 GRANT ALL ON FUNCTION public.get_plan_usage_and_fit(uuid) TO service_role;
+REVOKE ALL ON FUNCTION public.get_plan_usage_and_fit(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.get_plan_usage_and_fit(uuid) FROM anon;
 REVOKE ALL ON FUNCTION public.get_plan_usage_and_fit(uuid) FROM authenticated;
 
@@ -484,6 +487,7 @@ ALTER FUNCTION public.get_plan_usage_and_fit_uncached(uuid) OWNER TO "postgres";
 GRANT ALL ON FUNCTION public.get_plan_usage_and_fit_uncached(
     uuid
 ) TO service_role;
+REVOKE ALL ON FUNCTION public.get_plan_usage_and_fit_uncached(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.get_plan_usage_and_fit_uncached(uuid) FROM anon;
 REVOKE ALL ON FUNCTION public.get_plan_usage_and_fit_uncached(
     uuid
