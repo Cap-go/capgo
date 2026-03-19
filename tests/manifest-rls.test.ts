@@ -154,7 +154,7 @@ describe('manifest RLS', () => {
   it.concurrent('allows an API key for the owning org to read manifest entries', async () => {
     const { response, data } = await fetchManifestRows({
       ...headers,
-      Authorization: APIKEY_TEST_ALL,
+      capgkey: APIKEY_TEST_ALL,
     }, ownVersionId)
 
     expect(response.status).toBe(200)
@@ -162,11 +162,11 @@ describe('manifest RLS', () => {
     expect(data[0]?.file_name).toBe('own-entry.js')
   })
 
-  it.concurrent('prevents an API key from reading another org', async () => {
+  it.concurrent('prevents an API key from reading another org\'s manifest entries', async () => {
     const { response, data } = await fetchManifestRows({
       ...headers,
-      Authorization: APIKEY_TEST2_ALL,
-    }, otherVersionId)
+      capgkey: APIKEY_TEST2_ALL,
+    }, ownVersionId)
 
     expect(response.status).toBe(200)
     expect(data).toHaveLength(0)
