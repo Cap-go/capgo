@@ -99,6 +99,37 @@ function getDailyWindow(referenceDate = new Date()): DailyWindow {
   }
 }
 
+async function globalStatsHasBuildMinuteColumns(c: Context): Promise<boolean> {
+  const requiredColumns = [
+    'build_minutes_day_ios',
+    'build_minutes_day_android',
+    'builds_day_ios',
+    'builds_day_android',
+  ]
+  const pgClient = getPgClient(c, true)
+
+  try {
+    const result = await pgClient.query(
+      `
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_schema = 'public'
+          AND table_name = 'global_stats'
+          AND column_name = ANY($1)
+      `,
+      [requiredColumns],
+    )
+    return (result.rows?.length ?? 0) === requiredColumns.length
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'failed to inspect global_stats columns', error })
+    return false
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
+}
+
 async function calculateRevenue(c: Context): Promise<PlanRevenue> {
   const supabase = supabaseAdmin(c)
 
@@ -705,8 +736,6 @@ app.post('/', middlewareAPISecret, async (c) => {
     demo_apps_created,
   })
   // cloudlog(c.get('requestId'), 'app', app.app_id, downloads, versions, shared, channels)
-  const date_id = getDateId()
-  const prevDayDateId = getDateId(new Date(Date.now() - 24 * 60 * 60 * 1000))
   const newData: Database['public']['Tables']['global_stats']['Insert'] = {
     date_id: snapshotDateId,
     apps,
@@ -779,27 +808,33 @@ app.post('/', middlewareAPISecret, async (c) => {
     .upsert(newData)
   if (error)
     cloudlogErr({ requestId: c.get('requestId'), message: 'insert global_stats error', error })
-  const buildMinutesPayload = {
-    date_id: snapshotDateId,
-    build_minutes_day_ios: build_stats.minutes_day_ios,
-    build_minutes_day_android: build_stats.minutes_day_android,
-    builds_day_ios: build_stats.builds_day_ios,
-    builds_day_android: build_stats.builds_day_android,
-  }
-  const { error: buildMinutesError } = await supabaseAdmin(c)
-    .from('global_stats')
-    .upsert(buildMinutesPayload as any)
-  if (buildMinutesError) {
-    const errorCode = String((buildMinutesError as any)?.code ?? '').toUpperCase()
-    const message = String((buildMinutesError as any)?.message ?? '')
-    if (
-      errorCode !== 'PGRST204'
-      && errorCode !== '42703'
-      && !message.toLowerCase().includes('build_minutes_day')
-      && !message.toLowerCase().includes('builds_day')
-    ) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'insert build minutes error', error: buildMinutesError })
+  const hasBuildMinuteColumns = await globalStatsHasBuildMinuteColumns(c)
+  if (hasBuildMinuteColumns) {
+    const { error: buildMinutesError } = await supabaseAdmin(c)
+      .from('global_stats')
+      .update({
+        build_minutes_day_ios: build_stats.minutes_day_ios,
+        build_minutes_day_android: build_stats.minutes_day_android,
+        builds_day_ios: build_stats.builds_day_ios,
+        builds_day_android: build_stats.builds_day_android,
+      })
+      .eq('date_id', snapshotDateId)
+
+    if (buildMinutesError) {
+      const errorCode = String((buildMinutesError as any)?.code ?? '').toUpperCase()
+      const message = String((buildMinutesError as any)?.message ?? '')
+      if (
+        errorCode !== 'PGRST204'
+        && errorCode !== '42703'
+        && !message.toLowerCase().includes('build_minutes_day')
+        && !message.toLowerCase().includes('builds_day')
+      ) {
+        cloudlogErr({ requestId: c.get('requestId'), message: 'update build minutes error', error: buildMinutesError })
+      }
     }
+  }
+  else {
+    cloudlog({ requestId: c.get('requestId'), message: 'Skipping build minute update because columns are missing' })
   }
   await logsnag(c).track({
     channel: 'updates-stats',
