@@ -254,6 +254,7 @@ export async function deliverWebhook(
       method: 'POST',
       headers,
       body: payloadString,
+      redirect: 'manual',
       signal: controller.signal,
     })
 
