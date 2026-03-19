@@ -102,14 +102,14 @@ function getStoreUrls(url: string) {
     const parsed = new URL(url)
     const host = parsed.hostname.toLowerCase()
 
-    if (host.includes('apps.apple.com')) {
+    if (host === 'apps.apple.com') {
       return {
         iosStoreUrl: parsed.toString(),
         androidStoreUrl: null,
       }
     }
 
-    if (host.includes('play.google.com')) {
+    if (host === 'play.google.com') {
       return {
         iosStoreUrl: null,
         androidStoreUrl: parsed.toString(),

@@ -52,7 +52,7 @@ async function fetchIconDataUrl(iconUrl: string | null) {
 
 function extractAndroidAppId(url: URL) {
   const host = url.hostname.toLowerCase()
-  if (!host.includes('play.google.com')) {
+  if (host !== 'play.google.com') {
     return null
   }
 
@@ -62,7 +62,7 @@ function extractAndroidAppId(url: URL) {
 
 function extractAppleStoreId(url: URL) {
   const host = url.hostname.toLowerCase()
-  if (!host.includes('apps.apple.com')) {
+  if (host !== 'apps.apple.com') {
     return null
   }
 
@@ -113,7 +113,6 @@ function extractTitle(html: string) {
 
 function decodeHtml(value: string) {
   return value
-    .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, '\'')
     .replace(/&lt;/g, '<')
@@ -124,7 +123,7 @@ function normalizeStoreName(name: string, url: URL) {
   const trimmed = name.trim()
   const host = url.hostname.toLowerCase()
 
-  if (host.includes('play.google.com')) {
+  if (host === 'play.google.com') {
     return trimmed
       .replace(/\s*[-|:]\s*Apps on Google Play\s*$/i, '')
       .replace(/\s*[-|:]\s*Google Play\s*$/i, '')
