@@ -998,10 +998,10 @@ export interface AdminGlobalStatsTrend {
   builds_last_month: number
   builds_last_month_ios: number
   builds_last_month_android: number
-  build_minutes_day_ios: number
-  build_minutes_day_android: number
-  builds_day_ios: number
-  builds_day_android: number
+  build_total_seconds_day_ios: number
+  build_total_seconds_day_android: number
+  build_avg_seconds_day_ios: number
+  build_avg_seconds_day_android: number
 }
 
 export async function getAdminGlobalStatsTrend(
@@ -1066,10 +1066,10 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(builds_last_month, 0)::int AS builds_last_month,
         COALESCE(builds_last_month_ios, 0)::int AS builds_last_month_ios,
         COALESCE(builds_last_month_android, 0)::int AS builds_last_month_android,
-        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_minutes_day_ios', '')::float, 0)::float AS build_minutes_day_ios,
-        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_minutes_day_android', '')::float, 0)::float AS build_minutes_day_android,
-        COALESCE(NULLIF(to_jsonb(gs) ->> 'builds_day_ios', '')::int, 0)::int AS builds_day_ios,
-        COALESCE(NULLIF(to_jsonb(gs) ->> 'builds_day_android', '')::int, 0)::int AS builds_day_android
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_total_seconds_day_ios', '')::bigint, 0)::bigint AS build_total_seconds_day_ios,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_total_seconds_day_android', '')::bigint, 0)::bigint AS build_total_seconds_day_android,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_avg_seconds_day_ios', '')::float, 0)::float AS build_avg_seconds_day_ios,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_avg_seconds_day_android', '')::float, 0)::float AS build_avg_seconds_day_android
       FROM global_stats gs
       WHERE date_id <= ${endDateOnly}
       )
@@ -1126,10 +1126,10 @@ export async function getAdminGlobalStatsTrend(
       builds_last_month: Number(row.builds_last_month) || 0,
       builds_last_month_ios: Number(row.builds_last_month_ios) || 0,
       builds_last_month_android: Number(row.builds_last_month_android) || 0,
-      build_minutes_day_ios: Number(row.build_minutes_day_ios) || 0,
-      build_minutes_day_android: Number(row.build_minutes_day_android) || 0,
-      builds_day_ios: Number(row.builds_day_ios) || 0,
-      builds_day_android: Number(row.builds_day_android) || 0,
+      build_total_seconds_day_ios: Number(row.build_total_seconds_day_ios) || 0,
+      build_total_seconds_day_android: Number(row.build_total_seconds_day_android) || 0,
+      build_avg_seconds_day_ios: Number(row.build_avg_seconds_day_ios) || 0,
+      build_avg_seconds_day_android: Number(row.build_avg_seconds_day_android) || 0,
     }))
 
     cloudlog({ requestId: c.get('requestId'), message: 'getAdminGlobalStatsTrend result', resultCount: data.length })

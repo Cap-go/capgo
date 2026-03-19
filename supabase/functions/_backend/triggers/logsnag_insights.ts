@@ -28,10 +28,10 @@ interface BuildStats {
   success_total: number
   success_ios: number
   success_android: number
-  minutes_day_ios: number
-  minutes_day_android: number
-  builds_day_ios: number
-  builds_day_android: number
+  total_seconds_day_ios: number
+  total_seconds_day_android: number
+  avg_seconds_day_ios: number
+  avg_seconds_day_android: number
 }
 interface DailyWindow {
   prevDayStart: Date
@@ -99,12 +99,12 @@ function getDailyWindow(referenceDate = new Date()): DailyWindow {
   }
 }
 
-async function globalStatsHasBuildMinuteColumns(c: Context): Promise<boolean> {
+async function globalStatsHasBuildMetricColumns(c: Context): Promise<boolean> {
   const requiredColumns = [
-    'build_minutes_day_ios',
-    'build_minutes_day_android',
-    'builds_day_ios',
-    'builds_day_android',
+    'build_total_seconds_day_ios',
+    'build_total_seconds_day_android',
+    'build_avg_seconds_day_ios',
+    'build_avg_seconds_day_android',
   ]
   const pgClient = getPgClient(c, true)
 
@@ -390,10 +390,10 @@ async function getBuildStats(c: Context, window?: DailyWindow): Promise<BuildSta
       success_total: successTotalResult.count ?? 0,
       success_ios: successIosResult.count ?? 0,
       success_android: successAndroidResult.count ?? 0,
-      minutes_day_ios: dailyBuildStats.minutes.ios,
-      minutes_day_android: dailyBuildStats.minutes.android,
-      builds_day_ios: dailyBuildStats.counts.ios,
-      builds_day_android: dailyBuildStats.counts.android,
+      total_seconds_day_ios: dailyBuildStats.totalSeconds.ios,
+      total_seconds_day_android: dailyBuildStats.totalSeconds.android,
+      avg_seconds_day_ios: dailyBuildStats.avgSeconds.ios,
+      avg_seconds_day_android: dailyBuildStats.avgSeconds.android,
     }
   }
   catch (e) {
@@ -408,10 +408,10 @@ async function getBuildStats(c: Context, window?: DailyWindow): Promise<BuildSta
       success_total: 0,
       success_ios: 0,
       success_android: 0,
-      minutes_day_ios: 0,
-      minutes_day_android: 0,
-      builds_day_ios: 0,
-      builds_day_android: 0,
+      total_seconds_day_ios: 0,
+      total_seconds_day_android: 0,
+      avg_seconds_day_ios: 0,
+      avg_seconds_day_android: 0,
     }
   }
 }
@@ -421,32 +421,32 @@ async function aggregateDailyBuildStats(
   start: Date,
   end: Date,
 ): Promise<{
-  minutes: Record<'ios' | 'android', number>
-  counts: Record<'ios' | 'android', number>
+  totalSeconds: Record<'ios' | 'android', number>
+  avgSeconds: Record<'ios' | 'android', number>
 }> {
   // Read from primary so the daily rollup is not permanently undercounted by replica lag.
   const pgClient = getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
-  const minutesByPlatform: Record<'ios' | 'android', number> = { ios: 0, android: 0 }
-  const countsByPlatform: Record<'ios' | 'android', number> = { ios: 0, android: 0 }
+  const totalSecondsByPlatform: Record<'ios' | 'android', number> = { ios: 0, android: 0 }
+  const avgSecondsByPlatform: Record<'ios' | 'android', number> = { ios: 0, android: 0 }
 
   try {
     const query = sql`
       SELECT
         platform,
-        SUM(build_time_unit)::float AS total_seconds,
-        COUNT(*)::int AS total_builds
+        SUM(build_time_unit)::bigint AS total_seconds,
+        COALESCE(ROUND(AVG(build_time_unit)::numeric, 1), 0)::float AS avg_seconds
       FROM build_logs
       WHERE created_at >= ${start}
         AND created_at < ${end}
         AND platform IN ('ios', 'android')
       GROUP BY platform
     `
-    const result = await drizzleClient.execute<{ platform: string, total_seconds: number, total_builds: number }>(query)
+    const result = await drizzleClient.execute<{ platform: string, total_seconds: number, avg_seconds: number }>(query)
     for (const row of result.rows ?? []) {
       if (row.platform === 'ios' || row.platform === 'android') {
-        minutesByPlatform[row.platform] = (Number(row.total_seconds) || 0) / 60
-        countsByPlatform[row.platform] = Number(row.total_builds) || 0
+        totalSecondsByPlatform[row.platform] = Number(row.total_seconds) || 0
+        avgSecondsByPlatform[row.platform] = Number(row.avg_seconds) || 0
       }
     }
   }
@@ -457,7 +457,7 @@ async function aggregateDailyBuildStats(
     closeClient(c, pgClient)
   }
 
-  return { minutes: minutesByPlatform, counts: countsByPlatform }
+  return { totalSeconds: totalSecondsByPlatform, avgSeconds: avgSecondsByPlatform }
 }
 
 function getStats(c: Context, window?: DailyWindow): GlobalStats {
@@ -716,7 +716,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     res.build_stats,
   ])
   const not_paying = users - customers.total - plans.Trial
-  const org_conversion_rate = orgs > 0 ? (paying_orgs_for_conversion * 100) / orgs : 0
+  const org_conversion_rate = orgs > 0 ? Number((((paying_orgs_for_conversion * 100) / orgs)).toFixed(1)) : 0
   cloudlog({
     requestId: c.get('requestId'),
     message: 'All Promises',
@@ -809,33 +809,33 @@ app.post('/', middlewareAPISecret, async (c) => {
     .upsert(newData)
   if (error)
     cloudlogErr({ requestId: c.get('requestId'), message: 'insert global_stats error', error })
-  const hasBuildMinuteColumns = await globalStatsHasBuildMinuteColumns(c)
-  if (hasBuildMinuteColumns) {
-    const { error: buildMinutesError } = await supabaseAdmin(c)
+  const hasBuildMetricColumns = await globalStatsHasBuildMetricColumns(c)
+  if (hasBuildMetricColumns) {
+    const { error: buildMetricsError } = await supabaseAdmin(c)
       .from('global_stats')
       .update({
-        build_minutes_day_ios: build_stats.minutes_day_ios,
-        build_minutes_day_android: build_stats.minutes_day_android,
-        builds_day_ios: build_stats.builds_day_ios,
-        builds_day_android: build_stats.builds_day_android,
+        build_total_seconds_day_ios: build_stats.total_seconds_day_ios,
+        build_total_seconds_day_android: build_stats.total_seconds_day_android,
+        build_avg_seconds_day_ios: build_stats.avg_seconds_day_ios,
+        build_avg_seconds_day_android: build_stats.avg_seconds_day_android,
       })
       .eq('date_id', dailyWindow.prevDayDateId)
 
-    if (buildMinutesError) {
-      const errorCode = String((buildMinutesError as any)?.code ?? '').toUpperCase()
-      const message = String((buildMinutesError as any)?.message ?? '')
+    if (buildMetricsError) {
+      const errorCode = String((buildMetricsError as any)?.code ?? '').toUpperCase()
+      const message = String((buildMetricsError as any)?.message ?? '')
       if (
         errorCode !== 'PGRST204'
         && errorCode !== '42703'
-        && !message.toLowerCase().includes('build_minutes_day')
-        && !message.toLowerCase().includes('builds_day')
+        && !message.toLowerCase().includes('build_total_seconds_day')
+        && !message.toLowerCase().includes('build_avg_seconds_day')
       ) {
-        cloudlogErr({ requestId: c.get('requestId'), message: 'update build minutes error', error: buildMinutesError })
+        cloudlogErr({ requestId: c.get('requestId'), message: 'update build metrics error', error: buildMetricsError })
       }
     }
   }
   else {
-    cloudlog({ requestId: c.get('requestId'), message: 'Skipping build minute update because columns are missing' })
+    cloudlog({ requestId: c.get('requestId'), message: 'Skipping build metric update because columns are missing' })
   }
   await logsnag(c).track({
     channel: 'updates-stats',
@@ -846,7 +846,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       success_rate,
       registers_today,
       storage_gb: bundle_storage_gb,
-      org_conversion_rate: Number(org_conversion_rate.toFixed(2)),
+      org_conversion_rate,
     },
     icon: '📲',
   }).catch((e: any) => {
@@ -920,7 +920,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     },
     {
       title: 'Org conversion rate',
-      value: `${org_conversion_rate.toFixed(2)}%`,
+      value: `${org_conversion_rate.toFixed(1)}%`,
       icon: '🎯',
     },
     {
