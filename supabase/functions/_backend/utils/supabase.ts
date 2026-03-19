@@ -14,15 +14,24 @@ import { getEnv, isStripeConfigured } from './utils.ts'
 const DEFAULT_LIMIT = 1000
 // Import Supabase client
 
+/**
+ * Escape a string and wrap it in double quotes for safely embedding into PostgREST filter payloads.
+ */
 function quotePostgrestFilterValue(value: string): string {
   const escapedValue = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
   return `"${escapedValue}"`
 }
 
+/**
+ * Return a PostgREST `ilike` pattern that matches the provided value as a substring.
+ */
 function buildIlikeContainsPattern(value: string): string {
   return quotePostgrestFilterValue(`%${value}%`)
 }
 
+/**
+ * Derive whether the device cursor should sort ascending or descending by `updated_at`.
+ */
 function getDevicesOrder(order?: Order[]) {
   const activeOrder = order?.find(
     col => col.key === 'updated_at' && typeof col.sortable === 'string',
@@ -1139,6 +1148,9 @@ export async function readDeviceVersionCountsSB(c: Context, app_id: string, chan
   }, {})
 }
 
+/**
+ * Retrieve stats entries for the given app, honoring the optional filters and sorting provided in `params`.
+ */
 export async function readStatsSB(c: Context, params: ReadStatsParams) {
   const supabase = supabaseAdmin(c)
 
@@ -1203,6 +1215,9 @@ export async function readStatsSB(c: Context, params: ReadStatsParams) {
   return data ?? []
 }
 
+/**
+ * Query the devices table for an app with search, cursor pagination, and ordering helpers applied.
+ */
 export async function readDevicesSB(c: Context, params: ReadDevicesParams, customIdMode: boolean) {
   const supabase = supabaseAdmin(c)
   const limit = params.limit ?? DEFAULT_LIMIT
@@ -1271,6 +1286,9 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
   return data ?? []
 }
 
+/**
+ * Count how many devices match the supplied filters so pagination totals stay accurate.
+ */
 export async function countDevicesSB(
   c: Context,
   app_id: string,

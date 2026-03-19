@@ -606,6 +606,9 @@ interface DeviceInfoCF {
   updated_at: string
 }
 
+/**
+ * Read device metadata from the Analytics Engine, respecting search, version, custom ID, and cursor filters.
+ */
 export async function readDevicesCF(c: Context, params: ReadDevicesParams, customIdMode: boolean): Promise<DeviceRes[]> {
   // Use Analytics Engine DEVICE_INFO for reading devices
   // Schema: blob1=device_id, blob2=version_name, blob3=plugin_version, blob4=os_version,
