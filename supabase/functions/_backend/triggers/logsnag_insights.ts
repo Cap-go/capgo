@@ -1,17 +1,19 @@
+import { sql } from 'drizzle-orm'
+import { Hono } from 'hono/tiny'
+
 import type { Context } from 'hono'
 import type { DevicesByPlatform, PluginBreakdownResult } from '../utils/cloudflare.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { Hono } from 'hono/tiny'
+
 import { getPluginBreakdownCF, readActiveAppsCF, readLastMonthDevicesByPlatformCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
 import { DEMO_APP_PREFIX } from '../utils/demo.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { logsnag, logsnagInsights } from '../utils/logsnag.ts'
+import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { countAllApps, countAllUpdates, countAllUpdatesExternal, getUpdateStats } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
-import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
-import { sql } from 'drizzle-orm'
 
 interface PlanTotal { [key: string]: number }
 interface Actives { users: number, apps: number }
@@ -75,9 +77,8 @@ interface GlobalStats {
   build_stats: PromiseLike<BuildStats>
 }
 
-function getTodayDateId(): string {
-  const today = new Date()
-  return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())).toISOString().slice(0, 10)
+function getDateId(targetDate = new Date()): string {
+  return new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate())).toISOString().slice(0, 10)
 }
 
 async function calculateRevenue(c: Context): Promise<PlanRevenue> {
@@ -277,6 +278,8 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
   const todayStartMillis = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
   const prevDayStart = new Date(todayStartMillis - 24 * 60 * 60 * 1000)
   const prevDayEnd = new Date(todayStartMillis)
+  const date_id = getDateId(today)
+  const prevDayDateId = getDateId(prevDayStart)
 
   try {
     // Run all count queries in parallel for better performance
@@ -677,8 +680,6 @@ app.post('/', middlewareAPISecret, async (c) => {
     demo_apps_created,
   })
   // cloudlog(c.get('requestId'), 'app', app.app_id, downloads, versions, shared, channels)
-  // create var date_id with yearn-month-day
-  const date_id = getTodayDateId()
   const newData: Database['public']['Tables']['global_stats']['Insert'] = {
     date_id,
     apps,
@@ -744,29 +745,32 @@ app.post('/', middlewareAPISecret, async (c) => {
     builds_last_month: build_stats.last_month,
     builds_last_month_ios: build_stats.last_month_ios,
     builds_last_month_android: build_stats.last_month_android,
-    build_minutes_day_ios: build_stats.minutes_day_ios,
-    build_minutes_day_android: build_stats.minutes_day_android,
   }
   cloudlog({ requestId: c.get('requestId'), message: 'newData', newData })
   let { error } = await supabaseAdmin(c)
     .from('global_stats')
     .upsert(newData)
-  if (error) {
-    const errorCode = String((error as any)?.code ?? '').toUpperCase()
-    const message = String((error as any)?.message ?? '')
-    if (
-      errorCode === 'PGRST204'
-      || errorCode === '42703'
-      || message.toLowerCase().includes('build_minutes_day')
-    ) {
-      const { build_minutes_day_ios, build_minutes_day_android, ...legacyData } = newData
-      ;({ error } = await supabaseAdmin(c)
-        .from('global_stats')
-        .upsert(legacyData))
-    }
-  }
   if (error)
     cloudlogErr({ requestId: c.get('requestId'), message: 'insert global_stats error', error })
+  const buildMinutesPayload = {
+    date_id: prevDayDateId,
+    build_minutes_day_ios: build_stats.minutes_day_ios,
+    build_minutes_day_android: build_stats.minutes_day_android,
+  }
+  const { error: buildMinutesError } = await supabaseAdmin(c)
+    .from('global_stats')
+    .upsert(buildMinutesPayload)
+  if (buildMinutesError) {
+    const errorCode = String((buildMinutesError as any)?.code ?? '').toUpperCase()
+    const message = String((buildMinutesError as any)?.message ?? '')
+    if (
+      errorCode !== 'PGRST204'
+      && errorCode !== '42703'
+      && !message.toLowerCase().includes('build_minutes_day')
+    ) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'insert build minutes error', error: buildMinutesError })
+    }
+  }
   await logsnag(c).track({
     channel: 'updates-stats',
     event: 'Updates last month',
