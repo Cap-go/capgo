@@ -2758,6 +2758,29 @@ export type Database = {
           credits_required: number
         }[]
       }
+      calculate_org_metrics_cache_entry: {
+        Args: { p_end_date: string; p_org_id: string; p_start_date: string }
+        Returns: {
+          bandwidth: number
+          build_time_unit: number
+          cached_at: string
+          end_date: string
+          fail: number
+          get: number
+          install: number
+          mau: number
+          org_id: string
+          start_date: string
+          storage: number
+          uninstall: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "org_metrics_cache"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       check_domain_sso: {
         Args: { p_domain: string }
         Returns: {

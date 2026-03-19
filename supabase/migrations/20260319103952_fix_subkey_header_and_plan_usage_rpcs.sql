@@ -162,7 +162,13 @@ DECLARE
     v_plan_bandwidth bigint;
     v_plan_storage bigint;
     v_plan_build_time bigint;
-    v_anchor_day interval;
+    v_anchor_day integer;
+    v_current_month_start date;
+    v_current_month_anchor date;
+    v_target_month_start date;
+    v_target_month_last_day date;
+    v_next_target_month_start date;
+    v_next_target_month_last_day date;
     v_plan_name text;
     total_stats RECORD;
     percent_mau double precision;
@@ -172,7 +178,7 @@ DECLARE
     v_is_good_plan boolean;
 BEGIN
     SELECT
-        COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL),
+        COALESCE(EXTRACT(DAY FROM si.subscription_anchor_start)::integer, 1),
         p.mau,
         p.bandwidth,
         p.storage,
@@ -184,12 +190,30 @@ BEGIN
     LEFT JOIN public.plans p ON si.product_id = p.stripe_id
     WHERE o.id = orgid;
 
-    IF v_anchor_day > NOW() - date_trunc('MONTH', NOW()) THEN
-        v_start_date := (date_trunc('MONTH', NOW() - INTERVAL '1 MONTH') + v_anchor_day)::date;
+    v_current_month_start := date_trunc('MONTH', NOW())::date;
+    v_current_month_anchor := v_current_month_start + (
+        LEAST(
+            v_anchor_day,
+            EXTRACT(DAY FROM (v_current_month_start + INTERVAL '1 MONTH - 1 day'))::integer
+        ) - 1
+    );
+
+    IF NOW()::date < v_current_month_anchor THEN
+        v_target_month_start := (v_current_month_start - INTERVAL '1 MONTH')::date;
     ELSE
-        v_start_date := (date_trunc('MONTH', NOW()) + v_anchor_day)::date;
+        v_target_month_start := v_current_month_start;
     END IF;
-    v_end_date := (v_start_date + INTERVAL '1 MONTH')::date;
+
+    v_target_month_last_day := (v_target_month_start + INTERVAL '1 MONTH - 1 day')::date;
+    v_start_date := v_target_month_start + (
+        LEAST(v_anchor_day, EXTRACT(DAY FROM v_target_month_last_day)::integer) - 1
+    );
+
+    v_next_target_month_start := (v_target_month_start + INTERVAL '1 MONTH')::date;
+    v_next_target_month_last_day := (v_next_target_month_start + INTERVAL '1 MONTH - 1 day')::date;
+    v_end_date := v_next_target_month_start + (
+        LEAST(v_anchor_day, EXTRACT(DAY FROM v_next_target_month_last_day)::integer) - 1
+    );
 
     SELECT * INTO total_stats
     FROM public.get_total_metrics(orgid, v_start_date, v_end_date);
@@ -244,7 +268,13 @@ DECLARE
     v_plan_bandwidth bigint;
     v_plan_storage bigint;
     v_plan_build_time bigint;
-    v_anchor_day interval;
+    v_anchor_day integer;
+    v_current_month_start date;
+    v_current_month_anchor date;
+    v_target_month_start date;
+    v_target_month_last_day date;
+    v_next_target_month_start date;
+    v_next_target_month_last_day date;
     v_plan_name text;
     total_stats RECORD;
     percent_mau double precision;
@@ -254,7 +284,7 @@ DECLARE
     v_is_good_plan boolean;
 BEGIN
     SELECT
-        COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL),
+        COALESCE(EXTRACT(DAY FROM si.subscription_anchor_start)::integer, 1),
         p.mau,
         p.bandwidth,
         p.storage,
@@ -266,12 +296,30 @@ BEGIN
     LEFT JOIN public.plans p ON si.product_id = p.stripe_id
     WHERE o.id = orgid;
 
-    IF v_anchor_day > NOW() - date_trunc('MONTH', NOW()) THEN
-        v_start_date := (date_trunc('MONTH', NOW() - INTERVAL '1 MONTH') + v_anchor_day)::date;
+    v_current_month_start := date_trunc('MONTH', NOW())::date;
+    v_current_month_anchor := v_current_month_start + (
+        LEAST(
+            v_anchor_day,
+            EXTRACT(DAY FROM (v_current_month_start + INTERVAL '1 MONTH - 1 day'))::integer
+        ) - 1
+    );
+
+    IF NOW()::date < v_current_month_anchor THEN
+        v_target_month_start := (v_current_month_start - INTERVAL '1 MONTH')::date;
     ELSE
-        v_start_date := (date_trunc('MONTH', NOW()) + v_anchor_day)::date;
+        v_target_month_start := v_current_month_start;
     END IF;
-    v_end_date := (v_start_date + INTERVAL '1 MONTH')::date;
+
+    v_target_month_last_day := (v_target_month_start + INTERVAL '1 MONTH - 1 day')::date;
+    v_start_date := v_target_month_start + (
+        LEAST(v_anchor_day, EXTRACT(DAY FROM v_target_month_last_day)::integer) - 1
+    );
+
+    v_next_target_month_start := (v_target_month_start + INTERVAL '1 MONTH')::date;
+    v_next_target_month_last_day := (v_next_target_month_start + INTERVAL '1 MONTH - 1 day')::date;
+    v_end_date := v_next_target_month_start + (
+        LEAST(v_anchor_day, EXTRACT(DAY FROM v_next_target_month_last_day)::integer) - 1
+    );
 
     SELECT * INTO total_stats
     FROM public.seed_org_metrics_cache(orgid, v_start_date, v_end_date);

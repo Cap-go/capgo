@@ -269,7 +269,7 @@ describe('[GET] /app subkey ownership enforcement', () => {
 
 describe('[GET] /app invalid subkey header handling', () => {
   it.concurrent('should reject malformed x-limited-key-id values instead of ignoring them', async () => {
-    const invalidSubkeyValues = ['', '0', '73603x', '73603,', ' 73603']
+    const invalidSubkeyValues = ['', '0', '73603x', '73603,', ' 73603', '9007199254740992']
 
     for (const invalidSubkeyValue of invalidSubkeyValues) {
       const response = await fetch(`${BASE_URL}/app?limit=1`, {
