@@ -6,7 +6,6 @@ import {
   getAuthHeaders,
   getAuthHeadersForCredentials,
   getSupabaseClient,
-  headers,
   ORG_ID_2,
   resetAndSeedAppData,
   resetAppData,
@@ -27,6 +26,10 @@ let authHeadersUser2: Record<string, string>
 let authHeadersNonMember: Record<string, string>
 let ownVersionId: number
 let otherVersionId: number
+
+const restApiKeyHeaders = {
+  'Content-Type': 'application/json',
+}
 
 function getRestManifestUrl(appVersionId: number): string {
   const supabaseUrl = process.env.SUPABASE_URL
@@ -153,7 +156,7 @@ describe('manifest RLS', () => {
 
   it.concurrent('allows an API key for the owning org to read manifest entries', async () => {
     const { response, data } = await fetchManifestRows({
-      ...headers,
+      ...restApiKeyHeaders,
       capgkey: APIKEY_TEST_ALL,
     }, ownVersionId)
 
@@ -164,7 +167,7 @@ describe('manifest RLS', () => {
 
   it.concurrent('prevents an API key from reading another org\'s manifest entries', async () => {
     const { response, data } = await fetchManifestRows({
-      ...headers,
+      ...restApiKeyHeaders,
       capgkey: APIKEY_TEST2_ALL,
     }, ownVersionId)
 
