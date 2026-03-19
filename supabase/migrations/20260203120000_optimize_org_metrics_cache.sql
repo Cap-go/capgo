@@ -116,6 +116,8 @@ REVOKE ALL ON FUNCTION public.calculate_org_metrics_cache_entry(uuid, date, date
 REVOKE ALL ON FUNCTION public.calculate_org_metrics_cache_entry(uuid, date, date) FROM anon;
 REVOKE ALL ON FUNCTION public.calculate_org_metrics_cache_entry(uuid, date, date) FROM authenticated;
 REVOKE ALL ON FUNCTION public.calculate_org_metrics_cache_entry(uuid, date, date) FROM service_role;
+COMMENT ON FUNCTION public.calculate_org_metrics_cache_entry(uuid, date, date) IS
+  'Compute the aggregated org metrics (MAU, storage, bandwidth, build time unit, get/fail/install/uninstall) for the supplied date range without persisting changes. Read-only paths use this helper so they can return cached metrics without touching org_metrics_cache directly.';
 
 CREATE OR REPLACE FUNCTION public.seed_org_metrics_cache(
     p_org_id uuid,

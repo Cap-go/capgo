@@ -3,6 +3,7 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { getEffectivePasswordMinLength, getPasswordPolicyValidationErrors } from '../utils/password_policy.ts'
 import { emptySupabase, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 import { syncUserPreferenceTags } from '../utils/user_preferences.ts'
 import { getEnv } from '../utils/utils.ts'
@@ -36,25 +37,6 @@ const DEFAULT_PASSWORD_POLICY: PasswordPolicy = {
   require_uppercase: true,
   require_number: true,
   require_special: true,
-}
-
-// Build dynamic password validation schema based on org's policy
-function buildPasswordSchema(policy: PasswordPolicy) {
-  let schema = z.string().check(
-    z.minLength(policy.min_length, `Password must be at least ${policy.min_length} characters`),
-  )
-
-  if (policy.require_uppercase) {
-    schema = schema.check(z.regex(/[A-Z]/, 'Password must contain at least one uppercase letter'))
-  }
-  if (policy.require_number) {
-    schema = schema.check(z.regex(/\d/, 'Password must contain at least one number'))
-  }
-  if (policy.require_special) {
-    schema = schema.check(z.regex(/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/, 'Password must contain at least one special character'))
-  }
-
-  return schema
 }
 
 // Base schema for initial validation (without password)
@@ -367,15 +349,16 @@ app.post('/', async (c) => {
   // Use org's password policy if enabled, otherwise use default (new user only)
   const policyConfig = org?.password_policy_config as unknown as PasswordPolicy | null
   const passwordPolicy: PasswordPolicy = policyConfig?.enabled
-    ? policyConfig
+    ? {
+        ...policyConfig,
+        min_length: getEffectivePasswordMinLength(policyConfig.min_length),
+      }
     : DEFAULT_PASSWORD_POLICY
 
-  // Validate password against the policy (new user only)
-  const passwordSchema = buildPasswordSchema(passwordPolicy)
-  const passwordValidationResult = passwordSchema.safeParse(baseBody.password)
-  if (!passwordValidationResult.success) {
+  const passwordPolicyErrors = getPasswordPolicyValidationErrors(baseBody.password, passwordPolicy)
+  if (passwordPolicyErrors.length > 0) {
     throw simpleError('invalid_password', 'Password does not meet requirements', {
-      errors: z.prettifyError(passwordValidationResult.error),
+      errors: passwordPolicyErrors,
       policy: {
         min_length: passwordPolicy.min_length,
         require_uppercase: passwordPolicy.require_uppercase,
@@ -387,7 +370,7 @@ app.post('/', async (c) => {
 
   const body = {
     ...baseBody,
-    password: passwordValidationResult.data,
+    password: baseBody.password,
   }
   const { password: _pwd, captchaToken: _cap, ...bodyWithoutSecrets } = body
   cloudlog({ requestId: c.get('requestId'), context: 'accept_invitation validated body', body: bodyWithoutSecrets })
