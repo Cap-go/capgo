@@ -32,7 +32,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
       throw simpleError('missing_org_id', 'Missing org ID for console notification')
     }
     if (!(await checkPermission(c, 'org.read', { orgId: requestedOrgId })))
-      throw simpleError('cannot_access_organization', 'You can\'t access this organization', { org_id: requestedOrgId })
+      return c.json({ error: 'Forbidden' }, 403)
     if (orgId) {
       await backgroundTask(c, broadcastCLIEvent(c, {
         event: body.event,
