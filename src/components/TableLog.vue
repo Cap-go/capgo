@@ -382,8 +382,8 @@ function loadFromUrlParams() {
     }
   }
 
-  const hasSortParam = props.columns.some((col) => params.has(`sort_${col.key}`))
-  const newColumns = props.columns.map((col) => ({
+  const hasSortParam = props.columns.some(col => params.has(`sort_${col.key}`))
+  const newColumns = props.columns.map(col => ({
     ...col,
     sortable: hasSortParam && typeof col.sortable === 'string' ? true : col.sortable,
   }))
