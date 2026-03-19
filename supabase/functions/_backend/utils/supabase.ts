@@ -8,18 +8,45 @@ import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged, nullableStri
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { createCustomer } from './stripe.ts'
+import { Constants } from './supabase.types.ts'
 import { getEnv, isStripeConfigured } from './utils.ts'
 
 const DEFAULT_LIMIT = 1000
 // Import Supabase client
 
+/**
+ * Escape a string and wrap it in double quotes for safely embedding into PostgREST filter payloads.
+ */
 function quotePostgrestFilterValue(value: string): string {
   const escapedValue = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
   return `"${escapedValue}"`
 }
 
-function buildIlikePrefixPattern(value: string): string {
-  return quotePostgrestFilterValue(`${value}%`)
+/**
+ * Return a PostgREST `ilike` pattern that matches the provided value as a substring.
+ */
+function buildIlikeContainsPattern(value: string): string {
+  return quotePostgrestFilterValue(`%${value}%`)
+}
+
+/**
+ * Derive whether the device cursor should sort ascending or descending by `updated_at`.
+ */
+type DevicesOrder = {
+  ascending: boolean
+} | null
+
+function getDevicesOrder(order?: Order[]): DevicesOrder {
+  const activeOrder = order?.find(
+    col => col.key === 'updated_at' && typeof col.sortable === 'string',
+  )
+
+  if (!activeOrder)
+    return null
+
+  return {
+    ascending: activeOrder.sortable === 'asc',
+  }
 }
 
 export interface InsertPayload<T extends keyof Database['public']['Tables']> {
@@ -1149,6 +1176,9 @@ export async function readDeviceVersionCountsSB(c: Context, app_id: string, chan
   }, {})
 }
 
+/**
+ * Retrieve stats entries for the given app, honoring the optional filters and sorting provided in `params`.
+ */
 export async function readStatsSB(c: Context, params: ReadStatsParams) {
   const supabase = supabaseAdmin(c)
 
@@ -1182,11 +1212,16 @@ export async function readStatsSB(c: Context, params: ReadStatsParams) {
 
   if (params.search) {
     cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
-    const searchPattern = buildIlikePrefixPattern(params.search)
-    if (params.deviceIds?.length)
-      query = query.or(`version_build.ilike.${searchPattern},version_name.ilike.${searchPattern}`)
-    else
-      query = query.or(`device_id.ilike.${searchPattern},version_build.ilike.${searchPattern},version_name.ilike.${searchPattern}`)
+    const searchPattern = buildIlikeContainsPattern(params.search)
+    const orFilters = params.deviceIds?.length
+      ? [`version_name.ilike.${searchPattern}`]
+      : [`device_id.ilike.${searchPattern}`, `version_name.ilike.${searchPattern}`]
+
+    const matchedActions = Constants.public.Enums.stats_action
+      .filter(action => action.toLowerCase().includes(params.search!.toLowerCase()))
+      .map(action => `action.eq.${action}`)
+
+    query = query.or([...orFilters, ...matchedActions].join(','))
   }
 
   if (params.order?.length) {
@@ -1208,6 +1243,9 @@ export async function readStatsSB(c: Context, params: ReadStatsParams) {
   return data ?? []
 }
 
+/**
+ * Query the devices table for an app with search, cursor pagination, and ordering helpers applied.
+ */
 export async function readDevicesSB(c: Context, params: ReadDevicesParams, customIdMode: boolean) {
   const supabase = supabaseAdmin(c)
   const limit = params.limit ?? DEFAULT_LIMIT
@@ -1235,7 +1273,7 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
 
   if (params.search) {
     cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
-    const searchPattern = buildIlikePrefixPattern(params.search)
+    const searchPattern = buildIlikeContainsPattern(params.search)
     if (params.deviceIds?.length)
       query = query.or(`custom_id.ilike.${searchPattern},version_name.ilike.${searchPattern}`)
     else
@@ -1245,22 +1283,25 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
   if (params.version_name)
     query = query.eq('version_name', params.version_name)
 
-  // Cursor-based pagination
-  if (params.cursor) {
+  const devicesOrder = getDevicesOrder(params.order)
+
+  // Cursor-based pagination only works when an updated_at order is active
+  if (params.cursor && devicesOrder) {
     // Cursor format: "updated_at|device_id"
     const [cursorTime, cursorDeviceId] = params.cursor.split('|')
     if (cursorTime && cursorDeviceId) {
-      // For DESC order: get records older than cursor or same time with device_id > cursor
       const quotedCursorTime = quotePostgrestFilterValue(cursorTime)
       const quotedCursorDeviceId = quotePostgrestFilterValue(cursorDeviceId)
-      query = query.or(`updated_at.lt.${quotedCursorTime},and(updated_at.eq.${quotedCursorTime},device_id.gt.${quotedCursorDeviceId})`)
+      if (devicesOrder.ascending)
+        query = query.or(`updated_at.gt.${quotedCursorTime},and(updated_at.eq.${quotedCursorTime},device_id.gt.${quotedCursorDeviceId})`)
+      else
+        query = query.or(`updated_at.lt.${quotedCursorTime},and(updated_at.eq.${quotedCursorTime},device_id.gt.${quotedCursorDeviceId})`)
     }
   }
 
-  // Always order by updated_at DESC, device_id ASC for stable cursor pagination
-  query = query
-    .order('updated_at', { ascending: false })
-    .order('device_id', { ascending: true })
+  if (devicesOrder)
+    query = query.order('updated_at', { ascending: devicesOrder.ascending })
+  query = query.order('device_id', { ascending: true })
     .limit(limit + 1) // Fetch one extra to check if there are more results
 
   const { data, error } = await query
@@ -1273,6 +1314,9 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
   return data ?? []
 }
 
+/**
+ * Count how many devices match the supplied filters so pagination totals stay accurate.
+ */
 export async function countDevicesSB(
   c: Context,
   app_id: string,
@@ -1300,7 +1344,7 @@ export async function countDevicesSB(
   }
 
   if (search) {
-    const normalizedSearch = buildIlikePrefixPattern(search)
+    const normalizedSearch = buildIlikeContainsPattern(search)
     if (deviceIds.length)
       req = req.or(`custom_id.ilike.${normalizedSearch},version_name.ilike.${normalizedSearch}`)
     else
