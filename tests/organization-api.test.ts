@@ -743,7 +743,7 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
     })
 
     expect(data).toBeNull()
-    expect(error).toBeTruthy()
+    expect(error?.code).toBe('42501')
   })
 
   it('rejects authenticated RPC access to get_orgs_v7(userid)', async () => {
@@ -769,7 +769,7 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
     })
 
     expect(data).toBeNull()
-    expect(error).toBeTruthy()
+    expect(error?.code).toBe('42501')
 
     await authClient.auth.signOut()
   })

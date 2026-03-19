@@ -299,6 +299,7 @@ ALTER FUNCTION public.get_total_metrics(uuid, date, date) OWNER TO "postgres";
 GRANT ALL ON FUNCTION public.get_total_metrics(
     uuid, date, date
 ) TO service_role;
+REVOKE ALL ON FUNCTION public.get_total_metrics(uuid, date, date) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.get_total_metrics(uuid, date, date) FROM anon;
 REVOKE ALL ON FUNCTION public.get_total_metrics(
     uuid, date, date
