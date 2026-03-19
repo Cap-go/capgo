@@ -820,8 +820,8 @@ app.post('/', middlewareAPISecret, async (c) => {
         const { error: legacyBuildMetricsError } = await supabaseAdmin(c)
           .from('global_stats')
           .update({
-            build_minutes_day_ios: Math.round(build_stats.total_seconds_day_ios / 60),
-            build_minutes_day_android: Math.round(build_stats.total_seconds_day_android / 60),
+            build_minutes_day_ios: build_stats.total_seconds_day_ios / 60,
+            build_minutes_day_android: build_stats.total_seconds_day_android / 60,
             builds_day_ios: build_stats.build_count_day_ios,
             builds_day_android: build_stats.build_count_day_android,
           } as any)

@@ -54,12 +54,12 @@ SET
 CREATE TEMP TABLE temp_daily_build_stats ON COMMIT DROP AS
 SELECT
   to_char(DATE(timezone('UTC', created_at)), 'YYYY-MM-DD') AS date_id,
-  COALESCE(SUM(build_time_unit) FILTER (WHERE platform = 'ios'), 0)::bigint AS build_total_seconds_day_ios,
-  COALESCE(SUM(build_time_unit) FILTER (WHERE platform = 'android'), 0)::bigint AS build_total_seconds_day_android,
-  COALESCE(COUNT(*) FILTER (WHERE platform = 'ios'), 0)::integer AS build_count_day_ios,
-  COALESCE(COUNT(*) FILTER (WHERE platform = 'android'), 0)::integer AS build_count_day_android,
-  COALESCE(ROUND((AVG(build_time_unit) FILTER (WHERE platform = 'ios'))::numeric, 1), 0)::double precision AS build_avg_seconds_day_ios,
-  COALESCE(ROUND((AVG(build_time_unit) FILTER (WHERE platform = 'android'))::numeric, 1), 0)::double precision AS build_avg_seconds_day_android
+  SUM(build_time_unit) FILTER (WHERE platform = 'ios')::bigint AS build_total_seconds_day_ios,
+  SUM(build_time_unit) FILTER (WHERE platform = 'android')::bigint AS build_total_seconds_day_android,
+  COUNT(*) FILTER (WHERE platform = 'ios')::integer AS build_count_day_ios,
+  COUNT(*) FILTER (WHERE platform = 'android')::integer AS build_count_day_android,
+  ROUND((AVG(build_time_unit) FILTER (WHERE platform = 'ios'))::numeric, 1)::double precision AS build_avg_seconds_day_ios,
+  ROUND((AVG(build_time_unit) FILTER (WHERE platform = 'android'))::numeric, 1)::double precision AS build_avg_seconds_day_android
 FROM public.build_logs
 WHERE platform IN ('ios', 'android')
 GROUP BY DATE(timezone('UTC', created_at));
@@ -89,16 +89,26 @@ INSERT INTO public.global_stats (
 )
 SELECT
   temp_daily_build_stats.date_id,
-  0::bigint AS apps,
-  0::bigint AS updates,
-  0::bigint AS stars,
-  temp_daily_build_stats.build_total_seconds_day_ios,
-  temp_daily_build_stats.build_total_seconds_day_android,
-  temp_daily_build_stats.build_count_day_ios,
-  temp_daily_build_stats.build_count_day_android,
-  temp_daily_build_stats.build_avg_seconds_day_ios,
-  temp_daily_build_stats.build_avg_seconds_day_android
+  COALESCE(prev_snapshot.apps, 0)::bigint AS apps,
+  COALESCE(prev_snapshot.updates, 0)::bigint AS updates,
+  COALESCE(prev_snapshot.stars, 0)::bigint AS stars,
+  COALESCE(temp_daily_build_stats.build_total_seconds_day_ios, 0)::bigint,
+  COALESCE(temp_daily_build_stats.build_total_seconds_day_android, 0)::bigint,
+  COALESCE(temp_daily_build_stats.build_count_day_ios, 0)::integer,
+  COALESCE(temp_daily_build_stats.build_count_day_android, 0)::integer,
+  COALESCE(temp_daily_build_stats.build_avg_seconds_day_ios, 0)::double precision,
+  COALESCE(temp_daily_build_stats.build_avg_seconds_day_android, 0)::double precision
 FROM temp_daily_build_stats
+LEFT JOIN LATERAL (
+  SELECT
+    gs.apps,
+    gs.updates,
+    gs.stars
+  FROM public.global_stats gs
+  WHERE gs.date_id < temp_daily_build_stats.date_id
+  ORDER BY gs.date_id DESC
+  LIMIT 1
+) AS prev_snapshot ON true
 WHERE NOT EXISTS (
   SELECT 1
   FROM public.global_stats gs
