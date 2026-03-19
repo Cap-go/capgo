@@ -253,6 +253,18 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
         // Identity already transferred — log but still return merged so frontend redirects to login
       }
 
+      // Update app_metadata.provider on the original user to reflect the SSO provider.
+      // Our raw identity transfer bypasses Supabase Auth's normal flow, which would otherwise
+      // update this field. Without this, the next SSO login returns provider='email' and
+      // the provider check above rejects the user with sso_auth_required.
+      const { error: updateProviderError } = await admin.auth.admin.updateUserById(originalUserId, {
+        app_metadata: { provider: userProvider },
+      })
+      if (updateProviderError) {
+        cloudlogErr({ requestId, message: 'Failed to update app_metadata.provider on original user after merge', originalUserId, error: updateProviderError })
+        // Non-fatal: identity transfer succeeded; log but continue
+      }
+
       cloudlog({ requestId, message: 'SSO account merged successfully — user must re-login', userId, originalUserId })
       return c.json({ success: true, merged: true })
     }
