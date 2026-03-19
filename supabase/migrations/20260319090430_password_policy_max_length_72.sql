@@ -5,9 +5,9 @@ WITH "normalized_password_policy_min_lengths" AS (
   SELECT
     "id",
     LEAST(
-      72,
+      72::numeric,
       GREATEST(
-        6,
+        6::numeric,
         CEIL(
           CASE
             WHEN jsonb_typeof("password_policy_config"->'min_length') = 'number'
@@ -17,9 +17,9 @@ WITH "normalized_password_policy_min_lengths" AS (
               THEN (btrim("password_policy_config"->>'min_length'))::numeric
             ELSE 6::numeric
           END
-        )::integer
+        )
       )
-    ) AS "normalized_min_length"
+    )::integer AS "normalized_min_length"
   FROM "public"."orgs"
   WHERE "password_policy_config" IS NOT NULL
     AND jsonb_typeof("password_policy_config") = 'object'
@@ -52,7 +52,8 @@ CHECK (
       NOT ("password_policy_config" ? 'min_length')
       OR (
         jsonb_typeof("password_policy_config"->'min_length') = 'number'
-        AND ("password_policy_config"->>'min_length')::integer BETWEEN 6 AND 72
+        AND ("password_policy_config"->>'min_length')::numeric = trunc(("password_policy_config"->>'min_length')::numeric)
+        AND ("password_policy_config"->>'min_length')::numeric BETWEEN 6::numeric AND 72::numeric
       )
     )
   )
@@ -92,7 +93,8 @@ WITH CHECK (
         NOT ("password_policy_config" ? 'min_length')
         OR (
           jsonb_typeof("password_policy_config"->'min_length') = 'number'
-          AND ("password_policy_config"->>'min_length')::integer BETWEEN 6 AND 72
+          AND ("password_policy_config"->>'min_length')::numeric = trunc(("password_policy_config"->>'min_length')::numeric)
+          AND ("password_policy_config"->>'min_length')::numeric BETWEEN 6::numeric AND 72::numeric
         )
       )
     )
