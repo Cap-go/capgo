@@ -1133,10 +1133,12 @@ export type Database = {
           builds_last_month: number | null
           builds_last_month_android: number | null
           builds_last_month_ios: number | null
-          build_minutes_day_android: number
-          build_minutes_day_ios: number
-          builds_day_ios: number
-          builds_day_android: number
+          build_avg_seconds_day_android: number
+          build_avg_seconds_day_ios: number
+          build_count_day_android: number
+          build_count_day_ios: number
+          build_total_seconds_day_android: number
+          build_total_seconds_day_ios: number
           builds_success_android: number | null
           builds_success_ios: number | null
           builds_success_total: number | null
@@ -1198,10 +1200,12 @@ export type Database = {
           builds_last_month?: number | null
           builds_last_month_android?: number | null
           builds_last_month_ios?: number | null
-          build_minutes_day_android?: number
-          build_minutes_day_ios?: number
-          builds_day_ios?: number
-          builds_day_android?: number
+          build_avg_seconds_day_android?: number
+          build_avg_seconds_day_ios?: number
+          build_count_day_android?: number
+          build_count_day_ios?: number
+          build_total_seconds_day_android?: number
+          build_total_seconds_day_ios?: number
           builds_success_android?: number | null
           builds_success_ios?: number | null
           builds_success_total?: number | null
@@ -1263,10 +1267,12 @@ export type Database = {
           builds_last_month?: number | null
           builds_last_month_android?: number | null
           builds_last_month_ios?: number | null
-          build_minutes_day_android?: number
-          build_minutes_day_ios?: number
-          builds_day_ios?: number
-          builds_day_android?: number
+          build_avg_seconds_day_android?: number
+          build_avg_seconds_day_ios?: number
+          build_count_day_android?: number
+          build_count_day_ios?: number
+          build_total_seconds_day_android?: number
+          build_total_seconds_day_ios?: number
           builds_success_android?: number | null
           builds_success_ios?: number | null
           builds_success_total?: number | null

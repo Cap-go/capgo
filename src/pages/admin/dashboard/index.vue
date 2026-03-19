@@ -56,13 +56,45 @@ const globalStatsTrendData = ref<Array<{
   builds_last_month: number
   builds_last_month_ios: number
   builds_last_month_android: number
-  build_minutes_day_ios: number
-  build_minutes_day_android: number
-  builds_day_ios: number
-  builds_day_android: number
+  build_total_seconds_day_ios: number
+  build_total_seconds_day_android: number
+  build_avg_seconds_day_ios: number
+  build_avg_seconds_day_android: number
+  build_count_day_ios: number
+  build_count_day_android: number
+  build_minutes_day_ios?: number
+  build_minutes_day_android?: number
+  builds_day_ios?: number
+  builds_day_android?: number
 }>>([])
 
 const isLoadingGlobalStatsTrend = ref(false)
+
+function getBuildTotalSeconds(item: (typeof globalStatsTrendData.value)[number], platform: 'ios' | 'android') {
+  const totalSeconds = platform === 'ios' ? item.build_total_seconds_day_ios : item.build_total_seconds_day_android
+  if (totalSeconds != null)
+    return totalSeconds
+
+  const legacyMinutes = platform === 'ios' ? item.build_minutes_day_ios : item.build_minutes_day_android
+  return (legacyMinutes ?? 0) * 60
+}
+
+function getBuildCount(item: (typeof globalStatsTrendData.value)[number], platform: 'ios' | 'android') {
+  const count = platform === 'ios' ? item.build_count_day_ios : item.build_count_day_android
+  if (count != null)
+    return count
+
+  return platform === 'ios' ? (item.builds_day_ios ?? 0) : (item.builds_day_android ?? 0)
+}
+
+function getBuildAverageSeconds(item: (typeof globalStatsTrendData.value)[number], platform: 'ios' | 'android') {
+  const avgSeconds = platform === 'ios' ? item.build_avg_seconds_day_ios : item.build_avg_seconds_day_android
+  if (avgSeconds != null)
+    return avgSeconds
+
+  const count = getBuildCount(item, platform)
+  return count > 0 ? getBuildTotalSeconds(item, platform) / count : 0
+}
 
 async function loadGlobalStatsTrend() {
   isLoadingGlobalStatsTrend.value = true
@@ -265,60 +297,102 @@ const buildsLastMonthTrendSeries = computed(() => {
   ]
 })
 
-const buildMinutesTrendSeries = computed(() => {
+const buildTotalSecondsTrendSeries = computed(() => {
   if (globalStatsTrendData.value.length === 0)
     return []
 
   return [
     {
-      label: 'iOS Build Minutes',
+      label: 'iOS Total Build Seconds',
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
-        value: item.build_minutes_day_ios || 0,
+        value: getBuildTotalSeconds(item, 'ios'),
       })),
       color: '#000000',
     },
     {
-      label: 'Android Build Minutes',
+      label: 'Android Total Build Seconds',
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
-        value: item.build_minutes_day_android || 0,
+        value: getBuildTotalSeconds(item, 'android'),
       })),
       color: '#3ddc84',
     },
   ]
 })
 
-const periodBuildAverages = computed(() => {
+const buildAverageSecondsTrendSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'iOS Avg Build Seconds',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: getBuildAverageSeconds(item, 'ios'),
+      })),
+      color: '#000000',
+    },
+    {
+      label: 'Android Avg Build Seconds',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: getBuildAverageSeconds(item, 'android'),
+      })),
+      color: '#3ddc84',
+    },
+  ]
+})
+
+const periodBuildStats = computed(() => {
   const totals = globalStatsTrendData.value.reduce((acc, item) => {
-    acc.iosMinutes += item.build_minutes_day_ios || 0
-    acc.androidMinutes += item.build_minutes_day_android || 0
-    acc.iosBuilds += item.builds_day_ios || 0
-    acc.androidBuilds += item.builds_day_android || 0
+    acc.iosTotalSeconds += getBuildTotalSeconds(item, 'ios')
+    acc.androidTotalSeconds += getBuildTotalSeconds(item, 'android')
+    acc.iosBuildCount += getBuildCount(item, 'ios')
+    acc.androidBuildCount += getBuildCount(item, 'android')
+    if (getBuildAverageSeconds(item, 'ios') > 0) {
+      acc.iosAvgSecondsSum += getBuildAverageSeconds(item, 'ios')
+      acc.iosAvgDays += 1
+    }
+    if (getBuildAverageSeconds(item, 'android') > 0) {
+      acc.androidAvgSecondsSum += getBuildAverageSeconds(item, 'android')
+      acc.androidAvgDays += 1
+    }
     return acc
   }, {
-    iosMinutes: 0,
-    androidMinutes: 0,
-    iosBuilds: 0,
-    androidBuilds: 0,
+    iosTotalSeconds: 0,
+    androidTotalSeconds: 0,
+    iosBuildCount: 0,
+    androidBuildCount: 0,
+    iosAvgSecondsSum: 0,
+    androidAvgSecondsSum: 0,
+    iosAvgDays: 0,
+    androidAvgDays: 0,
   })
 
   return {
     ios: {
-      averageMinutes: totals.iosBuilds > 0 ? totals.iosMinutes / totals.iosBuilds : 0,
-      totalMinutes: totals.iosMinutes,
-      builds: totals.iosBuilds,
+      averageSeconds: totals.iosBuildCount > 0 ? totals.iosTotalSeconds / totals.iosBuildCount : 0,
+      totalSeconds: totals.iosTotalSeconds,
+      builds: totals.iosBuildCount,
+      days: totals.iosAvgDays,
     },
     android: {
-      averageMinutes: totals.androidBuilds > 0 ? totals.androidMinutes / totals.androidBuilds : 0,
-      totalMinutes: totals.androidMinutes,
-      builds: totals.androidBuilds,
+      averageSeconds: totals.androidBuildCount > 0 ? totals.androidTotalSeconds / totals.androidBuildCount : 0,
+      totalSeconds: totals.androidTotalSeconds,
+      builds: totals.androidBuildCount,
+      days: totals.androidAvgDays,
     },
   }
 })
 
-function formatMinutes(value: number) {
-  return `${value.toFixed(1)} min`
+function formatSeconds(value: number) {
+  return `${value.toFixed(1)} sec`
+}
+
+function formatTotalSeconds(value: number) {
+  return `${Math.round(value).toLocaleString()} sec`
 }
 
 // Latest metrics from global stats
@@ -891,7 +965,7 @@ displayStore.defaultBack = '/dashboard'
             </ChartCard>
           </div>
 
-          <!-- Build Minutes Section -->
+          <!-- Build Time Section -->
           <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
               <div class="flex items-start justify-between mb-4">
@@ -909,10 +983,10 @@ displayStore.defaultBack = '/dashboard'
                   <span class="loading loading-spinner loading-lg text-gray-900 dark:text-gray-100" />
                 </div>
                 <p v-else class="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
-                  {{ formatMinutes(periodBuildAverages.ios.averageMinutes) }}
+                  {{ formatSeconds(periodBuildStats.ios.averageSeconds) }}
                 </p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ periodBuildAverages.ios.builds.toLocaleString() }} iOS builds, {{ formatMinutes(periodBuildAverages.ios.totalMinutes) }} total in selected period
+                  {{ periodBuildStats.ios.builds.toLocaleString() }} builds across {{ periodBuildStats.ios.days.toLocaleString() }} active days, {{ formatTotalSeconds(periodBuildStats.ios.totalSeconds) }} total in selected period
                 </p>
               </div>
             </div>
@@ -933,10 +1007,10 @@ displayStore.defaultBack = '/dashboard'
                   <span class="loading loading-spinner loading-lg text-green-500" />
                 </div>
                 <p v-else class="mt-2 text-3xl font-bold text-green-500">
-                  {{ formatMinutes(periodBuildAverages.android.averageMinutes) }}
+                  {{ formatSeconds(periodBuildStats.android.averageSeconds) }}
                 </p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ periodBuildAverages.android.builds.toLocaleString() }} Android builds, {{ formatMinutes(periodBuildAverages.android.totalMinutes) }} total in selected period
+                  {{ periodBuildStats.android.builds.toLocaleString() }} builds across {{ periodBuildStats.android.days.toLocaleString() }} active days, {{ formatTotalSeconds(periodBuildStats.android.totalSeconds) }} total in selected period
                 </p>
               </div>
             </div>
@@ -944,12 +1018,25 @@ displayStore.defaultBack = '/dashboard'
 
           <div class="grid grid-cols-1 gap-6">
             <ChartCard
-              title="Build Minutes by Day"
+              title="Build Total Seconds by Day"
               :is-loading="isLoadingGlobalStatsTrend"
-              :has-data="buildMinutesTrendSeries.length > 0"
+              :has-data="buildTotalSecondsTrendSeries.length > 0"
             >
               <AdminMultiLineChart
-                :series="buildMinutesTrendSeries"
+                :series="buildTotalSecondsTrendSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+          </div>
+
+          <div class="grid grid-cols-1 gap-6">
+            <ChartCard
+              title="Average Build Time by Day (sec)"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="buildAverageSecondsTrendSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="buildAverageSecondsTrendSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
               />
             </ChartCard>
