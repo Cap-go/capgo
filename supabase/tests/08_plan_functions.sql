@@ -76,6 +76,8 @@ SELECT
     );
 
 -- Test is_good_plan_v5_org
+SELECT tests.authenticate_as('test_admin');
+
 SELECT
     is(
         is_good_plan_v5_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
@@ -89,6 +91,8 @@ SELECT
         is_good_plan_v5_org('00000000-0000-0000-0000-000000000000') IS NOT NULL,
         'is_good_plan_v5_org test - non-existent org returns valid result'
     );
+
+SELECT tests.clear_authentication();
 
 -- Test find_best_plan_v3
 -- Retrieve Solo plan details and perform the test
