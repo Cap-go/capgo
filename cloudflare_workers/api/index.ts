@@ -22,6 +22,7 @@ import { app as sso_prelink_internal } from '../../supabase/functions/_backend/p
 import { app as sso_prelink } from '../../supabase/functions/_backend/private/sso/prelink.ts'
 import { app as sso_providers } from '../../supabase/functions/_backend/private/sso/providers.ts'
 import { app as sso_provision_user } from '../../supabase/functions/_backend/private/sso/provision-user.ts'
+import { app as sso_sp_metadata } from '../../supabase/functions/_backend/private/sso/sp-metadata.ts'
 import { app as sso_verify_dns } from '../../supabase/functions/_backend/private/sso/verify-dns.ts'
 import { app as stats_priv } from '../../supabase/functions/_backend/private/stats.ts'
 import { app as storeTop } from '../../supabase/functions/_backend/private/store_top.ts'
@@ -110,6 +111,7 @@ appPrivate.route('/sso/providers', sso_providers)
 appPrivate.route('/sso/prelink-users', sso_prelink)
 appPrivate.route('/sso/prelink-internal', sso_prelink_internal)
 appPrivate.route('/sso/provision-user', sso_provision_user)
+appPrivate.route('/sso/sp-metadata', sso_sp_metadata)
 appPrivate.route('/sso/verify-dns', sso_verify_dns)
 
 // Triggers
