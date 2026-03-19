@@ -62,9 +62,39 @@ const globalStatsTrendData = ref<Array<{
   build_avg_seconds_day_android: number
   build_count_day_ios: number
   build_count_day_android: number
+  build_minutes_day_ios?: number
+  build_minutes_day_android?: number
+  builds_day_ios?: number
+  builds_day_android?: number
 }>>([])
 
 const isLoadingGlobalStatsTrend = ref(false)
+
+function getBuildTotalSeconds(item: (typeof globalStatsTrendData.value)[number], platform: 'ios' | 'android') {
+  const totalSeconds = platform === 'ios' ? item.build_total_seconds_day_ios : item.build_total_seconds_day_android
+  if (totalSeconds != null)
+    return totalSeconds
+
+  const legacyMinutes = platform === 'ios' ? item.build_minutes_day_ios : item.build_minutes_day_android
+  return (legacyMinutes ?? 0) * 60
+}
+
+function getBuildCount(item: (typeof globalStatsTrendData.value)[number], platform: 'ios' | 'android') {
+  const count = platform === 'ios' ? item.build_count_day_ios : item.build_count_day_android
+  if (count != null)
+    return count
+
+  return platform === 'ios' ? (item.builds_day_ios ?? 0) : (item.builds_day_android ?? 0)
+}
+
+function getBuildAverageSeconds(item: (typeof globalStatsTrendData.value)[number], platform: 'ios' | 'android') {
+  const avgSeconds = platform === 'ios' ? item.build_avg_seconds_day_ios : item.build_avg_seconds_day_android
+  if (avgSeconds != null)
+    return avgSeconds
+
+  const count = getBuildCount(item, platform)
+  return count > 0 ? getBuildTotalSeconds(item, platform) / count : 0
+}
 
 async function loadGlobalStatsTrend() {
   isLoadingGlobalStatsTrend.value = true
@@ -276,7 +306,7 @@ const buildTotalSecondsTrendSeries = computed(() => {
       label: 'iOS Total Build Seconds',
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
-        value: item.build_total_seconds_day_ios || 0,
+        value: getBuildTotalSeconds(item, 'ios'),
       })),
       color: '#000000',
     },
@@ -284,7 +314,7 @@ const buildTotalSecondsTrendSeries = computed(() => {
       label: 'Android Total Build Seconds',
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
-        value: item.build_total_seconds_day_android || 0,
+        value: getBuildTotalSeconds(item, 'android'),
       })),
       color: '#3ddc84',
     },
@@ -300,7 +330,7 @@ const buildAverageSecondsTrendSeries = computed(() => {
       label: 'iOS Avg Build Seconds',
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
-        value: item.build_avg_seconds_day_ios || 0,
+        value: getBuildAverageSeconds(item, 'ios'),
       })),
       color: '#000000',
     },
@@ -308,7 +338,7 @@ const buildAverageSecondsTrendSeries = computed(() => {
       label: 'Android Avg Build Seconds',
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
-        value: item.build_avg_seconds_day_android || 0,
+        value: getBuildAverageSeconds(item, 'android'),
       })),
       color: '#3ddc84',
     },
@@ -317,16 +347,16 @@ const buildAverageSecondsTrendSeries = computed(() => {
 
 const periodBuildStats = computed(() => {
   const totals = globalStatsTrendData.value.reduce((acc, item) => {
-    acc.iosTotalSeconds += item.build_total_seconds_day_ios || 0
-    acc.androidTotalSeconds += item.build_total_seconds_day_android || 0
-    acc.iosBuildCount += item.build_count_day_ios || 0
-    acc.androidBuildCount += item.build_count_day_android || 0
-    if ((item.build_avg_seconds_day_ios || 0) > 0) {
-      acc.iosAvgSecondsSum += item.build_avg_seconds_day_ios || 0
+    acc.iosTotalSeconds += getBuildTotalSeconds(item, 'ios')
+    acc.androidTotalSeconds += getBuildTotalSeconds(item, 'android')
+    acc.iosBuildCount += getBuildCount(item, 'ios')
+    acc.androidBuildCount += getBuildCount(item, 'android')
+    if (getBuildAverageSeconds(item, 'ios') > 0) {
+      acc.iosAvgSecondsSum += getBuildAverageSeconds(item, 'ios')
       acc.iosAvgDays += 1
     }
-    if ((item.build_avg_seconds_day_android || 0) > 0) {
-      acc.androidAvgSecondsSum += item.build_avg_seconds_day_android || 0
+    if (getBuildAverageSeconds(item, 'android') > 0) {
+      acc.androidAvgSecondsSum += getBuildAverageSeconds(item, 'android')
       acc.androidAvgDays += 1
     }
     return acc
