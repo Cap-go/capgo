@@ -303,3 +303,7 @@ REVOKE ALL ON FUNCTION public.get_total_metrics(uuid, date, date) FROM service_r
 GRANT ALL ON FUNCTION public.get_total_metrics(
     uuid, date, date
 ) TO service_role;
+
+REVOKE ALL ON FUNCTION public.get_total_metrics(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.get_plan_usage_and_fit(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.get_plan_usage_and_fit_uncached(uuid) FROM PUBLIC;
