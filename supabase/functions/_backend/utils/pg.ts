@@ -1002,6 +1002,8 @@ export interface AdminGlobalStatsTrend {
   build_total_seconds_day_android: number
   build_avg_seconds_day_ios: number
   build_avg_seconds_day_android: number
+  build_count_day_ios: number
+  build_count_day_android: number
 }
 
 export async function getAdminGlobalStatsTrend(
@@ -1069,7 +1071,9 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(NULLIF(to_jsonb(gs) ->> 'build_total_seconds_day_ios', '')::bigint, 0)::bigint AS build_total_seconds_day_ios,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'build_total_seconds_day_android', '')::bigint, 0)::bigint AS build_total_seconds_day_android,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'build_avg_seconds_day_ios', '')::float, 0)::float AS build_avg_seconds_day_ios,
-        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_avg_seconds_day_android', '')::float, 0)::float AS build_avg_seconds_day_android
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_avg_seconds_day_android', '')::float, 0)::float AS build_avg_seconds_day_android,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_count_day_ios', '')::int, 0)::int AS build_count_day_ios,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_count_day_android', '')::int, 0)::int AS build_count_day_android
       FROM global_stats gs
       WHERE date_id <= ${endDateOnly}
       )
@@ -1130,6 +1134,8 @@ export async function getAdminGlobalStatsTrend(
       build_total_seconds_day_android: Number(row.build_total_seconds_day_android) || 0,
       build_avg_seconds_day_ios: Number(row.build_avg_seconds_day_ios) || 0,
       build_avg_seconds_day_android: Number(row.build_avg_seconds_day_android) || 0,
+      build_count_day_ios: Number(row.build_count_day_ios) || 0,
+      build_count_day_android: Number(row.build_count_day_android) || 0,
     }))
 
     cloudlog({ requestId: c.get('requestId'), message: 'getAdminGlobalStatsTrend result', resultCount: data.length })

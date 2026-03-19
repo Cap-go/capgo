@@ -32,6 +32,8 @@ interface BuildStats {
   total_seconds_day_android: number
   avg_seconds_day_ios: number
   avg_seconds_day_android: number
+  build_count_day_ios: number
+  build_count_day_android: number
 }
 interface DailyWindow {
   prevDayStart: Date
@@ -105,6 +107,8 @@ async function globalStatsHasBuildMetricColumns(c: Context): Promise<boolean> {
     'build_total_seconds_day_android',
     'build_avg_seconds_day_ios',
     'build_avg_seconds_day_android',
+    'build_count_day_ios',
+    'build_count_day_android',
   ]
   const pgClient = getPgClient(c, true)
 
@@ -394,6 +398,8 @@ async function getBuildStats(c: Context, window?: DailyWindow): Promise<BuildSta
       total_seconds_day_android: dailyBuildStats.totalSeconds.android,
       avg_seconds_day_ios: dailyBuildStats.avgSeconds.ios,
       avg_seconds_day_android: dailyBuildStats.avgSeconds.android,
+      build_count_day_ios: dailyBuildStats.counts.ios,
+      build_count_day_android: dailyBuildStats.counts.android,
     }
   }
   catch (e) {
@@ -412,6 +418,8 @@ async function getBuildStats(c: Context, window?: DailyWindow): Promise<BuildSta
       total_seconds_day_android: 0,
       avg_seconds_day_ios: 0,
       avg_seconds_day_android: 0,
+      build_count_day_ios: 0,
+      build_count_day_android: 0,
     }
   }
 }
@@ -423,30 +431,34 @@ async function aggregateDailyBuildStats(
 ): Promise<{
   totalSeconds: Record<'ios' | 'android', number>
   avgSeconds: Record<'ios' | 'android', number>
+  counts: Record<'ios' | 'android', number>
 }> {
   // Read from primary so the daily rollup is not permanently undercounted by replica lag.
   const pgClient = getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
   const totalSecondsByPlatform: Record<'ios' | 'android', number> = { ios: 0, android: 0 }
   const avgSecondsByPlatform: Record<'ios' | 'android', number> = { ios: 0, android: 0 }
+  const countsByPlatform: Record<'ios' | 'android', number> = { ios: 0, android: 0 }
 
   try {
     const query = sql`
       SELECT
         platform,
         SUM(build_time_unit)::bigint AS total_seconds,
-        COALESCE(ROUND(AVG(build_time_unit)::numeric, 1), 0)::float AS avg_seconds
+        COALESCE(ROUND(AVG(build_time_unit)::numeric, 1), 0)::float AS avg_seconds,
+        COUNT(*)::int AS total_builds
       FROM build_logs
       WHERE created_at >= ${start}
         AND created_at < ${end}
         AND platform IN ('ios', 'android')
       GROUP BY platform
     `
-    const result = await drizzleClient.execute<{ platform: string, total_seconds: number, avg_seconds: number }>(query)
+    const result = await drizzleClient.execute<{ platform: string, total_seconds: number, avg_seconds: number, total_builds: number }>(query)
     for (const row of result.rows ?? []) {
       if (row.platform === 'ios' || row.platform === 'android') {
         totalSecondsByPlatform[row.platform] = Number(row.total_seconds) || 0
         avgSecondsByPlatform[row.platform] = Number(row.avg_seconds) || 0
+        countsByPlatform[row.platform] = Number(row.total_builds) || 0
       }
     }
   }
@@ -457,7 +469,7 @@ async function aggregateDailyBuildStats(
     closeClient(c, pgClient)
   }
 
-  return { totalSeconds: totalSecondsByPlatform, avgSeconds: avgSecondsByPlatform }
+  return { totalSeconds: totalSecondsByPlatform, avgSeconds: avgSecondsByPlatform, counts: countsByPlatform }
 }
 
 function getStats(c: Context, window?: DailyWindow): GlobalStats {
@@ -818,6 +830,8 @@ app.post('/', middlewareAPISecret, async (c) => {
         build_total_seconds_day_android: build_stats.total_seconds_day_android,
         build_avg_seconds_day_ios: build_stats.avg_seconds_day_ios,
         build_avg_seconds_day_android: build_stats.avg_seconds_day_android,
+        build_count_day_ios: build_stats.build_count_day_ios,
+        build_count_day_android: build_stats.build_count_day_android,
       })
       .eq('date_id', dailyWindow.prevDayDateId)
 
@@ -829,6 +843,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         && errorCode !== '42703'
         && !message.toLowerCase().includes('build_total_seconds_day')
         && !message.toLowerCase().includes('build_avg_seconds_day')
+        && !message.toLowerCase().includes('build_count_day')
       ) {
         cloudlogErr({ requestId: c.get('requestId'), message: 'update build metrics error', error: buildMetricsError })
       }

@@ -60,6 +60,8 @@ const globalStatsTrendData = ref<Array<{
   build_total_seconds_day_android: number
   build_avg_seconds_day_ios: number
   build_avg_seconds_day_android: number
+  build_count_day_ios: number
+  build_count_day_android: number
 }>>([])
 
 const isLoadingGlobalStatsTrend = ref(false)
@@ -317,6 +319,8 @@ const periodBuildStats = computed(() => {
   const totals = globalStatsTrendData.value.reduce((acc, item) => {
     acc.iosTotalSeconds += item.build_total_seconds_day_ios || 0
     acc.androidTotalSeconds += item.build_total_seconds_day_android || 0
+    acc.iosBuildCount += item.build_count_day_ios || 0
+    acc.androidBuildCount += item.build_count_day_android || 0
     if ((item.build_avg_seconds_day_ios || 0) > 0) {
       acc.iosAvgSecondsSum += item.build_avg_seconds_day_ios || 0
       acc.iosAvgDays += 1
@@ -329,6 +333,8 @@ const periodBuildStats = computed(() => {
   }, {
     iosTotalSeconds: 0,
     androidTotalSeconds: 0,
+    iosBuildCount: 0,
+    androidBuildCount: 0,
     iosAvgSecondsSum: 0,
     androidAvgSecondsSum: 0,
     iosAvgDays: 0,
@@ -337,13 +343,15 @@ const periodBuildStats = computed(() => {
 
   return {
     ios: {
-      averageSeconds: totals.iosAvgDays > 0 ? totals.iosAvgSecondsSum / totals.iosAvgDays : 0,
+      averageSeconds: totals.iosBuildCount > 0 ? totals.iosTotalSeconds / totals.iosBuildCount : 0,
       totalSeconds: totals.iosTotalSeconds,
+      builds: totals.iosBuildCount,
       days: totals.iosAvgDays,
     },
     android: {
-      averageSeconds: totals.androidAvgDays > 0 ? totals.androidAvgSecondsSum / totals.androidAvgDays : 0,
+      averageSeconds: totals.androidBuildCount > 0 ? totals.androidTotalSeconds / totals.androidBuildCount : 0,
       totalSeconds: totals.androidTotalSeconds,
+      builds: totals.androidBuildCount,
       days: totals.androidAvgDays,
     },
   }
@@ -948,7 +956,7 @@ displayStore.defaultBack = '/dashboard'
                   {{ formatSeconds(periodBuildStats.ios.averageSeconds) }}
                 </p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ periodBuildStats.ios.days.toLocaleString() }} active days, {{ formatTotalSeconds(periodBuildStats.ios.totalSeconds) }} total in selected period
+                  {{ periodBuildStats.ios.builds.toLocaleString() }} builds across {{ periodBuildStats.ios.days.toLocaleString() }} active days, {{ formatTotalSeconds(periodBuildStats.ios.totalSeconds) }} total in selected period
                 </p>
               </div>
             </div>
@@ -972,7 +980,7 @@ displayStore.defaultBack = '/dashboard'
                   {{ formatSeconds(periodBuildStats.android.averageSeconds) }}
                 </p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ periodBuildStats.android.days.toLocaleString() }} active days, {{ formatTotalSeconds(periodBuildStats.android.totalSeconds) }} total in selected period
+                  {{ periodBuildStats.android.builds.toLocaleString() }} builds across {{ periodBuildStats.android.days.toLocaleString() }} active days, {{ formatTotalSeconds(periodBuildStats.android.totalSeconds) }} total in selected period
                 </p>
               </div>
             </div>
