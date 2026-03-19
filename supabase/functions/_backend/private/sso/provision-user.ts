@@ -116,13 +116,15 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     }
 
     const userProvider = userAuth.user.app_metadata?.provider
-    if (!userProvider || (userProvider !== 'sso' && !userProvider.startsWith('sso:'))) {
-      cloudlog({ requestId, message: 'User did not authenticate via SSO, rejecting provisioning', userId, provider: userProvider })
+    const userProviders: string[] = userAuth.user.app_metadata?.providers ?? []
+    const isSsoProvider = (p: string) => p === 'sso' || p.startsWith('sso:')
+    if (!isSsoProvider(userProvider ?? '') && !userProviders.some(isSsoProvider)) {
+      cloudlog({ requestId, message: 'User did not authenticate via SSO, rejecting provisioning', userId, provider: userProvider, providers: userProviders })
       return quickError(403, 'sso_auth_required', 'User must authenticate via SSO to be provisioned')
     }
 
     const userIdentities = userAuth.user.identities ?? []
-    const trustedSsoProviders = getTrustedSsoProviders(userProvider, userIdentities)
+    const trustedSsoProviders = getTrustedSsoProviders(userProvider ?? '', userIdentities)
     if (trustedSsoProviders.length === 0) {
       cloudlog({ requestId, message: 'User has no SSO identity, rejecting provisioning', userId })
       return quickError(403, 'sso_identity_required', 'User must have an SSO identity to be provisioned')
