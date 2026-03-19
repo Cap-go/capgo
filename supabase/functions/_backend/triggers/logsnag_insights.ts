@@ -77,6 +77,10 @@ interface GlobalStats {
   build_stats: PromiseLike<BuildStats>
 }
 
+function getDateId(targetDate = new Date()): string {
+  return new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate())).toISOString().slice(0, 10)
+}
+
 async function calculateRevenue(c: Context): Promise<PlanRevenue> {
   const supabase = supabaseAdmin(c)
 
@@ -674,6 +678,8 @@ app.post('/', middlewareAPISecret, async (c) => {
     demo_apps_created,
   })
   // cloudlog(c.get('requestId'), 'app', app.app_id, downloads, versions, shared, channels)
+  const date_id = getDateId()
+  const prevDayDateId = getDateId(new Date(Date.now() - 24 * 60 * 60 * 1000))
   const newData: Database['public']['Tables']['global_stats']['Insert'] = {
     date_id,
     apps,
@@ -753,7 +759,7 @@ app.post('/', middlewareAPISecret, async (c) => {
   }
   const { error: buildMinutesError } = await supabaseAdmin(c)
     .from('global_stats')
-    .upsert(buildMinutesPayload)
+    .upsert(buildMinutesPayload as any)
   if (buildMinutesError) {
     const errorCode = String((buildMinutesError as any)?.code ?? '').toUpperCase()
     const message = String((buildMinutesError as any)?.message ?? '')
