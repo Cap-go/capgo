@@ -62,7 +62,7 @@ DROP POLICY IF EXISTS "Allow update for auth (admin+)" ON "public"."orgs";
 
 CREATE POLICY "Allow update for auth (admin+)" ON "public"."orgs"
 FOR UPDATE
-TO "authenticated"
+TO "authenticated", "anon"
 USING (
   "public"."check_min_rights"(
     'admin'::"public"."user_min_right",

@@ -39,26 +39,6 @@ const DEFAULT_PASSWORD_POLICY: PasswordPolicy = {
   require_special: true,
 }
 
-// Build dynamic password validation schema based on org's policy
-function buildPasswordSchema(policy: PasswordPolicy) {
-  const effectiveMinLength = getEffectivePasswordMinLength(policy.min_length)
-  let schema = z.string().check(
-    z.minLength(effectiveMinLength, `Password must be at least ${effectiveMinLength} characters`),
-  )
-
-  if (policy.require_uppercase) {
-    schema = schema.check(z.regex(/[A-Z]/, 'Password must contain at least one uppercase letter'))
-  }
-  if (policy.require_number) {
-    schema = schema.check(z.regex(/\d/, 'Password must contain at least one number'))
-  }
-  if (policy.require_special) {
-    schema = schema.check(z.regex(/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/, 'Password must contain at least one special character'))
-  }
-
-  return schema
-}
-
 // Base schema for initial validation (without password)
 const baseInvitationSchema = z.object({
   password: z.string(),
@@ -375,15 +355,10 @@ app.post('/', async (c) => {
       }
     : DEFAULT_PASSWORD_POLICY
 
-  // Validate password against the policy (new user only)
-  const passwordSchema = buildPasswordSchema(passwordPolicy)
-  const passwordValidationResult = passwordSchema.safeParse(baseBody.password)
   const passwordPolicyErrors = getPasswordPolicyValidationErrors(baseBody.password, passwordPolicy)
-  if (!passwordValidationResult.success || passwordPolicyErrors.length > 0) {
+  if (passwordPolicyErrors.length > 0) {
     throw simpleError('invalid_password', 'Password does not meet requirements', {
-      errors: passwordValidationResult.success
-        ? passwordPolicyErrors
-        : [z.prettifyError(passwordValidationResult.error), ...passwordPolicyErrors].filter(Boolean),
+      errors: passwordPolicyErrors,
       policy: {
         min_length: passwordPolicy.min_length,
         require_uppercase: passwordPolicy.require_uppercase,
@@ -395,7 +370,7 @@ app.post('/', async (c) => {
 
   const body = {
     ...baseBody,
-    password: passwordValidationResult.data,
+    password: baseBody.password,
   }
   const { password: _pwd, captchaToken: _cap, ...bodyWithoutSecrets } = body
   cloudlog({ requestId: c.get('requestId'), context: 'accept_invitation validated body', body: bodyWithoutSecrets })
