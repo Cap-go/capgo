@@ -726,7 +726,7 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
     await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false }).eq('id', ORG_ID)
   })
 
-  it('rejects public RPC access to get_orgs_v7(userid)', async () => {
+  it.concurrent('rejects public RPC access to get_orgs_v7(userid)', async () => {
     const supabaseUrl = process.env.SUPABASE_URL
     const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
     if (!supabaseUrl || !supabaseAnonKey)
@@ -746,7 +746,7 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
     expect(error?.code).toBe('42501')
   })
 
-  it('rejects authenticated RPC access to get_orgs_v7(userid)', async () => {
+  it.concurrent('rejects authenticated RPC access to get_orgs_v7(userid)', async () => {
     const supabaseUrl = process.env.SUPABASE_URL
     const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
     if (!supabaseUrl || !supabaseAnonKey)
