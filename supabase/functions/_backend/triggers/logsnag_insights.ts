@@ -77,10 +77,6 @@ interface GlobalStats {
   build_stats: PromiseLike<BuildStats>
 }
 
-function getDateId(targetDate = new Date()): string {
-  return new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate())).toISOString().slice(0, 10)
-}
-
 async function calculateRevenue(c: Context): Promise<PlanRevenue> {
   const supabase = supabaseAdmin(c)
 
@@ -278,8 +274,6 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
   const todayStartMillis = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
   const prevDayStart = new Date(todayStartMillis - 24 * 60 * 60 * 1000)
   const prevDayEnd = new Date(todayStartMillis)
-  const date_id = getDateId(today)
-  const prevDayDateId = getDateId(prevDayStart)
 
   try {
     // Run all count queries in parallel for better performance
