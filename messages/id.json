@@ -1499,6 +1499,7 @@
   "sso-status-pending": "Tertunda",
   "sso-status-verified": "Terverifikasi",
   "sso-upgrade-to-enterprise": "Upgrade to Enterprise",
+  "sso-linked-success": "SSO sign-in successful. Welcome!",
   "sso-verify-dns": "Verifikasi DNS",
   "sso-verifying": "Memverifikasi...",
   "start-onboarding": "Mulai proses orientasi",
