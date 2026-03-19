@@ -19,7 +19,10 @@ app.post('/', middlewareAPISecret, async (c) => {
   if (!body.orgId)
     throw simpleError('no_orgId', 'No orgId', { body })
 
-  const pgClient = getPgClient(c, true)
+  // `checkPlanStatusOnly()` may refresh the org metrics cache through
+  // `get_plan_usage_and_fit_uncached()`, so this path must use a write-capable
+  // transaction instead of a read-only pool.
+  const pgClient = getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
   try {
     let planStatusCalculated = false

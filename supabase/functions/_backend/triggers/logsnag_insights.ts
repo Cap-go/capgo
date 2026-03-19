@@ -2,12 +2,16 @@ import type { Context } from 'hono'
 import type { DevicesByPlatform, PluginBreakdownResult } from '../utils/cloudflare.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
+
+import { sql } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
+
 import { getPluginBreakdownCF, readActiveAppsCF, readLastMonthDevicesByPlatformCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
 import { DEMO_APP_PREFIX } from '../utils/demo.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { logsnag, logsnagInsights } from '../utils/logsnag.ts'
+import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { countAllApps, countAllUpdates, countAllUpdatesExternal, getUpdateStats } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -24,6 +28,18 @@ interface BuildStats {
   success_total: number
   success_ios: number
   success_android: number
+  total_seconds_day_ios: number
+  total_seconds_day_android: number
+  avg_seconds_day_ios: number
+  avg_seconds_day_android: number
+  build_count_day_ios: number
+  build_count_day_android: number
+  daily_metrics_available: boolean
+}
+interface DailyWindow {
+  prevDayStart: Date
+  prevDayEnd: Date
+  prevDayDateId: string
 }
 interface PlanRevenue {
   mrr: number
@@ -71,9 +87,29 @@ interface GlobalStats {
   build_stats: PromiseLike<BuildStats>
 }
 
-function getTodayDateId(): string {
-  const today = new Date()
-  return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())).toISOString().slice(0, 10)
+function getDateId(targetDate = new Date()): string {
+  return new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate())).toISOString().slice(0, 10)
+}
+
+function getDailyWindow(referenceDate = new Date()): DailyWindow {
+  const todayStartMillis = Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), referenceDate.getUTCDate())
+  const prevDayStart = new Date(todayStartMillis - 24 * 60 * 60 * 1000)
+  const prevDayEnd = new Date(todayStartMillis)
+  return {
+    prevDayStart,
+    prevDayEnd,
+    prevDayDateId: getDateId(prevDayStart),
+  }
+}
+
+function isMissingBuildMetricColumnError(error: unknown): boolean {
+  const errorCode = String((error as any)?.code ?? '').toUpperCase()
+  const message = String((error as any)?.message ?? '').toLowerCase()
+  return errorCode === 'PGRST204'
+    || errorCode === '42703'
+    || message.includes('build_total_seconds_day')
+    || message.includes('build_avg_seconds_day')
+    || message.includes('build_count_day')
 }
 
 async function calculateRevenue(c: Context): Promise<PlanRevenue> {
@@ -266,9 +302,10 @@ async function getGithubStars(): Promise<number> {
   }
 }
 
-async function getBuildStats(c: Context): Promise<BuildStats> {
+async function getBuildStats(c: Context, window?: DailyWindow): Promise<BuildStats> {
   const supabase = supabaseAdmin(c)
   const last30days = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  const { prevDayStart, prevDayEnd } = window ?? getDailyWindow()
 
   try {
     // Run all count queries in parallel for better performance
@@ -282,6 +319,7 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
       successTotalResult,
       successIosResult,
       successAndroidResult,
+      dailyBuildStats,
     ] = await Promise.all([
       // Count total builds (all time)
       supabase.from('build_logs').select('*', { count: 'exact', head: true }),
@@ -301,6 +339,7 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
       supabase.from('build_requests').select('*', { count: 'exact', head: true }).eq('platform', 'ios').eq('status', 'succeeded'),
       // Count successful Android builds (all time)
       supabase.from('build_requests').select('*', { count: 'exact', head: true }).eq('platform', 'android').eq('status', 'succeeded'),
+      aggregateDailyBuildStats(c, prevDayStart, prevDayEnd),
     ])
 
     // Log any errors
@@ -333,6 +372,13 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
       success_total: successTotalResult.count ?? 0,
       success_ios: successIosResult.count ?? 0,
       success_android: successAndroidResult.count ?? 0,
+      total_seconds_day_ios: dailyBuildStats?.totalSeconds.ios ?? 0,
+      total_seconds_day_android: dailyBuildStats?.totalSeconds.android ?? 0,
+      avg_seconds_day_ios: dailyBuildStats?.avgSeconds.ios ?? 0,
+      avg_seconds_day_android: dailyBuildStats?.avgSeconds.android ?? 0,
+      build_count_day_ios: dailyBuildStats?.counts.ios ?? 0,
+      build_count_day_android: dailyBuildStats?.counts.android ?? 0,
+      daily_metrics_available: dailyBuildStats !== null,
     }
   }
   catch (e) {
@@ -347,11 +393,67 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
       success_total: 0,
       success_ios: 0,
       success_android: 0,
+      total_seconds_day_ios: 0,
+      total_seconds_day_android: 0,
+      avg_seconds_day_ios: 0,
+      avg_seconds_day_android: 0,
+      build_count_day_ios: 0,
+      build_count_day_android: 0,
+      daily_metrics_available: false,
     }
   }
 }
 
-function getStats(c: Context): GlobalStats {
+async function aggregateDailyBuildStats(
+  c: Context,
+  start: Date,
+  end: Date,
+): Promise<{
+  totalSeconds: Record<'ios' | 'android', number>
+  avgSeconds: Record<'ios' | 'android', number>
+  counts: Record<'ios' | 'android', number>
+} | null> {
+  // Read from primary so the daily rollup is not permanently undercounted by replica lag.
+  const pgClient = getPgClient(c, false)
+  const drizzleClient = getDrizzleClient(pgClient)
+  const totalSecondsByPlatform: Record<'ios' | 'android', number> = { ios: 0, android: 0 }
+  const avgSecondsByPlatform: Record<'ios' | 'android', number> = { ios: 0, android: 0 }
+  const countsByPlatform: Record<'ios' | 'android', number> = { ios: 0, android: 0 }
+
+  try {
+    const query = sql`
+      SELECT
+        platform,
+        SUM(build_time_unit)::bigint AS total_seconds,
+        COALESCE(ROUND(AVG(build_time_unit)::numeric, 1), 0)::float AS avg_seconds,
+        COUNT(*)::int AS total_builds
+      FROM build_logs
+      WHERE created_at >= ${start}
+        AND created_at < ${end}
+        AND platform IN ('ios', 'android')
+      GROUP BY platform
+    `
+    const result = await drizzleClient.execute<{ platform: string, total_seconds: number, avg_seconds: number, total_builds: number }>(query)
+    for (const row of result.rows ?? []) {
+      if (row.platform === 'ios' || row.platform === 'android') {
+        totalSecondsByPlatform[row.platform] = Number(row.total_seconds) || 0
+        avgSecondsByPlatform[row.platform] = Number(row.avg_seconds) || 0
+        countsByPlatform[row.platform] = Number(row.total_builds) || 0
+      }
+    }
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'aggregateDailyBuildStats error', error })
+    return null
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
+
+  return { totalSeconds: totalSecondsByPlatform, avgSeconds: avgSecondsByPlatform, counts: countsByPlatform }
+}
+
+function getStats(c: Context, window?: DailyWindow): GlobalStats {
   const supabase = supabaseAdmin(c)
   const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   return {
@@ -539,14 +641,16 @@ function getStats(c: Context): GlobalStats {
         return res.count ?? 0
       }),
     plugin_breakdown: getPluginBreakdownCF(c),
-    build_stats: getBuildStats(c),
+    build_stats: getBuildStats(c, window),
   }
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, async (c) => {
-  const res = getStats(c)
+  const dailyWindow = getDailyWindow()
+  const res = getStats(c, dailyWindow)
+  const snapshotDateId = getDateId()
   const [
     apps,
     updates,
@@ -605,7 +709,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     res.build_stats,
   ])
   const not_paying = users - customers.total - plans.Trial
-  const org_conversion_rate = orgs > 0 ? (paying_orgs_for_conversion * 100) / orgs : 0
+  const org_conversion_rate = orgs > 0 ? Number((((paying_orgs_for_conversion * 100) / orgs)).toFixed(1)) : 0
   cloudlog({
     requestId: c.get('requestId'),
     message: 'All Promises',
@@ -626,10 +730,8 @@ app.post('/', middlewareAPISecret, async (c) => {
     demo_apps_created,
   })
   // cloudlog(c.get('requestId'), 'app', app.app_id, downloads, versions, shared, channels)
-  // create var date_id with yearn-month-day
-  const date_id = getTodayDateId()
   const newData: Database['public']['Tables']['global_stats']['Insert'] = {
-    date_id,
+    date_id: snapshotDateId,
     apps,
     trial: plans.Trial,
     users,
@@ -700,6 +802,43 @@ app.post('/', middlewareAPISecret, async (c) => {
     .upsert(newData)
   if (error)
     cloudlogErr({ requestId: c.get('requestId'), message: 'insert global_stats error', error })
+  if (build_stats.daily_metrics_available) {
+    const { error: buildMetricsError } = await supabaseAdmin(c)
+      .from('global_stats')
+      .update({
+        build_total_seconds_day_ios: build_stats.total_seconds_day_ios,
+        build_total_seconds_day_android: build_stats.total_seconds_day_android,
+        build_avg_seconds_day_ios: build_stats.avg_seconds_day_ios,
+        build_avg_seconds_day_android: build_stats.avg_seconds_day_android,
+        build_count_day_ios: build_stats.build_count_day_ios,
+        build_count_day_android: build_stats.build_count_day_android,
+      })
+      .eq('date_id', dailyWindow.prevDayDateId)
+
+    if (buildMetricsError) {
+      if (isMissingBuildMetricColumnError(buildMetricsError)) {
+        const { error: legacyBuildMetricsError } = await supabaseAdmin(c)
+          .from('global_stats')
+          .update({
+            build_minutes_day_ios: build_stats.total_seconds_day_ios / 60,
+            build_minutes_day_android: build_stats.total_seconds_day_android / 60,
+            builds_day_ios: build_stats.build_count_day_ios,
+            builds_day_android: build_stats.build_count_day_android,
+          } as any)
+          .eq('date_id', dailyWindow.prevDayDateId)
+
+        if (legacyBuildMetricsError) {
+          cloudlogErr({ requestId: c.get('requestId'), message: 'legacy update build metrics error', error: legacyBuildMetricsError })
+        }
+      }
+      else {
+        cloudlogErr({ requestId: c.get('requestId'), message: 'update build metrics error', error: buildMetricsError })
+      }
+    }
+  }
+  else {
+    cloudlog({ requestId: c.get('requestId'), message: 'Skipping build metric update because daily aggregation failed' })
+  }
   await logsnag(c).track({
     channel: 'updates-stats',
     event: 'Updates last month',
@@ -709,7 +848,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       success_rate,
       registers_today,
       storage_gb: bundle_storage_gb,
-      org_conversion_rate: Number(org_conversion_rate.toFixed(2)),
+      org_conversion_rate,
     },
     icon: '📲',
   }).catch((e: any) => {
@@ -783,7 +922,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     },
     {
       title: 'Org conversion rate',
-      value: `${org_conversion_rate.toFixed(2)}%`,
+      value: `${org_conversion_rate.toFixed(1)}%`,
       icon: '🎯',
     },
     {

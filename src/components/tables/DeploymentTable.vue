@@ -24,6 +24,12 @@ interface DeploymentData {
 }
 type Element = DeploymentData
 
+function getActiveOrder(columns: TableColumn[]) {
+  return columns
+    .filter(col => typeof col.sortable === 'string')
+    .map(col => ({ key: col.key, sortable: col.sortable }))
+}
+
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const router = useRouter()
 const { t } = useI18n()
@@ -74,9 +80,7 @@ async function getData() {
           appId: props.appId,
           devicesId: props.deviceId ? [props.deviceId] : undefined,
           search: search.value ? search.value : undefined,
-          order: columns.value
-            .filter(elem => typeof elem.sortable === 'string')
-            .map(elem => ({ key: elem.key as string, sortable: elem.sortable as 'asc' | 'desc' })),
+          order: getActiveOrder(columns.value),
           rangeStart: paginatedRange.value.rangeStart,
           rangeEnd: paginatedRange.value.rangeEnd,
           actions: [
@@ -168,6 +172,7 @@ columns.value = [
 
 async function reload() {
   try {
+    currentPage.value = 1
     elements.value.length = 0
     await getData()
   }

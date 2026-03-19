@@ -6,6 +6,7 @@ import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { parseBody, quickError, simpleError, simpleRateLimit, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { getEffectivePasswordMinLength, getPasswordPolicyValidationErrors } from '../utils/password_policy.ts'
 import { isIPRateLimited, recordFailedAuth } from '../utils/rate_limit.ts'
 import { buildRateLimitInfo } from '../utils/rateLimitInfo.ts'
 import { emptySupabase, supabaseClient, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
@@ -105,38 +106,6 @@ const bodySchema = z.object({
   org_id: z.string().check(z.uuid()),
   captcha_token: z.optional(z.string().check(z.minLength(1))),
 })
-
-// Check if password meets the policy requirements
-function passwordMeetsPolicy(password: string, policy: {
-  min_length?: number
-  require_uppercase?: boolean
-  require_number?: boolean
-  require_special?: boolean
-}): { valid: boolean, errors: string[] } {
-  const errors: string[] = []
-
-  // Check minimum length
-  if (policy.min_length && password.length < policy.min_length) {
-    errors.push(`Password must be at least ${policy.min_length} characters`)
-  }
-
-  // Check uppercase requirement
-  if (policy.require_uppercase && !/[A-Z]/.test(password)) {
-    errors.push('Password must contain at least one uppercase letter')
-  }
-
-  // Check number requirement
-  if (policy.require_number && !/\d/.test(password)) {
-    errors.push('Password must contain at least one number')
-  }
-
-  // Check special character requirement
-  if (policy.require_special && !/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
-    errors.push('Password must contain at least one special character')
-  }
-
-  return { valid: errors.length === 0, errors }
-}
 
 /**
  * Resolve whether the authenticated user has `org.read` access for the org.
@@ -250,13 +219,14 @@ app.post('/', async (c) => {
   }
 
   // Check if the password meets the policy requirements
-  const policyCheck = passwordMeetsPolicy(body.password, policy)
+  const policyErrors = getPasswordPolicyValidationErrors(body.password, policy)
+  const effectiveMinLength = getEffectivePasswordMinLength(policy.min_length)
 
-  if (!policyCheck.valid) {
+  if (policyErrors.length > 0) {
     throw simpleError('password_does_not_meet_policy', 'Your current password does not meet the organization requirements', {
-      errors: policyCheck.errors,
+      errors: policyErrors,
       policy: {
-        min_length: policy.min_length,
+        min_length: effectiveMinLength,
         require_uppercase: policy.require_uppercase,
         require_number: policy.require_number,
         require_special: policy.require_special,

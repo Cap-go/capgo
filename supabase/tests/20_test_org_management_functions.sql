@@ -418,6 +418,7 @@ SELECT
     );
 
 -- Test get_current_plan_name_org
+SELECT tests.authenticate_as('test_admin');
 SELECT
     ok(
         get_current_plan_name_org(
@@ -425,6 +426,7 @@ SELECT
         ) IS NOT NULL,
         'get_current_plan_name_org test - returns plan name'
     );
+SELECT tests.clear_authentication();
 
 -- Test get_current_plan_max_org
 SELECT tests.authenticate_as_service_role();
@@ -440,6 +442,7 @@ SELECT
 SELECT tests.clear_authentication();
 
 -- Test get_cycle_info_org
+SELECT tests.authenticate_as('test_admin');
 SELECT
     ok(
         (
@@ -449,6 +452,7 @@ SELECT
         ) >= 0,
         'get_cycle_info_org test - returns cycle info'
     );
+SELECT tests.clear_authentication();
 
 -- Test get_organization_cli_warnings with proper API key setup
 -- Test 1: Set up valid API key and test normal scenario (good plan)

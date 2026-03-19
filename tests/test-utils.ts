@@ -15,7 +15,7 @@ export const POSTGRES_URL = normalizePostgresUrl(
   ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
 )
 
-function normalizeLocalhostUrl(raw: string | undefined): string | undefined {
+export function normalizeLocalhostUrl(raw: string | undefined): string | undefined {
   if (!raw)
     return raw
   try {

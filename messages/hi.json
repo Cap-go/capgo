@@ -1499,6 +1499,7 @@
   "sso-status-pending": "लंबित",
   "sso-status-verified": "सत्यापित",
   "sso-upgrade-to-enterprise": "Upgrade to Enterprise",
+  "sso-linked-success": "SSO sign-in successful. Welcome!",
   "sso-verify-dns": "DNS सत्यापित करें",
   "sso-verifying": "सत्यापित किया जा रहा है...",
   "start-onboarding": "ऑनबोर्डिंग शुरू करें",
