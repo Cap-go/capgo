@@ -12,7 +12,7 @@ const router = useRouter()
 const supabase = useSupabase()
 const isLoading = ref(true)
 const errorMessage = ref('')
-const { provisionUser } = useSSOProvisioning()
+const { provisionUser, error: provisionError } = useSSOProvisioning()
 
 function validateRedirectPath(path: string | undefined): string {
   // Default fallback
@@ -115,6 +115,13 @@ async function completeSsoLogin() {
         // The current session is now invalid — sign out and redirect to login.
         await supabase.auth.signOut()
         router.replace('/login?message=sso_account_linked')
+        return
+      }
+      if (provisionError.value) {
+        await supabase.auth.signOut()
+        isLoading.value = false
+        errorMessage.value = provisionError.value
+        toast.error(provisionError.value)
         return
       }
     }
