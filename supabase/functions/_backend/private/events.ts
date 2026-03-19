@@ -9,23 +9,12 @@ import { logsnag } from '../utils/logsnag.ts'
 import { trackPosthogEvent } from '../utils/posthog.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { broadcastCLIEvent } from '../utils/realtime_broadcast.ts'
-import { hasOrgRight, hasOrgRightApikey, supabaseWithAuth } from '../utils/supabase.ts'
+import { supabaseWithAuth } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
-
-async function canAccessRequestedOrg(c: Context<MiddlewareKeyVariables>, orgId: string) {
-  const auth = c.get('auth')
-  if (!auth?.userId || !orgId)
-    return false
-
-  if (auth.authType === 'apikey')
-    return hasOrgRightApikey(c, orgId, auth.userId, 'read', c.get('capgkey'))
-
-  return hasOrgRight(c, orgId, auth.userId, 'read')
-}
 
 app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   const body = await parseBody<TrackOptions & { notifyConsole?: boolean }>(c)
@@ -33,8 +22,8 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     ? body.user_id
     : undefined
 
-  if (requestedOrgId && !(await canAccessRequestedOrg(c, requestedOrgId)))
-    return c.json({ error: 'Forbidden' }, 403)
+  if (requestedOrgId && !(await checkPermission(c, 'org.read', { orgId: requestedOrgId })))
+    throw simpleError('cannot_access_organization', 'You can\'t access this organization', { org_id: requestedOrgId })
 
   const orgId = typeof body.user_id === 'string' && body.user_id.length > 0
     ? body.user_id
@@ -44,9 +33,6 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   if (body.notifyConsole) {
     if (!body.user_id) {
       throw simpleError('missing_org_id', 'Missing org ID for console notification')
-    }
-    if (!(await checkPermission(c, 'org.read', { orgId: body.user_id }))) {
-      throw simpleError('cannot_access_organization', 'You can\'t access this organization', { org_id: body.user_id })
     }
     if (orgId) {
       await backgroundTask(c, broadcastCLIEvent(c, {
