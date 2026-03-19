@@ -144,16 +144,18 @@ DECLARE
   url text;
   queue_size bigint;
   calls_needed integer;
+  effective_batch_size integer;
 BEGIN
   EXECUTE format('SELECT count(*) FROM pgmq.q_%I', queue_name) INTO queue_size;
 
   IF queue_size > 0 THEN
+    effective_batch_size := GREATEST(batch_size, 1);
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'apisecret', public.get_apikey()
     );
     url := public.get_db_url() || '/functions/v1/triggers/queue_consumer/sync';
-    calls_needed := least(ceil(queue_size / batch_size::float)::int, 10);
+    calls_needed := least(ceil(queue_size / effective_batch_size::float)::int, 10);
 
     FOR i IN 1..calls_needed LOOP
       PERFORM net.http_post(
@@ -161,7 +163,7 @@ BEGIN
         headers := headers,
         body := jsonb_build_object(
           'queue_name', queue_name,
-          'batch_size', batch_size,
+          'batch_size', effective_batch_size,
           'cron_run_id', p_run_id,
           'cron_task_name', p_cron_task_name
         ),
@@ -243,6 +245,8 @@ DECLARE
   lock_acquired boolean;
   run_id uuid;
   total_batches integer;
+  last_started_at timestamptz;
+  elapsed_seconds double precision;
 BEGIN
   lock_acquired := pg_try_advisory_lock(1);
 
@@ -262,7 +266,17 @@ BEGIN
       should_run := false;
 
       IF task.second_interval IS NOT NULL THEN
-        should_run := true;
+        SELECT MAX(public.cron_task_runs.created_at)
+        INTO last_started_at
+        FROM public.cron_task_runs
+        WHERE public.cron_task_runs.cron_task_id = task.id;
+
+        IF last_started_at IS NULL THEN
+          should_run := true;
+        ELSE
+          elapsed_seconds := EXTRACT(EPOCH FROM (NOW() - last_started_at));
+          should_run := elapsed_seconds >= task.second_interval;
+        END IF;
       ELSIF task.minute_interval IS NOT NULL THEN
         should_run := (current_minute % task.minute_interval = 0)
                       AND (current_second < 10);
