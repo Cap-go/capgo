@@ -25,6 +25,12 @@ interface LogData {
 }
 type Element = LogData
 
+function getActiveOrder(columns: TableColumn[]) {
+  return columns
+    .filter(col => typeof col.sortable === 'string')
+    .map(col => ({ key: col.key, sortable: col.sortable }))
+}
+
 interface ParsedVersionName {
   version: string
   filename: string | null
@@ -287,9 +293,7 @@ async function getData() {
           appId: props.appId,
           devicesId: props.deviceId ? [props.deviceId] : undefined,
           search: search.value ? search.value : undefined,
-          order: columns.value
-            .filter(elem => typeof elem.sortable === 'string')
-            .map(elem => ({ key: elem.key as string, sortable: elem.sortable as 'asc' | 'desc' })),
+          order: getActiveOrder(columns.value),
           rangeStart: paginatedRange.value.rangeStart,
           rangeEnd: paginatedRange.value.rangeEnd,
           actions: activeActions.value,
@@ -351,9 +355,7 @@ async function exportCsv() {
         appId: props.appId,
         devicesId: props.deviceId ? [props.deviceId] : undefined,
         search: search.value ? search.value : undefined,
-        order: columns.value
-          .filter(elem => typeof elem.sortable === 'string')
-          .map(elem => ({ key: elem.key as string, sortable: elem.sortable as 'asc' | 'desc' })),
+        order: getActiveOrder(columns.value),
         rangeStart: range.value?.[0]?.toISOString(),
         rangeEnd: range.value?.[1]?.toISOString(),
         actions: activeActions.value,
@@ -446,6 +448,7 @@ columns.value = [
 
 async function reload() {
   try {
+    currentPage.value = 1
     elements.value.length = 0
     await getData()
   }
@@ -490,7 +493,19 @@ onMounted(async () => {
   initializeActionFilters()
   await refreshData()
 })
-watch(props, async () => {
+watch(columns, async () => {
+  await refreshData()
+}, { deep: true })
+watch(search, async () => {
+  await refreshData()
+})
+watch(() => props.appId, async () => {
+  await refreshData()
+})
+watch(() => props.deviceId, async () => {
+  await refreshData()
+})
+watch(() => props.actions, async () => {
   await refreshData()
 })
 watch(actionFilters, async () => {
