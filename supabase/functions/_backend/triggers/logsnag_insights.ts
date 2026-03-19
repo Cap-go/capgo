@@ -424,7 +424,8 @@ async function aggregateDailyBuildStats(
   minutes: Record<'ios' | 'android', number>
   counts: Record<'ios' | 'android', number>
 }> {
-  const pgClient = getPgClient(c, true)
+  // Read from primary so the daily rollup is not permanently undercounted by replica lag.
+  const pgClient = getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
   const minutesByPlatform: Record<'ios' | 'android', number> = { ios: 0, android: 0 }
   const countsByPlatform: Record<'ios' | 'android', number> = { ios: 0, android: 0 }
@@ -656,7 +657,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', middlewareAPISecret, async (c) => {
   const dailyWindow = getDailyWindow()
   const res = getStats(c, dailyWindow)
-  const snapshotDateId = dailyWindow.prevDayDateId
+  const snapshotDateId = getDateId()
   const [
     apps,
     updates,
@@ -818,7 +819,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         builds_day_ios: build_stats.builds_day_ios,
         builds_day_android: build_stats.builds_day_android,
       })
-      .eq('date_id', snapshotDateId)
+      .eq('date_id', dailyWindow.prevDayDateId)
 
     if (buildMinutesError) {
       const errorCode = String((buildMinutesError as any)?.code ?? '').toUpperCase()

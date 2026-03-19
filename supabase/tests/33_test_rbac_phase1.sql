@@ -164,7 +164,6 @@ WITH seed_data AS (
         '22222222-2222-4222-8222-222222222222'::uuid AS org_rbac,
         'com.rbac.new'::text AS app_rbac
 )
-
 INSERT INTO public.app_versions (id, name, app_id, owner_org, storage_provider)
 OVERRIDING SYSTEM VALUE
 SELECT

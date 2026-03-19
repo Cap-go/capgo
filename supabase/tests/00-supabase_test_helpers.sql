@@ -450,14 +450,13 @@ $$ LANGUAGE plpgsql;
 -- investigating options to make this better.  Maybe a dedicated test harness
 -- but we dont' want these functions to always exist on the database.
 BEGIN;
-SELECT PLAN(7);
-SELECT
-    FUNCTION_RETURNS('tests', 'create_supabase_user', ARRAY['text', 'text', 'text', 'jsonb'], 'uuid');
-SELECT FUNCTION_RETURNS('tests', 'get_supabase_uid', ARRAY['text'], 'uuid');
-SELECT FUNCTION_RETURNS('tests', 'get_supabase_user', ARRAY['text'], 'json');
-SELECT FUNCTION_RETURNS('tests', 'authenticate_as', ARRAY['text'], 'void');
-SELECT FUNCTION_RETURNS('tests', 'clear_authentication', ARRAY[null], 'void');
-SELECT FUNCTION_RETURNS('tests', 'rls_enabled', ARRAY['text', 'text'], 'text');
-SELECT FUNCTION_RETURNS('tests', 'rls_enabled', ARRAY['text'], 'text');
-SELECT * FROM FINISH();
+SELECT plan(7);
+SELECT function_returns('tests', 'create_supabase_user', ARRAY['text', 'text', 'text', 'jsonb'], 'uuid');
+SELECT function_returns('tests', 'get_supabase_uid', ARRAY['text'], 'uuid');
+SELECT function_returns('tests', 'get_supabase_user', ARRAY['text'], 'json');
+SELECT function_returns('tests', 'authenticate_as', ARRAY['text'], 'void');
+SELECT function_returns('tests', 'clear_authentication', ARRAY[null], 'void');
+SELECT function_returns('tests', 'rls_enabled', ARRAY['text', 'text'], 'text');
+SELECT function_returns('tests', 'rls_enabled', ARRAY['text'], 'text');
+SELECT * FROM finish();
 ROLLBACK;

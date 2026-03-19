@@ -46,9 +46,7 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION public.rbac_is_enabled_for_org(
-    p_org_id uuid
-) RETURNS boolean
+CREATE OR REPLACE FUNCTION public.rbac_is_enabled_for_org(p_org_id uuid) RETURNS boolean
 LANGUAGE plpgsql
 SET search_path = ''
 AS $$
@@ -61,7 +59,7 @@ END;
 $$;
 
 COMMENT ON FUNCTION public.rbac_is_enabled_for_org(uuid) IS
-'Feature-flag gate for RBAC. Defaults to false; true when org or global env setting is enabled.';
+  'Feature-flag gate for RBAC. Defaults to false; true when org or global env setting is enabled.';
 
 -- ============================================================================
 -- Email OTP enforcement threshold from environment

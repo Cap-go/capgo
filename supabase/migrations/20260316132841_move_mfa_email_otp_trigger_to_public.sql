@@ -48,7 +48,7 @@ END;
 $$;
 
 ALTER FUNCTION public.enforce_email_otp_for_mfa() OWNER TO postgres;
-REVOKE ALL ON FUNCTION public.enforce_email_otp_for_mfa() FROM public;
+REVOKE ALL ON FUNCTION public.enforce_email_otp_for_mfa() FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.enforce_email_otp_for_mfa() FROM anon;
 REVOKE ALL ON FUNCTION public.enforce_email_otp_for_mfa() FROM authenticated;
 REVOKE ALL ON FUNCTION public.enforce_email_otp_for_mfa() FROM service_role;

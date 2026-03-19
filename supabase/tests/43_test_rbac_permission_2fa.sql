@@ -95,10 +95,8 @@ VALUES (
 
 -- Enable RBAC for the test orgs
 SELECT tests.authenticate_as_service_role();
-SELECT
-    public.rbac_enable_for_org(current_setting('test.rbac_org_with_2fa')::uuid, tests.get_supabase_uid('test_rbac_2fa_user'));
-SELECT
-    public.rbac_enable_for_org(current_setting('test.rbac_org_without_2fa')::uuid, tests.get_supabase_uid('test_rbac_2fa_user'));
+SELECT public.rbac_enable_for_org(current_setting('test.rbac_org_with_2fa')::uuid, tests.get_supabase_uid('test_rbac_2fa_user'));
+SELECT public.rbac_enable_for_org(current_setting('test.rbac_org_without_2fa')::uuid, tests.get_supabase_uid('test_rbac_2fa_user'));
 
 -- Test 1: RBAC permission check allows 2FA-enabled user when org enforces 2FA
 SELECT

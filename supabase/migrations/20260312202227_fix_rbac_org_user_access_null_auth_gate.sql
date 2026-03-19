@@ -1,25 +1,23 @@
-CREATE OR REPLACE FUNCTION public.get_org_user_access_rbac(
-    p_user_id uuid, p_org_id uuid
-)
+CREATE OR REPLACE FUNCTION "public"."get_org_user_access_rbac"(p_user_id uuid, p_org_id uuid)
 RETURNS TABLE (
-    id uuid,
-    principal_type text,
-    principal_id uuid,
-    role_id uuid,
-    role_name text,
-    role_description text,
-    scope_type text,
-    org_id uuid,
-    app_id uuid,
-    channel_id uuid,
-    granted_at timestamptz,
-    granted_by uuid,
-    expires_at timestamptz,
-    reason text,
-    is_direct boolean,
-    principal_name text,
-    user_email text,
-    group_name text
+  id uuid,
+  principal_type text,
+  principal_id uuid,
+  role_id uuid,
+  role_name text,
+  role_description text,
+  scope_type text,
+  org_id uuid,
+  app_id uuid,
+  channel_id uuid,
+  granted_at timestamptz,
+  granted_by uuid,
+  expires_at timestamptz,
+  reason text,
+  is_direct boolean,
+  principal_name text,
+  user_email text,
+  group_name text
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
