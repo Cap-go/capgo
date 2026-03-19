@@ -206,7 +206,7 @@ SELECT
         ARRAY[
             'Allow users to delete manifest entries',
             'Allow users to insert manifest entries',
-            'Allow users to read any manifest entry',
+            'Allow users to read manifest entries for accessible apps',
             'Prevent users from updating manifest entries'
         ],
         'manifest should have correct policies'
