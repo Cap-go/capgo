@@ -51,6 +51,8 @@ REVOKE ALL ON FUNCTION public.get_current_plan_name_org(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.get_current_plan_name_org(uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.get_current_plan_name_org(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_current_plan_name_org(uuid) TO service_role;
+COMMENT ON FUNCTION public.get_current_plan_name_org(uuid) IS
+  'Return the Stripe plan name for the supplied organization after enforcing read-level access; returns NULL when the org is missing or the caller is unauthorized.';
 
 CREATE OR REPLACE FUNCTION public.get_cycle_info_org(orgid uuid)
 RETURNS TABLE (
@@ -127,6 +129,8 @@ REVOKE ALL ON FUNCTION public.get_cycle_info_org(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.get_cycle_info_org(uuid) FROM anon;
 GRANT EXECUTE ON FUNCTION public.get_cycle_info_org(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_cycle_info_org(uuid) TO service_role;
+COMMENT ON FUNCTION public.get_cycle_info_org(uuid) IS
+  'Return the billing cycle start and end for the supplied organization after verifying read access, using Stripe anchor dates to compute the boundaries.';
 
 CREATE OR REPLACE FUNCTION public.get_plan_usage_percent_detailed(orgid uuid)
 RETURNS TABLE (
@@ -229,6 +233,13 @@ $$;
 
 ALTER FUNCTION public.get_plan_usage_percent_detailed(uuid) OWNER TO "postgres";
 
+REVOKE ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.get_plan_usage_percent_detailed(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.get_plan_usage_percent_detailed(uuid) TO service_role;
+COMMENT ON FUNCTION public.get_plan_usage_percent_detailed(uuid) IS
+  'Return current-cycle plan usage percentages (total and per metric) for the supplied organization while respecting read permissions and delegating to cached metrics when running in read-only transactions.';
+
 CREATE OR REPLACE FUNCTION public.get_plan_usage_percent_detailed(
   orgid uuid,
   cycle_start date,
@@ -318,12 +329,9 @@ $$;
 
 ALTER FUNCTION public.get_plan_usage_percent_detailed(uuid, date, date) OWNER TO "postgres";
 
-REVOKE ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid) FROM anon;
-GRANT EXECUTE ON FUNCTION public.get_plan_usage_percent_detailed(uuid) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.get_plan_usage_percent_detailed(uuid) TO service_role;
-
 REVOKE ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid, date, date) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid, date, date) FROM anon;
 GRANT EXECUTE ON FUNCTION public.get_plan_usage_percent_detailed(uuid, date, date) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_plan_usage_percent_detailed(uuid, date, date) TO service_role;
+COMMENT ON FUNCTION public.get_plan_usage_percent_detailed(uuid, date, date) IS
+  'Return plan usage percentages for the supplied date range after verifying read access; read-only callers stay read-only by using the cached metrics helper.';
