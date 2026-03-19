@@ -448,6 +448,7 @@ columns.value = [
 
 async function reload() {
   try {
+    currentPage.value = 1
     elements.value.length = 0
     await getData()
   }
