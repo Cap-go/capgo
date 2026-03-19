@@ -1499,6 +1499,7 @@
   "sso-status-pending": "Ожидание",
   "sso-status-verified": "Подтвержден",
   "sso-upgrade-to-enterprise": "Upgrade to Enterprise",
+  "sso-linked-success": "SSO sign-in successful. Welcome!",
   "sso-verify-dns": "Проверить DNS",
   "sso-verifying": "Проверка...",
   "start-onboarding": "Начать внедрение",

@@ -1499,6 +1499,7 @@
   "sso-status-pending": "Pendente",
   "sso-status-verified": "Verificado",
   "sso-upgrade-to-enterprise": "Upgrade to Enterprise",
+  "sso-linked-success": "SSO sign-in successful. Welcome!",
   "sso-verify-dns": "Verificar DNS",
   "sso-verifying": "Verificando...",
   "start-onboarding": "Inicie o processo de integração",
