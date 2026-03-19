@@ -24,6 +24,8 @@ interface BuildStats {
   success_total: number
   success_ios: number
   success_android: number
+  minutes_day_ios: number
+  minutes_day_android: number
 }
 interface PlanRevenue {
   mrr: number
@@ -269,6 +271,9 @@ async function getGithubStars(): Promise<number> {
 async function getBuildStats(c: Context): Promise<BuildStats> {
   const supabase = supabaseAdmin(c)
   const last30days = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+  const today = new Date()
+  const dayStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())).toISOString()
+  const dayEnd = new Date(Date.parse(dayStart) + 24 * 60 * 60 * 1000).toISOString()
 
   try {
     // Run all count queries in parallel for better performance
@@ -282,6 +287,7 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
       successTotalResult,
       successIosResult,
       successAndroidResult,
+      dailyMinutesResult,
     ] = await Promise.all([
       // Count total builds (all time)
       supabase.from('build_logs').select('*', { count: 'exact', head: true }),
@@ -301,6 +307,13 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
       supabase.from('build_requests').select('*', { count: 'exact', head: true }).eq('platform', 'ios').eq('status', 'succeeded'),
       // Count successful Android builds (all time)
       supabase.from('build_requests').select('*', { count: 'exact', head: true }).eq('platform', 'android').eq('status', 'succeeded'),
+      // Sum raw build minutes by platform for the current UTC day
+      supabase
+        .from('build_logs')
+        .select('platform, build_time_unit')
+        .gte('created_at', dayStart)
+        .lt('created_at', dayEnd)
+        .in('platform', ['ios', 'android']),
     ])
 
     // Log any errors
@@ -322,6 +335,14 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
       cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats successIos error', error: successIosResult.error })
     if (successAndroidResult.error)
       cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats successAndroid error', error: successAndroidResult.error })
+    if (dailyMinutesResult.error)
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats dailyMinutes error', error: dailyMinutesResult.error })
+
+    const dailyMinutesByPlatform = (dailyMinutesResult.data || []).reduce<Record<'ios' | 'android', number>>((acc, row) => {
+      if (row.platform === 'ios' || row.platform === 'android')
+        acc[row.platform] += (Number(row.build_time_unit) || 0) / 60
+      return acc
+    }, { ios: 0, android: 0 })
 
     return {
       total: totalResult.count ?? 0,
@@ -333,6 +354,8 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
       success_total: successTotalResult.count ?? 0,
       success_ios: successIosResult.count ?? 0,
       success_android: successAndroidResult.count ?? 0,
+      minutes_day_ios: Number(dailyMinutesByPlatform.ios.toFixed(2)),
+      minutes_day_android: Number(dailyMinutesByPlatform.android.toFixed(2)),
     }
   }
   catch (e) {
@@ -347,6 +370,8 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
       success_total: 0,
       success_ios: 0,
       success_android: 0,
+      minutes_day_ios: 0,
+      minutes_day_android: 0,
     }
   }
 }
@@ -693,6 +718,8 @@ app.post('/', middlewareAPISecret, async (c) => {
     builds_last_month: build_stats.last_month,
     builds_last_month_ios: build_stats.last_month_ios,
     builds_last_month_android: build_stats.last_month_android,
+    build_minutes_day_ios: build_stats.minutes_day_ios,
+    build_minutes_day_android: build_stats.minutes_day_android,
   }
   cloudlog({ requestId: c.get('requestId'), message: 'newData', newData })
   const { error } = await supabaseAdmin(c)
