@@ -628,6 +628,7 @@ export async function recordBuildTime(
   buildId: string,
   platform: 'ios' | 'android',
   buildTimeSeconds: number,
+  completedAt?: number | null,
 ): Promise<string | null> {
   try {
     const { data, error } = await supabaseAdmin(c)
@@ -643,6 +644,26 @@ export async function recordBuildTime(
     if (error) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'recordBuildTime error', orgId, userId, buildId, error })
       return null
+    }
+
+    if (completedAt) {
+      const completedAtIso = new Date(completedAt).toISOString()
+      const { error: updateError } = await supabaseAdmin(c)
+        .from('build_logs')
+        .update({ created_at: completedAtIso })
+        .eq('org_id', orgId)
+        .eq('build_id', buildId)
+
+      if (updateError) {
+        cloudlogErr({
+          requestId: c.get('requestId'),
+          message: 'recordBuildTime timestamp sync error',
+          orgId,
+          buildId,
+          completedAt: completedAtIso,
+          error: updateError,
+        })
+      }
     }
 
     return data as string

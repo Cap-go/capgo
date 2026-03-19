@@ -998,6 +998,10 @@ export interface AdminGlobalStatsTrend {
   builds_last_month: number
   builds_last_month_ios: number
   builds_last_month_android: number
+  build_minutes_day_ios: number
+  build_minutes_day_android: number
+  builds_day_ios: number
+  builds_day_android: number
 }
 
 export async function getAdminGlobalStatsTrend(
@@ -1016,7 +1020,8 @@ export async function getAdminGlobalStatsTrend(
     // Simple query - just SELECT all columns from global_stats
     // Revenue metrics are already calculated and stored by logsnag_insights cron job
     const query = sql`
-      SELECT
+      WITH stats AS (
+        SELECT
         date_id AS date,
         apps::int,
         apps_active::int,
@@ -1060,11 +1065,18 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(builds_success_android, 0)::int AS builds_success_android,
         COALESCE(builds_last_month, 0)::int AS builds_last_month,
         COALESCE(builds_last_month_ios, 0)::int AS builds_last_month_ios,
-        COALESCE(builds_last_month_android, 0)::int AS builds_last_month_android
-      FROM global_stats
-      WHERE date_id >= ${startDateOnly}
-        AND date_id <= ${endDateOnly}
-      ORDER BY date_id ASC
+        COALESCE(builds_last_month_android, 0)::int AS builds_last_month_android,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_minutes_day_ios', '')::float, 0)::float AS build_minutes_day_ios,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_minutes_day_android', '')::float, 0)::float AS build_minutes_day_android,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'builds_day_ios', '')::int, 0)::int AS builds_day_ios,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'builds_day_android', '')::int, 0)::int AS builds_day_android
+      FROM global_stats gs
+      WHERE date_id <= ${endDateOnly}
+      )
+      SELECT *
+      FROM stats
+      WHERE date >= ${startDateOnly}
+      ORDER BY date ASC
     `
 
     const result = await drizzleClient.execute(query)
@@ -1114,6 +1126,10 @@ export async function getAdminGlobalStatsTrend(
       builds_last_month: Number(row.builds_last_month) || 0,
       builds_last_month_ios: Number(row.builds_last_month_ios) || 0,
       builds_last_month_android: Number(row.builds_last_month_android) || 0,
+      build_minutes_day_ios: Number(row.build_minutes_day_ios) || 0,
+      build_minutes_day_android: Number(row.build_minutes_day_android) || 0,
+      builds_day_ios: Number(row.builds_day_ios) || 0,
+      builds_day_android: Number(row.builds_day_android) || 0,
     }))
 
     cloudlog({ requestId: c.get('requestId'), message: 'getAdminGlobalStatsTrend result', resultCount: data.length })
