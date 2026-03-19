@@ -259,6 +259,55 @@ describe('[Encrypted Bundles Enforcement]', () => {
       expect(error).toBeNull()
       expect(data?.name).toBe('1.0.0-direct-no-enforcement')
     })
+
+    it('should reject direct update that clears session_key when enforcement is enabled', async () => {
+      await getSupabaseClient()
+        .from('orgs')
+        .update({ enforce_encrypted_bundles: true })
+        .eq('id', ORG_ID_ENCRYPTED)
+
+      const bundleName = `1.0.0-direct-update-rejected-${Date.now()}`
+      const { data: inserted, error: insertError } = await getSupabaseClient()
+        .from('app_versions')
+        .insert({
+          app_id: APP_NAME_ENCRYPTED,
+          name: bundleName,
+          checksum: 'd4e5f6789abcdef123456789abcdef123456789abcdef123456789abcdef12',
+          owner_org: ORG_ID_ENCRYPTED,
+          storage_provider: 'r2',
+          session_key: 'encrypted-session-key-for-direct-update',
+        })
+        .select('id, session_key')
+        .single()
+
+      expect(insertError).toBeNull()
+      expect(inserted?.session_key).toBe('encrypted-session-key-for-direct-update')
+
+      const { error: updateError } = await getSupabaseClient()
+        .from('app_versions')
+        .update({
+          session_key: '',
+          key_id: null,
+        })
+        .eq('id', inserted!.id)
+
+      expect(updateError).not.toBeNull()
+      expect(updateError?.message).toContain('encryption_required')
+
+      const { data: afterUpdate, error: fetchError } = await getSupabaseClient()
+        .from('app_versions')
+        .select('session_key')
+        .eq('id', inserted!.id)
+        .single()
+
+      expect(fetchError).toBeNull()
+      expect(afterUpdate?.session_key).toBe('encrypted-session-key-for-direct-update')
+
+      await getSupabaseClient()
+        .from('orgs')
+        .update({ enforce_encrypted_bundles: false })
+        .eq('id', ORG_ID_ENCRYPTED)
+    })
   })
 
   describe('helper Functions', () => {

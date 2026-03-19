@@ -3,6 +3,7 @@ import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import { z } from 'zod/mini'
 import { BRES, createHono, middlewareAuth, parseBody, quickError, simpleError, useCors } from '../../utils/hono.ts'
 import { cloudlogErr } from '../../utils/logging.ts'
+import { closeClient, getPgClient } from '../../utils/pg.ts'
 import { requireEnterprisePlan } from '../../utils/plan-gating.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { createSSOProvider, deleteSSOProvider, ManagementAPIError } from '../../utils/supabase-management.ts'
@@ -83,6 +84,27 @@ async function requireManageSsoPermission(c: Context<MiddlewareKeyVariables>, or
   const allowed = await checkPermission(c, 'org.update_settings' as any, { orgId })
   if (!allowed) {
     quickError(403, 'not_authorized', 'Not authorized')
+  }
+}
+
+async function syncAuthUsersSsoOnlyByDomain(c: Context<MiddlewareKeyVariables>, domain: string, isSsoOnly: boolean): Promise<void> {
+  let pgClient: ReturnType<typeof getPgClient> | undefined
+  try {
+    pgClient = getPgClient(c)
+    await pgClient.query(
+      `
+        update auth.users
+        set is_sso_user = $1
+        where email is not null
+          and lower(split_part(email, '@', 2)) = lower($2)
+      `,
+      [isSsoOnly, domain],
+    )
+  }
+  finally {
+    if (pgClient) {
+      await closeClient(c, pgClient)
+    }
   }
 }
 
@@ -239,7 +261,7 @@ app.patch('/:id', async (c) => {
   const supabase = supabaseWithAuth(c, auth) as any
   const { data: provider, error: providerError } = await supabase
     .from('sso_providers')
-    .select('id, org_id, status')
+    .select('id, org_id, domain, status, enforce_sso')
     .eq('id', id)
     .single()
 
@@ -300,6 +322,18 @@ app.patch('/:id', async (c) => {
 
   if (updateError || !updatedProvider) {
     quickError(500, 'provider_update_failed', 'Failed to update SSO provider', { error: updateError })
+  }
+
+  const wasSsoEnforced = provider.status === 'active' && provider.enforce_sso === true
+  const isSsoEnforced = updatedProvider.status === 'active' && updatedProvider.enforce_sso === true
+  if (wasSsoEnforced !== isSsoEnforced) {
+    try {
+      await syncAuthUsersSsoOnlyByDomain(c, updatedProvider.domain, isSsoEnforced)
+    }
+    catch (syncError) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to sync auth.users.is_sso_user with provider enforcement', providerId: id, domain: updatedProvider.domain, enforceSso: isSsoEnforced, error: syncError })
+      return quickError(500, 'provider_sync_failed', 'Failed to sync SSO enforcement state')
+    }
   }
 
   return c.json(sanitizeProvider(updatedProvider))
