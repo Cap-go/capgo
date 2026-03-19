@@ -286,6 +286,12 @@ async function checkKeyByIdPg(
   }
 }
 
+/**
+ * Parses the x-limited-key-id header and returns either a validated subkey ID or a quickError response.
+ *
+ * @param c - Hono context used to read headers.
+ * @returns The parsed subkey id when valid or a quickError entry when the header is invalid.
+ */
 function getSubkeyId(c: Context) {
   const headerValue = c.req.header('x-limited-key-id')
   if (!headerValue) {
@@ -304,6 +310,13 @@ function getSubkeyId(c: Context) {
   return { subkeyId, error: null }
 }
 
+/**
+ * Persists the authenticated API key on the context for downstream middleware.
+ *
+ * @param c - Hono context used to store auth data.
+ * @param apikey - The row representing the authenticated API key.
+ * @param keyString - The raw API key string that was provided.
+ */
 function setApiKeyAuthContext(c: Context, apikey: Database['public']['Tables']['apikeys']['Row'], keyString: string) {
   c.set('auth', {
     userId: apikey.user_id,
@@ -315,6 +328,13 @@ function setApiKeyAuthContext(c: Context, apikey: Database['public']['Tables']['
   c.set('capgkey', keyString)
 }
 
+/**
+ * Overrides the context auth payload with the subkey and its owning user id.
+ *
+ * @param c - Hono context used to store auth data.
+ * @param userId - The owner of the parent API key.
+ * @param subkey - The row representing the validated subkey.
+ */
 function setSubkeyAuthContext(c: Context, userId: string, subkey: Database['public']['Tables']['apikeys']['Row']) {
   c.set('auth', {
     userId,
@@ -325,12 +345,25 @@ function setSubkeyAuthContext(c: Context, userId: string, subkey: Database['publ
   c.set('subkey', subkey)
 }
 
+/**
+ * Returns true when a subkey explicitly limits access to zero apps and zero orgs.
+ *
+ * @param subkey - The row representing the subkey to evaluate.
+ * @returns True when both app and org limit lists are empty.
+ */
 function hasEmptySubkeyLimits(subkey: Database['public']['Tables']['apikeys']['Row']) {
   const apps = subkey.limited_to_apps
   const orgs = subkey.limited_to_orgs
   return Array.isArray(apps) && apps.length === 0 && Array.isArray(orgs) && orgs.length === 0
 }
 
+/**
+ * Ensures the subkey enforces at least one organization or application limit.
+ *
+ * @param c - Hono context used for logging.
+ * @param subkey - The candidate subkey row.
+ * @returns quickError response when invalid limits are detected, otherwise null.
+ */
 function validateSubkeyLimits(c: Context, subkey: Database['public']['Tables']['apikeys']['Row']) {
   if (hasEmptySubkeyLimits(subkey)) {
     cloudlog({
@@ -344,6 +377,14 @@ function validateSubkeyLimits(c: Context, subkey: Database['public']['Tables']['
   return null
 }
 
+/**
+ * Verifies that a subkey belongs to the same user as its parent API key.
+ *
+ * @param c - Hono context used for logging.
+ * @param subkey - The subkey row.
+ * @param apikey - The parent API key row.
+ * @returns quickError response when the user IDs differ, otherwise null.
+ */
 function validateSubkeyUser(c: Context, subkey: Database['public']['Tables']['apikeys']['Row'], apikey: Database['public']['Tables']['apikeys']['Row']) {
   if (subkey.user_id !== apikey.user_id) {
     cloudlog({
@@ -426,6 +467,14 @@ async function resolveSubkey(
   }
 }
 
+/**
+ * Authenticates an API key string, performs rate limiting, and optionally resolves a matching subkey.
+ *
+ * @param c - Hono context used for logging and auth storage.
+ * @param capgkeyString - The key string provided in capgkey or authorization headers.
+ * @param rights - Required key modes for the request.
+ * @returns quickError when authentication fails or undefined when authentication succeeds.
+ */
 async function foundAPIKey(c: Context, capgkeyString: string, rights: Database['public']['Enums']['key_mode'][]) {
   const { subkeyId: subkey_id, error: subkeyError } = getSubkeyId(c)
   if (subkeyError) {
@@ -529,6 +578,12 @@ export function middlewareV2(rights: Database['public']['Enums']['key_mode'][]) 
   })
 }
 
+/**
+ * Middleware factory that validates API keys and optional subkeys, enforcing rate limits and expected rights.
+ *
+ * @param rights - Required key modes for the route.
+ * @param usePostgres - When true, performs key lookups via Postgres instead of Supabase client.
+ */
 export function middlewareKey(rights: Database['public']['Enums']['key_mode'][], usePostgres = false) {
   const subMiddlewareKey = honoFactory.createMiddleware(async (c, next) => {
     // Check if IP is rate limited due to failed auth attempts
