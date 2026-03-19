@@ -1068,12 +1068,28 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(builds_last_month, 0)::int AS builds_last_month,
         COALESCE(builds_last_month_ios, 0)::int AS builds_last_month_ios,
         COALESCE(builds_last_month_android, 0)::int AS builds_last_month_android,
-        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_total_seconds_day_ios', '')::bigint, 0)::bigint AS build_total_seconds_day_ios,
-        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_total_seconds_day_android', '')::bigint, 0)::bigint AS build_total_seconds_day_android,
-        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_avg_seconds_day_ios', '')::float, 0)::float AS build_avg_seconds_day_ios,
-        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_avg_seconds_day_android', '')::float, 0)::float AS build_avg_seconds_day_android,
-        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_count_day_ios', '')::int, 0)::int AS build_count_day_ios,
-        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_count_day_android', '')::int, 0)::int AS build_count_day_android
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_total_seconds_day_ios', '')::bigint, ROUND(COALESCE(NULLIF(to_jsonb(gs) ->> 'build_minutes_day_ios', '')::float, 0) * 60)::bigint, 0)::bigint AS build_total_seconds_day_ios,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_total_seconds_day_android', '')::bigint, ROUND(COALESCE(NULLIF(to_jsonb(gs) ->> 'build_minutes_day_android', '')::float, 0) * 60)::bigint, 0)::bigint AS build_total_seconds_day_android,
+        COALESCE(
+          NULLIF(to_jsonb(gs) ->> 'build_avg_seconds_day_ios', '')::float,
+          CASE
+            WHEN COALESCE(NULLIF(to_jsonb(gs) ->> 'builds_day_ios', '')::int, 0) > 0
+              THEN (COALESCE(NULLIF(to_jsonb(gs) ->> 'build_minutes_day_ios', '')::float, 0) * 60) / COALESCE(NULLIF(to_jsonb(gs) ->> 'builds_day_ios', '')::int, 0)
+            ELSE 0
+          END,
+          0
+        )::float AS build_avg_seconds_day_ios,
+        COALESCE(
+          NULLIF(to_jsonb(gs) ->> 'build_avg_seconds_day_android', '')::float,
+          CASE
+            WHEN COALESCE(NULLIF(to_jsonb(gs) ->> 'builds_day_android', '')::int, 0) > 0
+              THEN (COALESCE(NULLIF(to_jsonb(gs) ->> 'build_minutes_day_android', '')::float, 0) * 60) / COALESCE(NULLIF(to_jsonb(gs) ->> 'builds_day_android', '')::int, 0)
+            ELSE 0
+          END,
+          0
+        )::float AS build_avg_seconds_day_android,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_count_day_ios', '')::int, NULLIF(to_jsonb(gs) ->> 'builds_day_ios', '')::int, 0)::int AS build_count_day_ios,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_count_day_android', '')::int, NULLIF(to_jsonb(gs) ->> 'builds_day_android', '')::int, 0)::int AS build_count_day_android
       FROM global_stats gs
       WHERE date_id <= ${endDateOnly}
       )
