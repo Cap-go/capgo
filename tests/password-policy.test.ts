@@ -1,6 +1,8 @@
+import type { Database } from '../src/types/supabase.types.ts'
 import { randomUUID } from 'node:crypto'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { createClient } from '@supabase/supabase-js'
 
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { checkOrgReadAccess } from '../supabase/functions/_backend/private/validate_password_compliance.ts'
 import { BASE_URL, executeSQL, getSupabaseClient, headers, TEST_EMAIL, USER_EMAIL, USER_ID, USER_ID_2, USER_PASSWORD, USER_PASSWORD_HASH } from './test-utils.ts'
 
@@ -105,6 +107,78 @@ describe('password Policy Configuration via SDK', () => {
 
     expect(fetchError).toBeNull()
     expect(org?.password_policy_config).toEqual(policyConfig)
+  })
+
+  it('reject password policy lengths above the Supabase maximum', async () => {
+    const policyConfig = {
+      enabled: true,
+      min_length: 73,
+      require_uppercase: true,
+      require_number: true,
+      require_special: true,
+    }
+
+    const { error } = await getSupabaseClient()
+      .from('orgs')
+      .update({ password_policy_config: policyConfig })
+      .eq('id', ORG_ID)
+
+    expect(error).not.toBeNull()
+    expect(error?.message).toContain('password_policy_config')
+  })
+
+  it('reject oversized password policy lengths through the org RLS update policy', async () => {
+    const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/$/, '')
+    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
+
+    if (!supabaseUrl || !supabaseAnonKey)
+      throw new Error('SUPABASE_URL or SUPABASE_ANON_KEY is missing for password policy RLS test')
+
+    const client = createClient<Database>(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        persistSession: false,
+      },
+    })
+
+    const { error: signInError } = await client.auth.signInWithPassword({
+      email: USER_EMAIL,
+      password: USER_PASSWORD,
+    })
+
+    expect(signInError).toBeNull()
+
+    const { data: beforeUpdate, error: beforeUpdateError } = await getSupabaseClient()
+      .from('orgs')
+      .select('password_policy_config')
+      .eq('id', ORG_ID)
+      .single()
+
+    expect(beforeUpdateError).toBeNull()
+
+    const { error } = await client
+      .from('orgs')
+      .update({
+        password_policy_config: {
+          enabled: true,
+          min_length: 73,
+          require_uppercase: true,
+          require_number: true,
+          require_special: true,
+        },
+      })
+      .eq('id', ORG_ID)
+
+    expect(error).toBeNull()
+
+    const { data: afterUpdate, error: afterUpdateError } = await getSupabaseClient()
+      .from('orgs')
+      .select('password_policy_config')
+      .eq('id', ORG_ID)
+      .single()
+
+    expect(afterUpdateError).toBeNull()
+    expect(afterUpdate?.password_policy_config).toEqual(beforeUpdate?.password_policy_config)
+    expect((afterUpdate?.password_policy_config as { min_length?: number } | null)?.min_length).not.toBe(73)
   })
 
   it('disable password policy', async () => {
@@ -357,7 +431,8 @@ describe('[POST] /private/validate_password_compliance', () => {
     if (disableError)
       throw disableError
 
-    let testError: Error | null = null
+    let caughtError: Error | null = null
+    let restoreErrorMessage: string | null = null
     try {
       const response = await fetch(`${BASE_URL}/private/validate_password_compliance`, {
         headers,
@@ -374,7 +449,7 @@ describe('[POST] /private/validate_password_compliance', () => {
       expect(responseData.error).toBe('no_policy')
     }
     catch (error) {
-      testError = error as Error
+      caughtError = error as Error
     }
     finally {
       const { error: restoreError } = await getSupabaseClient()
@@ -382,17 +457,16 @@ describe('[POST] /private/validate_password_compliance', () => {
         .update({ password_policy_config: policyConfig })
         .eq('id', ORG_ID)
 
-      // If restore failed, throw it (but preserve test failure if there was one)
-      if (restoreError) {
-        if (testError)
-          throw new Error(`Test failed AND restore failed: ${testError.message} | Restore error: ${restoreError.message}`)
-        throw restoreError
-      }
-
-      // Re-throw original test error if any
-      if (testError)
-        throw testError
+      if (restoreError)
+        restoreErrorMessage = restoreError.message
     }
+
+    if (restoreErrorMessage && caughtError)
+      throw new Error(`Test failed AND restore failed: ${caughtError.message} | Restore error: ${restoreErrorMessage}`)
+    if (restoreErrorMessage)
+      throw new Error(restoreErrorMessage)
+    if (caughtError)
+      throw caughtError
   })
 
   it('reject request with invalid credentials', async () => {
