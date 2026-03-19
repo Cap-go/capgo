@@ -53,6 +53,7 @@ const isSaving = ref(false)
 displayStore.NavTitle = t('security')
 
 const { currentOrganization } = storeToRefs(organizationStore)
+const SUPABASE_MAX_PASSWORD_LENGTH = 72
 
 // Hashed API keys enforcement state
 const enforceHashedApiKeys = ref(false)
@@ -159,7 +160,7 @@ function loadPolicyFromOrg() {
   const config = currentOrganization.value?.password_policy_config
   if (config?.enabled) {
     policyEnabled.value = config.enabled
-    minLength.value = config.min_length ?? 10
+    minLength.value = Math.min(config.min_length ?? 10, SUPABASE_MAX_PASSWORD_LENGTH)
     requireUppercase.value = config.require_uppercase ?? true
     requireNumber.value = config.require_number ?? true
     requireSpecial.value = config.require_special ?? true
@@ -815,11 +816,14 @@ async function updatePasswordPolicy() {
     return
   }
 
+  const sanitizedMinLength = Math.min(Math.max(minLength.value, 6), SUPABASE_MAX_PASSWORD_LENGTH)
+  minLength.value = sanitizedMinLength
+
   isSaving.value = true
 
   const policyConfig = {
     enabled: policyEnabled.value,
-    min_length: minLength.value,
+    min_length: sanitizedMinLength,
     require_uppercase: requireUppercase.value,
     require_number: requireNumber.value,
     require_special: requireSpecial.value,
@@ -1198,7 +1202,7 @@ onMounted(async () => {
                     v-model.number="minLength"
                     type="number"
                     min="6"
-                    max="128"
+                    max="72"
                     :disabled="!hasOrgPerm || isSaving"
                     class="w-20 px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white disabled:opacity-50"
                     @change="handleSettingChange"

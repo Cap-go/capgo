@@ -1133,6 +1133,10 @@ export type Database = {
           builds_last_month: number | null
           builds_last_month_android: number | null
           builds_last_month_ios: number | null
+          build_minutes_day_android: number
+          build_minutes_day_ios: number
+          builds_day_ios: number
+          builds_day_android: number
           builds_success_android: number | null
           builds_success_ios: number | null
           builds_success_total: number | null
@@ -1194,6 +1198,10 @@ export type Database = {
           builds_last_month?: number | null
           builds_last_month_android?: number | null
           builds_last_month_ios?: number | null
+          build_minutes_day_android?: number
+          build_minutes_day_ios?: number
+          builds_day_ios?: number
+          builds_day_android?: number
           builds_success_android?: number | null
           builds_success_ios?: number | null
           builds_success_total?: number | null
@@ -1255,6 +1263,10 @@ export type Database = {
           builds_last_month?: number | null
           builds_last_month_android?: number | null
           builds_last_month_ios?: number | null
+          build_minutes_day_android?: number
+          build_minutes_day_ios?: number
+          builds_day_ios?: number
+          builds_day_android?: number
           builds_success_android?: number | null
           builds_success_ios?: number | null
           builds_success_total?: number | null
@@ -2757,6 +2769,29 @@ export type Database = {
           credit_step_id: number
           credits_required: number
         }[]
+      }
+      calculate_org_metrics_cache_entry: {
+        Args: { p_end_date: string; p_org_id: string; p_start_date: string }
+        Returns: {
+          bandwidth: number
+          build_time_unit: number
+          cached_at: string
+          end_date: string
+          fail: number
+          get: number
+          install: number
+          mau: number
+          org_id: string
+          start_date: string
+          storage: number
+          uninstall: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "org_metrics_cache"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       check_domain_sso: {
         Args: { p_domain: string }
