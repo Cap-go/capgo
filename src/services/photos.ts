@@ -145,6 +145,39 @@ async function uploadPhotoOrg(formId: string, data: string, fileName: string, co
   await uploadPhotoShared(data, `org/${safeGid}/logo/${fileName}`, contentType, isLoading, orgCallback)
 }
 
+export async function uploadOrgLogoFile(orgId: string, file: Blob, fileName?: string) {
+  const safeOrgId = orgId.trim()
+  if (!safeOrgId)
+    throw new Error('Organization ID is required')
+
+  const extension = mime.getExtension(file.type) ?? 'png'
+  const targetFileName = fileName ?? `${Date.now()}.${extension}`
+  const storagePath = `org/${safeOrgId}/logo/${targetFileName}`
+
+  const { error: uploadError } = await supabase.storage
+    .from('images')
+    .upload(storagePath, file, {
+      contentType: file.type || undefined,
+      upsert: true,
+    })
+
+  if (uploadError)
+    throw uploadError
+
+  const { error: updateError } = await supabase
+    .from('orgs')
+    .update({ logo: storagePath })
+    .eq('id', safeOrgId)
+
+  if (updateError)
+    throw updateError
+
+  await organizationStore.fetchOrganizations()
+  organizationStore.setCurrentOrganization(safeOrgId)
+
+  return storagePath
+}
+
 function blobToData(blob: Blob) {
   return new Promise<string>((resolve) => {
     const reader = new FileReader()

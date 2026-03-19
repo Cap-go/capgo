@@ -7,6 +7,7 @@ import { createSignedImageUrl } from '~/services/storage'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
+import { useOrganizationStore } from '~/stores/organization'
 import { getPlans, isPlatformAdmin } from './../services/supabase'
 
 async function updateUser(
@@ -88,6 +89,7 @@ async function guard(
 ) {
   const supabase = useSupabase()
   const main = useMainStore()
+  const organizationStore = useOrganizationStore()
   const { data: claimsData } = await supabase.auth.getClaims()
   const { data: sessionData } = await supabase.auth.getSession()
   const sessionUser = sessionData?.session?.user ?? null
@@ -154,6 +156,11 @@ async function guard(
       await updateUser(main, supabase)
     }
 
+    await organizationStore.fetchOrganizations()
+    if (!organizationStore.hasOrganizations && !to.path.startsWith('/onboarding/organization')) {
+      return next('/onboarding/organization')
+    }
+
     getPlans().then((pls) => {
       main.plans = pls
     })
@@ -211,6 +218,11 @@ async function guard(
       catch (error) {
         console.error('Error checking if account is disabled:', error)
       }
+    }
+
+    await organizationStore.dedupFetchOrganizations()
+    if (!organizationStore.hasOrganizations && !to.path.startsWith('/onboarding/organization')) {
+      return next('/onboarding/organization')
     }
 
     // Check if user is trying to access admin routes

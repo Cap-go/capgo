@@ -19,16 +19,11 @@ const supabase = useSupabase()
 const main = useMainStore()
 const dropdown = useTemplateRef('dropdown')
 const hasNewInvitation = ref(false)
-const orgNameInput = ref('')
 
 onClickOutside(dropdown, () => closeDropdown())
 
 onMounted(async () => {
   await organizationStore.fetchOrganizations()
-    .catch((error) => {
-      console.error('Cannot get orgs!', error)
-      createNewOrg()
-    })
   hasNewInvitation.value = organizationStore.organizations.some(org => org.role.startsWith('invite'))
 })
 
@@ -118,58 +113,8 @@ function onOrganizationClick(org: Organization) {
 }
 
 async function createNewOrg() {
-  orgNameInput.value = ''
-
-  dialogStore.openDialog({
-    title: t('create-new-org'),
-    description: `${t('type-new-org-name')}`,
-    size: 'lg',
-    buttons: [
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-      },
-      {
-        text: t('button-confirm'),
-        role: 'primary',
-        id: 'confirm-button',
-        handler: async () => {
-          const orgName = orgNameInput.value
-          if (!orgName) {
-            toast.error(t('org-name-required'))
-            return false
-          }
-
-          const { error } = await supabase.from('orgs')
-            .insert({
-              name: orgName,
-              created_by: main.auth?.id ?? '',
-              management_email: main.auth?.email ?? '',
-            })
-
-          if (error) {
-            console.error('Error when creating org', error)
-            toast.error(error.code === '23505' ? t('org-with-this-name-exists') : t('cannot-create-org'))
-            return false
-          }
-
-          toast.success(t('org-created-successfully'))
-          await organizationStore.fetchOrganizations()
-          const org = organizationStore.organizations.find(org => org.name === orgName)
-          if (org) {
-            console.log('org found', org)
-            organizationStore.setCurrentOrganization(org.gid)
-            currentOrganization.value = org
-            router.push('/apps')
-          }
-          else {
-            console.log('org not found', organizationStore.organizations)
-          }
-        },
-      },
-    ],
-  })
-  return dialogStore.onDialogDismiss()
+  closeDropdown()
+  await router.push('/onboarding/organization')
 }
 
 function isSelected(org: Organization) {
@@ -198,7 +143,7 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
 
 <template>
   <div>
-    <details v-show="currentOrganization" ref="dropdown" class="w-full d-dropdown d-dropdown-end">
+    <details v-if="currentOrganization" ref="dropdown" class="w-full d-dropdown d-dropdown-end">
       <summary class="justify-between shadow-none w-full d-btn d-btn-sm border border-gray-700 text-white bg-[#1a1d24] hover:bg-gray-700 hover:text-white active:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-800">
         <div class="flex items-center w-4/5 text-left">
           <img
@@ -264,22 +209,10 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
         </div>
       </div>
     </details>
-    <div v-show="!currentOrganization" class="p-px rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
+    <div v-else class="p-px rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
       <button class="block w-full text-white d-btn d-btn-outline bg-slate-800 d-btn-sm" @click="createNewOrg">
-        {{ t('add-organization') }}
+        {{ t('create-new-org', 'Create organization') }}
       </button>
     </div>
-
-    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('create-new-org')" to="#dialog-v2-content" defer>
-      <div class="w-full">
-        <input
-          v-model="orgNameInput"
-          type="text"
-          :placeholder="t('organization-name')"
-          class="w-full p-3 text-gray-900 bg-white border border-gray-300 rounded-lg dark:text-white dark:bg-gray-800 dark:border-gray-600"
-          @keydown.enter="$event.preventDefault()"
-        >
-      </div>
-    </Teleport>
   </div>
 </template>
