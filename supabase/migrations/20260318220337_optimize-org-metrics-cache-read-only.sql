@@ -296,13 +296,10 @@ $function$;
 
 ALTER FUNCTION public.get_total_metrics(uuid, date, date) OWNER TO "postgres";
 
+REVOKE ALL ON FUNCTION public.get_total_metrics(uuid, date, date) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.get_total_metrics(uuid, date, date) FROM anon;
+REVOKE ALL ON FUNCTION public.get_total_metrics(uuid, date, date) FROM authenticated;
+REVOKE ALL ON FUNCTION public.get_total_metrics(uuid, date, date) FROM service_role;
 GRANT ALL ON FUNCTION public.get_total_metrics(
     uuid, date, date
 ) TO service_role;
-REVOKE ALL ON FUNCTION public.get_total_metrics(
-    uuid, date, date
-) FROM public;
-REVOKE ALL ON FUNCTION public.get_total_metrics(uuid, date, date) FROM anon;
-REVOKE ALL ON FUNCTION public.get_total_metrics(
-    uuid, date, date
-) FROM authenticated;

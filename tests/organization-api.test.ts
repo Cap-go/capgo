@@ -3,7 +3,22 @@ import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_ADMIN_EMAIL, USER_EMAIL, USER_ID, USER_PASSWORD } from './test-utils.ts'
+import {
+  BASE_URL,
+  SUPABASE_ANON_KEY,
+  SUPABASE_BASE_URL,
+  normalizeLocalhostUrl,
+  getAuthHeadersForCredentials,
+  getSupabaseClient,
+  headers,
+  TEST_EMAIL,
+  USER_ADMIN_EMAIL,
+  USER_EMAIL,
+  USER_ID,
+  USER_PASSWORD,
+} from './test-utils.ts'
+
+const normalizedSupabaseBaseUrl = normalizeLocalhostUrl(SUPABASE_BASE_URL) ?? SUPABASE_BASE_URL
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
@@ -726,13 +741,11 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
     await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false }).eq('id', ORG_ID)
   })
 
-  it('rejects public RPC access to get_orgs_v7(userid)', async () => {
-    const supabaseUrl = process.env.SUPABASE_URL
-    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
-    if (!supabaseUrl || !supabaseAnonKey)
+  it.concurrent('rejects public RPC access to get_orgs_v7(userid)', async () => {
+    if (!normalizedSupabaseBaseUrl || !SUPABASE_ANON_KEY)
       throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY are required for this test')
 
-    const publicSupabase = createClient(supabaseUrl, supabaseAnonKey, {
+    const publicSupabase = createClient(normalizedSupabaseBaseUrl, SUPABASE_ANON_KEY, {
       auth: {
         persistSession: false,
       },
@@ -746,23 +759,22 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
     expect(error?.code).toBe('42501')
   })
 
-  it('rejects authenticated RPC access to get_orgs_v7(userid)', async () => {
-    const supabaseUrl = process.env.SUPABASE_URL
-    const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
-    if (!supabaseUrl || !supabaseAnonKey)
+  it.concurrent('rejects authenticated RPC access to get_orgs_v7(userid)', async () => {
+    if (!normalizedSupabaseBaseUrl || !SUPABASE_ANON_KEY)
       throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY are required for this test')
 
-    const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+    const authClient = createClient(normalizedSupabaseBaseUrl, SUPABASE_ANON_KEY, {
       auth: {
         persistSession: false,
       },
     })
 
-    const { error: signInError } = await authClient.auth.signInWithPassword({
-      email: USER_EMAIL,
-      password: USER_PASSWORD,
-    })
-    expect(signInError).toBeNull()
+    const authHeaders = await getAuthHeadersForCredentials(USER_EMAIL, USER_PASSWORD)
+    const accessToken = authHeaders.Authorization?.replace('Bearer ', '')
+    if (!accessToken)
+      throw new Error('Unable to obtain authenticated token for tests')
+
+    authClient.auth.setAuth(accessToken)
 
     const { data, error } = await authClient.rpc('get_orgs_v7', {
       userid: USER_ID,
@@ -770,8 +782,6 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
 
     expect(data).toBeNull()
     expect(error?.code).toBe('42501')
-
-    await authClient.auth.signOut()
   })
 })
 
