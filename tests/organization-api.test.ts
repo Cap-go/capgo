@@ -28,7 +28,7 @@ beforeAll(async () => {
     management_email: TEST_EMAIL,
     created_by: USER_ID,
     customer_id: customerId,
-    use_new_rbac: false, // Explicitly legacy — this suite tests the legacy permission path
+    use_new_rbac: false, // Explicitly legacy - this suite tests the legacy permission path
   })
   if (error)
     throw error
@@ -51,32 +51,79 @@ afterAll(async () => {
 })
 
 describe('read-mode API keys cannot access destructive organization routes', () => {
-  const readOnlyKey = `org-read-only-${randomUUID()}`
+  const readOnlyOrgId = randomUUID()
+  const readOnlyGlobalId = randomUUID()
+  const readOnlyName = `Test Read-Only Organization ${readOnlyGlobalId}`
+  const readOnlyCustomerId = `cus_test_${readOnlyOrgId}`
+  let readOnlyKey = ''
+  let readOnlyKeyId = 0
   const readOnlyHeaders = {
     'Content-Type': 'application/json',
-    'Authorization': readOnlyKey,
   }
 
   beforeAll(async () => {
-    const { error } = await getSupabaseClient().from('apikeys').insert({
-      user_id: USER_ID,
-      key: readOnlyKey,
-      mode: 'read',
-      name: `Organization read-only regression ${randomUUID()}`,
+    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
+      customer_id: readOnlyCustomerId,
+      status: 'succeeded',
+      product_id: 'prod_LQIregjtNduh4q',
+      subscription_id: `sub_${readOnlyGlobalId}`,
+      trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+      is_good_plan: true,
     })
-    expect(error).toBeNull()
+    expect(stripeError).toBeNull()
+
+    const { error: orgError } = await getSupabaseClient().from('orgs').insert({
+      id: readOnlyOrgId,
+      name: readOnlyName,
+      management_email: TEST_EMAIL,
+      created_by: USER_ID,
+      customer_id: readOnlyCustomerId,
+      require_apikey_expiration: false,
+      use_new_rbac: false, // Explicitly legacy — this suite tests the legacy permission path
+    })
+    expect(orgError).toBeNull()
+
+    const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+      org_id: readOnlyOrgId,
+      user_id: USER_ID,
+      user_right: 'super_admin',
+    })
+    expect(orgUserError).toBeNull()
+
+    const createResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: `Organization read-only regression ${randomUUID()}`,
+        mode: 'read',
+        hashed: false,
+        limited_to_orgs: [readOnlyOrgId],
+      }),
+    })
+    expect(createResponse.status).toBe(200)
+    const createdKey = await createResponse.json<{ id: number, key: string }>()
+    readOnlyKey = createdKey.key
+    readOnlyKeyId = createdKey.id
   })
 
   afterAll(async () => {
-    await getSupabaseClient().from('apikeys').delete().eq('key', readOnlyKey)
+    if (readOnlyKeyId) {
+      await fetch(`${BASE_URL}/apikey/${readOnlyKeyId}`, {
+        method: 'DELETE',
+        headers,
+      })
+    }
+    await getSupabaseClient().from('org_users').delete().eq('org_id', readOnlyOrgId)
+    await getSupabaseClient().from('orgs').delete().eq('id', readOnlyOrgId)
+    await getSupabaseClient().from('stripe_info').delete().eq('customer_id', readOnlyCustomerId)
   })
 
   it.concurrent('rejects POST /organization/members', async () => {
     const response = await fetch(`${BASE_URL}/organization/members`, {
-      headers: readOnlyHeaders,
+      headers: { ...readOnlyHeaders, Authorization: readOnlyKey },
       method: 'POST',
       body: JSON.stringify({
-        orgId: ORG_ID,
+        orgId: readOnlyOrgId,
         email: USER_ADMIN_EMAIL,
         invite_type: 'read',
       }),
@@ -86,8 +133,8 @@ describe('read-mode API keys cannot access destructive organization routes', () 
   })
 
   it.concurrent('rejects DELETE /organization/members', async () => {
-    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID}&email=${USER_ADMIN_EMAIL}`, {
-      headers: readOnlyHeaders,
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${readOnlyOrgId}&email=${USER_ADMIN_EMAIL}`, {
+      headers: { ...readOnlyHeaders, Authorization: readOnlyKey },
       method: 'DELETE',
     })
 
@@ -96,10 +143,10 @@ describe('read-mode API keys cannot access destructive organization routes', () 
 
   it.concurrent('rejects PUT /organization', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
-      headers: readOnlyHeaders,
+      headers: { ...readOnlyHeaders, Authorization: readOnlyKey },
       method: 'PUT',
       body: JSON.stringify({
-        orgId: ORG_ID,
+        orgId: readOnlyOrgId,
         name: `Blocked update ${randomUUID()}`,
       }),
     })
@@ -109,9 +156,10 @@ describe('read-mode API keys cannot access destructive organization routes', () 
 
   it.concurrent('rejects POST /organization', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
-      headers: readOnlyHeaders,
+      headers: { ...readOnlyHeaders, Authorization: readOnlyKey },
       method: 'POST',
       body: JSON.stringify({
+        orgId: readOnlyOrgId,
         name: `Blocked create ${randomUUID()}`,
       }),
     })
@@ -120,8 +168,8 @@ describe('read-mode API keys cannot access destructive organization routes', () 
   })
 
   it.concurrent('rejects DELETE /organization', async () => {
-    const response = await fetch(`${BASE_URL}/organization?orgId=${ORG_ID}`, {
-      headers: readOnlyHeaders,
+    const response = await fetch(`${BASE_URL}/organization?orgId=${readOnlyOrgId}`, {
+      headers: { ...readOnlyHeaders, Authorization: readOnlyKey },
       method: 'DELETE',
     })
 
@@ -129,14 +177,14 @@ describe('read-mode API keys cannot access destructive organization routes', () 
   })
 
   it.concurrent('allows GET /organization for accessible organizations', async () => {
-    const response = await fetch(`${BASE_URL}/organization?orgId=${ORG_ID}`, {
-      headers: readOnlyHeaders,
+    const response = await fetch(`${BASE_URL}/organization?orgId=${readOnlyOrgId}`, {
+      headers: { ...readOnlyHeaders, Authorization: readOnlyKey },
       method: 'GET',
     })
 
     expect(response.status).toBe(200)
     const type = z.object({ id: z.string(), name: z.string() })
-    expect(type.parse(await response.json())).toEqual({ id: ORG_ID, name })
+    expect(type.parse(await response.json())).toEqual({ id: readOnlyOrgId, name: readOnlyName })
   })
 })
 
