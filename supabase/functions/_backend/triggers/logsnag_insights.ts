@@ -10,6 +10,8 @@ import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { logsnag, logsnagInsights } from '../utils/logsnag.ts'
 import { countAllApps, countAllUpdates, countAllUpdatesExternal, getUpdateStats } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
+import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
+import { sql } from 'drizzle-orm'
 
 interface PlanTotal { [key: string]: number }
 interface Actives { users: number, apps: number }
@@ -272,8 +274,9 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
   const supabase = supabaseAdmin(c)
   const last30days = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
   const today = new Date()
-  const dayStart = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())).toISOString()
-  const dayEnd = new Date(Date.parse(dayStart) + 24 * 60 * 60 * 1000).toISOString()
+  const todayStartMillis = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
+  const prevDayStart = new Date(todayStartMillis - 24 * 60 * 60 * 1000)
+  const prevDayEnd = new Date(todayStartMillis)
 
   try {
     // Run all count queries in parallel for better performance
@@ -287,7 +290,7 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
       successTotalResult,
       successIosResult,
       successAndroidResult,
-      dailyMinutesResult,
+      dailyMinutesByPlatform,
     ] = await Promise.all([
       // Count total builds (all time)
       supabase.from('build_logs').select('*', { count: 'exact', head: true }),
@@ -307,13 +310,7 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
       supabase.from('build_requests').select('*', { count: 'exact', head: true }).eq('platform', 'ios').eq('status', 'succeeded'),
       // Count successful Android builds (all time)
       supabase.from('build_requests').select('*', { count: 'exact', head: true }).eq('platform', 'android').eq('status', 'succeeded'),
-      // Sum raw build minutes by platform for the current UTC day
-      supabase
-        .from('build_logs')
-        .select('platform, build_time_unit')
-        .gte('created_at', dayStart)
-        .lt('created_at', dayEnd)
-        .in('platform', ['ios', 'android']),
+      aggregateDailyBuildMinutes(c, prevDayStart, prevDayEnd),
     ])
 
     // Log any errors
@@ -335,14 +332,6 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
       cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats successIos error', error: successIosResult.error })
     if (successAndroidResult.error)
       cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats successAndroid error', error: successAndroidResult.error })
-    if (dailyMinutesResult.error)
-      cloudlogErr({ requestId: c.get('requestId'), message: 'getBuildStats dailyMinutes error', error: dailyMinutesResult.error })
-
-    const dailyMinutesByPlatform = (dailyMinutesResult.data || []).reduce<Record<'ios' | 'android', number>>((acc, row) => {
-      if (row.platform === 'ios' || row.platform === 'android')
-        acc[row.platform] += (Number(row.build_time_unit) || 0) / 60
-      return acc
-    }, { ios: 0, android: 0 })
 
     return {
       total: totalResult.count ?? 0,
@@ -374,6 +363,43 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
       minutes_day_android: 0,
     }
   }
+}
+
+async function aggregateDailyBuildMinutes(
+  c: Context,
+  start: Date,
+  end: Date,
+): Promise<Record<'ios' | 'android', number>> {
+  const pgClient = getPgClient(c, true)
+  const drizzleClient = getDrizzleClient(pgClient)
+  const minutesByPlatform: Record<'ios' | 'android', number> = { ios: 0, android: 0 }
+
+  try {
+    const query = sql`
+      SELECT
+        platform,
+        SUM(build_time_unit)::float AS total_seconds
+      FROM build_logs
+      WHERE created_at >= ${start}
+        AND created_at < ${end}
+        AND platform IN ('ios', 'android')
+      GROUP BY platform
+    `
+    const result = await drizzleClient.execute<{ platform: string, total_seconds: number }>(query)
+    for (const row of result.rows ?? []) {
+      if (row.platform === 'ios' || row.platform === 'android') {
+        minutesByPlatform[row.platform] = (Number(row.total_seconds) || 0) / 60
+      }
+    }
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'aggregateDailyBuildMinutes error', error })
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
+
+  return minutesByPlatform
 }
 
 function getStats(c: Context): GlobalStats {
@@ -722,9 +748,23 @@ app.post('/', middlewareAPISecret, async (c) => {
     build_minutes_day_android: build_stats.minutes_day_android,
   }
   cloudlog({ requestId: c.get('requestId'), message: 'newData', newData })
-  const { error } = await supabaseAdmin(c)
+  let { error } = await supabaseAdmin(c)
     .from('global_stats')
     .upsert(newData)
+  if (error) {
+    const errorCode = String((error as any)?.code ?? '').toUpperCase()
+    const message = String((error as any)?.message ?? '')
+    if (
+      errorCode === 'PGRST204'
+      || errorCode === '42703'
+      || message.toLowerCase().includes('build_minutes_day')
+    ) {
+      const { build_minutes_day_ios, build_minutes_day_android, ...legacyData } = newData
+      ;({ error } = await supabaseAdmin(c)
+        .from('global_stats')
+        .upsert(legacyData))
+    }
+  }
   if (error)
     cloudlogErr({ requestId: c.get('requestId'), message: 'insert global_stats error', error })
   await logsnag(c).track({
