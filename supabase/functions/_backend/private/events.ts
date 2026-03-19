@@ -1,4 +1,5 @@
 import type { TrackOptions } from '@logsnag/node'
+import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
@@ -7,17 +8,36 @@ import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { trackPosthogEvent } from '../utils/posthog.ts'
 import { broadcastCLIEvent } from '../utils/realtime_broadcast.ts'
-import { supabaseWithAuth } from '../utils/supabase.ts'
+import { hasOrgRight, hasOrgRightApikey, supabaseWithAuth } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
+async function canAccessRequestedOrg(c: Context<MiddlewareKeyVariables>, orgId: string) {
+  const auth = c.get('auth')
+  if (!auth?.userId || !orgId)
+    return false
+
+  if (auth.authType === 'apikey')
+    return hasOrgRightApikey(c, orgId, auth.userId, 'read', c.get('capgkey'))
+
+  return hasOrgRight(c, orgId, auth.userId, 'read')
+}
+
 app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   const body = await parseBody<TrackOptions & { notifyConsole?: boolean }>(c)
+  const requestedOrgId = body.notifyConsole && typeof body.user_id === 'string' && body.user_id.length > 0
+    ? body.user_id
+    : undefined
 
-  const orgId = body.user_id ?? c.get('auth')?.userId ?? ''
+  if (requestedOrgId && !(await canAccessRequestedOrg(c, requestedOrgId)))
+    return c.json({ error: 'Forbidden' }, 403)
+
+  const orgId = typeof body.user_id === 'string' && body.user_id.length > 0
+    ? body.user_id
+    : c.get('auth')?.userId ?? ''
 
   // notifyConsole: broadcast to Supabase Realtime only, skip all tracking
   if (body.notifyConsole) {

@@ -12,6 +12,7 @@ env:
 jobs:
   github-releases-to-discord:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:
