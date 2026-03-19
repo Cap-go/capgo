@@ -3,7 +3,7 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { trackBentoEvent } from '../utils/bento.ts'
-import { BRES, parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { BRES, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { logsnag } from '../utils/logsnag.ts'
 import { trackPosthogEvent } from '../utils/posthog.ts'
@@ -32,7 +32,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
       throw simpleError('missing_org_id', 'Missing org ID for console notification')
     }
     if (!(await checkPermission(c, 'org.read', { orgId: requestedOrgId })))
-      return c.json({ error: 'Forbidden' }, 403)
+      return quickError(403, 'Forbidden', 'Forbidden')
     if (orgId) {
       await backgroundTask(c, broadcastCLIEvent(c, {
         event: body.event,
