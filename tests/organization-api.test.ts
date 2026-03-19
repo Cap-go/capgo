@@ -5,12 +5,11 @@ import { z } from 'zod'
 
 import {
   BASE_URL,
-  SUPABASE_ANON_KEY,
-  SUPABASE_BASE_URL,
-  normalizeLocalhostUrl,
-  getAuthHeadersForCredentials,
   getSupabaseClient,
   headers,
+  normalizeLocalhostUrl,
+  SUPABASE_ANON_KEY,
+  SUPABASE_BASE_URL,
   TEST_EMAIL,
   USER_ADMIN_EMAIL,
   USER_EMAIL,
@@ -113,7 +112,7 @@ describe('[GET] /organization/members', () => {
     const safe = type.safeParse(await response.json())
     expect(safe.success).toBe(true)
     expect(safe.data?.length).toBeGreaterThanOrEqual(1)
-    
+
     const testUser = safe.data?.find(m => m.uid === USER_ID)
     expect(testUser).toBeTruthy()
     expect(testUser?.email).toBe(USER_EMAIL)
@@ -341,7 +340,6 @@ describe('[DELETE] /organization/members', () => {
       user_right: 'read',
     })
     expect(error).toBeNull()
-
 
     // The sync_org_user_to_role_binding_on_insert trigger automatically creates role_bindings
     // when a user is added to org_users. Verify the trigger created the binding.
@@ -769,12 +767,11 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
       },
     })
 
-    const authHeaders = await getAuthHeadersForCredentials(USER_EMAIL, USER_PASSWORD)
-    const accessToken = authHeaders.Authorization?.replace('Bearer ', '')
-    if (!accessToken)
-      throw new Error('Unable to obtain authenticated token for tests')
-
-    authClient.auth.setAuth(accessToken)
+    const { error: signInError } = await authClient.auth.signInWithPassword({
+      email: USER_EMAIL,
+      password: USER_PASSWORD,
+    })
+    expect(signInError).toBeNull()
 
     const { data, error } = await authClient.rpc('get_orgs_v7', {
       userid: USER_ID,
@@ -782,6 +779,8 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
 
     expect(data).toBeNull()
     expect(error?.code).toBe('42501')
+
+    await authClient.auth.signOut()
   })
 })
 
@@ -795,7 +794,7 @@ const globalIdRbac = randomUUID()
 const nameRbac = `RBAC Test Organization ${globalIdRbac}`
 const customerIdRbac = `cus_test_rbac_${ORG_ID_RBAC}`
 
-describe('RBAC mode - organization member operations', () => {
+describe('rbac mode - organization member operations', () => {
   beforeAll(async () => {
     const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
       customer_id: customerIdRbac,
@@ -934,7 +933,7 @@ describe('RBAC mode - organization member operations', () => {
   })
 })
 
-describe('Hashed API key enforcement integration', () => {
+describe('hashed API key enforcement integration', () => {
   it('find_apikey_by_value finds hashed key', async () => {
     // Create a hashed API key via API
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
