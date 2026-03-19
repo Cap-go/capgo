@@ -1,5 +1,5 @@
-import { sql } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
+import { sql } from 'drizzle-orm'
 
 import type { Context } from 'hono'
 import type { DevicesByPlatform, PluginBreakdownResult } from '../utils/cloudflare.ts'
@@ -75,6 +75,11 @@ interface GlobalStats {
   demo_apps_created: PromiseLike<number>
   plugin_breakdown: PromiseLike<PluginBreakdownResult>
   build_stats: PromiseLike<BuildStats>
+}
+
+interface DailyWindow {
+  start: Date
+  end: Date
 }
 
 function getDateId(targetDate = new Date()): string {
@@ -271,15 +276,9 @@ async function getGithubStars(): Promise<number> {
   }
 }
 
-async function getBuildStats(c: Context): Promise<BuildStats> {
+async function getBuildStats(c: Context, range: DailyWindow): Promise<BuildStats> {
   const supabase = supabaseAdmin(c)
   const last30days = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-  const today = new Date()
-  const todayStartMillis = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
-  const prevDayStart = new Date(todayStartMillis - 24 * 60 * 60 * 1000)
-  const prevDayEnd = new Date(todayStartMillis)
-  const date_id = getDateId(today)
-  const prevDayDateId = getDateId(prevDayStart)
 
   try {
     // Run all count queries in parallel for better performance
@@ -313,7 +312,7 @@ async function getBuildStats(c: Context): Promise<BuildStats> {
       supabase.from('build_requests').select('*', { count: 'exact', head: true }).eq('platform', 'ios').eq('status', 'succeeded'),
       // Count successful Android builds (all time)
       supabase.from('build_requests').select('*', { count: 'exact', head: true }).eq('platform', 'android').eq('status', 'succeeded'),
-      aggregateDailyBuildMinutes(c, prevDayStart, prevDayEnd),
+      aggregateDailyBuildMinutes(c, range.start, range.end),
     ])
 
     // Log any errors
@@ -405,7 +404,7 @@ async function aggregateDailyBuildMinutes(
   return minutesByPlatform
 }
 
-function getStats(c: Context): GlobalStats {
+function getStats(c: Context, range: DailyWindow): GlobalStats {
   const supabase = supabaseAdmin(c)
   const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
   return {
@@ -593,14 +592,20 @@ function getStats(c: Context): GlobalStats {
         return res.count ?? 0
       }),
     plugin_breakdown: getPluginBreakdownCF(c),
-    build_stats: getBuildStats(c),
+    build_stats: getBuildStats(c, range),
   }
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, async (c) => {
-  const res = getStats(c)
+  const today = new Date()
+  const todayStartMillis = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())
+  const prevDayStart = new Date(todayStartMillis - 24 * 60 * 60 * 1000)
+  const prevDayEnd = new Date(todayStartMillis)
+  const date_id = getDateId(today)
+  const prevDayDateId = getDateId(prevDayStart)
+  const res = getStats(c, { start: prevDayStart, end: prevDayEnd })
   const [
     apps,
     updates,
@@ -747,7 +752,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     builds_last_month_android: build_stats.last_month_android,
   }
   cloudlog({ requestId: c.get('requestId'), message: 'newData', newData })
-  let { error } = await supabaseAdmin(c)
+  const { error } = await supabaseAdmin(c)
     .from('global_stats')
     .upsert(newData)
   if (error)
