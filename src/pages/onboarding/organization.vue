@@ -210,11 +210,16 @@ async function createOrganization() {
   isSubmitting.value = true
 
   try {
+    const normalizedWebsite = mode.value === 'website'
+      ? websitePreview.value?.website
+      : undefined
+
     const { data, error } = await supabase.functions.invoke('organization', {
       method: 'POST',
       body: {
         name: orgName,
         email: main.auth.email ?? '',
+        website: normalizedWebsite,
       },
     })
 

@@ -1610,6 +1610,7 @@ export type Database = {
           stats_updated_at: string | null
           updated_at: string | null
           use_new_rbac: boolean
+          website: string | null
         }
         Insert: {
           created_at?: string | null
@@ -1633,6 +1634,7 @@ export type Database = {
           stats_updated_at?: string | null
           updated_at?: string | null
           use_new_rbac?: boolean
+          website?: string | null
         }
         Update: {
           created_at?: string | null
@@ -1656,6 +1658,7 @@ export type Database = {
           stats_updated_at?: string | null
           updated_at?: string | null
           use_new_rbac?: boolean
+          website?: string | null
         }
         Relationships: [
           {
@@ -3322,7 +3325,7 @@ export type Database = {
               trial_left: number
               use_new_rbac: boolean
             }[]
-          }
+        }
         | {
             Args: { userid: string }
             Returns: {
@@ -3342,7 +3345,7 @@ export type Database = {
               trial_left: number
               use_new_rbac: boolean
             }[]
-          }
+        }
       get_orgs_v7:
         | {
             Args: never
@@ -3378,6 +3381,7 @@ export type Database = {
               subscription_start: string
               trial_left: number
               use_new_rbac: boolean
+              website: string | null
             }[]
           }
         | {
@@ -3414,6 +3418,7 @@ export type Database = {
               subscription_start: string
               trial_left: number
               use_new_rbac: boolean
+              website: string | null
             }[]
           }
       get_password_policy_hash: {
