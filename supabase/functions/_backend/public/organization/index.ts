@@ -24,9 +24,9 @@ app.put('/', middlewareV2(['all', 'write', 'read', 'upload']), async (c) => {
   return put(c, body, apikey)
 })
 
-app.post('/', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
+app.post('/', middlewareV2(['all', 'write', 'read', 'upload']), async (c) => {
   const body = await getBodyOrQuery<any>(c)
-  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | null | undefined
   return post(c, body, apikey)
 })
 
