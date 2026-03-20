@@ -276,7 +276,7 @@ describe('[POST] /private/events operations', () => {
     })
 
     const data = await response.json() as { error: string }
-    expect(response.status).toBe(400)
-    expect(data.error).toBe('cannot_access_organization')
+    expect(response.status).toBe(403)
+    expect(data.error).toBe('Forbidden')
   })
 })

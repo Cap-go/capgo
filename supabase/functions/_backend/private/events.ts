@@ -75,7 +75,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     : undefined
 
   if (requestedOrgId && !(await canAccessRequestedOrg(c, requestedOrgId)))
-    throw simpleError('cannot_access_organization', 'You cannot send events for this organization')
+    throw quickError(403, 'Forbidden', 'You cannot send events for this organization')
 
   const requestedUserId = typeof body.user_id === 'string' ? body.user_id : undefined
   const appId = typeof body.tags?.['app-id'] === 'string' ? body.tags['app-id'] : undefined
@@ -87,7 +87,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     if (!requestedOrgId)
       throw simpleError('missing_org_id', 'Missing org ID for console notification')
     if (!(await checkPermission(c, 'org.read', { orgId: requestedOrgId })))
-      throw simpleError('cannot_access_organization', 'You cannot send events for this organization')
+      throw quickError(403, 'Forbidden', 'You cannot send events for this organization')
     if (trackingUserId) {
       await backgroundTask(c, broadcastCLIEvent(c, {
         event: trackedBody.event,
