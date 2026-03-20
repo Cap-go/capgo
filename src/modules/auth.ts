@@ -96,7 +96,7 @@ async function guard(
   const hasAuth = !!claimsData?.claims?.sub && !!sessionUser
   const hadAuth = !!main.auth
   const needsVerifiedEmail = to.path.startsWith('/settings') || to.path === '/delete_account'
-  const redirectToOrgOnboarding = () => !to.path.startsWith('/onboarding/organization')
+  const shouldRedirectToOrgOnboarding = !to.path.startsWith('/onboarding/organization')
   const isAdminRoute = to.path.startsWith('/admin')
 
   async function tryLoadOrganizations(fetcher: () => Promise<void>) {
@@ -170,17 +170,17 @@ async function guard(
     }
 
     const organizationsLoaded = await tryLoadOrganizations(() => organizationStore.fetchOrganizations())
-    if (organizationsLoaded && !organizationStore.hasOrganizations && redirectToOrgOnboarding()) {
-      if (isAdminRoute) {
-        try {
-          main.isAdmin = main.isAdmin ?? await isPlatformAdmin()
-        }
-        catch (error) {
-          console.error('Failed to resolve platform admin status:', error)
-          main.isAdmin = false
-        }
+    if (organizationsLoaded && isAdminRoute) {
+      try {
+        main.isAdmin = main.isAdmin ?? await isPlatformAdmin()
       }
+      catch (error) {
+        console.error('Failed to resolve platform admin status:', error)
+        main.isAdmin = false
+      }
+    }
 
+    if (organizationsLoaded && !organizationStore.hasOrganizations && shouldRedirectToOrgOnboarding) {
       if (!isAdminRoute || !main.isAdmin) {
         return next({
           path: '/onboarding/organization',
@@ -197,7 +197,7 @@ async function guard(
 
     try {
       // isPlatformAdmin() is the only frontend admin-rights source.
-      main.isAdmin = await isPlatformAdmin()
+      main.isAdmin = main.isAdmin ?? await isPlatformAdmin()
     }
     catch (error) {
       console.error('Failed to resolve platform admin status:', error)
@@ -251,7 +251,7 @@ async function guard(
     }
 
     const organizationsLoaded = await tryLoadOrganizations(() => organizationStore.dedupFetchOrganizations())
-    if (organizationsLoaded && !organizationStore.hasOrganizations && redirectToOrgOnboarding()) {
+    if (organizationsLoaded && !organizationStore.hasOrganizations && shouldRedirectToOrgOnboarding) {
       return next('/onboarding/organization')
     }
 

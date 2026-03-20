@@ -58,13 +58,19 @@ function deriveNameFromHostname(hostname: string) {
     .join(' ')
 }
 
-function findMetaContent(html: string, key: string) {
-  const patterns = [
-    new RegExp(`<meta[^>]+property=["']${key}["'][^>]+content=["']([^"']+)["'][^>]*>`, 'i'),
-    new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+property=["']${key}["'][^>]*>`, 'i'),
-    new RegExp(`<meta[^>]+name=["']${key}["'][^>]+content=["']([^"']+)["'][^>]*>`, 'i'),
-    new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+name=["']${key}["'][^>]*>`, 'i'),
-  ]
+const META_PATTERNS = {
+  'application-name': [
+    /<meta[^>]+name=["']application-name["'][^>]+content=["']([^"']+)["'][^>]*>/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+name=["']application-name["'][^>]*>/i,
+  ],
+  'og:site_name': [
+    /<meta[^>]+property=["']og:site_name["'][^>]+content=["']([^"']+)["'][^>]*>/i,
+    /<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:site_name["'][^>]*>/i,
+  ],
+} as const
+
+function findMetaContent(html: string, key: keyof typeof META_PATTERNS) {
+  const patterns = META_PATTERNS[key]
 
   for (const pattern of patterns) {
     const match = pattern.exec(html)
