@@ -1,6 +1,5 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
-import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { closeClient, getPgClient, logPgError } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
@@ -18,7 +17,7 @@ export interface CreateApp {
   android_store_url?: string
 }
 
-export async function post(c: Context<MiddlewareKeyVariables>, body: CreateApp, _apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function post(c: Context<MiddlewareKeyVariables>, body: CreateApp): Promise<Response> {
   if (!body.app_id) {
     throw simpleError('missing_app_id', 'Missing app_id', { body })
   }
@@ -82,7 +81,15 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: CreateApp, 
     data = result.rows[0]
   }
   catch (error) {
+    const pgError = error as { code?: string, constraint?: string, detail?: string, message?: string }
     logPgError(c, 'create_app', error)
+    if (pgError.code === '23505') {
+      throw quickError(409, 'app_id_already_exists', 'App ID already exists', {
+        app_id: body.app_id,
+        constraint: pgError.constraint,
+        detail: pgError.detail,
+      })
+    }
     throw simpleError('cannot_create_app', 'Cannot create app', { error: (error as Error)?.message })
   }
   finally {

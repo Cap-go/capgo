@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Database } from '~/types/supabase.types'
 import { FormKit } from '@formkit/vue'
+import { FunctionsHttpError } from '@supabase/supabase-js'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -42,6 +43,9 @@ const appName = ref('')
 const storeUrl = ref('')
 const importedStoreAppId = ref('')
 const manualAppId = ref('')
+const appIdSuggestions = ref<string[]>([])
+const appIdFeedback = ref('')
+const hasEditedAppId = ref(false)
 
 const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ''
 const cliCommand = computed(() => `npx @capgo/cli@latest i ${apiKey.value ?? '[APIKEY]'}${localCommand}`)
@@ -58,12 +62,9 @@ const canShowAppDetails = computed(() => {
     return existingAppSetup.value !== null
   return false
 })
-const generatedAppId = computed(() => {
+const suggestedAppId = computed(() => {
   if (createdApp.value)
     return createdApp.value.app_id
-
-  if (existingApp.value === true && existingAppSetup.value === 'manual' && manualAppId.value.trim())
-    return manualAppId.value.trim()
 
   const storeAppId = importedStoreAppId.value || extractAndroidAppId(storeUrl.value)
   if (existingApp.value === true && storeAppId)
@@ -73,6 +74,7 @@ const generatedAppId = computed(() => {
   const appSlug = slugify(appName.value || 'mobile-app')
   return `com.${orgSlug}.${appSlug}`
 })
+const generatedAppId = computed(() => createdApp.value?.app_id || manualAppId.value.trim() || suggestedAppId.value)
 
 function slugify(value: string) {
   return value
@@ -190,7 +192,7 @@ async function loadResumeApp() {
   if (data.icon_url)
     localIconPreview.value = await createSignedImageUrl(data.icon_url) ?? ''
   storeScreenshotPreview.value = ''
-  flowStep.value = 'choice'
+  flowStep.value = 'install'
   return true
 }
 
@@ -246,6 +248,18 @@ function onSelectIconFormKit(value: unknown) {
   localIconPreview.value = file ? URL.createObjectURL(file) : ''
 }
 
+function onAppIdInput(event: Event) {
+  hasEditedAppId.value = true
+  manualAppId.value = (event.target as HTMLInputElement).value
+  appIdFeedback.value = ''
+}
+
+function applyAppIdSuggestion(suggestion: string) {
+  hasEditedAppId.value = true
+  manualAppId.value = suggestion
+  appIdFeedback.value = ''
+}
+
 function isAppIdConflict(error: { status?: number, message?: string } | null | undefined) {
   if (!error)
     return false
@@ -254,7 +268,49 @@ function isAppIdConflict(error: { status?: number, message?: string } | null | u
     return true
 
   const message = error.message?.toLowerCase() || ''
-  return ['duplicate', 'already exists', 'unique constraint', 'apps_pkey', 'app_id_key'].some(fragment => message.includes(fragment))
+  return ['duplicate', 'already exists', 'unique constraint', 'apps_pkey', 'app_id_key', 'app_id_already_exists'].some(fragment => message.includes(fragment))
+}
+
+function buildAlternativeAppIds(baseId: string) {
+  const normalized = baseId.trim().replace(/\.+$/g, '') || suggestedAppId.value
+  const proposals = [
+    `${normalized}.app`,
+    `${normalized}.mobile`,
+    `${normalized}.capgo`,
+    `${normalized}.${currentOrg.value?.name ? slugify(currentOrg.value.name) : 'prod'}`,
+    `${normalized}.${crypto.randomUUID().slice(0, 4)}`,
+  ]
+
+  return [...new Set(proposals.filter(candidate => candidate !== normalized))]
+}
+
+async function readFunctionError(error: unknown) {
+  if (!(error instanceof FunctionsHttpError) || !(error.context instanceof Response))
+    return null
+
+  try {
+    const json = await error.context.clone().json() as {
+      error?: string
+      message?: string
+      app_id?: string
+      moreInfo?: { app_id?: string, error?: string }
+    }
+
+    return {
+      status: error.context.status,
+      code: json.error ?? '',
+      message: json.message ?? 'Unable to create the onboarding app.',
+      appId: json.app_id ?? json.moreInfo?.app_id ?? '',
+    }
+  }
+  catch {
+    return {
+      status: error.context.status,
+      code: '',
+      message: `Unable to create the onboarding app (${error.context.status}).`,
+      appId: '',
+    }
+  }
 }
 
 async function uploadIcon(appId: string, iconSourceUrl?: string) {
@@ -312,7 +368,7 @@ async function createAppRecord() {
     return
   }
 
-  if (existingApp.value === true && existingAppSetup.value === 'manual' && !manualAppId.value.trim()) {
+  if (!generatedAppId.value.trim()) {
     toast.error('Add the real bundle or package ID to continue.')
     return
   }
@@ -323,9 +379,9 @@ async function createAppRecord() {
 
     let appId = generatedAppId.value
     let responseData: AppRow | null = null
+    const candidateIds = [appId, ...buildAlternativeAppIds(appId)]
 
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const candidateId = attempt === 0 ? appId : `${appId}.${crypto.randomUUID().slice(0, 4)}`
+    for (const candidateId of candidateIds) {
       const { data, error } = await supabase.functions.invoke('app', {
         method: 'POST',
         body: {
@@ -342,15 +398,37 @@ async function createAppRecord() {
       if (!error && data?.app_id) {
         responseData = data as AppRow
         appId = candidateId
+        manualAppId.value = candidateId
+        if (candidateId !== candidateIds[0]) {
+          appIdFeedback.value = `App ID ${candidateIds[0]} was already taken, so Capgo switched to ${candidateId}.`
+          appIdSuggestions.value = buildAlternativeAppIds(candidateIds[0])
+          toast.info(appIdFeedback.value)
+        }
+        else {
+          appIdFeedback.value = ''
+          appIdSuggestions.value = []
+        }
         break
       }
 
-      if (!isAppIdConflict(error))
-        throw error ?? new Error('Unable to create the onboarding app.')
+      const functionError = await readFunctionError(error)
+      const isConflict = isAppIdConflict({
+        status: functionError?.status ?? (error as { status?: number } | null | undefined)?.status,
+        message: `${functionError?.code ?? ''} ${functionError?.message ?? (error as { message?: string } | null | undefined)?.message ?? ''}`,
+      })
+
+      if (isConflict)
+        continue
+
+      appIdFeedback.value = functionError?.message ?? 'Unable to create the onboarding app.'
+      toast.error(appIdFeedback.value)
+      throw error ?? new Error(appIdFeedback.value)
     }
 
     if (!responseData) {
-      toast.error('Unable to create the onboarding app.')
+      appIdSuggestions.value = buildAlternativeAppIds(candidateIds[0])
+      appIdFeedback.value = `App ID ${candidateIds[0]} is already used. Pick another one or use one of the suggestions.`
+      toast.error(appIdFeedback.value)
       return
     }
 
@@ -366,7 +444,8 @@ async function createAppRecord() {
   }
   catch (error) {
     console.error('Cannot create onboarding app', error)
-    toast.error('Unable to create the onboarding app.')
+    if (!appIdFeedback.value)
+      toast.error('Unable to create the onboarding app.')
   }
   finally {
     isSubmitting.value = false
@@ -391,7 +470,7 @@ async function seedDemoData() {
       throw error
     }
 
-    router.push(`/app/${encodeURIComponent(createdApp.value.app_id)}?tour=1`)
+    router.push(`/app/${encodeURIComponent(createdApp.value.app_id)}?tour=1&refresh=true`)
   }
   catch (error) {
     console.error('Cannot seed demo data', error)
@@ -435,9 +514,15 @@ watch(existingApp, (value) => {
     storeIconPreview.value = ''
     storeScreenshotPreview.value = ''
     importedStoreAppId.value = ''
-    manualAppId.value = ''
   }
+  appIdSuggestions.value = []
+  appIdFeedback.value = ''
 })
+
+watch(suggestedAppId, (value) => {
+  if (!hasEditedAppId.value && !createdApp.value)
+    manualAppId.value = value
+}, { immediate: true })
 </script>
 
 <template>
@@ -502,19 +587,38 @@ watch(existingApp, (value) => {
                     Import app name and icon
                   </button>
                 </template>
-                <div v-else-if="existingAppSetup === 'manual'">
-                  <label class="text-sm font-medium text-slate-800">Bundle or package ID</label>
-                  <input v-model="manualAppId" class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm" placeholder="com.example.app">
-                  <p class="mt-2 text-xs text-slate-500">
-                    Use the exact app ID from your Capacitor project or store listing.
-                  </p>
-                </div>
               </div>
 
               <template v-if="canShowAppDetails">
                 <div>
                   <label class="text-sm font-medium text-slate-800">App name</label>
                   <input v-model="appName" class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm" placeholder="Capgo demo app" maxlength="100">
+                </div>
+
+                <div>
+                  <label class="text-sm font-medium text-slate-800">App ID</label>
+                  <input
+                    :value="manualAppId"
+                    class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm"
+                    placeholder="com.example.app"
+                    @input="onAppIdInput"
+                  >
+                  <p class="mt-2 text-xs text-slate-500">
+                    {{ existingApp ? 'Use the real bundle or package ID from your project or store listing.' : 'This ID will be used when the app is created in Capgo and later in the CLI.' }}
+                  </p>
+                  <p v-if="appIdFeedback" class="mt-2 text-xs font-medium text-amber-600">
+                    {{ appIdFeedback }}
+                  </p>
+                  <div v-if="appIdSuggestions.length > 0" class="mt-3 flex flex-wrap gap-2">
+                    <button
+                      v-for="suggestion in appIdSuggestions"
+                      :key="suggestion"
+                      class="rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-700 transition hover:border-azure-300 hover:text-azure-600"
+                      @click="applyAppIdSuggestion(suggestion)"
+                    >
+                      {{ suggestion }}
+                    </button>
+                  </div>
                 </div>
 
                 <div>

@@ -47,7 +47,7 @@ const onboardingTour = [
   },
   {
     title: 'Ready for the real app',
-    body: 'When you are ready, start the real onboarding flow. The CLI can reuse this pending app and clear the temporary onboarding data before your first real upload.',
+    body: 'When you are ready, finish the real app setup. The CLI can reuse this pending app and clear the temporary onboarding data before your first real upload.',
   },
 ]
 const appOrganization = computed(() => {
@@ -133,7 +133,7 @@ async function refreshData() {
   isLoading.value = false
 }
 
-function startRealOnboarding() {
+function finishRealOnboarding() {
   if (!id.value)
     return
 
@@ -174,21 +174,21 @@ watchEffect(async () => {
         <!-- Content - blurred when app not found -->
         <div :class="{ 'blur-sm pointer-events-none select-none': appNotFound }">
           <div v-if="showOnboardingBanner" class="mb-6 rounded-3xl border border-azure-200 bg-white p-5 shadow-sm">
-            <div class="flex flex-wrap items-start justify-between gap-4">
+            <div class="flex flex-wrap items-center justify-between gap-4">
               <div class="max-w-3xl">
                 <p class="text-sm font-semibold uppercase tracking-[0.18em] text-azure-500">
                   Onboarding app
                 </p>
                 <h2 class="mt-2 text-2xl font-semibold text-slate-900">
-                  Explore first, then connect the real app when you are ready
+                  Explore first, then finish the real app setup when you are ready
                 </h2>
                 <p class="mt-2 text-sm text-slate-600">
                   This app is still marked as pending onboarding. Demo data is temporary, and the real CLI onboarding can reuse this app instead of creating a second one.
                 </p>
               </div>
               <div class="flex flex-wrap gap-3">
-                <button class="d-btn d-btn-primary" @click="startRealOnboarding">
-                  Start real app onboarding
+                <button class="d-btn d-btn-primary" @click="finishRealOnboarding">
+                  Finish real app setup
                 </button>
                 <button v-if="!showOnboardingTour" class="d-btn d-btn-outline" @click="router.replace(`/app/${encodeURIComponent(id)}?tour=1`)">
                   Show tour
@@ -258,8 +258,8 @@ watchEffect(async () => {
               <button class="d-btn d-btn-outline" @click="closeTour">
                 Close
               </button>
-              <button v-if="onboardingTourStep === onboardingTour.length - 1" class="d-btn d-btn-primary" @click="startRealOnboarding">
-                Start real onboarding
+              <button v-if="onboardingTourStep === onboardingTour.length - 1" class="d-btn d-btn-primary" @click="finishRealOnboarding">
+                Finish real setup
               </button>
               <button v-else class="d-btn d-btn-primary" @click="nextTourStep">
                 Next
