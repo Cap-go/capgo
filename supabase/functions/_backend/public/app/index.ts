@@ -13,9 +13,8 @@ import { fetchStoreMetadata } from './store_metadata.ts'
 
 export const app = honoFactory.createApp()
 
-// Enable CORS for /demo route (browser requests need OPTIONS preflight)
-app.use('/demo', useCors)
-app.use('/store-metadata', useCors)
+// Enable CORS for all routes (browser requests need OPTIONS preflight for all app endpoints)
+app.use('*', useCors)
 
 app.get('/', middlewareKey(['all', 'read']), async (c) => {
   const pageQuery = c.req.query('page')
