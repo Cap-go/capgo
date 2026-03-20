@@ -39,7 +39,7 @@ BEGIN
 
     SELECT auth.uid() INTO _auth_uid;
     IF _auth_uid IS NOT NULL THEN
-        RETURN _auth_uid::text = _folder_parts[0];
+        RETURN _auth_uid::text = _folder_parts[1];
     END IF;
 
     SELECT public.get_apikey_header() INTO _api_key_text;
@@ -52,7 +52,7 @@ BEGIN
     END IF;
 
     SELECT public.get_identity_apikey_only(keymode) INTO _api_key_user_id;
-    RETURN _api_key_user_id IS NOT NULL AND _api_key_user_id::text = _folder_parts[0];
+    RETURN _api_key_user_id IS NOT NULL AND _api_key_user_id::text = _folder_parts[1];
 END;
 $$;
 
