@@ -101,13 +101,22 @@ app.post('/', middlewareAPISecret, async (c) => {
       const builderJob = await response.json() as BuilderStatusResponse
       const jobStatus = builderJob.job.status
 
+      const buildTimeSeconds = (builderJob.job.started_at != null && builderJob.job.completed_at != null)
+        ? Math.floor((builderJob.job.completed_at - builderJob.job.started_at) / 1000)
+        : null
+
+      const updatePayload: Record<string, unknown> = {
+        status: jobStatus,
+        last_error: builderJob.job.error || null,
+        updated_at: new Date().toISOString(),
+      }
+
+      if (buildTimeSeconds != null)
+        updatePayload.build_time_seconds = buildTimeSeconds
+
       const { error: updateError } = await supabase
         .from('build_requests')
-        .update({
-          status: jobStatus,
-          last_error: builderJob.job.error || null,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updatePayload)
         .eq('id', build.id)
 
       if (updateError)
@@ -115,10 +124,8 @@ app.post('/', middlewareAPISecret, async (c) => {
 
       if (
         TERMINAL_STATUSES.has(jobStatus)
-        && builderJob.job.started_at
-        && builderJob.job.completed_at
+        && buildTimeSeconds != null
       ) {
-        const buildTimeSeconds = Math.floor((builderJob.job.completed_at - builderJob.job.started_at) / 1000)
 
         if (build.platform !== 'ios' && build.platform !== 'android') {
           cloudlogErr({ requestId: c.get('requestId'), message: 'Unexpected platform, skipping recordBuildTime', buildId: build.id, platform: build.platform })
