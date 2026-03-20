@@ -3399,6 +3399,7 @@ export type Database = {
               subscription_start: string
               trial_left: number
               use_new_rbac: boolean
+              website: string
             }[]
           }
         | {
@@ -3435,6 +3436,7 @@ export type Database = {
               subscription_start: string
               trial_left: number
               use_new_rbac: boolean
+              website: string
             }[]
           }
       get_password_policy_hash: {

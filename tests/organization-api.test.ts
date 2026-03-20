@@ -23,6 +23,7 @@ const ORG_ID = randomUUID()
 const globalId = randomUUID()
 const name = `Test Organization ${globalId}`
 const customerId = `cus_test_${ORG_ID}`
+const website = 'https://test-organization.example/'
 
 beforeAll(async () => {
   // Create stripe_info for this test org
@@ -43,6 +44,7 @@ beforeAll(async () => {
     management_email: TEST_EMAIL,
     created_by: USER_ID,
     customer_id: customerId,
+    website,
     use_new_rbac: false, // Explicitly legacy — this suite tests the legacy permission path
   })
   if (error)
@@ -80,10 +82,10 @@ describe('[GET] /organization', () => {
       headers,
     })
     expect(response.status).toBe(200)
-    const type = z.object({ id: z.string(), name: z.string() })
+    const type = z.object({ id: z.string(), name: z.string(), website: z.string().nullable() })
     const safe = type.safeParse(await response.json())
     expect(safe.success).toBe(true)
-    expect(safe.data).toEqual({ id: ORG_ID, name })
+    expect(safe.data).toEqual({ id: ORG_ID, name, website })
   })
 
   it('get organization with invalid orgId', async () => {
@@ -410,7 +412,7 @@ describe('[DELETE] /organization/members', () => {
 describe('[POST] /organization', () => {
   it('create organization', async () => {
     const name = `Created Organization ${new Date().toISOString()}`
-    const website = 'capgo.app'
+    const website = 'HTTPS://capgo.app'
     const response = await fetch(`${BASE_URL}/organization`, {
       headers,
       method: 'POST',
@@ -462,6 +464,20 @@ describe('[POST] /organization', () => {
     expect(response.status).toBe(400)
     const responseData = await response.json() as { error: string }
     expect(responseData.error).toBe('invalid_body')
+  })
+
+  it('create organization rejects invalid website scheme', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'POST',
+      body: JSON.stringify({
+        name: `Created Organization ${new Date().toISOString()}`,
+        website: 'ftp://capgo.app',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { error: string }
+    expect(responseData.error).toBe('website_must_be_a_valid_url')
   })
 })
 
@@ -522,6 +538,21 @@ describe('[PUT] /organization', () => {
     expect(response.status).toBe(400)
     const responseData = await response.json() as { error: string }
     expect(responseData.error).toBe('invalid_body')
+  })
+
+  it('update organization rejects invalid website scheme', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'PUT',
+      body: JSON.stringify({
+        orgId: ORG_ID,
+        name: `Updated Organization ${new Date().toISOString()}`,
+        website: 'ftp://www.capgo.app/docs',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { error: string }
+    expect(responseData.error).toBe('website_must_be_a_valid_url')
   })
 })
 
@@ -726,7 +757,9 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
 
   it('get_orgs_v7 returns enforce_hashed_api_keys field', async () => {
     // Set a known value
-    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: true }).eq('id', ORG_ID)
+    const rpcWebsite = website
+    const previousWebsite = 'https://www.capgo.app/docs'
+    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: true, website: rpcWebsite }).eq('id', ORG_ID)
 
     // Call get_orgs_v7 via RPC
     const { data, error } = await getSupabaseClient().rpc('get_orgs_v7', { userid: USER_ID })
@@ -738,9 +771,11 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
     expect(testOrg).toBeTruthy()
     expect(testOrg).toHaveProperty('enforce_hashed_api_keys')
     expect(testOrg!.enforce_hashed_api_keys).toBe(true)
+    expect(testOrg).toHaveProperty('website')
+    expect(testOrg!.website).toBe(rpcWebsite)
 
     // Reset
-    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false }).eq('id', ORG_ID)
+    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false, website: previousWebsite }).eq('id', ORG_ID)
   })
 
   it.concurrent('rejects public RPC access to get_orgs_v7(userid)', async () => {
