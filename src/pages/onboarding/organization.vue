@@ -17,6 +17,13 @@ interface InviteTeammateModalRef {
   openDialog: () => void
 }
 
+interface WebsitePreview {
+  hostname: string
+  name: string
+  icon: string | null
+  website: string
+}
+
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
@@ -34,8 +41,10 @@ const importedOrgName = ref('')
 const createdOrgId = ref('')
 const isSubmitting = ref(false)
 const isUploadingLogo = ref(false)
+const isLoadingWebsitePreview = ref(false)
 const selectedLogoPreview = ref('')
 const inviteSuccessCount = ref(0)
+const websitePreview = ref<WebsitePreview | null>(null)
 const inviteModalRef = ref<InviteTeammateModalRef | null>(null)
 const logoInputRef = useTemplateRef<HTMLInputElement>('logoInput')
 
@@ -45,11 +54,11 @@ const onboardingSteps: Array<{ id: OnboardingStep, label: string }> = [
   { id: 'invite', label: t('organization-onboarding-step-invite', 'Invite users') },
 ]
 
-const activeOrgId = computed(() => createdOrgId.value || currentOrganization.value?.gid || '')
+const activeOrgId = computed(() => createdOrgId.value || '')
 const activeOrgName = computed(() => {
   if (currentOrganization.value?.gid === activeOrgId.value)
     return currentOrganization.value.name
-  return importedOrgName.value || orgNameInput.value.trim()
+  return websitePreview.value?.name || importedOrgName.value || orgNameInput.value.trim()
 })
 
 const websiteHostname = computed(() => {
@@ -66,11 +75,7 @@ const websiteHostname = computed(() => {
   }
 })
 
-const importedLogoUrl = computed(() => {
-  if (!websiteHostname.value)
-    return ''
-  return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(websiteHostname.value)}&sz=256`
-})
+const importedLogoUrl = computed(() => websitePreview.value?.icon ?? '')
 
 function toTitleCaseSegment(segment: string) {
   return segment
@@ -110,26 +115,67 @@ async function hydrateOnboardingFromQuery() {
   const queryOrgId = typeof route.query.org === 'string' ? route.query.org : ''
   const queryStep = typeof route.query.step === 'string' ? route.query.step as OnboardingStep : 'details'
 
-  if (queryOrgId) {
+  const validatedOrg = queryOrgId
+    ? organizationStore.organizations.find(org => org.gid === queryOrgId && !org.role.includes('invite'))
+    : null
+
+  if (validatedOrg) {
     createdOrgId.value = queryOrgId
     organizationStore.setCurrentOrganization(queryOrgId)
   }
+  else {
+    createdOrgId.value = ''
+  }
 
-  if (queryStep === 'logo' || queryStep === 'invite')
+  if (validatedOrg && (queryStep === 'logo' || queryStep === 'invite'))
     step.value = queryStep
+  else if (queryStep === 'logo' || queryStep === 'invite')
+    await syncRouteQuery('details', '')
+}
+
+async function fetchWebsitePreview() {
+  if (mode.value !== 'website')
+    return null
+
+  if (!websiteHostname.value) {
+    toast.error(t('organization-onboarding-website-invalid', 'Enter a valid website'))
+    return null
+  }
+
+  isLoadingWebsitePreview.value = true
+  try {
+    const { data, error } = await supabase.functions.invoke('private/website_preview', {
+      body: {
+        website: websiteInput.value.trim(),
+      },
+    })
+
+    if (error || !data) {
+      console.error('Failed to fetch website preview', error)
+      toast.error(t('organization-onboarding-website-fetch-failed', 'Could not import website assets'))
+      return null
+    }
+
+    websitePreview.value = data as WebsitePreview
+    importedOrgName.value = data.name || deriveOrgNameFromWebsite(websiteHostname.value)
+    return websitePreview.value
+  }
+  finally {
+    isLoadingWebsitePreview.value = false
+  }
 }
 
 async function createOrganization() {
-  if (isSubmitting.value)
+  if (isSubmitting.value || !main.auth)
     return
 
   let orgName = orgNameInput.value.trim()
   if (mode.value === 'website') {
-    if (!websiteHostname.value) {
-      toast.error(t('organization-onboarding-website-invalid', 'Enter a valid website'))
+    const preview = await fetchWebsitePreview()
+    if (!preview)
       return
-    }
-    orgName = deriveOrgNameFromWebsite(websiteHostname.value)
+
+    orgName = preview.name || deriveOrgNameFromWebsite(websiteHostname.value)
     importedOrgName.value = orgName
   }
 
@@ -145,8 +191,8 @@ async function createOrganization() {
       .from('orgs')
       .insert({
         name: orgName,
-        created_by: main.auth?.id ?? '',
-        management_email: main.auth?.email ?? '',
+        created_by: main.auth.id,
+        management_email: main.auth.email ?? '',
       })
       .select('id')
       .single()
@@ -202,6 +248,11 @@ async function useImportedLogo() {
 
   try {
     const response = await fetch(importedLogoUrl.value)
+    const contentType = response.headers.get('content-type')?.split(';')[0]?.trim() ?? ''
+    if (!response.ok || !contentType.startsWith('image/')) {
+      toast.error(t('organization-onboarding-imported-logo-failed', 'Could not import logo from website'))
+      return
+    }
     const blob = await response.blob()
     await uploadLogoBlob(blob, `${websiteHostname.value || 'website-logo'}.png`)
   }
@@ -255,7 +306,20 @@ watch(() => route.query.step, (nextValue) => {
     step.value = nextValue
 })
 
+watch([websiteInput, mode], () => {
+  if (mode.value !== 'website') {
+    websitePreview.value = null
+    return
+  }
+
+  websitePreview.value = null
+})
+
 onMounted(async () => {
+  if (!main.auth) {
+    await router.replace('/login?to=/onboarding/organization')
+    return
+  }
   displayStore.NavTitle = t('organization-onboarding-title', 'Organization onboarding')
   displayStore.defaultBack = '/apps'
   await hydrateOnboardingFromQuery()
@@ -316,6 +380,7 @@ onUnmounted(() => {
                 type="button"
                 class="p-4 text-left rounded-2xl border transition"
                 :class="mode === 'website' ? 'border-violet-400 bg-violet-50 dark:border-violet-700 dark:bg-violet-950/30' : 'border-slate-200 dark:border-slate-700'"
+                data-test="onboarding-mode-website"
                 @click="mode = 'website'"
               >
                 <div class="text-base font-semibold text-slate-900 dark:text-white">
@@ -329,6 +394,7 @@ onUnmounted(() => {
                 type="button"
                 class="p-4 text-left rounded-2xl border transition"
                 :class="mode === 'name' ? 'border-violet-400 bg-violet-50 dark:border-violet-700 dark:bg-violet-950/30' : 'border-slate-200 dark:border-slate-700'"
+                data-test="onboarding-mode-name"
                 @click="mode = 'name'"
               >
                 <div class="text-base font-semibold text-slate-900 dark:text-white">
@@ -348,11 +414,16 @@ onUnmounted(() => {
                 v-model="websiteInput"
                 type="url"
                 placeholder="https://capgo.app"
+                data-test="onboarding-website"
                 class="block py-3 px-4 w-full rounded-2xl border border-slate-300 shadow-sm dark:text-white dark:border-slate-700 dark:bg-slate-950"
               >
               <p class="text-sm text-slate-500 dark:text-slate-400">
-                {{ websiteHostname ? t('organization-onboarding-website-preview', 'Organization name preview') : t('organization-onboarding-website-help', 'Enter your company website to derive the org name.') }}
-                <span v-if="websiteHostname" class="font-semibold text-slate-700 dark:text-slate-200">: {{ deriveOrgNameFromWebsite(websiteHostname) }}</span>
+                {{ websitePreview?.name
+                  ? t('organization-onboarding-website-preview', 'Organization name preview')
+                  : websiteHostname
+                    ? t('organization-onboarding-website-help-loading', 'Website assets will be imported when you continue.')
+                    : t('organization-onboarding-website-help', 'Enter your company website to infer the organization name and logo from its assets.') }}
+                <span v-if="websitePreview?.name" class="font-semibold text-slate-700 dark:text-slate-200">: {{ websitePreview.name }}</span>
               </p>
             </div>
 
@@ -364,6 +435,7 @@ onUnmounted(() => {
                 v-model="orgNameInput"
                 type="text"
                 :placeholder="t('organization-name', 'Organization name')"
+                data-test="onboarding-org-name"
                 class="block py-3 px-4 w-full rounded-2xl border border-slate-300 shadow-sm dark:text-white dark:border-slate-700 dark:bg-slate-950"
               >
             </div>
@@ -372,10 +444,12 @@ onUnmounted(() => {
               <button
                 type="button"
                 class="d-btn d-btn-primary"
-                :disabled="isSubmitting"
+                data-test="onboarding-create-org"
+                :disabled="isSubmitting || isLoadingWebsitePreview || !main.auth"
                 @click="createOrganization"
               >
-                <span v-if="!isSubmitting">{{ t('organization-onboarding-continue-logo', 'Continue to logo') }}</span>
+                <span v-if="!isSubmitting && !isLoadingWebsitePreview">{{ t('organization-onboarding-continue-logo', 'Continue to logo') }}</span>
+                <Spinner v-else-if="isLoadingWebsitePreview" size="w-5 h-5" />
                 <Spinner v-else size="w-5 h-5" />
               </button>
             </div>
@@ -446,19 +520,20 @@ onUnmounted(() => {
             </div>
 
             <div class="flex flex-wrap gap-3">
-              <button type="button" class="d-btn d-btn-primary" :disabled="isUploadingLogo" @click="openLogoPicker">
+              <button type="button" class="d-btn d-btn-primary" data-test="onboarding-upload-logo" :disabled="isUploadingLogo" @click="openLogoPicker">
                 {{ t('organization-onboarding-upload-logo', 'Upload logo') }}
               </button>
               <button
                 v-if="importedLogoUrl"
                 type="button"
                 class="d-btn d-btn-secondary"
+                data-test="onboarding-use-imported-logo"
                 :disabled="isUploadingLogo"
                 @click="useImportedLogo"
               >
                 {{ t('organization-onboarding-use-imported-logo', 'Use imported logo') }}
               </button>
-              <button type="button" class="d-btn d-btn-ghost" :disabled="isUploadingLogo" @click="skipLogo">
+              <button type="button" class="d-btn d-btn-ghost" data-test="onboarding-skip-logo" :disabled="isUploadingLogo" @click="skipLogo">
                 {{ t('skip', 'Skip') }}
               </button>
             </div>
@@ -500,10 +575,10 @@ onUnmounted(() => {
             </div>
 
             <div class="flex flex-wrap gap-3">
-              <button type="button" class="d-btn d-btn-primary" @click="openInviteModal">
+              <button type="button" class="d-btn d-btn-primary" data-test="onboarding-invite-users" @click="openInviteModal">
                 {{ t('organization-onboarding-open-invite', 'Invite users') }}
               </button>
-              <button type="button" class="d-btn d-btn-secondary" @click="finishOnboarding">
+              <button type="button" class="d-btn d-btn-secondary" data-test="onboarding-finish" @click="finishOnboarding">
                 {{ t('organization-onboarding-finish', 'Continue to apps') }}
               </button>
             </div>
@@ -524,3 +599,8 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
+
+<route lang="yaml">
+meta:
+  middleware: auth
+</route>

@@ -19,6 +19,8 @@ const supabase = useSupabase()
 const main = useMainStore()
 const dropdown = useTemplateRef('dropdown')
 const hasNewInvitation = ref(false)
+const hasVisibleOrganizations = computed(() => organizationStore.organizations.length > 0)
+const currentLabel = computed(() => currentOrganization.value?.name ?? t('select-organization', 'Select organization'))
 
 onClickOutside(dropdown, () => closeDropdown())
 
@@ -143,7 +145,7 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
 
 <template>
   <div>
-    <details v-if="currentOrganization" ref="dropdown" class="w-full d-dropdown d-dropdown-end">
+    <details v-if="hasVisibleOrganizations" ref="dropdown" class="w-full d-dropdown d-dropdown-end">
       <summary class="justify-between shadow-none w-full d-btn d-btn-sm border border-gray-700 text-white bg-[#1a1d24] hover:bg-gray-700 hover:text-white active:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-800">
         <div class="flex items-center w-4/5 text-left">
           <img
@@ -156,9 +158,9 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
             v-else
             class="flex items-center justify-center w-6 h-6 mr-2 text-xs font-semibold text-gray-300 bg-gray-700 rounded-sm d-mask d-mask-squircle shrink-0"
           >
-            {{ acronym(currentOrganization?.name ?? '') }}
+            {{ acronym(currentLabel) }}
           </div>
-          <span class="truncate">{{ currentOrganization?.name }}</span>
+          <span class="truncate">{{ currentLabel }}</span>
           <div v-if="hasNewInvitation" class="w-3 h-3 ml-1 bg-red-500 rounded-full" />
         </div>
         <IconDown class="w-6 h-6 ml-1 fill-current shrink-0 text-slate-400" />

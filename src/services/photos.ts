@@ -164,13 +164,21 @@ export async function uploadOrgLogoFile(orgId: string, file: Blob, fileName?: st
   if (uploadError)
     throw uploadError
 
-  const { error: updateError } = await supabase
+  const { data: updatedOrg, error: updateError } = await supabase
     .from('orgs')
     .update({ logo: storagePath })
     .eq('id', safeOrgId)
+    .select('id')
+    .single()
 
-  if (updateError)
-    throw updateError
+  if (updateError || !updatedOrg) {
+    const { error: cleanupError } = await supabase.storage
+      .from('images')
+      .remove([storagePath])
+    if (cleanupError)
+      console.error('cannot cleanup orphaned org logo upload', cleanupError)
+    throw updateError ?? new Error('Organization logo update affected no rows')
+  }
 
   await organizationStore.fetchOrganizations()
   organizationStore.setCurrentOrganization(safeOrgId)

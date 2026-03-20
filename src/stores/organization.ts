@@ -126,6 +126,10 @@ function matchesRbacRole(role: string, requiredRole: string) {
   return normalizeLegacyRole(role) === normalizeLegacyRole(requiredRole)
 }
 
+function isSelectableOrganization(role: string) {
+  return !role.includes('invite')
+}
+
 const supabase = useSupabase()
 const main = useMainStore()
 
@@ -143,7 +147,7 @@ export const useOrganizationStore = defineStore('organization', () => {
       )
     },
   )
-  const hasOrganizations = computed(() => organizations.value.length > 0)
+  const hasOrganizations = computed(() => organizations.value.some(org => isSelectableOrganization(org.role)))
 
   const getCurrentRole = async (appOwner: string, appId?: string, channelId?: number): Promise<OrganizationRole> => {
     if (_organizations.value.size === 0) {
@@ -373,7 +377,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     _organizations.value = new Map(mappedData.map(item => [item.gid, item as Organization]))
 
     const selectableOrganizations = mappedData
-      .filter(org => !org.role.includes('invite'))
+      .filter(org => isSelectableOrganization(org.role))
       .sort((a, b) => b.app_count - a.app_count)
 
     const organization = selectableOrganizations[0]
@@ -391,7 +395,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     if (!targetOrgId) {
       const storedOrgId = localStorage.getItem(STORAGE_KEY)
       if (storedOrgId) {
-        const storedOrg = mappedData.find(org => org.gid === storedOrgId && !org.role.includes('invite'))
+        const storedOrg = mappedData.find(org => org.gid === storedOrgId && isSelectableOrganization(org.role))
         if (storedOrg) {
           targetOrgId = storedOrg.gid
         }

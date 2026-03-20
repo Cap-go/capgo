@@ -96,6 +96,18 @@ async function guard(
   const hasAuth = !!claimsData?.claims?.sub && !!sessionUser
   const hadAuth = !!main.auth
   const needsVerifiedEmail = to.path.startsWith('/settings') || to.path === '/delete_account'
+  const redirectToOrgOnboarding = () => !to.path.startsWith('/onboarding/organization')
+
+  async function tryLoadOrganizations(fetcher: () => Promise<void>) {
+    try {
+      await fetcher()
+      return true
+    }
+    catch (error) {
+      console.error('Failed to load organizations during auth guard:', error)
+      return false
+    }
+  }
 
   if (hasAuth && sessionUser) {
     const authConfirmedAt = main.auth?.email_confirmed_at
@@ -156,8 +168,8 @@ async function guard(
       await updateUser(main, supabase)
     }
 
-    await organizationStore.fetchOrganizations()
-    if (!organizationStore.hasOrganizations && !to.path.startsWith('/onboarding/organization')) {
+    const organizationsLoaded = await tryLoadOrganizations(() => organizationStore.fetchOrganizations())
+    if (organizationsLoaded && !organizationStore.hasOrganizations && redirectToOrgOnboarding()) {
       return next('/onboarding/organization')
     }
 
@@ -220,8 +232,8 @@ async function guard(
       }
     }
 
-    await organizationStore.dedupFetchOrganizations()
-    if (!organizationStore.hasOrganizations && !to.path.startsWith('/onboarding/organization')) {
+    const organizationsLoaded = await tryLoadOrganizations(() => organizationStore.dedupFetchOrganizations())
+    if (organizationsLoaded && !organizationStore.hasOrganizations && redirectToOrgOnboarding()) {
       return next('/onboarding/organization')
     }
 
