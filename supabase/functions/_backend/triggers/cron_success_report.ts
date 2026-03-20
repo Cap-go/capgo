@@ -1,3 +1,4 @@
+import type { Context } from 'hono'
 import { BRES, createHono, middlewareAPISecret, parseBody, quickError, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { version } from '../utils/version.ts'
@@ -10,7 +11,10 @@ interface CronSuccessReportPayload {
 
 export const app = createHono('', version)
 
-app.post('/', middlewareAPISecret, async (c) => {
+/**
+ * Deliver a cron success webhook after a run completes successfully.
+ */
+async function handleCronSuccessReport(c: Context) {
   const payload = await parseBody<CronSuccessReportPayload>(c)
   const url = payload?.url?.trim()
 
@@ -80,4 +84,6 @@ app.post('/', middlewareAPISecret, async (c) => {
   })
 
   return c.json(BRES)
-})
+}
+
+app.post('/', middlewareAPISecret, handleCronSuccessReport)

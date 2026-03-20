@@ -2,7 +2,7 @@ import type { UploadOptions } from '@capgo/cli/sdk'
 import { randomUUID } from 'node:crypto'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { cwd, env } from 'node:process'
+import { chdir, cwd, env } from 'node:process'
 import { CapgoSDK } from '@capgo/cli/sdk'
 import { BASE_DEPENDENCIES, BASE_DEPENDENCIES_OLD, BASE_PACKAGE_JSON, TEMP_DIR_NAME } from './cli-utils'
 import { APIKEY_TEST_ALL } from './test-utils'
@@ -32,8 +32,14 @@ let keyGenerationQueue = Promise.resolve()
 // Serialize SDK operations that temporarily change cwd
 let sdkCwdQueue = Promise.resolve()
 
+/**
+ * Build the temporary folder path for a test app.
+ */
 export const tempFileFolder = (appId: string) => join(ROOT_DIR, TEMP_DIR_NAME, appId)
 
+/**
+ * Create the default capacitor.config.json structure used by the SDK tests.
+ */
 function generateDefaultJsonCliConfig(appId: string) {
   return {
     appId,
@@ -59,7 +65,7 @@ async function createCapacitorConfig(appId: string, folderPath: string) {
 }
 
 /**
- * Create package.json for test app
+ * Write a package.json for the test app fixture.
  */
 async function createPackageJson(appId: string, folderPath: string, dependencies: Record<string, string> = BASE_DEPENDENCIES) {
   const packageJsonPath = join(folderPath, 'package.json')
@@ -70,6 +76,9 @@ async function createPackageJson(appId: string, folderPath: string, dependencies
   await writeFile(packageJsonPath, packageJsonContent)
 }
 
+/**
+ * Write the dist/index.html fixture with a unique build marker.
+ */
 async function writeDistIndexHtml(folderPath: string) {
   const distPath = join(folderPath, 'dist')
   await mkdir(distPath, { recursive: true })
@@ -105,8 +114,7 @@ async function createDistFolder(folderPath: string) {
 }
 
 /**
- * Prepare a test app environment (creates folders and config files)
- * This is cached to avoid repeated setup
+ * Prepare the reusable test app fixture directory.
  */
 export async function prepareCli(appId: string, dependencies?: Record<string, string>) {
   if (preparedApps.has(appId)) {
@@ -127,7 +135,7 @@ export async function prepareCli(appId: string, dependencies?: Record<string, st
 }
 
 /**
- * Clean up test app directory
+ * Remove the prepared test app fixture directory.
  */
 export async function cleanupCli(appId: string) {
   const folderPath = tempFileFolder(appId)
@@ -136,7 +144,7 @@ export async function cleanupCli(appId: string) {
 }
 
 /**
- * Create an SDK instance with test credentials
+ * Create an SDK instance with the shared test credentials.
  */
 export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
   return new CapgoSDK({
@@ -147,8 +155,7 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
 }
 
 /**
- * Upload a bundle using the SDK with test-specific defaults
- * Provides: auto path calculation, disables code checks, uses zip format
+ * Upload a bundle through the SDK using the test fixture path.
  */
 export async function uploadBundleSDK(
   appId: string,
@@ -182,11 +189,11 @@ export async function uploadBundleSDK(
       // checksum for the same app/version pair.
       await writeDistIndexHtml(tempFileFolder(appId))
     }
-    process.chdir(tempFileFolder(appId))
+    chdir(tempFileFolder(appId))
     return await sdk.uploadBundle(options)
   }
   finally {
-    process.chdir(originalCwd)
+    chdir(originalCwd)
     operationComplete!()
   }
 }
@@ -195,17 +202,7 @@ export async function uploadBundleSDK(
 // Example: const sdk = createTestSDK(); await sdk.addChannel({ channelId, appId })
 
 /**
- * Generate encryption keys using the SDK
- * Uses a queue to serialize operations (prevent concurrent conflicts when creating keys in project root)
- *
- * IMPORTANT: The SDK's generateEncryptionKeys() modifies the project's capacitor.config.ts
- * to add the public key. This function backs up and restores the config file to prevent
- * test pollution.
- *
- * Since tests run concurrently but key generation is serialized via the queue, we:
- * 1. Back up the config at the start of each queued operation
- * 2. Restore it at the end of each queued operation (in finally block)
- * This ensures each test sees a clean config file.
+ * Generate encryption keys while serializing config-file mutations.
  */
 export async function generateEncryptionKeysSDK(appId: string, force = true) {
   const { existsSync, renameSync, readFileSync, writeFileSync } = await import('node:fs')

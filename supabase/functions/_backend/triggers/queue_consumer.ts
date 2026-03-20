@@ -37,17 +37,25 @@ interface Message {
 
 export const messagesArraySchema = z.array(messageSchema)
 
-// Helper function to generate UUID v4
+/**
+ * Generate a UUID for outbound queue requests.
+ */
 function generateUUID(): string {
   return crypto.randomUUID()
 }
 
+/**
+ * Extract a validated cron run ID from an arbitrary payload value.
+ */
 function getCronRunId(value: unknown): string | null {
   if (typeof value !== 'string' || !UUID_REGEX.test(value))
     return null
   return value
 }
 
+/**
+ * Remove cron-only metadata before forwarding payloads to triggers.
+ */
 function stripCronMetadata<T>(payload: T): T {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload))
     return payload
@@ -56,6 +64,9 @@ function stripCronMetadata<T>(payload: T): T {
   return rest as T
 }
 
+/**
+ * Update run counters after a queue batch completes and enqueue success reports.
+ */
 async function updateCronTaskRunBatch(
   db: ReturnType<typeof getPgClient>,
   runId: string,
@@ -93,6 +104,9 @@ async function updateCronTaskRunBatch(
   }
 }
 
+/**
+ * Process a queue batch and update cron run state when relevant metadata is present.
+ */
 async function processQueue(
   c: Context,
   db: ReturnType<typeof getPgClient>,
@@ -319,6 +333,9 @@ async function processQueue(
   }
 }
 
+/**
+ * Extract an error code from a failed trigger response.
+ */
 async function extractErrorCode(response: Response): Promise<string | null> {
   if (response.status < 400) {
     return null
@@ -354,7 +371,9 @@ async function extractErrorCode(response: Response): Promise<string | null> {
   return null
 }
 
-// Reads messages from the queue and logs them
+/**
+ * Read a batch of messages from pgmq and normalize their shape.
+ */
 async function readQueue(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, batchSize: number = DEFAULT_BATCH_SIZE): Promise<Message[]> {
   const queueKey = 'readQueue'
   const startTime = Date.now()
@@ -399,7 +418,9 @@ async function readQueue(c: Context, db: ReturnType<typeof getPgClient>, queueNa
   return messages
 }
 
-// The main HTTP POST helper function
+/**
+ * Build and send a trigger POST request for the queue consumer.
+ */
 export async function http_post_helper(
   c: Context,
   function_name: string,
@@ -459,7 +480,9 @@ export async function http_post_helper(
   }
 }
 
-// Helper function to delete multiple messages from the queue in a single batch
+/**
+ * Delete a set of queue messages in one pgmq call.
+ */
 async function delete_queue_message_batch(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, msgIds: number[]) {
   try {
     if (msgIds.length === 0)
@@ -475,7 +498,9 @@ async function delete_queue_message_batch(c: Context, db: ReturnType<typeof getP
   }
 }
 
-// Helper function to archive multiple messages from the queue in a single batch
+/**
+ * Archive a set of queue messages in one pgmq call.
+ */
 async function archive_queue_messages(c: Context, db: ReturnType<typeof getPgClient>, queueName: string, msgIds: number[]) {
   try {
     if (msgIds.length === 0)
@@ -506,7 +531,9 @@ async function archive_queue_messages(c: Context, db: ReturnType<typeof getPgCli
   }
 }
 
-// Helper function to mass update queue messages with CF IDs
+/**
+ * Update queue messages with their Cloudflare request IDs.
+ */
 async function mass_edit_queue_messages_cf_ids(
   c: Context,
   db: ReturnType<typeof getPgClient>,
