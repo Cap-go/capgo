@@ -2,7 +2,7 @@
 import type { Database } from '~/types/supabase.types'
 import { FormKit } from '@formkit/vue'
 import { FunctionsHttpError } from '@supabase/supabase-js'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconCheck from '~icons/lucide/check'
@@ -245,6 +245,8 @@ function onSelectIconFormKit(value: unknown) {
       : null
 
   selectedIconFile.value = file
+  if (localIconPreview.value.startsWith('blob:'))
+    URL.revokeObjectURL(localIconPreview.value)
   localIconPreview.value = file ? URL.createObjectURL(file) : ''
 }
 
@@ -321,9 +323,15 @@ async function uploadIcon(appId: string, iconSourceUrl?: string) {
 
   if (!fileToUpload && iconSourceUrl) {
     try {
-      const response = await fetch(iconSourceUrl)
-      const blob = await response.blob()
-      fileToUpload = new File([blob], 'store-icon.png', { type: blob.type || 'image/png' })
+      const parsedIconUrl = new URL(iconSourceUrl)
+      if (parsedIconUrl.protocol !== 'https:') {
+        console.warn('Skipping non-HTTPS icon URL', iconSourceUrl)
+      }
+      else {
+        const response = await fetch(parsedIconUrl.toString())
+        const blob = await response.blob()
+        fileToUpload = new File([blob], 'store-icon.png', { type: blob.type || 'image/png' })
+      }
     }
     catch (error) {
       console.warn('Cannot fetch remote icon', error)
@@ -497,7 +505,13 @@ onMounted(async () => {
   try {
     await organizationStore.awaitInitialLoad()
     await main.awaitInitialLoad()
-    await ensureApiKey()
+    try {
+      await ensureApiKey()
+    }
+    catch (error) {
+      console.error('Cannot ensure API key', error)
+      toast.error('Unable to load your API key. Some CLI actions may not work yet.')
+    }
     const resumed = await loadResumeApp()
     if (!resumed)
       flowStep.value = 'details'
@@ -505,6 +519,11 @@ onMounted(async () => {
   finally {
     isLoading.value = false
   }
+})
+
+onBeforeUnmount(() => {
+  if (localIconPreview.value.startsWith('blob:'))
+    URL.revokeObjectURL(localIconPreview.value)
 })
 
 watch(existingApp, (value) => {
