@@ -90,6 +90,7 @@ const appChoices: AppChoice[] = [
     iconColor: '#0f766e',
   },
 ]
+const customAppChoice = ref<AppChoice | null>(null)
 
 const fakeSpringboardApps: SpringboardApp[] = [
   { id: 'mail', name: 'Mail', icon: '✉️', iconBg: '#dbeafe', iconColor: '#1d4ed8' },
@@ -114,14 +115,14 @@ const fakeDockApps: SpringboardApp[] = [
 const onboardingSteps: StepMeta[] = [
   { id: 1, label: 'Create app', caption: 'Generate your app ID' },
   { id: 2, label: 'Install + Update', caption: 'Push first update' },
-  { id: 3, label: 'Re-open', caption: 'Verify on phone' },
+  { id: 3, label: 'Test', caption: 'Verify on phone' },
 ]
 
 const stepContentMap: Record<DemoStep, StepContent> = {
   1: {
     title: '1. Create an app',
-    description: 'Pick one app name and continue with the full flow in one pass.',
-    terminalIdle: 'Choose an app name to start.',
+    description: 'Type your app name to see how the Capgo flow works.',
+    terminalIdle: 'Type your app name above to start.',
     terminalDone: 'App ready on device',
   },
   2: {
@@ -210,21 +211,21 @@ const defaultDemoApp: SpringboardApp = {
 
 const isCreateStep = computed(() => step.value === 1)
 const isUploadStep = computed(() => step.value === 2)
-const isReopenStep = computed(() => step.value === 3)
 const isPhoneInstalling = computed(() => phoneStage.value === 'installing')
 const isBgColorUpdateApplied = computed(() => hasOpenedUpdatedApp.value && selectedAction.value?.id === 'bg-color')
 const isTitleUpdateApplied = computed(() => hasOpenedUpdatedApp.value && selectedAction.value?.id === 'title')
 const isConfettiUpdateApplied = computed(() => hasOpenedUpdatedApp.value && selectedAction.value?.id === 'confetti')
 const showPhoneLauncher = computed(() => phoneStage.value === 'launching' || phoneStage.value === 'app')
 const showPhoneHome = computed(() => phoneStage.value === 'home' || phoneStage.value === 'installing')
-const showReopenButton = computed(() => isReopenStep.value && !hasOpenedUpdatedApp.value && isUploadComplete.value && phoneStage.value === 'app')
+const showReopenButton = computed(() => !hasOpenedUpdatedApp.value && isUploadComplete.value && phoneStage.value === 'app')
 
 const stepContent = computed(() => stepContentMap[step.value])
 const stepTitle = computed(() => stepContent.value.title)
 const stepDescription = computed(() => stepContent.value.description)
 
-const selectedApp = computed(() => appChoices.find(choice => choice.id === selectedAppId.value))
-const installedApp = computed(() => appChoices.find(choice => choice.id === installedAppId.value))
+const availableAppChoices = computed(() => customAppChoice.value ? [customAppChoice.value, ...appChoices] : appChoices)
+const selectedApp = computed(() => availableAppChoices.value.find(choice => choice.id === selectedAppId.value))
+const installedApp = computed(() => availableAppChoices.value.find(choice => choice.id === installedAppId.value))
 const springboardDemoApp = computed<SpringboardApp>(() => {
   if (!installedApp.value)
     return defaultDemoApp
@@ -246,7 +247,7 @@ const springboardDockApps = computed(() => {
 })
 
 const canContinueOnboarding = computed(() => {
-  return step.value === 3 && hasOpenedUpdatedApp.value
+  return !!installedAppId.value
 })
 
 function currentStepText(entryId: DemoStep) {
@@ -356,13 +357,16 @@ function queueTerminalLines(linesRef: Ref<string[]>, entries: TimedTerminalLine[
 function closeModal() {
   trackNoAppDemoStepEvent(step.value, 'closed', { step: step.value })
   emit('close')
+  router.push('/app/new')
 }
 
 const showConfetti = ref(false)
 const confettiPieces = ref<ConfettiPiece[]>([])
 
-async function triggerConfetti() {
-  trackNoAppDemoStepEvent(step.value, 'confetti-clicked', { step: step.value })
+async function triggerConfetti(trackClickOrEvent: boolean | Event = true) {
+  const trackClick = typeof trackClickOrEvent === 'boolean' ? trackClickOrEvent : true
+  if (trackClick)
+    trackNoAppDemoStepEvent(step.value, 'confetti-clicked', { step: step.value })
   if (confettiTimer.value !== null) {
     window.clearTimeout(confettiTimer.value)
     confettiTimer.value = null
@@ -385,6 +389,7 @@ async function triggerConfetti() {
 
 function resetDemo() {
   appName.value = ''
+  customAppChoice.value = null
   selectedAppId.value = ''
   installedAppId.value = ''
   step.value = 1
@@ -433,6 +438,21 @@ function openAppFromPhoneHome(markUpdated = false) {
   timers.value.push(timer)
 }
 
+function submitAppName() {
+  const name = appName.value.trim()
+  if (!name || isCreatingApp.value)
+    return
+  const choice = {
+    id: formatDemoAppId(name).replace(/\./g, '-'),
+    name,
+    icon: '📱',
+    iconBg: '#ede9fe',
+    iconColor: '#6d28d9',
+  }
+  customAppChoice.value = choice
+  selectApp(choice)
+}
+
 function selectApp(choice: AppChoice) {
   trackNoAppDemoStepEvent(step.value, 'app-selected', {
     app_id: choice.id,
@@ -451,10 +471,10 @@ function selectApp(choice: AppChoice) {
   }, 130)
 
   queueTerminalLines(createLines, [
-    { line: '  - validating your CLI session', delay: 500 },
-    { line: '  - creating app on Capgo', delay: 1050 },
-    { line: '  - syncing app id and metadata', delay: 1600 },
-    { line: '✔ app successfully created', delay: 2150 },
+    { line: '◆  Adding', delay: 400 },
+    { line: `Adding ${appId} to Capgo`, delay: 900 },
+    { line: `✔ App ${appId} added to Capgo`, delay: 1500 },
+    { line: `Next step: upload a bundle with "npx @capgo/cli bundle upload"`, delay: 1800 },
   ])
 
   createTimer.value = window.setTimeout(() => {
@@ -567,6 +587,11 @@ watch(
   },
 )
 
+watch(hasOpenedUpdatedApp, (opened) => {
+  if (opened && selectedAction.value?.id === 'confetti')
+    triggerConfetti(false)
+})
+
 watch(step, (newStep, oldStep) => {
   if (newStep !== oldStep) {
     trackNoAppDemoStepEvent('global', 'step-changed', {
@@ -600,12 +625,12 @@ onUnmounted(() => {
 
       <div class="overflow-y-auto max-h-[90vh]">
         <div class="grid gap-0 overflow-hidden md:grid-cols-[1.08fr,0.92fr]">
-          <div class="flex flex-col h-full gap-6 p-6 bg-white md:p-10">
+          <div class="flex flex-col h-full gap-4 p-5 bg-white md:p-6">
             <div>
               <p class="inline-flex rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-semibold tracking-[0.08em] text-violet-700">
                 START WITH CAPGO
               </p>
-              <div class="p-2 mt-4 border rounded-2xl border-slate-200 bg-slate-50">
+              <div class="p-1.5 mt-3 border rounded-2xl border-slate-200 bg-slate-50">
                 <div class="grid grid-cols-3 gap-2">
                   <div
                     v-for="entry in onboardingSteps"
@@ -622,36 +647,35 @@ onUnmounted(() => {
                   </div>
                 </div>
               </div>
-              <h2 class="mt-4 text-3xl font-semibold text-slate-900">
+              <h2 class="mt-3 text-2xl font-semibold text-slate-900">
                 {{ stepTitle }}
               </h2>
-              <p class="max-w-2xl mt-3 text-sm leading-relaxed text-slate-600">
+              <p class="max-w-2xl mt-1.5 text-sm leading-relaxed text-slate-600">
                 {{ stepDescription }}
               </p>
             </div>
 
             <div class="flex-1 space-y-4">
-              <div v-if="isCreateStep" class="grid grid-cols-3 gap-2 xl:gap-3">
-                <button
-                  v-for="app in appChoices"
-                  :key="app.id"
-                  class="relative flex items-start gap-2 p-3 text-left transition bg-white border shadow-sm rounded-xl border-slate-200 hover:border-violet-300 hover:bg-violet-50 disabled:cursor-not-allowed disabled:opacity-60 sm:gap-3 sm:p-4 sm:rounded-2xl"
-                  type="button"
-                  :disabled="isCreatingApp"
-                  @click="selectApp(app)"
-                >
-                  <span
-                    class="inline-flex items-center justify-center w-8 h-8 text-base shrink-0 rounded-xl sm:w-10 sm:h-10 sm:text-lg"
-                    :style="{ backgroundColor: app.iconBg, color: app.iconColor }"
+              <div v-if="isCreateStep" class="flex flex-col gap-3">
+                <form class="flex gap-2" @submit.prevent="submitAppName">
+                  <label for="demo-app-name" class="sr-only">App name</label>
+                  <input
+                    id="demo-app-name"
+                    v-model="appName"
+                    type="text"
+                    placeholder="App Name"
+                    maxlength="40"
+                    :disabled="isCreatingApp"
+                    class="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 shadow-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 disabled:opacity-50"
                   >
-                    {{ app.icon }}
-                  </span>
-                  <span class="flex-1">
-                    <span class="font-semibold text-slate-900">{{ app.name }}</span>
-                    <span class="block mt-1 text-xs text-slate-500">{{ isCreatingApp ? 'Creating…' : 'Use this app' }}</span>
-                  </span>
-                  <span class="text-xs text-slate-400">{{ selectedAppId === app.id ? 'Selected' : 'Choose' }}</span>
-                </button>
+                  <button
+                    type="submit"
+                    :disabled="!appName.trim() || isCreatingApp"
+                    class="rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {{ isCreatingApp ? 'Creating…' : 'Continue' }}
+                  </button>
+                </form>
                 <p v-if="isCreatingApp" class="text-xs text-slate-500">
                   Running <span class="font-mono text-emerald-600">{{ CAPGO_CLI_COMMAND }} app add</span> ...
                 </p>
@@ -689,7 +713,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div class="relative flex items-center justify-center p-6 border-l border-slate-100 bg-gradient-to-b from-white to-slate-100">
+          <div class="relative flex items-center justify-center p-4 border-l border-slate-100 bg-gradient-to-b from-white to-slate-100">
             <div class="w-full max-w-[56rem] space-y-3">
               <div class="flex flex-col items-center gap-3 md:flex-row">
                 <div class="flex-1 w-full p-4 border rounded-xl border-slate-800 bg-slate-950 md:flex-[2.2]">
@@ -697,7 +721,7 @@ onUnmounted(() => {
                     <span class="inline-block w-2 h-2 rounded-full bg-emerald-400" />
                     Demo Terminal
                   </div>
-                  <div class="h-64 p-2 space-y-1 overflow-hidden font-mono text-xs leading-snug rounded-lg bg-black/70 text-emerald-200">
+                  <div class="h-52 p-2 space-y-1 overflow-hidden font-mono text-xs leading-snug rounded-lg bg-black/70 text-emerald-200">
                     <p v-for="(line, index) in terminalLines" :key="`${line}-${index}`">
                       {{ line }}
                     </p>
@@ -723,9 +747,9 @@ onUnmounted(() => {
                 </div>
 
                 <div class="flex flex-col items-center">
-                  <div class="relative mx-auto h-[470px] w-[250px] rounded-[42px] border-[4px] border-slate-900 bg-slate-900 p-[4px] shadow-2xl">
-                    <div class="relative h-full rounded-[34px] overflow-hidden bg-slate-900 p-[3px]">
-                      <div class="relative h-full rounded-[28px] bg-gradient-to-b p-4" :class="phoneBackgroundClass">
+                  <div class="relative mx-auto h-[380px] w-[202px] rounded-[34px] border-[4px] border-slate-900 bg-slate-900 p-[4px] shadow-2xl">
+                    <div class="relative h-full rounded-[28px] overflow-hidden bg-slate-900 p-[3px]">
+                      <div class="relative h-full rounded-[22px] bg-gradient-to-b p-3" :class="phoneBackgroundClass">
                         <div class="absolute top-0 w-20 h-4 -translate-x-1/2 pointer-events-none left-1/2 rounded-b-2xl bg-slate-900/80" />
                         <div class="mx-auto mb-3 flex h-4 w-full items-center justify-between text-[9px] font-semibold text-slate-600">
                           <span>9:41</span>
@@ -858,7 +882,7 @@ onUnmounted(() => {
                   </div>
                 </div>
               </div>
-              <div v-if="isReopenStep" class="flex justify-center pt-2">
+              <div v-if="canContinueOnboarding" class="flex justify-center pt-2">
                 <button
                   class="w-auto px-6 d-btn d-btn-primary"
                   type="button"

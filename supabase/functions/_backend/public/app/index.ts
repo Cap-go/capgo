@@ -1,6 +1,7 @@
 import type { Database } from '../../utils/supabase.types.ts'
 import type { CreateDemoApp } from './demo.ts'
 import type { CreateApp } from './post.ts'
+import type { FetchStoreMetadataBody } from './store_metadata.ts'
 import { getBodyOrQuery, honoFactory, useCors } from '../../utils/hono.ts'
 import { middlewareKey, middlewareV2 } from '../../utils/hono_middleware.ts'
 import { deleteApp } from './delete.ts'
@@ -8,11 +9,13 @@ import { createDemoApp } from './demo.ts'
 import { get, getAll } from './get.ts'
 import { post } from './post.ts'
 import { put } from './put.ts'
+import { fetchStoreMetadata } from './store_metadata.ts'
 
 export const app = honoFactory.createApp()
 
 // Enable CORS for /demo route (browser requests need OPTIONS preflight)
 app.use('/demo', useCors)
+app.use('/store-metadata', useCors)
 
 app.get('/', middlewareKey(['all', 'read']), async (c) => {
   const pageQuery = c.req.query('page')
@@ -37,10 +40,9 @@ app.get('/:id', middlewareKey(['all', 'read']), async (c) => {
   return get(c, id, keyToUse)
 })
 
-app.post('/', middlewareKey(['all', 'write']), async (c) => {
+app.post('/', middlewareV2(['all', 'write']), async (c) => {
   const body = await getBodyOrQuery<CreateApp>(c)
-  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-  return post(c, body, apikey)
+  return post(c, body)
 })
 
 app.put('/:id', middlewareKey(['all', 'write']), async (c) => {
@@ -64,4 +66,9 @@ app.delete('/:id', middlewareKey(['all', 'write']), async (c) => {
 app.post('/demo', middlewareV2(['all', 'write']), async (c) => {
   const body = await getBodyOrQuery<CreateDemoApp>(c)
   return createDemoApp(c, body)
+})
+
+app.post('/store-metadata', middlewareV2(['all', 'read']), async (c) => {
+  const body = await getBodyOrQuery<FetchStoreMetadataBody>(c)
+  return fetchStoreMetadata(c, body)
 })

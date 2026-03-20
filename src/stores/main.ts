@@ -55,6 +55,7 @@ export const useMainStore = defineStore('main', () => {
           listener.data.subscription.unsubscribe()
           auth.value = undefined
           user.value = undefined
+          isAdmin.value = false
           reset(config.supaHost)
           unspoofUser()
           resolve()
