@@ -1,13 +1,11 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
-import StepsApp from '~/components/dashboard/StepsApp.vue'
+import AppOnboardingFlow from '~/components/dashboard/AppOnboardingFlow.vue'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 
-const router = useRouter()
 const supabase = useSupabase()
 const displayStore = useDisplayStore()
 const organizationStore = useOrganizationStore()
@@ -31,24 +29,13 @@ async function fetchAppsCount() {
     appsCount.value = 0
     return
   }
+
   const { count } = await supabase
     .from('apps')
     .select('id', { count: 'exact', head: true })
     .eq('owner_org', orgId)
 
   appsCount.value = count ?? 0
-}
-
-function onClose() {
-  router.push('/apps')
-}
-
-async function onAppDone(newAppId?: string) {
-  if (!newAppId)
-    return
-
-  // Next step: upload a bundle for this app
-  router.push(`/app/${encodeURIComponent(newAppId)}/bundles/new`)
 }
 
 async function init() {
@@ -84,12 +71,6 @@ onMounted(() => {
       <Spinner size="w-40 h-40" />
     </div>
 
-    <div v-else>
-      <StepsApp
-        :onboarding="isOnboarding"
-        @done="onAppDone"
-        @close-step="onClose"
-      />
-    </div>
+    <AppOnboardingFlow v-else :onboarding="isOnboarding" />
   </div>
 </template>

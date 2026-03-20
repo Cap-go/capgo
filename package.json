@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.117.6",
+  "version": "12.118.0",
   "private": true,
   "license": "GPL-3.0",
   "scripts": {
@@ -12,6 +12,7 @@
     "cloudsql:allow-cloudflare": "bash scripts/update_cloudsql_authorized_networks.sh",
     "supabase:start": "bun scripts/supabase-worktree.ts start",
     "supabase:stop": "bun scripts/supabase-worktree.ts stop",
+    "supabase:stop:all": "bun scripts/supabase-stop-all-worktrees.ts",
     "supabase:status": "bun scripts/supabase-worktree.ts status",
     "supabase:db:reset": "bun scripts/supabase-worktree.ts db reset",
     "supabase:functions:serve": "bun scripts/supabase-worktree.ts functions serve",
@@ -32,6 +33,7 @@
     "dev": "vite",
     "serve": "vite",
     "serve:local": "ENV=local vite",
+    "serve:worktree": "bun run supabase:with-env -- bun -e \"const supabaseUrl = process.env.SUPABASE_URL || ''; process.env.SUPA_URL = supabaseUrl; process.env.SUPA_ANON = process.env.SUPABASE_ANON_KEY || ''; process.env.API_DOMAIN = supabaseUrl.replace(/^https?:\\/\\//, '') + '/functions/v1'; process.env.ENV = 'local'; const { spawnSync } = require('node:child_process'); const result = spawnSync('bun', ['run', 'serve:local'], { stdio: 'inherit', env: process.env }); process.exit(result.status ?? 1)\"",
     "serve:dev": "BRANCH=development vite",
     "serve:preprod": "BRANCH=preprod vite",
     "ios:dev": "cap sync && cap run ios",
