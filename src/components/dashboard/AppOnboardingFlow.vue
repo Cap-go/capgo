@@ -556,19 +556,19 @@ watch(suggestedAppId, (value) => {
           <p class="text-sm font-semibold tracking-[0.18em] uppercase text-azure-500">
             Create your app
           </p>
-          <h1 class="mt-3 text-3xl font-semibold text-slate-900 sm:text-4xl">
+          <h1 class="mt-3 text-3xl font-semibold text-slate-900 sm:text-4xl dark:text-slate-50">
             {{ props.onboarding ? 'Create your first app, then choose how you want to start.' : 'Create an app, then install Capgo when you are ready.' }}
           </h1>
-          <p class="max-w-2xl mx-auto mt-3 text-base text-slate-600">
+          <p class="mx-auto mt-3 max-w-2xl text-base text-slate-700 dark:text-slate-300">
             The app is created immediately in Capgo. From there you can either connect your real project in the CLI or explore the dashboard with temporary demo data.
           </p>
         </div>
 
-        <div v-if="flowStep === 'details'" class="p-6 bg-white border shadow-sm rounded-3xl border-slate-200">
+        <div v-if="flowStep === 'details'" class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
           <div class="grid gap-6 md:grid-cols-[1.25fr_0.9fr]">
             <div class="space-y-5">
               <div class="rounded-2xl border border-slate-200 p-4">
-                <p class="text-sm font-medium text-slate-900">
+                <p class="text-sm font-medium text-slate-900 dark:text-slate-100">
                   Does the app already exist?
                 </p>
                 <div class="flex flex-wrap gap-3 mt-4">
@@ -583,7 +583,7 @@ watch(suggestedAppId, (value) => {
 
               <div v-if="existingApp === true" class="grid gap-4 rounded-2xl border border-slate-200 p-4">
                 <div>
-                  <p class="text-sm font-medium text-slate-900">
+                  <p class="text-sm font-medium text-slate-900 dark:text-slate-100">
                     How do you want to start?
                   </p>
                   <div class="flex flex-wrap gap-3 mt-4">
@@ -598,8 +598,8 @@ watch(suggestedAppId, (value) => {
 
                 <template v-if="existingAppSetup === 'import'">
                   <div>
-                    <label class="text-sm font-medium text-slate-800">App Store or Google Play link</label>
-                    <input v-model="storeUrl" class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm" placeholder="https://apps.apple.com/... or https://play.google.com/store/apps/details?id=com.example.app" type="url">
+                    <label class="text-sm font-medium text-slate-800 dark:text-slate-100">App Store or Google Play link</label>
+                    <input v-model="storeUrl" class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:placeholder:text-slate-500" placeholder="https://apps.apple.com/... or https://play.google.com/store/apps/details?id=com.example.app" type="url">
                   </div>
                   <button class="d-btn d-btn-outline w-fit" :disabled="isImportingStore || !storeUrl" @click="importStoreMetadata()">
                     <IconLoader v-if="isImportingStore" class="w-4 h-4 animate-spin" />
@@ -610,29 +610,29 @@ watch(suggestedAppId, (value) => {
 
               <template v-if="canShowAppDetails">
                 <div>
-                  <label class="text-sm font-medium text-slate-800">App name</label>
-                  <input v-model="appName" class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm" placeholder="Capgo demo app" maxlength="100">
+                  <label class="text-sm font-medium text-slate-800 dark:text-slate-100">App name</label>
+                  <input v-model="appName" class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:placeholder:text-slate-500" placeholder="Capgo demo app" maxlength="100">
                 </div>
 
                 <div>
-                  <label class="text-sm font-medium text-slate-800">App ID</label>
+                  <label class="text-sm font-medium text-slate-800 dark:text-slate-100">App ID</label>
                   <input
                     :value="manualAppId"
-                    class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm"
+                    class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-50 dark:placeholder:text-slate-500"
                     placeholder="com.example.app"
                     @input="onAppIdInput"
                   >
-                  <p class="mt-2 text-xs text-slate-500">
+                  <p class="mt-2 text-xs text-slate-600 dark:text-slate-300">
                     {{ existingApp ? 'Use the real bundle or package ID from your project or store listing.' : 'This ID will be used when the app is created in Capgo and later in the CLI.' }}
                   </p>
-                  <p v-if="appIdFeedback" class="mt-2 text-xs font-medium text-amber-600">
+                  <p v-if="appIdFeedback" class="mt-2 text-xs font-medium text-amber-700 dark:text-amber-300">
                     {{ appIdFeedback }}
                   </p>
                   <div v-if="appIdSuggestions.length > 0" class="mt-3 flex flex-wrap gap-2">
                     <button
                       v-for="suggestion in appIdSuggestions"
                       :key="suggestion"
-                      class="rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-700 transition hover:border-azure-300 hover:text-azure-600"
+                      class="rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-800 transition hover:border-azure-300 hover:text-azure-600 dark:border-slate-700 dark:text-slate-200 dark:hover:border-azure-400 dark:hover:text-azure-300"
                       @click="applyAppIdSuggestion(suggestion)"
                     >
                       {{ suggestion }}
@@ -646,10 +646,10 @@ watch(suggestedAppId, (value) => {
                     label="App icon"
                     accept="image/*"
                     outer-class="mt-0"
-                    input-class="mt-2 block w-full text-sm text-slate-600"
+                    input-class="mt-2 block w-full text-sm text-slate-700 dark:text-slate-300"
                     @update:model-value="onSelectIconFormKit"
                   />
-                  <p class="text-xs text-slate-500">
+                  <p class="text-xs text-slate-600 dark:text-slate-300">
                     We keep the icon optional. If you imported store metadata, we will try to reuse that icon automatically.
                   </p>
                 </div>
@@ -712,10 +712,10 @@ watch(suggestedAppId, (value) => {
             <p class="text-sm font-semibold uppercase tracking-[0.18em] text-azure-500">
               Real app
             </p>
-            <h2 class="mt-3 text-2xl font-semibold text-slate-900">
+            <h2 class="mt-3 text-2xl font-semibold text-slate-900 dark:text-slate-50">
               Install Capgo in your project
             </h2>
-            <p class="mt-3 text-sm text-slate-600">
+            <p class="mt-3 text-sm text-slate-700 dark:text-slate-300">
               Continue with the CLI and finish the real setup in your codebase. Capgo will reuse <span class="font-mono">{{ createdApp.app_id }}</span>.
             </p>
           </button>
@@ -728,13 +728,13 @@ watch(suggestedAppId, (value) => {
             <p class="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-500">
               Explore first
             </p>
-            <h2 class="mt-3 text-2xl font-semibold text-slate-900">
+            <h2 class="mt-3 text-2xl font-semibold text-slate-900 dark:text-slate-50">
               Add demo data and take a tour
             </h2>
-            <p class="mt-3 text-sm text-slate-600">
+            <p class="mt-3 text-sm text-slate-700 dark:text-slate-300">
               We will populate this app with temporary bundles, channels, devices, and charts so you can learn the dashboard before touching the CLI.
             </p>
-            <p v-if="isSeedingDemo" class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+            <p v-if="isSeedingDemo" class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
               <IconLoader class="h-4 w-4 animate-spin" />
               Creating demo data
             </p>
@@ -747,10 +747,10 @@ watch(suggestedAppId, (value) => {
               <p class="text-sm font-semibold uppercase tracking-[0.18em] text-azure-500">
                 CLI onboarding
               </p>
-              <h2 class="mt-2 text-2xl font-semibold text-slate-900">
+              <h2 class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">
                 Finish setup in your app
               </h2>
-              <p class="mt-2 max-w-2xl text-sm text-slate-600">
+              <p class="mt-2 max-w-2xl text-sm text-slate-700 dark:text-slate-300">
                 Run the init command in the app project. The upcoming CLI change can detect this pending app and reuse it instead of creating a second app in Capgo.
               </p>
             </div>
@@ -764,7 +764,7 @@ watch(suggestedAppId, (value) => {
           </div>
 
           <div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-            <p class="font-medium text-slate-900">
+            <p class="font-medium text-slate-900 dark:text-slate-50">
               What happens next
             </p>
             <ul class="mt-3 space-y-2">
