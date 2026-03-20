@@ -1,9 +1,11 @@
+import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareAuth, parseBody, quickError, useCors } from '../utils/hono.ts'
 import { getWebhookUrlValidationError } from '../utils/webhook.ts'
 
 const MAX_ICON_BYTES = 512 * 1024
+const MAX_REDIRECTS = 5
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
@@ -23,13 +25,13 @@ function normalizeWebsiteUrl(input: string) {
 }
 
 function decodeHtmlEntities(value: string) {
-  return value
-    .replaceAll('&amp;', '&')
-    .replaceAll('&quot;', '"')
-    .replaceAll('&#39;', '\'')
-    .replaceAll('&lt;', '<')
-    .replaceAll('&gt;', '>')
-    .trim()
+  try {
+    const parsed = new DOMParser().parseFromString(`<body>${value}</body>`, 'text/html')
+    return parsed.body.textContent?.trim() ?? value.trim()
+  }
+  catch {
+    return value.trim()
+  }
 }
 
 function deriveNameFromHostname(hostname: string) {
@@ -85,8 +87,43 @@ function findIconHref(html: string) {
   return candidates.sort((a, b) => b.priority - a.priority)[0]?.href ?? ''
 }
 
-async function fetchIconDataUrl(iconUrl: string) {
-  const response = await fetch(iconUrl)
+async function fetchValidatedUrl(
+  c: Context,
+  urlString: string,
+  init?: RequestInit,
+) {
+  let currentUrl = urlString
+
+  for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount++) {
+    const validationError = getWebhookUrlValidationError(c, currentUrl)
+    if (validationError)
+      return { error: validationError, response: null as Response | null }
+
+    const response = await fetch(currentUrl, {
+      ...init,
+      redirect: 'manual',
+    })
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location')
+      if (!location)
+        return { error: 'Could not fetch website', response: null as Response | null }
+
+      currentUrl = new URL(location, currentUrl).toString()
+      continue
+    }
+
+    return { error: null, response }
+  }
+
+  return { error: 'Too many redirects', response: null as Response | null }
+}
+
+async function fetchIconDataUrl(c: Context, iconUrl: string) {
+  const { error, response } = await fetchValidatedUrl(c, iconUrl)
+  if (error || !response)
+    return null
+
   if (!response.ok)
     return null
 
@@ -121,12 +158,14 @@ app.post('/', middlewareAuth, async (c) => {
   if (websiteValidationError)
     return quickError(400, 'invalid_website', websiteValidationError)
 
-  const response = await fetch(website, {
+  const { error: fetchError, response } = await fetchValidatedUrl(c, website, {
     headers: {
       'User-Agent': 'CapgoWebsitePreview/1.0',
       'Accept': 'text/html,application/xhtml+xml',
     },
   })
+  if (fetchError || !response)
+    return quickError(400, 'invalid_website', fetchError ?? 'Could not fetch website')
 
   if (!response.ok)
     return quickError(400, 'website_fetch_failed', 'Could not fetch website')
@@ -146,12 +185,7 @@ app.post('/', middlewareAuth, async (c) => {
 
   const iconHref = findIconHref(html)
   const iconUrl = iconHref ? new URL(iconHref, finalUrl).toString() : ''
-  if (iconUrl) {
-    const iconValidationError = getWebhookUrlValidationError(c, iconUrl)
-    if (iconValidationError)
-      return quickError(400, 'invalid_website', iconValidationError)
-  }
-  const icon = iconUrl ? await fetchIconDataUrl(iconUrl) : null
+  const icon = iconUrl ? await fetchIconDataUrl(c, iconUrl) : null
 
   return c.json({
     website: finalUrl.toString(),
