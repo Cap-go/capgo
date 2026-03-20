@@ -65,7 +65,7 @@ describe('[POST] /private/events operations', () => {
         user_id: NON_OWNER_ORG_ID,
         tags: {
           'app-id': APPNAME_EVENT,
-          test: true,
+          'test': true,
         },
       }),
     })
@@ -90,7 +90,7 @@ describe('[POST] /private/events operations', () => {
         user_id: ORG_ID,
         tags: {
           'app-id': APPNAME_EVENT,
-          test: true,
+          'test': true,
         },
       }),
     })
@@ -174,7 +174,7 @@ describe('[POST] /private/events operations', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        capgkey: 'invalid_key',
+        'capgkey': 'invalid_key',
       },
       body: JSON.stringify({
         channel: 'test',
@@ -195,7 +195,7 @@ describe('[POST] /private/events operations', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        authorization: 'Bearer invalid_token',
+        'authorization': 'Bearer invalid_token',
       },
       body: JSON.stringify({
         channel: 'test',
