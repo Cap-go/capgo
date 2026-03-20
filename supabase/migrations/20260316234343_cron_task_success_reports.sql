@@ -357,9 +357,11 @@ BEGIN
               FROM jsonb_array_elements_text(task.target::jsonb);
 
               IF task.success_report_url IS NULL THEN
-                total_batches := public.process_function_queue(
+                total_batches := public.process_function_queue_with_run(
                   queue_names,
-                  COALESCE(task.batch_size, 950)
+                  COALESCE(task.batch_size, 950),
+                  run_id,
+                  task.name
                 );
               ELSE
                 total_batches := public.process_function_queue_with_run(
