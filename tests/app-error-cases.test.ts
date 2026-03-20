@@ -1,12 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, NON_ACCESS_APP_NAME, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
+import { BASE_URL, getSupabaseClient, headers, NON_ACCESS_APP_NAME, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.app.error.${id}`
 const testOrgId = randomUUID()
 const testStripeCustomerId = `cus_app_error_${id.replace(/-/g, '').slice(0, 18)}`
-const testApiKeyValue = randomUUID()
 let testApiKeyId: number | null = null
 let testHeaders: Record<string, string>
 
@@ -17,27 +16,26 @@ beforeAll(async () => {
     stripeCustomerId: testStripeCustomerId,
   })
 
-  const { data, error } = await getSupabaseClient()
-    .from('apikeys')
-    .insert({
-      user_id: USER_ID,
-      key: testApiKeyValue,
-      mode: 'all',
+  const createResponse = await fetch(`${BASE_URL}/apikey`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
       name: `app-error-cases-${id}`,
+      mode: 'all',
       limited_to_orgs: [testOrgId],
       limited_to_apps: [],
-    })
-    .select('id')
-    .single()
+    }),
+  })
 
-  if (error || !data) {
-    throw error ?? new Error('Failed to create isolated API key for app error case tests')
+  const createData = await createResponse.json() as { id: number, key: string, error?: string }
+  if (createResponse.status !== 200 || !createData?.id || !createData?.key) {
+    throw new Error(`Failed to create isolated API key for app error case tests: ${JSON.stringify(createData)}`)
   }
 
-  testApiKeyId = data.id
+  testApiKeyId = createData.id
   testHeaders = {
     'Content-Type': 'application/json',
-    'Authorization': testApiKeyValue,
+    'Authorization': createData.key,
   }
 })
 
@@ -48,7 +46,10 @@ afterAll(async () => {
   await getSupabaseClient().from('apps').delete().eq('app_id', `${APPNAME}.put`)
   await getSupabaseClient().from('apps').delete().eq('app_id', `${APPNAME}.notfound`)
   if (testApiKeyId !== null) {
-    await getSupabaseClient().from('apikeys').delete().eq('id', testApiKeyId)
+    await fetch(`${BASE_URL}/apikey/${testApiKeyId}`, {
+      method: 'DELETE',
+      headers,
+    })
   }
   await getSupabaseClient().from('org_users').delete().eq('org_id', testOrgId)
   await getSupabaseClient().from('orgs').delete().eq('id', testOrgId)
