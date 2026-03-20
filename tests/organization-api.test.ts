@@ -471,13 +471,27 @@ describe('[POST] /organization', () => {
     expect(responseData.error).toBe('invalid_body')
   })
 
-  it('create organization rejects invalid website scheme', async () => {
+  it.concurrent('create organization rejects invalid website scheme', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
       headers,
       method: 'POST',
       body: JSON.stringify({
         name: `Created Organization ${new Date().toISOString()}`,
         website: 'ftp://capgo.app',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { error: string }
+    expect(responseData.error).toBe('invalid_body')
+  })
+
+  it.concurrent('create organization rejects credential-bearing website urls', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'POST',
+      body: JSON.stringify({
+        name: `Created Organization ${new Date().toISOString()}`,
+        website: 'https://user:pass@capgo.app',
       }),
     })
     expect(response.status).toBe(400)
@@ -587,7 +601,7 @@ describe('[PUT] /organization', () => {
     expect(responseData.error).toBe('invalid_body')
   })
 
-  it('update organization rejects invalid website scheme', async () => {
+  it.concurrent('update organization rejects invalid website scheme', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
       headers,
       method: 'PUT',
@@ -595,6 +609,21 @@ describe('[PUT] /organization', () => {
         orgId: ORG_ID,
         name: `Updated Organization ${new Date().toISOString()}`,
         website: 'ftp://www.capgo.app/docs',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { error: string }
+    expect(responseData.error).toBe('invalid_body')
+  })
+
+  it.concurrent('update organization rejects credential-bearing website urls', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'PUT',
+      body: JSON.stringify({
+        orgId: ORG_ID,
+        name: `Updated Organization ${new Date().toISOString()}`,
+        website: 'https://user:pass@www.capgo.app/docs',
       }),
     })
     expect(response.status).toBe(400)
@@ -805,7 +834,7 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
   it('get_orgs_v7 returns enforce_hashed_api_keys field', async () => {
     // Set a known value
     const rpcWebsite = website
-    const previousWebsite = 'https://www.capgo.app/docs'
+    const previousWebsite = website
     await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: true, website: rpcWebsite }).eq('id', ORG_ID)
 
     // Call get_orgs_v7 via RPC

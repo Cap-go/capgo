@@ -16,4 +16,9 @@ describe('normalizeWebsiteUrl', () => {
   it.concurrent('rejects non-web schemes', () => {
     expect(() => normalizeWebsiteUrl('ftp://example.com')).toThrowError()
   })
+
+  it.concurrent('rejects credential-bearing urls', () => {
+    expect(() => normalizeWebsiteUrl('https://user:pass@example.com')).toThrowError()
+    expect(() => normalizeWebsiteUrl('user:pass@example.com')).toThrowError()
+  })
 })
