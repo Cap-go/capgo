@@ -135,7 +135,7 @@ describe('read-mode API keys cannot access destructive organization routes', () 
 
   it.concurrent('rejects POST /organization/members', async () => {
     const response = await fetch(`${BASE_URL}/organization/members`, {
-      headers: { ...readOnlyHeaders, Authorization: readOnlyKey },
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
       method: 'POST',
       body: JSON.stringify({
         orgId: readOnlyOrgId,
@@ -149,7 +149,7 @@ describe('read-mode API keys cannot access destructive organization routes', () 
 
   it.concurrent('rejects DELETE /organization/members', async () => {
     const response = await fetch(`${BASE_URL}/organization/members?orgId=${readOnlyOrgId}&email=${USER_ADMIN_EMAIL}`, {
-      headers: { ...readOnlyHeaders, Authorization: readOnlyKey },
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
       method: 'DELETE',
     })
 
@@ -158,7 +158,7 @@ describe('read-mode API keys cannot access destructive organization routes', () 
 
   it.concurrent('rejects PUT /organization', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
-      headers: { ...readOnlyHeaders, Authorization: readOnlyKey },
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
       method: 'PUT',
       body: JSON.stringify({
         orgId: readOnlyOrgId,
@@ -171,7 +171,7 @@ describe('read-mode API keys cannot access destructive organization routes', () 
 
   it.concurrent('rejects POST /organization', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
-      headers: { ...readOnlyHeaders, Authorization: readOnlyKey },
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
       method: 'POST',
       body: JSON.stringify({
         orgId: readOnlyOrgId,
@@ -184,7 +184,7 @@ describe('read-mode API keys cannot access destructive organization routes', () 
 
   it.concurrent('rejects DELETE /organization', async () => {
     const response = await fetch(`${BASE_URL}/organization?orgId=${readOnlyOrgId}`, {
-      headers: { ...readOnlyHeaders, Authorization: readOnlyKey },
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
       method: 'DELETE',
     })
 
@@ -193,13 +193,28 @@ describe('read-mode API keys cannot access destructive organization routes', () 
 
   it.concurrent('allows GET /organization for accessible organizations', async () => {
     const response = await fetch(`${BASE_URL}/organization?orgId=${readOnlyOrgId}`, {
-      headers: { ...readOnlyHeaders, Authorization: readOnlyKey },
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
       method: 'GET',
     })
 
     expect(response.status).toBe(200)
     const type = z.object({ id: z.string(), name: z.string() })
     expect(type.parse(await response.json())).toEqual({ id: readOnlyOrgId, name: readOnlyName })
+  })
+
+  it.concurrent('allows GET /organization/members for accessible organizations', async () => {
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${readOnlyOrgId}`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'GET',
+    })
+
+    expect(response.status).toBe(200)
+    const members = z.array(z.object({
+      uid: z.string(),
+      email: z.string(),
+      role: z.string(),
+    }))
+    expect(members.parse(await response.json()).some(member => member.uid === USER_ID)).toBe(true)
   })
 })
 

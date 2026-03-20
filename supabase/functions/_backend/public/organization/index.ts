@@ -18,19 +18,19 @@ app.get('/', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
   return get(c, body, apikey)
 })
 
-app.put('/', middlewareV2(['all', 'write', 'upload']), async (c) => {
+app.put('/', middlewareV2(['all', 'write']), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return put(c, body, apikey)
 })
 
-app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
+app.post('/', middlewareKey(['all', 'write']), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return post(c, body, apikey)
 })
 
-app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
+app.delete('/', middlewareKey(['all', 'write']), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return deleteOrg(c, body, apikey)
@@ -42,13 +42,13 @@ app.get('/members', middlewareKey(['all', 'write', 'read', 'upload']), async (c)
   return getMembers(c, body, apikey)
 })
 
-app.post('/members', middlewareKey(['all', 'write', 'upload']), async (c) => {
+app.post('/members', middlewareKey(['all', 'write']), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return inviteUser(c, body, apikey)
 })
 
-app.delete('/members', middlewareKey(['all', 'write', 'upload']), async (c) => {
+app.delete('/members', middlewareKey(['all', 'write']), async (c) => {
   const body = await getBodyOrQuery<any>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   return deleteMember(c, body, apikey)
