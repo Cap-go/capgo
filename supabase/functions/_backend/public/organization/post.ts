@@ -8,7 +8,21 @@ import { supabaseWithAuth } from '../../utils/supabase.ts'
 const bodySchema = z.object({
   name: z.string().check(z.minLength(3)),
   email: z.optional(z.email()),
+  website: z.optional(z.string()),
 })
+
+function normalizeWebsiteUrl(input?: string | null) {
+  const trimmed = input?.trim()
+  if (!trimmed)
+    return null
+
+  try {
+    return new URL(/^https?:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`).toString()
+  }
+  catch {
+    throw simpleError('invalid_body', 'Invalid body', { error: 'website_must_be_a_valid_url' })
+  }
+}
 
 export async function post(
   c: Context<MiddlewareKeyVariables>,
@@ -20,6 +34,7 @@ export async function post(
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
+  const website = normalizeWebsiteUrl(body.website)
 
   const auth = c.get('auth') as AuthInfo | undefined
   if (!auth?.userId) {
@@ -31,7 +46,12 @@ export async function post(
   if (userErr || !self?.email) {
     throw simpleError('cannot_get_user', 'Cannot get user', { error: userErr?.message })
   }
-  const newOrg = { name: body.name, created_by: auth.userId, management_email: body.email ?? self.email ?? '' }
+  const newOrg = {
+    name: body.name,
+    created_by: auth.userId,
+    management_email: body.email ?? self.email ?? '',
+    website,
+  }
   const { error: errorOrg } = await supabase
     .from('orgs')
     .insert(newOrg)

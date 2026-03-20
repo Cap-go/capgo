@@ -1610,6 +1610,7 @@ export type Database = {
           stats_updated_at: string | null
           updated_at: string | null
           use_new_rbac: boolean
+          website: string | null
         }
         Insert: {
           created_at?: string | null
@@ -1633,6 +1634,7 @@ export type Database = {
           stats_updated_at?: string | null
           updated_at?: string | null
           use_new_rbac?: boolean
+          website?: string | null
         }
         Update: {
           created_at?: string | null
@@ -1656,6 +1658,7 @@ export type Database = {
           stats_updated_at?: string | null
           updated_at?: string | null
           use_new_rbac?: boolean
+          website?: string | null
         }
         Relationships: [
           {

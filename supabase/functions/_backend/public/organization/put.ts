@@ -11,6 +11,7 @@ const bodySchema = z.object({
   orgId: z.string(),
   logo: z.optional(z.string()),
   name: z.optional(z.string()),
+  website: z.optional(z.nullable(z.string())),
   management_email: z.optional(z.email()),
   require_apikey_expiration: z.optional(z.boolean()),
   max_apikey_expiration_days: z.optional(z.nullable(z.number())),
@@ -24,6 +25,22 @@ function parseBody(bodyRaw: unknown) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   return bodyParsed.data
+}
+
+function normalizeWebsiteUrl(input?: string | null) {
+  if (input === null)
+    return null
+
+  const trimmed = input?.trim()
+  if (!trimmed)
+    return null
+
+  try {
+    return new URL(/^https?:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`).toString()
+  }
+  catch {
+    throw simpleError('invalid_body', 'Invalid body', { error: 'website_must_be_a_valid_url' })
+  }
 }
 
 async function ensureOrgAccess(
@@ -63,6 +80,8 @@ function buildUpdateFields(body: z.infer<typeof bodySchema>) {
   const updateFields: Partial<Database['public']['Tables']['orgs']['Update']> = {}
   if (body.name !== undefined)
     updateFields.name = body.name
+  if (body.website !== undefined)
+    updateFields.website = normalizeWebsiteUrl(body.website)
   if (body.logo !== undefined)
     updateFields.logo = normalizeImagePath(body.logo) ?? body.logo
   if (body.management_email !== undefined)

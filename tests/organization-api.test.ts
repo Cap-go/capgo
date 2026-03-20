@@ -410,10 +410,11 @@ describe('[DELETE] /organization/members', () => {
 describe('[POST] /organization', () => {
   it('create organization', async () => {
     const name = `Created Organization ${new Date().toISOString()}`
+    const website = 'capgo.app'
     const response = await fetch(`${BASE_URL}/organization`, {
       headers,
       method: 'POST',
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, website }),
     })
     expect(response.status).toBe(200)
     const type = z.object({
@@ -427,6 +428,7 @@ describe('[POST] /organization', () => {
     expect(error).toBeNull()
     expect(data).toBeTruthy()
     expect(data?.name).toBe(name)
+    expect(data?.website).toBe('https://capgo.app/')
     // New orgs should default to RBAC enabled
     expect(data?.use_new_rbac).toBe(true)
   })
@@ -466,10 +468,11 @@ describe('[POST] /organization', () => {
 describe('[PUT] /organization', () => {
   it('update organization', async () => {
     const name = `Updated Organization ${new Date().toISOString()}`
+    const website = 'https://www.capgo.app/docs'
     const response = await fetch(`${BASE_URL}/organization`, {
       headers,
       method: 'PUT',
-      body: JSON.stringify({ orgId: ORG_ID, name }),
+      body: JSON.stringify({ orgId: ORG_ID, name, website }),
     })
     expect(response.status).toBe(200)
     const type = z.object({
@@ -484,6 +487,7 @@ describe('[PUT] /organization', () => {
     expect(error).toBeNull()
     expect(data).toBeTruthy()
     expect(data?.name).toBe(name)
+    expect(data?.website).toBe(website)
   })
 
   it('update organization with invalid body', async () => {
