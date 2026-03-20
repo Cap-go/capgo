@@ -135,6 +135,7 @@ function decodeHtml(value: string) {
     .replace(/&#39;/g, '\'')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
 }
 
 function normalizeStoreName(name: string, url: URL) {

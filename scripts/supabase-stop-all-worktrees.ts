@@ -20,6 +20,10 @@ function getSupabaseCmd(repoRoot: string): SupabaseCmd {
   if (localBin)
     return { cmd: localBin, argsPrefix: [] }
 
+  if (existsSync(resolve(repoRoot, 'node_modules', 'supabase', 'package.json'))) {
+    throw new Error('Supabase CLI is installed without its binary. Run `bun pm trust supabase && bun install` so Bun can execute the package postinstall.')
+  }
+
   if (hasSupabaseCli())
     return { cmd: 'supabase', argsPrefix: [] }
 
