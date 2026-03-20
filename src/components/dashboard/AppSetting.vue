@@ -66,6 +66,7 @@ const RETENTION_PRESETS = [
 
 const selectedRetentionPreset = ref<number>(2592000)
 const customRetentionValue = ref<number>(0)
+const isImportingStoreIcon = ref(false)
 
 const isCustomRetention = computed(() => selectedRetentionPreset.value === -1)
 
@@ -199,6 +200,13 @@ async function submit(form: { app_name: string, expose_metadata: boolean, allow_
   }
 
   try {
+    await updateStoreUrls((form as typeof form & { store_url?: string }).store_url ?? '')
+  }
+  catch (error) {
+    toast.error(error as string)
+  }
+
+  try {
     await updateAppRetention(effectiveRetentionValue.value)
   }
   catch (error) {
@@ -229,6 +237,133 @@ async function submit(form: { app_name: string, expose_metadata: boolean, allow_
   }
 
   isLoading.value = false
+}
+
+function getStoreUrls(rawUrl: string) {
+  const trimmedUrl = rawUrl.trim()
+  if (!trimmedUrl)
+    return { iosStoreUrl: null, androidStoreUrl: null }
+
+  let parsedUrl: URL
+  try {
+    parsedUrl = new URL(trimmedUrl)
+  }
+  catch {
+    throw new Error('Please enter a valid App Store or Google Play link')
+  }
+
+  if (parsedUrl.hostname === 'apps.apple.com')
+    return { iosStoreUrl: trimmedUrl, androidStoreUrl: null }
+
+  if (parsedUrl.hostname === 'play.google.com')
+    return { iosStoreUrl: null, androidStoreUrl: trimmedUrl }
+
+  throw new Error('Please use an App Store or Google Play link')
+}
+
+const storeUrl = computed(() => appRef.value?.ios_store_url || appRef.value?.android_store_url || '')
+const shouldShowStoreIconImport = computed(() => !appRef.value?.icon_url && !!storeUrl.value)
+
+async function updateStoreUrls(newStoreUrl: string) {
+  const { iosStoreUrl, androidStoreUrl } = getStoreUrls(newStoreUrl)
+  const currentIosStoreUrl = appRef.value?.ios_store_url ?? null
+  const currentAndroidStoreUrl = appRef.value?.android_store_url ?? null
+
+  if (iosStoreUrl === currentIosStoreUrl && androidStoreUrl === currentAndroidStoreUrl)
+    return Promise.resolve()
+
+  const { error } = await supabase
+    .from('apps')
+    .update({
+      ios_store_url: iosStoreUrl,
+      android_store_url: androidStoreUrl,
+    })
+    .eq('app_id', props.appId)
+
+  if (error)
+    return Promise.reject(new Error('Unable to update the store link'))
+
+  if (appRef.value) {
+    appRef.value.ios_store_url = iosStoreUrl
+    appRef.value.android_store_url = androidStoreUrl
+  }
+
+  toast.success('Store link updated')
+}
+
+async function uploadIconFromSource(iconSourceUrl: string) {
+  if (!appRef.value)
+    throw new Error('App not loaded')
+
+  const response = await fetch(iconSourceUrl)
+  if (!response.ok)
+    throw new Error('Unable to download the store icon')
+
+  const blob = await response.blob()
+  const contentType = blob.type || 'image/png'
+  const iconPath = `org/${appRef.value.owner_org.id}/${props.appId}/icon`
+
+  const { error: uploadError } = await supabase.storage
+    .from('images')
+    .upload(iconPath, blob, {
+      contentType,
+      upsert: true,
+    })
+
+  if (uploadError) {
+    console.error(uploadError)
+    throw new Error(t('upload-img-error'))
+  }
+
+  const { error: updateError } = await supabase
+    .from('apps')
+    .update({ icon_url: iconPath })
+    .eq('app_id', props.appId)
+
+  if (updateError) {
+    console.error(updateError)
+    throw new Error(t('upload-img-error'))
+  }
+
+  appRef.value.icon_url = await createSignedImageUrl(iconPath)
+}
+
+async function importIconFromStore() {
+  if (!canUpdateSettings.value) {
+    toast.error(t('no-permission'))
+    return
+  }
+
+  if (!storeUrl.value) {
+    toast.error('Add a store link first')
+    return
+  }
+
+  isImportingStoreIcon.value = true
+
+  try {
+    const { data, error } = await supabase.functions.invoke('app/store-metadata', {
+      method: 'POST',
+      body: { url: storeUrl.value },
+    })
+
+    if (error)
+      throw new Error(error.message || 'Unable to import the store icon')
+
+    const iconSource = data?.icon_data_url || data?.icon_url
+    if (!iconSource)
+      throw new Error('No icon found for this store link')
+
+    await uploadIconFromSource(iconSource)
+    toast.success('Store icon imported')
+  }
+  catch (error) {
+    console.error(error)
+    toast.error(error instanceof Error ? error.message : 'Unable to import the store icon')
+  }
+  finally {
+    isImportingStoreIcon.value = false
+  }
 }
 
 async function updateAppName(newName: string) {
@@ -983,6 +1118,34 @@ async function transferAppOwnership() {
                 :value="appRef?.name ?? ''"
                 :label="t('app-name')"
               />
+              <FormKit
+                type="url"
+                name="store_url"
+                :value="storeUrl"
+                label="Store link"
+                help="Use either an App Store or Google Play link."
+                placeholder="https://apps.apple.com/... or https://play.google.com/..."
+              />
+              <div v-if="shouldShowStoreIconImport" class="mb-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-900/70">
+                <div class="text-sm font-medium text-slate-800 dark:text-slate-100">
+                  Import the app icon from the store
+                </div>
+                <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                  Your app does not have an icon yet. We can fetch it from the store link above.
+                </p>
+                <button
+                  type="button"
+                  class="d-btn d-btn-sm mt-3"
+                  :class="{ 'd-btn-disabled': isImportingStoreIcon }"
+                  :disabled="isImportingStoreIcon"
+                  @click="importIconFromStore"
+                >
+                  {{ isImportingStoreIcon ? 'Importing...' : 'Import icon' }}
+                </button>
+              </div>
+              <div v-else-if="!appRef?.icon_url" class="mb-3 rounded-2xl border border-dashed border-slate-300 p-4 text-sm text-slate-600 dark:border-slate-700 dark:text-slate-300">
+                Add a store link to auto-import the app icon if you do not want to upload one manually.
+              </div>
               <div
                 :key="forceBump"
                 class="flex flex-row cursor-pointer"
