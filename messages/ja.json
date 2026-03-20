@@ -1499,6 +1499,7 @@
   "sso-status-pending": "保留中",
   "sso-status-verified": "検証済み",
   "sso-upgrade-to-enterprise": "Upgrade to Enterprise",
+  "sso-linked-success": "SSO sign-in successful. Welcome!",
   "sso-verify-dns": "DNSを検証",
   "sso-verifying": "検証中...",
   "start-onboarding": "オンボーディングを開始する",
