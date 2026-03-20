@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
-import { isAppDemo } from '../utils/demo.ts'
+import { isDemoApp } from '../utils/demo.ts'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
@@ -47,8 +47,8 @@ app.post('/', middlewareAPISecret, triggerValidator('deploy_history', 'INSERT'),
       return c.json(BRES)
     }
 
-    // Check if this is a demo app (identified by com.capdemo. prefix) - skip notifications
-    if (isAppDemo(record.app_id)) {
+    // Demo apps skip deploy notifications.
+    if (await isDemoApp(c, record.app_id)) {
       cloudlog({ requestId: c.get('requestId'), message: 'Demo app detected, skipping deploy notifications' })
       return c.json(BRES)
     }
