@@ -41,6 +41,7 @@ const existingAppSetup = ref<'import' | 'manual' | null>(null)
 const appName = ref('')
 const storeUrl = ref('')
 const importedStoreAppId = ref('')
+const manualAppId = ref('')
 
 const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ''
 const cliCommand = computed(() => `npx @capgo/cli@latest i ${apiKey.value ?? '[APIKEY]'}${localCommand}`)
@@ -60,6 +61,9 @@ const canShowAppDetails = computed(() => {
 const generatedAppId = computed(() => {
   if (createdApp.value)
     return createdApp.value.app_id
+
+  if (existingApp.value === true && existingAppSetup.value === 'manual' && manualAppId.value.trim())
+    return manualAppId.value.trim()
 
   const storeAppId = importedStoreAppId.value || extractAndroidAppId(storeUrl.value)
   if (existingApp.value === true && storeAppId)
@@ -128,15 +132,18 @@ async function ensureApiKey() {
   if (!userId)
     return
 
+  const isLiveKey = (expiresAt: string | null) => !expiresAt || new Date(expiresAt).getTime() > Date.now()
+
   const { data, error } = await supabase
     .from('apikeys')
-    .select('key')
+    .select('key, expires_at')
     .eq('user_id', userId)
     .eq('mode', 'all')
-    .limit(1)
+    .order('created_at', { ascending: false })
 
-  if (!error && data?.[0]?.key) {
-    apiKey.value = data[0].key
+  const validKey = !error ? data?.find(key => !!key.key && isLiveKey(key.expires_at)) : null
+  if (validKey?.key) {
+    apiKey.value = validKey.key
     return
   }
 
@@ -151,12 +158,12 @@ async function ensureApiKey() {
 
   const { data: refreshedData } = await supabase
     .from('apikeys')
-    .select('key')
+    .select('key, expires_at')
     .eq('user_id', claimsUserId)
     .eq('mode', 'all')
-    .limit(1)
+    .order('created_at', { ascending: false })
 
-  apiKey.value = refreshedData?.[0]?.key ?? null
+  apiKey.value = refreshedData?.find(key => !!key.key && isLiveKey(key.expires_at))?.key ?? null
 }
 
 async function loadResumeApp() {
@@ -239,6 +246,17 @@ function onSelectIconFormKit(value: unknown) {
   localIconPreview.value = file ? URL.createObjectURL(file) : ''
 }
 
+function isAppIdConflict(error: { status?: number, message?: string } | null | undefined) {
+  if (!error)
+    return false
+
+  if (error.status === 409)
+    return true
+
+  const message = error.message?.toLowerCase() || ''
+  return ['duplicate', 'already exists', 'unique constraint', 'apps_pkey', 'app_id_key'].some(fragment => message.includes(fragment))
+}
+
 async function uploadIcon(appId: string, iconSourceUrl?: string) {
   if (!currentOrg.value?.gid)
     return
@@ -294,6 +312,11 @@ async function createAppRecord() {
     return
   }
 
+  if (existingApp.value === true && existingAppSetup.value === 'manual' && !manualAppId.value.trim()) {
+    toast.error('Add the real bundle or package ID to continue.')
+    return
+  }
+
   isSubmitting.value = true
   try {
     const normalizedStoreUrls = getStoreUrls(storeUrl.value.trim())
@@ -321,6 +344,9 @@ async function createAppRecord() {
         appId = candidateId
         break
       }
+
+      if (!isAppIdConflict(error))
+        throw error ?? new Error('Unable to create the onboarding app.')
     }
 
     if (!responseData) {
@@ -409,6 +435,7 @@ watch(existingApp, (value) => {
     storeIconPreview.value = ''
     storeScreenshotPreview.value = ''
     importedStoreAppId.value = ''
+    manualAppId.value = ''
   }
 })
 </script>
@@ -475,6 +502,13 @@ watch(existingApp, (value) => {
                     Import app name and icon
                   </button>
                 </template>
+                <div v-else-if="existingAppSetup === 'manual'">
+                  <label class="text-sm font-medium text-slate-800">Bundle or package ID</label>
+                  <input v-model="manualAppId" class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm" placeholder="com.example.app">
+                  <p class="mt-2 text-xs text-slate-500">
+                    Use the exact app ID from your Capacitor project or store listing.
+                  </p>
+                </div>
               </div>
 
               <template v-if="canShowAppDetails">

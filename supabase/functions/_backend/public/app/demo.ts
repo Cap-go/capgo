@@ -470,8 +470,13 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       })()
 
   if (appData.id) {
+    if (!appData.need_onboarding) {
+      cloudlog({ requestId, message: 'Attempted demo seeding on completed app', app_id: appId })
+      throw simpleError('app_not_pending_onboarding', 'Cannot seed demo data on an app that already completed onboarding', { app_id: appId })
+    }
+
     const { error: cleanupError } = await supabase
-      .rpc('clear_onboarding_app_data' as any, { p_app_uuid: appData.id })
+      .rpc('clear_onboarding_app_data', { p_app_uuid: appData.id })
 
     if (cleanupError) {
       cloudlog({ requestId, message: 'Error clearing onboarding data before demo seeding', error: cleanupError, app_id: appId })

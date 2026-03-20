@@ -2793,6 +2793,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      clear_onboarding_app_data: {
+        Args: { p_app_uuid: string }
+        Returns: undefined
+      }
       check_domain_sso: {
         Args: { p_domain: string }
         Returns: {

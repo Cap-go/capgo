@@ -58,6 +58,9 @@ BEGIN
   DELETE FROM public.daily_mau
   WHERE app_id = v_app_id;
 
+  DELETE FROM public.daily_build_time
+  WHERE app_id = v_app_id;
+
   DELETE FROM public.build_requests
   WHERE app_id = v_app_id;
 

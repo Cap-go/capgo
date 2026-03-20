@@ -14,6 +14,14 @@ interface AppleLookupResult {
   screenshotUrls?: string[]
 }
 
+const ALLOWED_STORE_HOSTS = new Set([
+  'apps.apple.com',
+  'itunes.apple.com',
+  'play.google.com',
+  'play-lh.googleusercontent.com',
+  'play.googleusercontent.com',
+])
+
 function uint8ArrayToBase64(bytes: Uint8Array) {
   let binary = ''
   const chunkSize = 0x8000
@@ -31,6 +39,7 @@ async function fetchIconDataUrl(iconUrl: string | null) {
     return null
 
   try {
+    assertAllowedStoreUrl(iconUrl)
     const response = await fetch(iconUrl, {
       headers: {
         'user-agent': 'Mozilla/5.0 (compatible; CapgoOnboardingBot/1.0)',
@@ -48,6 +57,15 @@ async function fetchIconDataUrl(iconUrl: string | null) {
   catch {
     return null
   }
+}
+
+function assertAllowedStoreUrl(rawUrl: string) {
+  const parsedUrl = new URL(rawUrl)
+
+  if (parsedUrl.protocol !== 'https:' || !ALLOWED_STORE_HOSTS.has(parsedUrl.hostname.toLowerCase()))
+    throw quickError(400, 'invalid_url', 'Only official App Store and Google Play URLs are allowed', { url: rawUrl })
+
+  return parsedUrl
 }
 
 function extractAndroidAppId(url: URL) {
@@ -133,20 +151,16 @@ function normalizeStoreName(name: string, url: URL) {
   return trimmed
 }
 
-export async function fetchStoreMetadata(_c: Context<MiddlewareKeyVariables>, body: FetchStoreMetadataBody): Promise<Response> {
+export async function fetchStoreMetadata(c: Context<MiddlewareKeyVariables>, body: FetchStoreMetadataBody): Promise<Response> {
   if (!body.url) {
     throw quickError(400, 'missing_url', 'Missing store URL')
   }
 
   let parsedUrl: URL
   try {
-    parsedUrl = new URL(body.url)
+    parsedUrl = assertAllowedStoreUrl(body.url)
   }
   catch {
-    throw quickError(400, 'invalid_url', 'Invalid store URL', { url: body.url })
-  }
-
-  if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
     throw quickError(400, 'invalid_url', 'Invalid store URL', { url: body.url })
   }
 
@@ -177,7 +191,7 @@ export async function fetchStoreMetadata(_c: Context<MiddlewareKeyVariables>, bo
   const icon_url = appleLookup?.artworkUrl512?.trim() || appleLookup?.artworkUrl100?.trim() || scrapedIconUrl
   const icon_data_url = await fetchIconDataUrl(icon_url)
 
-  return Response.json({
+  return c.json({
     status: 'ok',
     name,
     icon_url,

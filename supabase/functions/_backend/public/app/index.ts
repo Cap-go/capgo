@@ -8,8 +8,8 @@ import { deleteApp } from './delete.ts'
 import { createDemoApp } from './demo.ts'
 import { get, getAll } from './get.ts'
 import { post } from './post.ts'
-import { fetchStoreMetadata } from './store_metadata.ts'
 import { put } from './put.ts'
+import { fetchStoreMetadata } from './store_metadata.ts'
 
 export const app = honoFactory.createApp()
 
