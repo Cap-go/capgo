@@ -1,13 +1,14 @@
 import type { Context } from 'hono'
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import { Hono } from 'hono/tiny'
-import { middlewareAuth, parseBody, quickError, useCors } from '../utils/hono.ts'
+import { createHono, middlewareAuth, parseBody, quickError, useCors } from '../utils/hono.ts'
+import { version } from '../utils/version.ts'
 import { getWebhookUrlValidationError } from '../utils/webhook.ts'
 
 const MAX_ICON_BYTES = 512 * 1024
+const MAX_HTML_BYTES = 1024 * 1024
 const MAX_REDIRECTS = 5
+const DNS_LOOKUP_URL = 'https://cloudflare-dns.com/dns-query'
 
-export const app = new Hono<MiddlewareKeyVariables>()
+export const app = createHono('', version)
 
 app.use('/', useCors)
 
@@ -130,6 +131,125 @@ function findIconHref(html: string) {
   return candidates.sort((a, b) => b.priority - a.priority)[0]?.href ?? ''
 }
 
+function isPrivateIpv4(ip: string) {
+  const octets = ip.split('.').map(part => Number.parseInt(part, 10))
+  if (octets.length !== 4 || octets.some(part => Number.isNaN(part) || part < 0 || part > 255))
+    return true
+
+  const [a, b] = octets
+  return a === 0
+    || a === 10
+    || a === 127
+    || (a === 169 && b === 254)
+    || (a === 172 && b >= 16 && b <= 31)
+    || (a === 192 && b === 168)
+    || (a === 100 && b >= 64 && b <= 127)
+    || (a === 198 && (b === 18 || b === 19))
+  // Reserved TEST-NET ranges are also non-public for this fetch path.
+    || (a === 192 && b === 0)
+    || (a === 192 && b === 0 && octets[2] === 2)
+    || (a === 198 && b === 51 && octets[2] === 100)
+    || (a === 203 && b === 0 && octets[2] === 113)
+}
+
+function isPrivateIpv6(ip: string) {
+  const normalized = ip.toLowerCase()
+  if (normalized === '::1' || normalized === '::')
+    return true
+  if (normalized.startsWith('fe80:') || normalized.startsWith('fc') || normalized.startsWith('fd'))
+    return true
+  if (normalized.startsWith('::ffff:')) {
+    const mappedIpv4 = normalized.slice(7)
+    return isPrivateIpv4(mappedIpv4)
+  }
+  return false
+}
+
+function isPrivateIp(ip: string) {
+  return ip.includes(':') ? isPrivateIpv6(ip) : isPrivateIpv4(ip)
+}
+
+async function resolveHostnameIps(hostname: string, type: 'A' | 'AAAA') {
+  const dnsUrl = new URL(DNS_LOOKUP_URL)
+  dnsUrl.searchParams.set('name', hostname)
+  dnsUrl.searchParams.set('type', type)
+
+  const response = await fetch(dnsUrl.toString(), {
+    headers: { Accept: 'application/dns-json' },
+  })
+  if (!response.ok)
+    return []
+
+  const data = await response.json() as { Answer?: Array<{ data?: string }> }
+  return (data.Answer ?? [])
+    .map(answer => answer.data?.trim() ?? '')
+    .filter(Boolean)
+}
+
+async function getPublicHostnameValidationError(c: Context, urlString: string) {
+  const validationError = getWebhookUrlValidationError(c, urlString)
+  if (validationError)
+    return validationError
+
+  let url: URL
+  try {
+    url = new URL(urlString)
+  }
+  catch {
+    return 'Website must be a valid URL'
+  }
+
+  const ips = [
+    ...await resolveHostnameIps(url.hostname, 'A'),
+    ...await resolveHostnameIps(url.hostname, 'AAAA'),
+  ]
+
+  if (ips.length === 0)
+    return 'Could not resolve website host'
+  if (ips.some(isPrivateIp))
+    return 'Website must point to a public host'
+
+  return null
+}
+
+async function readResponseTextWithLimit(response: Response, limit: number) {
+  const contentLength = Number.parseInt(response.headers.get('content-length') ?? '', 10)
+  if (Number.isFinite(contentLength) && contentLength > limit)
+    return null
+
+  if (!response.body)
+    return await response.text()
+
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done)
+      break
+
+    if (!value)
+      continue
+
+    total += value.byteLength
+    if (total > limit) {
+      await reader.cancel()
+      return null
+    }
+    chunks.push(value)
+  }
+
+  const bytes = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+
+  return new TextDecoder().decode(bytes)
+}
+
 async function fetchValidatedUrl(
   c: Context,
   urlString: string,
@@ -138,14 +258,20 @@ async function fetchValidatedUrl(
   let currentUrl = urlString
 
   for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount++) {
-    const validationError = getWebhookUrlValidationError(c, currentUrl)
+    const validationError = await getPublicHostnameValidationError(c, currentUrl)
     if (validationError)
       return { error: validationError, response: null as Response | null }
 
-    const response = await fetch(currentUrl, {
-      ...init,
-      redirect: 'manual',
-    })
+    let response: Response
+    try {
+      response = await fetch(currentUrl, {
+        ...init,
+        redirect: 'manual',
+      })
+    }
+    catch {
+      return { error: 'Could not fetch website', response: null as Response | null }
+    }
 
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location')
@@ -174,6 +300,10 @@ async function fetchIconDataUrl(c: Context, iconUrl: string) {
   if (!contentType.startsWith('image/'))
     return null
 
+  const contentLength = Number.parseInt(response.headers.get('content-length') ?? '', 10)
+  if (Number.isFinite(contentLength) && contentLength > MAX_ICON_BYTES)
+    return null
+
   const arrayBuffer = await response.arrayBuffer()
   if (arrayBuffer.byteLength === 0 || arrayBuffer.byteLength > MAX_ICON_BYTES)
     return null
@@ -197,7 +327,7 @@ app.post('/', middlewareAuth, async (c) => {
   if (!website)
     return quickError(400, 'invalid_website', 'Website must be a valid URL')
 
-  const websiteValidationError = getWebhookUrlValidationError(c, website)
+  const websiteValidationError = await getPublicHostnameValidationError(c, website)
   if (websiteValidationError)
     return quickError(400, 'invalid_website', websiteValidationError)
 
@@ -217,7 +347,9 @@ app.post('/', middlewareAuth, async (c) => {
   if (!contentType.includes('html'))
     return quickError(400, 'website_not_html', 'Website did not return HTML')
 
-  const html = await response.text()
+  const html = await readResponseTextWithLimit(response, MAX_HTML_BYTES)
+  if (!html)
+    return quickError(400, 'website_too_large', 'Website response is too large')
   const finalUrl = new URL(response.url)
   const hostname = finalUrl.hostname.replace(/^www\./, '')
 

@@ -181,7 +181,12 @@ export async function uploadOrgLogoFile(orgId: string, file: Blob, fileName?: st
     throw updateError ?? new Error('Organization logo update affected no rows')
   }
 
-  await organizationStore.fetchOrganizations()
+  try {
+    await organizationStore.fetchOrganizations()
+  }
+  catch (error) {
+    console.error('Failed to refresh organizations after org logo upload', error)
+  }
   organizationStore.setCurrentOrganization(safeOrgId)
 
   return storagePath

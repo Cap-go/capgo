@@ -172,7 +172,7 @@ async function guard(
     const organizationsLoaded = await tryLoadOrganizations(() => organizationStore.fetchOrganizations())
     if (organizationsLoaded && isAdminRoute) {
       try {
-        main.isAdmin = main.isAdmin ?? await isPlatformAdmin()
+        main.isAdmin = await isPlatformAdmin()
       }
       catch (error) {
         console.error('Failed to resolve platform admin status:', error)
@@ -197,7 +197,7 @@ async function guard(
 
     try {
       // isPlatformAdmin() is the only frontend admin-rights source.
-      main.isAdmin = main.isAdmin ?? await isPlatformAdmin()
+      main.isAdmin = await isPlatformAdmin()
     }
     catch (error) {
       console.error('Failed to resolve platform admin status:', error)
@@ -257,16 +257,13 @@ async function guard(
 
     // Check if user is trying to access admin routes
     if (isAdminRoute) {
-      // Ensure isAdmin is loaded before checking
-      if (main.isAdmin === undefined) {
-        try {
-          // Re-check via the single approved frontend path for admin-rights.
-          main.isAdmin = await isPlatformAdmin()
-        }
-        catch (error) {
-          console.error('Failed to resolve platform admin status:', error)
-          main.isAdmin = false
-        }
+      try {
+        // Re-check via the single approved frontend path for admin-rights.
+        main.isAdmin = await isPlatformAdmin()
+      }
+      catch (error) {
+        console.error('Failed to resolve platform admin status:', error)
+        main.isAdmin = false
       }
 
       // Redirect non-admin users to dashboard

@@ -355,9 +355,14 @@ function openInviteModal() {
 }
 
 async function finishOnboarding() {
-  await organizationStore.fetchOrganizations()
-  if (activeOrgId.value)
-    organizationStore.setCurrentOrganization(activeOrgId.value)
+  try {
+    await organizationStore.fetchOrganizations()
+    if (activeOrgId.value)
+      organizationStore.setCurrentOrganization(activeOrgId.value)
+  }
+  catch (error) {
+    console.error('Failed to refresh organizations before finishing onboarding', error)
+  }
 
   const nextPath = typeof route.query.to === 'string' && route.query.to && !route.query.to.startsWith('/onboarding/')
     ? route.query.to
@@ -568,8 +573,8 @@ onUnmounted(() => {
                 <div class="flex items-center gap-4">
                   <div class="flex h-18 w-18 items-center justify-center overflow-hidden rounded-[22px] bg-slate-800 text-2xl font-semibold">
                     <img
-                      v-if="importedLogoUrl || selectedLogoPreview || currentOrganization?.logo"
-                      :src="currentOrganization?.logo || selectedLogoPreview || importedLogoUrl"
+                      v-if="importedLogoUrl || selectedLogoPreview || (currentOrganization?.gid === activeOrgId && currentOrganization?.logo)"
+                      :src="(currentOrganization?.gid === activeOrgId ? currentOrganization.logo : '') || selectedLogoPreview || importedLogoUrl"
                       :alt="`${activeOrgName} logo preview`"
                       class="h-full w-full object-cover"
                     >
@@ -651,7 +656,7 @@ onUnmounted(() => {
                 <div class="flex items-center gap-4">
                   <div class="flex h-18 w-18 items-center justify-center overflow-hidden rounded-[22px] bg-slate-800 text-2xl font-semibold text-white">
                     <img
-                      v-if="currentOrganization?.logo"
+                      v-if="currentOrganization?.gid === activeOrgId && currentOrganization?.logo"
                       :src="currentOrganization.logo"
                       :alt="`${activeOrgName} logo`"
                       class="object-cover w-20 h-20 rounded-2xl"
