@@ -10,8 +10,6 @@ import { createSignedImageUrl } from './storage'
 import { useSupabase } from './supabase'
 
 const supabase = useSupabase()
-const main = useMainStore()
-const organizationStore = useOrganizationStore()
 
 function normalizeImageStoragePath(path?: string | null) {
   if (!path)
@@ -50,6 +48,7 @@ async function uploadPhotoShared(
 }
 
 async function uploadPhotoUser(formId: string, data: string, fileName: string, contentType: string, isLoading: Ref<boolean>, wentWrong: string) {
+  const main = useMainStore()
   const userId = main.user?.id
   if (!userId) {
     setErrors(formId, [wentWrong], {})
@@ -111,6 +110,7 @@ async function uploadPhotoUser(formId: string, data: string, fileName: string, c
 }
 
 async function uploadPhotoOrg(formId: string, data: string, fileName: string, contentType: string, isLoading: Ref<boolean>, wentWrong: string) {
+  const organizationStore = useOrganizationStore()
   const gid = organizationStore.currentOrganization?.gid
   if (!gid) {
     console.error('No current org id', gid)
@@ -146,6 +146,7 @@ async function uploadPhotoOrg(formId: string, data: string, fileName: string, co
 }
 
 export async function uploadOrgLogoFile(orgId: string, file: Blob, fileName?: string) {
+  const organizationStore = useOrganizationStore()
   const safeOrgId = orgId.trim()
   if (!safeOrgId)
     throw new Error('Organization ID is required')

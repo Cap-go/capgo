@@ -131,9 +131,9 @@ function isSelectableOrganization(role: string) {
 }
 
 const supabase = useSupabase()
-const main = useMainStore()
 
 export const useOrganizationStore = defineStore('organization', () => {
+  const main = useMainStore()
   const _organizations: Ref<Map<string, Organization>> = ref(new Map())
   const _organizationsByAppId: Ref<Map<string, Organization>> = ref(new Map())
   const _initialLoadPromise = ref(Promise.withResolvers())
