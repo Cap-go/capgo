@@ -95,7 +95,7 @@ async function execWithServiceRoleAndCapgkey(
   try {
     await client.query('BEGIN')
     try {
-      await client.query('SELECT set_config(\'role\', \'service_role\', true)')
+      await client.query('SET LOCAL ROLE service_role')
       await client.query('SELECT set_config(\'request.jwt.claims\', null, true)')
       await client.query(
         'SELECT set_config(\'request.headers\', $1, true)',
