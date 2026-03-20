@@ -22,21 +22,21 @@ DECLARE
   cycle_end timestamptz;
   request_role text;
 BEGIN
-  request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
+  request_role := NULLIF((auth.jwt() ->> 'role'), '');
 
   IF request_role IS NULL THEN
-    RETURN;
+    RAISE EXCEPTION 'NO_RIGHTS';
   END IF;
 
   IF request_role <> 'service_role' THEN
-    IF NOT public.check_min_rights(
+    IF public.check_min_rights(
         'read'::public.user_min_right,
         public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_app_metrics.org_id),
         get_app_metrics.org_id,
         NULL::character varying,
         NULL::bigint
-    ) THEN
-      RETURN;
+    ) IS NOT TRUE THEN
+      RAISE EXCEPTION 'NO_RIGHTS';
     END IF;
   END IF;
 
@@ -71,21 +71,21 @@ DECLARE
   org_exists boolean;
   request_role text;
 BEGIN
-  request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
+  request_role := NULLIF((auth.jwt() ->> 'role'), '');
 
   IF request_role IS NULL THEN
-    RETURN;
+    RAISE EXCEPTION 'NO_RIGHTS';
   END IF;
 
   IF request_role <> 'service_role' THEN
-    IF NOT public.check_min_rights(
+    IF public.check_min_rights(
         'read'::public.user_min_right,
         public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_app_metrics.org_id),
         get_app_metrics.org_id,
         NULL::character varying,
         NULL::bigint
-    ) THEN
-      RETURN;
+    ) IS NOT TRUE THEN
+      RAISE EXCEPTION 'NO_RIGHTS';
     END IF;
   END IF;
 
@@ -163,21 +163,21 @@ DECLARE
   cycle_end timestamptz;
   request_role text;
 BEGIN
-  request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
+  request_role := NULLIF((auth.jwt() ->> 'role'), '');
 
   IF request_role IS NULL THEN
-    RETURN;
+    RAISE EXCEPTION 'NO_RIGHTS';
   END IF;
 
   IF request_role <> 'service_role' THEN
-    IF NOT public.check_min_rights(
+    IF public.check_min_rights(
         'read'::public.user_min_right,
         public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_global_metrics.org_id),
         get_global_metrics.org_id,
         NULL::character varying,
         NULL::bigint
-    ) THEN
-      RETURN;
+    ) IS NOT TRUE THEN
+      RAISE EXCEPTION 'NO_RIGHTS';
     END IF;
   END IF;
 
@@ -209,21 +209,21 @@ SET
 DECLARE
   request_role text;
 BEGIN
-  request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
+  request_role := NULLIF((auth.jwt() ->> 'role'), '');
 
   IF request_role IS NULL THEN
-    RETURN;
+    RAISE EXCEPTION 'NO_RIGHTS';
   END IF;
 
   IF request_role <> 'service_role' THEN
-    IF NOT public.check_min_rights(
+    IF public.check_min_rights(
         'read'::public.user_min_right,
         public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_global_metrics.org_id),
         get_global_metrics.org_id,
         NULL::character varying,
         NULL::bigint
-    ) THEN
-      RETURN;
+    ) IS NOT TRUE THEN
+      RAISE EXCEPTION 'NO_RIGHTS';
     END IF;
   END IF;
 
@@ -257,23 +257,41 @@ SET search_path = '' AS $$
 DECLARE
   v_is_service_role boolean;
   v_request_role text;
+  v_request_user uuid;
+  v_apikey_identity uuid;
 BEGIN
   v_request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
-  v_is_service_role := (
-    (v_request_role = 'service_role')
-    OR ((SELECT auth.jwt() ->> 'role') = 'service_role')
-    OR ((SELECT auth.role()) = 'service_role')
-    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
-  );
+  v_is_service_role := v_request_role = 'service_role'
+    OR NULLIF((auth.jwt() ->> 'role'), '') = 'service_role'
+    OR auth.role() = 'service_role';
 
-  IF NOT v_is_service_role AND NOT public.check_min_rights(
-      'read'::public.user_min_right,
-      public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_current_plan_max_org.orgid),
-      get_current_plan_max_org.orgid,
-      NULL::character varying,
-      NULL::bigint
-  ) THEN
-    RAISE EXCEPTION 'NO_RIGHTS';
+  IF NOT v_is_service_role THEN
+    v_request_user := auth.uid();
+
+    IF v_request_user IS NOT NULL THEN
+      IF public.check_min_rights(
+          'read'::public.user_min_right,
+          v_request_user,
+          get_current_plan_max_org.orgid,
+          NULL::character varying,
+          NULL::bigint
+      ) IS NOT TRUE THEN
+        RAISE EXCEPTION 'NO_RIGHTS';
+      END IF;
+    ELSIF public.get_apikey_header() IS NOT NULL THEN
+      v_apikey_identity := public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_current_plan_max_org.orgid);
+      IF v_apikey_identity IS NULL OR public.check_min_rights(
+          'read'::public.user_min_right,
+          v_apikey_identity,
+          get_current_plan_max_org.orgid,
+          NULL::character varying,
+          NULL::bigint
+      ) IS NOT TRUE THEN
+        RAISE EXCEPTION 'NO_RIGHTS';
+      END IF;
+    ELSE
+      RAISE EXCEPTION 'NO_RIGHTS';
+    END IF;
   END IF;
 
   RETURN QUERY
@@ -293,23 +311,33 @@ SET
 DECLARE
   v_is_service_role boolean;
   v_request_role text;
+  v_request_user uuid;
 BEGIN
   v_request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
-  v_is_service_role := (
-    (v_request_role = 'service_role')
-    OR ((SELECT auth.jwt() ->> 'role') = 'service_role')
-    OR ((SELECT auth.role()) = 'service_role')
-    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
-  );
+  v_is_service_role := v_request_role = 'service_role'
+    OR NULLIF((auth.jwt() ->> 'role'), '') = 'service_role'
+    OR auth.role() = 'service_role';
 
-  IF NOT v_is_service_role AND NOT public.check_min_rights(
-      'read'::public.user_min_right,
-      public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_current_plan_name_org.orgid),
-      get_current_plan_name_org.orgid,
-      NULL::character varying,
-      NULL::bigint
-  ) THEN
-    RAISE EXCEPTION 'NO_RIGHTS';
+  IF NOT v_is_service_role THEN
+    v_request_user := auth.uid();
+
+    IF v_request_user IS NOT NULL THEN
+      IF public.is_member_of_org(v_request_user, get_current_plan_name_org.orgid) IS NOT TRUE THEN
+        RAISE EXCEPTION 'NO_RIGHTS';
+      END IF;
+    ELSIF public.get_apikey_header() IS NOT NULL THEN
+      IF public.check_min_rights(
+          'read'::public.user_min_right,
+          public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_current_plan_name_org.orgid),
+          get_current_plan_name_org.orgid,
+          NULL::character varying,
+          NULL::bigint
+      ) IS NOT TRUE THEN
+        RAISE EXCEPTION 'NO_RIGHTS';
+      END IF;
+    ELSE
+      RAISE EXCEPTION 'NO_RIGHTS';
+    END IF;
   END IF;
 
   RETURN
@@ -337,23 +365,33 @@ DECLARE
   end_date timestamp with time zone;
   v_is_service_role boolean;
   v_request_role text;
+  v_request_user uuid;
 BEGIN
   v_request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
-  v_is_service_role := (
-    (v_request_role = 'service_role')
-    OR ((SELECT auth.jwt() ->> 'role') = 'service_role')
-    OR ((SELECT auth.role()) = 'service_role')
-    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
-  );
+  v_is_service_role := v_request_role = 'service_role'
+    OR NULLIF((auth.jwt() ->> 'role'), '') = 'service_role'
+    OR auth.role() = 'service_role';
 
-  IF NOT v_is_service_role AND NOT public.check_min_rights(
-      'read'::public.user_min_right,
-      public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_cycle_info_org.orgid),
-      get_cycle_info_org.orgid,
-      NULL::character varying,
-      NULL::bigint
-  ) THEN
-    RAISE EXCEPTION 'NO_RIGHTS';
+  IF NOT v_is_service_role THEN
+    v_request_user := auth.uid();
+
+    IF v_request_user IS NOT NULL THEN
+      IF public.is_member_of_org(v_request_user, get_cycle_info_org.orgid) IS NOT TRUE THEN
+        RAISE EXCEPTION 'NO_RIGHTS';
+      END IF;
+    ELSIF public.get_apikey_header() IS NOT NULL THEN
+      IF public.check_min_rights(
+          'read'::public.user_min_right,
+          public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_cycle_info_org.orgid),
+          get_cycle_info_org.orgid,
+          NULL::character varying,
+          NULL::bigint
+      ) IS NOT TRUE THEN
+        RAISE EXCEPTION 'NO_RIGHTS';
+      END IF;
+    ELSE
+      RAISE EXCEPTION 'NO_RIGHTS';
+    END IF;
   END IF;
 
   SELECT customer_id INTO customer_id_var FROM public.orgs WHERE id = orgid;
@@ -399,23 +437,33 @@ DECLARE
   percent_build_time double precision;
   v_is_service_role boolean;
   v_request_role text;
+  v_request_user uuid;
 BEGIN
   v_request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
-  v_is_service_role := (
-    (v_request_role = 'service_role')
-    OR ((SELECT auth.jwt() ->> 'role') = 'service_role')
-    OR ((SELECT auth.role()) = 'service_role')
-    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
-  );
+  v_is_service_role := v_request_role = 'service_role'
+    OR NULLIF((auth.jwt() ->> 'role'), '') = 'service_role'
+    OR auth.role() = 'service_role';
 
-  IF NOT v_is_service_role AND NOT public.check_min_rights(
-      'read'::public.user_min_right,
-      public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_plan_usage_percent_detailed.orgid),
-      get_plan_usage_percent_detailed.orgid,
-      NULL::character varying,
-      NULL::bigint
-  ) THEN
-    RAISE EXCEPTION 'NO_RIGHTS';
+  IF NOT v_is_service_role THEN
+    v_request_user := auth.uid();
+
+    IF v_request_user IS NOT NULL THEN
+      IF public.is_member_of_org(v_request_user, get_plan_usage_percent_detailed.orgid) IS NOT TRUE THEN
+        RAISE EXCEPTION 'NO_RIGHTS';
+      END IF;
+    ELSIF public.get_apikey_header() IS NOT NULL THEN
+      IF public.check_min_rights(
+          'read'::public.user_min_right,
+          public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_plan_usage_percent_detailed.orgid),
+          get_plan_usage_percent_detailed.orgid,
+          NULL::character varying,
+          NULL::bigint
+      ) IS NOT TRUE THEN
+        RAISE EXCEPTION 'NO_RIGHTS';
+      END IF;
+    ELSE
+      RAISE EXCEPTION 'NO_RIGHTS';
+    END IF;
   END IF;
 
   SELECT
@@ -478,23 +526,33 @@ DECLARE
   percent_build_time double precision;
   v_is_service_role boolean;
   v_request_role text;
+  v_request_user uuid;
 BEGIN
   v_request_role := NULLIF(current_setting('request.jwt.claim.role', true), '');
-  v_is_service_role := (
-    (v_request_role = 'service_role')
-    OR ((SELECT auth.jwt() ->> 'role') = 'service_role')
-    OR ((SELECT auth.role()) = 'service_role')
-    OR ((SELECT session_user) IS NOT DISTINCT FROM 'postgres')
-  );
+  v_is_service_role := v_request_role = 'service_role'
+    OR NULLIF((auth.jwt() ->> 'role'), '') = 'service_role'
+    OR auth.role() = 'service_role';
 
-  IF NOT v_is_service_role AND NOT public.check_min_rights(
-      'read'::public.user_min_right,
-      public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_plan_usage_percent_detailed.orgid),
-      get_plan_usage_percent_detailed.orgid,
-      NULL::character varying,
-      NULL::bigint
-  ) THEN
-    RAISE EXCEPTION 'NO_RIGHTS';
+  IF NOT v_is_service_role THEN
+    v_request_user := auth.uid();
+
+    IF v_request_user IS NOT NULL THEN
+      IF NOT public.is_member_of_org(v_request_user, get_plan_usage_percent_detailed.orgid) THEN
+        RAISE EXCEPTION 'NO_RIGHTS';
+      END IF;
+    ELSIF public.get_apikey_header() IS NOT NULL THEN
+      IF public.check_min_rights(
+          'read'::public.user_min_right,
+          public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_plan_usage_percent_detailed.orgid),
+          get_plan_usage_percent_detailed.orgid,
+          NULL::character varying,
+          NULL::bigint
+      ) IS NOT TRUE THEN
+        RAISE EXCEPTION 'NO_RIGHTS';
+      END IF;
+    ELSE
+      RAISE EXCEPTION 'NO_RIGHTS';
+    END IF;
   END IF;
 
   SELECT p.mau, p.bandwidth, p.storage, p.build_time_unit
@@ -520,6 +578,31 @@ BEGIN
     percent_build_time;
 END;
 $$;
+
+REVOKE ALL ON FUNCTION public.get_current_plan_max_org(uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.get_current_plan_max_org(uuid) TO anon;
+GRANT ALL ON FUNCTION public.get_current_plan_max_org(uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.get_current_plan_max_org(uuid) TO service_role;
+
+REVOKE ALL ON FUNCTION public.get_current_plan_name_org(uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.get_current_plan_name_org(uuid) TO anon;
+GRANT ALL ON FUNCTION public.get_current_plan_name_org(uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.get_current_plan_name_org(uuid) TO service_role;
+
+REVOKE ALL ON FUNCTION public.get_cycle_info_org(uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.get_cycle_info_org(uuid) TO anon;
+GRANT ALL ON FUNCTION public.get_cycle_info_org(uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.get_cycle_info_org(uuid) TO service_role;
+
+REVOKE ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid) TO anon;
+GRANT ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid) TO service_role;
+
+REVOKE ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid, date, date) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid, date, date) TO anon;
+GRANT ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid, date, date) TO authenticated;
+GRANT ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid, date, date) TO service_role;
 
 REVOKE EXECUTE ON FUNCTION public.delete_old_deleted_versions() FROM public;
 REVOKE EXECUTE ON FUNCTION public.delete_old_deleted_versions() FROM anon, authenticated;

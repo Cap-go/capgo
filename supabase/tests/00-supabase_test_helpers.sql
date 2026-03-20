@@ -259,8 +259,9 @@ CREATE OR REPLACE FUNCTION tests.authenticate_as_service_role()
 RETURNS void
 AS $$
         BEGIN
-            perform set_config('role', 'service_role', true);
-            perform set_config('request.jwt.claims', null, true);
+            EXECUTE 'SET LOCAL ROLE service_role';
+            perform set_config('request.jwt.claim.role', 'service_role', true);
+            perform set_config('request.jwt.claims', json_build_object('role', 'service_role')::text, true);
         END
     $$ LANGUAGE plpgsql;
 
@@ -282,7 +283,7 @@ AS $$
 CREATE OR REPLACE FUNCTION tests.clear_authentication()
 RETURNS void AS $$
 BEGIN
-    perform set_config('role', 'anon', true);
+    EXECUTE 'SET LOCAL ROLE anon';
     perform set_config('request.jwt.claims', null, true);
     perform set_config('request.jwt.claim.role', null, true);
     perform set_config('request.jwt.claim.email', null, true);

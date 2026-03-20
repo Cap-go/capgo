@@ -30,7 +30,7 @@ BEGIN
       NULL::varchar,
       NULL::bigint
     ) THEN
-      RETURN NULL;
+      RAISE EXCEPTION 'NO_RIGHTS';
     END IF;
   END IF;
 
@@ -49,6 +49,7 @@ ALTER FUNCTION public.get_current_plan_name_org(uuid) OWNER TO "postgres";
 
 REVOKE ALL ON FUNCTION public.get_current_plan_name_org(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.get_current_plan_name_org(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.get_current_plan_name_org(uuid) TO anon;
 GRANT EXECUTE ON FUNCTION public.get_current_plan_name_org(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_current_plan_name_org(uuid) TO service_role;
 COMMENT ON FUNCTION public.get_current_plan_name_org(uuid) IS
@@ -91,7 +92,7 @@ BEGIN
       NULL::varchar,
       NULL::bigint
     ) THEN
-      RETURN;
+      RAISE EXCEPTION 'NO_RIGHTS';
     END IF;
   END IF;
 
@@ -127,6 +128,7 @@ ALTER FUNCTION public.get_cycle_info_org(uuid) OWNER TO "postgres";
 
 REVOKE ALL ON FUNCTION public.get_cycle_info_org(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.get_cycle_info_org(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.get_cycle_info_org(uuid) TO anon;
 GRANT EXECUTE ON FUNCTION public.get_cycle_info_org(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_cycle_info_org(uuid) TO service_role;
 COMMENT ON FUNCTION public.get_cycle_info_org(uuid) IS
@@ -180,8 +182,10 @@ BEGIN
       NULL::varchar,
       NULL::bigint
     ) THEN
-      RETURN;
+      RAISE EXCEPTION 'NO_RIGHTS';
     END IF;
+
+    v_tx_read_only := TRUE;
   END IF;
 
   SELECT
@@ -235,6 +239,7 @@ ALTER FUNCTION public.get_plan_usage_percent_detailed(uuid) OWNER TO "postgres";
 
 REVOKE ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.get_plan_usage_percent_detailed(uuid) TO anon;
 GRANT EXECUTE ON FUNCTION public.get_plan_usage_percent_detailed(uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_plan_usage_percent_detailed(uuid) TO service_role;
 COMMENT ON FUNCTION public.get_plan_usage_percent_detailed(uuid) IS
@@ -289,8 +294,10 @@ BEGIN
       NULL::varchar,
       NULL::bigint
     ) THEN
-      RETURN;
+      RAISE EXCEPTION 'NO_RIGHTS';
     END IF;
+
+    v_tx_read_only := TRUE;
   END IF;
 
   SELECT p.mau, p.bandwidth, p.storage, p.build_time_unit
@@ -331,6 +338,7 @@ ALTER FUNCTION public.get_plan_usage_percent_detailed(uuid, date, date) OWNER TO
 
 REVOKE ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid, date, date) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.get_plan_usage_percent_detailed(uuid, date, date) FROM anon;
+GRANT EXECUTE ON FUNCTION public.get_plan_usage_percent_detailed(uuid, date, date) TO anon;
 GRANT EXECUTE ON FUNCTION public.get_plan_usage_percent_detailed(uuid, date, date) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.get_plan_usage_percent_detailed(uuid, date, date) TO service_role;
 COMMENT ON FUNCTION public.get_plan_usage_percent_detailed(uuid, date, date) IS

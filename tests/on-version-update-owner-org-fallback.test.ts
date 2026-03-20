@@ -19,7 +19,7 @@ describe('[POST] /triggers/on_version_update - owner_org fallback', () => {
     ])
   })
 
-  it('skips app_versions_meta upsert when deleted_apps fallback exists but the parent version row is gone', async () => {
+  it.concurrent('skips app_versions_meta upsert when deleted_apps fallback exists but the parent version row is gone', async () => {
     await executeSQL(
       'INSERT INTO public.deleted_apps (app_id, owner_org) VALUES ($1, $2)',
       [appId, ORG_ID],
