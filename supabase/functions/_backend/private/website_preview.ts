@@ -25,13 +25,28 @@ function normalizeWebsiteUrl(input: string) {
 }
 
 function decodeHtmlEntities(value: string) {
-  try {
-    const parsed = new DOMParser().parseFromString(`<body>${value}</body>`, 'text/html')
-    return parsed.body.textContent?.trim() ?? value.trim()
+  const namedEntities: Record<string, string> = {
+    amp: '&',
+    apos: '\'',
+    gt: '>',
+    lt: '<',
+    nbsp: ' ',
+    quot: '"',
   }
-  catch {
-    return value.trim()
-  }
+
+  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (match, entity: string) => {
+    if (entity.startsWith('#x') || entity.startsWith('#X')) {
+      const codePoint = Number.parseInt(entity.slice(2), 16)
+      return Number.isNaN(codePoint) ? match : String.fromCodePoint(codePoint)
+    }
+
+    if (entity.startsWith('#')) {
+      const codePoint = Number.parseInt(entity.slice(1), 10)
+      return Number.isNaN(codePoint) ? match : String.fromCodePoint(codePoint)
+    }
+
+    return namedEntities[entity.toLowerCase()] ?? match
+  }).trim()
 }
 
 function deriveNameFromHostname(hostname: string) {

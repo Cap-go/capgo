@@ -261,6 +261,21 @@ async function useImportedLogo() {
   }
 
   try {
+    if (importedLogoUrl.value.startsWith('data:')) {
+      const [header, payload = ''] = importedLogoUrl.value.split(',', 2)
+      const contentType = header.match(/^data:([^;]+)/)?.[1] ?? ''
+      if (!contentType.startsWith('image/') || !payload) {
+        toast.error(t('organization-onboarding-imported-logo-failed', 'Could not import logo from website'))
+        return
+      }
+
+      const binary = atob(payload)
+      const bytes = Uint8Array.from(binary, char => char.charCodeAt(0))
+      const blob = new Blob([bytes], { type: contentType })
+      await uploadLogoBlob(blob, `${websiteHostname.value || 'website-logo'}.png`)
+      return
+    }
+
     const response = await fetch(importedLogoUrl.value)
     const contentType = response.headers.get('content-type')?.split(';')[0]?.trim() ?? ''
     if (!response.ok || !contentType.startsWith('image/')) {
