@@ -340,7 +340,7 @@ describe('generate_org_on_user_create', () => {
     }
   })
 
-  it('still creates a personal org for email-auth users on managed domains', async () => {
+  it('does not create a personal org for email-auth users on managed domains', async () => {
     const managedOrgId = randomUUID()
     const managedCustomerId = `cus_email_managed_${randomUUID()}`
     const providerId = randomUUID()
@@ -415,8 +415,7 @@ describe('generate_org_on_user_create', () => {
         .eq('created_by', createdUser.user.id)
 
       expect(createdOrgsError).toBeNull()
-      expect(createdOrgs ?? []).toHaveLength(1)
-      expect(createdOrgs?.[0]?.management_email).toBe(email)
+      expect(createdOrgs ?? []).toHaveLength(0)
     }
     finally {
       await Promise.allSettled([

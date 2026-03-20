@@ -354,6 +354,17 @@ For RPCs and helper functions, apply minimum privileges explicitly:
 - If `uuid`-based checks exist, do not grant `anon` or `authenticated` unless there is a strict user-facing requirement.
 - Prefer granting only `service_role` for `uuid` overloads and keep user-context variants (`()`) on authenticated access only where needed.
 
+### PostgreSQL RPC Data Exposure
+
+Prevent RPCs from becoming an oracle system.
+
+- Do not expose RPCs that let unauthorized users infer whether sensitive data exists, matches, or belongs to another user or org.
+- Default to denying access unless the caller already has the rights required to read the underlying data through the normal permission model.
+- If an RPC returns data, metadata, booleans, counts, or different error shapes, treat all of those as potential data leaks and gate them the same way.
+- Never use a publicly callable RPC to answer sensitive existence checks, membership checks, entitlement checks, or status checks for records the caller cannot already access.
+- Only allow broader access when the information is genuinely non-critical and the UX benefit is material.
+- In that exceptional case, add an English code comment directly next to the function, endpoint, or policy explaining why the exposure is acceptable, what is intentionally revealed, and why restricting it would significantly harm UX.
+
 ### SQL FUNCTION SECURITY (UPPERCASE RULES)
 
 WHEN ADDING AN ADMIN/PLATFORM-RBAC CHECK FUNCTION:
