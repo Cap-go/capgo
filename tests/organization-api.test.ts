@@ -1,8 +1,23 @@
 import { randomUUID } from 'node:crypto'
+import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_ADMIN_EMAIL, USER_EMAIL, USER_ID } from './test-utils.ts'
+import {
+  BASE_URL,
+  getSupabaseClient,
+  headers,
+  normalizeLocalhostUrl,
+  SUPABASE_ANON_KEY,
+  SUPABASE_BASE_URL,
+  TEST_EMAIL,
+  USER_ADMIN_EMAIL,
+  USER_EMAIL,
+  USER_ID,
+  USER_PASSWORD,
+} from './test-utils.ts'
+
+const normalizedSupabaseBaseUrl = normalizeLocalhostUrl(SUPABASE_BASE_URL) ?? SUPABASE_BASE_URL
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
@@ -97,7 +112,7 @@ describe('[GET] /organization/members', () => {
     const safe = type.safeParse(await response.json())
     expect(safe.success).toBe(true)
     expect(safe.data?.length).toBeGreaterThanOrEqual(1)
-    
+
     const testUser = safe.data?.find(m => m.uid === USER_ID)
     expect(testUser).toBeTruthy()
     expect(testUser?.email).toBe(USER_EMAIL)
@@ -325,7 +340,6 @@ describe('[DELETE] /organization/members', () => {
       user_right: 'read',
     })
     expect(error).toBeNull()
-
 
     // The sync_org_user_to_role_binding_on_insert trigger automatically creates role_bindings
     // when a user is added to org_users. Verify the trigger created the binding.
@@ -724,6 +738,50 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
     // Reset
     await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false }).eq('id', ORG_ID)
   })
+
+  it.concurrent('rejects public RPC access to get_orgs_v7(userid)', async () => {
+    if (!normalizedSupabaseBaseUrl || !SUPABASE_ANON_KEY)
+      throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY are required for this test')
+
+    const publicSupabase = createClient(normalizedSupabaseBaseUrl, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: false,
+      },
+    })
+
+    const { data, error } = await publicSupabase.rpc('get_orgs_v7', {
+      userid: USER_ID,
+    })
+
+    expect(data).toBeNull()
+    expect(error?.code).toBe('42501')
+  })
+
+  it.concurrent('rejects authenticated RPC access to get_orgs_v7(userid)', async () => {
+    if (!normalizedSupabaseBaseUrl || !SUPABASE_ANON_KEY)
+      throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY are required for this test')
+
+    const authClient = createClient(normalizedSupabaseBaseUrl, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: false,
+      },
+    })
+
+    const { error: signInError } = await authClient.auth.signInWithPassword({
+      email: USER_EMAIL,
+      password: USER_PASSWORD,
+    })
+    expect(signInError).toBeNull()
+
+    const { data, error } = await authClient.rpc('get_orgs_v7', {
+      userid: USER_ID,
+    })
+
+    expect(data).toBeNull()
+    expect(error?.code).toBe('42501')
+
+    await authClient.auth.signOut()
+  })
 })
 
 // ─── RBAC mode coverage ──────────────────────────────────────────────────────
@@ -736,7 +794,7 @@ const globalIdRbac = randomUUID()
 const nameRbac = `RBAC Test Organization ${globalIdRbac}`
 const customerIdRbac = `cus_test_rbac_${ORG_ID_RBAC}`
 
-describe('RBAC mode - organization member operations', () => {
+describe('rbac mode - organization member operations', () => {
   beforeAll(async () => {
     const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
       customer_id: customerIdRbac,
@@ -875,7 +933,7 @@ describe('RBAC mode - organization member operations', () => {
   })
 })
 
-describe('Hashed API key enforcement integration', () => {
+describe('hashed API key enforcement integration', () => {
   it('find_apikey_by_value finds hashed key', async () => {
     // Create a hashed API key via API
     const createResponse = await fetch(`${BASE_URL}/apikey`, {

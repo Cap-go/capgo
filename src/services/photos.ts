@@ -10,8 +10,6 @@ import { createSignedImageUrl } from './storage'
 import { useSupabase } from './supabase'
 
 const supabase = useSupabase()
-const main = useMainStore()
-const organizationStore = useOrganizationStore()
 
 function normalizeImageStoragePath(path?: string | null) {
   if (!path)
@@ -50,6 +48,7 @@ async function uploadPhotoShared(
 }
 
 async function uploadPhotoUser(formId: string, data: string, fileName: string, contentType: string, isLoading: Ref<boolean>, wentWrong: string) {
+  const main = useMainStore()
   const userId = main.user?.id
   if (!userId) {
     setErrors(formId, [wentWrong], {})
@@ -111,6 +110,7 @@ async function uploadPhotoUser(formId: string, data: string, fileName: string, c
 }
 
 async function uploadPhotoOrg(formId: string, data: string, fileName: string, contentType: string, isLoading: Ref<boolean>, wentWrong: string) {
+  const organizationStore = useOrganizationStore()
   const gid = organizationStore.currentOrganization?.gid
   if (!gid) {
     console.error('No current org id', gid)
@@ -143,6 +143,53 @@ async function uploadPhotoOrg(formId: string, data: string, fileName: string, co
   }
 
   await uploadPhotoShared(data, `org/${safeGid}/logo/${fileName}`, contentType, isLoading, orgCallback)
+}
+
+export async function uploadOrgLogoFile(orgId: string, file: Blob, fileName?: string) {
+  const organizationStore = useOrganizationStore()
+  const safeOrgId = orgId.trim()
+  if (!safeOrgId)
+    throw new Error('Organization ID is required')
+
+  const extension = mime.getExtension(file.type) ?? 'png'
+  const targetFileName = fileName ?? `${Date.now()}.${extension}`
+  const storagePath = `org/${safeOrgId}/logo/${targetFileName}`
+
+  const { error: uploadError } = await supabase.storage
+    .from('images')
+    .upload(storagePath, file, {
+      contentType: file.type || undefined,
+      upsert: true,
+    })
+
+  if (uploadError)
+    throw uploadError
+
+  const { data: updatedOrg, error: updateError } = await supabase
+    .from('orgs')
+    .update({ logo: storagePath })
+    .eq('id', safeOrgId)
+    .select('id')
+    .single()
+
+  if (updateError || !updatedOrg) {
+    const { error: cleanupError } = await supabase.storage
+      .from('images')
+      .remove([storagePath])
+    if (cleanupError)
+      console.error('cannot cleanup orphaned org logo upload', cleanupError)
+    throw updateError ?? new Error('Organization logo update affected no rows')
+  }
+
+  try {
+    await organizationStore.fetchOrganizations()
+  }
+  catch (error) {
+    console.error('Failed to refresh organizations after org logo upload', error)
+  }
+  organizationStore.setCurrentOrganization(safeOrgId)
+
+  return storagePath
 }
 
 function blobToData(blob: Blob) {

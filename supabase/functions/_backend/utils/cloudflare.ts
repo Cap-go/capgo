@@ -260,8 +260,22 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
   }
 }
 
-export function formatDateCF(date: string | undefined) {
-  return dayjs(date).format('YYYY-MM-DD HH:mm:ss')
+export function formatDateCF(date: string | Date | undefined) {
+  if (!date)
+    return dayjs(date).format('YYYY-MM-DD HH:mm:ss')
+
+  const normalizedDate = date instanceof Date ? date : new Date(date)
+  if (Number.isNaN(normalizedDate.getTime()))
+    return dayjs(date).format('YYYY-MM-DD HH:mm:ss')
+
+  const year = normalizedDate.getUTCFullYear()
+  const month = String(normalizedDate.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(normalizedDate.getUTCDate()).padStart(2, '0')
+  const hours = String(normalizedDate.getUTCHours()).padStart(2, '0')
+  const minutes = String(normalizedDate.getUTCMinutes()).padStart(2, '0')
+  const seconds = String(normalizedDate.getUTCSeconds()).padStart(2, '0')
+
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }
 
 interface AnalyticsApiResponse {
@@ -592,6 +606,9 @@ interface DeviceInfoCF {
   updated_at: string
 }
 
+/**
+ * Read device metadata from the Analytics Engine, respecting search, version, custom ID, and cursor filters.
+ */
 export async function readDevicesCF(c: Context, params: ReadDevicesParams, customIdMode: boolean): Promise<DeviceRes[]> {
   // Use Analytics Engine DEVICE_INFO for reading devices
   // Schema: blob1=device_id, blob2=version_name, blob3=plugin_version, blob4=os_version,
@@ -633,13 +650,20 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
     conditions.push(`blob2 = '${escapeSqlString(params.version_name)}'`)
   }
 
+  const activeOrder = params.order?.find(
+    col => col.key === 'updated_at' && typeof col.sortable === 'string',
+  )
+  const devicesOrder = activeOrder ? { ascending: activeOrder.sortable === 'asc' } : null
+
   // Cursor-based pagination using timestamp
   let cursorFilter = ''
-  if (params.cursor) {
+  if (params.cursor && devicesOrder) {
     // Cursor format: "timestamp|device_id"
     const [cursorTime, cursorDeviceId] = params.cursor.split('|')
     if (cursorTime && cursorDeviceId) {
-      cursorFilter = `AND (timestamp < toDateTime('${escapeSqlString(cursorTime)}') OR (timestamp = toDateTime('${escapeSqlString(cursorTime)}') AND blob1 > '${escapeSqlString(cursorDeviceId)}'))`
+      cursorFilter = devicesOrder.ascending
+        ? `AND (timestamp > toDateTime('${escapeSqlString(cursorTime)}') OR (timestamp = toDateTime('${escapeSqlString(cursorTime)}') AND blob1 > '${escapeSqlString(cursorDeviceId)}'))`
+        : `AND (timestamp < toDateTime('${escapeSqlString(cursorTime)}') OR (timestamp = toDateTime('${escapeSqlString(cursorTime)}') AND blob1 > '${escapeSqlString(cursorDeviceId)}'))`
     }
   }
 
@@ -660,7 +684,7 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
 FROM device_info
 WHERE ${conditions.join(' AND ')} ${cursorFilter}
 GROUP BY blob1
-ORDER BY updated_at DESC, device_id ASC
+ORDER BY ${devicesOrder ? `updated_at ${devicesOrder.ascending ? 'ASC' : 'DESC'}, device_id ASC` : 'device_id ASC'}
 LIMIT ${limit + 1}`
 
   cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF query', query })
@@ -681,7 +705,7 @@ LIMIT ${limit + 1}`
       is_prod: Boolean(row.is_prod),
       is_emulator: Boolean(row.is_emulator),
       custom_id: row.custom_id,
-      updated_at: row.updated_at,
+      updated_at: formatDateCF(row.updated_at),
       default_channel: row.default_channel || null,
       created_at: null, // Not stored in Analytics Engine
       key_id: row.key_id || null,

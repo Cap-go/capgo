@@ -26,6 +26,7 @@ const turnstileToken = ref('')
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 const captchaComponent = ref<InstanceType<typeof VueTurnstile> | null>(null)
 const { t } = useI18n()
+const SUPABASE_MAX_PASSWORD_LENGTH = 72
 
 function resetCaptcha() {
   captchaComponent.value?.reset()
@@ -43,7 +44,10 @@ const needsPasswordVerification = computed(() => {
 const passwordPolicy = computed(() => {
   const org = organizationStore.currentOrganization
   if (org?.password_policy_config?.enabled) {
-    return org.password_policy_config
+    return {
+      ...org.password_policy_config,
+      min_length: Math.min(org.password_policy_config.min_length, SUPABASE_MAX_PASSWORD_LENGTH),
+    }
   }
   // Default policy
   return {

@@ -46,6 +46,7 @@ const columns = ref<TableColumn[]>([
     class: 'truncate max-w-10',
     mobile: true,
     head: true,
+    sortable: false,
     onClick: (elem: Device) => openOne(elem),
     renderFunction: (item) => {
       const customId = item.custom_id?.trim()
@@ -61,6 +62,7 @@ const columns = ref<TableColumn[]>([
     label: t('updated-at'),
     key: 'updated_at',
     mobile: false,
+    sortable: 'desc',
     displayFunction: (elem: Device) => formatDate(elem.updated_at ?? ''),
   },
   {
@@ -68,6 +70,7 @@ const columns = ref<TableColumn[]>([
     key: 'platform',
     mobile: true,
     head: true,
+    sortable: false,
     displayFunction: (elem: Device) => `${elem.platform} ${elem.os_version}`,
   },
   {
@@ -75,10 +78,17 @@ const columns = ref<TableColumn[]>([
     key: 'version_name',
     mobile: true,
     head: true,
+    sortable: false,
     displayFunction: (elem: Device) => elem.version_name ?? elem.version ?? 'unknown',
     onClick: (elem: Device) => openOneVersion(elem),
   },
 ])
+
+function getActiveOrder(columns: TableColumn[]) {
+  return columns
+    .filter(col => typeof col.sortable === 'string')
+    .map(col => ({ key: col.key, sortable: col.sortable }))
+}
 
 function getSearchTerm() {
   const trimmed = search.value.trim()
@@ -90,6 +100,7 @@ function getQuerySignature() {
     appId: props.appId,
     versionName: props.versionName,
     search: getSearchTerm(),
+    order: getActiveOrder(columns.value),
     override: filters.value.Override,
     customIdMode: filters.value.CustomId,
     ids: props.ids ? [...props.ids].sort().join(',') : '',
@@ -141,6 +152,7 @@ async function countDevices() {
         versionName: props.versionName,
         devicesId: deviceIds.length > 0 ? deviceIds : undefined,
         search: searchTerm,
+        order: getActiveOrder(columns.value),
         customIdMode: filters.value.CustomId,
       }),
     })
@@ -243,6 +255,7 @@ async function fetchDevicesPage(cursor: string | undefined | null) {
       versionName: props.versionName,
       devicesId: ids.length ? ids : undefined,
       search: searchTerm,
+      order: getActiveOrder(columns.value),
       cursor: cursor ?? undefined,
       limit: offset,
       customIdMode: filters.value.CustomId,

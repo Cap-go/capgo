@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Session } from '@supabase/supabase-js'
 import { onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconLoader from '~icons/lucide/loader-2'
@@ -10,9 +11,10 @@ import { useSupabase } from '~/services/supabase'
 const route = useRoute()
 const router = useRouter()
 const supabase = useSupabase()
+const { t } = useI18n()
 const isLoading = ref(true)
 const errorMessage = ref('')
-const { provisionUser } = useSSOProvisioning()
+const { provisionUser, error: provisionError } = useSSOProvisioning()
 
 function validateRedirectPath(path: string | undefined): string {
   // Default fallback
@@ -109,13 +111,24 @@ async function completeSsoLogin() {
     }
 
     if (session) {
-      const { merged } = await provisionUser(session)
+      const { merged, alreadyMember } = await provisionUser(session)
       if (merged) {
         // The duplicate SSO user was merged into the existing account.
         // The current session is now invalid — sign out and redirect to login.
         await supabase.auth.signOut()
         router.replace('/login?message=sso_account_linked')
         return
+      }
+      if (provisionError.value) {
+        await supabase.auth.signOut()
+        isLoading.value = false
+        errorMessage.value = provisionError.value
+        toast.error(provisionError.value)
+        return
+      }
+
+      if (!alreadyMember) {
+        toast.success(t('sso-linked-success'))
       }
     }
 
