@@ -77,11 +77,9 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
     const signedIcon = await createSignedImageUrl(c, data.icon_url)
     data.icon_url = signedIcon ?? ''
   }
-
   const completedPendingOnboarding = previousApp.need_onboarding === true && data.need_onboarding === false
-  const isDemo = (data as { is_demo?: boolean }).is_demo === true
 
-  if (completedPendingOnboarding && !isDemo) {
+  if (completedPendingOnboarding) {
     const { data: orgData, error: orgError } = await supabaseAdmin(c)
       .from('orgs')
       .select('management_email, name')

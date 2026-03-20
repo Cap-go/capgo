@@ -141,6 +141,11 @@ async function createDemoApp() {
     toast.error(t('onboarding-demo-error-no-org'))
     return
   }
+  const demoAppId = appId.value ?? await getLatestAppId()
+  if (!demoAppId) {
+    toast.error(t('onboarding-demo-error-create'))
+    return
+  }
 
   isDemoLoading.value = true
   try {
@@ -155,7 +160,10 @@ async function createDemoApp() {
 
     const { data, error } = await supabase.functions.invoke('app/demo', {
       method: 'POST',
-      body: { owner_org: orgId },
+      body: {
+        owner_org: orgId,
+        app_id: demoAppId,
+      },
     })
 
     if (error || !data?.app_id) {

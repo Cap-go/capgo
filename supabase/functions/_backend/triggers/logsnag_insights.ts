@@ -7,7 +7,6 @@ import { sql } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 
 import { getPluginBreakdownCF, readActiveAppsCF, readLastMonthDevicesByPlatformCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
-import { DEMO_APP_PREFIX } from '../utils/demo.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { logsnag, logsnagInsights } from '../utils/logsnag.ts'
@@ -632,7 +631,7 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
       .from('apps')
       .select('id', { count: 'exact', head: true })
       .gte('created_at', last24h)
-      .like('app_id', `${DEMO_APP_PREFIX}%`)
+      .eq('need_onboarding', true)
       .then((res) => {
         if (res.error) {
           cloudlog({ requestId: c.get('requestId'), message: 'demo_apps_created error', error: res.error })

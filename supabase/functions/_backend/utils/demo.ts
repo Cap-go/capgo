@@ -1,16 +1,21 @@
-/**
- * Demo app prefix used to identify demo apps.
- * Demo apps are created for non-technical users during onboarding and are auto-deleted after 14 days.
- */
-export const DEMO_APP_PREFIX = 'com.capdemo.'
+import type { Context } from 'hono'
+import type { MiddlewareKeyVariables } from './hono.ts'
+import { supabaseAdmin } from './supabase.ts'
 
-/**
- * Check if an app is a demo app by checking if the app_id starts with the demo prefix.
- * No database query needed - just a simple string check.
- *
- * @param appId - The app_id to check
- * @returns true if the app is a demo app
- */
-export function isAppDemo(appId: string): boolean {
-  return appId.startsWith(DEMO_APP_PREFIX)
+export function isDemoAppRow(app?: { need_onboarding?: boolean | null }): boolean {
+  return app?.need_onboarding === true
+}
+
+export async function isDemoApp(c: Context<MiddlewareKeyVariables>, appId: string): Promise<boolean> {
+  const { data, error } = await supabaseAdmin(c)
+    .from('apps')
+    .select('need_onboarding')
+    .eq('app_id', appId)
+    .single()
+
+  if (error || !data) {
+    return false
+  }
+
+  return isDemoAppRow(data)
 }
