@@ -13,7 +13,7 @@ import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
 type OnboardingStep = 'details' | 'logo' | 'invite'
-type OnboardingMode = 'website' | 'name'
+type OnboardingMode = 'website' | 'name' | null
 
 interface InviteTeammateModalRef {
   openDialog: () => void
@@ -36,10 +36,9 @@ const organizationStore = useOrganizationStore()
 const { currentOrganization } = storeToRefs(organizationStore)
 
 const step = ref<OnboardingStep>('details')
-const mode = ref<OnboardingMode>('website')
+const mode = ref<OnboardingMode>(null)
 const websiteInput = ref('')
 const orgNameInput = ref('')
-const importedOrgName = ref('')
 const createdOrgId = ref('')
 const isSubmitting = ref(false)
 const isUploadingLogo = ref(false)
@@ -60,7 +59,7 @@ const activeOrgId = computed(() => createdOrgId.value || '')
 const activeOrgName = computed(() => {
   if (currentOrganization.value?.gid === activeOrgId.value)
     return currentOrganization.value.name
-  return websitePreview.value?.name || importedOrgName.value || orgNameInput.value.trim()
+  return orgNameInput.value.trim() || websitePreview.value?.name || ''
 })
 
 const websiteHostname = computed(() => {
@@ -78,6 +77,13 @@ const websiteHostname = computed(() => {
 })
 
 const importedLogoUrl = computed(() => websitePreview.value?.icon ?? '')
+const canShowOrgDetails = computed(() => mode.value !== null)
+const canCreateOrganization = computed(() => {
+  if (!main.auth || isSubmitting.value || isLoadingWebsitePreview.value || !mode.value)
+    return false
+
+  return !!orgNameInput.value.trim()
+})
 
 function toTitleCaseSegment(segment: string) {
   return segment
@@ -160,7 +166,7 @@ async function fetchWebsitePreview() {
     }
 
     websitePreview.value = data as WebsitePreview
-    importedOrgName.value = data.name || deriveOrgNameFromWebsite(websiteHostname.value)
+    orgNameInput.value = data.name || deriveNameFromWebsitePreview(data.hostname)
     return websitePreview.value
   }
   finally {
@@ -168,20 +174,20 @@ async function fetchWebsitePreview() {
   }
 }
 
+function deriveNameFromWebsitePreview(hostname: string) {
+  return deriveOrgNameFromWebsite(hostname || websiteHostname.value)
+}
+
 async function createOrganization() {
   if (isSubmitting.value || !main.auth)
     return
 
-  let orgName = orgNameInput.value.trim()
-  if (mode.value === 'website') {
-    const preview = await fetchWebsitePreview()
-    if (!preview)
-      return
-
-    orgName = preview.name || deriveOrgNameFromWebsite(websiteHostname.value)
-    importedOrgName.value = orgName
+  if (!mode.value) {
+    toast.error(t('organization-onboarding-mode-required', 'Choose how you want to start'))
+    return
   }
 
+  const orgName = orgNameInput.value.trim()
   if (!orgName) {
     toast.error(t('org-name-required', 'Organization name is required'))
     return
@@ -190,15 +196,13 @@ async function createOrganization() {
   isSubmitting.value = true
 
   try {
-    const { data, error } = await supabase
-      .from('orgs')
-      .insert({
+    const { data, error } = await supabase.functions.invoke('organization', {
+      method: 'POST',
+      body: {
         name: orgName,
-        created_by: main.auth.id,
-        management_email: main.auth.email ?? '',
-      })
-      .select('id')
-      .single()
+        email: main.auth.email ?? '',
+      },
+    })
 
     if (error || !data?.id) {
       console.error('Error creating organization during onboarding', error)
@@ -209,7 +213,6 @@ async function createOrganization() {
     }
 
     createdOrgId.value = data.id
-    step.value = 'logo'
     toast.success(t('org-created-successfully', 'Organization created'))
 
     try {
@@ -221,6 +224,17 @@ async function createOrganization() {
       toast.error(t('organization-onboarding-refresh-failed', 'Organization created, but we could not refresh the org list'))
     }
 
+    if (mode.value === 'website' && importedLogoUrl.value) {
+      try {
+        await useImportedLogo()
+        return
+      }
+      catch (error) {
+        console.error('Failed to import logo after organization create', error)
+      }
+    }
+
+    step.value = 'logo'
     try {
       await syncRouteQuery('logo', data.id)
     }
@@ -358,6 +372,7 @@ watch(() => route.query.step, (nextValue) => {
 watch([websiteInput, mode], () => {
   if (mode.value !== 'website') {
     websitePreview.value = null
+    isLoadingWebsitePreview.value = false
     return
   }
 
@@ -411,7 +426,7 @@ onUnmounted(() => {
             :key="entry.id"
             class="rounded-full border px-4 py-2 text-sm font-medium transition"
             :class="[
-              isStepActive(entry.id) ? 'border-azure-300 bg-azure-50 text-azure-700' : '',
+              isStepActive(entry.id) ? 'border-slate-900 bg-slate-900 text-white' : '',
               !isStepActive(entry.id) && isStepDone(entry.id) ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : '',
               !isStepActive(entry.id) && !isStepDone(entry.id) ? 'border-slate-200 bg-white text-slate-500' : '',
             ]"
@@ -425,89 +440,101 @@ onUnmounted(() => {
             <div class="space-y-5">
               <div class="rounded-2xl border border-slate-200 p-4">
                 <p class="text-sm font-medium text-slate-900">
-                  {{ t('organization-onboarding-selected-path', 'Selected flow') }}
+                  {{ t('organization-onboarding-question', 'How do you want to create the organization?') }}
                 </p>
-                <div class="grid gap-3 mt-4 sm:grid-cols-2">
+                <div class="flex flex-wrap gap-3 mt-4">
                   <button
-                    type="button"
-                    class="rounded-2xl border p-4 text-left transition"
-                    :class="mode === 'website' ? 'border-azure-300 bg-azure-50 shadow-sm' : 'border-slate-200 hover:border-azure-200'"
+                    class="d-btn"
+                    :class="mode === 'website' ? 'd-btn-primary' : 'd-btn-outline'"
                     data-test="onboarding-mode-website"
                     @click="mode = 'website'"
                   >
-                    <div class="text-base font-semibold text-slate-900">
-                      {{ t('organization-onboarding-mode-website', 'Website auto import') }}
-                    </div>
-                    <p class="mt-2 text-sm text-slate-600">
-                      {{ t('organization-onboarding-mode-website-desc', 'Start from your website and prefill the organization name from its domain.') }}
-                    </p>
+                    {{ t('organization-onboarding-mode-website', 'Website auto import') }}
                   </button>
                   <button
-                    type="button"
-                    class="rounded-2xl border p-4 text-left transition"
-                    :class="mode === 'name' ? 'border-azure-300 bg-azure-50 shadow-sm' : 'border-slate-200 hover:border-azure-200'"
+                    class="d-btn"
+                    :class="mode === 'name' ? 'd-btn-primary' : 'd-btn-outline'"
                     data-test="onboarding-mode-name"
                     @click="mode = 'name'"
                   >
-                    <div class="text-base font-semibold text-slate-900">
-                      {{ t('organization-onboarding-mode-name', 'Enter a name') }}
-                    </div>
-                    <p class="mt-2 text-sm text-slate-600">
-                      {{ t('organization-onboarding-mode-name-desc', 'Create the org manually if you do not want to import anything from a website.') }}
-                    </p>
+                    {{ t('organization-onboarding-mode-name', 'Enter a name') }}
                   </button>
                 </div>
               </div>
 
-              <div v-if="mode === 'website'">
-                <label class="text-sm font-medium text-slate-800">
-                  {{ t('organization-onboarding-website-label', 'Website') }}
-                </label>
-                <input
-                  v-model="websiteInput"
-                  type="url"
-                  placeholder="https://capgo.app"
-                  data-test="onboarding-website"
-                  class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm"
+              <div v-if="mode === 'website'" class="grid gap-4 rounded-2xl border border-slate-200 p-4">
+                <div>
+                  <label class="text-sm font-medium text-slate-800">
+                    {{ t('organization-onboarding-website-label', 'Website') }}
+                  </label>
+                  <input
+                    v-model="websiteInput"
+                    type="url"
+                    placeholder="https://capgo.app"
+                    data-test="onboarding-website"
+                    class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm"
+                  >
+                </div>
+                <button
+                  type="button"
+                  class="d-btn d-btn-outline w-fit"
+                  data-test="onboarding-import-website"
+                  :disabled="isLoadingWebsitePreview || !websiteInput.trim()"
+                  @click="fetchWebsitePreview"
                 >
-                <p class="mt-2 text-xs text-slate-500">
-                  {{ websitePreview?.name
-                    ? t('organization-onboarding-website-preview', 'Organization name preview')
-                    : websiteHostname
-                      ? t('organization-onboarding-website-help-loading', 'Website assets will be imported when you continue.')
-                      : t('organization-onboarding-website-help', 'Enter your company website to infer the organization name and logo from its assets.') }}
-                  <span v-if="websitePreview?.name" class="font-semibold text-slate-700">: {{ websitePreview.name }}</span>
+                  <IconLoader v-if="isLoadingWebsitePreview" class="w-4 h-4 animate-spin" />
+                  <span v-else>{{ t('organization-onboarding-import-website', 'Import organization name and logo') }}</span>
+                </button>
+                <p class="text-xs text-slate-500">
+                  {{ websitePreview
+                    ? t('organization-onboarding-website-imported', 'Website assets imported. You can review the organization name before continuing.')
+                    : t('organization-onboarding-website-help', 'Enter your company website to import the organization name and logo from its assets.') }}
                 </p>
               </div>
 
-              <div v-else>
-                <label class="text-sm font-medium text-slate-800">
-                  {{ t('organization-name', 'Organization name') }}
-                </label>
-                <input
-                  v-model="orgNameInput"
-                  type="text"
-                  :placeholder="t('organization-name', 'Organization name')"
-                  data-test="onboarding-org-name"
-                  class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm"
-                >
+              <div v-else-if="!mode" class="rounded-2xl border border-dashed border-slate-300 p-5 text-sm text-slate-500">
+                {{ t('organization-onboarding-choice-hint', 'Pick one path first. You can either import the name and logo from a website or type the organization name manually.') }}
               </div>
 
-              <div class="flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  class="d-btn d-btn-primary"
-                  data-test="onboarding-create-org"
-                  :disabled="isSubmitting || isLoadingWebsitePreview || !main.auth"
-                  @click="createOrganization"
-                >
-                  <span v-if="!isSubmitting && !isLoadingWebsitePreview">{{ t('organization-onboarding-continue-logo', 'Continue to logo') }}</span>
-                  <IconLoader v-else class="w-4 h-4 animate-spin" />
-                </button>
-                <button type="button" class="d-btn d-btn-outline" @click="router.push('/apps')">
-                  {{ t('cancel', 'Cancel') }}
-                </button>
-              </div>
+              <template v-if="canShowOrgDetails">
+                <div>
+                  <label class="text-sm font-medium text-slate-800">
+                    {{ t('organization-name', 'Organization name') }}
+                  </label>
+                  <input
+                    v-model="orgNameInput"
+                    type="text"
+                    :placeholder="t('organization-name', 'Organization name')"
+                    data-test="onboarding-org-name"
+                    class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm"
+                  >
+                  <p v-if="mode === 'website'" class="mt-2 text-xs text-slate-500">
+                    {{ importedLogoUrl
+                      ? t('organization-onboarding-website-name-helper', 'Imported from your website. You can still edit the organization name before continuing.')
+                      : t('organization-onboarding-website-name-helper-empty', 'Import from the website first, then review the generated organization name here.') }}
+                  </p>
+                </div>
+
+                <div class="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    class="d-btn d-btn-primary"
+                    data-test="onboarding-create-org"
+                    :disabled="!canCreateOrganization"
+                    @click="createOrganization"
+                  >
+                    <span v-if="!isSubmitting">
+                      {{ mode === 'website' && importedLogoUrl
+                        ? t('organization-onboarding-continue-invite', 'Continue to invite users')
+                        : t('organization-onboarding-continue-logo', 'Continue to logo') }}
+                    </span>
+                    <IconLoader v-else class="w-4 h-4 animate-spin" />
+                  </button>
+                  <button type="button" class="d-btn d-btn-outline" @click="router.push('/apps')">
+                    {{ t('cancel', 'Cancel') }}
+                  </button>
+                </div>
+              </template>
             </div>
 
             <div class="rounded-[28px] border border-slate-200 bg-slate-950 p-5 text-white">
@@ -541,7 +568,11 @@ onUnmounted(() => {
                       {{ t('organization-onboarding-selected-path', 'Selected flow') }}
                     </div>
                     <div class="mt-1 text-base text-white">
-                      {{ mode === 'website' ? t('organization-onboarding-mode-website', 'Website auto import') : t('organization-onboarding-mode-name', 'Enter a name') }}
+                      {{ mode === 'website'
+                        ? t('organization-onboarding-mode-website', 'Website auto import')
+                        : mode === 'name'
+                          ? t('organization-onboarding-mode-name', 'Enter a name')
+                          : t('organization-onboarding-no-choice', 'Not selected yet') }}
                     </div>
                   </div>
                   <div>
@@ -551,15 +582,21 @@ onUnmounted(() => {
                     <ul class="mt-3 space-y-3">
                       <li class="flex gap-3">
                         <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                        {{ t('organization-onboarding-next-logo', '1. Save the organization logo') }}
+                        {{ mode === 'website' && importedLogoUrl
+                          ? t('organization-onboarding-next-invite-direct', '1. Review the imported organization and invite teammates')
+                          : t('organization-onboarding-next-logo', '1. Save the organization logo') }}
                       </li>
                       <li class="flex gap-3">
                         <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                        {{ t('organization-onboarding-next-invite', '2. Invite teammates') }}
+                        {{ mode === 'website' && importedLogoUrl
+                          ? t('organization-onboarding-next-apps-direct', '2. Continue to apps once the team is invited')
+                          : t('organization-onboarding-next-invite', '2. Invite teammates') }}
                       </li>
                       <li class="flex gap-3">
                         <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                        {{ t('organization-onboarding-next-apps', '3. Start app onboarding') }}
+                        {{ mode === 'website' && importedLogoUrl
+                          ? t('organization-onboarding-next-assets-direct', '3. Update the logo later in settings if you want a different asset')
+                          : t('organization-onboarding-next-apps', '3. Start app onboarding') }}
                       </li>
                     </ul>
                   </div>

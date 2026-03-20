@@ -58,6 +58,28 @@ function deriveNameFromHostname(hostname: string) {
     .join(' ')
 }
 
+function normalizeCandidateName(value: string, hostname: string, options?: { preferLeadingSegment?: boolean }) {
+  const trimmed = decodeHtmlEntities(value).trim()
+  if (!trimmed)
+    return ''
+
+  const withoutProtocol = trimmed.replace(/^https?:\/\//i, '').replace(/^www\./i, '')
+  if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(withoutProtocol) && !withoutProtocol.includes(' ')) {
+    return deriveNameFromHostname(withoutProtocol)
+  }
+
+  const parts = options?.preferLeadingSegment
+    ? trimmed.split(/\s[|·•:–—-]\s|[|·•:–—]/).map(part => part.trim()).filter(Boolean)
+    : [trimmed]
+
+  const candidate = parts[0] ?? trimmed
+  if (/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(candidate) && !candidate.includes(' ')) {
+    return deriveNameFromHostname(candidate)
+  }
+
+  return candidate
+}
+
 const META_PATTERNS = {
   'application-name': [
     /<meta[^>]+name=["']application-name["'][^>]+content=["']([^"']+)["'][^>]*>/i,
@@ -199,9 +221,9 @@ app.post('/', middlewareAuth, async (c) => {
   const finalUrl = new URL(response.url)
   const hostname = finalUrl.hostname.replace(/^www\./, '')
 
-  const name = findMetaContent(html, 'og:site_name')
-    || findMetaContent(html, 'application-name')
-    || findTitle(html)
+  const name = normalizeCandidateName(findMetaContent(html, 'og:site_name'), hostname)
+    || normalizeCandidateName(findMetaContent(html, 'application-name'), hostname)
+    || normalizeCandidateName(findTitle(html), hostname, { preferLeadingSegment: true })
     || deriveNameFromHostname(hostname)
 
   const iconHref = findIconHref(html)
