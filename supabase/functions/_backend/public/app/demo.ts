@@ -227,14 +227,27 @@ async function getExistingPendingApp(
     .select('*')
     .eq('owner_org', ownerOrg)
     .eq('app_id', appId)
+    .eq('need_onboarding', true)
     .single()
 
-  if (error || !data) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Error loading onboarding app', error, owner_org: ownerOrg, app_id: appId })
-    throw simpleError('cannot_find_app', 'Cannot find app for demo onboarding', { owner_org: ownerOrg, app_id: appId })
+  if (!error && data) {
+    return data
   }
 
-  return data
+  const { data: existingApp, error: existingAppError } = await supabase
+    .from('apps')
+    .select('id, need_onboarding')
+    .eq('owner_org', ownerOrg)
+    .eq('app_id', appId)
+    .maybeSingle()
+
+  if (!existingAppError && existingApp && existingApp.need_onboarding !== true) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Attempted demo seeding on completed app', app_id: appId })
+    throw simpleError('app_not_pending_onboarding', 'Cannot seed demo data on an app that already completed onboarding', { app_id: appId })
+  }
+
+  cloudlog({ requestId: c.get('requestId'), message: 'Error loading onboarding app', error: error ?? existingAppError, owner_org: ownerOrg, app_id: appId })
+  throw simpleError('cannot_find_app', 'Cannot find app for demo onboarding', { owner_org: ownerOrg, app_id: appId })
 }
 
 /**
@@ -277,21 +290,15 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
   const supabase = supabaseAdmin(c)
   const appId = body.app_id.trim()
   const appData = await getExistingPendingApp(c, supabase, body.owner_org, appId)
+  if (!appData.id) {
+    throw simpleError('cannot_find_app', 'Cannot find app for demo onboarding', { owner_org: body.owner_org, app_id: appId })
+  }
+  const { error: cleanupError } = await supabase
+    .rpc('clear_onboarding_app_data', { p_app_uuid: appData.id })
 
-  if (appData.id) {
-    if (!appData.need_onboarding) {
-      cloudlog({ requestId, message: 'Attempted demo seeding on completed app', app_id: appId })
-      throw simpleError('app_not_pending_onboarding', 'Cannot seed demo data on an app that already completed onboarding', { app_id: appId })
-    }
-
-    const { error: cleanupError } = await supabase
-      .rpc('clear_onboarding_app_data', { p_app_uuid: appData.id })
-
-    if (cleanupError) {
-      cloudlog({ requestId, message: 'Error clearing onboarding data before demo seeding', error: cleanupError, app_id: appId })
-      throw simpleError('cannot_prepare_demo_app', 'Cannot prepare app for demo data', { error: cleanupError })
-    }
-
+  if (cleanupError) {
+    cloudlog({ requestId, message: 'Error clearing onboarding data before demo seeding', error: cleanupError, app_id: appId })
+    throw simpleError('cannot_prepare_demo_app', 'Cannot prepare app for demo data', { error: cleanupError })
   }
 
   cloudlog({ requestId, message: 'Creating demo app with demo data', appId, owner_org: body.owner_org })
