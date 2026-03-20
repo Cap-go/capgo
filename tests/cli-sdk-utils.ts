@@ -15,6 +15,14 @@ const CAPACITOR_CONFIG_PATH = join(ROOT_DIR, 'capacitor.config.ts')
 const SUPABASE_URL = env.SUPABASE_URL || 'http://localhost:54321'
 const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY || 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH'
 
+// The CLI SDK uses `rpc("get_user_id", { apikey })` for local auth. That RPC is intentionally
+// restricted to `service_role` in this repo's migrations, so tests must run the SDK with a
+// service-role key, not the anon key.
+const SUPABASE_KEY_FOR_CLI_RPC = env.SUPABASE_SERVICE_KEY
+  ?? env.SUPABASE_SERVICE_ROLE_KEY
+  ?? env.SERVICE_ROLE_KEY
+  ?? SUPABASE_ANON_KEY
+
 /**
  * SDK-based CLI test utilities
  * This replaces process spawning with direct SDK function calls for faster test execution
@@ -135,7 +143,7 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
   return new CapgoSDK({
     apikey,
     supaHost: SUPABASE_URL,
-    supaAnon: SUPABASE_ANON_KEY,
+    supaAnon: SUPABASE_KEY_FOR_CLI_RPC,
   })
 }
 

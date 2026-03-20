@@ -21,6 +21,10 @@ import { CLI_HASHED_APIKEY, CLI_HASHED_ORG_ID, CLI_HASHED_STRIPE_CUSTOMER_ID, CL
 // Supabase base URL (not including /functions/v1)
 const SUPABASE_URL = env.SUPABASE_URL || 'http://localhost:54321'
 const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY || 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH'
+const SUPABASE_KEY_FOR_CLI_RPC = env.SUPABASE_SERVICE_KEY
+  ?? env.SUPABASE_SERVICE_ROLE_KEY
+  ?? env.SERVICE_ROLE_KEY
+  ?? SUPABASE_ANON_KEY
 
 /**
  * Create an SDK instance with the CLI hashed API key (isolated test data)
@@ -29,7 +33,7 @@ function createHashedKeySDK() {
   return new CapgoSDK({
     apikey: CLI_HASHED_APIKEY,
     supaHost: SUPABASE_URL,
-    supaAnon: SUPABASE_ANON_KEY,
+    supaAnon: SUPABASE_KEY_FOR_CLI_RPC,
   })
 }
 
