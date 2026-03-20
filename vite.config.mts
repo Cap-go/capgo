@@ -161,7 +161,7 @@ export default defineConfig({
   ],
 
   server: {
-    allowedHosts: true,
+    allowedHosts: ['.torichan.dev'],
     fs: {
       strict: true,
     },

@@ -226,9 +226,19 @@ columns.value = [
     key: 'build_time',
     class: 'truncate max-w-24',
     displayFunction: (elem: Element) => {
-      const seconds = elem.build_time_seconds
-      if (seconds == null)
-        return '-'
+      // Use builder-sourced build_time_seconds when available;
+      // fall back to updated_at - created_at for historical rows that were
+      // completed before the column existed.
+      let seconds = elem.build_time_seconds
+      if (seconds == null) {
+        const terminalStatuses = ['completed', 'succeeded', 'failed']
+        if (!terminalStatuses.includes(elem.status) || !elem.created_at || !elem.updated_at)
+          return '-'
+        const diffMs = new Date(elem.updated_at).getTime() - new Date(elem.created_at).getTime()
+        if (diffMs < 0)
+          return '-'
+        seconds = Math.floor(diffMs / 1000)
+      }
       if (seconds < 60)
         return `${seconds}s`
       const minutes = Math.floor(seconds / 60)

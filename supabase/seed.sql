@@ -621,6 +621,7 @@ BEGIN
     (NOW() - interval '2 hours', NOW() - interval '1 hour 58 minutes', 'com.demo.app', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'ios', 'release', 'failed', 120, 'sess-2', '/uploads/2', 'https://example.com/upload/2', NOW() + interval '1 hour'),
     (NOW() - interval '3 hours', NOW() - interval '2 hours 57 minutes 30 seconds', 'com.demo.app', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'ios', 'release', 'succeeded', 150, 'sess-3', '/uploads/3', 'https://example.com/upload/3', NOW() + interval '1 hour'),
     (NOW() - interval '4 hours', NOW() - interval '3 hours 52 minutes', 'com.demo.app', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'android', 'release', 'completed', 480, 'sess-4', '/uploads/4', 'https://example.com/upload/4', NOW() + interval '1 hour'),
+    (NOW() - interval '30 minutes', NOW() - interval '29 minutes', 'com.demo.app', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'ios', 'release', 'running', NULL, 'sess-6', '/uploads/6', 'https://example.com/upload/6', NOW() + interval '1 hour'),
     (NOW() - interval '5 hours', NOW() - interval '4 hours 45 minutes', 'com.demo.app', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', '6aa76066-55ef-4238-ade6-0b32334a4097', 'ios', 'release', 'succeeded', 900, 'sess-5', '/uploads/5', 'https://example.com/upload/5', NOW() + interval '1 hour');
 
     -- Drop replicated orgs but keet the the seed ones

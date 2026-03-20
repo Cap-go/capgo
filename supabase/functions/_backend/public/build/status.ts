@@ -97,6 +97,11 @@ export async function getBuildStatus(
     completed_at: builderJob.job.completed_at,
   })
 
+  // Derive build duration once from the builder's own timestamps.
+  const buildTimeSeconds = (builderJob.job.started_at != null && builderJob.job.completed_at != null)
+    ? Math.floor((builderJob.job.completed_at - builderJob.job.started_at) / 1000)
+    : null
+
   // Update build_requests table with current status
   // Use admin client: access was already verified above (RLS SELECT + checkPermission).
   // The data written comes from the trusted builder API, not from user input.
@@ -107,10 +112,8 @@ export async function getBuildStatus(
     updated_at: new Date().toISOString(),
   }
 
-  // Store build_time_seconds from the builder's own timestamps (accurate, not poll-dependent)
-  if (builderJob.job.started_at && builderJob.job.completed_at) {
-    updatePayload.build_time_seconds = Math.floor((builderJob.job.completed_at - builderJob.job.started_at) / 1000)
-  }
+  if (buildTimeSeconds != null)
+    updatePayload.build_time_seconds = buildTimeSeconds
 
   const { error: updateError } = await supabaseAdmin(c)
     .from('build_requests')
@@ -127,30 +130,25 @@ export async function getBuildStatus(
     })
   }
 
-  // Track build time if job completed
-  if (builderJob.job.started_at && builderJob.job.completed_at) {
-    const buildTimeSeconds = Math.floor((builderJob.job.completed_at - builderJob.job.started_at) / 1000)
+  // Record build time in tracking system (only once per terminal build)
+  if (buildTimeSeconds != null && (builderJob.job.status === 'succeeded' || builderJob.job.status === 'failed')) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Recording build time',
+      job_id,
+      org_id,
+      build_time_seconds: buildTimeSeconds,
+      platform,
+    })
 
-    // Record build time in tracking system (only once per build)
-    if (builderJob.job.status === 'succeeded' || builderJob.job.status === 'failed') {
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: 'Recording build time',
-        job_id,
-        org_id,
-        build_time_seconds: buildTimeSeconds,
-        platform,
-      })
-
-      await recordBuildTime(
-        c,
-        org_id,
-        apikey.user_id,
-        job_id,
-        resolvedPlatform,
-        buildTimeSeconds,
-      )
-    }
+    await recordBuildTime(
+      c,
+      org_id,
+      apikey.user_id,
+      job_id,
+      resolvedPlatform,
+      buildTimeSeconds,
+    )
   }
 
   return c.json({
@@ -159,9 +157,7 @@ export async function getBuildStatus(
     machine: builderJob.machine || null,
     started_at: builderJob.job.started_at,
     completed_at: builderJob.job.completed_at,
-    build_time_seconds: builderJob.job.started_at && builderJob.job.completed_at
-      ? Math.floor((builderJob.job.completed_at - builderJob.job.started_at) / 1000)
-      : null,
+    build_time_seconds: buildTimeSeconds,
     error: builderJob.job.error || null,
     upload_url: builderJob.uploadUrl || null,
   }, 200)
