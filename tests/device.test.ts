@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APP_NAME, BASE_URL, fetchWithRetry, headers, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { APP_NAME, BASE_URL, fetchWithRetry, getSupabaseClient, headers, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME_DEVICE = `${APP_NAME}.d.${id}`
@@ -68,16 +68,39 @@ describe.concurrent('[GET] /device operations', () => {
 
 describe('[POST] /device operations', () => {
   it('link device', async () => {
-    const deviceId = '11111111-1111-1111-1111-111111111111'
-    const response = await fetch(`${BASE_URL}/device`, {
+    const deviceId = randomUUID().toLowerCase()
+    const { data: betaChannel, error: betaChannelError } = await getSupabaseClient()
+      .from('channels')
+      .select('name')
+      .eq('app_id', APPNAME_DEVICE)
+      .eq('name', 'beta')
+      .single()
+
+    expect(betaChannelError).toBeNull()
+    expect(betaChannel?.name).toBe('beta')
+
+    let response = await fetch(`${BASE_URL}/device`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
         app_id: APPNAME_DEVICE,
         device_id: deviceId,
-        channel: 'no_access',
+        channel: 'beta',
       }),
     })
+
+    if (response.status === 429) {
+      await new Promise(resolve => setTimeout(resolve, 1100))
+      response = await fetchWithRetry(`${BASE_URL}/device`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          app_id: APPNAME_DEVICE,
+          device_id: deviceId,
+          channel: 'beta',
+        }),
+      })
+    }
 
     const data = await response.json<{ status: string }>()
     expect(response.status).toBe(200)
@@ -97,7 +120,7 @@ describe('[POST] /device operations', () => {
     // console.log(data2)
     // expect(getResponse.status).toBe(200)
     // expect(data2.device_id).toBe(deviceId)
-    // expect(data2.channel).toBe('no_access')
+    // expect(data2.channel).toBe('beta')
   })
 
   it.concurrent('invalid app_id', async () => {

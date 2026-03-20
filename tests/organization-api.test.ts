@@ -1,8 +1,23 @@
 import { randomUUID } from 'node:crypto'
+import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_ADMIN_EMAIL, USER_EMAIL, USER_ID } from './test-utils.ts'
+import {
+  BASE_URL,
+  getSupabaseClient,
+  headers,
+  normalizeLocalhostUrl,
+  SUPABASE_ANON_KEY,
+  SUPABASE_BASE_URL,
+  TEST_EMAIL,
+  USER_ADMIN_EMAIL,
+  USER_EMAIL,
+  USER_ID,
+  USER_PASSWORD,
+} from './test-utils.ts'
+
+const normalizedSupabaseBaseUrl = normalizeLocalhostUrl(SUPABASE_BASE_URL) ?? SUPABASE_BASE_URL
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
@@ -860,6 +875,50 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
 
     // Reset
     await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false }).eq('id', ORG_ID)
+  })
+
+  it.concurrent('rejects public RPC access to get_orgs_v7(userid)', async () => {
+    if (!normalizedSupabaseBaseUrl || !SUPABASE_ANON_KEY)
+      throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY are required for this test')
+
+    const publicSupabase = createClient(normalizedSupabaseBaseUrl, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: false,
+      },
+    })
+
+    const { data, error } = await publicSupabase.rpc('get_orgs_v7', {
+      userid: USER_ID,
+    })
+
+    expect(data).toBeNull()
+    expect(error?.code).toBe('42501')
+  })
+
+  it.concurrent('rejects authenticated RPC access to get_orgs_v7(userid)', async () => {
+    if (!normalizedSupabaseBaseUrl || !SUPABASE_ANON_KEY)
+      throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY are required for this test')
+
+    const authClient = createClient(normalizedSupabaseBaseUrl, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: false,
+      },
+    })
+
+    const { error: signInError } = await authClient.auth.signInWithPassword({
+      email: USER_EMAIL,
+      password: USER_PASSWORD,
+    })
+    expect(signInError).toBeNull()
+
+    const { data, error } = await authClient.rpc('get_orgs_v7', {
+      userid: USER_ID,
+    })
+
+    expect(data).toBeNull()
+    expect(error?.code).toBe('42501')
+
+    await authClient.auth.signOut()
   })
 })
 

@@ -6,7 +6,7 @@ export function useSSOProvisioning() {
   const isProvisioning = ref(false)
   const error = ref<string | null>(null)
 
-  async function provisionUser(session: Session): Promise<{ merged: boolean }> {
+  async function provisionUser(session: Session): Promise<{ merged: boolean, alreadyMember: boolean }> {
     isProvisioning.value = true
     error.value = null
 
@@ -17,7 +17,7 @@ export function useSSOProvisioning() {
 
       if (!email) {
         error.value = 'No email found in session'
-        return { merged: false }
+        return { merged: false, alreadyMember: false }
       }
 
       // Check if user has a public.users record
@@ -57,24 +57,24 @@ export function useSSOProvisioning() {
           console.error('SSO provisioning: provision request failed', provisionResponse.status, errorData)
           const errorMsg = typeof errorData.error === 'string' ? errorData.error : typeof errorData.message === 'string' ? errorData.message : null
           error.value = errorMsg ?? `Provisioning failed (${provisionResponse.status})`
-          return { merged: false }
+          return { merged: false, alreadyMember: false }
         }
 
-        const provisionData = await provisionResponse.json() as { success: boolean, merged?: boolean }
+        const provisionData = await provisionResponse.json() as { success: boolean, merged?: boolean, already_member?: boolean }
         console.log('SSO provisioning: user provisioned successfully', provisionData)
-        return { merged: provisionData.merged === true }
+        return { merged: provisionData.merged === true, alreadyMember: provisionData.already_member === true }
       }
       catch (provisionError) {
         console.error('SSO provisioning: provision request error', provisionError)
         error.value = provisionError instanceof Error ? provisionError.message : 'Provisioning request failed'
-        return { merged: false }
+        return { merged: false, alreadyMember: false }
       }
     }
     catch (err) {
       const message = err instanceof Error ? err.message : 'SSO provisioning failed'
       console.error('SSO provisioning error:', message)
       error.value = message
-      return { merged: false }
+      return { merged: false, alreadyMember: false }
     }
     finally {
       isProvisioning.value = false
