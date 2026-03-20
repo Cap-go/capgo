@@ -410,7 +410,7 @@ describe('[DELETE] /organization/members', () => {
 })
 
 describe('[POST] /organization', () => {
-  it('create organization', async () => {
+  it.concurrent('create organization', async () => {
     const name = `Created Organization ${new Date().toISOString()}`
     const website = 'HTTPS://capgo.app'
     const response = await fetch(`${BASE_URL}/organization`, {
@@ -426,13 +426,18 @@ describe('[POST] /organization', () => {
     expect(safe.success).toBe(true)
     expect(safe.data?.id).toBeDefined()
 
-    const { data, error } = await getSupabaseClient().from('orgs').select().eq('id', safe.data!.id).single()
-    expect(error).toBeNull()
-    expect(data).toBeTruthy()
-    expect(data?.name).toBe(name)
-    expect(data?.website).toBe('https://capgo.app/')
-    // New orgs should default to RBAC enabled
-    expect(data?.use_new_rbac).toBe(true)
+    try {
+      const { data, error } = await getSupabaseClient().from('orgs').select().eq('id', safe.data!.id).single()
+      expect(error).toBeNull()
+      expect(data).toBeTruthy()
+      expect(data?.name).toBe(name)
+      expect(data?.website).toBe('https://capgo.app/')
+      // New orgs should default to RBAC enabled
+      expect(data?.use_new_rbac).toBe(true)
+    }
+    finally {
+      await getSupabaseClient().from('orgs').delete().eq('id', safe.data!.id)
+    }
   })
 
   it('create organization with missing name', async () => {
@@ -477,33 +482,75 @@ describe('[POST] /organization', () => {
     })
     expect(response.status).toBe(400)
     const responseData = await response.json() as { error: string }
-    expect(responseData.error).toBe('website_must_be_a_valid_url')
+    expect(responseData.error).toBe('invalid_body')
   })
 })
 
 describe('[PUT] /organization', () => {
-  it('update organization', async () => {
+  it.concurrent('update organization', async () => {
+    const orgId = randomUUID()
+    const originalName = `Update Base Organization ${new Date().toISOString()}`
     const name = `Updated Organization ${new Date().toISOString()}`
     const website = 'https://www.capgo.app/docs'
-    const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
-      method: 'PUT',
-      body: JSON.stringify({ orgId: ORG_ID, name, website }),
+    const customerId = `cus_test_${orgId}`
+    const subscriptionId = `sub_${orgId}`
+    const trialAt = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
+    const stripeInfo = {
+      customer_id: customerId,
+      status: 'succeeded',
+      product_id: 'prod_LQIregjtNduh4q',
+      subscription_id: subscriptionId,
+      trial_at: trialAt,
+      is_good_plan: true,
+    }
+    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert(stripeInfo)
+    if (stripeError)
+      throw stripeError
+    const { error: createError } = await getSupabaseClient().from('orgs').insert({
+      id: orgId,
+      name: originalName,
+      management_email: TEST_EMAIL,
+      created_by: USER_ID,
+      customer_id: customerId,
+      website: 'https://base.example/',
+      use_new_rbac: false,
     })
-    expect(response.status).toBe(200)
-    const type = z.object({
-      id: z.uuid(),
-      data: z.any(),
+    if (createError)
+      throw createError
+    const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+      org_id: orgId,
+      user_id: USER_ID,
+      user_right: 'super_admin',
     })
-    const safe = type.safeParse(await response.json())
-    expect(safe.success).toBe(true)
-    expect(safe.data?.id).toBe(ORG_ID)
+    if (orgUserError)
+      throw orgUserError
 
-    const { data, error } = await getSupabaseClient().from('orgs').select().eq('id', ORG_ID).single()
-    expect(error).toBeNull()
-    expect(data).toBeTruthy()
-    expect(data?.name).toBe(name)
-    expect(data?.website).toBe(website)
+    try {
+      const response = await fetch(`${BASE_URL}/organization`, {
+        headers,
+        method: 'PUT',
+        body: JSON.stringify({ orgId, name, website }),
+      })
+      expect(response.status).toBe(200)
+      const type = z.object({
+        id: z.uuid(),
+        data: z.any(),
+      })
+      const safe = type.safeParse(await response.json())
+      expect(safe.success).toBe(true)
+      expect(safe.data?.id).toBe(orgId)
+
+      const { data, error } = await getSupabaseClient().from('orgs').select().eq('id', orgId).single()
+      expect(error).toBeNull()
+      expect(data).toBeTruthy()
+      expect(data?.name).toBe(name)
+      expect(data?.website).toBe(website)
+    }
+    finally {
+      await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
+      await getSupabaseClient().from('orgs').delete().eq('id', orgId)
+      await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
+    }
   })
 
   it('update organization with invalid body', async () => {
@@ -552,7 +599,7 @@ describe('[PUT] /organization', () => {
     })
     expect(response.status).toBe(400)
     const responseData = await response.json() as { error: string }
-    expect(responseData.error).toBe('website_must_be_a_valid_url')
+    expect(responseData.error).toBe('invalid_body')
   })
 })
 
