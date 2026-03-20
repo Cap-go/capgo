@@ -68,7 +68,7 @@ async function handleCronSuccessReport(c: Context) {
       message: 'cron success report failed',
       runId: payload.runId,
       taskName: payload.taskName,
-      url,
+      url: '[redacted]',
       status: response.status,
     })
     throw quickError(502, 'cron_success_report_failed', 'Failed to deliver cron success report')
@@ -79,7 +79,7 @@ async function handleCronSuccessReport(c: Context) {
     message: 'cron success report delivered',
     runId: payload.runId,
     taskName: payload.taskName,
-    url,
+    url: '[redacted]',
     status: response.status,
   })
 

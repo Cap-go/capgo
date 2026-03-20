@@ -284,15 +284,20 @@ async function processQueue(
     const relatedFailures = messagesFailed.filter(message => getCronRunId(message.message?.payload?.__cron_run_id) === cronRunId)
     const relatedSkipped = messagesToSkip.filter(message => getCronRunId(message.message?.payload?.__cron_run_id) === cronRunId)
 
-    if (relatedResults.length > 0 || relatedSkipped.length > 0) {
-      const batchSucceeded = relatedSkipped.length === 0 && relatedFailures.length === 0
+    if (relatedResults.length > 0 || relatedFailures.length > 0 || relatedSkipped.length > 0) {
+      const batchSucceeded = relatedSkipped.length === 0
+        && relatedFailures.length === 0
+        && relatedResults.length > 0
+        && relatedResults.every(result => result.httpResponse.status >= 200 && result.httpResponse.status < 300)
 
-      await updateCronTaskRunBatch(
-        db,
-        cronRunId,
-        batchSucceeded,
-        batchSucceeded ? undefined : `${queueName} batch failed`,
-      )
+      if (batchSucceeded || relatedSkipped.length > 0) {
+        await updateCronTaskRunBatch(
+          db,
+          cronRunId,
+          batchSucceeded,
+          batchSucceeded ? undefined : `${queueName} batch failed`,
+        )
+      }
     }
   }
 
@@ -311,18 +316,27 @@ async function processQueue(
   }
 
   for (const runId of messageRunIds) {
+    if (runId === cronRunId) {
+      continue
+    }
     const relatedResults = results.filter(result => getCronRunId(result.message?.payload?.__cron_run_id) === runId)
+    const relatedFailures = messagesFailed.filter(message => getCronRunId(message.message?.payload?.__cron_run_id) === runId)
     const relatedSkipped = messagesToSkip.filter(message => getCronRunId(message.message?.payload?.__cron_run_id) === runId)
     const succeeded = relatedSkipped.length === 0
+      && relatedFailures.length === 0
       && relatedResults.length > 0
       && relatedResults.every(result => result.httpResponse.status >= 200 && result.httpResponse.status < 300)
 
-    await updateCronTaskRunBatch(
-      db,
-      runId,
-      succeeded,
-      succeeded ? undefined : `${queueName} message failed`,
-    )
+    if (relatedResults.length > 0 || relatedFailures.length > 0 || relatedSkipped.length > 0) {
+      if (succeeded || relatedSkipped.length > 0) {
+        await updateCronTaskRunBatch(
+          db,
+          runId,
+          succeeded,
+          succeeded ? undefined : `${queueName} message failed`,
+        )
+      }
+    }
   }
 
   if (successMessages.length !== messagesToProcess.length) {
@@ -463,7 +477,11 @@ export async function http_post_helper(
   // 15 second timeout, as the queue consumer is running every 10 seconds and the visibility timeout is 60 seconds
 
   try {
-    cloudlog({ requestId: c.get('requestId'), message: `[${function_name}] Making HTTP POST request to "${url}" with body:`, body })
+    const loggedBody = function_name === 'cron_success_report' && body && typeof body === 'object' && !Array.isArray(body)
+      ? { ...(body as Record<string, unknown>), url: '[redacted]' }
+      : body
+
+    cloudlog({ requestId: c.get('requestId'), message: `[${function_name}] Making HTTP POST request to "${url}" with body:`, body: loggedBody })
     const response = await fetch(url, {
       method: 'POST',
       headers,

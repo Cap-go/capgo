@@ -61,11 +61,11 @@ BEGIN
   PERFORM pgmq.send(
     'cron_success_report',
     jsonb_build_object(
+      'function_name', 'cron_success_report',
+      'function_type', 'supabase',
       'runId', run_record.id,
       'taskName', run_record.task_name,
       'url', run_record.success_report_url,
-      'function_name', 'cron_success_report',
-      'function_type', 'supabase',
       'payload', jsonb_build_object(
         'runId', run_record.id,
         'taskName', run_record.task_name,
@@ -145,27 +145,35 @@ DECLARE
   url text;
   queue_size bigint;
   calls_needed integer;
+  safe_batch_size integer;
+  body jsonb;
 BEGIN
   EXECUTE format('SELECT count(*) FROM pgmq.q_%I', queue_name) INTO queue_size;
 
   IF queue_size > 0 THEN
+    safe_batch_size := GREATEST(COALESCE(batch_size, 1), 1);
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'apisecret', public.get_apikey()
     );
     url := public.get_db_url() || '/functions/v1/triggers/queue_consumer/sync';
-    calls_needed := least(ceil(queue_size / batch_size::float)::int, 10);
+    calls_needed := least(ceil(queue_size / safe_batch_size::float)::int, 10);
 
     FOR i IN 1..calls_needed LOOP
+      body := jsonb_build_object(
+        'queue_name', queue_name,
+        'batch_size', safe_batch_size,
+        'cron_task_name', p_cron_task_name
+      );
+
+      IF p_run_id IS NOT NULL THEN
+        body := body || jsonb_build_object('cron_run_id', p_run_id);
+      END IF;
+
       PERFORM net.http_post(
         url := url,
         headers := headers,
-        body := jsonb_build_object(
-          'queue_name', queue_name,
-          'batch_size', batch_size,
-          'cron_run_id', p_run_id,
-          'cron_task_name', p_cron_task_name
-        ),
+        body := body,
         timeout_milliseconds := 8000
       );
     END LOOP;
@@ -238,6 +246,7 @@ DECLARE
   current_second int;
   current_dow int;
   current_day int;
+  latest_run_at timestamptz;
   task RECORD;
   queue_names text[];
   should_run boolean;
@@ -263,7 +272,13 @@ BEGIN
       should_run := false;
 
       IF task.second_interval IS NOT NULL THEN
-        should_run := true;
+        SELECT MAX(COALESCE(finished_at, created_at))
+        INTO latest_run_at
+        FROM public.cron_task_runs
+        WHERE cron_task_id = task.id;
+
+        should_run := latest_run_at IS NULL
+          OR EXTRACT(EPOCH FROM (NOW() - latest_run_at)) >= task.second_interval;
       ELSIF task.minute_interval IS NOT NULL THEN
         should_run := (current_minute % task.minute_interval = 0)
                       AND (current_second < 10);
@@ -333,16 +348,19 @@ BEGIN
             WHEN 'queue' THEN
               PERFORM pgmq.send(
                 task.target,
-                CASE
-                  WHEN task.success_report_url IS NULL THEN
-                    COALESCE(task.payload, jsonb_build_object('function_name', task.target))
-                  ELSE
-                    COALESCE(task.payload, jsonb_build_object('function_name', task.target))
-                    || jsonb_build_object(
-                      '__cron_run_id', run_id,
-                      '__cron_task_name', task.name
-                    )
-                END
+                jsonb_build_object(
+                  'function_name', COALESCE(task.payload->>'function_name', task.target),
+                  'function_type', COALESCE(task.payload->>'function_type', 'supabase'),
+                  'payload',
+                  CASE
+                    WHEN task.payload ? 'payload' THEN COALESCE(task.payload->'payload', '{}'::jsonb)
+                    ELSE COALESCE(task.payload, '{}'::jsonb)
+                  END
+                  || CASE WHEN run_id IS NOT NULL THEN jsonb_build_object(
+                    '__cron_run_id', run_id,
+                    '__cron_task_name', task.name
+                  ) ELSE '{}'::jsonb END
+                )
               );
 
               IF task.success_report_url IS NOT NULL THEN
@@ -357,11 +375,9 @@ BEGIN
               FROM jsonb_array_elements_text(task.target::jsonb);
 
               IF task.success_report_url IS NULL THEN
-                total_batches := public.process_function_queue_with_run(
+                PERFORM public.process_function_queue(
                   queue_names,
-                  COALESCE(task.batch_size, 950),
-                  run_id,
-                  task.name
+                  COALESCE(task.batch_size, 950)
                 );
               ELSE
                 total_batches := public.process_function_queue_with_run(
