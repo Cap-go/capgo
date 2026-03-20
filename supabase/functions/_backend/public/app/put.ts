@@ -3,6 +3,7 @@ import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { trackBentoEvent } from '../../utils/bento.ts'
 import { createIfNotExistStoreInfo } from '../../utils/cloudflare.ts'
+import { lockOnboardingApp, unlockOnboardingApp } from '../../utils/demo.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
@@ -52,22 +53,36 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
   }
 
   const normalizedIcon = normalizeImagePath(body.icon)
-  const { data, error: dbError } = await supabaseApikey(c, apikey.key)
-    .from('apps')
-    .update({
-      name: body.name,
-      icon_url: normalizedIcon ?? body.icon,
-      retention: body.retention,
-      expose_metadata: body.expose_metadata,
-      allow_device_custom_id: body.allow_device_custom_id,
-      need_onboarding: body.need_onboarding,
-      existing_app: body.existing_app,
-      ios_store_url: body.ios_store_url,
-      android_store_url: body.android_store_url,
-    })
-    .eq('app_id', appId)
-    .select()
-    .single()
+  const shouldSerializeOnboardingCompletion = previousApp.need_onboarding === true && body.need_onboarding === false
+  const onboardingLock = shouldSerializeOnboardingCompletion
+    ? await lockOnboardingApp(c, appId)
+    : null
+
+  const { data, error: dbError } = await (async () => {
+    try {
+      return await supabaseApikey(c, apikey.key)
+        .from('apps')
+        .update({
+          name: body.name,
+          icon_url: normalizedIcon ?? body.icon,
+          retention: body.retention,
+          expose_metadata: body.expose_metadata,
+          allow_device_custom_id: body.allow_device_custom_id,
+          need_onboarding: body.need_onboarding,
+          existing_app: body.existing_app,
+          ios_store_url: body.ios_store_url,
+          android_store_url: body.android_store_url,
+        })
+        .eq('app_id', appId)
+        .select()
+        .single()
+    }
+    finally {
+      if (onboardingLock) {
+        await unlockOnboardingApp(c, onboardingLock, appId)
+      }
+    }
+  })()
 
   if (dbError || !data) {
     throw simpleError('cannot_update_app', 'Cannot update app', { supabaseError: dbError })

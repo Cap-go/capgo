@@ -119,6 +119,26 @@ FOR EACH ROW
 WHEN (OLD.need_onboarding IS TRUE AND NEW.need_onboarding IS FALSE)
 EXECUTE FUNCTION "public"."cleanup_onboarding_app_data_on_complete"();
 
+CREATE OR REPLACE FUNCTION "public"."has_seeded_demo_data"("p_app_id" text)
+RETURNS boolean
+LANGUAGE "sql"
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT EXISTS (
+    SELECT 1
+    FROM public.app_versions
+    INNER JOIN public.manifest
+      ON public.manifest.app_version_id = public.app_versions.id
+    WHERE public.app_versions.app_id = p_app_id
+      AND public.manifest.s3_path LIKE ('demo/' || p_app_id || '/%')
+  );
+$$;
+
+ALTER FUNCTION "public"."has_seeded_demo_data"(text) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."has_seeded_demo_data"(text) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."has_seeded_demo_data"(text) TO "service_role";
+
 CREATE OR REPLACE FUNCTION "public"."cleanup_expired_demo_apps"()
 RETURNS void
 LANGUAGE "plpgsql"
@@ -128,11 +148,25 @@ AS $$
 DECLARE
   deleted_count integer;
 BEGIN
-  DELETE FROM public.apps
-  WHERE need_onboarding IS TRUE
-    AND created_at < now() - interval '14 days';
+  WITH deleted_apps AS (
+    DELETE FROM public.apps
+    WHERE need_onboarding IS TRUE
+      AND created_at < now() - interval '14 days'
+      AND public.has_seeded_demo_data(app_id)
+    RETURNING owner_org
+  ),
+  evicted_cache AS (
+    DELETE FROM public.app_metrics_cache
+    WHERE org_id IN (
+      SELECT DISTINCT owner_org
+      FROM deleted_apps
+      WHERE owner_org IS NOT NULL
+    )
+  )
+  SELECT COUNT(*)::integer
+  INTO deleted_count
+  FROM deleted_apps;
 
-  GET DIAGNOSTICS deleted_count = ROW_COUNT;
   RAISE NOTICE 'cleanup_expired_demo_apps: Deleted % expired demo apps', deleted_count;
 END;
 $$;

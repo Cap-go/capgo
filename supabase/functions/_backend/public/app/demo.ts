@@ -1,14 +1,15 @@
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
-import { quickError, simpleError } from '../../utils/hono.ts'
+import { lockOnboardingApp, unlockOnboardingApp } from '../../utils/demo.ts'
+import { simpleError } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
 import { hasOrgRight, supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
 
 /** Request body for creating a demo app */
 export interface CreateDemoApp {
   owner_org: string
-  app_id: string
+  app_id?: string
 }
 
 /** Demo version configuration */
@@ -250,6 +251,42 @@ async function getExistingPendingApp(
   throw simpleError('cannot_find_app', 'Cannot find app for demo onboarding', { owner_org: ownerOrg, app_id: appId })
 }
 
+async function getLatestPendingAppForOrg(
+  c: Context<MiddlewareKeyVariables>,
+  supabase: ReturnType<typeof supabaseAdmin>,
+  ownerOrg: string,
+) {
+  const { data, error } = await supabase
+    .from('apps')
+    .select('*')
+    .eq('owner_org', ownerOrg)
+    .eq('need_onboarding', true)
+    .order('created_at', { ascending: false })
+    .limit(2)
+
+  if (error) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Error loading pending onboarding app for org', error, owner_org: ownerOrg })
+    throw simpleError('cannot_find_app', 'Cannot find app for demo onboarding', { owner_org: ownerOrg })
+  }
+
+  const appData = data?.[0]
+  if (!appData) {
+    throw simpleError('cannot_find_app', 'Cannot find app for demo onboarding', { owner_org: ownerOrg })
+  }
+
+  if ((data?.length ?? 0) > 1) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Multiple pending onboarding apps found, using most recent for legacy demo request',
+      owner_org: ownerOrg,
+      app_id: appData.app_id,
+      count: data?.length ?? 0,
+    })
+  }
+
+  return appData
+}
+
 /**
  * Seeds demo data into an already-created onboarding app.
  * The app stays marked by public.apps.need_onboarding = true until the
@@ -278,9 +315,6 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
   if (!body.owner_org) {
     throw simpleError('missing_owner_org', 'Missing owner_org', { body })
   }
-  if (!body.app_id?.trim()) {
-    throw quickError(400, 'missing_app_id', 'Missing app_id', { body })
-  }
 
   // Check if the user is allowed to create an app in this organization
   if (!(await hasOrgRight(c, body.owner_org, auth.userId, 'write'))) {
@@ -288,487 +322,499 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
   }
 
   const supabase = supabaseAdmin(c)
-  const appId = body.app_id.trim()
-  const appData = await getExistingPendingApp(c, supabase, body.owner_org, appId)
-  if (!appData.id) {
-    throw simpleError('cannot_find_app', 'Cannot find app for demo onboarding', { owner_org: body.owner_org, app_id: appId })
-  }
-  const { error: cleanupError } = await supabase
-    .rpc('clear_onboarding_app_data', { p_app_uuid: appData.id })
+  const requestedAppId = body.app_id?.trim()
+  const resolvedApp = requestedAppId
+    ? { app_id: requestedAppId }
+    : await getLatestPendingAppForOrg(c, supabase, body.owner_org)
+  const lockedAppId = resolvedApp.app_id
+  const onboardingLock = await lockOnboardingApp(c, lockedAppId)
 
-  if (cleanupError) {
-    cloudlog({ requestId, message: 'Error clearing onboarding data before demo seeding', error: cleanupError, app_id: appId })
-    throw simpleError('cannot_prepare_demo_app', 'Cannot prepare app for demo data', { error: cleanupError })
-  }
-
-  cloudlog({ requestId, message: 'Creating demo app with demo data', appId, owner_org: body.owner_org })
-
-  // RLS bypass needed: Demo app creation inserts into multiple tables (apps, app_versions,
-  // channels, devices, daily_mau, daily_bandwidth, daily_storage, daily_version, build_requests,
-  // manifest, deploy_history) where RLS policies may not grant direct user insert access.
-  // Authorization is enforced at endpoint level via hasOrgRight check above.
-
-  // Create the demo app
-  cloudlog({ requestId, message: 'Demo app created', appData })
-
-  // Demo versions to create - simulates app development lifecycle
-  const demoVersions: DemoVersion[] = [
-    { name: 'unknown', daysAgo: 14 },
-    { name: 'builtin', daysAgo: 14 },
-    { name: '1.0.0', daysAgo: 13, comment: 'Initial release' },
-    { name: '1.0.1', daysAgo: 10, comment: 'Bug fixes for login screen' },
-    { name: '1.1.0', daysAgo: 7, comment: 'Added dark mode support' },
-    { name: '1.1.1', daysAgo: 4, comment: 'Performance improvements' },
-    { name: '1.2.0', daysAgo: 1, comment: 'New dashboard features', link: 'https://github.com/example/demo-app/pull/123' },
-  ]
-
-  // Create all versions with manifest and native_packages for real versions
-  const versionInserts = demoVersions.map((v) => {
-    const isSystemVersion = v.name === 'unknown' || v.name === 'builtin'
-    const manifest = isSystemVersion ? null : getDemoManifest(v.name, appId)
-    const nativePackages = isSystemVersion ? null : getDemoNativePackages(v.name)
-
-    return {
-      owner_org: body.owner_org,
-      deleted: isSystemVersion,
-      name: v.name,
-      app_id: appId,
-      created_at: daysAgoDate(v.daysAgo),
-      comment: v.comment,
-      link: v.link,
-      user_id: auth.userId,
-      // Add manifest and native_packages for non-system versions
-      manifest: manifest as any,
-      manifest_count: manifest?.length ?? 0,
-      native_packages: nativePackages as any,
+  try {
+    const appData = await getExistingPendingApp(c, supabase, body.owner_org, lockedAppId)
+    if (!appData.id) {
+      throw simpleError('cannot_find_app', 'Cannot find app for demo onboarding', { owner_org: body.owner_org, app_id: lockedAppId })
     }
-  })
+    const appId = appData.app_id
+    const { error: cleanupError } = await supabase
+      .rpc('clear_onboarding_app_data', { p_app_uuid: appData.id })
 
-  const { data: versionsData, error: versionsError } = await supabase
-    .from('app_versions')
-    .upsert(versionInserts, { onConflict: 'name,app_id', ignoreDuplicates: true })
-    .select()
-
-  if (versionsError) {
-    cloudlog({ requestId, message: 'Error creating demo versions', error: versionsError })
-  }
-  else {
-    cloudlog({ requestId, message: 'Demo versions created', count: versionsData?.length })
-  }
-
-  // Get all version IDs for channel and deploy history creation
-  const { data: allVersions, error: allVersionsError } = await supabase
-    .from('app_versions')
-    .select('id, name')
-    .eq('app_id', appId)
-    .eq('owner_org', body.owner_org)
-
-  if (allVersionsError || !allVersions) {
-    cloudlog({ requestId, message: 'Error getting versions', error: allVersionsError })
-    throw simpleError('cannot_get_versions', 'Cannot get versions', { error: allVersionsError })
-  }
-
-  const versionMap = new Map(allVersions.map(v => [v.name, v.id]))
-
-  // Insert manifest entries into the manifest table for each version
-  // This is required for the bundle file list to show in the UI
-  const manifestInserts: Database['public']['Tables']['manifest']['Insert'][] = []
-
-  for (const version of demoVersions) {
-    if (version.name === 'unknown' || version.name === 'builtin')
-      continue
-
-    const versionId = versionMap.get(version.name)
-    if (!versionId)
-      continue
-
-    const manifestEntries = getDemoManifest(version.name, appId)
-    for (const entry of manifestEntries) {
-      manifestInserts.push({
-        app_version_id: versionId,
-        file_name: entry.file_name,
-        file_hash: entry.file_hash,
-        s3_path: entry.s3_path,
-        file_size: entry.file_size,
-      })
-    }
-  }
-
-  if (manifestInserts.length > 0) {
-    const { error: manifestError } = await supabase
-      .from('manifest')
-      .insert(manifestInserts)
-
-    if (manifestError) {
-      cloudlog({ requestId, message: 'Error creating manifest entries', error: manifestError })
-    }
-    else {
-      cloudlog({ requestId, message: 'Manifest entries created', count: manifestInserts.length })
-    }
-  }
-
-  // Demo channels configuration
-  const demoChannels: DemoChannel[] = [
-    { name: 'production', public: true },
-    { name: 'development', public: false },
-    { name: 'pr-123', public: false, allowDeviceSelfSet: true },
-  ]
-
-  // Channel to version mapping
-  const channelVersions: Record<string, string> = {
-    'production': '1.1.1',
-    'development': '1.2.0',
-    'pr-123': '1.2.0',
-  }
-
-  // Create channels
-  const createdChannels: Map<string, number> = new Map()
-
-  for (const channel of demoChannels) {
-    const versionName = channelVersions[channel.name]
-    const versionId = versionMap.get(versionName)
-
-    if (!versionId) {
-      cloudlog({ requestId, message: 'Version not found for channel', channel: channel.name, versionName })
-      continue
+    if (cleanupError) {
+      cloudlog({ requestId, message: 'Error clearing onboarding data before demo seeding', error: cleanupError, app_id: appId })
+      throw simpleError('cannot_prepare_demo_app', 'Cannot prepare app for demo data', { error: cleanupError })
     }
 
-    const channelInsert: Database['public']['Tables']['channels']['Insert'] = {
-      created_by: auth.userId,
-      app_id: appId,
-      name: channel.name,
-      public: channel.public,
-      disable_auto_update_under_native: true,
-      disable_auto_update: 'major',
-      ios: true,
-      android: true,
-      electron: true,
-      allow_device_self_set: channel.allowDeviceSelfSet ?? false,
-      allow_emulator: true,
-      allow_device: true,
-      allow_dev: channel.name !== 'production',
-      allow_prod: true,
-      version: versionId,
-      owner_org: body.owner_org,
-    }
+    cloudlog({ requestId, message: 'Creating demo app with demo data', appId, owner_org: body.owner_org })
 
-    try {
-      await updateOrCreateChannel(c, channelInsert)
-      cloudlog({ requestId, message: 'Channel created', channel: channel.name })
-    }
-    catch (error) {
-      cloudlog({ requestId, message: 'Error creating channel', channel: channel.name, error })
-    }
-  }
+    // RLS bypass needed: Demo app creation inserts into multiple tables (apps, app_versions,
+    // channels, devices, daily_mau, daily_bandwidth, daily_storage, daily_version, build_requests,
+    // manifest, deploy_history) where RLS policies may not grant direct user insert access.
+    // Authorization is enforced at endpoint level via hasOrgRight check above.
 
-  // Get all channel IDs for deploy history creation
-  const { data: allChannels, error: allChannelsError } = await supabase
-    .from('channels')
-    .select('id, name')
-    .eq('app_id', appId)
-    .eq('owner_org', body.owner_org)
+    // Create the demo app
+    cloudlog({ requestId, message: 'Demo app created', appData })
 
-  if (allChannelsError) {
-    cloudlog({ requestId, message: 'Error getting channels', error: allChannelsError })
-  }
-  else if (allChannels) {
-    for (const ch of allChannels) {
-      createdChannels.set(ch.name, ch.id)
-    }
-  }
+    // Demo versions to create - simulates app development lifecycle
+    const demoVersions: DemoVersion[] = [
+      { name: 'unknown', daysAgo: 14 },
+      { name: 'builtin', daysAgo: 14 },
+      { name: '1.0.0', daysAgo: 13, comment: 'Initial release' },
+      { name: '1.0.1', daysAgo: 10, comment: 'Bug fixes for login screen' },
+      { name: '1.1.0', daysAgo: 7, comment: 'Added dark mode support' },
+      { name: '1.1.1', daysAgo: 4, comment: 'Performance improvements' },
+      { name: '1.2.0', daysAgo: 1, comment: 'New dashboard features', link: 'https://github.com/example/demo-app/pull/123' },
+    ]
 
-  // Create deploy history to show progression
-  const deployHistory: Array<{ channel: string, version: string, daysAgo: number }> = [
-    { channel: 'production', version: '1.0.0', daysAgo: 13 },
-    { channel: 'development', version: '1.0.1', daysAgo: 10 },
-    { channel: 'production', version: '1.0.1', daysAgo: 9 },
-    { channel: 'development', version: '1.1.0', daysAgo: 7 },
-    { channel: 'production', version: '1.1.0', daysAgo: 6 },
-    { channel: 'development', version: '1.1.1', daysAgo: 4 },
-    { channel: 'production', version: '1.1.1', daysAgo: 3 },
-    { channel: 'pr-123', version: '1.2.0', daysAgo: 1 },
-    { channel: 'development', version: '1.2.0', daysAgo: 1 },
-  ]
+    // Create all versions with manifest and native_packages for real versions
+    const versionInserts = demoVersions.map((v) => {
+      const isSystemVersion = v.name === 'unknown' || v.name === 'builtin'
+      const manifest = isSystemVersion ? null : getDemoManifest(v.name, appId)
+      const nativePackages = isSystemVersion ? null : getDemoNativePackages(v.name)
 
-  const deployInserts = deployHistory
-    .filter(d => createdChannels.has(d.channel) && versionMap.has(d.version))
-    .map(d => ({
-      app_id: appId,
-      channel_id: createdChannels.get(d.channel)!,
-      version_id: versionMap.get(d.version)!,
-      created_by: auth.userId,
-      owner_org: body.owner_org,
-      created_at: daysAgoDate(d.daysAgo),
-      deployed_at: daysAgoDate(d.daysAgo),
-    }))
-
-  if (deployInserts.length > 0) {
-    const { error: deployError } = await supabase
-      .from('deploy_history')
-      .insert(deployInserts)
-
-    if (deployError) {
-      cloudlog({ requestId, message: 'Error creating deploy history', error: deployError })
-    }
-    else {
-      cloudlog({ requestId, message: 'Deploy history created', count: deployInserts.length })
-    }
-  }
-
-  // Create fake devices - mix of iOS and Android
-  // Note: In production Cloudflare Workers, devices are read from Analytics Engine (DEVICE_INFO)
-  // This Supabase data serves as fallback for non-workerd environments (dev, staging, Deno)
-  const platforms: Array<Database['public']['Enums']['platform_os']> = ['ios', 'android']
-  const deviceInserts: Database['public']['Tables']['devices']['Insert'][] = []
-  const generatedDeviceIds: string[] = []
-
-  // Create 8 devices (4 iOS, 4 Android)
-  for (let i = 0; i < 8; i++) {
-    const platform = platforms[i % 2]
-    const latestVersionId = versionMap.get('1.1.1')
-    const deviceId = generateDeviceId()
-    generatedDeviceIds.push(deviceId)
-    deviceInserts.push({
-      app_id: appId,
-      device_id: deviceId,
-      platform,
-      plugin_version: '6.0.0',
-      version: latestVersionId,
-      version_name: '1.1.1',
-      version_build: '1',
-      os_version: platform === 'ios' ? '17.0' : '14',
-      is_emulator: false,
-      is_prod: true,
-      updated_at: daysAgoDate(Math.floor(Math.random() * 3)),
-    })
-  }
-
-  const { error: devicesError } = await supabase
-    .from('devices')
-    .insert(deviceInserts)
-
-  if (devicesError) {
-    cloudlog({ requestId, message: 'Error creating demo devices', error: devicesError })
-  }
-  else {
-    cloudlog({ requestId, message: 'Demo devices created', count: deviceInserts.length })
-  }
-
-  // Create chart data for the past 14 days
-  // Insert directly into daily_* tables (which the frontend queries via get_app_metrics RPC)
-  // instead of raw *_usage tables (which require cron job aggregation)
-  const dailyMauInserts: Database['public']['Tables']['daily_mau']['Insert'][] = []
-  const dailyBandwidthInserts: Database['public']['Tables']['daily_bandwidth']['Insert'][] = []
-  const dailyStorageInserts: Database['public']['Tables']['daily_storage']['Insert'][] = []
-  const dailyVersionInserts: Database['public']['Tables']['daily_version']['Insert'][] = []
-
-  // Version sizes for storage calculation
-  const versionSizes: Record<string, number> = {
-    '1.0.0': 4500000,
-    '1.0.1': 4600000,
-    '1.1.0': 5200000,
-    '1.1.1': 5300000,
-    '1.2.0': 5800000,
-  }
-
-  // Track cumulative storage (versions accumulate over time)
-  let cumulativeStorage = 0
-
-  // Version active periods (when each version was in production)
-  const versionActivePeriods: Record<string, { startDaysAgo: number, endDaysAgo: number }> = {
-    '1.0.0': { startDaysAgo: 13, endDaysAgo: 9 },
-    '1.0.1': { startDaysAgo: 9, endDaysAgo: 6 },
-    '1.1.0': { startDaysAgo: 6, endDaysAgo: 3 },
-    '1.1.1': { startDaysAgo: 3, endDaysAgo: 0 },
-    '1.2.0': { startDaysAgo: 1, endDaysAgo: 0 }, // Only in dev/pr channel
-  }
-
-  for (let daysAgo = 13; daysAgo >= 0; daysAgo--) {
-    const date = daysAgoDate(daysAgo).split('T')[0] // Get just the date part (YYYY-MM-DD)
-
-    // MAU: Number of active devices increases over time (simulating user growth)
-    const mau = Math.min(generatedDeviceIds.length, 3 + Math.floor((13 - daysAgo) * 0.5))
-    dailyMauInserts.push({
-      app_id: appId,
-      date,
-      mau,
-    })
-
-    // Bandwidth: Downloads per day (varies based on active users)
-    const bundleSize = 5500000 // ~5.5MB average bundle
-    const downloadsToday = Math.max(1, mau - 1)
-    const bandwidth = bundleSize * downloadsToday
-    dailyBandwidthInserts.push({
-      app_id: appId,
-      date,
-      bandwidth,
-    })
-
-    // Storage: Add new version sizes when they're released
-    for (const [versionName, size] of Object.entries(versionSizes)) {
-      const versionConfig = demoVersions.find(v => v.name === versionName)
-      if (versionConfig && versionConfig.daysAgo === daysAgo) {
-        cumulativeStorage += size
-      }
-    }
-    // Only add storage entry if we have some storage
-    if (cumulativeStorage > 0) {
-      dailyStorageInserts.push({
+      return {
+        owner_org: body.owner_org,
+        deleted: isSystemVersion,
+        name: v.name,
         app_id: appId,
-        date,
-        storage: cumulativeStorage,
-      })
+        created_at: daysAgoDate(v.daysAgo),
+        comment: v.comment,
+        link: v.link,
+        user_id: auth.userId,
+        // Add manifest and native_packages for non-system versions
+        manifest: manifest as any,
+        manifest_count: manifest?.length ?? 0,
+        native_packages: nativePackages as any,
+      }
+    })
+
+    const { data: versionsData, error: versionsError } = await supabase
+      .from('app_versions')
+      .upsert(versionInserts, { onConflict: 'name,app_id', ignoreDuplicates: true })
+      .select()
+
+    if (versionsError) {
+      cloudlog({ requestId, message: 'Error creating demo versions', error: versionsError })
+    }
+    else {
+      cloudlog({ requestId, message: 'Demo versions created', count: versionsData?.length })
     }
 
-    // Version usage: Create aggregated stats for each active version on this day
-    for (const [versionName, period] of Object.entries(versionActivePeriods)) {
-      if (daysAgo <= period.startDaysAgo && daysAgo >= period.endDaysAgo) {
-        const versionId = versionMap.get(versionName)
-        if (!versionId)
-          continue
+    // Get all version IDs for channel and deploy history creation
+    const { data: allVersions, error: allVersionsError } = await supabase
+      .from('app_versions')
+      .select('id, name')
+      .eq('app_id', appId)
+      .eq('owner_org', body.owner_org)
 
-        // Activity increases as version gets more exposure
-        const daysSinceRelease = period.startDaysAgo - daysAgo
-        const baseActivity = Math.min(3 + daysSinceRelease, 8)
+    if (allVersionsError || !allVersions) {
+      cloudlog({ requestId, message: 'Error getting versions', error: allVersionsError })
+      throw simpleError('cannot_get_versions', 'Cannot get versions', { error: allVersionsError })
+    }
 
-        const getCount = baseActivity * 2
-        const installCount = Math.floor(getCount * 0.8)
-        const failCount = Math.max(0, Math.floor(getCount * 0.05))
-        const uninstallCount = daysAgo < period.startDaysAgo - 1 ? Math.max(0, Math.floor(installCount * 0.1)) : 0
+    const versionMap = new Map(allVersions.map(v => [v.name, v.id]))
 
-        dailyVersionInserts.push({
-          app_id: appId,
-          date,
-          version_id: versionId,
-          version_name: versionName,
-          get: getCount,
-          install: installCount,
-          fail: failCount,
-          uninstall: uninstallCount,
+    // Insert manifest entries into the manifest table for each version
+    // This is required for the bundle file list to show in the UI
+    const manifestInserts: Database['public']['Tables']['manifest']['Insert'][] = []
+
+    for (const version of demoVersions) {
+      if (version.name === 'unknown' || version.name === 'builtin')
+        continue
+
+      const versionId = versionMap.get(version.name)
+      if (!versionId)
+        continue
+
+      const manifestEntries = getDemoManifest(version.name, appId)
+      for (const entry of manifestEntries) {
+        manifestInserts.push({
+          app_version_id: versionId,
+          file_name: entry.file_name,
+          file_hash: entry.file_hash,
+          s3_path: entry.s3_path,
+          file_size: entry.file_size,
         })
       }
     }
-  }
 
-  // Insert chart data into daily_* tables
-  if (dailyMauInserts.length > 0) {
-    const { error: mauError } = await supabase.from('daily_mau').upsert(dailyMauInserts, { onConflict: 'app_id,date' })
-    if (mauError) {
-      cloudlog({ requestId, message: 'Error creating daily_mau data', error: mauError })
+    if (manifestInserts.length > 0) {
+      const { error: manifestError } = await supabase
+        .from('manifest')
+        .insert(manifestInserts)
+
+      if (manifestError) {
+        cloudlog({ requestId, message: 'Error creating manifest entries', error: manifestError })
+      }
+      else {
+        cloudlog({ requestId, message: 'Manifest entries created', count: manifestInserts.length })
+      }
+    }
+
+    // Demo channels configuration
+    const demoChannels: DemoChannel[] = [
+      { name: 'production', public: true },
+      { name: 'development', public: false },
+      { name: 'pr-123', public: false, allowDeviceSelfSet: true },
+    ]
+
+    // Channel to version mapping
+    const channelVersions: Record<string, string> = {
+      'production': '1.1.1',
+      'development': '1.2.0',
+      'pr-123': '1.2.0',
+    }
+
+    // Create channels
+    const createdChannels: Map<string, number> = new Map()
+
+    for (const channel of demoChannels) {
+      const versionName = channelVersions[channel.name]
+      const versionId = versionMap.get(versionName)
+
+      if (!versionId) {
+        cloudlog({ requestId, message: 'Version not found for channel', channel: channel.name, versionName })
+        continue
+      }
+
+      const channelInsert: Database['public']['Tables']['channels']['Insert'] = {
+        created_by: auth.userId,
+        app_id: appId,
+        name: channel.name,
+        public: channel.public,
+        disable_auto_update_under_native: true,
+        disable_auto_update: 'major',
+        ios: true,
+        android: true,
+        electron: true,
+        allow_device_self_set: channel.allowDeviceSelfSet ?? false,
+        allow_emulator: true,
+        allow_device: true,
+        allow_dev: channel.name !== 'production',
+        allow_prod: true,
+        version: versionId,
+        owner_org: body.owner_org,
+      }
+
+      try {
+        await updateOrCreateChannel(c, channelInsert)
+        cloudlog({ requestId, message: 'Channel created', channel: channel.name })
+      }
+      catch (error) {
+        cloudlog({ requestId, message: 'Error creating channel', channel: channel.name, error })
+      }
+    }
+
+    // Get all channel IDs for deploy history creation
+    const { data: allChannels, error: allChannelsError } = await supabase
+      .from('channels')
+      .select('id, name')
+      .eq('app_id', appId)
+      .eq('owner_org', body.owner_org)
+
+    if (allChannelsError) {
+      cloudlog({ requestId, message: 'Error getting channels', error: allChannelsError })
+    }
+    else if (allChannels) {
+      for (const ch of allChannels) {
+        createdChannels.set(ch.name, ch.id)
+      }
+    }
+
+    // Create deploy history to show progression
+    const deployHistory: Array<{ channel: string, version: string, daysAgo: number }> = [
+      { channel: 'production', version: '1.0.0', daysAgo: 13 },
+      { channel: 'development', version: '1.0.1', daysAgo: 10 },
+      { channel: 'production', version: '1.0.1', daysAgo: 9 },
+      { channel: 'development', version: '1.1.0', daysAgo: 7 },
+      { channel: 'production', version: '1.1.0', daysAgo: 6 },
+      { channel: 'development', version: '1.1.1', daysAgo: 4 },
+      { channel: 'production', version: '1.1.1', daysAgo: 3 },
+      { channel: 'pr-123', version: '1.2.0', daysAgo: 1 },
+      { channel: 'development', version: '1.2.0', daysAgo: 1 },
+    ]
+
+    const deployInserts = deployHistory
+      .filter(d => createdChannels.has(d.channel) && versionMap.has(d.version))
+      .map(d => ({
+        app_id: appId,
+        channel_id: createdChannels.get(d.channel)!,
+        version_id: versionMap.get(d.version)!,
+        created_by: auth.userId,
+        owner_org: body.owner_org,
+        created_at: daysAgoDate(d.daysAgo),
+        deployed_at: daysAgoDate(d.daysAgo),
+      }))
+
+    if (deployInserts.length > 0) {
+      const { error: deployError } = await supabase
+        .from('deploy_history')
+        .insert(deployInserts)
+
+      if (deployError) {
+        cloudlog({ requestId, message: 'Error creating deploy history', error: deployError })
+      }
+      else {
+        cloudlog({ requestId, message: 'Deploy history created', count: deployInserts.length })
+      }
+    }
+
+    // Create fake devices - mix of iOS and Android
+    // Note: In production Cloudflare Workers, devices are read from Analytics Engine (DEVICE_INFO)
+    // This Supabase data serves as fallback for non-workerd environments (dev, staging, Deno)
+    const platforms: Array<Database['public']['Enums']['platform_os']> = ['ios', 'android']
+    const deviceInserts: Database['public']['Tables']['devices']['Insert'][] = []
+    const generatedDeviceIds: string[] = []
+
+    // Create 8 devices (4 iOS, 4 Android)
+    for (let i = 0; i < 8; i++) {
+      const platform = platforms[i % 2]
+      const latestVersionId = versionMap.get('1.1.1')
+      const deviceId = generateDeviceId()
+      generatedDeviceIds.push(deviceId)
+      deviceInserts.push({
+        app_id: appId,
+        device_id: deviceId,
+        platform,
+        plugin_version: '6.0.0',
+        version: latestVersionId,
+        version_name: '1.1.1',
+        version_build: '1',
+        os_version: platform === 'ios' ? '17.0' : '14',
+        is_emulator: false,
+        is_prod: true,
+        updated_at: daysAgoDate(Math.floor(Math.random() * 3)),
+      })
+    }
+
+    const { error: devicesError } = await supabase
+      .from('devices')
+      .insert(deviceInserts)
+
+    if (devicesError) {
+      cloudlog({ requestId, message: 'Error creating demo devices', error: devicesError })
     }
     else {
-      cloudlog({ requestId, message: 'Daily MAU data created', count: dailyMauInserts.length })
+      cloudlog({ requestId, message: 'Demo devices created', count: deviceInserts.length })
     }
-  }
 
-  if (dailyBandwidthInserts.length > 0) {
-    const { error: bandwidthError } = await supabase.from('daily_bandwidth').upsert(dailyBandwidthInserts, { onConflict: 'app_id,date' })
-    if (bandwidthError) {
-      cloudlog({ requestId, message: 'Error creating daily_bandwidth data', error: bandwidthError })
+    // Create chart data for the past 14 days
+    // Insert directly into daily_* tables (which the frontend queries via get_app_metrics RPC)
+    // instead of raw *_usage tables (which require cron job aggregation)
+    const dailyMauInserts: Database['public']['Tables']['daily_mau']['Insert'][] = []
+    const dailyBandwidthInserts: Database['public']['Tables']['daily_bandwidth']['Insert'][] = []
+    const dailyStorageInserts: Database['public']['Tables']['daily_storage']['Insert'][] = []
+    const dailyVersionInserts: Database['public']['Tables']['daily_version']['Insert'][] = []
+
+    // Version sizes for storage calculation
+    const versionSizes: Record<string, number> = {
+      '1.0.0': 4500000,
+      '1.0.1': 4600000,
+      '1.1.0': 5200000,
+      '1.1.1': 5300000,
+      '1.2.0': 5800000,
+    }
+
+    // Track cumulative storage (versions accumulate over time)
+    let cumulativeStorage = 0
+
+    // Version active periods (when each version was in production)
+    const versionActivePeriods: Record<string, { startDaysAgo: number, endDaysAgo: number }> = {
+      '1.0.0': { startDaysAgo: 13, endDaysAgo: 9 },
+      '1.0.1': { startDaysAgo: 9, endDaysAgo: 6 },
+      '1.1.0': { startDaysAgo: 6, endDaysAgo: 3 },
+      '1.1.1': { startDaysAgo: 3, endDaysAgo: 0 },
+      '1.2.0': { startDaysAgo: 1, endDaysAgo: 0 }, // Only in dev/pr channel
+    }
+
+    for (let daysAgo = 13; daysAgo >= 0; daysAgo--) {
+      const date = daysAgoDate(daysAgo).split('T')[0] // Get just the date part (YYYY-MM-DD)
+
+      // MAU: Number of active devices increases over time (simulating user growth)
+      const mau = Math.min(generatedDeviceIds.length, 3 + Math.floor((13 - daysAgo) * 0.5))
+      dailyMauInserts.push({
+        app_id: appId,
+        date,
+        mau,
+      })
+
+      // Bandwidth: Downloads per day (varies based on active users)
+      const bundleSize = 5500000 // ~5.5MB average bundle
+      const downloadsToday = Math.max(1, mau - 1)
+      const bandwidth = bundleSize * downloadsToday
+      dailyBandwidthInserts.push({
+        app_id: appId,
+        date,
+        bandwidth,
+      })
+
+      // Storage: Add new version sizes when they're released
+      for (const [versionName, size] of Object.entries(versionSizes)) {
+        const versionConfig = demoVersions.find(v => v.name === versionName)
+        if (versionConfig && versionConfig.daysAgo === daysAgo) {
+          cumulativeStorage += size
+        }
+      }
+      // Only add storage entry if we have some storage
+      if (cumulativeStorage > 0) {
+        dailyStorageInserts.push({
+          app_id: appId,
+          date,
+          storage: cumulativeStorage,
+        })
+      }
+
+      // Version usage: Create aggregated stats for each active version on this day
+      for (const [versionName, period] of Object.entries(versionActivePeriods)) {
+        if (daysAgo <= period.startDaysAgo && daysAgo >= period.endDaysAgo) {
+          const versionId = versionMap.get(versionName)
+          if (!versionId)
+            continue
+
+          // Activity increases as version gets more exposure
+          const daysSinceRelease = period.startDaysAgo - daysAgo
+          const baseActivity = Math.min(3 + daysSinceRelease, 8)
+
+          const getCount = baseActivity * 2
+          const installCount = Math.floor(getCount * 0.8)
+          const failCount = Math.max(0, Math.floor(getCount * 0.05))
+          const uninstallCount = daysAgo < period.startDaysAgo - 1 ? Math.max(0, Math.floor(installCount * 0.1)) : 0
+
+          dailyVersionInserts.push({
+            app_id: appId,
+            date,
+            version_id: versionId,
+            version_name: versionName,
+            get: getCount,
+            install: installCount,
+            fail: failCount,
+            uninstall: uninstallCount,
+          })
+        }
+      }
+    }
+
+    // Insert chart data into daily_* tables
+    if (dailyMauInserts.length > 0) {
+      const { error: mauError } = await supabase.from('daily_mau').upsert(dailyMauInserts, { onConflict: 'app_id,date' })
+      if (mauError) {
+        cloudlog({ requestId, message: 'Error creating daily_mau data', error: mauError })
+      }
+      else {
+        cloudlog({ requestId, message: 'Daily MAU data created', count: dailyMauInserts.length })
+      }
+    }
+
+    if (dailyBandwidthInserts.length > 0) {
+      const { error: bandwidthError } = await supabase.from('daily_bandwidth').upsert(dailyBandwidthInserts, { onConflict: 'app_id,date' })
+      if (bandwidthError) {
+        cloudlog({ requestId, message: 'Error creating daily_bandwidth data', error: bandwidthError })
+      }
+      else {
+        cloudlog({ requestId, message: 'Daily bandwidth data created', count: dailyBandwidthInserts.length })
+      }
+    }
+
+    if (dailyStorageInserts.length > 0) {
+      const { error: storageError } = await supabase.from('daily_storage').upsert(dailyStorageInserts, { onConflict: 'app_id,date' })
+      if (storageError) {
+        cloudlog({ requestId, message: 'Error creating daily_storage data', error: storageError })
+      }
+      else {
+        cloudlog({ requestId, message: 'Daily storage data created', count: dailyStorageInserts.length })
+      }
+    }
+
+    if (dailyVersionInserts.length > 0) {
+      const { error: versionError } = await supabase.from('daily_version').upsert(dailyVersionInserts as any, { onConflict: 'app_id,date,version_name' })
+      if (versionError) {
+        cloudlog({ requestId, message: 'Error creating daily_version data', error: versionError })
+      }
+      else {
+        cloudlog({ requestId, message: 'Daily version data created', count: dailyVersionInserts.length })
+      }
+    }
+
+    cloudlog({ requestId, message: 'Chart data created for 14 days' })
+
+    // Create fake native builds to showcase the build feature
+    // Shows a mix of successful builds and one pending build
+    const buildInserts: Database['public']['Tables']['build_requests']['Insert'][] = []
+
+    // Build configurations for different versions
+    const nativeBuilds = [
+      { version: '1.0.0', platform: 'ios', daysAgo: 13, status: 'succeeded' },
+      { version: '1.0.0', platform: 'android', daysAgo: 13, status: 'succeeded' },
+      { version: '1.1.0', platform: 'ios', daysAgo: 7, status: 'succeeded' },
+      { version: '1.1.0', platform: 'android', daysAgo: 7, status: 'succeeded' },
+      { version: '1.1.1', platform: 'ios', daysAgo: 4, status: 'succeeded' },
+      { version: '1.1.1', platform: 'android', daysAgo: 4, status: 'succeeded' },
+      { version: '1.2.0', platform: 'ios', daysAgo: 1, status: 'succeeded' },
+      { version: '1.2.0', platform: 'android', daysAgo: 0, status: 'pending' }, // One pending build to show UI state
+    ]
+
+    for (const build of nativeBuilds) {
+      const buildId = crypto.randomUUID()
+      const createdAt = daysAgoDate(build.daysAgo)
+      const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Expires in 24 hours
+
+      buildInserts.push({
+        id: buildId,
+        app_id: appId,
+        owner_org: body.owner_org,
+        platform: build.platform,
+        requested_by: auth.userId,
+        status: build.status,
+        build_mode: 'release',
+        build_config: {
+          version: build.version,
+          bundleId: appId,
+          buildNumber: build.version.replace(/\./g, ''),
+        },
+        builder_job_id: build.status === 'succeeded' ? `demo-job-${buildId.slice(0, 8)}` : null,
+        created_at: createdAt,
+        upload_expires_at: expiresAt,
+        upload_path: `builds/${appId}/${build.platform}/${build.version}`,
+        upload_session_key: `demo-session-${buildId.slice(0, 8)}`,
+        upload_url: `https://demo-builds.example.com/${appId}/${build.platform}/${build.version}`,
+      })
+    }
+
+    if (buildInserts.length > 0) {
+      const { error: buildError } = await supabase
+        .from('build_requests')
+        .insert(buildInserts)
+
+      if (buildError) {
+        cloudlog({ requestId, message: 'Error creating demo build requests', error: buildError })
+      }
+      else {
+        cloudlog({ requestId, message: 'Demo build requests created', count: buildInserts.length })
+      }
+    }
+
+    // Invalidate the app_metrics_cache so the dashboard shows fresh data immediately
+    // The get_app_metrics RPC caches results for 5 minutes, so we need to clear it
+    const { error: cacheError } = await supabase
+      .from('app_metrics_cache')
+      .delete()
+      .eq('org_id', body.owner_org)
+
+    if (cacheError) {
+      cloudlog({ requestId, message: 'Error invalidating app_metrics_cache', error: cacheError })
     }
     else {
-      cloudlog({ requestId, message: 'Daily bandwidth data created', count: dailyBandwidthInserts.length })
+      cloudlog({ requestId, message: 'App metrics cache invalidated for org', org_id: body.owner_org })
     }
-  }
 
-  if (dailyStorageInserts.length > 0) {
-    const { error: storageError } = await supabase.from('daily_storage').upsert(dailyStorageInserts, { onConflict: 'app_id,date' })
-    if (storageError) {
-      cloudlog({ requestId, message: 'Error creating daily_storage data', error: storageError })
-    }
-    else {
-      cloudlog({ requestId, message: 'Daily storage data created', count: dailyStorageInserts.length })
-    }
-  }
+    cloudlog({ requestId, message: 'Demo app with all demo data created successfully', appId })
 
-  if (dailyVersionInserts.length > 0) {
-    const { error: versionError } = await supabase.from('daily_version').upsert(dailyVersionInserts as any, { onConflict: 'app_id,date,version_name' })
-    if (versionError) {
-      cloudlog({ requestId, message: 'Error creating daily_version data', error: versionError })
-    }
-    else {
-      cloudlog({ requestId, message: 'Daily version data created', count: dailyVersionInserts.length })
-    }
-  }
-
-  cloudlog({ requestId, message: 'Chart data created for 14 days' })
-
-  // Create fake native builds to showcase the build feature
-  // Shows a mix of successful builds and one pending build
-  const buildInserts: Database['public']['Tables']['build_requests']['Insert'][] = []
-
-  // Build configurations for different versions
-  const nativeBuilds = [
-    { version: '1.0.0', platform: 'ios', daysAgo: 13, status: 'succeeded' },
-    { version: '1.0.0', platform: 'android', daysAgo: 13, status: 'succeeded' },
-    { version: '1.1.0', platform: 'ios', daysAgo: 7, status: 'succeeded' },
-    { version: '1.1.0', platform: 'android', daysAgo: 7, status: 'succeeded' },
-    { version: '1.1.1', platform: 'ios', daysAgo: 4, status: 'succeeded' },
-    { version: '1.1.1', platform: 'android', daysAgo: 4, status: 'succeeded' },
-    { version: '1.2.0', platform: 'ios', daysAgo: 1, status: 'succeeded' },
-    { version: '1.2.0', platform: 'android', daysAgo: 0, status: 'pending' }, // One pending build to show UI state
-  ]
-
-  for (const build of nativeBuilds) {
-    const buildId = crypto.randomUUID()
-    const createdAt = daysAgoDate(build.daysAgo)
-    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Expires in 24 hours
-
-    buildInserts.push({
-      id: buildId,
+    return c.json({
+      status: 'ok',
       app_id: appId,
-      owner_org: body.owner_org,
-      platform: build.platform,
-      requested_by: auth.userId,
-      status: build.status,
-      build_mode: 'release',
-      build_config: {
-        version: build.version,
-        bundleId: appId,
-        buildNumber: build.version.replace(/\./g, ''),
-      },
-      builder_job_id: build.status === 'succeeded' ? `demo-job-${buildId.slice(0, 8)}` : null,
-      created_at: createdAt,
-      upload_expires_at: expiresAt,
-      upload_path: `builds/${appId}/${build.platform}/${build.version}`,
-      upload_session_key: `demo-session-${buildId.slice(0, 8)}`,
-      upload_url: `https://demo-builds.example.com/${appId}/${build.platform}/${build.version}`,
+      name: appData.name ?? 'Demo App',
+      message: 'Demo app created successfully with sample data. Explore channels, versions, and analytics!',
     })
   }
-
-  if (buildInserts.length > 0) {
-    const { error: buildError } = await supabase
-      .from('build_requests')
-      .insert(buildInserts)
-
-    if (buildError) {
-      cloudlog({ requestId, message: 'Error creating demo build requests', error: buildError })
-    }
-    else {
-      cloudlog({ requestId, message: 'Demo build requests created', count: buildInserts.length })
-    }
+  finally {
+    await unlockOnboardingApp(c, onboardingLock, lockedAppId)
   }
-
-  // Invalidate the app_metrics_cache so the dashboard shows fresh data immediately
-  // The get_app_metrics RPC caches results for 5 minutes, so we need to clear it
-  const { error: cacheError } = await supabase
-    .from('app_metrics_cache')
-    .delete()
-    .eq('org_id', body.owner_org)
-
-  if (cacheError) {
-    cloudlog({ requestId, message: 'Error invalidating app_metrics_cache', error: cacheError })
-  }
-  else {
-    cloudlog({ requestId, message: 'App metrics cache invalidated for org', org_id: body.owner_org })
-  }
-
-  cloudlog({ requestId, message: 'Demo app with all demo data created successfully', appId })
-
-  return c.json({
-    status: 'ok',
-    app_id: appId,
-    name: appData.name ?? 'Demo App',
-    message: 'Demo app created successfully with sample data. Explore channels, versions, and analytics!',
-  })
 }
