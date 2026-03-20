@@ -3,6 +3,8 @@ import { storeToRefs } from 'pinia'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
+import IconCheck from '~icons/lucide/check'
+import IconLoader from '~icons/lucide/loader-2'
 import InviteTeammateModal from '~/components/dashboard/InviteTeammateModal.vue'
 import { uploadOrgLogoFile } from '~/services/photos'
 import { useSupabase } from '~/services/supabase'
@@ -379,272 +381,359 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="overflow-y-auto px-4 py-6 mx-auto w-full max-w-6xl sm:px-6 lg:px-8">
-    <InviteTeammateModal ref="inviteModalRef" @success="inviteSuccessCount += 1" />
-    <input
-      ref="logoInput"
-      type="file"
-      accept="image/*"
-      class="hidden"
-      @change="onLogoSelected"
-    >
+  <section class="h-full py-10 overflow-y-auto sm:py-16 max-h-fit">
+    <div class="px-4 mx-auto max-w-5xl sm:px-6 lg:px-8">
+      <InviteTeammateModal ref="inviteModalRef" @success="inviteSuccessCount += 1" />
+      <input
+        ref="logoInput"
+        type="file"
+        accept="image/*"
+        class="hidden"
+        @change="onLogoSelected"
+      >
 
-    <div class="overflow-hidden bg-white border shadow-xl rounded-3xl border-slate-200 dark:bg-slate-900 dark:border-slate-800">
-      <div class="px-6 py-8 border-b sm:px-8 border-slate-200 dark:border-slate-800">
-        <span class="inline-flex px-3 py-1 text-xs font-semibold tracking-[0.12em] text-violet-700 uppercase rounded-full bg-violet-50 dark:bg-violet-900/30 dark:text-violet-200">
-          {{ t('organization-onboarding-badge', 'Get started') }}
-        </span>
-        <h1 class="mt-4 text-3xl font-semibold text-slate-900 dark:text-white">
-          {{ t('organization-onboarding-title', 'Create your organization') }}
-        </h1>
-        <p class="mt-3 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-          {{ t('organization-onboarding-subtitle', 'Create the org first, then add a logo and invite your team before you start creating apps.') }}
-        </p>
+      <div class="space-y-6">
+        <div class="text-center">
+          <p class="text-sm font-semibold tracking-[0.18em] uppercase text-azure-500">
+            {{ t('organization-onboarding-badge', 'Get started') }}
+          </p>
+          <h1 class="mt-3 text-3xl font-semibold text-slate-900 sm:text-4xl">
+            {{ t('organization-onboarding-title', 'Create your organization') }}
+          </h1>
+          <p class="max-w-2xl mx-auto mt-3 text-base text-slate-600">
+            {{ t('organization-onboarding-subtitle', 'Create the org first, then add a logo and invite your team before you start creating apps.') }}
+          </p>
+        </div>
 
-        <div class="grid gap-3 mt-6 sm:grid-cols-3">
+        <div class="flex flex-wrap justify-center gap-3">
           <div
             v-for="entry in onboardingSteps"
             :key="entry.id"
-            class="px-4 py-3 rounded-2xl border"
+            class="rounded-full border px-4 py-2 text-sm font-medium transition"
             :class="[
-              isStepActive(entry.id) ? 'border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-700 dark:bg-violet-950/40 dark:text-violet-200' : '',
-              !isStepActive(entry.id) && isStepDone(entry.id) ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200' : '',
-              !isStepActive(entry.id) && !isStepDone(entry.id) ? 'border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300' : '',
+              isStepActive(entry.id) ? 'border-azure-300 bg-azure-50 text-azure-700' : '',
+              !isStepActive(entry.id) && isStepDone(entry.id) ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : '',
+              !isStepActive(entry.id) && !isStepDone(entry.id) ? 'border-slate-200 bg-white text-slate-500' : '',
             ]"
           >
-            <div class="text-xs font-semibold uppercase">
-              {{ entry.label }}
+            {{ entry.label }}
+          </div>
+        </div>
+
+        <div v-if="step === 'details'" class="p-6 bg-white border shadow-sm rounded-3xl border-slate-200">
+          <div class="grid gap-6 md:grid-cols-[1.25fr_0.9fr]">
+            <div class="space-y-5">
+              <div class="rounded-2xl border border-slate-200 p-4">
+                <p class="text-sm font-medium text-slate-900">
+                  {{ t('organization-onboarding-selected-path', 'Selected flow') }}
+                </p>
+                <div class="grid gap-3 mt-4 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    class="rounded-2xl border p-4 text-left transition"
+                    :class="mode === 'website' ? 'border-azure-300 bg-azure-50 shadow-sm' : 'border-slate-200 hover:border-azure-200'"
+                    data-test="onboarding-mode-website"
+                    @click="mode = 'website'"
+                  >
+                    <div class="text-base font-semibold text-slate-900">
+                      {{ t('organization-onboarding-mode-website', 'Website auto import') }}
+                    </div>
+                    <p class="mt-2 text-sm text-slate-600">
+                      {{ t('organization-onboarding-mode-website-desc', 'Start from your website and prefill the organization name from its domain.') }}
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    class="rounded-2xl border p-4 text-left transition"
+                    :class="mode === 'name' ? 'border-azure-300 bg-azure-50 shadow-sm' : 'border-slate-200 hover:border-azure-200'"
+                    data-test="onboarding-mode-name"
+                    @click="mode = 'name'"
+                  >
+                    <div class="text-base font-semibold text-slate-900">
+                      {{ t('organization-onboarding-mode-name', 'Enter a name') }}
+                    </div>
+                    <p class="mt-2 text-sm text-slate-600">
+                      {{ t('organization-onboarding-mode-name-desc', 'Create the org manually if you do not want to import anything from a website.') }}
+                    </p>
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="mode === 'website'">
+                <label class="text-sm font-medium text-slate-800">
+                  {{ t('organization-onboarding-website-label', 'Website') }}
+                </label>
+                <input
+                  v-model="websiteInput"
+                  type="url"
+                  placeholder="https://capgo.app"
+                  data-test="onboarding-website"
+                  class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm"
+                >
+                <p class="mt-2 text-xs text-slate-500">
+                  {{ websitePreview?.name
+                    ? t('organization-onboarding-website-preview', 'Organization name preview')
+                    : websiteHostname
+                      ? t('organization-onboarding-website-help-loading', 'Website assets will be imported when you continue.')
+                      : t('organization-onboarding-website-help', 'Enter your company website to infer the organization name and logo from its assets.') }}
+                  <span v-if="websitePreview?.name" class="font-semibold text-slate-700">: {{ websitePreview.name }}</span>
+                </p>
+              </div>
+
+              <div v-else>
+                <label class="text-sm font-medium text-slate-800">
+                  {{ t('organization-name', 'Organization name') }}
+                </label>
+                <input
+                  v-model="orgNameInput"
+                  type="text"
+                  :placeholder="t('organization-name', 'Organization name')"
+                  data-test="onboarding-org-name"
+                  class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm"
+                >
+              </div>
+
+              <div class="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  class="d-btn d-btn-primary"
+                  data-test="onboarding-create-org"
+                  :disabled="isSubmitting || isLoadingWebsitePreview || !main.auth"
+                  @click="createOrganization"
+                >
+                  <span v-if="!isSubmitting && !isLoadingWebsitePreview">{{ t('organization-onboarding-continue-logo', 'Continue to logo') }}</span>
+                  <IconLoader v-else class="w-4 h-4 animate-spin" />
+                </button>
+                <button type="button" class="d-btn d-btn-outline" @click="router.push('/apps')">
+                  {{ t('cancel', 'Cancel') }}
+                </button>
+              </div>
+            </div>
+
+            <div class="rounded-[28px] border border-slate-200 bg-slate-950 p-5 text-white">
+              <div class="rounded-[24px] border border-white/10 bg-slate-900 p-5">
+                <div class="flex items-center gap-4">
+                  <div class="flex h-18 w-18 items-center justify-center overflow-hidden rounded-[22px] bg-slate-800 text-2xl font-semibold">
+                    <img
+                      v-if="importedLogoUrl || selectedLogoPreview || currentOrganization?.logo"
+                      :src="currentOrganization?.logo || selectedLogoPreview || importedLogoUrl"
+                      :alt="`${activeOrgName} logo preview`"
+                      class="h-full w-full object-cover"
+                    >
+                    <span v-else>{{ (activeOrgName || 'O').slice(0, 2).toUpperCase() }}</span>
+                  </div>
+                  <div class="min-w-0">
+                    <p class="text-xs uppercase tracking-[0.2em] text-slate-400">
+                      {{ t('organization-onboarding-summary', 'Summary') }}
+                    </p>
+                    <p class="truncate text-lg font-semibold">
+                      {{ activeOrgName || t('organization-onboarding-org-placeholder', 'New organization') }}
+                    </p>
+                    <p class="mt-1 truncate text-xs text-slate-400">
+                      {{ websiteHostname || t('organization-onboarding-mode-name', 'Enter a name') }}
+                    </p>
+                  </div>
+                </div>
+
+                <div class="mt-6 space-y-4 text-sm text-slate-300">
+                  <div>
+                    <div class="text-xs font-medium uppercase text-slate-500">
+                      {{ t('organization-onboarding-selected-path', 'Selected flow') }}
+                    </div>
+                    <div class="mt-1 text-base text-white">
+                      {{ mode === 'website' ? t('organization-onboarding-mode-website', 'Website auto import') : t('organization-onboarding-mode-name', 'Enter a name') }}
+                    </div>
+                  </div>
+                  <div>
+                    <div class="text-xs font-medium uppercase text-slate-500">
+                      {{ t('organization-onboarding-next-steps', 'Next steps') }}
+                    </div>
+                    <ul class="mt-3 space-y-3">
+                      <li class="flex gap-3">
+                        <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                        {{ t('organization-onboarding-next-logo', '1. Save the organization logo') }}
+                      </li>
+                      <li class="flex gap-3">
+                        <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                        {{ t('organization-onboarding-next-invite', '2. Invite teammates') }}
+                      </li>
+                      <li class="flex gap-3">
+                        <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                        {{ t('organization-onboarding-next-apps', '3. Start app onboarding') }}
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <div class="px-6 py-8 sm:px-8">
-        <section v-if="step === 'details'" class="grid gap-8 lg:grid-cols-[1.3fr_0.9fr]">
-          <div class="space-y-6">
-            <div class="grid gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                class="p-4 text-left rounded-2xl border transition"
-                :class="mode === 'website' ? 'border-violet-400 bg-violet-50 dark:border-violet-700 dark:bg-violet-950/30' : 'border-slate-200 dark:border-slate-700'"
-                data-test="onboarding-mode-website"
-                @click="mode = 'website'"
-              >
-                <div class="text-base font-semibold text-slate-900 dark:text-white">
-                  {{ t('organization-onboarding-mode-website', 'Website auto import') }}
-                </div>
-                <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                  {{ t('organization-onboarding-mode-website-desc', 'Start from your website and prefill the organization name from its domain.') }}
-                </p>
-              </button>
-              <button
-                type="button"
-                class="p-4 text-left rounded-2xl border transition"
-                :class="mode === 'name' ? 'border-violet-400 bg-violet-50 dark:border-violet-700 dark:bg-violet-950/30' : 'border-slate-200 dark:border-slate-700'"
-                data-test="onboarding-mode-name"
-                @click="mode = 'name'"
-              >
-                <div class="text-base font-semibold text-slate-900 dark:text-white">
-                  {{ t('organization-onboarding-mode-name', 'Enter a name') }}
-                </div>
-                <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                  {{ t('organization-onboarding-mode-name-desc', 'Create the org manually if you do not want to import anything from a website.') }}
-                </p>
-              </button>
-            </div>
-
-            <div v-if="mode === 'website'" class="space-y-3">
-              <label class="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ t('organization-onboarding-website-label', 'Website') }}
-              </label>
-              <input
-                v-model="websiteInput"
-                type="url"
-                placeholder="https://capgo.app"
-                data-test="onboarding-website"
-                class="block py-3 px-4 w-full rounded-2xl border border-slate-300 shadow-sm dark:text-white dark:border-slate-700 dark:bg-slate-950"
-              >
-              <p class="text-sm text-slate-500 dark:text-slate-400">
-                {{ websitePreview?.name
-                  ? t('organization-onboarding-website-preview', 'Organization name preview')
-                  : websiteHostname
-                    ? t('organization-onboarding-website-help-loading', 'Website assets will be imported when you continue.')
-                    : t('organization-onboarding-website-help', 'Enter your company website to infer the organization name and logo from its assets.') }}
-                <span v-if="websitePreview?.name" class="font-semibold text-slate-700 dark:text-slate-200">: {{ websitePreview.name }}</span>
-              </p>
-            </div>
-
-            <div v-else class="space-y-3">
-              <label class="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                {{ t('organization-name', 'Organization name') }}
-              </label>
-              <input
-                v-model="orgNameInput"
-                type="text"
-                :placeholder="t('organization-name', 'Organization name')"
-                data-test="onboarding-org-name"
-                class="block py-3 px-4 w-full rounded-2xl border border-slate-300 shadow-sm dark:text-white dark:border-slate-700 dark:bg-slate-950"
-              >
-            </div>
-
-            <div class="flex gap-3 items-center">
-              <button
-                type="button"
-                class="d-btn d-btn-primary"
-                data-test="onboarding-create-org"
-                :disabled="isSubmitting || isLoadingWebsitePreview || !main.auth"
-                @click="createOrganization"
-              >
-                <span v-if="!isSubmitting && !isLoadingWebsitePreview">{{ t('organization-onboarding-continue-logo', 'Continue to logo') }}</span>
-                <Spinner v-else-if="isLoadingWebsitePreview" size="w-5 h-5" />
-                <Spinner v-else size="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-
-          <div class="p-6 rounded-3xl border bg-slate-50 border-slate-200 dark:bg-slate-950 dark:border-slate-800">
-            <div class="text-sm font-semibold uppercase text-slate-500 dark:text-slate-400">
-              {{ t('organization-onboarding-summary', 'Summary') }}
-            </div>
-            <div class="mt-4 space-y-4">
+        <div v-else-if="step === 'logo'" class="p-6 bg-white border shadow-sm rounded-3xl border-slate-200">
+          <div class="grid gap-6 md:grid-cols-[1.15fr_0.9fr]">
+            <div class="space-y-5">
               <div>
-                <div class="text-xs font-medium uppercase text-slate-400 dark:text-slate-500">
-                  {{ t('organization-onboarding-selected-path', 'Selected flow') }}
-                </div>
-                <div class="mt-1 text-base text-slate-900 dark:text-white">
-                  {{ mode === 'website' ? t('organization-onboarding-mode-website', 'Website auto import') : t('organization-onboarding-mode-name', 'Enter a name') }}
+                <p class="text-sm font-semibold tracking-[0.18em] uppercase text-azure-500">
+                  {{ t('organization-onboarding-step-logo', 'Add logo') }}
+                </p>
+                <h2 class="mt-2 text-2xl font-semibold text-slate-900">
+                  {{ t('organization-onboarding-logo-title', 'Add a logo') }}
+                </h2>
+                <p class="mt-2 text-sm text-slate-600">
+                  {{ t('organization-onboarding-logo-subtitle', 'Upload a logo now, or skip and do it later from organization settings.') }}
+                </p>
+              </div>
+
+              <div class="rounded-2xl border border-slate-200 p-5">
+                <div class="flex items-center gap-4">
+                  <div class="flex h-18 w-18 items-center justify-center overflow-hidden rounded-[22px] bg-slate-800 text-2xl font-semibold text-white">
+                    <img
+                      v-if="currentOrganization?.logo"
+                      :src="currentOrganization.logo"
+                      :alt="`${activeOrgName} logo`"
+                      class="object-cover w-20 h-20 rounded-2xl"
+                    >
+                    <img
+                      v-else-if="selectedLogoPreview"
+                      :src="selectedLogoPreview"
+                      :alt="`${activeOrgName} logo preview`"
+                      class="object-cover w-20 h-20 rounded-2xl"
+                    >
+                    <span v-else>{{ (activeOrgName || 'O').slice(0, 2).toUpperCase() }}</span>
+                  </div>
+                  <div>
+                    <div class="text-lg font-semibold text-slate-900">
+                      {{ activeOrgName || t('organization-onboarding-org-placeholder', 'New organization') }}
+                    </div>
+                    <div class="text-sm text-slate-500">
+                      {{ t('organization-onboarding-logo-helper', 'Recommended: square image, 256x256 or larger') }}
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div>
-                <div class="text-xs font-medium uppercase text-slate-400 dark:text-slate-500">
-                  {{ t('organization-onboarding-next-steps', 'Next steps') }}
+
+              <div class="flex flex-wrap gap-3">
+                <button type="button" class="d-btn d-btn-primary" data-test="onboarding-upload-logo" :disabled="isUploadingLogo" @click="openLogoPicker">
+                  {{ t('organization-onboarding-upload-logo', 'Upload logo') }}
+                </button>
+                <button
+                  v-if="importedLogoUrl"
+                  type="button"
+                  class="d-btn d-btn-secondary"
+                  data-test="onboarding-use-imported-logo"
+                  :disabled="isUploadingLogo"
+                  @click="useImportedLogo"
+                >
+                  {{ t('organization-onboarding-use-imported-logo', 'Use imported logo') }}
+                </button>
+                <button type="button" class="d-btn d-btn-ghost" data-test="onboarding-skip-logo" :disabled="isUploadingLogo" @click="skipLogo">
+                  {{ t('skip', 'Skip') }}
+                </button>
+              </div>
+            </div>
+
+            <div class="rounded-[28px] border border-slate-200 bg-slate-950 p-5 text-white">
+              <div class="rounded-[24px] border border-white/10 bg-slate-900 p-5">
+                <p class="text-xs uppercase tracking-[0.2em] text-slate-400">
+                  {{ t('organization-onboarding-import-preview', 'Imported preview') }}
+                </p>
+                <div class="mt-4 flex items-center gap-4">
+                  <img
+                    v-if="importedLogoUrl"
+                    :src="importedLogoUrl"
+                    alt="Imported website logo preview"
+                    class="h-16 w-16 rounded-2xl border border-white/10 object-cover"
+                  >
+                  <div v-else class="flex h-16 w-16 items-center justify-center rounded-2xl border border-dashed border-white/10 bg-slate-950/40 text-xs text-slate-400">
+                    No logo
+                  </div>
+                  <div class="min-w-0">
+                    <p class="truncate text-sm font-semibold text-white">
+                      {{ activeOrgName || t('organization-onboarding-org-placeholder', 'New organization') }}
+                    </p>
+                    <p class="mt-1 truncate text-xs text-slate-400">
+                      {{ websiteHostname || t('organization-onboarding-mode-name', 'Enter a name') }}
+                    </p>
+                  </div>
                 </div>
-                <ul class="mt-2 space-y-2 text-sm text-slate-600 dark:text-slate-300">
-                  <li>{{ t('organization-onboarding-next-logo', '1. Save the organization logo') }}</li>
-                  <li>{{ t('organization-onboarding-next-invite', '2. Invite teammates') }}</li>
-                  <li>{{ t('organization-onboarding-next-apps', '3. Start app onboarding') }}</li>
+
+                <ul class="mt-6 space-y-3 text-sm text-slate-300">
+                  <li class="flex gap-3">
+                    <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                    Upload your own asset if you want tighter brand control.
+                  </li>
+                  <li class="flex gap-3">
+                    <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                    Skip this step if you just want to reach app setup quickly.
+                  </li>
                 </ul>
               </div>
             </div>
           </div>
-        </section>
+        </div>
 
-        <section v-else-if="step === 'logo'" class="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-          <div class="space-y-6">
-            <div>
-              <h2 class="text-2xl font-semibold text-slate-900 dark:text-white">
-                {{ t('organization-onboarding-logo-title', 'Add a logo') }}
-              </h2>
-              <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                {{ t('organization-onboarding-logo-subtitle', 'Upload a logo now, or skip and do it later from organization settings.') }}
-              </p>
-            </div>
-
-            <div class="flex gap-4 items-center p-5 rounded-3xl border border-slate-200 dark:border-slate-700">
-              <div class="flex justify-center items-center w-20 h-20 text-2xl font-semibold text-white rounded-2xl bg-slate-800">
-                <img
-                  v-if="currentOrganization?.logo"
-                  :src="currentOrganization.logo"
-                  :alt="`${activeOrgName} logo`"
-                  class="object-cover w-20 h-20 rounded-2xl"
-                >
-                <img
-                  v-else-if="selectedLogoPreview"
-                  :src="selectedLogoPreview"
-                  :alt="`${activeOrgName} logo preview`"
-                  class="object-cover w-20 h-20 rounded-2xl"
-                >
-                <span v-else>{{ (activeOrgName || 'O').slice(0, 2).toUpperCase() }}</span>
-              </div>
+        <div v-else class="p-6 bg-white border shadow-sm rounded-3xl border-slate-200">
+          <div class="grid gap-6 md:grid-cols-[1.15fr_0.9fr]">
+            <div class="space-y-5">
               <div>
-                <div class="text-lg font-semibold text-slate-900 dark:text-white">
+                <p class="text-sm font-semibold tracking-[0.18em] uppercase text-azure-500">
+                  {{ t('organization-onboarding-step-invite', 'Invite users') }}
+                </p>
+                <h2 class="mt-2 text-2xl font-semibold text-slate-900">
+                  {{ t('organization-onboarding-invite-title', 'Invite your users') }}
+                </h2>
+                <p class="mt-2 text-sm text-slate-600">
+                  {{ t('organization-onboarding-invite-subtitle', 'Invite teammates now or finish onboarding and do it later from the members page.') }}
+                </p>
+              </div>
+
+              <div class="rounded-2xl border border-slate-200 p-5">
+                <div class="text-base font-semibold text-slate-900">
                   {{ activeOrgName || t('organization-onboarding-org-placeholder', 'New organization') }}
                 </div>
-                <div class="text-sm text-slate-500 dark:text-slate-400">
-                  {{ t('organization-onboarding-logo-helper', 'Recommended: square image, 256x256 or larger') }}
-                </div>
+                <p class="mt-2 text-sm text-slate-500">
+                  {{ inviteSuccessCount > 0
+                    ? t('organization-onboarding-invite-success-state', 'Invitations sent. You can keep inviting more users or continue to apps.')
+                    : t('organization-onboarding-invite-empty-state', 'No invitations sent yet.') }}
+                </p>
+              </div>
+
+              <div class="flex flex-wrap gap-3">
+                <button type="button" class="d-btn d-btn-primary" data-test="onboarding-invite-users" @click="openInviteModal">
+                  {{ t('organization-onboarding-open-invite', 'Invite users') }}
+                </button>
+                <button type="button" class="d-btn d-btn-secondary" data-test="onboarding-finish" @click="finishOnboarding">
+                  {{ t('organization-onboarding-finish', 'Continue to apps') }}
+                </button>
               </div>
             </div>
 
-            <div class="flex flex-wrap gap-3">
-              <button type="button" class="d-btn d-btn-primary" data-test="onboarding-upload-logo" :disabled="isUploadingLogo" @click="openLogoPicker">
-                {{ t('organization-onboarding-upload-logo', 'Upload logo') }}
-              </button>
-              <button
-                v-if="importedLogoUrl"
-                type="button"
-                class="d-btn d-btn-secondary"
-                data-test="onboarding-use-imported-logo"
-                :disabled="isUploadingLogo"
-                @click="useImportedLogo"
-              >
-                {{ t('organization-onboarding-use-imported-logo', 'Use imported logo') }}
-              </button>
-              <button type="button" class="d-btn d-btn-ghost" data-test="onboarding-skip-logo" :disabled="isUploadingLogo" @click="skipLogo">
-                {{ t('skip', 'Skip') }}
-              </button>
-            </div>
-          </div>
-
-          <div v-if="importedLogoUrl" class="p-6 rounded-3xl border bg-slate-50 border-slate-200 dark:bg-slate-950 dark:border-slate-800">
-            <div class="text-sm font-semibold uppercase text-slate-500 dark:text-slate-400">
-              {{ t('organization-onboarding-import-preview', 'Imported preview') }}
-            </div>
-            <div class="flex gap-4 items-center mt-4">
-              <img :src="importedLogoUrl" alt="Imported website logo preview" class="w-16 h-16 rounded-2xl border border-slate-200 dark:border-slate-700">
-              <div class="text-sm text-slate-600 dark:text-slate-300">
-                {{ websiteHostname }}
+            <div class="rounded-[28px] border border-slate-200 bg-slate-950 p-5 text-white">
+              <div class="rounded-[24px] border border-white/10 bg-slate-900 p-5">
+                <p class="text-xs uppercase tracking-[0.2em] text-slate-400">
+                  {{ t('organization-onboarding-what-next', 'What happens next') }}
+                </p>
+                <ul class="mt-6 space-y-3 text-sm text-slate-300">
+                  <li class="flex gap-3">
+                    <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                    {{ t('organization-onboarding-after-invite-1', 'Members receive an invite and can join the organization.') }}
+                  </li>
+                  <li class="flex gap-3">
+                    <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                    {{ t('organization-onboarding-after-invite-2', 'The new organization stays selected in the org switcher.') }}
+                  </li>
+                  <li class="flex gap-3">
+                    <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                    {{ t('organization-onboarding-after-invite-3', 'The next step after this page is app onboarding.') }}
+                  </li>
+                </ul>
               </div>
             </div>
           </div>
-        </section>
-
-        <section v-else class="grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-          <div class="space-y-6">
-            <div>
-              <h2 class="text-2xl font-semibold text-slate-900 dark:text-white">
-                {{ t('organization-onboarding-invite-title', 'Invite your users') }}
-              </h2>
-              <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
-                {{ t('organization-onboarding-invite-subtitle', 'Invite teammates now or finish onboarding and do it later from the members page.') }}
-              </p>
-            </div>
-
-            <div class="p-6 rounded-3xl border border-slate-200 dark:border-slate-700">
-              <div class="text-base font-semibold text-slate-900 dark:text-white">
-                {{ activeOrgName || t('organization-onboarding-org-placeholder', 'New organization') }}
-              </div>
-              <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                {{ inviteSuccessCount > 0
-                  ? t('organization-onboarding-invite-success-state', 'Invitations sent. You can keep inviting more users or continue to apps.')
-                  : t('organization-onboarding-invite-empty-state', 'No invitations sent yet.') }}
-              </p>
-            </div>
-
-            <div class="flex flex-wrap gap-3">
-              <button type="button" class="d-btn d-btn-primary" data-test="onboarding-invite-users" @click="openInviteModal">
-                {{ t('organization-onboarding-open-invite', 'Invite users') }}
-              </button>
-              <button type="button" class="d-btn d-btn-secondary" data-test="onboarding-finish" @click="finishOnboarding">
-                {{ t('organization-onboarding-finish', 'Continue to apps') }}
-              </button>
-            </div>
-          </div>
-
-          <div class="p-6 rounded-3xl border bg-slate-50 border-slate-200 dark:bg-slate-950 dark:border-slate-800">
-            <div class="text-sm font-semibold uppercase text-slate-500 dark:text-slate-400">
-              {{ t('organization-onboarding-what-next', 'What happens next') }}
-            </div>
-            <ul class="mt-4 space-y-3 text-sm text-slate-600 dark:text-slate-300">
-              <li>{{ t('organization-onboarding-after-invite-1', 'Members receive an invite and can join the organization.') }}</li>
-              <li>{{ t('organization-onboarding-after-invite-2', 'The new organization stays selected in the org switcher.') }}</li>
-              <li>{{ t('organization-onboarding-after-invite-3', 'The next step after this page is app onboarding.') }}</li>
-            </ul>
-          </div>
-        </section>
+        </div>
       </div>
     </div>
-  </div>
+  </section>
 </template>
 
 <route lang="yaml">

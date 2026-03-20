@@ -101,8 +101,6 @@ const router = createRouter({
   ],
   history: createWebHistory(import.meta.env.BASE_URL),
 })
-app.use(router)
-
 router.beforeEach((to, from, next) => {
   if (to.path.startsWith('/app/') && to.query.tab) {
     const tab = to.query.tab as string
@@ -122,6 +120,8 @@ type UserModule = (ctx: { app: typeof app, router: Router }) => void
 
 Object.values(import.meta.glob<{ install: UserModule }>('./modules/*.ts', { eager: true }))
   .forEach(i => i.install?.({ app, router }))
+
+app.use(router)
 
 router.isReady().then(async () => {
   app.mount('#app')

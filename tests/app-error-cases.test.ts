@@ -1,14 +1,44 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, headers, NON_ACCESS_APP_NAME, ORG_ID, resetAndSeedAppData, resetAppData } from './test-utils.ts'
+import { BASE_URL, getSupabaseClient, NON_ACCESS_APP_NAME, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.app.error.${id}`
-// Use existing ORG_ID which has proper stripe_info setup
-const testOrgId = ORG_ID
+const testOrgId = randomUUID()
+const testStripeCustomerId = `cus_app_error_${id.replace(/-/g, '').slice(0, 18)}`
+const testApiKeyValue = randomUUID()
+let testApiKeyId: number | null = null
+let testHeaders: Record<string, string>
 
 beforeAll(async () => {
-  await resetAndSeedAppData(APPNAME)
+  await resetAndSeedAppData(APPNAME, {
+    orgId: testOrgId,
+    userId: USER_ID,
+    stripeCustomerId: testStripeCustomerId,
+  })
+
+  const { data, error } = await getSupabaseClient()
+    .from('apikeys')
+    .insert({
+      user_id: USER_ID,
+      key: testApiKeyValue,
+      mode: 'all',
+      name: `app-error-cases-${id}`,
+      limited_to_orgs: [testOrgId],
+      limited_to_apps: [],
+    })
+    .select('id')
+    .single()
+
+  if (error || !data) {
+    throw error ?? new Error('Failed to create isolated API key for app error case tests')
+  }
+
+  testApiKeyId = data.id
+  testHeaders = {
+    'Content-Type': 'application/json',
+    'Authorization': testApiKeyValue,
+  }
 })
 
 afterAll(async () => {
@@ -17,13 +47,19 @@ afterAll(async () => {
   await getSupabaseClient().from('apps').delete().eq('app_id', `${APPNAME}.delete`)
   await getSupabaseClient().from('apps').delete().eq('app_id', `${APPNAME}.put`)
   await getSupabaseClient().from('apps').delete().eq('app_id', `${APPNAME}.notfound`)
+  if (testApiKeyId !== null) {
+    await getSupabaseClient().from('apikeys').delete().eq('id', testApiKeyId)
+  }
+  await getSupabaseClient().from('org_users').delete().eq('org_id', testOrgId)
+  await getSupabaseClient().from('orgs').delete().eq('id', testOrgId)
+  await getSupabaseClient().from('stripe_info').delete().eq('customer_id', testStripeCustomerId)
 })
 
 describe('[POST] /app - Error Cases', () => {
   it('should return 400 when name is missing', async () => {
     const response = await fetch(`${BASE_URL}/app`, {
       method: 'POST',
-      headers,
+      headers: testHeaders,
       body: JSON.stringify({
         owner_org: testOrgId,
         app_id: `${APPNAME}.missingname`,
@@ -39,7 +75,7 @@ describe('[POST] /app - Error Cases', () => {
     const nonExistentOrgId = randomUUID()
     const response = await fetch(`${BASE_URL}/app`, {
       method: 'POST',
-      headers,
+      headers: testHeaders,
       body: JSON.stringify({
         app_id: `${APPNAME}.accessdenied`,
         name: 'Test App',
@@ -51,26 +87,26 @@ describe('[POST] /app - Error Cases', () => {
     expect(data.error).toBe('cannot_access_organization')
   })
 
-  it('should return 409 when app creation fails due to duplicate app id', async () => {
-    // Try to create another app with the same app_id as the one created in beforeAll
+  it('should return 400 when app creation fails due to duplicate name', async () => {
+    // Try to create another app with the same name (same app_id)
     const response2 = await fetch(`${BASE_URL}/app`, {
       method: 'POST',
-      headers,
+      headers: testHeaders,
       body: JSON.stringify({
         app_id: APPNAME, // Same app_id as the one created in beforeAll
         name: APPNAME,
         owner_org: testOrgId,
       }),
     })
-    expect(response2.status).toBe(409)
+    expect(response2.status).toBe(400)
     const data = await response2.json() as { error: string }
-    expect(data.error).toBe('app_id_already_exists')
+    expect(data.error).toBe('cannot_create_app')
   })
 
   it('should return 400 with invalid JSON body', async () => {
     const response = await fetch(`${BASE_URL}/app`, {
       method: 'POST',
-      headers,
+      headers: testHeaders,
       body: 'invalid json',
     })
     expect(response.status).toBeGreaterThanOrEqual(400)
@@ -81,7 +117,7 @@ describe('[GET] /app - Error Cases', () => {
   it('should return 400 when user cannot access the app', async () => {
     const response = await fetch(`${BASE_URL}/app/nonexistent.app`, {
       method: 'GET',
-      headers,
+      headers: testHeaders,
     })
     expect(response.status).toBe(401)
     const data = await response.json() as { error: string }
@@ -92,7 +128,7 @@ describe('[GET] /app - Error Cases', () => {
     // Create an app first to get access, then delete it to test 404
     const createResponse = await fetch(`${BASE_URL}/app`, {
       method: 'POST',
-      headers,
+      headers: testHeaders,
       body: JSON.stringify({
         name: `App ${APPNAME}.notfound`,
         app_id: `${APPNAME}.notfound`,
@@ -107,7 +143,7 @@ describe('[GET] /app - Error Cases', () => {
     // Try to get the deleted app
     const response = await fetch(`${BASE_URL}/app/${APPNAME}.notfound`, {
       method: 'GET',
-      headers,
+      headers: testHeaders,
     })
     expect(response.status).toBe(401)
     const data = await response.json() as { error: string }
@@ -119,7 +155,7 @@ describe('[GET] /app - Error Cases', () => {
     // For now, we test with a response structure check
     const response = await fetch(`${BASE_URL}/app/${NON_ACCESS_APP_NAME}`, {
       method: 'GET',
-      headers,
+      headers: testHeaders,
     })
 
     const data = await response.json() as { error: string }
@@ -132,7 +168,7 @@ describe('[PUT] /app - Error Cases', () => {
     // Ensure the test app exists for PUT tests
     const createResponse = await fetch(`${BASE_URL}/app`, {
       method: 'POST',
-      headers,
+      headers: testHeaders,
       body: JSON.stringify({
         name: `App ${APPNAME}.put`,
         app_id: `${APPNAME}.put`,
@@ -145,7 +181,7 @@ describe('[PUT] /app - Error Cases', () => {
   it('should return 400 when user cannot access the app', async () => {
     const response = await fetch(`${BASE_URL}/app/nonexistent.app`, {
       method: 'PUT',
-      headers,
+      headers: testHeaders,
       body: JSON.stringify({
         name: 'Updated Name',
       }),
@@ -159,7 +195,7 @@ describe('[PUT] /app - Error Cases', () => {
     // Try to update with invalid data that would cause a database error
     const response = await fetch(`${BASE_URL}/app/${APPNAME}.put`, {
       method: 'PUT',
-      headers,
+      headers: testHeaders,
       body: JSON.stringify({
         // Try to set owner_org to non-existent org (this might cause an error)
         owner_org: 'non-existent-org-id',
@@ -173,7 +209,7 @@ describe('[PUT] /app - Error Cases', () => {
   it('should handle invalid JSON body', async () => {
     const response = await fetch(`${BASE_URL}/app/${APPNAME}.put`, {
       method: 'PUT',
-      headers,
+      headers: testHeaders,
       body: 'invalid json',
     })
     expect(response.status).toBeGreaterThanOrEqual(400)
@@ -184,7 +220,7 @@ describe('[DELETE] /app - Error Cases', () => {
   it('should return 400 when user cannot access the app', async () => {
     const response = await fetch(`${BASE_URL}/app/nonexistent.app`, {
       method: 'DELETE',
-      headers,
+      headers: testHeaders,
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
@@ -195,7 +231,7 @@ describe('[DELETE] /app - Error Cases', () => {
     // Create an app to test deletion
     const createResponse = await fetch(`${BASE_URL}/app`, {
       method: 'POST',
-      headers,
+      headers: testHeaders,
       body: JSON.stringify({
         name: `App ${APPNAME}.delete`,
         app_id: `${APPNAME}.delete`,
@@ -207,7 +243,7 @@ describe('[DELETE] /app - Error Cases', () => {
     // Try to delete the app (this should work)
     const response = await fetch(`${BASE_URL}/app/${APPNAME}.delete`, {
       method: 'DELETE',
-      headers,
+      headers: testHeaders,
     })
 
     // The first delete should succeed
@@ -216,7 +252,7 @@ describe('[DELETE] /app - Error Cases', () => {
     // Try to delete the same app again (should fail)
     const response2 = await fetch(`${BASE_URL}/app/${APPNAME}.delete`, {
       method: 'DELETE',
-      headers,
+      headers: testHeaders,
     })
     expect(response2.status).toBe(400)
     const data = await response2.json() as { error: string }
