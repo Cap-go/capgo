@@ -116,13 +116,15 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     }
 
     const userProvider = userAuth.user.app_metadata?.provider
-    if (!userProvider || (userProvider !== 'sso' && !userProvider.startsWith('sso:'))) {
-      cloudlog({ requestId, message: 'User did not authenticate via SSO, rejecting provisioning', userId, provider: userProvider })
+    const userProviders: string[] = userAuth.user.app_metadata?.providers ?? []
+    const isSsoProvider = (p: string) => p === 'sso' || p.startsWith('sso:')
+    if (!isSsoProvider(userProvider ?? '') && !userProviders.some(isSsoProvider)) {
+      cloudlog({ requestId, message: 'User did not authenticate via SSO, rejecting provisioning', userId, provider: userProvider, providers: userProviders })
       return quickError(403, 'sso_auth_required', 'User must authenticate via SSO to be provisioned')
     }
 
     const userIdentities = userAuth.user.identities ?? []
-    const trustedSsoProviders = getTrustedSsoProviders(userProvider, userIdentities)
+    const trustedSsoProviders = getTrustedSsoProviders(userProvider ?? '', userIdentities)
     if (trustedSsoProviders.length === 0) {
       cloudlog({ requestId, message: 'User has no SSO identity, rejecting provisioning', userId })
       return quickError(403, 'sso_identity_required', 'User must have an SSO identity to be provisioned')
@@ -251,6 +253,18 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       if (deleteError) {
         cloudlogErr({ requestId, message: 'Failed to delete duplicate SSO user after identity transfer', userId, originalUserId, error: deleteError })
         // Identity already transferred — log but still return merged so frontend redirects to login
+      }
+
+      // Update app_metadata.provider on the original user to reflect the SSO provider.
+      // Our raw identity transfer bypasses Supabase Auth's normal flow, which would otherwise
+      // update this field. Without this, the next SSO login returns provider='email' and
+      // the provider check above rejects the user with sso_auth_required.
+      const { error: updateProviderError } = await admin.auth.admin.updateUserById(originalUserId, {
+        app_metadata: { provider: userProvider },
+      })
+      if (updateProviderError) {
+        cloudlogErr({ requestId, message: 'Failed to update app_metadata.provider on original user after merge', originalUserId, error: updateProviderError })
+        // Non-fatal: identity transfer succeeded; log but continue
       }
 
       cloudlog({ requestId, message: 'SSO account merged successfully — user must re-login', userId, originalUserId })

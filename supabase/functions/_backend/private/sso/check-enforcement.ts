@@ -30,13 +30,17 @@ app.post('/', middlewareAuth, async (c) => {
     return quickError(400, 'no_email', 'Email not found in authentication token')
   }
 
-  // Determine auth type from JWT app_metadata.provider
+  // Determine auth type from JWT app_metadata — check both provider (singular, last login)
+  // and providers[] (array, cumulative). After an account merge Supabase resets provider='email'
+  // while providers[] retains the sso:X entry, so providers[] is the reliable source of truth.
   const provider = claims?.app_metadata?.provider
-  const isSsoAuth = !!provider && provider !== 'email'
+  const providers: string[] = Array.isArray(claims?.app_metadata?.providers) ? claims.app_metadata.providers as string[] : []
+  const isSsoProvider = (p: string) => p === 'sso' || p.startsWith('sso:')
+  const isSsoAuth = isSsoProvider(provider ?? '') || providers.some(isSsoProvider)
 
   // SSO authentication is always allowed
   if (isSsoAuth) {
-    cloudlog({ requestId, context: 'check_enforcement - SSO auth always allowed', email, provider })
+    cloudlog({ requestId, context: 'check_enforcement - SSO auth always allowed', email, provider, providers })
     return c.json({ allowed: true })
   }
 

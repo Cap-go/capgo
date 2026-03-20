@@ -1499,6 +1499,7 @@
   "sso-status-pending": "待处理",
   "sso-status-verified": "已验证",
   "sso-upgrade-to-enterprise": "Upgrade to Enterprise",
+  "sso-linked-success": "SSO sign-in successful. Welcome!",
   "sso-verify-dns": "验证 DNS",
   "sso-verifying": "正在验证...",
   "start-onboarding": "开始入职流程",
