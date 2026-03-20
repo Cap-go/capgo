@@ -23,6 +23,7 @@ const inviteLastName = ref('')
 const inviteCaptchaToken = ref('')
 const inviteCaptchaElement = ref<InstanceType<typeof VueTurnstile> | null>(null)
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
+const shouldUseCaptcha = computed(() => Boolean(captchaKey.value))
 const isInviting = ref(false)
 const useRbacInvites = computed(() => organizationStore.currentOrganization?.use_new_rbac === true)
 const inviteRole = computed(() => (useRbacInvites.value ? 'org_admin' : 'admin'))
@@ -41,8 +42,8 @@ function showEmailDialog() {
   isFullDetailsDialogOpen.value = false
 
   dialogStore.openDialog({
-    title: t('onboarding-invite-option-modal-title'),
-    description: t('onboarding-invite-option-dialog-desc'),
+    title: t('onboarding-invite-option-modal-title', 'Invite a teammate'),
+    description: t('onboarding-invite-option-dialog-desc', 'Invite a teammate now or finish onboarding and do it later from the members page.'),
     size: 'lg',
     preventAccidentalClose: true,
     buttons: [
@@ -74,7 +75,8 @@ function showFullDetailsDialog() {
   isFullDetailsDialogOpen.value = true
 
   dialogStore.openDialog({
-    title: t('invite-new-user-dialog-header', 'Invite New User'),
+    title: t('invite-new-user-dialog-header', 'Invite teammate'),
+    description: t('invite-new-user-dialog-description', 'Add a few details so we can send the invitation and create their account if needed.'),
     size: 'lg',
     preventAccidentalClose: true,
     buttons: [
@@ -124,7 +126,7 @@ function updateFullDetailsButton() {
   const submitButton = buttons.find(button => button.id === 'invite-full-send')
   if (!submitButton)
     return
-  const captchaNotReady = captchaKey.value && !inviteCaptchaToken.value
+  const captchaNotReady = shouldUseCaptcha.value && !inviteCaptchaToken.value
   submitButton.disabled = isInviting.value || captchaNotReady
   submitButton.text = isInviting.value
     ? t('sending-invitation')
@@ -139,7 +141,7 @@ function resetInviteForm() {
   inviteEmail.value = ''
   inviteFirstName.value = ''
   inviteLastName.value = ''
-  if (captchaKey.value) {
+  if (shouldUseCaptcha.value) {
     inviteCaptchaToken.value = ''
     inviteCaptchaElement.value?.reset()
   }
@@ -227,10 +229,6 @@ async function handleEmailSubmit() {
 
     if (data === 'NO_EMAIL') {
       // User doesn't exist, show full details dialog
-      if (!captchaKey.value) {
-        toast.error(t('captcha-not-available', 'Captcha verification is not configured in this environment.'))
-        return
-      }
       showFullDetailsDialog()
       return
     }
@@ -278,7 +276,7 @@ async function handleFullDetailsSubmit() {
     return
   }
 
-  if (captchaKey.value && !inviteCaptchaToken.value) {
+  if (shouldUseCaptcha.value && !inviteCaptchaToken.value) {
     toast.error(t('captcha-required', 'Captcha verification is required'))
     return
   }
@@ -297,7 +295,7 @@ async function handleFullDetailsSubmit() {
         email,
         org_id: orgId,
         invite_type: inviteRole.value,
-        captcha_token: inviteCaptchaToken.value,
+        captcha_token: shouldUseCaptcha.value ? inviteCaptchaToken.value : undefined,
         first_name: firstName,
         last_name: lastName,
       },
@@ -317,7 +315,7 @@ async function handleFullDetailsSubmit() {
   }
   finally {
     isInviting.value = false
-    if (captchaKey.value)
+    if (shouldUseCaptcha.value)
       inviteCaptchaElement.value?.reset()
     inviteCaptchaToken.value = ''
   }
@@ -402,19 +400,19 @@ defineExpose({
           >
         </div>
       </div>
-      <template v-if="!!captchaKey">
+      <template v-if="shouldUseCaptcha">
         <div>
           <VueTurnstile
             id="invite-captcha"
             ref="inviteCaptchaElement"
             v-model="inviteCaptchaToken"
             size="flexible"
-            :site-key="captchaKey"
+            :site-key="captchaKey!"
           />
         </div>
       </template>
       <p class="text-sm text-gray-500 dark:text-gray-400">
-        {{ t('onboarding-invite-option-helper') }}
+        {{ t('invite-new-user-dialog-helper', 'We will invite this teammate to the organization. If they do not have an account yet, Capgo will create one from this information.') }}
       </p>
       <button type="submit" class="hidden" tabindex="-1" aria-hidden="true" />
     </form>

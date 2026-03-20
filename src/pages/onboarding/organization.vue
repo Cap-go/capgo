@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconCheck from '~icons/lucide/check'
 import IconLoader from '~icons/lucide/loader-2'
+import IconBack from '~icons/material-symbols/arrow-back-ios-rounded'
 import InviteTeammateModal from '~/components/dashboard/InviteTeammateModal.vue'
 import { uploadOrgLogoFile } from '~/services/photos'
 import { useSupabase } from '~/services/supabase'
@@ -84,6 +85,7 @@ const canCreateOrganization = computed(() => {
 
   return !!orgNameInput.value.trim()
 })
+const hasExistingOrganization = computed(() => organizationStore.organizations.some(org => !org.role.includes('invite')))
 
 function toTitleCaseSegment(segment: string) {
   return segment
@@ -105,6 +107,18 @@ function isStepDone(stepId: OnboardingStep) {
 
 function isStepActive(stepId: OnboardingStep) {
   return step.value === stepId
+}
+
+async function goBack() {
+  if (window.history.length > 1) {
+    await router.back()
+    return
+  }
+
+  const fallbackPath = typeof route.query.to === 'string' && route.query.to && !route.query.to.startsWith('/onboarding/')
+    ? route.query.to
+    : '/login'
+  await router.push(fallbackPath)
 }
 
 async function syncRouteQuery(nextStep: OnboardingStep, orgId = createdOrgId.value) {
@@ -408,6 +422,18 @@ onUnmounted(() => {
       >
 
       <div class="space-y-6">
+        <div v-if="hasExistingOrganization" class="flex justify-start">
+          <button
+            type="button"
+            class="inline-flex items-center gap-1 rounded-sm p-2 text-slate-500 transition dark:text-white dark:hover:bg-slate-600 hover:bg-slate-300 hover:text-slate-600"
+            :aria-label="t('button-back', 'Back')"
+            @click="goBack"
+          >
+            <IconBack class="w-5 h-5 fill-current" />
+            <span>{{ t('button-back', 'Back') }}</span>
+          </button>
+        </div>
+
         <div class="text-center">
           <p class="text-sm font-semibold tracking-[0.18em] uppercase text-azure-500">
             {{ t('organization-onboarding-badge', 'Get started') }}
