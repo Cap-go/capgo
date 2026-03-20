@@ -97,6 +97,7 @@ async function guard(
   const hadAuth = !!main.auth
   const needsVerifiedEmail = to.path.startsWith('/settings') || to.path === '/delete_account'
   const redirectToOrgOnboarding = () => !to.path.startsWith('/onboarding/organization')
+  const isAdminRoute = to.path.startsWith('/admin')
 
   async function tryLoadOrganizations(fetcher: () => Promise<void>) {
     try {
@@ -170,7 +171,24 @@ async function guard(
 
     const organizationsLoaded = await tryLoadOrganizations(() => organizationStore.fetchOrganizations())
     if (organizationsLoaded && !organizationStore.hasOrganizations && redirectToOrgOnboarding()) {
-      return next('/onboarding/organization')
+      if (isAdminRoute) {
+        try {
+          main.isAdmin = main.isAdmin ?? await isPlatformAdmin()
+        }
+        catch (error) {
+          console.error('Failed to resolve platform admin status:', error)
+          main.isAdmin = false
+        }
+      }
+
+      if (!isAdminRoute || !main.isAdmin) {
+        return next({
+          path: '/onboarding/organization',
+          query: {
+            to: to.fullPath,
+          },
+        })
+      }
     }
 
     getPlans().then((pls) => {
@@ -238,7 +256,7 @@ async function guard(
     }
 
     // Check if user is trying to access admin routes
-    if (to.path.startsWith('/admin')) {
+    if (isAdminRoute) {
       // Ensure isAdmin is loaded before checking
       if (main.isAdmin === undefined) {
         try {

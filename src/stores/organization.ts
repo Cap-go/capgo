@@ -382,6 +382,7 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     const organization = selectableOrganizations[0]
     if (!organization) {
+      _organizations.value = new Map(selectableOrganizations.map(item => [item.gid, item as Organization]))
       currentOrganization.value = undefined
       currentRole.value = null
       currentOrganizationFailed.value = false

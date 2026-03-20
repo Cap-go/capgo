@@ -1,6 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareAuth, parseBody, quickError, useCors } from '../utils/hono.ts'
+import { getWebhookUrlValidationError } from '../utils/webhook.ts'
 
 const MAX_ICON_BYTES = 512 * 1024
 
@@ -108,9 +109,17 @@ async function fetchIconDataUrl(iconUrl: string) {
 
 app.post('/', middlewareAuth, async (c) => {
   const body = await parseBody<{ website?: string }>(c)
-  const website = normalizeWebsiteUrl(body.website ?? '')
+  const rawWebsite = body.website
+  if (typeof rawWebsite !== 'string' || rawWebsite.trim() === '')
+    return quickError(400, 'invalid_website', 'Website must be a valid URL')
+
+  const website = normalizeWebsiteUrl(rawWebsite.trim())
   if (!website)
     return quickError(400, 'invalid_website', 'Website must be a valid URL')
+
+  const websiteValidationError = getWebhookUrlValidationError(c, website)
+  if (websiteValidationError)
+    return quickError(400, 'invalid_website', websiteValidationError)
 
   const response = await fetch(website, {
     headers: {
@@ -137,6 +146,11 @@ app.post('/', middlewareAuth, async (c) => {
 
   const iconHref = findIconHref(html)
   const iconUrl = iconHref ? new URL(iconHref, finalUrl).toString() : ''
+  if (iconUrl) {
+    const iconValidationError = getWebhookUrlValidationError(c, iconUrl)
+    if (iconValidationError)
+      return quickError(400, 'invalid_website', iconValidationError)
+  }
   const icon = iconUrl ? await fetchIconDataUrl(iconUrl) : null
 
   return c.json({

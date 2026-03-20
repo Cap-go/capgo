@@ -104,6 +104,7 @@ async function syncRouteQuery(nextStep: OnboardingStep, orgId = createdOrgId.val
     path: '/onboarding/organization',
     query: {
       ...(orgId ? { org: orgId } : {}),
+      ...(typeof route.query.to === 'string' ? { to: route.query.to } : {}),
       step: nextStep,
     },
   })
@@ -206,11 +207,24 @@ async function createOrganization() {
     }
 
     createdOrgId.value = data.id
-    await organizationStore.fetchOrganizations()
     organizationStore.setCurrentOrganization(data.id)
     step.value = 'logo'
     toast.success(t('org-created-successfully', 'Organization created'))
-    await syncRouteQuery('logo', data.id)
+
+    try {
+      await organizationStore.fetchOrganizations()
+    }
+    catch (error) {
+      console.error('Failed to refresh organizations after onboarding create', error)
+      toast.error(t('organization-onboarding-refresh-failed', 'Organization created, but we could not refresh the org list'))
+    }
+
+    try {
+      await syncRouteQuery('logo', data.id)
+    }
+    catch (error) {
+      console.error('Failed to sync onboarding route after create', error)
+    }
   }
   finally {
     isSubmitting.value = false
@@ -296,14 +310,29 @@ async function finishOnboarding() {
   await organizationStore.fetchOrganizations()
   if (activeOrgId.value)
     organizationStore.setCurrentOrganization(activeOrgId.value)
-  await router.push('/apps')
+
+  const nextPath = typeof route.query.to === 'string' && route.query.to && !route.query.to.startsWith('/onboarding/')
+    ? route.query.to
+    : '/apps'
+  await router.push(nextPath)
 }
 
 watch(() => route.query.step, (nextValue) => {
   if (typeof nextValue !== 'string')
     return
-  if (nextValue === 'details' || nextValue === 'logo' || nextValue === 'invite')
+
+  if (nextValue === 'details') {
+    step.value = 'details'
+    return
+  }
+
+  if ((nextValue === 'logo' || nextValue === 'invite') && createdOrgId.value) {
     step.value = nextValue
+    return
+  }
+
+  if (nextValue === 'logo' || nextValue === 'invite')
+    void syncRouteQuery('details', '')
 })
 
 watch([websiteInput, mode], () => {
