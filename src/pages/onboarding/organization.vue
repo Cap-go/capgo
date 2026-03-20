@@ -207,12 +207,12 @@ async function createOrganization() {
     }
 
     createdOrgId.value = data.id
-    organizationStore.setCurrentOrganization(data.id)
     step.value = 'logo'
     toast.success(t('org-created-successfully', 'Organization created'))
 
     try {
       await organizationStore.fetchOrganizations()
+      organizationStore.setCurrentOrganization(data.id)
     }
     catch (error) {
       console.error('Failed to refresh organizations after onboarding create', error)
@@ -294,6 +294,8 @@ async function onLogoSelected(event: Event) {
 }
 
 async function skipLogo() {
+  if (activeOrgId.value)
+    organizationStore.setCurrentOrganization(activeOrgId.value)
   step.value = 'invite'
   await syncRouteQuery('invite')
 }
@@ -303,6 +305,7 @@ function openInviteModal() {
     toast.error(t('organization-not-found', 'Organization not found'))
     return
   }
+  organizationStore.setCurrentOrganization(activeOrgId.value)
   inviteModalRef.value?.openDialog()
 }
 
