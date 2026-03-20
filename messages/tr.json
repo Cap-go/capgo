@@ -1499,6 +1499,7 @@
   "sso-status-pending": "Beklemede",
   "sso-status-verified": "Doğrulandı",
   "sso-upgrade-to-enterprise": "Upgrade to Enterprise",
+  "sso-linked-success": "SSO sign-in successful. Welcome!",
   "sso-verify-dns": "DNS'i Doğrula",
   "sso-verifying": "Doğrulanıyor...",
   "start-onboarding": "Başlangıç eğitimine başla",

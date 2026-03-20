@@ -1,6 +1,17 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APP_NAME, BASE_URL, getAuthHeaders, headers, ORG_ID, resetAndSeedAppData, resetAndSeedAppDataStats, resetAppData, resetAppDataStats } from './test-utils.ts'
+import {
+  APP_NAME,
+  BASE_URL,
+  getAuthHeaders,
+  headers,
+  NON_OWNER_ORG_ID,
+  ORG_ID,
+  resetAndSeedAppData,
+  resetAndSeedAppDataStats,
+  resetAppData,
+  resetAppDataStats,
+} from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME_EVENT = `${APP_NAME}.e.${id}`
@@ -39,7 +50,7 @@ describe('[POST] /private/events operations', () => {
     expect(data.status).toBe('ok')
   })
 
-  it('rejects apikey attempts to broadcast events to a foreign org', async () => {
+  it('rejects notifyConsole broadcasts for foreign organizations', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers: {
@@ -48,9 +59,14 @@ describe('[POST] /private/events operations', () => {
       body: JSON.stringify({
         channel: 'test',
         event: 'test_event',
-        description: 'Testing event tracking',
+        description: 'Cross-org spoof attempt',
+        icon: '🧪',
         notifyConsole: true,
-        user_id: FOREIGN_ORG_ID,
+        user_id: NON_OWNER_ORG_ID,
+        tags: {
+          'app-id': APPNAME_EVENT,
+          test: true,
+        },
       }),
     })
 
@@ -59,7 +75,7 @@ describe('[POST] /private/events operations', () => {
     expect(data.error).toBe('Forbidden')
   })
 
-  it('allows apikey broadcasts for an authorized org', async () => {
+  it('allows notifyConsole broadcasts for the caller organization', async () => {
     const response = await fetch(`${BASE_URL}/private/events`, {
       method: 'POST',
       headers: {
@@ -68,9 +84,14 @@ describe('[POST] /private/events operations', () => {
       body: JSON.stringify({
         channel: 'test',
         event: 'test_event',
-        description: 'Testing event tracking',
+        description: 'Valid org broadcast',
+        icon: '🧪',
         notifyConsole: true,
         user_id: ORG_ID,
+        tags: {
+          'app-id': APPNAME_EVENT,
+          test: true,
+        },
       }),
     })
 
@@ -153,7 +174,7 @@ describe('[POST] /private/events operations', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'capgkey': 'invalid_key',
+        capgkey: 'invalid_key',
       },
       body: JSON.stringify({
         channel: 'test',
@@ -174,7 +195,7 @@ describe('[POST] /private/events operations', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'authorization': 'Bearer invalid_token',
+        authorization: 'Bearer invalid_token',
       },
       body: JSON.stringify({
         channel: 'test',

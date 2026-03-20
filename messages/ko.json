@@ -1499,6 +1499,7 @@
   "sso-status-pending": "대기 중",
   "sso-status-verified": "확인됨",
   "sso-upgrade-to-enterprise": "Upgrade to Enterprise",
+  "sso-linked-success": "SSO sign-in successful. Welcome!",
   "sso-verify-dns": "DNS 확인",
   "sso-verifying": "확인 중...",
   "start-onboarding": "온보딩을 시작하십시오",

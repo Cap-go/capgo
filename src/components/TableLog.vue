@@ -112,6 +112,12 @@ const currentGeneralTime = ref<QuickHourOption>(1)
 const preciseDates = ref<[Date, Date]>()
 const thisOrganization = ref<Organization | null>(null)
 const organizationStore = useOrganizationStore()
+const autoReload = computed(() => props.autoReload ?? true)
+
+function requestReload() {
+  if (autoReload.value)
+    emit('reload')
+}
 
 const startTime = computed(() => {
   const subStart = thisOrganization.value?.subscription_start
@@ -151,6 +157,12 @@ function sortClick(key: number) {
   else
     sortable = 'asc'
   const newColumns = [...props.columns]
+
+  newColumns.forEach((col, index) => {
+    if (index !== key && col.sortable && typeof col.sortable === 'string')
+      newColumns[index] = { ...col, sortable: true }
+  })
+
   newColumns[key].sortable = sortable
   emit('update:columns', newColumns)
 }
@@ -370,11 +382,15 @@ function loadFromUrlParams() {
     }
   }
 
-  const newColumns = [...props.columns]
-  props.columns.forEach((col) => {
+  const hasSortParam = props.columns.some(col => params.has(`sort_${col.key}`))
+  const newColumns = props.columns.map(col => ({
+    ...col,
+    sortable: hasSortParam && typeof col.sortable === 'string' ? true : col.sortable,
+  }))
+  props.columns.forEach((col, index) => {
     const sortParam = params.get(`sort_${col.key}`)
-    if (sortParam && col.sortable && (sortParam === 'asc' || sortParam === 'desc')) {
-      newColumns[props.columns.indexOf(col)].sortable = sortParam
+    if (sortParam && typeof col.sortable === 'string' && (sortParam === 'asc' || sortParam === 'desc')) {
+      newColumns[index].sortable = sortParam
     }
   })
   emit('update:columns', newColumns)
@@ -397,9 +413,7 @@ onUnmounted(() => {
 // Add watches
 watch(() => props.columns, useDebounceFn(() => {
   updateUrlParams()
-  if (props.autoReload === false)
-    return
-  emit('reload')
+  requestReload()
 }, 500), { deep: true })
 
 watch(preciseDates, useDebounceFn(() => {
@@ -407,18 +421,14 @@ watch(preciseDates, useDebounceFn(() => {
   // Only emit if the range actually changed from the prop value
   if (!rangesEqual(preciseDates.value, props.range)) {
     emit('update:range', preciseDates.value)
-    if (props.autoReload === false)
-      return
-    emit('reload')
+    requestReload()
   }
 }, 500))
 
 watch(searchVal, useDebounceFn(() => {
   updateUrlParams()
   emit('update:search', searchVal.value)
-  if (props.autoReload === false)
-    return
-  emit('reload')
+  requestReload()
 }, 500))
 
 onMounted(async () => {
