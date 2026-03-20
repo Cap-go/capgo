@@ -1,7 +1,7 @@
 import type { UploadOptions } from '@capgo/cli/sdk'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { cwd, env } from 'node:process'
+import { chdir, cwd, env } from 'node:process'
 import { CapgoSDK } from '@capgo/cli/sdk'
 import { BASE_DEPENDENCIES, BASE_DEPENDENCIES_OLD, BASE_PACKAGE_JSON, TEMP_DIR_NAME } from './cli-utils'
 import { APIKEY_TEST_ALL } from './test-utils'
@@ -18,8 +18,7 @@ const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY || 'sb_publishable_ACJWlzQHlZjBr
 // The CLI SDK uses `rpc("get_user_id", { apikey })` for local auth. That RPC is intentionally
 // restricted to `service_role` in this repo's migrations, so tests must run the SDK with a
 // service-role key, not the anon key.
-const SUPABASE_KEY_FOR_CLI_RPC = env.SUPABASE_SERVICE_KEY
-  ?? env.SUPABASE_SERVICE_ROLE_KEY
+const SUPABASE_KEY_FOR_CLI_RPC = env.SUPABASE_SERVICE_ROLE_KEY
   ?? env.SERVICE_ROLE_KEY
   ?? SUPABASE_ANON_KEY
 
@@ -177,11 +176,11 @@ export async function uploadBundleSDK(
   const originalCwd = cwd()
 
   try {
-    process.chdir(tempFileFolder(appId))
+    chdir(tempFileFolder(appId))
     return await sdk.uploadBundle(options)
   }
   finally {
-    process.chdir(originalCwd)
+    chdir(originalCwd)
     operationComplete!()
   }
 }
