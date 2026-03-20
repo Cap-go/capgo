@@ -497,7 +497,7 @@ describe('[PUT] /organization', () => {
     const trialAt = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
     const stripeInfo = {
       customer_id: customerId,
-      status: 'succeeded',
+      status: 'succeeded' as const,
       product_id: 'prod_LQIregjtNduh4q',
       subscription_id: subscriptionId,
       trial_at: trialAt,
