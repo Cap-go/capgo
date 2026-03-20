@@ -51,8 +51,8 @@ describe('[POST] /app - Error Cases', () => {
     expect(data.error).toBe('cannot_access_organization')
   })
 
-  it('should return 400 when app creation fails due to duplicate name', async () => {
-    // Try to create another app with the same name (same app_id)
+  it('should return 409 when app creation fails due to duplicate app id', async () => {
+    // Try to create another app with the same app_id as the one created in beforeAll
     const response2 = await fetch(`${BASE_URL}/app`, {
       method: 'POST',
       headers,
@@ -62,9 +62,9 @@ describe('[POST] /app - Error Cases', () => {
         owner_org: testOrgId,
       }),
     })
-    expect(response2.status).toBe(400)
+    expect(response2.status).toBe(409)
     const data = await response2.json() as { error: string }
-    expect(data.error).toBe('cannot_create_app')
+    expect(data.error).toBe('app_id_already_exists')
   })
 
   it('should return 400 with invalid JSON body', async () => {
