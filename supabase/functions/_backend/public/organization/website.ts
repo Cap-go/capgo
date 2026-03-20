@@ -6,12 +6,12 @@ export function normalizeWebsiteUrl(input?: string | null) {
     return null
 
   try {
-    const hasScheme = /^[a-z][a-z\d+\-.]*:/i.test(trimmed)
-    if (hasScheme && !/^https?:\/\//i.test(trimmed)) {
+    const hasExplicitScheme = /^[a-z][a-z\d+\-.]*:\/\//i.test(trimmed)
+    if (hasExplicitScheme && !/^https?:\/\//i.test(trimmed)) {
       throw new Error('invalid website protocol')
     }
 
-    const normalized = new URL(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`)
+    const normalized = new URL(hasExplicitScheme ? trimmed : `https://${trimmed}`)
     if (normalized.protocol !== 'http:' && normalized.protocol !== 'https:') {
       throw new Error('invalid website protocol')
     }
