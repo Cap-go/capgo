@@ -419,10 +419,7 @@ async function finishOnboarding() {
     console.error('Failed to refresh organizations before finishing onboarding', error)
   }
 
-  const nextPath = typeof route.query.to === 'string' && route.query.to && !route.query.to.startsWith('/onboarding/')
-    ? route.query.to
-    : '/apps'
-  await router.push(nextPath)
+  await router.push('/app/new')
 }
 
 watch(() => route.query.step, (nextValue) => {
@@ -677,14 +674,14 @@ onUnmounted(() => {
                       <li class="flex gap-3">
                         <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
                         {{ mode === 'website' && importedLogoUrl
-                          ? t('organization-onboarding-next-apps-direct', '2. Continue to apps once the team is invited')
+                          ? t('organization-onboarding-next-create-app-direct', '2. Create your first app once the team is invited')
                           : t('organization-onboarding-next-invite', '2. Invite teammates') }}
                       </li>
                       <li class="flex gap-3">
                         <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
                         {{ mode === 'website' && importedLogoUrl
                           ? t('organization-onboarding-next-assets-direct', '3. Update the logo later in settings if you want a different asset')
-                          : t('organization-onboarding-next-apps', '3. Start app onboarding') }}
+                          : t('organization-onboarding-next-create-app', '3. Create your first app') }}
                       </li>
                     </ul>
                   </div>
@@ -818,7 +815,7 @@ onUnmounted(() => {
                 </div>
                 <p class="mt-2 text-sm text-slate-500">
                   {{ inviteSuccessCount > 0
-                    ? t('organization-onboarding-invite-success-state', 'Invitations sent. You can keep inviting more users or continue to apps.')
+                    ? t('organization-onboarding-invite-success-state', 'Invitations sent. You can keep inviting more users or create your first app.')
                     : t('organization-onboarding-invite-empty-state', 'No invitations sent yet.') }}
                 </p>
 
@@ -848,7 +845,7 @@ onUnmounted(() => {
                   {{ t('organization-onboarding-open-invite', 'Invite users') }}
                 </button>
                 <button type="button" class="d-btn d-btn-outline" data-test="onboarding-finish" @click="finishOnboarding">
-                  {{ t('organization-onboarding-finish', 'Continue to apps') }}
+                  {{ t('organization-onboarding-create-app', 'Create app') }}
                 </button>
               </div>
             </div>
@@ -869,7 +866,7 @@ onUnmounted(() => {
                   </li>
                   <li class="flex gap-3">
                     <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                    {{ t('organization-onboarding-after-invite-3', 'The next step after this page is app onboarding.') }}
+                    {{ t('organization-onboarding-after-create-app', 'The next step after this page is creating your first app.') }}
                   </li>
                 </ul>
               </div>
