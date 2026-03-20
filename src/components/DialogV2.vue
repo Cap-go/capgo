@@ -98,7 +98,8 @@ onUnmounted(() => {
 
       <!-- Dialog -->
       <div
-        class="overflow-y-auto relative mx-4 w-full bg-white rounded-lg shadow-xl max-h-[90vh] dark:bg-base-200"
+        data-theme="light"
+        class="overflow-y-auto relative mx-4 w-full bg-white rounded-lg shadow-xl max-h-[90vh]"
         :class="[
           sizeClasses[dialogStore.dialogOptions?.size || 'md'],
         ]"
@@ -106,7 +107,7 @@ onUnmounted(() => {
         <!-- Close button -->
         <button
           v-if="!dialogStore.dialogOptions?.preventAccidentalClose"
-          class="absolute z-10 text-2xl text-black top-4 right-4 dark:text-white hover:text-white hover:bg-gray-500 d-btn d-btn-sm d-btn-circle d-btn-ghost dark:hover:bg-gray-500"
+          class="absolute z-10 text-2xl text-black top-4 right-4 hover:text-white hover:bg-gray-500 d-btn d-btn-sm d-btn-circle d-btn-ghost"
           @click="close()"
         >
           ✕
@@ -114,7 +115,7 @@ onUnmounted(() => {
 
         <!-- Header -->
         <div v-if="dialogStore.dialogOptions?.title" class="px-6 pt-6 pb-2">
-          <h3 class="text-lg font-bold text-gray-900 dark:text-white">
+          <h3 class="text-lg font-bold text-gray-900">
             {{ dialogStore.dialogOptions.title }}
           </h3>
         </div>
@@ -123,13 +124,13 @@ onUnmounted(() => {
         <div class="px-6" :class="{ 'pt-6': !dialogStore.dialogOptions?.title }">
           <!-- Default description -->
           <div v-if="dialogStore.dialogOptions?.description" class="pb-4">
-            <p class="text-base text-gray-500 whitespace-pre-wrap break-all dark:text-gray-400">
+            <p class="text-base text-gray-500 whitespace-pre-wrap break-all">
               {{ dialogStore.dialogOptions.description }}
             </p>
           </div>
 
           <!-- Teleport target for custom content -->
-          <div id="dialog-v2-content" class="pb-4 text-gray-500 dark:text-gray-400" />
+          <div id="dialog-v2-content" class="pb-4 text-gray-500" />
         </div>
 
         <!-- Buttons -->
@@ -145,7 +146,7 @@ onUnmounted(() => {
                   'd-btn d-btn-warning': button.role === 'danger',
                   'd-btn d-btn-outline': button.role === 'cancel',
                   'd-btn': !button.role,
-                  '!cursor-pointer': !button.disabled,
+                  'cursor-pointer!': !button.disabled,
                   'opacity-70 cursor-not-allowed': button.disabled,
                 }"
                 :disabled="button.disabled"
@@ -165,7 +166,7 @@ onUnmounted(() => {
                   'd-btn d-btn-warning': button.role === 'danger',
                   'd-btn d-btn-outline': button.role === 'cancel',
                   'd-btn': !button.role,
-                  '!cursor-pointer': !button.disabled,
+                  'cursor-pointer!': !button.disabled,
                   'opacity-70 cursor-not-allowed': button.disabled,
                   'pointer-events-none': button.disabled,
                 }"

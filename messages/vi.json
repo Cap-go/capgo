@@ -1499,6 +1499,7 @@
   "sso-status-pending": "Đang chờ xử lý",
   "sso-status-verified": "Đã xác minh",
   "sso-upgrade-to-enterprise": "Upgrade to Enterprise",
+  "sso-linked-success": "SSO sign-in successful. Welcome!",
   "sso-verify-dns": "Xác minh DNS",
   "sso-verifying": "Đang xác minh...",
   "start-onboarding": "Bắt đầu quá trình hướng dẫn",

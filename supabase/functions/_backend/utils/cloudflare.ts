@@ -606,6 +606,9 @@ interface DeviceInfoCF {
   updated_at: string
 }
 
+/**
+ * Read device metadata from the Analytics Engine, respecting search, version, custom ID, and cursor filters.
+ */
 export async function readDevicesCF(c: Context, params: ReadDevicesParams, customIdMode: boolean): Promise<DeviceRes[]> {
   // Use Analytics Engine DEVICE_INFO for reading devices
   // Schema: blob1=device_id, blob2=version_name, blob3=plugin_version, blob4=os_version,
@@ -647,13 +650,20 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
     conditions.push(`blob2 = '${escapeSqlString(params.version_name)}'`)
   }
 
+  const activeOrder = params.order?.find(
+    col => col.key === 'updated_at' && typeof col.sortable === 'string',
+  )
+  const devicesOrder = activeOrder ? { ascending: activeOrder.sortable === 'asc' } : null
+
   // Cursor-based pagination using timestamp
   let cursorFilter = ''
-  if (params.cursor) {
+  if (params.cursor && devicesOrder) {
     // Cursor format: "timestamp|device_id"
     const [cursorTime, cursorDeviceId] = params.cursor.split('|')
     if (cursorTime && cursorDeviceId) {
-      cursorFilter = `AND (timestamp < toDateTime('${escapeSqlString(cursorTime)}') OR (timestamp = toDateTime('${escapeSqlString(cursorTime)}') AND blob1 > '${escapeSqlString(cursorDeviceId)}'))`
+      cursorFilter = devicesOrder.ascending
+        ? `AND (timestamp > toDateTime('${escapeSqlString(cursorTime)}') OR (timestamp = toDateTime('${escapeSqlString(cursorTime)}') AND blob1 > '${escapeSqlString(cursorDeviceId)}'))`
+        : `AND (timestamp < toDateTime('${escapeSqlString(cursorTime)}') OR (timestamp = toDateTime('${escapeSqlString(cursorTime)}') AND blob1 > '${escapeSqlString(cursorDeviceId)}'))`
     }
   }
 
@@ -674,7 +684,7 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
 FROM device_info
 WHERE ${conditions.join(' AND ')} ${cursorFilter}
 GROUP BY blob1
-ORDER BY updated_at DESC, device_id ASC
+ORDER BY ${devicesOrder ? `updated_at ${devicesOrder.ascending ? 'ASC' : 'DESC'}, device_id ASC` : 'device_id ASC'}
 LIMIT ${limit + 1}`
 
   cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF query', query })
