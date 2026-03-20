@@ -286,95 +286,118 @@ BEGIN
       END IF;
 
       IF should_run THEN
-        run_id := gen_random_uuid();
+        run_id := NULL;
 
-        INSERT INTO public.cron_task_runs (
-          id,
-          cron_task_id,
-          task_name,
-          task_type,
-          status,
-          success_report_url,
-          expected_batches
-        )
-        VALUES (
-          run_id,
-          task.id,
-          task.name,
-          task.task_type,
-          'running',
-          task.success_report_url,
-          CASE WHEN task.task_type = 'function' THEN 1 ELSE 0 END
-        );
+        IF task.success_report_url IS NOT NULL THEN
+          run_id := gen_random_uuid();
+
+          INSERT INTO public.cron_task_runs (
+            id,
+            cron_task_id,
+            task_name,
+            task_type,
+            status,
+            success_report_url,
+            expected_batches
+          )
+          VALUES (
+            run_id,
+            task.id,
+            task.name,
+            task.task_type,
+            'running',
+            task.success_report_url,
+            CASE WHEN task.task_type = 'function' THEN 1 ELSE 0 END
+          );
+        END IF;
 
         BEGIN
           CASE task.task_type
             WHEN 'function' THEN
               EXECUTE 'SELECT ' || task.target;
 
-              UPDATE public.cron_task_runs
-              SET status = 'success',
-                  expected_batches = 1,
-                  completed_batches = 1,
-                  failed_batches = 0,
-                  finished_at = NOW(),
-                  updated_at = NOW()
-              WHERE id = run_id;
-
-              PERFORM public.queue_cron_success_report(run_id);
-
-            WHEN 'queue' THEN
-              PERFORM pgmq.send(
-                task.target,
-                COALESCE(task.payload, jsonb_build_object('function_name', task.target))
-                || jsonb_build_object(
-                  '__cron_run_id', run_id,
-                  '__cron_task_name', task.name
-                )
-              );
-
-              UPDATE public.cron_task_runs
-              SET expected_batches = 1,
-                  updated_at = NOW()
-              WHERE id = run_id;
-
-            WHEN 'function_queue' THEN
-              SELECT array_agg(value::text) INTO queue_names
-              FROM jsonb_array_elements_text(task.target::jsonb);
-
-              total_batches := public.process_function_queue_with_run(
-                queue_names,
-                COALESCE(task.batch_size, 950),
-                run_id,
-                task.name
-              );
-
-              IF total_batches = 0 THEN
+              IF task.success_report_url IS NOT NULL
+                 AND task.target <> 'public.process_deploy_install_stats_email()' THEN
                 UPDATE public.cron_task_runs
                 SET status = 'success',
-                    expected_batches = 0,
-                    completed_batches = 0,
+                    expected_batches = 1,
+                    completed_batches = 1,
                     failed_batches = 0,
                     finished_at = NOW(),
                     updated_at = NOW()
                 WHERE id = run_id;
 
                 PERFORM public.queue_cron_success_report(run_id);
-              ELSE
+              END IF;
+
+            WHEN 'queue' THEN
+              PERFORM pgmq.send(
+                task.target,
+                CASE
+                  WHEN task.success_report_url IS NULL THEN
+                    COALESCE(task.payload, jsonb_build_object('function_name', task.target))
+                  ELSE
+                    COALESCE(task.payload, jsonb_build_object('function_name', task.target))
+                    || jsonb_build_object(
+                      '__cron_run_id', run_id,
+                      '__cron_task_name', task.name
+                    )
+                END
+              );
+
+              IF task.success_report_url IS NOT NULL THEN
                 UPDATE public.cron_task_runs
-                SET expected_batches = total_batches,
+                SET expected_batches = 1,
                     updated_at = NOW()
                 WHERE id = run_id;
               END IF;
+
+            WHEN 'function_queue' THEN
+              SELECT array_agg(value::text) INTO queue_names
+              FROM jsonb_array_elements_text(task.target::jsonb);
+
+              IF task.success_report_url IS NULL THEN
+                total_batches := public.process_function_queue(
+                  queue_names,
+                  COALESCE(task.batch_size, 950)
+                );
+              ELSE
+                total_batches := public.process_function_queue_with_run(
+                  queue_names,
+                  COALESCE(task.batch_size, 950),
+                  run_id,
+                  task.name
+                );
+
+                IF total_batches = 0 THEN
+                  UPDATE public.cron_task_runs
+                  SET status = 'success',
+                      expected_batches = 0,
+                      completed_batches = 0,
+                      failed_batches = 0,
+                      finished_at = NOW(),
+                      updated_at = NOW()
+                  WHERE id = run_id;
+
+                  PERFORM public.queue_cron_success_report(run_id);
+                ELSE
+                  UPDATE public.cron_task_runs
+                  SET expected_batches = total_batches,
+                      updated_at = NOW()
+                  WHERE id = run_id;
+                END IF;
+              END IF;
           END CASE;
         EXCEPTION WHEN OTHERS THEN
-          UPDATE public.cron_task_runs
-          SET status = 'failed',
-              failed_batches = GREATEST(failed_batches, 1),
-              last_error = SQLERRM,
-              finished_at = NOW(),
-              updated_at = NOW()
-          WHERE id = run_id;
+          IF task.success_report_url IS NOT NULL THEN
+            UPDATE public.cron_task_runs
+            SET status = 'failed',
+                failed_batches = GREATEST(failed_batches, 1),
+                last_error = SQLERRM,
+                finished_at = NOW(),
+                updated_at = NOW()
+            WHERE id = run_id;
+          END IF;
 
           RAISE WARNING 'cron task "%" failed: %', task.name, SQLERRM;
         END;
