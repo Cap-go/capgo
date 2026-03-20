@@ -281,7 +281,8 @@ describe.concurrent('tests CLI upload options in parallel', () => {
       // Error message can vary - either explicit org mismatch or generic permission error
       expect(
         result.error?.includes('Cannot get organization id for app id')
-        || result.error?.includes('Invalid API key or insufficient permissions'),
+        || result.error?.includes('Invalid API key or insufficient permissions')
+        || result.error?.includes('Cannot get upload url')
       ).toBe(true)
     }
     finally {

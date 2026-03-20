@@ -14,6 +14,7 @@ const CAPACITOR_CONFIG_PATH = join(ROOT_DIR, 'capacitor.config.ts')
 // Supabase base URL (not including /functions/v1)
 const SUPABASE_URL = env.SUPABASE_URL || 'http://localhost:54321'
 const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY || 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH'
+const SUPABASE_SERVICE_KEY = env.SUPABASE_SERVICE_KEY || env.SUPABASE_SERVICE_ROLE_KEY || env.SERVICE_ROLE_KEY
 
 // The CLI SDK uses `rpc("get_user_id", { apikey })` for local auth. That RPC is intentionally
 // restricted to `service_role` in this repo's migrations, so tests must run the SDK with a

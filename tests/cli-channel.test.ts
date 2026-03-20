@@ -142,7 +142,10 @@ describe('tests CLI channel commands', () => {
       const bundle = '1.0.0'
       const { uploadBundleSDK, prepareCli } = await import('./cli-sdk-utils')
       await prepareCli(APPNAME)
-      await uploadBundleSDK(APPNAME, bundle)
+      await uploadBundleSDK(APPNAME, bundle, 'production', {
+        ignoreCompatibilityCheck: true,
+        useTus: true,
+      })
 
       const result = await createTestSDK().updateChannel({ channelId: channelName, appId: APPNAME, bundle })
       expect(result.success).toBe(true)
