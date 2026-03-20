@@ -4,35 +4,13 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../utils/hono.ts'
 import { supabaseWithAuth } from '../../utils/supabase.ts'
+import { normalizeWebsiteUrl } from './website.ts'
 
 const bodySchema = z.object({
   name: z.string().check(z.minLength(3)),
   email: z.optional(z.email()),
   website: z.optional(z.string()),
 })
-
-function normalizeWebsiteUrl(input?: string | null) {
-  const trimmed = input?.trim()
-  if (!trimmed)
-    return null
-
-  try {
-    const hasScheme = /^[a-z][a-z\d+\-.]*:/i.test(trimmed)
-    if (hasScheme && !/^https?:\/\//i.test(trimmed)) {
-      throw new Error('invalid website protocol')
-    }
-
-    const normalized = new URL(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`)
-    if (normalized.protocol !== 'http:' && normalized.protocol !== 'https:') {
-      throw new Error('invalid website protocol')
-    }
-
-    return normalized.toString()
-  }
-  catch {
-    throw simpleError('invalid_body', 'Invalid body', { error: 'website_must_be_a_valid_url' })
-  }
-}
 
 export async function post(
   c: Context<MiddlewareKeyVariables>,

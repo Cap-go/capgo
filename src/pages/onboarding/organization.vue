@@ -211,7 +211,7 @@ async function createOrganization() {
 
   try {
     const normalizedWebsite = mode.value === 'website'
-      ? (websitePreview.value?.website || websiteInput.value.trim())
+      ? websitePreview.value?.website
       : undefined
 
     const { data, error } = await supabase.functions.invoke('organization', {

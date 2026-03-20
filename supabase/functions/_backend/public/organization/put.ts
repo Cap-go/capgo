@@ -6,6 +6,7 @@ import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { createSignedImageUrl, normalizeImagePath } from '../../utils/storage.ts'
 import { apikeyHasOrgRightWithPolicy, supabaseAdmin, supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
+import { normalizeWebsiteUrl } from './website.ts'
 
 const bodySchema = z.object({
   orgId: z.string(),
@@ -25,32 +26,6 @@ function parseBody(bodyRaw: unknown) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   return bodyParsed.data
-}
-
-function normalizeWebsiteUrl(input?: string | null) {
-  if (input === null)
-    return null
-
-  const trimmed = input?.trim()
-  if (!trimmed)
-    return null
-
-  try {
-    const hasScheme = /^[a-z][a-z\d+\-.]*:/i.test(trimmed)
-    if (hasScheme && !/^https?:\/\//i.test(trimmed)) {
-      throw new Error('invalid website protocol')
-    }
-
-    const normalized = new URL(/^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`)
-    if (normalized.protocol !== 'http:' && normalized.protocol !== 'https:') {
-      throw new Error('invalid website protocol')
-    }
-
-    return normalized.toString()
-  }
-  catch {
-    throw simpleError('invalid_body', 'Invalid body', { error: 'website_must_be_a_valid_url' })
-  }
 }
 
 async function ensureOrgAccess(
