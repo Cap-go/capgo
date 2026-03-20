@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(8);
+SELECT plan(9);
 
 SELECT tests.clear_authentication();
 
@@ -61,6 +61,13 @@ SELECT
         get_user_id('ae6e7458-c46d-4c00-aa3b-153b0b8520ea'),
         '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
         'service role should still call get_user_id'
+    );
+
+SELECT
+    is(
+        get_user_id('ae6e7458-c46d-4c00-aa3b-153b0b8520ea', 'com.demo.app'),
+        '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
+        'service role should still call get_user_id with app_id'
     );
 
 SELECT
