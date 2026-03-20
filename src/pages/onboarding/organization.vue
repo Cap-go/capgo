@@ -240,8 +240,9 @@ async function createOrganization() {
 
     if (mode.value === 'website' && importedLogoUrl.value) {
       try {
-        await useImportedLogo()
-        return
+        const imported = await useImportedLogo()
+        if (imported)
+          return
       }
       catch (error) {
         console.error('Failed to import logo after organization create', error)
@@ -287,7 +288,7 @@ async function uploadLogoBlob(blob: Blob, filename?: string) {
 async function useImportedLogo() {
   if (!importedLogoUrl.value) {
     toast.error(t('organization-onboarding-imported-logo-unavailable', 'No imported logo available'))
-    return
+    return false
   }
 
   try {
@@ -296,28 +297,30 @@ async function useImportedLogo() {
       const contentType = header.match(/^data:([^;]+)/)?.[1] ?? ''
       if (!contentType.startsWith('image/') || !payload) {
         toast.error(t('organization-onboarding-imported-logo-failed', 'Could not import logo from website'))
-        return
+        return false
       }
 
       const binary = atob(payload)
       const bytes = Uint8Array.from(binary, char => char.charCodeAt(0))
       const blob = new Blob([bytes], { type: contentType })
       await uploadLogoBlob(blob, `${websiteHostname.value || 'website-logo'}.png`)
-      return
+      return true
     }
 
     const response = await fetch(importedLogoUrl.value)
     const contentType = response.headers.get('content-type')?.split(';')[0]?.trim() ?? ''
     if (!response.ok || !contentType.startsWith('image/')) {
       toast.error(t('organization-onboarding-imported-logo-failed', 'Could not import logo from website'))
-      return
+      return false
     }
     const blob = await response.blob()
     await uploadLogoBlob(blob, `${websiteHostname.value || 'website-logo'}.png`)
+    return true
   }
   catch (error) {
     console.error('Failed to fetch imported logo', error)
     toast.error(t('organization-onboarding-imported-logo-failed', 'Could not import logo from website'))
+    return false
   }
 }
 

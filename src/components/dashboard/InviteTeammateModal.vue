@@ -229,6 +229,10 @@ async function handleEmailSubmit() {
 
     if (data === 'NO_EMAIL') {
       // User doesn't exist, show full details dialog
+      if (!captchaKey.value) {
+        toast.error(t('captcha-not-available', 'Captcha verification is not configured in this environment.'))
+        return
+      }
       showFullDetailsDialog()
       return
     }

@@ -169,6 +169,10 @@ function isPrivateIp(ip: string) {
   return ip.includes(':') ? isPrivateIpv6(ip) : isPrivateIpv4(ip)
 }
 
+function isIpLiteral(value: string) {
+  return /^[0-9.]+$/.test(value) || value.includes(':')
+}
+
 async function resolveHostnameIps(hostname: string, type: 'A' | 'AAAA') {
   const dnsUrl = new URL(DNS_LOOKUP_URL)
   dnsUrl.searchParams.set('name', hostname)
@@ -183,7 +187,7 @@ async function resolveHostnameIps(hostname: string, type: 'A' | 'AAAA') {
   const data = await response.json() as { Answer?: Array<{ data?: string }> }
   return (data.Answer ?? [])
     .map(answer => answer.data?.trim() ?? '')
-    .filter(Boolean)
+    .filter(answer => !!answer && isIpLiteral(answer))
 }
 
 async function getPublicHostnameValidationError(c: Context, urlString: string) {
