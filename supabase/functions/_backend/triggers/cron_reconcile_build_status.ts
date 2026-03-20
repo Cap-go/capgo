@@ -131,6 +131,7 @@ app.post('/', middlewareAPISecret, async (c) => {
             build.builder_job_id!,
             build.platform,
             buildTimeSeconds,
+            builderJob.job.completed_at,
           )
         }
       }

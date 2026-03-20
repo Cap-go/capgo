@@ -56,9 +56,45 @@ const globalStatsTrendData = ref<Array<{
   builds_last_month: number
   builds_last_month_ios: number
   builds_last_month_android: number
+  build_total_seconds_day_ios: number
+  build_total_seconds_day_android: number
+  build_avg_seconds_day_ios: number
+  build_avg_seconds_day_android: number
+  build_count_day_ios: number
+  build_count_day_android: number
+  build_minutes_day_ios?: number
+  build_minutes_day_android?: number
+  builds_day_ios?: number
+  builds_day_android?: number
 }>>([])
 
 const isLoadingGlobalStatsTrend = ref(false)
+
+function getBuildTotalSeconds(item: (typeof globalStatsTrendData.value)[number], platform: 'ios' | 'android') {
+  const totalSeconds = platform === 'ios' ? item.build_total_seconds_day_ios : item.build_total_seconds_day_android
+  if (totalSeconds != null)
+    return totalSeconds
+
+  const legacyMinutes = platform === 'ios' ? item.build_minutes_day_ios : item.build_minutes_day_android
+  return (legacyMinutes ?? 0) * 60
+}
+
+function getBuildCount(item: (typeof globalStatsTrendData.value)[number], platform: 'ios' | 'android') {
+  const count = platform === 'ios' ? item.build_count_day_ios : item.build_count_day_android
+  if (count != null)
+    return count
+
+  return platform === 'ios' ? (item.builds_day_ios ?? 0) : (item.builds_day_android ?? 0)
+}
+
+function getBuildAverageSeconds(item: (typeof globalStatsTrendData.value)[number], platform: 'ios' | 'android') {
+  const avgSeconds = platform === 'ios' ? item.build_avg_seconds_day_ios : item.build_avg_seconds_day_android
+  if (avgSeconds != null)
+    return avgSeconds
+
+  const count = getBuildCount(item, platform)
+  return count > 0 ? getBuildTotalSeconds(item, platform) / count : 0
+}
 
 async function loadGlobalStatsTrend() {
   isLoadingGlobalStatsTrend.value = true
@@ -260,6 +296,104 @@ const buildsLastMonthTrendSeries = computed(() => {
     },
   ]
 })
+
+const buildTotalSecondsTrendSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'iOS Total Build Seconds',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: getBuildTotalSeconds(item, 'ios'),
+      })),
+      color: '#000000',
+    },
+    {
+      label: 'Android Total Build Seconds',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: getBuildTotalSeconds(item, 'android'),
+      })),
+      color: '#3ddc84',
+    },
+  ]
+})
+
+const buildAverageSecondsTrendSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'iOS Avg Build Seconds',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: getBuildAverageSeconds(item, 'ios'),
+      })),
+      color: '#000000',
+    },
+    {
+      label: 'Android Avg Build Seconds',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: getBuildAverageSeconds(item, 'android'),
+      })),
+      color: '#3ddc84',
+    },
+  ]
+})
+
+const periodBuildStats = computed(() => {
+  const totals = globalStatsTrendData.value.reduce((acc, item) => {
+    acc.iosTotalSeconds += getBuildTotalSeconds(item, 'ios')
+    acc.androidTotalSeconds += getBuildTotalSeconds(item, 'android')
+    acc.iosBuildCount += getBuildCount(item, 'ios')
+    acc.androidBuildCount += getBuildCount(item, 'android')
+    if (getBuildAverageSeconds(item, 'ios') > 0) {
+      acc.iosAvgSecondsSum += getBuildAverageSeconds(item, 'ios')
+      acc.iosAvgDays += 1
+    }
+    if (getBuildAverageSeconds(item, 'android') > 0) {
+      acc.androidAvgSecondsSum += getBuildAverageSeconds(item, 'android')
+      acc.androidAvgDays += 1
+    }
+    return acc
+  }, {
+    iosTotalSeconds: 0,
+    androidTotalSeconds: 0,
+    iosBuildCount: 0,
+    androidBuildCount: 0,
+    iosAvgSecondsSum: 0,
+    androidAvgSecondsSum: 0,
+    iosAvgDays: 0,
+    androidAvgDays: 0,
+  })
+
+  return {
+    ios: {
+      averageSeconds: totals.iosBuildCount > 0 ? totals.iosTotalSeconds / totals.iosBuildCount : 0,
+      totalSeconds: totals.iosTotalSeconds,
+      builds: totals.iosBuildCount,
+      days: totals.iosAvgDays,
+    },
+    android: {
+      averageSeconds: totals.androidBuildCount > 0 ? totals.androidTotalSeconds / totals.androidBuildCount : 0,
+      totalSeconds: totals.androidTotalSeconds,
+      builds: totals.androidBuildCount,
+      days: totals.androidAvgDays,
+    },
+  }
+})
+
+function formatSeconds(value: number) {
+  return `${value.toFixed(1)} sec`
+}
+
+function formatTotalSeconds(value: number) {
+  return `${Math.round(value).toLocaleString()} sec`
+}
 
 // Latest metrics from global stats
 const latestGlobalStats = computed(() => {
@@ -826,6 +960,83 @@ displayStore.defaultBack = '/dashboard'
             >
               <AdminMultiLineChart
                 :series="buildsLastMonthTrendSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+          </div>
+
+          <!-- Build Time Section -->
+          <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-gray-900/10 dark:bg-gray-100/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 text-gray-900 dark:text-gray-100">
+                    <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z" />
+                  </svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  Avg iOS Build Time
+                </p>
+                <div v-if="isLoadingGlobalStatsTrend" class="my-2">
+                  <span class="loading loading-spinner loading-lg text-gray-900 dark:text-gray-100" />
+                </div>
+                <p v-else class="mt-2 text-3xl font-bold text-gray-900 dark:text-gray-100">
+                  {{ formatSeconds(periodBuildStats.ios.averageSeconds) }}
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ periodBuildStats.ios.builds.toLocaleString() }} builds across {{ periodBuildStats.ios.days.toLocaleString() }} active days, {{ formatTotalSeconds(periodBuildStats.ios.totalSeconds) }} total in selected period
+                </p>
+              </div>
+            </div>
+
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-green-500/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 text-green-500">
+                    <path d="M17.523 2.477a.75.75 0 0 0-1.06 1.06l1.47 1.47A6.472 6.472 0 0 0 12 3.5a6.472 6.472 0 0 0-5.933 1.507l1.47-1.47a.75.75 0 0 0-1.06-1.06L4.537 4.417a.75.75 0 0 0 0 1.06l1.94 1.94A6.5 6.5 0 0 0 5.5 11v5.5a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V11a6.5 6.5 0 0 0-.977-3.583l1.94-1.94a.75.75 0 0 0 0-1.06l-1.94-1.94zM9 10a1 1 0 1 1 0 2 1 1 0 0 1 0-2zm6 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2z" />
+                  </svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  Avg Android Build Time
+                </p>
+                <div v-if="isLoadingGlobalStatsTrend" class="my-2">
+                  <span class="loading loading-spinner loading-lg text-green-500" />
+                </div>
+                <p v-else class="mt-2 text-3xl font-bold text-green-500">
+                  {{ formatSeconds(periodBuildStats.android.averageSeconds) }}
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ periodBuildStats.android.builds.toLocaleString() }} builds across {{ periodBuildStats.android.days.toLocaleString() }} active days, {{ formatTotalSeconds(periodBuildStats.android.totalSeconds) }} total in selected period
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 gap-6">
+            <ChartCard
+              title="Build Total Seconds by Day"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="buildTotalSecondsTrendSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="buildTotalSecondsTrendSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+          </div>
+
+          <div class="grid grid-cols-1 gap-6">
+            <ChartCard
+              title="Average Build Time by Day (sec)"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="buildAverageSecondsTrendSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="buildAverageSecondsTrendSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
               />
             </ChartCard>
