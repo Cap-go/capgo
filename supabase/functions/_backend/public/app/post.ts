@@ -84,6 +84,10 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: CreateApp):
     const pgError = error as { code?: string, constraint?: string, detail?: string, message?: string }
     logPgError(c, 'create_app', error)
     if (pgError.code === '23505') {
+      // Intentionally expose duplicate app_id conflicts for this user-facing path.
+      // The onboarding UI uses the 409 to suggest alternatives immediately, and
+      // the oracle risk is acceptable here because app IDs are public identifiers
+      // and the caller already needs organization write access to reach this code.
       throw quickError(409, 'app_id_already_exists', 'App ID already exists', {
         app_id: body.app_id,
         constraint: pgError.constraint,
