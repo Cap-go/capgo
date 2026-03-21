@@ -13,9 +13,8 @@ import { fetchStoreMetadata } from './store_metadata.ts'
 
 export const app = honoFactory.createApp()
 
-// Enable CORS for /demo route (browser requests need OPTIONS preflight)
-app.use('/demo', useCors)
-app.use('/store-metadata', useCors)
+// Enable CORS for all routes (browser requests need OPTIONS preflight for all app endpoints)
+app.use('*', useCors)
 
 app.get('/', middlewareKey(['all', 'read']), async (c) => {
   const pageQuery = c.req.query('page')
@@ -47,7 +46,17 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
 
 app.put('/:id', middlewareKey(['all', 'write']), async (c) => {
   const id = c.req.param('id')
-  const body = await getBodyOrQuery<{ name?: string, icon?: string, retention?: number, expose_metadata?: boolean, allow_device_custom_id?: boolean }>(c)
+  const body = await getBodyOrQuery<{
+    name?: string
+    icon?: string
+    retention?: number
+    expose_metadata?: boolean
+    allow_device_custom_id?: boolean
+    need_onboarding?: boolean
+    existing_app?: boolean
+    ios_store_url?: string | null
+    android_store_url?: string | null
+  }>(c)
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
   const subkey = c.get('subkey') as Database['public']['Tables']['apikeys']['Row'] | undefined
   const keyToUse = subkey || apikey

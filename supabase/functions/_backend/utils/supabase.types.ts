@@ -1628,6 +1628,7 @@ export type Database = {
           stats_updated_at: string | null
           updated_at: string | null
           use_new_rbac: boolean
+          website: string | null
         }
         Insert: {
           created_at?: string | null
@@ -1651,6 +1652,7 @@ export type Database = {
           stats_updated_at?: string | null
           updated_at?: string | null
           use_new_rbac?: boolean
+          website?: string | null
         }
         Update: {
           created_at?: string | null
@@ -1674,6 +1676,7 @@ export type Database = {
           stats_updated_at?: string | null
           updated_at?: string | null
           use_new_rbac?: boolean
+          website?: string | null
         }
         Relationships: [
           {
@@ -3396,6 +3399,7 @@ export type Database = {
               subscription_start: string
               trial_left: number
               use_new_rbac: boolean
+              website: string
             }[]
           }
         | {
@@ -3432,6 +3436,7 @@ export type Database = {
               subscription_start: string
               trial_left: number
               use_new_rbac: boolean
+              website: string
             }[]
           }
       get_password_policy_hash: {
