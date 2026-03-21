@@ -20,6 +20,12 @@ interface InviteTeammateModalRef {
   openDialog: () => void
 }
 
+interface SentInvite {
+  email: string
+  firstName: string
+  lastName: string
+}
+
 interface WebsitePreview {
   hostname: string
   name: string
@@ -45,10 +51,11 @@ const isSubmitting = ref(false)
 const isUploadingLogo = ref(false)
 const isLoadingWebsitePreview = ref(false)
 const selectedLogoPreview = ref('')
-const inviteSuccessCount = ref(0)
+const sentInvites = ref<SentInvite[]>([])
 const websitePreview = ref<WebsitePreview | null>(null)
 const inviteModalRef = ref<InviteTeammateModalRef | null>(null)
 const logoInputRef = useTemplateRef<HTMLInputElement>('logoInput')
+const isAdditionalOrgFlow = ref(false)
 
 const onboardingSteps: Array<{ id: OnboardingStep, label: string }> = [
   { id: 'details', label: t('organization-onboarding-step-details', 'Create org') },
@@ -86,6 +93,42 @@ const canCreateOrganization = computed(() => {
   return !!orgNameInput.value.trim()
 })
 const hasExistingOrganization = computed(() => organizationStore.organizations.some(org => !org.role.includes('invite')))
+const inviteSuccessCount = computed(() => sentInvites.value.length)
+const isCompactCreateOrgFlow = computed(() => isAdditionalOrgFlow.value)
+const onboardingBadge = computed(() => isCompactCreateOrgFlow.value
+  ? t('organization-create-badge', 'New organization')
+  : t('organization-onboarding-badge', 'Get started'))
+const onboardingTitle = computed(() => isCompactCreateOrgFlow.value
+  ? t('organization-create-title', 'Create a new organization')
+  : t('organization-onboarding-title', 'Create your organization'))
+const onboardingSubtitle = computed(() => isCompactCreateOrgFlow.value
+  ? t('organization-create-subtitle', 'Set up another organization without going through onboarding again.')
+  : t('organization-onboarding-subtitle', 'Create the org first, then add a logo and invite your team before you start creating apps.'))
+
+function getInviteDisplayName(invite: SentInvite) {
+  const fullName = `${invite.firstName} ${invite.lastName}`.trim()
+  return fullName || invite.email
+}
+
+function getInviteInitials(invite: SentInvite) {
+  const fullName = `${invite.firstName} ${invite.lastName}`.trim()
+  if (fullName) {
+    return fullName
+      .split(/\s+/)
+      .slice(0, 2)
+      .map(part => part[0]?.toUpperCase() ?? '')
+      .join('')
+  }
+
+  return invite.email.slice(0, 2).toUpperCase()
+}
+
+function onInviteSuccess(invite: SentInvite) {
+  sentInvites.value = [
+    invite,
+    ...sentInvites.value.filter(entry => entry.email !== invite.email),
+  ]
+}
 
 function toTitleCaseSegment(segment: string) {
   return segment
@@ -126,6 +169,7 @@ async function syncRouteQuery(nextStep: OnboardingStep, orgId = createdOrgId.val
     path: '/onboarding/organization',
     query: {
       ...(orgId ? { org: orgId } : {}),
+      ...(typeof route.query.source === 'string' ? { source: route.query.source } : {}),
       ...(typeof route.query.to === 'string' ? { to: route.query.to } : {}),
       step: nextStep,
     },
@@ -134,6 +178,9 @@ async function syncRouteQuery(nextStep: OnboardingStep, orgId = createdOrgId.val
 
 async function hydrateOnboardingFromQuery() {
   await organizationStore.fetchOrganizations()
+  isAdditionalOrgFlow.value = typeof route.query.source === 'string'
+    ? route.query.source === 'org-switcher'
+    : hasExistingOrganization.value
 
   const queryOrgId = typeof route.query.org === 'string' ? route.query.org : ''
   const queryStep = typeof route.query.step === 'string' ? route.query.step as OnboardingStep : 'details'
@@ -210,11 +257,16 @@ async function createOrganization() {
   isSubmitting.value = true
 
   try {
+    const normalizedWebsite = mode.value === 'website'
+      ? websitePreview.value?.website
+      : undefined
+
     const { data, error } = await supabase.functions.invoke('organization', {
       method: 'POST',
       body: {
         name: orgName,
         email: main.auth.email ?? '',
+        website: normalizedWebsite,
       },
     })
 
@@ -367,10 +419,7 @@ async function finishOnboarding() {
     console.error('Failed to refresh organizations before finishing onboarding', error)
   }
 
-  const nextPath = typeof route.query.to === 'string' && route.query.to && !route.query.to.startsWith('/onboarding/')
-    ? route.query.to
-    : '/apps'
-  await router.push(nextPath)
+  await router.push('/app/new')
 }
 
 watch(() => route.query.step, (nextValue) => {
@@ -420,7 +469,7 @@ onUnmounted(() => {
 <template>
   <section class="h-full py-10 overflow-y-auto sm:py-16 max-h-fit">
     <div class="px-4 mx-auto max-w-5xl sm:px-6 lg:px-8">
-      <InviteTeammateModal ref="inviteModalRef" @success="inviteSuccessCount += 1" />
+      <InviteTeammateModal ref="inviteModalRef" @success="onInviteSuccess" />
       <input
         ref="logoInput"
         type="file"
@@ -444,13 +493,13 @@ onUnmounted(() => {
 
         <div class="text-center">
           <p class="text-sm font-semibold tracking-[0.18em] uppercase text-azure-500">
-            {{ t('organization-onboarding-badge', 'Get started') }}
+            {{ onboardingBadge }}
           </p>
           <h1 class="mt-3 text-3xl font-semibold text-slate-900 sm:text-4xl">
-            {{ t('organization-onboarding-title', 'Create your organization') }}
+            {{ onboardingTitle }}
           </h1>
           <p class="max-w-2xl mx-auto mt-3 text-base text-slate-600">
-            {{ t('organization-onboarding-subtitle', 'Create the org first, then add a logo and invite your team before you start creating apps.') }}
+            {{ onboardingSubtitle }}
           </p>
         </div>
 
@@ -558,13 +607,15 @@ onUnmounted(() => {
                     @click="createOrganization"
                   >
                     <span v-if="!isSubmitting">
-                      {{ mode === 'website' && importedLogoUrl
+                      {{ isCompactCreateOrgFlow
+                        ? t('organization-create-submit', 'Create organization')
+                        : mode === 'website' && importedLogoUrl
                         ? t('organization-onboarding-continue-invite', 'Continue to invite users')
                         : t('organization-onboarding-continue-logo', 'Continue to logo') }}
                     </span>
                     <IconLoader v-else class="w-4 h-4 animate-spin" />
                   </button>
-                  <button type="button" class="d-btn d-btn-outline" @click="router.push('/apps')">
+                  <button type="button" class="d-btn d-btn-outline" @click="goBack">
                     {{ t('cancel', 'Cancel') }}
                   </button>
                 </div>
@@ -623,14 +674,14 @@ onUnmounted(() => {
                       <li class="flex gap-3">
                         <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
                         {{ mode === 'website' && importedLogoUrl
-                          ? t('organization-onboarding-next-apps-direct', '2. Continue to apps once the team is invited')
+                          ? t('organization-onboarding-next-create-app-direct', '2. Create your first app once the team is invited')
                           : t('organization-onboarding-next-invite', '2. Invite teammates') }}
                       </li>
                       <li class="flex gap-3">
                         <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
                         {{ mode === 'website' && importedLogoUrl
                           ? t('organization-onboarding-next-assets-direct', '3. Update the logo later in settings if you want a different asset')
-                          : t('organization-onboarding-next-apps', '3. Start app onboarding') }}
+                          : t('organization-onboarding-next-create-app', '3. Create your first app') }}
                       </li>
                     </ul>
                   </div>
@@ -764,17 +815,37 @@ onUnmounted(() => {
                 </div>
                 <p class="mt-2 text-sm text-slate-500">
                   {{ inviteSuccessCount > 0
-                    ? t('organization-onboarding-invite-success-state', 'Invitations sent. You can keep inviting more users or continue to apps.')
+                    ? t('organization-onboarding-invite-success-state', 'Invitations sent. You can keep inviting more users or create your first app.')
                     : t('organization-onboarding-invite-empty-state', 'No invitations sent yet.') }}
                 </p>
+
+                <ul v-if="inviteSuccessCount > 0" class="mt-4 space-y-3">
+                  <li
+                    v-for="invite in sentInvites"
+                    :key="invite.email"
+                    class="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
+                  >
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold text-white">
+                      {{ getInviteInitials(invite) }}
+                    </div>
+                    <div class="min-w-0">
+                      <div class="truncate text-sm font-semibold text-slate-900">
+                        {{ getInviteDisplayName(invite) }}
+                      </div>
+                      <div class="truncate text-xs text-slate-500">
+                        {{ invite.email }}
+                      </div>
+                    </div>
+                  </li>
+                </ul>
               </div>
 
               <div class="flex flex-wrap gap-3">
                 <button type="button" class="d-btn d-btn-primary" data-test="onboarding-invite-users" @click="openInviteModal">
                   {{ t('organization-onboarding-open-invite', 'Invite users') }}
                 </button>
-                <button type="button" class="d-btn d-btn-secondary" data-test="onboarding-finish" @click="finishOnboarding">
-                  {{ t('organization-onboarding-finish', 'Continue to apps') }}
+                <button type="button" class="d-btn d-btn-outline" data-test="onboarding-finish" @click="finishOnboarding">
+                  {{ t('organization-onboarding-create-app', 'Create app') }}
                 </button>
               </div>
             </div>
@@ -795,7 +866,7 @@ onUnmounted(() => {
                   </li>
                   <li class="flex gap-3">
                     <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                    {{ t('organization-onboarding-after-invite-3', 'The next step after this page is app onboarding.') }}
+                    {{ t('organization-onboarding-after-create-app', 'The next step after this page is creating your first app.') }}
                   </li>
                 </ul>
               </div>
