@@ -57,11 +57,13 @@ async function resolveTrackingUserId(
 
 async function canAccessRequestedOrg(c: Context<MiddlewareKeyVariables>, orgId: string) {
   const auth = c.get('auth')
-  if (!auth?.userId || !orgId)
+  if (!auth?.userId || !orgId) {
     return false
+  }
 
-  if (auth.authType === 'apikey')
+  if (auth.authType === 'apikey') {
     return hasOrgRightApikey(c, orgId, auth.userId, 'read', c.get('capgkey'))
+  }
 
   return hasOrgRight(c, orgId, auth.userId, 'read')
 }
@@ -73,7 +75,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     : undefined
 
   if (requestedOrgId && !(await canAccessRequestedOrg(c, requestedOrgId)))
-    return c.json({ error: 'Forbidden' }, 403)
+    throw quickError(403, 'Forbidden', 'You cannot send events for this organization')
 
   const requestedUserId = typeof body.user_id === 'string' ? body.user_id : undefined
   const appId = typeof body.tags?.['app-id'] === 'string' ? body.tags['app-id'] : undefined
@@ -82,6 +84,10 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
 
   // notifyConsole: broadcast to Supabase Realtime only, skip all tracking
   if (trackedBody.notifyConsole) {
+    if (!requestedOrgId)
+      throw simpleError('missing_org_id', 'Missing org ID for console notification')
+    if (!(await checkPermission(c, 'org.read', { orgId: requestedOrgId })))
+      throw quickError(403, 'Forbidden', 'You cannot send events for this organization')
     if (trackingUserId) {
       await backgroundTask(c, broadcastCLIEvent(c, {
         event: trackedBody.event,

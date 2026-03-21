@@ -19,16 +19,13 @@ const supabase = useSupabase()
 const main = useMainStore()
 const dropdown = useTemplateRef('dropdown')
 const hasNewInvitation = ref(false)
-const orgNameInput = ref('')
+const hasVisibleOrganizations = computed(() => organizationStore.organizations.length > 0)
+const currentLabel = computed(() => currentOrganization.value?.name ?? t('select-organization', 'Select organization'))
 
 onClickOutside(dropdown, () => closeDropdown())
 
 onMounted(async () => {
   await organizationStore.fetchOrganizations()
-    .catch((error) => {
-      console.error('Cannot get orgs!', error)
-      createNewOrg()
-    })
   hasNewInvitation.value = organizationStore.organizations.some(org => org.role.startsWith('invite'))
 })
 
@@ -118,58 +115,14 @@ function onOrganizationClick(org: Organization) {
 }
 
 async function createNewOrg() {
-  orgNameInput.value = ''
-
-  dialogStore.openDialog({
-    title: t('create-new-org'),
-    description: `${t('type-new-org-name')}`,
-    size: 'lg',
-    buttons: [
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-      },
-      {
-        text: t('button-confirm'),
-        role: 'primary',
-        id: 'confirm-button',
-        handler: async () => {
-          const orgName = orgNameInput.value
-          if (!orgName) {
-            toast.error(t('org-name-required'))
-            return false
-          }
-
-          const { error } = await supabase.from('orgs')
-            .insert({
-              name: orgName,
-              created_by: main.auth?.id ?? '',
-              management_email: main.auth?.email ?? '',
-            })
-
-          if (error) {
-            console.error('Error when creating org', error)
-            toast.error(error.code === '23505' ? t('org-with-this-name-exists') : t('cannot-create-org'))
-            return false
-          }
-
-          toast.success(t('org-created-successfully'))
-          await organizationStore.fetchOrganizations()
-          const org = organizationStore.organizations.find(org => org.name === orgName)
-          if (org) {
-            console.log('org found', org)
-            organizationStore.setCurrentOrganization(org.gid)
-            currentOrganization.value = org
-            router.push('/apps')
-          }
-          else {
-            console.log('org not found', organizationStore.organizations)
-          }
-        },
-      },
-    ],
+  closeDropdown()
+  await router.push({
+    path: '/onboarding/organization',
+    query: {
+      source: 'org-switcher',
+      to: '/dashboard',
+    },
   })
-  return dialogStore.onDialogDismiss()
 }
 
 function isSelected(org: Organization) {
@@ -198,7 +151,7 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
 
 <template>
   <div>
-    <details v-show="currentOrganization" ref="dropdown" class="w-full d-dropdown d-dropdown-end">
+    <details v-if="hasVisibleOrganizations" ref="dropdown" class="w-full d-dropdown d-dropdown-end">
       <summary class="justify-between shadow-none w-full d-btn d-btn-sm border border-gray-700 text-white bg-[#1a1d24] hover:bg-gray-700 hover:text-white active:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-800">
         <div class="flex items-center w-4/5 text-left">
           <img
@@ -211,9 +164,9 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
             v-else
             class="flex items-center justify-center w-6 h-6 mr-2 text-xs font-semibold text-gray-300 bg-gray-700 rounded-sm d-mask d-mask-squircle shrink-0"
           >
-            {{ acronym(currentOrganization?.name ?? '') }}
+            {{ acronym(currentLabel) }}
           </div>
-          <span class="truncate">{{ currentOrganization?.name }}</span>
+          <span class="truncate">{{ currentLabel }}</span>
           <div v-if="hasNewInvitation" class="w-3 h-3 ml-1 bg-red-500 rounded-full" />
         </div>
         <IconDown class="w-6 h-6 ml-1 fill-current shrink-0 text-slate-400" />
@@ -264,22 +217,10 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
         </div>
       </div>
     </details>
-    <div v-show="!currentOrganization" class="p-px rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
+    <div v-else class="p-px rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
       <button class="block w-full text-white d-btn d-btn-outline bg-slate-800 d-btn-sm" @click="createNewOrg">
-        {{ t('add-organization') }}
+        {{ t('create-new-org', 'Create organization') }}
       </button>
     </div>
-
-    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('create-new-org')" to="#dialog-v2-content" defer>
-      <div class="w-full">
-        <input
-          v-model="orgNameInput"
-          type="text"
-          :placeholder="t('organization-name')"
-          class="w-full p-3 text-gray-900 bg-white border border-gray-300 rounded-lg dark:text-white dark:bg-gray-800 dark:border-gray-600"
-          @keydown.enter="$event.preventDefault()"
-        >
-      </div>
-    </Teleport>
   </div>
 </template>
