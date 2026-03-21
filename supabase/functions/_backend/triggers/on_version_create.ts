@@ -2,7 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { purgeOnPremCache } from '../utils/cloudflare_cache_purge.ts'
-import { isAppDemo } from '../utils/demo.ts'
+import { isDemoApp } from '../utils/demo.ts'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { logsnag } from '../utils/logsnag.ts'
@@ -28,8 +28,8 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'INSERT'), a
   // Skip email notifications for special system bundles (unknown, builtin)
   let shouldSkipNotifications = SKIP_EMAIL_BUNDLE_NAMES.includes(record.name)
 
-  // Also skip notifications for demo apps (identified by com.capdemo. prefix)
-  if (!shouldSkipNotifications && isAppDemo(record.app_id)) {
+  // Also skip notifications for demo apps.
+  if (!shouldSkipNotifications && await isDemoApp(c, record.app_id)) {
     cloudlog({ requestId: c.get('requestId'), message: 'Demo app detected, skipping email notifications' })
     shouldSkipNotifications = true
   }

@@ -4,18 +4,66 @@ import { S3Client } from '@bradenmacdonald/s3-lite-client'
 import { cloudlog } from './logging.ts'
 import { getEnv } from './utils.ts'
 
+function firstForwardedHeaderValue(value: string | undefined): string | undefined {
+  if (!value)
+    return undefined
+  return value.split(',')[0]?.trim() || undefined
+}
+
+function resolveEndpointProtocol(c: Context): 'http' | 'https' {
+  const forwardedProto = firstForwardedHeaderValue(c.req.header('X-Forwarded-Proto'))
+  if (forwardedProto === 'http' || forwardedProto === 'https')
+    return forwardedProto
+  try {
+    const requestProtocol = new URL(c.req.url).protocol.replace(':', '')
+    if (requestProtocol === 'http' || requestProtocol === 'https')
+      return requestProtocol
+  }
+  catch {
+    // Ignore URL parsing failures and use the storage config fallback below.
+  }
+  return getEnv(c, 'S3_SSL') === 'true' ? 'https' : 'http'
+}
+
+function resolveStorageEndpoint(c: Context): string {
+  const storageEndpoint = getEnv(c, 'S3_ENDPOINT')
+  const protocol = resolveEndpointProtocol(c)
+  const rawEndpoint = storageEndpoint.includes('://')
+    ? storageEndpoint
+    : `${protocol}://${storageEndpoint}`
+
+  try {
+    const endpointUrl = new URL(rawEndpoint)
+    const looksLikeLocalStorage = endpointUrl.pathname.startsWith('/storage/v1/s3')
+      && ['localhost', '127.0.0.1', 'kong'].includes(endpointUrl.hostname)
+
+    if (!looksLikeLocalStorage)
+      return endpointUrl.toString()
+
+    let forwardedHost = firstForwardedHeaderValue(c.req.header('X-Forwarded-Host'))
+    const forwardedPort = firstForwardedHeaderValue(c.req.header('X-Forwarded-Port'))
+    const hostHeader = c.req.header('Host')
+
+    if (forwardedHost && !forwardedHost.includes(':') && forwardedPort) {
+      forwardedHost = `${forwardedHost}:${forwardedPort}`
+    }
+
+    endpointUrl.protocol = `${protocol}:`
+    endpointUrl.host = forwardedHost || hostHeader || endpointUrl.host
+    return endpointUrl.toString()
+  }
+  catch {
+    return rawEndpoint
+  }
+}
+
 function initS3(c: Context) {
   const access_key_id = getEnv(c, 'S3_ACCESS_KEY_ID')
   const access_key_secret = getEnv(c, 'S3_SECRET_ACCESS_KEY')
-  const storageEndpoint = getEnv(c, 'S3_ENDPOINT')
   const storageRegion = getEnv(c, 'S3_REGION') || 'us-east-1'
-  const useSSL = getEnv(c, 'S3_SSL') === 'true'
   const bucket = getEnv(c, 'S3_BUCKET')
-  const endPoint = useSSL
-    ? `https://${storageEndpoint}`
-    : `http://${storageEndpoint}`
   const client = new S3Client({
-    endPoint,
+    endPoint: resolveStorageEndpoint(c),
     accessKey: access_key_id,
     pathStyle: true,
     secretKey: access_key_secret,

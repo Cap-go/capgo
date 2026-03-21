@@ -16,7 +16,7 @@ import { backgroundTask } from '../utils/utils.ts'
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c) => {
-  const record = c.get('webhookBody') as Database['public']['Tables']['apps']['Row'] & { is_demo?: boolean }
+  const record = c.get('webhookBody') as Database['public']['Tables']['apps']['Row']
   cloudlog({ requestId: c.get('requestId'), message: 'record', record })
 
   if (!record.id) {
@@ -88,9 +88,13 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
   }
 
   // Check if this is a demo app - skip onboarding emails and store info for demo apps
-  const isDemo = record.is_demo === true
+  const isDemo = record.need_onboarding === true
+  const isPendingOnboarding = record.need_onboarding === true
   if (isDemo) {
     cloudlog({ requestId: c.get('requestId'), message: 'Demo app detected, skipping onboarding emails and store info' })
+  }
+  else if (isPendingOnboarding) {
+    cloudlog({ requestId: c.get('requestId'), message: 'Pending onboarding app detected, skipping onboarding emails and store info until CLI completes', app_id: record.app_id })
   }
 
   // Can't proceed with onboarding/default versions without an org id.
@@ -102,12 +106,13 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
   const LogSnag = logsnag(c)
   await backgroundTask(c, LogSnag.track({
     channel: 'app-created',
-    event: isDemo ? 'Demo App Created' : 'App Created',
-    icon: isDemo ? '🎮' : '🎉',
+    event: isDemo ? 'Demo App Created' : isPendingOnboarding ? 'Onboarding App Created' : 'App Created',
+    icon: isDemo ? '🎮' : isPendingOnboarding ? '🧭' : '🎉',
     user_id: ownerOrg,
     tags: {
       app_id: record.app_id,
       is_demo: isDemo ? 'true' : 'false',
+      need_onboarding: isPendingOnboarding ? 'true' : 'false',
     },
     notify: false,
   }))
@@ -137,7 +142,7 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
   }
 
   // Skip onboarding emails for demo apps
-  if (!isDemo) {
+  if (!isDemo && !isPendingOnboarding) {
     await backgroundTask(c, supabase
       .from('orgs')
       .select('*')

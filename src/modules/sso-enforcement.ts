@@ -15,7 +15,7 @@ const PUBLIC_ROUTES = [
   '/sso-callback',
   '/confirm-signup',
   '/forgot_password',
-  '/onboarding',
+  '/onboarding/set_password',
   '/accountDisabled',
 ]
 

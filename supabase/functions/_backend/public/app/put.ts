@@ -1,10 +1,14 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
+import { trackBentoEvent } from '../../utils/bento.ts'
+import { createIfNotExistStoreInfo } from '../../utils/cloudflare.ts'
+import { lockOnboardingApp, unlockOnboardingApp } from '../../utils/demo.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
+import { cloudlog } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { createSignedImageUrl, normalizeImagePath } from '../../utils/storage.ts'
-import { supabaseApikey } from '../../utils/supabase.ts'
+import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 import { isValidAppId } from '../../utils/utils.ts'
 
 interface UpdateApp {
@@ -13,6 +17,10 @@ interface UpdateApp {
   retention?: number
   expose_metadata?: boolean
   allow_device_custom_id?: boolean
+  need_onboarding?: boolean
+  existing_app?: boolean
+  ios_store_url?: string | null
+  android_store_url?: string | null
 }
 
 export async function put(c: Context<MiddlewareKeyVariables>, appId: string, body: UpdateApp, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
@@ -34,19 +42,47 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
     throw quickError(400, 'retention_to_small', 'Retention cannot be smaller than 0', { retention: body.retention })
   }
 
-  const normalizedIcon = normalizeImagePath(body.icon)
-  const { data, error: dbError } = await supabaseApikey(c, apikey.key)
+  const { data: previousApp, error: previousAppError } = await supabaseApikey(c, apikey.key)
     .from('apps')
-    .update({
-      name: body.name,
-      icon_url: normalizedIcon ?? body.icon,
-      retention: body.retention,
-      expose_metadata: body.expose_metadata,
-      allow_device_custom_id: body.allow_device_custom_id,
-    })
+    .select('need_onboarding, owner_org, name, app_id')
     .eq('app_id', appId)
-    .select()
     .single()
+
+  if (previousAppError || !previousApp) {
+    throw simpleError('cannot_load_app', 'Cannot load app before update', { supabaseError: previousAppError })
+  }
+
+  const normalizedIcon = normalizeImagePath(body.icon)
+  const shouldSerializeOnboardingCompletion = previousApp.need_onboarding === true && body.need_onboarding === false
+  const onboardingLock = shouldSerializeOnboardingCompletion
+    ? await lockOnboardingApp(c, appId)
+    : null
+
+  const { data, error: dbError } = await (async () => {
+    try {
+      return await supabaseApikey(c, apikey.key)
+        .from('apps')
+        .update({
+          name: body.name,
+          icon_url: normalizedIcon ?? body.icon,
+          retention: body.retention,
+          expose_metadata: body.expose_metadata,
+          allow_device_custom_id: body.allow_device_custom_id,
+          need_onboarding: body.need_onboarding,
+          existing_app: body.existing_app,
+          ios_store_url: body.ios_store_url,
+          android_store_url: body.android_store_url,
+        })
+        .eq('app_id', appId)
+        .select()
+        .single()
+    }
+    finally {
+      if (onboardingLock) {
+        await unlockOnboardingApp(c, onboardingLock, appId)
+      }
+    }
+  })()
 
   if (dbError || !data) {
     throw simpleError('cannot_update_app', 'Cannot update app', { supabaseError: dbError })
@@ -55,6 +91,34 @@ export async function put(c: Context<MiddlewareKeyVariables>, appId: string, bod
   if (data.icon_url) {
     const signedIcon = await createSignedImageUrl(c, data.icon_url)
     data.icon_url = signedIcon ?? ''
+  }
+  const completedPendingOnboarding = previousApp.need_onboarding === true && data.need_onboarding === false
+
+  if (completedPendingOnboarding) {
+    const { data: orgData, error: orgError } = await supabaseAdmin(c)
+      .from('orgs')
+      .select('management_email, name')
+      .eq('id', data.owner_org)
+      .single()
+
+    if (orgError || !orgData) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Cannot load organization for onboarding completion side effects', error: orgError, app_id: appId })
+    }
+    else {
+      await trackBentoEvent(c, orgData.management_email, {
+        org_id: data.owner_org,
+        org_name: orgData.name,
+        app_name: data.name,
+      }, 'app:created')
+    }
+
+    await createIfNotExistStoreInfo(c, {
+      app_id: data.app_id,
+      updates: 1,
+      onprem: true,
+      capacitor: true,
+      capgo: true,
+    })
   }
 
   return c.json(data)
