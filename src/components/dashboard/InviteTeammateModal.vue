@@ -10,17 +10,17 @@ import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
 import { resolveInviteNewUserErrorMessage } from '~/utils/invites'
 
-const props = withDefaults(defineProps<{
-  inviteKind?: 'generic' | 'technical'
-}>(), {
-  inviteKind: 'generic',
-})
-
 interface InviteSuccessPayload {
   email: string
   firstName: string
   lastName: string
 }
+
+const props = withDefaults(defineProps<{
+  inviteKind?: 'generic' | 'technical'
+}>(), {
+  inviteKind: 'generic',
+})
 
 const emit = defineEmits<{
   success: [payload: InviteSuccessPayload]

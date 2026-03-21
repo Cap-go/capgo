@@ -14,7 +14,11 @@ const DEFAULT_BATCH_SIZE = 950 // Default batch size for queue reads limit of CF
 const DISCORD_IGNORED_ERROR_CODES = new Set(['version_not_found', 'no_channel'])
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 
-// Zod schema for a message object
+/**
+ * Zod schema for a single pgmq message.
+ *
+ * Keep this aligned with `pgmq.read()` output (`msg_id`, `read_ct`, `message`).
+ */
 export const messageSchema = z.object({
   msg_id: z.coerce.number(),
   read_ct: z.coerce.number(),
@@ -35,6 +39,9 @@ interface Message {
   }
 }
 
+/**
+ * Zod schema for a batch of pgmq messages.
+ */
 export const messagesArraySchema = z.array(messageSchema)
 
 /**
@@ -579,6 +586,13 @@ async function mass_edit_queue_messages_cf_ids(
 }
 
 // --- Hono app setup ---
+/**
+ * Queue consumer trigger app.
+ *
+ * Exposes:
+ * - `GET /health` simple health check
+ * - `POST /sync` internal endpoint to process a pgmq queue batch
+ */
 export const app = new Hono<MiddlewareKeyVariables>()
 
 // /health endpoint

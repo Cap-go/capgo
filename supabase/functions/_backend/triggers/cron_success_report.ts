@@ -9,6 +9,12 @@ interface CronSuccessReportPayload {
   url: string
 }
 
+/**
+ * Hono app for delivering cron success callbacks.
+ *
+ * This is invoked via the internal trigger router (`/triggers/cron_success_report`)
+ * with `middlewareAPISecret` authentication.
+ */
 export const app = createHono('', version)
 
 /**
