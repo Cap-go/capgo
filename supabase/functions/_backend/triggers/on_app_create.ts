@@ -16,7 +16,7 @@ import { backgroundTask } from '../utils/utils.ts'
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c) => {
-  const record = c.get('webhookBody') as Database['public']['Tables']['apps']['Row'] & { is_demo?: boolean }
+  const record = c.get('webhookBody') as Database['public']['Tables']['apps']['Row']
   cloudlog({ requestId: c.get('requestId'), message: 'record', record })
 
   if (!record.id) {
@@ -88,7 +88,7 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
   }
 
   // Check if this is a demo app - skip onboarding emails and store info for demo apps
-  const isDemo = record.is_demo === true
+  const isDemo = record.need_onboarding === true
   const isPendingOnboarding = record.need_onboarding === true
   if (isDemo) {
     cloudlog({ requestId: c.get('requestId'), message: 'Demo app detected, skipping onboarding emails and store info' })

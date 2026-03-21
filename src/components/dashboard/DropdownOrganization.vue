@@ -116,7 +116,13 @@ function onOrganizationClick(org: Organization) {
 
 async function createNewOrg() {
   closeDropdown()
-  await router.push('/onboarding/organization')
+  await router.push({
+    path: '/onboarding/organization',
+    query: {
+      source: 'org-switcher',
+      to: '/dashboard',
+    },
+  })
 }
 
 function isSelected(org: Organization) {

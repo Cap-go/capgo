@@ -21,6 +21,7 @@ const orgSchema = z.object({
   name: z.string(),
   management_email: z.email(),
   customer_id: z.nullable(z.string()),
+  website: z.nullable(z.string()),
 })
 
 function parseBody(bodyRaw: unknown) {

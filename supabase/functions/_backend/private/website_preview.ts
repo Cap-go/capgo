@@ -18,7 +18,10 @@ function normalizeWebsiteUrl(input: string) {
     return ''
 
   try {
-    return new URL(/^https?:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`).toString()
+    const normalized = new URL(/^https?:\/\//.test(trimmed) ? trimmed : `https://${trimmed}`)
+    if (normalized.username || normalized.password)
+      return ''
+    return normalized.toString()
   }
   catch {
     return ''

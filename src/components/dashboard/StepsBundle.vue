@@ -341,5 +341,5 @@ onUnmounted(() => {
       </div>
     </div>
   </section>
-  <InviteTeammateModal ref="inviteModalRef" @success="onInviteSuccess" />
+  <InviteTeammateModal ref="inviteModalRef" invite-kind="technical" @success="onInviteSuccess" />
 </template>
