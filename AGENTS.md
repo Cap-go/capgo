@@ -252,6 +252,12 @@ Then in your test file, use ONLY these dedicated resources for modifications.
 
 - All code comments must be in English, regardless of the chat language.
 
+### Translations
+
+- Never pass inline fallback text as the second argument to translation calls such as `t('key', 'English text')`.
+- Always use translation keys only, for example `t('key')`.
+- When text is missing, add or update the key in `messages/en.json` instead of putting English fallback text in code.
+
 ### Commit Messages
 
 - Follow Conventional Commits v1.0.0 (<https://www.conventionalcommits.org/en/v1.0.0/>).
