@@ -218,6 +218,17 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     }))
     expect(members.parse(await response.json()).some(member => member.uid === USER_ID)).toBe(true)
   })
+
+  it.concurrent('allows GET /organization/audit for accessible organizations', async () => {
+    const response = await fetch(`${BASE_URL}/organization/audit?orgId=${readOnlyOrgId}`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'GET',
+    })
+
+    expect(response.status).toBe(200)
+    // The audit endpoint is allowed for read-mode keys; payload may be empty for a new org.
+    expect(await response.json()).toBeDefined()
+  })
 })
 
 describe('[GET] /organization', () => {
