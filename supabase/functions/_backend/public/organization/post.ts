@@ -4,10 +4,12 @@ import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../utils/hono.ts'
 import { supabaseWithAuth } from '../../utils/supabase.ts'
+import { normalizeWebsiteUrl } from './website.ts'
 
 const bodySchema = z.object({
   name: z.string().check(z.minLength(3)),
   email: z.optional(z.email()),
+  website: z.optional(z.string()),
 })
 
 export async function post(
@@ -20,6 +22,7 @@ export async function post(
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
+  const website = normalizeWebsiteUrl(body.website)
 
   const auth = c.get('auth') as AuthInfo | undefined
   if (!auth?.userId) {
@@ -31,7 +34,12 @@ export async function post(
   if (userErr || !self?.email) {
     throw simpleError('cannot_get_user', 'Cannot get user', { error: userErr?.message })
   }
-  const newOrg = { name: body.name, created_by: auth.userId, management_email: body.email ?? self.email ?? '' }
+  const newOrg = {
+    name: body.name,
+    created_by: auth.userId,
+    management_email: body.email ?? self.email ?? '',
+    website,
+  }
   const { error: errorOrg } = await supabase
     .from('orgs')
     .insert(newOrg)

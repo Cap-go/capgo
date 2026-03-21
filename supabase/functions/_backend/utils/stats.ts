@@ -1,9 +1,10 @@
 import type { Context } from 'hono'
+import type { MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import type { DeviceRes, DeviceWithoutCreatedAt, ReadDevicesParams, ReadDevicesResponse, ReadStatsParams, StatsActions, VersionUsage } from './types.ts'
 import { getRuntimeKey } from 'hono/adapter'
 import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readDeviceVersionCountsCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
-import { isAppDemo } from './demo.ts'
+import { isDemoApp } from './demo.ts'
 import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
 import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readDeviceVersionCountsSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
@@ -279,9 +280,9 @@ async function generateDemoLogs(c: Context, params: ReadStatsParams): Promise<De
   return logs.slice(0, limit)
 }
 
-export async function readStats(c: Context, params: ReadStatsParams) {
+export async function readStats(c: Context<MiddlewareKeyVariables>, params: ReadStatsParams) {
   // For demo apps, generate fake logs instead of querying real data
-  if (isAppDemo(params.app_id)) {
+  if (await isDemoApp(c, params.app_id)) {
     return generateDemoLogs(c, params)
   }
 

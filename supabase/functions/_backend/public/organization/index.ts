@@ -1,5 +1,5 @@
 import type { Database } from '../../utils/supabase.types.ts'
-import { getBodyOrQuery, honoFactory } from '../../utils/hono.ts'
+import { getBodyOrQuery, honoFactory, useCors } from '../../utils/hono.ts'
 import { middlewareKey, middlewareV2 } from '../../utils/hono_middleware.ts'
 import { getAuditLogs } from './audit.ts'
 import { deleteOrg } from './delete.ts'
@@ -11,6 +11,9 @@ import { post } from './post.ts'
 import { put } from './put.ts'
 
 export const app = honoFactory.createApp()
+
+// Browser clients call this function directly and need CORS preflight support.
+app.use('*', useCors)
 
 app.get('/', middlewareKey(['all', 'write', 'read', 'upload']), async (c) => {
   const body = await getBodyOrQuery<any>(c)
