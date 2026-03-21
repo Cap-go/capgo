@@ -67,6 +67,173 @@ afterAll(async () => {
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
 })
 
+describe('read-mode API keys cannot access destructive organization routes', () => {
+  const readOnlyOrgId = randomUUID()
+  const readOnlyGlobalId = randomUUID()
+  const readOnlyName = `Test Read-Only Organization ${readOnlyGlobalId}`
+  const readOnlyCustomerId = `cus_test_${readOnlyOrgId}`
+  let readOnlyKey = ''
+  let readOnlyKeyId = 0
+  const readOnlyHeaders = {
+    'Content-Type': 'application/json',
+  }
+
+  beforeAll(async () => {
+    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
+      customer_id: readOnlyCustomerId,
+      status: 'succeeded',
+      product_id: 'prod_LQIregjtNduh4q',
+      subscription_id: `sub_${readOnlyGlobalId}`,
+      trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+      is_good_plan: true,
+    })
+    expect(stripeError).toBeNull()
+
+    const { error: orgError } = await getSupabaseClient().from('orgs').insert({
+      id: readOnlyOrgId,
+      name: readOnlyName,
+      management_email: TEST_EMAIL,
+      created_by: USER_ID,
+      customer_id: readOnlyCustomerId,
+      require_apikey_expiration: false,
+      use_new_rbac: false, // Explicitly legacy — this suite tests the legacy permission path
+    })
+    expect(orgError).toBeNull()
+
+    const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+      org_id: readOnlyOrgId,
+      user_id: USER_ID,
+      user_right: 'super_admin',
+    })
+    expect(orgUserError).toBeNull()
+
+    const createResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: `Organization read-only regression ${randomUUID()}`,
+        mode: 'read',
+        hashed: false,
+        limited_to_orgs: [readOnlyOrgId],
+      }),
+    })
+    expect(createResponse.status).toBe(200)
+    const createdKey = await createResponse.json<{ id: number, key: string }>()
+    readOnlyKey = createdKey.key
+    readOnlyKeyId = createdKey.id
+  })
+
+  afterAll(async () => {
+    if (readOnlyKeyId) {
+      await fetch(`${BASE_URL}/apikey/${readOnlyKeyId}`, {
+        method: 'DELETE',
+        headers,
+      })
+    }
+    await getSupabaseClient().from('org_users').delete().eq('org_id', readOnlyOrgId)
+    await getSupabaseClient().from('orgs').delete().eq('id', readOnlyOrgId)
+    await getSupabaseClient().from('stripe_info').delete().eq('customer_id', readOnlyCustomerId)
+  })
+
+  it.concurrent('rejects POST /organization/members', async () => {
+    const response = await fetch(`${BASE_URL}/organization/members`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'POST',
+      body: JSON.stringify({
+        orgId: readOnlyOrgId,
+        email: USER_ADMIN_EMAIL,
+        invite_type: 'read',
+      }),
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+  it.concurrent('rejects DELETE /organization/members', async () => {
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${readOnlyOrgId}&email=${USER_ADMIN_EMAIL}`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'DELETE',
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+  it.concurrent('rejects PUT /organization', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'PUT',
+      body: JSON.stringify({
+        orgId: readOnlyOrgId,
+        name: `Blocked update ${randomUUID()}`,
+      }),
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+	  it.concurrent('rejects POST /organization', async () => {
+	    const response = await fetch(`${BASE_URL}/organization`, {
+	      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+	      method: 'POST',
+	      body: JSON.stringify({
+	        orgId: readOnlyOrgId,
+	        name: `Blocked create ${randomUUID()}`,
+	      }),
+	    })
+
+	    expect(response.status).toBe(401)
+	    // Ensure this is blocked by API-key auth (key mode allowlist), not by RLS deeper in the handler.
+	    const payload = await response.json() as { error?: string }
+	    expect(payload.error).toBe('invalid_apikey')
+	  })
+
+  it.concurrent('rejects DELETE /organization', async () => {
+    const response = await fetch(`${BASE_URL}/organization?orgId=${readOnlyOrgId}`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'DELETE',
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+  it.concurrent('allows GET /organization for accessible organizations', async () => {
+    const response = await fetch(`${BASE_URL}/organization?orgId=${readOnlyOrgId}`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'GET',
+    })
+
+    expect(response.status).toBe(200)
+    const type = z.object({ id: z.string(), name: z.string() })
+    expect(type.parse(await response.json())).toEqual({ id: readOnlyOrgId, name: readOnlyName })
+  })
+
+  it.concurrent('allows GET /organization/members for accessible organizations', async () => {
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${readOnlyOrgId}`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'GET',
+    })
+
+    expect(response.status).toBe(200)
+    const members = z.array(z.object({
+      uid: z.string(),
+      email: z.string(),
+      role: z.string(),
+    }))
+    expect(members.parse(await response.json()).some(member => member.uid === USER_ID)).toBe(true)
+  })
+
+  it.concurrent('allows GET /organization/audit for accessible organizations', async () => {
+    const response = await fetch(`${BASE_URL}/organization/audit?orgId=${readOnlyOrgId}`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'GET',
+    })
+
+    expect(response.status).toBe(200)
+    // The audit endpoint is allowed for read-mode keys; payload may be empty for a new org.
+    expect(await response.json()).toBeDefined()
+  })
+})
+
 describe('[GET] /organization', () => {
   it('get organization', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
