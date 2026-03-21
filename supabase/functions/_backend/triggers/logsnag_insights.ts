@@ -7,7 +7,6 @@ import { sql } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 
 import { getPluginBreakdownCF, readActiveAppsCF, readLastMonthDevicesByPlatformCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
-import { DEMO_APP_PREFIX } from '../utils/demo.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { logsnag, logsnagInsights } from '../utils/logsnag.ts'
@@ -453,6 +452,37 @@ async function aggregateDailyBuildStats(
   return { totalSeconds: totalSecondsByPlatform, avgSeconds: avgSecondsByPlatform, counts: countsByPlatform }
 }
 
+async function countDemoSeededApps(c: Context, createdAfterIso: string): Promise<number> {
+  const pgClient = getPgClient(c, false)
+  const drizzleClient = getDrizzleClient(pgClient)
+
+  try {
+    const result = await drizzleClient.execute<{ count: number }>(sql`
+      SELECT COUNT(*)::int AS count
+      FROM public.apps AS apps
+      WHERE apps.created_at >= ${new Date(createdAfterIso)}
+        AND EXISTS (
+          SELECT 1
+          FROM public.app_versions AS app_versions
+          INNER JOIN public.manifest AS manifest
+            ON manifest.app_version_id = app_versions.id
+          WHERE app_versions.app_id = apps.app_id
+            AND app_versions.owner_org = apps.owner_org
+            AND manifest.s3_path LIKE ('demo/' || apps.app_id || '/%')
+        )
+    `)
+
+    return Number(result.rows[0]?.count) || 0
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'countDemoSeededApps error', error })
+    return 0
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
+}
+
 function getStats(c: Context, window?: DailyWindow): GlobalStats {
   const supabase = supabaseAdmin(c)
   const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
@@ -628,18 +658,7 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
         }
         return (res.data || []).reduce((sum, row) => sum + (Number(row.credits_used) || 0), 0)
       }),
-    demo_apps_created: supabase
-      .from('apps')
-      .select('id', { count: 'exact', head: true })
-      .gte('created_at', last24h)
-      .like('app_id', `${DEMO_APP_PREFIX}%`)
-      .then((res) => {
-        if (res.error) {
-          cloudlog({ requestId: c.get('requestId'), message: 'demo_apps_created error', error: res.error })
-          return 0
-        }
-        return res.count ?? 0
-      }),
+    demo_apps_created: countDemoSeededApps(c, last24h),
     plugin_breakdown: getPluginBreakdownCF(c),
     build_stats: getBuildStats(c, window),
   }

@@ -10,7 +10,21 @@ import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
 import { resolveInviteNewUserErrorMessage } from '~/utils/invites'
 
-const emit = defineEmits(['success'])
+interface InviteSuccessPayload {
+  email: string
+  firstName: string
+  lastName: string
+}
+
+const props = withDefaults(defineProps<{
+  inviteKind?: 'generic' | 'technical'
+}>(), {
+  inviteKind: 'generic',
+})
+
+const emit = defineEmits<{
+  success: [payload: InviteSuccessPayload]
+}>()
 
 const { t } = useI18n()
 const supabase = useSupabase()
@@ -27,6 +41,12 @@ const shouldUseCaptcha = computed(() => Boolean(captchaKey.value))
 const isInviting = ref(false)
 const useRbacInvites = computed(() => organizationStore.currentOrganization?.use_new_rbac === true)
 const inviteRole = computed(() => (useRbacInvites.value ? 'org_admin' : 'admin'))
+const emailDialogTitle = computed(() => props.inviteKind === 'technical'
+  ? t('onboarding-invite-option-modal-title', 'Invite a technical teammate')
+  : t('invite-teammate-modal-title', 'Invite a teammate'))
+const emailDialogDescription = computed(() => props.inviteKind === 'technical'
+  ? t('onboarding-invite-option-dialog-desc', 'We will email them detailed instructions to create the first app for this organization.')
+  : t('invite-teammate-modal-description', 'Invite a teammate now or finish onboarding and do it later from the members page.'))
 
 // Dialog state tracking
 const isEmailDialogOpen = ref(false)
@@ -42,8 +62,8 @@ function showEmailDialog() {
   isFullDetailsDialogOpen.value = false
 
   dialogStore.openDialog({
-    title: t('onboarding-invite-option-modal-title', 'Invite a teammate'),
-    description: t('onboarding-invite-option-dialog-desc', 'Invite a teammate now or finish onboarding and do it later from the members page.'),
+    title: emailDialogTitle.value,
+    description: emailDialogDescription.value,
     size: 'lg',
     preventAccidentalClose: true,
     buttons: [
@@ -147,12 +167,12 @@ function resetInviteForm() {
   }
 }
 
-function completeInviteSuccess() {
+function completeInviteSuccess(payload: InviteSuccessPayload) {
   resetInviteForm()
   dialogStore.closeDialog()
   isEmailDialogOpen.value = false
   isFullDetailsDialogOpen.value = false
-  emit('success')
+  emit('success', payload)
   sendEvent({
     channel: 'onboarding-v2',
     event: `onboarding-step-invite-teammate`,
@@ -223,7 +243,11 @@ async function handleEmailSubmit() {
 
     if (data === 'OK') {
       toast.success(t('org-invited-user', 'User has been invited successfully'))
-      completeInviteSuccess()
+      completeInviteSuccess({
+        email,
+        firstName: '',
+        lastName: '',
+      })
       return
     }
 
@@ -315,7 +339,11 @@ async function handleFullDetailsSubmit() {
     }
 
     toast.success(t('org-invited-user', 'User has been invited successfully'))
-    completeInviteSuccess()
+    completeInviteSuccess({
+      email,
+      firstName,
+      lastName,
+    })
   }
   finally {
     isInviting.value = false
