@@ -126,10 +126,14 @@ function matchesRbacRole(role: string, requiredRole: string) {
   return normalizeLegacyRole(role) === normalizeLegacyRole(requiredRole)
 }
 
+function isSelectableOrganization(role: string) {
+  return !role.includes('invite')
+}
+
 const supabase = useSupabase()
-const main = useMainStore()
 
 export const useOrganizationStore = defineStore('organization', () => {
+  const main = useMainStore()
   const _organizations: Ref<Map<string, Organization>> = ref(new Map())
   const _organizationsByAppId: Ref<Map<string, Organization>> = ref(new Map())
   const _initialLoadPromise = ref(Promise.withResolvers())
@@ -143,6 +147,7 @@ export const useOrganizationStore = defineStore('organization', () => {
       )
     },
   )
+  const hasOrganizations = computed(() => organizations.value.some(org => isSelectableOrganization(org.role)))
 
   const getCurrentRole = async (appOwner: string, appId?: string, channelId?: number): Promise<OrganizationRole> => {
     if (_organizations.value.size === 0) {
@@ -346,6 +351,7 @@ export const useOrganizationStore = defineStore('organization', () => {
           currentRole.value = null
         }
       })
+      _initialized.value = true
     }
 
     // We have RLS that ensure that we only select rows where we are member or owner
@@ -355,14 +361,6 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     if (error) {
       console.error('Cannot get orgs!', error)
-      throw error
-    }
-
-    const organization = data
-      .filter(org => !org.role.includes('invite'))
-      .sort((a, b) => b.app_count - a.app_count)[0]
-    if (!organization) {
-      console.log('user has no main organization')
       throw error
     }
 
@@ -378,12 +376,28 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     _organizations.value = new Map(mappedData.map(item => [item.gid, item as Organization]))
 
+    const selectableOrganizations = mappedData
+      .filter(org => isSelectableOrganization(org.role))
+      .sort((a, b) => b.app_count - a.app_count)
+
+    const organization = selectableOrganizations[0]
+    if (!organization) {
+      // Clear visible organizations because none are selectable.
+      _organizations.value = new Map()
+      currentOrganization.value = undefined
+      currentRole.value = null
+      currentOrganizationFailed.value = false
+      _organizationsByAppId.value = new Map()
+      _initialLoadPromise.value.resolve(true)
+      return
+    }
+
     // Try to restore from localStorage first
     let targetOrgId = currentOrganization.value?.gid
     if (!targetOrgId) {
       const storedOrgId = localStorage.getItem(STORAGE_KEY)
       if (storedOrgId) {
-        const storedOrg = mappedData.find(org => org.gid === storedOrgId && !org.role.includes('invite'))
+        const storedOrg = mappedData.find(org => org.gid === storedOrgId && isSelectableOrganization(org.role))
         if (storedOrg) {
           targetOrgId = storedOrg.gid
         }
@@ -504,5 +518,6 @@ export const useOrganizationStore = defineStore('organization', () => {
     awaitInitialLoad,
     deleteOrganization,
     checkPasswordPolicyImpact,
+    hasOrganizations,
   }
 })
