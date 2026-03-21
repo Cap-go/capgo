@@ -610,8 +610,8 @@ onUnmounted(() => {
                       {{ isCompactCreateOrgFlow
                         ? t('organization-create-submit', 'Create organization')
                         : mode === 'website' && importedLogoUrl
-                        ? t('organization-onboarding-continue-invite', 'Continue to invite users')
-                        : t('organization-onboarding-continue-logo', 'Continue to logo') }}
+                          ? t('organization-onboarding-continue-invite', 'Continue to invite users')
+                          : t('organization-onboarding-continue-logo', 'Continue to logo') }}
                     </span>
                     <IconLoader v-else class="w-4 h-4 animate-spin" />
                   </button>
