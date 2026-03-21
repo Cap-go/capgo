@@ -65,7 +65,7 @@ describe('[POST] /private/events operations', () => {
         user_id: NON_OWNER_ORG_ID,
         tags: {
           'app-id': APPNAME_EVENT,
-          test: true,
+          'test': true,
         },
       }),
     })
@@ -90,7 +90,7 @@ describe('[POST] /private/events operations', () => {
         user_id: ORG_ID,
         tags: {
           'app-id': APPNAME_EVENT,
-          test: true,
+          'test': true,
         },
       }),
     })
@@ -174,7 +174,7 @@ describe('[POST] /private/events operations', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        capgkey: 'invalid_key',
+        'capgkey': 'invalid_key',
       },
       body: JSON.stringify({
         channel: 'test',
@@ -195,7 +195,7 @@ describe('[POST] /private/events operations', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        authorization: 'Bearer invalid_token',
+        'authorization': 'Bearer invalid_token',
       },
       body: JSON.stringify({
         channel: 'test',
@@ -220,5 +220,63 @@ describe('[POST] /private/events operations', () => {
 
     await response.arrayBuffer()
     expect(response.status).toBe(400)
+  })
+
+  it.concurrent('broadcasts console event for an authorized org', async () => {
+    const response = await fetch(`${BASE_URL}/private/events`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        channel: 'test',
+        event: 'test_event',
+        description: 'Testing console event tracking',
+        notifyConsole: true,
+        user_id: ORG_ID,
+        tags: {
+          'app-id': APPNAME_EVENT,
+          'channel': 'production',
+          'bundle': '1.0.0',
+        },
+      }),
+    })
+
+    const data = await response.json() as { status: string }
+    expect(response.status).toBe(200)
+    expect(data.status).toBe('ok')
+  })
+
+  it.concurrent('rejects console event broadcast without an org id', async () => {
+    const response = await fetch(`${BASE_URL}/private/events`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        channel: 'test',
+        event: 'test_event',
+        description: 'Testing console event tracking',
+        notifyConsole: true,
+      }),
+    })
+
+    const data = await response.json() as { error: string }
+    expect(response.status).toBe(400)
+    expect(data.error).toBe('missing_org_id')
+  })
+
+  it.concurrent('rejects console event broadcast for a foreign org', async () => {
+    const response = await fetch(`${BASE_URL}/private/events`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        channel: 'test',
+        event: 'test_event',
+        description: 'Testing console event tracking',
+        notifyConsole: true,
+        user_id: randomUUID(),
+      }),
+    })
+
+    const data = await response.json() as { error: string }
+    expect(response.status).toBe(403)
+    expect(data.error).toBe('Forbidden')
   })
 })

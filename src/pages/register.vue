@@ -72,7 +72,7 @@ async function submit(form: { first_name: string, last_name: string, password: s
       console.error('Failed to seed user profile after signup', profileError)
   }
 
-  router.push(`/app`)
+  router.push('/onboarding/organization')
 }
 </script>
 

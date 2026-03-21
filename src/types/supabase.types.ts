@@ -252,18 +252,22 @@ export type Database = {
       }
       apps: {
         Row: {
+          android_store_url: string | null
           allow_device_custom_id: boolean
           allow_preview: boolean
           app_id: string
           channel_device_count: number
           created_at: string | null
           default_upload_channel: string
+          existing_app: boolean
           expose_metadata: boolean
           icon_url: string
           id: string | null
+          ios_store_url: string | null
           last_version: string | null
           manifest_bundle_count: number
           name: string | null
+          need_onboarding: boolean
           owner_org: string
           retention: number
           transfer_history: Json[] | null
@@ -271,18 +275,22 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          android_store_url?: string | null
           allow_device_custom_id?: boolean
           allow_preview?: boolean
           app_id: string
           channel_device_count?: number
           created_at?: string | null
           default_upload_channel?: string
+          existing_app?: boolean
           expose_metadata?: boolean
           icon_url: string
           id?: string | null
+          ios_store_url?: string | null
           last_version?: string | null
           manifest_bundle_count?: number
           name?: string | null
+          need_onboarding?: boolean
           owner_org: string
           retention?: number
           transfer_history?: Json[] | null
@@ -290,18 +298,22 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          android_store_url?: string | null
           allow_device_custom_id?: boolean
           allow_preview?: boolean
           app_id?: string
           channel_device_count?: number
           created_at?: string | null
           default_upload_channel?: string
+          existing_app?: boolean
           expose_metadata?: boolean
           icon_url?: string
           id?: string | null
+          ios_store_url?: string | null
           last_version?: string | null
           manifest_bundle_count?: number
           name?: string | null
+          need_onboarding?: boolean
           owner_org?: string
           retention?: number
           transfer_history?: Json[] | null
@@ -1598,6 +1610,7 @@ export type Database = {
           stats_updated_at: string | null
           updated_at: string | null
           use_new_rbac: boolean
+          website: string | null
         }
         Insert: {
           created_at?: string | null
@@ -1621,6 +1634,7 @@ export type Database = {
           stats_updated_at?: string | null
           updated_at?: string | null
           use_new_rbac?: boolean
+          website?: string | null
         }
         Update: {
           created_at?: string | null
@@ -1644,6 +1658,7 @@ export type Database = {
           stats_updated_at?: string | null
           updated_at?: string | null
           use_new_rbac?: boolean
+          website?: string | null
         }
         Relationships: [
           {
@@ -2781,6 +2796,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      clear_onboarding_app_data: {
+        Args: { p_app_uuid: string }
+        Returns: undefined
+      }
       check_domain_sso: {
         Args: { p_domain: string }
         Returns: {
@@ -3306,7 +3325,7 @@ export type Database = {
               trial_left: number
               use_new_rbac: boolean
             }[]
-          }
+        }
         | {
             Args: { userid: string }
             Returns: {
@@ -3326,7 +3345,7 @@ export type Database = {
               trial_left: number
               use_new_rbac: boolean
             }[]
-          }
+        }
       get_orgs_v7:
         | {
             Args: never
@@ -3362,6 +3381,7 @@ export type Database = {
               subscription_start: string
               trial_left: number
               use_new_rbac: boolean
+              website: string | null
             }[]
           }
         | {
@@ -3398,6 +3418,7 @@ export type Database = {
               subscription_start: string
               trial_left: number
               use_new_rbac: boolean
+              website: string | null
             }[]
           }
       get_password_policy_hash: {

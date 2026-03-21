@@ -1,27 +1,45 @@
 import type { Context } from 'hono'
+import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
 import { simpleError } from '../../utils/hono.ts'
-import { supabaseApikey } from '../../utils/supabase.ts'
+import { supabaseWithAuth } from '../../utils/supabase.ts'
+import { normalizeWebsiteUrl } from './website.ts'
 
 const bodySchema = z.object({
   name: z.string().check(z.minLength(3)),
   email: z.optional(z.email()),
+  website: z.optional(z.string()),
 })
 
-export async function post(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
+export async function post(
+  c: Context<MiddlewareKeyVariables>,
+  bodyRaw: any,
+  _apikey: Database['public']['Tables']['apikeys']['Row'] | null | undefined,
+): Promise<Response> {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
+  const website = normalizeWebsiteUrl(body.website)
 
-  const supabase = supabaseApikey(c, apikey.key)
-  const { data: self, error: userErr } = await supabase.from('users').select('email').eq('id', apikey.user_id).single()
+  const auth = c.get('auth') as AuthInfo | undefined
+  if (!auth?.userId) {
+    throw simpleError('not_authorized', 'Not authorized')
+  }
+
+  const supabase = supabaseWithAuth(c, auth)
+  const { data: self, error: userErr } = await supabase.from('users').select('email').eq('id', auth.userId).single()
   if (userErr || !self?.email) {
     throw simpleError('cannot_get_user', 'Cannot get user', { error: userErr?.message })
   }
-  const newOrg = { name: body.name, created_by: apikey.user_id, management_email: body.email ?? self.email ?? '' }
+  const newOrg = {
+    name: body.name,
+    created_by: auth.userId,
+    management_email: body.email ?? self.email ?? '',
+    website,
+  }
   const { error: errorOrg } = await supabase
     .from('orgs')
     .insert(newOrg)
@@ -33,7 +51,7 @@ export async function post(c: Context, bodyRaw: any, apikey: Database['public'][
   const { data: dataOrg, error: errorOrg2 } = await supabase
     .from('orgs')
     .select('id')
-    .eq('created_by', apikey.user_id)
+    .eq('created_by', auth.userId)
     .eq('name', body.name)
     .single()
   if (errorOrg2 || !dataOrg) {
