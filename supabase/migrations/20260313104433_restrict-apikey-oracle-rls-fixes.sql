@@ -7,9 +7,9 @@ REVOKE ALL ON FUNCTION "public"."get_org_perm_for_apikey" ("apikey" "text", "app
 REVOKE ALL ON FUNCTION "public"."get_user_id" ("apikey" "text") FROM "authenticated";
 REVOKE ALL ON FUNCTION "public"."get_user_id" ("apikey" "text", "app_id" "text") FROM "authenticated";
 REVOKE ALL ON FUNCTION "public"."get_org_perm_for_apikey" ("apikey" "text", "app_id" "text") FROM "authenticated";
-REVOKE ALL ON FUNCTION "public"."get_user_id" ("apikey" "text") FROM "public";
-REVOKE ALL ON FUNCTION "public"."get_user_id" ("apikey" "text", "app_id" "text") FROM "public";
-REVOKE ALL ON FUNCTION "public"."get_org_perm_for_apikey" ("apikey" "text", "app_id" "text") FROM "public";
+REVOKE ALL ON FUNCTION "public"."get_user_id" ("apikey" "text") FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."get_user_id" ("apikey" "text", "app_id" "text") FROM PUBLIC;
+REVOKE ALL ON FUNCTION "public"."get_org_perm_for_apikey" ("apikey" "text", "app_id" "text") FROM PUBLIC;
 
 GRANT EXECUTE ON FUNCTION "public"."get_user_id" ("apikey" "text") TO "service_role";
 GRANT EXECUTE ON FUNCTION "public"."get_user_id" ("apikey" "text", "app_id" "text") TO "service_role";
@@ -36,9 +36,12 @@ DECLARE
     _folder_parts text[];
 BEGIN
     _folder_parts := "storage"."foldername"(object_name);
+    IF COALESCE(array_length(_folder_parts, 1), 0) < 1 OR _folder_parts[1] IS NULL THEN
+        RETURN false;
+    END IF;
 
     SELECT auth.uid() INTO _auth_uid;
-    IF _auth_uid IS NOT NULL THEN
+    IF _auth_uid IS NOT NULL AND _auth_uid::text = _folder_parts[1] THEN
         RETURN _auth_uid::text = _folder_parts[1];
     END IF;
 
