@@ -496,7 +496,7 @@ onUnmounted(() => {
         <div v-if="hasExistingOrganization" class="flex justify-start">
           <button
             type="button"
-            class="inline-flex items-center gap-1 rounded-sm p-2 text-slate-500 transition dark:text-white dark:hover:bg-slate-600 hover:bg-slate-300 hover:text-slate-600"
+            class="inline-flex items-center gap-1 rounded-sm p-2 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700 dark:text-slate-300 dark:hover:bg-white/8 dark:hover:text-white"
             :aria-label="t('button-back')"
             @click="goBack"
           >
@@ -521,11 +521,11 @@ onUnmounted(() => {
           <div
             v-for="entry in onboardingSteps"
             :key="entry.id"
-            class="rounded-full border px-4 py-2 text-sm font-medium transition"
+            class="rounded-full border px-5 py-2.5 text-sm font-medium transition-all duration-200"
             :class="[
-              isStepActive(entry.id) ? 'border-white bg-white text-slate-900 shadow-sm' : '',
-              !isStepActive(entry.id) && isStepDone(entry.id) ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : '',
-              !isStepActive(entry.id) && !isStepDone(entry.id) ? 'border-slate-300 bg-white text-slate-700' : '',
+              isStepActive(entry.id) ? 'border-white bg-white text-azure-600 shadow-sm ring-2 ring-azure-400/35' : '',
+              !isStepActive(entry.id) && isStepDone(entry.id) ? 'border-white/75 bg-white/92 text-slate-700 shadow-sm' : '',
+              !isStepActive(entry.id) && !isStepDone(entry.id) ? 'border-white/70 bg-white/88 text-slate-500 shadow-sm' : '',
             ]"
           >
             {{ entry.label }}
