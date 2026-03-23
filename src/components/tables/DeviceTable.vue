@@ -346,7 +346,7 @@ async function openOne(one: Device) {
 }
 async function openOneVersion(one: Device) {
   if (!props.appId) {
-    toast.error(t('app-id-missing', 'App ID is missing'))
+    toast.error(t('app-id-missing'))
     return
   }
 
@@ -355,7 +355,7 @@ async function openOneVersion(one: Device) {
     return
   }
 
-  const loadingToastId = toast.loading(t('loading-version', 'Loading version…'))
+  const loadingToastId = toast.loading(t('loading-version'))
   const { data: versionRecord, error } = await supabase
     .from('app_versions')
     .select('id')
@@ -364,7 +364,7 @@ async function openOneVersion(one: Device) {
     .single()
   toast.dismiss(loadingToastId)
   if (error || !versionRecord?.id) {
-    toast.error(t('cannot-find-version', 'Cannot find version'))
+    toast.error(t('cannot-find-version'))
     return
   }
   router.push(`/app/${props.appId}/bundle/${versionRecord.id}`)
