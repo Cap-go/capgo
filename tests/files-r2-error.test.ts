@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 
+const retryGetMock = vi.fn()
+const retryHeadMock = vi.fn()
+
 vi.mock('hono/adapter', async (importOriginal) => {
   const actual = await importOriginal<typeof import('hono/adapter')>()
   return {
@@ -16,22 +19,29 @@ vi.mock('../supabase/functions/_backend/utils/discord.ts', () => ({
 vi.mock('../supabase/functions/_backend/files/retry.ts', () => ({
   DEFAULT_RETRY_PARAMS: {},
   RetryBucket: class RetryBucketMock {
-    constructor() {}
+    constructor() { }
     get() {
-      throw new Error('r2 unavailable')
+      return retryGetMock()
     }
+
     head() {
-      return null
+      return retryHeadMock()
     }
   },
 }))
 
 describe('files R2 error handling', () => {
   it('should return 503 when R2 get fails', async () => {
+    vi.resetModules()
+    retryHeadMock.mockResolvedValue(null)
+    retryGetMock.mockImplementation(() => {
+      throw new Error('r2 unavailable')
+    })
+
     globalThis.caches = {
       default: {
         match: async () => null,
-        put: async () => {},
+        put: async () => { },
       },
     } as any
 
@@ -47,11 +57,62 @@ describe('files R2 error handling', () => {
     const response = await appGlobal.fetch(
       request,
       { ATTACHMENT_BUCKET: {} },
-      { waitUntil: () => {} } as any,
+      { waitUntil: () => { } } as any,
     )
 
     expect(response.status).toBe(503)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('upstream_unavailable')
+  })
+
+  it('should add no-transform on cached responses', async () => {
+    vi.resetModules()
+    retryHeadMock.mockResolvedValue(null)
+    retryGetMock.mockResolvedValue(null)
+
+    globalThis.caches = {
+      default: {
+        match: async () => new Response('cached zip bytes', {
+          headers: {
+            'content-type': 'application/zip',
+          },
+        }),
+        put: async () => { },
+      },
+    } as any
+
+    const { app: files } = await import('../supabase/functions/_backend/files/files.ts')
+    const { createAllCatch, createHono } = await import('../supabase/functions/_backend/utils/hono.ts')
+    const { version } = await import('../supabase/functions/_backend/utils/version.ts')
+
+    const appGlobal = createHono('files', version)
+    appGlobal.route('/', files)
+    createAllCatch(appGlobal, 'files')
+
+    const request = new Request('http://localhost/read/attachments/test.zip')
+    const response = await appGlobal.fetch(
+      request,
+      {
+        ATTACHMENT_BUCKET: { put: vi.fn().mockResolvedValue(undefined) },
+      },
+      { waitUntil: () => { } } as any,
+    )
+
+    expect(response.status).toBe(200)
+    expect(response.headers.get('cache-control')).toBe('no-transform')
+  })
+
+  it('should persist no-transform in file metadata written to R2', async () => {
+    const { buildFileHttpMetadata } = await import('../supabase/functions/_backend/files/util.ts')
+
+    expect(buildFileHttpMetadata('application/zip')).toEqual({
+      cacheControl: 'no-transform',
+      contentType: 'application/zip',
+    })
+
+    expect(buildFileHttpMetadata('application/zip', 'public, max-age=3600')).toEqual({
+      cacheControl: 'public, max-age=3600, no-transform',
+      contentType: 'application/zip',
+    })
   })
 })
