@@ -199,7 +199,7 @@
     "cron-schedule": "^5.0.4",
     "crypto-random-string": "^5.0.0",
     "daisyui": "^5.5.19",
-    "dayjs": "1.11.19",
+    "dayjs": "1.11.20",
     "dompurify": "^3.3.3",
     "dotenv": "^17.3.1",
     "drizzle-orm": "^0.44.7",
