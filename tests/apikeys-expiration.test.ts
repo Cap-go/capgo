@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, fetchWithRetry, getSupabaseClient, headers, ORG_ID, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, fetchWithRetry, getAuthHeaders, getSupabaseClient, headers, ORG_ID, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.app.expiration.${id}`
@@ -424,6 +424,46 @@ describe('[PUT] /organization with API key policy', () => {
       }),
     })
     expect(response.status).toBe(400)
+  })
+
+  it('rejects invalid max expiration days via direct org update RLS path', async () => {
+    const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/$/, '')
+    if (!supabaseUrl)
+      throw new Error('SUPABASE_URL is missing for direct org update RLS test')
+
+    const authHeaders = await getAuthHeaders()
+    const restHeaders = {
+      ...authHeaders,
+      apikey: process.env.SUPABASE_ANON_KEY ?? '',
+      Prefer: 'return=representation',
+    }
+
+    const { data: beforeUpdate, error: beforeUpdateError } = await getSupabaseClient()
+      .from('orgs')
+      .select('max_apikey_expiration_days')
+      .eq('id', updateOrgId)
+      .single()
+
+    expect(beforeUpdateError).toBeNull()
+
+    const response = await fetchWithRetry(`${supabaseUrl}/rest/v1/orgs?id=eq.${updateOrgId}`, {
+      method: 'PATCH',
+      headers: restHeaders,
+      body: JSON.stringify({
+        max_apikey_expiration_days: -1,
+      }),
+    })
+
+    expect(response.ok).toBe(false)
+
+    const { data: afterUpdate, error: afterUpdateError } = await getSupabaseClient()
+      .from('orgs')
+      .select('max_apikey_expiration_days')
+      .eq('id', updateOrgId)
+      .single()
+
+    expect(afterUpdateError).toBeNull()
+    expect(afterUpdate?.max_apikey_expiration_days).toBe(beforeUpdate?.max_apikey_expiration_days ?? null)
   })
 
   // This test must be last because it enables require_apikey_expiration,

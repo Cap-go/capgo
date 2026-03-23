@@ -171,21 +171,21 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     expect(response.status).toBe(401)
   })
 
-	  it.concurrent('rejects POST /organization', async () => {
-	    const response = await fetch(`${BASE_URL}/organization`, {
-	      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
-	      method: 'POST',
-	      body: JSON.stringify({
-	        orgId: readOnlyOrgId,
-	        name: `Blocked create ${randomUUID()}`,
-	      }),
-	    })
+  it.concurrent('rejects POST /organization', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'POST',
+      body: JSON.stringify({
+        orgId: readOnlyOrgId,
+        name: `Blocked create ${randomUUID()}`,
+      }),
+    })
 
-	    expect(response.status).toBe(401)
-	    // Ensure this is blocked by API-key auth (key mode allowlist), not by RLS deeper in the handler.
-	    const payload = await response.json() as { error?: string }
-	    expect(payload.error).toBe('invalid_apikey')
-	  })
+    expect(response.status).toBe(401)
+    // Ensure this is blocked by API-key auth (key mode allowlist), not by RLS deeper in the handler.
+    const payload = await response.json() as { error?: string }
+    expect(payload.error).toBe('invalid_apikey')
+  })
 
   it.concurrent('rejects DELETE /organization', async () => {
     const response = await fetch(`${BASE_URL}/organization?orgId=${readOnlyOrgId}`, {
@@ -947,6 +947,55 @@ describe('[DELETE] /organization', () => {
     await getSupabaseClient().from('org_users').delete().eq('org_id', id).eq('user_id', USER_ID)
     await getSupabaseClient().from('orgs').delete().eq('id', id)
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
+  })
+})
+
+describe('[PUT] /organization - encrypted bundles settings', () => {
+  afterAll(async () => {
+    await getSupabaseClient().from('orgs').update({
+      enforce_encrypted_bundles: false,
+      required_encryption_key: null,
+    }).eq('id', ORG_ID)
+  })
+
+  it('updates encrypted bundle enforcement and required key', async () => {
+    const requiredEncryptionKey = 'ABCDEFGHIJKLMNOPQRSTU'
+
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'PUT',
+      body: JSON.stringify({
+        orgId: ORG_ID,
+        enforce_encrypted_bundles: true,
+        required_encryption_key: requiredEncryptionKey,
+      }),
+    })
+    expect(response.status).toBe(200)
+
+    const { data, error } = await getSupabaseClient()
+      .from('orgs')
+      .select('enforce_encrypted_bundles, required_encryption_key')
+      .eq('id', ORG_ID)
+      .single()
+
+    expect(error).toBeNull()
+    expect(data?.enforce_encrypted_bundles).toBe(true)
+    expect(data?.required_encryption_key).toBe(requiredEncryptionKey)
+  })
+
+  it('rejects invalid required encryption key length', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'PUT',
+      body: JSON.stringify({
+        orgId: ORG_ID,
+        required_encryption_key: 'too-short',
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { error: string }
+    expect(responseData.error).toBe('invalid_required_encryption_key')
   })
 })
 
