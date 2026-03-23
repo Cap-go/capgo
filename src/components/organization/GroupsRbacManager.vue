@@ -117,12 +117,12 @@ const dynamicColumns = computed<TableColumn[]>(() => {
       actions: [
         {
           icon: IconWrench,
-          title: t('manage', 'Manage'),
+          title: t('manage'),
           onClick: (group: GroupRow) => router.push(`/settings/organization/groups/${group.id}`),
         },
         {
           icon: IconTrash,
-          title: t('remove', 'Remove'),
+          title: t('remove'),
           onClick: (group: GroupRow) => deleteGroup(group),
         },
       ],
@@ -160,7 +160,7 @@ async function refreshData() {
   }
   catch (error) {
     console.error('Error loading groups:', error)
-    toast.error(t('error-fetching-groups', 'Error fetching groups'))
+    toast.error(t('error-fetching-groups'))
   }
   finally {
     isLoading.value = false
@@ -241,15 +241,15 @@ async function deleteGroup(group: GroupRow) {
 
   dialogStore.openDialog({
     id: 'delete-group-confirmation',
-    title: t('remove-group', 'Remove group'),
-    description: t('remove-group-confirmation', 'This action removes the group and all linked role assignments.'),
+    title: t('remove-group'),
+    description: t('remove-group-confirmation'),
     buttons: [
       {
         text: t('button-cancel'),
         role: 'cancel',
       },
       {
-        text: t('remove', 'Remove'),
+        text: t('remove'),
         role: 'danger',
       },
     ],
@@ -266,12 +266,12 @@ async function deleteGroup(group: GroupRow) {
     if (error)
       throw error
 
-    toast.success(t('group-removed', 'Group removed'))
+    toast.success(t('group-removed'))
     await refreshData()
   }
   catch (error) {
     console.error('Error deleting group:', error)
-    toast.error(t('error-removing-group', 'Error removing group'))
+    toast.error(t('error-removing-group'))
   }
   finally {
     isSubmitting.value = false
@@ -298,7 +298,7 @@ async function reload() {
         :show-add="props.canManage"
         :total="filteredGroups.length"
         :element-list="filteredGroups"
-        :search-placeholder="t('search-groups', 'Search groups')"
+        :search-placeholder="t('search-groups')"
         :is-loading="isLoading"
         :auto-reload="false"
         @reload="reload"
