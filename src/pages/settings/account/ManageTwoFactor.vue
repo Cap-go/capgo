@@ -420,7 +420,7 @@ onBeforeUnmount(async () => {
                 {{ t('2fa-step-captcha') }}
               </h4>
               <p class="text-sm text-slate-500 dark:text-slate-400">
-                {{ t('captcha', 'Complete the CAPTCHA to proceed.') }}
+                {{ t('captcha') }}
               </p>
               <div v-if="captchaKey">
                 <VueTurnstile

@@ -20,7 +20,7 @@ const main = useMainStore()
 const dropdown = useTemplateRef('dropdown')
 const hasNewInvitation = ref(false)
 const hasVisibleOrganizations = computed(() => organizationStore.organizations.length > 0)
-const currentLabel = computed(() => currentOrganization.value?.name ?? t('select-organization', 'Select organization'))
+const currentLabel = computed(() => currentOrganization.value?.name ?? t('select-organization'))
 
 onClickOutside(dropdown, () => closeDropdown())
 
@@ -219,7 +219,7 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
     </details>
     <div v-else class="p-px rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
       <button class="block w-full text-white d-btn d-btn-outline bg-slate-800 d-btn-sm" @click="createNewOrg">
-        {{ t('create-new-org', 'Create organization') }}
+        {{ t('create-new-org') }}
       </button>
     </div>
   </div>

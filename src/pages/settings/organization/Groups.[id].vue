@@ -189,7 +189,7 @@ const filteredGroupMembers = computed(() => {
 })
 
 const memberDynamicColumns = computed<TableColumn[]>(() => [
-  { key: 'email', label: t('email', 'Email'), head: true, mobile: true, sortable: true },
+  { key: 'email', label: t('email'), head: true, mobile: true, sortable: true },
   {
     key: 'actions',
     label: t('actions'),
@@ -197,7 +197,7 @@ const memberDynamicColumns = computed<TableColumn[]>(() => [
     actions: [
       {
         icon: IconTrash,
-        title: t('remove', 'Remove'),
+        title: t('remove'),
         onClick: (member: GroupMember) => removeMemberFromGroup(member.user_id),
       },
     ],
@@ -219,7 +219,7 @@ watch(groupId, async (id: string) => {
     editDescription.value = ''
     selectedOrgRole.value = ''
     pendingAppBindings.value = {}
-    displayStore.NavTitle = t('create-group', 'Create group')
+    displayStore.NavTitle = t('create-group')
     await Promise.all([fetchRoles(), fetchApps()])
   }
   else if (UUID_REGEX.test(id)) {
@@ -232,7 +232,7 @@ watch(groupId, async (id: string) => {
     selectedOrgRole.value = ''
     pendingAppBindings.value = {}
     displayStore.NavTitle = t('groups')
-    toast.error(t('invalid-group-id', 'Invalid group ID'))
+    toast.error(t('invalid-group-id'))
   }
 }, { immediate: true })
 
@@ -251,7 +251,7 @@ async function loadAll() {
   }
   catch (error) {
     console.error('Error loading group data:', error)
-    toast.error(t('error-loading-group-data', 'Error loading group data'))
+    toast.error(t('error-loading-group-data'))
   }
   finally {
     isLoading.value = false
@@ -408,7 +408,7 @@ function onAppRoleChange(appId: string, event: Event) {
 
 async function createGroup() {
   if (!editName.value.trim()) {
-    toast.error(t('please-enter-group-name', 'Please enter a group name'))
+    toast.error(t('please-enter-group-name'))
     return
   }
 
@@ -439,7 +439,7 @@ async function createGroup() {
     }
     catch (roleError) {
       console.error('Error saving group org role:', roleError)
-      toast.warning(t('error-saving-group-role', 'Group created but role assignment failed'))
+      toast.warning(t('error-saving-group-role'))
     }
 
     try {
@@ -447,15 +447,15 @@ async function createGroup() {
     }
     catch (bindingError) {
       console.error('Error syncing app bindings:', bindingError)
-      toast.warning(t('error-syncing-app-bindings', 'Group created but app role assignments failed'))
+      toast.warning(t('error-syncing-app-bindings'))
     }
 
-    toast.success(t('group-created', 'Group created'))
+    toast.success(t('group-created'))
     await router.replace(`/settings/organization/groups/${data.id}`)
   }
   catch (error) {
     console.error('Error creating group:', error)
-    toast.error(t('error-creating-group', 'Error creating group'))
+    toast.error(t('error-creating-group'))
   }
   finally {
     isSubmitting.value = false
@@ -464,7 +464,7 @@ async function createGroup() {
 
 async function saveGroup() {
   if (!group.value || !editName.value.trim()) {
-    toast.error(t('please-enter-group-name', 'Please enter a group name'))
+    toast.error(t('please-enter-group-name'))
     return
   }
 
@@ -491,11 +491,11 @@ async function saveGroup() {
     group.value.name = editName.value.trim()
     group.value.description = editDescription.value.trim() || null
     displayStore.NavTitle = group.value.name
-    toast.success(t('group-updated', 'Group updated'))
+    toast.success(t('group-updated'))
   }
   catch (error) {
     console.error('Error saving group:', error)
-    toast.error(t('error-updating-group', 'Error updating group'))
+    toast.error(t('error-updating-group'))
   }
   finally {
     isSubmitting.value = false
@@ -609,13 +609,13 @@ function openAddMembersModal() {
   modalMemberSearch.value = ''
   dialogStore.openDialog({
     id: 'add-group-members',
-    title: t('add-members', 'Add members'),
+    title: t('add-members'),
     description: '',
     size: 'xl',
     buttons: [
       { text: t('button-cancel'), role: 'cancel' },
       {
-        text: t('add-members', 'Add members'),
+        text: t('add-members'),
         role: 'primary',
         preventClose: true,
         handler: addSelectedMembersToGroup,
@@ -626,7 +626,7 @@ function openAddMembersModal() {
 
 async function addSelectedMembersToGroup() {
   if (selectedMemberIds.value.length === 0) {
-    toast.error(t('please-select-member', 'Please select at least one member'))
+    toast.error(t('please-select-member'))
     return false
   }
 
@@ -647,13 +647,13 @@ async function addSelectedMembersToGroup() {
 
     selectedMemberIds.value = []
     await fetchGroupMembers()
-    toast.success(t('member-added', 'Member added'))
+    toast.success(t('member-added'))
     dialogStore.closeDialog()
     return true
   }
   catch (error) {
     console.error('Error adding members:', error)
-    toast.error(t('error-adding-member', 'Error adding member'))
+    toast.error(t('error-adding-member'))
     return false
   }
   finally {
@@ -724,13 +724,13 @@ async function removeMemberFromGroup(userId: string) {
         <!-- Create / Edit mode -->
         <template v-else-if="isCreateMode || group">
           <h1 class="mb-6 text-2xl font-bold dark:text-white text-slate-800">
-            {{ isCreateMode ? t('create-group', 'Create group') : group!.name }}
+            {{ isCreateMode ? t('create-group') : group!.name }}
           </h1>
 
           <!-- Group information -->
           <section class="mb-8">
             <h2 class="mb-4 text-sm font-semibold uppercase text-slate-500">
-              {{ t('group-information', 'Group information') }}
+              {{ t('group-information') }}
             </h2>
             <div class="space-y-4 max-w-lg">
               <div>
@@ -741,7 +741,7 @@ async function removeMemberFromGroup(userId: string) {
                   v-model="editName"
                   type="text"
                   class="w-full d-input d-input-bordered"
-                  :placeholder="t('group-name', 'Group name')"
+                  :placeholder="t('group-name')"
                   :disabled="isSubmitting"
                 >
               </div>
@@ -763,10 +763,10 @@ async function removeMemberFromGroup(userId: string) {
           <!-- Organization role -->
           <section class="mb-8">
             <h2 class="mb-4 text-sm font-semibold uppercase text-slate-500">
-              {{ t('organization', 'Organization') }}
+              {{ t('organization') }}
             </h2>
             <p class="mb-3 text-sm text-slate-500">
-              {{ t('select-user-role', 'Select a role') }}
+              {{ t('select-user-role') }}
             </p>
             <div class="space-y-2">
               <label class="flex items-center gap-3 cursor-pointer">
@@ -817,7 +817,7 @@ async function removeMemberFromGroup(userId: string) {
           <!-- App access tab -->
           <div v-if="activeSection === 'access'" class="pt-6 pb-2">
             <div v-if="!showAppAccessForm" class="py-8 text-center text-sm text-slate-500">
-              {{ t('app-access-member-only', 'App access control is only available for member groups.') }}
+              {{ t('app-access-member-only') }}
             </div>
 
             <template v-else>
@@ -831,7 +831,7 @@ async function removeMemberFromGroup(userId: string) {
                     <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
                       <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
                     </svg>
-                    {{ t('add-app', 'Add app') }}
+                    {{ t('add-app') }}
                   </button>
 
                   <div v-if="showAppDropdown" class="fixed inset-0 z-10" @click="showAppDropdown = false" />
@@ -840,7 +840,7 @@ async function removeMemberFromGroup(userId: string) {
                     class="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg min-w-[240px] max-h-60 overflow-y-auto"
                   >
                     <div v-if="apps.length === 0" class="px-4 py-3 text-sm text-slate-500">
-                      {{ t('no-apps', 'No apps available') }}
+                      {{ t('no-apps') }}
                     </div>
                     <label
                       v-for="app in apps"
@@ -867,7 +867,7 @@ async function removeMemberFromGroup(userId: string) {
               </div>
 
               <div v-if="selectedAppIds.length === 0" class="py-8 text-center text-sm text-slate-500">
-                {{ t('app-access-none', 'No app access configured') }}
+                {{ t('app-access-none') }}
               </div>
               <div v-else class="border rounded-lg border-slate-200 dark:border-slate-700 overflow-hidden">
                 <div
@@ -912,7 +912,7 @@ async function removeMemberFromGroup(userId: string) {
               :show-add="true"
               :total="filteredGroupMembers.length"
               :element-list="filteredGroupMembers"
-              :search-placeholder="t('search-members', 'Search members')"
+              :search-placeholder="t('search-members')"
               :is-loading="isLoading"
               :auto-reload="false"
               @reload="fetchGroupMembers"
@@ -934,7 +934,7 @@ async function removeMemberFromGroup(userId: string) {
         </template>
 
         <div v-else class="py-12 text-center text-slate-500">
-          {{ t('group-not-found', 'Group not found') }}
+          {{ t('group-not-found') }}
         </div>
       </div>
     </div>
@@ -952,12 +952,12 @@ async function removeMemberFromGroup(userId: string) {
         class="d-input-sm"
       />
       <div v-if="availableMembersToAdd.length === 0" class="py-4 text-sm text-center text-slate-500">
-        {{ t('no-members-to-add', 'No members available to add') }}
+        {{ t('no-members-to-add') }}
       </div>
       <template v-else>
         <div class="border rounded-lg border-slate-200 dark:border-slate-700 overflow-hidden max-h-80 overflow-y-auto">
           <div v-if="filteredAvailableMembers.length === 0" class="px-4 py-6 text-sm text-center text-slate-500">
-            {{ t('no-results', 'No results') }}
+            {{ t('no-results') }}
           </div>
           <label
             v-for="member in filteredAvailableMembers"
@@ -974,7 +974,7 @@ async function removeMemberFromGroup(userId: string) {
           </label>
         </div>
         <p v-if="selectedMemberIds.length > 0" class="text-xs text-slate-500">
-          {{ selectedMemberIds.length }} {{ t('selected', 'selected') }}
+          {{ selectedMemberIds.length }} {{ t('selected') }}
         </p>
       </template>
     </div>

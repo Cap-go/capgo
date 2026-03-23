@@ -266,7 +266,7 @@ async function performAccountDeletion(password: string) {
   }
 
   if (captchaKey.value && !deleteAccountCaptchaToken.value) {
-    toast.error(t('captcha-required', 'Captcha verification is required'))
+    toast.error(t('captcha-required'))
     return false
   }
 
@@ -682,7 +682,7 @@ onMounted(async () => {
         </div>
         <div v-if="captchaKey" class="mt-4">
           <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-            {{ t('captcha', 'Captcha') }}
+            {{ t('captcha') }}
           </label>
           <VueTurnstile
             ref="deleteAccountCaptchaRef"
