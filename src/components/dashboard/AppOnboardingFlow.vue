@@ -3,13 +3,16 @@ import type { Database } from '~/types/supabase.types'
 import { FormKit } from '@formkit/vue'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import IconCopy from '~icons/ion/copy-outline'
 import IconCheck from '~icons/lucide/check'
 import IconLoader from '~icons/lucide/loader-2'
 import { createDefaultApiKey } from '~/services/apikeys'
 import { createSignedImageUrl } from '~/services/storage'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
+import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -19,7 +22,9 @@ const props = defineProps<{
 
 const route = useRoute('/app/new')
 const router = useRouter()
+const { t } = useI18n()
 const supabase = useSupabase()
+const dialogStore = useDialogV2Store()
 const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const config = getLocalConfig()
@@ -30,6 +35,7 @@ const isLoading = ref(true)
 const isSubmitting = ref(false)
 const isImportingStore = ref(false)
 const isSeedingDemo = ref(false)
+const isCliCommandVisible = ref(false)
 const apiKey = ref<string | null>(null)
 const createdApp = ref<AppRow | null>(null)
 const flowStep = ref<'details' | 'choice' | 'install'>('details')
@@ -49,12 +55,22 @@ const hasEditedAppId = ref(false)
 
 const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ''
 const cliCommand = computed(() => `npx @capgo/cli@latest i ${apiKey.value ?? '[APIKEY]'}${localCommand}`)
+const cliCommandArgs = computed(() => {
+  const args: string[] = []
+
+  if (isLocal(config.supaHost)) {
+    args.push('--supa-host', config.supaHost, '--supa-anon', config.supaKey)
+  }
+
+  return args
+})
 const currentOrg = computed(() => organizationStore.currentOrganization)
 const resumeAppId = computed(() => {
   const value = route.query.resume
   return typeof value === 'string' ? value : ''
 })
 const iconPreview = computed(() => localIconPreview.value || storeIconPreview.value || '')
+const hasImportedStoreMetadata = computed(() => !!(importedStoreAppId.value || storeIconPreview.value || storeScreenshotPreview.value))
 const canShowAppDetails = computed(() => {
   if (existingApp.value === false)
     return true
@@ -75,6 +91,20 @@ const suggestedAppId = computed(() => {
   return `com.${orgSlug}.${appSlug}`
 })
 const generatedAppId = computed(() => createdApp.value?.app_id || manualAppId.value.trim() || suggestedAppId.value)
+
+function whiteCardToggleButtonClass(active: boolean) {
+  return active
+    ? 'border-slate-900 bg-slate-900 text-white hover:border-slate-800 hover:bg-slate-800'
+    : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50'
+}
+
+function whiteCardSecondaryButtonClass() {
+  return 'border-slate-300 bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50 disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-100'
+}
+
+function whiteCardPrimaryButtonClass() {
+  return 'border-slate-900 bg-slate-900 text-white hover:border-slate-800 hover:bg-slate-800 disabled:border-slate-300 disabled:bg-slate-300 disabled:text-white disabled:opacity-100'
+}
 
 function slugify(value: string) {
   return value
@@ -180,7 +210,7 @@ async function loadResumeApp() {
     .single()
 
   if (error || !data) {
-    toast.error('Unable to find the onboarding app.')
+    toast.error(t('app-onboarding-toast-resume-not-found'))
     return false
   }
 
@@ -229,7 +259,7 @@ async function importStoreMetadata() {
   }
   catch (error) {
     console.error('Cannot import store metadata', error)
-    toast.error('Unable to fetch metadata from that store link.')
+    toast.error(t('app-onboarding-toast-store-metadata-error'))
   }
   finally {
     isImportingStore.value = false
@@ -301,7 +331,7 @@ async function readFunctionError(error: unknown) {
     return {
       status: error.context.status,
       code: json.error ?? '',
-      message: json.message ?? 'Unable to create the onboarding app.',
+      message: json.message ?? t('app-onboarding-toast-create-error'),
       appId: json.app_id ?? json.moreInfo?.app_id ?? '',
     }
   }
@@ -309,7 +339,7 @@ async function readFunctionError(error: unknown) {
     return {
       status: error.context.status,
       code: '',
-      message: `Unable to create the onboarding app (${error.context.status}).`,
+      message: t('app-onboarding-toast-create-error-status', { status: error.context.status }),
       appId: '',
     }
   }
@@ -362,22 +392,22 @@ async function uploadIcon(appId: string, iconSourceUrl?: string) {
 
 async function createAppRecord() {
   if (!currentOrg.value?.gid) {
-    toast.error('No organization selected.')
+    toast.error(t('app-onboarding-toast-no-organization'))
     return
   }
 
   if (existingApp.value === null) {
-    toast.error('Choose whether the app already exists.')
+    toast.error(t('app-onboarding-toast-existing-required'))
     return
   }
 
   if (!appName.value.trim()) {
-    toast.error('Add an app name to continue.')
+    toast.error(t('app-onboarding-toast-name-required'))
     return
   }
 
   if (!generatedAppId.value.trim()) {
-    toast.error('Add the real bundle or package ID to continue.')
+    toast.error(t('app-onboarding-toast-appid-required'))
     return
   }
 
@@ -408,7 +438,10 @@ async function createAppRecord() {
         appId = candidateId
         manualAppId.value = candidateId
         if (candidateId !== candidateIds[0]) {
-          appIdFeedback.value = `App ID ${candidateIds[0]} was already taken, so Capgo switched to ${candidateId}.`
+          appIdFeedback.value = t('app-onboarding-appid-taken-switched', {
+            original: candidateIds[0],
+            replacement: candidateId,
+          })
           appIdSuggestions.value = buildAlternativeAppIds(candidateIds[0])
           toast.info(appIdFeedback.value)
         }
@@ -428,14 +461,16 @@ async function createAppRecord() {
       if (isConflict)
         continue
 
-      appIdFeedback.value = functionError?.message ?? 'Unable to create the onboarding app.'
+      appIdFeedback.value = functionError?.message ?? t('app-onboarding-toast-create-error')
       toast.error(appIdFeedback.value)
       throw error ?? new Error(appIdFeedback.value)
     }
 
     if (!responseData) {
       appIdSuggestions.value = buildAlternativeAppIds(candidateIds[0])
-      appIdFeedback.value = `App ID ${candidateIds[0]} is already used. Pick another one or use one of the suggestions.`
+      appIdFeedback.value = t('app-onboarding-appid-taken-pick-another', {
+        appId: candidateIds[0],
+      })
       toast.error(appIdFeedback.value)
       return
     }
@@ -453,7 +488,7 @@ async function createAppRecord() {
   catch (error) {
     console.error('Cannot create onboarding app', error)
     if (!appIdFeedback.value)
-      toast.error('Unable to create the onboarding app.')
+      toast.error(t('app-onboarding-toast-create-error'))
   }
   finally {
     isSubmitting.value = false
@@ -482,14 +517,36 @@ async function seedDemoData() {
   }
   catch (error) {
     console.error('Cannot seed demo data', error)
-    toast.error('Unable to create demo data for this app.')
+    toast.error(t('app-onboarding-toast-demo-error'))
   }
   finally {
     isSeedingDemo.value = false
   }
 }
 
+async function copyCliCommand() {
+  try {
+    await navigator.clipboard.writeText(cliCommand.value)
+    toast.success(t('copied-to-clipboard'))
+  }
+  catch (error) {
+    console.error('Failed to copy CLI command', error)
+    dialogStore.openDialog({
+      title: t('cannot-copy'),
+      description: cliCommand.value,
+      buttons: [
+        {
+          text: t('button-cancel'),
+          role: 'cancel',
+        },
+      ],
+    })
+    await dialogStore.onDialogDismiss()
+  }
+}
+
 function goToInstallStep() {
+  isCliCommandVisible.value = false
   flowStep.value = 'install'
 }
 
@@ -510,7 +567,7 @@ onMounted(async () => {
     }
     catch (error) {
       console.error('Cannot ensure API key', error)
-      toast.error('Unable to load your API key. Some CLI actions may not work yet.')
+      toast.error(t('app-onboarding-toast-apikey-error'))
     }
     const resumed = await loadResumeApp()
     if (!resumed)
@@ -554,85 +611,125 @@ watch(suggestedAppId, (value) => {
       <div v-else class="space-y-6">
         <div class="text-center">
           <p class="text-sm font-semibold tracking-[0.18em] uppercase text-azure-500">
-            Create your app
+            {{ t('app-onboarding-badge') }}
           </p>
-          <h1 class="mt-3 text-3xl font-semibold text-slate-900 sm:text-4xl">
-            {{ props.onboarding ? 'Create your first app, then choose how you want to start.' : 'Create an app, then install Capgo when you are ready.' }}
+          <h1 class="mt-3 text-3xl font-semibold text-slate-900 sm:text-4xl dark:text-slate-50">
+            {{ props.onboarding
+              ? t('app-onboarding-title-first')
+              : t('app-onboarding-title-return') }}
           </h1>
-          <p class="max-w-2xl mx-auto mt-3 text-base text-slate-600">
-            The app is created immediately in Capgo. From there you can either connect your real project in the CLI or explore the dashboard with temporary demo data.
+          <p class="max-w-2xl mx-auto mt-3 text-base text-slate-600 dark:text-slate-300">
+            {{ t('app-onboarding-subtitle') }}
           </p>
         </div>
 
-        <div v-if="flowStep === 'details'" class="p-6 bg-white border shadow-sm rounded-3xl border-slate-200">
+        <div v-if="flowStep === 'details'" class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-200 dark:bg-white">
           <div class="grid gap-6 md:grid-cols-[1.25fr_0.9fr]">
             <div class="space-y-5">
-              <div class="rounded-2xl border border-slate-200 p-4">
-                <p class="text-sm font-medium text-slate-900">
-                  Does the app already exist?
+              <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-200 dark:bg-slate-50/70">
+                <p class="text-sm font-medium text-slate-900 dark:text-slate-900">
+                  {{ t('app-onboarding-existing-question') }}
                 </p>
                 <div class="flex flex-wrap gap-3 mt-4">
-                  <button class="d-btn" :class="existingApp === true ? 'd-btn-primary' : 'd-btn-outline'" @click="existingApp = true">
-                    Yes, it already exists
+                  <button class="d-btn" :class="whiteCardToggleButtonClass(existingApp === true)" @click="existingApp = true">
+                    {{ t('app-onboarding-existing-yes') }}
                   </button>
-                  <button class="d-btn" :class="existingApp === false ? 'd-btn-primary' : 'd-btn-outline'" @click="existingApp = false">
-                    No, create it from the CLI
+                  <button class="d-btn" :class="whiteCardToggleButtonClass(existingApp === false)" @click="existingApp = false">
+                    {{ t('app-onboarding-existing-no') }}
                   </button>
+                </div>
+                <div class="mt-4">
+                  <button
+                    class="text-xs font-medium text-slate-400 underline decoration-slate-300 underline-offset-3 transition hover:text-slate-600 dark:text-slate-500 dark:decoration-slate-600 dark:hover:text-slate-300"
+                    @click="isCliCommandVisible = !isCliCommandVisible"
+                  >
+                    {{ isCliCommandVisible ? t('app-onboarding-command-hide') : t('app-onboarding-command-show') }}
+                  </button>
+                  <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                    {{ t('app-onboarding-command-help') }}
+                  </p>
+                  <div
+                    v-if="isCliCommandVisible"
+                    class="group relative mt-3 cursor-pointer rounded-xl bg-black p-4 pr-14 ring-1 ring-white/10 transition hover:ring-white/20 dark:bg-slate-950"
+                    role="button"
+                    tabindex="0"
+                    @click="copyCliCommand"
+                    @keydown.enter.prevent="copyCliCommand"
+                    @keydown.space.prevent="copyCliCommand"
+                  >
+                    <code class="block whitespace-pre-wrap break-all text-sm">
+                      <span class="text-slate-500">npx</span>
+                      <span class="text-sky-300"> @capgo/cli@latest</span>
+                      <span class="text-violet-300"> i</span>
+                      <span class="text-emerald-300"> {{ apiKey ?? '[APIKEY]' }}</span>
+                      <template v-for="(arg, index) in cliCommandArgs" :key="`${arg}-${index}`">
+                        <span :class="index % 2 === 0 ? 'text-amber-300' : 'text-cyan-300'"> {{ arg }}</span>
+                      </template>
+                    </code>
+                    <IconCopy class="absolute right-4 top-4 h-5 w-5 text-muted-blue-300 transition group-hover:text-white" />
+                  </div>
                 </div>
               </div>
 
-              <div v-if="existingApp === true" class="grid gap-4 rounded-2xl border border-slate-200 p-4">
+              <div v-if="existingApp === true" class="grid gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-200 dark:bg-slate-50/70">
                 <div>
-                  <p class="text-sm font-medium text-slate-900">
-                    How do you want to start?
+                  <p class="text-sm font-medium text-slate-900 dark:text-slate-900">
+                    {{ t('app-onboarding-start-question') }}
                   </p>
                   <div class="flex flex-wrap gap-3 mt-4">
-                    <button class="d-btn" :class="existingAppSetup === 'import' ? 'd-btn-primary' : 'd-btn-outline'" @click="existingAppSetup = 'import'">
-                      Import from store
+                    <button class="d-btn" :class="whiteCardToggleButtonClass(existingAppSetup === 'import')" @click="existingAppSetup = 'import'">
+                      {{ t('app-onboarding-mode-import') }}
                     </button>
-                    <button class="d-btn" :class="existingAppSetup === 'manual' ? 'd-btn-primary' : 'd-btn-outline'" @click="existingAppSetup = 'manual'">
-                      Set up manually
+                    <button class="d-btn" :class="whiteCardToggleButtonClass(existingAppSetup === 'manual')" @click="existingAppSetup = 'manual'">
+                      {{ t('app-onboarding-mode-manual') }}
                     </button>
                   </div>
                 </div>
 
                 <template v-if="existingAppSetup === 'import'">
                   <div>
-                    <label class="text-sm font-medium text-slate-800">App Store or Google Play link</label>
-                    <input v-model="storeUrl" class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm" placeholder="https://apps.apple.com/... or https://play.google.com/store/apps/details?id=com.example.app" type="url">
+                    <label class="text-sm font-medium text-slate-800 dark:text-slate-800">{{ t('app-onboarding-store-link-label') }}</label>
+                    <input v-model="storeUrl" class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-azure-400 focus:ring-2 focus:ring-azure-100 dark:border-slate-300 dark:bg-white dark:text-slate-900 dark:placeholder:text-slate-400 dark:focus:border-azure-400 dark:focus:ring-azure-100" :placeholder="t('app-onboarding-store-link-placeholder')" type="url">
                   </div>
-                  <button class="d-btn d-btn-outline w-fit" :disabled="isImportingStore || !storeUrl" @click="importStoreMetadata()">
+                  <button class="d-btn w-fit" :class="whiteCardSecondaryButtonClass()" :disabled="isImportingStore || !storeUrl" @click="importStoreMetadata()">
                     <IconLoader v-if="isImportingStore" class="w-4 h-4 animate-spin" />
-                    Import app name and icon
+                    <span v-else>{{ t('app-onboarding-store-import-button') }}</span>
                   </button>
+                  <p class="text-xs text-slate-500 dark:text-slate-500">
+                    {{ hasImportedStoreMetadata
+                      ? t('app-onboarding-store-imported-help')
+                      : t('app-onboarding-store-help') }}
+                  </p>
                 </template>
               </div>
 
               <template v-if="canShowAppDetails">
                 <div>
-                  <label class="text-sm font-medium text-slate-800">App name</label>
-                  <input v-model="appName" class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm" placeholder="Capgo demo app" maxlength="100">
+                  <label class="text-sm font-medium text-slate-800 dark:text-slate-800">{{ t('app-name') }}</label>
+                  <input v-model="appName" class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-azure-400 focus:ring-2 focus:ring-azure-100 dark:border-slate-300 dark:bg-white dark:text-slate-900 dark:placeholder:text-slate-400 dark:focus:border-azure-400 dark:focus:ring-azure-100" :placeholder="t('app-onboarding-name-placeholder')" maxlength="100">
                 </div>
 
                 <div>
-                  <label class="text-sm font-medium text-slate-800">App ID</label>
+                  <label class="text-sm font-medium text-slate-800 dark:text-slate-800">{{ t('app-id') }}</label>
                   <input
                     :value="manualAppId"
-                    class="mt-2 w-full rounded-xl border border-slate-300 px-4 py-3 text-sm"
-                    placeholder="com.example.app"
+                    class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-azure-400 focus:ring-2 focus:ring-azure-100 dark:border-slate-300 dark:bg-white dark:text-slate-900 dark:placeholder:text-slate-400 dark:focus:border-azure-400 dark:focus:ring-azure-100"
+                    :placeholder="t('app-onboarding-appid-placeholder')"
                     @input="onAppIdInput"
                   >
-                  <p class="mt-2 text-xs text-slate-500">
-                    {{ existingApp ? 'Use the real bundle or package ID from your project or store listing.' : 'This ID will be used when the app is created in Capgo and later in the CLI.' }}
+                  <p class="mt-2 text-xs text-slate-500 dark:text-slate-500">
+                    {{ existingApp
+                      ? t('app-onboarding-appid-help-existing')
+                      : t('app-onboarding-appid-help-new') }}
                   </p>
-                  <p v-if="appIdFeedback" class="mt-2 text-xs font-medium text-amber-600">
+                  <p v-if="appIdFeedback" class="mt-2 text-xs font-medium text-amber-600 dark:text-amber-400">
                     {{ appIdFeedback }}
                   </p>
                   <div v-if="appIdSuggestions.length > 0" class="mt-3 flex flex-wrap gap-2">
                     <button
                       v-for="suggestion in appIdSuggestions"
                       :key="suggestion"
-                      class="rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-700 transition hover:border-azure-300 hover:text-azure-600"
+                      class="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs text-slate-700 transition hover:border-azure-300 hover:text-azure-600 dark:border-slate-300 dark:bg-white dark:text-slate-700 dark:hover:border-azure-300 dark:hover:text-azure-600"
                       @click="applyAppIdSuggestion(suggestion)"
                     >
                       {{ suggestion }}
@@ -643,63 +740,64 @@ watch(suggestedAppId, (value) => {
                 <div>
                   <FormKit
                     type="file"
-                    label="App icon"
+                    :label="t('app-onboarding-icon-label')"
                     accept="image/*"
                     outer-class="mt-0"
-                    input-class="mt-2 block w-full text-sm text-slate-600"
+                    label-class="text-sm font-medium text-slate-800 dark:text-slate-800"
+                    input-class="mt-2 block w-full text-sm text-slate-600 dark:text-slate-600"
                     @update:model-value="onSelectIconFormKit"
                   />
-                  <p class="text-xs text-slate-500">
-                    We keep the icon optional. If you imported store metadata, we will try to reuse that icon automatically.
+                  <p class="text-xs text-slate-500 dark:text-slate-500">
+                    {{ t('app-onboarding-icon-help') }}
                   </p>
                 </div>
 
                 <div class="flex flex-wrap gap-3">
-                  <button class="d-btn d-btn-primary" :disabled="isSubmitting" @click="createAppRecord">
+                  <button class="d-btn" :class="whiteCardPrimaryButtonClass()" :disabled="isSubmitting" @click="createAppRecord">
                     <IconLoader v-if="isSubmitting" class="w-4 h-4 animate-spin" />
-                    Continue
+                    <span v-else>{{ t('app-onboarding-continue') }}</span>
                   </button>
-                  <button class="d-btn d-btn-outline" @click="router.push('/apps')">
-                    Cancel
+                  <button class="d-btn" :class="whiteCardSecondaryButtonClass()" @click="router.push('/apps')">
+                    {{ t('button-cancel') }}
                   </button>
                 </div>
               </template>
             </div>
 
-            <div class="rounded-[28px] border border-slate-200 bg-slate-950 p-5 text-white">
-              <div class="rounded-[24px] border border-white/10 bg-slate-900 p-5">
+            <div class="rounded-[28px] border border-slate-200 bg-slate-950 p-5 text-white dark:border-slate-800 dark:bg-linear-to-br dark:from-slate-900 dark:via-slate-900 dark:to-slate-950">
+              <div class="rounded-3xl border border-white/10 bg-slate-900 p-5 dark:border-slate-800 dark:bg-slate-900/90">
                 <div class="flex items-center gap-4">
                   <div class="flex h-18 w-18 items-center justify-center overflow-hidden rounded-[22px] bg-slate-800 text-3xl">
-                    <img v-if="iconPreview" :src="iconPreview" alt="App icon preview" class="h-full w-full object-cover">
+                    <img v-if="iconPreview" :src="iconPreview" :alt="t('app-onboarding-icon-preview-alt')" class="h-full w-full object-cover">
                     <span v-else>📱</span>
                   </div>
                   <div class="min-w-0">
-                    <p class="text-xs uppercase tracking-[0.2em] text-slate-400">
-                      Preview
+                    <p class="text-xs uppercase tracking-[0.2em] text-slate-300 dark:text-slate-400">
+                      {{ t('app-onboarding-preview-label') }}
                     </p>
                     <p class="truncate text-lg font-semibold">
-                      {{ appName || 'Your app' }}
+                      {{ appName || t('app-onboarding-preview-placeholder') }}
                     </p>
-                    <p class="mt-1 truncate text-xs text-slate-400">
+                    <p class="mt-1 truncate text-xs text-slate-300 dark:text-slate-400">
                       {{ generatedAppId }}
                     </p>
                   </div>
                 </div>
-                <div v-if="storeScreenshotPreview" class="mt-6 overflow-hidden rounded-[24px] border border-white/10 bg-slate-950/40">
-                  <img :src="storeScreenshotPreview" alt="Store screenshot preview" class="aspect-[9/19.5] w-full object-cover object-top">
+                <div v-if="storeScreenshotPreview" class="mt-6 overflow-hidden rounded-3xl border border-white/10 bg-slate-950/40">
+                  <img :src="storeScreenshotPreview" :alt="t('app-onboarding-store-screenshot-alt')" class="aspect-9/19.5 w-full object-cover object-top">
                 </div>
-                <ul class="mt-6 space-y-3 text-sm text-slate-300">
+                <ul class="mt-6 space-y-3 text-sm text-slate-200 dark:text-slate-300">
                   <li class="flex gap-3">
                     <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                    Capgo creates one onboarding app and keeps the same record for demo mode or real setup.
+                    {{ t('app-onboarding-preview-bullet-one') }}
                   </li>
                   <li class="flex gap-3">
                     <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                    Demo data stays disposable. When the CLI completes, pending onboarding data can be cleared automatically.
+                    {{ t('app-onboarding-preview-bullet-two') }}
                   </li>
                   <li class="flex gap-3">
                     <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
-                    Existing apps skip local Capacitor scaffolding later in the CLI.
+                    {{ t('app-onboarding-preview-bullet-three') }}
                   </li>
                 </ul>
               </div>
@@ -708,83 +806,101 @@ watch(suggestedAppId, (value) => {
         </div>
 
         <div v-else-if="flowStep === 'choice' && createdApp" class="grid gap-6 md:grid-cols-2">
-          <button class="rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:border-azure-300 hover:shadow-md" @click="goToInstallStep">
+          <button class="rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:border-azure-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-azure-500 dark:hover:bg-slate-900/90 dark:hover:shadow-none" @click="goToInstallStep">
             <p class="text-sm font-semibold uppercase tracking-[0.18em] text-azure-500">
-              Real app
+              {{ t('app-onboarding-choice-real-badge') }}
             </p>
-            <h2 class="mt-3 text-2xl font-semibold text-slate-900">
-              Install Capgo in your project
+            <h2 class="mt-3 text-2xl font-semibold text-slate-900 dark:text-slate-50">
+              {{ t('app-onboarding-choice-real-title') }}
             </h2>
-            <p class="mt-3 text-sm text-slate-600">
-              Continue with the CLI and finish the real setup in your codebase. Capgo will reuse <span class="font-mono">{{ createdApp.app_id }}</span>.
+            <p class="mt-3 text-sm text-slate-600 dark:text-slate-300">
+              {{ t('app-onboarding-choice-real-subtitle') }} <span class="font-mono">{{ createdApp.app_id }}</span>.
             </p>
           </button>
 
           <button
-            class="rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:border-emerald-300 hover:shadow-md"
+            class="rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-sm transition hover:border-emerald-300 hover:shadow-md dark:border-slate-800 dark:bg-slate-900 dark:hover:border-emerald-500 dark:hover:bg-slate-900/90 dark:hover:shadow-none"
             :disabled="isSeedingDemo"
             @click="seedDemoData"
           >
             <p class="text-sm font-semibold uppercase tracking-[0.18em] text-emerald-500">
-              Explore first
+              {{ t('app-onboarding-choice-demo-badge') }}
             </p>
-            <h2 class="mt-3 text-2xl font-semibold text-slate-900">
-              Add demo data and take a tour
+            <h2 class="mt-3 text-2xl font-semibold text-slate-900 dark:text-slate-50">
+              {{ t('app-onboarding-choice-demo-title') }}
             </h2>
-            <p class="mt-3 text-sm text-slate-600">
-              We will populate this app with temporary bundles, channels, devices, and charts so you can learn the dashboard before touching the CLI.
+            <p class="mt-3 text-sm text-slate-600 dark:text-slate-300">
+              {{ t('app-onboarding-choice-demo-subtitle') }}
             </p>
-            <p v-if="isSeedingDemo" class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+            <p v-if="isSeedingDemo" class="mt-4 inline-flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
               <IconLoader class="h-4 w-4 animate-spin" />
-              Creating demo data
+              {{ t('app-onboarding-choice-demo-loading') }}
             </p>
           </button>
         </div>
 
-        <div v-else-if="flowStep === 'install' && createdApp" class="space-y-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <div v-else-if="flowStep === 'install' && createdApp" class="space-y-5 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900 dark:shadow-none">
           <div class="flex flex-wrap items-start justify-between gap-4">
             <div>
               <p class="text-sm font-semibold uppercase tracking-[0.18em] text-azure-500">
-                CLI onboarding
+                {{ t('app-onboarding-install-badge') }}
               </p>
-              <h2 class="mt-2 text-2xl font-semibold text-slate-900">
-                Finish setup in your app
+              <h2 class="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-50">
+                {{ t('app-onboarding-install-title') }}
               </h2>
-              <p class="mt-2 max-w-2xl text-sm text-slate-600">
-                Run the init command in the app project. The upcoming CLI change can detect this pending app and reuse it instead of creating a second app in Capgo.
+              <p class="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
+                {{ t('app-onboarding-install-subtitle') }}
               </p>
             </div>
             <button class="d-btn d-btn-outline" @click="openDashboard">
-              Open dashboard
+              {{ t('app-onboarding-open-dashboard') }}
             </button>
           </div>
 
-          <div class="rounded-2xl bg-black p-5">
-            <code class="block whitespace-pre-wrap break-all text-sm text-pumpkin-orange-700">{{ cliCommand }}</code>
+          <div
+            class="group relative cursor-pointer rounded-2xl bg-black p-5 pr-14 ring-1 ring-white/10 transition hover:ring-white/20 dark:bg-slate-950"
+            role="button"
+            tabindex="0"
+            @click="copyCliCommand"
+            @keydown.enter.prevent="copyCliCommand"
+            @keydown.space.prevent="copyCliCommand"
+          >
+            <code class="block whitespace-pre-wrap break-all text-sm">
+              <span class="text-slate-500">npx</span>
+              <span class="text-sky-300"> @capgo/cli@latest</span>
+              <span class="text-violet-300"> i</span>
+              <span class="text-emerald-300"> {{ apiKey ?? '[APIKEY]' }}</span>
+              <template v-for="(arg, index) in cliCommandArgs" :key="`${arg}-${index}`">
+                <span :class="index % 2 === 0 ? 'text-amber-300' : 'text-cyan-300'"> {{ arg }}</span>
+              </template>
+            </code>
+            <IconCopy class="absolute right-4 top-4 h-5 w-5 text-muted-blue-300 transition group-hover:text-white" />
           </div>
 
-          <div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700">
-            <p class="font-medium text-slate-900">
-              What happens next
+          <div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700 dark:bg-slate-950/60 dark:text-slate-300">
+            <p class="font-medium text-slate-900 dark:text-slate-100">
+              {{ t('app-onboarding-next-title') }}
             </p>
             <ul class="mt-3 space-y-2">
               <li class="flex gap-3">
                 <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
-                {{ createdApp.existing_app ? 'The CLI should attach Capgo to your existing project without scaffolding a new Capacitor app.' : 'The CLI can scaffold the local Capacitor app with the generated app ID if you do not have one yet.' }}
+                {{ createdApp.existing_app
+                  ? t('app-onboarding-next-existing')
+                  : t('app-onboarding-next-new') }}
               </li>
               <li class="flex gap-3">
                 <IconCheck class="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
-                When the CLI marks onboarding as completed, the temporary onboarding data can be cleared automatically before the first real upload continues.
+                {{ t('app-onboarding-next-cleanup') }}
               </li>
             </ul>
           </div>
 
           <div class="flex flex-wrap gap-3">
             <button class="d-btn d-btn-primary" @click="openDashboard">
-              I’ll do the CLI later
+              {{ t('app-onboarding-install-later') }}
             </button>
             <button class="d-btn d-btn-outline" @click="flowStep = 'choice'">
-              Back
+              {{ t('button-back') }}
             </button>
           </div>
         </div>
