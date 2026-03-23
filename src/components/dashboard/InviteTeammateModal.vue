@@ -10,17 +10,17 @@ import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
 import { resolveInviteNewUserErrorMessage } from '~/utils/invites'
 
-const props = withDefaults(defineProps<{
-  inviteKind?: 'generic' | 'technical'
-}>(), {
-  inviteKind: 'generic',
-})
-
 interface InviteSuccessPayload {
   email: string
   firstName: string
   lastName: string
 }
+
+const props = withDefaults(defineProps<{
+  inviteKind?: 'generic' | 'technical'
+}>(), {
+  inviteKind: 'generic',
+})
 
 const emit = defineEmits<{
   success: [payload: InviteSuccessPayload]
@@ -42,11 +42,11 @@ const isInviting = ref(false)
 const useRbacInvites = computed(() => organizationStore.currentOrganization?.use_new_rbac === true)
 const inviteRole = computed(() => (useRbacInvites.value ? 'org_admin' : 'admin'))
 const emailDialogTitle = computed(() => props.inviteKind === 'technical'
-  ? t('onboarding-invite-option-modal-title', 'Invite a technical teammate')
-  : t('invite-teammate-modal-title', 'Invite a teammate'))
+  ? t('onboarding-invite-option-modal-title')
+  : t('invite-teammate-modal-title'))
 const emailDialogDescription = computed(() => props.inviteKind === 'technical'
-  ? t('onboarding-invite-option-dialog-desc', 'We will email them detailed instructions to create the first app for this organization.')
-  : t('invite-teammate-modal-description', 'Invite a teammate now or finish onboarding and do it later from the members page.'))
+  ? t('onboarding-invite-option-dialog-desc')
+  : t('invite-teammate-modal-description'))
 
 // Dialog state tracking
 const isEmailDialogOpen = ref(false)
@@ -73,7 +73,7 @@ function showEmailDialog() {
       },
       {
         id: 'invite-email-next',
-        text: t('button-next', 'Next'),
+        text: t('button-next'),
         role: 'primary',
         preventClose: true,
         handler: () => {
@@ -95,8 +95,8 @@ function showFullDetailsDialog() {
   isFullDetailsDialogOpen.value = true
 
   dialogStore.openDialog({
-    title: t('invite-new-user-dialog-header', 'Invite teammate'),
-    description: t('invite-new-user-dialog-description', 'Add a few details so we can send the invitation and create their account if needed.'),
+    title: t('invite-new-user-dialog-header'),
+    description: t('invite-new-user-dialog-description'),
     size: 'lg',
     preventAccidentalClose: true,
     buttons: [
@@ -135,8 +135,8 @@ function updateEmailDialogButton(loading: boolean) {
     return
   submitButton.disabled = loading
   submitButton.text = loading
-    ? t('checking', 'Checking...')
-    : t('button-next', 'Next')
+    ? t('checking')
+    : t('button-next')
 }
 
 function updateFullDetailsButton() {
@@ -189,12 +189,12 @@ async function handleEmailSubmit() {
   const email = inviteEmail.value.trim().toLowerCase()
 
   if (!email) {
-    toast.error(t('missing-email', 'Email is required'))
+    toast.error(t('missing-email'))
     return
   }
 
   if (!validateEmail(email)) {
-    toast.error(t('invalid-email', 'Invalid email'))
+    toast.error(t('invalid-email'))
     return
   }
 
@@ -232,17 +232,17 @@ async function handleEmailSubmit() {
 
     if (error) {
       console.error('Error inviting user:', error)
-      toast.error(t('error-inviting-user', 'Error inviting user'))
+      toast.error(t('error-inviting-user'))
       return
     }
 
     if (!data) {
-      toast.error(t('invitation-failed', 'Invitation failed'))
+      toast.error(t('invitation-failed'))
       return
     }
 
     if (data === 'OK') {
-      toast.success(t('org-invited-user', 'User has been invited successfully'))
+      toast.success(t('org-invited-user'))
       completeInviteSuccess({
         email,
         firstName: '',
@@ -254,7 +254,7 @@ async function handleEmailSubmit() {
     if (data === 'NO_EMAIL') {
       // User doesn't exist, show full details dialog
       if (!captchaKey.value) {
-        toast.error(t('captcha-not-available', 'Captcha verification is not configured in this environment.'))
+        toast.error(t('captcha-not-available'))
         return
       }
       showFullDetailsDialog()
@@ -262,22 +262,22 @@ async function handleEmailSubmit() {
     }
 
     if (data === 'ALREADY_INVITED') {
-      toast.error(t('user-already-invited', 'This user is already invited'))
+      toast.error(t('user-already-invited'))
     }
     else if (data === 'TOO_RECENT_INVITATION_CANCELATION') {
-      toast.error(t('too-recent-invitation-cancelation', 'An invitation was cancelled recently. Please wait a bit longer.'))
+      toast.error(t('too-recent-invitation-cancelation'))
     }
     else if (data === 'CAN_NOT_INVITE_OWNER') {
-      toast.error(t('cannot-invite-owner', 'You cannot invite the owner of the account'))
+      toast.error(t('cannot-invite-owner'))
     }
     else if (data === 'RBAC_NOT_ENABLED' || data === 'ROLE_NOT_FOUND') {
-      toast.error(t('invitation-failed', 'Invitation failed'))
+      toast.error(t('invitation-failed'))
     }
     else if (data === 'NO_RIGHTS') {
-      toast.error(t('no-permission', 'You do not have permission to invite members'))
+      toast.error(t('no-permission'))
     }
     else {
-      toast.error(`${t('unexpected-invitation-response', 'Unexpected invitation response')}: ${data}`)
+      toast.error(`${t('unexpected-invitation-response')}: ${data}`)
     }
   }
   finally {
@@ -295,17 +295,17 @@ async function handleFullDetailsSubmit() {
   const lastName = inviteLastName.value.trim()
 
   if (!firstName) {
-    toast.error(t('first-name-required', 'First name is required'))
+    toast.error(t('first-name-required'))
     return
   }
 
   if (!lastName) {
-    toast.error(t('last-name-required', 'Last name is required'))
+    toast.error(t('last-name-required'))
     return
   }
 
   if (shouldUseCaptcha.value && !inviteCaptchaToken.value) {
-    toast.error(t('captcha-required', 'Captcha verification is required'))
+    toast.error(t('captcha-required'))
     return
   }
 
@@ -334,11 +334,11 @@ async function handleFullDetailsSubmit() {
       const errorMessage = await resolveInviteNewUserErrorMessage(error, t, {
         cancelledFallback: 'An invitation was cancelled recently. Please wait a bit longer.',
       })
-      toast.error(errorMessage ?? t('invitation-failed', 'Invitation failed'))
+      toast.error(errorMessage ?? t('invitation-failed'))
       return
     }
 
-    toast.success(t('org-invited-user', 'User has been invited successfully'))
+    toast.success(t('org-invited-user'))
     completeInviteSuccess({
       email,
       firstName,
@@ -370,7 +370,7 @@ defineExpose({
     <form @submit.prevent="handleEmailSubmit">
       <div>
         <label for="invite-email" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-200">
-          {{ t('email', 'Email') }}
+          {{ t('email') }}
         </label>
         <input
           id="invite-email"
@@ -392,7 +392,7 @@ defineExpose({
       <!-- Email (not editable) -->
       <div>
         <label for="invite-email-readonly" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-200">
-          {{ t('email', 'Email') }}
+          {{ t('email') }}
         </label>
         <input
           id="invite-email-readonly"
@@ -405,7 +405,7 @@ defineExpose({
       <div class="grid gap-4 sm:grid-cols-2">
         <div>
           <label for="invite-first-name" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-200">
-            {{ t('first-name', 'First name') }}
+            {{ t('first-name') }}
           </label>
           <input
             id="invite-first-name"
@@ -419,7 +419,7 @@ defineExpose({
         </div>
         <div>
           <label for="invite-last-name" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-200">
-            {{ t('last-name', 'Last name') }}
+            {{ t('last-name') }}
           </label>
           <input
             id="invite-last-name"
@@ -444,7 +444,7 @@ defineExpose({
         </div>
       </template>
       <p class="text-sm text-gray-500 dark:text-gray-400">
-        {{ t('invite-new-user-dialog-helper', 'We will invite this teammate to the organization. If they do not have an account yet, Capgo will create one from this information.') }}
+        {{ t('invite-new-user-dialog-helper') }}
       </p>
       <button type="submit" class="hidden" tabindex="-1" aria-hidden="true" />
     </form>
