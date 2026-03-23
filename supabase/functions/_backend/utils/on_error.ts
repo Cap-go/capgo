@@ -3,6 +3,7 @@ import type { SimpleErrorResponse } from './hono.ts'
 import { DrizzleError, entityKind, TransactionRollbackError } from 'drizzle-orm'
 import { sendDiscordAlert500 } from './discord.ts'
 import { cloudlogErr, serializeError } from './logging.ts'
+import { capturePosthogException } from './posthog.ts'
 import { backgroundTask } from './utils.ts'
 
 const drizzleErrorNames = new Set(['DrizzleError', 'DrizzleQueryError', 'TransactionRollbackError'])
@@ -117,7 +118,18 @@ export function onError(functionName: string) {
       if (e.status >= 500) {
         await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
       }
-      c.get('sentry')?.captureException(e)
+      await backgroundTask(c, capturePosthogException(c, e, {
+        handled: e.status < 500,
+        additionalProperties: {
+          function_name: functionName,
+          request_id: c.get('requestId'),
+          method: c.req.method,
+          url: c.req.url,
+          http_status: e.status,
+          error_code: res.error,
+          error_message: res.message,
+        },
+      }))
       return c.json(res, e.status)
     }
     if (isDrizzleError) {
@@ -135,7 +147,17 @@ export function onError(functionName: string) {
         },
       })
       await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
-      c.get('sentry')?.captureException(e)
+      await backgroundTask(c, capturePosthogException(c, e, {
+        handled: false,
+        additionalProperties: {
+          function_name: functionName,
+          request_id: c.get('requestId'),
+          method: c.req.method,
+          url: c.req.url,
+          http_status: 500,
+          error_kind: 'drizzle_error',
+        },
+      }))
       return c.json(defaultResponse, 500)
     }
     // Non-HTTP errors: log with stack and return 500
@@ -149,7 +171,17 @@ export function onError(functionName: string) {
       stack: serializeError(e)?.stack ?? 'N/A',
     })
     await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
-    c.get('sentry')?.captureException(e)
+    await backgroundTask(c, capturePosthogException(c, e, {
+      handled: false,
+      additionalProperties: {
+        function_name: functionName,
+        request_id: c.get('requestId'),
+        method: c.req.method,
+        url: c.req.url,
+        http_status: 500,
+        error_kind: 'unhandled_error',
+      },
+    }))
     return c.json(defaultResponse, 500)
   }
 }

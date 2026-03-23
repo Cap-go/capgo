@@ -4,7 +4,6 @@
     "jsr:@bradenmacdonald/s3-lite-client@0.9.4": "0.9.4",
     "jsr:@std/semver@1.0.6": "1.0.6",
     "npm:@cloudflare/workers-types@4.20251014.0": "4.20251014.0",
-    "npm:@hono/sentry@1.2.2": "1.2.2_hono@4.11.3",
     "npm:@supabase/supabase-js@2.81.1": "2.81.1",
     "npm:@types/pg@*": "8.16.0",
     "npm:cron-schedule@5.0.4": "5.0.4",
@@ -26,29 +25,6 @@
   "npm": {
     "@cloudflare/workers-types@4.20251014.0": {
       "integrity": "sha512-tEW98J/kOa0TdylIUOrLKRdwkUw0rvvYVlo+Ce0mqRH3c8kSoxLzUH9gfCvwLe0M89z1RkzFovSKAW2Nwtyn3w=="
-    },
-    "@hono/sentry@1.2.2_hono@4.11.3": {
-      "integrity": "sha512-027grZBrRGDPor8mRd+QOBcSpUlF07YrTp/WFDXZhbvWZ+1LrZdERUqcdg1gBGDUTanHhd9ucblpNNN6+V1bxg==",
-      "dependencies": [
-        "hono",
-        "toucan-js"
-      ]
-    },
-    "@sentry/core@8.9.2": {
-      "integrity": "sha512-ixm8NISFlPlEo3FjSaqmq4nnd13BRHoafwJ5MG+okCz6BKGZ1SexEggP42/QpGvDprUUHnfncG6WUMgcarr1zA==",
-      "dependencies": [
-        "@sentry/types",
-        "@sentry/utils"
-      ]
-    },
-    "@sentry/types@8.9.2": {
-      "integrity": "sha512-+LFOyQGl+zk5SZRGZD2MEURf7i5RHgP/mt3s85Rza+vz8M211WJ0YsjkIGUJFSY842nged5QLx4JysLaBlLymg=="
-    },
-    "@sentry/utils@8.9.2": {
-      "integrity": "sha512-A4srR9mEBFdVXwSEKjQ94msUbVkMr8JeFiEj9ouOFORw/Y/ux/WV2bWVD/ZI9wq0TcTNK8L1wBgU8UMS5lIq3A==",
-      "dependencies": [
-        "@sentry/types"
-      ]
     },
     "@supabase/auth-js@2.81.1": {
       "integrity": "sha512-K20GgiSm9XeRLypxYHa5UCnybWc2K0ok0HLbqCej/wRxDpJxToXNOwKt0l7nO8xI1CyQ+GrNfU6bcRzvdbeopQ==",
@@ -295,14 +271,6 @@
         "qs"
       ]
     },
-    "toucan-js@4.1.1": {
-      "integrity": "sha512-GTPwEaCRN8IbYe5/VeGiwxYvMO0dKaC16fTeLbF+QGswjkLZ9JUqAfDhLMyH2SWukYhmetH+uxWa1Bhluv/evQ==",
-      "dependencies": [
-        "@sentry/core",
-        "@sentry/types",
-        "@sentry/utils"
-      ]
-    },
     "tslib@2.8.1": {
       "integrity": "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w=="
     },
@@ -324,7 +292,6 @@
       "jsr:@bradenmacdonald/s3-lite-client@0.9.4",
       "jsr:@std/semver@1.0.6",
       "npm:@cloudflare/workers-types@4.20251014.0",
-      "npm:@hono/sentry@1.2.2",
       "npm:@logsnag/node@1.0.1",
       "npm:@supabase/supabase-js@2.81.1",
       "npm:@types/pg@8.15.6",

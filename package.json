@@ -84,7 +84,7 @@
     "deploy:cloudflare:console:preprod": "wrangler deploy --env=preprod",
     "deploy:cloudflare:console:dev": "wrangler deploy --env=dev",
     "deploy:cloudflare:prod": "bun run deploy:cloudflare:api:prod && bun run deploy:cloudflare:files:prod && bun run deploy:cloudflare:plugins:prod",
-    "deploy:cloudflare:api:prod": "bunx wrangler deploy --config cloudflare_workers/api/wrangler.jsonc --env=prod --minify --outdir dist --upload-source-maps --var SENTRY_RELEASE:$(sentry-cli releases propose-version)",
+    "deploy:cloudflare:api:prod": "bunx wrangler deploy --config cloudflare_workers/api/wrangler.jsonc --env=prod --minify --outdir dist --upload-source-maps",
     "deploy:cloudflare:files:prod": "bunx wrangler deploy --config cloudflare_workers/files/wrangler.jsonc --env=prod --minify",
     "deploy:cloudflare:preprod": "bun run deploy:cloudflare:api:preprod && bun run deploy:cloudflare:files:preprod && bun run deploy:cloudflare:plugin:preprod",
     "deploy:cloudflare:api:preprod": "bunx wrangler deploy --config cloudflare_workers/api/wrangler.jsonc --env=preprod --minify",
@@ -126,9 +126,7 @@
     "deploy:supabase_env:prod": "bunx supabase secrets set --project-ref xvwzpoazmxkqosrdewyv --env-file internal/cloudflare/.env.prod",
     "deploy:supabase_env:preprod": "bunx supabase secrets set --project-ref aucsybvnhavogdmzwtcw --env-file internal/cloudflare/.env.preprod",
     "deploy:supabase_env:dev": "bunx supabase secrets set --project-ref aucsybvnhavogdmzwtcw --env-file internal/cloudflare/.env.alpha",
-    "size": "bunx vite-bundle-visualizer",
-    "sentry:sourcemaps": "_SENTRY_RELEASE=$(sentry-cli releases propose-version) && sentry-cli releases new $_SENTRY_RELEASE --org=forgr-cu --project=capgo-cloudflare && sentry-cli sourcemaps upload --org=forgr-cu --project=capgo-cloudflare --release=$_SENTRY_RELEASE --strip-prefix 'cloudflare_workers/api/dist/..' cloudflare_workers/api/dist",
-    "postdeploy:cloudflare:api:prod": "bun run sentry:sourcemaps"
+    "size": "bunx vite-bundle-visualizer"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1008.0",
@@ -178,12 +176,10 @@
     "@formkit/icons": "^1.7.2",
     "@formkit/themes": "1.6.9",
     "@formkit/vue": "1.6.9",
-    "@hono/sentry": "1.2.2",
     "@iconify-json/simple-icons": "^1.2.73",
     "@intlify/unplugin-vue-i18n": "^11.0.7",
     "@logsnag/node": "1.0.1",
     "@revenuecat/purchases-capacitor": "11.2.13",
-    "@sentry/cli": "^2.58.5",
     "@std/semver": "npm:@jsr/std__semver@1.0.8",
     "@supabase/supabase-js": "2.93.3",
     "@tailwindcss/forms": "^0.5.11",
@@ -289,7 +285,6 @@
     "pre-commit": "bun typecheck"
   },
   "trustedDependencies": [
-    "@sentry/cli",
     "supabase",
     "core-js"
   ]

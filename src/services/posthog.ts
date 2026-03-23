@@ -63,6 +63,14 @@ export function pushEvent(nameEvent: string, supaHost: string, properties?: Post
   posthog.capture(nameEvent, properties)
 }
 
+export function captureException(error: unknown, supaHost: string, properties?: PostHogProperties): void {
+  if (isLocal(supaHost))
+    return
+  if (typeof posthog === 'undefined' || typeof posthog.captureException !== 'function')
+    return
+  posthog.captureException(error, properties)
+}
+
 export function setUser(uuid: string, data: {
   nickname?: string
   phone?: string

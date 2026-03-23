@@ -6,7 +6,7 @@ import { setupLayouts } from 'virtual:generated-layouts'
 import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import { routes } from 'vue-router/auto-routes'
-import { posthogLoader } from '~/services/posthog'
+import { captureException, posthogLoader } from '~/services/posthog'
 import { getLocalConfig } from '~/services/supabase'
 
 import App from './App.vue'
@@ -16,6 +16,9 @@ import { initPlausible } from './services/plausible'
 import { getRemoteConfig } from './services/supabase'
 // your custom styles here
 import './styles/style.css'
+
+const config = getLocalConfig()
+posthogLoader(config.supaHost)
 
 // Handle chunk load errors (stale chunks after deployment)
 // When a new version is deployed, old chunk URLs return 404/HTML instead of JS
@@ -38,8 +41,20 @@ function isChunkLoadError(message: string | undefined): boolean {
 }
 
 window.addEventListener('error', (event) => {
-  if (isChunkLoadError(event.message))
+  if (isChunkLoadError(event.message)) {
     handleChunkError(event.message)
+    return
+  }
+
+  const error = event.error instanceof Error
+    ? event.error
+    : new Error(event.message || 'Unknown window error')
+  captureException(error, config.supaHost, {
+    source: 'window.error',
+    filename: event.filename || null,
+    lineno: event.lineno || null,
+    colno: event.colno || null,
+  })
 }, true)
 
 // Also handle unhandled promise rejections for dynamic imports
@@ -48,13 +63,31 @@ window.addEventListener('unhandledrejection', (event) => {
   if (isChunkLoadError(message)) {
     event.preventDefault()
     handleChunkError(message)
+    return
   }
+
+  const reason = event.reason instanceof Error ? event.reason : new Error(message)
+  captureException(reason, config.supaHost, {
+    source: 'window.unhandledrejection',
+  })
 })
 
 const guestPath = ['/login', '/delete_account', '/confirm-signup', '/forgot_password', '/resend_email', '/onboarding', '/register', '/invitation', '/scan', '/sso-callback']
 
 getRemoteConfig()
 const app = createApp(App)
+app.config.errorHandler = (error, instance, info) => {
+  const component = instance?.$options?.name
+    || instance?.$?.type?.__name
+    || instance?.$?.type?.name
+
+  captureException(error, config.supaHost, {
+    source: 'vue.errorHandler',
+    vue_info: info,
+    vue_component: typeof component === 'string' ? component : null,
+  })
+  console.error(error)
+}
 CapacitorUpdater.notifyAppReady()
 console.log(`Capgo Version : "${import.meta.env.VITE_APP_VERSION}"`)
 // setup up pages with layouts
@@ -111,9 +144,7 @@ router.beforeEach((to, from, next) => {
   next()
 })
 
-const config = getLocalConfig()
 initPlausible(import.meta.env.pls_domain as string)
-posthogLoader(config.supaHost)
 
 // install all modules under `modules/`
 type UserModule = (ctx: { app: typeof app, router: Router }) => void

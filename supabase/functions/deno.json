@@ -1,7 +1,6 @@
 {
   "imports": {
     "@cloudflare/workers-types": "npm:@cloudflare/workers-types@4.20251014.0",
-    "@hono/sentry": "npm:@hono/sentry@1.2.2",
     "hono": "npm:hono@^4.10.2",
     "hono/": "npm:/hono@^4.10.2/",
     "stripe": "npm:stripe@19.3.0",
