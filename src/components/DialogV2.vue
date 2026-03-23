@@ -27,6 +27,28 @@ const sizeClasses = {
   xl: 'max-w-xl',
 }
 
+function getButtonClasses(button: DialogV2Button) {
+  const baseClasses = 'd-btn'
+
+  const roleClasses = {
+    primary: 'd-btn-primary',
+    secondary: 'd-btn-secondary',
+    danger: 'd-btn-warning',
+    cancel: 'd-btn-outline',
+    default: '',
+  } as const
+
+  const stateClasses = button.disabled
+    ? 'cursor-not-allowed opacity-70'
+    : 'cursor-pointer'
+
+  return [
+    baseClasses,
+    roleClasses[button.role ?? 'default'],
+    stateClasses,
+  ]
+}
+
 function close(button?: DialogV2Button) {
   dialogStore.closeDialog(button)
 }
@@ -88,7 +110,7 @@ onUnmounted(() => {
 
 <template>
   <Teleport to="body">
-    <div v-if="dialogStore.showDialog" class="fixed inset-0 z-50 flex items-center justify-center">
+    <div v-if="dialogStore.showDialog" data-theme="capgolight" class="fixed inset-0 z-50 flex items-center justify-center">
       <!-- Backdrop -->
       <div
         class="fixed inset-0 bg-black/50"
@@ -98,7 +120,6 @@ onUnmounted(() => {
 
       <!-- Dialog -->
       <div
-        data-theme="light"
         class="overflow-y-auto relative mx-4 w-full bg-white rounded-lg shadow-xl max-h-[90vh]"
         :class="[
           sizeClasses[dialogStore.dialogOptions?.size || 'md'],
@@ -140,15 +161,7 @@ onUnmounted(() => {
               <button
                 v-if="!button.href"
                 type="button"
-                :class="{
-                  'd-btn d-btn-primary': button.role === 'primary',
-                  'd-btn d-btn-secondary': button.role === 'secondary',
-                  'd-btn d-btn-warning': button.role === 'danger',
-                  'd-btn d-btn-outline': button.role === 'cancel',
-                  'd-btn': !button.role,
-                  'cursor-pointer!': !button.disabled,
-                  'opacity-70 cursor-not-allowed': button.disabled,
-                }"
+                :class="getButtonClasses(button)"
                 :disabled="button.disabled"
                 @click="handleButtonClick(button, $event)"
               >
@@ -160,16 +173,7 @@ onUnmounted(() => {
                 :href="button.href"
                 :target="button.target"
                 :rel="normalizeRel(button.rel, button.target)"
-                :class="{
-                  'd-btn d-btn-primary': button.role === 'primary',
-                  'd-btn d-btn-secondary': button.role === 'secondary',
-                  'd-btn d-btn-warning': button.role === 'danger',
-                  'd-btn d-btn-outline': button.role === 'cancel',
-                  'd-btn': !button.role,
-                  'cursor-pointer!': !button.disabled,
-                  'opacity-70 cursor-not-allowed': button.disabled,
-                  'pointer-events-none': button.disabled,
-                }"
+                :class="[getButtonClasses(button), button.disabled ? 'pointer-events-none' : '']"
                 :aria-disabled="button.disabled || undefined"
                 :tabindex="button.disabled ? -1 : undefined"
                 @click="handleButtonClick(button, $event)"
