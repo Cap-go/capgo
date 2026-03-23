@@ -4,6 +4,7 @@ import { storeToRefs } from 'pinia'
 import { onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
+import IconSettings from '~icons/lucide/settings'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -18,15 +19,14 @@ const { t } = useI18n()
 const supabase = useSupabase()
 const main = useMainStore()
 const dropdown = useTemplateRef('dropdown')
-const hasNewInvitation = ref(false)
 const hasVisibleOrganizations = computed(() => organizationStore.organizations.length > 0)
 const currentLabel = computed(() => currentOrganization.value?.name ?? t('select-organization'))
+const invitationCount = computed(() => organizationStore.organizations.filter(org => org.role.startsWith('invite')).length)
 
 onClickOutside(dropdown, () => closeDropdown())
 
 onMounted(async () => {
   await organizationStore.fetchOrganizations()
-  hasNewInvitation.value = organizationStore.organizations.some(org => org.role.startsWith('invite'))
 })
 
 async function handleOrganizationInvitation(org: Organization) {
@@ -125,8 +125,26 @@ async function createNewOrg() {
   })
 }
 
+async function openOrganizationSettings(org: Organization, e: MouseEvent) {
+  e.preventDefault()
+  e.stopPropagation()
+
+  if (org.role.startsWith('invite'))
+    return
+
+  if (!isSelected(org))
+    organizationStore.setCurrentOrganization(org.gid)
+
+  closeDropdown()
+  await router.push('/settings/organization')
+}
+
 function isSelected(org: Organization) {
   return !!(currentOrganization.value && org.gid === currentOrganization.value.gid)
+}
+
+function isInvitation(org: Organization) {
+  return org.role.startsWith('invite')
 }
 
 function acronym(name: string) {
@@ -153,7 +171,7 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
   <div>
     <details v-if="hasVisibleOrganizations" ref="dropdown" class="w-full d-dropdown d-dropdown-end">
       <summary class="justify-between shadow-none w-full d-btn d-btn-sm border border-gray-700 text-white bg-[#1a1d24] hover:bg-gray-700 hover:text-white active:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-800">
-        <div class="flex items-center w-4/5 text-left">
+        <div class="flex flex-1 items-center min-w-0 text-left">
           <img
             v-if="currentOrganization?.logo"
             :src="currentOrganization.logo"
@@ -167,11 +185,17 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
             {{ acronym(currentLabel) }}
           </div>
           <span class="truncate">{{ currentLabel }}</span>
-          <div v-if="hasNewInvitation" class="w-3 h-3 ml-1 bg-red-500 rounded-full" />
+          <div
+            v-if="invitationCount > 0"
+            class="inline-flex items-center gap-1 px-2 py-0.5 ml-2 text-[11px] font-medium rounded-full border border-amber-400/30 bg-amber-500/10 text-amber-200 shrink-0"
+          >
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-300" />
+            <span>{{ invitationCount }}</span>
+          </div>
         </div>
         <IconDown class="w-6 h-6 ml-1 fill-current shrink-0 text-slate-400" />
       </summary>
-      <div class="flex flex-col w-52 max-h-[60vh] shadow d-dropdown-content bg-[#1a1d24] rounded-box z-1 text-white" @click="closeDropdown()">
+      <div class="flex flex-col w-full min-w-0 max-h-[60vh] shadow d-dropdown-content bg-[#1a1d24] rounded-box z-1 text-white" @click="closeDropdown()">
         <ul class="flex-1 overflow-y-auto p-2 cursor-pointer">
           <li
             v-for="org in organizationStore.organizations"
@@ -179,13 +203,14 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
             class="block px-1 my-1 rounded-lg"
             :class="isSelected(org) ? 'bg-gray-700' : 'hover:bg-gray-600'"
           >
-            <a
-              class="flex items-center justify-between px-3 py-3 text-white rounded-md"
-              :class="isSelected(org) ? 'cursor-default' : 'cursor-pointer'"
-              :aria-current="isSelected(org) ? 'true' : undefined"
-              @click="onOrgItemClick(org, $event)"
-            >
-              <div class="flex items-center min-w-0">
+            <div class="flex items-center gap-2 px-3 py-3 text-white rounded-md">
+              <button
+                class="flex flex-1 items-center min-w-0 text-left"
+                :class="isSelected(org) ? 'cursor-default' : 'cursor-pointer'"
+                :aria-current="isSelected(org) ? 'true' : undefined"
+                type="button"
+                @click="onOrgItemClick(org, $event)"
+              >
                 <img
                   v-if="org.logo"
                   :src="org.logo"
@@ -198,12 +223,27 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
                 >
                   {{ acronym(org.name) }}
                 </div>
-                <span class="truncate">{{ org.name }}</span>
+                <span class="block truncate">{{ org.name }}</span>
+              </button>
+              <div class="flex items-center justify-end min-w-0 shrink-0">
+                <span
+                  v-if="isInvitation(org)"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full border border-amber-400/25 bg-amber-500/8 text-amber-200"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-300" />
+                  {{ t('sso-status-pending') }}
+                </span>
+                <button
+                  v-else
+                  type="button"
+                  class="flex items-center justify-center w-8 h-8 rounded-md cursor-pointer text-slate-300 transition-colors hover:bg-slate-500/30 hover:text-white"
+                  :aria-label="`${t('settings')} ${org.name}`"
+                  @click="openOrganizationSettings(org, $event)"
+                >
+                  <IconSettings class="w-4 h-4" />
+                </button>
               </div>
-              <div class="flex items-center gap-2">
-                <div v-if="org.role.startsWith('invite')" class="w-3 h-3 bg-red-500 rounded-full" />
-              </div>
-            </a>
+            </div>
           </li>
         </ul>
         <div class="p-2 border-t border-gray-700">

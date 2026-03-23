@@ -1,4 +1,4 @@
-import type { R2HTTPMetadata, R2UploadedPart } from '@cloudflare/workers-types'
+import type { R2UploadedPart } from '@cloudflare/workers-types'
 import type { Context } from 'hono'
 import type { BlankSchema } from 'hono/types'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
