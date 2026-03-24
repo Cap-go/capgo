@@ -6,7 +6,6 @@ import { quickError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { sendNotifToOrgMembers } from './org_email_notifications.ts'
 import { syncSubscriptionData } from './stripe.ts'
-import { sendEventToTracking } from './tracking.ts'
 import {
   getCurrentPlanNameOrg,
   getPlanUsageAndFit,
@@ -23,6 +22,7 @@ import {
   set_storage_exceeded,
   supabaseAdmin,
 } from './supabase.ts'
+import { sendEventToTracking } from './tracking.ts'
 import { isStripeConfigured } from './utils.ts'
 
 type CreditMetric = Database['public']['Enums']['credit_metric_type']

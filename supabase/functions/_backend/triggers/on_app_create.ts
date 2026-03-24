@@ -1,5 +1,6 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
+import type { BentoTrackingPayload } from '../utils/tracking.ts'
 import { eq, or } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { createIfNotExistStoreInfo } from '../utils/cloudflare.ts'
@@ -102,8 +103,9 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
     return c.json(BRES)
   }
 
-  const appCreatedBentoEvent = !isDemo && !isPendingOnboarding
-    ? await supabase
+  let appCreatedBentoEvent: BentoTrackingPayload | undefined
+  if (!isDemo && !isPendingOnboarding) {
+    appCreatedBentoEvent = await supabase
       .from('orgs')
       .select('*')
       .eq('id', ownerOrg)
@@ -125,7 +127,7 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
           },
         }
       })
-    : undefined
+  }
 
   await sendEventToTracking(c, {
     bento: appCreatedBentoEvent,

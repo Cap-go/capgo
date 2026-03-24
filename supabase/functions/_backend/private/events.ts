@@ -1,6 +1,7 @@
 import type { TrackOptions } from '@logsnag/node'
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { BentoTrackingPayload } from '../utils/tracking.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
@@ -108,8 +109,10 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   }
 
   const supabase = supabaseWithAuth(c, c.get('auth')!)
-  const onboardingBentoEvent = trackedBody.user_id && appId && trackedBody.event === 'onboarding-step-done'
-    ? await Promise.all([
+
+  let onboardingBentoEvent: BentoTrackingPayload | undefined
+  if (trackedBody.user_id && appId && trackedBody.event === 'onboarding-step-done') {
+    onboardingBentoEvent = await Promise.all([
       supabase
         .from('orgs')
         .select('*')
@@ -137,7 +140,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
         },
       }
     })
-    : undefined
+  }
 
   await sendEventToTracking(c, {
     ...trackedBody,
