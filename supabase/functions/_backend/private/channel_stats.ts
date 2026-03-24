@@ -130,7 +130,7 @@ app.post('/', middlewareAuth, async (c) => {
     throw simpleError('missing_params', 'channel_id and app_id are required')
   }
 
-  const days = Math.min(Math.max(body.days ?? 14, 1), 30)
+  const days = Math.min(Math.max(body.days ?? 3, 1), 7)
 
   if (!(await checkPermission(c, 'app.read', { appId: body.app_id }))) {
     throw simpleError('app_access_denied', 'You can\'t access this app', { app_id: body.app_id })

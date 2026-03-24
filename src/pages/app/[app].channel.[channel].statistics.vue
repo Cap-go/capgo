@@ -127,7 +127,7 @@ const loading = ref(true)
 const statsLoading = ref(true)
 const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
 const stats = ref<ChannelStatsResponse | null>(null)
-const days = ref(14)
+const days = ref(3)
 
 const bundleIdCache = ref<Record<string, number>>({})
 const versionByLabel = computed(() => {
@@ -732,7 +732,7 @@ watchEffect(async () => {
             </h3>
             <div class="flex items-center gap-2">
               <button
-                v-for="d in [7, 14, 30]"
+                v-for="d in [1, 3, 7]"
                 :key="d"
                 class="px-3 py-1 text-sm transition-colors rounded-md"
                 :class="days === d
