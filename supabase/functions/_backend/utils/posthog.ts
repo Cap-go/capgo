@@ -1,7 +1,7 @@
 import type { TrackOptions } from '@logsnag/node'
 import type { Context } from 'hono'
 import { cloudlog, cloudlogErr, serializeError } from './logging.ts'
-import { existInEnv, getEnv } from './utils.ts'
+import { getEnv } from './utils.ts'
 
 const POSTHOG_CAPTURE_URL = 'https://eu.i.posthog.com/capture/'
 const POSTHOG_MAX_CAUSE_RECURSION = 4
@@ -67,7 +67,7 @@ function getPostHogCaptureUrl(c: Context) {
 
 async function sendPostHogCapture(c: Context, body: PostHogCapturePayload) {
   const apiKey = getEnv(c, 'POSTHOG_API_KEY')
-  if (!apiKey || !existInEnv(c, 'POSTHOG_API_KEY')) {
+  if (!apiKey) {
     cloudlog({ requestId: c.get('requestId'), message: 'PostHog not configured' })
     return false
   }
@@ -102,7 +102,20 @@ async function sendPostHogCapture(c: Context, body: PostHogCapturePayload) {
 }
 
 function parseIntOrUndefined(input: string | undefined): number | undefined {
-  return Number.parseInt(input || '', 10) || undefined
+  if (input === undefined)
+    return undefined
+
+  const parsed = Number.parseInt(input, 10)
+  return Number.isNaN(parsed) ? undefined : parsed
+}
+
+function safeDecodeUri(value: string): string {
+  try {
+    return decodeURI(value)
+  }
+  catch {
+    return value
+  }
 }
 
 function isIntegerString(input: string) {
@@ -202,7 +215,7 @@ function parseNodeStackTrace(stack: string, skipFirstLines = 0): PostHogStackFra
         in_app: filenameIsInApp(filename || '', isNative),
       }
       if (filename)
-        frame.filename = decodeURI(filename)
+        frame.filename = safeDecodeUri(filename)
       if (functionName)
         frame.function = functionName
       if (parsedLocation.lineno !== undefined)
