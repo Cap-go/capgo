@@ -240,7 +240,10 @@ const currentVersionDataset = computed(() => {
   return stats.value.datasets.find(dataset => dataset.label === stats.value?.currentVersion) ?? null
 })
 
-const selectedPeriodLabel = computed(() => t('last-n-days', { days: days.value }))
+const requestedDays = computed(() => days.value === 1 ? 2 : days.value)
+const selectedPeriodLabel = computed(() => days.value === 1
+  ? t('today-vs-yesterday')
+  : t('last-n-days', { days: days.value }))
 
 const periodSummary = computed(() => {
   const dataset = currentVersionDataset.value
@@ -486,7 +489,7 @@ async function fetchStats() {
       body: JSON.stringify({
         channel_id: id.value,
         app_id: packageId.value,
-        days: days.value,
+        days: requestedDays.value,
       }),
     })
 
