@@ -1,39 +1,12 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import type { EmailPreferenceKey, EmailPreferences } from '../utils/org_email_notifications.ts'
 import { Hono } from 'hono/tiny'
-import { trackBentoEvent } from '../utils/bento.ts'
 import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
+import { sendEmailToOrgMembers } from '../utils/org_email_notifications.ts'
 import { findBestPlan } from '../utils/plans.ts'
 import { readStatsVersion } from '../utils/stats.ts'
 import { getCurrentPlanNameOrg, supabaseAdmin } from '../utils/supabase.ts'
-
-/**
- * Check if a user has a specific email preference enabled.
- * Defaults to true if preference is not set.
- */
-async function isEmailPreferenceEnabled(
-  c: Context,
-  email: string,
-  preferenceKey: EmailPreferenceKey,
-): Promise<boolean> {
-  // email_preferences is a JSONB column added in migration 20251228065406
-  const { data: user, error } = await supabaseAdmin(c)
-    .from('users')
-    .select('*')
-    .eq('email', email)
-    .single()
-
-  if (error || !user) {
-    // Default to true if user not found (shouldn't happen)
-    return true
-  }
-
-  const prefs = ((user as any).email_preferences as EmailPreferences | null) ?? {}
-  const prefValue = prefs[preferenceKey]
-  return prefValue === undefined ? true : prefValue
-}
 
 const thresholds = {
   // Number of updates in plain number
@@ -99,6 +72,19 @@ function getFunComparison(comparison: keyof typeof funComparisons, stat: number)
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
+async function getOrgIdForApp(c: Context, appId: string): Promise<string> {
+  const { data: appData, error: appError } = await supabaseAdmin(c)
+    .from('apps')
+    .select('owner_org')
+    .eq('app_id', appId)
+    .single()
+
+  if (appError || !appData?.owner_org)
+    throw simpleError('org_not_found', 'Organization not found for app', { appError, appId })
+
+  return appData.owner_org
+}
+
 app.post('/', middlewareAPISecret, async (c) => {
   const {
     email,
@@ -152,8 +138,6 @@ app.post('/', middlewareAPISecret, async (c) => {
     return await handleBillingPeriodStats(c, email, orgId, cycleStart, cycleEnd)
   }
 
-  // daily_fail_ratio sends to management_email which may not be a registered user
-  // Handle before user existence check (similar to billing_period_stats)
   if (type === 'daily_fail_ratio') {
     if (!appId) {
       throw simpleError('missing_appId', 'Missing appId for daily_fail_ratio', { email, type })
@@ -175,25 +159,16 @@ app.post('/', middlewareAPISecret, async (c) => {
     throw simpleError('missing_appId', 'Missing appId', { email, type })
   }
 
-  // check if email exists
-  const { data: user, error: userError } = await supabaseAdmin(c)
-    .from('users')
-    .select('*')
-    .eq('email', email)
-    .single()
-  if (userError || !user)
-    throw simpleError('user_not_found', 'User not found', { email, userError })
-
   if (type === 'weekly_install_stats') {
-    return await handleWeeklyInstallStats(c, email, appId)
+    return await handleWeeklyInstallStats(c, appId)
   }
   else if (type === 'monthly_create_stats') {
-    return await handleMonthlyCreateStats(c, email, appId)
+    return await handleMonthlyCreateStats(c, appId)
   }
   else if (type === 'deploy_install_stats') {
     return await handleDeployInstallStats(c, {
-      email,
       appId,
+      orgId,
       deployId,
       versionId,
       versionName,
@@ -209,14 +184,7 @@ app.post('/', middlewareAPISecret, async (c) => {
   }
 })
 
-async function handleWeeklyInstallStats(c: Context, email: string, appId: string) {
-  // Check if user has weekly_stats preference enabled
-  const isEnabled = await isEmailPreferenceEnabled(c, email, 'weekly_stats')
-  if (!isEnabled) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Weekly stats email disabled for user', email, appId })
-    return c.json({ status: 'Email preference disabled' }, 200)
-  }
-
+async function handleWeeklyInstallStats(c: Context, appId: string) {
   const supabase = await supabaseAdmin(c)
 
   const { data: weeklyStats, error: generateStatsError } = await supabase.rpc('get_weekly_stats', {
@@ -263,19 +231,12 @@ async function handleWeeklyInstallStats(c: Context, email: string, appId: string
     fun_comparison_3: getFunComparison('appOpen', weeklyStats.open_app),
   }
 
-  await trackBentoEvent(c, email, metadata, 'user:weekly_stats')
+  await sendEmailToOrgMembers(c, 'user:weekly_stats', 'weekly_stats', metadata, await getOrgIdForApp(c, appId))
 
   return c.json(BRES)
 }
 
-async function handleMonthlyCreateStats(c: Context, email: string, appId: string) {
-  // Check if user has monthly_stats preference enabled
-  const isEnabled = await isEmailPreferenceEnabled(c, email, 'monthly_stats')
-  if (!isEnabled) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Monthly stats email disabled for user', email, appId })
-    return c.json({ status: 'Email preference disabled' }, 200)
-  }
-
+async function handleMonthlyCreateStats(c: Context, appId: string) {
   const supabase = await supabaseAdmin(c)
 
   // Calculate the previous month's date range
@@ -312,7 +273,7 @@ async function handleMonthlyCreateStats(c: Context, email: string, appId: string
   }
 
   if (bundleCount > 0 || publishCount > 0) {
-    await trackBentoEvent(c, email, metadata, 'org:monthly_create_stats')
+    await sendEmailToOrgMembers(c, 'org:monthly_create_stats', 'monthly_stats', metadata, await getOrgIdForApp(c, appId))
   }
 
   return c.json(BRES)
@@ -321,8 +282,8 @@ async function handleMonthlyCreateStats(c: Context, email: string, appId: string
 async function handleDeployInstallStats(
   c: Context,
   payload: {
-    email: string
     appId: string
+    orgId?: string
     deployId?: number
     versionId?: number
     versionName?: string
@@ -334,8 +295,8 @@ async function handleDeployInstallStats(
   },
 ) {
   const {
-    email,
     appId,
+    orgId,
     deployId,
     versionId,
     versionName,
@@ -345,13 +306,6 @@ async function handleDeployInstallStats(
     appName,
     deployedAt,
   } = payload
-
-  // Check if user has deploy_stats_24h preference enabled
-  const isEnabled = await isEmailPreferenceEnabled(c, email, 'deploy_stats_24h')
-  if (!isEnabled) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Deploy install stats email disabled for user', email, appId })
-    return c.json({ status: 'Email preference disabled' }, 200)
-  }
 
   if (!versionId) {
     throw simpleError('missing_version_id', 'Missing versionId', { appId, deployId })
@@ -400,7 +354,7 @@ async function handleDeployInstallStats(
   }
 
   if (installs > 1) {
-    await trackBentoEvent(c, email, metadata, 'bundle:install_stats_24h')
+    await sendEmailToOrgMembers(c, 'bundle:install_stats_24h', 'deploy_stats_24h', metadata, orgId ?? await getOrgIdForApp(c, appId))
   }
 
   return c.json(BRES)
@@ -425,14 +379,7 @@ function formatNumber(num: number): string {
   return num.toLocaleString('en-US')
 }
 
-async function handleBillingPeriodStats(c: Context, email: string, orgId: string, cycleStart?: string, cycleEnd?: string) {
-  // Check if user has billing_period_stats preference enabled
-  const isEnabled = await isEmailPreferenceEnabled(c, email, 'billing_period_stats')
-  if (!isEnabled) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Billing period stats email disabled for user', email, orgId })
-    return c.json({ status: 'Email preference disabled' }, 200)
-  }
-
+async function handleBillingPeriodStats(c: Context, _email: string, orgId: string, cycleStart?: string, cycleEnd?: string) {
   const supabase = await supabaseAdmin(c)
 
   // Get organization info
@@ -463,7 +410,7 @@ async function handleBillingPeriodStats(c: Context, email: string, orgId: string
       .single()
 
     if (cycleError || !cycleInfo) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get cycle info', error: cycleError, metadata: { orgId, email } })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get cycle info', error: cycleError, metadata: { orgId } })
       throw simpleError('cannot_get_cycle_info', 'Cannot get cycle info', { error: cycleError })
     }
 
@@ -481,7 +428,7 @@ async function handleBillingPeriodStats(c: Context, email: string, orgId: string
     .single()
 
   if (metricsError) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get total metrics', error: metricsError, metadata: { orgId, email } })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot get total metrics', error: metricsError, metadata: { orgId } })
     throw simpleError('cannot_get_metrics', 'Cannot get metrics', { error: metricsError })
   }
 
@@ -604,7 +551,7 @@ async function handleBillingPeriodStats(c: Context, email: string, orgId: string
     max_usage_percent: maxUsagePercent.toString(),
   }
 
-  await trackBentoEvent(c, email, metadata, 'org:billing_period_stats')
+  await sendEmailToOrgMembers(c, 'org:billing_period_stats', 'billing_period_stats', metadata, orgId)
 
   return c.json(BRES)
 }
@@ -612,7 +559,6 @@ async function handleBillingPeriodStats(c: Context, email: string, orgId: string
 async function handleDailyFailRatio(
   c: Context,
   payload: {
-    email: string
     appId?: string
     orgId?: string
     appName?: string
@@ -623,7 +569,6 @@ async function handleDailyFailRatio(
   },
 ) {
   const {
-    email,
     appId,
     orgId,
     appName,
@@ -634,14 +579,7 @@ async function handleDailyFailRatio(
   } = payload
 
   if (!appId) {
-    throw simpleError('missing_app_id', 'Missing appId for daily_fail_ratio', { email })
-  }
-
-  // Check if user has daily_fail_ratio preference enabled
-  const isEnabled = await isEmailPreferenceEnabled(c, email, 'daily_fail_ratio')
-  if (!isEnabled) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Daily fail ratio email disabled for user', email, appId })
-    return c.json({ status: 'Email preference disabled' }, 200)
+    throw simpleError('missing_app_id', 'Missing appId for daily_fail_ratio', { orgId })
   }
 
   // Safely handle numeric values and clamp percentages to valid range
@@ -661,12 +599,11 @@ async function handleDailyFailRatio(
     success_percentage: safeSuccessPercentage.toFixed(2),
   }
 
-  await trackBentoEvent(c, email, metadata, 'app:daily_fail_ratio')
+  await sendEmailToOrgMembers(c, 'app:daily_fail_ratio', 'daily_fail_ratio', metadata, orgId ?? await getOrgIdForApp(c, appId))
 
   cloudlog({
     requestId: c.get('requestId'),
     message: 'Daily fail ratio email sent',
-    email,
     appId,
     failPercentage,
   })

@@ -2,15 +2,14 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { eq, or } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
-import { trackBentoEvent } from '../utils/bento.ts'
 import { createIfNotExistStoreInfo } from '../utils/cloudflare.ts'
 import { purgeOnPremCache } from '../utils/cloudflare_cache_purge.ts'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { logsnag } from '../utils/logsnag.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import * as schema from '../utils/postgres_schema.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
+import { sendEventToTracking } from '../utils/tracking.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -103,11 +102,37 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
     return c.json(BRES)
   }
 
-  const LogSnag = logsnag(c)
-  await backgroundTask(c, LogSnag.track({
+  const appCreatedBentoEvent = !isDemo && !isPendingOnboarding
+    ? await supabase
+      .from('orgs')
+      .select('*')
+      .eq('id', ownerOrg)
+      .single()
+      .then(({ data, error }) => {
+        if (error || !data) {
+          throw simpleError('error_fetching_organization', 'Error fetching organization', { error })
+        }
+
+        return {
+          cron: '* * * * *',
+          event: 'app:created',
+          preferenceKey: 'onboarding' as const,
+          uniqId: `app:created:${record.app_id}`,
+          data: {
+            org_id: ownerOrg,
+            org_name: data.name,
+            app_name: record.name,
+          },
+        }
+      })
+    : undefined
+
+  await sendEventToTracking(c, {
+    bento: appCreatedBentoEvent,
     channel: 'app-created',
     event: isDemo ? 'Demo App Created' : isPendingOnboarding ? 'Onboarding App Created' : 'App Created',
     icon: isDemo ? '🎮' : isPendingOnboarding ? '🧭' : '🎉',
+    sentToBento: Boolean(appCreatedBentoEvent),
     user_id: ownerOrg,
     tags: {
       app_id: record.app_id,
@@ -115,7 +140,7 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
       need_onboarding: isPendingOnboarding ? 'true' : 'false',
     },
     notify: false,
-  }))
+  })
 
   // Purge on-prem cache for this app to clear any stale responses
   await backgroundTask(c, purgeOnPremCache(c, record.app_id))
@@ -143,21 +168,6 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
 
   // Skip onboarding emails for demo apps
   if (!isDemo && !isPendingOnboarding) {
-    await backgroundTask(c, supabase
-      .from('orgs')
-      .select('*')
-      .eq('id', ownerOrg)
-      .single()
-      .then(({ data, error }) => {
-        if (error || !data) {
-          throw simpleError('error_fetching_organization', 'Error fetching organization', { error })
-        }
-        return trackBentoEvent(c, data.management_email, {
-          org_id: ownerOrg,
-          org_name: data.name,
-          app_name: record.name,
-        }, 'app:created')
-      }))
     await backgroundTask(c, createIfNotExistStoreInfo(c, {
       app_id: record.app_id,
       updates: 1,

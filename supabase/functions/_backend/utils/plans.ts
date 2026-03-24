@@ -4,9 +4,9 @@ import type { PlanUsage } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
 import { quickError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
-import { logsnag } from './logsnag.ts'
 import { sendNotifToOrgMembers } from './org_email_notifications.ts'
 import { syncSubscriptionData } from './stripe.ts'
+import { sendEventToTracking } from './tracking.ts'
 import {
   getCurrentPlanNameOrg,
   getPlanUsageAndFit,
@@ -315,7 +315,7 @@ async function userAbovePlan(c: Context, org: {
   )
   if (sent) {
     cloudlog({ requestId: c.get('requestId'), message: `user:upgrade_to_${bestPlanKey}`, orgId })
-    await logsnag(c).track({
+    await sendEventToTracking(c, {
       channel: 'usage',
       event: `User need upgrade to ${bestPlanKey}`,
       icon: '⚠️',
@@ -339,7 +339,7 @@ async function userIsAtPlanUsage(c: Context, orgId: string, customerId: string |
     // cron every month
     const sent = await sendNotifToOrgMembers(c, 'user:usage_90_percent_of_plan', 'usage_limit', { percent: percentUsage }, orgId, orgId, '0 0 1 * *', drizzleClient)
     if (sent) {
-      await logsnag(c).track({
+      await sendEventToTracking(c, {
         channel: 'usage',
         event: 'User is at 90% of plan usage',
         icon: '⚠️',
@@ -352,7 +352,7 @@ async function userIsAtPlanUsage(c: Context, orgId: string, customerId: string |
     // cron every month
     const sent = await sendNotifToOrgMembers(c, 'user:usage_70_percent_of_plan', 'usage_limit', { percent: percentUsage }, orgId, orgId, '0 0 1 * *', drizzleClient)
     if (sent) {
-      await logsnag(c).track({
+      await sendEventToTracking(c, {
         channel: 'usage',
         event: 'User is at 70% of plan usage',
         icon: '⚠️',
@@ -364,7 +364,7 @@ async function userIsAtPlanUsage(c: Context, orgId: string, customerId: string |
   else if (percentUsage.total_percent >= 50) {
     const sent = await sendNotifToOrgMembers(c, 'user:usage_50_percent_of_plan', 'usage_limit', { percent: percentUsage }, orgId, orgId, '0 0 1 * *', drizzleClient)
     if (sent) {
-      await logsnag(c).track({
+      await sendEventToTracking(c, {
         channel: 'usage',
         event: 'User is at 50% of plan usage',
         icon: '⚠️',
@@ -446,7 +446,7 @@ export async function handleOrgNotificationsAndEvents(c: Context, org: any, orgI
   else if (!is_onboarded && is_onboarding_needed) {
     const sent = await sendNotifToOrgMembers(c, 'user:need_onboarding', 'onboarding', {}, orgId, orgId, '0 0 1 * *', drizzleClient)
     if (sent) {
-      await logsnag(c).track({
+      await sendEventToTracking(c, {
         channel: 'usage',
         event: 'User need onboarding',
         icon: '🥲',

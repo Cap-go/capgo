@@ -2,14 +2,12 @@ import type { TrackOptions } from '@logsnag/node'
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { trackBentoEvent } from '../utils/bento.ts'
 import { BRES, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
-import { logsnag } from '../utils/logsnag.ts'
-import { trackPosthogEvent } from '../utils/posthog.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { broadcastCLIEvent } from '../utils/realtime_broadcast.ts'
 import { hasOrgRight, hasOrgRightApikey, supabaseWithAuth } from '../utils/supabase.ts'
+import { sendEventToTracking } from '../utils/tracking.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -55,7 +53,7 @@ async function resolveTrackingUserId(
   throw quickError(403, forbiddenError, 'You cannot send events for this organization')
 }
 
-async function canAccessRequestedOrg(c: Context<MiddlewareKeyVariables>, orgId: string) {
+function canAccessRequestedOrg(c: Context<MiddlewareKeyVariables>, orgId: string) {
   const auth = c.get('auth')
   if (!auth?.userId || !orgId) {
     return false
@@ -70,6 +68,7 @@ async function canAccessRequestedOrg(c: Context<MiddlewareKeyVariables>, orgId: 
 
 app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   const body = await parseBody<TrackOptions & { notifyConsole?: boolean }>(c)
+  const { notifyConsole = false, ...trackOptions } = body
   const requestedOrgId = body.notifyConsole && typeof body.user_id === 'string' && body.user_id.length > 0
     ? body.user_id
     : undefined
@@ -78,12 +77,16 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     throw quickError(403, 'Forbidden', 'You cannot send events for this organization')
 
   const requestedUserId = typeof body.user_id === 'string' ? body.user_id : undefined
-  const appId = typeof body.tags?.['app-id'] === 'string' ? body.tags['app-id'] : undefined
+  const appId = typeof body.tags?.['app-id'] === 'string'
+    ? body.tags['app-id']
+    : typeof body.tags?.app_id === 'string'
+      ? body.tags.app_id
+      : undefined
   const trackingUserId = await resolveTrackingUserId(c, requestedUserId, appId, Boolean(body.notifyConsole))
-  const trackedBody = requestedUserId ? { ...body, user_id: trackingUserId } : body
+  const trackedBody = requestedUserId ? { ...trackOptions, user_id: trackingUserId } : trackOptions
 
   // notifyConsole: broadcast to Supabase Realtime only, skip all tracking
-  if (trackedBody.notifyConsole) {
+  if (notifyConsole) {
     if (!requestedOrgId)
       throw simpleError('missing_org_id', 'Missing org ID for console notification')
     if (!(await checkPermission(c, 'org.read', { orgId: requestedOrgId })))
@@ -105,20 +108,8 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   }
 
   const supabase = supabaseWithAuth(c, c.get('auth')!)
-  const ip = c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for')?.split(',')[0]?.trim()
-
-  await backgroundTask(c, logsnag(c).track(trackedBody))
-  await backgroundTask(c, trackPosthogEvent(c, {
-    event: trackedBody.event,
-    user_id: trackingUserId,
-    tags: trackedBody.tags,
-    channel: trackedBody.channel,
-    description: trackedBody.description,
-    ip,
-  }))
-  if (trackedBody.user_id && trackedBody.tags && typeof trackedBody.tags['app-id'] === 'string' && trackedBody.event === 'onboarding-step-done') {
-    const onboardingAppId = trackedBody.tags['app-id']
-    await backgroundTask(c, Promise.all([
+  const onboardingBentoEvent = trackedBody.user_id && appId && trackedBody.event === 'onboarding-step-done'
+    ? await Promise.all([
       supabase
         .from('orgs')
         .select('*')
@@ -127,20 +118,32 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
       supabase
         .from('apps')
         .select('*')
-        .eq('app_id', onboardingAppId)
+        .eq('app_id', appId)
         .single(),
-    ])
-      .then(([orgResult, appResult]) => {
-        if (orgResult.error || !orgResult.data || appResult.error || !appResult.data) {
-          throw simpleError('error_fetching_organization_or_app', 'Error fetching organization or app', { org: orgResult.error, app: appResult.error })
-        }
-        return trackBentoEvent(c, orgResult.data.management_email, {
+    ]).then(([orgResult, appResult]) => {
+      if (orgResult.error || !orgResult.data || appResult.error || !appResult.data) {
+        throw simpleError('error_fetching_organization_or_app', 'Error fetching organization or app', { org: orgResult.error, app: appResult.error })
+      }
+
+      return {
+        cron: '* * * * *',
+        event: 'app:updated',
+        preferenceKey: 'onboarding' as const,
+        uniqId: `app:updated:${appId}`,
+        data: {
           org_id: orgResult.data.id,
           org_name: orgResult.data.name,
           app_name: appResult.data.name,
-        }, 'app:updated') as any
-      }))
-  }
+        },
+      }
+    })
+    : undefined
+
+  await sendEventToTracking(c, {
+    ...trackedBody,
+    bento: onboardingBentoEvent,
+    sentToBento: Boolean(onboardingBentoEvent),
+  })
 
   return c.json(BRES)
 })
