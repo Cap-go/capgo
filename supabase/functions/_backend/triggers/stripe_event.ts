@@ -25,6 +25,8 @@ interface Org {
   customer_id?: string | null
 }
 
+type StripeInfoRow = Database['public']['Tables']['stripe_info']['Row']
+
 const checkoutSessionEventTypes = new Set([
   'checkout.session.completed',
   'checkout.session.async_payment_succeeded',
@@ -32,6 +34,23 @@ const checkoutSessionEventTypes = new Set([
 
 function isCheckoutSessionEvent(event: Stripe.Event) {
   return checkoutSessionEventTypes.has(event.type)
+}
+
+function getPaidAtUpdate(
+  currentStripeInfo: Pick<StripeInfoRow, 'paid_at' | 'status'> | null | undefined,
+  nextStatus: Database['public']['Enums']['stripe_status'] | null | undefined,
+  nowIso: string = new Date().toISOString(),
+) {
+  if (nextStatus !== 'succeeded')
+    return undefined
+
+  if (currentStripeInfo?.paid_at)
+    return undefined
+
+  if (currentStripeInfo?.status === 'succeeded')
+    return undefined
+
+  return nowIso
 }
 
 async function getCreditTopUpProductIdFromCustomer(c: Context, customerId: string): Promise<string> {
@@ -302,7 +321,13 @@ async function invoiceUpcoming(c: Context, org: Org, stripeEvent: Stripe.Invoice
   return c.json(BRES)
 }
 
-async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, originalStatus?: string) {
+async function createdOrUpdated(
+  c: Context,
+  stripeData: StripeData,
+  org: Org,
+  currentStripeInfo: Pick<StripeInfoRow, 'paid_at' | 'status'> | null | undefined,
+  originalStatus?: string,
+) {
   const status = originalStatus ?? stripeData.data.status
   let statusName: string = status ?? ''
   const { data: plan } = await supabaseAdmin(c)
@@ -315,6 +340,9 @@ async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, or
     const updateData = Object.fromEntries(
       Object.entries(stripeData.data).filter(([_, v]) => v !== undefined),
     )
+    const paidAt = getPaidAtUpdate(currentStripeInfo, stripeData.data.status)
+    if (paidAt)
+      updateData.paid_at = paidAt
     const { error: dbError2 } = await supabaseAdmin(c)
       .from('stripe_info')
       .update(updateData)
@@ -496,7 +524,7 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
   if (['created', 'succeeded', 'updated'].includes(stripeData.data.status ?? '') && stripeData.data.price_id && stripeData.data.product_id) {
     const originalStatus = stripeData.data.status
     stripeData.data.status = 'succeeded'
-    await createdOrUpdated(c, stripeData, org, originalStatus!)
+    await createdOrUpdated(c, stripeData, org, customer, originalStatus!)
   }
   else if (stripeData.data.status === 'failed') {
     await trackBentoEvent(c, org.management_email, {}, 'org:failed_payment')
@@ -528,3 +556,7 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
   }
   return cancelingOrFinished(c, stripeEvent, stripeData.data)
 })
+
+export const stripeEventTestUtils = {
+  getPaidAtUpdate,
+}

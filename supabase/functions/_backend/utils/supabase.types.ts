@@ -2081,6 +2081,7 @@ export type Database = {
           id: number
           is_good_plan: boolean | null
           mau_exceeded: boolean | null
+          paid_at: string | null
           plan_calculated_at: string | null
           plan_usage: number | null
           price_id: string | null
@@ -2103,6 +2104,7 @@ export type Database = {
           id?: number
           is_good_plan?: boolean | null
           mau_exceeded?: boolean | null
+          paid_at?: string | null
           plan_calculated_at?: string | null
           plan_usage?: number | null
           price_id?: string | null
@@ -2125,6 +2127,7 @@ export type Database = {
           id?: number
           is_good_plan?: boolean | null
           mau_exceeded?: boolean | null
+          paid_at?: string | null
           plan_calculated_at?: string | null
           plan_usage?: number | null
           price_id?: string | null
