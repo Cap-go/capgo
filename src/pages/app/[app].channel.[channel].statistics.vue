@@ -218,12 +218,8 @@ function formatPercent(value: number) {
   return `${value.toFixed(1)}%`
 }
 
-function formatSignedPoints(value: number) {
-  if (!Number.isFinite(value))
-    return `0.0 ${t('points-short')}`
-
-  const sign = value > 0 ? '+' : ''
-  return `${sign}${value.toFixed(1)} ${t('points-short')}`
+function formatPercentRange(start: number, end: number) {
+  return `${formatPercent(start)} -> ${formatPercent(end)}`
 }
 
 function formatShortDate(value: string | null | undefined) {
@@ -271,20 +267,15 @@ const periodSummary = computed(() => {
   const startShare = normalizedShares[0] ?? 0
   const latestShare = normalizedShares[normalizedShares.length - 1] ?? 0
   const changeShare = latestShare - startShare
-  const peakIndex = normalizedShares.reduce((bestIndex, value, index, values) =>
-    value > values[bestIndex] ? index : bestIndex, 0)
 
   return {
     startShare,
     startCount: normalizedCounts[0] ?? 0,
     latestShare,
     latestCount: normalizedCounts[normalizedCounts.length - 1] ?? 0,
-    changeShare,
-    peakShare: normalizedShares[peakIndex] ?? 0,
-    peakCount: normalizedCounts[peakIndex] ?? 0,
     startDateLabel: formatShortDate(labels[0]),
     latestDateLabel: formatShortDate(labels[labels.length - 1]),
-    peakDateLabel: formatShortDate(labels[peakIndex]),
+    changeShare,
   }
 })
 
@@ -678,20 +669,33 @@ watchEffect(async () => {
               <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
                 <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
                   <IconCheckCircle class="w-4 h-4" />
-                  {{ t('adoption-at-period-start') }}
+                  {{ t('start-of-selected-period') }}
                 </div>
                 <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
                   {{ formatPercent(periodSummary?.startShare ?? 0) }}
                 </div>
                 <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ t('adoption-at-period-start-help', { date: periodSummary?.startDateLabel ?? '-', count: (periodSummary?.startCount ?? 0).toLocaleString(), version: stats?.currentVersion || '-' }) }}
+                  {{ t('start-of-selected-period-help', { date: periodSummary?.startDateLabel ?? '-', count: (periodSummary?.startCount ?? 0).toLocaleString(), version: stats?.currentVersion || '-' }) }}
+                </div>
+              </div>
+
+              <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                  <IconCheckCircle class="w-4 h-4" />
+                  {{ t('latest-day-in-selected-period') }}
+                </div>
+                <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
+                  {{ formatPercent(periodSummary?.latestShare ?? 0) }}
+                </div>
+                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ t('latest-day-in-selected-period-help', { date: periodSummary?.latestDateLabel ?? '-', count: (periodSummary?.latestCount ?? 0).toLocaleString(), version: stats?.currentVersion || '-' }) }}
                 </div>
               </div>
 
               <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
                 <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
                   <IconTrendingUp class="w-4 h-4" />
-                  {{ t('change-in-selected-period') }}
+                  {{ t('adoption-over-selected-period') }}
                 </div>
                 <div
                   class="mt-2 text-lg font-semibold"
@@ -701,23 +705,10 @@ watchEffect(async () => {
                     'text-slate-900 dark:text-white': (periodSummary?.changeShare ?? 0) === 0,
                   }"
                 >
-                  {{ formatSignedPoints(periodSummary?.changeShare ?? 0) }}
+                  {{ formatPercentRange(periodSummary?.startShare ?? 0, periodSummary?.latestShare ?? 0) }}
                 </div>
                 <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ t('change-in-selected-period-help', { start: periodSummary?.startDateLabel ?? '-', end: periodSummary?.latestDateLabel ?? '-', version: stats?.currentVersion || '-' }) }}
-                </div>
-              </div>
-
-              <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-                <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                  <IconTrendingUp class="w-4 h-4" />
-                  {{ t('best-day-in-period') }}
-                </div>
-                <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
-                  {{ formatPercent(periodSummary?.peakShare ?? 0) }}
-                </div>
-                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  {{ t('best-day-in-period-help', { date: periodSummary?.peakDateLabel ?? '-', count: (periodSummary?.peakCount ?? 0).toLocaleString(), version: stats?.currentVersion || '-' }) }}
+                  {{ t('adoption-over-selected-period-help', { start: periodSummary?.startDateLabel ?? '-', end: periodSummary?.latestDateLabel ?? '-', version: stats?.currentVersion || '-' }) }}
                 </div>
               </div>
             </div>
