@@ -6,8 +6,7 @@ COMMENT ON COLUMN public.stripe_info.paid_at IS 'Timestamp when the org first be
 UPDATE public.stripe_info
 SET paid_at = created_at
 WHERE paid_at IS NULL
-  AND status = 'succeeded'
-  AND created_at = updated_at;
+  AND status = 'succeeded';
 
 CREATE INDEX IF NOT EXISTS stripe_info_paid_at_idx
 ON public.stripe_info (paid_at)

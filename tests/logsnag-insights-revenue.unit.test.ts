@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { logsnagInsightsTestUtils } from '../supabase/functions/_backend/triggers/logsnag_insights.ts'
 
 describe('logsnag revenue metric helpers', () => {
-  it('counts paid customers from paid_at rows and legacy fallback rows', () => {
+  it.concurrent('counts paid customers from paid_at rows and legacy fallback rows', () => {
     expect(logsnagInsightsTestUtils.countUniqueCustomers(
       [
         { customer_id: 'cus_paid_1' },
@@ -14,7 +14,7 @@ describe('logsnag revenue metric helpers', () => {
     )).toBe(3)
   })
 
-  it('deduplicates customer ids across the paid_at query and legacy fallback query', () => {
+  it.concurrent('deduplicates customer ids across the paid_at query and legacy fallback query', () => {
     expect(logsnagInsightsTestUtils.countUniqueCustomers(
       [
         { customer_id: 'cus_shared' },
@@ -25,7 +25,7 @@ describe('logsnag revenue metric helpers', () => {
     )).toBe(1)
   })
 
-  it('builds UTC calendar-day bounds', () => {
+  it.concurrent('builds UTC calendar-day bounds', () => {
     const { dayStart, nextDayStart, dayDateId } = logsnagInsightsTestUtils.getCurrentDayWindow(new Date('2026-03-24T18:45:12.000Z'))
 
     expect(dayStart.toISOString()).toBe('2026-03-24T00:00:00.000Z')
