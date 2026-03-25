@@ -81,12 +81,6 @@ REVOKE ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uui
 REVOKE ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid) FROM anon;
 REVOKE ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid) FROM authenticated;
 GRANT ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid) TO service_role;
-
-CREATE INDEX IF NOT EXISTS idx_device_usage_timestamp_app_id
-  ON public.device_usage USING btree (timestamp, app_id);
-
-CREATE INDEX IF NOT EXISTS idx_bandwidth_usage_timestamp_app_id
-  ON public.bandwidth_usage USING btree (timestamp, app_id);
 CREATE OR REPLACE FUNCTION public.process_cron_stats_jobs() RETURNS void
 LANGUAGE plpgsql
 SET search_path = '' AS $function$
