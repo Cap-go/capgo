@@ -5,7 +5,7 @@ import { Capacitor } from '@capacitor/core'
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
 import dayjs from 'dayjs'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -39,12 +39,78 @@ const hasSso = ref(false)
 const enforceSso = ref(false)
 const isDomainChecking = ref(false)
 const isCheckingSavedSession = ref(true)
+const captchaStatus = ref<'disabled' | 'loading' | 'ready' | 'unavailable'>(captchaKey.value ? 'loading' : 'disabled')
+let captchaInitTimeout: ReturnType<typeof setTimeout> | null = null
 
 const version = import.meta.env.VITE_APP_VERSION
 const isEmailStepBusy = computed(() => isDomainChecking.value || isCheckingSavedSession.value)
-const isCaptchaReady = computed(() => !captchaKey.value || !!turnstileToken.value)
+const shouldBlockForCaptcha = computed(() => !!captchaKey.value && captchaStatus.value === 'loading' && !turnstileToken.value)
 
 const registerUrl = window.location.host === 'console.capgo.app' ? 'https://capgo.app/register/' : `/register/`
+
+function clearCaptchaInitTimeout() {
+  if (captchaInitTimeout) {
+    clearTimeout(captchaInitTimeout)
+    captchaInitTimeout = null
+  }
+}
+
+function scheduleCaptchaInitTimeout() {
+  if (!captchaKey.value || statusAuth.value !== 'credentials') {
+    clearCaptchaInitTimeout()
+    return
+  }
+
+  clearCaptchaInitTimeout()
+  captchaInitTimeout = setTimeout(() => {
+    if (!turnstileToken.value && !window.turnstile) {
+      captchaStatus.value = 'unavailable'
+      console.error('Turnstile failed to initialize')
+    }
+  }, 8000)
+}
+
+function handleCaptchaUnavailable(reason: string, error?: unknown) {
+  captchaStatus.value = 'unavailable'
+  clearCaptchaInitTimeout()
+  console.error(reason, error)
+}
+
+watch(turnstileToken, (token) => {
+  if (!captchaKey.value) {
+    captchaStatus.value = 'disabled'
+    return
+  }
+
+  if (token) {
+    captchaStatus.value = 'ready'
+    clearCaptchaInitTimeout()
+  }
+  else if (statusAuth.value === 'credentials') {
+    captchaStatus.value = 'loading'
+    scheduleCaptchaInitTimeout()
+  }
+})
+
+watch(statusAuth, (status) => {
+  if (!captchaKey.value) {
+    captchaStatus.value = 'disabled'
+    clearCaptchaInitTimeout()
+    return
+  }
+
+  if (status === 'credentials') {
+    captchaStatus.value = turnstileToken.value ? 'ready' : 'loading'
+    scheduleCaptchaInitTimeout()
+  }
+  else {
+    clearCaptchaInitTimeout()
+  }
+}, { immediate: true })
+
+onBeforeUnmount(() => {
+  clearCaptchaInitTimeout()
+})
 
 async function nextLogin() {
   if (route.query.to && typeof route.query.to === 'string') {
@@ -214,7 +280,7 @@ async function handlePasswordSubmit(form: { password: string }) {
 }
 
 async function handleSsoLogin() {
-  if (isLoading.value || !isCaptchaReady.value) {
+  if (isLoading.value || shouldBlockForCaptcha.value) {
     return
   }
 
@@ -239,7 +305,12 @@ async function handleSsoLogin() {
       console.error('SSO login error', error)
       turnstileToken.value = ''
       captchaComponent.value?.reset()
-      toast.error(t('invalid-auth'))
+      if (error.message.includes('captcha')) {
+        toast.error(t('captcha-fail'))
+      }
+      else {
+        toast.error(t('invalid-auth'))
+      }
       isLoading.value = false
       return
     }
@@ -595,12 +666,19 @@ onMounted(checkLogin)
                   {{ t('sso-detected') }}
                 </p>
                 <div v-if="!!captchaKey">
-                  <VueTurnstile ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
+                  <VueTurnstile
+                    ref="captchaComponent"
+                    v-model="turnstileToken"
+                    size="flexible"
+                    :site-key="captchaKey"
+                    @error="handleCaptchaUnavailable('Turnstile error', $event)"
+                    @unsupported="handleCaptchaUnavailable('Turnstile unsupported')"
+                  />
                 </div>
                 <div>
                   <div class="inline-flex justify-center items-center w-full">
                     <button
-                      type="button" data-test="sso-login" :disabled="isLoading || !isCaptchaReady" :aria-busy="isLoading ? 'true' : 'false'"
+                      type="button" data-test="sso-login" :disabled="isLoading || shouldBlockForCaptcha" :aria-busy="isLoading ? 'true' : 'false'"
                       class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-60"
                       @click="handleSsoLogin"
                     >
@@ -653,7 +731,7 @@ onMounted(checkLogin)
                     <div v-if="hasSso && !enforceSso">
                       <button
                         type="button" data-test="sso-login"
-                        :disabled="isLoading || !isCaptchaReady"
+                        :disabled="isLoading || shouldBlockForCaptcha"
                         :aria-busy="isLoading ? 'true' : 'false'"
                         class="inline-flex justify-center items-center py-3 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-60"
                         @click="handleSsoLogin"
@@ -675,13 +753,20 @@ onMounted(checkLogin)
                       />
                     </div>
                     <div v-if="!!captchaKey">
-                      <VueTurnstile ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
+                      <VueTurnstile
+                        ref="captchaComponent"
+                        v-model="turnstileToken"
+                        size="flexible"
+                        :site-key="captchaKey"
+                        @error="handleCaptchaUnavailable('Turnstile error', $event)"
+                        @unsupported="handleCaptchaUnavailable('Turnstile unsupported')"
+                      />
                     </div>
                     <FormKitMessages data-test="form-error" />
                     <div>
                       <div class="inline-flex justify-center items-center w-full">
                         <button
-                          type="submit" data-test="submit" :disabled="isLoading || !isCaptchaReady" :aria-busy="isLoading ? 'true' : 'false'"
+                          type="submit" data-test="submit" :disabled="isLoading || shouldBlockForCaptcha" :aria-busy="isLoading ? 'true' : 'false'"
                           class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           <svg
