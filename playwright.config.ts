@@ -12,6 +12,9 @@ const headless = !!env.CI || !!env.PLAYWRIGHT_HEADLESS
 
 const webServer: PlaywrightTestConfig['webServer'] = []
 const { ports: supabasePorts } = getSupabaseWorktreeConfig()
+const localSupabaseUrl = `http://localhost:${supabasePorts.api}`
+const localApiDomain = `localhost:${supabasePorts.api}/functions/v1`
+const localSupabaseAnonKey = env.SUPABASE_ANON_KEY || 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH'
 
 if (!env.SKIP_BACKEND_START) {
   webServer.push({
@@ -26,7 +29,7 @@ else {
 }
 
 webServer.push({
-  command: 'bun run serve:dev',
+  command: `ENV=local SUPA_URL=${localSupabaseUrl} SUPA_ANON=${localSupabaseAnonKey} API_DOMAIN=${localApiDomain} CAPTCHA_KEY='' bun run serve:local`,
   port: 5173,
   timeout: 60_000,
   reuseExistingServer: true,
