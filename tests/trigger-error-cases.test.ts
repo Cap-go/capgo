@@ -156,19 +156,19 @@ describe('[POST] /triggers/cron_email - Error Cases', () => {
     expect(data.error).toBe('invalid_stats_type')
   })
 
-  it('should return 400 when stats cannot be generated', async () => {
+  it('should return 400 when deploy stats are missing versionId', async () => {
     const response = await fetch(`${BASE_URL}/triggers/cron_email`, {
       method: 'POST',
       headers: triggerHeaders,
       body: JSON.stringify({
         email: 'test@example.com',
         appId: 'nonexistent-app',
-        type: 'yoyoy',
+        type: 'deploy_install_stats',
       }),
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('user_not_found')
+    expect(data.error).toBe('missing_version_id')
   })
 })
 

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import type { EmailPreferences } from '../supabase/functions/_backend/utils/org_email_notifications.ts'
 import { APP_NAME, BASE_URL, getSupabaseClient, ORG_ID_EMAIL_PREFS, resetAndSeedAppData, resetAppData, STRIPE_CUSTOMER_ID_EMAIL_PREFS, USER_EMAIL_EMAIL_PREFS, USER_ID_EMAIL_PREFS } from './test-utils.ts'
 
@@ -9,6 +9,38 @@ const APPNAME_PREFS = `${APP_NAME}.ep.${id}`
 const triggerHeaders = {
   'Content-Type': 'application/json',
   'apisecret': 'testsecret',
+}
+
+const defaultEmailPreferences: EmailPreferences = {
+  usage_limit: true,
+  credit_usage: true,
+  onboarding: true,
+  weekly_stats: true,
+  monthly_stats: true,
+  deploy_stats_24h: true,
+  bundle_created: true,
+  bundle_deployed: true,
+  device_error: true,
+  channel_self_rejected: true,
+}
+
+function isBentoConfiguredForTests() {
+  const publishableKey = (process.env.BENTO_PUBLISHABLE_KEY || '').trim()
+  const secretKey = (process.env.BENTO_SECRET_KEY || '').trim()
+  const siteUuid = (process.env.BENTO_SITE_UUID || '').trim()
+
+  if (!publishableKey || !secretKey || !siteUuid)
+    return false
+
+  const placeholders = new Set(['test', 'TEST', 'placeholder', 'changeme'])
+  return !placeholders.has(publishableKey) && !placeholders.has(secretKey) && !placeholders.has(siteUuid)
+}
+
+async function resetEmailPreferences() {
+  const supabase = getSupabaseClient()
+  await supabase.from('users').update({
+    email_preferences: defaultEmailPreferences,
+  } as any).eq('id', USER_ID_EMAIL_PREFS)
 }
 
 beforeAll(async () => {
@@ -21,22 +53,15 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await resetAppData(APPNAME_PREFS)
-  // Reset user email preferences to defaults
-  const supabase = getSupabaseClient()
-  await supabase.from('users').update({
-    email_preferences: {
-      usage_limit: true,
-      credit_usage: true,
-      onboarding: true,
-      weekly_stats: true,
-      monthly_stats: true,
-      deploy_stats_24h: true,
-      bundle_created: true,
-      bundle_deployed: true,
-      device_error: true,
-      channel_self_rejected: true,
-    },
-  } as any).eq('id', USER_ID_EMAIL_PREFS)
+  await resetEmailPreferences()
+})
+
+beforeEach(async () => {
+  await resetEmailPreferences()
+})
+
+afterEach(async () => {
+  await resetEmailPreferences()
 })
 
 // Helper to check if migration has been applied
@@ -169,6 +194,10 @@ describe('[POST] /triggers/cron_email - Email Preference Filtering', () => {
       console.warn('Skipping test: email_preferences migration not yet applied')
       return
     }
+    if (!isBentoConfiguredForTests()) {
+      console.warn('Skipping test: Bento is not configured, cron_email does not exercise org email preference fan-out in CI')
+      return
+    }
 
     const supabase = getSupabaseClient()
 
@@ -213,6 +242,10 @@ describe('[POST] /triggers/cron_email - Email Preference Filtering', () => {
     const migrationApplied = await isMigrationApplied()
     if (!migrationApplied) {
       console.warn('Skipping test: email_preferences migration not yet applied')
+      return
+    }
+    if (!isBentoConfiguredForTests()) {
+      console.warn('Skipping test: Bento is not configured, cron_email does not exercise org email preference fan-out in CI')
       return
     }
 
@@ -342,6 +375,10 @@ describe('[POST] /triggers/cron_email - Deploy Install Stats Preference', () => 
       console.warn('Skipping test: email_preferences migration not yet applied')
       return
     }
+    if (!isBentoConfiguredForTests()) {
+      console.warn('Skipping test: Bento is not configured, cron_email does not exercise org email preference fan-out in CI')
+      return
+    }
 
     const supabase = getSupabaseClient()
 
@@ -435,17 +472,7 @@ describe('[Database] Email Preferences - Multi-preference Update', () => {
     await supabase
       .from('users')
       .update({
-        email_preferences: {
-          usage_limit: true,
-          credit_usage: true,
-          onboarding: true,
-          weekly_stats: true,
-          monthly_stats: true,
-          deploy_stats_24h: true,
-          bundle_created: true,
-          bundle_deployed: true,
-          device_error: true,
-        },
+        email_preferences: defaultEmailPreferences,
       } as any)
       .eq('id', USER_ID_EMAIL_PREFS)
   })
