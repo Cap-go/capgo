@@ -8,6 +8,7 @@ const POSTHOG_CAPTURE_URL = 'https://eu.i.posthog.com/capture/'
 interface PostHogCapturePayload extends Pick<TrackOptions, 'event'>, Pick<TrackOptions, 'channel' | 'description'> {
   distinct_id?: string
   ip?: string
+  setPersonProperties?: boolean
   tags?: Record<string, any>
   user_id?: string
 }
@@ -30,7 +31,7 @@ export async function trackPosthogEvent(c: Context, payload: PostHogCapturePaylo
     ...(payload.tags || {}),
     channel: payload.channel,
     description: payload.description,
-    $set: payload.tags,
+    ...(payload.setPersonProperties === false ? {} : { $set: payload.tags }),
   }
 
   const body = {
@@ -74,9 +75,10 @@ export async function capturePosthogException(c: Context, payload: {
 }) {
   return trackPosthogEvent(c, {
     event: 'Backend exception',
-    distinct_id: c.get('requestId'),
+    distinct_id: `backend:${getEnv(c, 'ENV_NAME') || 'unknown'}:${payload.functionName}`,
     channel: 'backend-errors',
     description: `Unhandled backend error in ${payload.functionName}`,
+    setPersonProperties: false,
     tags: {
       error_kind: payload.kind,
       error_message: payload.error instanceof Error ? payload.error.message : String(payload.error),
