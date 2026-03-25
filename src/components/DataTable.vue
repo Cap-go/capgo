@@ -39,10 +39,12 @@ interface Props {
   elementList: { [key: string]: any }[]
   massSelect?: boolean
   autoReload?: boolean
+  mobileFixedPagination?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   autoReload: true,
+  mobileFixedPagination: true,
 })
 const emit = defineEmits([
   'add',
@@ -313,6 +315,13 @@ function displayValueKey(elem: any, col: TableColumn | undefined) {
     return DOMPurify.sanitize(text)
   return text
 }
+
+function getActionTitle(action: NonNullable<TableColumn['actions']>[number], elem: any): string {
+  if (!action.title)
+    return ''
+  return typeof action.title === 'function' ? action.title(elem) : action.title
+}
+
 const displayElemRange = computed(() => {
   const begin = (props.currentPage - 1) * props.elementList.length
   const end = begin + props.elementList.length
@@ -437,6 +446,9 @@ const RenderCell = defineComponent<{
 
 const isReloading = computed(() => props.isLoading || pendingReset.value)
 const isAdding = computed(() => props.isLoading || pendingAdd.value)
+const paginationClass = computed(() => props.mobileFixedPagination
+  ? 'fixed bottom-0 left-0 z-40 flex items-center justify-between w-full p-4 bg-white md:relative md:pt-4 md:bg-transparent dark:bg-gray-900 dark:md:bg-transparent'
+  : 'flex items-center justify-between w-full p-4 bg-white md:relative md:pt-4 md:bg-transparent dark:bg-gray-900 dark:md:bg-transparent')
 </script>
 
 <template>
@@ -579,16 +591,27 @@ const isAdding = computed(() => props.isLoading || pendingAdd.value)
                 >
                   <div class="flex items-center space-x-1">
                     <template v-if="col.actions">
-                      <button
+                      <div
                         v-for="(action, actionIndex) in col.actions"
                         v-show="!action.visible || action.visible(elem)" :key="actionIndex"
-                        :disabled="action.disabled && action.disabled(elem)"
-                        :title="typeof action.title === 'function' ? action.title(elem) : action.title"
-                        class="p-2 text-gray-500 rounded-md cursor-pointer dark:text-gray-400 hover:text-gray-600 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed dark:hover:bg-gray-700 dark:hover:text-gray-300 dark:disabled:hover:text-gray-400 disabled:hover:bg-transparent disabled:hover:text-gray-500"
-                        @click.stop="action.onClick(elem)"
                       >
-                        <component :is="action.icon" />
-                      </button>
+                        <div class="relative inline-flex group">
+                          <button
+                            :disabled="action.disabled && action.disabled(elem)"
+                            :title="getActionTitle(action, elem)"
+                            class="p-2 text-gray-500 rounded-md cursor-pointer dark:text-gray-400 hover:text-gray-600 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed dark:hover:bg-gray-700 dark:hover:text-gray-300 dark:disabled:hover:text-gray-400 disabled:hover:bg-transparent disabled:hover:text-gray-500"
+                            @click.stop="action.onClick(elem)"
+                          >
+                            <component :is="action.icon" />
+                          </button>
+                          <span
+                            v-if="getActionTitle(action, elem)"
+                            class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white shadow-lg transition-opacity duration-150 group-hover:block group-focus-within:block dark:bg-slate-100 dark:text-slate-900"
+                          >
+                            {{ getActionTitle(action, elem) }}
+                          </span>
+                        </div>
+                      </div>
                     </template>
                     <template v-else-if="col.icon">
                       <button
@@ -649,10 +672,7 @@ const isAdding = computed(() => props.isLoading || pendingAdd.value)
       </table>
     </div>
 
-    <nav
-      class="fixed bottom-0 left-0 z-40 flex items-center justify-between w-full p-4 bg-white md:relative md:pt-4 md:bg-transparent dark:bg-gray-900 dark:md:bg-transparent"
-      aria-label="Table navigation"
-    >
+    <nav :class="paginationClass" aria-label="Table navigation">
       <span class="text-sm font-normal text-gray-500 dark:text-gray-400">
         <span class="hidden mr-1 md:inline-block">
           {{ t("showing") }}

@@ -825,13 +825,208 @@ getKeys()
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- Teleport Content for Add New Key Modal -->
-    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-add-new-key')" defer to="#dialog-v2-content">
-      <div class="space-y-6">
-        <!-- API Key Name -->
-        <div>
+      <!-- Teleport Content for Add New Key Modal -->
+      <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-add-new-key')" defer to="#dialog-v2-content">
+        <div class="space-y-6">
+          <!-- API Key Name -->
+          <div>
+            <FormKit
+              v-model="newApiKeyName"
+              type="text"
+              :label="t('name')"
+              :placeholder="t('type-new-name')"
+              validation="required|length:1,32"
+              :validation-messages="{
+                length: t('name-length-error'),
+              }"
+            />
+          </div>
+
+          <!-- API Key Type Selection -->
+          <div>
+            <div class="p-4 border rounded-lg dark:border-gray-600">
+              <div class="space-y-3">
+                <div class="form-control">
+                  <label class="justify-start gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
+                    <input
+                      v-model="selectedKeyType"
+                      type="radio"
+                      name="key-type"
+                      value="read"
+                      class="mr-2 radio radio-primary"
+                    >
+                    <span class="text-base label-text">{{ t('key-read') }}</span>
+                  </label>
+                </div>
+                <div class="form-control">
+                  <label class="justify-start gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
+                    <input
+                      v-model="selectedKeyType"
+                      type="radio"
+                      name="key-type"
+                      value="upload"
+                      class="mr-2 radio radio-primary"
+                    >
+                    <span class="text-base label-text">{{ t('key-upload') }}</span>
+                  </label>
+                </div>
+                <div class="form-control">
+                  <label class="justify-start gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
+                    <input
+                      v-model="selectedKeyType"
+                      type="radio"
+                      name="key-type"
+                      value="write"
+                      class="mr-2 radio radio-primary"
+                    >
+                    <span class="text-base label-text">{{ t('write-key') }}</span>
+                  </label>
+                </div>
+                <div class="form-control">
+                  <label class="justify-start gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
+                    <input
+                      v-model="selectedKeyType"
+                      type="radio"
+                      name="key-type"
+                      value="all"
+                      class="mr-2 radio radio-primary"
+                    >
+                    <span class="text-base label-text">{{ t('key-all') }}</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Create as Secure (Hashed) Key -->
+          <div class="p-4 border border-blue-200 rounded-lg bg-blue-50 dark:bg-blue-900/20 dark:border-blue-700">
+            <div class="flex items-start gap-3">
+              <input
+                id="create-as-hashed"
+                v-model="createAsHashed"
+                type="checkbox"
+                class="mt-1 border-blue-500 dark:border-blue-400 checkbox checkbox-primary"
+              >
+              <div>
+                <label for="create-as-hashed" class="font-medium text-blue-800 cursor-pointer dark:text-blue-200">
+                  {{ t('create-secure-key') }}
+                </label>
+                <p class="mt-1 text-sm text-blue-600 dark:text-blue-300">
+                  {{ t('create-secure-key-description') }}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Limit to Organizations -->
+          <div class="flex items-center gap-2">
+            <input
+              id="limit-to-org"
+              v-model="limitToOrgCheckbox"
+              type="checkbox"
+              class="border-gray-500 dark:border-gray-700 checkbox"
+            >
+            <label for="limit-to-org" class="text-sm">
+              {{ t('limit-to-org') }}
+            </label>
+          </div>
+          <div v-if="limitToOrgCheckbox" class="pl-6">
+            <div class="p-2 space-y-2 overflow-y-auto border rounded-lg max-h-32">
+              <div v-for="org in organizationStore.organizations" :key="org.gid" class="flex items-center gap-2">
+                <input
+                  :id="`org-${org.gid}`"
+                  :value="org.gid"
+                  type="checkbox"
+                  class="border-gray-500 dark:border-gray-700 checkbox"
+                  @change="handleOrgSelection(org.gid, ($event.target as HTMLInputElement).checked)"
+                >
+                <label :for="`org-${org.gid}`" class="text-sm">
+                  {{ org.name }}
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Limit to Apps (only show if orgs are selected) -->
+          <div v-if="limitToOrgCheckbox && displayStore.selectedOrganizations.length > 0" class="flex items-center gap-2">
+            <input
+              id="limit-to-app"
+              v-model="limitToAppCheckbox"
+              type="checkbox"
+              class="border-gray-500 dark:border-gray-700 checkbox"
+            >
+            <label for="limit-to-app" class="text-sm">
+              {{ t('limit-to-app') }}
+            </label>
+          </div>
+          <div v-if="limitToAppCheckbox && displayStore.selectedOrganizations.length > 0" class="pl-6">
+            <div class="p-2 space-y-2 overflow-y-auto border rounded-lg max-h-32">
+              <div v-for="app in filteredAppsForSelectedOrgs" :key="app.app_id" class="flex items-center gap-2">
+                <input
+                  :id="`app-${app.app_id}`"
+                  :value="app"
+                  type="checkbox"
+                  class="border-gray-500 dark:border-gray-700 checkbox"
+                  @change="handleAppSelection(app, ($event.target as HTMLInputElement).checked)"
+                >
+                <label :for="`app-${app.app_id}`" class="text-sm">
+                  {{ app.name }}
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Set Expiration Date -->
+          <div class="flex items-center gap-2">
+            <input
+              id="set-expiration"
+              v-model="setExpirationCheckbox"
+              type="checkbox"
+              class="border-gray-500 dark:border-gray-700 checkbox"
+            >
+            <label for="set-expiration" class="text-sm">
+              {{ t('set-expiration-date') }}
+            </label>
+          </div>
+          <div v-if="setExpirationCheckbox" class="pl-6">
+            <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
+              {{ t('expiration-date') }}
+            </label>
+            <VueDatePicker
+              v-model="expirationDate"
+              :min-date="minExpirationDate"
+              :enable-time-picker="false"
+              :time-picker-inline="false"
+              :time-picker="false"
+              :time-config="{ enableTimePicker: false }"
+              :dark="isDark"
+              teleport="body"
+              :auto-apply="true"
+              hide-input-icon
+              :action-row="{ showCancel: false, showSelect: false, showNow: false, showPreview: false }"
+              :placeholder="t('select-expiration-date')"
+              :ui="{ menu: 'apikey-datepicker-menu' }"
+            >
+              <template #trigger>
+                <button
+                  type="button"
+                  class="flex items-center w-full gap-2 px-3 py-2 text-sm text-left transition-colors bg-white border border-gray-300 rounded-md dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-primary-500 focus:outline-none"
+                >
+                  <IconCalendar class="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  <span :class="expirationDate ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'">
+                    {{ expirationDate ? dayjs(expirationDate).format('YYYY-MM-DD') : t('select-expiration-date') }}
+                  </span>
+                </button>
+              </template>
+            </VueDatePicker>
+          </div>
+        </div>
+      </Teleport>
+
+      <!-- Teleport Content for Change Name Modal -->
+      <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('change-api-key-name')" defer to="#dialog-v2-content">
+        <div class="space-y-4">
           <FormKit
             v-model="newApiKeyName"
             type="text"
@@ -839,137 +1034,55 @@ getKeys()
             :placeholder="t('type-new-name')"
             validation="required|length:1,32"
             :validation-messages="{
+              required: t('name-required'),
               length: t('name-length-error'),
             }"
           />
         </div>
+      </Teleport>
 
-        <!-- API Key Type Selection -->
-        <div>
-          <div class="p-4 border rounded-lg dark:border-gray-600">
-            <div class="space-y-3">
-              <div class="form-control">
-                <label class="justify-start gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
-                  <input
-                    v-model="selectedKeyType"
-                    type="radio"
-                    name="key-type"
-                    value="read"
-                    class="mr-2 radio radio-primary"
-                  >
-                  <span class="text-base label-text">{{ t('key-read') }}</span>
-                </label>
-              </div>
-              <div class="form-control">
-                <label class="justify-start gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
-                  <input
-                    v-model="selectedKeyType"
-                    type="radio"
-                    name="key-type"
-                    value="upload"
-                    class="mr-2 radio radio-primary"
-                  >
-                  <span class="text-base label-text">{{ t('key-upload') }}</span>
-                </label>
-              </div>
-              <div class="form-control">
-                <label class="justify-start gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
-                  <input
-                    v-model="selectedKeyType"
-                    type="radio"
-                    name="key-type"
-                    value="write"
-                    class="mr-2 radio radio-primary"
-                  >
-                  <span class="text-base label-text">{{ t('write-key') }}</span>
-                </label>
-              </div>
-              <div class="form-control">
-                <label class="justify-start gap-3 p-3 rounded-lg cursor-pointer hover:bg-gray-50 label dark:hover:bg-gray-800">
-                  <input
-                    v-model="selectedKeyType"
-                    type="radio"
-                    name="key-type"
-                    value="all"
-                    class="mr-2 radio radio-primary"
-                  >
-                  <span class="text-base label-text">{{ t('key-all') }}</span>
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Create as Secure (Hashed) Key -->
-        <div class="p-4 border border-blue-200 rounded-lg bg-blue-50 dark:bg-blue-900/20 dark:border-blue-700">
-          <div class="flex items-start gap-3">
-            <input
-              id="create-as-hashed"
-              v-model="createAsHashed"
-              type="checkbox"
-              class="mt-1 border-blue-500 dark:border-blue-400 checkbox checkbox-primary"
-            >
-            <div>
-              <label for="create-as-hashed" class="font-medium text-blue-800 cursor-pointer dark:text-blue-200">
-                {{ t('create-secure-key') }}
-              </label>
-              <p class="mt-1 text-sm text-blue-600 dark:text-blue-300">
-                {{ t('create-secure-key-description') }}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <!-- Limit to Organizations -->
-        <div class="flex items-center gap-2">
-          <input
-            id="limit-to-org"
-            v-model="limitToOrgCheckbox"
-            type="checkbox"
-            class="border-gray-500 dark:border-gray-700 checkbox"
-          >
-          <label for="limit-to-org" class="text-sm">
-            {{ t('limit-to-org') }}
-          </label>
-        </div>
-        <div v-if="limitToOrgCheckbox" class="pl-6">
-          <div class="p-2 space-y-2 overflow-y-auto border rounded-lg max-h-32">
-            <div v-for="org in organizationStore.organizations" :key="org.gid" class="flex items-center gap-2">
+      <!-- Teleport Content for Organization Selection Modal -->
+      <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-confirm-org-limit')" defer to="#dialog-v2-content">
+        <div class="space-y-4">
+          <div class="p-2 overflow-y-auto border rounded-lg max-h-64">
+            <div v-for="org in organizationStore.organizations" :key="org.gid" class="flex items-center gap-2 p-2">
               <input
-                :id="`org-${org.gid}`"
+                :id="`org-select-${org.gid}`"
                 :value="org.gid"
                 type="checkbox"
-                class="border-gray-500 dark:border-gray-700 checkbox"
+                class="checkbox"
                 @change="handleOrgSelection(org.gid, ($event.target as HTMLInputElement).checked)"
               >
-              <label :for="`org-${org.gid}`" class="text-sm">
+              <label :for="`org-select-${org.gid}`" class="text-sm">
                 {{ org.name }}
               </label>
             </div>
           </div>
+          <div class="flex items-center gap-2 mt-4">
+            <input
+              id="limit-to-app-org"
+              v-model="limitToOrgCheckbox"
+              type="checkbox"
+              class="checkbox"
+            >
+            <label for="limit-to-app-org" class="text-sm">
+              {{ t('limit-to-app') }}
+            </label>
+          </div>
         </div>
+      </Teleport>
 
-        <!-- Limit to Apps (only show if orgs are selected) -->
-        <div v-if="limitToOrgCheckbox && displayStore.selectedOrganizations.length > 0" class="flex items-center gap-2">
-          <input
-            id="limit-to-app"
-            v-model="limitToAppCheckbox"
-            type="checkbox"
-            class="border-gray-500 dark:border-gray-700 checkbox"
-          >
-          <label for="limit-to-app" class="text-sm">
-            {{ t('limit-to-app') }}
-          </label>
-        </div>
-        <div v-if="limitToAppCheckbox && displayStore.selectedOrganizations.length > 0" class="pl-6">
-          <div class="p-2 space-y-2 overflow-y-auto border rounded-lg max-h-32">
-            <div v-for="app in filteredAppsForSelectedOrgs" :key="app.app_id" class="flex items-center gap-2">
+      <!-- Teleport Content for App Selection Modal -->
+      <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-confirm-appid-limit')" defer to="#dialog-v2-content">
+        <div class="space-y-4">
+          <div class="p-2 overflow-y-auto border rounded-lg max-h-64">
+            <div v-for="app in availableApps" :key="app.app_id" class="flex items-center gap-2 p-2">
               <input
                 :id="`app-${app.app_id}`"
                 :value="app"
                 type="checkbox"
-                class="border-gray-500 dark:border-gray-700 checkbox"
-                @change="handleAppSelection(app, ($event.target as HTMLInputElement).checked)"
+                class="checkbox"
+                @change="handleAppSelection(app as any, ($event.target as HTMLInputElement).checked)"
               >
               <label :for="`app-${app.app_id}`" class="text-sm">
                 {{ app.name }}
@@ -977,120 +1090,11 @@ getKeys()
             </div>
           </div>
         </div>
-
-        <!-- Set Expiration Date -->
-        <div class="flex items-center gap-2">
-          <input
-            id="set-expiration"
-            v-model="setExpirationCheckbox"
-            type="checkbox"
-            class="border-gray-500 dark:border-gray-700 checkbox"
-          >
-          <label for="set-expiration" class="text-sm">
-            {{ t('set-expiration-date') }}
-          </label>
-        </div>
-        <div v-if="setExpirationCheckbox" class="pl-6">
-          <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-200">
-            {{ t('expiration-date') }}
-          </label>
-          <VueDatePicker
-            v-model="expirationDate"
-            :min-date="minExpirationDate"
-            :enable-time-picker="false"
-            :time-picker-inline="false"
-            :time-picker="false"
-            :time-config="{ enableTimePicker: false }"
-            :dark="isDark"
-            teleport="body"
-            :auto-apply="true"
-            hide-input-icon
-            :action-row="{ showCancel: false, showSelect: false, showNow: false, showPreview: false }"
-            :placeholder="t('select-expiration-date')"
-            :ui="{ menu: 'apikey-datepicker-menu' }"
-          >
-            <template #trigger>
-              <button
-                type="button"
-                class="flex items-center w-full gap-2 px-3 py-2 text-sm text-left transition-colors bg-white border border-gray-300 rounded-md dark:text-white dark:bg-gray-800 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-primary-500 focus:outline-none"
-              >
-                <IconCalendar class="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                <span :class="expirationDate ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400'">
-                  {{ expirationDate ? dayjs(expirationDate).format('YYYY-MM-DD') : t('select-expiration-date') }}
-                </span>
-              </button>
-            </template>
-          </VueDatePicker>
-        </div>
-      </div>
-    </Teleport>
-
-    <!-- Teleport Content for Change Name Modal -->
-    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('change-api-key-name')" defer to="#dialog-v2-content">
-      <div class="space-y-4">
-        <FormKit
-          v-model="newApiKeyName"
-          type="text"
-          :label="t('name')"
-          :placeholder="t('type-new-name')"
-          validation="required|length:1,32"
-          :validation-messages="{
-            required: t('name-required'),
-            length: t('name-length-error'),
-          }"
-        />
-      </div>
-    </Teleport>
-
-    <!-- Teleport Content for Organization Selection Modal -->
-    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-confirm-org-limit')" defer to="#dialog-v2-content">
-      <div class="space-y-4">
-        <div class="p-2 overflow-y-auto border rounded-lg max-h-64">
-          <div v-for="org in organizationStore.organizations" :key="org.gid" class="flex items-center gap-2 p-2">
-            <input
-              :id="`org-select-${org.gid}`"
-              :value="org.gid"
-              type="checkbox"
-              class="checkbox"
-              @change="handleOrgSelection(org.gid, ($event.target as HTMLInputElement).checked)"
-            >
-            <label :for="`org-select-${org.gid}`" class="text-sm">
-              {{ org.name }}
-            </label>
-          </div>
-        </div>
-        <div class="flex items-center gap-2 mt-4">
-          <input
-            id="limit-to-app-org"
-            v-model="limitToOrgCheckbox"
-            type="checkbox"
-            class="checkbox"
-          >
-          <label for="limit-to-app-org" class="text-sm">
-            {{ t('limit-to-app') }}
-          </label>
-        </div>
-      </div>
-    </Teleport>
-
-    <!-- Teleport Content for App Selection Modal -->
-    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-confirm-appid-limit')" defer to="#dialog-v2-content">
-      <div class="space-y-4">
-        <div class="p-2 overflow-y-auto border rounded-lg max-h-64">
-          <div v-for="app in availableApps" :key="app.app_id" class="flex items-center gap-2 p-2">
-            <input
-              :id="`app-${app.app_id}`"
-              :value="app"
-              type="checkbox"
-              class="checkbox"
-              @change="handleAppSelection(app as any, ($event.target as HTMLInputElement).checked)"
-            >
-            <label :for="`app-${app.app_id}`" class="text-sm">
-              {{ app.name }}
-            </label>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+      </Teleport>
+    </div>
   </div>
 </template>
+
+<route lang="yaml">
+path: /apikeys
+</route>
