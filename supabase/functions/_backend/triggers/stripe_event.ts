@@ -39,7 +39,7 @@ function isCheckoutSessionEvent(event: Stripe.Event) {
 function getPaidAtUpdate(
   currentStripeInfo: Pick<StripeInfoRow, 'paid_at' | 'status'> | null | undefined,
   nextStatus: Database['public']['Enums']['stripe_status'] | null | undefined,
-  nowIso: string = new Date().toISOString(),
+  eventOccurredAtIso: string = new Date().toISOString(),
 ) {
   if (nextStatus !== 'succeeded')
     return undefined
@@ -50,7 +50,7 @@ function getPaidAtUpdate(
   if (currentStripeInfo?.status === 'succeeded')
     return undefined
 
-  return nowIso
+  return eventOccurredAtIso
 }
 
 async function getCreditTopUpProductIdFromCustomer(c: Context, customerId: string): Promise<string> {
@@ -326,6 +326,7 @@ async function createdOrUpdated(
   stripeData: StripeData,
   org: Org,
   currentStripeInfo: Pick<StripeInfoRow, 'paid_at' | 'status'> | null | undefined,
+  eventOccurredAtIso: string,
   originalStatus?: string,
 ) {
   const status = originalStatus ?? stripeData.data.status
@@ -340,7 +341,7 @@ async function createdOrUpdated(
     const updateData = Object.fromEntries(
       Object.entries(stripeData.data).filter(([_, v]) => v !== undefined),
     )
-    const paidAt = getPaidAtUpdate(currentStripeInfo, stripeData.data.status)
+    const paidAt = getPaidAtUpdate(currentStripeInfo, stripeData.data.status, eventOccurredAtIso)
     if (paidAt)
       updateData.paid_at = paidAt
     const { error: dbError2 } = await supabaseAdmin(c)
@@ -523,8 +524,9 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
 
   if (['created', 'succeeded', 'updated'].includes(stripeData.data.status ?? '') && stripeData.data.price_id && stripeData.data.product_id) {
     const originalStatus = stripeData.data.status
+    const eventOccurredAtIso = new Date(stripeEvent.created * 1000).toISOString()
     stripeData.data.status = 'succeeded'
-    await createdOrUpdated(c, stripeData, org, customer, originalStatus!)
+    await createdOrUpdated(c, stripeData, org, customer, eventOccurredAtIso, originalStatus!)
   }
   else if (stripeData.data.status === 'failed') {
     await trackBentoEvent(c, org.management_email, {}, 'org:failed_payment')

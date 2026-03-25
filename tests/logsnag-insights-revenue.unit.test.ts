@@ -32,4 +32,12 @@ describe('logsnag revenue metric helpers', () => {
     expect(nextDayStart.toISOString()).toBe('2026-03-25T00:00:00.000Z')
     expect(dayDateId).toBe('2026-03-24')
   })
+
+  it.concurrent('builds the previous completed UTC day window for scheduled snapshots', () => {
+    const { dayStart, nextDayStart, dayDateId } = logsnagInsightsTestUtils.getCompletedDayWindow(new Date('2026-03-25T01:01:00.000Z'))
+
+    expect(dayStart.toISOString()).toBe('2026-03-24T00:00:00.000Z')
+    expect(nextDayStart.toISOString()).toBe('2026-03-25T00:00:00.000Z')
+    expect(dayDateId).toBe('2026-03-24')
+  })
 })

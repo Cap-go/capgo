@@ -3,15 +3,15 @@ import { stripeEventTestUtils } from '../supabase/functions/_backend/triggers/st
 
 describe('stripe paid_at tracking', () => {
   it.concurrent('sets paid_at when an org becomes paying for the first time', () => {
-    const nowIso = '2026-03-24T12:00:00.000Z'
+    const eventOccurredAtIso = '2026-03-24T12:00:00.000Z'
 
     expect(
       stripeEventTestUtils.getPaidAtUpdate(
         { paid_at: null, status: null },
         'succeeded',
-        nowIso,
+        eventOccurredAtIso,
       ),
-    ).toBe(nowIso)
+    ).toBe(eventOccurredAtIso)
   })
 
   it.concurrent('does not overwrite an existing paid_at timestamp', () => {

@@ -8,6 +8,12 @@ SET paid_at = created_at
 WHERE paid_at IS NULL
   AND status = 'succeeded';
 
+UPDATE public.stripe_info
+SET paid_at = COALESCE(subscription_anchor_start, created_at)
+WHERE paid_at IS NULL
+  AND status IN ('canceled', 'failed', 'deleted')
+  AND subscription_id IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS stripe_info_paid_at_idx
 ON public.stripe_info (paid_at)
 WHERE paid_at IS NOT NULL;

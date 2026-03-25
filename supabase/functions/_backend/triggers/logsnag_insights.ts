@@ -121,6 +121,15 @@ function getCurrentDayWindow(referenceDate = new Date()): CurrentDayWindow {
   }
 }
 
+function getCompletedDayWindow(referenceDate = new Date()): CurrentDayWindow {
+  const { prevDayStart, prevDayEnd, prevDayDateId } = getDailyWindow(referenceDate)
+  return {
+    dayStart: prevDayStart,
+    nextDayStart: prevDayEnd,
+    dayDateId: prevDayDateId,
+  }
+}
+
 function countUniqueCustomers(...rowSets: Array<Array<CustomerIdRow | null | undefined>>) {
   return new Set(
     rowSets
@@ -515,7 +524,14 @@ async function countDemoSeededApps(c: Context, createdAfterIso: string): Promise
 function getStats(c: Context, window?: DailyWindow): GlobalStats {
   const supabase = supabaseAdmin(c)
   const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-  const { dayStart, nextDayStart } = getCurrentDayWindow()
+  const metricWindow = window
+    ? {
+        dayStart: window.prevDayStart,
+        nextDayStart: window.prevDayEnd,
+        dayDateId: window.prevDayDateId,
+      }
+    : getCurrentDayWindow()
+  const { dayStart, nextDayStart } = metricWindow
   const dayStartIso = dayStart.toISOString()
   const nextDayStartIso = nextDayStart.toISOString()
   return {
@@ -711,6 +727,7 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
 
 export const logsnagInsightsTestUtils = {
   countUniqueCustomers,
+  getCompletedDayWindow,
   getCurrentDayWindow,
 }
 
