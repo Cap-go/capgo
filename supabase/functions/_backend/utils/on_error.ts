@@ -3,6 +3,7 @@ import type { SimpleErrorResponse } from './hono.ts'
 import { DrizzleError, entityKind, TransactionRollbackError } from 'drizzle-orm'
 import { sendDiscordAlert500 } from './discord.ts'
 import { cloudlogErr, serializeError } from './logging.ts'
+import { capturePosthogException } from './posthog.ts'
 import { backgroundTask } from './utils.ts'
 
 const drizzleErrorNames = new Set(['DrizzleError', 'DrizzleQueryError', 'TransactionRollbackError'])
@@ -116,8 +117,13 @@ export function onError(functionName: string) {
       }
       if (e.status >= 500) {
         await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
+        void backgroundTask(c, capturePosthogException(c, {
+          error: e,
+          functionName,
+          kind: 'http_exception',
+          status: e.status,
+        }))
       }
-      c.get('sentry')?.captureException(e)
       return c.json(res, e.status)
     }
     if (isDrizzleError) {
@@ -135,7 +141,12 @@ export function onError(functionName: string) {
         },
       })
       await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
-      c.get('sentry')?.captureException(e)
+      void backgroundTask(c, capturePosthogException(c, {
+        error: e,
+        functionName,
+        kind: 'drizzle_error',
+        status: 500,
+      }))
       return c.json(defaultResponse, 500)
     }
     // Non-HTTP errors: log with stack and return 500
@@ -149,7 +160,12 @@ export function onError(functionName: string) {
       stack: serializeError(e)?.stack ?? 'N/A',
     })
     await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
-    c.get('sentry')?.captureException(e)
+    void backgroundTask(c, capturePosthogException(c, {
+      error: e,
+      functionName,
+      kind: 'unhandled_error',
+      status: 500,
+    }))
     return c.json(defaultResponse, 500)
   }
 }
