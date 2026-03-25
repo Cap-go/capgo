@@ -17,6 +17,7 @@ SET search_path = '' AS $function$
 DECLARE
   v_org_id uuid;
   v_lock_key integer;
+  v_lock_acquired boolean := false;
 BEGIN
   IF p_app_id IS NULL OR p_app_id = '' THEN
     RETURN;
@@ -45,9 +46,10 @@ BEGIN
   -- Use a session lock so dedupe stays atomic without accumulating xact locks
   -- across the whole cron sweep.
   v_lock_key := pg_catalog.hashtext(p_app_id);
-  PERFORM pg_catalog.pg_advisory_lock(v_lock_key);
-
   BEGIN
+    PERFORM pg_catalog.pg_advisory_lock(v_lock_key);
+    v_lock_acquired := true;
+
     IF NOT EXISTS (
       SELECT 1
       FROM pgmq.q_cron_stat_app AS queued_job
@@ -65,16 +67,21 @@ BEGIN
         )
       );
     END IF;
+
+    PERFORM pg_catalog.pg_advisory_unlock(v_lock_key);
+    v_lock_acquired := false;
   EXCEPTION
     WHEN query_canceled THEN
-      PERFORM pg_catalog.pg_advisory_unlock(v_lock_key);
+      IF v_lock_acquired THEN
+        PERFORM pg_catalog.pg_advisory_unlock(v_lock_key);
+      END IF;
       RAISE;
     WHEN OTHERS THEN
-      PERFORM pg_catalog.pg_advisory_unlock(v_lock_key);
+      IF v_lock_acquired THEN
+        PERFORM pg_catalog.pg_advisory_unlock(v_lock_key);
+      END IF;
       RAISE;
   END;
-
-  PERFORM pg_catalog.pg_advisory_unlock(v_lock_key);
 END;
 $function$;
 
