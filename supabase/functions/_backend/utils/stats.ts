@@ -143,15 +143,15 @@ export function readStatsVersion(c: Context, app_id: string, start_date: string,
   return readStatsVersionCF(c, app_id, start_date, end_date)
 }
 
-async function queueCronStatApp(c: Context, app_id: string, org_id?: string) {
-  const { error } = await supabaseAdmin(c).rpc('queue_cron_stat_app_for_app', {
-    p_app_id: app_id,
-    ...(org_id ? { p_org_id: org_id } : {}),
-  })
-  if (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Failed to queue cron_stat_app from live usage', app_id, org_id, error })
-  }
-}
+// async function queueCronStatApp(c: Context, app_id: string, org_id?: string) {
+//   const { error } = await supabaseAdmin(c).rpc('queue_cron_stat_app_for_app', {
+//     p_app_id: app_id,
+//     ...(org_id ? { p_org_id: org_id } : {}),
+//   })
+//   if (error) {
+//     cloudlog({ requestId: c.get('requestId'), message: 'Failed to queue cron_stat_app from live usage', app_id, org_id, error })
+//   }
+// }
 
 function shouldUseAnalyticsEngine(c: Context): boolean {
   if (getRuntimeKey() !== 'workerd' || !c.env.DEVICE_INFO)
