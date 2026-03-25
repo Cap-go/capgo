@@ -26,7 +26,7 @@ else {
 }
 
 webServer.push({
-  command: 'bun run serve:dev',
+  command: 'bun run serve:worktree',
   port: 5173,
   timeout: 60_000,
   reuseExistingServer: true,

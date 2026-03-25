@@ -29,7 +29,6 @@ test.describe('Authentication', () => {
   })
 
   test('should show error for invalid credentials', async ({ page }) => {
-    test.fixme(true, 'Local auth E2E needs a Turnstile bypass')
     await continueToPasswordStep(page, 'wrong@example.com')
     await page.fill('[data-test="password"]', 'wrongpass')
     await page.click('[data-test="submit"]')
@@ -37,7 +36,6 @@ test.describe('Authentication', () => {
   })
 
   test('should show error for deleted account', async ({ page }) => {
-    test.fixme(true, 'Local auth E2E needs a Turnstile bypass')
     await continueToPasswordStep(page, 'deleted@capgo.app')
     await page.fill('[data-test="password"]', 'password')
     await page.click('[data-test="submit"]')
@@ -45,7 +43,6 @@ test.describe('Authentication', () => {
   })
 
   test('should login successfully and redirect', async ({ page }) => {
-    test.fixme(true, 'Local auth E2E needs a Turnstile bypass')
     await continueToPasswordStep(page, 'test@capgo.app')
     await page.fill('[data-test="password"]', 'testtest')
     await page.click('[data-test="submit"]')
@@ -70,7 +67,6 @@ test.describe('Password Reset', () => {
   })
 
   test('should show success message after password reset request', async ({ page }) => {
-    test.fixme(true, 'Local auth E2E needs a Turnstile bypass')
     await page.fill('[data-test="email"]', 'test@capgo.app')
     await page.waitForSelector('[data-test="submit"]:not([disabled])')
     await page.click('[data-test="submit"]')

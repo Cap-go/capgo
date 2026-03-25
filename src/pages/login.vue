@@ -346,6 +346,7 @@ async function checkMagicLink() {
   const logSession = await autoAuth(route)
   if (!logSession) {
     isLoading.value = false
+    hideLoader()
     return
   }
   if (logSession.user && logSession?.user?.email && logSession?.user?.id) {
@@ -421,6 +422,11 @@ async function checkLogin() {
       isLoading.value = false
       hideLoader()
     }
+  }
+  catch (error) {
+    console.error('Login bootstrap failed', error)
+    isLoading.value = false
+    hideLoader()
   }
   finally {
     isCheckingSavedSession.value = false
