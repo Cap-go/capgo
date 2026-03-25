@@ -9,14 +9,14 @@
 
 CREATE OR REPLACE FUNCTION public.queue_cron_stat_app_for_app(
   p_app_id character varying,
-  p_org_id uuid DEFAULT NULL,
-  p_use_advisory_lock boolean DEFAULT true
+  p_org_id uuid DEFAULT NULL
 ) RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = '' AS $function$
 DECLARE
   v_org_id uuid;
+  v_lock_key integer;
 BEGIN
   IF p_app_id IS NULL OR p_app_id = '' THEN
     RETURN;
@@ -39,38 +39,45 @@ BEGIN
     RETURN;
   END IF;
 
-  IF p_use_advisory_lock THEN
-    PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(p_app_id));
-  END IF;
+  -- Use a session lock so dedupe stays atomic without accumulating xact locks
+  -- across the whole cron sweep.
+  v_lock_key := pg_catalog.hashtext(p_app_id);
+  PERFORM pg_catalog.pg_advisory_lock(v_lock_key);
 
-  IF EXISTS (
-    SELECT 1
-    FROM pgmq.q_cron_stat_app AS queued_job
-    WHERE queued_job.message->'payload'->>'appId' = p_app_id
-  ) THEN
-    RETURN;
-  END IF;
+  BEGIN
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pgmq.q_cron_stat_app AS queued_job
+      WHERE queued_job.message->'payload'->>'appId' = p_app_id
+    ) THEN
+      PERFORM pgmq.send('cron_stat_app',
+        jsonb_build_object(
+          'function_name', 'cron_stat_app',
+          'function_type', 'cloudflare',
+          'payload', jsonb_build_object(
+            'appId', p_app_id,
+            'orgId', v_org_id,
+            'todayOnly', false
+          )
+        )
+      );
+    END IF;
+  EXCEPTION
+    WHEN OTHERS THEN
+      PERFORM pg_catalog.pg_advisory_unlock(v_lock_key);
+      RAISE;
+  END;
 
-  PERFORM pgmq.send('cron_stat_app',
-    jsonb_build_object(
-      'function_name', 'cron_stat_app',
-      'function_type', 'cloudflare',
-      'payload', jsonb_build_object(
-        'appId', p_app_id,
-        'orgId', v_org_id,
-        'todayOnly', false
-      )
-    )
-  );
+  PERFORM pg_catalog.pg_advisory_unlock(v_lock_key);
 END;
 $function$;
 
-ALTER FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid, boolean) OWNER TO postgres;
+ALTER FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid) OWNER TO postgres;
 
-REVOKE ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid, boolean) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid, boolean) FROM anon;
-REVOKE ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid, boolean) FROM authenticated;
-GRANT ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid, boolean) TO service_role;
+REVOKE ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid) FROM anon;
+REVOKE ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid) FROM authenticated;
+GRANT ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid) TO service_role;
 
 CREATE INDEX IF NOT EXISTS idx_device_usage_timestamp_app_id
   ON public.device_usage USING btree (timestamp, app_id);
@@ -117,7 +124,7 @@ BEGIN
     WHERE COALESCE(a.owner_org, da.owner_org) IS NOT NULL
   )
   LOOP
-    PERFORM public.queue_cron_stat_app_for_app(app_record.app_id, app_record.owner_org, false);
+    PERFORM public.queue_cron_stat_app_for_app(app_record.app_id, app_record.owner_org);
   END LOOP;
 END;
 $function$;

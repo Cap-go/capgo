@@ -2,16 +2,16 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   ORG_ID_CRON_QUEUE,
-  PLUGIN_BASE_URL,
-  STRIPE_CUSTOMER_ID_CRON_QUEUE,
   createAppVersions,
   executeSQL,
   getBaseData,
+  getEndpointUrl,
   headers,
   resetAndSeedAppData,
   resetAndSeedAppDataStats,
   resetAppData,
   resetAppDataStats,
+  STRIPE_CUSTOMER_ID_CRON_QUEUE,
 } from './test-utils.ts'
 
 const processCronAppId = `com.cron.queue.${randomUUID().slice(0, 8)}`
@@ -91,14 +91,14 @@ describe('cron_stat_app queue resilience', () => {
       version_name: versionName,
     }
 
-    const firstResponse = await fetch(`${PLUGIN_BASE_URL}/stats`, {
+    const firstResponse = await fetch(getEndpointUrl('/stats'), {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
     })
     expect(firstResponse.status).toBe(200)
 
-    const secondResponse = await fetch(`${PLUGIN_BASE_URL}/stats`, {
+    const secondResponse = await fetch(getEndpointUrl('/stats'), {
       method: 'POST',
       headers,
       body: JSON.stringify({

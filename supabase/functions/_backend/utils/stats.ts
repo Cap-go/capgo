@@ -54,11 +54,13 @@ export function createStatsBandwidth(c: Context, device_id: string, app_id: stri
   cloudlog({ requestId: c.get('requestId'), message: 'createStatsBandwidth', device_id: lowerDeviceId, app_id, file_size })
   if (file_size === 0)
     return
-  void backgroundTask(c, queueCronStatApp(c, app_id))
-  if (!c.env.BANDWIDTH_USAGE) {
-    return Promise.resolve(trackBandwidthUsageSB(c, lowerDeviceId, app_id, file_size))
-  }
-  return Promise.resolve(trackBandwidthUsageCF(c, lowerDeviceId, app_id, file_size))
+  const trackingJob = !c.env.BANDWIDTH_USAGE
+    ? Promise.resolve(trackBandwidthUsageSB(c, lowerDeviceId, app_id, file_size))
+    : Promise.resolve(trackBandwidthUsageCF(c, lowerDeviceId, app_id, file_size))
+  return backgroundTask(c, Promise.all([
+    queueCronStatApp(c, app_id),
+    trackingJob,
+  ]))
 }
 
 export type VersionAction = 'get' | 'fail' | 'install' | 'uninstall'
@@ -142,9 +144,9 @@ export function readStatsVersion(c: Context, app_id: string, start_date: string,
 }
 
 async function queueCronStatApp(c: Context, app_id: string, org_id?: string) {
-  const { error } = await supabaseAdmin(c).rpc('queue_cron_stat_app_for_app' as any, {
+  const { error } = await supabaseAdmin(c).rpc('queue_cron_stat_app_for_app', {
     p_app_id: app_id,
-    p_org_id: org_id ?? null,
+    p_org_id: org_id ?? undefined,
   })
   if (error) {
     cloudlog({ requestId: c.get('requestId'), message: 'Failed to queue cron_stat_app from live usage', app_id, org_id, error })
