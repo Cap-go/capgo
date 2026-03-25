@@ -99,25 +99,25 @@ BEGIN
     WITH active_apps AS (
       SELECT DISTINCT av.app_id
       FROM public.app_versions av
-      WHERE av.created_at >= NOW() - INTERVAL '30 days'
+      WHERE av.created_at >= pg_catalog.now() - INTERVAL '30 days'
 
       UNION
 
       SELECT DISTINCT dm.app_id
       FROM public.daily_mau dm
-      WHERE dm.date >= NOW() - INTERVAL '30 days' AND dm.mau > 0
+      WHERE dm.date >= pg_catalog.now() - INTERVAL '30 days' AND dm.mau > 0
 
       UNION
 
       SELECT DISTINCT du.app_id
       FROM public.device_usage du
-      WHERE du.timestamp >= NOW() - INTERVAL '30 days'
+      WHERE du.timestamp >= pg_catalog.now() - INTERVAL '30 days'
 
       UNION
 
       SELECT DISTINCT bu.app_id
       FROM public.bandwidth_usage bu
-      WHERE bu.timestamp >= NOW() - INTERVAL '30 days'
+      WHERE bu.timestamp >= pg_catalog.now() - INTERVAL '30 days'
     )
     SELECT DISTINCT
       active_apps.app_id,
