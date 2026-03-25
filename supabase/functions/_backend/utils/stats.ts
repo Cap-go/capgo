@@ -11,7 +11,7 @@ import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, 
 import { DEFAULT_LIMIT } from './types.ts'
 import { backgroundTask, getEnv, isInternalVersionName } from './utils.ts'
 
-export function createStatsMau(c: Context, device_id: string, app_id: string, org_id: string, platform: string) {
+export function createStatsMau(c: Context, device_id: string, app_id: string, org_id: string, platform: string): Promise<void> {
   const lowerDeviceId = device_id
   const jobs: Promise<unknown>[] = [
     queueCronStatApp(c, app_id, org_id),
@@ -22,7 +22,7 @@ export function createStatsMau(c: Context, device_id: string, app_id: string, or
   else {
     jobs.push(Promise.resolve(trackDeviceUsageCF(c, lowerDeviceId, app_id, org_id, platform)))
   }
-  return Promise.all(jobs)
+  return Promise.all(jobs).then(() => undefined)
 }
 
 export async function onPremStats(c: Context, app_id: string, action: string, device: DeviceWithoutCreatedAt) {

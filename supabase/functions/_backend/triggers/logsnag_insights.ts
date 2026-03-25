@@ -648,6 +648,7 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
         .from('stripe_info')
         .select('customer_id')
         .not('paid_at', 'is', null)
+        .eq('is_good_plan', true)
         .gte('paid_at', dayStartIso)
         .lt('paid_at', nextDayStartIso),
       supabase

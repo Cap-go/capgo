@@ -41,7 +41,7 @@ function getPaidAtUpdate(
   nextStatus: Database['public']['Enums']['stripe_status'] | null | undefined,
   eventOccurredAtIso: string = new Date().toISOString(),
 ) {
-  if (nextStatus !== 'succeeded')
+  if (!nextStatus || !['created', 'succeeded'].includes(nextStatus))
     return undefined
 
   if (currentStripeInfo?.paid_at)
@@ -346,7 +346,7 @@ async function createdOrUpdated(
   org: Org,
   currentStripeInfo: Pick<StripeInfoRow, 'paid_at' | 'status'> | null | undefined,
   eventOccurredAtIso: string,
-  originalStatus?: string,
+  originalStatus?: Database['public']['Enums']['stripe_status'] | null,
 ) {
   const status = originalStatus ?? stripeData.data.status
   let statusName: string = status ?? ''
@@ -360,7 +360,7 @@ async function createdOrUpdated(
     const updateData = Object.fromEntries(
       Object.entries(stripeData.data).filter(([_, v]) => v !== undefined),
     )
-    const paidAt = getPaidAtUpdate(currentStripeInfo, stripeData.data.status, eventOccurredAtIso)
+    const paidAt = getPaidAtUpdate(currentStripeInfo, status, eventOccurredAtIso)
     if (paidAt)
       updateData.paid_at = paidAt
     const { error: dbError2 } = await supabaseAdmin(c)
