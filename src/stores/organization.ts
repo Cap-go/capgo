@@ -107,6 +107,22 @@ function legacyRoleRank(role?: string | null) {
   return LEGACY_ROLE_RANK[normalized] ?? null
 }
 
+export function roleHasLegacyMinRight(role: string | null | undefined, minRight: LegacyMinRight) {
+  const roleRank = legacyRoleRank(role)
+  const requiredRank = legacyRoleRank(minRight)
+  if (roleRank === null || requiredRank === null)
+    return false
+  return roleRank >= requiredRank
+}
+
+export function isAdminRole(role: string | null | undefined) {
+  return roleHasLegacyMinRight(role, 'admin')
+}
+
+export function isSuperAdminRole(role: string | null | undefined) {
+  return roleHasLegacyMinRight(role, 'super_admin')
+}
+
 function normalizeRbacRole(role: string, scope: 'org' | 'app') {
   const legacy = normalizeLegacyRole(role)
   if (!legacy)
@@ -443,11 +459,7 @@ export const useOrganizationStore = defineStore('organization', () => {
         return true
     }
 
-    const roleRank = legacyRoleRank(role)
-    const requiredRank = legacyRoleRank(minRight)
-    if (roleRank === null || requiredRank === null)
-      return false
-    return roleRank >= requiredRank
+    return roleHasLegacyMinRight(role, minRight)
   }
 
   // Check password policy compliance for all org members (for super_admin preview)

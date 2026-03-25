@@ -18,7 +18,7 @@ import { getCurrentPlanNameOrg, isPayingOrg, useSupabase } from '~/services/supa
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
-import { useOrganizationStore } from '~/stores/organization'
+import { isSuperAdminRole, useOrganizationStore } from '~/stores/organization'
 // tabs handled by settings layout
 
 const version = import.meta.env.VITE_APP_VERSION
@@ -59,7 +59,7 @@ async function checkOrganizationImpact() {
   ])
 
   // Get all organizations where user is super_admin
-  const superAdminOrgs = organizationStore.organizations.filter(org => org.role === 'super_admin' || org.role === 'org_super_admin')
+  const superAdminOrgs = organizationStore.organizations.filter(org => isSuperAdminRole(org.role))
 
   if (superAdminOrgs.length === 0) {
     return { orgsToBeDeleted: [], paidOrgsToBeDeleted: [], canProceed: true }
@@ -84,7 +84,7 @@ async function checkOrganizationImpact() {
         }
 
         superAdminCount = members.filter(member =>
-          !member.is_invite && !member.is_tmp && member.role_name === 'org_super_admin',
+          !member.is_invite && !member.is_tmp && isSuperAdminRole(member.role_name),
         ).length
       }
       else {
@@ -97,9 +97,7 @@ async function checkOrganizationImpact() {
         }
 
         // Count super_admins (excluding temporary users)
-        superAdminCount = members.filter(member =>
-          member.role === 'super_admin' && !member.is_tmp,
-        ).length
+        superAdminCount = members.filter(member => isSuperAdminRole(member.role) && !member.is_tmp).length
       }
 
       // If user is the only super_admin, this org will be deleted

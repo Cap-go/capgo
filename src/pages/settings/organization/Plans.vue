@@ -15,7 +15,7 @@ import { openSupport } from '~/services/support'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
-import { useOrganizationStore } from '~/stores/organization'
+import { isSuperAdminRole, useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
 const mainStore = useMainStore()
@@ -220,7 +220,7 @@ async function openChangePlan(plan: Database['public']['Tables']['plans']['Row']
       .filter(org =>
         org.gid !== currentOrganization.value?.gid
         && org.app_count > 0
-        && org.role.includes('super_admin'),
+        && isSuperAdminRole(org.role),
       )
       .sort((a, b) => b.app_count - a.app_count)
 
@@ -344,7 +344,7 @@ watch(currentOrganization, async (newOrg, prevOrg) => {
         const orgsMap = organizationStore.getAllOrgs()
         const newOrg = [...orgsMap]
           .map(([_, a]) => a)
-          .filter(org => org.role.includes('super_admin'))
+          .filter(org => isSuperAdminRole(org.role))
           .sort((a, b) => b.app_count - a.app_count)[0]
 
         if (newOrg) {
@@ -398,7 +398,7 @@ watchEffect(async () => {
           const orgsMap = organizationStore.getAllOrgs()
           const newOrg = [...orgsMap]
             .map(([_, a]) => a)
-            .filter(org => org.role.includes('super_admin'))
+            .filter(org => isSuperAdminRole(org.role))
             .sort((a, b) => b.app_count - a.app_count)[0]
 
           if (newOrg) {
