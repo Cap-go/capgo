@@ -41,6 +41,11 @@ interface DailyWindow {
   prevDayEnd: Date
   prevDayDateId: string
 }
+interface CurrentDayWindow {
+  dayStart: Date
+  nextDayStart: Date
+  dayDateId: string
+}
 interface PlanRevenue {
   mrr: number
   total_revenue: number
@@ -86,6 +91,9 @@ interface GlobalStats {
   plugin_breakdown: PromiseLike<PluginBreakdownResult>
   build_stats: PromiseLike<BuildStats>
 }
+interface CustomerIdRow {
+  customer_id: string
+}
 
 function getDateId(targetDate = new Date()): string {
   return new Date(Date.UTC(targetDate.getUTCFullYear(), targetDate.getUTCMonth(), targetDate.getUTCDate())).toISOString().slice(0, 10)
@@ -100,6 +108,35 @@ function getDailyWindow(referenceDate = new Date()): DailyWindow {
     prevDayEnd,
     prevDayDateId: getDateId(prevDayStart),
   }
+}
+
+function getCurrentDayWindow(referenceDate = new Date()): CurrentDayWindow {
+  const dayStartMillis = Date.UTC(referenceDate.getUTCFullYear(), referenceDate.getUTCMonth(), referenceDate.getUTCDate())
+  const dayStart = new Date(dayStartMillis)
+  const nextDayStart = new Date(dayStartMillis + 24 * 60 * 60 * 1000)
+  return {
+    dayStart,
+    nextDayStart,
+    dayDateId: getDateId(dayStart),
+  }
+}
+
+function getCompletedDayWindow(referenceDate = new Date()): CurrentDayWindow {
+  const { prevDayStart, prevDayEnd, prevDayDateId } = getDailyWindow(referenceDate)
+  return {
+    dayStart: prevDayStart,
+    nextDayStart: prevDayEnd,
+    dayDateId: prevDayDateId,
+  }
+}
+
+function countUniqueCustomers(...rowSets: Array<Array<CustomerIdRow | null | undefined>>) {
+  return new Set(
+    rowSets
+      .flat()
+      .filter((row): row is CustomerIdRow => Boolean(row?.customer_id))
+      .map(row => row.customer_id),
+  ).size
 }
 
 function isMissingBuildMetricColumnError(error: unknown): boolean {
@@ -487,6 +524,16 @@ async function countDemoSeededApps(c: Context, createdAfterIso: string): Promise
 function getStats(c: Context, window?: DailyWindow): GlobalStats {
   const supabase = supabaseAdmin(c)
   const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+  const metricWindow = window
+    ? {
+        dayStart: window.prevDayStart,
+        nextDayStart: window.prevDayEnd,
+        dayDateId: window.prevDayDateId,
+      }
+    : getCurrentDayWindow()
+  const { dayStart, nextDayStart } = metricWindow
+  const dayStartIso = dayStart.toISOString()
+  const nextDayStartIso = nextDayStart.toISOString()
   return {
     apps: countAllApps(c),
     updates: countAllUpdates(c),
@@ -596,26 +643,39 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
         return Number.isFinite(gigabytes) ? Number(gigabytes.toFixed(2)) : 0
       }),
     revenue: calculateRevenue(c),
-    new_paying_orgs: supabase
-      .from('stripe_info')
-      .select('customer_id', { count: 'exact', head: false })
-      .eq('status', 'succeeded')
-      .eq('is_good_plan', true)
-      .gte('created_at', last24h)
-      .then((res) => {
-        if (res.error) {
-          cloudlog({ requestId: c.get('requestId'), message: 'new_paying_orgs error', error: res.error })
-          return 0
-        }
-        // Count unique customer_ids (orgs) that started paying today
-        const uniqueCustomers = new Set((res.data || []).map(row => row.customer_id))
-        return uniqueCustomers.size
-      }),
+    new_paying_orgs: Promise.all([
+      supabase
+        .from('stripe_info')
+        .select('customer_id')
+        .not('paid_at', 'is', null)
+        .eq('is_good_plan', true)
+        .gte('paid_at', dayStartIso)
+        .lt('paid_at', nextDayStartIso),
+      supabase
+        .from('stripe_info')
+        .select('customer_id')
+        .is('paid_at', null)
+        .eq('status', 'succeeded')
+        .eq('is_good_plan', true)
+        .gte('created_at', dayStartIso)
+        .lt('created_at', nextDayStartIso),
+    ]).then(([paidToday, legacyFallback]) => {
+      if (paidToday.error) {
+        cloudlog({ requestId: c.get('requestId'), message: 'new_paying_orgs paid_at error', error: paidToday.error })
+        return 0
+      }
+      if (legacyFallback.error) {
+        cloudlog({ requestId: c.get('requestId'), message: 'new_paying_orgs legacy fallback error', error: legacyFallback.error })
+        return 0
+      }
+      return countUniqueCustomers(paidToday.data || [], legacyFallback.data || [])
+    }),
     canceled_orgs: supabase
       .from('stripe_info')
-      .select('customer_id', { count: 'exact', head: false })
+      .select('customer_id')
       .not('canceled_at', 'is', null)
-      .gte('canceled_at', last24h)
+      .gte('canceled_at', dayStartIso)
+      .lt('canceled_at', nextDayStartIso)
       .then((res) => {
         if (res.error) {
           cloudlog({ requestId: c.get('requestId'), message: 'canceled_orgs error', error: res.error })
@@ -627,8 +687,9 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
       }),
     upgraded_orgs: supabase
       .from('stripe_info')
-      .select('customer_id', { count: 'exact', head: false })
-      .gte('upgraded_at', last24h)
+      .select('customer_id')
+      .gte('upgraded_at', dayStartIso)
+      .lt('upgraded_at', nextDayStartIso)
       .then((res) => {
         if (res.error) {
           cloudlog({ requestId: c.get('requestId'), message: 'upgraded_orgs error', error: res.error })
@@ -665,12 +726,18 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
   }
 }
 
+export const logsnagInsightsTestUtils = {
+  countUniqueCustomers,
+  getCompletedDayWindow,
+  getCurrentDayWindow,
+}
+
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', middlewareAPISecret, async (c) => {
   const dailyWindow = getDailyWindow()
   const res = getStats(c, dailyWindow)
-  const snapshotDateId = getDateId()
+  const snapshotDateId = dailyWindow.prevDayDateId
   const [
     apps,
     updates,
