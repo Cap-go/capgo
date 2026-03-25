@@ -14,7 +14,7 @@ import { backgroundTask, getEnv, isInternalVersionName } from './utils.ts'
 export function createStatsMau(c: Context, device_id: string, app_id: string, org_id: string, platform: string): Promise<void> {
   const lowerDeviceId = device_id
   const jobs: Promise<unknown>[] = [
-    queueCronStatApp(c, app_id, org_id),
+    // queueCronStatApp(c, app_id, org_id),
   ]
   if (!c.env.DEVICE_USAGE) {
     jobs.push(Promise.resolve(trackDeviceUsageSB(c, lowerDeviceId, app_id, org_id)))
