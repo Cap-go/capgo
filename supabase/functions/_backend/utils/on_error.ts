@@ -117,14 +117,13 @@ export function onError(functionName: string) {
       }
       if (e.status >= 500) {
         await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
+        void backgroundTask(c, capturePosthogException(c, {
+          error: e,
+          functionName,
+          kind: 'http_exception',
+          status: e.status,
+        }))
       }
-      await backgroundTask(c, capturePosthogException(c, {
-        error: e,
-        functionName,
-        kind: 'http_exception',
-        requestBody: body,
-        status: e.status,
-      }))
       return c.json(res, e.status)
     }
     if (isDrizzleError) {
@@ -142,11 +141,10 @@ export function onError(functionName: string) {
         },
       })
       await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
-      await backgroundTask(c, capturePosthogException(c, {
+      void backgroundTask(c, capturePosthogException(c, {
         error: e,
         functionName,
         kind: 'drizzle_error',
-        requestBody: body,
         status: 500,
       }))
       return c.json(defaultResponse, 500)
@@ -162,11 +160,10 @@ export function onError(functionName: string) {
       stack: serializeError(e)?.stack ?? 'N/A',
     })
     await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
-    await backgroundTask(c, capturePosthogException(c, {
+    void backgroundTask(c, capturePosthogException(c, {
       error: e,
       functionName,
       kind: 'unhandled_error',
-      requestBody: body,
       status: 500,
     }))
     return c.json(defaultResponse, 500)

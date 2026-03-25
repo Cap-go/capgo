@@ -79,6 +79,7 @@ describe('onError PostHog capture', () => {
       kind: 'http_exception',
       status: 500,
     }))
+    expect(capturePosthogExceptionMock.mock.calls[0]?.[1]).not.toHaveProperty('requestBody')
     expect(response).toEqual({
       body: {
         error: 'internal_error',
@@ -86,6 +87,29 @@ describe('onError PostHog capture', () => {
         moreInfo: { trace: 'abc' },
       },
       status: 500,
+    })
+  })
+
+  it.concurrent('skips PostHog capture for client HTTP exceptions', async () => {
+    const { onError } = await import('../supabase/functions/_backend/utils/on_error.ts')
+
+    const response = await onError('app')(new HTTPException(400, {
+      cause: {
+        error: 'bad_request',
+        message: 'Invalid input',
+        moreInfo: {},
+      },
+    }), createContext())
+
+    expect(sendDiscordAlert500Mock).not.toHaveBeenCalled()
+    expect(capturePosthogExceptionMock).not.toHaveBeenCalled()
+    expect(response).toEqual({
+      body: {
+        error: 'bad_request',
+        message: 'Invalid input',
+        moreInfo: {},
+      },
+      status: 400,
     })
   })
 })

@@ -70,7 +70,6 @@ export async function capturePosthogException(c: Context, payload: {
   error: unknown
   functionName: string
   kind: 'drizzle_error' | 'http_exception' | 'unhandled_error'
-  requestBody?: string
   status?: number
 }) {
   return trackPosthogEvent(c, {
@@ -84,7 +83,6 @@ export async function capturePosthogException(c: Context, payload: {
       error_name: payload.error instanceof Error ? payload.error.name : typeof payload.error,
       function_name: payload.functionName,
       method: c.req.method,
-      request_body: payload.requestBody,
       request_id: c.get('requestId'),
       status: payload.status,
       url: c.req.url,
