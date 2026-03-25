@@ -1,4 +1,5 @@
 import type { UploadOptions } from '@capgo/cli/sdk'
+import { execFile } from 'node:child_process'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { chdir, cwd, env } from 'node:process'
@@ -23,10 +24,11 @@ const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY || 'sb_publishable_ACJWlzQHlZjBr
 // Cache for prepared apps to avoid repeated setup
 const preparedApps = new Set<string>()
 
-// The SDK writes keys into the current working directory and also temporarily
-// mutates project-level config. Uploads also change cwd. Keep those operations
-// in a single critical section so concurrent tests cannot interfere.
-let sdkOperationQueue = Promise.resolve()
+// Key generation mutates repo-level files, so keep those operations serialized.
+let keyGenerationQueue = Promise.resolve()
+
+// Uploads temporarily change cwd, so serialize them within the current process.
+let sdkCwdQueue = Promise.resolve()
 
 export const tempFileFolder = (appId: string) => join(ROOT_DIR, TEMP_DIR_NAME, appId)
 
@@ -160,9 +162,9 @@ export async function uploadBundleSDK(
     ...additionalOptions,
   }
 
-  const previousOperation = sdkOperationQueue
+  const previousOperation = sdkCwdQueue
   let operationComplete: () => void
-  sdkOperationQueue = new Promise(resolve => operationComplete = resolve)
+  sdkCwdQueue = new Promise(resolve => operationComplete = resolve)
 
   await previousOperation
   const originalCwd = cwd()
@@ -196,10 +198,10 @@ export async function uploadBundleSDK(
 export async function generateEncryptionKeysSDK(appId: string, force = true) {
   const { existsSync, renameSync, readFileSync, writeFileSync } = await import('node:fs')
 
-  // Queue this operation to run after previous SDK operations complete.
+  // Queue this operation to run after previous key generations complete.
   let operationComplete: () => void
-  const previousOperation = sdkOperationQueue
-  sdkOperationQueue = new Promise(resolve => operationComplete = resolve)
+  const previousOperation = keyGenerationQueue
+  keyGenerationQueue = new Promise(resolve => operationComplete = resolve)
 
   await previousOperation
 
@@ -211,22 +213,56 @@ export async function generateEncryptionKeysSDK(appId: string, force = true) {
   }
 
   try {
-    const sdk = createTestSDK()
     const folderPath = tempFileFolder(appId)
-    const originalCwd = cwd()
+    const result = await new Promise<{ success: boolean, error?: string }>((resolve) => {
+      const script = `
+        import { CapgoSDK } from '@capgo/cli/sdk'
 
-    // Force key generation to run from the repository root. Otherwise a
-    // concurrent uploadBundleSDK() can leave the process cwd inside another
-    // test app folder and the SDK will emit keys there.
-    chdir(ROOT_DIR)
+        const sdk = new CapgoSDK({
+          supaHost: ${JSON.stringify(SUPABASE_URL)},
+          supaAnon: ${JSON.stringify(SUPABASE_ANON_KEY)},
+        })
 
-    let result
-    try {
-      result = await sdk.generateEncryptionKeys({ force })
-    }
-    finally {
-      chdir(originalCwd)
-    }
+        const result = await sdk.generateEncryptionKeys({ force: ${force ? 'true' : 'false'} })
+        console.log(JSON.stringify(result))
+        process.exit(result.success ? 0 : 1)
+      `
+
+      execFile('bun', ['-e', script], { cwd: ROOT_DIR }, (error, stdout, stderr) => {
+        const output = `${stdout}\n${stderr}`.trim()
+        if (error) {
+          resolve({
+            success: false,
+            error: output || error.message,
+          })
+          return
+        }
+
+        const lines = output
+          .split('\n')
+          .map(line => line.trim())
+          .filter(Boolean)
+        const jsonLine = [...lines].reverse().find(line => line.startsWith('{') && line.endsWith('}'))
+
+        if (!jsonLine) {
+          resolve({
+            success: false,
+            error: output || 'generateEncryptionKeys returned no result',
+          })
+          return
+        }
+
+        try {
+          resolve(JSON.parse(jsonLine))
+        }
+        catch {
+          resolve({
+            success: false,
+            error: output || 'generateEncryptionKeys returned invalid JSON',
+          })
+        }
+      })
+    })
 
     if (!result.success) {
       return result
