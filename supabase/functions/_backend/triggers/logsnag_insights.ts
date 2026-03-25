@@ -737,7 +737,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.post('/', middlewareAPISecret, async (c) => {
   const dailyWindow = getDailyWindow()
   const res = getStats(c, dailyWindow)
-  const snapshotDateId = getDateId()
+  const snapshotDateId = dailyWindow.prevDayDateId
   const [
     apps,
     updates,
