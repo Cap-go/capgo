@@ -11,7 +11,7 @@ import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, 
 import { DEFAULT_LIMIT } from './types.ts'
 import { backgroundTask, getEnv, isInternalVersionName } from './utils.ts'
 
-export function createStatsMau(c: Context, device_id: string, app_id: string, org_id: string, platform: string) {
+export function createStatsMau(c: Context, device_id: string, app_id: string, org_id: string, platform: string): Promise<void> {
   const lowerDeviceId = device_id
   const jobs: Promise<unknown>[] = [
     queueCronStatApp(c, app_id, org_id),
@@ -22,7 +22,7 @@ export function createStatsMau(c: Context, device_id: string, app_id: string, or
   else {
     jobs.push(Promise.resolve(trackDeviceUsageCF(c, lowerDeviceId, app_id, org_id, platform)))
   }
-  return Promise.all(jobs)
+  return Promise.all(jobs).then(() => undefined)
 }
 
 export async function onPremStats(c: Context, app_id: string, action: string, device: DeviceWithoutCreatedAt) {
@@ -60,7 +60,7 @@ export function createStatsBandwidth(c: Context, device_id: string, app_id: stri
   return backgroundTask(c, Promise.all([
     queueCronStatApp(c, app_id),
     trackingJob,
-  ]))
+  ]).then(() => undefined))
 }
 
 export type VersionAction = 'get' | 'fail' | 'install' | 'uninstall'
@@ -146,7 +146,7 @@ export function readStatsVersion(c: Context, app_id: string, start_date: string,
 async function queueCronStatApp(c: Context, app_id: string, org_id?: string) {
   const { error } = await supabaseAdmin(c).rpc('queue_cron_stat_app_for_app', {
     p_app_id: app_id,
-    p_org_id: org_id ?? undefined,
+    ...(org_id ? { p_org_id: org_id } : {}),
   })
   if (error) {
     cloudlog({ requestId: c.get('requestId'), message: 'Failed to queue cron_stat_app from live usage', app_id, org_id, error })

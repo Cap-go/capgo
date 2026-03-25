@@ -87,7 +87,6 @@ CREATE INDEX IF NOT EXISTS idx_device_usage_timestamp_app_id
 
 CREATE INDEX IF NOT EXISTS idx_bandwidth_usage_timestamp_app_id
   ON public.bandwidth_usage USING btree (timestamp, app_id);
-
 CREATE OR REPLACE FUNCTION public.process_cron_stats_jobs() RETURNS void
 LANGUAGE plpgsql
 SET search_path = '' AS $function$

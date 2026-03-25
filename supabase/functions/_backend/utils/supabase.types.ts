@@ -2093,6 +2093,7 @@ export type Database = {
           id: number
           is_good_plan: boolean | null
           mau_exceeded: boolean | null
+          paid_at: string | null
           plan_calculated_at: string | null
           plan_usage: number | null
           price_id: string | null
@@ -2115,6 +2116,7 @@ export type Database = {
           id?: number
           is_good_plan?: boolean | null
           mau_exceeded?: boolean | null
+          paid_at?: string | null
           plan_calculated_at?: string | null
           plan_usage?: number | null
           price_id?: string | null
@@ -2137,6 +2139,7 @@ export type Database = {
           id?: number
           is_good_plan?: boolean | null
           mau_exceeded?: boolean | null
+          paid_at?: string | null
           plan_calculated_at?: string | null
           plan_usage?: number | null
           price_id?: string | null
@@ -3720,7 +3723,7 @@ export type Database = {
         | { Args: { userid: string }; Returns: boolean }
       is_rbac_enabled_globally: { Args: never; Returns: boolean }
       is_recent_email_otp_verified: {
-        Args: { user_id: string }
+        Args: { p_user_id: string }
         Returns: boolean
       }
       is_storage_exceeded_by_org: { Args: { org_id: string }; Returns: boolean }
