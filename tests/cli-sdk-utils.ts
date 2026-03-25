@@ -1,7 +1,7 @@
 import type { UploadOptions } from '@capgo/cli/sdk'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { cwd, env } from 'node:process'
+import { chdir, cwd, env } from 'node:process'
 import { CapgoSDK } from '@capgo/cli/sdk'
 import { BASE_DEPENDENCIES, BASE_DEPENDENCIES_OLD, BASE_PACKAGE_JSON, TEMP_DIR_NAME } from './cli-utils'
 import { APIKEY_TEST_ALL } from './test-utils'
@@ -23,13 +23,10 @@ const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY || 'sb_publishable_ACJWlzQHlZjBr
 // Cache for prepared apps to avoid repeated setup
 const preparedApps = new Set<string>()
 
-// Simple queue for key generation to prevent concurrent conflicts
-// When multiple tests run in parallel, they all try to create keys in the project root
-// This queue ensures they run one at a time
-let keyGenerationQueue = Promise.resolve()
-
-// Serialize SDK operations that temporarily change cwd
-let sdkCwdQueue = Promise.resolve()
+// The SDK writes keys into the current working directory and also temporarily
+// mutates project-level config. Uploads also change cwd. Keep those operations
+// in a single critical section so concurrent tests cannot interfere.
+let sdkOperationQueue = Promise.resolve()
 
 export const tempFileFolder = (appId: string) => join(ROOT_DIR, TEMP_DIR_NAME, appId)
 
@@ -157,23 +154,25 @@ export async function uploadBundleSDK(
     bundle: version,
     channel,
     disableCodeCheck: true, // Skip notifyAppReady check for tests
+    useZip: true,
+    useTus: false,
     // TUS protocol uses localApiFiles from capacitor.config.json
     ...additionalOptions,
   }
 
-  const previousOperation = sdkCwdQueue
+  const previousOperation = sdkOperationQueue
   let operationComplete: () => void
-  sdkCwdQueue = new Promise(resolve => operationComplete = resolve)
+  sdkOperationQueue = new Promise(resolve => operationComplete = resolve)
 
   await previousOperation
   const originalCwd = cwd()
 
   try {
-    process.chdir(tempFileFolder(appId))
+    chdir(tempFileFolder(appId))
     return await sdk.uploadBundle(options)
   }
   finally {
-    process.chdir(originalCwd)
+    chdir(originalCwd)
     operationComplete!()
   }
 }
@@ -197,12 +196,11 @@ export async function uploadBundleSDK(
 export async function generateEncryptionKeysSDK(appId: string, force = true) {
   const { existsSync, renameSync, readFileSync, writeFileSync } = await import('node:fs')
 
-  // Queue this operation to run after previous ones complete
-  const previousOperation = keyGenerationQueue
+  // Queue this operation to run after previous SDK operations complete.
   let operationComplete: () => void
-  keyGenerationQueue = new Promise(resolve => operationComplete = resolve)
+  const previousOperation = sdkOperationQueue
+  sdkOperationQueue = new Promise(resolve => operationComplete = resolve)
 
-  // Wait for previous operation to finish
   await previousOperation
 
   // Backup the capacitor.config.ts content AFTER waiting for the queue
@@ -215,18 +213,28 @@ export async function generateEncryptionKeysSDK(appId: string, force = true) {
   try {
     const sdk = createTestSDK()
     const folderPath = tempFileFolder(appId)
+    const originalCwd = cwd()
 
-    // Generate keys (they will be created in the project root)
-    const result = await sdk.generateEncryptionKeys({ force })
+    // Force key generation to run from the repository root. Otherwise a
+    // concurrent uploadBundleSDK() can leave the process cwd inside another
+    // test app folder and the SDK will emit keys there.
+    chdir(ROOT_DIR)
+
+    let result
+    try {
+      result = await sdk.generateEncryptionKeys({ force })
+    }
+    finally {
+      chdir(originalCwd)
+    }
 
     if (!result.success) {
       return result
     }
 
     // Find where the keys were actually created and move them to the test folder
-    const projectRoot = cwd()
-    const privateKeySource = join(projectRoot, '.capgo_key_v2')
-    const publicKeySource = join(projectRoot, '.capgo_key_v2.pub')
+    const privateKeySource = join(ROOT_DIR, '.capgo_key_v2')
+    const publicKeySource = join(ROOT_DIR, '.capgo_key_v2.pub')
     const privateKeyDest = join(folderPath, '.capgo_key_v2')
     const publicKeyDest = join(folderPath, '.capgo_key_v2.pub')
 
