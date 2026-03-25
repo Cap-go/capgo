@@ -171,6 +171,9 @@ function isRowInteractive(org: Organization) {
 }
 
 function onOrgItemKeydown(org: Organization, e: KeyboardEvent) {
+  if (e.target !== e.currentTarget)
+    return
+
   if (!isRowInteractive(org))
     return
 
@@ -178,6 +181,7 @@ function onOrgItemKeydown(org: Organization, e: KeyboardEvent) {
     return
 
   e.preventDefault()
+  closeDropdown()
   onOrganizationClick(org)
 }
 </script>
