@@ -21,7 +21,7 @@ import { createSignedImageUrl } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
-import { getRbacRoleI18nKey, useOrganizationStore } from '~/stores/organization'
+import { getRbacRoleI18nKey, isAdminRole, isSuperAdminRole, useOrganizationStore } from '~/stores/organization'
 import { resolveInviteNewUserErrorMessage } from '~/utils/invites'
 import DeleteOrgDialog from './DeleteOrgDialog.vue'
 
@@ -118,7 +118,6 @@ const isInviteFormValid = computed(() => {
     && captchaToken.value !== ''
 })
 
-const rbacSuperAdminRole = 'org_super_admin'
 const appAccessMember = ref<OrganizationMemberRow | null>(null)
 const appAccessSearch = ref('')
 const appAccessSelectedAppIds = ref<string[]>([])
@@ -129,12 +128,6 @@ const availableAppRoles = ref<Role[]>([])
 const isAppAccessLoading = ref(false)
 const isAppAccessSubmitting = ref(false)
 const appAccessRoleTouched = ref(false)
-
-function isSuperAdminRole(role: string | undefined) {
-  if (!role)
-    return false
-  return role === 'super_admin' || role === rbacSuperAdminRole
-}
 
 function isInviteMember(member: OrganizationMemberRow) {
   if (member.is_invite || member.is_tmp)
@@ -791,7 +784,7 @@ async function cannotDeleteOwner() {
                   // get member from id
                   const selectedUser = members.value.filter(m => m.id === selectedUserToDelegateAdmin.value)[0]
                   // set user to super admin
-                  _changeMemberPermission(selectedUser, useNewRbac.value ? rbacSuperAdminRole : 'super_admin')
+                  _changeMemberPermission(selectedUser, useNewRbac.value ? 'org_super_admin' : 'super_admin')
                   selectedUserToDelegateAdmin.value = null
                   // get current member
                   const currentMember = members.value.filter(m => m.uid === main.user?.id)[0]
@@ -1125,10 +1118,7 @@ function canDelete(member: OrganizationMemberRow) {
   if (isSelf)
     return true
 
-  const currentUserIsAdmin = role === 'admin'
-    || role === 'super_admin'
-    || role === 'org_admin'
-    || role === rbacSuperAdminRole
+  const currentUserIsAdmin = isAdminRole(role)
 
   return currentUserIsAdmin
 }

@@ -137,7 +137,8 @@ export async function capturePosthogException(c: Context, payload: {
   const posthogUrl = getPostHogExceptionUrl(host)
   const serializedError = serializeError(payload.error)
   const distinctId = `backend:${getEnv(c, 'ENV_NAME') || 'unknown'}:${payload.functionName}`
-  const topFrame = parseExceptionFrames(serializedError.stack, payload.functionName)[0]
+  const frames = parseExceptionFrames(serializedError.stack, payload.functionName)
+  const topFrame = frames[0]
   const fingerprint = [
     distinctId,
     payload.kind,
@@ -161,7 +162,7 @@ export async function capturePosthogException(c: Context, payload: {
         },
         stacktrace: {
           type: 'raw',
-          frames: parseExceptionFrames(serializedError.stack, payload.functionName),
+          frames,
         },
       }],
       $exception_fingerprint: fingerprint,

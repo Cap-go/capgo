@@ -5,6 +5,7 @@ import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { createSignedImageUrl } from '~/services/storage'
 import { stripeEnabled, useSupabase } from '~/services/supabase'
+import { createDeferredPromise } from '../utils/promise'
 import { useDashboardAppsStore } from './dashboardApps'
 import { useDisplayStore } from './display'
 import { useMainStore } from './main'
@@ -107,6 +108,22 @@ function legacyRoleRank(role?: string | null) {
   return LEGACY_ROLE_RANK[normalized] ?? null
 }
 
+export function roleHasLegacyMinRight(role: string | null | undefined, minRight: LegacyMinRight) {
+  const roleRank = legacyRoleRank(role)
+  const requiredRank = legacyRoleRank(minRight)
+  if (roleRank === null || requiredRank === null)
+    return false
+  return roleRank >= requiredRank
+}
+
+export function isAdminRole(role: string | null | undefined) {
+  return roleHasLegacyMinRight(role, 'admin')
+}
+
+export function isSuperAdminRole(role: string | null | undefined) {
+  return roleHasLegacyMinRight(role, 'super_admin')
+}
+
 function normalizeRbacRole(role: string, scope: 'org' | 'app') {
   const legacy = normalizeLegacyRole(role)
   if (!legacy)
@@ -136,7 +153,7 @@ export const useOrganizationStore = defineStore('organization', () => {
   const main = useMainStore()
   const _organizations: Ref<Map<string, Organization>> = ref(new Map())
   const _organizationsByAppId: Ref<Map<string, Organization>> = ref(new Map())
-  const _initialLoadPromise = ref(Promise.withResolvers())
+  const _initialLoadPromise = ref(createDeferredPromise<boolean>())
   const _initialized = ref(false)
 
   const organizations: ComputedRef<Organization[]> = computed(
@@ -346,7 +363,7 @@ export const useOrganizationStore = defineStore('organization', () => {
           // Remove all from orgs
           _organizations.value = new Map()
           _organizationsByAppId.value = new Map()
-          _initialLoadPromise.value = Promise.withResolvers()
+          _initialLoadPromise.value = createDeferredPromise<boolean>()
           currentOrganization.value = undefined
           currentRole.value = null
         }
@@ -443,11 +460,7 @@ export const useOrganizationStore = defineStore('organization', () => {
         return true
     }
 
-    const roleRank = legacyRoleRank(role)
-    const requiredRank = legacyRoleRank(minRight)
-    if (roleRank === null || requiredRank === null)
-      return false
-    return roleRank >= requiredRank
+    return roleHasLegacyMinRight(role, minRight)
   }
 
   // Check password policy compliance for all org members (for super_admin preview)
@@ -468,6 +481,10 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
   }
 
+  const canDeleteOrganization = (orgId?: string) => {
+    return hasPermissionsInRole('super_admin', ['org_super_admin'], orgId)
+  }
+
   const deleteOrganization = async (orgId: string) => {
     // Validate input
     if (!orgId || typeof orgId !== 'string' || orgId.trim() === '') {
@@ -483,8 +500,8 @@ export const useOrganizationStore = defineStore('organization', () => {
     // Verify user has super_admin or owner role for this organization
     const currentOrg = _organizations.value.get(orgId)
     console.log('Delete org check:', { orgId, currentOrg, role: currentOrg?.role, userId: currentUserId })
-    if (!currentOrg || (currentOrg.role !== 'super_admin' && currentOrg.role !== 'owner')) {
-      console.error('Permission denied:', { role: currentOrg?.role, required: ['super_admin', 'owner'] })
+    if (!currentOrg || !canDeleteOrganization(orgId)) {
+      console.error('Permission denied:', { role: currentOrg?.role, required: ['super_admin', 'owner', 'org_super_admin'] })
       return { data: null, error: new Error('Insufficient permissions') }
     }
 
@@ -517,6 +534,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     getOrgByAppId,
     awaitInitialLoad,
     deleteOrganization,
+    canDeleteOrganization,
     checkPasswordPolicyImpact,
     hasOrganizations,
   }
