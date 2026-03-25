@@ -1,6 +1,6 @@
+import type { EmailPreferences } from '../supabase/functions/_backend/utils/org_email_notifications.ts'
 import { randomUUID } from 'node:crypto'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import type { EmailPreferences } from '../supabase/functions/_backend/utils/org_email_notifications.ts'
 import { APP_NAME, BASE_URL, getSupabaseClient, ORG_ID_EMAIL_PREFS, resetAndSeedAppData, resetAppData, STRIPE_CUSTOMER_ID_EMAIL_PREFS, USER_EMAIL_EMAIL_PREFS, USER_ID_EMAIL_PREFS } from './test-utils.ts'
 
 const id = randomUUID()
@@ -38,9 +38,12 @@ function isBentoConfiguredForTests() {
 
 async function resetEmailPreferences() {
   const supabase = getSupabaseClient()
-  await supabase.from('users').update({
+  const { error } = await supabase.from('users').update({
     email_preferences: defaultEmailPreferences,
   } as any).eq('id', USER_ID_EMAIL_PREFS)
+
+  if (error)
+    throw new Error(`resetEmailPreferences failed: ${error.message} (${error.code ?? 'unknown_code'})`)
 }
 
 beforeAll(async () => {
@@ -51,16 +54,16 @@ beforeAll(async () => {
   })
 })
 
-afterAll(async () => {
-  await resetAppData(APPNAME_PREFS)
-  await resetEmailPreferences()
-})
-
 beforeEach(async () => {
   await resetEmailPreferences()
 })
 
 afterEach(async () => {
+  await resetEmailPreferences()
+})
+
+afterAll(async () => {
+  await resetAppData(APPNAME_PREFS)
   await resetEmailPreferences()
 })
 
