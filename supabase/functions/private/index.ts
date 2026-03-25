@@ -39,7 +39,7 @@ import { createAllCatch, createHono } from '../_backend/utils/hono.ts'
 import { version } from '../_backend/utils/version.ts'
 
 const functionName = 'private'
-const appGlobal = createHono(functionName, version, Deno.env.get('SENTRY_DSN_SUPABASE'))
+const appGlobal = createHono(functionName, version)
 
 // Webapps API
 

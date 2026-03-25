@@ -5,7 +5,14 @@ import { existInEnv, getEnv } from './utils.ts'
 
 const POSTHOG_CAPTURE_URL = 'https://eu.i.posthog.com/capture/'
 
-export async function trackPosthogEvent(c: Context, payload: Pick<TrackOptions, 'event'> & { user_id?: string } & Pick<TrackOptions, 'channel' | 'description'> & { ip?: string, tags?: Record<string, any> }) {
+interface PostHogCapturePayload extends Pick<TrackOptions, 'event'>, Pick<TrackOptions, 'channel' | 'description'> {
+  distinct_id?: string
+  ip?: string
+  tags?: Record<string, any>
+  user_id?: string
+}
+
+export async function trackPosthogEvent(c: Context, payload: PostHogCapturePayload) {
   const apiKey = getEnv(c, 'POSTHOG_API_KEY')
   if (!apiKey || !existInEnv(c, 'POSTHOG_API_KEY')) {
     cloudlog({ requestId: c.get('requestId'), message: 'PostHog not configured' })
@@ -17,7 +24,7 @@ export async function trackPosthogEvent(c: Context, payload: Pick<TrackOptions, 
     ? host
     : new URL('capture/', host.endsWith('/') ? host : `${host}/`).toString()
 
-  const distinctId = payload.user_id || 'anonymous'
+  const distinctId = payload.user_id || payload.distinct_id || 'anonymous'
 
   const properties = {
     ...(payload.tags || {}),
@@ -57,4 +64,31 @@ export async function trackPosthogEvent(c: Context, payload: Pick<TrackOptions, 
     cloudlogErr({ requestId: c.get('requestId'), message: 'PostHog fetch failed', error: serializeError(e), event: payload.event, distinctId })
     return false
   }
+}
+
+export async function capturePosthogException(c: Context, payload: {
+  error: unknown
+  functionName: string
+  kind: 'drizzle_error' | 'http_exception' | 'unhandled_error'
+  requestBody?: string
+  status?: number
+}) {
+  return trackPosthogEvent(c, {
+    event: 'Backend exception',
+    distinct_id: c.get('requestId'),
+    channel: 'backend-errors',
+    description: `Unhandled backend error in ${payload.functionName}`,
+    tags: {
+      error_kind: payload.kind,
+      error_message: payload.error instanceof Error ? payload.error.message : String(payload.error),
+      error_name: payload.error instanceof Error ? payload.error.name : typeof payload.error,
+      function_name: payload.functionName,
+      method: c.req.method,
+      request_body: payload.requestBody,
+      request_id: c.get('requestId'),
+      status: payload.status,
+      url: c.req.url,
+      ...serializeError(payload.error),
+    },
+  })
 }
