@@ -132,3 +132,8 @@ END;
 $function$;
 
 ALTER FUNCTION public.process_cron_stats_jobs() OWNER TO postgres;
+
+REVOKE ALL ON FUNCTION public.process_cron_stats_jobs() FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.process_cron_stats_jobs() FROM anon;
+REVOKE ALL ON FUNCTION public.process_cron_stats_jobs() FROM authenticated;
+GRANT ALL ON FUNCTION public.process_cron_stats_jobs() TO service_role;
