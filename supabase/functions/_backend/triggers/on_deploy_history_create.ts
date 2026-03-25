@@ -4,10 +4,10 @@ import { Hono } from 'hono/tiny'
 import { isDemoApp } from '../utils/demo.ts'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { logsnag } from '../utils/logsnag.ts'
 import { sendEmailToOrgMembers } from '../utils/org_email_notifications.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
+import { sendEventToTracking } from '../utils/tracking.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -53,8 +53,7 @@ app.post('/', middlewareAPISecret, triggerValidator('deploy_history', 'INSERT'),
       return c.json(BRES)
     }
 
-    const LogSnag = logsnag(c)
-    await backgroundTask(c, LogSnag.track({
+    await sendEventToTracking(c, {
       channel: 'bundle-deployed',
       event: 'Bundle Deployed',
       icon: '🚀',
@@ -65,7 +64,7 @@ app.post('/', middlewareAPISecret, triggerValidator('deploy_history', 'INSERT'),
         channel_id: record.channel_id,
       },
       notify: false,
-    }))
+    })
 
     const pgClient = getPgClient(c, true)
     const drizzleClient = getDrizzleClient(pgClient)

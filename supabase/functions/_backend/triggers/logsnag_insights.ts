@@ -9,10 +9,11 @@ import { Hono } from 'hono/tiny'
 import { getPluginBreakdownCF, readActiveAppsCF, readLastMonthDevicesByPlatformCF, readLastMonthDevicesCF, readLastMonthUpdatesCF } from '../utils/cloudflare.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
-import { logsnag, logsnagInsights } from '../utils/logsnag.ts'
+import { logsnagInsights } from '../utils/logsnag.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { countAllApps, countAllUpdates, countAllUpdatesExternal, getUpdateStats } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
+import { sendEventToTracking } from '../utils/tracking.ts'
 
 interface PlanTotal { [key: string]: number }
 interface Actives { users: number, apps: number }
@@ -858,7 +859,7 @@ app.post('/', middlewareAPISecret, async (c) => {
   else {
     cloudlog({ requestId: c.get('requestId'), message: 'Skipping build metric update because daily aggregation failed' })
   }
-  await logsnag(c).track({
+  await sendEventToTracking(c, {
     channel: 'updates-stats',
     event: 'Updates last month',
     user_id: 'admin',

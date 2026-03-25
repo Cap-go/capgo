@@ -10,11 +10,11 @@ import { getFallbackCreditProductId } from '../utils/credits.ts'
 import { BRES, quickError, simpleError } from '../utils/hono.ts'
 import { middlewareStripeWebhook } from '../utils/hono_middleware_stripe.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { logsnag } from '../utils/logsnag.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import * as schema from '../utils/postgres_schema.ts'
 import { ensureCustomerMetadata, getStripe } from '../utils/stripe.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
+import { sendEventToTracking } from '../utils/tracking.ts'
 
 export const app = new Hono<MiddlewareKeyVariablesStripe>()
 
@@ -225,33 +225,47 @@ async function handleCheckoutSessionCompleted(
   return c.json(BRES)
 }
 
-async function customerSourceCreated(c: Context, LogSnag: ReturnType<typeof logsnag>, org: Org, stripeEvent: Stripe.CustomerSourceCreatedEvent) {
+async function customerSourceCreated(c: Context, org: Org, stripeEvent: Stripe.CustomerSourceCreatedEvent) {
   const card = stripeEvent.data.object as any
   const expirationDate = card.exp_month && card.exp_year ? `${card.exp_month}/${card.exp_year}` : 'unknown'
-  await trackBentoEvent(c, org.management_email, { expiration_date: expirationDate }, 'org:card_added')
-  await LogSnag.track({
+  await sendEventToTracking(c, {
+    bento: {
+      cron: '* * * * *',
+      data: { expiration_date: expirationDate },
+      event: 'org:card_added',
+      preferenceKey: 'credit_usage',
+      uniqId: 'org:card_added',
+    },
     channel: 'usage',
     event: 'Credit Card Added',
     icon: '💳',
+    sentToBento: true,
     user_id: org.id,
     notify: false,
-  }).catch()
+  })
   return c.json(BRES)
 }
 
-async function customerSourceExpiring(c: Context, LogSnag: ReturnType<typeof logsnag>, org: Org) {
-  await trackBentoEvent(c, org.management_email, {}, 'org:card_expiring')
-  await LogSnag.track({
+async function customerSourceExpiring(c: Context, org: Org) {
+  await sendEventToTracking(c, {
+    bento: {
+      cron: '* * * * *',
+      data: {},
+      event: 'org:card_expiring',
+      preferenceKey: 'credit_usage',
+      uniqId: 'org:card_expiring',
+    },
     channel: 'usage',
     event: 'Credit Card Expiring',
     icon: '⚠️',
+    sentToBento: true,
     user_id: org.id,
     notify: false,
-  }).catch()
+  })
   return c.json(BRES)
 }
 
-async function invoiceUpcoming(c: Context, LogSnag: ReturnType<typeof logsnag>, org: Org, stripeEvent: Stripe.InvoiceUpcomingEvent, stripeData: StripeData) {
+async function invoiceUpcoming(c: Context, org: Org, stripeEvent: Stripe.InvoiceUpcomingEvent, stripeData: StripeData) {
   const invoice = stripeEvent.data.object as any
   let planName = null
   let planType = 'monthly'
@@ -270,18 +284,25 @@ async function invoiceUpcoming(c: Context, LogSnag: ReturnType<typeof logsnag>, 
     }
   }
   const price = invoice.total ? invoice.total / 100 : 0
-  await trackBentoEvent(c, org.management_email, { plan_name: planName, price, plan_type: planType }, 'org:invoice_upcoming')
-  await LogSnag.track({
+  await sendEventToTracking(c, {
+    bento: {
+      cron: '* * * * *',
+      data: { plan_name: planName, price, plan_type: planType },
+      event: 'org:invoice_upcoming',
+      preferenceKey: 'credit_usage',
+      uniqId: 'org:invoice_upcoming',
+    },
     channel: 'usage',
     event: 'Invoice Upcoming',
     icon: '📄',
+    sentToBento: true,
     user_id: org.id,
     notify: false,
-  }).catch()
+  })
   return c.json(BRES)
 }
 
-async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, LogSnag: ReturnType<typeof logsnag>, originalStatus?: string) {
+async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, originalStatus?: string) {
   const status = originalStatus ?? stripeData.data.status
   let statusName: string = status ?? ''
   const { data: plan } = await supabaseAdmin(c)
@@ -305,21 +326,28 @@ async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, Lo
         .select()
         .eq('stripe_id', stripeData.previousProductId)
         .single()
-      await trackBentoEvent(c, org.management_email, {
-        plan_name: plan.name,
-        previous_plan_name: previousProduct.data?.name ?? '',
-      }, 'user:plan_change')
-      await LogSnag.track({
+      await sendEventToTracking(c, {
+        bento: {
+          cron: '* * * * *',
+          data: {
+            plan_name: plan.name,
+            previous_plan_name: previousProduct.data?.name ?? '',
+          },
+          event: 'user:plan_change',
+          preferenceKey: 'credit_usage',
+          uniqId: 'user:plan_change',
+        },
         channel: 'usage',
         event: 'User Upgraded',
         icon: '💰',
+        sentToBento: true,
         user_id: org.id,
         notify: true,
         tags: {
           plan_name: plan.name,
           previous_plan_name: previousProduct.data?.name ?? '',
         },
-      }).catch()
+      })
     }
 
     if (dbError2) {
@@ -329,19 +357,26 @@ async function createdOrUpdated(c: Context, stripeData: StripeData, org: Org, Lo
     const segment = await customerToSegmentOrg(c, org.id, stripeData.data.price_id, plan)
     const isMonthly = plan.price_m_id === stripeData.data.price_id
     const eventName = `user:subscribe_${statusName}:${isMonthly ? 'monthly' : 'yearly'}`
-    await trackBentoEvent(c, org.management_email, { plan_name: plan.name }, eventName)
     await addTagBento(c, org.management_email, segment)
     const isNewSubscription = status === 'created'
-    await LogSnag.track({
+    await sendEventToTracking(c, {
+      bento: {
+        cron: '* * * * *',
+        data: { plan_name: plan.name },
+        event: eventName,
+        preferenceKey: 'credit_usage',
+        uniqId: `subscription:${eventName}:${plan.name}`,
+      },
       channel: 'usage',
       event: isNewSubscription ? 'User subscribe' : 'User update subscribe',
       icon: '💰',
+      sentToBento: true,
       user_id: org.id,
       notify: isNewSubscription,
       tags: {
         plan_name: plan.name,
       },
-    }).catch()
+    })
   }
   else {
     const segment = await customerToSegmentOrg(c, org.id, stripeData.data.price_id)
@@ -364,17 +399,24 @@ async function updateStripeInfo(c: Context, stripeData: StripeData) {
   return false
 }
 
-async function didCancel(c: Context, org: Org, LogSnag: ReturnType<typeof logsnag>) {
+async function didCancel(c: Context, org: Org) {
   const segment = await customerToSegmentOrg(c, org.id, 'canceled')
   await addTagBento(c, org.management_email, segment)
-  await trackBentoEvent(c, org.management_email, {}, 'user:cancel')
-  await LogSnag.track({
+  await sendEventToTracking(c, {
+    bento: {
+      cron: '* * * * *',
+      data: {},
+      event: 'user:cancel',
+      preferenceKey: 'credit_usage',
+      uniqId: 'user:cancel',
+    },
     channel: 'usage',
     event: 'User cancel',
     icon: '⚠️',
+    sentToBento: true,
     user_id: org.id,
     notify: true,
-  }).catch()
+  })
 }
 
 async function getOrg(c: Context, stripeData: StripeData) {
@@ -418,7 +460,6 @@ async function cancelingOrFinished(c: Context, stripeEvent: Stripe.Event, stripe
 }
 
 app.post('/', middlewareStripeWebhook(), async (c) => {
-  const LogSnag = logsnag(c)
   const stripeData = c.get('stripeData')!
   const stripeEvent = c.get('stripeEvent')!
   const isCheckoutSession = isCheckoutSessionEvent(stripeEvent)
@@ -443,19 +484,19 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
   }
 
   if (stripeEvent.type === 'customer.source.expiring') {
-    return customerSourceExpiring(c, LogSnag, org)
+    return customerSourceExpiring(c, org)
   }
   else if (stripeEvent.type === 'customer.source.created') {
-    return customerSourceCreated(c, LogSnag, org, stripeEvent)
+    return customerSourceCreated(c, org, stripeEvent)
   }
   else if (stripeEvent.type === 'invoice.upcoming') {
-    return invoiceUpcoming(c, LogSnag, org, stripeEvent, stripeData)
+    return invoiceUpcoming(c, org, stripeEvent, stripeData)
   }
 
   if (['created', 'succeeded', 'updated'].includes(stripeData.data.status ?? '') && stripeData.data.price_id && stripeData.data.product_id) {
     const originalStatus = stripeData.data.status
     stripeData.data.status = 'succeeded'
-    await createdOrUpdated(c, stripeData, org, LogSnag, originalStatus!)
+    await createdOrUpdated(c, stripeData, org, originalStatus!)
   }
   else if (stripeData.data.status === 'failed') {
     await trackBentoEvent(c, org.management_email, {}, 'org:failed_payment')
@@ -470,7 +511,7 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
     // Check if this is the subscription currently in the database
     if (customer && customer.subscription_id === stripeData.data.subscription_id) {
       // This is the known subscription being cancelled
-      await didCancel(c, org, LogSnag)
+      await didCancel(c, org)
       // Only mark as 'succeeded' if subscription is still active until period end
       // Check if subscription_anchor_end is in the future
       if (stripeData.data.subscription_anchor_end && new Date(stripeData.data.subscription_anchor_end) > new Date()) {
