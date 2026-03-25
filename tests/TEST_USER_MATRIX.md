@@ -23,7 +23,7 @@ Legend: R = reads user records only (no direct auth/public users writes detected
 | tests/cron_stat_integration.test.ts | USER_ID | R | Shared |
 | tests/cron_stat_org.test.ts | USER_ID | R | Shared |
 | tests/delete-user-reauth.test.ts | USER_ID, USER_ID_DELETE_USER_STALE, USER_ID_DELETE_USER_FRESH, USER_EMAIL_DELETE_USER_FRESH, USER_EMAIL | R | Shared |
-| tests/email-preferences.test.ts | USER_ID, USER_ID_EMAIL_PREFS, USER_EMAIL_EMAIL_PREFS, USER_EMAIL | R | Shared |
+| tests/email-preferences.test.ts | USER_ID_EMAIL_PREFS, USER_EMAIL_EMAIL_PREFS | W | Isolated |
 | tests/enforce-encrypted-bundles.test.ts | USER_ID, USER_ID_ENCRYPTED | R | Shared |
 | tests/hashed-apikey-rls.test.ts | USER_ID, USER_ID_RLS | R | Shared |
 | tests/organization-api.test.ts | USER_ID, USER_EMAIL, USER_ADMIN_EMAIL | R | Shared |
