@@ -63,6 +63,9 @@ BEGIN
       );
     END IF;
   EXCEPTION
+    WHEN query_canceled THEN
+      PERFORM pg_catalog.pg_advisory_unlock(v_lock_key);
+      RAISE;
     WHEN OTHERS THEN
       PERFORM pg_catalog.pg_advisory_unlock(v_lock_key);
       RAISE;
