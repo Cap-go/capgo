@@ -25,7 +25,7 @@ BEGIN
   v_org_id := p_org_id;
 
   IF v_org_id IS NULL THEN
-    SELECT COALESCE(a.owner_org, da.owner_org)
+    SELECT pg_catalog.COALESCE(a.owner_org, da.owner_org)
     INTO v_org_id
     FROM (
       SELECT p_app_id AS app_id
@@ -51,10 +51,10 @@ BEGIN
       WHERE queued_job.message->'payload'->>'appId' = p_app_id
     ) THEN
       PERFORM pgmq.send('cron_stat_app',
-        jsonb_build_object(
+        pg_catalog.jsonb_build_object(
           'function_name', 'cron_stat_app',
           'function_type', 'cloudflare',
-          'payload', jsonb_build_object(
+          'payload', pg_catalog.jsonb_build_object(
             'appId', p_app_id,
             'orgId', v_org_id,
             'todayOnly', false
