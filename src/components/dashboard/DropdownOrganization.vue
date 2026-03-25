@@ -165,6 +165,21 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
   }
   onOrganizationClick(org)
 }
+
+function isRowInteractive(org: Organization) {
+  return isInvitation(org) || !isSelected(org)
+}
+
+function onOrgItemKeydown(org: Organization, e: KeyboardEvent) {
+  if (!isRowInteractive(org))
+    return
+
+  if (e.key !== 'Enter' && e.key !== ' ')
+    return
+
+  e.preventDefault()
+  onOrganizationClick(org)
+}
 </script>
 
 <template>
@@ -203,13 +218,17 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
             class="block px-1 my-1 rounded-lg"
             :class="isSelected(org) ? 'bg-gray-700' : 'hover:bg-gray-600'"
           >
-            <div class="flex items-center gap-2 px-3 py-3 text-white rounded-md">
-              <button
+            <div
+              class="flex items-center gap-2 px-3 py-3 text-white rounded-md"
+              :class="isRowInteractive(org) ? 'cursor-pointer' : 'cursor-default'"
+              :aria-current="isSelected(org) ? 'true' : undefined"
+              :role="isRowInteractive(org) ? 'button' : undefined"
+              :tabindex="isRowInteractive(org) ? 0 : -1"
+              @click="onOrgItemClick(org, $event)"
+              @keydown="onOrgItemKeydown(org, $event)"
+            >
+              <div
                 class="flex flex-1 items-center min-w-0 text-left"
-                :class="isSelected(org) ? 'cursor-default' : 'cursor-pointer'"
-                :aria-current="isSelected(org) ? 'true' : undefined"
-                type="button"
-                @click="onOrgItemClick(org, $event)"
               >
                 <img
                   v-if="org.logo"
@@ -224,7 +243,7 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
                   {{ acronym(org.name) }}
                 </div>
                 <span class="block truncate">{{ org.name }}</span>
-              </button>
+              </div>
               <div class="flex items-center justify-end min-w-0 shrink-0">
                 <span
                   v-if="isInvitation(org)"
