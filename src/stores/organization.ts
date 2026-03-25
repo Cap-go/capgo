@@ -5,6 +5,7 @@ import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { createSignedImageUrl } from '~/services/storage'
 import { stripeEnabled, useSupabase } from '~/services/supabase'
+import { createDeferredPromise } from '../utils/promise'
 import { useDashboardAppsStore } from './dashboardApps'
 import { useDisplayStore } from './display'
 import { useMainStore } from './main'
@@ -152,7 +153,7 @@ export const useOrganizationStore = defineStore('organization', () => {
   const main = useMainStore()
   const _organizations: Ref<Map<string, Organization>> = ref(new Map())
   const _organizationsByAppId: Ref<Map<string, Organization>> = ref(new Map())
-  const _initialLoadPromise = ref(Promise.withResolvers())
+  const _initialLoadPromise = ref(createDeferredPromise<boolean>())
   const _initialized = ref(false)
 
   const organizations: ComputedRef<Organization[]> = computed(
@@ -362,7 +363,7 @@ export const useOrganizationStore = defineStore('organization', () => {
           // Remove all from orgs
           _organizations.value = new Map()
           _organizationsByAppId.value = new Map()
-          _initialLoadPromise.value = Promise.withResolvers()
+          _initialLoadPromise.value = createDeferredPromise<boolean>()
           currentOrganization.value = undefined
           currentRole.value = null
         }
