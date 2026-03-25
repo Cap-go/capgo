@@ -16,8 +16,6 @@ SECURITY DEFINER
 SET search_path = '' AS $function$
 DECLARE
   v_org_id uuid;
-  v_lock_key integer;
-  v_lock_acquired boolean := false;
 BEGIN
   IF p_app_id IS NULL OR p_app_id = '' THEN
     RETURN;
@@ -26,10 +24,7 @@ BEGIN
   v_org_id := p_org_id;
 
   IF v_org_id IS NULL THEN
-    SELECT CASE
-      WHEN a.owner_org IS NOT NULL THEN a.owner_org
-      ELSE da.owner_org
-    END
+    SELECT COALESCE(a.owner_org, da.owner_org)
     INTO v_org_id
     FROM (
       SELECT p_app_id AS app_id
@@ -43,45 +38,27 @@ BEGIN
     RETURN;
   END IF;
 
-  -- Use a session lock so dedupe stays atomic without accumulating xact locks
-  -- across the whole cron sweep.
-  v_lock_key := pg_catalog.hashtext(p_app_id);
-  BEGIN
-    PERFORM pg_catalog.pg_advisory_lock(v_lock_key);
-    v_lock_acquired := true;
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(p_app_id));
 
-    IF NOT EXISTS (
-      SELECT 1
-      FROM pgmq.q_cron_stat_app AS queued_job
-      WHERE queued_job.message->'payload'->>'appId' = p_app_id
-    ) THEN
-      PERFORM pgmq.send('cron_stat_app',
-        pg_catalog.jsonb_build_object(
-          'function_name', 'cron_stat_app',
-          'function_type', 'cloudflare',
-          'payload', pg_catalog.jsonb_build_object(
-            'appId', p_app_id,
-            'orgId', v_org_id,
-            'todayOnly', false
-          )
-        )
-      );
-    END IF;
+  IF EXISTS (
+    SELECT 1
+    FROM pgmq.q_cron_stat_app AS queued_job
+    WHERE queued_job.message->'payload'->>'appId' = p_app_id
+  ) THEN
+    RETURN;
+  END IF;
 
-    PERFORM pg_catalog.pg_advisory_unlock(v_lock_key);
-    v_lock_acquired := false;
-  EXCEPTION
-    WHEN query_canceled THEN
-      IF v_lock_acquired THEN
-        PERFORM pg_catalog.pg_advisory_unlock(v_lock_key);
-      END IF;
-      RAISE;
-    WHEN OTHERS THEN
-      IF v_lock_acquired THEN
-        PERFORM pg_catalog.pg_advisory_unlock(v_lock_key);
-      END IF;
-      RAISE;
-  END;
+  PERFORM pgmq.send('cron_stat_app',
+    jsonb_build_object(
+      'function_name', 'cron_stat_app',
+      'function_type', 'cloudflare',
+      'payload', jsonb_build_object(
+        'appId', p_app_id,
+        'orgId', v_org_id,
+        'todayOnly', false
+      )
+    )
+  );
 END;
 $function$;
 
@@ -91,6 +68,7 @@ REVOKE ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uui
 REVOKE ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid) FROM anon;
 REVOKE ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid) FROM authenticated;
 GRANT ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid) TO service_role;
+
 CREATE OR REPLACE FUNCTION public.process_cron_stats_jobs() RETURNS void
 LANGUAGE plpgsql
 SET search_path = '' AS $function$
@@ -123,9 +101,11 @@ BEGIN
     )
     SELECT DISTINCT
       active_apps.app_id,
-      a.owner_org
+      COALESCE(a.owner_org, da.owner_org) AS owner_org
     FROM active_apps
-    INNER JOIN public.apps a ON a.app_id = active_apps.app_id
+    LEFT JOIN public.apps a ON a.app_id = active_apps.app_id
+    LEFT JOIN public.deleted_apps da ON da.app_id = active_apps.app_id
+    WHERE COALESCE(a.owner_org, da.owner_org) IS NOT NULL
   )
   LOOP
     PERFORM public.queue_cron_stat_app_for_app(app_record.app_id, app_record.owner_org);

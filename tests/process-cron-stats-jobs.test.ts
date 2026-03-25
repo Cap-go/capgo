@@ -4,9 +4,9 @@ import {
   createAppVersions,
   executeSQL,
   getBaseData,
-  getEndpointUrl,
   headers,
   ORG_ID_CRON_QUEUE,
+  PLUGIN_BASE_URL,
   resetAndSeedAppData,
   resetAndSeedAppDataStats,
   resetAppData,
@@ -49,7 +49,7 @@ describe('cron_stat_app queue resilience', () => {
     await resetAppDataStats(liveQueueAppId)
   })
 
-  it.concurrent('process_cron_stats_jobs still queues active apps when daily_mau is quiet', async () => {
+  it('process_cron_stats_jobs still queues active apps when daily_mau is quiet', async () => {
     await clearCronStatAppMessages(processCronAppId)
 
     await executeSQL(`DELETE FROM public.daily_mau WHERE app_id = $1`, [processCronAppId])
@@ -76,7 +76,7 @@ describe('cron_stat_app queue resilience', () => {
     expect(queuedMessages[0]?.message?.payload?.todayOnly).toBe(false)
   })
 
-  it.concurrent('live /stats traffic queues at most one pending cron_stat_app job per app', async () => {
+  it('live /stats traffic queues at most one pending cron_stat_app job per app', async () => {
     await clearCronStatAppMessages(liveQueueAppId)
 
     const versionName = '1.0.0'
@@ -91,14 +91,14 @@ describe('cron_stat_app queue resilience', () => {
       version_name: versionName,
     }
 
-    const firstResponse = await fetch(getEndpointUrl('/stats'), {
+    const firstResponse = await fetch(`${PLUGIN_BASE_URL}/stats`, {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
     })
     expect(firstResponse.status).toBe(200)
 
-    const secondResponse = await fetch(getEndpointUrl('/stats'), {
+    const secondResponse = await fetch(`${PLUGIN_BASE_URL}/stats`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
