@@ -143,7 +143,6 @@ app.post('/', middlewareAPISecret, async (c) => {
       throw simpleError('missing_appId', 'Missing appId for daily_fail_ratio', { email, type })
     }
     return await handleDailyFailRatio(c, {
-      email,
       appId,
       orgId,
       appName,
@@ -201,8 +200,8 @@ async function handleWeeklyInstallStats(c: Context, appId: string) {
 
   const successUpdates = weeklyStats.all_updates - weeklyStats.failed_updates
   if (successUpdates < 0) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot send email for app, successUpdates < 0', error: weeklyStats, metadata: { app_id: appId, email } })
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid stats detected', error: weeklyStats, metadata: { app_id: appId, email } })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Cannot send email for app, successUpdates < 0', error: weeklyStats, metadata: { app_id: appId } })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid stats detected', error: weeklyStats, metadata: { app_id: appId } })
     return c.json({ status: 'No valid stats available' }, 200)
   }
 
