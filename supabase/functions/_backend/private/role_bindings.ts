@@ -136,6 +136,49 @@ async function validatePrincipalAccess(
     }
   }
 
+  if (principalType === 'apikey') {
+    const [apiKey] = await drizzle
+      .select({ user_id: schema.apikeys.user_id })
+      .from(schema.apikeys)
+      .where(eq(schema.apikeys.rbac_id, principalId))
+      .limit(1)
+
+    if (!apiKey) {
+      return { ok: false, status: 400, error: 'API key not found' }
+    }
+
+    const [membership] = await drizzle
+      .select({ id: schema.org_users.id })
+      .from(schema.org_users)
+      .where(
+        and(
+          eq(schema.org_users.user_id, apiKey.user_id),
+          eq(schema.org_users.org_id, orgId),
+        ),
+      )
+      .limit(1)
+
+    if (membership) {
+      return { ok: true, data: null }
+    }
+
+    const [ownerRbacAccess] = await drizzle
+      .select({ id: schema.role_bindings.id })
+      .from(schema.role_bindings)
+      .where(
+        and(
+          eq(schema.role_bindings.principal_type, 'user'),
+          eq(schema.role_bindings.principal_id, apiKey.user_id),
+          eq(schema.role_bindings.org_id, orgId),
+        ),
+      )
+      .limit(1)
+
+    if (!ownerRbacAccess) {
+      return { ok: false, status: 400, error: 'API key owner is not a member of this org' }
+    }
+  }
+
   return { ok: true, data: null }
 }
 
