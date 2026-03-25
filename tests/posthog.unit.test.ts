@@ -3,10 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const {
   cloudlogErrMock,
   cloudlogMock,
+  envState,
   fetchMock,
 } = vi.hoisted(() => ({
   cloudlogErrMock: vi.fn(),
   cloudlogMock: vi.fn(),
+  envState: {
+    posthogApiHost: 'https://eu.i.posthog.com',
+  },
   fetchMock: vi.fn(),
 }))
 
@@ -27,7 +31,7 @@ vi.mock('../supabase/functions/_backend/utils/utils.ts', () => ({
     if (key === 'POSTHOG_API_KEY')
       return 'posthog-key'
     if (key === 'POSTHOG_API_HOST')
-      return 'https://eu.i.posthog.com'
+      return envState.posthogApiHost
     if (key === 'ENV_NAME')
       return 'prod'
     return ''
@@ -45,6 +49,7 @@ function createContext() {
 }
 
 beforeEach(() => {
+  envState.posthogApiHost = 'https://eu.i.posthog.com'
   fetchMock.mockResolvedValue({
     ok: true,
     text: vi.fn().mockResolvedValue(''),
@@ -78,8 +83,9 @@ describe('posthog helper', () => {
     expect(body.properties.$set).toEqual({ app_id: 'app-id' })
   })
 
-  it('uses a stable backend distinct_id and skips person updates for exceptions', async () => {
+  it('uses the full exception endpoint host and only sends the request path for exceptions', async () => {
     const { capturePosthogException } = await import('../supabase/functions/_backend/utils/posthog.ts')
+    envState.posthogApiHost = 'https://eu.i.posthog.com/i/v0/e'
 
     await capturePosthogException(createContext(), {
       error: new Error('boom'),
@@ -97,10 +103,32 @@ describe('posthog helper', () => {
     expect(body.token).toBe('posthog-key')
     expect(body.properties.distinct_id).toBe('backend:prod:app')
     expect(body.properties.request_id).toBe('request-id')
+    expect(body.properties.url_path).toBe('/functions/v1/app')
+    expect(body.properties).not.toHaveProperty('url')
     expect(body.properties).not.toHaveProperty('$set')
     expect(body.properties.$exception_fingerprint).toContain('backend:prod:app')
     expect(body.properties.$exception_list[0].type).toBe('Error')
     expect(body.properties.$exception_list[0].value).toBe('boom')
     expect(body.properties.$exception_list[0].stacktrace.frames[0].platform).toBe('custom')
+    expect(request?.[1]?.signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('logs and skips exception delivery when the configured PostHog host is invalid', async () => {
+    const { capturePosthogException } = await import('../supabase/functions/_backend/utils/posthog.ts')
+    envState.posthogApiHost = '://bad-host'
+
+    const sent = await capturePosthogException(createContext(), {
+      error: new Error('boom'),
+      functionName: 'app',
+      kind: 'unhandled_error',
+      status: 500,
+    })
+
+    expect(sent).toBe(false)
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(cloudlogErrMock).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'Invalid PostHog host',
+      host: '://bad-host',
+    }))
   })
 })

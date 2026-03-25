@@ -69,11 +69,21 @@ export async function trackPosthogEvent(c: Context, payload: PostHogCapturePaylo
 }
 
 function getPostHogExceptionUrl(host: string) {
-  if (host.endsWith('/i/v0/e/'))
-    return host
+  const trimmedHost = host.replace(/\/+$/, '')
+  if (trimmedHost.endsWith('/i/v0/e'))
+    return `${trimmedHost}/`
 
-  const normalizedHost = host.replace(/\/capture\/?$/, '/')
+  const normalizedHost = trimmedHost.replace(/\/capture$/, '/')
   return new URL('i/v0/e/', normalizedHost.endsWith('/') ? normalizedHost : `${normalizedHost}/`).toString()
+}
+
+function getRequestPath(url: string) {
+  try {
+    return new URL(url).pathname || '/'
+  }
+  catch {
+    return '/'
+  }
 }
 
 function parseExceptionFrames(stack: string | undefined, fallbackFunctionName: string) {
@@ -134,11 +144,19 @@ export async function capturePosthogException(c: Context, payload: {
   }
 
   const host = getEnv(c, 'POSTHOG_API_HOST') || POSTHOG_EXCEPTION_URL
-  const posthogUrl = getPostHogExceptionUrl(host)
+  let posthogUrl: string
+  try {
+    posthogUrl = getPostHogExceptionUrl(host)
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Invalid PostHog host', error: serializeError(e), host })
+    return false
+  }
   const serializedError = serializeError(payload.error)
   const distinctId = `backend:${getEnv(c, 'ENV_NAME') || 'unknown'}:${payload.functionName}`
   const frames = parseExceptionFrames(serializedError.stack, payload.functionName)
   const topFrame = frames[0]
+  const requestPath = getRequestPath(c.req.url)
   const fingerprint = [
     distinctId,
     payload.kind,
@@ -171,19 +189,30 @@ export async function capturePosthogException(c: Context, payload: {
       method: c.req.method,
       request_id: c.get('requestId'),
       status: payload.status,
-      url: c.req.url,
+      url_path: requestPath,
     },
     timestamp: new Date().toISOString(),
   }
 
   try {
-    const res = await fetch(posthogUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    })
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000)
+    let res: Response
+    try {
+      res = await fetch(posthogUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+    }
+    catch (fetchError) {
+      clearTimeout(timeoutId)
+      throw fetchError
+    }
 
     if (!res.ok) {
       const error = await res.text()
