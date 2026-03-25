@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test'
 import { expect, test } from '../support/commands'
 
 test.describe('Authentication', () => {
@@ -5,35 +6,51 @@ test.describe('Authentication', () => {
     await page.goto('/login/')
   })
 
-  test('should show loading state during login', async ({ page }) => {
+  async function continueToPasswordStep(page: Page, email: string) {
+    await page.fill('[data-test="email"]', email)
+    await page.click('[data-test="continue"]')
+    await page.waitForSelector('[data-test="password"]')
+  }
+
+  test('should show loading state during domain check', async ({ page }) => {
+    await page.route('**/private/sso/check-domain', async (route) => {
+      await new Promise(resolve => setTimeout(resolve, 500))
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ has_sso: false }),
+      })
+    })
+
     await page.fill('[data-test="email"]', 'test@capgo.app')
-    await page.fill('[data-test="password"]', 'testtest')
-    await page.click('[data-test="submit"]')
-    await expect(page.locator('svg.animate-spin')).toBeVisible()
+    await page.click('[data-test="continue"]')
+    await expect(page.locator('[data-test="loading"]')).toBeVisible()
+    await expect(page.locator('[data-test="password"]')).toBeVisible()
   })
 
   test('should show error for invalid credentials', async ({ page }) => {
-    await page.fill('[data-test="email"]', 'wrong@example.com')
+    await continueToPasswordStep(page, 'wrong@example.com')
     await page.fill('[data-test="password"]', 'wrongpass')
     await page.click('[data-test="submit"]')
     await expect(page.locator('[data-test="form-error"]')).toContainText('Invalid login credentials')
   })
 
   test('should show error for deleted account', async ({ page }) => {
-    await page.fill('[data-test="email"]', 'deleted@capgo.app')
+    await continueToPasswordStep(page, 'deleted@capgo.app')
     await page.fill('[data-test="password"]', 'password')
     await page.click('[data-test="submit"]')
     await expect(page.locator('[data-test="form-error"]')).toContainText('Account with this email used to exist, cannot recreate')
   })
 
   test('should login successfully and redirect', async ({ page }) => {
-    await page.fill('[data-test="email"]', 'test@capgo.app')
+    await continueToPasswordStep(page, 'test@capgo.app')
     await page.fill('[data-test="password"]', 'testtest')
     await page.click('[data-test="submit"]')
-    await page.waitForURL('/apps')
+    await page.waitForURL(/\/(apps|dashboard)(\/|$)/)
   })
 
   test('should navigate to forgot password page', async ({ page }) => {
+    await continueToPasswordStep(page, 'test@capgo.app')
     await page.click('[data-test="forgot-password"]')
     await expect(page).toHaveURL('/forgot_password')
   })

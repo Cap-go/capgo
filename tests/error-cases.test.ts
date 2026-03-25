@@ -252,7 +252,7 @@ describe('trigger Endpoint Error Cases', () => {
     })
     expect(response.status).toBe(400)
     const data = await response.json() as { error: string }
-    expect(data.error).toBe('user_not_found')
+    expect(data.error).toBe('invalid_stats_type')
   })
 })
 
