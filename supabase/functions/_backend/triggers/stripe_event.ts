@@ -3,7 +3,7 @@ import type Stripe from 'stripe'
 import type { MiddlewareKeyVariablesStripe } from '../utils/hono_middleware_stripe.ts'
 import type { StripeData } from '../utils/stripe.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { addTagBento, trackBentoEvent } from '../utils/bento.ts'
 import { getFallbackCreditProductId } from '../utils/credits.ts'
@@ -51,6 +51,25 @@ function getPaidAtUpdate(
     return undefined
 
   return eventOccurredAtIso
+}
+
+async function writePaidAtAtomically(c: Context, customerId: string, eventOccurredAtIso: string) {
+  const pgClient = getPgClient(c, false)
+  const drizzleClient = getDrizzleClient(pgClient)
+
+  try {
+    await drizzleClient.execute(sql`
+      UPDATE public.stripe_info
+      SET paid_at = LEAST(
+        COALESCE(paid_at, ${new Date(eventOccurredAtIso)}),
+        ${new Date(eventOccurredAtIso)}
+      )
+      WHERE customer_id = ${customerId}
+    `)
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
 }
 
 async function getCreditTopUpProductIdFromCustomer(c: Context, customerId: string): Promise<string> {
@@ -381,6 +400,10 @@ async function createdOrUpdated(
 
     if (dbError2) {
       return quickError(404, 'succeeded_customer_id_not_found', `succeeded: customer_id not found`, { dbError2, stripeData })
+    }
+
+    if (paidAt) {
+      await writePaidAtAtomically(c, stripeData.data.customer_id, paidAt)
     }
 
     const segment = await customerToSegmentOrg(c, org.id, stripeData.data.price_id, plan)
