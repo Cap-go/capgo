@@ -25,7 +25,10 @@ BEGIN
   v_org_id := p_org_id;
 
   IF v_org_id IS NULL THEN
-    SELECT pg_catalog.COALESCE(a.owner_org, da.owner_org)
+    SELECT CASE
+      WHEN a.owner_org IS NOT NULL THEN a.owner_org
+      ELSE da.owner_org
+    END
     INTO v_org_id
     FROM (
       SELECT p_app_id AS app_id
