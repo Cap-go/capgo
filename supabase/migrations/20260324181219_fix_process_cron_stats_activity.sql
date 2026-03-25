@@ -117,11 +117,9 @@ BEGIN
     )
     SELECT DISTINCT
       active_apps.app_id,
-      COALESCE(a.owner_org, da.owner_org) AS owner_org
+      a.owner_org
     FROM active_apps
-    LEFT JOIN public.apps a ON a.app_id = active_apps.app_id
-    LEFT JOIN public.deleted_apps da ON da.app_id = active_apps.app_id
-    WHERE COALESCE(a.owner_org, da.owner_org) IS NOT NULL
+    INNER JOIN public.apps a ON a.app_id = active_apps.app_id
   )
   LOOP
     PERFORM public.queue_cron_stat_app_for_app(app_record.app_id, app_record.owner_org);

@@ -3720,7 +3720,7 @@ export type Database = {
         | { Args: { userid: string }; Returns: boolean }
       is_rbac_enabled_globally: { Args: never; Returns: boolean }
       is_recent_email_otp_verified: {
-        Args: { p_user_id: string }
+        Args: { user_id: string }
         Returns: boolean
       }
       is_storage_exceeded_by_org: { Args: { org_id: string }; Returns: boolean }
