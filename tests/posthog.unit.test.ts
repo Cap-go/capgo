@@ -14,7 +14,9 @@ vi.mock('../supabase/functions/_backend/utils/logging.ts', () => ({
   cloudlog: cloudlogMock,
   cloudlogErr: cloudlogErrMock,
   serializeError: (error: unknown) => ({
+    cause: error instanceof Error ? error.cause : undefined,
     message: error instanceof Error ? error.message : String(error),
+    name: error instanceof Error ? error.name : 'Error',
     stack: error instanceof Error ? error.stack ?? 'N/A' : 'N/A',
   }),
 }))
@@ -58,7 +60,7 @@ afterEach(() => {
 })
 
 describe('posthog helper', () => {
-  it.concurrent('keeps person property updates enabled for normal PostHog events', async () => {
+  it('keeps person property updates enabled for normal PostHog events', async () => {
     const { trackPosthogEvent } = await import('../supabase/functions/_backend/utils/posthog.ts')
 
     await trackPosthogEvent(createContext(), {
@@ -76,7 +78,7 @@ describe('posthog helper', () => {
     expect(body.properties.$set).toEqual({ app_id: 'app-id' })
   })
 
-  it.concurrent('uses a stable backend distinct_id and skips person updates for exceptions', async () => {
+  it('uses a stable backend distinct_id and skips person updates for exceptions', async () => {
     const { capturePosthogException } = await import('../supabase/functions/_backend/utils/posthog.ts')
 
     await capturePosthogException(createContext(), {

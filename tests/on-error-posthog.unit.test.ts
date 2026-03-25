@@ -28,7 +28,9 @@ vi.mock('../supabase/functions/_backend/utils/posthog.ts', () => ({
 vi.mock('../supabase/functions/_backend/utils/logging.ts', () => ({
   cloudlogErr: cloudlogErrMock,
   serializeError: (error: unknown) => ({
+    cause: error instanceof Error ? error.cause : undefined,
     message: error instanceof Error ? error.message : String(error),
+    name: error instanceof Error ? error.name : 'Error',
     stack: error instanceof Error ? error.stack ?? 'N/A' : 'N/A',
   }),
 }))
@@ -60,7 +62,7 @@ afterEach(() => {
 })
 
 describe('onError PostHog capture', () => {
-  it.concurrent('captures backend HTTP exceptions in PostHog', async () => {
+  it('captures backend HTTP exceptions in PostHog', async () => {
     const { onError } = await import('../supabase/functions/_backend/utils/on_error.ts')
 
     const error = new HTTPException(500, {
@@ -90,7 +92,7 @@ describe('onError PostHog capture', () => {
     })
   })
 
-  it.concurrent('skips PostHog capture for client HTTP exceptions', async () => {
+  it('skips PostHog capture for client HTTP exceptions', async () => {
     const { onError } = await import('../supabase/functions/_backend/utils/on_error.ts')
 
     const response = await onError('app')(new HTTPException(400, {
@@ -110,6 +112,52 @@ describe('onError PostHog capture', () => {
         moreInfo: {},
       },
       status: 400,
+    })
+  })
+
+  it('captures Drizzle-style errors in PostHog', async () => {
+    const { onError } = await import('../supabase/functions/_backend/utils/on_error.ts')
+
+    const response = await onError('app')({
+      cause: new Error('query failed'),
+      message: 'db failed',
+      name: 'DrizzleError',
+    }, createContext())
+
+    expect(sendDiscordAlert500Mock).toHaveBeenCalledOnce()
+    expect(capturePosthogExceptionMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      functionName: 'app',
+      kind: 'drizzle_error',
+      status: 500,
+    }))
+    expect(response).toEqual({
+      body: {
+        error: 'unknown_error',
+        message: 'Unknown error',
+        moreInfo: {},
+      },
+      status: 500,
+    })
+  })
+
+  it('captures generic unhandled errors in PostHog', async () => {
+    const { onError } = await import('../supabase/functions/_backend/utils/on_error.ts')
+
+    const response = await onError('app')(new Error('boom'), createContext())
+
+    expect(sendDiscordAlert500Mock).toHaveBeenCalledOnce()
+    expect(capturePosthogExceptionMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      functionName: 'app',
+      kind: 'unhandled_error',
+      status: 500,
+    }))
+    expect(response).toEqual({
+      body: {
+        error: 'unknown_error',
+        message: 'Unknown error',
+        moreInfo: {},
+      },
+      status: 500,
     })
   })
 })
