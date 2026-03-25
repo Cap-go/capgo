@@ -75,6 +75,9 @@ describe('onError PostHog capture', () => {
 
     const response = await onError('app')(error, createContext())
 
+    expect(backgroundTaskMock).toHaveBeenCalledTimes(2)
+    expect(backgroundTaskMock.mock.calls[0]?.[1]).toBeInstanceOf(Promise)
+    expect(backgroundTaskMock.mock.calls[1]?.[1]).toBeInstanceOf(Promise)
     expect(sendDiscordAlert500Mock).toHaveBeenCalledOnce()
     expect(capturePosthogExceptionMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       functionName: 'app',
@@ -103,6 +106,7 @@ describe('onError PostHog capture', () => {
       },
     }), createContext())
 
+    expect(backgroundTaskMock).not.toHaveBeenCalled()
     expect(sendDiscordAlert500Mock).not.toHaveBeenCalled()
     expect(capturePosthogExceptionMock).not.toHaveBeenCalled()
     expect(response).toEqual({
@@ -124,6 +128,9 @@ describe('onError PostHog capture', () => {
       name: 'DrizzleError',
     }, createContext())
 
+    expect(backgroundTaskMock).toHaveBeenCalledTimes(2)
+    expect(backgroundTaskMock.mock.calls[0]?.[1]).toBeInstanceOf(Promise)
+    expect(backgroundTaskMock.mock.calls[1]?.[1]).toBeInstanceOf(Promise)
     expect(sendDiscordAlert500Mock).toHaveBeenCalledOnce()
     expect(capturePosthogExceptionMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       functionName: 'app',
@@ -145,6 +152,9 @@ describe('onError PostHog capture', () => {
 
     const response = await onError('app')(new Error('boom'), createContext())
 
+    expect(backgroundTaskMock).toHaveBeenCalledTimes(2)
+    expect(backgroundTaskMock.mock.calls[0]?.[1]).toBeInstanceOf(Promise)
+    expect(backgroundTaskMock.mock.calls[1]?.[1]).toBeInstanceOf(Promise)
     expect(sendDiscordAlert500Mock).toHaveBeenCalledOnce()
     expect(capturePosthogExceptionMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
       functionName: 'app',
