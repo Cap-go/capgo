@@ -54,16 +54,11 @@ export function createStatsBandwidth(c: Context, device_id: string, app_id: stri
   cloudlog({ requestId: c.get('requestId'), message: 'createStatsBandwidth', device_id: lowerDeviceId, app_id, file_size })
   if (file_size === 0)
     return
-  const jobs: Promise<unknown>[] = [
-    queueCronStatApp(c, app_id),
-  ]
+  void backgroundTask(c, queueCronStatApp(c, app_id))
   if (!c.env.BANDWIDTH_USAGE) {
-    jobs.push(Promise.resolve(trackBandwidthUsageSB(c, lowerDeviceId, app_id, file_size)))
+    return Promise.resolve(trackBandwidthUsageSB(c, lowerDeviceId, app_id, file_size))
   }
-  else {
-    jobs.push(Promise.resolve(trackBandwidthUsageCF(c, lowerDeviceId, app_id, file_size)))
-  }
-  return Promise.all(jobs)
+  return Promise.resolve(trackBandwidthUsageCF(c, lowerDeviceId, app_id, file_size))
 }
 
 export type VersionAction = 'get' | 'fail' | 'install' | 'uninstall'

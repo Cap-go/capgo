@@ -9,7 +9,8 @@
 
 CREATE OR REPLACE FUNCTION public.queue_cron_stat_app_for_app(
   p_app_id character varying,
-  p_org_id uuid DEFAULT NULL
+  p_org_id uuid DEFAULT NULL,
+  p_use_advisory_lock boolean DEFAULT true
 ) RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -38,7 +39,9 @@ BEGIN
     RETURN;
   END IF;
 
-  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(p_app_id));
+  IF p_use_advisory_lock THEN
+    PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(p_app_id));
+  END IF;
 
   IF EXISTS (
     SELECT 1
@@ -62,12 +65,18 @@ BEGIN
 END;
 $function$;
 
-ALTER FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid) OWNER TO postgres;
+ALTER FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid, boolean) OWNER TO postgres;
 
-REVOKE ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid) FROM anon;
-REVOKE ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid) FROM authenticated;
-GRANT ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid) TO service_role;
+REVOKE ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid, boolean) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid, boolean) FROM anon;
+REVOKE ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid, boolean) FROM authenticated;
+GRANT ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid, boolean) TO service_role;
+
+CREATE INDEX IF NOT EXISTS idx_device_usage_timestamp_app_id
+  ON public.device_usage USING btree (timestamp, app_id);
+
+CREATE INDEX IF NOT EXISTS idx_bandwidth_usage_timestamp_app_id
+  ON public.bandwidth_usage USING btree (timestamp, app_id);
 
 CREATE OR REPLACE FUNCTION public.process_cron_stats_jobs() RETURNS void
 LANGUAGE plpgsql
@@ -108,7 +117,7 @@ BEGIN
     WHERE COALESCE(a.owner_org, da.owner_org) IS NOT NULL
   )
   LOOP
-    PERFORM public.queue_cron_stat_app_for_app(app_record.app_id, app_record.owner_org);
+    PERFORM public.queue_cron_stat_app_for_app(app_record.app_id, app_record.owner_org, false);
   END LOOP;
 END;
 $function$;

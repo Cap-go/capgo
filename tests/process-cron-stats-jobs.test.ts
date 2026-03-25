@@ -49,7 +49,7 @@ describe('cron_stat_app queue resilience', () => {
     await resetAppDataStats(liveQueueAppId)
   })
 
-  it('process_cron_stats_jobs still queues active apps when daily_mau is quiet', async () => {
+  it.concurrent('process_cron_stats_jobs still queues active apps when daily_mau is quiet', async () => {
     await clearCronStatAppMessages(processCronAppId)
 
     await executeSQL(`DELETE FROM public.daily_mau WHERE app_id = $1`, [processCronAppId])
@@ -76,7 +76,7 @@ describe('cron_stat_app queue resilience', () => {
     expect(queuedMessages[0]?.message?.payload?.todayOnly).toBe(false)
   })
 
-  it('live /stats traffic queues at most one pending cron_stat_app job per app', async () => {
+  it.concurrent('live /stats traffic queues at most one pending cron_stat_app job per app', async () => {
     await clearCronStatAppMessages(liveQueueAppId)
 
     const versionName = '1.0.0'
