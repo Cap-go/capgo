@@ -58,7 +58,7 @@ export function createStatsBandwidth(c: Context, device_id: string, app_id: stri
     ? Promise.resolve(trackBandwidthUsageSB(c, lowerDeviceId, app_id, file_size))
     : Promise.resolve(trackBandwidthUsageCF(c, lowerDeviceId, app_id, file_size))
   return backgroundTask(c, Promise.all([
-    queueCronStatApp(c, app_id),
+    // queueCronStatApp(c, app_id),
     trackingJob,
   ]).then(() => undefined))
 }
