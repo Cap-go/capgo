@@ -89,10 +89,18 @@ describe('posthog helper', () => {
     })
 
     const request = fetchMock.mock.calls[0]
+    const url = request?.[0]
     const body = JSON.parse(request?.[1]?.body as string)
 
-    expect(body.distinct_id).toBe('backend:prod:app')
+    expect(url).toBe('https://eu.i.posthog.com/i/v0/e/')
+    expect(body.event).toBe('$exception')
+    expect(body.token).toBe('posthog-key')
+    expect(body.properties.distinct_id).toBe('backend:prod:app')
     expect(body.properties.request_id).toBe('request-id')
     expect(body.properties).not.toHaveProperty('$set')
+    expect(body.properties.$exception_fingerprint).toContain('backend:prod:app')
+    expect(body.properties.$exception_list[0].type).toBe('Error')
+    expect(body.properties.$exception_list[0].value).toBe('boom')
+    expect(body.properties.$exception_list[0].stacktrace.frames[0].platform).toBe('custom')
   })
 })
