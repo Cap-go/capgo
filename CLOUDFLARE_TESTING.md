@@ -32,9 +32,6 @@ The application has three Cloudflare Workers:
 2. Database must be seeded: `supabase db reset`
 3. Environment variables must be configured in `cloudflare_workers/.env.local`
    Note: `./scripts/start-cloudflare-workers.sh` overrides the Supabase keys at runtime using `supabase status` to match your local instance, and also sets Cloudflare-local defaults like `CLOUDFLARE_FUNCTION_URL`.
-4. (Optional) For V2/D1 testing: Local D1 database must be synced (see V2/D1
-   Testing section)
-
 ## Testing Modes
 
 The workers support two testing modes:

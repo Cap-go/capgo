@@ -183,8 +183,7 @@ const acronym = computed(() => {
 })
 
 function canDeleteOrg() {
-  const role = currentOrganization.value?.role
-  return (role === 'super_admin' || role === 'org_super_admin')
+  return organizationStore.canDeleteOrganization(currentOrganization.value?.gid)
     && organizationStore.organizations.length > 1
 }
 
@@ -220,7 +219,7 @@ async function copyOrganizationId() {
 <template>
   <div>
     <div class="flex flex-col h-full pb-8 overflow-hidden overflow-y-auto bg-white border shadow-lg md:pb-0 max-h-fit grow md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
-      <FormKit id="update-org" type="form" :actions="false" @submit="saveChanges">
+      <FormKit id="update-org" :key="currentOrganization?.gid ?? 'no-org'" type="form" :actions="false" @submit="saveChanges">
         <div class="p-6 space-y-6">
           <h2 class="mb-5 text-2xl font-bold dark:text-white text-slate-800">
             {{ t('general-information') }}

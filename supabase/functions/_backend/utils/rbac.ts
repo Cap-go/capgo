@@ -71,20 +71,11 @@ export type Permission
     | 'channel.manage_forced_devices'
     | 'channel.read_forced_devices'
     | 'channel.read_audit'
-    // Platform permissions (internal only)
-    | 'platform.impersonate_user'
-    | 'platform.manage_orgs_any'
-    | 'platform.manage_apps_any'
-    | 'platform.manage_channels_any'
-    | 'platform.run_maintenance_jobs'
-    | 'platform.delete_orphan_users'
-    | 'platform.read_all_audit'
-    | 'platform.db_break_glass'
 
 /**
  * Scope types for RBAC permissions
  */
-export type ScopeType = 'platform' | 'org' | 'app' | 'channel'
+export type ScopeType = 'org' | 'app' | 'channel'
 
 /**
  * Scope identifiers for permission checks.
@@ -153,15 +144,6 @@ const PERMISSION_TO_LEGACY_RIGHT: Record<Permission, Database['public']['Enums']
   'channel.manage_forced_devices': 'write',
   'channel.read_forced_devices': 'read',
   'channel.read_audit': 'admin',
-  // Platform permissions - require super_admin (will fail for regular users)
-  'platform.impersonate_user': 'super_admin',
-  'platform.manage_orgs_any': 'super_admin',
-  'platform.manage_apps_any': 'super_admin',
-  'platform.manage_channels_any': 'super_admin',
-  'platform.run_maintenance_jobs': 'super_admin',
-  'platform.delete_orphan_users': 'super_admin',
-  'platform.read_all_audit': 'super_admin',
-  'platform.db_break_glass': 'super_admin',
 }
 
 // =============================================================================
@@ -468,7 +450,5 @@ export function getScopeTypeFromPermission(permission: Permission): ScopeType {
     return 'app'
   if (permission.startsWith('channel.'))
     return 'channel'
-  if (permission.startsWith('platform.'))
-    return 'platform'
   return 'org' // Default fallback
 }

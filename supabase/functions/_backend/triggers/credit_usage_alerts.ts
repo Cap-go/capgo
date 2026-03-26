@@ -2,9 +2,9 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { logsnag } from '../utils/logsnag.ts'
 import { sendNotifToOrgMembers } from '../utils/org_email_notifications.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
+import { sendEventToTracking } from '../utils/tracking.ts'
 
 interface CreditUsageAlertPayload {
   org_id: string
@@ -72,7 +72,7 @@ app.post('/', middlewareAPISecret, async (c) => {
 
     if (sent) {
       cloudlog({ requestId: c.get('requestId'), message: 'credit usage alert sent', eventName, orgId, metadata })
-      await logsnag(c).track({
+      await sendEventToTracking(c, {
         channel: 'usage',
         event: `Credit usage ${threshold}%+`,
         icon: '⚡️',

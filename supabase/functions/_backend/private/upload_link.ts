@@ -4,10 +4,10 @@ import { Hono } from 'hono/tiny'
 import { parseBody, quickError, simpleError } from '../utils/hono.ts'
 import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { logsnag } from '../utils/logsnag.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { s3 } from '../utils/s3.ts'
 import { supabaseApikey } from '../utils/supabase.ts'
+import { sendEventToTracking } from '../utils/tracking.ts'
 
 interface DataUpload {
   name: string
@@ -74,8 +74,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     throw simpleError('cannot_get_upload_link', 'Cannot get upload link')
   }
 
-  const LogSnag = logsnag(c)
-  await LogSnag.track({
+  await sendEventToTracking(c, {
     channel: 'upload-get-link',
     event: 'Upload via single file',
     icon: '🏛️',

@@ -18,7 +18,7 @@ import { getCurrentPlanNameOrg, isPayingOrg, useSupabase } from '~/services/supa
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
-import { useOrganizationStore } from '~/stores/organization'
+import { isSuperAdminRole, useOrganizationStore } from '~/stores/organization'
 // tabs handled by settings layout
 
 const version = import.meta.env.VITE_APP_VERSION
@@ -38,7 +38,18 @@ const deleteAccountCaptchaRef = ref<InstanceType<typeof VueTurnstile> | null>(nu
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 const organizationsToDelete = ref<string[]>([])
 const paidOrganizationsToDelete = ref<Array<{ name: string, planName: string }>>([])
+const isEmailVerified = computed(() => !!main.auth?.email_confirmed_at)
 displayStore.NavTitle = t('account')
+
+async function redirectToEmailVerification() {
+  await router.push({
+    path: '/resend_email',
+    query: {
+      reason: 'email_not_verified',
+      return_to: '/settings/account',
+    },
+  })
+}
 
 async function checkOrganizationImpact() {
   // Wait for organizations and main store to load
@@ -48,7 +59,7 @@ async function checkOrganizationImpact() {
   ])
 
   // Get all organizations where user is super_admin
-  const superAdminOrgs = organizationStore.organizations.filter(org => org.role === 'super_admin' || org.role === 'org_super_admin')
+  const superAdminOrgs = organizationStore.organizations.filter(org => isSuperAdminRole(org.role))
 
   if (superAdminOrgs.length === 0) {
     return { orgsToBeDeleted: [], paidOrgsToBeDeleted: [], canProceed: true }
@@ -73,7 +84,7 @@ async function checkOrganizationImpact() {
         }
 
         superAdminCount = members.filter(member =>
-          !member.is_invite && !member.is_tmp && member.role_name === 'org_super_admin',
+          !member.is_invite && !member.is_tmp && isSuperAdminRole(member.role_name),
         ).length
       }
       else {
@@ -86,9 +97,7 @@ async function checkOrganizationImpact() {
         }
 
         // Count super_admins (excluding temporary users)
-        superAdminCount = members.filter(member =>
-          member.role === 'super_admin' && !member.is_tmp,
-        ).length
+        superAdminCount = members.filter(member => isSuperAdminRole(member.role) && !member.is_tmp).length
       }
 
       // If user is the only super_admin, this org will be deleted
@@ -125,6 +134,11 @@ async function checkOrganizationImpact() {
 }
 
 async function deleteAccount() {
+  if (!isEmailVerified.value) {
+    await redirectToEmailVerification()
+    return
+  }
+
   // First, check organization impact
   const { orgsToBeDeleted, paidOrgsToBeDeleted, canProceed } = await checkOrganizationImpact()
 
@@ -239,13 +253,18 @@ async function performAccountDeletion(password: string) {
     return false
   const supabaseClient = useSupabase()
 
+  if (!isEmailVerified.value) {
+    await redirectToEmailVerification()
+    return false
+  }
+
   if (!password) {
     toast.error(t('password-placeholder'))
     return false
   }
 
   if (captchaKey.value && !deleteAccountCaptchaToken.value) {
-    toast.error(t('captcha-required', 'Captcha verification is required'))
+    toast.error(t('captcha-required'))
     return false
   }
 
@@ -309,6 +328,10 @@ async function performAccountDeletion(password: string) {
 
     if (deleteError) {
       console.error('Delete error:', deleteError)
+      if (deleteError.message?.includes('email_not_verified')) {
+        await redirectToEmailVerification()
+        return false
+      }
       if (deleteError.message?.includes('reauth_required')) {
         deleteAccountCaptchaToken.value = ''
         deleteAccountCaptchaRef.value?.reset()
@@ -657,7 +680,7 @@ onMounted(async () => {
         </div>
         <div v-if="captchaKey" class="mt-4">
           <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-            {{ t('captcha', 'Captcha') }}
+            {{ t('captcha') }}
           </label>
           <VueTurnstile
             ref="deleteAccountCaptchaRef"

@@ -565,7 +565,7 @@ onMounted(async () => {
         <button
           v-if="canAssignRoles"
           class="d-btn d-btn-sm d-btn-ghost"
-          :title="t('edit-role', 'Edit role')"
+          :title="t('edit-role')"
           @click="openEditRoleModal(row)"
         >
           <IconWrench class="size-4" />

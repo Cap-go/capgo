@@ -3,7 +3,7 @@
 BEGIN;
 
 -- Plan the number of tests
-SELECT plan(37);
+SELECT plan(39);
 
 -- Test app_versions policies
 SELECT
@@ -41,7 +41,7 @@ SELECT
     policies_are(
         'public',
         'global_stats',
-        ARRAY['Allow anon to select'],
+        ARRAY[]::text [],
         'global_stats should have correct policies'
     );
 
@@ -70,6 +70,36 @@ SELECT
             'Prevent non 2FA access'
         ],
         'channel_devices should have correct policies'
+    );
+
+-- Test channel_permission_overrides policies
+SELECT
+    policies_are(
+        'public',
+        'channel_permission_overrides',
+        ARRAY[
+            'channel_permission_overrides_admin_delete',
+            'channel_permission_overrides_admin_insert',
+            'channel_permission_overrides_admin_select',
+            'channel_permission_overrides_admin_update'
+        ],
+        'channel_permission_overrides should have split write policies and one select policy'
+    );
+
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM pg_policies
+            WHERE
+                schemaname = 'public'
+                AND tablename = 'channel_permission_overrides'
+                AND permissive = 'PERMISSIVE'
+                AND 'authenticated' = any(roles)
+                AND cmd IN ('SELECT', 'ALL')
+        ),
+        1::bigint,
+        'channel_permission_overrides should expose only one permissive SELECT path for authenticated'
     );
 
 -- Test orgs policies
@@ -206,7 +236,7 @@ SELECT
         ARRAY[
             'Allow users to delete manifest entries',
             'Allow users to insert manifest entries',
-            'Allow users to read any manifest entry',
+            'Allow select for auth, api keys (read+)',
             'Prevent users from updating manifest entries'
         ],
         'manifest should have correct policies'

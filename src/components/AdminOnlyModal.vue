@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconUserCircle from '~icons/heroicons/user-circle'
-import { useOrganizationStore } from '~/stores/organization'
+import { isAdminRole, useOrganizationStore } from '~/stores/organization'
 
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
@@ -14,7 +14,7 @@ onMounted(async () => {
   try {
     const members = await organizationStore.getMembers()
     admins.value = members
-      .filter(m => m.role === 'super_admin' || m.role === 'admin')
+      .filter(m => isAdminRole(m.role))
       .map(m => ({ email: m.email, image_url: m.image_url }))
   }
   catch (e) {

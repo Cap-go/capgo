@@ -1,13 +1,16 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { parseBody, quickError, simpleError, simpleRateLimit, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { getEffectivePasswordMinLength, getPasswordPolicyValidationErrors } from '../utils/password_policy.ts'
 import { isIPRateLimited, recordFailedAuth } from '../utils/rate_limit.ts'
 import { buildRateLimitInfo } from '../utils/rateLimitInfo.ts'
 import { emptySupabase, supabaseClient, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
+import { getEnv } from '../utils/utils.ts'
 
 interface ValidatePasswordCompliance {
   email: string
@@ -23,6 +26,80 @@ interface OrgReadAccessResult {
   error?: string
 }
 
+type BackendContext = Context<MiddlewareKeyVariables>
+
+/**
+ * Normalize and validate a request origin string to a stable origin value.
+ */
+function normalizeOrigin(origin: string): string {
+  try {
+    return new URL(origin).origin
+  }
+  catch {
+    return ''
+  }
+}
+
+/**
+ * Build the explicit origin allowlist for this endpoint.
+ * Includes configured webapp origin plus optional custom allowed origins.
+ */
+function getAllowedOrigins(c: BackendContext): Set<string> {
+  const webappUrl = normalizeOrigin(getEnv(c, 'WEBAPP_URL'))
+  const configuredOrigins = getEnv(c, 'PASSWORD_COMPLIANCE_ALLOWED_ORIGINS')
+    .split(',')
+    .map(origin => normalizeOrigin(origin.trim()))
+    .filter(Boolean)
+
+  const allowed = new Set<string>()
+  if (webappUrl)
+    allowed.add(webappUrl)
+
+  for (const origin of configuredOrigins) {
+    allowed.add(origin)
+  }
+
+  return allowed
+}
+
+/**
+ * Return true for native/webview origins that are expected for first-party clients.
+ */
+function isNativeOrLocalOrigin(origin: string): boolean {
+  try {
+    const parsed = new URL(origin)
+    if (parsed.protocol === 'capacitor:')
+      return parsed.hostname === 'localhost'
+    if (parsed.protocol === 'ionic:')
+      return parsed.hostname === 'localhost'
+    if (!(['http:', 'https:'].includes(parsed.protocol)))
+      return false
+    return ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname)
+  }
+  catch {
+    return false
+  }
+}
+
+/**
+ * Validate incoming Origin header before processing the password compliance payload.
+ */
+async function validateOrigin(c: BackendContext, next: () => Promise<void>) {
+  const origin = c.req.header('origin')
+  if (!origin)
+    return next()
+
+  const requestOrigin = normalizeOrigin(origin)
+  const allowedOrigins = getAllowedOrigins(c)
+  const isNativeOrLocal = isNativeOrLocalOrigin(origin)
+  if (!isNativeOrLocal && (!requestOrigin || !allowedOrigins.has(requestOrigin))) {
+    cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - forbidden origin', origin })
+    return quickError(403, 'forbidden_origin', 'Origin is not allowed for this endpoint')
+  }
+
+  return next()
+}
+
 const bodySchema = z.object({
   email: z.string().check(z.email()),
   password: z.string().check(z.minLength(1)),
@@ -30,38 +107,9 @@ const bodySchema = z.object({
   captcha_token: z.optional(z.string().check(z.minLength(1))),
 })
 
-// Check if password meets the policy requirements
-function passwordMeetsPolicy(password: string, policy: {
-  min_length?: number
-  require_uppercase?: boolean
-  require_number?: boolean
-  require_special?: boolean
-}): { valid: boolean, errors: string[] } {
-  const errors: string[] = []
-
-  // Check minimum length
-  if (policy.min_length && password.length < policy.min_length) {
-    errors.push(`Password must be at least ${policy.min_length} characters`)
-  }
-
-  // Check uppercase requirement
-  if (policy.require_uppercase && !/[A-Z]/.test(password)) {
-    errors.push('Password must contain at least one uppercase letter')
-  }
-
-  // Check number requirement
-  if (policy.require_number && !/\d/.test(password)) {
-    errors.push('Password must contain at least one number')
-  }
-
-  // Check special character requirement
-  if (policy.require_special && !/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password)) {
-    errors.push('Password must contain at least one special character')
-  }
-
-  return { valid: errors.length === 0, errors }
-}
-
+/**
+ * Resolve whether the authenticated user has `org.read` access for the org.
+ */
 export async function checkOrgReadAccess(
   supabase: RpcClient,
   orgId: string,
@@ -82,6 +130,7 @@ export async function checkOrgReadAccess(
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
+app.use('*', validateOrigin)
 app.use('/', useCors)
 
 app.post('/', async (c) => {
@@ -170,13 +219,14 @@ app.post('/', async (c) => {
   }
 
   // Check if the password meets the policy requirements
-  const policyCheck = passwordMeetsPolicy(body.password, policy)
+  const policyErrors = getPasswordPolicyValidationErrors(body.password, policy)
+  const effectiveMinLength = getEffectivePasswordMinLength(policy.min_length)
 
-  if (!policyCheck.valid) {
+  if (policyErrors.length > 0) {
     throw simpleError('password_does_not_meet_policy', 'Your current password does not meet the organization requirements', {
-      errors: policyCheck.errors,
+      errors: policyErrors,
       policy: {
-        min_length: policy.min_length,
+        min_length: effectiveMinLength,
         require_uppercase: policy.require_uppercase,
         require_number: policy.require_number,
         require_special: policy.require_special,

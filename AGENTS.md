@@ -88,6 +88,10 @@ testing against Cloudflare Workers.
 - For **schema changes**, always edit or add files under
   `supabase/migrations/` and treat `supabase/schemas/prod.sql` as read-only
   reference.
+  - Migration files must be created via CLI only.
+  - Never create migration files manually.
+  - Always use `bunx supabase migration new <feature_slug>`.
+  - Manual creation of migration files is not allowed.
 - **Supabase admin client + sign-in pitfall:** if you call
   `supabaseAdmin.auth.signInWithPassword(...)`, that client becomes authenticated
   as the user (it is no longer a pure service-role client). Always use a
@@ -115,7 +119,7 @@ Capgo relies on two layered caches for plugin endpoints (`/updates`, `/stats`, `
 - **Edge on-prem cache (Cloudflare Snippet)**: `cloudflare_workers/snippet/index.js` caches responses when it detects:
   - `429` + `{ error: 'on_premise_app' }` (from `/updates` or `/channel_self`), or
   - `{ isOnprem: true }` (from `/stats`).
-  The snippet stores cached responses using the worker's `Cache-Control` TTL and serves them before routing.
+    The snippet stores cached responses using the worker's `Cache-Control` TTL and serves them before routing.
 - **Edge plan-upgrade cache (Cloudflare Snippet)**: same file caches responses when it detects:
   - `429` + `{ error: 'need_plan_upgrade' }`.
 - **App status cache (Worker runtime)**: `supabase/functions/_backend/utils/appStatus.ts` stores `onprem` / `cancelled` / `cloud` for 60s using the Cache API to short-circuit DB lookups.
@@ -185,37 +189,43 @@ Capgo relies on two layered caches for plugin endpoints (`/updates`, `/stats`, `
 
 **ALL TEST FILES RUN IN PARALLEL.** Tests within the same file run sequentially (unless explicitly configured otherwise), but different test files execute simultaneously. You MUST design tests accordingly.
 
-**Maximize parallelism:** Use `it.concurrent()` instead of `it()` to run tests in parallel within the same file. More parallel tests = faster CI/CD.
+**Maximize parallelism:** Use `it.concurrent()` instead of `it()` when possible, to run tests in parallel within the same file. More parallel tests = faster CI/CD.
 
 When creating tests that interact with shared resources (users, apps, orgs, devices, channels, bundles, etc.), follow these rules:
 
 **You CAN reuse existing seed data IF:**
+
 - You only READ the data, not modify it
 - You create your OWN child resources under it (e.g., reuse a user but create your own app/org for that user)
 - The parent resource is not modified by your test or other tests
 
 **You MUST create dedicated seed data IF:**
+
 - Your test MODIFIES the resource (update, delete, change settings)
 - Other tests also modify that same resource
 - The resource state matters for your test assertions
 
 **Guidelines:**
+
 1. **Create dedicated seed data when needed** - Add new test-specific entries in `supabase/seed.sql` with unique identifiers
 2. **Use unique naming conventions** - Prefix test data with the test file name or feature being tested (e.g., `test_my_feature_user@capgo.app`, `com.test.myfeature.app`)
 3. **Clean up is NOT enough** - Even with cleanup, parallel test files might try to use the data simultaneously
 
 **Examples of what breaks parallel test files:**
+
 - Modifying the default `test@capgo.app` user's settings
 - Deleting or updating the default app `com.demo.app`
 - Changing org settings on the shared test org
 - Using hardcoded IDs that other test files also modify
 
 **Examples of safe reuse:**
+
 - Using `test@capgo.app` to create a NEW app specific to your test (user is not modified)
 - Reading from shared orgs without modifying them
 - Creating new channels/bundles under your own dedicated app
 
 **When you need isolation, create dedicated seed data:**
+
 ```sql
 -- In seed.sql, add dedicated test data for your test file:
 INSERT INTO auth.users (id, email, ...) VALUES
@@ -248,6 +258,12 @@ Then in your test file, use ONLY these dedicated resources for modifications.
 
 - All code comments must be in English, regardless of the chat language.
 
+### Translations
+
+- Never pass inline fallback text as the second argument to translation calls such as `t('key', 'English text')`.
+- Always use translation keys only, for example `t('key')`.
+- When text is missing, add or update the key in `messages/en.json` instead of putting English fallback text in code.
+
 ### Commit Messages
 
 - Follow Conventional Commits v1.0.0 (<https://www.conventionalcommits.org/en/v1.0.0/>).
@@ -262,6 +278,10 @@ Then in your test file, use ONLY these dedicated resources for modifications.
 - When a feature requires schema changes, create a single migration file with
   the Supabase CLI (`bunx supabase migration new <feature_slug>`) and keep editing
   that file until the feature ships; never edit previously committed migrations.
+- If a migration file is newly created and not yet committed, it may be modified.
+- Keep amending the same migration file while the pull request is still open.
+- Never create a second migration file for the same schema change set. If not yet merged, do not split work into multiple migration files for one change.
+- Use CLI for migrations. Never manually create migration files.
 - Updating `supabase/seed.sql` to back new or evolved tests is expected; keep
   fixtures focused on current behavior while leaving committed migrations
   unchanged.
@@ -277,6 +297,11 @@ Then in your test file, use ONLY these dedicated resources for modifications.
 - Do not create new cron jobs it's bad pattern instead update
   process_all_cron_tasks function in a new migration file to add your job if
   needed.
+- For runtime feature flags and security-related toggles, use runtime config from
+  Vault-backed settings and avoid mutable singleton tables in application code.
+- Do not store environment-driven behavior in singleton tables.
+- Use Vault-backed configuration values as the source of truth and runtime
+  environment values only for deployment-time overrides.
 - Never use the Supabase admin SDK (with service key) for user-facing APIs.
   Always use the client SDK with user authentication so RLS policies are
   enforced. The admin SDK should only be used when accessing data that is not
@@ -288,6 +313,16 @@ Then in your test file, use ONLY these dedicated resources for modifications.
   `supabase.auth.getClaims()` (frontend) or auth context from middleware
   (backend) instead of `getUser()` unless you explicitly need the full user
   record from the Auth API.
+
+### PostgreSQL Extension Policy
+
+- Avoid introducing new PostgreSQL extensions if an existing feature or SQL
+  approach can solve the same requirement.
+- If an extension is truly unavoidable, add it only with explicit user
+  consent and never by default.
+- If there is no practical alternative, add a migration with a clear fallback plan.
+- Never enable a new PostgreSQL extension without explicit user consent before
+  applying it.
 
 ### PostgreSQL Function Security
 
@@ -320,6 +355,67 @@ BEGIN
 END;
 $$;
 ```
+
+### PostgreSQL Function Permissioning (Least Privilege)
+
+For RPCs and helper functions, apply minimum privileges explicitly:
+
+- Start from deny-by-default and grant only required roles.
+- Set `OWNER` explicitly for each new function.
+- Use `REVOKE ALL ... FROM PUBLIC` to prevent public access drift from default ACLs.
+- If `uuid`-based checks exist, do not grant `anon` or `authenticated` unless there is a strict user-facing requirement.
+- Prefer granting only `service_role` for `uuid` overloads and keep user-context variants (`()`) on authenticated access only where needed.
+
+### PostgreSQL RPC Data Exposure
+
+Prevent RPCs from becoming an oracle system.
+
+- Do not expose RPCs that let unauthorized users infer whether sensitive data exists, matches, or belongs to another user or org.
+- Default to denying access unless the caller already has the rights required to read the underlying data through the normal permission model.
+- If an RPC returns data, metadata, booleans, counts, or different error shapes, treat all of those as potential data leaks and gate them the same way.
+- Never use a publicly callable RPC to answer sensitive existence checks, membership checks, entitlement checks, or status checks for records the caller cannot already access.
+- Only allow broader access when the information is genuinely non-critical and the UX benefit is material.
+- In that exceptional case, add an English code comment directly next to the function, endpoint, or policy explaining why the exposure is acceptable, what is intentionally revealed, and why restricting it would significantly harm UX.
+
+### SQL FUNCTION SECURITY (UPPERCASE RULES)
+
+WHEN ADDING AN ADMIN/PLATFORM-RBAC CHECK FUNCTION:
+
+- DEFINE ONE SERVICE-ROLE-ONLY `uuid` OVERLOAD FOR INTERNAL LOOKUPS.
+- DEFINE ONE USER-CONTEXT `()` OVERLOAD FOR CLIENT USAGE.
+- APPLY `REVOKE ALL ... FROM PUBLIC` TO EVERY OVERLOAD.
+- GRANT `service_role` TO `uuid` ONLY; GRANT `authenticated` ONLY TO `()` IF NEEDED.
+- KEEP `SET search_path = ''` AND `SECURITY DEFINER` EXPLICIT.
+- COMMENT THE BEHAVIOR (E.G., LEGACY VS PLATFORM SECRET CHECK) TO PREVENT REGRSSION.
+
+```sql
+ALTER FUNCTION public.is_platform_admin(userid uuid) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION public.is_platform_admin(userid uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.is_platform_admin(userid uuid) TO "service_role";
+```
+
+### Platform Admin Guardrails
+
+Platform admin is **NOT** a general-purpose superuser capability.
+
+- The only allowed platform-admin user action is spoofing/impersonating another
+  user.
+- The admin dashboard must stay read-only and limited to admin statistics,
+  observability, and similar reporting.
+- Never build a platform-admin write path that can change org membership, RBAC
+  bindings, roles, permissions, billing state, app ownership, or any other
+  privilege-bearing state.
+- Never use platform admin as a shortcut around normal auth/RLS for mutating
+  APIs. If an action could cause privilege elevation, do not expose it behind
+  platform admin.
+- Platform admins are defined from runtime Vault-backed configuration, not from
+  mutable database state.
+- There must be no API, UI, or database path to grant/revoke platform admin
+  dynamically. The only supported way to change platform admins is to publish a
+  new runtime version with updated environment configuration.
+- If a privileged operational action is needed beyond impersonation or reading
+  admin stats, implement it as a strictly internal service-role-only path, not
+  as a platform-admin feature.
 
 ### RLS Policy Optimization Rules
 
@@ -528,6 +624,10 @@ When backend code uses the plugin read-path (`/updates`, `/stats`, `/channel_sel
 - Logical replication replicates **table data**, not derived objects like **views** and **SQL functions**.
 - Treat the read replica (what you see in PlanetScale) as the source of truth for what is queryable from plugin endpoints.
 - Do **not** query credits ledger tables/views from the replica (e.g. `usage_credit_*` / `usage_credit_balances`). If plugin logic needs a “has credits” signal, **materialize it into a replicated column/table** (example: an org-level boolean flag that is refreshed by primary-side jobs).
+- `/updates`, `/stats`, and `/channel_self` are extremely hot paths and can be called hundreds of times per second.
+- Those endpoints must not call the primary Supabase/Postgres database in-request or through `backgroundTask()` side effects unless there is no other practical option.
+- Background work is not an exception: do not enqueue primary-DB RPCs, writes, or lookups from these plugin endpoints just because the response is returned first.
+- If an unavoidable primary write remains for one of these endpoints, keep it minimal, document the reason inline, and treat it as an exception that requires extra review.
 
 ## Pull Request Guidelines
 
@@ -617,13 +717,15 @@ let isNewVersion = false
 try {
   const parsed = parse(pluginVersion)
   isNewVersion = !isDeprecatedPluginVersion(parsed, MIN_V5, MIN_V6, MIN_V7, MIN_V8)
-} catch (error) {
+}
+catch (error) {
   // If version parsing fails, assume old version for safety
 }
 
 if (isNewVersion) {
   // New behavior for updated plugins
-} else {
+}
+else {
   // Legacy behavior for old plugins
 }
 ```

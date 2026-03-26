@@ -1,20 +1,28 @@
 import type { Context } from 'hono'
+import type { MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
 import type { DeviceRes, DeviceWithoutCreatedAt, ReadDevicesParams, ReadDevicesResponse, ReadStatsParams, StatsActions, VersionUsage } from './types.ts'
 import { getRuntimeKey } from 'hono/adapter'
 import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readDeviceVersionCountsCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
-import { isAppDemo } from './demo.ts'
+import { isDemoApp } from './demo.ts'
 import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
-import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readDeviceVersionCountsSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
+import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readDeviceVersionCountsSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, supabaseAdmin, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
 import { DEFAULT_LIMIT } from './types.ts'
 import { backgroundTask, getEnv, isInternalVersionName } from './utils.ts'
 
-export function createStatsMau(c: Context, device_id: string, app_id: string, org_id: string, platform: string) {
+export function createStatsMau(c: Context, device_id: string, app_id: string, org_id: string, platform: string): Promise<void> {
   const lowerDeviceId = device_id
-  if (!c.env.DEVICE_USAGE)
-    return trackDeviceUsageSB(c, lowerDeviceId, app_id, org_id)
-  return trackDeviceUsageCF(c, lowerDeviceId, app_id, org_id, platform)
+  const jobs: Promise<unknown>[] = [
+    // queueCronStatApp(c, app_id, org_id),
+  ]
+  if (!c.env.DEVICE_USAGE) {
+    jobs.push(Promise.resolve(trackDeviceUsageSB(c, lowerDeviceId, app_id, org_id)))
+  }
+  else {
+    jobs.push(Promise.resolve(trackDeviceUsageCF(c, lowerDeviceId, app_id, org_id, platform)))
+  }
+  return Promise.all(jobs).then(() => undefined)
 }
 
 export async function onPremStats(c: Context, app_id: string, action: string, device: DeviceWithoutCreatedAt) {
@@ -46,9 +54,13 @@ export function createStatsBandwidth(c: Context, device_id: string, app_id: stri
   cloudlog({ requestId: c.get('requestId'), message: 'createStatsBandwidth', device_id: lowerDeviceId, app_id, file_size })
   if (file_size === 0)
     return
-  if (!c.env.BANDWIDTH_USAGE)
-    return backgroundTask(c, trackBandwidthUsageSB(c, lowerDeviceId, app_id, file_size))
-  return trackBandwidthUsageCF(c, lowerDeviceId, app_id, file_size)
+  const trackingJob = !c.env.BANDWIDTH_USAGE
+    ? Promise.resolve(trackBandwidthUsageSB(c, lowerDeviceId, app_id, file_size))
+    : Promise.resolve(trackBandwidthUsageCF(c, lowerDeviceId, app_id, file_size))
+  return backgroundTask(c, Promise.all([
+    // queueCronStatApp(c, app_id),
+    trackingJob,
+  ]).then(() => undefined))
 }
 
 export type VersionAction = 'get' | 'fail' | 'install' | 'uninstall'
@@ -130,6 +142,16 @@ export function readStatsVersion(c: Context, app_id: string, start_date: string,
     return readStatsVersionSB(c, app_id, start_date, end_date)
   return readStatsVersionCF(c, app_id, start_date, end_date)
 }
+
+// async function queueCronStatApp(c: Context, app_id: string, org_id?: string) {
+//   const { error } = await supabaseAdmin(c).rpc('queue_cron_stat_app_for_app', {
+//     p_app_id: app_id,
+//     ...(org_id ? { p_org_id: org_id } : {}),
+//   })
+//   if (error) {
+//     cloudlog({ requestId: c.get('requestId'), message: 'Failed to queue cron_stat_app from live usage', app_id, org_id, error })
+//   }
+// }
 
 function shouldUseAnalyticsEngine(c: Context): boolean {
   if (getRuntimeKey() !== 'workerd' || !c.env.DEVICE_INFO)
@@ -279,9 +301,9 @@ async function generateDemoLogs(c: Context, params: ReadStatsParams): Promise<De
   return logs.slice(0, limit)
 }
 
-export async function readStats(c: Context, params: ReadStatsParams) {
+export async function readStats(c: Context<MiddlewareKeyVariables>, params: ReadStatsParams) {
   // For demo apps, generate fake logs instead of querying real data
-  if (isAppDemo(params.app_id)) {
+  if (await isDemoApp(c, params.app_id)) {
     return generateDemoLogs(c, params)
   }
 
@@ -290,13 +312,21 @@ export async function readStats(c: Context, params: ReadStatsParams) {
   return readStatsCF(c, params)
 }
 
-export function countDevices(c: Context, app_id: string, customIdMode: boolean) {
+export function countDevices(
+  c: Context,
+  app_id: string,
+  customIdMode: boolean,
+  deviceIds: string[] = [],
+  versionName?: string,
+  search?: string,
+) {
   // Use Analytics Engine DEVICE_INFO when available in Cloudflare Workers.
   // In local Cloudflare testing these bindings are often absent, so fall back
   // to the Postgres/Supabase path.
+  const trimmedSearch = search?.trim()
   if (shouldUseAnalyticsEngine(c))
-    return countDevicesCF(c, app_id, customIdMode)
-  return countDevicesSB(c, app_id, customIdMode)
+    return countDevicesCF(c, app_id, customIdMode, deviceIds, versionName, trimmedSearch)
+  return countDevicesSB(c, app_id, customIdMode, deviceIds, versionName, trimmedSearch)
 }
 
 export async function readDevices(c: Context, params: ReadDevicesParams, customIdMode: boolean): Promise<ReadDevicesResponse> {

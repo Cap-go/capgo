@@ -10,7 +10,21 @@ import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
 import { resolveInviteNewUserErrorMessage } from '~/utils/invites'
 
-const emit = defineEmits(['success'])
+interface InviteSuccessPayload {
+  email: string
+  firstName: string
+  lastName: string
+}
+
+const props = withDefaults(defineProps<{
+  inviteKind?: 'generic' | 'technical'
+}>(), {
+  inviteKind: 'generic',
+})
+
+const emit = defineEmits<{
+  success: [payload: InviteSuccessPayload]
+}>()
 
 const { t } = useI18n()
 const supabase = useSupabase()
@@ -23,9 +37,16 @@ const inviteLastName = ref('')
 const inviteCaptchaToken = ref('')
 const inviteCaptchaElement = ref<InstanceType<typeof VueTurnstile> | null>(null)
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
+const shouldUseCaptcha = computed(() => Boolean(captchaKey.value))
 const isInviting = ref(false)
 const useRbacInvites = computed(() => organizationStore.currentOrganization?.use_new_rbac === true)
 const inviteRole = computed(() => (useRbacInvites.value ? 'org_admin' : 'admin'))
+const emailDialogTitle = computed(() => props.inviteKind === 'technical'
+  ? t('onboarding-invite-option-modal-title')
+  : t('invite-teammate-modal-title'))
+const emailDialogDescription = computed(() => props.inviteKind === 'technical'
+  ? t('onboarding-invite-option-dialog-desc')
+  : t('invite-teammate-modal-description'))
 
 // Dialog state tracking
 const isEmailDialogOpen = ref(false)
@@ -41,8 +62,8 @@ function showEmailDialog() {
   isFullDetailsDialogOpen.value = false
 
   dialogStore.openDialog({
-    title: t('onboarding-invite-option-modal-title'),
-    description: t('onboarding-invite-option-dialog-desc'),
+    title: emailDialogTitle.value,
+    description: emailDialogDescription.value,
     size: 'lg',
     preventAccidentalClose: true,
     buttons: [
@@ -52,7 +73,7 @@ function showEmailDialog() {
       },
       {
         id: 'invite-email-next',
-        text: t('button-next', 'Next'),
+        text: t('button-next'),
         role: 'primary',
         preventClose: true,
         handler: () => {
@@ -74,7 +95,8 @@ function showFullDetailsDialog() {
   isFullDetailsDialogOpen.value = true
 
   dialogStore.openDialog({
-    title: t('invite-new-user-dialog-header', 'Invite New User'),
+    title: t('invite-new-user-dialog-header'),
+    description: t('invite-new-user-dialog-description'),
     size: 'lg',
     preventAccidentalClose: true,
     buttons: [
@@ -113,8 +135,8 @@ function updateEmailDialogButton(loading: boolean) {
     return
   submitButton.disabled = loading
   submitButton.text = loading
-    ? t('checking', 'Checking...')
-    : t('button-next', 'Next')
+    ? t('checking')
+    : t('button-next')
 }
 
 function updateFullDetailsButton() {
@@ -124,7 +146,7 @@ function updateFullDetailsButton() {
   const submitButton = buttons.find(button => button.id === 'invite-full-send')
   if (!submitButton)
     return
-  const captchaNotReady = captchaKey.value && !inviteCaptchaToken.value
+  const captchaNotReady = shouldUseCaptcha.value && !inviteCaptchaToken.value
   submitButton.disabled = isInviting.value || captchaNotReady
   submitButton.text = isInviting.value
     ? t('sending-invitation')
@@ -139,18 +161,18 @@ function resetInviteForm() {
   inviteEmail.value = ''
   inviteFirstName.value = ''
   inviteLastName.value = ''
-  if (captchaKey.value) {
+  if (shouldUseCaptcha.value) {
     inviteCaptchaToken.value = ''
     inviteCaptchaElement.value?.reset()
   }
 }
 
-function completeInviteSuccess() {
+function completeInviteSuccess(payload: InviteSuccessPayload) {
   resetInviteForm()
   dialogStore.closeDialog()
   isEmailDialogOpen.value = false
   isFullDetailsDialogOpen.value = false
-  emit('success')
+  emit('success', payload)
   sendEvent({
     channel: 'onboarding-v2',
     event: `onboarding-step-invite-teammate`,
@@ -167,12 +189,12 @@ async function handleEmailSubmit() {
   const email = inviteEmail.value.trim().toLowerCase()
 
   if (!email) {
-    toast.error(t('missing-email', 'Email is required'))
+    toast.error(t('missing-email'))
     return
   }
 
   if (!validateEmail(email)) {
-    toast.error(t('invalid-email', 'Invalid email'))
+    toast.error(t('invalid-email'))
     return
   }
 
@@ -210,25 +232,29 @@ async function handleEmailSubmit() {
 
     if (error) {
       console.error('Error inviting user:', error)
-      toast.error(t('error-inviting-user', 'Error inviting user'))
+      toast.error(t('error-inviting-user'))
       return
     }
 
     if (!data) {
-      toast.error(t('invitation-failed', 'Invitation failed'))
+      toast.error(t('invitation-failed'))
       return
     }
 
     if (data === 'OK') {
-      toast.success(t('org-invited-user', 'User has been invited successfully'))
-      completeInviteSuccess()
+      toast.success(t('org-invited-user'))
+      completeInviteSuccess({
+        email,
+        firstName: '',
+        lastName: '',
+      })
       return
     }
 
     if (data === 'NO_EMAIL') {
       // User doesn't exist, show full details dialog
       if (!captchaKey.value) {
-        toast.error(t('captcha-not-available', 'Captcha verification is not configured in this environment.'))
+        toast.error(t('captcha-not-available'))
         return
       }
       showFullDetailsDialog()
@@ -236,22 +262,22 @@ async function handleEmailSubmit() {
     }
 
     if (data === 'ALREADY_INVITED') {
-      toast.error(t('user-already-invited', 'This user is already invited'))
+      toast.error(t('user-already-invited'))
     }
     else if (data === 'TOO_RECENT_INVITATION_CANCELATION') {
-      toast.error(t('too-recent-invitation-cancelation', 'An invitation was cancelled recently. Please wait a bit longer.'))
+      toast.error(t('too-recent-invitation-cancelation'))
     }
     else if (data === 'CAN_NOT_INVITE_OWNER') {
-      toast.error(t('cannot-invite-owner', 'You cannot invite the owner of the account'))
+      toast.error(t('cannot-invite-owner'))
     }
     else if (data === 'RBAC_NOT_ENABLED' || data === 'ROLE_NOT_FOUND') {
-      toast.error(t('invitation-failed', 'Invitation failed'))
+      toast.error(t('invitation-failed'))
     }
     else if (data === 'NO_RIGHTS') {
-      toast.error(t('no-permission', 'You do not have permission to invite members'))
+      toast.error(t('no-permission'))
     }
     else {
-      toast.error(`${t('unexpected-invitation-response', 'Unexpected invitation response')}: ${data}`)
+      toast.error(`${t('unexpected-invitation-response')}: ${data}`)
     }
   }
   finally {
@@ -269,17 +295,17 @@ async function handleFullDetailsSubmit() {
   const lastName = inviteLastName.value.trim()
 
   if (!firstName) {
-    toast.error(t('first-name-required', 'First name is required'))
+    toast.error(t('first-name-required'))
     return
   }
 
   if (!lastName) {
-    toast.error(t('last-name-required', 'Last name is required'))
+    toast.error(t('last-name-required'))
     return
   }
 
-  if (captchaKey.value && !inviteCaptchaToken.value) {
-    toast.error(t('captcha-required', 'Captcha verification is required'))
+  if (shouldUseCaptcha.value && !inviteCaptchaToken.value) {
+    toast.error(t('captcha-required'))
     return
   }
 
@@ -297,7 +323,7 @@ async function handleFullDetailsSubmit() {
         email,
         org_id: orgId,
         invite_type: inviteRole.value,
-        captcha_token: inviteCaptchaToken.value,
+        captcha_token: shouldUseCaptcha.value ? inviteCaptchaToken.value : undefined,
         first_name: firstName,
         last_name: lastName,
       },
@@ -308,16 +334,20 @@ async function handleFullDetailsSubmit() {
       const errorMessage = await resolveInviteNewUserErrorMessage(error, t, {
         cancelledFallback: 'An invitation was cancelled recently. Please wait a bit longer.',
       })
-      toast.error(errorMessage ?? t('invitation-failed', 'Invitation failed'))
+      toast.error(errorMessage ?? t('invitation-failed'))
       return
     }
 
-    toast.success(t('org-invited-user', 'User has been invited successfully'))
-    completeInviteSuccess()
+    toast.success(t('org-invited-user'))
+    completeInviteSuccess({
+      email,
+      firstName,
+      lastName,
+    })
   }
   finally {
     isInviting.value = false
-    if (captchaKey.value)
+    if (shouldUseCaptcha.value)
       inviteCaptchaElement.value?.reset()
     inviteCaptchaToken.value = ''
   }
@@ -340,7 +370,7 @@ defineExpose({
     <form @submit.prevent="handleEmailSubmit">
       <div>
         <label for="invite-email" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-200">
-          {{ t('email', 'Email') }}
+          {{ t('email') }}
         </label>
         <input
           id="invite-email"
@@ -362,7 +392,7 @@ defineExpose({
       <!-- Email (not editable) -->
       <div>
         <label for="invite-email-readonly" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-200">
-          {{ t('email', 'Email') }}
+          {{ t('email') }}
         </label>
         <input
           id="invite-email-readonly"
@@ -375,7 +405,7 @@ defineExpose({
       <div class="grid gap-4 sm:grid-cols-2">
         <div>
           <label for="invite-first-name" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-200">
-            {{ t('first-name', 'First name') }}
+            {{ t('first-name') }}
           </label>
           <input
             id="invite-first-name"
@@ -389,7 +419,7 @@ defineExpose({
         </div>
         <div>
           <label for="invite-last-name" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-200">
-            {{ t('last-name', 'Last name') }}
+            {{ t('last-name') }}
           </label>
           <input
             id="invite-last-name"
@@ -402,19 +432,19 @@ defineExpose({
           >
         </div>
       </div>
-      <template v-if="!!captchaKey">
+      <template v-if="shouldUseCaptcha">
         <div>
           <VueTurnstile
             id="invite-captcha"
             ref="inviteCaptchaElement"
             v-model="inviteCaptchaToken"
             size="flexible"
-            :site-key="captchaKey"
+            :site-key="captchaKey!"
           />
         </div>
       </template>
       <p class="text-sm text-gray-500 dark:text-gray-400">
-        {{ t('onboarding-invite-option-helper') }}
+        {{ t('invite-new-user-dialog-helper') }}
       </p>
       <button type="submit" class="hidden" tabindex="-1" aria-hidden="true" />
     </form>

@@ -3,7 +3,6 @@ import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import type { Bindings } from './cloudflare.ts'
 import type { DeletePayload, InsertPayload, UpdatePayload } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
-import { sentry } from '@hono/sentry'
 import { createClient } from '@supabase/supabase-js'
 import { getRuntimeKey } from 'hono/adapter'
 import { cors } from 'hono/cors'
@@ -104,7 +103,7 @@ export interface MiddlewareKeyVariables {
 export const useCors = cors({
   origin: '*',
   allowHeaders: ['Content-Type', 'Authorization', 'capgkey', 'capgo_api', 'x-api-key', 'x-limited-key-id', 'apisecret', 'apikey', 'x-client-info'],
-  allowMethods: ['POST', 'GET', 'PUT', 'DELETE', 'OPTIONS'],
+  allowMethods: ['POST', 'GET', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
 })
 
 export const honoFactory = createFactory<MiddlewareKeyVariables>()
@@ -211,20 +210,13 @@ export const middlewareAPISecret = honoFactory.createMiddleware(async (c, next) 
 
 export const BRES = { status: 'ok' }
 
-export function createHono(functionName: string, version: string, sentryDsn?: string) {
+export function createHono(functionName: string, _version: string) {
   let appGlobal
   if (getRuntimeKey() === 'deno') {
     appGlobal = new Hono<MiddlewareKeyVariables>().basePath(`/${functionName}`)
   }
   else {
     appGlobal = new Hono<MiddlewareKeyVariables>()
-  }
-
-  if (sentryDsn) {
-    appGlobal.use('*', sentry({
-      dsn: sentryDsn,
-      release: version,
-    }) as any)
   }
   appGlobal.use('*', (c, next): Promise<any> => {
     // ADD HEADER TO IDENTIFY WORKER SOURCE

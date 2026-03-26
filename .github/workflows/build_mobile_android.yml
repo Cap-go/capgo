@@ -13,9 +13,13 @@ on:
 
 permissions: {}
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   build_android:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       actions: write
@@ -63,7 +67,7 @@ jobs:
           encodedString: ${{ secrets.PLAY_CONFIG_JSON }}
       - uses: ruby/setup-ruby@v1
         with:
-          ruby-version: '3.4.8'
+          ruby-version: '3.4.9'
           bundler-cache: true
       - uses: maierj/fastlane-action@v3.1.0
         env:

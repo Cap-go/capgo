@@ -37,8 +37,8 @@ async function verifyAdmin(c: AppContext): Promise<{ isAdmin: boolean, userId: s
   const userId = auth.userId
   const userSupabase = supabaseClient(c, auth.jwt)
 
-  // is_admin() is MFA-aware and must run with the caller JWT context.
-  const { data: isAdmin, error: adminError } = await userSupabase.rpc('is_admin')
+  // is_platform_admin() is MFA-aware and must run with the caller JWT context.
+  const { data: isAdmin, error: adminError } = await userSupabase.rpc('is_platform_admin')
 
   if (adminError) {
     cloudlog({ requestId: c.get('requestId'), message: 'is_admin_error', error: adminError })

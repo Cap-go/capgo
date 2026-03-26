@@ -247,7 +247,7 @@ const allLimits = computed(() => {
 async function getAppStats(rangeStart: Date, rangeEnd: Date) {
   if (props.appId) {
     const cached = main.filterDashboard(props.appId)
-    if (cached.length > 0) {
+    if (!needsForceRefresh.value && cached.length > 0) {
       return {
         global: cached,
         byApp: {},

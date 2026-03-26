@@ -7,22 +7,23 @@ DO $$
 BEGIN
   PERFORM tests.create_supabase_user('test_rbac_2fa_user', 'rbac_2fa@test.com');
   PERFORM tests.create_supabase_user('test_rbac_no2fa_user', 'rbac_no2fa@test.com');
+  PERFORM tests.mark_email_otp_verified('test_rbac_2fa_user');
 END $$;
 
 -- Create entries in public.users for the test members
 INSERT INTO public.users (id, email, created_at, updated_at)
 VALUES
 (
-  tests.get_supabase_uid('test_rbac_2fa_user'),
-  'rbac_2fa@test.com',
-  now(),
-  now()
+    tests.get_supabase_uid('test_rbac_2fa_user'),
+    'rbac_2fa@test.com',
+    now(),
+    now()
 ),
 (
-  tests.get_supabase_uid('test_rbac_no2fa_user'),
-  'rbac_no2fa@test.com',
-  now(),
-  now()
+    tests.get_supabase_uid('test_rbac_no2fa_user'),
+    'rbac_no2fa@test.com',
+    now(),
+    now()
 )
 ON CONFLICT (id) DO NOTHING;
 
@@ -85,11 +86,11 @@ END $$;
 -- Create an API key for the non-2FA user (for apikey-based permission checks)
 INSERT INTO public.apikeys (id, user_id, key, mode, name)
 VALUES (
-  9101,
-  tests.get_supabase_uid('test_rbac_no2fa_user'),
-  'test-rbac-no2fa-key',
-  'all'::public.key_mode,
-  'Test RBAC No 2FA Key'
+    9101,
+    tests.get_supabase_uid('test_rbac_no2fa_user'),
+    'test-rbac-no2fa-key',
+    'all'::public.key_mode,
+    'Test RBAC No 2FA Key'
 );
 
 -- Enable RBAC for the test orgs
@@ -99,63 +100,63 @@ SELECT public.rbac_enable_for_org(current_setting('test.rbac_org_without_2fa')::
 
 -- Test 1: RBAC permission check allows 2FA-enabled user when org enforces 2FA
 SELECT
-  is(
-    public.rbac_check_permission_direct(
-      public.rbac_perm_org_update_settings(),
-      tests.get_supabase_uid('test_rbac_2fa_user'),
-      current_setting('test.rbac_org_with_2fa')::uuid,
-      NULL::character varying,
-      NULL::bigint,
-      NULL
-    ),
-    true,
-    'rbac_check_permission_direct 2FA enforcement test - verified 2FA user allowed'
-  );
+    is(
+        public.rbac_check_permission_direct(
+            public.rbac_perm_org_update_settings(),
+            tests.get_supabase_uid('test_rbac_2fa_user'),
+            current_setting('test.rbac_org_with_2fa')::uuid,
+            NULL::character varying,
+            NULL::bigint,
+            NULL
+        ),
+        TRUE,
+        'rbac_check_permission_direct 2FA enforcement test - verified 2FA user allowed'
+    );
 
 -- Test 2: RBAC permission check denies non-2FA user when org enforces 2FA
 SELECT
-  is(
-    public.rbac_check_permission_direct(
-      public.rbac_perm_org_update_settings(),
-      tests.get_supabase_uid('test_rbac_no2fa_user'),
-      current_setting('test.rbac_org_with_2fa')::uuid,
-      NULL::character varying,
-      NULL::bigint,
-      NULL
-    ),
-    false,
-    'rbac_check_permission_direct 2FA enforcement test - non-2FA user denied'
-  );
+    is(
+        public.rbac_check_permission_direct(
+            public.rbac_perm_org_update_settings(),
+            tests.get_supabase_uid('test_rbac_no2fa_user'),
+            current_setting('test.rbac_org_with_2fa')::uuid,
+            NULL::character varying,
+            NULL::bigint,
+            NULL
+        ),
+        FALSE,
+        'rbac_check_permission_direct 2FA enforcement test - non-2FA user denied'
+    );
 
 -- Test 3: RBAC permission check allows non-2FA user when org does NOT enforce 2FA
 SELECT
-  is(
-    public.rbac_check_permission_direct(
-      public.rbac_perm_org_update_settings(),
-      tests.get_supabase_uid('test_rbac_no2fa_user'),
-      current_setting('test.rbac_org_without_2fa')::uuid,
-      NULL::character varying,
-      NULL::bigint,
-      NULL
-    ),
-    true,
-    'rbac_check_permission_direct 2FA enforcement test - non-2FA user allowed without enforcement'
-  );
+    is(
+        public.rbac_check_permission_direct(
+            public.rbac_perm_org_update_settings(),
+            tests.get_supabase_uid('test_rbac_no2fa_user'),
+            current_setting('test.rbac_org_without_2fa')::uuid,
+            NULL::character varying,
+            NULL::bigint,
+            NULL
+        ),
+        TRUE,
+        'rbac_check_permission_direct 2FA enforcement test - non-2FA user allowed without enforcement'
+    );
 
 -- Test 4: RBAC permission check denies API key when org enforces 2FA and user lacks 2FA
 SELECT
-  is(
-    public.rbac_check_permission_direct(
-      public.rbac_perm_org_update_settings(),
-      NULL::uuid,
-      current_setting('test.rbac_org_with_2fa')::uuid,
-      NULL::character varying,
-      NULL::bigint,
-      'test-rbac-no2fa-key'
-    ),
-    false,
-    'rbac_check_permission_direct 2FA enforcement test - apikey denied for non-2FA user'
-  );
+    is(
+        public.rbac_check_permission_direct(
+            public.rbac_perm_org_update_settings(),
+            NULL::uuid,
+            current_setting('test.rbac_org_with_2fa')::uuid,
+            NULL::character varying,
+            NULL::bigint,
+            'test-rbac-no2fa-key'
+        ),
+        FALSE,
+        'rbac_check_permission_direct 2FA enforcement test - apikey denied for non-2FA user'
+    );
 
 SELECT * FROM finish();
 

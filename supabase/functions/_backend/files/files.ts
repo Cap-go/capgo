@@ -21,7 +21,7 @@ import { app as files_config } from './files_config.ts'
 import { parseUploadMetadata } from './parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
 import { supabaseTusCreateHandler, supabaseTusHeadHandler, supabaseTusPatchHandler } from './supabaseTusProxy.ts'
-import { ALLOWED_HEADERS, ALLOWED_METHODS, EXPOSED_HEADERS, MAX_UPLOAD_LENGTH_BYTES, toBase64, TUS_EXTENSIONS, TUS_VERSION, X_CHECKSUM_SHA256 } from './util.ts'
+import { ALLOWED_HEADERS, ALLOWED_METHODS, buildFileHttpMetadata, EXPOSED_HEADERS, MAX_UPLOAD_LENGTH_BYTES, toBase64, TUS_EXTENSIONS, TUS_VERSION, withNoTransformCacheControl, X_CHECKSUM_SHA256 } from './util.ts'
 
 const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 20 minutes
 
@@ -55,6 +55,21 @@ function getExternalBaseUrl(c: Context): string {
   }
 
   return `${proto}://${host}`
+}
+
+function ensureNoTransformResponse(response: Response): Response {
+  const cacheControl = withNoTransformCacheControl(response.headers.get('cache-control'))
+  if (cacheControl === response.headers.get('cache-control')) {
+    return response
+  }
+
+  const headers = new Headers(response.headers)
+  headers.set('cache-control', cacheControl)
+  return new Response(response.body, {
+    headers,
+    status: response.status,
+    statusText: response.statusText,
+  })
 }
 
 async function saveBandwidthUsage(c: Context, fileSize: number | null | undefined) {
@@ -109,6 +124,7 @@ async function getHandler(c: Context): Promise<Response> {
   const cacheKey = new Request(cacheUrl, c.req)
   let response = await cache.match(cacheKey)
   if (response != null) {
+    response = ensureNoTransformResponse(response)
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files cache hit' })
     // Best-effort restore: if file is cached but missing in R2, write it back.
     await backgroundTask(c, async () => {
@@ -119,7 +135,7 @@ async function getHandler(c: Context): Promise<Response> {
         const cached = response.clone()
         const data = await cached.arrayBuffer()
         const contentType = cached.headers.get('content-type') || undefined
-        const httpMetadata = contentType ? { contentType } : undefined
+        const httpMetadata = buildFileHttpMetadata(contentType, cached.headers.get('cache-control'))
         await bucket.put(fileId, data, { httpMetadata })
         cloudlog({ requestId: c.get('requestId'), message: 'Restored cached file to R2', fileId })
         await sendDiscordAlert(c, {
@@ -193,7 +209,7 @@ function objectHeaders(object: R2Object): Headers {
   object.writeHttpMetadata(headers)
   // Prevent CDN transformations (auto-minify, email obfuscation, etc.) that modify
   // bytes in transit, breaking checksum verification on devices.
-  headers.set('cache-control', 'no-transform')
+  headers.set('cache-control', withNoTransformCacheControl(headers.get('cache-control')))
   headers.set('etag', object.httpEtag)
 
   // the sha256 checksum was provided to R2 in the upload
@@ -611,7 +627,7 @@ async function checkWriteAppAccess(c: Context, next: Next) {
 }
 
 app.options(`/upload/${ATTACHMENT_PREFIX}`, optionsHandler)
-app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromMetadata, checkWriteAppAccess, async (c) => {
+app.post(`/upload/${ATTACHMENT_PREFIX}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromMetadata, checkWriteAppAccess, (c) => {
   if (getRuntimeKey() !== 'workerd') {
     return supabaseTusCreateHandler(c)
   }
@@ -625,7 +641,7 @@ app.get(
   middlewareKey(['all', 'write', 'upload'], true),
   setKeyFromIdParam,
   checkWriteAppAccess,
-  async (c) => {
+  (c) => {
     const isTusRequest = c.req.header('Tus-Resumable') != null
     // In Hono/tiny, HEAD is routed to the GET handler. Use the raw request method.
     const isHead = c.req.raw.method === 'HEAD'
@@ -644,7 +660,7 @@ app.get(
   },
 )
 app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, getHandler)
-app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromIdParam, checkWriteAppAccess, async (c) => {
+app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromIdParam, checkWriteAppAccess, (c) => {
   if (getRuntimeKey() !== 'workerd') {
     return supabaseTusPatchHandler(c)
   }

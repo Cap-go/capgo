@@ -51,7 +51,7 @@ window.addEventListener('unhandledrejection', (event) => {
   }
 })
 
-const guestPath = ['/login', '/delete_account', '/confirm-signup', '/forgot_password', '/resend_email', '/onboarding', '/register', '/invitation', '/scan']
+const guestPath = ['/login', '/delete_account', '/confirm-signup', '/forgot_password', '/resend_email', '/onboarding', '/register', '/invitation', '/scan', '/sso-callback']
 
 getRemoteConfig()
 const app = createApp(App)
@@ -101,8 +101,6 @@ const router = createRouter({
   ],
   history: createWebHistory(import.meta.env.BASE_URL),
 })
-app.use(router)
-
 router.beforeEach((to, from, next) => {
   if (to.path.startsWith('/app/') && to.query.tab) {
     const tab = to.query.tab as string
@@ -122,6 +120,8 @@ type UserModule = (ctx: { app: typeof app, router: Router }) => void
 
 Object.values(import.meta.glob<{ install: UserModule }>('./modules/*.ts', { eager: true }))
   .forEach(i => i.install?.({ app, router }))
+
+app.use(router)
 
 router.isReady().then(async () => {
   app.mount('#app')

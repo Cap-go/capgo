@@ -1,7 +1,8 @@
 import type { UploadOptions } from '@capgo/cli/sdk'
+import { execFile } from 'node:child_process'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { cwd, env } from 'node:process'
+import { chdir, cwd, env } from 'node:process'
 import { CapgoSDK } from '@capgo/cli/sdk'
 import { BASE_DEPENDENCIES, BASE_DEPENDENCIES_OLD, BASE_PACKAGE_JSON, TEMP_DIR_NAME } from './cli-utils'
 import { APIKEY_TEST_ALL } from './test-utils'
@@ -23,12 +24,10 @@ const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY || 'sb_publishable_ACJWlzQHlZjBr
 // Cache for prepared apps to avoid repeated setup
 const preparedApps = new Set<string>()
 
-// Simple queue for key generation to prevent concurrent conflicts
-// When multiple tests run in parallel, they all try to create keys in the project root
-// This queue ensures they run one at a time
+// Key generation mutates repo-level files, so keep those operations serialized.
 let keyGenerationQueue = Promise.resolve()
 
-// Serialize SDK operations that temporarily change cwd
+// Uploads temporarily change cwd, so serialize them within the current process.
 let sdkCwdQueue = Promise.resolve()
 
 export const tempFileFolder = (appId: string) => join(ROOT_DIR, TEMP_DIR_NAME, appId)
@@ -157,6 +156,8 @@ export async function uploadBundleSDK(
     bundle: version,
     channel,
     disableCodeCheck: true, // Skip notifyAppReady check for tests
+    useZip: true,
+    useTus: false,
     // TUS protocol uses localApiFiles from capacitor.config.json
     ...additionalOptions,
   }
@@ -169,11 +170,11 @@ export async function uploadBundleSDK(
   const originalCwd = cwd()
 
   try {
-    process.chdir(tempFileFolder(appId))
+    chdir(tempFileFolder(appId))
     return await sdk.uploadBundle(options)
   }
   finally {
-    process.chdir(originalCwd)
+    chdir(originalCwd)
     operationComplete!()
   }
 }
@@ -197,12 +198,11 @@ export async function uploadBundleSDK(
 export async function generateEncryptionKeysSDK(appId: string, force = true) {
   const { existsSync, renameSync, readFileSync, writeFileSync } = await import('node:fs')
 
-  // Queue this operation to run after previous ones complete
-  const previousOperation = keyGenerationQueue
+  // Queue this operation to run after previous key generations complete.
   let operationComplete: () => void
+  const previousOperation = keyGenerationQueue
   keyGenerationQueue = new Promise(resolve => operationComplete = resolve)
 
-  // Wait for previous operation to finish
   await previousOperation
 
   // Backup the capacitor.config.ts content AFTER waiting for the queue
@@ -213,20 +213,64 @@ export async function generateEncryptionKeysSDK(appId: string, force = true) {
   }
 
   try {
-    const sdk = createTestSDK()
     const folderPath = tempFileFolder(appId)
+    const result = await new Promise<{ success: boolean, error?: string }>((resolve) => {
+      const script = `
+        import { CapgoSDK } from '@capgo/cli/sdk'
 
-    // Generate keys (they will be created in the project root)
-    const result = await sdk.generateEncryptionKeys({ force })
+        const sdk = new CapgoSDK({
+          supaHost: ${JSON.stringify(SUPABASE_URL)},
+          supaAnon: ${JSON.stringify(SUPABASE_ANON_KEY)},
+        })
+
+        const result = await sdk.generateEncryptionKeys({ force: ${force ? 'true' : 'false'} })
+        console.log(JSON.stringify(result))
+        process.exit(result.success ? 0 : 1)
+      `
+
+      execFile('bun', ['-e', script], { cwd: ROOT_DIR }, (error, stdout, stderr) => {
+        const output = `${stdout}\n${stderr}`.trim()
+        if (error) {
+          resolve({
+            success: false,
+            error: output || error.message,
+          })
+          return
+        }
+
+        const lines = output
+          .split('\n')
+          .map(line => line.trim())
+          .filter(Boolean)
+        const jsonLine = [...lines].reverse().find(line => line.startsWith('{') && line.endsWith('}'))
+
+        if (!jsonLine) {
+          resolve({
+            success: false,
+            error: output || 'generateEncryptionKeys returned no result',
+          })
+          return
+        }
+
+        try {
+          resolve(JSON.parse(jsonLine))
+        }
+        catch {
+          resolve({
+            success: false,
+            error: output || 'generateEncryptionKeys returned invalid JSON',
+          })
+        }
+      })
+    })
 
     if (!result.success) {
       return result
     }
 
     // Find where the keys were actually created and move them to the test folder
-    const projectRoot = cwd()
-    const privateKeySource = join(projectRoot, '.capgo_key_v2')
-    const publicKeySource = join(projectRoot, '.capgo_key_v2.pub')
+    const privateKeySource = join(ROOT_DIR, '.capgo_key_v2')
+    const publicKeySource = join(ROOT_DIR, '.capgo_key_v2.pub')
     const privateKeyDest = join(folderPath, '.capgo_key_v2')
     const publicKeyDest = join(folderPath, '.capgo_key_v2.pub')
 

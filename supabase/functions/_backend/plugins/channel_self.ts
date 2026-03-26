@@ -163,7 +163,7 @@ export const jsonRequestSchema = z.looseObject({
   key_id: z.optional(z.string().check(z.maxLength(20))),
 })
 
-// TODO: delete when all mirgrated to jsonRequestSchema
+// TODO: delete when all migrated to jsonRequestSchema
 export const jsonRequestSchemaGet = z.looseObject({
   app_id: z.string({
     error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,
@@ -589,7 +589,7 @@ app.post('/', async (c) => {
     return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, ...buildRateLimitInfo(rateLimitStatus.resetAt) })
   }
 
-  // POST has writes, so always create PG client (even if using D1 for reads)
+  // POST has writes, so always create PG client
   const pgClient = getPgClient(c)
 
   return await runChannelSelfWithPgClient(
@@ -649,7 +649,7 @@ app.delete('/', async (c) => {
     return simpleRateLimit({ app_id: bodyParsed.app_id, device_id: bodyParsed.device_id, ...buildRateLimitInfo(rateLimitStatus.resetAt) })
   }
 
-  // DELETE has writes, so always create PG client (even if using D1 for reads)
+  // DELETE has writes, so always create PG client
   const pgClient = getPgClient(c)
 
   return await runChannelSelfWithPgClient(

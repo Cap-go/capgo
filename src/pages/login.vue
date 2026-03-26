@@ -5,7 +5,7 @@ import { Capacitor } from '@capacitor/core'
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
 import dayjs from 'dayjs'
-import { onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
@@ -36,18 +36,88 @@ const captchaComponent = ref<InstanceType<typeof VueTurnstile> | null>(null)
 // Two-step login state
 const emailForLogin = ref('')
 const hasSso = ref(false)
+const enforceSso = ref(false)
 const isDomainChecking = ref(false)
+const isCheckingSavedSession = ref(true)
+const captchaStatus = ref<'disabled' | 'loading' | 'ready' | 'unavailable'>(captchaKey.value ? 'loading' : 'disabled')
+let captchaInitTimeout: ReturnType<typeof setTimeout> | null = null
 
 const version = import.meta.env.VITE_APP_VERSION
+const isEmailStepBusy = computed(() => isDomainChecking.value || isCheckingSavedSession.value)
+const shouldBlockForCaptcha = computed(() => !!captchaKey.value && captchaStatus.value === 'loading' && !turnstileToken.value)
 
 const registerUrl = window.location.host === 'console.capgo.app' ? 'https://capgo.app/register/' : `/register/`
 
-async function nextLogin() {
-  if (route.query.to && typeof route.query.to === 'string') {
-    router.replace(route.query.to)
+function clearCaptchaInitTimeout() {
+  if (captchaInitTimeout) {
+    clearTimeout(captchaInitTimeout)
+    captchaInitTimeout = null
+  }
+}
+
+function scheduleCaptchaInitTimeout() {
+  if (!captchaKey.value || statusAuth.value !== 'credentials') {
+    clearCaptchaInitTimeout()
+    return
+  }
+
+  clearCaptchaInitTimeout()
+  captchaInitTimeout = setTimeout(() => {
+    if (!turnstileToken.value && !window.turnstile) {
+      captchaStatus.value = 'unavailable'
+      console.error('Turnstile failed to initialize')
+    }
+  }, 8000)
+}
+
+function handleCaptchaUnavailable(reason: string, error?: unknown) {
+  captchaStatus.value = 'unavailable'
+  clearCaptchaInitTimeout()
+  console.error(reason, error)
+}
+
+watch(turnstileToken, (token) => {
+  if (!captchaKey.value) {
+    captchaStatus.value = 'disabled'
+    return
+  }
+
+  if (token) {
+    captchaStatus.value = 'ready'
+    clearCaptchaInitTimeout()
+  }
+  else if (statusAuth.value === 'credentials') {
+    captchaStatus.value = 'loading'
+    scheduleCaptchaInitTimeout()
+  }
+})
+
+watch(statusAuth, (status) => {
+  if (!captchaKey.value) {
+    captchaStatus.value = 'disabled'
+    clearCaptchaInitTimeout()
+    return
+  }
+
+  if (status === 'credentials') {
+    captchaStatus.value = turnstileToken.value ? 'ready' : 'loading'
+    scheduleCaptchaInitTimeout()
   }
   else {
-    router.replace('/dashboard')
+    clearCaptchaInitTimeout()
+  }
+}, { immediate: true })
+
+onBeforeUnmount(() => {
+  clearCaptchaInitTimeout()
+})
+
+async function nextLogin() {
+  if (route.query.to && typeof route.query.to === 'string') {
+    await router.replace(route.query.to)
+  }
+  else {
+    await router.replace('/dashboard')
   }
   setTimeout(async () => {
     isLoading.value = false
@@ -141,9 +211,12 @@ async function login(form: { email: string, password: string }) {
     console.error('error', error)
     setErrors('login-account', [error.message], {})
     if (error.message.includes('Invalid login credentials')) {
+      turnstileToken.value = ''
       captchaComponent.value?.reset()
     }
     if (error.message.includes('captcha')) {
+      turnstileToken.value = ''
+      captchaComponent.value?.reset()
       toast.error(t('captcha-fail'))
     }
     else {
@@ -160,7 +233,7 @@ async function login(form: { email: string, password: string }) {
   await checkMfa()
 }
 
-async function checkDomain(email: string): Promise<{ has_sso: boolean, provider_id?: string, org_id?: string }> {
+async function checkDomain(email: string): Promise<{ has_sso: boolean, enforce_sso?: boolean, provider_id?: string, org_id?: string }> {
   try {
     const { data: sessionData } = await supabase.auth.getSession()
     const token = sessionData?.session?.access_token
@@ -195,6 +268,7 @@ async function handleEmailContinue(form: { email: string }) {
 
   const result = await checkDomain(form.email)
   hasSso.value = result.has_sso
+  enforceSso.value = result.enforce_sso === true
 
   isDomainChecking.value = false
   statusAuth.value = 'credentials'
@@ -206,6 +280,10 @@ async function handlePasswordSubmit(form: { password: string }) {
 }
 
 async function handleSsoLogin() {
+  if (isLoading.value || shouldBlockForCaptcha.value) {
+    return
+  }
+
   isLoading.value = true
   const domain = emailForLogin.value.split('@')[1]
 
@@ -219,12 +297,20 @@ async function handleSsoLogin() {
       domain,
       options: {
         redirectTo: redirectUrl.toString(),
+        captchaToken: turnstileToken.value,
       },
     })
 
     if (error) {
       console.error('SSO login error', error)
-      toast.error(t('invalid-auth'))
+      turnstileToken.value = ''
+      captchaComponent.value?.reset()
+      if (error.message.includes('captcha')) {
+        toast.error(t('captcha-fail'))
+      }
+      else {
+        toast.error(t('invalid-auth'))
+      }
       isLoading.value = false
       return
     }
@@ -235,6 +321,8 @@ async function handleSsoLogin() {
   }
   catch (err) {
     console.error('SSO login error', err)
+    turnstileToken.value = ''
+    captchaComponent.value?.reset()
     toast.error(t('invalid-auth'))
     isLoading.value = false
   }
@@ -268,6 +356,7 @@ async function checkAuthUser() {
   const { data: mfaData, error: mfaError } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel()
   if (mfaError) {
     console.error('Cannot guard auth', mfaError)
+    isLoading.value = false
     return
   }
 
@@ -276,6 +365,7 @@ async function checkAuthUser() {
     if (error) {
       setErrors('login-account', ['See browser console'], {})
       console.error('Cannot get MFA factors', error)
+      isLoading.value = false
       return
     }
 
@@ -285,6 +375,7 @@ async function checkAuthUser() {
     if (errorChallenge) {
       setErrors('login-account', ['See browser console'], {})
       console.error('Cannot challenge mfa', errorChallenge)
+      isLoading.value = false
       return
     }
 
@@ -310,6 +401,7 @@ async function checkMagicLink() {
 
   if (message) {
     isLoading.value = false
+    hideLoader()
     return setTimeout(() => {
       toast.success(message, {
         duration: 7000,
@@ -318,12 +410,16 @@ async function checkMagicLink() {
   }
   if (error) {
     isLoading.value = false
+    hideLoader()
     return toast.error(error)
   }
 
   const logSession = await autoAuth(route)
-  if (!logSession)
+  if (!logSession) {
+    isLoading.value = false
+    hideLoader()
     return
+  }
   if (logSession.user && logSession?.user?.email && logSession?.user?.id) {
     if (authType === 'email_change') {
       const email = logSession.user.email
@@ -346,38 +442,65 @@ async function openScan() {
 }
 
 async function checkLogin() {
-  const parsedUrl = new URL(route.fullPath, window.location.origin)
-  const params = new URLSearchParams(parsedUrl.search)
-  const accessToken = params.get('access_token')
-  const refreshToken = params.get('refresh_token')
+  try {
+    const parsedUrl = new URL(route.fullPath, window.location.origin)
+    const params = new URLSearchParams(parsedUrl.search)
 
-  if (!!accessToken && !!refreshToken) {
-    parsedUrl.searchParams.delete('access_token')
-    parsedUrl.searchParams.delete('refresh_token')
-    window.history.replaceState({}, '', parsedUrl.toString())
+    if (params.get('message') === 'sso_account_linked') {
+      parsedUrl.searchParams.delete('message')
+      window.history.replaceState({}, '', parsedUrl.toString())
+      toast.success(t('sso-account-linked'))
+    }
 
-    querySessionAccessToken.value = accessToken
-    querySessionRefreshToken.value = refreshToken
-    hasQuerySession.value = true
+    const accessToken = params.get('access_token')
+    const refreshToken = params.get('refresh_token')
+
+    if (!!accessToken && !!refreshToken) {
+      parsedUrl.searchParams.delete('access_token')
+      parsedUrl.searchParams.delete('refresh_token')
+      window.history.replaceState({}, '', parsedUrl.toString())
+
+      querySessionAccessToken.value = accessToken
+      querySessionRefreshToken.value = refreshToken
+      hasQuerySession.value = true
+      isLoading.value = false
+      hideLoader()
+      return
+    }
+
+    isLoading.value = true
+    const { data: claimsData } = await supabase.auth.getClaims()
+    const hasUser = !!claimsData?.claims?.sub
+    const { data: sessionData } = await supabase.auth.getSession()
+    const session = sessionData?.session
+    if (hasUser) {
+      await checkAuthUser()
+    }
+    else if (!session && route.query.code && typeof route.query.code === 'string') {
+      const { data, error } = await supabase.auth.exchangeCodeForSession(route.query.code)
+      if (!error && data.session) {
+        await nextLogin()
+      }
+      else {
+        isLoading.value = false
+        hideLoader()
+      }
+    }
+    else if (!session && route.hash) {
+      await checkMagicLink()
+    }
+    else {
+      isLoading.value = false
+      hideLoader()
+    }
+  }
+  catch (error) {
+    console.error('Login bootstrap failed', error)
     isLoading.value = false
     hideLoader()
-    return
   }
-
-  isLoading.value = true
-  const { data: claimsData } = await supabase.auth.getClaims()
-  const hasUser = !!claimsData?.claims?.sub
-  const { data: sessionData } = await supabase.auth.getSession()
-  const session = sessionData?.session
-  if (hasUser) {
-    await checkAuthUser()
-  }
-  else if (!session && route.hash) {
-    await checkMagicLink()
-  }
-  else {
-    isLoading.value = false
-    hideLoader()
+  finally {
+    isCheckingSavedSession.value = false
   }
 }
 
@@ -452,14 +575,25 @@ onMounted(checkLogin)
               This link contains a login session. Continue to sign in with this session?
             </p>
             <button
-              v-if="!isLoading" type="button" data-test="accept-query-session"
-              class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden"
+              type="button" data-test="accept-query-session" :disabled="isLoading" :aria-busy="isLoading ? 'true' : 'false'"
+              class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-60"
               @click="acceptQuerySession"
             >
+              <svg
+                v-if="isLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-white align-middle animate-spin"
+                xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading"
+              >
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path
+                  class="opacity-75" fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
               Continue
             </button>
             <button
-              v-if="!isLoading" type="button" class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-slate-700 rounded-md border border-slate-300 transition-all duration-200 hover:bg-slate-50 dark:text-slate-200 dark:border-slate-600 dark:hover:bg-slate-700"
+              type="button" :disabled="isLoading"
+              class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-slate-700 rounded-md border border-slate-300 transition-all duration-200 hover:bg-slate-50 dark:text-slate-200 dark:border-slate-600 dark:hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
               @click="declineQuerySession"
             >
               Cancel
@@ -474,27 +608,27 @@ onMounted(checkLogin)
               <FormKit id="email-step" type="form" :actions="false" @submit="handleEmailContinue">
                 <div class="space-y-5">
                   <FormKit
-                    type="email" name="email" :disabled="isDomainChecking" enterkeyhint="next" :placeholder="t('email')"
+                    type="email" name="email" :disabled="isEmailStepBusy" enterkeyhint="next" :placeholder="t('email')"
                     :prefix-icon="iconEmail" inputmode="email" :label="t('email')" autocomplete="email"
                     validation="required:trim" data-test="email"
                   />
                   <FormKitMessages data-test="form-error" />
                   <div>
                     <div class="inline-flex justify-center items-center w-full">
-                      <svg
-                        v-if="isDomainChecking" class="inline-block mr-3 -ml-1 w-5 h-5 text-gray-900 align-middle animate-spin dark:text-white"
-                        xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading"
-                      >
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                        <path
-                          class="opacity-75" fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        />
-                      </svg>
                       <button
-                        v-if="!isDomainChecking" type="submit" data-test="continue"
-                        class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden"
+                        type="submit" data-test="continue" :disabled="isEmailStepBusy" :aria-busy="isEmailStepBusy ? 'true' : 'false'"
+                        class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-60"
                       >
+                        <svg
+                          v-if="isEmailStepBusy" class="inline-block mr-3 -ml-1 w-5 h-5 text-white align-middle animate-spin"
+                          xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading"
+                        >
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                          <path
+                            class="opacity-75" fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
                         {{ t('continue') }}
                       </button>
                     </div>
@@ -522,34 +656,42 @@ onMounted(checkLogin)
           <!-- Step 2: Credentials (SSO or Password) -->
           <div v-else-if="statusAuth === 'credentials'" key="step-credentials" class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
             <div class="py-6 px-4 text-gray-500 sm:py-7 sm:px-8">
-              <!-- Show email context -->
-              <p class="mb-4 text-sm text-gray-400 truncate">
-                {{ emailForLogin }}
-              </p>
-
-              <!-- SSO path -->
-              <div v-if="hasSso" class="space-y-5">
+              <!-- SSO path (enforce_sso=true: SSO only) -->
+              <div v-if="hasSso && enforceSso" class="space-y-5">
+                <!-- Show email context -->
+                <p class="mb-4 text-sm text-gray-400 truncate">
+                  {{ emailForLogin }}
+                </p>
                 <p class="text-sm text-gray-600 dark:text-gray-300">
                   {{ t('sso-detected') }}
                 </p>
+                <div v-if="!!captchaKey">
+                  <VueTurnstile
+                    ref="captchaComponent"
+                    v-model="turnstileToken"
+                    size="flexible"
+                    :site-key="captchaKey"
+                    @error="handleCaptchaUnavailable('Turnstile error', $event)"
+                    @unsupported="handleCaptchaUnavailable('Turnstile unsupported')"
+                  />
+                </div>
                 <div>
                   <div class="inline-flex justify-center items-center w-full">
-                    <svg
-                      v-if="isLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-gray-900 align-middle animate-spin dark:text-white"
-                      xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading"
-                    >
-                      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                      <path
-                        class="opacity-75" fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
                     <button
-                      v-if="!isLoading"
-                      type="button" data-test="sso-login"
-                      class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden"
+                      type="button" data-test="sso-login" :disabled="isLoading || shouldBlockForCaptcha" :aria-busy="isLoading ? 'true' : 'false'"
+                      class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-60"
                       @click="handleSsoLogin"
                     >
+                      <svg
+                        v-if="isLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-white align-middle animate-spin"
+                        xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading"
+                      >
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                        <path
+                          class="opacity-75" fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        />
+                      </svg>
                       {{ t('continue-with-sso') }}
                     </button>
                   </div>
@@ -561,10 +703,47 @@ onMounted(checkLogin)
                 </div>
               </div>
 
-              <!-- Password path -->
+              <!-- Password path (with optional SSO button when enforce_sso=false) -->
               <div v-else>
                 <FormKit id="login-account" type="form" :actions="false" @submit="handlePasswordSubmit">
                   <div class="space-y-5">
+                    <!--
+                      Hidden email input placed inside the form so browsers and password managers
+                      can associate the password field with the correct account (autocomplete="username").
+                      Uses opacity+absolute positioning instead of display:none so browsers still
+                      detect it for autofill purposes.
+                    -->
+                    <input
+                      type="email"
+                      :value="emailForLogin"
+                      name="username"
+                      autocomplete="username"
+                      readonly
+                      tabindex="-1"
+                      aria-hidden="true"
+                      style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none;"
+                    >
+                    <!-- Show email context -->
+                    <p class="text-sm text-gray-400 truncate">
+                      {{ emailForLogin }}
+                    </p>
+                    <!-- Optional SSO button when SSO exists but is not enforced -->
+                    <div v-if="hasSso && !enforceSso">
+                      <button
+                        type="button" data-test="sso-login"
+                        :disabled="isLoading || shouldBlockForCaptcha"
+                        :aria-busy="isLoading ? 'true' : 'false'"
+                        class="inline-flex justify-center items-center py-3 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-60"
+                        @click="handleSsoLogin"
+                      >
+                        {{ t('continue-with-sso') }}
+                      </button>
+                      <div class="flex items-center my-4">
+                        <div class="flex-1 h-px bg-gray-200 dark:bg-gray-600" />
+                        <span class="px-3 text-sm text-gray-400">or</span>
+                        <div class="flex-1 h-px bg-gray-200 dark:bg-gray-600" />
+                      </div>
+                    </div>
                     <div>
                       <FormKit
                         id="passwordInput" type="password" :placeholder="t('password')"
@@ -574,25 +753,32 @@ onMounted(checkLogin)
                       />
                     </div>
                     <div v-if="!!captchaKey">
-                      <VueTurnstile ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
+                      <VueTurnstile
+                        ref="captchaComponent"
+                        v-model="turnstileToken"
+                        size="flexible"
+                        :site-key="captchaKey"
+                        @error="handleCaptchaUnavailable('Turnstile error', $event)"
+                        @unsupported="handleCaptchaUnavailable('Turnstile unsupported')"
+                      />
                     </div>
                     <FormKitMessages data-test="form-error" />
                     <div>
                       <div class="inline-flex justify-center items-center w-full">
-                        <svg
-                          v-if="isLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-gray-900 align-middle animate-spin dark:text-white"
-                          xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading"
-                        >
-                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                          <path
-                            class="opacity-75" fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          />
-                        </svg>
                         <button
-                          v-if="!isLoading" type="submit" data-test="submit"
-                          class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden"
+                          type="submit" data-test="submit" :disabled="isLoading || shouldBlockForCaptcha" :aria-busy="isLoading ? 'true' : 'false'"
+                          class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-60"
                         >
+                          <svg
+                            v-if="isLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-white align-middle animate-spin"
+                            xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading"
+                          >
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                            <path
+                              class="opacity-75" fill="currentColor"
+                              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                            />
+                          </svg>
                           {{ t('log-in') }}
                         </button>
                       </div>
@@ -653,20 +839,20 @@ onMounted(checkLogin)
                   <FormKitMessages />
                   <div>
                     <div class="inline-flex justify-center items-center w-full">
-                      <svg
-                        v-if="isLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-gray-900 align-middle animate-spin dark:text-white"
-                        xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                      >
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                        <path
-                          class="opacity-75" fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                        />
-                      </svg>
                       <button
-                        v-if="!isLoading" type="submit" data-test="verify"
-                        class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden"
+                        type="submit" data-test="verify" :disabled="isLoading" :aria-busy="isLoading ? 'true' : 'false'"
+                        class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden disabled:cursor-not-allowed disabled:opacity-60"
                       >
+                        <svg
+                          v-if="isLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-white align-middle animate-spin"
+                          xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" data-test="loading"
+                        >
+                          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                          <path
+                            class="opacity-75" fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
                         {{ t('verify') }}
                       </button>
                     </div>

@@ -1,4 +1,5 @@
 import { acceptHMRUpdate, defineStore } from 'pinia'
+import { ref, watch } from 'vue'
 
 export interface DialogV2Button {
   text: string
@@ -10,6 +11,7 @@ export interface DialogV2Button {
   role?: 'primary' | 'secondary' | 'danger' | 'cancel'
   preventClose?: boolean
   disabled?: boolean
+  skipNavigation?: boolean
 }
 
 export interface DialogV2Options {
@@ -31,6 +33,33 @@ export const useDialogV2Store = defineStore('dialogv2', () => {
     dialogOptions.value = options
     showDialog.value = true
     dialogCanceled.value = false
+    lastButtonRole.value = ''
+  }
+
+  const openButtonHref = (button: DialogV2Button) => {
+    if (!button.href)
+      return
+
+    if (typeof window === 'undefined')
+      return
+
+    if (button.target === '_blank') {
+      const relTokens = button.rel
+        ? button.rel.split(/[\s,]+/).map(token => token.toLowerCase())
+        : []
+      const relSet = new Set<string>()
+      relSet.add('noopener')
+      if (relTokens.includes('noreferrer'))
+        relSet.add('noreferrer')
+      const relFeatures = Array.from(relSet).join(',')
+      window.open(button.href, button.target, relFeatures)
+      return
+    }
+
+    if (button.target && button.target !== '_self')
+      window.open(button.href, button.target)
+    else
+      window.location.assign(button.href)
   }
 
   const closeDialog = async (button?: DialogV2Button) => {
@@ -50,15 +79,19 @@ export const useDialogV2Store = defineStore('dialogv2', () => {
           return
         }
       }
-    }
-    else {
-      // Dialog was dismissed without a button (ESC, backdrop, X button)
-      dialogCanceled.value = true
+
+      if (!button.preventClose) {
+        showDialog.value = false
+        if (button.href && !button.skipNavigation)
+          openButtonHref(button)
+      }
+      return
     }
 
-    if (!button?.preventClose) {
-      showDialog.value = false
-    }
+    // Modal dismissed without a button action (overlay, escape, close icon)
+    dialogCanceled.value = true
+    lastButtonRole.value = ''
+    showDialog.value = false
   }
 
   const onDialogDismiss = (): Promise<boolean> => {
@@ -71,7 +104,6 @@ export const useDialogV2Store = defineStore('dialogv2', () => {
       })
     })
   }
-
   return {
     showDialog,
     dialogOptions,

@@ -5,7 +5,7 @@
 Capgo is a live update platform for Capacitor apps, consisting of:
 - **Frontend**: Vue 3 SPA built with Vite, Tailwind CSS, and DaisyUI
 - **Backend**: Multi-platform edge functions (Cloudflare Workers primary, Supabase backup)
-- **Database**: PostgreSQL via Supabase, with migration to Cloudflare D1 in progress
+- **Database**: PostgreSQL via Supabase, with Cloudflare read path
 - **Mobile**: Capacitor iOS/Android apps with OTA update capabilities
 
 ## Critical Architecture Patterns
@@ -25,7 +25,7 @@ Use `cloudflare_workers/{api,plugin,files}/index.ts` to see routing. All routes 
 
 ### Database Layer: Postgres
 
-Active migration from Supabase Postgres to Cloudflare D1. Patterns:
+Primary data stays in Postgres via Supabase, with read paths using region replicas and Cloudflare bindings.
 - **functions**: `pg.ts` - `getPgClient()`, `getDrizzleClient()` using `postgres` package
 - Schema defined in `utils/postgress_schema.ts` with Drizzle ORM
 

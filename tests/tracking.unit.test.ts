@@ -1,0 +1,138 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const {
+  backgroundTaskMock,
+  cloudlogErrMock,
+  drizzleClientMock,
+  pgClientEndMock,
+  pgClientMock,
+  logsnagTrackMock,
+  notifToOrgMembersMock,
+  posthogMock,
+} = vi.hoisted(() => ({
+  backgroundTaskMock: vi.fn(),
+  cloudlogErrMock: vi.fn(),
+  drizzleClientMock: { mocked: true },
+  logsnagTrackMock: vi.fn(),
+  notifToOrgMembersMock: vi.fn(),
+  pgClientEndMock: vi.fn().mockResolvedValue(undefined),
+  pgClientMock: { mocked: true, end: vi.fn().mockResolvedValue(undefined) },
+  posthogMock: vi.fn(),
+}))
+
+vi.mock('../supabase/functions/_backend/utils/utils.ts', () => ({
+  backgroundTask: backgroundTaskMock,
+}))
+
+vi.mock('../supabase/functions/_backend/utils/logsnag.ts', () => ({
+  logsnag: () => ({
+    track: logsnagTrackMock,
+  }),
+}))
+
+vi.mock('../supabase/functions/_backend/utils/posthog.ts', () => ({
+  trackPosthogEvent: posthogMock,
+}))
+
+vi.mock('../supabase/functions/_backend/utils/org_email_notifications.ts', () => ({
+  sendNotifToOrgMembers: notifToOrgMembersMock,
+}))
+
+vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
+  getDrizzleClient: vi.fn(() => drizzleClientMock),
+  getPgClient: vi.fn(() => ({ ...pgClientMock, end: pgClientEndMock })),
+}))
+
+vi.mock('../supabase/functions/_backend/utils/logging.ts', () => ({
+  cloudlogErr: cloudlogErrMock,
+  serializeError: (error: unknown) => ({ message: error instanceof Error ? error.message : String(error) }),
+}))
+
+function createContext() {
+  return {
+    get: (key: string) => key === 'requestId' ? 'request-id' : undefined,
+    req: {
+      header: (name: string) => name === 'x-forwarded-for' ? '1.2.3.4, 5.6.7.8' : undefined,
+    },
+  } as any
+}
+
+beforeEach(() => {
+  backgroundTaskMock.mockImplementation((_c: unknown, promise: Promise<unknown>) => promise)
+  notifToOrgMembersMock.mockResolvedValue(true)
+  pgClientEndMock.mockResolvedValue(undefined)
+  logsnagTrackMock.mockResolvedValue(true)
+  posthogMock.mockResolvedValue(true)
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
+  backgroundTaskMock.mockReset()
+  notifToOrgMembersMock.mockReset()
+  pgClientEndMock.mockReset()
+  logsnagTrackMock.mockReset()
+  posthogMock.mockReset()
+  cloudlogErrMock.mockReset()
+})
+
+describe('sendEventToTracking', () => {
+  it('runs all tracking providers in the background by default', async () => {
+    const { sendEventToTracking } = await import('../supabase/functions/_backend/utils/tracking.ts')
+
+    await sendEventToTracking(createContext(), {
+      bento: {
+        cron: '* * * * *',
+        data: { org_id: 'org-id' },
+        event: 'org:tracked',
+        preferenceKey: 'onboarding',
+        uniqId: 'org:tracked',
+      },
+      channel: 'usage',
+      event: 'Tracked Event',
+      user_id: 'org-id',
+      description: 'test description',
+      notify: false,
+      sentToBento: true,
+      tags: { app_id: 'app-id' },
+    })
+
+    expect(backgroundTaskMock).toHaveBeenCalledTimes(2)
+    expect(logsnagTrackMock).toHaveBeenCalledWith(expect.objectContaining({ event: 'Tracked Event' }))
+    expect(posthogMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      event: 'Tracked Event',
+      ip: '1.2.3.4',
+      user_id: 'org-id',
+    }))
+    expect(notifToOrgMembersMock).toHaveBeenCalledWith(
+      expect.anything(),
+      'org:tracked',
+      'onboarding',
+      { org_id: 'org-id' },
+      'org-id',
+      'org:tracked',
+      '* * * * *',
+      expect.anything(),
+    )
+  })
+
+  it('can run inline and keeps other providers running when one fails', async () => {
+    logsnagTrackMock.mockRejectedValueOnce(new Error('logsnag failed'))
+    const { sendEventToTracking } = await import('../supabase/functions/_backend/utils/tracking.ts')
+
+    await sendEventToTracking(createContext(), {
+      channel: 'usage',
+      event: 'Inline Event',
+      user_id: 'org-id',
+      notify: true,
+    }, {
+      background: false,
+    })
+
+    expect(backgroundTaskMock).not.toHaveBeenCalled()
+    expect(posthogMock).toHaveBeenCalledOnce()
+    expect(cloudlogErrMock).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sendEventToTracking provider failed',
+      provider: 'logsnag',
+    }))
+  })
+})

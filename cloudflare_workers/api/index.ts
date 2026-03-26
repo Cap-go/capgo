@@ -1,4 +1,3 @@
-import { env } from 'node:process'
 import { app as accept_invitation } from '../../supabase/functions/_backend/private/accept_invitation.ts'
 import { app as admin_credits } from '../../supabase/functions/_backend/private/admin_credits.ts'
 import { app as admin_stats } from '../../supabase/functions/_backend/private/admin_stats.ts'
@@ -16,19 +15,20 @@ import { app as log_as } from '../../supabase/functions/_backend/private/log_as.
 import { app as plans } from '../../supabase/functions/_backend/private/plans.ts'
 import { app as publicStats } from '../../supabase/functions/_backend/private/public_stats.ts'
 import { app as set_org_email } from '../../supabase/functions/_backend/private/set_org_email.ts'
-import { app as stats_priv } from '../../supabase/functions/_backend/private/stats.ts'
-import { app as storeTop } from '../../supabase/functions/_backend/private/store_top.ts'
-import { app as stripe_checkout } from '../../supabase/functions/_backend/private/stripe_checkout.ts'
-import { app as stripe_portal } from '../../supabase/functions/_backend/private/stripe_portal.ts'
-import { app as validate_password_compliance } from '../../supabase/functions/_backend/private/validate_password_compliance.ts'
-import { app as verify_email_otp } from '../../supabase/functions/_backend/private/verify_email_otp.ts'
 import { app as sso_check_domain } from '../../supabase/functions/_backend/private/sso/check-domain.ts'
 import { app as sso_check_enforcement } from '../../supabase/functions/_backend/private/sso/check-enforcement.ts'
 import { app as sso_prelink_internal } from '../../supabase/functions/_backend/private/sso/prelink-internal.ts'
 import { app as sso_prelink } from '../../supabase/functions/_backend/private/sso/prelink.ts'
 import { app as sso_providers } from '../../supabase/functions/_backend/private/sso/providers.ts'
 import { app as sso_provision_user } from '../../supabase/functions/_backend/private/sso/provision-user.ts'
+import { app as sso_sp_metadata } from '../../supabase/functions/_backend/private/sso/sp-metadata.ts'
 import { app as sso_verify_dns } from '../../supabase/functions/_backend/private/sso/verify-dns.ts'
+import { app as stats_priv } from '../../supabase/functions/_backend/private/stats.ts'
+import { app as storeTop } from '../../supabase/functions/_backend/private/store_top.ts'
+import { app as stripe_checkout } from '../../supabase/functions/_backend/private/stripe_checkout.ts'
+import { app as stripe_portal } from '../../supabase/functions/_backend/private/stripe_portal.ts'
+import { app as validate_password_compliance } from '../../supabase/functions/_backend/private/validate_password_compliance.ts'
+import { app as verify_email_otp } from '../../supabase/functions/_backend/private/verify_email_otp.ts'
 import { app as apikey } from '../../supabase/functions/_backend/public/apikey/index.ts'
 import { app as appEndpoint } from '../../supabase/functions/_backend/public/app/index.ts'
 import { app as build } from '../../supabase/functions/_backend/public/build/index.ts'
@@ -65,7 +65,7 @@ import { version } from '../../supabase/functions/_backend/utils/version.ts'
 
 // Public API
 const functionName = 'api'
-const app = createHono(functionName, version, env.SENTRY_DSN)
+const app = createHono(functionName, version)
 app.route('/ok', ok)
 app.route('/apikey', apikey)
 app.route('/bundle', bundle)
@@ -110,6 +110,7 @@ appPrivate.route('/sso/providers', sso_providers)
 appPrivate.route('/sso/prelink-users', sso_prelink)
 appPrivate.route('/sso/prelink-internal', sso_prelink_internal)
 appPrivate.route('/sso/provision-user', sso_provision_user)
+appPrivate.route('/sso/sp-metadata', sso_sp_metadata)
 appPrivate.route('/sso/verify-dns', sso_verify_dns)
 
 // Triggers

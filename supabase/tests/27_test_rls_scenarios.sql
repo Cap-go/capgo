@@ -13,7 +13,17 @@ BEGIN;
 -- 'com.demoadmin.app', 'com.demo.app'
 -- Plan tests
 SELECT
-  plan (6);
+  plan (9);
+
+INSERT INTO public.app_versions (id, app_id, name, owner_org, storage_provider)
+VALUES
+  (910001, 'com.demo.app', 'manifest-own-rls', '046a36ac-e03c-4590-9257-bd6c9dba9ee8', 'r2'),
+  (910002, 'com.demoadmin.app', 'manifest-foreign-rls', '22dbad8a-b885-4309-9b3b-a09f8460fb6d', 'r2');
+
+INSERT INTO public.manifest (id, app_version_id, file_name, s3_path, file_hash)
+VALUES
+  (910001, 910001, 'own.js', 'orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demo.app/manifest-own-rls.zip', 'ownhash'),
+  (910002, 910002, 'foreign.js', 'orgs/22dbad8a-b885-4309-9b3b-a09f8460fb6d/apps/com.demoadmin.app/manifest-foreign-rls.zip', 'foreignhash');
 
 -- Test 1: Users can see organizations they belong to
 SET
@@ -55,11 +65,18 @@ SELECT
     'Anonymous users should be able to select from plans table'
   );
 
--- Test 4: Global stats is accessible to anonymous
+-- Test 4: Global stats should not be directly readable by anonymous users
 SELECT
-  lives_ok (
-    'SELECT COUNT(*) FROM public.global_stats',
-    'Anonymous users should be able to select from global_stats'
+  ok (
+    NOT has_table_privilege('anon', 'public.global_stats', 'SELECT'),
+    'Anonymous users should not be able to select from global_stats'
+  );
+
+-- Test 5: Global stats should not be directly readable by authenticated users
+SELECT
+  ok (
+    NOT has_table_privilege('authenticated', 'public.global_stats', 'SELECT'),
+    'Authenticated users should not be able to select from global_stats'
   );
 
 -- Test 5: Users table has RLS enabled
@@ -119,6 +136,36 @@ SELECT
         AND name = 'production'
     ),
     'User should be able to see existing channels from their apps'
+  );
+
+-- Test 8: Users should see manifest entries for apps they can access
+SELECT
+  is (
+    (
+      SELECT
+        COUNT(*)
+      FROM
+        public.manifest
+      WHERE
+        id = 910001
+    ),
+    1::bigint,
+    'User should see manifest entries for their own app versions'
+  );
+
+-- Test 9: Users should not see manifest entries for other organizations
+SELECT
+  is (
+    (
+      SELECT
+        COUNT(*)
+      FROM
+        public.manifest
+      WHERE
+        id = 910002
+    ),
+    0::bigint,
+    'User should not see manifest entries for app versions in other organizations'
   );
 
 -- TODO: fix it

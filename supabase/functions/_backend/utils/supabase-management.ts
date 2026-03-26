@@ -30,19 +30,26 @@ export class ManagementAPIError extends Error {
   }
 }
 
+function getProjectRef(c: Context): string | null {
+  const supabaseUrl = getEnv(c, 'SUPABASE_URL')
+  if (!supabaseUrl)
+    return null
+  return supabaseUrl.split('//')[1]?.split('.')[0]?.split(':')[0] || null
+}
+
 async function callManagementAPI(
   c: Context,
   method: string,
   path: string,
   body?: any,
 ): Promise<any> {
-  const token = getEnv(c, 'SUPABASE_MANAGEMENT_API_TOKEN')
-  const projectRef = getEnv(c, 'SUPABASE_PROJECT_REF')
+  const token = getEnv(c, 'SB_MANAGEMENT_API_TOKEN')
+  const projectRef = getProjectRef(c)
 
   if (!token) {
     cloudlogErr({
       requestId: c.get('requestId'),
-      message: 'SUPABASE_MANAGEMENT_API_TOKEN not configured',
+      message: 'SB_MANAGEMENT_API_TOKEN not configured',
     })
     throw new ManagementAPIError(500, 'management_api_not_configured', 'Management API token not configured')
   }
@@ -50,7 +57,7 @@ async function callManagementAPI(
   if (!projectRef) {
     cloudlogErr({
       requestId: c.get('requestId'),
-      message: 'SUPABASE_PROJECT_REF not configured',
+      message: 'SUPABASE_URL not configured or invalid',
     })
     throw new ManagementAPIError(500, 'project_ref_not_configured', 'Project reference not configured')
   }
@@ -84,7 +91,7 @@ async function callManagementAPI(
       try {
         errorData = await response.json()
       }
-      catch {}
+      catch { }
       cloudlogErr({
         requestId: c.get('requestId'),
         message: 'Management API error',
@@ -92,6 +99,7 @@ async function callManagementAPI(
         path,
         method,
         errorCode: errorData?.error_code || 'unknown',
+        errorData,
       })
       throw new ManagementAPIError(
         response.status,
@@ -142,6 +150,14 @@ async function callManagementAPI(
   }
 }
 
+function toManagementAttributeMapping(mapping: Record<string, string>): { keys: Record<string, { name: string }> } {
+  const keys: Record<string, { name: string }> = {}
+  for (const [key, name] of Object.entries(mapping)) {
+    keys[key] = { name }
+  }
+  return { keys }
+}
+
 export async function createSSOProvider(
   c: Context,
   domain: string,
@@ -152,7 +168,7 @@ export async function createSSOProvider(
     type: 'saml',
     domains: [domain],
     metadata_url: metadataUrl,
-    ...(attributeMapping && { attribute_mapping: attributeMapping }),
+    ...(attributeMapping && { attribute_mapping: toManagementAttributeMapping(attributeMapping) }),
   }
 
   const response = await callManagementAPI(c, 'POST', '/config/auth/sso/providers', body)
@@ -181,7 +197,7 @@ export async function updateSSOProvider(
     body.metadata_url = updates.metadata_url
   }
   if (updates.attribute_mapping) {
-    body.attribute_mapping = updates.attribute_mapping
+    body.attribute_mapping = toManagementAttributeMapping(updates.attribute_mapping)
   }
 
   const response = await callManagementAPI(c, 'PATCH', `/config/auth/sso/providers/${providerId}`, body)

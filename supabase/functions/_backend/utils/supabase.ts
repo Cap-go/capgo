@@ -8,10 +8,46 @@ import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged, nullableStri
 import { simpleError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import { createCustomer } from './stripe.ts'
+import { Constants } from './supabase.types.ts'
 import { getEnv, isStripeConfigured } from './utils.ts'
 
 const DEFAULT_LIMIT = 1000
 // Import Supabase client
+
+/**
+ * Escape a string and wrap it in double quotes for safely embedding into PostgREST filter payloads.
+ */
+function quotePostgrestFilterValue(value: string): string {
+  const escapedValue = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')
+  return `"${escapedValue}"`
+}
+
+/**
+ * Return a PostgREST `ilike` pattern that matches the provided value as a substring.
+ */
+function buildIlikeContainsPattern(value: string): string {
+  return quotePostgrestFilterValue(`%${value}%`)
+}
+
+/**
+ * Derive whether the device cursor should sort ascending or descending by `updated_at`.
+ */
+type DevicesOrder = {
+  ascending: boolean
+} | null
+
+function getDevicesOrder(order?: Order[]): DevicesOrder {
+  const activeOrder = order?.find(
+    col => col.key === 'updated_at' && typeof col.sortable === 'string',
+  )
+
+  if (!activeOrder)
+    return null
+
+  return {
+    ascending: activeOrder.sortable === 'asc',
+  }
+}
 
 export interface InsertPayload<T extends keyof Database['public']['Tables']> {
   type: 'INSERT'
@@ -619,6 +655,7 @@ export async function recordBuildTime(
   buildId: string,
   platform: 'ios' | 'android',
   buildTimeSeconds: number,
+  completedAt?: number | null,
 ): Promise<string | null> {
   try {
     const { data, error } = await supabaseAdmin(c)
@@ -634,6 +671,26 @@ export async function recordBuildTime(
     if (error) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'recordBuildTime error', orgId, userId, buildId, error })
       return null
+    }
+
+    if (completedAt) {
+      const completedAtIso = new Date(completedAt).toISOString()
+      const { error: updateError } = await supabaseAdmin(c)
+        .from('build_logs')
+        .update({ created_at: completedAtIso })
+        .eq('org_id', orgId)
+        .eq('build_id', buildId)
+
+      if (updateError) {
+        cloudlogErr({
+          requestId: c.get('requestId'),
+          message: 'recordBuildTime timestamp sync error',
+          orgId,
+          buildId,
+          completedAt: completedAtIso,
+          error: updateError,
+        })
+      }
     }
 
     return data as string
@@ -726,16 +783,6 @@ export async function isTrialOrg(c: Context, orgId: string): Promise<number> {
     cloudlogErr({ requestId: c.get('requestId'), message: 'isTrialOrg error', orgId, error })
   }
   return 0
-}
-
-export async function isAdmin(c: Context, userId: string): Promise<boolean> {
-  const { data, error } = await supabaseAdmin(c)
-    .rpc('is_admin', { userid: userId })
-    .single()
-  if (error)
-    throw new Error(error.message)
-
-  return data ?? false
 }
 
 export async function isAllowedActionOrg(c: Context, orgId: string): Promise<boolean> {
@@ -1129,6 +1176,9 @@ export async function readDeviceVersionCountsSB(c: Context, app_id: string, chan
   }, {})
 }
 
+/**
+ * Retrieve stats entries for the given app, honoring the optional filters and sorting provided in `params`.
+ */
 export async function readStatsSB(c: Context, params: ReadStatsParams) {
   const supabase = supabaseAdmin(c)
 
@@ -1162,10 +1212,16 @@ export async function readStatsSB(c: Context, params: ReadStatsParams) {
 
   if (params.search) {
     cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
-    if (params.deviceIds?.length)
-      query = query.or(`version_build.ilike.${params.search}%,version_name.ilike.${params.search}%`)
-    else
-      query = query.or(`device_id.ilike.${params.search}%,version_build.ilike.${params.search}%,version_name.ilike.${params.search}%`)
+    const searchPattern = buildIlikeContainsPattern(params.search)
+    const orFilters = params.deviceIds?.length
+      ? [`version_name.ilike.${searchPattern}`]
+      : [`device_id.ilike.${searchPattern}`, `version_name.ilike.${searchPattern}`]
+
+    const matchedActions = Constants.public.Enums.stats_action
+      .filter(action => action.toLowerCase().includes(params.search!.toLowerCase()))
+      .map(action => `action.eq.${action}`)
+
+    query = query.or([...orFilters, ...matchedActions].join(','))
   }
 
   if (params.order?.length) {
@@ -1187,6 +1243,9 @@ export async function readStatsSB(c: Context, params: ReadStatsParams) {
   return data ?? []
 }
 
+/**
+ * Query the devices table for an app with search, cursor pagination, and ordering helpers applied.
+ */
 export async function readDevicesSB(c: Context, params: ReadDevicesParams, customIdMode: boolean) {
   const supabase = supabaseAdmin(c)
   const limit = params.limit ?? DEFAULT_LIMIT
@@ -1214,29 +1273,35 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
 
   if (params.search) {
     cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
+    const searchPattern = buildIlikeContainsPattern(params.search)
     if (params.deviceIds?.length)
-      query = query.or(`custom_id.ilike.${params.search}%,version_name.ilike.${params.search}%`)
+      query = query.or(`custom_id.ilike.${searchPattern},version_name.ilike.${searchPattern}`)
     else
-      query = query.or(`device_id.ilike.${params.search}%,custom_id.ilike.${params.search}%,version_name.ilike.${params.search}%`)
+      query = query.or(`device_id.ilike.${searchPattern},custom_id.ilike.${searchPattern},version_name.ilike.${searchPattern}`)
   }
 
   if (params.version_name)
     query = query.eq('version_name', params.version_name)
 
-  // Cursor-based pagination
-  if (params.cursor) {
+  const devicesOrder = getDevicesOrder(params.order)
+
+  // Cursor-based pagination only works when an updated_at order is active
+  if (params.cursor && devicesOrder) {
     // Cursor format: "updated_at|device_id"
     const [cursorTime, cursorDeviceId] = params.cursor.split('|')
     if (cursorTime && cursorDeviceId) {
-      // For DESC order: get records older than cursor or same time with device_id > cursor
-      query = query.or(`updated_at.lt.${cursorTime},and(updated_at.eq.${cursorTime},device_id.gt.${cursorDeviceId})`)
+      const quotedCursorTime = quotePostgrestFilterValue(cursorTime)
+      const quotedCursorDeviceId = quotePostgrestFilterValue(cursorDeviceId)
+      if (devicesOrder.ascending)
+        query = query.or(`updated_at.gt.${quotedCursorTime},and(updated_at.eq.${quotedCursorTime},device_id.gt.${quotedCursorDeviceId})`)
+      else
+        query = query.or(`updated_at.lt.${quotedCursorTime},and(updated_at.eq.${quotedCursorTime},device_id.gt.${quotedCursorDeviceId})`)
     }
   }
 
-  // Always order by updated_at DESC, device_id ASC for stable cursor pagination
-  query = query
-    .order('updated_at', { ascending: false })
-    .order('device_id', { ascending: true })
+  if (devicesOrder)
+    query = query.order('updated_at', { ascending: devicesOrder.ascending })
+  query = query.order('device_id', { ascending: true })
     .limit(limit + 1) // Fetch one extra to check if there are more results
 
   const { data, error } = await query
@@ -1249,17 +1314,45 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
   return data ?? []
 }
 
-export async function countDevicesSB(c: Context, app_id: string, customIdMode: boolean) {
-  const req = supabaseAdmin(c)
+/**
+ * Count how many devices match the supplied filters so pagination totals stay accurate.
+ */
+export async function countDevicesSB(
+  c: Context,
+  app_id: string,
+  customIdMode: boolean,
+  deviceIds: string[] = [],
+  versionName?: string,
+  search?: string,
+) {
+  let req = supabaseAdmin(c)
     .from('devices')
     .select('device_id', { count: 'exact', head: true })
     .eq('app_id', app_id)
 
   if (customIdMode) {
-    req
+    req = req
       .not('custom_id', 'is', null)
       .neq('custom_id', '')
   }
+
+  if (deviceIds.length) {
+    if (deviceIds.length === 1)
+      req = req.eq('device_id', deviceIds[0])
+    else
+      req = req.in('device_id', deviceIds)
+  }
+
+  if (search) {
+    const normalizedSearch = buildIlikeContainsPattern(search)
+    if (deviceIds.length)
+      req = req.or(`custom_id.ilike.${normalizedSearch},version_name.ilike.${normalizedSearch}`)
+    else
+      req = req.or(`device_id.ilike.${normalizedSearch},custom_id.ilike.${normalizedSearch},version_name.ilike.${normalizedSearch}`)
+  }
+
+  if (versionName)
+    req = req.eq('version_name', versionName)
 
   const { count, error } = await req
 

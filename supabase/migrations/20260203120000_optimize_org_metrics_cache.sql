@@ -21,11 +21,11 @@ CREATE POLICY "Deny all" ON public.org_metrics_cache FOR ALL USING (false)
 WITH
 CHECK (false);
 
-CREATE OR REPLACE FUNCTION public.seed_org_metrics_cache(
+CREATE FUNCTION public.calculate_org_metrics_cache_entry(
     p_org_id uuid,
     p_start_date date,
     p_end_date date
-) RETURNS public.org_metrics_cache LANGUAGE plpgsql SECURITY DEFINER
+) RETURNS public.org_metrics_cache LANGUAGE plpgsql VOLATILE SECURITY DEFINER
 SET search_path = '' AS $function$
 DECLARE
     v_mau bigint;
@@ -93,6 +93,41 @@ BEGIN
     INTO v_mau, v_storage, v_bandwidth, v_build_time, v_get, v_fail, v_install, v_uninstall
     FROM mau, storage, bandwidth, build_time, version_stats;
 
+    cache_record.org_id := p_org_id;
+    cache_record.start_date := p_start_date;
+    cache_record.end_date := p_end_date;
+    cache_record.mau := v_mau;
+    cache_record.storage := v_storage;
+    cache_record.bandwidth := v_bandwidth;
+    cache_record.build_time_unit := v_build_time;
+    cache_record.get := v_get;
+    cache_record.fail := v_fail;
+    cache_record.install := v_install;
+    cache_record.uninstall := v_uninstall;
+    cache_record.cached_at := clock_timestamp();
+
+    RETURN cache_record;
+END;
+$function$;
+
+ALTER FUNCTION public.calculate_org_metrics_cache_entry(uuid, date, date) OWNER TO "postgres";
+
+REVOKE ALL ON FUNCTION public.calculate_org_metrics_cache_entry(uuid, date, date) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.calculate_org_metrics_cache_entry(uuid, date, date) FROM anon;
+REVOKE ALL ON FUNCTION public.calculate_org_metrics_cache_entry(uuid, date, date) FROM authenticated;
+REVOKE ALL ON FUNCTION public.calculate_org_metrics_cache_entry(uuid, date, date) FROM service_role;
+COMMENT ON FUNCTION public.calculate_org_metrics_cache_entry(uuid, date, date) IS
+  'Compute the aggregated org metrics (MAU, storage, bandwidth, build time unit, get/fail/install/uninstall) for the supplied date range without persisting changes. Read-only paths use this helper so they can return cached metrics without touching org_metrics_cache directly.';
+
+CREATE OR REPLACE FUNCTION public.seed_org_metrics_cache(
+    p_org_id uuid,
+    p_start_date date,
+    p_end_date date
+) RETURNS public.org_metrics_cache LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = '' AS $function$
+DECLARE
+    cache_record public.org_metrics_cache%ROWTYPE;
+BEGIN
     INSERT INTO public.org_metrics_cache (
         org_id,
         start_date,
@@ -107,20 +142,20 @@ BEGIN
         uninstall,
         cached_at
     )
-    VALUES (
-        p_org_id,
-        p_start_date,
-        p_end_date,
-        v_mau,
-        v_storage,
-        v_bandwidth,
-        v_build_time,
-        v_get,
-        v_fail,
-        v_install,
-        v_uninstall,
-        clock_timestamp()
-    )
+    SELECT
+        org_id,
+        start_date,
+        end_date,
+        mau,
+        storage,
+        bandwidth,
+        build_time_unit,
+        get,
+        fail,
+        install,
+        uninstall,
+        cached_at
+    FROM public.calculate_org_metrics_cache_entry(p_org_id, p_start_date, p_end_date)
     ON CONFLICT (org_id) DO UPDATE
         SET start_date = EXCLUDED.start_date,
             end_date = EXCLUDED.end_date,
@@ -139,12 +174,22 @@ BEGIN
 END;
 $function$;
 
-ALTER FUNCTION public.seed_org_metrics_cache(uuid, date, date) OWNER TO "postgres";
+ALTER FUNCTION public.seed_org_metrics_cache(
+    uuid, date, date
+) OWNER TO "postgres";
 
-REVOKE ALL ON FUNCTION public.seed_org_metrics_cache(uuid, date, date) FROM public;
-REVOKE ALL ON FUNCTION public.seed_org_metrics_cache(uuid, date, date) FROM anon;
-REVOKE ALL ON FUNCTION public.seed_org_metrics_cache(uuid, date, date) FROM authenticated;
-REVOKE ALL ON FUNCTION public.seed_org_metrics_cache(uuid, date, date) FROM service_role;
+REVOKE ALL ON FUNCTION public.seed_org_metrics_cache(
+    uuid, date, date
+) FROM public;
+REVOKE ALL ON FUNCTION public.seed_org_metrics_cache(
+    uuid, date, date
+) FROM anon;
+REVOKE ALL ON FUNCTION public.seed_org_metrics_cache(
+    uuid, date, date
+) FROM authenticated;
+REVOKE ALL ON FUNCTION public.seed_org_metrics_cache(
+    uuid, date, date
+) FROM service_role;
 
 -- Cached get_total_metrics implementation
 DROP FUNCTION IF EXISTS public.get_total_metrics(uuid, date, date);
@@ -167,6 +212,7 @@ SET search_path = '' AS $function$
 DECLARE
     cache_entry public.org_metrics_cache%ROWTYPE;
     cache_ttl interval := '5 minutes'::interval;
+    tx_read_only boolean := current_setting('transaction_read_only') = 'on';
 BEGIN
     IF start_date IS NULL OR end_date IS NULL THEN
         RETURN;
@@ -195,6 +241,21 @@ BEGIN
         )
         AND (n_tup_ins > 0 OR n_tup_upd > 0 OR n_tup_del > 0)
     ) THEN
+        IF tx_read_only THEN
+            RETURN QUERY
+            SELECT
+                metrics.mau,
+                metrics.storage,
+                metrics.bandwidth,
+                metrics.build_time_unit,
+                metrics.get,
+                metrics.fail,
+                metrics.install,
+                metrics.uninstall
+            FROM public.calculate_org_metrics_cache_entry(org_id, start_date, end_date) AS metrics;
+            RETURN;
+        END IF;
+
         cache_entry := public.seed_org_metrics_cache(org_id, start_date, end_date);
 
         RETURN QUERY SELECT
@@ -230,6 +291,21 @@ BEGIN
         RETURN;
     END IF;
 
+    IF tx_read_only THEN
+        RETURN QUERY
+        SELECT
+            metrics.mau,
+            metrics.storage,
+            metrics.bandwidth,
+            metrics.build_time_unit,
+            metrics.get,
+            metrics.fail,
+            metrics.install,
+            metrics.uninstall
+        FROM public.calculate_org_metrics_cache_entry(org_id, start_date, end_date) AS metrics;
+        RETURN;
+    END IF;
+
     cache_entry := public.seed_org_metrics_cache(org_id, start_date, end_date);
 
     RETURN QUERY SELECT
@@ -246,9 +322,13 @@ $function$;
 
 ALTER FUNCTION public.get_total_metrics(uuid, date, date) OWNER TO "postgres";
 
-GRANT ALL ON FUNCTION public.get_total_metrics(uuid, date, date) TO service_role;
+GRANT ALL ON FUNCTION public.get_total_metrics(
+    uuid, date, date
+) TO service_role;
 REVOKE ALL ON FUNCTION public.get_total_metrics(uuid, date, date) FROM anon;
-REVOKE ALL ON FUNCTION public.get_total_metrics(uuid, date, date) FROM authenticated;
+REVOKE ALL ON FUNCTION public.get_total_metrics(
+    uuid, date, date
+) FROM authenticated;
 
 -- Keep 1-arg get_total_metrics in sync with new column list
 DROP FUNCTION IF EXISTS public.get_total_metrics(uuid);
@@ -467,6 +547,10 @@ $function$;
 
 ALTER FUNCTION public.get_plan_usage_and_fit_uncached(uuid) OWNER TO "postgres";
 
-GRANT ALL ON FUNCTION public.get_plan_usage_and_fit_uncached(uuid) TO service_role;
+GRANT ALL ON FUNCTION public.get_plan_usage_and_fit_uncached(
+    uuid
+) TO service_role;
 REVOKE ALL ON FUNCTION public.get_plan_usage_and_fit_uncached(uuid) FROM anon;
-REVOKE ALL ON FUNCTION public.get_plan_usage_and_fit_uncached(uuid) FROM authenticated;
+REVOKE ALL ON FUNCTION public.get_plan_usage_and_fit_uncached(
+    uuid
+) FROM authenticated;

@@ -273,6 +273,8 @@ SELECT
     );
 
 -- Test is_paying_org (based on seed data, orgs have stripe_info so they are paying)
+SELECT tests.authenticate_as_service_role();
+
 SELECT
     is(
         is_paying_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
@@ -298,8 +300,8 @@ SELECT
 -- Test is_trial_org negative case
 SELECT
     ok(
-        is_trial_org('00000000-0000-0000-0000-000000000000') IS NULL,
-        'is_trial_org test - non-existent org returns null'
+        is_trial_org('00000000-0000-0000-0000-000000000000') = 0,
+        'is_trial_org test - non-existent org returns 0'
     );
 
 -- TODO: fix this test
@@ -335,8 +337,8 @@ SELECT
     ok(
         is_onboarding_needed_org(
             '00000000-0000-0000-0000-000000000000'
-        ) IS NULL,
-        'is_onboarding_needed_org test - non-existent org returns null'
+        ) = FALSE,
+        'is_onboarding_needed_org test - non-existent org returns false'
     );
 
 -- Test is_good_plan_v5_org (based on seed data with stripe_info)
@@ -416,6 +418,7 @@ SELECT
     );
 
 -- Test get_current_plan_name_org
+SELECT tests.authenticate_as('test_admin');
 SELECT
     ok(
         get_current_plan_name_org(
@@ -423,8 +426,10 @@ SELECT
         ) IS NOT NULL,
         'get_current_plan_name_org test - returns plan name'
     );
+SELECT tests.clear_authentication();
 
 -- Test get_current_plan_max_org
+SELECT tests.authenticate_as_service_role();
 SELECT
     ok(
         (
@@ -434,8 +439,10 @@ SELECT
         ) = 1,
         'get_current_plan_max_org test - returns plan limits'
     );
+SELECT tests.clear_authentication();
 
 -- Test get_cycle_info_org
+SELECT tests.authenticate_as('test_admin');
 SELECT
     ok(
         (
@@ -445,9 +452,12 @@ SELECT
         ) >= 0,
         'get_cycle_info_org test - returns cycle info'
     );
+SELECT tests.clear_authentication();
 
 -- Test get_organization_cli_warnings with proper API key setup
 -- Test 1: Set up valid API key and test normal scenario (good plan)
+SELECT tests.authenticate_as_service_role();
+
 SELECT
     set_config(
         'request.headers',
