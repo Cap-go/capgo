@@ -426,6 +426,8 @@ describe('[PUT] /organization with API key policy', () => {
     expect(response.status).toBe(400)
   })
 
+  // Intentionally not `it.concurrent()`: this suite mutates shared org settings (`updateOrgId`)
+  // and order matters (see the last test toggling `require_apikey_expiration`).
   it('rejects invalid max expiration days via direct org update RLS path', async () => {
     const supabaseUrl = process.env.SUPABASE_URL?.replace(/\/$/, '')
     if (!supabaseUrl)
