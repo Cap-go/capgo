@@ -624,9 +624,9 @@ When backend code uses the plugin read-path (`/updates`, `/stats`, `/channel_sel
 - Logical replication replicates **table data**, not derived objects like **views** and **SQL functions**.
 - Treat the read replica (what you see in PlanetScale) as the source of truth for what is queryable from plugin endpoints.
 - Do **not** query credits ledger tables/views from the replica (e.g. `usage_credit_*` / `usage_credit_balances`). If plugin logic needs a “has credits” signal, **materialize it into a replicated column/table** (example: an org-level boolean flag that is refreshed by primary-side jobs).
-- The hot plugin request paths (`/updates`, `/stats`, `/channel_self`) are **performance-sensitive** and must **never** add direct primary-DB work, service-role RPCs, queue writes, or any other Postgres side effect from the live request path.
-- In particular, do **not** call functions like `queue_cron_stat_app_for_app(...)` from live plugin traffic. If work must happen because of plugin traffic, record it in the existing analytics/log pipeline or let an already-scheduled async sweep (for example `process_cron_stats_jobs()`) pick it up later.
-- If a feature seems to require direct DB work from these endpoints, stop and design an alternative that keeps the request path replica-safe and off the primary DB. Treat direct request-path DB side effects here as forbidden unless the user explicitly approves an exception.
+- `/updates`, `/stats`, and `/channel_self` are extremely hot paths and can be called hundreds of times per second, so they must never add direct primary-DB work, service-role RPCs, queue writes, or any other Postgres side effect from the live request path.
+- In particular, do **not** call functions like `queue_cron_stat_app_for_app(...)` from live plugin traffic; if work must happen because of plugin traffic, record it through the existing analytics/log pipeline or an already-scheduled async sweep (for example `process_cron_stats_jobs()`), and avoid enqueuing primary-DB RPCs, writes, or lookups inside `backgroundTask()` for these endpoints.
+- If a feature seems to require direct DB work from these endpoints, stop and design an alternative that keeps the request path replica-safe and off the primary DB; treat such request-path side effects as forbidden unless explicitly approved, and document any unavoidable primary writes inline as an exception that needs extra review.
 
 ## Pull Request Guidelines
 

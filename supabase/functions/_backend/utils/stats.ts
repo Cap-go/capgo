@@ -13,7 +13,9 @@ import { backgroundTask, getEnv, isInternalVersionName } from './utils.ts'
 
 export function createStatsMau(c: Context, device_id: string, app_id: string, org_id: string, platform: string): Promise<void> {
   const lowerDeviceId = device_id
-  const jobs: Promise<unknown>[] = []
+  const jobs: Promise<unknown>[] = [
+    // queueCronStatApp(c, app_id, org_id),
+  ]
   if (!c.env.DEVICE_USAGE) {
     jobs.push(Promise.resolve(trackDeviceUsageSB(c, lowerDeviceId, app_id, org_id)))
   }
@@ -55,7 +57,10 @@ export function createStatsBandwidth(c: Context, device_id: string, app_id: stri
   const trackingJob = !c.env.BANDWIDTH_USAGE
     ? Promise.resolve(trackBandwidthUsageSB(c, lowerDeviceId, app_id, file_size))
     : Promise.resolve(trackBandwidthUsageCF(c, lowerDeviceId, app_id, file_size))
-  return backgroundTask(c, trackingJob.then(() => undefined))
+  return backgroundTask(c, Promise.all([
+    // queueCronStatApp(c, app_id),
+    trackingJob,
+  ]).then(() => undefined))
 }
 
 export type VersionAction = 'get' | 'fail' | 'install' | 'uninstall'
@@ -137,6 +142,16 @@ export function readStatsVersion(c: Context, app_id: string, start_date: string,
     return readStatsVersionSB(c, app_id, start_date, end_date)
   return readStatsVersionCF(c, app_id, start_date, end_date)
 }
+
+// async function queueCronStatApp(c: Context, app_id: string, org_id?: string) {
+//   const { error } = await supabaseAdmin(c).rpc('queue_cron_stat_app_for_app', {
+//     p_app_id: app_id,
+//     ...(org_id ? { p_org_id: org_id } : {}),
+//   })
+//   if (error) {
+//     cloudlog({ requestId: c.get('requestId'), message: 'Failed to queue cron_stat_app from live usage', app_id, org_id, error })
+//   }
+// }
 
 function shouldUseAnalyticsEngine(c: Context): boolean {
   if (getRuntimeKey() !== 'workerd' || !c.env.DEVICE_INFO)
