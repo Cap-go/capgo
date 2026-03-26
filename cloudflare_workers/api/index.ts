@@ -37,6 +37,7 @@ import { app as channel } from '../../supabase/functions/_backend/public/channel
 import { app as device } from '../../supabase/functions/_backend/public/device/index.ts'
 import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
 import { app as organization } from '../../supabase/functions/_backend/public/organization/index.ts'
+import { app as check_cpu_usage } from '../../supabase/functions/_backend/public/check_cpu_usage.ts'
 import { app as replication } from '../../supabase/functions/_backend/public/replication.ts'
 import { app as statistics } from '../../supabase/functions/_backend/public/statistics/index.ts'
 import { app as webhooks } from '../../supabase/functions/_backend/public/webhooks/index.ts'
@@ -77,6 +78,7 @@ app.route('/webhooks', webhooks)
 app.route('/app', appEndpoint)
 app.route('/build', build)
 app.route('/replication', replication)
+app.route('/check_cpu_usage', check_cpu_usage)
 
 // Private API
 const functionNamePrivate = 'private'
