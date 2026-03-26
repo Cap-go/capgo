@@ -25,7 +25,7 @@ app.get('/', middlewareAPISecret, async (c) => {
   try {
     const response = await fetch(url.toString(), {
       headers: {
-        'Authorization': `Basic ${btoa(grafanaToken)}`,
+        Authorization: `Basic ${btoa(grafanaToken)}`,
       },
     })
 
