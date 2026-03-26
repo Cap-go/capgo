@@ -380,3 +380,9 @@ import_map = "./functions/deno.json"
 [functions.replication]
 verify_jwt = false
 import_map = "./functions/deno.json"
+
+# Check CPU Usage
+
+[functions.check_cpu_usage]
+verify_jwt = false
+import_map = "./functions/deno.json"
