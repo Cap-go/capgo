@@ -30,7 +30,7 @@ import { createAllCatch, createHono } from '../_backend/utils/hono.ts'
 import { version } from '../_backend/utils/version.ts'
 
 const functionName = 'triggers'
-const appGlobal = createHono(functionName, version, Deno.env.get('SENTRY_DSN_SUPABASE'))
+const appGlobal = createHono(functionName, version)
 
 appGlobal.route('/cron_email', cron_email)
 appGlobal.route('/logsnag_insights', logsnag_insights)

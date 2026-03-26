@@ -51,7 +51,7 @@ describe('bundle metadata RBAC guard', () => {
     })
   })
 
-  it.concurrent('rejects metadata writes when upload permission is denied', async () => {
+  it('rejects metadata writes when upload permission is denied', async () => {
     checkPermissionMock.mockResolvedValue(false)
 
     const response = await app.request(postJson({
@@ -66,7 +66,7 @@ describe('bundle metadata RBAC guard', () => {
     expect(supabaseApikeyMock).not.toHaveBeenCalled()
   })
 
-  it.concurrent('allows metadata writes when upload permission is granted', async () => {
+  it('allows metadata writes when upload permission is granted', async () => {
     const response = await app.request(postJson({
       app_id: 'com.example.app',
       version_id: 123,

@@ -119,7 +119,7 @@ Capgo relies on two layered caches for plugin endpoints (`/updates`, `/stats`, `
 - **Edge on-prem cache (Cloudflare Snippet)**: `cloudflare_workers/snippet/index.js` caches responses when it detects:
   - `429` + `{ error: 'on_premise_app' }` (from `/updates` or `/channel_self`), or
   - `{ isOnprem: true }` (from `/stats`).
-  The snippet stores cached responses using the worker's `Cache-Control` TTL and serves them before routing.
+    The snippet stores cached responses using the worker's `Cache-Control` TTL and serves them before routing.
 - **Edge plan-upgrade cache (Cloudflare Snippet)**: same file caches responses when it detects:
   - `429` + `{ error: 'need_plan_upgrade' }`.
 - **App status cache (Worker runtime)**: `supabase/functions/_backend/utils/appStatus.ts` stores `onprem` / `cancelled` / `cloud` for 60s using the Cache API to short-circuit DB lookups.
@@ -189,37 +189,43 @@ Capgo relies on two layered caches for plugin endpoints (`/updates`, `/stats`, `
 
 **ALL TEST FILES RUN IN PARALLEL.** Tests within the same file run sequentially (unless explicitly configured otherwise), but different test files execute simultaneously. You MUST design tests accordingly.
 
-**Maximize parallelism:** Use `it.concurrent()` instead of `it()` to run tests in parallel within the same file. More parallel tests = faster CI/CD.
+**Maximize parallelism:** Use `it.concurrent()` instead of `it()` when possible, to run tests in parallel within the same file. More parallel tests = faster CI/CD.
 
 When creating tests that interact with shared resources (users, apps, orgs, devices, channels, bundles, etc.), follow these rules:
 
 **You CAN reuse existing seed data IF:**
+
 - You only READ the data, not modify it
 - You create your OWN child resources under it (e.g., reuse a user but create your own app/org for that user)
 - The parent resource is not modified by your test or other tests
 
 **You MUST create dedicated seed data IF:**
+
 - Your test MODIFIES the resource (update, delete, change settings)
 - Other tests also modify that same resource
 - The resource state matters for your test assertions
 
 **Guidelines:**
+
 1. **Create dedicated seed data when needed** - Add new test-specific entries in `supabase/seed.sql` with unique identifiers
 2. **Use unique naming conventions** - Prefix test data with the test file name or feature being tested (e.g., `test_my_feature_user@capgo.app`, `com.test.myfeature.app`)
 3. **Clean up is NOT enough** - Even with cleanup, parallel test files might try to use the data simultaneously
 
 **Examples of what breaks parallel test files:**
+
 - Modifying the default `test@capgo.app` user's settings
 - Deleting or updating the default app `com.demo.app`
 - Changing org settings on the shared test org
 - Using hardcoded IDs that other test files also modify
 
 **Examples of safe reuse:**
+
 - Using `test@capgo.app` to create a NEW app specific to your test (user is not modified)
 - Reading from shared orgs without modifying them
 - Creating new channels/bundles under your own dedicated app
 
 **When you need isolation, create dedicated seed data:**
+
 ```sql
 -- In seed.sql, add dedicated test data for your test file:
 INSERT INTO auth.users (id, email, ...) VALUES
@@ -374,6 +380,7 @@ Prevent RPCs from becoming an oracle system.
 ### SQL FUNCTION SECURITY (UPPERCASE RULES)
 
 WHEN ADDING AN ADMIN/PLATFORM-RBAC CHECK FUNCTION:
+
 - DEFINE ONE SERVICE-ROLE-ONLY `uuid` OVERLOAD FOR INTERNAL LOOKUPS.
 - DEFINE ONE USER-CONTEXT `()` OVERLOAD FOR CLIENT USAGE.
 - APPLY `REVOKE ALL ... FROM PUBLIC` TO EVERY OVERLOAD.
@@ -617,6 +624,10 @@ When backend code uses the plugin read-path (`/updates`, `/stats`, `/channel_sel
 - Logical replication replicates **table data**, not derived objects like **views** and **SQL functions**.
 - Treat the read replica (what you see in PlanetScale) as the source of truth for what is queryable from plugin endpoints.
 - Do **not** query credits ledger tables/views from the replica (e.g. `usage_credit_*` / `usage_credit_balances`). If plugin logic needs a “has credits” signal, **materialize it into a replicated column/table** (example: an org-level boolean flag that is refreshed by primary-side jobs).
+- `/updates`, `/stats`, and `/channel_self` are extremely hot paths and can be called hundreds of times per second.
+- Those endpoints must not call the primary Supabase/Postgres database in-request or through `backgroundTask()` side effects unless there is no other practical option.
+- Background work is not an exception: do not enqueue primary-DB RPCs, writes, or lookups from these plugin endpoints just because the response is returned first.
+- If an unavoidable primary write remains for one of these endpoints, keep it minimal, document the reason inline, and treat it as an exception that requires extra review.
 
 ## Pull Request Guidelines
 
@@ -706,13 +717,15 @@ let isNewVersion = false
 try {
   const parsed = parse(pluginVersion)
   isNewVersion = !isDeprecatedPluginVersion(parsed, MIN_V5, MIN_V6, MIN_V7, MIN_V8)
-} catch (error) {
+}
+catch (error) {
   // If version parsing fails, assume old version for safety
 }
 
 if (isNewVersion) {
   // New behavior for updated plugins
-} else {
+}
+else {
   // Legacy behavior for old plugins
 }
 ```

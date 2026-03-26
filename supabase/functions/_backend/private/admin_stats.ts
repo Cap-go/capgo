@@ -9,10 +9,17 @@ import { getAdminCancelledOrganizations, getAdminDeploymentsTrend, getAdminGloba
 import { getCancellationDetails } from '../utils/stripe.ts'
 import { supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
-const bodySchema = z.object({
+export const MAX_ADMIN_STATS_LIMIT = 50_000
+export const MAX_ADMIN_STATS_OFFSET = 100_000
+
+export const adminStatsBodySchema = z.object({
   metric_category: z.enum(['uploads', 'distribution', 'failures', 'success_rate', 'platform_overview', 'org_metrics', 'mau_trend', 'success_rate_trend', 'apps_trend', 'bundles_trend', 'deployments_trend', 'storage_trend', 'bandwidth_trend', 'global_stats_trend', 'plugin_breakdown', 'trial_organizations', 'onboarding_funnel', 'cancelled_users']),
   start_date: z.string().check(z.minLength(1)),
   end_date: z.string().check(z.minLength(1)),
+  app_id: z.optional(z.string().check(z.minLength(1))),
+  org_id: z.optional(z.string().check(z.minLength(1))),
+  limit: z.optional(z.number().check(z.int(), z.minimum(1), z.maximum(MAX_ADMIN_STATS_LIMIT))),
+  offset: z.optional(z.number().check(z.int(), z.minimum(0), z.maximum(MAX_ADMIN_STATS_OFFSET))),
 })
 
 interface AdminStatsBody {
@@ -73,7 +80,7 @@ app.post('/', middlewareAuth, async (c) => {
     throw simpleError('not_authorized', 'Not authorized')
 
   const body = await parseBody<AdminStatsBody>(c)
-  const parsedBodyResult = bodySchema.safeParse(body)
+  const parsedBodyResult = adminStatsBodySchema.safeParse(body)
   if (!parsedBodyResult.success) {
     throw simpleError('invalid_json_body', 'Invalid json body', { body, parsedBodyResult })
   }
@@ -92,8 +99,7 @@ app.post('/', middlewareAuth, async (c) => {
     throw simpleError('not_admin', 'Not admin - only admin users can access platform statistics')
   }
 
-  // Use body directly since it has the full interface type
-  const { metric_category, start_date, end_date, app_id, org_id, limit, offset } = body
+  const { metric_category, start_date, end_date, app_id, org_id, limit, offset } = parsedBodyResult.data
 
   cloudlog({
     requestId: c.get('requestId'),

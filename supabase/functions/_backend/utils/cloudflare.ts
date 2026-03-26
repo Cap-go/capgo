@@ -17,13 +17,13 @@ function escapeSqlString(value: string): string {
 
 const MAX_ANALYTICS_QUERY_LIMIT = 50_000
 
-function normalizeAnalyticsLimit(limit?: number): number {
+export function normalizeAnalyticsLimit(limit: unknown, fallback = DEFAULT_LIMIT): number {
   if (typeof limit !== 'number' || !Number.isFinite(limit))
-    return DEFAULT_LIMIT
+    return fallback
 
   const integerLimit = Math.trunc(limit)
   if (integerLimit < 1)
-    return DEFAULT_LIMIT
+    return fallback
 
   return Math.min(integerLimit, MAX_ANALYTICS_QUERY_LIMIT)
 }
@@ -1610,6 +1610,8 @@ export async function getAdminOrgMetrics(
   if (!c.env.DEVICE_USAGE)
     return []
 
+  const safeLimit = normalizeAnalyticsLimit(limit, 100)
+
   const query = `SELECT
     blob2 AS org_id,
     COUNT(DISTINCT blob1) AS mau,
@@ -1620,7 +1622,7 @@ export async function getAdminOrgMetrics(
     AND blob2 != ''
   GROUP BY org_id
   ORDER BY mau DESC
-  LIMIT ${limit}`
+  LIMIT ${safeLimit}`
 
   cloudlog({ requestId: c.get('requestId'), message: 'getAdminOrgMetrics query', query })
 
@@ -1640,7 +1642,7 @@ export async function getAdminOrgMetrics(
         AND du.blob2 != ''
       GROUP BY org_id
       ORDER BY bandwidth DESC
-      LIMIT ${limit}`
+      LIMIT ${safeLimit}`
 
       const bandwidthResult = await runQueryToCFA<{ org_id: string, bandwidth: number, updates: number }>(c, bandwidthQuery)
 
