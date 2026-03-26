@@ -2,11 +2,11 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../../utils/hono.ts'
 import type { Database } from '../../../utils/supabase.types.ts'
 import { z } from 'zod/mini'
-import { simpleError } from '../../../utils/hono.ts'
+import { quickError, simpleError } from '../../../utils/hono.ts'
 import { cloudlog } from '../../../utils/logging.ts'
 import { checkPermission } from '../../../utils/rbac.ts'
 import { createSignedImageUrl } from '../../../utils/storage.ts'
-import { supabaseApikey } from '../../../utils/supabase.ts'
+import { apikeyHasOrgRightWithPolicy, supabaseApikey } from '../../../utils/supabase.ts'
 
 const bodySchema = z.object({
   orgId: z.string(),
@@ -43,8 +43,16 @@ export async function get(c: Context<MiddlewareKeyVariables>, bodyRaw: any, apik
     throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
   }
 
-  // Use authenticated client for data queries - RLS will enforce access
   const supabase = supabaseApikey(c, apikey.key)
+  const orgCheck = await apikeyHasOrgRightWithPolicy(c, apikey, body.orgId, supabase)
+  if (!orgCheck.valid) {
+    if (orgCheck.error === 'org_requires_expiring_key') {
+      throw quickError(401, 'org_requires_expiring_key', 'This organization requires API keys with an expiration date. Please use a different key or update this key with an expiration date.')
+    }
+    throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
+  }
+
+  // Use authenticated client for data queries - RLS will enforce access
   const { data, error } = await supabase
     .rpc('get_org_members', {
       user_id: apikey.user_id,
