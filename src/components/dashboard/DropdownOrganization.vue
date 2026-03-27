@@ -31,12 +31,12 @@ let organizationLogoRefreshInterval: number | null = null
 let isOrganizationDropdownMounted = false
 
 function refreshOnFocus() {
-  void refreshOrganizationLogosIfNeeded(true)
+  void refreshOrganizationLogosIfNeeded()
 }
 
 function refreshOnVisibilityChange() {
   if (document.visibilityState === 'visible')
-    void refreshOrganizationLogosIfNeeded(true)
+    void refreshOrganizationLogosIfNeeded()
 }
 
 onClickOutside(dropdown, () => closeDropdown())
