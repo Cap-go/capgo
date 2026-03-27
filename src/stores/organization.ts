@@ -23,6 +23,7 @@ export interface PasswordPolicyConfig {
 // Note: Using get_orgs_v7 return type with explicit JSON parsing for password_policy_config
 type RawOrganization = ArrayElement<Database['public']['Functions']['get_orgs_v7']['Returns']>
 export type Organization = Omit<RawOrganization, 'password_policy_config'> & {
+  logo_storage_path?: string | null
   password_policy_config: PasswordPolicyConfig | null
 }
 export type OrganizationRole
@@ -387,6 +388,7 @@ export const useOrganizationStore = defineStore('organization', () => {
         id,
         ...item,
         logo: resolvedLogo || null,
+        logo_storage_path: item.logo ?? null,
         password_policy_config: item.password_policy_config as PasswordPolicyConfig | null,
       } as Organization & { id: number }
     }))
@@ -432,6 +434,37 @@ export const useOrganizationStore = defineStore('organization', () => {
     else {
       currentOrganizationFailed.value = !(!!currentOrganization.value?.paying || (currentOrganization.value?.trial_left ?? 0) > 0 || !!currentOrganization.value?.can_use_more)
     }
+  }
+
+  const refreshOrganizationLogos = async () => {
+    if (_organizations.value.size === 0)
+      return
+
+    const nextOrganizations = new Map(_organizations.value)
+    let updated = false
+
+    for (const [orgId, org] of nextOrganizations.entries()) {
+      if (!org.logo)
+        continue
+
+      const refreshedLogo = await createSignedImageUrl(org.logo_storage_path ?? org.logo, { forceRefresh: true })
+      if (!refreshedLogo || refreshedLogo === org.logo)
+        continue
+
+      nextOrganizations.set(orgId, {
+        ...org,
+        logo: refreshedLogo,
+        logo_storage_path: org.logo_storage_path ?? org.logo,
+      })
+      updated = true
+    }
+
+    if (!updated)
+      return
+
+    _organizations.value = nextOrganizations
+    if (currentOrganization.value)
+      currentOrganization.value = nextOrganizations.get(currentOrganization.value.gid)
   }
 
   const dedupFetchOrganizations = async () => {
@@ -530,6 +563,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     getAllOrgs,
     hasPermissionsInRole,
     fetchOrganizations,
+    refreshOrganizationLogos,
     dedupFetchOrganizations,
     getOrgByAppId,
     awaitInitialLoad,

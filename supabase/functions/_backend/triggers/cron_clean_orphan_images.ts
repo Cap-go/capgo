@@ -19,6 +19,20 @@ function normalizeImageStoragePath(path?: string | null) {
   return pathWithoutQuery.replace(/^images\//, '').replace(/^\/+/, '')
 }
 
+interface StorageListEntry {
+  id: string | null
+  name: string
+}
+
+export function getStaleOrgLogoPaths(orgId: string, files: StorageListEntry[], linkedLogoPath?: string | null) {
+  const normalizedLinkedLogoPath = normalizeImageStoragePath(linkedLogoPath)
+
+  return files
+    .filter(file => file.id !== null)
+    .map(file => `org/${orgId}/logo/${file.name}`)
+    .filter(path => path !== normalizedLinkedLogoPath)
+}
+
 // This CRON job cleans up orphaned images from storage
 // - User avatars stored at: images/{user_id}/*
 // - App icons stored at: images/org/{org_id}/{app_id}/icon
@@ -166,7 +180,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         // Check if org exists
         const { data: org, error: orgError } = await supabase
           .from('orgs')
-          .select('id')
+          .select('id, logo')
           .eq('id', orgId)
           .maybeSingle()
 
@@ -234,6 +248,51 @@ app.post('/', middlewareAPISecret, async (c) => {
                 continue // Skip files
 
               const appId = appFolder.name
+
+              if (appId === 'logo') {
+                try {
+                  const { data: files, error: logoListError } = await supabase
+                    .storage
+                    .from('images')
+                    .list(`org/${orgId}/logo`)
+
+                  if (logoListError) {
+                    cloudlogErr({ requestId: c.get('requestId'), message: 'error listing org logo images', error: logoListError, orgId })
+                    errors++
+                    continue
+                  }
+
+                  // The logo folder is organization-scoped, not app-scoped. Keep the
+                  // current org logo referenced in public.orgs.logo and only remove stale files.
+                  const staleLogoPaths = getStaleOrgLogoPaths(orgId, files ?? [], org.logo)
+                  if (staleLogoPaths.length === 0)
+                    continue
+
+                  const { error: removeLogoError } = await supabase
+                    .storage
+                    .from('images')
+                    .remove(staleLogoPaths)
+
+                  if (removeLogoError) {
+                    cloudlogErr({ requestId: c.get('requestId'), message: 'error deleting stale org logo images', error: removeLogoError, orgId })
+                    errors++
+                    continue
+                  }
+
+                  deletedOrgImages += staleLogoPaths.length
+                  cloudlog({
+                    requestId: c.get('requestId'),
+                    message: 'deleted stale org logo images not linked in org',
+                    count: staleLogoPaths.length,
+                    orgId,
+                  })
+                }
+                catch (error) {
+                  cloudlogErr({ requestId: c.get('requestId'), message: 'error processing org logo folder', error, orgId })
+                  errors++
+                }
+                continue
+              }
 
               // Check if app exists
               const { data: appCheck, error: appError } = await supabase
