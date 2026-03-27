@@ -465,8 +465,13 @@ export const useOrganizationStore = defineStore('organization', () => {
       return
 
     _organizations.value = nextOrganizations
-    if (currentOrganization.value)
-      currentOrganization.value = nextOrganizations.get(currentOrganization.value.gid)
+    if (currentOrganization.value) {
+      const refreshedCurrentOrganization = nextOrganizations.get(currentOrganization.value.gid)
+      if (refreshedCurrentOrganization) {
+        currentOrganization.value.logo = refreshedCurrentOrganization.logo
+        currentOrganization.value.logo_storage_path = refreshedCurrentOrganization.logo_storage_path
+      }
+    }
   }
 
   const dedupFetchOrganizations = async () => {
