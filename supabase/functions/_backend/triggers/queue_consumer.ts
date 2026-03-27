@@ -30,7 +30,7 @@ interface Message {
   message: {
     payload?: any
     function_name: string
-    function_type: 'cloudflare' | 'cloudflare_pp' | '' | null | undefined
+    function_type?: 'cloudflare' | 'cloudflare_pp' | '' | null
     [key: string]: unknown
   }
 }
