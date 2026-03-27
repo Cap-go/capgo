@@ -3,7 +3,7 @@ import type { ArrayElement, Concrete, Merge } from '~/services/types'
 import type { Database } from '~/types/supabase.types'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import { createSignedImageUrl } from '~/services/storage'
+import { createSignedImageUrl, resolveImagePath } from '~/services/storage'
 import { stripeEnabled, useSupabase } from '~/services/supabase'
 import { createDeferredPromise } from '../utils/promise'
 import { useDashboardAppsStore } from './dashboardApps'
@@ -23,6 +23,7 @@ export interface PasswordPolicyConfig {
 // Note: Using get_orgs_v7 return type with explicit JSON parsing for password_policy_config
 type RawOrganization = ArrayElement<Database['public']['Functions']['get_orgs_v7']['Returns']>
 export type Organization = Omit<RawOrganization, 'password_policy_config'> & {
+  logo_storage_path?: string | null
   password_policy_config: PasswordPolicyConfig | null
 }
 export type OrganizationRole
@@ -383,10 +384,12 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     const mappedData = await Promise.all(data.map(async (item, id) => {
       const resolvedLogo = item.logo ? await createSignedImageUrl(item.logo) : ''
+      const logoStoragePath = resolveImagePath(item.logo).normalized
       return {
         id,
         ...item,
         logo: resolvedLogo || null,
+        logo_storage_path: logoStoragePath || null,
         password_policy_config: item.password_policy_config as PasswordPolicyConfig | null,
       } as Organization & { id: number }
     }))
@@ -431,6 +434,43 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
     else {
       currentOrganizationFailed.value = !(!!currentOrganization.value?.paying || (currentOrganization.value?.trial_left ?? 0) > 0 || !!currentOrganization.value?.can_use_more)
+    }
+  }
+
+  const refreshOrganizationLogos = async () => {
+    if (_organizations.value.size === 0)
+      return
+
+    const nextOrganizations = new Map(_organizations.value)
+    let updated = false
+
+    for (const [orgId, org] of nextOrganizations.entries()) {
+      if (!org.logo)
+        continue
+
+      const logoStoragePath = resolveImagePath(org.logo_storage_path ?? org.logo).normalized
+      const refreshedLogo = await createSignedImageUrl(logoStoragePath || org.logo, { forceRefresh: true })
+      if (!refreshedLogo || refreshedLogo === org.logo)
+        continue
+
+      nextOrganizations.set(orgId, {
+        ...org,
+        logo: refreshedLogo,
+        logo_storage_path: logoStoragePath || null,
+      })
+      updated = true
+    }
+
+    if (!updated)
+      return
+
+    _organizations.value = nextOrganizations
+    if (currentOrganization.value) {
+      const refreshedCurrentOrganization = nextOrganizations.get(currentOrganization.value.gid)
+      if (refreshedCurrentOrganization) {
+        currentOrganization.value.logo = refreshedCurrentOrganization.logo
+        currentOrganization.value.logo_storage_path = refreshedCurrentOrganization.logo_storage_path
+      }
     }
   }
 
@@ -530,6 +570,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     getAllOrgs,
     hasPermissionsInRole,
     fetchOrganizations,
+    refreshOrganizationLogos,
     dedupFetchOrganizations,
     getOrgByAppId,
     awaitInitialLoad,
