@@ -25,7 +25,7 @@ const invitationCount = computed(() => organizationStore.organizations.filter(or
 const ORGANIZATION_LOGO_REFRESH_INTERVAL_MS = 10 * 60 * 1000
 const isRefreshingBrokenLogos = ref(false)
 const lastOrganizationLogoRefreshAt = ref(0)
-const refreshedBrokenLogoUrls = new Set<string>()
+const refreshedBrokenLogoKeys = new Set<string>()
 let organizationLogoRefreshInterval: number | null = null
 let isOrganizationDropdownMounted = false
 
@@ -134,12 +134,25 @@ function closeDropdown() {
   }
 }
 
-async function refreshBrokenOrganizationLogo(logo?: string | null) {
-  const failedLogo = logo?.trim()
-  if (!failedLogo || refreshedBrokenLogoUrls.has(failedLogo) || isRefreshingBrokenLogos.value)
+function getLogoRefreshKey(org?: Organization | null) {
+  if (!org)
+    return ''
+  const storagePath = org.logo_storage_path?.trim()
+  if (storagePath)
+    return storagePath
+  const logo = org.logo?.trim()
+  if (logo)
+    return logo
+  return org.gid?.trim() ?? ''
+}
+
+async function refreshBrokenOrganizationLogo(org?: Organization | null) {
+  const failedLogo = org?.logo?.trim()
+  const refreshKey = getLogoRefreshKey(org)
+  if (!failedLogo || !refreshKey || refreshedBrokenLogoKeys.has(refreshKey) || isRefreshingBrokenLogos.value)
     return
 
-  refreshedBrokenLogoUrls.add(failedLogo)
+  refreshedBrokenLogoKeys.add(refreshKey)
   await refreshOrganizationLogosIfNeeded(true)
 }
 
@@ -261,7 +274,7 @@ function onOrgItemKeydown(org: Organization, e: KeyboardEvent) {
             :src="currentOrganization.logo"
             :alt="`${currentOrganization.name} logo`"
             class="object-cover w-6 h-6 mr-2 rounded-sm d-mask d-mask-squircle shrink-0"
-            @error="refreshBrokenOrganizationLogo(currentOrganization.logo)"
+            @error="refreshBrokenOrganizationLogo(currentOrganization)"
           >
           <div
             v-else
@@ -305,7 +318,7 @@ function onOrgItemKeydown(org: Organization, e: KeyboardEvent) {
                   :src="org.logo"
                   :alt="`${org.name} logo`"
                   class="object-cover w-6 h-6 mr-2 rounded-sm d-mask d-mask-squircle shrink-0"
-                  @error="refreshBrokenOrganizationLogo(org.logo)"
+                  @error="refreshBrokenOrganizationLogo(org)"
                 >
                 <div
                   v-else

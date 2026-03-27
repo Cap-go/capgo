@@ -14,9 +14,18 @@ function normalizeImageStoragePath(path?: string | null) {
   const signedUrlRegex = /\/storage\/v1\/object\/(?:public\/|sign\/)?images\/(.+)$/
   const signedUrlMatch = signedUrlRegex.exec(pathWithoutQuery)
   if (signedUrlMatch?.[1])
-    return signedUrlMatch[1].replace(/^\/+/, '')
+    return decodePathSegment(signedUrlMatch[1]).replace(/^\/+/, '')
 
-  return pathWithoutQuery.replace(/^images\//, '').replace(/^\/+/, '')
+  return decodePathSegment(pathWithoutQuery).replace(/^images\//, '').replace(/^\/+/, '')
+}
+
+function decodePathSegment(value: string) {
+  try {
+    return decodeURIComponent(value)
+  }
+  catch {
+    return value
+  }
 }
 
 interface StorageListEntry {

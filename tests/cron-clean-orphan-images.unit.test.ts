@@ -33,6 +33,21 @@ describe('getStaleOrgLogoPaths', () => {
     ])
   })
 
+  it.concurrent('decodes signed logo URLs before comparing file names', () => {
+    const result = getStaleOrgLogoPaths(
+      'org-456',
+      [
+        { id: '1', name: 'company logo.png' },
+        { id: '2', name: 'fallback.png' },
+      ],
+      'https://sb.capgo.app/storage/v1/object/sign/images/org/org-456/logo/company%20logo.png?token=abc',
+    )
+
+    expect(result).toEqual([
+      'org/org-456/logo/fallback.png',
+    ])
+  })
+
   it.concurrent('deletes all org logo files when no linked logo remains in the org row', () => {
     const result = getStaleOrgLogoPaths(
       'org-789',
