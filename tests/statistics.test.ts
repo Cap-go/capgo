@@ -1,6 +1,15 @@
 import { afterAll, describe, expect, it } from 'vitest'
 import { APP_NAME_STATS, BASE_URL, headersStats, ORG_ID_STATS } from './test-utils.ts'
 
+function hasSeededStats(statsData: any[]) {
+  return statsData.some(stat =>
+    (stat.mau ?? 0) > 0
+    || (stat.storage ?? 0) > 0
+    || (stat.bandwidth ?? 0) > 0
+    || (stat.get ?? 0) > 0,
+  )
+}
+
 describe('[GET] /statistics operations with and without subkey', () => {
   const APPNAME = APP_NAME_STATS // Use the seeded stats app
   let subkeyId = 0
@@ -25,6 +34,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
     expect(getStats.status).toBe(200)
     const statsData = await getStats.json()
     expect(Array.isArray(statsData)).toBe(true)
+    expect(hasSeededStats(statsData)).toBe(true)
   })
 
   it('should get organization statistics without subkey', async () => {
@@ -91,6 +101,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
     expect(getStats.status).toBe(200)
     const statsData = await getStats.json()
     expect(Array.isArray(statsData)).toBe(true)
+    expect(hasSeededStats(statsData)).toBe(true)
   })
 
   it('should get organization statistics with subkey', async () => {

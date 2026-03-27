@@ -82,16 +82,20 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
     return { data: null, error: 'Invalid appId or ownerOrg' }
 
   let ownerOrgId = ownerOrg
-  if (appId) {
+  if (appId && !ownerOrgId) {
     const { data, error } = await supabase.from('apps').select('*').eq('app_id', appId).single()
     if (error)
       return { data: null, error }
     ownerOrgId = data.owner_org
   }
 
-  const { data: metrics, error: metricsError } = await supabase.rpc('get_app_metrics', { org_id: ownerOrgId!, start_date: dayjs(from).utc().format('YYYY-MM-DD'), end_date: dayjs(to).utc().format('YYYY-MM-DD') })
+  const rpcArgs = appId
+    ? { p_org_id: ownerOrgId!, p_app_id: appId, p_start_date: dayjs(from).utc().format('YYYY-MM-DD'), p_end_date: dayjs(to).utc().format('YYYY-MM-DD') }
+    : { org_id: ownerOrgId!, start_date: dayjs(from).utc().format('YYYY-MM-DD'), end_date: dayjs(to).utc().format('YYYY-MM-DD') }
+  const { data: rawMetrics, error: metricsError } = await supabase.rpc('get_app_metrics', rpcArgs)
   if (metricsError)
     return { data: null, error: metricsError }
+  const metrics = rawMetrics ?? []
   const graphDays = getDaysBetweenDates(from, to)
 
   const createUndefinedArray = (length: number) => {
@@ -531,7 +535,7 @@ app.get('/app/:app_id', async (c) => {
     await checkOrganizationAccess(c, app.owner_org, supabase)
   }
 
-  const { data: finalStats, error } = await getNormalStats(c, appId, null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt', false, body.noAccumulate ?? false)
+  const { data: finalStats, error } = await getNormalStats(c, appId, app?.owner_org ?? null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt', false, body.noAccumulate ?? false)
 
   if (error) {
     throw quickError(500, 'cannot_get_app_statistics', 'Cannot get app statistics', { error })
