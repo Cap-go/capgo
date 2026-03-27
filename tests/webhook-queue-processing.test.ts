@@ -84,8 +84,29 @@ async function waitForDeliveryRecord(webhookId: string, timeoutMs = 10000) {
   throw new Error(`Timed out waiting for delivery record for webhook ${webhookId}`)
 }
 
+async function waitForWebhookDeliveryQueueMessage(deliveryId: string, timeoutMs = 10000) {
+  const start = Date.now()
+
+  while (Date.now() - start < timeoutMs) {
+    const { rows } = await pool.query(
+      `SELECT count(*) AS count
+       FROM pgmq.q_webhook_delivery
+       WHERE message->'payload'->>'delivery_id' = $1`,
+      [deliveryId],
+    )
+
+    if (Number(rows[0]?.count ?? 0) > 0)
+      return
+
+    await new Promise(resolve => setTimeout(resolve, 250))
+  }
+
+  throw new Error(`Timed out waiting for webhook_delivery queue message for delivery ${deliveryId}`)
+}
+
 async function waitForDeliveryCompletion(deliveryId: string, timeoutMs = 15000) {
   const start = Date.now()
+  let lastState: Record<string, unknown> | null = null
 
   while (Date.now() - start < timeoutMs) {
     const { data, error } = await (getSupabaseClient() as any)
@@ -97,13 +118,15 @@ async function waitForDeliveryCompletion(deliveryId: string, timeoutMs = 15000) 
     if (error)
       throw error
 
+    lastState = data
+
     if (data?.status && data.status !== 'pending')
       return data
 
     await new Promise(resolve => setTimeout(resolve, 250))
   }
 
-  throw new Error(`Timed out waiting for delivery ${deliveryId} to complete`)
+  throw new Error(`Timed out waiting for delivery ${deliveryId} to complete: ${JSON.stringify(lastState)}`)
 }
 
 describe('webhook queue processing', () => {
@@ -188,6 +211,7 @@ describe('webhook queue processing', () => {
     expect(createdDelivery.event_type).toBe('apps.UPDATE')
     expect(createdDelivery.status).toBe('pending')
 
+    await waitForWebhookDeliveryQueueMessage(createdDelivery.id)
     await fetchQueueSync('webhook_delivery')
     const completedDelivery = await waitForDeliveryCompletion(createdDelivery.id)
 
