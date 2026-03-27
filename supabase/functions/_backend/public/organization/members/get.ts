@@ -37,14 +37,16 @@ export async function get(c: Context<MiddlewareKeyVariables>, bodyRaw: any, apik
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
+  const auth = c.get('auth') as { apikey?: Database['public']['Tables']['apikeys']['Row'] } | undefined
+  const effectiveApikey = auth?.apikey ?? apikey
 
   // Auth context is already set by middlewareKey
   if (!(await checkPermission(c, 'org.read_members', { orgId: body.orgId }))) {
     throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
   }
 
-  const supabase = supabaseApikey(c, apikey.key)
-  const orgCheck = await apikeyHasOrgRightWithPolicy(c, apikey, body.orgId, supabase)
+  const supabase = supabaseApikey(c, effectiveApikey.key)
+  const orgCheck = await apikeyHasOrgRightWithPolicy(c, effectiveApikey, body.orgId, supabase)
   if (!orgCheck.valid) {
     if (orgCheck.error === 'org_requires_expiring_key') {
       throw quickError(401, 'org_requires_expiring_key', 'This organization requires API keys with an expiration date. Please use a different key or update this key with an expiration date.')

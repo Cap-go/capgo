@@ -222,6 +222,21 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     expect(members.parse(await response.json()).some(member => member.uid === USER_ID)).toBe(true)
   })
 
+  it.concurrent('allows GET /organization/members for same user without org scope limits', async () => {
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID}`, {
+      headers,
+      method: 'GET',
+    })
+
+    expect(response.status).toBe(200)
+    const members = z.array(z.object({
+      uid: z.string(),
+      email: z.string(),
+      role: z.string(),
+    }))
+    expect(members.parse(await response.json()).some(member => member.uid === USER_ID)).toBe(true)
+  })
+
   it.concurrent('rejects GET /organization/members outside limited_to_orgs scope', async () => {
     const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID}`, {
       headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
