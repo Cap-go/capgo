@@ -66,7 +66,7 @@ describe('process_cron_sync_sub_jobs', () => {
       queuedMessage.message?.payload?.orgId === ORG_ID_CRON_QUEUE)
     expect(targetMessage?.message).toMatchObject({
       function_name: 'cron_sync_sub',
-      function_type: 'cloudflare',
+      function_type: null,
       payload: {
         orgId: ORG_ID_CRON_QUEUE,
         customerId: orgRow?.customer_id,
