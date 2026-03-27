@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'vitest'
-import { APP_NAME_STATS, BASE_URL, headersStats, ORG_ID_STATS } from './test-utils.ts'
+import { APP_NAME_STATS, BASE_URL, getAuthHeadersForCredentials, headersStats, ORG_ID_STATS } from './test-utils.ts'
 
 function hasSeededStats(statsData: any[]) {
   return statsData.some(stat =>
@@ -47,6 +47,38 @@ describe('[GET] /statistics operations with and without subkey', () => {
     expect(getOrgStats.status).toBe(200)
     const orgStatsData = await getOrgStats.json()
     expect(Array.isArray(orgStatsData)).toBe(true)
+    expect(hasSeededStats(orgStatsData)).toBe(true)
+  })
+
+  it('should get organization statistics breakdown without subkey', async () => {
+    const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const toDate = new Date().toISOString().split('T')[0]
+    const getOrgStats = await fetch(`${BASE_URL}/statistics/org/${ORG_ID_STATS}?from=${fromDate}&to=${toDate}&breakdown=true&noAccumulate=true`, {
+      method: 'GET',
+      headers: headersStats,
+    })
+    expect(getOrgStats.status).toBe(200)
+    const orgStatsData = await getOrgStats.json() as { global: any[], byApp: any[] }
+    expect(Array.isArray(orgStatsData.global)).toBe(true)
+    expect(Array.isArray(orgStatsData.byApp)).toBe(true)
+    expect(hasSeededStats(orgStatsData.global)).toBe(true)
+    expect(orgStatsData.byApp.some(stat => stat.app_id === APPNAME)).toBe(true)
+  })
+
+  it('should get organization statistics breakdown with jwt', async () => {
+    const authHeaders = await getAuthHeadersForCredentials('stats@capgo.app', 'testtest')
+    const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const toDate = new Date().toISOString().split('T')[0]
+    const getOrgStats = await fetch(`${BASE_URL}/statistics/org/${ORG_ID_STATS}?from=${fromDate}&to=${toDate}&breakdown=true&noAccumulate=true`, {
+      method: 'GET',
+      headers: authHeaders,
+    })
+    expect(getOrgStats.status).toBe(200)
+    const orgStatsData = await getOrgStats.json() as { global: any[], byApp: any[] }
+    expect(Array.isArray(orgStatsData.global)).toBe(true)
+    expect(Array.isArray(orgStatsData.byApp)).toBe(true)
+    expect(hasSeededStats(orgStatsData.global)).toBe(true)
+    expect(orgStatsData.byApp.some(stat => stat.app_id === APPNAME)).toBe(true)
   })
 
   it('should get user statistics without subkey', async () => {
