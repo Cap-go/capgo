@@ -16,7 +16,7 @@ function normalizeImageStoragePath(path?: string | null) {
   if (signedUrlMatch?.[1])
     return decodePathSegment(signedUrlMatch[1]).replace(/^\/+/, '')
 
-  return decodePathSegment(pathWithoutQuery).replace(/^images\//, '').replace(/^\/+/, '')
+  return decodePathSegment(pathWithoutQuery).replace(/^\/+/, '').replace(/^images\//, '')
 }
 
 function decodePathSegment(value: string) {

@@ -6,7 +6,7 @@ const MAX_CACHE_ENTRIES = 500
 const STORAGE_URL_REGEX = /\/storage\/v1\/object(?:\/(public|sign))?\/images\/(.+)$/
 const signedUrlCache = new Map<string, { url: string, expiresAt: number }>()
 
-function resolveImagePath(raw?: string | null) {
+export function resolveImagePath(raw?: string | null) {
   if (!raw)
     return { normalized: '', shouldSign: false }
 

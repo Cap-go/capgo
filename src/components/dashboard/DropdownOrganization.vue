@@ -6,6 +6,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconSettings from '~icons/lucide/settings'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
+import { resolveImagePath } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
@@ -137,13 +138,16 @@ function closeDropdown() {
 function getLogoRefreshKey(org?: Organization | null) {
   if (!org)
     return ''
-  const storagePath = org.logo_storage_path?.trim()
+  const storagePath = resolveImagePath(org.logo_storage_path).normalized
   if (storagePath)
     return storagePath
-  const logo = org.logo?.trim()
+  const gid = org.gid?.trim()
+  if (gid)
+    return gid
+  const logo = resolveImagePath(org.logo).normalized
   if (logo)
     return logo
-  return org.gid?.trim() ?? ''
+  return ''
 }
 
 async function refreshBrokenOrganizationLogo(org?: Organization | null) {

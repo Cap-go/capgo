@@ -48,6 +48,21 @@ describe('getStaleOrgLogoPaths', () => {
     ])
   })
 
+  it.concurrent('treats raw logo paths with a leading /images prefix as the linked file path', () => {
+    const result = getStaleOrgLogoPaths(
+      'org-123',
+      [
+        { id: '1', name: 'current.png' },
+        { id: '2', name: 'older.png' },
+      ],
+      '/images/org/org-123/logo/current.png',
+    )
+
+    expect(result).toEqual([
+      'org/org-123/logo/older.png',
+    ])
+  })
+
   it.concurrent('deletes all org logo files when no linked logo remains in the org row', () => {
     const result = getStaleOrgLogoPaths(
       'org-789',

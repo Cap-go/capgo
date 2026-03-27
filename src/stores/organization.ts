@@ -3,7 +3,7 @@ import type { ArrayElement, Concrete, Merge } from '~/services/types'
 import type { Database } from '~/types/supabase.types'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import { createSignedImageUrl } from '~/services/storage'
+import { createSignedImageUrl, resolveImagePath } from '~/services/storage'
 import { stripeEnabled, useSupabase } from '~/services/supabase'
 import { createDeferredPromise } from '../utils/promise'
 import { useDashboardAppsStore } from './dashboardApps'
@@ -384,11 +384,12 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     const mappedData = await Promise.all(data.map(async (item, id) => {
       const resolvedLogo = item.logo ? await createSignedImageUrl(item.logo) : ''
+      const logoStoragePath = resolveImagePath(item.logo).normalized
       return {
         id,
         ...item,
         logo: resolvedLogo || null,
-        logo_storage_path: item.logo ?? null,
+        logo_storage_path: logoStoragePath || null,
         password_policy_config: item.password_policy_config as PasswordPolicyConfig | null,
       } as Organization & { id: number }
     }))
@@ -447,14 +448,15 @@ export const useOrganizationStore = defineStore('organization', () => {
       if (!org.logo)
         continue
 
-      const refreshedLogo = await createSignedImageUrl(org.logo_storage_path ?? org.logo, { forceRefresh: true })
+      const logoStoragePath = resolveImagePath(org.logo_storage_path ?? org.logo).normalized
+      const refreshedLogo = await createSignedImageUrl(logoStoragePath || org.logo, { forceRefresh: true })
       if (!refreshedLogo || refreshedLogo === org.logo)
         continue
 
       nextOrganizations.set(orgId, {
         ...org,
         logo: refreshedLogo,
-        logo_storage_path: org.logo_storage_path ?? org.logo,
+        logo_storage_path: logoStoragePath || null,
       })
       updated = true
     }
