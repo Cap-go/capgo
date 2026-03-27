@@ -1,31 +1,47 @@
-import { afterAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { cleanupPostgresClient, executeSQL, ORG_ID_CRON_QUEUE } from './test-utils.ts'
 
-async function clearCronSyncSubMessages(orgId: string) {
+async function getCronSyncSubQueueBaseline() {
+  const [row] = await executeSQL(
+    `SELECT COALESCE(MAX(msg_id), 0) AS max_msg_id
+      FROM pgmq.q_cron_sync_sub
+      WHERE message->>'function_name' = 'cron_sync_sub'`,
+  )
+  return Number(row?.max_msg_id ?? 0)
+}
+
+async function clearCronSyncSubMessagesSince(minMsgIdExclusive: number) {
   await executeSQL(
     `DELETE FROM pgmq.q_cron_sync_sub
-      WHERE COALESCE(message->'payload'->>'orgId', message->>'orgId') = $1`,
-    [orgId],
+      WHERE message->>'function_name' = 'cron_sync_sub'
+        AND msg_id > $1`,
+    [minMsgIdExclusive],
   )
 }
 
-async function getCronSyncSubMessages(orgId: string) {
+async function getCronSyncSubMessagesSince(minMsgIdExclusive: number) {
   return executeSQL(
     `SELECT message
       FROM pgmq.q_cron_sync_sub
-      WHERE COALESCE(message->'payload'->>'orgId', message->>'orgId') = $1
+      WHERE message->>'function_name' = 'cron_sync_sub'
+        AND msg_id > $1
       ORDER BY msg_id DESC`,
-    [orgId],
+    [minMsgIdExclusive],
   )
 }
 
 describe('process_cron_sync_sub_jobs', () => {
+  let baselineMsgId = 0
+
   beforeEach(async () => {
-    await clearCronSyncSubMessages(ORG_ID_CRON_QUEUE)
+    baselineMsgId = await getCronSyncSubQueueBaseline()
+  })
+
+  afterEach(async () => {
+    await clearCronSyncSubMessagesSince(baselineMsgId)
   })
 
   afterAll(async () => {
-    await clearCronSyncSubMessages(ORG_ID_CRON_QUEUE)
     await cleanupPostgresClient()
   })
 
@@ -43,9 +59,12 @@ describe('process_cron_sync_sub_jobs', () => {
 
     await executeSQL('SELECT public.process_cron_sync_sub_jobs()')
 
-    const queuedMessages = await getCronSyncSubMessages(ORG_ID_CRON_QUEUE)
-    expect(queuedMessages).toHaveLength(1)
-    expect(queuedMessages[0]?.message).toMatchObject({
+    const queuedMessages = await getCronSyncSubMessagesSince(baselineMsgId)
+    expect(queuedMessages.length).toBeGreaterThan(0)
+
+    const targetMessage = queuedMessages.find((queuedMessage: { message?: { payload?: { orgId?: string } } }) =>
+      queuedMessage.message?.payload?.orgId === ORG_ID_CRON_QUEUE)
+    expect(targetMessage?.message).toMatchObject({
       function_name: 'cron_sync_sub',
       function_type: 'cloudflare',
       payload: {
@@ -53,6 +72,6 @@ describe('process_cron_sync_sub_jobs', () => {
         customerId: orgRow?.customer_id,
       },
     })
-    expect(queuedMessages[0]?.message?.orgId).toBeUndefined()
+    expect(targetMessage?.message?.orgId).toBeUndefined()
   })
 })

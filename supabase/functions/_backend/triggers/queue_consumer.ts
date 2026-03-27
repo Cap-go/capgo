@@ -474,6 +474,6 @@ app.post('/sync', async (c) => {
   return c.json(BRES, 202)
 })
 
-export const queueConsumerTestUtils = {
+export const __queueConsumerTestUtils__ = {
   extractMessageBody,
 }

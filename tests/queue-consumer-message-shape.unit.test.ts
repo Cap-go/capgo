@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { messagesArraySchema, queueConsumerTestUtils } from '../supabase/functions/_backend/triggers/queue_consumer.ts'
+import { __queueConsumerTestUtils__, messagesArraySchema } from '../supabase/functions/_backend/triggers/queue_consumer.ts'
 
 describe('queue_consumer legacy message compatibility', () => {
   it.concurrent('uses the payload envelope when it is present', () => {
@@ -18,7 +18,7 @@ describe('queue_consumer legacy message compatibility', () => {
       },
     ])
 
-    expect(queueConsumerTestUtils.extractMessageBody(message!)).toEqual({
+    expect(__queueConsumerTestUtils__.extractMessageBody(message!)).toEqual({
       orgId: 'org-1',
       customerId: 'cus_1',
     })
@@ -37,7 +37,7 @@ describe('queue_consumer legacy message compatibility', () => {
       },
     ])
 
-    expect(queueConsumerTestUtils.extractMessageBody(message!)).toEqual({
+    expect(__queueConsumerTestUtils__.extractMessageBody(message!)).toEqual({
       orgId: 'org-legacy',
       customerId: 'cus_legacy',
     })
@@ -54,6 +54,6 @@ describe('queue_consumer legacy message compatibility', () => {
       },
     ])
 
-    expect(queueConsumerTestUtils.extractMessageBody(message!)).toEqual({})
+    expect(__queueConsumerTestUtils__.extractMessageBody(message!)).toEqual({})
   })
 })
