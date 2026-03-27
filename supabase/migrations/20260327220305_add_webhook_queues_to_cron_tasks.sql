@@ -10,18 +10,32 @@ WITH updated_target AS (
     SELECT
         ct.name,
         (
+            WITH current_target AS (
+                SELECT COALESCE(ct.target::jsonb, '[]'::jsonb) AS target
+            ),
+            ordered_items AS (
+                SELECT value, ordinality
+                FROM current_target,
+                    jsonb_array_elements_text(current_target.target) WITH ORDINALITY AS existing_items(value, ordinality)
+
+                UNION ALL
+
+                SELECT 'webhook_dispatcher', 1000000
+                FROM current_target
+                WHERE NOT current_target.target ? 'webhook_dispatcher'
+
+                UNION ALL
+
+                SELECT 'webhook_delivery', 1000001
+                FROM current_target
+                WHERE NOT current_target.target ? 'webhook_delivery'
+            )
             SELECT
                 COALESCE(
-                    jsonb_agg(value ORDER BY value),
-                    '["webhook_delivery","webhook_dispatcher"]'::jsonb
+                    jsonb_agg(value ORDER BY ordinality),
+                    '["webhook_dispatcher","webhook_delivery"]'::jsonb
                 )::text
-            FROM (
-                SELECT jsonb_array_elements_text(ct.target::jsonb) AS value
-                UNION
-                SELECT 'webhook_dispatcher'
-                UNION
-                SELECT 'webhook_delivery'
-            ) AS items
+            FROM ordered_items
         ) AS normalized_target
     FROM public.cron_tasks AS ct
     WHERE ct.name = 'high_frequency_queues'
