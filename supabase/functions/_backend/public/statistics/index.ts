@@ -38,6 +38,19 @@ interface AppUsageByVersion {
   uninstall: number | null
 }
 
+interface AppMetricRow {
+  app_id: string
+  date: string
+  mau: number
+  storage: number
+  bandwidth: number
+  build_time_unit: number
+  get: number
+  fail: number
+  install: number
+  uninstall: number
+}
+
 // Helper to get authenticated supabase client based on auth type
 function getAuthenticatedSupabase(c: Context, auth: AuthInfo) {
   if (auth.authType === 'apikey' && auth.apikey) {
@@ -89,13 +102,31 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
     ownerOrgId = data.owner_org
   }
 
-  const rpcArgs = appId
-    ? { p_org_id: ownerOrgId!, p_app_id: appId, p_start_date: dayjs(from).utc().format('YYYY-MM-DD'), p_end_date: dayjs(to).utc().format('YYYY-MM-DD') }
-    : { org_id: ownerOrgId!, start_date: dayjs(from).utc().format('YYYY-MM-DD'), end_date: dayjs(to).utc().format('YYYY-MM-DD') }
-  const { data: rawMetrics, error: metricsError } = await supabase.rpc('get_app_metrics', rpcArgs)
+  const startDate = dayjs(from).utc().format('YYYY-MM-DD')
+  const endDate = dayjs(to).utc().format('YYYY-MM-DD')
+
+  let rawMetrics: AppMetricRow[] | null
+  let metricsError: unknown
+
+  if (appId) {
+    ({ data: rawMetrics, error: metricsError } = await supabase.rpc('get_app_metrics' as any, {
+      p_org_id: ownerOrgId!,
+      p_app_id: appId,
+      p_start_date: startDate,
+      p_end_date: endDate,
+    }) as { data: AppMetricRow[] | null, error: unknown })
+  }
+  else {
+    ({ data: rawMetrics, error: metricsError } = await supabase.rpc('get_app_metrics', {
+      org_id: ownerOrgId!,
+      start_date: startDate,
+      end_date: endDate,
+    }))
+  }
+
   if (metricsError)
     return { data: null, error: metricsError }
-  const metrics = rawMetrics ?? []
+  const metrics = (rawMetrics ?? []) as AppMetricRow[]
   const graphDays = getDaysBetweenDates(from, to)
 
   const createUndefinedArray = (length: number) => {

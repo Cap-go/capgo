@@ -1,8 +1,11 @@
 import { afterAll, describe, expect, it } from 'vitest'
 import { APP_NAME_STATS, BASE_URL, getAuthHeadersForCredentials, headersStats, ORG_ID_STATS } from './test-utils.ts'
 
-function hasSeededStats(statsData: any[]) {
-  return statsData.some(stat =>
+function hasSeededStats(statsData: unknown) {
+  if (!Array.isArray(statsData))
+    return false
+
+  return statsData.some((stat: any) =>
     (stat.mau ?? 0) > 0
     || (stat.storage ?? 0) > 0
     || (stat.bandwidth ?? 0) > 0
