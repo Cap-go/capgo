@@ -17,8 +17,8 @@ const DISCORD_IGNORED_ERROR_CODES = new Set(['version_not_found', 'no_channel'])
 export const messageSchema = z.object({
   msg_id: z.coerce.number(),
   read_ct: z.coerce.number(),
-  message: z.object({
-    payload: z.unknown(),
+  message: z.looseObject({
+    payload: z.optional(z.unknown()),
     function_name: z.string(),
     function_type: z.nullable(z.optional(z.enum(['cloudflare', 'cloudflare_pp', '']))),
   }),
@@ -28,13 +28,22 @@ interface Message {
   msg_id: number
   read_ct: number
   message: {
-    payload: any
+    payload?: any
     function_name: string
-    function_type: 'cloudflare' | 'cloudflare_pp' | '' | null | undefined
+    function_type?: 'cloudflare' | 'cloudflare_pp' | '' | null
+    [key: string]: unknown
   }
 }
 
 export const messagesArraySchema = z.array(messageSchema)
+
+function extractMessageBody(message: Message): Record<string, unknown> {
+  if (message.message?.payload !== undefined)
+    return (message.message.payload ?? {}) as Record<string, unknown>
+
+  const { function_name: _functionName, function_type: _functionType, ...legacyBody } = message.message ?? {}
+  return legacyBody
+}
 
 // Helper function to generate UUID v4
 function generateUUID(): string {
@@ -66,7 +75,14 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
   const results = await Promise.all(messagesToProcess.map(async (message) => {
     const function_name = message.message?.function_name ?? 'unknown'
     const function_type = message.message?.function_type ?? 'supabase'
-    const body = message.message?.payload ?? {}
+    const body = extractMessageBody(message)
+    if (message.message?.payload === undefined && Object.keys(body).length > 0) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: `[${queueName}] Using legacy queue message body shape for ${function_name}.`,
+        msgId: message.msg_id,
+      })
+    }
     const cfId = generateUUID()
     const httpResponse = await http_post_helper(c, function_name, function_type, body, cfId)
     const errorCode = await extractErrorCode(httpResponse)
@@ -457,3 +473,7 @@ app.post('/sync', async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: `[Sync Request] Responding 202 Accepted. Time: ${Date.now() - handlerStart}ms` })
   return c.json(BRES, 202)
 })
+
+export const __queueConsumerTestUtils__ = {
+  extractMessageBody,
+}

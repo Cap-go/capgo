@@ -4,8 +4,26 @@ import { ref } from 'vue'
 
 const mockEq = vi.fn()
 const mockDelete = vi.fn(() => ({ eq: mockEq }))
-const mockFrom = vi.fn(() => ({ delete: mockDelete }))
+const mockIn = vi.fn()
+const mockSelect = vi.fn(() => ({ in: mockIn }))
+const mockFrom = vi.fn((table: string) => {
+  if (table === 'apps') {
+    return {
+      select: mockSelect,
+    }
+  }
+
+  return {
+    delete: mockDelete,
+  }
+})
 const mockRpc = vi.fn()
+const mockCreateSignedImageUrl = vi.fn()
+const mockResolveImagePath = vi.fn((raw?: string | null) => ({
+  normalized: raw?.trim().replace(/^\/+/, '').replace(/^images\//, '') ?? '',
+  shouldSign: Boolean(raw?.trim()),
+}))
+const mockUpdateDashboard = vi.fn()
 
 vi.mock('~/services/supabase', () => ({
   stripeEnabled: ref(true),
@@ -25,13 +43,14 @@ vi.mock('~/services/supabase', () => ({
 }))
 
 vi.mock('~/services/storage', () => ({
-  createSignedImageUrl: vi.fn(),
+  createSignedImageUrl: mockCreateSignedImageUrl,
+  resolveImagePath: mockResolveImagePath,
 }))
 
 vi.mock('../src/stores/main.ts', () => ({
   useMainStore: () => ({
     user: { id: 'user-123' },
-    updateDashboard: vi.fn(),
+    updateDashboard: mockUpdateDashboard,
   }),
 }))
 
@@ -53,6 +72,12 @@ describe('organization store deleteOrganization', () => {
     vi.clearAllMocks()
     setActivePinia(createPinia())
     mockEq.mockResolvedValue({ data: null, error: null })
+    mockIn.mockResolvedValue({ data: [], error: null })
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn(),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    })
   })
 
   it('allows org deletion for org_super_admin roles', async () => {
@@ -109,5 +134,43 @@ describe('organization role helpers', () => {
     expect(roleHasLegacyMinRight('invite_org_super_admin', 'super_admin')).toBe(true)
     expect(roleHasLegacyMinRight('invite_org_admin', 'admin')).toBe(true)
     expect(roleHasLegacyMinRight('org_billing_admin', 'admin')).toBe(false)
+  })
+})
+
+describe('organization store refreshOrganizationLogos', () => {
+  it('updates the current org logo without retriggering the dashboard refresh watcher', async () => {
+    mockCreateSignedImageUrl.mockResolvedValueOnce('https://signed.example.com/org-logo.png')
+
+    const { useOrganizationStore } = await import('../src/stores/organization.ts')
+    const store = useOrganizationStore()
+    const currentOrganization = {
+      'gid': 'org-refresh',
+      'created_by': 'owner-123',
+      'role': 'org_super_admin',
+      'logo': 'https://signed.example.com/old-org-logo.png',
+      'logo_storage_path': 'org/org-refresh/logo/current.png',
+      'name': 'Refresh Org',
+      'password_policy_config': null,
+      'enforcing_2fa': false,
+      '2fa_has_access': true,
+      'password_has_access': true,
+      'paying': true,
+      'trial_left': 0,
+      'can_use_more': true,
+    } as any
+
+    store.getAllOrgs().set(currentOrganization.gid, { ...currentOrganization })
+    store.currentOrganization = currentOrganization
+    await Promise.resolve()
+    await Promise.resolve()
+    mockUpdateDashboard.mockClear()
+
+    const currentOrganizationRef = store.currentOrganization
+    await store.refreshOrganizationLogos()
+
+    expect(store.currentOrganization).toBe(currentOrganizationRef)
+    expect(store.currentOrganization?.logo).toBe('https://signed.example.com/org-logo.png')
+    expect(store.currentOrganization?.logo_storage_path).toBe('org/org-refresh/logo/current.png')
+    expect(mockUpdateDashboard).not.toHaveBeenCalled()
   })
 })
