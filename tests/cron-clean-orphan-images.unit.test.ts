@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { getStaleOrgLogoPaths } from '../supabase/functions/_backend/triggers/cron_clean_orphan_images.ts'
 
 describe('getStaleOrgLogoPaths', () => {
-  it('preserves the linked org logo file and removes only stale files', () => {
+  it.concurrent('preserves the linked org logo file and removes only stale files', () => {
     const result = getStaleOrgLogoPaths(
       'org-123',
       [
@@ -18,7 +18,7 @@ describe('getStaleOrgLogoPaths', () => {
     ])
   })
 
-  it('treats signed logo URLs as the linked file path', () => {
+  it.concurrent('treats signed logo URLs as the linked file path', () => {
     const result = getStaleOrgLogoPaths(
       'org-456',
       [
@@ -33,7 +33,7 @@ describe('getStaleOrgLogoPaths', () => {
     ])
   })
 
-  it('deletes all org logo files when no linked logo remains in the org row', () => {
+  it.concurrent('deletes all org logo files when no linked logo remains in the org row', () => {
     const result = getStaleOrgLogoPaths(
       'org-789',
       [

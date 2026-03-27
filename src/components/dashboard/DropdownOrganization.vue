@@ -27,6 +27,7 @@ const isRefreshingBrokenLogos = ref(false)
 const lastOrganizationLogoRefreshAt = ref(0)
 const refreshedBrokenLogoUrls = new Set<string>()
 let organizationLogoRefreshInterval: number | null = null
+let isOrganizationDropdownMounted = false
 
 function refreshOnFocus() {
   void refreshOrganizationLogosIfNeeded(true)
@@ -40,7 +41,11 @@ function refreshOnVisibilityChange() {
 onClickOutside(dropdown, () => closeDropdown())
 
 onMounted(async () => {
+  isOrganizationDropdownMounted = true
   await organizationStore.fetchOrganizations()
+  if (!isOrganizationDropdownMounted)
+    return
+
   lastOrganizationLogoRefreshAt.value = Date.now()
 
   window.addEventListener('focus', refreshOnFocus)
@@ -52,6 +57,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  isOrganizationDropdownMounted = false
   window.removeEventListener('focus', refreshOnFocus)
   document.removeEventListener('visibilitychange', refreshOnVisibilityChange)
   if (organizationLogoRefreshInterval !== null)
