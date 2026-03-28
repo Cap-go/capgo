@@ -1,11 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
-  createAppVersions,
   executeSQL,
-  getBaseData,
-  getEndpointUrl,
-  headers,
   ORG_ID_CRON_QUEUE,
   resetAndSeedAppData,
   resetAndSeedAppDataStats,
@@ -15,7 +11,6 @@ import {
 } from './test-utils.ts'
 
 const processCronAppId = `com.cron.queue.${randomUUID().slice(0, 8)}`
-const liveQueueAppId = `com.cron.live.${randomUUID().slice(0, 8)}`
 
 async function clearCronStatAppMessages(appId: string) {
   await executeSQL(`DELETE FROM pgmq.q_cron_stat_app WHERE message->'payload'->>'appId' = $1`, [appId])
@@ -35,23 +30,19 @@ describe('cron_stat_app queue resilience', () => {
       stripeCustomerId: STRIPE_CUSTOMER_ID_CRON_QUEUE,
     })
     await resetAndSeedAppDataStats(processCronAppId)
-
-    await resetAndSeedAppData(liveQueueAppId)
-    await resetAndSeedAppDataStats(liveQueueAppId)
   })
 
   afterAll(async () => {
     await clearCronStatAppMessages(processCronAppId)
-    await clearCronStatAppMessages(liveQueueAppId)
     await resetAppData(processCronAppId)
     await resetAppDataStats(processCronAppId)
-    await resetAppData(liveQueueAppId)
-    await resetAppDataStats(liveQueueAppId)
   })
 
-  it.concurrent('process_cron_stats_jobs still queues active apps when daily_mau is quiet', async () => {
+  it.concurrent('process_cron_stats_jobs still queues active apps when first-seen MAU leaves daily_mau quiet', async () => {
     await clearCronStatAppMessages(processCronAppId)
 
+    // MAU is now recorded on the device's first day in the billing window, so
+    // an active app may legitimately have no fresh daily_mau rows anymore.
     await executeSQL(`DELETE FROM public.daily_mau WHERE app_id = $1`, [processCronAppId])
     await executeSQL(
       `UPDATE public.app_versions SET created_at = NOW() - INTERVAL '45 days' WHERE app_id = $1`,

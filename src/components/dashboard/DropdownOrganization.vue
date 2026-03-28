@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import type { Organization } from '~/stores/organization'
 import { storeToRefs } from 'pinia'
-import { onMounted } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconSettings from '~icons/lucide/settings'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
+import { resolveImagePath } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
@@ -22,11 +23,47 @@ const dropdown = useTemplateRef('dropdown')
 const hasVisibleOrganizations = computed(() => organizationStore.organizations.length > 0)
 const currentLabel = computed(() => currentOrganization.value?.name ?? t('select-organization'))
 const invitationCount = computed(() => organizationStore.organizations.filter(org => org.role.startsWith('invite')).length)
+const ORGANIZATION_LOGO_REFRESH_INTERVAL_MS = 10 * 60 * 1000
+const isRefreshingBrokenLogos = ref(false)
+const lastOrganizationLogoRefreshAt = ref(0)
+const refreshedBrokenLogoKeys = new Set<string>()
+let organizationLogoRefreshInterval: number | null = null
+let isOrganizationDropdownMounted = false
+
+function refreshOnFocus() {
+  void refreshOrganizationLogosIfNeeded()
+}
+
+function refreshOnVisibilityChange() {
+  if (document.visibilityState === 'visible')
+    void refreshOrganizationLogosIfNeeded()
+}
 
 onClickOutside(dropdown, () => closeDropdown())
 
 onMounted(async () => {
+  isOrganizationDropdownMounted = true
   await organizationStore.fetchOrganizations()
+  if (!isOrganizationDropdownMounted)
+    return
+
+  lastOrganizationLogoRefreshAt.value = Date.now()
+
+  window.addEventListener('focus', refreshOnFocus)
+  document.addEventListener('visibilitychange', refreshOnVisibilityChange)
+
+  organizationLogoRefreshInterval = window.setInterval(() => {
+    void refreshOrganizationLogosIfNeeded()
+  }, ORGANIZATION_LOGO_REFRESH_INTERVAL_MS)
+})
+
+onUnmounted(() => {
+  isOrganizationDropdownMounted = false
+  window.removeEventListener('focus', refreshOnFocus)
+  document.removeEventListener('visibilitychange', refreshOnVisibilityChange)
+  if (organizationLogoRefreshInterval !== null)
+    window.clearInterval(organizationLogoRefreshInterval)
+  organizationLogoRefreshInterval = null
 })
 
 async function handleOrganizationInvitation(org: Organization) {
@@ -95,6 +132,51 @@ async function handleOrganizationInvitation(org: Organization) {
 function closeDropdown() {
   if (dropdown.value) {
     dropdown.value.removeAttribute('open')
+  }
+}
+
+function getLogoRefreshKey(org?: Organization | null) {
+  if (!org)
+    return ''
+  const storagePath = resolveImagePath(org.logo_storage_path).normalized
+  if (storagePath)
+    return storagePath
+  const gid = org.gid?.trim()
+  if (gid)
+    return gid
+  const logo = resolveImagePath(org.logo).normalized
+  if (logo)
+    return logo
+  return ''
+}
+
+async function refreshBrokenOrganizationLogo(org?: Organization | null) {
+  const failedLogo = org?.logo?.trim()
+  const refreshKey = getLogoRefreshKey(org)
+  if (!failedLogo || !refreshKey || refreshedBrokenLogoKeys.has(refreshKey) || isRefreshingBrokenLogos.value)
+    return
+
+  refreshedBrokenLogoKeys.add(refreshKey)
+  await refreshOrganizationLogosIfNeeded(true)
+}
+
+async function refreshOrganizationLogosIfNeeded(force = false) {
+  if (isRefreshingBrokenLogos.value)
+    return
+
+  if (!force && Date.now() - lastOrganizationLogoRefreshAt.value < ORGANIZATION_LOGO_REFRESH_INTERVAL_MS)
+    return
+
+  isRefreshingBrokenLogos.value = true
+  try {
+    await organizationStore.refreshOrganizationLogos()
+    lastOrganizationLogoRefreshAt.value = Date.now()
+  }
+  catch (error) {
+    console.error('Failed to refresh organization logos', error)
+  }
+  finally {
+    isRefreshingBrokenLogos.value = false
   }
 }
 
@@ -196,6 +278,7 @@ function onOrgItemKeydown(org: Organization, e: KeyboardEvent) {
             :src="currentOrganization.logo"
             :alt="`${currentOrganization.name} logo`"
             class="object-cover w-6 h-6 mr-2 rounded-sm d-mask d-mask-squircle shrink-0"
+            @error="refreshBrokenOrganizationLogo(currentOrganization)"
           >
           <div
             v-else
@@ -239,6 +322,7 @@ function onOrgItemKeydown(org: Organization, e: KeyboardEvent) {
                   :src="org.logo"
                   :alt="`${org.name} logo`"
                   class="object-cover w-6 h-6 mr-2 rounded-sm d-mask d-mask-squircle shrink-0"
+                  @error="refreshBrokenOrganizationLogo(org)"
                 >
                 <div
                   v-else
