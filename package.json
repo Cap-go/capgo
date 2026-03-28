@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.119.15",
+  "version": "12.119.19",
   "private": true,
   "license": "GPL-3.0",
   "scripts": {
@@ -228,6 +228,7 @@
     "@capacitor/core": "^8.2.0",
     "@capgo/cli": "7.76.4",
     "@cloudflare/workers-types": "4.20260303.0",
+    "@codspeed/vitest-plugin": "^5.2.0",
     "@formkit/core": "1.6.9",
     "@iconify/json": "^2.2.449",
     "@playwright/test": "1.57.0",

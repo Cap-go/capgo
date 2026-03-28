@@ -38,6 +38,19 @@ interface AppUsageByVersion {
   uninstall: number | null
 }
 
+interface AppMetricRow {
+  app_id: string
+  date: string
+  mau: number
+  storage: number
+  bandwidth: number
+  build_time_unit: number
+  get: number
+  fail: number
+  install: number
+  uninstall: number
+}
+
 // Helper to get authenticated supabase client based on auth type
 function getAuthenticatedSupabase(c: Context, auth: AuthInfo) {
   if (auth.authType === 'apikey' && auth.apikey) {
@@ -82,16 +95,38 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
     return { data: null, error: 'Invalid appId or ownerOrg' }
 
   let ownerOrgId = ownerOrg
-  if (appId) {
+  if (appId && !ownerOrgId) {
     const { data, error } = await supabase.from('apps').select('*').eq('app_id', appId).single()
     if (error)
       return { data: null, error }
     ownerOrgId = data.owner_org
   }
 
-  const { data: metrics, error: metricsError } = await supabase.rpc('get_app_metrics', { org_id: ownerOrgId!, start_date: dayjs(from).utc().format('YYYY-MM-DD'), end_date: dayjs(to).utc().format('YYYY-MM-DD') })
+  const startDate = dayjs(from).utc().format('YYYY-MM-DD')
+  const endDate = dayjs(to).utc().format('YYYY-MM-DD')
+
+  let rawMetrics: AppMetricRow[] | null
+  let metricsError: unknown
+
+  if (appId) {
+    ({ data: rawMetrics, error: metricsError } = await supabase.rpc('get_app_metrics' as any, {
+      p_org_id: ownerOrgId!,
+      p_app_id: appId,
+      p_start_date: startDate,
+      p_end_date: endDate,
+    }) as { data: AppMetricRow[] | null, error: unknown })
+  }
+  else {
+    ({ data: rawMetrics, error: metricsError } = await supabase.rpc('get_app_metrics', {
+      org_id: ownerOrgId!,
+      start_date: startDate,
+      end_date: endDate,
+    }))
+  }
+
   if (metricsError)
     return { data: null, error: metricsError }
+  const metrics = (rawMetrics ?? []) as AppMetricRow[]
   const graphDays = getDaysBetweenDates(from, to)
 
   const createUndefinedArray = (length: number) => {
@@ -531,7 +566,7 @@ app.get('/app/:app_id', async (c) => {
     await checkOrganizationAccess(c, app.owner_org, supabase)
   }
 
-  const { data: finalStats, error } = await getNormalStats(c, appId, null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt', false, body.noAccumulate ?? false)
+  const { data: finalStats, error } = await getNormalStats(c, appId, app?.owner_org ?? null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt', false, body.noAccumulate ?? false)
 
   if (error) {
     throw quickError(500, 'cannot_get_app_statistics', 'Cannot get app statistics', { error })
