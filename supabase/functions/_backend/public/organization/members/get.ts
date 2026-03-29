@@ -57,7 +57,7 @@ export async function get(c: Context<MiddlewareKeyVariables>, bodyRaw: any, apik
   // Use authenticated client for data queries - RLS will enforce access
   const { data, error } = await supabase
     .rpc('get_org_members', {
-      user_id: apikey.user_id,
+      user_id: effectiveApikey.user_id,
       guild_id: body.orgId,
     })
 
