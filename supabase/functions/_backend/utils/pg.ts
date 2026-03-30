@@ -1225,8 +1225,19 @@ export async function getAdminEmailTypeBreakdown(
   try {
     const pgClient = getPgClient(c, true)
     const drizzleClient = getDrizzleClient(pgClient)
-    const startDateOnly = start_date.split('T')[0]
-    const endDateOnly = end_date.split('T')[0]
+    const startTimestamp = new Date(start_date)
+    const endTimestamp = new Date(end_date)
+    const startDay = new Date(Date.UTC(startTimestamp.getUTCFullYear(), startTimestamp.getUTCMonth(), startTimestamp.getUTCDate()))
+    const endDay = new Date(Date.UTC(endTimestamp.getUTCFullYear(), endTimestamp.getUTCMonth(), endTimestamp.getUTCDate()))
+    const endIsExactUtcDayBoundary = endTimestamp.getTime() === endDay.getTime()
+    const seriesEndDay = new Date(endDay)
+    if (endIsExactUtcDayBoundary)
+      seriesEndDay.setUTCDate(seriesEndDay.getUTCDate() - 1)
+    const endExclusive = endIsExactUtcDayBoundary
+      ? endTimestamp
+      : new Date(endDay.getTime() + 24 * 60 * 60 * 1000)
+    const startDateOnly = startDay.toISOString().split('T')[0]
+    const endDateOnly = seriesEndDay.toISOString().split('T')[0]
 
     const personalDomainsSql = sql.join(PERSONAL_EMAIL_DOMAINS.map(domain => sql`${domain}`), sql`, `)
     const disposableDomainsSql = sql.join(DISPOSABLE_EMAIL_DOMAINS.map(domain => sql`${domain}`), sql`, `)
@@ -1240,8 +1251,8 @@ export async function getAdminEmailTypeBreakdown(
           (u.created_at AT TIME ZONE 'UTC')::date AS date,
           split_part(lower(trim(u.email)), '@', 2) AS domain
         FROM public.users u
-        WHERE u.created_at >= ${start_date}::timestamptz
-          AND u.created_at < ${end_date}::timestamptz
+        WHERE u.created_at >= ${startDay.toISOString()}::timestamptz
+          AND u.created_at < ${endExclusive.toISOString()}::timestamptz
           AND POSITION('@' IN u.email) > 0
       ),
       classified_users AS (
