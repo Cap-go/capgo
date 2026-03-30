@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { z } from 'zod/mini'
 import { trackBentoEvent } from '../utils/bento.ts'
+import { CacheHelper } from '../utils/cache.ts'
 import { BRES, createHono, middlewareAuth, parseBody, quickError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { checkPermission } from '../utils/rbac.ts'
@@ -13,6 +14,8 @@ const sendInviteSchema = z.object({
   email: z.email(),
   org_id: z.string().check(z.minLength(1)),
 })
+const INVITE_RESEND_COOLDOWN_MINUTES = 5
+const inviteNotificationCooldowns = new Map<string, number>()
 
 type AppContext = Context<MiddlewareKeyVariables, any, any>
 
@@ -25,6 +28,10 @@ function maskEmail(email: string) {
   if (!localPart)
     return `***@${domain}`
   return `${localPart[0]}***@${domain}`
+}
+
+function getInviteNotificationCooldownKey(orgId: string, userId: string) {
+  return `${orgId}:${userId}`
 }
 
 async function validateRequest(c: AppContext, rawBody: unknown) {
@@ -49,6 +56,7 @@ async function validateRequest(c: AppContext, rawBody: unknown) {
 
 app.post('/', middlewareAuth, async (c) => {
   const requestId = c.get('requestId')
+  const cooldownCache = new CacheHelper(c)
   const rawBody = await parseBody<unknown>(c)
   const validation = await validateRequest(c, rawBody)
 
@@ -151,6 +159,30 @@ app.post('/', middlewareAuth, async (c) => {
     })
   }
 
+  const inviteCooldownStorageKey = getInviteNotificationCooldownKey(body.org_id, invitedUser.id)
+  const inviteCooldownKey = cooldownCache.buildRequest('/private/send_existing_user_org_invite/cooldown', {
+    org_id: body.org_id,
+    user_id: invitedUser.id,
+  })
+  const now = Date.now()
+  const inMemoryCooldownUntil = inviteNotificationCooldowns.get(inviteCooldownStorageKey) ?? 0
+  if (inMemoryCooldownUntil <= now)
+    inviteNotificationCooldowns.delete(inviteCooldownStorageKey)
+  const cachedInviteNotification = await cooldownCache.matchJson<{ sentAt: string }>(inviteCooldownKey)
+  if (inMemoryCooldownUntil > now || cachedInviteNotification) {
+    cloudlog({
+      requestId,
+      context: 'send_existing_user_org_invite rate_limited',
+      orgId: body.org_id,
+      invitedUserId: invitedUser.id,
+      inviterId,
+    })
+    return quickError(409, 'user_already_invited', 'User already invited recently. Please wait before resending.', {
+      reason: 'invite_recently_sent',
+      cooldown_minutes: INVITE_RESEND_COOLDOWN_MINUTES,
+    })
+  }
+
   const inviterName = [inviter?.first_name, inviter?.last_name].filter(Boolean).join(' ').trim() || 'Capgo team'
   const invitedFirstName = invitedUser.first_name?.trim() || body.email.split('@')[0] || ''
   const invitedLastName = invitedUser.last_name?.trim() || ''
@@ -173,6 +205,16 @@ app.post('/', middlewareAuth, async (c) => {
   if (bentoEvent === false) {
     return quickError(500, 'failed_to_send_invite_email', 'Failed to send invitation email')
   }
+
+  inviteNotificationCooldowns.set(
+    inviteCooldownStorageKey,
+    now + INVITE_RESEND_COOLDOWN_MINUTES * 60 * 1000,
+  )
+  await cooldownCache.putJson(
+    inviteCooldownKey,
+    { sentAt: new Date().toISOString() },
+    INVITE_RESEND_COOLDOWN_MINUTES * 60,
+  )
 
   cloudlog({
     requestId,

@@ -1,11 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { getAuthHeaders, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, USER_EMAIL_NONMEMBER, USER_ID, USER_ID_NONMEMBER, USER_PASSWORD_NONMEMBER } from './test-utils.ts'
-
-const id = randomUUID()
-const testOrgId = randomUUID()
-const testCustomerId = `cus_existing_invite_${id}`
-const testOrgEmail = `existing-invite-${id}@capgo.app`
 
 let authHeaders: Record<string, string>
 let nonMemberAuthHeaders: Record<string, string>
@@ -18,12 +13,15 @@ async function postSendExistingUserOrgInvite(headers: Record<string, string>, bo
   })
 }
 
-beforeAll(async () => {
-  authHeaders = await getAuthHeaders()
-  nonMemberAuthHeaders = await getAuthHeadersForCredentials(USER_EMAIL_NONMEMBER, USER_PASSWORD_NONMEMBER)
+async function createInviteTestFixture() {
+  const id = randomUUID()
+  const orgId = randomUUID()
+  const customerId = `cus_existing_invite_${id}`
+  const orgEmail = `existing-invite-${id}@capgo.app`
+  const supabase = getSupabaseClient()
 
-  const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
-    customer_id: testCustomerId,
+  const { error: stripeError } = await supabase.from('stripe_info').insert({
+    customer_id: customerId,
     status: 'succeeded',
     product_id: 'prod_LQIregjtNduh4q',
     subscription_id: `sub_${id}`,
@@ -33,87 +31,115 @@ beforeAll(async () => {
   if (stripeError)
     throw stripeError
 
-  const { error: orgError } = await getSupabaseClient().from('orgs').insert({
-    id: testOrgId,
+  const { error: orgError } = await supabase.from('orgs').insert({
+    id: orgId,
     name: `Existing Invite Org ${id}`,
-    management_email: testOrgEmail,
+    management_email: orgEmail,
     created_by: USER_ID,
-    customer_id: testCustomerId,
+    customer_id: customerId,
     use_new_rbac: false,
   })
   if (orgError)
     throw orgError
 
-  const { error: orgUsersError } = await getSupabaseClient().from('org_users').insert([
+  const { error: orgUsersError } = await supabase.from('org_users').insert([
     {
-      org_id: testOrgId,
+      org_id: orgId,
       user_id: USER_ID,
       user_right: 'super_admin',
     },
     {
-      org_id: testOrgId,
+      org_id: orgId,
       user_id: USER_ID_NONMEMBER,
       user_right: 'invite_read',
     },
   ])
   if (orgUsersError)
     throw orgUsersError
-})
 
-afterAll(async () => {
-  await getSupabaseClient().from('org_users').delete().eq('org_id', testOrgId)
-  await getSupabaseClient().from('orgs').delete().eq('id', testOrgId)
-  await getSupabaseClient().from('stripe_info').delete().eq('customer_id', testCustomerId)
+  return {
+    id,
+    orgId,
+    supabase,
+    cleanup: async () => {
+      await supabase.from('org_users').delete().eq('org_id', orgId)
+      await supabase.from('orgs').delete().eq('id', orgId)
+      await supabase.from('stripe_info').delete().eq('customer_id', customerId)
+    },
+  }
+}
+
+beforeAll(async () => {
+  authHeaders = await getAuthHeaders()
+  nonMemberAuthHeaders = await getAuthHeadersForCredentials(USER_EMAIL_NONMEMBER, USER_PASSWORD_NONMEMBER)
 })
 
 describe('[POST] /private/send_existing_user_org_invite', () => {
-  it('returns ok for an existing user with a pending org invitation', async () => {
-    const response = await postSendExistingUserOrgInvite(authHeaders, {
-      email: USER_EMAIL_NONMEMBER,
-      org_id: testOrgId,
-    })
-
-    expect(response.status).toBe(200)
-    const data = await response.json() as { status: string }
-    expect(data.status).toBe('ok')
-  })
-
-  it('returns a validation error for an invalid email format', async () => {
-    const response = await postSendExistingUserOrgInvite(authHeaders, {
-      email: 'invalid-email',
-      org_id: testOrgId,
-    })
-
-    expect(response.status).toBe(400)
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('invalid_request')
-  })
-
-  it('returns not found when the target user does not exist', async () => {
-    const response = await postSendExistingUserOrgInvite(authHeaders, {
-      email: `missing-${id}@capgo.app`,
-      org_id: testOrgId,
-    })
-
-    expect(response.status).toBe(404)
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('user_not_found')
-  })
-
-  it('returns conflict when the invitation has already been accepted', async () => {
-    const supabase = getSupabaseClient()
-    const { error: updateError } = await supabase
-      .from('org_users')
-      .update({ user_right: 'read' })
-      .eq('org_id', testOrgId)
-      .eq('user_id', USER_ID_NONMEMBER)
-
-    expect(updateError).toBeNull()
-
+  it.concurrent('returns ok for an existing user with a pending org invitation', async () => {
+    const fixture = await createInviteTestFixture()
     try {
       const response = await postSendExistingUserOrgInvite(authHeaders, {
         email: USER_EMAIL_NONMEMBER,
-        org_id: testOrgId,
+        org_id: fixture.orgId,
+      })
+
+      expect(response.status).toBe(200)
+      const data = await response.json() as { status: string }
+      expect(data.status).toBe('ok')
+    }
+    finally {
+      await fixture.cleanup()
+    }
+  })
+
+  it.concurrent('returns a validation error for an invalid email format', async () => {
+    const fixture = await createInviteTestFixture()
+    try {
+      const response = await postSendExistingUserOrgInvite(authHeaders, {
+        email: 'invalid-email',
+        org_id: fixture.orgId,
+      })
+
+      expect(response.status).toBe(400)
+      const data = await response.json() as { error: string }
+      expect(data.error).toBe('invalid_request')
+    }
+    finally {
+      await fixture.cleanup()
+    }
+  })
+
+  it.concurrent('returns not found when the target user does not exist', async () => {
+    const fixture = await createInviteTestFixture()
+    try {
+      const response = await postSendExistingUserOrgInvite(authHeaders, {
+        email: `missing-${fixture.id}@capgo.app`,
+        org_id: fixture.orgId,
+      })
+
+      expect(response.status).toBe(404)
+      const data = await response.json() as { error: string }
+      expect(data.error).toBe('user_not_found')
+    }
+    finally {
+      await fixture.cleanup()
+    }
+  })
+
+  it.concurrent('returns conflict when the invitation has already been accepted', async () => {
+    const fixture = await createInviteTestFixture()
+    try {
+      const { error: updateError } = await fixture.supabase
+        .from('org_users')
+        .update({ user_right: 'read' })
+        .eq('org_id', fixture.orgId)
+        .eq('user_id', USER_ID_NONMEMBER)
+
+      expect(updateError).toBeNull()
+
+      const response = await postSendExistingUserOrgInvite(authHeaders, {
+        email: USER_EMAIL_NONMEMBER,
+        org_id: fixture.orgId,
       })
 
       expect(response.status).toBe(409)
@@ -121,24 +147,24 @@ describe('[POST] /private/send_existing_user_org_invite', () => {
       expect(data.error).toBe('invite_already_accepted')
     }
     finally {
-      const { error: resetError } = await supabase
-        .from('org_users')
-        .update({ user_right: 'invite_read' })
-        .eq('org_id', testOrgId)
-        .eq('user_id', USER_ID_NONMEMBER)
-
-      expect(resetError).toBeNull()
+      await fixture.cleanup()
     }
   })
 
-  it('returns forbidden when the caller cannot invite users', async () => {
-    const response = await postSendExistingUserOrgInvite(nonMemberAuthHeaders, {
-      email: USER_EMAIL_NONMEMBER,
-      org_id: testOrgId,
-    })
+  it.concurrent('returns forbidden when the caller cannot invite users', async () => {
+    const fixture = await createInviteTestFixture()
+    try {
+      const response = await postSendExistingUserOrgInvite(nonMemberAuthHeaders, {
+        email: USER_EMAIL_NONMEMBER,
+        org_id: fixture.orgId,
+      })
 
-    expect(response.status).toBe(403)
-    const data = await response.json() as { error: string }
-    expect(data.error).toBe('not_authorized')
+      expect(response.status).toBe(403)
+      const data = await response.json() as { error: string }
+      expect(data.error).toBe('not_authorized')
+    }
+    finally {
+      await fixture.cleanup()
+    }
   })
 })
