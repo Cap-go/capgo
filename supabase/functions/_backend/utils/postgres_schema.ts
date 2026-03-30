@@ -151,6 +151,7 @@ export const users = pgTable('users', {
 export const stripe_info = pgTable('stripe_info', {
   id: bigint('id', { mode: 'number' }).primaryKey().notNull(),
   customer_id: text('customer_id'),
+  customer_country: varchar('customer_country', { length: 2 }),
   product_id: varchar('product_id'),
   status: text('status'),
   trial_at: text('trial_at'),

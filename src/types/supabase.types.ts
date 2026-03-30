@@ -2090,6 +2090,7 @@ export type Database = {
           canceled_at: string | null
           created_at: string
           customer_id: string
+          customer_country: string | null
           id: number
           is_good_plan: boolean | null
           mau_exceeded: boolean | null
@@ -2113,6 +2114,7 @@ export type Database = {
           canceled_at?: string | null
           created_at?: string
           customer_id: string
+          customer_country?: string | null
           id?: number
           is_good_plan?: boolean | null
           mau_exceeded?: boolean | null
@@ -2136,6 +2138,7 @@ export type Database = {
           canceled_at?: string | null
           created_at?: string
           customer_id?: string
+          customer_country?: string | null
           id?: number
           is_good_plan?: boolean | null
           mau_exceeded?: boolean | null
@@ -4604,4 +4607,3 @@ export const Constants = {
     },
   },
 } as const
-
