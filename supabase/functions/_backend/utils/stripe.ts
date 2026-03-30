@@ -291,13 +291,13 @@ export async function getStripeCustomerCountry(c: Context, customerId: string | 
   }
 }
 
-export async function syncStripeCustomerCountry(c: Context, customerId: string | null | undefined) {
+export async function syncStripeCustomerCountry(c: Context, customerId: string | null | undefined): Promise<string | null | undefined> {
   if (!customerId || !isStripeConfigured(c))
-    return null
+    return undefined
 
   const customerCountry = await getStripeCustomerCountry(c, customerId)
   if (customerCountry === undefined)
-    return null
+    return undefined
 
   const { data, error } = await supabaseAdmin(c)
     .from('stripe_info')
