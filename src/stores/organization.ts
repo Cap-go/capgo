@@ -402,8 +402,8 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     const organization = selectableOrganizations[0]
     if (!organization) {
-      // Clear visible organizations because none are selectable.
-      _organizations.value = new Map()
+      // Keep invitation-only organizations available so invite deep links
+      // can still open the accept-invite dialog before the user joins.
       currentOrganization.value = undefined
       currentRole.value = null
       currentOrganizationFailed.value = false

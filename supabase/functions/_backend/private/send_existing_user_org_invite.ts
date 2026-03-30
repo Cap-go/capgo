@@ -1,26 +1,36 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import { Hono } from 'hono/tiny'
 import { z } from 'zod/mini'
 import { trackBentoEvent } from '../utils/bento.ts'
-import { BRES, middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { BRES, createHono, middlewareAuth, parseBody, quickError, useCors } from '../utils/hono.ts'
+import { cloudlog } from '../utils/logging.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
+import { version } from '../utils/version.ts'
 
 const sendInviteSchema = z.object({
   email: z.email(),
   org_id: z.string().check(z.minLength(1)),
 })
 
-export const app = new Hono<MiddlewareKeyVariables>()
+type AppContext = Context<MiddlewareKeyVariables, any, any>
+
+export const app = createHono('', version)
 
 app.use('/', useCors)
 
-async function validateRequest(c: Context, rawBody: unknown) {
+function maskEmail(email: string) {
+  const [localPart, domain = ''] = email.trim().toLowerCase().split('@')
+  if (!localPart)
+    return `***@${domain}`
+  return `${localPart[0]}***@${domain}`
+}
+
+async function validateRequest(c: AppContext, rawBody: unknown) {
   const validationResult = sendInviteSchema.safeParse(rawBody)
   if (!validationResult.success) {
-    throw simpleError('invalid_request', 'Invalid request', { errors: z.prettifyError(validationResult.error) })
+    quickError(400, 'invalid_request', 'Invalid request', { errors: z.prettifyError(validationResult.error) })
   }
 
   const body = validationResult.data
@@ -28,7 +38,7 @@ async function validateRequest(c: Context, rawBody: unknown) {
   const canUpdateUserRoles = await checkPermission(c, 'org.update_user_roles', { orgId: body.org_id })
 
   if (!canInviteUser && !canUpdateUserRoles) {
-    return quickError(403, 'not_authorized', 'Not authorized', {
+    quickError(403, 'not_authorized', 'Not authorized', {
       requiredPermission: 'org.invite_user',
       orgId: body.org_id,
     })
@@ -38,21 +48,32 @@ async function validateRequest(c: Context, rawBody: unknown) {
 }
 
 app.post('/', middlewareAuth, async (c) => {
+  const requestId = c.get('requestId')
   const rawBody = await parseBody<unknown>(c)
   const validation = await validateRequest(c, rawBody)
-
-  if (validation instanceof Response)
-    return validation
 
   const { body, canUpdateUserRoles } = validation
   const authContext = c.get('auth')
   const inviterId = authContext?.userId
   if (!inviterId) {
+    cloudlog({ requestId, context: 'send_existing_user_org_invite unauthorized_inviter' })
     return quickError(401, 'not_authorized', 'Not authorized')
   }
 
+  cloudlog({
+    requestId,
+    context: 'send_existing_user_org_invite validated body',
+    inviterId,
+    canUpdateUserRoles,
+    body: {
+      email: maskEmail(body.email),
+      org_id: body.org_id,
+    },
+  })
+
   const supabaseAdminClient = supabaseAdmin(c)
 
+  cloudlog({ requestId, context: 'send_existing_user_org_invite fetch organization', orgId: body.org_id })
   const { data: org, error: orgError } = await supabaseAdminClient
     .from('orgs')
     .select('id, name')
@@ -67,6 +88,7 @@ app.post('/', middlewareAuth, async (c) => {
     return quickError(404, 'organization_not_found', 'Organization not found')
   }
 
+  cloudlog({ requestId, context: 'send_existing_user_org_invite fetch inviter', inviterId, orgId: body.org_id })
   const { data: inviter, error: inviterError } = await supabaseAdminClient
     .from('users')
     .select('id, first_name, last_name')
@@ -77,6 +99,12 @@ app.post('/', middlewareAuth, async (c) => {
     return quickError(500, 'failed_to_invite_user', 'Failed to fetch inviter', { error: inviterError.message })
   }
 
+  cloudlog({
+    requestId,
+    context: 'send_existing_user_org_invite fetch invited user',
+    orgId: body.org_id,
+    invitedEmail: maskEmail(body.email),
+  })
   const { data: invitedUser, error: invitedUserError } = await supabaseAdminClient
     .from('users')
     .select('id, email, first_name, last_name')
@@ -91,6 +119,12 @@ app.post('/', middlewareAuth, async (c) => {
     return quickError(404, 'user_not_found', 'User not found')
   }
 
+  cloudlog({
+    requestId,
+    context: 'send_existing_user_org_invite fetch membership',
+    orgId: body.org_id,
+    invitedUserId: invitedUser.id,
+  })
   const { data: membership, error: membershipError } = await supabaseAdminClient
     .from('org_users')
     .select('id, user_right')
@@ -121,6 +155,13 @@ app.post('/', middlewareAuth, async (c) => {
   const invitedFirstName = invitedUser.first_name?.trim() || body.email.split('@')[0] || ''
   const invitedLastName = invitedUser.last_name?.trim() || ''
 
+  cloudlog({
+    requestId,
+    context: 'send_existing_user_org_invite track bento event',
+    orgId: body.org_id,
+    invitedUserId: invitedUser.id,
+    inviterId,
+  })
   const bentoEvent = await trackBentoEvent(c, invitedUser.email, {
     org_admin_name: inviterName,
     org_name: org.name,
@@ -133,5 +174,12 @@ app.post('/', middlewareAuth, async (c) => {
     return quickError(500, 'failed_to_send_invite_email', 'Failed to send invitation email')
   }
 
+  cloudlog({
+    requestId,
+    context: 'send_existing_user_org_invite success',
+    orgId: body.org_id,
+    invitedUserId: invitedUser.id,
+    inviterId,
+  })
   return c.json(BRES)
 })

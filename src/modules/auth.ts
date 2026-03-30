@@ -96,7 +96,8 @@ async function guard(
   const hasAuth = !!claimsData?.claims?.sub && !!sessionUser
   const hadAuth = !!main.auth
   const needsVerifiedEmail = to.path.startsWith('/settings') || to.path === '/delete_account'
-  const shouldRedirectToOrgOnboarding = !to.path.startsWith('/onboarding/organization')
+  const hasInviteOrgQuery = typeof to.query.invite_org === 'string' && to.query.invite_org.length > 0
+  const shouldRedirectToOrgOnboarding = !to.path.startsWith('/onboarding/organization') && !hasInviteOrgQuery
   const isAdminRoute = to.path.startsWith('/admin')
 
   async function tryLoadOrganizations(fetcher: () => Promise<void>) {
@@ -238,7 +239,7 @@ async function guard(
           path: '/resend_email',
           query: {
             reason: 'email_not_verified',
-            return_to: to.path,
+            return_to: to.fullPath,
           },
         })
       }

@@ -12,6 +12,8 @@ import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
+type OrganizationInvitationTarget = Pick<Organization, 'gid' | 'name' | 'role'>
+
 const router = useRouter()
 const route = useRoute()
 const organizationStore = useOrganizationStore()
@@ -70,7 +72,7 @@ onUnmounted(() => {
   organizationLogoRefreshInterval = null
 })
 
-async function handleOrganizationInvitation(org: Organization) {
+async function handleOrganizationInvitation(org: OrganizationInvitationTarget) {
   const newName = t('alert-accept-invitation').replace('%ORG%', org.name)
   dialogStore.openDialog({
     title: t('alert-confirm-invite'),
@@ -140,6 +142,7 @@ async function clearInviteOrgQuery() {
   const nextQuery = { ...route.query }
   delete nextQuery.invite_org
   await router.replace({ query: nextQuery })
+  handledInviteOrgId.value = null
 }
 
 async function openInvitationFromRouteIfNeeded() {
@@ -298,7 +301,9 @@ function onOrgItemKeydown(org: Organization, e: KeyboardEvent) {
 
 watch(
   () => route.query.invite_org,
-  () => {
+  (inviteOrg) => {
+    if (typeof inviteOrg !== 'string' || !inviteOrg)
+      handledInviteOrgId.value = null
     void openInvitationFromRouteIfNeeded()
   },
   { immediate: true },
