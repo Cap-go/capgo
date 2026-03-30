@@ -1236,15 +1236,17 @@ export async function getAdminEmailTypeBreakdown(
     const endExclusive = endIsExactUtcDayBoundary
       ? endTimestamp
       : new Date(endDay.getTime() + 24 * 60 * 60 * 1000)
-    const startDateOnly = startDay.toISOString().split('T')[0]
-    const endDateOnly = seriesEndDay.toISOString().split('T')[0]
 
     const personalDomainsSql = sql.join(PERSONAL_EMAIL_DOMAINS.map(domain => sql`${domain}`), sql`, `)
     const disposableDomainsSql = sql.join(DISPOSABLE_EMAIL_DOMAINS.map(domain => sql`${domain}`), sql`, `)
 
     const query = sql`
       WITH date_series AS (
-        SELECT generate_series(${startDateOnly}::date, (${endDateOnly}::date - interval '1 day')::date, interval '1 day')::date AS date
+        SELECT generate_series(
+          ${startDay.toISOString()}::timestamptz::date,
+          ${seriesEndDay.toISOString()}::timestamptz::date,
+          interval '1 day'
+        )::date AS date
       ),
       normalized_users AS (
         SELECT
