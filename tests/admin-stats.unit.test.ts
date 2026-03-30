@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { MAX_ADMIN_STATS_LIMIT, MAX_ADMIN_STATS_OFFSET, adminStatsBodySchema } from '../supabase/functions/_backend/private/admin_stats.ts'
+import { adminStatsBodySchema, MAX_ADMIN_STATS_LIMIT, MAX_ADMIN_STATS_OFFSET } from '../supabase/functions/_backend/private/admin_stats.ts'
 import { normalizeAnalyticsLimit } from '../supabase/functions/_backend/utils/cloudflare.ts'
 
 describe('admin stats validation', () => {
   const baseBody = {
     metric_category: 'org_metrics',
-    start_date: '2025-01-01',
-    end_date: '2025-01-31',
+    start_date: '2025-01-01T00:00:00.000Z',
+    end_date: '2025-01-31T00:00:00.000Z',
   }
 
   it.each([
@@ -37,6 +37,20 @@ describe('admin stats validation', () => {
 
     expect(parsed.data.limit).toBe(250)
     expect(parsed.data.offset).toBe(10)
+  })
+
+  it.each([
+    ['plain date start', { start_date: '2025-01-01' }],
+    ['plain date end', { end_date: '2025-01-31' }],
+    ['offset datetime start', { start_date: '2025-01-01T01:00:00+01:00' }],
+    ['offset datetime end', { end_date: '2025-01-31T01:00:00+01:00' }],
+  ])('rejects non-UTC ISO datetimes for %s', (_label, body) => {
+    const parsed = adminStatsBodySchema.safeParse({
+      ...baseBody,
+      ...body,
+    })
+
+    expect(parsed.success).toBe(false)
   })
 })
 

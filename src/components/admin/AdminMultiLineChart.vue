@@ -12,6 +12,7 @@ import {
   PointElement,
   Tooltip,
 } from 'chart.js'
+import dayjs from 'dayjs'
 import { computed } from 'vue'
 import { Line } from 'vue-chartjs'
 import { formatLocalDate } from '~/services/date'
@@ -31,12 +32,33 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  dateGranularity: {
+    type: String as () => 'day' | 'month',
+    default: 'day',
+  },
+  valuePrefix: {
+    type: String,
+    default: '',
+  },
+  valueSuffix: {
+    type: String,
+    default: '',
+  },
 })
 
 const isDark = useDark()
 
 function formatChartDate(date: string) {
+  if (props.dateGranularity === 'month') {
+    const parsed = dayjs(date)
+    if (parsed.isValid())
+      return parsed.format('MMM YYYY')
+  }
   return formatLocalDate(date) || date
+}
+
+function formatChartValue(value: number) {
+  return `${props.valuePrefix}${value.toLocaleString(undefined, { maximumFractionDigits: 2 })}${props.valueSuffix}`
 }
 
 Chart.register(
@@ -116,7 +138,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
       callbacks: {
         label: (context) => {
           const label = context.dataset.label || ''
-          const value = context.parsed.y?.toLocaleString() || '0'
+          const value = formatChartValue(Number(context.parsed.y ?? 0))
           return `${label}: ${value}`
         },
       },
@@ -144,7 +166,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
         color: isDark.value ? '#9ca3af' : '#6b7280',
         callback: (value) => {
           if (typeof value === 'number')
-            return value.toLocaleString()
+            return formatChartValue(value)
           return value
         },
       },
