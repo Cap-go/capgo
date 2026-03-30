@@ -41,18 +41,24 @@ import { app as organization } from '../../supabase/functions/_backend/public/or
 import { app as replication } from '../../supabase/functions/_backend/public/replication.ts'
 import { app as statistics } from '../../supabase/functions/_backend/public/statistics/index.ts'
 import { app as webhooks } from '../../supabase/functions/_backend/public/webhooks/index.ts'
+import { app as credit_usage_alerts } from '../../supabase/functions/_backend/triggers/credit_usage_alerts.ts'
 import { app as cron_clean_orphan_images } from '../../supabase/functions/_backend/triggers/cron_clean_orphan_images.ts'
 import { app as cron_clear_versions } from '../../supabase/functions/_backend/triggers/cron_clear_versions.ts'
 import { app as cron_email } from '../../supabase/functions/_backend/triggers/cron_email.ts'
+import { app as cron_reconcile_build_status } from '../../supabase/functions/_backend/triggers/cron_reconcile_build_status.ts'
 import { app as cron_stat_app } from '../../supabase/functions/_backend/triggers/cron_stat_app.ts'
 import { app as cron_stat_org } from '../../supabase/functions/_backend/triggers/cron_stat_org.ts'
 import { app as cron_sync_sub } from '../../supabase/functions/_backend/triggers/cron_sync_sub.ts'
 import { app as logsnag_insights } from '../../supabase/functions/_backend/triggers/logsnag_insights.ts'
 import { app as on_app_create } from '../../supabase/functions/_backend/triggers/on_app_create.ts'
+import { app as on_app_delete } from '../../supabase/functions/_backend/triggers/on_app_delete.ts'
+import { app as on_app_update } from '../../supabase/functions/_backend/triggers/on_app_update.ts'
 import { app as on_channel_update } from '../../supabase/functions/_backend/triggers/on_channel_update.ts'
 import { app as on_deploy_history_create } from '../../supabase/functions/_backend/triggers/on_deploy_history_create.ts'
 import { app as on_manifest_create } from '../../supabase/functions/_backend/triggers/on_manifest_create.ts'
+import { app as on_org_update } from '../../supabase/functions/_backend/triggers/on_org_update.ts'
 import { app as on_organization_create } from '../../supabase/functions/_backend/triggers/on_organization_create.ts'
+import { app as on_organization_delete } from '../../supabase/functions/_backend/triggers/on_organization_delete.ts'
 import { app as on_user_create } from '../../supabase/functions/_backend/triggers/on_user_create.ts'
 import { app as on_user_delete } from '../../supabase/functions/_backend/triggers/on_user_delete.ts'
 import { app as on_user_update } from '../../supabase/functions/_backend/triggers/on_user_update.ts'
@@ -61,6 +67,8 @@ import { app as on_version_delete } from '../../supabase/functions/_backend/trig
 import { app as on_version_update } from '../../supabase/functions/_backend/triggers/on_version_update.ts'
 import { app as queue_consumer } from '../../supabase/functions/_backend/triggers/queue_consumer.ts'
 import { app as stripe_event } from '../../supabase/functions/_backend/triggers/stripe_event.ts'
+import { app as webhook_delivery } from '../../supabase/functions/_backend/triggers/webhook_delivery.ts'
+import { app as webhook_dispatcher } from '../../supabase/functions/_backend/triggers/webhook_dispatcher.ts'
 import { createAllCatch, createHono } from '../../supabase/functions/_backend/utils/hono.ts'
 import { version } from '../../supabase/functions/_backend/utils/version.ts'
 
@@ -122,9 +130,15 @@ appTriggers.route('/ok', ok)
 appTriggers.route('/cron_email', cron_email)
 appTriggers.route('/cron_clear_versions', cron_clear_versions)
 appTriggers.route('/cron_clean_orphan_images', cron_clean_orphan_images)
+appTriggers.route('/cron_reconcile_build_status', cron_reconcile_build_status)
+appTriggers.route('/credit_usage_alerts', credit_usage_alerts)
 appTriggers.route('/logsnag_insights', logsnag_insights)
 appTriggers.route('/on_channel_update', on_channel_update)
 appTriggers.route('/on_app_create', on_app_create)
+appTriggers.route('/on_app_delete', on_app_delete)
+appTriggers.route('/on_app_update', on_app_update)
+appTriggers.route('/on_org_update', on_org_update)
+appTriggers.route('/on_organization_delete', on_organization_delete)
 appTriggers.route('/on_user_create', on_user_create)
 appTriggers.route('/on_user_update', on_user_update)
 appTriggers.route('/on_user_delete', on_user_delete)
@@ -139,6 +153,8 @@ appTriggers.route('/cron_stat_app', cron_stat_app)
 appTriggers.route('/cron_stat_org', cron_stat_org)
 appTriggers.route('/cron_sync_sub', cron_sync_sub)
 appTriggers.route('/queue_consumer', queue_consumer)
+appTriggers.route('/webhook_delivery', webhook_delivery)
+appTriggers.route('/webhook_dispatcher', webhook_dispatcher)
 
 app.route('/triggers', appTriggers)
 app.route('/private', appPrivate)
