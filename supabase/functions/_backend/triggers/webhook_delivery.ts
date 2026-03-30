@@ -42,8 +42,12 @@ app.post('/', middlewareAPISecret, async (c) => {
   try {
     const body = await c.req.json()
 
-    // Extract delivery data from the queue message
-    const deliveryData: DeliveryMessage = body.payload || body
+    // queue_consumer posts the queue payload directly, while direct trigger calls may
+    // still send the full pgmq envelope. Only unwrap when the delivery envelope is
+    // not already present on the body.
+    const deliveryData: DeliveryMessage = body?.delivery_id && body?.webhook_id && body?.url
+      ? body
+      : (body.payload || body)
 
     cloudlog({
       requestId: c.get('requestId'),

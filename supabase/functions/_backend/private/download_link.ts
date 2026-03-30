@@ -60,7 +60,7 @@ app.post('/', middlewareAuth, async (c) => {
     const { data: manifest, error: getManifestError } = await supabase
       .from('manifest')
       .select('*')
-      .eq('app_version_id', body.id)
+      .eq('app_version_id', bundle.id)
 
     if (getManifestError) {
       throw simpleError('cannot_get_manifest', 'Cannot get manifest', { getManifestError })
