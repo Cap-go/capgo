@@ -264,6 +264,55 @@ export function updateCustomerEmail(c: Context, customerId: string, newEmail: st
   )
 }
 
+export function normalizeStripeCountryCode(country: string | null | undefined): string | null {
+  if (!country)
+    return null
+
+  const normalized = country.trim().toUpperCase()
+  if (!normalized)
+    return null
+
+  return normalized.slice(0, 2)
+}
+
+export async function getStripeCustomerCountry(c: Context, customerId: string | null | undefined): Promise<string | null> {
+  if (!customerId || !isStripeConfigured(c))
+    return null
+
+  try {
+    const customer = await getStripe(c).customers.retrieve(customerId)
+    if (customer.deleted)
+      return null
+    return normalizeStripeCountryCode(customer.address?.country ?? null)
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getStripeCustomerCountry', customerId, error })
+    return null
+  }
+}
+
+export async function syncStripeCustomerCountry(c: Context, customerId: string | null | undefined) {
+  if (!customerId)
+    return null
+
+  const customerCountry = await getStripeCustomerCountry(c, customerId)
+
+  const { data, error } = await supabaseAdmin(c)
+    .from('stripe_info')
+    .update({ customer_country: customerCountry })
+    .eq('customer_id', customerId)
+    .select('customer_id')
+
+  if (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'syncStripeCustomerCountry', customerId, error })
+  }
+  else if (!data?.length) {
+    cloudlog({ requestId: c.get('requestId'), message: 'syncStripeCustomerCountry no stripe_info row matched', customerId, customerCountry })
+  }
+
+  return customerCountry
+}
+
 export async function cancelSubscription(c: Context, customerId: string) {
   if (!isStripeConfigured(c))
     return Promise.resolve()

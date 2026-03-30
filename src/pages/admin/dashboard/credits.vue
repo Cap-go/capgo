@@ -12,9 +12,13 @@ import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import MagnifyingGlassIcon from '~icons/heroicons/magnifying-glass'
 import XMarkIcon from '~icons/heroicons/x-mark'
+import AdminFilterBar from '~/components/admin/AdminFilterBar.vue'
+import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
+import ChartCard from '~/components/dashboard/ChartCard.vue'
 import Spinner from '~/components/Spinner.vue'
 import { formatLocalDateTime } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
+import { useAdminDashboardStore } from '~/stores/adminDashboard'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 
@@ -49,10 +53,18 @@ interface AdminGrant {
   }
 }
 
+interface GlobalStatsTrendRow {
+  date: string
+  mrr: number
+  credits_bought: number
+  credits_consumed: number
+}
+
 const { t } = useI18n()
 const router = useRouter()
 const mainStore = useMainStore()
 const displayStore = useDisplayStore()
+const adminStore = useAdminDashboardStore()
 const supabase = useSupabase()
 
 const searchQuery = ref('')
@@ -79,6 +91,8 @@ const expiresInMonths = computed(() => {
 
 const recentGrants = ref<AdminGrant[]>([])
 const isLoadingGrants = ref(false)
+const globalStatsTrendData = ref<GlobalStatsTrendRow[]>([])
+const isLoadingCreditAnalytics = ref(false)
 
 let searchDebounce: ReturnType<typeof setTimeout> | null = null
 let currentSearchQuery = '' // Track current query to avoid race conditions
@@ -92,6 +106,117 @@ function getExpiresAt() {
 function formatCredits(value: number) {
   return new Intl.NumberFormat(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
 }
+
+function toMonthKey(date: string) {
+  return dayjs(date).startOf('month').format('YYYY-MM-01')
+}
+
+async function loadCreditAnalytics() {
+  isLoadingCreditAnalytics.value = true
+
+  try {
+    const data = await adminStore.fetchStats('global_stats_trend')
+    globalStatsTrendData.value = (data || []) as GlobalStatsTrendRow[]
+  }
+  catch (error) {
+    console.error('Credit analytics load error:', error)
+    globalStatsTrendData.value = []
+    toast.error('Failed to load credit analytics')
+  }
+  finally {
+    isLoadingCreditAnalytics.value = false
+  }
+}
+
+const monthlyCreditSummary = computed(() => {
+  const monthlyBuckets = new Map<string, {
+    date: string
+    creditsBought: number
+    creditsConsumed: number
+    monthEndMrr: number
+  }>()
+
+  for (const row of globalStatsTrendData.value) {
+    const monthKey = toMonthKey(row.date)
+    const current = monthlyBuckets.get(monthKey) ?? {
+      date: monthKey,
+      creditsBought: 0,
+      creditsConsumed: 0,
+      monthEndMrr: 0,
+    }
+
+    current.creditsBought += Number(row.credits_bought || 0)
+    current.creditsConsumed += Number(row.credits_consumed || 0)
+    current.monthEndMrr = Number(row.mrr || 0)
+    monthlyBuckets.set(monthKey, current)
+  }
+
+  return Array.from(monthlyBuckets.values())
+})
+
+const dailyCreditsSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Credits Bought',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: Number(item.credits_bought || 0),
+      })),
+      color: '#119eff',
+    },
+    {
+      label: 'Credits Used',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: Number(item.credits_consumed || 0),
+      })),
+      color: '#ef4444',
+    },
+  ]
+})
+
+const monthlyCreditsSeries = computed(() => {
+  if (monthlyCreditSummary.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Credits Bought',
+      data: monthlyCreditSummary.value.map(item => ({
+        date: item.date,
+        value: item.creditsBought,
+      })),
+      color: '#119eff',
+    },
+    {
+      label: 'Credits Used',
+      data: monthlyCreditSummary.value.map(item => ({
+        date: item.date,
+        value: item.creditsConsumed,
+      })),
+      color: '#ef4444',
+    },
+  ]
+})
+
+const monthlyRevenueWithCreditsSeries = computed(() => {
+  if (monthlyCreditSummary.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Revenue (MRR + credit sales)',
+      data: monthlyCreditSummary.value.map(item => ({
+        date: item.date,
+        value: item.monthEndMrr + item.creditsBought,
+      })),
+      color: '#10b981',
+    },
+  ]
+})
 
 async function searchOrgs(query: string) {
   if (query.length < 2) {
@@ -266,6 +391,14 @@ async function loadRecentGrants() {
 
 watch(searchQuery, handleSearchInput)
 
+watch(() => adminStore.activeDateRange, () => {
+  loadCreditAnalytics()
+}, { deep: true })
+
+watch(() => adminStore.refreshTrigger, () => {
+  loadCreditAnalytics()
+})
+
 onUnmounted(() => {
   if (searchDebounce) {
     clearTimeout(searchDebounce)
@@ -281,7 +414,11 @@ onMounted(async () => {
   }
 
   displayStore.NavTitle = t('admin-credits')
-  await loadRecentGrants()
+  displayStore.defaultBack = '/dashboard'
+  await Promise.all([
+    loadRecentGrants(),
+    loadCreditAnalytics(),
+  ])
 })
 </script>
 
@@ -297,6 +434,58 @@ onMounted(async () => {
           <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {{ t('admin-credits-description') }}
           </p>
+        </div>
+
+        <div class="space-y-4">
+          <div class="flex flex-col gap-2">
+            <div>
+              <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+                Credits Analytics
+              </h2>
+              <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                Daily and monthly credit sales and usage. Monthly revenue combines month-end MRR with credit sales at 1 credit = $1.
+              </p>
+            </div>
+            <AdminFilterBar />
+          </div>
+
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <ChartCard
+              title="Credits by Day"
+              :is-loading="isLoadingCreditAnalytics"
+              :has-data="dailyCreditsSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="dailyCreditsSeries"
+                :is-loading="isLoadingCreditAnalytics"
+              />
+            </ChartCard>
+
+            <ChartCard
+              title="Credits by Month"
+              :is-loading="isLoadingCreditAnalytics"
+              :has-data="monthlyCreditsSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="monthlyCreditsSeries"
+                :is-loading="isLoadingCreditAnalytics"
+                date-granularity="month"
+              />
+            </ChartCard>
+          </div>
+
+          <ChartCard
+            title="Revenue by Month (MRR + Credit Sales)"
+            :is-loading="isLoadingCreditAnalytics"
+            :has-data="monthlyRevenueWithCreditsSeries.length > 0"
+          >
+            <AdminMultiLineChart
+              :series="monthlyRevenueWithCreditsSeries"
+              :is-loading="isLoadingCreditAnalytics"
+              date-granularity="month"
+              value-prefix="$"
+            />
+          </ChartCard>
         </div>
 
         <!-- Grant Form Card -->

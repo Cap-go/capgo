@@ -6,6 +6,7 @@ import { getRuntimeKey } from 'hono/adapter'
 // @ts-types="npm:@types/pg"
 import { Pool } from 'pg'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
+import { DISPOSABLE_EMAIL_DOMAINS, PERSONAL_EMAIL_DOMAINS } from './emailClassification.ts'
 import { getClientDbRegionSB } from './geolocation.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import * as schema from './postgres_schema.ts'
@@ -989,6 +990,8 @@ export interface AdminGlobalStatsTrend {
   revenue_maker: number
   revenue_team: number
   revenue_enterprise: number
+  credits_bought: number
+  credits_consumed: number
   builds_total: number
   builds_ios: number
   builds_android: number
@@ -1063,6 +1066,8 @@ export async function getAdminGlobalStatsTrend(
         revenue_maker::float,
         revenue_team::float,
         revenue_enterprise::float,
+        COALESCE(credits_bought, 0)::float AS credits_bought,
+        COALESCE(credits_consumed, 0)::float AS credits_consumed,
         COALESCE(builds_total, 0)::int AS builds_total,
         COALESCE(builds_ios, 0)::int AS builds_ios,
         COALESCE(builds_android, 0)::int AS builds_android,
@@ -1153,6 +1158,8 @@ export async function getAdminGlobalStatsTrend(
       revenue_maker: Number(row.revenue_maker) || 0,
       revenue_team: Number(row.revenue_team) || 0,
       revenue_enterprise: Number(row.revenue_enterprise) || 0,
+      credits_bought: Number(row.credits_bought) || 0,
+      credits_consumed: Number(row.credits_consumed) || 0,
       builds_total: Number(row.builds_total) || 0,
       builds_ios: Number(row.builds_ios) || 0,
       builds_android: Number(row.builds_android) || 0,
@@ -1181,6 +1188,130 @@ export async function getAdminGlobalStatsTrend(
   catch (e: unknown) {
     logPgError(c, 'getAdminGlobalStatsTrend', e)
     return []
+  }
+}
+
+export interface AdminEmailTypeBreakdown {
+  totals: {
+    professional: number
+    personal: number
+    disposable: number
+    total: number
+  }
+  trend: Array<{
+    date: string
+    professional: number
+    personal: number
+    disposable: number
+    total: number
+  }>
+}
+
+export async function getAdminEmailTypeBreakdown(
+  c: Context,
+  start_date: string,
+  end_date: string,
+): Promise<AdminEmailTypeBreakdown> {
+  const emptyResult: AdminEmailTypeBreakdown = {
+    totals: {
+      professional: 0,
+      personal: 0,
+      disposable: 0,
+      total: 0,
+    },
+    trend: [],
+  }
+
+  try {
+    const pgClient = getPgClient(c, true)
+    const drizzleClient = getDrizzleClient(pgClient)
+    const startDateOnly = start_date.split('T')[0]
+    const endDateOnly = end_date.split('T')[0]
+
+    const personalDomainsSql = sql.join(PERSONAL_EMAIL_DOMAINS.map(domain => sql`${domain}`), sql`, `)
+    const disposableDomainsSql = sql.join(DISPOSABLE_EMAIL_DOMAINS.map(domain => sql`${domain}`), sql`, `)
+
+    const query = sql`
+      WITH date_series AS (
+        SELECT generate_series(${startDateOnly}::date, ${endDateOnly}::date, interval '1 day')::date AS date
+      ),
+      normalized_users AS (
+        SELECT
+          (u.created_at AT TIME ZONE 'UTC')::date AS date,
+          split_part(lower(trim(u.email)), '@', 2) AS domain
+        FROM public.users u
+        WHERE u.created_at >= ${start_date}::timestamptz
+          AND u.created_at <= ${end_date}::timestamptz
+          AND POSITION('@' IN u.email) > 0
+      ),
+      classified_users AS (
+        SELECT
+          nu.date,
+          CASE
+            WHEN nu.domain IN (${disposableDomainsSql}) THEN 'disposable'
+            WHEN nu.domain IN (${personalDomainsSql}) THEN 'personal'
+            ELSE 'professional'
+          END AS email_type
+        FROM normalized_users nu
+      ),
+      daily_counts AS (
+        SELECT
+          ds.date,
+          COUNT(*) FILTER (WHERE cu.email_type = 'professional')::int AS professional,
+          COUNT(*) FILTER (WHERE cu.email_type = 'personal')::int AS personal,
+          COUNT(*) FILTER (WHERE cu.email_type = 'disposable')::int AS disposable
+        FROM date_series ds
+        LEFT JOIN classified_users cu ON cu.date = ds.date
+        GROUP BY ds.date
+      )
+      SELECT
+        dc.date::text AS date,
+        dc.professional,
+        dc.personal,
+        dc.disposable,
+        (dc.professional + dc.personal + dc.disposable)::int AS total
+      FROM daily_counts dc
+      ORDER BY dc.date ASC
+    `
+
+    const result = await drizzleClient.execute(query)
+
+    const trend = result.rows.map((row: any) => ({
+      date: row.date,
+      professional: Number(row.professional) || 0,
+      personal: Number(row.personal) || 0,
+      disposable: Number(row.disposable) || 0,
+      total: Number(row.total) || 0,
+    }))
+
+    const totals = trend.reduce((acc, row) => {
+      acc.professional += row.professional
+      acc.personal += row.personal
+      acc.disposable += row.disposable
+      acc.total += row.total
+      return acc
+    }, {
+      professional: 0,
+      personal: 0,
+      disposable: 0,
+      total: 0,
+    })
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'getAdminEmailTypeBreakdown result',
+      totalRows: trend.length,
+      totals,
+    })
+
+    return {
+      totals,
+      trend,
+    }
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAdminEmailTypeBreakdown', e)
+    return emptyResult
   }
 }
 

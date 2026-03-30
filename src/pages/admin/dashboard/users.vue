@@ -44,8 +44,26 @@ interface OnboardingFunnelData {
   }>
 }
 
+interface EmailTypeBreakdown {
+  totals: {
+    professional: number
+    personal: number
+    disposable: number
+    total: number
+  }
+  trend: Array<{
+    date: string
+    professional: number
+    personal: number
+    disposable: number
+    total: number
+  }>
+}
+
 const onboardingFunnelData = ref<OnboardingFunnelData | null>(null)
 const isLoadingOnboardingFunnel = ref(false)
+const emailTypeBreakdown = ref<EmailTypeBreakdown | null>(null)
+const isLoadingEmailTypeBreakdown = ref(false)
 
 // Global stats trend data
 const globalStatsTrendData = ref<Array<{
@@ -297,6 +315,21 @@ async function loadOnboardingFunnel() {
   }
 }
 
+async function loadEmailTypeBreakdown() {
+  isLoadingEmailTypeBreakdown.value = true
+  try {
+    const data = await adminStore.fetchStats('email_type_breakdown')
+    emailTypeBreakdown.value = data as EmailTypeBreakdown
+  }
+  catch (error) {
+    console.error('[Admin Dashboard Users] Error loading email type breakdown:', error)
+    emailTypeBreakdown.value = null
+  }
+  finally {
+    isLoadingEmailTypeBreakdown.value = false
+  }
+}
+
 // Computed properties for multi-line charts
 const usersTrendSeries = computed(() => {
   if (globalStatsTrendData.value.length === 0)
@@ -318,6 +351,46 @@ const usersTrendSeries = computed(() => {
         value: item.trial,
       })),
       color: '#f59e0b', // amber
+    },
+  ]
+})
+
+const emailTypeTotals = computed(() => emailTypeBreakdown.value?.totals ?? {
+  professional: 0,
+  personal: 0,
+  disposable: 0,
+  total: 0,
+})
+
+const emailTypeTrendSeries = computed(() => {
+  const trend = emailTypeBreakdown.value?.trend ?? []
+  if (trend.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Professional Emails',
+      data: trend.map(item => ({
+        date: item.date,
+        value: item.professional,
+      })),
+      color: '#119eff',
+    },
+    {
+      label: 'Personal Emails',
+      data: trend.map(item => ({
+        date: item.date,
+        value: item.personal,
+      })),
+      color: '#10b981',
+    },
+    {
+      label: 'Disposable Emails',
+      data: trend.map(item => ({
+        date: item.date,
+        value: item.disposable,
+      })),
+      color: '#ef4444',
     },
   ]
 })
@@ -525,6 +598,7 @@ const onboardingFunnelTrendSeries = computed(() => {
 watch(() => adminStore.activeDateRange, () => {
   loadGlobalStatsTrend()
   loadOnboardingFunnel()
+  loadEmailTypeBreakdown()
   loadCancelledOrganizations()
 }, { deep: true })
 
@@ -532,6 +606,7 @@ watch(() => adminStore.activeDateRange, () => {
 watch(() => adminStore.refreshTrigger, () => {
   loadGlobalStatsTrend()
   loadOnboardingFunnel()
+  loadEmailTypeBreakdown()
   loadTrialOrganizations()
   loadCancelledOrganizations()
 })
@@ -544,7 +619,7 @@ onMounted(async () => {
   }
 
   isLoading.value = true
-  await Promise.all([loadGlobalStatsTrend(), loadOnboardingFunnel(), loadTrialOrganizations(), loadCancelledOrganizations()])
+  await Promise.all([loadGlobalStatsTrend(), loadOnboardingFunnel(), loadEmailTypeBreakdown(), loadTrialOrganizations(), loadCancelledOrganizations()])
   isLoading.value = false
 
   displayStore.NavTitle = t('users-and-revenue')
@@ -673,6 +748,87 @@ displayStore.defaultBack = '/dashboard'
                 </p>
               </div>
             </div>
+          </div>
+
+          <div class="space-y-6">
+            <div class="flex flex-col gap-1">
+              <h3 class="text-lg font-semibold">
+                Email Type Breakdown
+              </h3>
+              <p class="text-sm text-slate-600 dark:text-slate-400">
+                Registration mix in the selected period, split between professional, personal, and disposable email domains.
+              </p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+              <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+                <div class="flex items-start justify-between mb-4">
+                  <div class="p-3 rounded-lg bg-primary/10">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-primary"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M5 7l1.5 12h11L19 7M9 11h6M10 15h4" /></svg>
+                  </div>
+                </div>
+                <div>
+                  <p class="text-sm text-slate-600 dark:text-slate-400">
+                    Professional Emails
+                  </p>
+                  <p class="mt-2 text-3xl font-bold text-primary">
+                    {{ emailTypeTotals.professional.toLocaleString() }}
+                  </p>
+                  <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Work and company domains
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+                <div class="flex items-start justify-between mb-4">
+                  <div class="p-3 rounded-lg bg-success/10">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-success"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  </div>
+                </div>
+                <div>
+                  <p class="text-sm text-slate-600 dark:text-slate-400">
+                    Personal Emails
+                  </p>
+                  <p class="mt-2 text-3xl font-bold text-success">
+                    {{ emailTypeTotals.personal.toLocaleString() }}
+                  </p>
+                  <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Public mailbox providers
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+                <div class="flex items-start justify-between mb-4">
+                  <div class="p-3 rounded-lg bg-error/10">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-error"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-1.414 1.414M7.05 16.95l-1.414 1.414M5.636 5.636l1.414 1.414M16.95 16.95l1.414 1.414M9 12h6M12 9v6m0 6a9 9 0 100-18 9 9 0 000 18z" /></svg>
+                  </div>
+                </div>
+                <div>
+                  <p class="text-sm text-slate-600 dark:text-slate-400">
+                    Disposable Emails
+                  </p>
+                  <p class="mt-2 text-3xl font-bold text-error">
+                    {{ emailTypeTotals.disposable.toLocaleString() }}
+                  </p>
+                  <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Temporary mailbox providers
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <ChartCard
+              title="Email Type Trend"
+              :is-loading="isLoadingEmailTypeBreakdown"
+              :has-data="emailTypeTrendSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="emailTypeTrendSeries"
+                :is-loading="isLoadingEmailTypeBreakdown"
+              />
+            </ChartCard>
           </div>
 
           <!-- Trial Organizations Table -->

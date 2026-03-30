@@ -5,7 +5,7 @@ import { z } from 'zod/mini'
 import { getAdminAppsTrend, getAdminBandwidthTrend, getAdminBundlesTrend, getAdminDistributionMetrics, getAdminFailureMetrics, getAdminMauTrend, getAdminOrgMetrics, getAdminPlatformOverview, getAdminStorageTrend, getAdminSuccessRate, getAdminSuccessRateTrend, getAdminUploadMetrics } from '../utils/cloudflare.ts'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { getAdminCancelledOrganizations, getAdminDeploymentsTrend, getAdminGlobalStatsTrend, getAdminOnboardingFunnel, getAdminPluginBreakdown, getAdminTrialOrganizations } from '../utils/pg.ts'
+import { getAdminCancelledOrganizations, getAdminDeploymentsTrend, getAdminEmailTypeBreakdown, getAdminGlobalStatsTrend, getAdminOnboardingFunnel, getAdminPluginBreakdown, getAdminTrialOrganizations } from '../utils/pg.ts'
 import { getCancellationDetails } from '../utils/stripe.ts'
 import { supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
@@ -13,7 +13,7 @@ export const MAX_ADMIN_STATS_LIMIT = 50_000
 export const MAX_ADMIN_STATS_OFFSET = 100_000
 
 export const adminStatsBodySchema = z.object({
-  metric_category: z.enum(['uploads', 'distribution', 'failures', 'success_rate', 'platform_overview', 'org_metrics', 'mau_trend', 'success_rate_trend', 'apps_trend', 'bundles_trend', 'deployments_trend', 'storage_trend', 'bandwidth_trend', 'global_stats_trend', 'plugin_breakdown', 'trial_organizations', 'onboarding_funnel', 'cancelled_users']),
+  metric_category: z.enum(['uploads', 'distribution', 'failures', 'success_rate', 'platform_overview', 'org_metrics', 'mau_trend', 'success_rate_trend', 'apps_trend', 'bundles_trend', 'deployments_trend', 'storage_trend', 'bandwidth_trend', 'global_stats_trend', 'plugin_breakdown', 'trial_organizations', 'onboarding_funnel', 'cancelled_users', 'email_type_breakdown']),
   start_date: z.string().check(z.minLength(1)),
   end_date: z.string().check(z.minLength(1)),
   app_id: z.optional(z.string().check(z.minLength(1))),
@@ -212,6 +212,10 @@ app.post('/', middlewareAuth, async (c) => {
 
       case 'onboarding_funnel':
         result = await getAdminOnboardingFunnel(c, start_date, end_date)
+        break
+
+      case 'email_type_breakdown':
+        result = await getAdminEmailTypeBreakdown(c, start_date, end_date)
         break
 
       default:

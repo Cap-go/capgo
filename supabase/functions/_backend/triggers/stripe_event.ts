@@ -12,7 +12,7 @@ import { middlewareStripeWebhook } from '../utils/hono_middleware_stripe.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import * as schema from '../utils/postgres_schema.ts'
-import { ensureCustomerMetadata, getStripe } from '../utils/stripe.ts'
+import { ensureCustomerMetadata, getStripe, syncStripeCustomerCountry } from '../utils/stripe.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 
@@ -32,8 +32,17 @@ const checkoutSessionEventTypes = new Set([
   'checkout.session.async_payment_succeeded',
 ])
 
+const customerProfileEventTypes = new Set([
+  'customer.created',
+  'customer.updated',
+])
+
 function isCheckoutSessionEvent(event: Stripe.Event) {
   return checkoutSessionEventTypes.has(event.type)
+}
+
+function isCustomerProfileEvent(event: Stripe.Event) {
+  return customerProfileEventTypes.has(event.type)
 }
 
 function getPaidAtUpdate(
@@ -516,10 +525,16 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
   const stripeEvent = c.get('stripeEvent')!
   const isCheckoutSession = isCheckoutSessionEvent(stripeEvent)
 
+  if (isCustomerProfileEvent(stripeEvent)) {
+    await syncStripeCustomerCountry(c, stripeData.data.customer_id)
+    return c.json(BRES)
+  }
+
   // find email from user with customer_id
   const org = await getOrg(c, stripeData)
 
   await ensureCustomerMetadata(c, stripeData.data.customer_id, org.id, org.created_by)
+  stripeData.data.customer_country = await syncStripeCustomerCountry(c, stripeData.data.customer_id)
 
   if (isCheckoutSession) {
     return handleCheckoutSessionCompleted(c, stripeEvent, org, stripeData.data.customer_id)
@@ -584,4 +599,5 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
 
 export const stripeEventTestUtils = {
   getPaidAtUpdate,
+  isCustomerProfileEvent,
 }
