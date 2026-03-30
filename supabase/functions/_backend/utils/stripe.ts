@@ -275,9 +275,9 @@ export function normalizeStripeCountryCode(country: string | null | undefined): 
   return normalized.slice(0, 2)
 }
 
-export async function getStripeCustomerCountry(c: Context, customerId: string | null | undefined): Promise<string | null> {
+export async function getStripeCustomerCountry(c: Context, customerId: string | null | undefined): Promise<string | null | undefined> {
   if (!customerId || !isStripeConfigured(c))
-    return null
+    return undefined
 
   try {
     const customer = await getStripe(c).customers.retrieve(customerId)
@@ -287,15 +287,17 @@ export async function getStripeCustomerCountry(c: Context, customerId: string | 
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getStripeCustomerCountry', customerId, error })
-    return null
+    return undefined
   }
 }
 
 export async function syncStripeCustomerCountry(c: Context, customerId: string | null | undefined) {
-  if (!customerId)
+  if (!customerId || !isStripeConfigured(c))
     return null
 
   const customerCountry = await getStripeCustomerCountry(c, customerId)
+  if (customerCountry === undefined)
+    return null
 
   const { data, error } = await supabaseAdmin(c)
     .from('stripe_info')

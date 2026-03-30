@@ -369,7 +369,7 @@ const emailTypeTrendSeries = computed(() => {
 
   return [
     {
-      label: 'Professional Emails',
+      label: t('admin-users-email-type-professional'),
       data: trend.map(item => ({
         date: item.date,
         value: item.professional,
@@ -377,7 +377,7 @@ const emailTypeTrendSeries = computed(() => {
       color: '#119eff',
     },
     {
-      label: 'Personal Emails',
+      label: t('admin-users-email-type-personal'),
       data: trend.map(item => ({
         date: item.date,
         value: item.personal,
@@ -385,7 +385,7 @@ const emailTypeTrendSeries = computed(() => {
       color: '#10b981',
     },
     {
-      label: 'Disposable Emails',
+      label: t('admin-users-email-type-disposable'),
       data: trend.map(item => ({
         date: item.date,
         value: item.disposable,
@@ -753,10 +753,10 @@ displayStore.defaultBack = '/dashboard'
           <div class="space-y-6">
             <div class="flex flex-col gap-1">
               <h3 class="text-lg font-semibold">
-                Email Type Breakdown
+                {{ t('admin-users-email-type-breakdown') }}
               </h3>
               <p class="text-sm text-slate-600 dark:text-slate-400">
-                Registration mix in the selected period, split between professional, personal, and disposable email domains.
+                {{ t('admin-users-email-type-breakdown-description') }}
               </p>
             </div>
 
@@ -769,13 +769,13 @@ displayStore.defaultBack = '/dashboard'
                 </div>
                 <div>
                   <p class="text-sm text-slate-600 dark:text-slate-400">
-                    Professional Emails
+                    {{ t('admin-users-email-type-professional') }}
                   </p>
                   <p class="mt-2 text-3xl font-bold text-primary">
                     {{ emailTypeTotals.professional.toLocaleString() }}
                   </p>
                   <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Work and company domains
+                    {{ t('admin-users-email-type-professional-description') }}
                   </p>
                 </div>
               </div>
@@ -788,13 +788,13 @@ displayStore.defaultBack = '/dashboard'
                 </div>
                 <div>
                   <p class="text-sm text-slate-600 dark:text-slate-400">
-                    Personal Emails
+                    {{ t('admin-users-email-type-personal') }}
                   </p>
                   <p class="mt-2 text-3xl font-bold text-success">
                     {{ emailTypeTotals.personal.toLocaleString() }}
                   </p>
                   <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Public mailbox providers
+                    {{ t('admin-users-email-type-personal-description') }}
                   </p>
                 </div>
               </div>
@@ -807,20 +807,20 @@ displayStore.defaultBack = '/dashboard'
                 </div>
                 <div>
                   <p class="text-sm text-slate-600 dark:text-slate-400">
-                    Disposable Emails
+                    {{ t('admin-users-email-type-disposable') }}
                   </p>
                   <p class="mt-2 text-3xl font-bold text-error">
                     {{ emailTypeTotals.disposable.toLocaleString() }}
                   </p>
                   <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Temporary mailbox providers
+                    {{ t('admin-users-email-type-disposable-description') }}
                   </p>
                 </div>
               </div>
             </div>
 
             <ChartCard
-              title="Email Type Trend"
+              :title="t('admin-users-email-type-trend')"
               :is-loading="isLoadingEmailTypeBreakdown"
               :has-data="emailTypeTrendSeries.length > 0"
             >

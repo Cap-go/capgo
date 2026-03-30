@@ -95,6 +95,7 @@ const globalStatsTrendData = ref<GlobalStatsTrendRow[]>([])
 const isLoadingCreditAnalytics = ref(false)
 
 let searchDebounce: ReturnType<typeof setTimeout> | null = null
+let creditAnalyticsRequestSeq = 0
 let currentSearchQuery = '' // Track current query to avoid race conditions
 
 function getExpiresAt() {
@@ -112,19 +113,25 @@ function toMonthKey(date: string) {
 }
 
 async function loadCreditAnalytics() {
+  const requestSeq = ++creditAnalyticsRequestSeq
   isLoadingCreditAnalytics.value = true
 
   try {
     const data = await adminStore.fetchStats('global_stats_trend')
+    if (requestSeq !== creditAnalyticsRequestSeq)
+      return
     globalStatsTrendData.value = (data || []) as GlobalStatsTrendRow[]
   }
   catch (error) {
+    if (requestSeq !== creditAnalyticsRequestSeq)
+      return
     console.error('Credit analytics load error:', error)
     globalStatsTrendData.value = []
-    toast.error('Failed to load credit analytics')
+    toast.error(t('admin-credits-analytics-error'))
   }
   finally {
-    isLoadingCreditAnalytics.value = false
+    if (requestSeq === creditAnalyticsRequestSeq)
+      isLoadingCreditAnalytics.value = false
   }
 }
 
@@ -160,7 +167,7 @@ const dailyCreditsSeries = computed(() => {
 
   return [
     {
-      label: 'Credits Bought',
+      label: t('admin-credits-analytics-series-bought'),
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
         value: Number(item.credits_bought || 0),
@@ -168,7 +175,7 @@ const dailyCreditsSeries = computed(() => {
       color: '#119eff',
     },
     {
-      label: 'Credits Used',
+      label: t('admin-credits-analytics-series-used'),
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
         value: Number(item.credits_consumed || 0),
@@ -184,7 +191,7 @@ const monthlyCreditsSeries = computed(() => {
 
   return [
     {
-      label: 'Credits Bought',
+      label: t('admin-credits-analytics-series-bought'),
       data: monthlyCreditSummary.value.map(item => ({
         date: item.date,
         value: item.creditsBought,
@@ -192,7 +199,7 @@ const monthlyCreditsSeries = computed(() => {
       color: '#119eff',
     },
     {
-      label: 'Credits Used',
+      label: t('admin-credits-analytics-series-used'),
       data: monthlyCreditSummary.value.map(item => ({
         date: item.date,
         value: item.creditsConsumed,
@@ -208,7 +215,7 @@ const monthlyRevenueWithCreditsSeries = computed(() => {
 
   return [
     {
-      label: 'Revenue (MRR + credit sales)',
+      label: t('admin-credits-analytics-series-revenue'),
       data: monthlyCreditSummary.value.map(item => ({
         date: item.date,
         value: item.monthEndMrr + item.creditsBought,
@@ -440,10 +447,10 @@ onMounted(async () => {
           <div class="flex flex-col gap-2">
             <div>
               <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-                Credits Analytics
+                {{ t('admin-credits-analytics-title') }}
               </h2>
               <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Daily and monthly credit sales and usage. Monthly revenue combines month-end MRR with credit sales at 1 credit = $1.
+                {{ t('admin-credits-analytics-description') }}
               </p>
             </div>
             <AdminFilterBar />
@@ -451,7 +458,7 @@ onMounted(async () => {
 
           <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <ChartCard
-              title="Credits by Day"
+              :title="t('admin-credits-analytics-chart-day')"
               :is-loading="isLoadingCreditAnalytics"
               :has-data="dailyCreditsSeries.length > 0"
             >
@@ -462,7 +469,7 @@ onMounted(async () => {
             </ChartCard>
 
             <ChartCard
-              title="Credits by Month"
+              :title="t('admin-credits-analytics-chart-month')"
               :is-loading="isLoadingCreditAnalytics"
               :has-data="monthlyCreditsSeries.length > 0"
             >
@@ -475,7 +482,7 @@ onMounted(async () => {
           </div>
 
           <ChartCard
-            title="Revenue by Month (MRR + Credit Sales)"
+            :title="t('admin-credits-analytics-chart-revenue-month')"
             :is-loading="isLoadingCreditAnalytics"
             :has-data="monthlyRevenueWithCreditsSeries.length > 0"
           >

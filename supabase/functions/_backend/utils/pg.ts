@@ -1233,7 +1233,7 @@ export async function getAdminEmailTypeBreakdown(
 
     const query = sql`
       WITH date_series AS (
-        SELECT generate_series(${startDateOnly}::date, ${endDateOnly}::date, interval '1 day')::date AS date
+        SELECT generate_series(${startDateOnly}::date, (${endDateOnly}::date - interval '1 day')::date, interval '1 day')::date AS date
       ),
       normalized_users AS (
         SELECT
@@ -1241,7 +1241,7 @@ export async function getAdminEmailTypeBreakdown(
           split_part(lower(trim(u.email)), '@', 2) AS domain
         FROM public.users u
         WHERE u.created_at >= ${start_date}::timestamptz
-          AND u.created_at <= ${end_date}::timestamptz
+          AND u.created_at < ${end_date}::timestamptz
           AND POSITION('@' IN u.email) > 0
       ),
       classified_users AS (
