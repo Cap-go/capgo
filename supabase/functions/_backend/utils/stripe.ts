@@ -269,10 +269,10 @@ export function normalizeStripeCountryCode(country: string | null | undefined): 
     return null
 
   const normalized = country.trim().toUpperCase()
-  if (!normalized)
+  if (!normalized || !/^[A-Z]{2}$/.test(normalized))
     return null
 
-  return normalized.slice(0, 2)
+  return normalized
 }
 
 export async function getStripeCustomerCountry(c: Context, customerId: string | null | undefined): Promise<string | null | undefined> {

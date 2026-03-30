@@ -99,6 +99,13 @@ testing against Cloudflare Workers.
   service-role writes. Example:
   - `const loginAdmin = supabaseAdmin(c)` → use for `signInWithPassword`
   - `const adminClient = supabaseAdmin(c)` → use for admin writes
+- **Backend DB access style:** prefer `getPgClient()` / `getDrizzleClient()` for
+  multi-step SQL, transactions, joins, schema-backed writes, or code that
+  benefits from explicit pool lifecycle handling. Do **not** force every simple
+  one-statement internal helper write into Drizzle just for consistency. A
+  small service-role helper that is already a single clear `supabaseAdmin(c)`
+  call may stay on `supabaseAdmin` when that keeps the code smaller and equally
+  correct.
 
 ### HTTP Response Conventions
 

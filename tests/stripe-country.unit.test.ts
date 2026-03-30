@@ -11,12 +11,13 @@ describe('stripe customer country sync', () => {
   it.concurrent('normalizes Stripe country codes to ISO alpha-2 uppercase', () => {
     expect(normalizeStripeCountryCode('it')).toBe('IT')
     expect(normalizeStripeCountryCode(' us ')).toBe('US')
-    expect(normalizeStripeCountryCode('gbr')).toBe('GB')
   })
 
-  it.concurrent('returns null when the Stripe country code is empty', () => {
+  it.concurrent('returns null for empty or invalid Stripe country codes', () => {
     expect(normalizeStripeCountryCode('')).toBeNull()
     expect(normalizeStripeCountryCode('   ')).toBeNull()
+    expect(normalizeStripeCountryCode('gbr')).toBeNull()
+    expect(normalizeStripeCountryCode('1@')).toBeNull()
     expect(normalizeStripeCountryCode(null)).toBeNull()
     expect(normalizeStripeCountryCode(undefined)).toBeNull()
   })

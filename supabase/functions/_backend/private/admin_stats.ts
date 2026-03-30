@@ -11,11 +11,13 @@ import { supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
 export const MAX_ADMIN_STATS_LIMIT = 50_000
 export const MAX_ADMIN_STATS_OFFSET = 100_000
+const ISO_UTC_DATETIME_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/
+const INVALID_ADMIN_STATS_DATE = 'Expected ISO 8601 UTC datetime string'
 
 export const adminStatsBodySchema = z.object({
   metric_category: z.enum(['uploads', 'distribution', 'failures', 'success_rate', 'platform_overview', 'org_metrics', 'mau_trend', 'success_rate_trend', 'apps_trend', 'bundles_trend', 'deployments_trend', 'storage_trend', 'bandwidth_trend', 'global_stats_trend', 'plugin_breakdown', 'trial_organizations', 'onboarding_funnel', 'cancelled_users', 'email_type_breakdown']),
-  start_date: z.string().check(z.minLength(1)),
-  end_date: z.string().check(z.minLength(1)),
+  start_date: z.string().check(z.minLength(1), z.regex(ISO_UTC_DATETIME_REGEX, { message: INVALID_ADMIN_STATS_DATE })),
+  end_date: z.string().check(z.minLength(1), z.regex(ISO_UTC_DATETIME_REGEX, { message: INVALID_ADMIN_STATS_DATE })),
   app_id: z.optional(z.string().check(z.minLength(1))),
   org_id: z.optional(z.string().check(z.minLength(1))),
   limit: z.optional(z.number().check(z.int(), z.minimum(1), z.maximum(MAX_ADMIN_STATS_LIMIT))),
