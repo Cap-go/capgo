@@ -8,7 +8,7 @@ import { useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
-import { resolveInviteNewUserErrorMessage } from '~/utils/invites'
+import { notifyExistingUserInvite, resolveInviteNewUserErrorMessage } from '~/utils/invites'
 
 interface InviteSuccessPayload {
   email: string
@@ -242,6 +242,7 @@ async function handleEmailSubmit() {
     }
 
     if (data === 'OK') {
+      await notifyExistingUserInvite(supabase, email, orgId)
       toast.success(t('org-invited-user'))
       completeInviteSuccess({
         email,

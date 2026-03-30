@@ -134,7 +134,12 @@ async function guard(
     && mfaData.nextLevel === 'aal2'
     && !isAdminForced
   ) {
-    return next(`/login?to=${to.path}`)
+    return next({
+      path: '/login',
+      query: {
+        to: to.fullPath,
+      },
+    })
   }
 
   if (hasAuth && sessionUser && !hadAuth) {
@@ -143,7 +148,7 @@ async function guard(
         path: '/resend_email',
         query: {
           reason: 'email_not_verified',
-          return_to: to.path,
+          return_to: to.fullPath,
         },
       })
     }
@@ -217,7 +222,12 @@ async function guard(
   }
   else if (from.path !== 'login' && !hasAuth) {
     main.auth = undefined
-    next(`/login?to=${to.path}`)
+    next({
+      path: '/login',
+      query: {
+        to: to.fullPath,
+      },
+    })
   }
   else if (hasAuth && main.auth) {
     // User is already authenticated, but check if account got disabled

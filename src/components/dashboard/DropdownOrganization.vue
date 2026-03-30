@@ -13,6 +13,7 @@ import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
 const router = useRouter()
+const route = useRoute()
 const organizationStore = useOrganizationStore()
 const { currentOrganization } = storeToRefs(organizationStore)
 const dialogStore = useDialogV2Store()
@@ -29,6 +30,7 @@ const lastOrganizationLogoRefreshAt = ref(0)
 const refreshedBrokenLogoKeys = new Set<string>()
 let organizationLogoRefreshInterval: number | null = null
 let isOrganizationDropdownMounted = false
+const handledInviteOrgId = ref<string | null>(null)
 
 function refreshOnFocus() {
   void refreshOrganizationLogosIfNeeded()
@@ -46,6 +48,8 @@ onMounted(async () => {
   await organizationStore.fetchOrganizations()
   if (!isOrganizationDropdownMounted)
     return
+
+  await openInvitationFromRouteIfNeeded()
 
   lastOrganizationLogoRefreshAt.value = Date.now()
 
@@ -127,6 +131,31 @@ async function handleOrganizationInvitation(org: Organization) {
       },
     ],
   })
+}
+
+async function clearInviteOrgQuery() {
+  if (!('invite_org' in route.query))
+    return
+
+  const nextQuery = { ...route.query }
+  delete nextQuery.invite_org
+  await router.replace({ query: nextQuery })
+}
+
+async function openInvitationFromRouteIfNeeded() {
+  const inviteOrgId = typeof route.query.invite_org === 'string' ? route.query.invite_org : ''
+  if (!inviteOrgId || inviteOrgId === handledInviteOrgId.value)
+    return
+
+  const inviteOrg = organizationStore.organizations.find(org => org.gid === inviteOrgId)
+  if (!inviteOrg)
+    return
+
+  handledInviteOrgId.value = inviteOrgId
+  await clearInviteOrgQuery()
+
+  if (isInvitation(inviteOrg))
+    await handleOrganizationInvitation(inviteOrg)
 }
 
 function closeDropdown() {
@@ -266,6 +295,21 @@ function onOrgItemKeydown(org: Organization, e: KeyboardEvent) {
   closeDropdown()
   onOrganizationClick(org)
 }
+
+watch(
+  () => route.query.invite_org,
+  () => {
+    void openInvitationFromRouteIfNeeded()
+  },
+  { immediate: true },
+)
+
+watch(
+  () => organizationStore.organizations.map(org => `${org.gid}:${org.role}`),
+  () => {
+    void openInvitationFromRouteIfNeeded()
+  },
+)
 </script>
 
 <template>

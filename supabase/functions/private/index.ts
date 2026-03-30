@@ -18,6 +18,7 @@ import { app as plans } from '../_backend/private/plans.ts'
 import { app as publicStats } from '../_backend/private/public_stats.ts'
 import { app as role_bindings } from '../_backend/private/role_bindings.ts'
 import { app as roles } from '../_backend/private/roles.ts'
+import { app as send_existing_user_org_invite } from '../_backend/private/send_existing_user_org_invite.ts'
 import { app as set_org_email } from '../_backend/private/set_org_email.ts'
 import { app as sso_check_domain } from '../_backend/private/sso/check-domain.ts'
 import { app as sso_check_enforcement } from '../_backend/private/sso/check-enforcement.ts'
@@ -67,6 +68,7 @@ appGlobal.route('/groups', groups)
 appGlobal.route('/role_bindings', role_bindings)
 appGlobal.route('/roles', roles)
 appGlobal.route('/invite_new_user_to_org', invite_new_user_to_org)
+appGlobal.route('/send_existing_user_org_invite', send_existing_user_org_invite)
 appGlobal.route('/accept_invitation', accept_invitation)
 appGlobal.route('/validate_password_compliance', validate_password_compliance)
 appGlobal.route('/verify_email_otp', verify_email_otp)
