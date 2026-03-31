@@ -434,7 +434,7 @@ export function requestInfosChannelDevicePostgres(
     .select(selectShape)
     .from(channelDevicesAlias)
     .innerJoin(channelAlias, eq(channelDevicesAlias.channel_id, channelAlias.id))
-    .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
+    .innerJoin(versionAlias, and(eq(channelAlias.version, versionAlias.id), eq(versionAlias.deleted, false)))
 
   const channelDevice = (includeManifest
     ? baseQuery.leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
@@ -467,7 +467,7 @@ export function requestInfosChannelPostgres(
   const baseQuery = drizzleClient
     .select(selectShape)
     .from(channelAlias)
-    .innerJoin(versionAlias, eq(channelAlias.version, versionAlias.id))
+    .innerJoin(versionAlias, and(eq(channelAlias.version, versionAlias.id), eq(versionAlias.deleted, false)))
 
   const channelQuery = (includeManifest
     ? baseQuery.leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))

@@ -109,14 +109,20 @@ export function emptySupabase(c: Context) {
 
 // WARNING: The service role key has admin privileges and should only be used in secure server environments!
 export function supabaseAdmin(c: Context) {
+  const serviceRoleKey = getEnv(c, 'SUPABASE_SERVICE_ROLE_KEY')
   const options = {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
       detectSessionInUrl: false,
     },
+    global: {
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+      },
+    },
   }
-  return createClient<Database>(getEnv(c, 'SUPABASE_URL'), getEnv(c, 'SUPABASE_SERVICE_ROLE_KEY'), options)
+  return createClient<Database>(getEnv(c, 'SUPABASE_URL'), serviceRoleKey, options)
 }
 
 export function supabaseApikey(c: Context, apikey: string | null | undefined) {
