@@ -133,6 +133,9 @@ async function handleOrganizationInvitation(org: OrganizationInvitationTarget) {
       },
     ],
   })
+
+  await dialogStore.onDialogDismiss()
+  await clearInviteOrgQuery()
 }
 
 async function clearInviteOrgQuery() {
@@ -155,8 +158,6 @@ async function openInvitationFromRouteIfNeeded() {
     return
 
   handledInviteOrgId.value = inviteOrgId
-  await clearInviteOrgQuery()
-
   if (isInvitation(inviteOrg))
     await handleOrganizationInvitation(inviteOrg)
 }
