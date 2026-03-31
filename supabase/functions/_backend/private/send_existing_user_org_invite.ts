@@ -5,6 +5,7 @@ import { trackBentoEvent } from '../utils/bento.ts'
 import { CacheHelper } from '../utils/cache.ts'
 import { BRES, createHono, middlewareAuth, parseBody, quickError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { closeClient, getPgClient } from '../utils/pg.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
@@ -32,6 +33,56 @@ function maskEmail(email: string) {
 
 function getInviteNotificationCooldownKey(orgId: string, userId: string) {
   return `${orgId}:${userId}`
+}
+
+function getInviteNotificationLockKey(orgId: string, userId: string) {
+  return `org-invite-notification:${orgId}:${userId}`
+}
+
+async function lockInviteNotification(c: AppContext, orgId: string, userId: string) {
+  const pgClient = getPgClient(c)
+  const inviteNotificationLockKey = getInviteNotificationLockKey(orgId, userId)
+
+  try {
+    await pgClient.query('SELECT pg_advisory_lock(hashtext($1))', [inviteNotificationLockKey])
+    return pgClient
+  }
+  catch (error) {
+    closeClient(c, pgClient)
+    cloudlog({
+      requestId: c.get('requestId'),
+      context: 'send_existing_user_org_invite lock_failed',
+      orgId,
+      invitedUserId: userId,
+      error,
+    })
+    throw error
+  }
+}
+
+async function unlockInviteNotification(
+  c: AppContext,
+  pgClient: ReturnType<typeof getPgClient>,
+  orgId: string,
+  userId: string,
+) {
+  const inviteNotificationLockKey = getInviteNotificationLockKey(orgId, userId)
+
+  try {
+    await pgClient.query('SELECT pg_advisory_unlock(hashtext($1))', [inviteNotificationLockKey])
+  }
+  catch (error) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      context: 'send_existing_user_org_invite unlock_failed',
+      orgId,
+      invitedUserId: userId,
+      error,
+    })
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
 }
 
 async function validateRequest(c: AppContext, rawBody: unknown) {
@@ -164,57 +215,62 @@ app.post('/', middlewareAuth, async (c) => {
     org_id: body.org_id,
     user_id: invitedUser.id,
   })
-  const now = Date.now()
-  const inMemoryCooldownUntil = inviteNotificationCooldowns.get(inviteCooldownStorageKey) ?? 0
-  if (inMemoryCooldownUntil <= now)
-    inviteNotificationCooldowns.delete(inviteCooldownStorageKey)
-  const cachedInviteNotification = await cooldownCache.matchJson<{ sentAt: string }>(inviteCooldownKey)
-  if (inMemoryCooldownUntil > now || cachedInviteNotification) {
+  const inviterName = [inviter?.first_name, inviter?.last_name].filter(Boolean).join(' ').trim() || 'Capgo team'
+  const invitedFirstName = invitedUser.first_name?.trim() || body.email.split('@')[0] || ''
+  const invitedLastName = invitedUser.last_name?.trim() || ''
+  const inviteNotificationLock = await lockInviteNotification(c, body.org_id, invitedUser.id)
+  try {
+    const now = Date.now()
+    const inMemoryCooldownUntil = inviteNotificationCooldowns.get(inviteCooldownStorageKey) ?? 0
+    if (inMemoryCooldownUntil <= now)
+      inviteNotificationCooldowns.delete(inviteCooldownStorageKey)
+    const cachedInviteNotification = await cooldownCache.matchJson<{ sentAt: string }>(inviteCooldownKey)
+    if (inMemoryCooldownUntil > now || cachedInviteNotification) {
+      cloudlog({
+        requestId,
+        context: 'send_existing_user_org_invite rate_limited',
+        orgId: body.org_id,
+        invitedUserId: invitedUser.id,
+        inviterId,
+      })
+      return quickError(409, 'user_already_invited', 'User already invited recently. Please wait before resending.', {
+        reason: 'invite_recently_sent',
+        cooldown_minutes: INVITE_RESEND_COOLDOWN_MINUTES,
+      })
+    }
+
     cloudlog({
       requestId,
-      context: 'send_existing_user_org_invite rate_limited',
+      context: 'send_existing_user_org_invite track bento event',
       orgId: body.org_id,
       invitedUserId: invitedUser.id,
       inviterId,
     })
-    return quickError(409, 'user_already_invited', 'User already invited recently. Please wait before resending.', {
-      reason: 'invite_recently_sent',
-      cooldown_minutes: INVITE_RESEND_COOLDOWN_MINUTES,
-    })
+    const bentoEvent = await trackBentoEvent(c, invitedUser.email, {
+      org_admin_name: inviterName,
+      org_name: org.name,
+      invite_link: `${getEnv(c, 'WEBAPP_URL')}/dashboard?invite_org=${body.org_id}`,
+      invited_first_name: invitedFirstName,
+      invited_last_name: invitedLastName,
+    }, 'org:invite_existing_capgo_user_to_org')
+
+    if (bentoEvent === false) {
+      return quickError(500, 'failed_to_send_invite_email', 'Failed to send invitation email')
+    }
+
+    inviteNotificationCooldowns.set(
+      inviteCooldownStorageKey,
+      now + INVITE_RESEND_COOLDOWN_MINUTES * 60 * 1000,
+    )
+    await cooldownCache.putJson(
+      inviteCooldownKey,
+      { sentAt: new Date().toISOString() },
+      INVITE_RESEND_COOLDOWN_MINUTES * 60,
+    )
   }
-
-  const inviterName = [inviter?.first_name, inviter?.last_name].filter(Boolean).join(' ').trim() || 'Capgo team'
-  const invitedFirstName = invitedUser.first_name?.trim() || body.email.split('@')[0] || ''
-  const invitedLastName = invitedUser.last_name?.trim() || ''
-
-  cloudlog({
-    requestId,
-    context: 'send_existing_user_org_invite track bento event',
-    orgId: body.org_id,
-    invitedUserId: invitedUser.id,
-    inviterId,
-  })
-  const bentoEvent = await trackBentoEvent(c, invitedUser.email, {
-    org_admin_name: inviterName,
-    org_name: org.name,
-    invite_link: `${getEnv(c, 'WEBAPP_URL')}/dashboard?invite_org=${body.org_id}`,
-    invited_first_name: invitedFirstName,
-    invited_last_name: invitedLastName,
-  }, 'org:invite_existing_capgo_user_to_org')
-
-  if (bentoEvent === false) {
-    return quickError(500, 'failed_to_send_invite_email', 'Failed to send invitation email')
+  finally {
+    await unlockInviteNotification(c, inviteNotificationLock, body.org_id, invitedUser.id)
   }
-
-  inviteNotificationCooldowns.set(
-    inviteCooldownStorageKey,
-    now + INVITE_RESEND_COOLDOWN_MINUTES * 60 * 1000,
-  )
-  await cooldownCache.putJson(
-    inviteCooldownKey,
-    { sentAt: new Date().toISOString() },
-    INVITE_RESEND_COOLDOWN_MINUTES * 60,
-  )
 
   cloudlog({
     requestId,
