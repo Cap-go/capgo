@@ -8,18 +8,21 @@ import type { TableColumn } from '~/components/comp_def'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import AdminBarChart from '~/components/admin/AdminBarChart.vue'
 import AdminFilterBar from '~/components/admin/AdminFilterBar.vue'
 import AdminFunnelChart from '~/components/admin/AdminFunnelChart.vue'
 import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
+import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
 import Spinner from '~/components/Spinner.vue'
 import { formatLocalDate } from '~/services/date'
+import { getEmoji } from '~/services/i18n'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 
-const { t } = useI18n()
+const { locale, t } = useI18n()
 const displayStore = useDisplayStore()
 const mainStore = useMainStore()
 const adminStore = useAdminDashboardStore()
@@ -60,10 +63,21 @@ interface EmailTypeBreakdown {
   }>
 }
 
+interface CustomerCountryBreakdown {
+  total_organizations: number
+  countries: Array<{
+    country_code: string
+    organizations: number
+    percentage: number
+  }>
+}
+
 const onboardingFunnelData = ref<OnboardingFunnelData | null>(null)
 const isLoadingOnboardingFunnel = ref(false)
 const emailTypeBreakdown = ref<EmailTypeBreakdown | null>(null)
 const isLoadingEmailTypeBreakdown = ref(false)
+const customerCountryBreakdown = ref<CustomerCountryBreakdown | null>(null)
+const isLoadingCustomerCountryBreakdown = ref(false)
 
 // Global stats trend data
 const globalStatsTrendData = ref<Array<{
@@ -330,6 +344,48 @@ async function loadEmailTypeBreakdown() {
   }
 }
 
+async function loadCustomerCountryBreakdown() {
+  isLoadingCustomerCountryBreakdown.value = true
+  try {
+    const data = await adminStore.fetchStats('customer_country_breakdown')
+    customerCountryBreakdown.value = data as CustomerCountryBreakdown
+  }
+  catch (error) {
+    console.error('[Admin Dashboard Users] Error loading customer country breakdown:', error)
+    customerCountryBreakdown.value = null
+  }
+  finally {
+    isLoadingCustomerCountryBreakdown.value = false
+  }
+}
+
+const countryDisplayNames = computed(() => {
+  try {
+    return new Intl.DisplayNames([locale.value || 'en'], { type: 'region' })
+  }
+  catch {
+    return new Intl.DisplayNames(['en'], { type: 'region' })
+  }
+})
+
+function normalizeCountryCode(countryCode: string) {
+  return countryCode.trim().toUpperCase()
+}
+
+function getCountryLabel(countryCode: string) {
+  const normalizedCountryCode = normalizeCountryCode(countryCode)
+  return countryDisplayNames.value.of(normalizedCountryCode) ?? normalizedCountryCode
+}
+
+function getCountryFlag(countryCode: string) {
+  try {
+    return getEmoji(normalizeCountryCode(countryCode))
+  }
+  catch {
+    return '🌐'
+  }
+}
+
 // Computed properties for multi-line charts
 const usersTrendSeries = computed(() => {
   if (globalStatsTrendData.value.length === 0)
@@ -394,6 +450,26 @@ const emailTypeTrendSeries = computed(() => {
     },
   ]
 })
+
+const customerCountryEntries = computed(() => customerCountryBreakdown.value?.countries ?? [])
+const topCustomerCountryEntries = computed(() => customerCountryEntries.value.slice(0, 10))
+
+const customerCountryTotalOrganizations = computed(() => customerCountryBreakdown.value?.total_organizations ?? 0)
+const customerCountryUniqueCountries = computed(() => customerCountryEntries.value.length)
+const leadingCustomerCountry = computed(() => topCustomerCountryEntries.value[0] ?? null)
+const leadingCustomerCountrySubtitle = computed(() => {
+  if (!leadingCustomerCountry.value)
+    return t('admin-users-country-top-country-empty')
+
+  return t('admin-users-country-top-country-description', {
+    country: getCountryLabel(leadingCustomerCountry.value.country_code),
+    count: leadingCustomerCountry.value.organizations.toLocaleString(),
+    share: leadingCustomerCountry.value.percentage.toFixed(1),
+  })
+})
+
+const customerCountryChartLabels = computed(() => topCustomerCountryEntries.value.map(country => `${getCountryFlag(country.country_code)} ${getCountryLabel(country.country_code)}`))
+const customerCountryChartValues = computed(() => topCustomerCountryEntries.value.map(country => country.organizations))
 
 const registrationsTrendSeries = computed(() => {
   if (globalStatsTrendData.value.length === 0)
@@ -599,6 +675,7 @@ watch(() => adminStore.activeDateRange, () => {
   loadGlobalStatsTrend()
   loadOnboardingFunnel()
   loadEmailTypeBreakdown()
+  loadCustomerCountryBreakdown()
   loadCancelledOrganizations()
 }, { deep: true })
 
@@ -607,6 +684,7 @@ watch(() => adminStore.refreshTrigger, () => {
   loadGlobalStatsTrend()
   loadOnboardingFunnel()
   loadEmailTypeBreakdown()
+  loadCustomerCountryBreakdown()
   loadTrialOrganizations()
   loadCancelledOrganizations()
 })
@@ -619,7 +697,7 @@ onMounted(async () => {
   }
 
   isLoading.value = true
-  await Promise.all([loadGlobalStatsTrend(), loadOnboardingFunnel(), loadEmailTypeBreakdown(), loadTrialOrganizations(), loadCancelledOrganizations()])
+  await Promise.all([loadGlobalStatsTrend(), loadOnboardingFunnel(), loadEmailTypeBreakdown(), loadCustomerCountryBreakdown(), loadTrialOrganizations(), loadCancelledOrganizations()])
   isLoading.value = false
 
   displayStore.NavTitle = t('users-and-revenue')
@@ -829,6 +907,110 @@ displayStore.defaultBack = '/dashboard'
                 :is-loading="isLoadingEmailTypeBreakdown"
               />
             </ChartCard>
+          </div>
+
+          <div class="space-y-6">
+            <div class="flex flex-col gap-1">
+              <h3 class="text-lg font-semibold">
+                {{ t('admin-users-country-breakdown') }}
+              </h3>
+              <p class="text-sm text-slate-600 dark:text-slate-400">
+                {{ t('admin-users-country-breakdown-description') }}
+              </p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+              <AdminStatsCard
+                :title="t('admin-users-country-covered-organizations')"
+                :value="customerCountryTotalOrganizations"
+                color-class="text-[#119eff]"
+                :is-loading="isLoadingCustomerCountryBreakdown"
+                :subtitle="t('admin-users-country-covered-organizations-description')"
+              />
+              <AdminStatsCard
+                :title="t('admin-users-country-unique-countries')"
+                :value="customerCountryUniqueCountries"
+                color-class="text-emerald-500"
+                :is-loading="isLoadingCustomerCountryBreakdown"
+                :subtitle="t('admin-users-country-unique-countries-description')"
+              />
+              <AdminStatsCard
+                :title="t('admin-users-country-top-country')"
+                :value="leadingCustomerCountry ? `${getCountryFlag(leadingCustomerCountry.country_code)} ${getCountryLabel(leadingCustomerCountry.country_code)}` : '-'"
+                color-class="text-amber-500"
+                :is-loading="isLoadingCustomerCountryBreakdown"
+                :subtitle="leadingCustomerCountrySubtitle"
+              />
+            </div>
+
+            <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+              <ChartCard
+                :title="t('admin-users-country-chart')"
+                :is-loading="isLoadingCustomerCountryBreakdown"
+                :has-data="topCustomerCountryEntries.length > 0"
+              >
+                <AdminBarChart
+                  :labels="customerCountryChartLabels"
+                  :values="customerCountryChartValues"
+                  :label="t('organizations')"
+                  value-mode="count"
+                  :is-loading="isLoadingCustomerCountryBreakdown"
+                />
+              </ChartCard>
+
+              <div class="p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+                <div class="flex flex-col gap-1">
+                  <h3 class="text-lg font-semibold">
+                    {{ t('admin-users-country-top-list') }}
+                  </h3>
+                  <p class="text-sm text-slate-600 dark:text-slate-400">
+                    {{ t('admin-users-country-top-list-description') }}
+                  </p>
+                </div>
+
+                <div v-if="isLoadingCustomerCountryBreakdown" class="flex items-center justify-center h-72">
+                  <span class="loading loading-spinner loading-lg" />
+                </div>
+
+                <div v-else-if="topCustomerCountryEntries.length > 0" class="mt-6 space-y-3">
+                  <div
+                    v-for="(country, index) in topCustomerCountryEntries"
+                    :key="country.country_code"
+                    class="flex items-center justify-between gap-4 p-4 border rounded-lg border-slate-200 dark:border-slate-700"
+                  >
+                    <div class="flex items-center gap-3 min-w-0">
+                      <div class="flex items-center justify-center w-9 h-9 text-sm font-semibold rounded-full bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-200 shrink-0">
+                        {{ index + 1 }}
+                      </div>
+                      <div class="text-2xl leading-none shrink-0">
+                        {{ getCountryFlag(country.country_code) }}
+                      </div>
+                      <div class="min-w-0">
+                        <p class="font-medium truncate">
+                          {{ getCountryLabel(country.country_code) }}
+                        </p>
+                        <p class="text-xs uppercase text-slate-500 dark:text-slate-400">
+                          {{ country.country_code }}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div class="text-right shrink-0">
+                      <p class="font-semibold">
+                        {{ country.organizations.toLocaleString() }}
+                      </p>
+                      <p class="text-xs text-slate-500 dark:text-slate-400">
+                        {{ country.percentage.toFixed(1) }}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-else class="flex items-center justify-center h-72 text-slate-400">
+                  {{ t('no-data-available') }}
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- Trial Organizations Table -->
