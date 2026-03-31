@@ -1328,6 +1328,88 @@ export async function getAdminEmailTypeBreakdown(
   }
 }
 
+export interface AdminCustomerCountryBreakdown {
+  total_organizations: number
+  countries: Array<{
+    country_code: string
+    organizations: number
+    percentage: number
+  }>
+}
+
+export async function getAdminCustomerCountryBreakdown(
+  c: Context,
+  start_date: string,
+  end_date: string,
+): Promise<AdminCustomerCountryBreakdown> {
+  const emptyResult: AdminCustomerCountryBreakdown = {
+    total_organizations: 0,
+    countries: [],
+  }
+
+  try {
+    const pgClient = getPgClient(c, true)
+    const drizzleClient = getDrizzleClient(pgClient)
+
+    const query = sql`
+      WITH country_counts AS (
+        SELECT
+          UPPER(BTRIM(si.customer_country)) AS country_code,
+          COUNT(*)::int AS organizations
+        FROM orgs o
+        INNER JOIN stripe_info si ON si.customer_id = o.customer_id
+        WHERE o.created_at >= ${start_date}::timestamptz
+          AND o.created_at < ${end_date}::timestamptz
+          AND si.customer_country IS NOT NULL
+          AND UPPER(BTRIM(si.customer_country)) ~ '^[A-Z]{2}$'
+        GROUP BY UPPER(BTRIM(si.customer_country))
+      ),
+      totals AS (
+        SELECT COALESCE(SUM(cc.organizations), 0)::int AS total_organizations
+        FROM country_counts cc
+      )
+      SELECT
+        cc.country_code,
+        cc.organizations,
+        CASE
+          WHEN totals.total_organizations > 0
+            THEN ROUND((cc.organizations::numeric / totals.total_organizations::numeric) * 100, 2)
+          ELSE 0
+        END::float AS percentage,
+        totals.total_organizations
+      FROM country_counts cc
+      CROSS JOIN totals
+      ORDER BY cc.organizations DESC, cc.country_code ASC
+    `
+
+    const result = await drizzleClient.execute(query)
+
+    const countries = result.rows.map((row: any) => ({
+      country_code: row.country_code,
+      organizations: Number(row.organizations) || 0,
+      percentage: Number(row.percentage) || 0,
+    }))
+
+    const totalOrganizations = Number((result.rows[0] as any)?.total_organizations) || 0
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'getAdminCustomerCountryBreakdown result',
+      totalOrganizations,
+      countryCount: countries.length,
+    })
+
+    return {
+      total_organizations: totalOrganizations,
+      countries,
+    }
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAdminCustomerCountryBreakdown', e)
+    return emptyResult
+  }
+}
+
 export interface AdminPluginBreakdown {
   date: string | null
   devices_last_month: number
