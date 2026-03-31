@@ -61,6 +61,16 @@ export async function checkWebhookPermissionV2(
   orgId: string,
   auth: AuthInfo,
 ): Promise<void> {
+  if (auth.authType === 'apikey' && auth.apikey) {
+    const orgCheck = await apikeyHasOrgRightWithPolicy(c, auth.apikey, orgId, supabaseApikey(c, c.get('capgkey') as string))
+    if (!orgCheck.valid) {
+      if (orgCheck.error === 'org_requires_expiring_key') {
+        throw quickError(401, 'org_requires_expiring_key', 'This organization requires API keys with an expiration date. Please use a different key or update this key with an expiration date.')
+      }
+      throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: orgId })
+    }
+  }
+
   // Check org admin access
   if (!(await hasOrgRight(c, orgId, auth.userId, 'admin'))) {
     throw simpleError('no_permission', 'You need admin access to manage webhooks', { org_id: orgId })
