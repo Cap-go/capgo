@@ -49,6 +49,7 @@ testing against Cloudflare Workers.
 ### Database and Backend
 
 - `bun run supabase:start` - Start local Supabase instance (worktree-isolated)
+- `bun run supabase:cleanup` - Stop local Supabase and delete this worktree's Supabase volumes
 - `bun run supabase:db:reset` - Reset and seed local database
 - `bun backend` - Start Supabase functions locally
 - `bun reset` - Reset Supabase database
