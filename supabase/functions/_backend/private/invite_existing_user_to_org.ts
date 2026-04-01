@@ -42,6 +42,18 @@ function getInviteNotificationLockKey(orgId: string, userId: string) {
   return `org-invite-notification:${orgId}:${userId}`
 }
 
+export function getInviteResendRequiredPermission(
+  userRight: string | null | undefined,
+  canInviteUser: boolean,
+  canUpdateUserRoles: boolean,
+) {
+  if (!userRight?.startsWith('invite_'))
+    return null
+  if (userRight === 'invite_super_admin')
+    return canUpdateUserRoles ? null : 'org.update_user_roles'
+  return canInviteUser ? null : 'org.invite_user'
+}
+
 async function lockInviteNotification(c: AppContext, orgId: string, userId: string) {
   const pgClient = getPgClient(c)
   const inviteNotificationLockKey = getInviteNotificationLockKey(orgId, userId)
@@ -106,7 +118,7 @@ async function validateRequest(c: AppContext, rawBody: unknown) {
     })
   }
 
-  return { body, canUpdateUserRoles }
+  return { body, canInviteUser, canUpdateUserRoles }
 }
 
 app.post('/', middlewareAuth, async (c) => {
@@ -115,7 +127,7 @@ app.post('/', middlewareAuth, async (c) => {
   const rawBody = await parseBody<unknown>(c)
   const validation = await validateRequest(c, rawBody)
 
-  const { body, canUpdateUserRoles } = validation
+  const { body, canInviteUser, canUpdateUserRoles } = validation
   const authContext = c.get('auth')
   const inviterId = authContext?.userId
   if (!inviterId) {
@@ -207,9 +219,15 @@ app.post('/', middlewareAuth, async (c) => {
     return quickError(409, 'invite_already_accepted', 'Invitation already accepted')
   }
 
-  if (membership.user_right === 'invite_super_admin' && !canUpdateUserRoles) {
+  const missingPermission = getInviteResendRequiredPermission(
+    membership.user_right,
+    canInviteUser,
+    canUpdateUserRoles,
+  )
+
+  if (missingPermission) {
     return quickError(403, 'not_authorized', 'Not authorized', {
-      requiredPermission: 'org.update_user_roles',
+      requiredPermission: missingPermission,
       orgId: body.org_id,
     })
   }
