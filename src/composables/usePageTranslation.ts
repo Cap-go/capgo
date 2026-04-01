@@ -9,6 +9,7 @@ const MAX_TOTAL_CHARACTERS = 12_000
 const MAX_UNIQUE_STRINGS = 220
 const REQUEST_TIMEOUT_MS = 15_000
 const TRANSLATION_DEBOUNCE_MS = 250
+const TRANSIENT_RETRY_DELAYS_MS = [1_000, 3_000, 10_000]
 const VALUE_TRANSLATABLE_TYPES = new Set(['button', 'reset', 'submit'])
 const SKIP_TAGS = new Set(['CODE', 'KBD', 'NOSCRIPT', 'PRE', 'SAMP', 'SCRIPT', 'STYLE', 'TEXTAREA'])
 const NO_TRANSLATE_SELECTOR = '[data-capgo-no-translate]'
@@ -35,6 +36,13 @@ interface AttributeSegment {
   element: Element
   source: string
   type: 'attribute'
+}
+
+class RetryableTranslationError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'RetryableTranslationError'
+  }
 }
 
 const textRecords = new WeakMap<Text, TextRecord>()
@@ -267,6 +275,7 @@ export function usePageTranslation() {
   let applyingTranslations = false
   let lastRequestHash = ''
   let translationDisabled = false
+  let transientRetryCount = 0
 
   function clearPendingWork() {
     if (debounceHandle) {
@@ -304,10 +313,12 @@ export function usePageTranslation() {
       }),
     })
 
-    if (response.status === 404 || response.status === 501 || response.status === 503) {
+    if (response.status === 404 || response.status === 501) {
       translationDisabled = true
       return {}
     }
+    if (response.status === 503)
+      throw new RetryableTranslationError('Translation service unavailable')
 
     if (!response.ok)
       throw new Error(`Translation request failed with ${response.status}`)
@@ -325,12 +336,14 @@ export function usePageTranslation() {
     if (isEnglishLocale(lang)) {
       restoreSourceContent(root)
       lastRequestHash = ''
+      transientRetryCount = 0
       return
     }
 
     if (translationDisabled) {
       restoreSourceContent(root)
       lastRequestHash = ''
+      transientRetryCount = 0
       return
     }
 
@@ -391,10 +404,19 @@ export function usePageTranslation() {
       })
 
       lastRequestHash = requestHash
+      transientRetryCount = 0
     }
     catch (error) {
+      if (!controller.signal.aborted && error instanceof RetryableTranslationError) {
+        const retryDelay = TRANSIENT_RETRY_DELAYS_MS[Math.min(transientRetryCount, TRANSIENT_RETRY_DELAYS_MS.length - 1)]
+        transientRetryCount += 1
+        scheduleTranslation(retryDelay)
+        return
+      }
+
       if (!controller.signal.aborted && error instanceof TypeError) {
         translationDisabled = true
+        transientRetryCount = 0
         restoreSourceContent(root)
         return
       }
@@ -451,12 +473,14 @@ export function usePageTranslation() {
   watch(() => route.fullPath, () => {
     lastRequestHash = ''
     translationDisabled = false
+    transientRetryCount = 0
     scheduleTranslation(80)
   }, { immediate: true })
 
   watch(selectedLanguage, () => {
     lastRequestHash = ''
     translationDisabled = false
+    transientRetryCount = 0
     scheduleTranslation(40)
   })
 }

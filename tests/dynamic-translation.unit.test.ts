@@ -32,7 +32,7 @@ describe('dynamic translation worker helpers', () => {
       'https://capgo.app',
       'Bundle uploads',
     ])).toEqual([
-      'Settings',
+      '  Settings  ',
       'https://capgo.app',
       'Bundle uploads',
     ])

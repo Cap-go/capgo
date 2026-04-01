@@ -70,31 +70,31 @@ export function normalizeTranslationStrings(strings: unknown) {
     throw quickError(400, 'invalid_translation_payload', 'strings must be an array')
 
   const unique = new Set<string>()
-  const normalized: string[] = []
+  const filtered: string[] = []
   let totalCharacters = 0
 
   for (const entry of strings) {
     if (typeof entry !== 'string')
       continue
 
-    const text = normalizeWhitespace(entry)
-    if (!text)
+    const normalized = normalizeWhitespace(entry)
+    if (!normalized)
       continue
-    if (text.length > 800)
+    if (normalized.length > 800)
       continue
-    if (unique.has(text))
+    if (unique.has(normalized))
       continue
-    if (normalized.length >= MAX_STRINGS)
+    if (filtered.length >= MAX_STRINGS)
       break
-    if (totalCharacters + text.length > MAX_TOTAL_CHARACTERS)
+    if (totalCharacters + entry.length > MAX_TOTAL_CHARACTERS)
       break
 
-    unique.add(text)
-    normalized.push(text)
-    totalCharacters += text.length
+    unique.add(normalized)
+    filtered.push(entry)
+    totalCharacters += entry.length
   }
 
-  return normalized
+  return filtered
 }
 
 export function protectTranslationTokens(text: string) {
