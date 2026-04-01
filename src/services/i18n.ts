@@ -14,6 +14,8 @@ export async function changeLanguage(lang: string) {
 
   await loadLanguageAsync(nextLanguage)
 
+  // The page translator rehydrates from rendered English source content after a
+  // full reload, so callers should persist any unsaved in-memory form state first.
   if (typeof window !== 'undefined')
     window.location.reload()
 

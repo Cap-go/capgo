@@ -45,12 +45,14 @@ declare global {
   const ignorableWatch: typeof import('@vueuse/core').ignorableWatch
   const inject: typeof import('vue').inject
   const injectLocal: typeof import('@vueuse/core').injectLocal
+  const isAdminRole: typeof import('./stores/organization').isAdminRole
   const isDefined: typeof import('@vueuse/core').isDefined
   const isProxy: typeof import('vue').isProxy
   const isReactive: typeof import('vue').isReactive
   const isReadonly: typeof import('vue').isReadonly
   const isRef: typeof import('vue').isRef
   const isShallow: typeof import('vue').isShallow
+  const isSuperAdminRole: typeof import('./stores/organization').isSuperAdminRole
   const makeDestructurable: typeof import('@vueuse/core').makeDestructurable
   const manualResetRef: typeof import('@vueuse/core').manualResetRef
   const markRaw: typeof import('vue').markRaw
@@ -96,6 +98,7 @@ declare global {
   const resolveComponent: typeof import('vue').resolveComponent
   const resolveRef: typeof import('@vueuse/core').resolveRef
   const resolveUnref: typeof import('@vueuse/core').resolveUnref
+  const roleHasLegacyMinRight: typeof import('./stores/organization').roleHasLegacyMinRight
   const shallowReactive: typeof import('vue').shallowReactive
   const shallowReadonly: typeof import('vue').shallowReadonly
   const shallowRef: typeof import('vue').shallowRef
@@ -225,6 +228,7 @@ declare global {
   const useOnline: typeof import('@vueuse/core').useOnline
   const useOrganizationStore: typeof import('./stores/organization').useOrganizationStore
   const usePageLeave: typeof import('@vueuse/core').usePageLeave
+  const usePageTranslation: typeof import('./composables/usePageTranslation').usePageTranslation
   const useParallax: typeof import('@vueuse/core').useParallax
   const useParentElement: typeof import('@vueuse/core').useParentElement
   const usePerformanceObserver: typeof import('@vueuse/core').usePerformanceObserver
@@ -389,12 +393,14 @@ declare module 'vue' {
     readonly ignorableWatch: UnwrapRef<typeof import('@vueuse/core')['ignorableWatch']>
     readonly inject: UnwrapRef<typeof import('vue')['inject']>
     readonly injectLocal: UnwrapRef<typeof import('@vueuse/core')['injectLocal']>
+    readonly isAdminRole: UnwrapRef<typeof import('./stores/organization')['isAdminRole']>
     readonly isDefined: UnwrapRef<typeof import('@vueuse/core')['isDefined']>
     readonly isProxy: UnwrapRef<typeof import('vue')['isProxy']>
     readonly isReactive: UnwrapRef<typeof import('vue')['isReactive']>
     readonly isReadonly: UnwrapRef<typeof import('vue')['isReadonly']>
     readonly isRef: UnwrapRef<typeof import('vue')['isRef']>
     readonly isShallow: UnwrapRef<typeof import('vue')['isShallow']>
+    readonly isSuperAdminRole: UnwrapRef<typeof import('./stores/organization')['isSuperAdminRole']>
     readonly makeDestructurable: UnwrapRef<typeof import('@vueuse/core')['makeDestructurable']>
     readonly manualResetRef: UnwrapRef<typeof import('@vueuse/core')['manualResetRef']>
     readonly markRaw: UnwrapRef<typeof import('vue')['markRaw']>
@@ -439,6 +445,7 @@ declare module 'vue' {
     readonly refWithControl: UnwrapRef<typeof import('@vueuse/core')['refWithControl']>
     readonly resolveComponent: UnwrapRef<typeof import('vue')['resolveComponent']>
     readonly resolveRef: UnwrapRef<typeof import('@vueuse/core')['resolveRef']>
+    readonly roleHasLegacyMinRight: UnwrapRef<typeof import('./stores/organization')['roleHasLegacyMinRight']>
     readonly shallowReactive: UnwrapRef<typeof import('vue')['shallowReactive']>
     readonly shallowReadonly: UnwrapRef<typeof import('vue')['shallowReadonly']>
     readonly shallowRef: UnwrapRef<typeof import('vue')['shallowRef']>
@@ -568,6 +575,7 @@ declare module 'vue' {
     readonly useOnline: UnwrapRef<typeof import('@vueuse/core')['useOnline']>
     readonly useOrganizationStore: UnwrapRef<typeof import('./stores/organization')['useOrganizationStore']>
     readonly usePageLeave: UnwrapRef<typeof import('@vueuse/core')['usePageLeave']>
+    readonly usePageTranslation: UnwrapRef<typeof import('./composables/usePageTranslation')['usePageTranslation']>
     readonly useParallax: UnwrapRef<typeof import('@vueuse/core')['useParallax']>
     readonly useParentElement: UnwrapRef<typeof import('@vueuse/core')['useParentElement']>
     readonly usePerformanceObserver: UnwrapRef<typeof import('@vueuse/core')['usePerformanceObserver']>

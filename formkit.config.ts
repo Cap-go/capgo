@@ -6,6 +6,8 @@ import { genesisIcons } from '@formkit/icons'
 
 import { rootClasses } from './formkit.theme'
 
+const SOURCE_FORMKIT_LOCALE = 'en'
+
 export default {
   config: {
     rootClasses,
@@ -15,5 +17,7 @@ export default {
     ...genesisIcons,
   },
   locales: { en },
-  locale: 'en',
+  // FormKit keeps English source strings and the runtime page translator localizes
+  // the rendered validation copy, so we do not ship per-locale FormKit bundles.
+  locale: SOURCE_FORMKIT_LOCALE,
 } satisfies DefaultConfigOptions

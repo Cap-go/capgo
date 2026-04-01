@@ -47,7 +47,7 @@ interface TranslationBody {
   targetLanguage?: string
 }
 
-interface ProtectedEntry {
+export interface ProtectedEntry {
   marker: string
   protectedText: string
   source: string
@@ -173,16 +173,29 @@ export function parseSegmentedTranslation(translatedText: string, entries: Prote
 
   entries.forEach((entry, index) => {
     const start = translatedText.indexOf(entry.marker)
-    const nextMarker = entries[index + 1]?.marker
-    const end = nextMarker ? translatedText.indexOf(nextMarker, start + entry.marker.length) : translatedText.length
 
     if (start < 0) {
+      console.warn('Translation segment marker missing from model output', { index, marker: entry.marker })
+      translations.set(entry.source, entry.source)
+      return
+    }
+
+    const contentStart = start + entry.marker.length
+    const markerBoundaries = entries
+      .slice(index + 1)
+      .map(nextEntry => translatedText.indexOf(nextEntry.marker, contentStart))
+      .filter(boundary => boundary >= 0)
+      .sort((left, right) => left - right)
+
+    const end = markerBoundaries[0] ?? translatedText.length
+    if (entries[index + 1] && markerBoundaries.length === 0) {
+      console.warn('Translation segment boundary missing from model output', { index, marker: entry.marker })
       translations.set(entry.source, entry.source)
       return
     }
 
     const segmentText = translatedText
-      .slice(start + entry.marker.length, end < 0 ? translatedText.length : end)
+      .slice(contentStart, end)
       .trim()
 
     const restored = restoreTranslationTokens(segmentText || entry.source, entry.tokens)
@@ -205,6 +218,8 @@ async function translateStrings(ai: { run: (model: string, input: unknown) => Pr
   const batches = buildBatches(entries)
   const translations = new Map<string, string>()
 
+  // Keep Workers AI calls serialized so large pages do not fan out bursty
+  // buildSegmentedText/ai.run requests and trip translation rate limits.
   for (const batch of batches) {
     const segmentedText = buildSegmentedText(batch)
     const result = await ai.run(TRANSLATION_MODEL, {

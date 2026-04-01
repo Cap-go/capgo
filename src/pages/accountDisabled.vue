@@ -111,14 +111,14 @@ const timeRemaining = computed(() => {
           {{ t('account-deletion-requested') }}
         </h1>
         <p class="mb-4 text-lg text-gray-600 dark:text-gray-300">
-          Please contact
+          {{ t('account-deletion-contact-support') }}
           <a
             href="https://support.capgo.app/"
             target="_blank"
             rel="noopener noreferrer"
             class="text-blue-500 underline hover:text-blue-600"
-          >Capgo support</a>
-          if you would like to restore it
+          >{{ t('account-deletion-support-link') }}</a>
+          {{ t('account-deletion-restore-suffix') }}
         </p>
         <div class="p-4 mt-6 bg-red-50 rounded-lg border border-red-200 dark:border-red-800 dark:bg-red-900/20">
           <p class="font-medium text-red-800 dark:text-red-200">

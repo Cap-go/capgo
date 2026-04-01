@@ -3,6 +3,7 @@ import { getWorkerLanguageCode, normalizeLanguage } from '../src/modules/i18n'
 import {
   normalizeTranslationStrings,
   parseSegmentedTranslation,
+  type ProtectedEntry,
   protectTranslationTokens,
   restoreTranslationTokens,
 } from '../supabase/functions/_backend/public/translation.ts'
@@ -51,7 +52,7 @@ describe('dynamic translation worker helpers', () => {
   it.concurrent('parses segmented model output back into per-string translations', () => {
     const first = protectTranslationTokens('Open settings for {app}')
     const second = protectTranslationTokens('Bundle uploads')
-    const entries = [
+    const entries: ProtectedEntry[] = [
       {
         marker: '[[CAPGO_SEGMENT_0000]]',
         protectedText: first.protectedText,
@@ -64,7 +65,7 @@ describe('dynamic translation worker helpers', () => {
         source: 'Bundle uploads',
         tokens: second.tokens,
       },
-    ] as any
+    ]
 
     const parsed = parseSegmentedTranslation([
       '[[CAPGO_SEGMENT_0000]]',
@@ -76,5 +77,32 @@ describe('dynamic translation worker helpers', () => {
 
     expect(parsed.get('Open settings for {app}')).toBe('Abrir ajustes para {app}')
     expect(parsed.get('Bundle uploads')).toBe('Cargas de bundles')
+  })
+
+  it.concurrent('falls back to the source text when a later marker is missing', () => {
+    const first = protectTranslationTokens('Open settings for {app}')
+    const second = protectTranslationTokens('Bundle uploads')
+    const entries: ProtectedEntry[] = [
+      {
+        marker: '[[CAPGO_SEGMENT_0000]]',
+        protectedText: first.protectedText,
+        source: 'Open settings for {app}',
+        tokens: first.tokens,
+      },
+      {
+        marker: '[[CAPGO_SEGMENT_0001]]',
+        protectedText: second.protectedText,
+        source: 'Bundle uploads',
+        tokens: second.tokens,
+      },
+    ]
+
+    const parsed = parseSegmentedTranslation([
+      '[[CAPGO_SEGMENT_0000]]',
+      'Abrir ajustes para __CAPGO_TOKEN_0__',
+    ].join('\n'), entries)
+
+    expect(parsed.get('Open settings for {app}')).toBe('Open settings for {app}')
+    expect(parsed.get('Bundle uploads')).toBe('Bundle uploads')
   })
 })

@@ -377,6 +377,7 @@ export function usePageTranslation() {
           return
         }
 
+        const attrRecord = getAttributeRecord(segment.element, segment.attr, lang)
         if (segment.attr === 'value' && segment.element instanceof HTMLInputElement) {
           segment.element.value = translated
           segment.element.setAttribute('value', translated)
@@ -385,7 +386,6 @@ export function usePageTranslation() {
           segment.element.setAttribute(segment.attr, translated)
         }
 
-        const attrRecord = getAttributeRecord(segment.element, segment.attr, lang)
         attrRecord.language = lang
         attrRecord.translated = translated
       })
@@ -450,11 +450,13 @@ export function usePageTranslation() {
 
   watch(() => route.fullPath, () => {
     lastRequestHash = ''
+    translationDisabled = false
     scheduleTranslation(80)
   }, { immediate: true })
 
   watch(selectedLanguage, () => {
     lastRequestHash = ''
+    translationDisabled = false
     scheduleTranslation(40)
   })
 }

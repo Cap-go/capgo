@@ -70,6 +70,8 @@ const messageCatalog = sourceMessages as Record<string, string>
 type MessageParams = Record<string, unknown> | string | undefined
 
 function interpolateMessage(message: string, params?: MessageParams): string {
+  // interpolateMessage treats string params as an explicit message override for
+  // legacy call sites that pass English text instead of placeholder values.
   if (typeof params === 'string')
     return params
 
@@ -147,7 +149,7 @@ export function getSourceMessage(key: string, defaultMessage?: string) {
     return resolved
   if (defaultMessage)
     return defaultMessage
-  return key.replaceAll('-', ' ')
+  return key
 }
 
 export function translateMessage(key: string, params?: MessageParams, defaultMessage?: string) {
