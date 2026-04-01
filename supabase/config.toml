@@ -160,47 +160,47 @@ otp_expiry = 3600
 
 [auth.email.template.confirmation]
 subject = "[Capgo]: Confirm your Signup to Capgo.app"
-content_path = "./supabase/templates/confirmation.html"
+content_path = "./templates/confirmation.html"
 
 [auth.email.template.invite]
 subject = "[Capgo]: You have been invited to Capgo.app"
-content_path = "./supabase/templates/invite.html"
+content_path = "./templates/invite.html"
 
 [auth.email.template.magic_link]
 subject = "[Capgo]: Magic Link to log into your Capgo.app account"
-content_path = "./supabase/templates/magic_link.html"
+content_path = "./templates/magic_link.html"
 
 [auth.email.template.email_change]
 subject = "[Capgo]: Confirm change of your Email with Capgo.app account"
-content_path = "./supabase/templates/email_change.html"
+content_path = "./templates/email_change.html"
 
 [auth.email.template.recovery]
 subject = "[Capgo]: Instructions to change your Capgo.app password"
-content_path = "./supabase/templates/recovery.html"
+content_path = "./templates/recovery.html"
 
 [auth.email.template.reauthentication]
 subject = "[Capgo]: Confirm Reauthentication of your Capgo.app account"
-content_path = "./supabase/templates/reauthentication.html"
+content_path = "./templates/reauthentication.html"
 
 [auth.email.notification.password_changed]
 enabled = true
 subject = "[Capgo]: Your Capgo.app password has been changed"
-content_path = "./supabase/templates/password_changed_notification.html"
+content_path = "./templates/password_changed_notification.html"
 
 [auth.email.notification.email_changed]
 enabled = true
 subject = "[Capgo]: Your Capgo.app email address has been changed"
-content_path = "./supabase/templates/email_changed_notification.html"
+content_path = "./templates/email_changed_notification.html"
 
 [auth.email.notification.mfa_factor_enrolled]
 enabled = true
 subject = "[Capgo]: New multi-factor authentication method added to your Capgo.app account"
-content_path = "./supabase/templates/mfa_factor_enrolled_notification.html"
+content_path = "./templates/mfa_factor_enrolled_notification.html"
 
 [auth.email.notification.mfa_factor_unenrolled]
 enabled = true
 subject = "[Capgo]: Multi-factor authentication method removed from your Capgo.app account"
-content_path = "./supabase/templates/mfa_factor_unenrolled_notification.html"
+content_path = "./templates/mfa_factor_unenrolled_notification.html"
 
 # Custom email templates kept in ./supabase/templates for consistency, but not managed by Supabase.
 # These are sent through Bento:
