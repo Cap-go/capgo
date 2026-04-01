@@ -322,7 +322,6 @@ app.post('/page', async (c) => {
   const strings = normalizeTranslationStrings(body.strings)
   const requestHash = await sha256Hex(JSON.stringify({
     model: TRANSLATION_MODEL,
-    pagePath: body.pagePath ?? '',
     targetLanguage,
     strings,
   }))

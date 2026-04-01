@@ -10,6 +10,7 @@ const MAX_UNIQUE_STRINGS = 220
 const REQUEST_TIMEOUT_MS = 15_000
 const TRANSLATION_DEBOUNCE_MS = 250
 const TRANSIENT_RETRY_DELAYS_MS = [1_000, 3_000, 10_000]
+const TRANSLATION_TIMEOUT_REASON = 'translation-timeout'
 const VALUE_TRANSLATABLE_TYPES = new Set(['button', 'reset', 'submit'])
 const SKIP_TAGS = new Set(['CODE', 'KBD', 'NOSCRIPT', 'PRE', 'SAMP', 'SCRIPT', 'STYLE', 'TEXTAREA'])
 const NO_TRANSLATE_SELECTOR = '[data-capgo-no-translate]'
@@ -411,8 +412,11 @@ export function usePageTranslation() {
   }
 
   function handleTranslationError(error: unknown, controller: AbortController, root: TranslationRoot) {
-    if (controller.signal.aborted)
+    if (controller.signal.aborted) {
+      if (controller.signal.reason === TRANSLATION_TIMEOUT_REASON)
+        scheduleTransientRetry(root)
       return
+    }
 
     if (error instanceof RetryableTranslationError || error instanceof TypeError) {
       scheduleTransientRetry(root)
@@ -441,7 +445,6 @@ export function usePageTranslation() {
     const requestedPath = route.path
     const requestHash = await sha256Hex(JSON.stringify({
       lang,
-      path: requestedPath,
       strings: uniqueSources,
     }))
 
@@ -451,7 +454,7 @@ export function usePageTranslation() {
     clearPendingWork()
     abortController = new AbortController()
     const controller = abortController
-    const timeoutHandle = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+    const timeoutHandle = setTimeout(() => controller.abort(TRANSLATION_TIMEOUT_REASON), REQUEST_TIMEOUT_MS)
 
     try {
       const translations = await fetchTranslations(uniqueSources, lang, requestedPath, controller.signal)
