@@ -166,8 +166,10 @@ Capgo relies on two layered caches for plugin endpoints (`/updates`, `/stats`, `
 
 ### Email Templates
 
-- Supabase auth emails use Supabase template syntax.
-- Bento emails use Bento template syntax.
+- `supabase/templates/invite_new_user_to_org.html` and `supabase/templates/invite_existing_user_to_org.html` are Bento templates.
+- Every other file in `supabase/templates/` is a Supabase auth or notification template.
+- Supabase templates use Supabase template syntax.
+- Bento templates use Bento template syntax.
 - Updating templates in the repository does not upload them anywhere automatically.
 - Supabase email templates must be uploaded manually to Supabase.
 - Bento email templates must be uploaded manually to Bento.
