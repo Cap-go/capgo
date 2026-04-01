@@ -21,8 +21,6 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 let intervalId: NodeJS.Timeout | null = null
 
-// Use i18n component interpolation in the template; no HTML parsing here
-
 // Fetch removal date and start timer
 onMounted(async () => {
   try {
@@ -112,16 +110,16 @@ const timeRemaining = computed(() => {
         <h1 class="mb-6 text-4xl font-bold text-gray-900 dark:text-white">
           {{ t('account-deletion-requested') }}
         </h1>
-        <i18n-t keypath="account-deletion-restore" tag="p" class="mb-4 text-lg text-gray-600 dark:text-gray-300">
-          <template #link>
-            <a
-              href="https://support.capgo.app/"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-blue-500 underline hover:text-blue-600"
-            >Capgo support</a>
-          </template>
-        </i18n-t>
+        <p class="mb-4 text-lg text-gray-600 dark:text-gray-300">
+          Please contact
+          <a
+            href="https://support.capgo.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-blue-500 underline hover:text-blue-600"
+          >Capgo support</a>
+          if you would like to restore it
+        </p>
         <div class="p-4 mt-6 bg-red-50 rounded-lg border border-red-200 dark:border-red-800 dark:bg-red-900/20">
           <p class="font-medium text-red-800 dark:text-red-200">
             {{ timeRemaining === t('account-deletion-very-soon') ? t('account-deletion-timer') : t('account-deletion-timer-in') }}

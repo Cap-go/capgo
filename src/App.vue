@@ -1,11 +1,14 @@
 <script setup lang="ts">
 import { defineAsyncComponent, watch } from 'vue'
+import { usePageTranslation } from '~/composables/usePageTranslation'
 
 const Toast = defineAsyncComponent(() => import('~/components/Toast.vue'))
 const DialogV2 = defineAsyncComponent(() => import('~/components/DialogV2.vue'))
 
 const route = useRoute()
 const display = useDisplayStore()
+
+usePageTranslation()
 
 watch(
   () => route.path,

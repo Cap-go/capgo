@@ -1,30 +1,21 @@
-import { changeLocale } from '@formkit/vue'
 import countryCodeToFlagEmoji from 'country-code-to-flag-emoji'
-import { loadLanguageAsync } from '~/modules/i18n'
+import { getLanguageConfig, getSelectedLanguage, loadLanguageAsync, normalizeLanguage } from '~/modules/i18n'
 
-export function getEmoji(country: string) {
-  // convert country code to emoji flag
-  let countryCode = country
-  switch (country) {
-    case 'en':
-      countryCode = 'US'
-      break
-    case 'ko':
-      countryCode = 'KR'
-      break
-    case 'ja':
-      countryCode = 'JP'
-      break
-    case 'hi':
-      countryCode = 'IN'
-      break
-    default:
-      break
-  }
-  return countryCodeToFlagEmoji(countryCode)
+export function getEmoji(lang: string) {
+  return countryCodeToFlagEmoji(getLanguageConfig(lang).countryCode)
 }
 
 export async function changeLanguage(lang: string) {
-  await loadLanguageAsync(lang)
-  changeLocale(lang)
+  const currentLanguage = getSelectedLanguage()
+  const nextLanguage = normalizeLanguage(lang)
+
+  if (currentLanguage === nextLanguage)
+    return nextLanguage
+
+  await loadLanguageAsync(nextLanguage)
+
+  if (typeof window !== 'undefined')
+    window.location.reload()
+
+  return nextLanguage
 }

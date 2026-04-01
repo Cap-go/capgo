@@ -10,6 +10,9 @@
   "placement": {
     "mode": "smart"
   },
+  "ai": {
+    "binding": "AI"
+  },
   "workers_dev": false,
   "upload_source_maps": true,
   "env": {
