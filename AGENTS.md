@@ -164,6 +164,14 @@ Capgo relies on two layered caches for plugin endpoints (`/updates`, `/stats`, `
    - Use the public shape like `npx @capgo/cli@latest ...` for customer-facing command examples.
    - Use internal execution equivalents (for example, `bunx @capgo/cli@latest ...`) only in internal tooling context.
 
+### Email Templates
+
+- Supabase auth emails use Supabase template syntax.
+- Bento emails use Bento template syntax.
+- Updating templates in the repository does not upload them anywhere automatically.
+- Supabase email templates must be uploaded manually to Supabase.
+- Bento email templates must be uploaded manually to Bento.
+
 ### Environment Setup
 
 1. Install dependencies: `bun install`
