@@ -103,6 +103,8 @@ function rewriteConfigToml(raw: string, cfg: ReturnType<typeof getSupabaseWorktr
       out.push(`inspector_port = ${ports.edgeInspector}`)
     else if (section in portBySection && line.match(/^\s*port\s*=\s*\d+\s*$/))
       out.push(`port = ${portBySection[section]}`)
+    else if (line.includes('./supabase/templates/'))
+      out.push(line.replace('./supabase/templates/', './templates/'))
     else
       out.push(line)
   }
@@ -125,6 +127,7 @@ function ensureWorktreeSupabaseDir(repoRoot: string): { workdir: string, cfg: Re
 
   // Symlink everything except config.toml so we can safely rewrite ports + project_id per worktree.
   const repoSupaDir = resolve(cfg.repoRoot, 'supabase')
+  const repoTemplatesDir = resolve(repoSupaDir, 'templates')
   for (const entry of ['functions', 'migrations', 'schemas', 'tests', 'seed.sql', 'migration_guide.md', '.gitignore']) {
     const src = resolve(repoSupaDir, entry)
     if (!existsSync(src))
@@ -132,6 +135,9 @@ function ensureWorktreeSupabaseDir(repoRoot: string): { workdir: string, cfg: Re
     const dst = resolve(supaDir, entry)
     ensureSymlink(dst, src)
   }
+
+  if (existsSync(repoTemplatesDir))
+    ensureSymlink(resolve(workdir, 'templates'), repoTemplatesDir)
 
   const baseConfig = readFileSync(resolve(repoSupaDir, 'config.toml'), 'utf8')
   const rewritten = rewriteConfigToml(baseConfig, cfg)
