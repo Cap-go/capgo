@@ -136,8 +136,10 @@ function ensureWorktreeSupabaseDir(repoRoot: string): { workdir: string, cfg: Re
     ensureSymlink(dst, src)
   }
 
-  if (existsSync(repoTemplatesDir))
+  if (existsSync(repoTemplatesDir)) {
     ensureSymlink(resolve(workdir, 'templates'), repoTemplatesDir)
+    ensureSymlink(resolve(supaDir, 'templates'), repoTemplatesDir)
+  }
 
   const baseConfig = readFileSync(resolve(repoSupaDir, 'config.toml'), 'utf8')
   const rewritten = rewriteConfigToml(baseConfig, cfg)
