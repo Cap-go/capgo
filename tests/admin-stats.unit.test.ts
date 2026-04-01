@@ -39,6 +39,15 @@ describe('admin stats validation', () => {
     expect(parsed.data.offset).toBe(10)
   })
 
+  it('accepts the customer country breakdown metric', () => {
+    const parsed = adminStatsBodySchema.safeParse({
+      ...baseBody,
+      metric_category: 'customer_country_breakdown',
+    })
+
+    expect(parsed.success).toBe(true)
+  })
+
   it.each([
     ['plain date start', { start_date: '2025-01-01' }],
     ['plain date end', { end_date: '2025-01-31' }],
