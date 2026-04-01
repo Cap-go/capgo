@@ -15,6 +15,8 @@ describe('stale asset error helpers', () => {
     expect(isStaleAssetErrorMessage('Failed to fetch')).toBe(false)
     expect(isStaleAssetErrorMessage('ResizeObserver loop completed with undelivered notifications.')).toBe(false)
     expect(isStaleAssetErrorMessage('Cannot read properties of undefined (reading \'digest\')')).toBe(false)
+    expect(isStaleAssetErrorMessage('\'application/json\' is not a valid JavaScript MIME type.')).toBe(false)
+    expect(isStaleAssetErrorMessage('\'text/plain\' is not a valid JavaScript MIME type.')).toBe(false)
   })
 
   it('extracts useful messages from arbitrary rejection values', () => {

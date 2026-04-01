@@ -3,7 +3,7 @@ const STALE_ASSET_ERROR_PATTERNS = [
   /error loading dynamically imported module/i,
   /Importing a module script failed/i,
   /Unable to preload CSS/i,
-  /is not a valid JavaScript MIME type/i,
+  /text\/html.*is not a valid JavaScript MIME type/i,
   /Loading chunk [\w-]+ failed/i,
   /Loading CSS chunk [\w-]+ failed/i,
 ]

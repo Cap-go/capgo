@@ -20,12 +20,13 @@ import './styles/style.css'
 
 // Handle chunk load errors (stale chunks after deployment)
 // When a new version is deployed, old chunk URLs return 404/HTML instead of JS
-const CHUNK_RELOAD_KEY = 'capgo_chunk_reload'
+const CHUNK_RELOAD_TIMESTAMP_KEY = 'capgo_chunk_reload_timestamp'
+const CHUNK_RELOAD_TOAST_KEY = 'capgo_chunk_reload_toast'
 const CHUNK_RELOAD_COOLDOWN_MS = 30_000
 
 function getChunkReloadTimestamp(): number | null {
   try {
-    const storedValue = sessionStorage.getItem(CHUNK_RELOAD_KEY)
+    const storedValue = sessionStorage.getItem(CHUNK_RELOAD_TIMESTAMP_KEY)
     if (!storedValue)
       return null
 
@@ -39,16 +40,34 @@ function getChunkReloadTimestamp(): number | null {
 
 function setChunkReloadTimestamp(): void {
   try {
-    sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()))
+    sessionStorage.setItem(CHUNK_RELOAD_TIMESTAMP_KEY, String(Date.now()))
   }
   catch {
     // Ignore storage access failures and still let the reload happen.
   }
 }
 
-function clearChunkReloadTimestamp(): void {
+function hasChunkReloadToastPending(): boolean {
   try {
-    sessionStorage.removeItem(CHUNK_RELOAD_KEY)
+    return sessionStorage.getItem(CHUNK_RELOAD_TOAST_KEY) === 'true'
+  }
+  catch {
+    return false
+  }
+}
+
+function setChunkReloadToastPending(): void {
+  try {
+    sessionStorage.setItem(CHUNK_RELOAD_TOAST_KEY, 'true')
+  }
+  catch {
+    // Ignore storage access failures and still let the reload happen.
+  }
+}
+
+function clearChunkReloadToastPending(): void {
+  try {
+    sessionStorage.removeItem(CHUNK_RELOAD_TOAST_KEY)
   }
   catch {
     // Ignore storage access failures during cleanup.
@@ -64,6 +83,7 @@ function handleChunkError(message: string) {
 
   console.warn('Chunk load error detected, reloading page...', message)
   setChunkReloadTimestamp()
+  setChunkReloadToastPending()
   window.location.reload()
 }
 
@@ -86,12 +106,14 @@ window.addEventListener('unhandledrejection', (event) => {
 })
 
 window.addEventListener('vite:preloadError', (event) => {
-  event.preventDefault()
-  event.stopImmediatePropagation()
   const preloadEvent = event as Event & { payload?: unknown, detail?: unknown }
   const message = getErrorMessage(preloadEvent.payload)
     ?? getErrorMessage(preloadEvent.detail)
     ?? 'Vite preload error'
+  if (!isStaleAssetErrorMessage(message))
+    return
+  event.preventDefault()
+  event.stopImmediatePropagation()
   handleChunkError(message)
 })
 
@@ -172,11 +194,11 @@ router.isReady().then(async () => {
 
   // Wait for vue-sonner component to be mounted
   setTimeout(async () => {
-    const key = getChunkReloadTimestamp()
+    const key = hasChunkReloadToastPending()
     console.log('Checking for chunk reload toast...', key)
     // Show toast if we just reloaded due to chunk error
     if (key) {
-      clearChunkReloadTimestamp()
+      clearChunkReloadToastPending()
       const { toast } = await import('vue-sonner')
       toast.info('App updated! Page was refreshed to load the latest version.')
     }
