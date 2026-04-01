@@ -16,6 +16,9 @@ const inviteExistingUserSchema = z.object({
   org_id: z.string().check(z.minLength(1)),
 })
 const INVITE_RESEND_COOLDOWN_MINUTES = 5
+// CacheHelper is the durable cross-instance cooldown layer. Keep this in-memory
+// fallback to throttle same-instance resend bursts when the Cache API is
+// unavailable in local/test runtimes.
 const inviteNotificationCooldowns = new Map<string, number>()
 
 type AppContext = Context<MiddlewareKeyVariables, any, any>
@@ -87,16 +90,17 @@ async function unlockInviteNotification(
 
 async function validateRequest(c: AppContext, rawBody: unknown) {
   const validationResult = inviteExistingUserSchema.safeParse(rawBody)
-  if (!validationResult.success) {
-    quickError(400, 'invalid_request', 'Invalid request', { errors: z.prettifyError(validationResult.error) })
-  }
+  if (!validationResult.success)
+    return quickError(400, 'invalid_request', 'Invalid request', { errors: z.prettifyError(validationResult.error) })
 
   const body = validationResult.data
+  // Check org-scoped permissions before fetching org details so this endpoint
+  // does not become an organization-existence oracle for arbitrary ids.
   const canInviteUser = await checkPermission(c, 'org.invite_user', { orgId: body.org_id })
   const canUpdateUserRoles = await checkPermission(c, 'org.update_user_roles', { orgId: body.org_id })
 
   if (!canInviteUser && !canUpdateUserRoles) {
-    quickError(403, 'not_authorized', 'Not authorized', {
+    return quickError(403, 'not_authorized', 'Not authorized', {
       requiredPermission: 'org.invite_user',
       orgId: body.org_id,
     })

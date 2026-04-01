@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { getAuthHeaders, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, USER_EMAIL_NONMEMBER, USER_ID, USER_ID_NONMEMBER, USER_PASSWORD_NONMEMBER } from './test-utils.ts'
+import { getAuthHeaders, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, USER_EMAIL_NONMEMBER, USER_ID, USER_ID_2, USER_ID_NONMEMBER, USER_PASSWORD, USER_PASSWORD_NONMEMBER } from './test-utils.ts'
 
 let authHeaders: Record<string, string>
 let nonMemberAuthHeaders: Record<string, string>
+let orgAdminAuthHeaders: Record<string, string>
+const USER_EMAIL_2 = 'test2@capgo.app'
 
 async function postInviteExistingUserToOrg(headers: Record<string, string>, body: { email: string, org_id: string }) {
   return fetch(getEndpointUrl('/private/invite_existing_user_to_org'), {
@@ -13,12 +15,19 @@ async function postInviteExistingUserToOrg(headers: Record<string, string>, body
   })
 }
 
-async function createInviteTestFixture() {
+async function createInviteTestFixture(options?: {
+  inviterUserId?: string
+  inviterUserRight?: 'admin' | 'super_admin'
+  invitedUserRight?: `invite_${'read' | 'super_admin'}` | 'read'
+}) {
   const id = randomUUID()
   const orgId = randomUUID()
   const customerId = `cus_existing_invite_${id}`
   const orgEmail = `existing-invite-${id}@capgo.app`
   const supabase = getSupabaseClient()
+  const inviterUserId = options?.inviterUserId ?? USER_ID
+  const inviterUserRight = options?.inviterUserRight ?? 'super_admin'
+  const invitedUserRight = options?.invitedUserRight ?? 'invite_read'
 
   const { error: stripeError } = await supabase.from('stripe_info').insert({
     customer_id: customerId,
@@ -45,13 +54,13 @@ async function createInviteTestFixture() {
   const { error: orgUsersError } = await supabase.from('org_users').insert([
     {
       org_id: orgId,
-      user_id: USER_ID,
-      user_right: 'super_admin',
+      user_id: inviterUserId,
+      user_right: inviterUserRight,
     },
     {
       org_id: orgId,
       user_id: USER_ID_NONMEMBER,
-      user_right: 'invite_read',
+      user_right: invitedUserRight,
     },
   ])
   if (orgUsersError)
@@ -72,6 +81,7 @@ async function createInviteTestFixture() {
 beforeAll(async () => {
   authHeaders = await getAuthHeaders()
   nonMemberAuthHeaders = await getAuthHeadersForCredentials(USER_EMAIL_NONMEMBER, USER_PASSWORD_NONMEMBER)
+  orgAdminAuthHeaders = await getAuthHeadersForCredentials(USER_EMAIL_2, USER_PASSWORD)
 })
 
 describe('[POST] /private/invite_existing_user_to_org', () => {
@@ -126,6 +136,23 @@ describe('[POST] /private/invite_existing_user_to_org', () => {
     }
   })
 
+  it.concurrent('returns forbidden when the caller targets an inaccessible organization id', async () => {
+    const fixture = await createInviteTestFixture()
+    try {
+      const response = await postInviteExistingUserToOrg(authHeaders, {
+        email: USER_EMAIL_NONMEMBER,
+        org_id: `${fixture.orgId}-missing`,
+      })
+
+      expect(response.status).toBe(403)
+      const data = await response.json() as { error: string }
+      expect(data.error).toBe('not_authorized')
+    }
+    finally {
+      await fixture.cleanup()
+    }
+  })
+
   it.concurrent('returns conflict when the invitation has already been accepted', async () => {
     const fixture = await createInviteTestFixture()
     try {
@@ -155,6 +182,27 @@ describe('[POST] /private/invite_existing_user_to_org', () => {
     const fixture = await createInviteTestFixture()
     try {
       const response = await postInviteExistingUserToOrg(nonMemberAuthHeaders, {
+        email: USER_EMAIL_NONMEMBER,
+        org_id: fixture.orgId,
+      })
+
+      expect(response.status).toBe(403)
+      const data = await response.json() as { error: string }
+      expect(data.error).toBe('not_authorized')
+    }
+    finally {
+      await fixture.cleanup()
+    }
+  })
+
+  it.concurrent('returns forbidden when an org admin tries to resend a super admin invite', async () => {
+    const fixture = await createInviteTestFixture({
+      inviterUserId: USER_ID_2,
+      inviterUserRight: 'admin',
+      invitedUserRight: 'invite_super_admin',
+    })
+    try {
+      const response = await postInviteExistingUserToOrg(orgAdminAuthHeaders, {
         email: USER_EMAIL_NONMEMBER,
         org_id: fixture.orgId,
       })

@@ -118,6 +118,7 @@ async function handleOrganizationInvitation(org: OrganizationInvitationTarget) {
           const { error } = await supabase
             .from('org_users')
             .delete()
+            .eq('org_id', org.gid)
             .eq('user_id', userId)
 
           if (error)

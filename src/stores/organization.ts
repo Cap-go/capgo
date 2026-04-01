@@ -250,7 +250,8 @@ export const useOrganizationStore = defineStore('organization', () => {
       return
 
     const organizations = Array.from(organizationsMap.values())
-    const orgIds = organizations.map(org => org.gid)
+    const selectableOrganizations = organizations.filter(org => isSelectableOrganization(org.role))
+    const orgIds = selectableOrganizations.map(org => org.gid)
 
     if (orgIds.length === 0) {
       _initialLoadPromise.value.resolve(true)
@@ -272,7 +273,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     for (const app of allAppsByOwner) {
       // For each app find the org_id that owns said app
       // This is needed for the "banner"
-      const org = organizations.find(org => org.gid === app.owner_org)
+      const org = selectableOrganizations.find(org => org.gid === app.owner_org)
       if (!org) {
         console.error(`Cannot find organization for app`, app)
         _initialLoadPromise.value.reject(`Cannot find organization for app ${app}`)
