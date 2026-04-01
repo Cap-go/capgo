@@ -202,7 +202,7 @@ enabled = true
 subject = "[Capgo]: Multi-factor authentication method removed from your Capgo.app account"
 content_path = "./templates/mfa_factor_unenrolled_notification.html"
 
-# Custom email templates kept in ./supabase/templates for consistency, but not managed by Supabase.
+# Custom email templates kept in ./templates for consistency, but not managed by Supabase.
 # These are sent through Bento:
 # - invite_new_user_to_org.html
 #   subject = "[Capgo]: Join {{ event.details.org_name }} org & create account"
