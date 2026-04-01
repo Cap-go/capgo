@@ -320,15 +320,6 @@ app.post('/page', async (c) => {
   }
 
   const strings = normalizeTranslationStrings(body.strings)
-  const rateLimitStatus = await recordTranslationRequest(c)
-  if (rateLimitStatus.limited) {
-    const retryAfter = rateLimitStatus.resetAt
-      ? Math.max(1, Math.ceil((rateLimitStatus.resetAt - Date.now()) / 1000))
-      : TRANSLATION_IP_RATE_TTL_SECONDS
-    c.header('Retry-After', String(retryAfter))
-    throw quickError(429, 'translation_rate_limited', 'Too many translation requests')
-  }
-
   const requestHash = await sha256Hex(JSON.stringify({
     model: TRANSLATION_MODEL,
     pagePath: body.pagePath ?? '',
@@ -347,6 +338,15 @@ app.post('/page', async (c) => {
 
   if (cached)
     return c.json(cached)
+
+  const rateLimitStatus = await recordTranslationRequest(c)
+  if (rateLimitStatus.limited) {
+    const retryAfter = rateLimitStatus.resetAt
+      ? Math.max(1, Math.ceil((rateLimitStatus.resetAt - Date.now()) / 1000))
+      : TRANSLATION_IP_RATE_TTL_SECONDS
+    c.header('Retry-After', String(retryAfter))
+    throw quickError(429, 'translation_rate_limited', 'Too many translation requests')
+  }
 
   const translations = strings.length > 0
     ? await translateStrings(c.env.AI, strings, targetLanguage)

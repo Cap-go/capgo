@@ -42,6 +42,9 @@ describe('dynamic translation language selection', () => {
 
   it.concurrent('only treats approved source strings as safe translation inputs', () => {
     expect(isKnownSourceText('Bundle uploads')).toBe(true)
+    expect(isKnownSourceText('2 minutes ago')).toBe(true)
+    expect(isKnownSourceText('Updates working well! 93% adoption')).toBe(true)
+    expect(isKnownSourceText('Successfully granted 10 credits to Acme')).toBe(false)
     expect(isKnownSourceText('Acme Corp internal metrics')).toBe(false)
   })
 

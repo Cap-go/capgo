@@ -67,14 +67,93 @@ export const languages = Object.fromEntries(languageOptions.map(option => [optio
 export const selectedLanguage = ref(SOURCE_LOCALE)
 
 const messageCatalog = sourceMessages as Record<string, string>
+const SAFE_DYNAMIC_PLACEHOLDERS = new Set([
+  'amount',
+  'channel',
+  'cmd',
+  'completed',
+  'count',
+  'country',
+  'current',
+  'date',
+  'days',
+  'duration',
+  'end',
+  'hours',
+  'metric',
+  'minutes',
+  'percent',
+  'seconds',
+  'share',
+  'start',
+  'status',
+  'time',
+  'total',
+  'unchanged',
+  'version',
+])
 const knownSourceTexts = new Set([
   ...Object.values(messageCatalog),
   ...languageOptions.map(option => option.label),
-].map(value => normalizeKnownSourceText(value)).filter(value => value && !value.includes('{')))
+].map(value => normalizeKnownSourceText(value)).filter(Boolean))
+const knownSourcePatterns = Object.values(messageCatalog)
+  .map(value => createKnownSourcePattern(normalizeKnownSourceText(value)))
+  .filter((value): value is RegExp => value !== null)
 type MessageParams = Record<string, unknown> | string | undefined
 
 function normalizeKnownSourceText(value: string) {
   return value.replace(/\s+/g, ' ').trim()
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function getPlaceholderPattern(token: string) {
+  if (!SAFE_DYNAMIC_PLACEHOLDERS.has(token))
+    return null
+
+  switch (token) {
+    case 'completed':
+    case 'count':
+    case 'current':
+    case 'days':
+    case 'hours':
+    case 'minutes':
+    case 'seconds':
+    case 'total':
+    case 'unchanged':
+      return '[-+]?\\d+(?:[\\d., ]*\\d)?'
+    case 'percent':
+    case 'share':
+      return '[-+]?\\d+(?:[\\d., ]*\\d)?%?'
+    default:
+      return '[^\\n]+?'
+  }
+}
+
+function createKnownSourcePattern(value: string) {
+  const matches = [...value.matchAll(/\{(\w+)\}/g)]
+  if (matches.length === 0)
+    return null
+
+  const parts: string[] = []
+  let lastIndex = 0
+
+  for (const match of matches) {
+    const [placeholder, token] = match
+    const replacement = getPlaceholderPattern(token)
+    if (!replacement)
+      return null
+
+    const startIndex = match.index ?? 0
+    parts.push(escapeRegex(value.slice(lastIndex, startIndex)))
+    parts.push(`(${replacement})`)
+    lastIndex = startIndex + placeholder.length
+  }
+
+  parts.push(escapeRegex(value.slice(lastIndex)))
+  return new RegExp(`^${parts.join('')}$`, 'u')
 }
 
 function interpolateMessage(message: string, params?: MessageParams): string {
@@ -162,7 +241,9 @@ export function getSourceMessage(key: string, defaultMessage?: string) {
 
 export function isKnownSourceText(value: string) {
   const normalized = normalizeKnownSourceText(value)
-  return !!normalized && knownSourceTexts.has(normalized)
+  if (!normalized)
+    return false
+  return knownSourceTexts.has(normalized) || knownSourcePatterns.some(pattern => pattern.test(normalized))
 }
 
 export function translateMessage(key: string, params?: MessageParams, defaultMessage?: string) {
