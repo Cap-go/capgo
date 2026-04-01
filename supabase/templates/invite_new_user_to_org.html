@@ -1,0 +1,22 @@
+Hi {{ event.details.invited_first_name }} {{ event.details.invited_last_name }},<br/><br/>
+
+<p>{{ event.details.org_admin_name }} has invited you to join the "{{ event.details.org_name }}" organization on Capgo.app.</p>
+
+<p>To accept this invitation and create your account, please use the button below:</p>
+
+<p>
+  <a
+    href="{{ event.details.invite_link }}"
+    target="_blank"
+    rel="noopener noreferrer nofollow"
+    style="background-color: #2563eb; color: #ffffff; border-radius: 8px; font-size: 14px; text-decoration: none; font-weight: bold; padding: 8px 16px; display: inline-block;"
+  >
+    Accept the invitation
+  </a>
+</p>
+
+<p>This invitation is valid for seven days.</p>
+
+<p>If you did not expect this invitation, you can safely ignore this email.</p>
+
+<span style="color: #6c757d;">- Martin, Founder of Capgo.app</span>
