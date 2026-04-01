@@ -5,6 +5,9 @@ name = "capgo"
 [setup]
 script = "bun i"
 
+[cleanup]
+script = "bun run supabase:cleanup"
+
 [[actions]]
 name = "Run prod"
 icon = "run"
