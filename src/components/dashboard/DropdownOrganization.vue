@@ -74,6 +74,7 @@ onUnmounted(() => {
 
 async function handleOrganizationInvitation(org: OrganizationInvitationTarget) {
   const newName = t('alert-accept-invitation').replace('%ORG%', org.name)
+  let invitationHandled = false
   dialogStore.openDialog({
     title: t('alert-confirm-invite'),
     description: `${newName}`,
@@ -92,6 +93,7 @@ async function handleOrganizationInvitation(org: OrganizationInvitationTarget) {
           }
 
           if (data === 'OK') {
+            invitationHandled = true
             organizationStore.setCurrentOrganization(org.gid)
             organizationStore.fetchOrganizations()
             toast.success(t('invite-accepted'))
@@ -121,9 +123,12 @@ async function handleOrganizationInvitation(org: OrganizationInvitationTarget) {
             .eq('org_id', org.gid)
             .eq('user_id', userId)
 
-          if (error)
+          if (error) {
             console.log('Error delete: ', error)
+            return
+          }
 
+          invitationHandled = true
           organizationStore.fetchOrganizations()
           toast.success(t('alert-denied-invite'))
         },
@@ -136,7 +141,8 @@ async function handleOrganizationInvitation(org: OrganizationInvitationTarget) {
   })
 
   await dialogStore.onDialogDismiss()
-  await clearInviteOrgQuery()
+  if (invitationHandled)
+    await clearInviteOrgQuery()
 }
 
 async function clearInviteOrgQuery() {
