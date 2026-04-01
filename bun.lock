@@ -99,6 +99,8 @@
         "zod": "^4.3.6",
       },
       "devDependencies": {
+        "@emulators/core": "./scripts/vendor/emulate-core",
+        "@emulators/stripe": "./scripts/vendor/emulate-stripe",
         "@antfu/eslint-config": "6.7.3",
         "@capacitor/cli": "^8.2.0",
         "@capacitor/core": "^8.2.0",
@@ -106,6 +108,7 @@
         "@cloudflare/workers-types": "4.20260303.0",
         "@codspeed/vitest-plugin": "^5.2.0",
         "@formkit/core": "1.6.9",
+        "@hono/node-server": "^1.19.12",
         "@iconify/json": "^2.2.449",
         "@playwright/test": "1.57.0",
         "@tailwindcss/aspect-ratio": "^0.4.2",
@@ -128,6 +131,7 @@
         "adm-zip": "^0.5.16",
         "cross-env": "^10.1.0",
         "discord-api-types": "^0.38.42",
+        "emulate": "github:vercel-labs/emulate#7ff0a600ed09c053d55fa1c3c10f4235d60677ce",
         "eslint": "9.39.4",
         "eslint-plugin-format": "^1.5.0",
         "sass": "1.97.3",
@@ -574,6 +578,10 @@
 
     "@emnapi/wasi-threads": ["@emnapi/wasi-threads@1.1.0", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-WI0DdZ8xFSbgMjR1sFsKABJ/C5OnRrjT06JXbZKexJGrDuPTzZdDYfFlsgcCXCyf+suG5QU2e/y1Wo2V/OapLQ=="],
 
+    "@emulators/core": ["@emulators/core@file:scripts/vendor/emulate-core", {}],
+
+    "@emulators/stripe": ["@emulators/stripe@file:scripts/vendor/emulate-stripe", {}],
+
     "@epic-web/invariant": ["@epic-web/invariant@1.0.0", "", {}, "sha512-lrTPqgvfFQtR/eY/qkIzp98OGdNJu0m5ji3q/nJI8v3SXkRKEnWiOxMmbvcSoAIzv/cGiuvRy57k4suKQSAdwA=="],
 
     "@es-joy/jsdoccomment": ["@es-joy/jsdoccomment@0.78.0", "", { "dependencies": { "@types/estree": "^1.0.8", "@typescript-eslint/types": "^8.46.4", "comment-parser": "1.4.1", "esquery": "^1.6.0", "jsdoc-type-pratt-parser": "~7.0.0" } }, "sha512-rQkU5u8hNAq2NVRzHnIUUvR6arbO0b6AOlvpTNS48CkiKSn/xtNfOzBK23JE4SiW89DgvU7GtxLVgV4Vn2HBAw=="],
@@ -783,6 +791,8 @@
     "@hapi/hoek": ["@hapi/hoek@9.3.0", "", {}, "sha512-/c6rf4UJlmHlC9b5BaNvzAcFv7HZ2QHaV0D4/HNlBdvFnvQq8RI4kYdhyPCl7Xj+oWvTWQ8ujhqS53LIgAe6KQ=="],
 
     "@hapi/topo": ["@hapi/topo@5.1.0", "", { "dependencies": { "@hapi/hoek": "^9.0.0" } }, "sha512-foQZKJig7Ob0BMAYBfcJk8d77QtOe7Wo4ox7ff1lQYoNNAb6jwcY1ncdoy2e9wQZzvNy7ODZCYJkK8kzmcAnAg=="],
+
+    "@hono/node-server": ["@hono/node-server@1.19.12", "", { "peerDependencies": { "hono": "^4" } }, "sha512-txsUW4SQ1iilgE0l9/e9VQWmELXifEFvmdA1j6WFh/aFPj99hIntrSsq/if0UWyGVkmrRPKA1wCeP+UCr1B9Uw=="],
 
     "@humanfs/core": ["@humanfs/core@0.19.1", "", {}, "sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA=="],
 
@@ -2015,6 +2025,8 @@
     "emojis-list": ["emojis-list@3.0.0", "", {}, "sha512-/kyM18EfinwXZbno9FyUGeFh87KC8HRQBQGildHZbEuRyWFOmv1U10o9BBp8XVZDVNNuQKyIGIu5ZYAAXJ0V2Q=="],
 
     "empathic": ["empathic@2.0.0", "", {}, "sha512-i6UzDscO/XfAcNYD75CfICkmfLedpyPDdozrLMmQc5ORaQcdMoc21OnlEylMIqI7U8eniKrPMxxtj8k0vhmJhA=="],
+
+    "emulate": ["emulate-monorepo@github:vercel-labs/emulate#7ff0a60", {}, "vercel-labs-emulate-7ff0a60", "sha512-FIyOy7ivSIdTvRTjfoVWEhTvVm09mFpYJaKk5LKkadGnITLcK+9HPLKGoFQV/OLFJJKaARRzHjLjDLvsZy8Raw=="],
 
     "encodeurl": ["encodeurl@2.0.0", "", {}, "sha512-Q0n9HRi4m6JuGIV1eFlmvJB7ZEVxu93IrMyiMsGC0lrMJMWzRgx6WGquyfQgZVb31vhGgXnfmPNNXmxnOkRBrg=="],
 

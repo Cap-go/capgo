@@ -58,10 +58,50 @@ export function resolveStripeEnvironment(c: Context): StripeEnvironment {
   return 'test'
 }
 
+function getStripeApiBaseUrl(c: Context): URL | null {
+  const rawBaseUrl = getEnv(c, 'STRIPE_API_BASE_URL').trim()
+  if (!rawBaseUrl)
+    return null
+
+  let parsedBaseUrl: URL
+  try {
+    parsedBaseUrl = new URL(rawBaseUrl)
+  }
+  catch {
+    throw new Error('Invalid STRIPE_API_BASE_URL')
+  }
+
+  if (!['http:', 'https:'].includes(parsedBaseUrl.protocol)) {
+    throw new Error('STRIPE_API_BASE_URL must use http or https')
+  }
+
+  if (parsedBaseUrl.pathname !== '/' && parsedBaseUrl.pathname !== '') {
+    throw new Error('STRIPE_API_BASE_URL must not include a path')
+  }
+
+  return parsedBaseUrl
+}
+
+export function isStripeEmulatorEnabled(c: Context): boolean {
+  return getStripeApiBaseUrl(c) !== null
+}
+
 export function getStripe(c: Context) {
+  const apiBaseUrl = getStripeApiBaseUrl(c)
+  const apiPort = apiBaseUrl
+    ? Number.parseInt(apiBaseUrl.port || (apiBaseUrl.protocol === 'https:' ? '443' : '80'), 10)
+    : undefined
+
   return new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'), {
     apiVersion: '2025-10-29.clover',
     httpClient: Stripe.createFetchHttpClient(),
+    ...(apiBaseUrl
+      ? {
+          host: apiBaseUrl.hostname,
+          port: apiPort,
+          protocol: apiBaseUrl.protocol.replace(':', '') as 'http' | 'https',
+        }
+      : {}),
   })
 }
 
@@ -333,9 +373,7 @@ async function getPriceIds(c: Context, planId: string, recurrence: string): Prom
   if (!isStripeConfigured(c))
     return { priceId }
   try {
-    const prices = await getStripe(c).prices.search({
-      query: `product:"${planId}"`,
-    })
+    const prices = await listPricesByProduct(c, planId)
     cloudlog({ requestId: c.get('requestId'), message: 'prices stripe', prices })
     prices.data.forEach((price) => {
       if (price.recurring && price.recurring.interval === recurrence && price.active && price.recurring.usage_type === 'licensed')
@@ -350,6 +388,19 @@ async function getPriceIds(c: Context, planId: string, recurrence: string): Prom
 
 export interface MeteredData {
   [key: string]: string
+}
+
+export interface CreditCheckoutItemSummary {
+  [key: string]: string | number | null
+  id: string | null
+  quantity: number | null
+  priceId: string | null
+  productId: string | null
+}
+
+export interface CreditCheckoutDetails {
+  creditQuantity: number
+  itemsSummary: CreditCheckoutItemSummary[]
 }
 
 export interface StripeData {
@@ -412,13 +463,19 @@ export async function createCheckout(c: Context, customerId: string, recurrence:
   return { url: session.url }
 }
 
+async function listPricesByProduct(c: Context, productId: string, active?: boolean) {
+  return await getStripe(c).prices.list({
+    product: productId,
+    ...(active === undefined ? {} : { active }),
+    limit: 100,
+  })
+}
+
 async function getOneTimePriceId(c: Context, productId: string): Promise<string | null> {
   if (!isStripeConfigured(c))
     return null
   try {
-    const prices = await getStripe(c).prices.search({
-      query: `product:"${productId}" AND active:'true'`,
-    })
+    const prices = await listPricesByProduct(c, productId, true)
 
     for (const price of prices.data) {
       if (price.type === 'one_time' && price.active)
@@ -478,10 +535,79 @@ export async function createOneTimeCheckout(
     ],
     metadata: {
       productId,
+      orgId: clientReferenceId ?? '',
       intendedQuantity: String(quantity),
     },
   })
   return { url: session.url }
+}
+
+export async function getCreditCheckoutDetails(c: Context, session: Stripe.Checkout.Session, expectedProductId: string): Promise<CreditCheckoutDetails> {
+  try {
+    const lineItems = await getStripe(c).checkout.sessions.listLineItems(session.id, {
+      expand: ['data.price.product'],
+      limit: 100,
+    })
+
+    let creditQuantity = 0
+    const itemsSummary = lineItems.data.map((item) => {
+      const priceProduct = typeof item.price?.product === 'string'
+        ? item.price.product
+        : (item.price?.product as { id?: string } | null)?.id ?? null
+
+      if (priceProduct === expectedProductId)
+        creditQuantity += item.quantity ?? 0
+
+      return {
+        id: item.id ?? null,
+        quantity: item.quantity ?? null,
+        priceId: item.price?.id ?? null,
+        productId: priceProduct,
+      }
+    })
+
+    return {
+      creditQuantity,
+      itemsSummary,
+    }
+  }
+  catch (error) {
+    if (!isStripeEmulatorEnabled(c))
+      throw error
+
+    const metadataProductId = typeof session.metadata?.productId === 'string'
+      ? session.metadata.productId
+      : null
+    const intendedQuantity = Number.parseInt(session.metadata?.intendedQuantity ?? '', 10)
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Falling back to Stripe checkout metadata for credit checkout details',
+      sessionId: session.id,
+      expectedProductId,
+      metadataProductId,
+      error: error instanceof Error ? error.message : String(error),
+    })
+
+    if (metadataProductId === expectedProductId && Number.isFinite(intendedQuantity) && intendedQuantity > 0) {
+      return {
+        creditQuantity: intendedQuantity,
+        itemsSummary: [
+          {
+            id: null,
+            quantity: intendedQuantity,
+            priceId: null,
+            productId: metadataProductId,
+          },
+        ],
+      }
+    }
+
+    return {
+      creditQuantity: 0,
+      itemsSummary: [],
+    }
+  }
 }
 
 function getAllowedRedirectUrl(c: Context, value: string, field: 'return_url' | 'success_url' | 'cancel_url') {

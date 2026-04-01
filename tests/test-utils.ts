@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../src/types/supabase.types'
-import { env } from 'node:process'
+import { spawnSync } from 'node:child_process'
+import process, { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 import { Pool } from 'pg'
 
@@ -39,6 +40,55 @@ const USE_CLOUDFLARE = env.USE_CLOUDFLARE_WORKERS === 'true'
 export const CLOUDFLARE_API_URL = env.CLOUDFLARE_API_URL ?? 'http://127.0.0.1:8787'
 export const CLOUDFLARE_PLUGIN_URL = env.CLOUDFLARE_PLUGIN_URL ?? 'http://127.0.0.1:8788'
 export const CLOUDFLARE_FILES_URL = env.CLOUDFLARE_FILES_URL ?? 'http://127.0.0.1:8789'
+
+function parseSupabaseStatusJson(mixed: string): Record<string, string> {
+  const idx = mixed.indexOf('{')
+  if (idx < 0)
+    throw new Error('Failed to parse Supabase status output')
+
+  return JSON.parse(mixed.slice(idx)) as Record<string, string>
+}
+
+function hydrateLocalSupabaseEnvFromStatus(): void {
+  if (USE_CLOUDFLARE)
+    return
+
+  const currentSupabaseUrl = normalizeLocalhostUrl(env.SUPABASE_URL) ?? ''
+  const currentAnonKey = env.SUPABASE_ANON_KEY ?? ''
+  const existingServiceKey = env.SUPABASE_SERVICE_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY ?? env.SERVICE_ROLE_KEY ?? ''
+  if (currentSupabaseUrl && currentAnonKey && existingServiceKey)
+    return
+
+  const status = spawnSync('bun', ['scripts/supabase-worktree.ts', 'status', '-o', 'json'], {
+    cwd: process.cwd(),
+    encoding: 'utf8',
+    env: process.env,
+  })
+
+  if ((status.status ?? 1) !== 0)
+    return
+
+  try {
+    const parsed = parseSupabaseStatusJson(status.stdout || '')
+    const supabaseUrl = normalizeLocalhostUrl(parsed.API_URL)
+    const anonKey = parsed.ANON_KEY || parsed.PUBLISHABLE_KEY
+    const serviceKey = parsed.SERVICE_ROLE_KEY || parsed.SECRET_KEY
+
+    if (supabaseUrl)
+      env.SUPABASE_URL = supabaseUrl
+    if (anonKey)
+      env.SUPABASE_ANON_KEY = anonKey
+    if (serviceKey) {
+      env.SUPABASE_SERVICE_ROLE_KEY = serviceKey
+      env.SUPABASE_SERVICE_KEY = serviceKey
+    }
+  }
+  catch {
+    // Keep the existing environment when status output is unavailable or malformed.
+  }
+}
+
+hydrateLocalSupabaseEnvFromStatus()
 
 // Default to Supabase Edge Functions for backward compatibility
 export const SUPABASE_BASE_URL = normalizeLocalhostUrl(env.SUPABASE_URL) ?? ''
@@ -156,7 +206,12 @@ let cachedAuthHeaders: Record<string, string> | null = null
 let authHeadersPromise: Promise<Record<string, string>> | null = null
 
 async function signInAndBuildAuthHeaders(email: string, password: string): Promise<Record<string, string>> {
-  if (!env.SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  hydrateLocalSupabaseEnvFromStatus()
+
+  const supabaseBaseUrl = normalizeLocalhostUrl(env.SUPABASE_URL) ?? SUPABASE_BASE_URL
+  const supabaseAnonKey = env.SUPABASE_ANON_KEY ?? SUPABASE_ANON_KEY
+
+  if (!supabaseBaseUrl || !supabaseAnonKey) {
     throw new Error('SUPABASE_URL or SUPABASE_ANON_KEY is missing for auth headers')
   }
 
@@ -183,7 +238,7 @@ async function signInAndBuildAuthHeaders(email: string, password: string): Promi
     throw lastError ?? new Error('Supabase fetch failed')
   }
 
-  const supabase = createClient<Database>(SUPABASE_BASE_URL, SUPABASE_ANON_KEY, {
+  const supabase = createClient<Database>(supabaseBaseUrl, supabaseAnonKey, {
     global: {
       fetch: supabaseFetch,
     },
@@ -538,7 +593,9 @@ export async function resetAppDataStats(appId: string): Promise<void> {
 
 export function getSupabaseClient(): SupabaseClient<Database> {
   if (!supabaseClient) {
-    const supabaseUrl = SUPABASE_BASE_URL
+    hydrateLocalSupabaseEnvFromStatus()
+
+    const supabaseUrl = normalizeLocalhostUrl(env.SUPABASE_URL) ?? SUPABASE_BASE_URL
     // Support both env names. Supabase CLI exposes SERVICE_ROLE_KEY, and our wrapper exports
     // SUPABASE_SERVICE_ROLE_KEY + SUPABASE_SERVICE_KEY for convenience.
     const supabaseServiceKey = env.SUPABASE_SERVICE_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY ?? env.SERVICE_ROLE_KEY ?? ''

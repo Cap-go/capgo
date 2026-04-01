@@ -1,0 +1,8 @@
+{
+  "name": "@emulators/stripe",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./index.ts"
+  }
+}

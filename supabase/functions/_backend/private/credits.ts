@@ -5,7 +5,7 @@ import { getFallbackCreditProductId } from '../utils/credits.ts'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { checkPermission } from '../utils/rbac.ts'
-import { createOneTimeCheckout, getStripe } from '../utils/stripe.ts'
+import { createOneTimeCheckout, getCreditCheckoutDetails, getStripe, isStripeEmulatorEnabled } from '../utils/stripe.ts'
 import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
@@ -63,7 +63,7 @@ interface StartTopUpRequest {
 
 interface CompleteTopUpRequest {
   orgId: string
-  sessionId: string
+  sessionId?: string
 }
 
 const DEFAULT_TOP_UP_QUANTITY = 100
@@ -155,6 +155,47 @@ async function resolveOrgStripeContext(c: AppContext, orgId: string) {
     throw simpleError('stripe_customer_missing', 'Organization does not have a Stripe customer or you don\'t have access')
 
   return { customerId: org.customer_id, token: rawAuthHeader }
+}
+
+async function resolveCheckoutSession(
+  c: AppContext,
+  stripe: ReturnType<typeof getStripe>,
+  orgId: string,
+  customerId: string,
+  sessionId?: string,
+) {
+  if (sessionId) {
+    const isValidStripeSessionId = /^cs_(?:test|live)_[a-zA-Z0-9]+$/.test(sessionId)
+    const isValidEmulatorSessionId = isStripeEmulatorEnabled(c) && /^cs_[\w-]+$/.test(sessionId)
+
+    if (!isValidStripeSessionId && !isValidEmulatorSessionId)
+      throw simpleError('invalid_session_id', 'Invalid session ID format')
+
+    return await stripe.checkout.sessions.retrieve(sessionId)
+  }
+
+  const sessions = await stripe.checkout.sessions.list({
+    customer: customerId,
+    limit: 100,
+  })
+
+  const latestCompletedPaymentSession = sessions.data
+    .filter(session =>
+      session.customer === customerId
+      && session.mode === 'payment'
+      && session.payment_status === 'paid'
+      && session.status === 'complete'
+      && (
+        session.client_reference_id === orgId
+        || session.metadata?.orgId === orgId
+      ),
+    )
+    .sort((a, b) => (b.created ?? 0) - (a.created ?? 0))[0]
+
+  if (!latestCompletedPaymentSession)
+    throw simpleError('session_not_found', 'No completed checkout session found')
+
+  return latestCompletedPaymentSession
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -329,13 +370,14 @@ app.post('/start-top-up', middlewareAuth, async (c) => {
 
 app.post('/complete-top-up', middlewareAuth, async (c) => {
   const body = await parseBody<CompleteTopUpRequest>(c)
-  if (!body.orgId || !body.sessionId)
-    throw simpleError('missing_parameters', 'orgId and sessionId are required')
+  if (!body.orgId)
+    throw simpleError('missing_parameters', 'orgId is required')
 
   const { customerId, token } = await resolveOrgStripeContext(c, body.orgId)
 
   const stripe = getStripe(c)
-  const session = await stripe.checkout.sessions.retrieve(body.sessionId)
+  const session = await resolveCheckoutSession(c, stripe, body.orgId, customerId, body.sessionId)
+  const resolvedSessionId = session.id
 
   if (!session || session.customer !== customerId)
     throw simpleError('invalid_session_customer', 'Checkout session does not belong to this organization')
@@ -351,35 +393,12 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
     ? session.payment_intent
     : session.payment_intent?.id ?? null
 
-  const lineItems = await stripe.checkout.sessions.listLineItems(body.sessionId, {
-    expand: ['data.price.product'],
-    limit: 100,
-  })
-
-  let creditQuantity = 0
-  const itemsSummary = lineItems.data.map((item) => {
-    const priceProduct = typeof item.price?.product === 'string'
-      ? item.price?.product
-      : (item.price?.product as { id?: string } | null)?.id ?? null
-    if (priceProduct === productId)
-      creditQuantity += item.quantity ?? 0
-
-    return {
-      id: item.id,
-      quantity: item.quantity,
-      priceId: item.price?.id ?? null,
-      productId: priceProduct,
-    }
-  })
+  const { creditQuantity, itemsSummary } = await getCreditCheckoutDetails(c, session, productId)
 
   if (creditQuantity <= 0)
     throw simpleError('credit_product_not_found', 'Checkout session does not include the credit product')
 
-  // Validate sessionId format to prevent injection (Stripe session IDs: cs_test_* or cs_live_*)
-  if (!/^cs_(?:test|live)_[a-zA-Z0-9]+$/.test(body.sessionId))
-    throw simpleError('invalid_session_id', 'Invalid session ID format')
-
-  const sourceMatchFilters = [`source_ref->>sessionId.eq.${body.sessionId}`]
+  const sourceMatchFilters = [`source_ref->>sessionId.eq.${resolvedSessionId}`]
   if (paymentIntentId)
     sourceMatchFilters.push(`source_ref->>paymentIntentId.eq.${paymentIntentId}`)
 
@@ -398,7 +417,7 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
       message: 'credit_top_up_idempotency_check_failed',
       error: existingTxError,
       orgId: body.orgId,
-      sessionId: body.sessionId,
+      sessionId: resolvedSessionId,
     })
 
     throw simpleError('idempotency_check_failed', 'Failed to verify top-up status', { error: existingTxError })
@@ -417,7 +436,7 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
       requestId: c.get('requestId'),
       message: 'Skipping credit top-up RPC due to existing transaction',
       orgId: body.orgId,
-      sessionId: body.sessionId,
+      sessionId: resolvedSessionId,
       transactionId: matchedTx.id,
     })
 
@@ -436,13 +455,13 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
     requestId: c.get('requestId'),
     message: 'Completing credit top-up',
     orgId: body.orgId,
-    sessionId: body.sessionId,
+    sessionId: resolvedSessionId,
     creditQuantity,
     itemsSummary,
   })
 
   const sourceRef = {
-    sessionId: body.sessionId,
+    sessionId: resolvedSessionId,
     paymentIntentId,
     itemsSummary,
   }
@@ -471,7 +490,7 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
       requestId: c.get('requestId'),
       message: 'credit_top_up_rpc_failed',
       orgId: body.orgId,
-      sessionId: body.sessionId,
+      sessionId: resolvedSessionId,
       rpcError: rpcErrorInfo,
     })
 
