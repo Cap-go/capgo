@@ -67,7 +67,15 @@ export const languages = Object.fromEntries(languageOptions.map(option => [optio
 export const selectedLanguage = ref(SOURCE_LOCALE)
 
 const messageCatalog = sourceMessages as Record<string, string>
+const knownSourceTexts = new Set([
+  ...Object.values(messageCatalog),
+  ...languageOptions.map(option => option.label),
+].map(value => normalizeKnownSourceText(value)).filter(value => value && !value.includes('{')))
 type MessageParams = Record<string, unknown> | string | undefined
+
+function normalizeKnownSourceText(value: string) {
+  return value.replace(/\s+/g, ' ').trim()
+}
 
 function interpolateMessage(message: string, params?: MessageParams): string {
   // interpolateMessage treats string params as an explicit message override for
@@ -150,6 +158,11 @@ export function getSourceMessage(key: string, defaultMessage?: string) {
   if (defaultMessage)
     return defaultMessage
   return key
+}
+
+export function isKnownSourceText(value: string) {
+  const normalized = normalizeKnownSourceText(value)
+  return !!normalized && knownSourceTexts.has(normalized)
 }
 
 export function translateMessage(key: string, params?: MessageParams, defaultMessage?: string) {

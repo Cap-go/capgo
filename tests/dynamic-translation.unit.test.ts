@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getWorkerLanguageCode, normalizeLanguage } from '../src/modules/i18n'
+import { getWorkerLanguageCode, isKnownSourceText, normalizeLanguage } from '../src/modules/i18n'
 import type { ProtectedEntry } from '../supabase/functions/_backend/public/translation.ts'
 import {
   normalizeTranslationStrings,
@@ -20,6 +20,11 @@ describe('dynamic translation language selection', () => {
     expect(getWorkerLanguageCode('zh-cn')).toBe('zh')
     expect(getWorkerLanguageCode('pt')).toBe('pt')
     expect(getWorkerLanguageCode('en')).toBe('en')
+  })
+
+  it.concurrent('only treats approved source strings as safe translation inputs', () => {
+    expect(isKnownSourceText('Bundle uploads')).toBe(true)
+    expect(isKnownSourceText('Acme Corp internal metrics')).toBe(false)
   })
 })
 

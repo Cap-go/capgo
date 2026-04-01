@@ -1,6 +1,6 @@
 import { nextTick, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { getWorkerLanguageCode, isEnglishLocale, selectedLanguage } from '~/modules/i18n'
+import { getWorkerLanguageCode, isEnglishLocale, isKnownSourceText, selectedLanguage } from '~/modules/i18n'
 import { defaultApiHost } from '~/services/supabase'
 
 const ATTRIBUTE_NAMES = ['alt', 'aria-label', 'placeholder', 'title'] as const
@@ -13,6 +13,7 @@ const TRANSIENT_RETRY_DELAYS_MS = [1_000, 3_000, 10_000]
 const VALUE_TRANSLATABLE_TYPES = new Set(['button', 'reset', 'submit'])
 const SKIP_TAGS = new Set(['CODE', 'KBD', 'NOSCRIPT', 'PRE', 'SAMP', 'SCRIPT', 'STYLE', 'TEXTAREA'])
 const NO_TRANSLATE_SELECTOR = '[data-capgo-no-translate]'
+const TRANSLATE_SELECTOR = '[data-capgo-translate]'
 
 type AttributeName = typeof ATTRIBUTE_NAMES[number]
 type TranslationRoot = Document | Element
@@ -74,7 +75,7 @@ function looksLikeIdentifier(value: string) {
     || /^[\w\-.][-\w]*\.[\w\-.][-\w]*\.[\w\-.]+$/.test(trimmed)
 }
 
-function shouldTranslateText(value: string) {
+function shouldTranslateText(value: string, allowDynamicTranslation = false) {
   const trimmed = normalizeWhitespace(value)
   if (!trimmed)
     return false
@@ -83,6 +84,10 @@ function shouldTranslateText(value: string) {
   if (!/\p{L}/u.test(trimmed))
     return false
   if (looksLikeIdentifier(trimmed))
+    return false
+  // Only source-catalog text leaves the browser by default. Developers can opt
+  // in extra static chrome with `data-capgo-translate` when needed.
+  if (!allowDynamicTranslation && !isKnownSourceText(trimmed))
     return false
   return true
 }
@@ -94,6 +99,11 @@ function isInsideNoTranslateZone(node: Node) {
   if (parent.closest(NO_TRANSLATE_SELECTOR))
     return true
   return SKIP_TAGS.has(parent.tagName)
+}
+
+function isInsideTranslateZone(node: Node | Element) {
+  const element = node instanceof Element ? node : node.parentElement
+  return !!element?.closest(TRANSLATE_SELECTOR)
 }
 
 function getTextRecord(node: Text, lang: string) {
@@ -154,7 +164,7 @@ function collectTextSegments(root: TranslationRoot, lang: string) {
     if (!isInsideNoTranslateZone(textNode)) {
       const record = getTextRecord(textNode, lang)
       const split = splitTextNodeValue(record.source)
-      if (shouldTranslateText(split.source)) {
+      if (shouldTranslateText(split.source, isInsideTranslateZone(textNode))) {
         segments.push({
           type: 'text',
           node: textNode,
@@ -178,18 +188,19 @@ function collectAttributeSegments(root: TranslationRoot, lang: string) {
     if (element.closest(NO_TRANSLATE_SELECTOR) || SKIP_TAGS.has(element.tagName))
       return
 
+    const allowDynamicTranslation = isInsideTranslateZone(element)
     ATTRIBUTE_NAMES.forEach((attr) => {
       if (!element.hasAttribute(attr))
         return
       const record = getAttributeRecord(element, attr, lang)
-      if (!shouldTranslateText(record.source))
+      if (!shouldTranslateText(record.source, allowDynamicTranslation))
         return
       segments.push({ type: 'attribute', element, attr, source: record.source })
     })
 
     if (element instanceof HTMLInputElement && VALUE_TRANSLATABLE_TYPES.has(element.type.toLowerCase()) && element.value) {
       const record = getAttributeRecord(element, 'value', lang)
-      if (!shouldTranslateText(record.source))
+      if (!shouldTranslateText(record.source, allowDynamicTranslation))
         return
       segments.push({ type: 'attribute', element, attr: 'value', source: record.source })
     }
@@ -300,6 +311,7 @@ export function usePageTranslation() {
   }
 
   function scheduleTransientRetry(root: TranslationRoot) {
+    // Stop automatic retries once the backoff table has been exhausted.
     const retryDelay = TRANSIENT_RETRY_DELAYS_MS[transientRetryCount]
     if (retryDelay === undefined) {
       transientRetryCount = 0
@@ -343,25 +355,76 @@ export function usePageTranslation() {
     return payload.translations ?? {}
   }
 
+  function resetTranslationState(root: TranslationRoot) {
+    restoreSourceContent(root)
+    lastRequestHash = ''
+    transientRetryCount = 0
+  }
+
+  function shouldSkipTranslation(root: TranslationRoot, lang: string) {
+    if (isEnglishLocale(lang) || translationDisabled) {
+      resetTranslationState(root)
+      return true
+    }
+
+    return false
+  }
+
+  function isStaleRequest(controller: AbortController, lang: string, requestedPath: string) {
+    return controller.signal.aborted || lang !== selectedLanguage.value || route.path !== requestedPath
+  }
+
+  function applyTranslations(segments: Array<TextSegment | AttributeSegment>, translations: Record<string, string>, lang: string) {
+    applyingTranslations = true
+    segments.forEach((segment) => {
+      const translated = translations[segment.source]
+      if (!translated || translated === segment.source)
+        return
+
+      if (segment.type === 'text') {
+        const record = textRecords.get(segment.node)
+        segment.node.nodeValue = `${segment.leadingWhitespace}${translated}${segment.trailingWhitespace}`
+        if (record) {
+          record.language = lang
+          record.translated = segment.node.nodeValue ?? translated
+        }
+        return
+      }
+
+      const attrRecord = getAttributeRecord(segment.element, segment.attr, lang)
+      if (segment.attr === 'value' && segment.element instanceof HTMLInputElement) {
+        segment.element.value = translated
+        segment.element.setAttribute('value', translated)
+      }
+      else {
+        segment.element.setAttribute(segment.attr, translated)
+      }
+
+      attrRecord.language = lang
+      attrRecord.translated = translated
+    })
+  }
+
+  function handleTranslationError(error: unknown, controller: AbortController, root: TranslationRoot) {
+    if (controller.signal.aborted)
+      return
+
+    if (error instanceof RetryableTranslationError || error instanceof TypeError) {
+      scheduleTransientRetry(root)
+      return
+    }
+
+    console.error('Page translation failed', error)
+  }
+
   async function translatePage() {
     const lang = selectedLanguage.value
     const root = document.body
     if (!root)
       return
 
-    if (isEnglishLocale(lang)) {
-      restoreSourceContent(root)
-      lastRequestHash = ''
-      transientRetryCount = 0
+    if (shouldSkipTranslation(root, lang))
       return
-    }
-
-    if (translationDisabled) {
-      restoreSourceContent(root)
-      lastRequestHash = ''
-      transientRetryCount = 0
-      return
-    }
 
     await nextTick()
 
@@ -387,56 +450,15 @@ export function usePageTranslation() {
 
     try {
       const translations = await fetchTranslations(uniqueSources, lang, requestedPath, controller.signal)
-      if (controller.signal.aborted || lang !== selectedLanguage.value || route.path !== requestedPath)
+      if (isStaleRequest(controller, lang, requestedPath))
         return
 
-      applyingTranslations = true
-      segments.forEach((segment) => {
-        const translated = translations[segment.source]
-        if (!translated || translated === segment.source)
-          return
-
-        if (segment.type === 'text') {
-          const record = textRecords.get(segment.node)
-          segment.node.nodeValue = `${segment.leadingWhitespace}${translated}${segment.trailingWhitespace}`
-          if (record) {
-            record.language = lang
-            record.translated = segment.node.nodeValue ?? translated
-          }
-          return
-        }
-
-        const attrRecord = getAttributeRecord(segment.element, segment.attr, lang)
-        if (segment.attr === 'value' && segment.element instanceof HTMLInputElement) {
-          segment.element.value = translated
-          segment.element.setAttribute('value', translated)
-        }
-        else {
-          segment.element.setAttribute(segment.attr, translated)
-        }
-
-        attrRecord.language = lang
-        attrRecord.translated = translated
-      })
-
+      applyTranslations(segments, translations, lang)
       lastRequestHash = requestHash
       transientRetryCount = 0
     }
     catch (error) {
-      if (!controller.signal.aborted && error instanceof RetryableTranslationError) {
-        if (scheduleTransientRetry(root))
-          return
-        return
-      }
-
-      if (!controller.signal.aborted && error instanceof TypeError) {
-        if (scheduleTransientRetry(root))
-          return
-        return
-      }
-
-      if (!controller.signal.aborted)
-        console.error('Page translation failed', error)
+      handleTranslationError(error, controller, root)
     }
     finally {
       setTimeout(() => {
