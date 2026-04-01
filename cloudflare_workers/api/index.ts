@@ -9,12 +9,12 @@ import { app as deleted_failed_version } from '../../supabase/functions/_backend
 import { app as devices_priv } from '../../supabase/functions/_backend/private/devices.ts'
 import { app as events } from '../../supabase/functions/_backend/private/events.ts'
 import { app as groups } from '../../supabase/functions/_backend/private/groups.ts'
+import { app as invite_existing_user_to_org } from '../../supabase/functions/_backend/private/invite_existing_user_to_org.ts'
 import { app as invite_new_user_to_org } from '../../supabase/functions/_backend/private/invite_new_user_to_org.ts'
 import { app as latency } from '../../supabase/functions/_backend/private/latency.ts'
 import { app as log_as } from '../../supabase/functions/_backend/private/log_as.ts'
 import { app as plans } from '../../supabase/functions/_backend/private/plans.ts'
 import { app as publicStats } from '../../supabase/functions/_backend/private/public_stats.ts'
-import { app as send_existing_user_org_invite } from '../../supabase/functions/_backend/private/send_existing_user_org_invite.ts'
 import { app as set_org_email } from '../../supabase/functions/_backend/private/set_org_email.ts'
 import { app as sso_check_domain } from '../../supabase/functions/_backend/private/sso/check-domain.ts'
 import { app as sso_check_enforcement } from '../../supabase/functions/_backend/private/sso/check-enforcement.ts'
@@ -101,7 +101,7 @@ appPrivate.route('/accept_invitation', accept_invitation)
 appPrivate.route('/devices', devices_priv)
 appPrivate.route('/log_as', log_as)
 appPrivate.route('/invite_new_user_to_org', invite_new_user_to_org)
-appPrivate.route('/send_existing_user_org_invite', send_existing_user_org_invite)
+appPrivate.route('/invite_existing_user_to_org', invite_existing_user_to_org)
 appPrivate.route('/set_org_email', set_org_email)
 appPrivate.route('/validate_password_compliance', validate_password_compliance)
 appPrivate.route('/admin_credits', admin_credits)

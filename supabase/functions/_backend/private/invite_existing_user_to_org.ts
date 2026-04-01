@@ -11,7 +11,7 @@ import { supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 import { version } from '../utils/version.ts'
 
-const sendInviteSchema = z.object({
+const inviteExistingUserSchema = z.object({
   email: z.email(),
   org_id: z.string().check(z.minLength(1)),
 })
@@ -51,7 +51,7 @@ async function lockInviteNotification(c: AppContext, orgId: string, userId: stri
     closeClient(c, pgClient)
     cloudlog({
       requestId: c.get('requestId'),
-      context: 'send_existing_user_org_invite lock_failed',
+      context: 'invite_existing_user_to_org lock_failed',
       orgId,
       invitedUserId: userId,
       error,
@@ -74,7 +74,7 @@ async function unlockInviteNotification(
   catch (error) {
     cloudlog({
       requestId: c.get('requestId'),
-      context: 'send_existing_user_org_invite unlock_failed',
+      context: 'invite_existing_user_to_org unlock_failed',
       orgId,
       invitedUserId: userId,
       error,
@@ -86,7 +86,7 @@ async function unlockInviteNotification(
 }
 
 async function validateRequest(c: AppContext, rawBody: unknown) {
-  const validationResult = sendInviteSchema.safeParse(rawBody)
+  const validationResult = inviteExistingUserSchema.safeParse(rawBody)
   if (!validationResult.success) {
     quickError(400, 'invalid_request', 'Invalid request', { errors: z.prettifyError(validationResult.error) })
   }
@@ -115,13 +115,13 @@ app.post('/', middlewareAuth, async (c) => {
   const authContext = c.get('auth')
   const inviterId = authContext?.userId
   if (!inviterId) {
-    cloudlog({ requestId, context: 'send_existing_user_org_invite unauthorized_inviter' })
+    cloudlog({ requestId, context: 'invite_existing_user_to_org unauthorized_inviter' })
     return quickError(401, 'not_authorized', 'Not authorized')
   }
 
   cloudlog({
     requestId,
-    context: 'send_existing_user_org_invite validated body',
+    context: 'invite_existing_user_to_org validated body',
     inviterId,
     canUpdateUserRoles,
     body: {
@@ -132,7 +132,7 @@ app.post('/', middlewareAuth, async (c) => {
 
   const supabaseAdminClient = supabaseAdmin(c)
 
-  cloudlog({ requestId, context: 'send_existing_user_org_invite fetch organization', orgId: body.org_id })
+  cloudlog({ requestId, context: 'invite_existing_user_to_org fetch organization', orgId: body.org_id })
   const { data: org, error: orgError } = await supabaseAdminClient
     .from('orgs')
     .select('id, name')
@@ -147,7 +147,7 @@ app.post('/', middlewareAuth, async (c) => {
     return quickError(404, 'organization_not_found', 'Organization not found')
   }
 
-  cloudlog({ requestId, context: 'send_existing_user_org_invite fetch inviter', inviterId, orgId: body.org_id })
+  cloudlog({ requestId, context: 'invite_existing_user_to_org fetch inviter', inviterId, orgId: body.org_id })
   const { data: inviter, error: inviterError } = await supabaseAdminClient
     .from('users')
     .select('id, first_name, last_name')
@@ -160,7 +160,7 @@ app.post('/', middlewareAuth, async (c) => {
 
   cloudlog({
     requestId,
-    context: 'send_existing_user_org_invite fetch invited user',
+    context: 'invite_existing_user_to_org fetch invited user',
     orgId: body.org_id,
     invitedEmail: maskEmail(body.email),
   })
@@ -180,7 +180,7 @@ app.post('/', middlewareAuth, async (c) => {
 
   cloudlog({
     requestId,
-    context: 'send_existing_user_org_invite fetch membership',
+    context: 'invite_existing_user_to_org fetch membership',
     orgId: body.org_id,
     invitedUserId: invitedUser.id,
   })
@@ -211,7 +211,7 @@ app.post('/', middlewareAuth, async (c) => {
   }
 
   const inviteCooldownStorageKey = getInviteNotificationCooldownKey(body.org_id, invitedUser.id)
-  const inviteCooldownKey = cooldownCache.buildRequest('/private/send_existing_user_org_invite/cooldown', {
+  const inviteCooldownKey = cooldownCache.buildRequest('/private/invite_existing_user_to_org/cooldown', {
     org_id: body.org_id,
     user_id: invitedUser.id,
   })
@@ -228,7 +228,7 @@ app.post('/', middlewareAuth, async (c) => {
     if (inMemoryCooldownUntil > now || cachedInviteNotification) {
       cloudlog({
         requestId,
-        context: 'send_existing_user_org_invite rate_limited',
+        context: 'invite_existing_user_to_org rate_limited',
         orgId: body.org_id,
         invitedUserId: invitedUser.id,
         inviterId,
@@ -241,7 +241,7 @@ app.post('/', middlewareAuth, async (c) => {
 
     cloudlog({
       requestId,
-      context: 'send_existing_user_org_invite track bento event',
+      context: 'invite_existing_user_to_org track bento event',
       orgId: body.org_id,
       invitedUserId: invitedUser.id,
       inviterId,
@@ -274,7 +274,7 @@ app.post('/', middlewareAuth, async (c) => {
 
   cloudlog({
     requestId,
-    context: 'send_existing_user_org_invite success',
+    context: 'invite_existing_user_to_org success',
     orgId: body.org_id,
     invitedUserId: invitedUser.id,
     inviterId,

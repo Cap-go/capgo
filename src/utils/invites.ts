@@ -40,7 +40,7 @@ export async function notifyExistingUserInvite(
   email: string,
   orgId: string,
 ): Promise<boolean> {
-  const { error } = await supabase.functions.invoke('private/send_existing_user_org_invite', {
+  const { error } = await supabase.functions.invoke('private/invite_existing_user_to_org', {
     body: {
       email,
       org_id: orgId,

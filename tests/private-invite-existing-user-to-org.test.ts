@@ -5,8 +5,8 @@ import { getAuthHeaders, getAuthHeadersForCredentials, getEndpointUrl, getSupaba
 let authHeaders: Record<string, string>
 let nonMemberAuthHeaders: Record<string, string>
 
-async function postSendExistingUserOrgInvite(headers: Record<string, string>, body: { email: string, org_id: string }) {
-  return fetch(getEndpointUrl('/private/send_existing_user_org_invite'), {
+async function postInviteExistingUserToOrg(headers: Record<string, string>, body: { email: string, org_id: string }) {
+  return fetch(getEndpointUrl('/private/invite_existing_user_to_org'), {
     method: 'POST',
     headers,
     body: JSON.stringify(body),
@@ -74,11 +74,11 @@ beforeAll(async () => {
   nonMemberAuthHeaders = await getAuthHeadersForCredentials(USER_EMAIL_NONMEMBER, USER_PASSWORD_NONMEMBER)
 })
 
-describe('[POST] /private/send_existing_user_org_invite', () => {
+describe('[POST] /private/invite_existing_user_to_org', () => {
   it.concurrent('returns ok for an existing user with a pending org invitation', async () => {
     const fixture = await createInviteTestFixture()
     try {
-      const response = await postSendExistingUserOrgInvite(authHeaders, {
+      const response = await postInviteExistingUserToOrg(authHeaders, {
         email: USER_EMAIL_NONMEMBER,
         org_id: fixture.orgId,
       })
@@ -95,7 +95,7 @@ describe('[POST] /private/send_existing_user_org_invite', () => {
   it.concurrent('returns a validation error for an invalid email format', async () => {
     const fixture = await createInviteTestFixture()
     try {
-      const response = await postSendExistingUserOrgInvite(authHeaders, {
+      const response = await postInviteExistingUserToOrg(authHeaders, {
         email: 'invalid-email',
         org_id: fixture.orgId,
       })
@@ -112,7 +112,7 @@ describe('[POST] /private/send_existing_user_org_invite', () => {
   it.concurrent('returns not found when the target user does not exist', async () => {
     const fixture = await createInviteTestFixture()
     try {
-      const response = await postSendExistingUserOrgInvite(authHeaders, {
+      const response = await postInviteExistingUserToOrg(authHeaders, {
         email: `missing-${fixture.id}@capgo.app`,
         org_id: fixture.orgId,
       })
@@ -137,7 +137,7 @@ describe('[POST] /private/send_existing_user_org_invite', () => {
 
       expect(updateError).toBeNull()
 
-      const response = await postSendExistingUserOrgInvite(authHeaders, {
+      const response = await postInviteExistingUserToOrg(authHeaders, {
         email: USER_EMAIL_NONMEMBER,
         org_id: fixture.orgId,
       })
@@ -154,7 +154,7 @@ describe('[POST] /private/send_existing_user_org_invite', () => {
   it.concurrent('returns forbidden when the caller cannot invite users', async () => {
     const fixture = await createInviteTestFixture()
     try {
-      const response = await postSendExistingUserOrgInvite(nonMemberAuthHeaders, {
+      const response = await postInviteExistingUserToOrg(nonMemberAuthHeaders, {
         email: USER_EMAIL_NONMEMBER,
         org_id: fixture.orgId,
       })
