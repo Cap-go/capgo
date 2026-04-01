@@ -14,6 +14,7 @@ const VALUE_TRANSLATABLE_TYPES = new Set(['button', 'reset', 'submit'])
 const SKIP_TAGS = new Set(['CODE', 'KBD', 'NOSCRIPT', 'PRE', 'SAMP', 'SCRIPT', 'STYLE', 'TEXTAREA'])
 const NO_TRANSLATE_SELECTOR = '[data-capgo-no-translate]'
 const TRANSLATE_SELECTOR = '[data-capgo-translate]'
+const TRANSLATION_ROOT_SELECTOR = '[data-capgo-translation-root]'
 
 type AttributeName = typeof ATTRIBUTE_NAMES[number]
 type TranslationRoot = Document | Element
@@ -278,6 +279,10 @@ async function sha256Hex(value: string) {
     .join('')
 }
 
+function getTranslationRoot() {
+  return document.querySelector<HTMLElement>(TRANSLATION_ROOT_SELECTOR)
+}
+
 export function usePageTranslation() {
   const route = useRoute()
   let observer: MutationObserver | null = null
@@ -419,7 +424,7 @@ export function usePageTranslation() {
 
   async function translatePage() {
     const lang = selectedLanguage.value
-    const root = document.body
+    const root = getTranslationRoot()
     if (!root)
       return
 
@@ -471,6 +476,10 @@ export function usePageTranslation() {
   }
 
   onMounted(() => {
+    const root = getTranslationRoot()
+    if (!root)
+      return
+
     observer = new MutationObserver((mutations) => {
       if (applyingTranslations)
         return
@@ -489,7 +498,7 @@ export function usePageTranslation() {
       }
     })
 
-    observer.observe(document.body, {
+    observer.observe(root, {
       subtree: true,
       childList: true,
       characterData: true,

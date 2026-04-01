@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getWorkerLanguageCode, isKnownSourceText, normalizeLanguage } from '../src/modules/i18n'
+import { loadLanguageAsync } from '../src/modules/i18n'
+import { changeLanguage } from '../src/services/i18n'
 import type { ProtectedEntry } from '../supabase/functions/_backend/public/translation.ts'
 import {
   normalizeTranslationStrings,
@@ -7,6 +9,22 @@ import {
   protectTranslationTokens,
   restoreTranslationTokens,
 } from '../supabase/functions/_backend/public/translation.ts'
+
+const originalWindow = globalThis.window
+const originalLocalStorage = globalThis.localStorage
+
+afterEach(() => {
+  vi.restoreAllMocks()
+  if (originalWindow === undefined)
+    Reflect.deleteProperty(globalThis, 'window')
+  else
+    Object.defineProperty(globalThis, 'window', { configurable: true, value: originalWindow })
+
+  if (originalLocalStorage === undefined)
+    Reflect.deleteProperty(globalThis, 'localStorage')
+  else
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: originalLocalStorage })
+})
 
 describe('dynamic translation language selection', () => {
   it.concurrent('normalizes legacy and regional language codes into supported locales', () => {
@@ -25,6 +43,34 @@ describe('dynamic translation language selection', () => {
   it.concurrent('only treats approved source strings as safe translation inputs', () => {
     expect(isKnownSourceText('Bundle uploads')).toBe(true)
     expect(isKnownSourceText('Acme Corp internal metrics')).toBe(false)
+  })
+
+  it('only reloads when callers opt in', async () => {
+    const reload = vi.fn()
+    const localStorageMock = {
+      clear: vi.fn(),
+      getItem: vi.fn(() => null),
+      key: vi.fn(() => null),
+      length: 0,
+      removeItem: vi.fn(),
+      setItem: vi.fn(),
+    } as unknown as Storage
+
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: { location: { reload } } as unknown as Window,
+    })
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: localStorageMock,
+    })
+
+    await loadLanguageAsync('en')
+    await changeLanguage('fr')
+    expect(reload).not.toHaveBeenCalled()
+
+    await changeLanguage('de', { reload: true })
+    expect(reload).toHaveBeenCalledTimes(1)
   })
 })
 
