@@ -22,7 +22,7 @@ import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { getRbacRoleI18nKey, isAdminRole, isSuperAdminRole, useOrganizationStore } from '~/stores/organization'
-import { notifyExistingUserInvite, resolveInviteNewUserErrorMessage, shouldNotifyExistingUserInvite } from '~/utils/invites'
+import { notifyExistingUserInvite, resolveInviteNewUserErrorMessage, shouldAttemptExistingUserInviteNotification } from '~/utils/invites'
 import DeleteOrgDialog from './DeleteOrgDialog.vue'
 
 const { t } = useI18n()
@@ -684,15 +684,21 @@ async function handleSendInvitationOutput(output: string, email: string, type: D
   console.log('Output: ', output)
   if (!output)
     return false
-  if (output === 'OK') {
-    const orgId = currentOrganization.value?.gid
-    if (orgId && shouldNotifyExistingUserInvite(type, useNewRbac.value)) {
-      const notified = await notifyExistingUserInvite(supabase, email, orgId)
-      if (!notified) {
-        console.warn('Failed to send invite email notification, but invite was created')
-        toast.warning(t('org-invite-email-notification-failed'))
-      }
+
+  const orgId = currentOrganization.value?.gid
+  if (orgId && shouldAttemptExistingUserInviteNotification(output, type, useNewRbac.value)) {
+    const notified = await notifyExistingUserInvite(supabase, email, orgId)
+    if (!notified) {
+      console.warn('Failed to send invite email notification')
+      toast.warning(t('org-invite-email-notification-failed'))
     }
+    else {
+      toast.success(t('org-invited-user'))
+      return true
+    }
+  }
+
+  if (output === 'OK') {
     toast.success(t('org-invited-user'))
     return true
   }

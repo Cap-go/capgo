@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { shouldNotifyExistingUserInvite } from '../src/utils/invites'
+import { shouldAttemptExistingUserInviteNotification, shouldNotifyExistingUserInvite } from '../src/utils/invites'
 
 describe('shouldNotifyExistingUserInvite', () => {
   it.concurrent('returns true for RBAC invite roles', () => {
@@ -15,5 +15,24 @@ describe('shouldNotifyExistingUserInvite', () => {
   it.concurrent('returns false for legacy direct membership roles', () => {
     expect(shouldNotifyExistingUserInvite('admin', false)).toBe(false)
     expect(shouldNotifyExistingUserInvite('super_admin', false)).toBe(false)
+  })
+})
+
+describe('shouldAttemptExistingUserInviteNotification', () => {
+  it.concurrent('returns true for new invites and existing pending invites', () => {
+    expect(shouldAttemptExistingUserInviteNotification('OK', 'invite_admin', false)).toBe(true)
+    expect(shouldAttemptExistingUserInviteNotification('ALREADY_INVITED', 'invite_admin', false)).toBe(true)
+    expect(shouldAttemptExistingUserInviteNotification('OK', 'org_admin', true)).toBe(true)
+    expect(shouldAttemptExistingUserInviteNotification('ALREADY_INVITED', 'org_admin', true)).toBe(true)
+  })
+
+  it.concurrent('returns false for outputs that should not send email', () => {
+    expect(shouldAttemptExistingUserInviteNotification('NO_EMAIL', 'invite_admin', false)).toBe(false)
+    expect(shouldAttemptExistingUserInviteNotification('CAN_NOT_INVITE_OWNER', 'org_admin', true)).toBe(false)
+  })
+
+  it.concurrent('returns false for legacy direct membership roles', () => {
+    expect(shouldAttemptExistingUserInviteNotification('OK', 'admin', false)).toBe(false)
+    expect(shouldAttemptExistingUserInviteNotification('ALREADY_INVITED', 'super_admin', false)).toBe(false)
   })
 })

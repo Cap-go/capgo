@@ -61,3 +61,14 @@ export function shouldNotifyExistingUserInvite(role: string, useNewRbac: boolean
 
   return role.startsWith('invite_')
 }
+
+export function shouldAttemptExistingUserInviteNotification(
+  output: string,
+  role: string,
+  useNewRbac: boolean,
+) {
+  if (output !== 'OK' && output !== 'ALREADY_INVITED')
+    return false
+
+  return shouldNotifyExistingUserInvite(role, useNewRbac)
+}
