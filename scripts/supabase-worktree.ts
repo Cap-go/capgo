@@ -133,7 +133,7 @@ function ensureWorktreeSupabaseDir(repoRoot: string): { workdir: string, cfg: Re
     ensureSymlink(dst, src)
   }
 
-  // Supabase resolves some template paths relative to the workdir root when `--workdir` is used.
+  // `supabase start --workdir` resolves template paths from the workdir root.
   ensureSymlink(resolve(workdir, 'templates'), resolve(repoSupaDir, 'templates'))
 
   const baseConfig = readFileSync(resolve(repoSupaDir, 'config.toml'), 'utf8')

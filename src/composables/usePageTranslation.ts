@@ -266,6 +266,7 @@ export function usePageTranslation() {
   let abortController: AbortController | null = null
   let applyingTranslations = false
   let lastRequestHash = ''
+  let translationDisabled = false
 
   function clearPendingWork() {
     if (debounceHandle) {
@@ -303,6 +304,11 @@ export function usePageTranslation() {
       }),
     })
 
+    if (response.status === 404 || response.status === 501 || response.status === 503) {
+      translationDisabled = true
+      return {}
+    }
+
     if (!response.ok)
       throw new Error(`Translation request failed with ${response.status}`)
 
@@ -317,6 +323,12 @@ export function usePageTranslation() {
       return
 
     if (isEnglishLocale(lang)) {
+      restoreSourceContent(root)
+      lastRequestHash = ''
+      return
+    }
+
+    if (translationDisabled) {
       restoreSourceContent(root)
       lastRequestHash = ''
       return
@@ -381,6 +393,12 @@ export function usePageTranslation() {
       lastRequestHash = requestHash
     }
     catch (error) {
+      if (!controller.signal.aborted && error instanceof TypeError) {
+        translationDisabled = true
+        restoreSourceContent(root)
+        return
+      }
+
       if (!controller.signal.aborted)
         console.error('Page translation failed', error)
     }
