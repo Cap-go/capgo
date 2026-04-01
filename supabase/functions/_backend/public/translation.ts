@@ -1,5 +1,6 @@
 import { CacheHelper } from '../utils/cache.ts'
 import { honoFactory, parseBody, quickError, useCors } from '../utils/hono.ts'
+import { cloudlog } from '../utils/logging.ts'
 
 const CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
 const MAX_BATCH_CHARACTERS = 3_200
@@ -175,7 +176,7 @@ export function parseSegmentedTranslation(translatedText: string, entries: Prote
     const start = translatedText.indexOf(entry.marker)
 
     if (start < 0) {
-      console.warn('Translation segment marker missing from model output', { index, marker: entry.marker })
+      cloudlog({ message: 'Translation segment marker missing from model output', index, marker: entry.marker })
       translations.set(entry.source, entry.source)
       return
     }
@@ -189,7 +190,7 @@ export function parseSegmentedTranslation(translatedText: string, entries: Prote
 
     const end = markerBoundaries[0] ?? translatedText.length
     if (entries[index + 1] && markerBoundaries.length === 0) {
-      console.warn('Translation segment boundary missing from model output', { index, marker: entry.marker })
+      cloudlog({ message: 'Translation segment boundary missing from model output', index, marker: entry.marker })
       translations.set(entry.source, entry.source)
       return
     }
