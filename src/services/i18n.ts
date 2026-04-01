@@ -1,7 +1,11 @@
 import countryCodeToFlagEmoji from 'country-code-to-flag-emoji'
 import { getLanguageConfig, getSelectedLanguage, loadLanguageAsync, normalizeLanguage } from '~/modules/i18n'
 
-export function getEmoji(lang: string) {
+export function getEmoji(countryCode: string) {
+  return countryCodeToFlagEmoji(countryCode.trim().toUpperCase())
+}
+
+export function getLanguageEmoji(lang: string) {
   return countryCodeToFlagEmoji(getLanguageConfig(lang).countryCode)
 }
 

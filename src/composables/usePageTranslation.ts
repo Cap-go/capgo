@@ -299,6 +299,20 @@ export function usePageTranslation() {
     }, delay)
   }
 
+  function scheduleTransientRetry(root: TranslationRoot) {
+    const retryDelay = TRANSIENT_RETRY_DELAYS_MS[transientRetryCount]
+    if (retryDelay === undefined) {
+      transientRetryCount = 0
+      lastRequestHash = ''
+      restoreSourceContent(root)
+      return false
+    }
+
+    transientRetryCount += 1
+    scheduleTranslation(retryDelay)
+    return true
+  }
+
   async function fetchTranslations(strings: string[], lang: string, pagePath: string, signal: AbortSignal) {
     const response = await fetch(`${defaultApiHost}/translation/page`, {
       method: 'POST',
@@ -314,6 +328,8 @@ export function usePageTranslation() {
     })
 
     if (response.status === 404 || response.status === 501) {
+      // Local/Supabase-only runtimes intentionally do not expose `/translation/page`.
+      // Disable on-the-fly translation for this session and keep the English source UI.
       translationDisabled = true
       return {}
     }
@@ -354,7 +370,7 @@ export function usePageTranslation() {
       return
 
     const uniqueSources = [...new Set(segments.map(segment => segment.source))]
-    const requestedPath = route.fullPath
+    const requestedPath = route.path
     const requestHash = await sha256Hex(JSON.stringify({
       lang,
       path: requestedPath,
@@ -371,7 +387,7 @@ export function usePageTranslation() {
 
     try {
       const translations = await fetchTranslations(uniqueSources, lang, requestedPath, controller.signal)
-      if (controller.signal.aborted || lang !== selectedLanguage.value || route.fullPath !== requestedPath)
+      if (controller.signal.aborted || lang !== selectedLanguage.value || route.path !== requestedPath)
         return
 
       applyingTranslations = true
@@ -408,16 +424,14 @@ export function usePageTranslation() {
     }
     catch (error) {
       if (!controller.signal.aborted && error instanceof RetryableTranslationError) {
-        const retryDelay = TRANSIENT_RETRY_DELAYS_MS[Math.min(transientRetryCount, TRANSIENT_RETRY_DELAYS_MS.length - 1)]
-        transientRetryCount += 1
-        scheduleTranslation(retryDelay)
+        if (scheduleTransientRetry(root))
+          return
         return
       }
 
       if (!controller.signal.aborted && error instanceof TypeError) {
-        translationDisabled = true
-        transientRetryCount = 0
-        restoreSourceContent(root)
+        if (scheduleTransientRetry(root))
+          return
         return
       }
 
@@ -470,7 +484,7 @@ export function usePageTranslation() {
     observer = null
   })
 
-  watch(() => route.fullPath, () => {
+  watch(() => route.path, () => {
     lastRequestHash = ''
     translationDisabled = false
     transientRetryCount = 0

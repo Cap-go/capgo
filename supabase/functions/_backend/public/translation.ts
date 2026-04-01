@@ -1,12 +1,19 @@
+import type { Context } from 'hono'
 import { CacheHelper } from '../utils/cache.ts'
 import { honoFactory, parseBody, quickError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { getClientIP } from '../utils/rate_limit.ts'
+import { getEnv } from '../utils/utils.ts'
 
 const CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
 const MAX_BATCH_CHARACTERS = 3_200
 const MAX_STRINGS = 220
 const MAX_TOTAL_CHARACTERS = 12_000
 const TRANSLATION_MODEL = '@cf/meta/m2m100-1.2b'
+const TRANSLATION_IP_RATE_PATH = '/translation/ip-rate'
+const TRANSLATION_IP_RATE_TTL_SECONDS = 60
+// High enough for real users behind shared NATs while still limiting quota abuse.
+const DEFAULT_TRANSLATION_IP_RATE_LIMIT = 240
 
 const SUPPORTED_LANGUAGES = new Set([
   'ar',
@@ -59,6 +66,17 @@ interface TranslationResponsePayload {
   model: string
   requestHash: string
   translations: Record<string, string>
+}
+
+interface TranslationRateLimitEntry {
+  count: number
+  resetAt: number
+}
+
+interface TranslationRateLimitStatus {
+  ip?: string
+  limited: boolean
+  resetAt?: number
 }
 
 function normalizeWhitespace(value: string) {
@@ -206,6 +224,51 @@ export function parseSegmentedTranslation(translatedText: string, entries: Prote
   return translations
 }
 
+function getTranslationIpRateLimit(c: Context) {
+  const envLimit = getEnv(c, 'RATE_LIMIT_TRANSLATION_IP')
+  if (envLimit) {
+    const parsed = Number.parseInt(envLimit, 10)
+    if (!Number.isNaN(parsed) && parsed > 0)
+      return parsed
+  }
+  return DEFAULT_TRANSLATION_IP_RATE_LIMIT
+}
+
+async function recordTranslationRequest(c: Context): Promise<TranslationRateLimitStatus> {
+  const ip = getClientIP(c)
+  if (ip === 'unknown') {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Translation IP rate limit skipped: unknown IP',
+    })
+    return { limited: false }
+  }
+
+  const cacheHelper = new CacheHelper(c)
+  const cacheKey = cacheHelper.buildRequest(TRANSLATION_IP_RATE_PATH, { ip })
+  const existing = await cacheHelper.matchJson<TranslationRateLimitEntry>(cacheKey)
+  const entry: TranslationRateLimitEntry = {
+    count: (existing?.count ?? 0) + 1,
+    resetAt: Date.now() + TRANSLATION_IP_RATE_TTL_SECONDS * 1000,
+  }
+
+  await cacheHelper.putJson(cacheKey, entry, TRANSLATION_IP_RATE_TTL_SECONDS)
+
+  const limit = getTranslationIpRateLimit(c)
+  const limited = entry.count >= limit
+  if (limited) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Translation IP rate limited',
+      ip,
+      count: entry.count,
+      limit,
+    })
+  }
+
+  return { limited, resetAt: entry.resetAt, ip }
+}
+
 async function sha256Hex(value: string) {
   const buffer = new TextEncoder().encode(value)
   const digest = await crypto.subtle.digest('SHA-256', buffer)
@@ -257,6 +320,15 @@ app.post('/page', async (c) => {
   }
 
   const strings = normalizeTranslationStrings(body.strings)
+  const rateLimitStatus = await recordTranslationRequest(c)
+  if (rateLimitStatus.limited) {
+    const retryAfter = rateLimitStatus.resetAt
+      ? Math.max(1, Math.ceil((rateLimitStatus.resetAt - Date.now()) / 1000))
+      : TRANSLATION_IP_RATE_TTL_SECONDS
+    c.header('Retry-After', String(retryAfter))
+    throw quickError(429, 'translation_rate_limited', 'Too many translation requests')
+  }
+
   const requestHash = await sha256Hex(JSON.stringify({
     model: TRANSLATION_MODEL,
     pagePath: body.pagePath ?? '',

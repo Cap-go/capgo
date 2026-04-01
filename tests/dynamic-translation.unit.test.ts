@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { getWorkerLanguageCode, normalizeLanguage } from '../src/modules/i18n'
+import type { ProtectedEntry } from '../supabase/functions/_backend/public/translation.ts'
 import {
   normalizeTranslationStrings,
   parseSegmentedTranslation,
-  type ProtectedEntry,
   protectTranslationTokens,
   restoreTranslationTokens,
 } from '../supabase/functions/_backend/public/translation.ts'
