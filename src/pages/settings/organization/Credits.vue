@@ -572,7 +572,7 @@ async function handleCreditCheckoutReturn() {
   const sessionIdParam = Array.isArray(sessionIdRaw) ? sessionIdRaw[0] : sessionIdRaw
   // Stripe may append unexpected query fragments after the session id; keep only the valid prefix.
   const sessionId = typeof sessionIdParam === 'string'
-    ? (sessionIdParam.match(/^cs_\w+/)?.[0] ?? null)
+    ? (sessionIdParam.match(/^cs_[\w-]+/)?.[0] ?? null)
     : null
   if (!currentOrganization.value?.gid)
     return
