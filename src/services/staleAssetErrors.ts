@@ -1,0 +1,58 @@
+const STALE_ASSET_ERROR_PATTERNS = [
+  /Failed to fetch dynamically imported module/i,
+  /error loading dynamically imported module/i,
+  /Importing a module script failed/i,
+  /Unable to preload CSS/i,
+  /is not a valid JavaScript MIME type/i,
+  /Loading chunk [\w-]+ failed/i,
+  /Loading CSS chunk [\w-]+ failed/i,
+]
+
+export function isStaleAssetErrorMessage(message: string | undefined): boolean {
+  if (!message)
+    return false
+
+  return STALE_ASSET_ERROR_PATTERNS.some(pattern => pattern.test(message))
+}
+
+export function getErrorMessage(value: unknown): string | undefined {
+  if (typeof value === 'string')
+    return value
+
+  if (value instanceof Error)
+    return value.message
+
+  if (typeof value === 'object' && value !== null) {
+    const candidate = (value as { message?: unknown }).message
+    if (typeof candidate === 'string')
+      return candidate
+  }
+
+  return undefined
+}
+
+interface PostHogExceptionLike {
+  value?: unknown
+  $exception_value?: unknown
+}
+
+interface PostHogEventLike {
+  event?: unknown
+  properties?: {
+    $exception_list?: PostHogExceptionLike[]
+    $exception_values?: unknown[]
+  }
+}
+
+export function shouldSuppressPostHogExceptionEvent(event: PostHogEventLike): boolean {
+  if (event.event !== '$exception')
+    return false
+
+  const exception = event.properties?.$exception_list?.[0]
+  const exceptionValue = getErrorMessage(exception?.value) ?? getErrorMessage(exception?.$exception_value)
+  if (isStaleAssetErrorMessage(exceptionValue))
+    return true
+
+  const fallbackValue = getErrorMessage(event.properties?.$exception_values?.[0])
+  return isStaleAssetErrorMessage(fallbackValue)
+}

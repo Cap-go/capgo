@@ -7,6 +7,7 @@ import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import { routes } from 'vue-router/auto-routes'
 import { posthogLoader } from '~/services/posthog'
+import { getErrorMessage, isStaleAssetErrorMessage } from '~/services/staleAssetErrors'
 import { getLocalConfig } from '~/services/supabase'
 
 import App from './App.vue'
@@ -20,35 +21,78 @@ import './styles/style.css'
 // Handle chunk load errors (stale chunks after deployment)
 // When a new version is deployed, old chunk URLs return 404/HTML instead of JS
 const CHUNK_RELOAD_KEY = 'capgo_chunk_reload'
+const CHUNK_RELOAD_COOLDOWN_MS = 30_000
+
+function getChunkReloadTimestamp(): number | null {
+  try {
+    const storedValue = sessionStorage.getItem(CHUNK_RELOAD_KEY)
+    if (!storedValue)
+      return null
+
+    const timestamp = Number.parseInt(storedValue, 10)
+    return Number.isFinite(timestamp) ? timestamp : null
+  }
+  catch {
+    return null
+  }
+}
+
+function setChunkReloadTimestamp(): void {
+  try {
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, String(Date.now()))
+  }
+  catch {
+    // Ignore storage access failures and still let the reload happen.
+  }
+}
+
+function clearChunkReloadTimestamp(): void {
+  try {
+    sessionStorage.removeItem(CHUNK_RELOAD_KEY)
+  }
+  catch {
+    // Ignore storage access failures during cleanup.
+  }
+}
 
 function handleChunkError(message: string) {
+  const previousReload = getChunkReloadTimestamp()
+  if (previousReload && Date.now() - previousReload < CHUNK_RELOAD_COOLDOWN_MS) {
+    console.warn('Chunk load error detected again after a recent reload, skipping automatic reload.', message)
+    return
+  }
+
   console.warn('Chunk load error detected, reloading page...', message)
-  // Store flag to show toast after reload
-  localStorage.setItem(CHUNK_RELOAD_KEY, 'true')
+  setChunkReloadTimestamp()
   window.location.reload()
 }
 
-function isChunkLoadError(message: string | undefined): boolean {
-  if (!message)
-    return false
-  return message.includes('Failed to fetch dynamically imported module')
-    || message.includes('is not a valid JavaScript MIME type')
-    || message.includes('Loading chunk')
-    || message.includes('Loading CSS chunk')
-}
-
 window.addEventListener('error', (event) => {
-  if (isChunkLoadError(event.message))
+  if (isStaleAssetErrorMessage(event.message)) {
+    event.preventDefault()
+    event.stopImmediatePropagation()
     handleChunkError(event.message)
+  }
 }, true)
 
 // Also handle unhandled promise rejections for dynamic imports
 window.addEventListener('unhandledrejection', (event) => {
-  const message = event.reason?.message || String(event.reason)
-  if (isChunkLoadError(message)) {
+  const message = getErrorMessage(event.reason) ?? String(event.reason)
+  if (isStaleAssetErrorMessage(message)) {
     event.preventDefault()
+    event.stopImmediatePropagation()
     handleChunkError(message)
   }
+})
+
+window.addEventListener('vite:preloadError', (event) => {
+  event.preventDefault()
+  event.stopImmediatePropagation()
+  const preloadEvent = event as Event & { payload?: unknown, detail?: unknown }
+  const message = getErrorMessage(preloadEvent.payload)
+    ?? getErrorMessage(preloadEvent.detail)
+    ?? 'Vite preload error'
+  handleChunkError(message)
 })
 
 const guestPath = ['/login', '/delete_account', '/confirm-signup', '/forgot_password', '/resend_email', '/onboarding', '/register', '/invitation', '/scan', '/sso-callback']
@@ -128,11 +172,11 @@ router.isReady().then(async () => {
 
   // Wait for vue-sonner component to be mounted
   setTimeout(async () => {
-    const key = localStorage.getItem(CHUNK_RELOAD_KEY)
+    const key = getChunkReloadTimestamp()
     console.log('Checking for chunk reload toast...', key)
     // Show toast if we just reloaded due to chunk error
     if (key) {
-      localStorage.removeItem(CHUNK_RELOAD_KEY)
+      clearChunkReloadTimestamp()
       const { toast } = await import('vue-sonner')
       toast.info('App updated! Page was refreshed to load the latest version.')
     }
