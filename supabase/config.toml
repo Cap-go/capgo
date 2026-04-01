@@ -205,7 +205,9 @@ content_path = "./supabase/templates/mfa_factor_unenrolled_notification.html"
 # Custom email templates kept in ./supabase/templates for consistency, but not managed by Supabase.
 # These are sent through Bento:
 # - invite_new_user_to_org.html
+#   subject = "[Capgo]: Join {{ event.details.org_name }} org & create account"
 # - invite_existing_user_to_org.html
+#   subject = "[Capgo]: Join {{ event.details.org_name }} with your account"
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
