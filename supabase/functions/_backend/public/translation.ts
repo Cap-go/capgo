@@ -99,15 +99,15 @@ export function normalizeTranslationStrings(strings: unknown) {
 export function protectTranslationTokens(text: string) {
   let index = 0
   const tokens = new Map<string, string>()
+  const tokenPattern = /\{\w+\}|\$\d+|https?:\/\/[^\s)]+|\b[\w.%+-]+@[\w.-]+\.[a-z]{2,}\b|\b(?:bunx?|npx)(?:\s+[@\w./:-]+)+/gi
 
-  const protectedText = text.replace(
-    /(\{\w+\}|\$\d+|https?:\/\/\S+|\S+@\S+\.\S+|\b(?:bunx?|npx)\s+[@\w./:-]+(?:\s+[@\w./:-]+)*)/g,
-    (match) => {
-      const token = `__CAPGO_TOKEN_${index++}__`
-      tokens.set(token, match)
-      return token
-    },
-  )
+  const replaceMatch = (match: string) => {
+    const token = `__CAPGO_TOKEN_${index++}__`
+    tokens.set(token, match)
+    return token
+  }
+
+  const protectedText = text.replace(tokenPattern, replaceMatch)
 
   return {
     protectedText,
