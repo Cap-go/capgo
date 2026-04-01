@@ -242,10 +242,12 @@ async function handleEmailSubmit() {
     }
 
     if (data === 'OK') {
-      const notified = await notifyExistingUserInvite(supabase, email, orgId)
-      if (!notified) {
-        console.warn('Failed to send invite email notification, but invite was created')
-        toast.warning(t('org-invite-email-notification-failed'))
+      if (useRbacInvites.value) {
+        const notified = await notifyExistingUserInvite(supabase, email, orgId)
+        if (!notified) {
+          console.warn('Failed to send invite email notification, but invite was created')
+          toast.warning(t('org-invite-email-notification-failed'))
+        }
       }
       toast.success(t('org-invited-user'))
       completeInviteSuccess({

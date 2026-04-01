@@ -686,7 +686,7 @@ async function handleSendInvitationOutput(output: string, email: string, type: D
     return false
   if (output === 'OK') {
     const orgId = currentOrganization.value?.gid
-    if (orgId) {
+    if (useNewRbac.value && orgId) {
       const notified = await notifyExistingUserInvite(supabase, email, orgId)
       if (!notified) {
         console.warn('Failed to send invite email notification, but invite was created')
