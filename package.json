@@ -12,6 +12,7 @@
     "cloudsql:allow-cloudflare": "bash scripts/update_cloudsql_authorized_networks.sh",
     "supabase:start": "bun scripts/supabase-worktree.ts start",
     "supabase:stop": "bun scripts/supabase-worktree.ts stop",
+    "supabase:cleanup": "bun scripts/supabase-worktree.ts stop --no-backup --yes",
     "supabase:stop:all": "bun scripts/supabase-stop-all-worktrees.ts",
     "supabase:status": "bun scripts/supabase-worktree.ts status",
     "supabase:db:reset": "bun scripts/supabase-worktree.ts db reset",
