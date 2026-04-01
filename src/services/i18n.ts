@@ -1,30 +1,27 @@
-import { changeLocale } from '@formkit/vue'
 import countryCodeToFlagEmoji from 'country-code-to-flag-emoji'
-import { loadLanguageAsync } from '~/modules/i18n'
+import { getLanguageConfig, getSelectedLanguage, loadLanguageAsync, normalizeLanguage } from '../modules/i18n'
 
-export function getEmoji(country: string) {
-  // convert country code to emoji flag
-  let countryCode = country
-  switch (country) {
-    case 'en':
-      countryCode = 'US'
-      break
-    case 'ko':
-      countryCode = 'KR'
-      break
-    case 'ja':
-      countryCode = 'JP'
-      break
-    case 'hi':
-      countryCode = 'IN'
-      break
-    default:
-      break
-  }
-  return countryCodeToFlagEmoji(countryCode)
+export function getEmoji(countryCode: string) {
+  return countryCodeToFlagEmoji(countryCode.trim().toUpperCase())
 }
 
-export async function changeLanguage(lang: string) {
-  await loadLanguageAsync(lang)
-  changeLocale(lang)
+export function getLanguageEmoji(lang: string) {
+  return countryCodeToFlagEmoji(getLanguageConfig(lang).countryCode)
+}
+
+export async function changeLanguage(lang: string, options?: { reload?: boolean }) {
+  const currentLanguage = getSelectedLanguage()
+  const nextLanguage = normalizeLanguage(lang)
+
+  if (currentLanguage === nextLanguage)
+    return nextLanguage
+
+  await loadLanguageAsync(nextLanguage)
+
+  // The page translator rehydrates from rendered English source content after a
+  // full reload, so callers should persist any unsaved in-memory form state first.
+  if (options?.reload === true && typeof window !== 'undefined')
+    window.location.reload()
+
+  return nextLanguage
 }

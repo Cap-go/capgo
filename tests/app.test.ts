@@ -85,6 +85,9 @@ describe('[GET] /app operations with subkey', () => {
   })
 
   it('should create app and subkey with limited rights', async () => {
+    await resetAppData(APPNAME)
+    await resetAppDataStats(APPNAME)
+
     // Create a test app
     const createApp = await fetch(`${BASE_URL}/app`, {
       method: 'POST',
@@ -99,7 +102,7 @@ describe('[GET] /app operations with subkey', () => {
     // Handle duplicate app creation gracefully on retry (app may already exist from a previous attempt)
     if (createApp.status !== 200) {
       const body = await createApp.json().catch(() => null) as any
-      const isDuplicate = body?.error === 'cannot_create_app'
+      const isDuplicate = body?.error === 'cannot_create_app' || body?.error === 'app_id_already_exists'
       if (!isDuplicate) {
         expect(createApp.status, JSON.stringify(body)).toBe(200)
       }
