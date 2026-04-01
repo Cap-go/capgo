@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import type Stripe from 'stripe'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { getFallbackCreditProductId } from '../utils/credits.ts'
@@ -157,9 +158,36 @@ async function resolveOrgStripeContext(c: AppContext, orgId: string) {
   return { customerId: org.customer_id, token: rawAuthHeader }
 }
 
+async function hasProcessedCreditTopUp(
+  supabase: ReturnType<typeof supabaseClient>,
+  orgId: string,
+  sessionId: string,
+) {
+  const { data, error } = await supabase
+    .from('usage_credit_transactions')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('transaction_type', 'purchase')
+    .contains('source_ref', { sessionId })
+    .limit(1)
+
+  if (error) {
+    cloudlogErr({
+      message: 'credit_top_up_candidate_check_failed',
+      orgId,
+      sessionId,
+      error,
+    })
+    throw simpleError('idempotency_check_failed', 'Failed to verify top-up status', { error })
+  }
+
+  return Boolean(data?.length)
+}
+
 async function resolveCheckoutSession(
   c: AppContext,
   stripe: ReturnType<typeof getStripe>,
+  supabase: ReturnType<typeof supabaseClient>,
   orgId: string,
   customerId: string,
   sessionId?: string,
@@ -179,7 +207,7 @@ async function resolveCheckoutSession(
     limit: 100,
   })
 
-  const latestCompletedPaymentSession = sessions.data
+  const candidateSessions = sessions.data
     .filter(session =>
       session.customer === customerId
       && session.mode === 'payment'
@@ -190,12 +218,24 @@ async function resolveCheckoutSession(
         || session.metadata?.orgId === orgId
       ),
     )
-    .sort((a, b) => (b.created ?? 0) - (a.created ?? 0))[0]
+    .sort((a, b) => (b.created ?? 0) - (a.created ?? 0))
 
-  if (!latestCompletedPaymentSession)
+  let unresolvedSession: Stripe.Checkout.Session | null = null
+  for (const candidateSession of candidateSessions) {
+    if (await hasProcessedCreditTopUp(supabase, orgId, candidateSession.id))
+      continue
+
+    if (unresolvedSession) {
+      throw simpleError('multiple_unprocessed_sessions', 'Multiple completed checkout sessions require an explicit sessionId')
+    }
+
+    unresolvedSession = candidateSession
+  }
+
+  if (!unresolvedSession)
     throw simpleError('session_not_found', 'No completed checkout session found')
 
-  return latestCompletedPaymentSession
+  return unresolvedSession
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -374,9 +414,10 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
     throw simpleError('missing_parameters', 'orgId is required')
 
   const { customerId, token } = await resolveOrgStripeContext(c, body.orgId)
+  const supabase = supabaseClient(c, token)
 
   const stripe = getStripe(c)
-  const session = await resolveCheckoutSession(c, stripe, body.orgId, customerId, body.sessionId)
+  const session = await resolveCheckoutSession(c, stripe, supabase, body.orgId, customerId, body.sessionId)
   const resolvedSessionId = session.id
 
   if (!session || session.customer !== customerId)
@@ -402,7 +443,6 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
   if (paymentIntentId)
     sourceMatchFilters.push(`source_ref->>paymentIntentId.eq.${paymentIntentId}`)
 
-  const supabase = supabaseClient(c, token)
   const { data: existingTx, error: existingTxError } = await supabase
     .from('usage_credit_transactions')
     .select('id, grant_id, balance_after')

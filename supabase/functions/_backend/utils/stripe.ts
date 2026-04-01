@@ -368,6 +368,27 @@ export async function cancelSubscription(c: Context, customerId: string) {
   })
 }
 
+async function getStoredPlanPriceId(c: Context, planId: string, recurrence: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabaseAdmin(c)
+      .from('plans')
+      .select('price_m_id, price_y_id')
+      .eq('stripe_id', planId)
+      .single()
+
+    if (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getStoredPlanPriceId', planId, recurrence, error })
+      return null
+    }
+
+    return recurrence === 'year' ? data.price_y_id : data.price_m_id
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getStoredPlanPriceId', planId, recurrence, error })
+    return null
+  }
+}
+
 async function getPriceIds(c: Context, planId: string, recurrence: string): Promise<{ priceId: string | null }> {
   let priceId = null
   if (!isStripeConfigured(c))
@@ -382,6 +403,10 @@ async function getPriceIds(c: Context, planId: string, recurrence: string): Prom
   }
   catch (err) {
     cloudlog({ requestId: c.get('requestId'), message: 'search err', error: err })
+  }
+  if (!priceId) {
+    priceId = await getStoredPlanPriceId(c, planId, recurrence)
+    cloudlog({ requestId: c.get('requestId'), message: 'prices fallback', planId, recurrence, priceId })
   }
   return { priceId }
 }
@@ -526,11 +551,15 @@ export async function createOneTimeCheckout(
       {
         price: priceId,
         quantity,
-        adjustable_quantity: {
-          enabled: true,
-          minimum: 1,
-          maximum: 100000,
-        },
+        ...(isStripeEmulatorEnabled(c)
+          ? {}
+          : {
+              adjustable_quantity: {
+                enabled: true,
+                minimum: 1,
+                maximum: 100000,
+              },
+            }),
       },
     ],
     metadata: {

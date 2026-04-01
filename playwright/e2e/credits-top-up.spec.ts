@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto'
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '../../src/types/supabase.types'
 import { getSupabaseClient, resetAndSeedAppData, resetAppData, USER_ID, USER_PASSWORD } from '../../tests/test-utils'
 import { expect, test } from '../support/commands'
 
@@ -23,12 +25,16 @@ async function stripeCreate<T>(path: string, body: Record<string, unknown>): Pro
 }
 
 test.describe('Credit Top-Up', () => {
-  const supabase = getSupabaseClient()
+  let supabase: SupabaseClient<Database>
 
   let orgId = ''
   let appId = ''
   let customerId = ''
   let planStripeId = ''
+
+  test.beforeAll(() => {
+    supabase = getSupabaseClient()
+  })
 
   test.afterEach(async () => {
     if (appId)

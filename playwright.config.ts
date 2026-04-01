@@ -2,6 +2,7 @@ import type { PlaywrightTestConfig } from '@playwright/test'
 import * as os from 'node:os'
 import { env } from 'node:process'
 import { defineConfig, devices } from '@playwright/test'
+import { getPlaywrightStripeApiBaseUrl, getStripeEmulatorPort } from './scripts/playwright-stripe'
 import { getSupabaseWorktreeConfig } from './scripts/supabase-worktree-config'
 
 /**
@@ -16,8 +17,8 @@ const { ports: supabasePorts } = getSupabaseWorktreeConfig()
 const localSupabaseUrl = `http://localhost:${supabasePorts.api}`
 const localApiDomain = `localhost:${supabasePorts.api}/functions/v1`
 const localSupabaseAnonKey = env.SUPABASE_ANON_KEY || 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH'
-const localStripeEmulatorPort = Number.parseInt(env.STRIPE_EMULATOR_PORT || '4510', 10)
-const localStripeApiBaseUrl = env.STRIPE_API_BASE_URL || `http://host.docker.internal:${localStripeEmulatorPort}`
+const localStripeEmulatorPort = getStripeEmulatorPort(env)
+const localStripeApiBaseUrl = getPlaywrightStripeApiBaseUrl(env)
 
 if (!env.SKIP_STRIPE_EMULATOR_START) {
   webServer.push({

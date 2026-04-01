@@ -49,6 +49,14 @@ function parseSupabaseStatusJson(mixed: string): Record<string, string> {
   return JSON.parse(mixed.slice(idx)) as Record<string, string>
 }
 
+function getLocalSupabaseStatus() {
+  return spawnSync('bun', ['scripts/supabase-worktree.ts', 'status', '-o', 'json'], {
+    cwd: process.cwd(),
+    encoding: 'utf8',
+    env: process.env,
+  })
+}
+
 function hydrateLocalSupabaseEnvFromStatus(): void {
   if (USE_CLOUDFLARE)
     return
@@ -59,11 +67,20 @@ function hydrateLocalSupabaseEnvFromStatus(): void {
   if (currentSupabaseUrl && currentAnonKey && existingServiceKey)
     return
 
-  const status = spawnSync('bun', ['scripts/supabase-worktree.ts', 'status', '-o', 'json'], {
-    cwd: process.cwd(),
-    encoding: 'utf8',
-    env: process.env,
-  })
+  let status = getLocalSupabaseStatus()
+
+  if ((status.status ?? 1) !== 0) {
+    const start = spawnSync('bun', ['run', 'supabase:start'], {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+      env: process.env,
+    })
+
+    if ((start.status ?? 1) !== 0)
+      return
+
+    status = getLocalSupabaseStatus()
+  }
 
   if ((status.status ?? 1) !== 0)
     return

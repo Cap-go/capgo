@@ -2,13 +2,13 @@ import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import process, { env } from 'node:process'
+import { getPlaywrightStripeApiBaseUrl } from './playwright-stripe'
 
 const repoRoot = process.cwd()
 const sourceEnvPath = resolve(repoRoot, 'supabase/functions/.env')
 const generatedEnvPath = resolve(repoRoot, '.context/playwright/supabase-functions.playwright.env')
 
-const defaultStripeBaseUrl = `http://127.0.0.1:${env.STRIPE_EMULATOR_PORT ?? '4510'}`
-const stripeApiBaseUrl = env.STRIPE_API_BASE_URL || defaultStripeBaseUrl
+const stripeApiBaseUrl = getPlaywrightStripeApiBaseUrl(env)
 const webAppUrl = env.WEBAPP_URL || 'http://localhost:5173'
 
 function upsertEnvValue(content: string, key: string, value: string): string {
