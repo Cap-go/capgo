@@ -54,3 +54,10 @@ export async function notifyExistingUserInvite(
 
   return true
 }
+
+export function shouldNotifyExistingUserInvite(role: string, useNewRbac: boolean) {
+  if (useNewRbac)
+    return true
+
+  return role.startsWith('invite_')
+}

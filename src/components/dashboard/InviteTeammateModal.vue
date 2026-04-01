@@ -8,7 +8,7 @@ import { useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useOrganizationStore } from '~/stores/organization'
-import { notifyExistingUserInvite, resolveInviteNewUserErrorMessage } from '~/utils/invites'
+import { notifyExistingUserInvite, resolveInviteNewUserErrorMessage, shouldNotifyExistingUserInvite } from '~/utils/invites'
 
 interface InviteSuccessPayload {
   email: string
@@ -40,7 +40,8 @@ const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 const shouldUseCaptcha = computed(() => Boolean(captchaKey.value))
 const isInviting = ref(false)
 const useRbacInvites = computed(() => organizationStore.currentOrganization?.use_new_rbac === true)
-const inviteRole = computed(() => (useRbacInvites.value ? 'org_admin' : 'admin'))
+const existingUserInviteRole = computed(() => (useRbacInvites.value ? 'org_admin' : 'invite_admin'))
+const newUserInviteRole = computed(() => (useRbacInvites.value ? 'org_admin' : 'admin'))
 const emailDialogTitle = computed(() => props.inviteKind === 'technical'
   ? t('onboarding-invite-option-modal-title')
   : t('invite-teammate-modal-title'))
@@ -215,7 +216,7 @@ async function handleEmailSubmit() {
       const result = await supabase.rpc('invite_user_to_org_rbac', {
         email,
         org_id: orgId,
-        role_name: inviteRole.value,
+        role_name: existingUserInviteRole.value,
       })
       data = result.data
       error = result.error
@@ -224,7 +225,7 @@ async function handleEmailSubmit() {
       const result = await supabase.rpc('invite_user_to_org', {
         email,
         org_id: orgId,
-        invite_type: inviteRole.value as Database['public']['Enums']['user_min_right'],
+        invite_type: existingUserInviteRole.value as Database['public']['Enums']['user_min_right'],
       })
       data = result.data
       error = result.error
@@ -242,7 +243,7 @@ async function handleEmailSubmit() {
     }
 
     if (data === 'OK') {
-      if (useRbacInvites.value) {
+      if (shouldNotifyExistingUserInvite(existingUserInviteRole.value, useRbacInvites.value)) {
         const notified = await notifyExistingUserInvite(supabase, email, orgId)
         if (!notified) {
           console.warn('Failed to send invite email notification, but invite was created')
@@ -329,7 +330,7 @@ async function handleFullDetailsSubmit() {
       body: {
         email,
         org_id: orgId,
-        invite_type: inviteRole.value,
+        invite_type: newUserInviteRole.value,
         captcha_token: shouldUseCaptcha.value ? inviteCaptchaToken.value : undefined,
         first_name: firstName,
         last_name: lastName,
