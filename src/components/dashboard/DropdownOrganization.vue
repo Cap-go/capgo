@@ -12,7 +12,10 @@ import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
+type OrganizationInvitationTarget = Pick<Organization, 'gid' | 'name' | 'role'>
+
 const router = useRouter()
+const route = useRoute()
 const organizationStore = useOrganizationStore()
 const { currentOrganization } = storeToRefs(organizationStore)
 const dialogStore = useDialogV2Store()
@@ -29,6 +32,7 @@ const lastOrganizationLogoRefreshAt = ref(0)
 const refreshedBrokenLogoKeys = new Set<string>()
 let organizationLogoRefreshInterval: number | null = null
 let isOrganizationDropdownMounted = false
+const handledInviteOrgId = ref<string | null>(null)
 
 function refreshOnFocus() {
   void refreshOrganizationLogosIfNeeded()
@@ -46,6 +50,8 @@ onMounted(async () => {
   await organizationStore.fetchOrganizations()
   if (!isOrganizationDropdownMounted)
     return
+
+  await openInvitationFromRouteIfNeeded()
 
   lastOrganizationLogoRefreshAt.value = Date.now()
 
@@ -66,8 +72,9 @@ onUnmounted(() => {
   organizationLogoRefreshInterval = null
 })
 
-async function handleOrganizationInvitation(org: Organization) {
+async function handleOrganizationInvitation(org: OrganizationInvitationTarget) {
   const newName = t('alert-accept-invitation').replace('%ORG%', org.name)
+  let invitationHandled = false
   dialogStore.openDialog({
     title: t('alert-confirm-invite'),
     description: `${newName}`,
@@ -86,8 +93,9 @@ async function handleOrganizationInvitation(org: Organization) {
           }
 
           if (data === 'OK') {
+            invitationHandled = true
             organizationStore.setCurrentOrganization(org.gid)
-            organizationStore.fetchOrganizations()
+            await organizationStore.fetchOrganizations()
             toast.success(t('invite-accepted'))
           }
           else if (data === 'NO_INVITE') {
@@ -112,12 +120,16 @@ async function handleOrganizationInvitation(org: Organization) {
           const { error } = await supabase
             .from('org_users')
             .delete()
+            .eq('org_id', org.gid)
             .eq('user_id', userId)
 
-          if (error)
+          if (error) {
             console.log('Error delete: ', error)
+            return
+          }
 
-          organizationStore.fetchOrganizations()
+          invitationHandled = true
+          await organizationStore.fetchOrganizations()
           toast.success(t('alert-denied-invite'))
         },
       },
@@ -127,6 +139,34 @@ async function handleOrganizationInvitation(org: Organization) {
       },
     ],
   })
+
+  await dialogStore.onDialogDismiss()
+  if (invitationHandled)
+    await clearInviteOrgQuery()
+}
+
+async function clearInviteOrgQuery() {
+  if (!('invite_org' in route.query))
+    return
+
+  const nextQuery = { ...route.query }
+  delete nextQuery.invite_org
+  await router.replace({ query: nextQuery })
+  handledInviteOrgId.value = null
+}
+
+async function openInvitationFromRouteIfNeeded() {
+  const inviteOrgId = typeof route.query.invite_org === 'string' ? route.query.invite_org : ''
+  if (!inviteOrgId || inviteOrgId === handledInviteOrgId.value)
+    return
+
+  const inviteOrg = organizationStore.organizations.find(org => org.gid === inviteOrgId)
+  if (!inviteOrg)
+    return
+
+  handledInviteOrgId.value = inviteOrgId
+  if (isInvitation(inviteOrg))
+    await handleOrganizationInvitation(inviteOrg)
 }
 
 function closeDropdown() {
@@ -266,6 +306,23 @@ function onOrgItemKeydown(org: Organization, e: KeyboardEvent) {
   closeDropdown()
   onOrganizationClick(org)
 }
+
+watch(
+  () => route.query.invite_org,
+  (inviteOrg) => {
+    if (typeof inviteOrg !== 'string' || !inviteOrg)
+      handledInviteOrgId.value = null
+    void openInvitationFromRouteIfNeeded()
+  },
+  { immediate: true },
+)
+
+watch(
+  () => organizationStore.organizations.map(org => `${org.gid}:${org.role}`),
+  () => {
+    void openInvitationFromRouteIfNeeded()
+  },
+)
 </script>
 
 <template>
