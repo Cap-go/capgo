@@ -1719,7 +1719,7 @@ export async function getAdminOnboardingFunnel(
         INNER JOIN channels c ON c.app_id = a.app_id
       ),
       orgs_with_bundles AS (
-        SELECT DISTINCT o.id, o.created_date
+        SELECT DISTINCT o.id, o.customer_id, o.created_date
         FROM orgs_in_range o
         INNER JOIN apps a ON a.owner_org = o.id
         INNER JOIN channels c ON c.app_id = a.app_id
@@ -1727,7 +1727,7 @@ export async function getAdminOnboardingFunnel(
       ),
       orgs_subscribed AS (
         SELECT DISTINCT o.id, o.created_date
-        FROM orgs_in_range o
+        FROM orgs_with_bundles o
         INNER JOIN stripe_info si ON si.customer_id = o.customer_id
         WHERE si.paid_at IS NOT NULL
       )
@@ -1800,9 +1800,14 @@ export async function getAdminOnboardingFunnel(
       daily_subscriptions AS (
         SELECT o.created_at::date as date, COUNT(DISTINCT o.id)::int as orgs_subscribed
         FROM orgs o
+        INNER JOIN apps a ON a.owner_org = o.id
+        INNER JOIN channels c ON c.app_id = a.app_id
+        INNER JOIN app_versions av ON av.id = c.version AND av.name NOT IN ('builtin', 'unknown')
         INNER JOIN stripe_info si ON si.customer_id = o.customer_id
         WHERE o.created_at >= ${start_date}::timestamp
           AND o.created_at < ${end_date}::timestamp
+          AND av.created_at >= o.created_at
+          AND av.created_at < o.created_at + interval '7 days'
           AND si.paid_at IS NOT NULL
           AND si.paid_at >= o.created_at
           AND si.paid_at < o.created_at + interval '7 days'

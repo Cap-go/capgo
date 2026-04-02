@@ -25,6 +25,11 @@ const ONBOARDING_CHANNEL_CREATED_AT = '2026-02-03T10:00:00.000Z'
 const ONBOARDING_BUNDLE_CREATED_AT = '2026-02-04T10:00:00.000Z'
 const ONBOARDING_PAID_AT = '2026-02-05T10:00:00.000Z'
 
+const ONBOARDING_NO_BUNDLE_ORG_ID = randomUUID()
+const ONBOARDING_NO_BUNDLE_CUSTOMER_ID = `cus_admin_stats_onboarding_nobundle_${ONBOARDING_NO_BUNDLE_ORG_ID.slice(0, 8)}`
+const ONBOARDING_NO_BUNDLE_CREATED_AT = '2026-02-01T12:00:00.000Z'
+const ONBOARDING_NO_BUNDLE_PAID_AT = '2026-02-06T10:00:00.000Z'
+
 let adminHeaders: Record<string, string>
 let soloPlan: {
   name: string
@@ -109,6 +114,19 @@ beforeAll(async () => {
       subscription_anchor_start: '2026-02-05T00:00:00.000Z',
       subscription_anchor_end: '2026-03-05T00:00:00.000Z',
     },
+    {
+      customer_id: ONBOARDING_NO_BUNDLE_CUSTOMER_ID,
+      status: 'succeeded',
+      product_id: soloPlan.stripe_id,
+      price_id: soloPlan.price_m_id,
+      subscription_id: null,
+      trial_at: '2026-02-20T00:00:00.000Z',
+      paid_at: ONBOARDING_NO_BUNDLE_PAID_AT,
+      is_good_plan: true,
+      plan_usage: 2,
+      subscription_anchor_start: '2026-02-06T00:00:00.000Z',
+      subscription_anchor_end: '2026-03-06T00:00:00.000Z',
+    },
   ])
   if (stripeError)
     throw stripeError
@@ -142,6 +160,14 @@ beforeAll(async () => {
       management_email: TEST_EMAIL,
       customer_id: ONBOARDING_CUSTOMER_ID,
       created_at: ONBOARDING_ORG_CREATED_AT,
+    },
+    {
+      id: ONBOARDING_NO_BUNDLE_ORG_ID,
+      name: `Admin Stats Onboarding No Bundle ${ONBOARDING_NO_BUNDLE_ORG_ID.slice(0, 8)}`,
+      created_by: USER_ID,
+      management_email: TEST_EMAIL,
+      customer_id: ONBOARDING_NO_BUNDLE_CUSTOMER_ID,
+      created_at: ONBOARDING_NO_BUNDLE_CREATED_AT,
     },
   ])
   if (orgError)
@@ -209,7 +235,7 @@ beforeAll(async () => {
   })
   if (channelError)
     throw channelError
-})
+}, 30000)
 
 afterAll(async () => {
   const supabase = getSupabaseClient()
@@ -217,8 +243,8 @@ afterAll(async () => {
   await supabase.from('channels').delete().eq('app_id', ONBOARDING_APP_ID)
   await supabase.from('app_versions').delete().in('app_id', [TRIAL_APP_ID, ONBOARDING_APP_ID])
   await supabase.from('apps').delete().in('app_id', [TRIAL_APP_ID, ONBOARDING_APP_ID])
-  await supabase.from('orgs').delete().in('id', [TRIAL_ORG_ID, CANCELLED_YEARLY_ORG_ID, CANCELLED_MONTHLY_ORG_ID, ONBOARDING_ORG_ID])
-  await supabase.from('stripe_info').delete().in('customer_id', [TRIAL_CUSTOMER_ID, CANCELLED_YEARLY_CUSTOMER_ID, CANCELLED_MONTHLY_CUSTOMER_ID, ONBOARDING_CUSTOMER_ID])
+  await supabase.from('orgs').delete().in('id', [TRIAL_ORG_ID, CANCELLED_YEARLY_ORG_ID, CANCELLED_MONTHLY_ORG_ID, ONBOARDING_ORG_ID, ONBOARDING_NO_BUNDLE_ORG_ID])
+  await supabase.from('stripe_info').delete().in('customer_id', [TRIAL_CUSTOMER_ID, CANCELLED_YEARLY_CUSTOMER_ID, CANCELLED_MONTHLY_CUSTOMER_ID, ONBOARDING_CUSTOMER_ID, ONBOARDING_NO_BUNDLE_CUSTOMER_ID])
 })
 
 describe('/private/admin_stats', () => {
@@ -293,7 +319,7 @@ describe('/private/admin_stats', () => {
     expect(monthlyOrganization?.first_subscription_date).toBe(creatorUserCreatedAt)
   })
 
-  it.concurrent('returns subscribed as the last onboarding funnel step', async () => {
+  it.concurrent('returns subscribed as the last onboarding funnel step without exceeding the bundle cohort', async () => {
     const response = await fetchWithRetry(`${BASE_URL}/private/admin_stats`, {
       method: 'POST',
       headers: adminHeaders,
@@ -313,22 +339,26 @@ describe('/private/admin_stats', () => {
         orgs_with_channel: number
         orgs_with_bundle: number
         orgs_subscribed: number
+        subscription_conversion_rate: number
         trend: Array<{
           date: string
+          new_orgs: number
           orgs_subscribed: number
         }>
       }
     }
 
     expect(payload.success).toBe(true)
-    expect(payload.data.total_orgs).toBe(1)
+    expect(payload.data.total_orgs).toBe(2)
     expect(payload.data.orgs_with_app).toBe(1)
     expect(payload.data.orgs_with_channel).toBe(1)
     expect(payload.data.orgs_with_bundle).toBe(1)
     expect(payload.data.orgs_subscribed).toBe(1)
+    expect(payload.data.subscription_conversion_rate).toBe(100)
     expect(payload.data.trend).toHaveLength(1)
     expect(payload.data.trend[0]).toMatchObject({
       date: '2026-02-01',
+      new_orgs: 2,
       orgs_subscribed: 1,
     })
   })
