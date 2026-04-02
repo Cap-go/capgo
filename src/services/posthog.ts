@@ -1,4 +1,5 @@
 // @ts-nocheck
+import { shouldSuppressPostHogExceptionEvent } from '~/services/staleAssetErrors'
 import { isLocal } from '~/services/supabase'
 
 export function posthogLoader(supaHost: string) {
@@ -51,13 +52,21 @@ export function posthogLoader(supaHost: string) {
     ui_host: 'https://eu.posthog.com',
     person_profiles: 'identified_only',
     defaults: '2025-11-30',
+    before_send: (event) => {
+      if (shouldSuppressPostHogExceptionEvent(event))
+        return false
+      return event
+    },
   })
 }
 
-export function pushEvent(nameEvent: string, supaHost: string): void {
+type JsonPrimitive = string | number | boolean | null
+type PostHogProperties = Record<string, JsonPrimitive>
+
+export function pushEvent(nameEvent: string, supaHost: string, properties?: PostHogProperties): void {
   if (isLocal(supaHost))
     return
-  posthog.capture(nameEvent)
+  posthog.capture(nameEvent, properties)
 }
 
 export function setUser(uuid: string, data: {

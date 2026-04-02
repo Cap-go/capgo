@@ -7,7 +7,8 @@ import { createSignedImageUrl } from '~/services/storage'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useMainStore } from '~/stores/main'
-import { getPlans, isAdmin } from './../services/supabase'
+import { useOrganizationStore } from '~/stores/organization'
+import { getPlans, isPlatformAdmin } from './../services/supabase'
 
 async function updateUser(
   main: ReturnType<typeof useMainStore>,
@@ -88,12 +89,36 @@ async function guard(
 ) {
   const supabase = useSupabase()
   const main = useMainStore()
+  const organizationStore = useOrganizationStore()
   const { data: claimsData } = await supabase.auth.getClaims()
   const { data: sessionData } = await supabase.auth.getSession()
   const sessionUser = sessionData?.session?.user ?? null
   const hasAuth = !!claimsData?.claims?.sub && !!sessionUser
   const hadAuth = !!main.auth
   const needsVerifiedEmail = to.path.startsWith('/settings') || to.path === '/delete_account'
+  const inviteOrgId = typeof to.query.invite_org === 'string' && to.query.invite_org.length > 0
+    ? to.query.invite_org
+    : null
+  const isAdminRoute = to.path.startsWith('/admin')
+
+  async function tryLoadOrganizations(fetcher: () => Promise<void>) {
+    try {
+      await fetcher()
+      return true
+    }
+    catch (error) {
+      console.error('Failed to load organizations during auth guard:', error)
+      return false
+    }
+  }
+
+  function shouldRedirectToOrgOnboarding() {
+    if (to.path.startsWith('/onboarding/organization'))
+      return false
+    if (!inviteOrgId)
+      return true
+    return !organizationStore.organizations.some(org => org.gid === inviteOrgId && org.role.startsWith('invite'))
+  }
 
   if (hasAuth && sessionUser) {
     const authConfirmedAt = main.auth?.email_confirmed_at
@@ -119,7 +144,12 @@ async function guard(
     && mfaData.nextLevel === 'aal2'
     && !isAdminForced
   ) {
-    return next(`/login?to=${to.path}`)
+    return next({
+      path: '/login',
+      query: {
+        to: to.fullPath,
+      },
+    })
   }
 
   if (hasAuth && sessionUser && !hadAuth) {
@@ -128,7 +158,7 @@ async function guard(
         path: '/resend_email',
         query: {
           reason: 'email_not_verified',
-          return_to: to.path,
+          return_to: to.fullPath,
         },
       })
     }
@@ -154,13 +184,40 @@ async function guard(
       await updateUser(main, supabase)
     }
 
+    const organizationsLoaded = await tryLoadOrganizations(() => organizationStore.fetchOrganizations())
+    if (organizationsLoaded && isAdminRoute) {
+      try {
+        main.isAdmin = await isPlatformAdmin()
+      }
+      catch (error) {
+        console.error('Failed to resolve platform admin status:', error)
+        main.isAdmin = false
+      }
+    }
+
+    if (organizationsLoaded && !organizationStore.hasOrganizations && shouldRedirectToOrgOnboarding()) {
+      if (!isAdminRoute || !main.isAdmin) {
+        return next({
+          path: '/onboarding/organization',
+          query: {
+            to: to.fullPath,
+          },
+        })
+      }
+    }
+
     getPlans().then((pls) => {
       main.plans = pls
     })
 
-    isAdmin(main.auth?.id).then((res) => {
-      main.isAdmin = res
-    })
+    try {
+      // isPlatformAdmin() is the only frontend admin-rights source.
+      main.isAdmin = await isPlatformAdmin()
+    }
+    catch (error) {
+      console.error('Failed to resolve platform admin status:', error)
+      main.isAdmin = false
+    }
 
     sendEvent({
       channel: 'user-login',
@@ -175,7 +232,12 @@ async function guard(
   }
   else if (from.path !== 'login' && !hasAuth) {
     main.auth = undefined
-    next(`/login?to=${to.path}`)
+    next({
+      path: '/login',
+      query: {
+        to: to.fullPath,
+      },
+    })
   }
   else if (hasAuth && main.auth) {
     // User is already authenticated, but check if account got disabled
@@ -186,7 +248,7 @@ async function guard(
           path: '/resend_email',
           query: {
             reason: 'email_not_verified',
-            return_to: to.path,
+            return_to: to.fullPath,
           },
         })
       }
@@ -208,12 +270,20 @@ async function guard(
       }
     }
 
+    const organizationsLoaded = await tryLoadOrganizations(() => organizationStore.dedupFetchOrganizations())
+    if (organizationsLoaded && !organizationStore.hasOrganizations && shouldRedirectToOrgOnboarding()) {
+      return next('/onboarding/organization')
+    }
+
     // Check if user is trying to access admin routes
-    if (to.path.startsWith('/admin')) {
-      // Ensure isAdmin is loaded before checking
-      if (main.isAdmin === undefined) {
-        const adminStatus = await isAdmin(main.auth.id)
-        main.isAdmin = adminStatus
+    if (isAdminRoute) {
+      try {
+        // Re-check via the single approved frontend path for admin-rights.
+        main.isAdmin = await isPlatformAdmin()
+      }
+      catch (error) {
+        console.error('Failed to resolve platform admin status:', error)
+        main.isAdmin = false
       }
 
       // Redirect non-admin users to dashboard

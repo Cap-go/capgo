@@ -76,7 +76,6 @@ export function useSupabase() {
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: false,
-      flowType: 'pkce' as const,
     },
   }
   if (supaClient)
@@ -337,12 +336,12 @@ export async function isTrialOrg(orgId: string): Promise<number> {
 
   return data ?? 0
 }
-export async function isAdmin(userid?: string): Promise<boolean> {
-  if (!userid)
-    return false
-  const { data, error } = await useSupabase()
-    .rpc('is_admin', { userid })
-    .single()
+// Canonical frontend platform-admin verification.
+// Use this only for platform-rights checks in the UI flow; no other path should use
+// user-id based admin function checks from the browser.
+export async function isPlatformAdmin(): Promise<boolean> {
+  const rpc = useSupabase().rpc('is_platform_admin')
+  const { data, error } = await rpc.single()
   if (error)
     throw new Error(error.message)
 

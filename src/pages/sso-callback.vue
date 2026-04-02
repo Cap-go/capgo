@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import type { Session } from '@supabase/supabase-js'
 import { onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconLoader from '~icons/lucide/loader-2'
@@ -9,9 +11,10 @@ import { useSupabase } from '~/services/supabase'
 const route = useRoute()
 const router = useRouter()
 const supabase = useSupabase()
+const { t } = useI18n()
 const isLoading = ref(true)
 const errorMessage = ref('')
-const { provisionUser } = useSSOProvisioning()
+const { provisionUser, error: provisionError } = useSSOProvisioning()
 
 function validateRedirectPath(path: string | undefined): string {
   // Default fallback
@@ -32,28 +35,101 @@ function validateRedirectPath(path: string | undefined): string {
   return path
 }
 
-async function exchangeCode() {
-  const code = route.query.code as string | undefined
+function getSsoCallbackParams() {
+  const hashParams = new URLSearchParams(globalThis.location.hash.replace('#', ''))
+  const queryParams = new URLSearchParams(globalThis.location.search)
 
-  if (!code) {
+  return {
+    accessToken: hashParams.get('access_token') ?? queryParams.get('access_token') ?? '',
+    refreshToken: hashParams.get('refresh_token') ?? queryParams.get('refresh_token') ?? '',
+    code: queryParams.get('code') ?? hashParams.get('code') ?? '',
+    error: queryParams.get('error') ?? hashParams.get('error') ?? '',
+    errorDescription: queryParams.get('error_description') ?? hashParams.get('error_description') ?? '',
+  }
+}
+
+function clearAuthParamsFromUrl() {
+  const parsedUrl = new URL(globalThis.location.href)
+  const hashParams = new URLSearchParams(parsedUrl.hash.replace('#', ''))
+
+  parsedUrl.searchParams.delete('access_token')
+  parsedUrl.searchParams.delete('refresh_token')
+  hashParams.delete('access_token')
+  hashParams.delete('refresh_token')
+
+  const nextHash = hashParams.toString()
+  parsedUrl.hash = nextHash ? `#${nextHash}` : ''
+
+  globalThis.history.replaceState({}, '', parsedUrl.toString())
+}
+
+async function completeSsoLogin() {
+  const { accessToken, refreshToken, code, error, errorDescription } = getSsoCallbackParams()
+  clearAuthParamsFromUrl()
+
+  if (error) {
     isLoading.value = false
-    errorMessage.value = 'No authentication code found'
+    errorMessage.value = errorDescription || error
+    toast.error(errorMessage.value)
     return
   }
 
   try {
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+    let session: Session | null = null
 
-    if (error) {
+    if (accessToken && refreshToken) {
+      const { data, error } = await supabase.auth.setSession({
+        access_token: accessToken,
+        refresh_token: refreshToken,
+      })
+
+      if (error) {
+        isLoading.value = false
+        errorMessage.value = error.message || 'Failed to authenticate with SSO'
+        toast.error(errorMessage.value)
+        return
+      }
+
+      session = data.session
+    }
+    else if (code) {
+      const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+
+      if (error) {
+        isLoading.value = false
+        errorMessage.value = error.message || 'Failed to authenticate with SSO'
+        toast.error(errorMessage.value)
+        return
+      }
+
+      session = data.session
+    }
+    else {
       isLoading.value = false
-      errorMessage.value = error.message || 'Failed to authenticate with SSO'
-      toast.error(errorMessage.value)
+      errorMessage.value = 'No authentication data found'
       return
     }
 
-    // Auto-provision user on first SSO login
-    if (data.session) {
-      await provisionUser(data.session)
+    if (session) {
+      const { merged, alreadyMember } = await provisionUser(session)
+      if (merged) {
+        // The duplicate SSO user was merged into the existing account.
+        // The current session is now invalid — sign out and redirect to login.
+        await supabase.auth.signOut()
+        router.replace('/login?message=sso_account_linked')
+        return
+      }
+      if (provisionError.value) {
+        await supabase.auth.signOut()
+        isLoading.value = false
+        errorMessage.value = provisionError.value
+        toast.error(provisionError.value)
+        return
+      }
+
+      if (!alreadyMember) {
+        toast.success(t('sso-linked-success'))
+      }
     }
 
     // Validate redirect path to prevent open redirect
@@ -68,7 +144,7 @@ async function exchangeCode() {
   }
 }
 
-onMounted(exchangeCode)
+onMounted(completeSsoLogin)
 </script>
 
 <template>

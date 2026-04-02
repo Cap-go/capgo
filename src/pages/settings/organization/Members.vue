@@ -21,8 +21,8 @@ import { createSignedImageUrl } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
-import { getRbacRoleI18nKey, useOrganizationStore } from '~/stores/organization'
-import { resolveInviteNewUserErrorMessage } from '~/utils/invites'
+import { getRbacRoleI18nKey, isAdminRole, isSuperAdminRole, useOrganizationStore } from '~/stores/organization'
+import { notifyExistingUserInvite, resolveInviteNewUserErrorMessage, shouldAttemptExistingUserInviteNotification } from '~/utils/invites'
 import DeleteOrgDialog from './DeleteOrgDialog.vue'
 
 const { t } = useI18n()
@@ -118,7 +118,6 @@ const isInviteFormValid = computed(() => {
     && captchaToken.value !== ''
 })
 
-const rbacSuperAdminRole = 'org_super_admin'
 const appAccessMember = ref<OrganizationMemberRow | null>(null)
 const appAccessSearch = ref('')
 const appAccessSelectedAppIds = ref<string[]>([])
@@ -130,18 +129,51 @@ const isAppAccessLoading = ref(false)
 const isAppAccessSubmitting = ref(false)
 const appAccessRoleTouched = ref(false)
 
-function isSuperAdminRole(role: string | undefined) {
-  if (!role)
-    return false
-  return role === 'super_admin' || role === rbacSuperAdminRole
-}
-
 function isInviteMember(member: OrganizationMemberRow) {
   if (member.is_invite || member.is_tmp)
     return true
   if (typeof member.role === 'string')
     return member.role.includes('invite')
   return false
+}
+
+function getMemberRoleLabel(member: OrganizationMemberRow) {
+  if (useNewRbac.value) {
+    const normalizedRole = member.role.replace(/^invite_/, '')
+    const i18nKey = getRbacRoleI18nKey(normalizedRole)
+    return i18nKey ? t(i18nKey) : normalizedRole.replaceAll('_', ' ')
+  }
+  return member.role.replaceAll('_', ' ')
+}
+
+function getMemberStatusLabel(member: OrganizationMemberRow) {
+  return isInviteMember(member) ? t('sso-status-pending') : t('sso-status-active')
+}
+
+function getMemberStatusClasses(member: OrganizationMemberRow) {
+  if (isInviteMember(member)) {
+    return {
+      pill: 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/25 dark:bg-amber-500/8 dark:text-amber-200',
+      dot: 'bg-amber-400 dark:bg-amber-300',
+    }
+  }
+
+  return {
+    pill: 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/25 dark:bg-emerald-500/8 dark:text-emerald-200',
+    dot: 'bg-emerald-500 dark:bg-emerald-300',
+  }
+}
+
+function renderRoleCell(member: OrganizationMemberRow) {
+  const statusClasses = getMemberStatusClasses(member)
+
+  return h('div', { class: 'flex flex-wrap items-center gap-2 min-w-0 whitespace-normal' }, [
+    h('span', { class: 'truncate text-slate-700 dark:text-slate-200' }, getMemberRoleLabel(member)),
+    h('span', { class: `inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full border shrink-0 ${statusClasses.pill}` }, [
+      h('span', { class: `w-1.5 h-1.5 rounded-full ${statusClasses.dot}` }),
+      h('span', getMemberStatusLabel(member)),
+    ]),
+  ])
 }
 
 async function checkRbacEnabled() {
@@ -186,8 +218,8 @@ function updateInviteNewUserButton() {
     return
   submitButton.disabled = isSubmittingInvite.value || !isInviteFormValid.value
   submitButton.text = isSubmittingInvite.value
-    ? t('sending-invitation', 'Sending invitation...')
-    : t('send-invitation', 'Send Invitation')
+    ? t('sending-invitation')
+    : t('send-invitation')
 }
 
 const filteredMembers = computed(() => {
@@ -260,9 +292,9 @@ function getInheritedAppAccessLabel(roleName?: string): string | null {
     return null
   const normalizedRole = roleName.replace(/^invite_/, '')
   if (normalizedRole === 'org_billing_admin')
-    return t('app-access-none', 'No app access')
+    return t('app-access-none')
   if (normalizedRole === 'org_member')
-    return t('app-access-none', 'No app access')
+    return t('app-access-none')
   if (normalizedRole === 'org_admin')
     return t('app-access-inherited', { role: getRoleDisplayName('app_admin') })
   if (normalizedRole === 'org_super_admin')
@@ -343,14 +375,8 @@ columns.value = [
     key: 'role',
     mobile: true,
     sortable: 'desc',
-    displayFunction: (member: OrganizationMemberRow) => {
-      if (useNewRbac.value) {
-        const normalizedRole = member.role.replace(/^invite_/, '')
-        const i18nKey = getRbacRoleI18nKey(normalizedRole)
-        return i18nKey ? t(i18nKey) : normalizedRole.replaceAll('_', ' ')
-      }
-      return member.role.replaceAll('_', ' ')
-    },
+    displayFunction: (member: OrganizationMemberRow) => getMemberRoleLabel(member),
+    renderFunction: (member: OrganizationMemberRow) => renderRoleCell(member),
   },
   {
     key: 'actions',
@@ -359,7 +385,7 @@ columns.value = [
     actions: computed(() => [
       {
         icon: IconWrench,
-        title: rbacSystemEnabled ? t('edit-role', 'Edit role') : t('actions'),
+        title: rbacSystemEnabled ? t('edit-role') : t('actions'),
         visible: (member: OrganizationMemberRow) => canUpdateUserRoles.value && member.uid !== currentOrganization?.value?.created_by,
         onClick: (member: OrganizationMemberRow) => {
           changeMemberPermission(member)
@@ -510,9 +536,9 @@ async function showPermModal(invite: boolean, onConfirm?: (permission: Database[
   }
 
   dialogStore.openDialog({
-    title: useNewRbac.value ? t('select-user-role', 'Select a role') : t('select-user-perms'),
+    title: useNewRbac.value ? t('select-user-role') : t('select-user-perms'),
     description: useNewRbac.value
-      ? t('select-user-role-expanded', 'Choose the RBAC role to assign. Legacy roles remain visible during migration.')
+      ? t('select-user-role-expanded')
       : t('select-user-perms-expanded'),
     size: 'lg',
     preventAccidentalClose: !!onConfirm,
@@ -658,6 +684,23 @@ async function handleSendInvitationOutput(output: string, email: string, type: D
   console.log('Output: ', output)
   if (!output)
     return false
+
+  const orgId = currentOrganization.value?.gid
+  const existingMember = members.value.find(member => member.email.toLowerCase() === email.toLowerCase())
+  const hasPendingInvite = existingMember ? isInviteMember(existingMember) : false
+
+  if (orgId && shouldAttemptExistingUserInviteNotification(output, type, useNewRbac.value, hasPendingInvite)) {
+    const notified = await notifyExistingUserInvite(supabase, email, orgId)
+    if (!notified) {
+      console.warn('Failed to send invite email notification')
+      toast.warning(t('org-invite-email-notification-failed'))
+    }
+    else {
+      toast.success(t('org-invited-user'))
+      return true
+    }
+  }
+
   if (output === 'OK') {
     toast.success(t('org-invited-user'))
     return true
@@ -791,7 +834,7 @@ async function cannotDeleteOwner() {
                   // get member from id
                   const selectedUser = members.value.filter(m => m.id === selectedUserToDelegateAdmin.value)[0]
                   // set user to super admin
-                  _changeMemberPermission(selectedUser, useNewRbac.value ? rbacSuperAdminRole : 'super_admin')
+                  _changeMemberPermission(selectedUser, useNewRbac.value ? 'org_super_admin' : 'super_admin')
                   selectedUserToDelegateAdmin.value = null
                   // get current member
                   const currentMember = members.value.filter(m => m.uid === main.user?.id)[0]
@@ -1125,10 +1168,7 @@ function canDelete(member: OrganizationMemberRow) {
   if (isSelf)
     return true
 
-  const currentUserIsAdmin = role === 'admin'
-    || role === 'super_admin'
-    || role === 'org_admin'
-    || role === rbacSuperAdminRole
+  const currentUserIsAdmin = isAdminRole(role)
 
   return currentUserIsAdmin
 }
@@ -1191,7 +1231,7 @@ async function showInviteNewUserDialog(email: string, roleType: Database['public
   resetInviteCaptcha()
 
   dialogStore.openDialog({
-    title: t('invite-new-user-dialog-header', 'Invite New User'),
+    title: t('invite-new-user-dialog-header'),
     size: 'lg',
     preventAccidentalClose: true,
     buttons: [
@@ -1201,7 +1241,7 @@ async function showInviteNewUserDialog(email: string, roleType: Database['public
       },
       {
         id: 'invite-new-user-send',
-        text: t('send-invitation', 'Send Invitation'),
+        text: t('send-invitation'),
         role: 'primary',
         preventClose: true,
         handler: handleInviteNewUserSubmit,
@@ -1360,7 +1400,7 @@ async function handleAppAccessAssign() {
   }
 
   if (appAccessSelectedAppIds.value.length === 0) {
-    toast.error(t('select-app', 'Select an app'))
+    toast.error(t('select-app'))
     return false
   }
 
@@ -1439,17 +1479,17 @@ async function handleInviteNewUserSubmit() {
     return false
 
   if (!inviteUserFirstName.value.trim()) {
-    toast.error(t('first-name-required', 'First name is required'))
+    toast.error(t('first-name-required'))
     return false
   }
 
   if (!inviteUserLastName.value.trim()) {
-    toast.error(t('last-name-required', 'Last name is required'))
+    toast.error(t('last-name-required'))
     return false
   }
 
   if (!captchaToken.value) {
-    toast.error(t('captcha-required', 'Captcha verification is required'))
+    toast.error(t('captcha-required'))
     return false
   }
 
@@ -1473,12 +1513,12 @@ async function handleInviteNewUserSubmit() {
     if (error) {
       console.error('Invitation failed:', error)
       const errorMessage = await resolveInviteNewUserErrorMessage(error, t)
-      toast.error(errorMessage ?? t('invitation-failed', 'Invitation failed'))
+      toast.error(errorMessage ?? t('invitation-failed'))
       resetInviteCaptcha()
       return false
     }
 
-    toast.success(t('org-invited-user', 'User has been invited successfully'))
+    toast.success(t('org-invited-user'))
 
     // Refresh the members list
     await reloadData()
@@ -1490,7 +1530,7 @@ async function handleInviteNewUserSubmit() {
   catch (error) {
     console.error('Invitation failed:', error)
     const errorMessage = await resolveInviteNewUserErrorMessage(error, t)
-    toast.error(errorMessage ?? t('invitation-failed', 'Invitation failed'))
+    toast.error(errorMessage ?? t('invitation-failed'))
     resetInviteCaptcha()
     return false
   }
@@ -1512,10 +1552,10 @@ async function handleInviteNewUserSubmit() {
         <IconInformation class="w-6 h-6 text-sky-400 shrink-0" />
         <div class="text-sm text-slate-100">
           <p class="font-semibold">
-            {{ t('rbac-system-enabled', 'RBAC role management preview') }}
+            {{ t('rbac-system-enabled') }}
           </p>
           <p class="text-slate-200">
-            {{ t('rbac-system-enabled-body', 'Editing roles here will use the RBAC system. Legacy roles stay visible during migration.') }}
+            {{ t('rbac-system-enabled-body') }}
           </p>
         </div>
       </div>
@@ -1550,13 +1590,13 @@ async function handleInviteNewUserSubmit() {
     </Teleport>
 
     <!-- Teleport for invite new user dialog -->
-    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('invite-new-user-dialog-header', 'Invite New User')" defer to="#dialog-v2-content">
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('invite-new-user-dialog-header')" defer to="#dialog-v2-content">
       <div class="w-full">
         <form @submit.prevent="handleInviteNewUserSubmit">
           <!-- Email (not editable) -->
           <div class="mb-4">
             <label for="email" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
-              {{ t('email', 'Email') }}
+              {{ t('email') }}
             </label>
             <input
               v-model="inviteUserEmail"
@@ -1569,7 +1609,7 @@ async function handleInviteNewUserSubmit() {
           <!-- Role (not editable) -->
           <div class="mb-4">
             <label for="role" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
-              {{ t('role', 'Role') }}
+              {{ t('role') }}
             </label>
             <input
               v-model="inviteUserRole"
@@ -1582,7 +1622,7 @@ async function handleInviteNewUserSubmit() {
           <!-- First Name -->
           <div class="mb-4">
             <label for="first-name" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
-              {{ t('first-name', 'First Name') }}
+              {{ t('first-name') }}
             </label>
             <input
               v-model="inviteUserFirstName"
@@ -1594,7 +1634,7 @@ async function handleInviteNewUserSubmit() {
           <!-- Last Name -->
           <div class="mb-4">
             <label for="last-name" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
-              {{ t('last-name', 'Last Name') }}
+              {{ t('last-name') }}
             </label>
             <input
               v-model="inviteUserLastName"
@@ -1606,18 +1646,18 @@ async function handleInviteNewUserSubmit() {
           <!-- Captcha -->
           <div class="mt-4 mb-4">
             <label for="captcha" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
-              {{ t('captcha', 'Captcha') }}
+              {{ t('captcha') }}
             </label>
             <VueTurnstile v-if="captchaKey" ref="captchaElement" v-model="captchaToken" size="flexible" :site-key="captchaKey" />
             <div v-else class="py-3 text-sm text-center text-gray-600 border border-gray-300 border-dashed rounded-lg dark:text-gray-400 dark:border-gray-600">
-              {{ t('captcha-not-available', 'Captcha not available') }}
+              {{ t('captcha-not-available') }}
             </div>
           </div>
 
           <!-- Form Validation Info -->
           <div class="flex flex-col items-center mt-6">
             <p v-if="!isInviteFormValid" class="mb-2 text-xs text-gray-500 dark:text-gray-400">
-              {{ t('complete-all-fields', 'Please complete all required fields to continue') }}
+              {{ t('complete-all-fields') }}
             </p>
 
             <div class="relative flex items-center text-xs text-blue-600 cursor-pointer dark:text-blue-400 group" :class="{ 'mt-2': isInviteFormValid }">
@@ -1638,7 +1678,7 @@ async function handleInviteNewUserSubmit() {
 
     <!-- Teleport for permission selection modal -->
     <Teleport
-      v-if="dialogStore.showDialog && (dialogStore.dialogOptions?.title === t('select-user-perms') || dialogStore.dialogOptions?.title === t('select-user-role', 'Select a role'))"
+      v-if="dialogStore.showDialog && (dialogStore.dialogOptions?.title === t('select-user-perms') || dialogStore.dialogOptions?.title === t('select-user-role'))"
       defer
       to="#dialog-v2-content"
     >
@@ -1675,7 +1715,7 @@ async function handleInviteNewUserSubmit() {
             <div>
               <SearchInput
                 v-model="appAccessSearch"
-                :placeholder="t('search-apps', 'Search apps')"
+                :placeholder="t('search-apps')"
                 :disabled="isAppAccessLoading"
               />
               <div class="mt-3 overflow-hidden border rounded-lg dark:border-gray-600">
@@ -1725,7 +1765,7 @@ async function handleInviteNewUserSubmit() {
                     {{ selectedAppAccessBinding ? getRoleDisplayName(selectedAppAccessBinding.role_name) : t('none') }}
                   </span>
                   <span v-else-if="appAccessSelectedAppIds.length > 1">
-                    {{ t('selected-apps', 'Selected apps') }}: {{ appAccessSelectedAppIds.length }}
+                    {{ t('selected-apps') }}: {{ appAccessSelectedAppIds.length }}
                   </span>
                   <span v-else>
                     {{ t('none') }}

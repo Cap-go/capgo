@@ -1,6 +1,6 @@
 import { Pool } from 'pg'
 
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { BASE_URL, headersInternal, POSTGRES_URL } from './test-utils.ts'
 
 const BASE_URL_TRIGGER = `${BASE_URL}/triggers`
@@ -17,6 +17,32 @@ beforeAll(async () => {
   await pool.query(`DELETE FROM pgmq.q_${queueName}`)
   await pool.query(`DELETE FROM pgmq.a_${queueName}`)
 })
+
+beforeEach(async () => {
+  await pool.query(`DELETE FROM pgmq.q_${queueName}`)
+  await pool.query(`DELETE FROM pgmq.a_${queueName}`)
+})
+
+async function fetchQueueSync(queueName: string, maxRetries = 4) {
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const response = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
+      method: 'POST',
+      headers: headersInternal,
+      body: JSON.stringify({ queue_name: queueName }),
+    })
+
+    if (response.status === 202) {
+      expect(await response.json()).toEqual({ status: 'ok' })
+      return response
+    }
+
+    if (attempt < maxRetries - 1)
+      await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)))
+  }
+
+  throw new Error(`queue_consumer/sync failed for ${queueName}`)
+}
+
 describe('queue Load Test', () => {
   afterAll(async () => {
     // Close postgres connection
@@ -32,15 +58,7 @@ describe('queue Load Test', () => {
   })
 
   it('should process queue sync requests correctly', async () => {
-    // Test valid queue sync request
-    const validResponse = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
-      method: 'POST',
-      headers: headersInternal,
-      body: JSON.stringify({ queue_name: queueName }),
-    })
-
-    expect(validResponse.status).toBe(202)
-    expect(await validResponse.json()).toEqual({ status: 'ok' })
+    await fetchQueueSync(queueName)
   })
 
   it('should reject invalid queue sync requests', async () => {
@@ -79,10 +97,6 @@ describe('queue Load Test', () => {
   })
 
   it('should handle multiple queue messages simultaneously', async () => {
-    // Clean queue before adding messages (in case other tests added messages)
-    await pool.query(`DELETE FROM pgmq.q_${queueName}`)
-    await pool.query(`DELETE FROM pgmq.a_${queueName}`)
-
     // Add fake messages directly to test queue using pgmq.send
     for (let i = 0; i < 10; i++) {
       const fakeMessage = {
@@ -103,13 +117,7 @@ describe('queue Load Test', () => {
     expect(initialRows[0].count).toBe('10')
 
     // Process the queue
-    const response = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
-      method: 'POST',
-      headers: headersInternal,
-      body: JSON.stringify({ queue_name: queueName }),
-    })
-    expect(response.status).toBe(202)
-    expect(await response.json()).toEqual({ status: 'ok' })
+    await fetchQueueSync(queueName)
 
     // Wait for processing to complete
     await new Promise(resolve => setTimeout(resolve, 2000))

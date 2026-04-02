@@ -8,6 +8,9 @@ on:
 
 permissions: {}
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   # Run all tests first before creating any tags
   test:
@@ -22,6 +25,7 @@ jobs:
     needs: [test]
     if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') && !startsWith(github.event.head_commit.message, 'chore(auto-sync):') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     name: Bump version and create tag
     permissions:
       contents: write
@@ -70,6 +74,7 @@ jobs:
     needs: bump-version
     if: ${{ github.ref == 'refs/heads/main' && !startsWith(github.event.head_commit.message, 'chore(release):') && !startsWith(github.event.head_commit.message, 'chore(auto-sync):') }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: write
     steps:

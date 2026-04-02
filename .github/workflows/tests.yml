@@ -12,10 +12,12 @@ permissions: {}
 
 env:
   DENO_DIR: my_cache_directory
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
   test_all:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     name: Run tests
     permissions:
       contents: read
@@ -142,6 +144,8 @@ jobs:
           version: latest
       - name: Show Supabase CLI version
         run: supabase --version
+      - name: Link Supabase templates
+        run: ln -sfn supabase/templates templates
       - name: Run Supabase Start
         run: supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,studio,logflare,vector,realtime
       - name: Run Supabase Test DB

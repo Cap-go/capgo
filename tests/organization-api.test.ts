@@ -1,13 +1,29 @@
 import { randomUUID } from 'node:crypto'
+import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_ADMIN_EMAIL, USER_EMAIL, USER_ID } from './test-utils.ts'
+import {
+  BASE_URL,
+  getSupabaseClient,
+  headers,
+  normalizeLocalhostUrl,
+  SUPABASE_ANON_KEY,
+  SUPABASE_BASE_URL,
+  TEST_EMAIL,
+  USER_ADMIN_EMAIL,
+  USER_EMAIL,
+  USER_ID,
+  USER_PASSWORD,
+} from './test-utils.ts'
+
+const normalizedSupabaseBaseUrl = normalizeLocalhostUrl(SUPABASE_BASE_URL) ?? SUPABASE_BASE_URL
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
 const name = `Test Organization ${globalId}`
 const customerId = `cus_test_${ORG_ID}`
+const website = 'https://test-organization.example/'
 
 beforeAll(async () => {
   // Create stripe_info for this test org
@@ -28,6 +44,7 @@ beforeAll(async () => {
     management_email: TEST_EMAIL,
     created_by: USER_ID,
     customer_id: customerId,
+    website,
     use_new_rbac: false, // Explicitly legacy — this suite tests the legacy permission path
   })
   if (error)
@@ -50,6 +67,199 @@ afterAll(async () => {
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
 })
 
+describe('read-mode API keys cannot access destructive organization routes', () => {
+  const readOnlyOrgId = randomUUID()
+  const readOnlyGlobalId = randomUUID()
+  const readOnlyName = `Test Read-Only Organization ${readOnlyGlobalId}`
+  const readOnlyCustomerId = `cus_test_${readOnlyOrgId}`
+  let readOnlyKey = ''
+  let readOnlyKeyId = 0
+  const readOnlyHeaders = {
+    'Content-Type': 'application/json',
+  }
+
+  beforeAll(async () => {
+    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
+      customer_id: readOnlyCustomerId,
+      status: 'succeeded',
+      product_id: 'prod_LQIregjtNduh4q',
+      subscription_id: `sub_${readOnlyGlobalId}`,
+      trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+      is_good_plan: true,
+    })
+    expect(stripeError).toBeNull()
+
+    const { error: orgError } = await getSupabaseClient().from('orgs').insert({
+      id: readOnlyOrgId,
+      name: readOnlyName,
+      management_email: TEST_EMAIL,
+      created_by: USER_ID,
+      customer_id: readOnlyCustomerId,
+      require_apikey_expiration: false,
+      use_new_rbac: false, // Explicitly legacy — this suite tests the legacy permission path
+    })
+    expect(orgError).toBeNull()
+
+    const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+      org_id: readOnlyOrgId,
+      user_id: USER_ID,
+      user_right: 'super_admin',
+    })
+    expect(orgUserError).toBeNull()
+
+    const createResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: `Organization read-only regression ${randomUUID()}`,
+        mode: 'read',
+        hashed: false,
+        limited_to_orgs: [readOnlyOrgId],
+      }),
+    })
+    expect(createResponse.status).toBe(200)
+    const createdKey = await createResponse.json<{ id: number, key: string }>()
+    readOnlyKey = createdKey.key
+    readOnlyKeyId = createdKey.id
+  })
+
+  afterAll(async () => {
+    if (readOnlyKeyId) {
+      await fetch(`${BASE_URL}/apikey/${readOnlyKeyId}`, {
+        method: 'DELETE',
+        headers,
+      })
+    }
+    await getSupabaseClient().from('org_users').delete().eq('org_id', readOnlyOrgId)
+    await getSupabaseClient().from('orgs').delete().eq('id', readOnlyOrgId)
+    await getSupabaseClient().from('stripe_info').delete().eq('customer_id', readOnlyCustomerId)
+  })
+
+  it.concurrent('rejects POST /organization/members', async () => {
+    const response = await fetch(`${BASE_URL}/organization/members`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'POST',
+      body: JSON.stringify({
+        orgId: readOnlyOrgId,
+        email: USER_ADMIN_EMAIL,
+        invite_type: 'read',
+      }),
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+  it.concurrent('rejects DELETE /organization/members', async () => {
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${readOnlyOrgId}&email=${USER_ADMIN_EMAIL}`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'DELETE',
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+  it.concurrent('rejects PUT /organization', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'PUT',
+      body: JSON.stringify({
+        orgId: readOnlyOrgId,
+        name: `Blocked update ${randomUUID()}`,
+      }),
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+	  it.concurrent('rejects POST /organization', async () => {
+	    const response = await fetch(`${BASE_URL}/organization`, {
+	      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+	      method: 'POST',
+	      body: JSON.stringify({
+	        orgId: readOnlyOrgId,
+	        name: `Blocked create ${randomUUID()}`,
+	      }),
+	    })
+
+	    expect(response.status).toBe(401)
+	    // Ensure this is blocked by API-key auth (key mode allowlist), not by RLS deeper in the handler.
+	    const payload = await response.json() as { error?: string }
+	    expect(payload.error).toBe('invalid_apikey')
+	  })
+
+  it.concurrent('rejects DELETE /organization', async () => {
+    const response = await fetch(`${BASE_URL}/organization?orgId=${readOnlyOrgId}`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'DELETE',
+    })
+
+    expect(response.status).toBe(401)
+  })
+
+  it.concurrent('allows GET /organization for accessible organizations', async () => {
+    const response = await fetch(`${BASE_URL}/organization?orgId=${readOnlyOrgId}`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'GET',
+    })
+
+    expect(response.status).toBe(200)
+    const type = z.object({ id: z.string(), name: z.string() })
+    expect(type.parse(await response.json())).toEqual({ id: readOnlyOrgId, name: readOnlyName })
+  })
+
+  it.concurrent('allows GET /organization/members for accessible organizations', async () => {
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${readOnlyOrgId}`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'GET',
+    })
+
+    expect(response.status).toBe(200)
+    const members = z.array(z.object({
+      uid: z.string(),
+      email: z.string(),
+      role: z.string(),
+    }))
+    expect(members.parse(await response.json()).some(member => member.uid === USER_ID)).toBe(true)
+  })
+
+  it.concurrent('allows GET /organization/members for same user without org scope limits', async () => {
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID}`, {
+      headers,
+      method: 'GET',
+    })
+
+    expect(response.status).toBe(200)
+    const members = z.array(z.object({
+      uid: z.string(),
+      email: z.string(),
+      role: z.string(),
+    }))
+    expect(members.parse(await response.json()).some(member => member.uid === USER_ID)).toBe(true)
+  })
+
+  it.concurrent('rejects GET /organization/members outside limited_to_orgs scope', async () => {
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID}`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'GET',
+    })
+
+    expect(response.status).toBe(400)
+    const payload = await response.json() as { error: string }
+    expect(payload.error).toBe('cannot_access_organization')
+  })
+
+  it.concurrent('allows GET /organization/audit for accessible organizations', async () => {
+    const response = await fetch(`${BASE_URL}/organization/audit?orgId=${readOnlyOrgId}`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'GET',
+    })
+
+    expect(response.status).toBe(200)
+    // The audit endpoint is allowed for read-mode keys; payload may be empty for a new org.
+    expect(await response.json()).toBeDefined()
+  })
+})
+
 describe('[GET] /organization', () => {
   it('get organization', async () => {
     const response = await fetch(`${BASE_URL}/organization`, {
@@ -65,10 +275,10 @@ describe('[GET] /organization', () => {
       headers,
     })
     expect(response.status).toBe(200)
-    const type = z.object({ id: z.string(), name: z.string() })
+    const type = z.object({ id: z.string(), name: z.string(), website: z.string().nullable() })
     const safe = type.safeParse(await response.json())
     expect(safe.success).toBe(true)
-    expect(safe.data).toEqual({ id: ORG_ID, name })
+    expect(safe.data).toEqual({ id: ORG_ID, name, website })
   })
 
   it('get organization with invalid orgId', async () => {
@@ -97,7 +307,7 @@ describe('[GET] /organization/members', () => {
     const safe = type.safeParse(await response.json())
     expect(safe.success).toBe(true)
     expect(safe.data?.length).toBeGreaterThanOrEqual(1)
-    
+
     const testUser = safe.data?.find(m => m.uid === USER_ID)
     expect(testUser).toBeTruthy()
     expect(testUser?.email).toBe(USER_EMAIL)
@@ -326,7 +536,6 @@ describe('[DELETE] /organization/members', () => {
     })
     expect(error).toBeNull()
 
-
     // The sync_org_user_to_role_binding_on_insert trigger automatically creates role_bindings
     // when a user is added to org_users. Verify the trigger created the binding.
     const { data: rbacData, error: rbacFetchError } = await getSupabaseClient()
@@ -394,12 +603,13 @@ describe('[DELETE] /organization/members', () => {
 })
 
 describe('[POST] /organization', () => {
-  it('create organization', async () => {
+  it.concurrent('create organization', async () => {
     const name = `Created Organization ${new Date().toISOString()}`
+    const website = 'HTTPS://capgo.app'
     const response = await fetch(`${BASE_URL}/organization`, {
       headers,
       method: 'POST',
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, website }),
     })
     expect(response.status).toBe(200)
     const type = z.object({
@@ -409,12 +619,18 @@ describe('[POST] /organization', () => {
     expect(safe.success).toBe(true)
     expect(safe.data?.id).toBeDefined()
 
-    const { data, error } = await getSupabaseClient().from('orgs').select().eq('id', safe.data!.id).single()
-    expect(error).toBeNull()
-    expect(data).toBeTruthy()
-    expect(data?.name).toBe(name)
-    // New orgs should default to RBAC enabled
-    expect(data?.use_new_rbac).toBe(true)
+    try {
+      const { data, error } = await getSupabaseClient().from('orgs').select().eq('id', safe.data!.id).single()
+      expect(error).toBeNull()
+      expect(data).toBeTruthy()
+      expect(data?.name).toBe(name)
+      expect(data?.website).toBe('https://capgo.app/')
+      // New orgs should default to RBAC enabled
+      expect(data?.use_new_rbac).toBe(true)
+    }
+    finally {
+      await getSupabaseClient().from('orgs').delete().eq('id', safe.data!.id)
+    }
   })
 
   it('create organization with missing name', async () => {
@@ -447,29 +663,101 @@ describe('[POST] /organization', () => {
     const responseData = await response.json() as { error: string }
     expect(responseData.error).toBe('invalid_body')
   })
+
+  it.concurrent('create organization rejects invalid website scheme', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'POST',
+      body: JSON.stringify({
+        name: `Created Organization ${new Date().toISOString()}`,
+        website: 'ftp://capgo.app',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { error: string }
+    expect(responseData.error).toBe('invalid_body')
+  })
+
+  it.concurrent('create organization rejects credential-bearing website urls', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'POST',
+      body: JSON.stringify({
+        name: `Created Organization ${new Date().toISOString()}`,
+        website: 'https://user:pass@capgo.app',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { error: string }
+    expect(responseData.error).toBe('invalid_body')
+  })
 })
 
 describe('[PUT] /organization', () => {
-  it('update organization', async () => {
+  it.concurrent('update organization', async () => {
+    const orgId = randomUUID()
+    const originalName = `Update Base Organization ${new Date().toISOString()}`
     const name = `Updated Organization ${new Date().toISOString()}`
-    const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
-      method: 'PUT',
-      body: JSON.stringify({ orgId: ORG_ID, name }),
+    const website = 'https://www.capgo.app/docs'
+    const customerId = `cus_test_${orgId}`
+    const subscriptionId = `sub_${orgId}`
+    const trialAt = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
+    const stripeInfo = {
+      customer_id: customerId,
+      status: 'succeeded' as const,
+      product_id: 'prod_LQIregjtNduh4q',
+      subscription_id: subscriptionId,
+      trial_at: trialAt,
+      is_good_plan: true,
+    }
+    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert(stripeInfo)
+    if (stripeError)
+      throw stripeError
+    const { error: createError } = await getSupabaseClient().from('orgs').insert({
+      id: orgId,
+      name: originalName,
+      management_email: TEST_EMAIL,
+      created_by: USER_ID,
+      customer_id: customerId,
+      website: 'https://base.example/',
+      use_new_rbac: false,
     })
-    expect(response.status).toBe(200)
-    const type = z.object({
-      id: z.uuid(),
-      data: z.any(),
+    if (createError)
+      throw createError
+    const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+      org_id: orgId,
+      user_id: USER_ID,
+      user_right: 'super_admin',
     })
-    const safe = type.safeParse(await response.json())
-    expect(safe.success).toBe(true)
-    expect(safe.data?.id).toBe(ORG_ID)
+    if (orgUserError)
+      throw orgUserError
 
-    const { data, error } = await getSupabaseClient().from('orgs').select().eq('id', ORG_ID).single()
-    expect(error).toBeNull()
-    expect(data).toBeTruthy()
-    expect(data?.name).toBe(name)
+    try {
+      const response = await fetch(`${BASE_URL}/organization`, {
+        headers,
+        method: 'PUT',
+        body: JSON.stringify({ orgId, name, website }),
+      })
+      expect(response.status).toBe(200)
+      const type = z.object({
+        id: z.uuid(),
+        data: z.any(),
+      })
+      const safe = type.safeParse(await response.json())
+      expect(safe.success).toBe(true)
+      expect(safe.data?.id).toBe(orgId)
+
+      const { data, error } = await getSupabaseClient().from('orgs').select().eq('id', orgId).single()
+      expect(error).toBeNull()
+      expect(data).toBeTruthy()
+      expect(data?.name).toBe(name)
+      expect(data?.website).toBe(website)
+    }
+    finally {
+      await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
+      await getSupabaseClient().from('orgs').delete().eq('id', orgId)
+      await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
+    }
   })
 
   it('update organization with invalid body', async () => {
@@ -500,6 +788,36 @@ describe('[PUT] /organization', () => {
       headers,
       method: 'PUT',
       body: JSON.stringify({ name: 'New Name' }), // Missing orgId
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { error: string }
+    expect(responseData.error).toBe('invalid_body')
+  })
+
+  it.concurrent('update organization rejects invalid website scheme', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'PUT',
+      body: JSON.stringify({
+        orgId: ORG_ID,
+        name: `Updated Organization ${new Date().toISOString()}`,
+        website: 'ftp://www.capgo.app/docs',
+      }),
+    })
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { error: string }
+    expect(responseData.error).toBe('invalid_body')
+  })
+
+  it.concurrent('update organization rejects credential-bearing website urls', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'PUT',
+      body: JSON.stringify({
+        orgId: ORG_ID,
+        name: `Updated Organization ${new Date().toISOString()}`,
+        website: 'https://user:pass@www.capgo.app/docs',
+      }),
     })
     expect(response.status).toBe(400)
     const responseData = await response.json() as { error: string }
@@ -708,7 +1026,9 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
 
   it('get_orgs_v7 returns enforce_hashed_api_keys field', async () => {
     // Set a known value
-    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: true }).eq('id', ORG_ID)
+    const rpcWebsite = website
+    const previousWebsite = website
+    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: true, website: rpcWebsite }).eq('id', ORG_ID)
 
     // Call get_orgs_v7 via RPC
     const { data, error } = await getSupabaseClient().rpc('get_orgs_v7', { userid: USER_ID })
@@ -720,9 +1040,55 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
     expect(testOrg).toBeTruthy()
     expect(testOrg).toHaveProperty('enforce_hashed_api_keys')
     expect(testOrg!.enforce_hashed_api_keys).toBe(true)
+    expect(testOrg).toHaveProperty('website')
+    expect(testOrg!.website).toBe(rpcWebsite)
 
     // Reset
-    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false }).eq('id', ORG_ID)
+    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false, website: previousWebsite }).eq('id', ORG_ID)
+  })
+
+  it.concurrent('rejects public RPC access to get_orgs_v7(userid)', async () => {
+    if (!normalizedSupabaseBaseUrl || !SUPABASE_ANON_KEY)
+      throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY are required for this test')
+
+    const publicSupabase = createClient(normalizedSupabaseBaseUrl, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: false,
+      },
+    })
+
+    const { data, error } = await publicSupabase.rpc('get_orgs_v7', {
+      userid: USER_ID,
+    })
+
+    expect(data).toBeNull()
+    expect(error?.code).toBe('42501')
+  })
+
+  it.concurrent('rejects authenticated RPC access to get_orgs_v7(userid)', async () => {
+    if (!normalizedSupabaseBaseUrl || !SUPABASE_ANON_KEY)
+      throw new Error('SUPABASE_URL and SUPABASE_ANON_KEY are required for this test')
+
+    const authClient = createClient(normalizedSupabaseBaseUrl, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: false,
+      },
+    })
+
+    const { error: signInError } = await authClient.auth.signInWithPassword({
+      email: USER_EMAIL,
+      password: USER_PASSWORD,
+    })
+    expect(signInError).toBeNull()
+
+    const { data, error } = await authClient.rpc('get_orgs_v7', {
+      userid: USER_ID,
+    })
+
+    expect(data).toBeNull()
+    expect(error?.code).toBe('42501')
+
+    await authClient.auth.signOut()
   })
 })
 
@@ -736,7 +1102,7 @@ const globalIdRbac = randomUUID()
 const nameRbac = `RBAC Test Organization ${globalIdRbac}`
 const customerIdRbac = `cus_test_rbac_${ORG_ID_RBAC}`
 
-describe('RBAC mode - organization member operations', () => {
+describe('rbac mode - organization member operations', () => {
   beforeAll(async () => {
     const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
       customer_id: customerIdRbac,
@@ -875,7 +1241,7 @@ describe('RBAC mode - organization member operations', () => {
   })
 })
 
-describe('Hashed API key enforcement integration', () => {
+describe('hashed API key enforcement integration', () => {
   it('find_apikey_by_value finds hashed key', async () => {
     // Create a hashed API key via API
     const createResponse = await fetch(`${BASE_URL}/apikey`, {

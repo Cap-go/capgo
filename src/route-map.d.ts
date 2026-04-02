@@ -334,6 +334,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/onboarding/organization': RouteRecordInfo<
+      '/onboarding/organization',
+      '/onboarding/organization',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/onboarding/set_password': RouteRecordInfo<
       '/onboarding/set_password',
       '/onboarding/set_password',
@@ -762,6 +769,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/login.vue': {
       routes:
         | '/login'
+      views:
+        | never
+    }
+    'src/pages/onboarding/organization.vue': {
+      routes:
+        | '/onboarding/organization'
       views:
         | never
     }

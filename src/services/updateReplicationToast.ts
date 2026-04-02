@@ -113,7 +113,7 @@ function buildActionButton(actionLabel?: string, onAction?: () => void): VNode |
         'inline-flex h-9 w-fit items-center justify-center rounded-md px-4',
         'bg-slate-900 text-sm font-medium text-white',
         'border border-transparent hover:bg-slate-800',
-        'dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100',
+        'cursor-pointer',
         'focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0',
         'transition-none',
       ].join(' '),
@@ -131,14 +131,14 @@ function buildStatusList(regions: DeploymentRegion[], completed: number): VNode[
       ? 'bg-emerald-500 text-emerald-500'
       : isActive
         ? 'bg-amber-500 text-amber-500'
-        : 'bg-slate-300 text-slate-300 dark:bg-slate-500 dark:text-slate-500'
+        : 'bg-slate-300 text-slate-300'
 
     return h('li', { class: 'flex min-w-0 w-full items-start gap-1.5 pr-0' }, [
       h('span', {
         class: [`inline-block h-2 w-2 shrink-0 rounded-full border-2 border-current ${statusClass} mt-1`].join(' '),
       }),
       h('span', {
-        class: `min-w-0 flex-1 text-xs ${isDone ? 'text-green-700 dark:text-green-300' : isActive ? 'text-amber-700 dark:text-amber-300' : 'text-slate-700 dark:text-slate-400'}`,
+        class: `min-w-0 flex-1 text-xs ${isDone ? 'text-green-700' : isActive ? 'text-amber-700' : 'text-slate-700'}`,
       }, region.label),
     ])
   })
@@ -162,12 +162,12 @@ function buildDescription(
   const actionButton = buildActionButton(actionLabel, onAction)
 
   return h('div', { class: 'w-full flex flex-col gap-1.5' }, [
-    h('div', { class: 'text-sm text-slate-700 dark:text-slate-200' }, i18n.global.t('replication-toast-regions-replicated', {
+    h('div', { class: 'text-sm text-slate-700' }, i18n.global.t('replication-toast-regions-replicated', {
       completed: safeCompleted,
       total,
     })),
-    h('div', { class: 'text-xs text-slate-600 dark:text-slate-300' }, formatDuration(Math.max(0, Math.ceil(remainingMs / 1000)))),
-    h('div', { class: 'h-1.5 w-full rounded bg-slate-200 dark:bg-slate-700/40 overflow-hidden' }, [
+    h('div', { class: 'text-xs text-slate-600' }, formatDuration(Math.max(0, Math.ceil(remainingMs / 1000)))),
+    h('div', { class: 'h-1.5 w-full rounded bg-slate-200 overflow-hidden' }, [
       h('div', {
         class: 'h-full rounded bg-emerald-400 transition-all',
         style: `width: ${percent}%`,
@@ -182,7 +182,7 @@ function buildDoneDescription(regions: DeploymentRegion[], actionLabel?: string,
   const actionButton = buildActionButton(actionLabel, onAction)
 
   return h('div', { class: 'w-full flex flex-col gap-1.5' }, [
-    h('div', { class: 'text-sm text-slate-700 dark:text-slate-200' }, i18n.global.t('replication-toast-complete')),
+    h('div', { class: 'text-sm text-slate-700' }, i18n.global.t('replication-toast-complete')),
     h('ul', { class: 'w-full space-y-0.5 list-none pl-0 pr-0' }, buildStatusList(regions, regions.length)),
     ...(actionButton ? [actionButton] : []),
   ])

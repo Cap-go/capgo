@@ -1,12 +1,10 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
-import { trackBentoEvent } from '../utils/bento.ts'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { logsnag } from '../utils/logsnag.ts'
 import { createStripeCustomer, finalizePendingStripeCustomer } from '../utils/supabase.ts'
-import { backgroundTask } from '../utils/utils.ts'
+import { sendEventToTracking } from '../utils/tracking.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
@@ -26,18 +24,24 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c)
     await finalizePendingStripeCustomer(c, record)
   }
 
-  const LogSnag = logsnag(c)
-  await backgroundTask(c, LogSnag.track({
+  await sendEventToTracking(c, {
+    bento: {
+      cron: '* * * * *',
+      data: {
+        org_id: record.id,
+        org_name: record.name,
+      },
+      event: 'org:created',
+      preferenceKey: 'onboarding',
+      uniqId: `org:created:${record.id}`,
+    },
     channel: 'org-created',
     event: 'Org Created',
     icon: '🎉',
+    sentToBento: true,
     user_id: record.id,
     notify: false,
-  }))
-  await backgroundTask(c, trackBentoEvent(c, record.management_email, {
-    org_id: record.id,
-    org_name: record.name,
-  }, 'org:created'))
+  })
 
   return c.json(BRES)
 })

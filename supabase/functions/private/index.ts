@@ -10,6 +10,7 @@ import { app as devices_priv } from '../_backend/private/devices.ts'
 import { app as download_link } from '../_backend/private/download_link.ts'
 import { app as events } from '../_backend/private/events.ts'
 import { app as groups } from '../_backend/private/groups.ts'
+import { app as invite_existing_user_to_org } from '../_backend/private/invite_existing_user_to_org.ts'
 import { app as invite_new_user_to_org } from '../_backend/private/invite_new_user_to_org.ts'
 import { app as latency } from '../_backend/private/latency.ts'
 import { app as log_as } from '../_backend/private/log_as.ts'
@@ -34,11 +35,12 @@ import { app as stripe_portal } from '../_backend/private/stripe_portal.ts'
 import { app as upload_link } from '../_backend/private/upload_link.ts'
 import { app as validate_password_compliance } from '../_backend/private/validate_password_compliance.ts'
 import { app as verify_email_otp } from '../_backend/private/verify_email_otp.ts'
+import { app as website_preview } from '../_backend/private/website_preview.ts'
 import { createAllCatch, createHono } from '../_backend/utils/hono.ts'
 import { version } from '../_backend/utils/version.ts'
 
 const functionName = 'private'
-const appGlobal = createHono(functionName, version, Deno.env.get('SENTRY_DSN_SUPABASE'))
+const appGlobal = createHono(functionName, version)
 
 // Webapps API
 
@@ -66,9 +68,11 @@ appGlobal.route('/groups', groups)
 appGlobal.route('/role_bindings', role_bindings)
 appGlobal.route('/roles', roles)
 appGlobal.route('/invite_new_user_to_org', invite_new_user_to_org)
+appGlobal.route('/invite_existing_user_to_org', invite_existing_user_to_org)
 appGlobal.route('/accept_invitation', accept_invitation)
 appGlobal.route('/validate_password_compliance', validate_password_compliance)
 appGlobal.route('/verify_email_otp', verify_email_otp)
+appGlobal.route('/website_preview', website_preview)
 appGlobal.route('/sso/check-domain', sso_check_domain)
 appGlobal.route('/sso/check-enforcement', sso_check_enforcement)
 appGlobal.route('/sso/providers', sso_providers)

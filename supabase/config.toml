@@ -158,10 +158,56 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
-# Uncomment to customize email template
-# [auth.email.template.invite]
-# subject = "You have been invited"
-# content_path = "./supabase/templates/invite.html"
+[auth.email.template.confirmation]
+subject = "[Capgo]: Confirm your Signup to Capgo.app"
+content_path = "./templates/confirmation.html"
+
+[auth.email.template.invite]
+subject = "[Capgo]: You have been invited to Capgo.app"
+content_path = "./templates/invite.html"
+
+[auth.email.template.magic_link]
+subject = "[Capgo]: Magic Link to log into your Capgo.app account"
+content_path = "./templates/magic_link.html"
+
+[auth.email.template.email_change]
+subject = "[Capgo]: Confirm change of your Email with Capgo.app account"
+content_path = "./templates/email_change.html"
+
+[auth.email.template.recovery]
+subject = "[Capgo]: Instructions to change your Capgo.app password"
+content_path = "./templates/recovery.html"
+
+[auth.email.template.reauthentication]
+subject = "[Capgo]: Confirm Reauthentication of your Capgo.app account"
+content_path = "./templates/reauthentication.html"
+
+[auth.email.notification.password_changed]
+enabled = true
+subject = "[Capgo]: Your Capgo.app password has been changed"
+content_path = "./templates/password_changed_notification.html"
+
+[auth.email.notification.email_changed]
+enabled = true
+subject = "[Capgo]: Your Capgo.app email address has been changed"
+content_path = "./templates/email_changed_notification.html"
+
+[auth.email.notification.mfa_factor_enrolled]
+enabled = true
+subject = "[Capgo]: New multi-factor authentication method added to your Capgo.app account"
+content_path = "./templates/mfa_factor_enrolled_notification.html"
+
+[auth.email.notification.mfa_factor_unenrolled]
+enabled = true
+subject = "[Capgo]: Multi-factor authentication method removed from your Capgo.app account"
+content_path = "./templates/mfa_factor_unenrolled_notification.html"
+
+# Custom email templates kept in ./templates for consistency, but not managed by Supabase.
+# These are sent through Bento:
+# - invite_new_user_to_org.html
+#   subject = "[Capgo]: Join {{ event.details.org_name }} org & create account"
+# - invite_existing_user_to_org.html
+#   subject = "[Capgo]: Join {{ event.details.org_name }} with your account"
 
 [auth.sms]
 # Allow/disallow new user signups via SMS to your project.
@@ -378,5 +424,11 @@ import_map = "./functions/deno.json"
 # Replication 
 
 [functions.replication]
+verify_jwt = false
+import_map = "./functions/deno.json"
+
+# Check CPU Usage
+
+[functions.check_cpu_usage]
 verify_jwt = false
 import_map = "./functions/deno.json"

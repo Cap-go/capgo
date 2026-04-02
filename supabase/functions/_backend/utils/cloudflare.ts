@@ -15,6 +15,19 @@ function escapeSqlString(value: string): string {
   return value.replace(/'/g, '\'\'').replace(/\\/g, '\\\\')
 }
 
+const MAX_ANALYTICS_QUERY_LIMIT = 50_000
+
+export function normalizeAnalyticsLimit(limit: unknown, fallback = DEFAULT_LIMIT): number {
+  if (typeof limit !== 'number' || !Number.isFinite(limit))
+    return fallback
+
+  const integerLimit = Math.trunc(limit)
+  if (integerLimit < 1)
+    return fallback
+
+  return Math.min(integerLimit, MAX_ANALYTICS_QUERY_LIMIT)
+}
+
 // type is require for the bindings no interface
 // eslint-disable-next-line ts/consistent-type-definitions
 export type Bindings = {
@@ -247,8 +260,22 @@ export async function trackDevicesCF(c: Context, device: DeviceWithoutCreatedAt)
   }
 }
 
-export function formatDateCF(date: string | undefined) {
-  return dayjs(date).format('YYYY-MM-DD HH:mm:ss')
+export function formatDateCF(date: string | Date | undefined) {
+  if (!date)
+    return dayjs(date).format('YYYY-MM-DD HH:mm:ss')
+
+  const normalizedDate = date instanceof Date ? date : new Date(date)
+  if (Number.isNaN(normalizedDate.getTime()))
+    return dayjs(date).format('YYYY-MM-DD HH:mm:ss')
+
+  const year = normalizedDate.getUTCFullYear()
+  const month = String(normalizedDate.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(normalizedDate.getUTCDate()).padStart(2, '0')
+  const hours = String(normalizedDate.getUTCHours()).padStart(2, '0')
+  const minutes = String(normalizedDate.getUTCMinutes()).padStart(2, '0')
+  const seconds = String(normalizedDate.getUTCSeconds()).padStart(2, '0')
+
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
 }
 
 interface AnalyticsApiResponse {
@@ -514,12 +541,44 @@ GROUP BY version_name`
   return {}
 }
 
-export async function countDevicesCF(c: Context, app_id: string, customIdMode: boolean) {
+export async function countDevicesCF(
+  c: Context,
+  app_id: string,
+  customIdMode: boolean,
+  deviceIds: string[] = [],
+  versionName?: string,
+  search?: string,
+) {
   // Use Analytics Engine DEVICE_INFO for counting devices
-  const customIdFilter = customIdMode ? `AND blob5 != ''` : ''
+  const conditions = [`index1 = '${escapeSqlString(app_id)}'`]
+
+  if (customIdMode)
+    conditions.push(`blob5 != ''`)
+
+  if (deviceIds.length) {
+    if (deviceIds.length === 1)
+      conditions.push(`blob1 = '${escapeSqlString(deviceIds[0])}'`)
+    else
+      conditions.push(`blob1 IN (${deviceIds.map(id => `'${escapeSqlString(id)}'`).join(', ')})`)
+  }
+
+  if (search) {
+    const searchLower = search.toLowerCase()
+    if (deviceIds.length) {
+      conditions.push(`position('${escapeSqlString(searchLower)}' IN toLower(blob5)) > 0`)
+    }
+    else {
+      // Search in device_id, custom_id, or version_name
+      conditions.push(`(position('${escapeSqlString(searchLower)}' IN toLower(blob1)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob5)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob2)) > 0)`)
+    }
+  }
+
+  if (versionName)
+    conditions.push(`blob2 = '${escapeSqlString(versionName)}'`)
+
   const query = `SELECT COUNT(DISTINCT blob1) AS total
 FROM device_info
-WHERE index1 = '${escapeSqlString(app_id)}' ${customIdFilter}`
+WHERE ${conditions.join(' AND ')}`
 
   cloudlog({ requestId: c.get('requestId'), message: 'countDevicesCF query', query })
   try {
@@ -547,6 +606,9 @@ interface DeviceInfoCF {
   updated_at: string
 }
 
+/**
+ * Read device metadata from the Analytics Engine, respecting search, version, custom ID, and cursor filters.
+ */
 export async function readDevicesCF(c: Context, params: ReadDevicesParams, customIdMode: boolean): Promise<DeviceRes[]> {
   // Use Analytics Engine DEVICE_INFO for reading devices
   // Schema: blob1=device_id, blob2=version_name, blob3=plugin_version, blob4=os_version,
@@ -554,7 +616,7 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
   //         double1=platform (0=android, 1=ios), double2=is_prod, double3=is_emulator
   //         index1=app_id, timestamp=updated_at
 
-  const limit = params.limit ?? DEFAULT_LIMIT
+  const limit = normalizeAnalyticsLimit(params.limit)
   const conditions: string[] = [`index1 = '${escapeSqlString(params.app_id)}'`]
 
   if (customIdMode) {
@@ -588,13 +650,20 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
     conditions.push(`blob2 = '${escapeSqlString(params.version_name)}'`)
   }
 
+  const activeOrder = params.order?.find(
+    col => col.key === 'updated_at' && typeof col.sortable === 'string',
+  )
+  const devicesOrder = activeOrder ? { ascending: activeOrder.sortable === 'asc' } : null
+
   // Cursor-based pagination using timestamp
   let cursorFilter = ''
-  if (params.cursor) {
+  if (params.cursor && devicesOrder) {
     // Cursor format: "timestamp|device_id"
     const [cursorTime, cursorDeviceId] = params.cursor.split('|')
     if (cursorTime && cursorDeviceId) {
-      cursorFilter = `AND (timestamp < toDateTime('${escapeSqlString(cursorTime)}') OR (timestamp = toDateTime('${escapeSqlString(cursorTime)}') AND blob1 > '${escapeSqlString(cursorDeviceId)}'))`
+      cursorFilter = devicesOrder.ascending
+        ? `AND (timestamp > toDateTime('${escapeSqlString(cursorTime)}') OR (timestamp = toDateTime('${escapeSqlString(cursorTime)}') AND blob1 > '${escapeSqlString(cursorDeviceId)}'))`
+        : `AND (timestamp < toDateTime('${escapeSqlString(cursorTime)}') OR (timestamp = toDateTime('${escapeSqlString(cursorTime)}') AND blob1 > '${escapeSqlString(cursorDeviceId)}'))`
     }
   }
 
@@ -615,7 +684,7 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
 FROM device_info
 WHERE ${conditions.join(' AND ')} ${cursorFilter}
 GROUP BY blob1
-ORDER BY updated_at DESC, device_id ASC
+ORDER BY ${devicesOrder ? `updated_at ${devicesOrder.ascending ? 'ASC' : 'DESC'}, device_id ASC` : 'device_id ASC'}
 LIMIT ${limit + 1}`
 
   cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF query', query })
@@ -636,7 +705,7 @@ LIMIT ${limit + 1}`
       is_prod: Boolean(row.is_prod),
       is_emulator: Boolean(row.is_emulator),
       custom_id: row.custom_id,
-      updated_at: row.updated_at,
+      updated_at: formatDateCF(row.updated_at),
       default_channel: row.default_channel || null,
       created_at: null, // Not stored in Analytics Engine
       key_id: row.key_id || null,
@@ -661,6 +730,8 @@ interface StatRowCF {
 export async function readStatsCF(c: Context, params: ReadStatsParams) {
   if (!c.env.APP_LOG)
     return [] as StatRowCF[]
+
+  const limit = normalizeAnalyticsLimit(params.limit)
 
   let deviceFilter = ''
 
@@ -721,7 +792,7 @@ WHERE
   app_id = '${escapeSqlString(params.app_id)}' ${deviceFilter} ${actionsFilter} ${searchFilter} ${startFilter} ${endFilter}
 GROUP BY app_id, created_at, action, device_id, version_name
 ${orderFilter}
-LIMIT ${params.limit ?? DEFAULT_LIMIT}`
+LIMIT ${limit}`
 
   cloudlog({ requestId: c.get('requestId'), message: 'readStatsCF query', query })
   try {
@@ -1539,6 +1610,8 @@ export async function getAdminOrgMetrics(
   if (!c.env.DEVICE_USAGE)
     return []
 
+  const safeLimit = normalizeAnalyticsLimit(limit, 100)
+
   const query = `SELECT
     blob2 AS org_id,
     COUNT(DISTINCT blob1) AS mau,
@@ -1549,7 +1622,7 @@ export async function getAdminOrgMetrics(
     AND blob2 != ''
   GROUP BY org_id
   ORDER BY mau DESC
-  LIMIT ${limit}`
+  LIMIT ${safeLimit}`
 
   cloudlog({ requestId: c.get('requestId'), message: 'getAdminOrgMetrics query', query })
 
@@ -1569,7 +1642,7 @@ export async function getAdminOrgMetrics(
         AND du.blob2 != ''
       GROUP BY org_id
       ORDER BY bandwidth DESC
-      LIMIT ${limit}`
+      LIMIT ${safeLimit}`
 
       const bandwidthResult = await runQueryToCFA<{ org_id: string, bandwidth: number, updates: number }>(c, bandwidthQuery)
 

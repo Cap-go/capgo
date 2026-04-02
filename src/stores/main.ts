@@ -6,6 +6,7 @@ import { ref } from 'vue'
 import { getDaysBetweenDates } from '~/services/conversion'
 import { reset } from '~/services/posthog'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
+import { createDeferredPromise } from '../utils/promise'
 import {
   findBestPlan,
   getAllDashboard,
@@ -42,7 +43,7 @@ export const useMainStore = defineStore('main', () => {
   const totalDevices = ref<number>(0)
   const totalStorage = ref<number>(0)
   const dashboardFetched = ref<boolean>(false)
-  const _initialLoadPromise = ref(Promise.withResolvers())
+  const _initialLoadPromise = ref(createDeferredPromise<boolean>())
 
   const totalDownload = ref<number>(0)
 
@@ -55,6 +56,7 @@ export const useMainStore = defineStore('main', () => {
           listener.data.subscription.unsubscribe()
           auth.value = undefined
           user.value = undefined
+          isAdmin.value = false
           reset(config.supaHost)
           unspoofUser()
           resolve()

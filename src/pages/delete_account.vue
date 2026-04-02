@@ -31,6 +31,16 @@ const isLoadingSession = ref(true)
 const isEmailVerified = ref(true)
 const isDeleteBlocked = computed(() => !isEmailVerified.value)
 
+async function redirectToEmailVerification() {
+  await router.push({
+    path: '/resend_email',
+    query: {
+      reason: 'email_not_verified',
+      return_to: '/delete_account',
+    },
+  })
+}
+
 async function checkEmailVerification() {
   isLoadingSession.value = true
   const { data: sessionResult, error: sessionError } = await supabase.auth.getSession()
@@ -63,7 +73,7 @@ async function deleteAccount() {
 
             if (captchaKey.value && !confirmCaptchaToken.value) {
               isLoading.value = false
-              return setErrors('delete-account', [t('captcha-required', 'Captcha verification is required')], {})
+              return setErrors('delete-account', [t('captcha-required')], {})
             }
 
             const { error: reauthError } = await supabase.auth.signInWithPassword({
@@ -103,6 +113,11 @@ async function deleteAccount() {
 
             if (deleteError) {
               console.error('Delete error:', deleteError)
+              if (deleteError.message?.includes('email_not_verified')) {
+                isLoading.value = false
+                await redirectToEmailVerification()
+                return false
+              }
               if (deleteError.message?.includes('reauth_required')) {
                 isLoading.value = false
                 return setErrors('delete-account', [t('invalid-auth')], {})
@@ -151,12 +166,12 @@ async function deleteAccount() {
 
 async function submit(form: { email: string, password: string }) {
   if (isDeleteBlocked.value) {
-    return setErrors('delete-account', [t('email-not-verified', 'Please verify your email before deleting your account.')], {})
+    return setErrors('delete-account', [t('email-not-verified')], {})
   }
   isLoading.value = true
   if (captchaKey.value && !turnstileToken.value) {
     isLoading.value = false
-    setErrors('delete-account', [t('captcha-required', 'Captcha verification is required')], {})
+    setErrors('delete-account', [t('captcha-required')], {})
     return
   }
   const { error } = await supabase.auth.signInWithPassword({
@@ -213,16 +228,16 @@ onMounted (() => {
         </div>
         <div v-else-if="isDeleteBlocked" class="rounded-md border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-100">
           <p class="mb-1">
-            {{ t('email-not-verified', 'You must verify your email before deleting your account.') }}
+            {{ t('email-not-verified') }}
           </p>
           <p class="mb-3 text-xs">
-            {{ t('delete-account-verify-hint', 'You cannot start account deletion while email is unverified. Verify your address to continue.') }}
+            {{ t('delete-account-verify-hint') }}
           </p>
           <router-link
             :to="{ path: '/resend_email', query: { reason: 'email_not_verified', return_to: '/delete_account' } }"
             class="inline-flex justify-center items-center px-4 py-2 rounded-md text-sm font-semibold text-white bg-muted-blue-700 hover:bg-blue-700 focus:bg-blue-700"
           >
-            {{ t('validate-email', 'Validate email and continue') }}
+            {{ t('validate-email') }}
           </router-link>
         </div>
         <div v-else class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
@@ -252,7 +267,7 @@ onMounted (() => {
                 </div>
                 <div v-if="captchaKey">
                   <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {{ t('captcha', 'Captcha') }}
+                    {{ t('captcha') }}
                   </label>
                   <VueTurnstile ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
                 </div>
@@ -300,7 +315,7 @@ onMounted (() => {
       <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.id === 'delete-account-confirm'" to="#dialog-v2-content" defer>
         <div v-if="captchaKey" class="mt-4">
           <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-            {{ t('captcha', 'Captcha') }}
+            {{ t('captcha') }}
           </label>
           <VueTurnstile
             ref="confirmCaptchaComponent"

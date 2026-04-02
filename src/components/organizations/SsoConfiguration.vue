@@ -124,6 +124,7 @@ async function fetchSpMetadata() {
     if (!response.ok) {
       console.error('Failed to fetch SSO SP metadata:', response.status)
       spMetadata.value = null
+      toast.error(t('sso-error-loading-sp-metadata'))
       return
     }
 
@@ -143,6 +144,7 @@ async function fetchSpMetadata() {
   catch (error) {
     console.error('Error fetching SSO SP metadata:', error)
     spMetadata.value = null
+    toast.error(t('sso-error-loading-sp-metadata'))
   }
 }
 
@@ -358,10 +360,7 @@ function formatDate(dateString: string): string {
 }
 
 onMounted(async () => {
-  await Promise.all([
-    fetchProviders(),
-    fetchSpMetadata(),
-  ])
+  await Promise.all([fetchProviders(), fetchSpMetadata()])
 })
 
 // Expose showAddForm so parent can control it

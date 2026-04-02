@@ -127,7 +127,7 @@ const loading = ref(true)
 const statsLoading = ref(true)
 const channel = ref<Database['public']['Tables']['channels']['Row'] & Channel>()
 const stats = ref<ChannelStatsResponse | null>(null)
-const days = ref(14)
+const days = ref(3)
 
 const bundleIdCache = ref<Record<string, number>>({})
 const versionByLabel = computed(() => {
@@ -211,11 +211,82 @@ const currentVersionDeployLabel = computed(() => {
   return date.toLocaleDateString()
 })
 
+function formatPercent(value: number) {
+  if (!Number.isFinite(value))
+    return '0.0%'
+
+  return `${value.toFixed(1)}%`
+}
+
+function formatPercentRange(start: number, end: number) {
+  return `${formatPercent(start)} -> ${formatPercent(end)}`
+}
+
+function formatShortDate(value: string | null | undefined) {
+  if (!value)
+    return '-'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime()))
+    return '-'
+
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+const currentVersionDataset = computed(() => {
+  if (!stats.value?.currentVersion)
+    return null
+
+  return stats.value.datasets.find(dataset => dataset.label === stats.value?.currentVersion) ?? null
+})
+
+const requestedDays = computed(() => days.value === 1 ? 2 : days.value)
+const selectedPeriodLabel = computed(() => days.value === 1
+  ? t('today-vs-yesterday')
+  : t('last-n-days', { days: days.value }))
+
+const periodSummary = computed(() => {
+  const dataset = currentVersionDataset.value
+  const labels = stats.value?.labels ?? []
+
+  if (!dataset || labels.length === 0)
+    return null
+
+  const normalizedShares = labels.map((_, index) => {
+    const rawValue = dataset.data?.[index]
+    const numeric = typeof rawValue === 'number' ? rawValue : Number(rawValue)
+    return Number.isFinite(numeric) ? numeric : 0
+  })
+
+  const normalizedCounts = labels.map((_, index) => {
+    const rawValue = dataset.metaCounts?.[index]
+    const numeric = typeof rawValue === 'number' ? rawValue : Number(rawValue)
+    return Number.isFinite(numeric) ? Math.max(0, Math.round(numeric)) : 0
+  })
+
+  if (normalizedShares.length === 0)
+    return null
+
+  const startShare = normalizedShares[0] ?? 0
+  const latestShare = normalizedShares[normalizedShares.length - 1] ?? 0
+  const changeShare = latestShare - startShare
+
+  return {
+    startShare,
+    startCount: normalizedCounts[0] ?? 0,
+    latestShare,
+    latestCount: normalizedCounts[normalizedCounts.length - 1] ?? 0,
+    startDateLabel: formatShortDate(labels[0]),
+    latestDateLabel: formatShortDate(labels[labels.length - 1]),
+    changeShare,
+  }
+})
+
 const statusDetail = computed(() => {
   if (!stats.value || totalDevices.value <= 0)
     return ''
 
-  const base = `${Math.round(devicesOnCurrent.value)} / ${Math.round(totalDevices.value)} ${t('devices-updated')}`
+  const base = `${Math.round(devicesOnCurrent.value)} / ${Math.round(totalDevices.value)} ${t('devices-on-current-version-status')}`
   if (statusType.value !== 'ramping')
     return base
 
@@ -418,7 +489,7 @@ async function fetchStats() {
       body: JSON.stringify({
         channel_id: id.value,
         app_id: packageId.value,
-        days: days.value,
+        days: requestedDays.value,
       }),
     })
 
@@ -530,41 +601,119 @@ watchEffect(async () => {
         </div>
 
         <!-- Stats Overview Cards -->
-        <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-            <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-              <span
-                class="w-2.5 h-2.5 rounded-full"
-                :style="currentVersionColor ? { backgroundColor: currentVersionColor.border } : undefined"
-              />
-              <IconTrendingUp class="w-4 h-4" />
-              {{ t('current-version') }}
+        <div class="space-y-4">
+          <div>
+            <div class="mb-3">
+              <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                {{ t('latest-snapshot') }}
+              </h3>
+              <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                {{ t('channel-stats-latest-snapshot-help') }}
+              </p>
             </div>
-            <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
-              {{ stats?.currentVersion || '-' }}
-            </div>
-            <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              {{ t('released') }}: {{ currentVersionDeployLabel }}
+
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                  <span
+                    class="w-2.5 h-2.5 rounded-full"
+                    :style="currentVersionColor ? { backgroundColor: currentVersionColor.border } : undefined"
+                  />
+                  <IconTrendingUp class="w-4 h-4" />
+                  {{ t('current-channel-version') }}
+                </div>
+                <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
+                  {{ stats?.currentVersion || '-' }}
+                </div>
+                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ t('released') }}: {{ currentVersionDeployLabel }}
+                </div>
+              </div>
+
+              <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                  <IconCheckCircle class="w-4 h-4" />
+                  {{ t('adoption-in-latest-snapshot') }}
+                </div>
+                <div class="mt-2 text-lg font-semibold" :class="adoptionRateColorClass">
+                  {{ formatPercent(stats?.totals.percent_on_current ?? 0) }}
+                </div>
+                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ t('adoption-in-latest-snapshot-help', { version: stats?.currentVersion || '-', total: totalDevices.toLocaleString() }) }}
+                </div>
+              </div>
+
+              <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                  <IconAlertCircle class="w-4 h-4" />
+                  {{ t('devices-on-current-version') }}
+                </div>
+                <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
+                  {{ devicesOnCurrent.toLocaleString() }}
+                </div>
+                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ t('devices-on-current-version-help', { current: devicesOnCurrent.toLocaleString(), total: totalDevices.toLocaleString(), version: stats?.currentVersion || '-' }) }}
+                </div>
+              </div>
             </div>
           </div>
 
-          <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-            <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-              <IconCheckCircle class="w-4 h-4" />
-              {{ t('adoption-rate') }}
+          <div>
+            <div class="mb-3">
+              <h3 class="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">
+                {{ t('selected-period') }}: {{ selectedPeriodLabel }}
+              </h3>
+              <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                {{ t('channel-stats-period-help') }}
+              </p>
             </div>
-            <div class="mt-2 text-lg font-semibold" :class="adoptionRateColorClass">
-              {{ stats?.totals.percent_on_current.toFixed(1) || '0.0' }}%
-            </div>
-          </div>
 
-          <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
-            <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-              <IconAlertCircle class="w-4 h-4" />
-              {{ t('updated-devices') }}
-            </div>
-            <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
-              {{ stats ? Math.round(stats.totals.total_devices) : 0 }}
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                  <IconCheckCircle class="w-4 h-4" />
+                  {{ t('start-of-selected-period') }}
+                </div>
+                <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
+                  {{ formatPercent(periodSummary?.startShare ?? 0) }}
+                </div>
+                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ t('start-of-selected-period-help', { date: periodSummary?.startDateLabel ?? '-', count: (periodSummary?.startCount ?? 0).toLocaleString(), version: stats?.currentVersion || '-' }) }}
+                </div>
+              </div>
+
+              <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                  <IconCheckCircle class="w-4 h-4" />
+                  {{ t('latest-day-in-selected-period') }}
+                </div>
+                <div class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
+                  {{ formatPercent(periodSummary?.latestShare ?? 0) }}
+                </div>
+                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ t('latest-day-in-selected-period-help', { date: periodSummary?.latestDateLabel ?? '-', count: (periodSummary?.latestCount ?? 0).toLocaleString(), version: stats?.currentVersion || '-' }) }}
+                </div>
+              </div>
+
+              <div class="p-4 bg-white border rounded-lg shadow-sm dark:bg-slate-800 border-slate-200 dark:border-slate-700">
+                <div class="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                  <IconTrendingUp class="w-4 h-4" />
+                  {{ t('adoption-over-selected-period') }}
+                </div>
+                <div
+                  class="mt-2 text-lg font-semibold"
+                  :class="{
+                    'text-emerald-600 dark:text-emerald-400': (periodSummary?.changeShare ?? 0) > 0,
+                    'text-rose-600 dark:text-rose-400': (periodSummary?.changeShare ?? 0) < 0,
+                    'text-slate-900 dark:text-white': (periodSummary?.changeShare ?? 0) === 0,
+                  }"
+                >
+                  {{ formatPercentRange(periodSummary?.startShare ?? 0, periodSummary?.latestShare ?? 0) }}
+                </div>
+                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {{ t('adoption-over-selected-period-help', { start: periodSummary?.startDateLabel ?? '-', end: periodSummary?.latestDateLabel ?? '-', version: stats?.currentVersion || '-' }) }}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -577,7 +726,7 @@ watchEffect(async () => {
             </h3>
             <div class="flex items-center gap-2">
               <button
-                v-for="d in [7, 14, 30]"
+                v-for="d in [1, 3, 7]"
                 :key="d"
                 class="px-3 py-1 text-sm transition-colors rounded-md"
                 :class="days === d
@@ -589,6 +738,10 @@ watchEffect(async () => {
               </button>
             </div>
           </div>
+
+          <p class="mb-4 text-sm text-slate-600 dark:text-slate-300">
+            {{ t('channel-stats-help') }}
+          </p>
 
           <div v-if="statsLoading" class="flex items-center justify-center h-64">
             <Spinner size="w-12 h-12" />

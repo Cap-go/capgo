@@ -274,16 +274,20 @@ export type Database = {
         Row: {
           allow_device_custom_id: boolean
           allow_preview: boolean
+          android_store_url: string | null
           app_id: string
           channel_device_count: number
           created_at: string | null
           default_upload_channel: string
+          existing_app: boolean
           expose_metadata: boolean
           icon_url: string
           id: string | null
+          ios_store_url: string | null
           last_version: string | null
           manifest_bundle_count: number
           name: string | null
+          need_onboarding: boolean
           owner_org: string
           retention: number
           transfer_history: Json[] | null
@@ -293,16 +297,20 @@ export type Database = {
         Insert: {
           allow_device_custom_id?: boolean
           allow_preview?: boolean
+          android_store_url?: string | null
           app_id: string
           channel_device_count?: number
           created_at?: string | null
           default_upload_channel?: string
+          existing_app?: boolean
           expose_metadata?: boolean
           icon_url: string
           id?: string | null
+          ios_store_url?: string | null
           last_version?: string | null
           manifest_bundle_count?: number
           name?: string | null
+          need_onboarding?: boolean
           owner_org: string
           retention?: number
           transfer_history?: Json[] | null
@@ -312,16 +320,20 @@ export type Database = {
         Update: {
           allow_device_custom_id?: boolean
           allow_preview?: boolean
+          android_store_url?: string | null
           app_id?: string
           channel_device_count?: number
           created_at?: string | null
           default_upload_channel?: string
+          existing_app?: boolean
           expose_metadata?: boolean
           icon_url?: string
           id?: string | null
+          ios_store_url?: string | null
           last_version?: string | null
           manifest_bundle_count?: number
           name?: string | null
+          need_onboarding?: boolean
           owner_org?: string
           retention?: number
           transfer_history?: Json[] | null
@@ -1140,6 +1152,12 @@ export type Database = {
         Row: {
           apps: number
           apps_active: number | null
+          build_avg_seconds_day_android: number
+          build_avg_seconds_day_ios: number
+          build_count_day_android: number
+          build_count_day_ios: number
+          build_total_seconds_day_android: number
+          build_total_seconds_day_ios: number
           builds_android: number | null
           builds_ios: number | null
           builds_last_month: number | null
@@ -1201,6 +1219,12 @@ export type Database = {
         Insert: {
           apps: number
           apps_active?: number | null
+          build_avg_seconds_day_android?: number
+          build_avg_seconds_day_ios?: number
+          build_count_day_android?: number
+          build_count_day_ios?: number
+          build_total_seconds_day_android?: number
+          build_total_seconds_day_ios?: number
           builds_android?: number | null
           builds_ios?: number | null
           builds_last_month?: number | null
@@ -1262,6 +1286,12 @@ export type Database = {
         Update: {
           apps?: number
           apps_active?: number | null
+          build_avg_seconds_day_android?: number
+          build_avg_seconds_day_ios?: number
+          build_count_day_android?: number
+          build_count_day_ios?: number
+          build_total_seconds_day_android?: number
+          build_total_seconds_day_ios?: number
           builds_android?: number | null
           builds_ios?: number | null
           builds_last_month?: number | null
@@ -1606,10 +1636,11 @@ export type Database = {
           password_policy_config: Json | null
           require_apikey_expiration: boolean
           required_encryption_key: string | null
+          sso_enabled: boolean
           stats_updated_at: string | null
           updated_at: string | null
           use_new_rbac: boolean
-          sso_enabled: boolean
+          website: string | null
         }
         Insert: {
           created_at?: string | null
@@ -1629,10 +1660,11 @@ export type Database = {
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
+          sso_enabled?: boolean
           stats_updated_at?: string | null
           updated_at?: string | null
           use_new_rbac?: boolean
-          sso_enabled?: boolean
+          website?: string | null
         }
         Update: {
           created_at?: string | null
@@ -1652,10 +1684,11 @@ export type Database = {
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
+          sso_enabled?: boolean
           stats_updated_at?: string | null
           updated_at?: string | null
           use_new_rbac?: boolean
-          sso_enabled?: boolean
+          website?: string | null
         }
         Relationships: [
           {
@@ -1763,27 +1796,6 @@ export type Database = {
           storage?: number
           stripe_id?: string
           updated_at?: string
-        }
-        Relationships: []
-      }
-      rbac_settings: {
-        Row: {
-          created_at: string
-          id: number
-          updated_at: string
-          use_new_rbac: boolean
-        }
-        Insert: {
-          created_at?: string
-          id?: number
-          updated_at?: string
-          use_new_rbac?: boolean
-        }
-        Update: {
-          created_at?: string
-          id?: number
-          updated_at?: string
-          use_new_rbac?: boolean
         }
         Relationships: []
       }
@@ -1967,20 +1979,58 @@ export type Database = {
         }
         Relationships: []
       }
-      security_settings: {
+      sso_providers: {
         Row: {
-          id: boolean
-          mfa_email_otp_enforced_at: string
+          attribute_mapping: Json | null
+          created_at: string
+          dns_verification_token: string
+          dns_verified_at: string | null
+          domain: string
+          enforce_sso: boolean
+          id: string
+          metadata_url: string | null
+          org_id: string
+          provider_id: string | null
+          status: string
+          updated_at: string
         }
         Insert: {
-          id?: boolean
-          mfa_email_otp_enforced_at?: string
+          attribute_mapping?: Json | null
+          created_at?: string
+          dns_verification_token: string
+          dns_verified_at?: string | null
+          domain: string
+          enforce_sso?: boolean
+          id?: string
+          metadata_url?: string | null
+          org_id: string
+          provider_id?: string | null
+          status?: string
+          updated_at?: string
         }
         Update: {
-          id?: boolean
-          mfa_email_otp_enforced_at?: string
+          attribute_mapping?: Json | null
+          created_at?: string
+          dns_verification_token?: string
+          dns_verified_at?: string | null
+          domain?: string
+          enforce_sso?: boolean
+          id?: string
+          metadata_url?: string | null
+          org_id?: string
+          provider_id?: string | null
+          status?: string
+          updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sso_providers_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       stats: {
         Row: {
@@ -2040,9 +2090,11 @@ export type Database = {
           canceled_at: string | null
           created_at: string
           customer_id: string
+          customer_country: string | null
           id: number
           is_good_plan: boolean | null
           mau_exceeded: boolean | null
+          paid_at: string | null
           plan_calculated_at: string | null
           plan_usage: number | null
           price_id: string | null
@@ -2062,9 +2114,11 @@ export type Database = {
           canceled_at?: string | null
           created_at?: string
           customer_id: string
+          customer_country?: string | null
           id?: number
           is_good_plan?: boolean | null
           mau_exceeded?: boolean | null
+          paid_at?: string | null
           plan_calculated_at?: string | null
           plan_usage?: number | null
           price_id?: string | null
@@ -2084,9 +2138,11 @@ export type Database = {
           canceled_at?: string | null
           created_at?: string
           customer_id?: string
+          customer_country?: string | null
           id?: number
           is_good_plan?: boolean | null
           mau_exceeded?: boolean | null
+          paid_at?: string | null
           plan_calculated_at?: string | null
           plan_usage?: number | null
           price_id?: string | null
@@ -2753,6 +2809,37 @@ export type Database = {
           credits_required: number
         }[]
       }
+      calculate_org_metrics_cache_entry: {
+        Args: { p_end_date: string; p_org_id: string; p_start_date: string }
+        Returns: {
+          bandwidth: number
+          build_time_unit: number
+          cached_at: string
+          end_date: string
+          fail: number
+          get: number
+          install: number
+          mau: number
+          org_id: string
+          start_date: string
+          storage: number
+          uninstall: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "org_metrics_cache"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      check_domain_sso: {
+        Args: { p_domain: string }
+        Returns: {
+          has_sso: boolean
+          org_id: string
+          provider_id: string
+        }[]
+      }
       check_min_rights:
         | {
             Args: {
@@ -2834,6 +2921,10 @@ export type Database = {
       cleanup_queue_messages: { Args: never; Returns: undefined }
       cleanup_tmp_users: { Args: never; Returns: undefined }
       cleanup_webhook_deliveries: { Args: never; Returns: undefined }
+      clear_onboarding_app_data: {
+        Args: { p_app_uuid: string }
+        Returns: undefined
+      }
       convert_bytes_to_gb: { Args: { bytes_value: number }; Returns: number }
       convert_bytes_to_mb: { Args: { bytes_value: number }; Returns: number }
       convert_gb_to_bytes: { Args: { gb: number }; Returns: number }
@@ -2859,25 +2950,6 @@ export type Database = {
           total_non_compliant: number
           wrong_key_count: number
         }[]
-      }
-      create_demo_app_with_limits: {
-        Args: {
-          p_active_window_days: number
-          p_app_id: string
-          p_default_upload_channel: string
-          p_icon_url: string
-          p_last_version: string
-          p_max_active_per_org: number
-          p_name: string
-          p_org_per_24h: number
-          p_org_per_hour: number
-          p_owner_org: string
-          p_retention: number
-          p_user_id: string
-          p_user_per_24h: number
-          p_user_per_hour: number
-        }
-        Returns: Json
       }
       create_hashed_apikey: {
         Args: {
@@ -3137,6 +3209,13 @@ export type Database = {
         }
         Returns: string
       }
+      get_identity_org_allowed_apikey_only: {
+        Args: {
+          keymode: Database["public"]["Enums"]["key_mode"][]
+          org_id: string
+        }
+        Returns: string
+      }
       get_identity_org_appid: {
         Args: {
           app_id: string
@@ -3153,6 +3232,7 @@ export type Database = {
           role: string
         }[]
       }
+      get_mfa_email_otp_enforced_at: { Args: never; Returns: string }
       get_next_cron_time: {
         Args: { p_schedule: string; p_timestamp: string }
         Returns: string
@@ -3324,12 +3404,13 @@ export type Database = {
               require_apikey_expiration: boolean
               required_encryption_key: string
               role: string
+              sso_enabled: boolean
               stats_updated_at: string
               subscription_end: string
               subscription_start: string
               trial_left: number
               use_new_rbac: boolean
-              sso_enabled: boolean
+              website: string
             }[]
           }
         | {
@@ -3360,12 +3441,13 @@ export type Database = {
               require_apikey_expiration: boolean
               required_encryption_key: string
               role: string
+              sso_enabled: boolean
               stats_updated_at: string
               subscription_end: string
               subscription_start: string
               trial_left: number
               use_new_rbac: boolean
-              sso_enabled: boolean
+              website: string
             }[]
           }
       get_password_policy_hash: {
@@ -3415,6 +3497,13 @@ export type Database = {
               total_percent: number
             }[]
           }
+      get_sso_enforcement_by_domain: {
+        Args: { p_domain: string }
+        Returns: {
+          enforce_sso: boolean
+          org_id: string
+        }[]
+      }
       get_total_app_storage_size_orgs: {
         Args: { app_id: string; org_id: string }
         Returns: number
@@ -3555,6 +3644,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      has_seeded_demo_data: { Args: { p_app_id: string }; Returns: boolean }
       invite_user_to_org: {
         Args: {
           email: string
@@ -3568,9 +3658,6 @@ export type Database = {
         Returns: string
       }
       is_account_disabled: { Args: { user_id: string }; Returns: boolean }
-      is_admin:
-        | { Args: never; Returns: boolean }
-        | { Args: { userid: string }; Returns: boolean }
       is_allowed_action: {
         Args: { apikey: string; appid: string }
         Returns: boolean
@@ -3634,8 +3721,12 @@ export type Database = {
         Returns: boolean
       }
       is_paying_org: { Args: { orgid: string }; Returns: boolean }
+      is_platform_admin:
+        | { Args: never; Returns: boolean }
+        | { Args: { userid: string }; Returns: boolean }
+      is_rbac_enabled_globally: { Args: never; Returns: boolean }
       is_recent_email_otp_verified: {
-        Args: { user_id: string }
+        Args: { p_user_id: string }
         Returns: boolean
       }
       is_storage_exceeded_by_org: { Args: { org_id: string }; Returns: boolean }
@@ -3694,6 +3785,10 @@ export type Database = {
       process_stats_email_monthly: { Args: never; Returns: undefined }
       process_stats_email_weekly: { Args: never; Returns: undefined }
       process_subscribed_orgs: { Args: never; Returns: undefined }
+      queue_cron_stat_app_for_app: {
+        Args: { p_app_id: string; p_org_id?: string }
+        Returns: undefined
+      }
       queue_cron_stat_org_for_org: {
         Args: { customer_id: string; org_id: string }
         Returns: undefined
@@ -4035,6 +4130,10 @@ export type Database = {
       reset_and_seed_stats_data: { Args: never; Returns: undefined }
       reset_app_data: { Args: { p_app_id: string }; Returns: undefined }
       reset_app_stats_data: { Args: { p_app_id: string }; Returns: undefined }
+      resync_org_user_role_bindings: {
+        Args: { p_org_id: string; p_user_id: string }
+        Returns: undefined
+      }
       seed_get_app_metrics_caches: {
         Args: { p_end_date: string; p_org_id: string; p_start_date: string }
         Returns: {
@@ -4508,4 +4607,3 @@ export const Constants = {
     },
   },
 } as const
-

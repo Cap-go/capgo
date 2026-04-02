@@ -43,13 +43,13 @@ async function callManagementAPI(
   path: string,
   body?: any,
 ): Promise<any> {
-  const token = getEnv(c, 'SUPABASE_MANAGEMENT_API_TOKEN')
+  const token = getEnv(c, 'SB_MANAGEMENT_API_TOKEN')
   const projectRef = getProjectRef(c)
 
   if (!token) {
     cloudlogErr({
       requestId: c.get('requestId'),
-      message: 'SUPABASE_MANAGEMENT_API_TOKEN not configured',
+      message: 'SB_MANAGEMENT_API_TOKEN not configured',
     })
     throw new ManagementAPIError(500, 'management_api_not_configured', 'Management API token not configured')
   }
@@ -91,7 +91,7 @@ async function callManagementAPI(
       try {
         errorData = await response.json()
       }
-      catch {}
+      catch { }
       cloudlogErr({
         requestId: c.get('requestId'),
         message: 'Management API error',

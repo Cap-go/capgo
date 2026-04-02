@@ -2,11 +2,10 @@
   "recommendations": [
     "antfu.vite",
     "Vue.volar",
-    "lokalise.i18n-ally",
+    "lydanne.i18n-ally-next",
     "antfu.iconify",
     "dbaeumer.vscode-eslint",
     "csstools.postcss",
-    "ReneSaarsoo.sql-formatter-vsc",
-    "vitest.explorer"
+    "ReneSaarsoo.sql-formatter-vsc"
   ]
 }

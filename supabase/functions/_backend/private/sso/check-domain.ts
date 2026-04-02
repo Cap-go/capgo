@@ -63,7 +63,7 @@ app.post('/', async (c) => {
   const { email } = validation.data
 
   // Extract domain from email
-  const domain = email.split('@')[1]
+  const domain = email.split('@')[1]?.toLowerCase().trim()
   if (!domain) {
     return quickError(400, 'invalid_email', 'Email must contain a domain')
   }
@@ -72,20 +72,47 @@ app.post('/', async (c) => {
   const requestId = c.get('requestId')
 
   try {
-    const { data, error } = await (supabase.rpc as any)('check_domain_sso', { p_domain: domain })
-    if (error) {
-      cloudlog({ requestId, context: 'check_domain - query error', error: error.message, domain })
+    const [
+      { data: enforcementData, error: enforcementError },
+      { data: legacyData, error: legacyError },
+    ] = await Promise.all([
+      (supabase.rpc as any)('get_sso_enforcement_by_domain', { p_domain: domain }),
+      (supabase.rpc as any)('check_domain_sso', { p_domain: domain }),
+    ])
+
+    if (enforcementError || legacyError) {
+      cloudlog({
+        requestId,
+        context: 'check_domain - query error',
+        domain,
+        enforcementError: enforcementError?.message,
+        legacyError: legacyError?.message,
+      })
       return quickError(500, 'query_error', 'Failed to check domain')
     }
 
-    if (!data || (Array.isArray(data) && data.length === 0)) {
+    const enforcementRow = Array.isArray(enforcementData) ? enforcementData[0] : enforcementData
+    const legacyRow = Array.isArray(legacyData) ? legacyData[0] : legacyData
+
+    if (!enforcementRow && !legacyRow) {
       cloudlog({ requestId, context: 'check_domain - no SSO provider found', domain })
       return c.json({ has_sso: false })
     }
 
-    cloudlog({ requestId, context: 'check_domain - SSO provider found', domain })
+    cloudlog({
+      requestId,
+      context: 'check_domain - SSO provider found',
+      domain,
+      enforce_sso: enforcementRow?.enforce_sso,
+      provider_id: legacyRow?.provider_id,
+      org_id: enforcementRow?.org_id ?? legacyRow?.org_id,
+    })
+
     return c.json({
       has_sso: true,
+      enforce_sso: enforcementRow?.enforce_sso === true,
+      provider_id: legacyRow?.provider_id,
+      org_id: enforcementRow?.org_id ?? legacyRow?.org_id,
     })
   }
   catch (err) {

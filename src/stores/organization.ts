@@ -3,8 +3,9 @@ import type { ArrayElement, Concrete, Merge } from '~/services/types'
 import type { Database } from '~/types/supabase.types'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import { createSignedImageUrl } from '~/services/storage'
+import { createSignedImageUrl, resolveImagePath } from '~/services/storage'
 import { stripeEnabled, useSupabase } from '~/services/supabase'
+import { createDeferredPromise } from '../utils/promise'
 import { useDashboardAppsStore } from './dashboardApps'
 import { useDisplayStore } from './display'
 import { useMainStore } from './main'
@@ -22,6 +23,7 @@ export interface PasswordPolicyConfig {
 // Note: Using get_orgs_v7 return type with explicit JSON parsing for password_policy_config
 type RawOrganization = ArrayElement<Database['public']['Functions']['get_orgs_v7']['Returns']>
 export type Organization = Omit<RawOrganization, 'password_policy_config'> & {
+  logo_storage_path?: string | null
   password_policy_config: PasswordPolicyConfig | null
 }
 export type OrganizationRole
@@ -107,6 +109,22 @@ function legacyRoleRank(role?: string | null) {
   return LEGACY_ROLE_RANK[normalized] ?? null
 }
 
+export function roleHasLegacyMinRight(role: string | null | undefined, minRight: LegacyMinRight) {
+  const roleRank = legacyRoleRank(role)
+  const requiredRank = legacyRoleRank(minRight)
+  if (roleRank === null || requiredRank === null)
+    return false
+  return roleRank >= requiredRank
+}
+
+export function isAdminRole(role: string | null | undefined) {
+  return roleHasLegacyMinRight(role, 'admin')
+}
+
+export function isSuperAdminRole(role: string | null | undefined) {
+  return roleHasLegacyMinRight(role, 'super_admin')
+}
+
 function normalizeRbacRole(role: string, scope: 'org' | 'app') {
   const legacy = normalizeLegacyRole(role)
   if (!legacy)
@@ -126,13 +144,17 @@ function matchesRbacRole(role: string, requiredRole: string) {
   return normalizeLegacyRole(role) === normalizeLegacyRole(requiredRole)
 }
 
+function isSelectableOrganization(role: string) {
+  return !role.includes('invite')
+}
+
 const supabase = useSupabase()
-const main = useMainStore()
 
 export const useOrganizationStore = defineStore('organization', () => {
+  const main = useMainStore()
   const _organizations: Ref<Map<string, Organization>> = ref(new Map())
   const _organizationsByAppId: Ref<Map<string, Organization>> = ref(new Map())
-  const _initialLoadPromise = ref(Promise.withResolvers())
+  const _initialLoadPromise = ref(createDeferredPromise<boolean>())
   const _initialized = ref(false)
 
   const organizations: ComputedRef<Organization[]> = computed(
@@ -143,6 +165,7 @@ export const useOrganizationStore = defineStore('organization', () => {
       )
     },
   )
+  const hasOrganizations = computed(() => organizations.value.some(org => isSelectableOrganization(org.role)))
 
   const getCurrentRole = async (appOwner: string, appId?: string, channelId?: number): Promise<OrganizationRole> => {
     if (_organizations.value.size === 0) {
@@ -227,7 +250,8 @@ export const useOrganizationStore = defineStore('organization', () => {
       return
 
     const organizations = Array.from(organizationsMap.values())
-    const orgIds = organizations.map(org => org.gid)
+    const selectableOrganizations = organizations.filter(org => isSelectableOrganization(org.role))
+    const orgIds = selectableOrganizations.map(org => org.gid)
 
     if (orgIds.length === 0) {
       _initialLoadPromise.value.resolve(true)
@@ -249,7 +273,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     for (const app of allAppsByOwner) {
       // For each app find the org_id that owns said app
       // This is needed for the "banner"
-      const org = organizations.find(org => org.gid === app.owner_org)
+      const org = selectableOrganizations.find(org => org.gid === app.owner_org)
       if (!org) {
         console.error(`Cannot find organization for app`, app)
         _initialLoadPromise.value.reject(`Cannot find organization for app ${app}`)
@@ -341,11 +365,12 @@ export const useOrganizationStore = defineStore('organization', () => {
           // Remove all from orgs
           _organizations.value = new Map()
           _organizationsByAppId.value = new Map()
-          _initialLoadPromise.value = Promise.withResolvers()
+          _initialLoadPromise.value = createDeferredPromise<boolean>()
           currentOrganization.value = undefined
           currentRole.value = null
         }
       })
+      _initialized.value = true
     }
 
     // We have RLS that ensure that we only select rows where we are member or owner
@@ -358,32 +383,42 @@ export const useOrganizationStore = defineStore('organization', () => {
       throw error
     }
 
-    const organization = data
-      .filter(org => !org.role.includes('invite'))
-      .sort((a, b) => b.app_count - a.app_count)[0]
-    if (!organization) {
-      console.log('user has no main organization')
-      throw error
-    }
-
     const mappedData = await Promise.all(data.map(async (item, id) => {
       const resolvedLogo = item.logo ? await createSignedImageUrl(item.logo) : ''
+      const logoStoragePath = resolveImagePath(item.logo).normalized
       return {
         id,
         ...item,
         logo: resolvedLogo || null,
+        logo_storage_path: logoStoragePath || null,
         password_policy_config: item.password_policy_config as PasswordPolicyConfig | null,
       } as Organization & { id: number }
     }))
 
     _organizations.value = new Map(mappedData.map(item => [item.gid, item as Organization]))
 
+    const selectableOrganizations = mappedData
+      .filter(org => isSelectableOrganization(org.role))
+      .sort((a, b) => b.app_count - a.app_count)
+
+    const organization = selectableOrganizations[0]
+    if (!organization) {
+      // Keep invitation-only organizations available so invite deep links
+      // can still open the accept-invite dialog before the user joins.
+      currentOrganization.value = undefined
+      currentRole.value = null
+      currentOrganizationFailed.value = false
+      _organizationsByAppId.value = new Map()
+      _initialLoadPromise.value.resolve(true)
+      return
+    }
+
     // Try to restore from localStorage first
     let targetOrgId = currentOrganization.value?.gid
     if (!targetOrgId) {
       const storedOrgId = localStorage.getItem(STORAGE_KEY)
       if (storedOrgId) {
-        const storedOrg = mappedData.find(org => org.gid === storedOrgId && !org.role.includes('invite'))
+        const storedOrg = mappedData.find(org => org.gid === storedOrgId && isSelectableOrganization(org.role))
         if (storedOrg) {
           targetOrgId = storedOrg.gid
         }
@@ -400,6 +435,43 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
     else {
       currentOrganizationFailed.value = !(!!currentOrganization.value?.paying || (currentOrganization.value?.trial_left ?? 0) > 0 || !!currentOrganization.value?.can_use_more)
+    }
+  }
+
+  const refreshOrganizationLogos = async () => {
+    if (_organizations.value.size === 0)
+      return
+
+    const nextOrganizations = new Map(_organizations.value)
+    let updated = false
+
+    for (const [orgId, org] of nextOrganizations.entries()) {
+      if (!org.logo)
+        continue
+
+      const logoStoragePath = resolveImagePath(org.logo_storage_path ?? org.logo).normalized
+      const refreshedLogo = await createSignedImageUrl(logoStoragePath || org.logo, { forceRefresh: true })
+      if (!refreshedLogo || refreshedLogo === org.logo)
+        continue
+
+      nextOrganizations.set(orgId, {
+        ...org,
+        logo: refreshedLogo,
+        logo_storage_path: logoStoragePath || null,
+      })
+      updated = true
+    }
+
+    if (!updated)
+      return
+
+    _organizations.value = nextOrganizations
+    if (currentOrganization.value) {
+      const refreshedCurrentOrganization = nextOrganizations.get(currentOrganization.value.gid)
+      if (refreshedCurrentOrganization) {
+        currentOrganization.value.logo = refreshedCurrentOrganization.logo
+        currentOrganization.value.logo_storage_path = refreshedCurrentOrganization.logo_storage_path
+      }
     }
   }
 
@@ -429,11 +501,7 @@ export const useOrganizationStore = defineStore('organization', () => {
         return true
     }
 
-    const roleRank = legacyRoleRank(role)
-    const requiredRank = legacyRoleRank(minRight)
-    if (roleRank === null || requiredRank === null)
-      return false
-    return roleRank >= requiredRank
+    return roleHasLegacyMinRight(role, minRight)
   }
 
   // Check password policy compliance for all org members (for super_admin preview)
@@ -454,6 +522,10 @@ export const useOrganizationStore = defineStore('organization', () => {
     }
   }
 
+  const canDeleteOrganization = (orgId?: string) => {
+    return hasPermissionsInRole('super_admin', ['org_super_admin'], orgId)
+  }
+
   const deleteOrganization = async (orgId: string) => {
     // Validate input
     if (!orgId || typeof orgId !== 'string' || orgId.trim() === '') {
@@ -469,8 +541,8 @@ export const useOrganizationStore = defineStore('organization', () => {
     // Verify user has super_admin or owner role for this organization
     const currentOrg = _organizations.value.get(orgId)
     console.log('Delete org check:', { orgId, currentOrg, role: currentOrg?.role, userId: currentUserId })
-    if (!currentOrg || (currentOrg.role !== 'super_admin' && currentOrg.role !== 'owner')) {
-      console.error('Permission denied:', { role: currentOrg?.role, required: ['super_admin', 'owner'] })
+    if (!currentOrg || !canDeleteOrganization(orgId)) {
+      console.error('Permission denied:', { role: currentOrg?.role, required: ['super_admin', 'owner', 'org_super_admin'] })
       return { data: null, error: new Error('Insufficient permissions') }
     }
 
@@ -499,10 +571,13 @@ export const useOrganizationStore = defineStore('organization', () => {
     getAllOrgs,
     hasPermissionsInRole,
     fetchOrganizations,
+    refreshOrganizationLogos,
     dedupFetchOrganizations,
     getOrgByAppId,
     awaitInitialLoad,
     deleteOrganization,
+    canDeleteOrganization,
     checkPasswordPolicyImpact,
+    hasOrganizations,
   }
 })

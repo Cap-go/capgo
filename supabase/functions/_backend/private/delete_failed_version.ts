@@ -3,10 +3,10 @@ import { Hono } from 'hono/tiny'
 import { BRES, parseBody, quickError, simpleError } from '../utils/hono.ts'
 import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { logsnag } from '../utils/logsnag.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { s3 } from '../utils/s3.ts'
 import { supabaseApikey } from '../utils/supabase.ts'
+import { sendEventToTracking } from '../utils/tracking.ts'
 
 interface DataUpload {
   app_id: string
@@ -87,8 +87,7 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     })
   }
 
-  const LogSnag = logsnag(c)
-  await LogSnag.track({
+  await sendEventToTracking(c, {
     channel: 'upload-failed',
     event: 'Failed to upload a bundle',
     user_id: version.owner_org,

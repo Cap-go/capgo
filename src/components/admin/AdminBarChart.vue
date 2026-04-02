@@ -34,6 +34,14 @@ const props = defineProps({
     type: Number,
     default: undefined,
   },
+  valueMode: {
+    type: String as () => 'percent' | 'count',
+    default: 'percent',
+  },
+  valueSuffix: {
+    type: String,
+    default: '',
+  },
 })
 
 const isDark = useDark()
@@ -59,6 +67,11 @@ const palette = [
   '#a855f7',
   '#84cc16',
 ]
+
+function formatCountValue(value: number) {
+  const formattedValue = value.toLocaleString()
+  return props.valueSuffix ? `${formattedValue} ${props.valueSuffix}` : formattedValue
+}
 
 const chartData = computed<ChartData<'bar'>>(() => ({
   labels: props.labels,
@@ -99,6 +112,9 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => ({
       callbacks: {
         label: (context) => {
           const value = Number(context.parsed.x ?? 0)
+          if (props.valueMode === 'count')
+            return `${context.dataset.label || props.label}: ${formatCountValue(value)}`
+
           const percent = `${value.toFixed(2)}%`
           if (props.total) {
             const devices = Math.round((value / 100) * props.total)
@@ -112,13 +128,17 @@ const chartOptions = computed<ChartOptions<'bar'>>(() => ({
   scales: {
     x: {
       beginAtZero: true,
-      suggestedMax: 100,
+      suggestedMax: props.valueMode === 'percent' ? 100 : undefined,
       grid: {
         color: isDark.value ? 'rgba(75, 85, 99, 0.3)' : 'rgba(229, 231, 235, 0.8)',
       },
       ticks: {
         color: isDark.value ? '#9ca3af' : '#6b7280',
-        callback: value => `${value}%`,
+        callback: (value) => {
+          if (props.valueMode === 'count')
+            return formatCountValue(Number(value))
+          return `${value}%`
+        },
       },
     },
     y: {

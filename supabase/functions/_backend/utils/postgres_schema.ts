@@ -30,6 +30,10 @@ export const apps = pgTable('apps', {
   manifest_bundle_count: bigint('manifest_bundle_count', { mode: 'number' }).notNull().default(0),
   expose_metadata: boolean('expose_metadata').notNull().default(false),
   allow_device_custom_id: boolean('allow_device_custom_id').notNull().default(true),
+  need_onboarding: boolean('need_onboarding').notNull().default(false),
+  existing_app: boolean('existing_app').notNull().default(false),
+  ios_store_url: text('ios_store_url'),
+  android_store_url: text('android_store_url'),
 })
 
 export const app_versions = pgTable('app_versions', {
@@ -147,6 +151,7 @@ export const users = pgTable('users', {
 export const stripe_info = pgTable('stripe_info', {
   id: bigint('id', { mode: 'number' }).primaryKey().notNull(),
   customer_id: text('customer_id'),
+  customer_country: varchar('customer_country', { length: 2 }),
   product_id: varchar('product_id'),
   status: text('status'),
   trial_at: text('trial_at'),

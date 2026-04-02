@@ -5,14 +5,23 @@ import { z } from 'zod/mini'
 import { getAdminAppsTrend, getAdminBandwidthTrend, getAdminBundlesTrend, getAdminDistributionMetrics, getAdminFailureMetrics, getAdminMauTrend, getAdminOrgMetrics, getAdminPlatformOverview, getAdminStorageTrend, getAdminSuccessRate, getAdminSuccessRateTrend, getAdminUploadMetrics } from '../utils/cloudflare.ts'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { getAdminCancelledOrganizations, getAdminDeploymentsTrend, getAdminGlobalStatsTrend, getAdminOnboardingFunnel, getAdminPluginBreakdown, getAdminTrialOrganizations } from '../utils/pg.ts'
+import { getAdminCancelledOrganizations, getAdminCustomerCountryBreakdown, getAdminDeploymentsTrend, getAdminEmailTypeBreakdown, getAdminGlobalStatsTrend, getAdminOnboardingFunnel, getAdminPluginBreakdown, getAdminTrialOrganizations } from '../utils/pg.ts'
 import { getCancellationDetails } from '../utils/stripe.ts'
 import { supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
-const bodySchema = z.object({
-  metric_category: z.enum(['uploads', 'distribution', 'failures', 'success_rate', 'platform_overview', 'org_metrics', 'mau_trend', 'success_rate_trend', 'apps_trend', 'bundles_trend', 'deployments_trend', 'storage_trend', 'bandwidth_trend', 'global_stats_trend', 'plugin_breakdown', 'trial_organizations', 'onboarding_funnel', 'cancelled_users']),
-  start_date: z.string().check(z.minLength(1)),
-  end_date: z.string().check(z.minLength(1)),
+export const MAX_ADMIN_STATS_LIMIT = 50_000
+export const MAX_ADMIN_STATS_OFFSET = 100_000
+const ISO_UTC_DATETIME_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/
+const INVALID_ADMIN_STATS_DATE = 'Expected ISO 8601 UTC datetime string'
+
+export const adminStatsBodySchema = z.object({
+  metric_category: z.enum(['uploads', 'distribution', 'failures', 'success_rate', 'platform_overview', 'org_metrics', 'mau_trend', 'success_rate_trend', 'apps_trend', 'bundles_trend', 'deployments_trend', 'storage_trend', 'bandwidth_trend', 'global_stats_trend', 'plugin_breakdown', 'trial_organizations', 'onboarding_funnel', 'cancelled_users', 'email_type_breakdown', 'customer_country_breakdown']),
+  start_date: z.string().check(z.minLength(1), z.regex(ISO_UTC_DATETIME_REGEX, { message: INVALID_ADMIN_STATS_DATE })),
+  end_date: z.string().check(z.minLength(1), z.regex(ISO_UTC_DATETIME_REGEX, { message: INVALID_ADMIN_STATS_DATE })),
+  app_id: z.optional(z.string().check(z.minLength(1))),
+  org_id: z.optional(z.string().check(z.minLength(1))),
+  limit: z.optional(z.number().check(z.int(), z.minimum(1), z.maximum(MAX_ADMIN_STATS_LIMIT))),
+  offset: z.optional(z.number().check(z.int(), z.minimum(0), z.maximum(MAX_ADMIN_STATS_OFFSET))),
 })
 
 interface AdminStatsBody {
@@ -73,14 +82,14 @@ app.post('/', middlewareAuth, async (c) => {
     throw simpleError('not_authorized', 'Not authorized')
 
   const body = await parseBody<AdminStatsBody>(c)
-  const parsedBodyResult = bodySchema.safeParse(body)
+  const parsedBodyResult = adminStatsBodySchema.safeParse(body)
   if (!parsedBodyResult.success) {
     throw simpleError('invalid_json_body', 'Invalid json body', { body, parsedBodyResult })
   }
 
   // Verify user is admin
   const supabaseClient = useSupabaseClient(c, authToken)
-  const { data: isAdmin, error: adminError } = await supabaseClient.rpc('is_admin')
+  const { data: isAdmin, error: adminError } = await supabaseClient.rpc('is_platform_admin')
 
   if (adminError) {
     cloudlog({ requestId: c.get('requestId'), message: 'is_admin_error', error: adminError })
@@ -92,8 +101,7 @@ app.post('/', middlewareAuth, async (c) => {
     throw simpleError('not_admin', 'Not admin - only admin users can access platform statistics')
   }
 
-  // Use body directly since it has the full interface type
-  const { metric_category, start_date, end_date, app_id, org_id, limit, offset } = body
+  const { metric_category, start_date, end_date, app_id, org_id, limit, offset } = parsedBodyResult.data
 
   cloudlog({
     requestId: c.get('requestId'),
@@ -193,6 +201,9 @@ app.post('/', middlewareAuth, async (c) => {
               org_name: org.org_name,
               management_email: org.management_email,
               canceled_at: org.canceled_at,
+              plan_name: org.plan_name,
+              billing_type: org.billing_type,
+              subscription_or_signup_date: org.subscription_or_signup_date,
               cancellation_reason: formatCancellationReason(details),
             }
           }),
@@ -206,6 +217,14 @@ app.post('/', middlewareAuth, async (c) => {
 
       case 'onboarding_funnel':
         result = await getAdminOnboardingFunnel(c, start_date, end_date)
+        break
+
+      case 'email_type_breakdown':
+        result = await getAdminEmailTypeBreakdown(c, start_date, end_date)
+        break
+
+      case 'customer_country_breakdown':
+        result = await getAdminCustomerCountryBreakdown(c, start_date, end_date)
         break
 
       default:

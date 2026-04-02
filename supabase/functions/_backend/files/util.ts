@@ -1,6 +1,7 @@
 // Copyright 2023 Signal Messenger, LLC
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import type { R2HTTPMetadata } from '@cloudflare/workers-types'
 import type { Context } from 'hono'
 import { Buffer } from 'node:buffer'
 import { HTTPException } from 'hono/http-exception'
@@ -41,6 +42,7 @@ export const MAX_CHUNK_SIZE_BYTES = 1024 * 1024 * 99 // 99MB
 export const ALERT_UPLOAD_SIZE_BYTES = 1024 * 1024 * 20 // 20MB
 
 export const X_CHECKSUM_SHA256 = 'X-Checksum-Sha256'
+export const NO_TRANSFORM_CACHE_CONTROL = 'no-transform'
 
 // how long an unfinished upload lives in ms
 export const UPLOAD_EXPIRATION_MS = 1 * 24 * 60 * 60 * 1000 // 1 day
@@ -59,6 +61,31 @@ export const UPLOAD_INFO_KEY = 'upload-info'
 export const ALLOWED_HEADERS = HEADERS.join(', ')
 export const ALLOWED_METHODS = REQUEST_METHODS.join(', ')
 export const EXPOSED_HEADERS = HEADERS.join(', ')
+
+export function withNoTransformCacheControl(cacheControl: string | null | undefined): string {
+  if (cacheControl == null || cacheControl.trim() === '') {
+    return NO_TRANSFORM_CACHE_CONTROL
+  }
+
+  const directives = cacheControl
+    .split(',')
+    .map(directive => directive.trim().toLowerCase())
+    .filter(Boolean)
+
+  if (directives.includes(NO_TRANSFORM_CACHE_CONTROL)) {
+    return cacheControl
+  }
+
+  return `${cacheControl}, ${NO_TRANSFORM_CACHE_CONTROL}`
+}
+
+export function buildFileHttpMetadata(contentType?: string, cacheControl?: string | null): R2HTTPMetadata {
+  return {
+    ...(contentType ? { contentType } : {}),
+    cacheControl: withNoTransformCacheControl(cacheControl),
+  }
+}
+
 export function readIntFromHeader(headers: Headers, name: string): number {
   const headerString = headers.get(name)
   if (headerString == null) {

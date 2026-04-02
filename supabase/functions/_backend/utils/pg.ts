@@ -6,6 +6,7 @@ import { getRuntimeKey } from 'hono/adapter'
 // @ts-types="npm:@types/pg"
 import { Pool } from 'pg'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
+import { DISPOSABLE_EMAIL_DOMAINS, PERSONAL_EMAIL_DOMAINS } from './emailClassification.ts'
 import { getClientDbRegionSB } from './geolocation.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import * as schema from './postgres_schema.ts'
@@ -989,6 +990,8 @@ export interface AdminGlobalStatsTrend {
   revenue_maker: number
   revenue_team: number
   revenue_enterprise: number
+  credits_bought: number
+  credits_consumed: number
   builds_total: number
   builds_ios: number
   builds_android: number
@@ -998,6 +1001,16 @@ export interface AdminGlobalStatsTrend {
   builds_last_month: number
   builds_last_month_ios: number
   builds_last_month_android: number
+  build_minutes_day_ios: number
+  build_minutes_day_android: number
+  builds_day_ios: number
+  builds_day_android: number
+  build_total_seconds_day_ios: number
+  build_total_seconds_day_android: number
+  build_avg_seconds_day_ios: number
+  build_avg_seconds_day_android: number
+  build_count_day_ios: number
+  build_count_day_android: number
 }
 
 export async function getAdminGlobalStatsTrend(
@@ -1016,7 +1029,8 @@ export async function getAdminGlobalStatsTrend(
     // Simple query - just SELECT all columns from global_stats
     // Revenue metrics are already calculated and stored by logsnag_insights cron job
     const query = sql`
-      SELECT
+      WITH stats AS (
+        SELECT
         date_id AS date,
         apps::int,
         apps_active::int,
@@ -1052,6 +1066,8 @@ export async function getAdminGlobalStatsTrend(
         revenue_maker::float,
         revenue_team::float,
         revenue_enterprise::float,
+        COALESCE(credits_bought, 0)::float AS credits_bought,
+        COALESCE(credits_consumed, 0)::float AS credits_consumed,
         COALESCE(builds_total, 0)::int AS builds_total,
         COALESCE(builds_ios, 0)::int AS builds_ios,
         COALESCE(builds_android, 0)::int AS builds_android,
@@ -1060,11 +1076,48 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(builds_success_android, 0)::int AS builds_success_android,
         COALESCE(builds_last_month, 0)::int AS builds_last_month,
         COALESCE(builds_last_month_ios, 0)::int AS builds_last_month_ios,
-        COALESCE(builds_last_month_android, 0)::int AS builds_last_month_android
-      FROM global_stats
-      WHERE date_id >= ${startDateOnly}
-        AND date_id <= ${endDateOnly}
-      ORDER BY date_id ASC
+        COALESCE(builds_last_month_android, 0)::int AS builds_last_month_android,
+        COALESCE(
+          NULLIF(to_jsonb(gs) ->> 'build_minutes_day_ios', '')::float,
+          COALESCE(NULLIF(to_jsonb(gs) ->> 'build_total_seconds_day_ios', '')::bigint, 0)::float / 60,
+          0
+        )::float AS build_minutes_day_ios,
+        COALESCE(
+          NULLIF(to_jsonb(gs) ->> 'build_minutes_day_android', '')::float,
+          COALESCE(NULLIF(to_jsonb(gs) ->> 'build_total_seconds_day_android', '')::bigint, 0)::float / 60,
+          0
+        )::float AS build_minutes_day_android,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'builds_day_ios', '')::int, NULLIF(to_jsonb(gs) ->> 'build_count_day_ios', '')::int, 0)::int AS builds_day_ios,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'builds_day_android', '')::int, NULLIF(to_jsonb(gs) ->> 'build_count_day_android', '')::int, 0)::int AS builds_day_android,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_total_seconds_day_ios', '')::bigint, ROUND(COALESCE(NULLIF(to_jsonb(gs) ->> 'build_minutes_day_ios', '')::float, 0) * 60)::bigint, 0)::bigint AS build_total_seconds_day_ios,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_total_seconds_day_android', '')::bigint, ROUND(COALESCE(NULLIF(to_jsonb(gs) ->> 'build_minutes_day_android', '')::float, 0) * 60)::bigint, 0)::bigint AS build_total_seconds_day_android,
+        COALESCE(
+          NULLIF(to_jsonb(gs) ->> 'build_avg_seconds_day_ios', '')::float,
+          CASE
+            WHEN COALESCE(NULLIF(to_jsonb(gs) ->> 'builds_day_ios', '')::int, 0) > 0
+              THEN (COALESCE(NULLIF(to_jsonb(gs) ->> 'build_minutes_day_ios', '')::float, 0) * 60) / COALESCE(NULLIF(to_jsonb(gs) ->> 'builds_day_ios', '')::int, 0)
+            ELSE 0
+          END,
+          0
+        )::float AS build_avg_seconds_day_ios,
+        COALESCE(
+          NULLIF(to_jsonb(gs) ->> 'build_avg_seconds_day_android', '')::float,
+          CASE
+            WHEN COALESCE(NULLIF(to_jsonb(gs) ->> 'builds_day_android', '')::int, 0) > 0
+              THEN (COALESCE(NULLIF(to_jsonb(gs) ->> 'build_minutes_day_android', '')::float, 0) * 60) / COALESCE(NULLIF(to_jsonb(gs) ->> 'builds_day_android', '')::int, 0)
+            ELSE 0
+          END,
+          0
+        )::float AS build_avg_seconds_day_android,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_count_day_ios', '')::int, NULLIF(to_jsonb(gs) ->> 'builds_day_ios', '')::int, 0)::int AS build_count_day_ios,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'build_count_day_android', '')::int, NULLIF(to_jsonb(gs) ->> 'builds_day_android', '')::int, 0)::int AS build_count_day_android
+      FROM global_stats gs
+      WHERE date_id <= ${endDateOnly}
+      )
+      SELECT *
+      FROM stats
+      WHERE date >= ${startDateOnly}
+      ORDER BY date ASC
     `
 
     const result = await drizzleClient.execute(query)
@@ -1105,6 +1158,8 @@ export async function getAdminGlobalStatsTrend(
       revenue_maker: Number(row.revenue_maker) || 0,
       revenue_team: Number(row.revenue_team) || 0,
       revenue_enterprise: Number(row.revenue_enterprise) || 0,
+      credits_bought: Number(row.credits_bought) || 0,
+      credits_consumed: Number(row.credits_consumed) || 0,
       builds_total: Number(row.builds_total) || 0,
       builds_ios: Number(row.builds_ios) || 0,
       builds_android: Number(row.builds_android) || 0,
@@ -1114,6 +1169,16 @@ export async function getAdminGlobalStatsTrend(
       builds_last_month: Number(row.builds_last_month) || 0,
       builds_last_month_ios: Number(row.builds_last_month_ios) || 0,
       builds_last_month_android: Number(row.builds_last_month_android) || 0,
+      build_minutes_day_ios: Number(row.build_minutes_day_ios) || 0,
+      build_minutes_day_android: Number(row.build_minutes_day_android) || 0,
+      builds_day_ios: Number(row.builds_day_ios) || 0,
+      builds_day_android: Number(row.builds_day_android) || 0,
+      build_total_seconds_day_ios: Number(row.build_total_seconds_day_ios) || 0,
+      build_total_seconds_day_android: Number(row.build_total_seconds_day_android) || 0,
+      build_avg_seconds_day_ios: Number(row.build_avg_seconds_day_ios) || 0,
+      build_avg_seconds_day_android: Number(row.build_avg_seconds_day_android) || 0,
+      build_count_day_ios: Number(row.build_count_day_ios) || 0,
+      build_count_day_android: Number(row.build_count_day_android) || 0,
     }))
 
     cloudlog({ requestId: c.get('requestId'), message: 'getAdminGlobalStatsTrend result', resultCount: data.length })
@@ -1123,6 +1188,225 @@ export async function getAdminGlobalStatsTrend(
   catch (e: unknown) {
     logPgError(c, 'getAdminGlobalStatsTrend', e)
     return []
+  }
+}
+
+export interface AdminEmailTypeBreakdown {
+  totals: {
+    professional: number
+    personal: number
+    disposable: number
+    total: number
+  }
+  trend: Array<{
+    date: string
+    professional: number
+    personal: number
+    disposable: number
+    total: number
+  }>
+}
+
+export async function getAdminEmailTypeBreakdown(
+  c: Context,
+  start_date: string,
+  end_date: string,
+): Promise<AdminEmailTypeBreakdown> {
+  const emptyResult: AdminEmailTypeBreakdown = {
+    totals: {
+      professional: 0,
+      personal: 0,
+      disposable: 0,
+      total: 0,
+    },
+    trend: [],
+  }
+
+  try {
+    const pgClient = getPgClient(c, true)
+    const drizzleClient = getDrizzleClient(pgClient)
+    const startTimestamp = new Date(start_date)
+    const endTimestamp = new Date(end_date)
+    const startDay = new Date(Date.UTC(startTimestamp.getUTCFullYear(), startTimestamp.getUTCMonth(), startTimestamp.getUTCDate()))
+    const endDay = new Date(Date.UTC(endTimestamp.getUTCFullYear(), endTimestamp.getUTCMonth(), endTimestamp.getUTCDate()))
+    const endIsExactUtcDayBoundary = endTimestamp.getTime() === endDay.getTime()
+    const seriesEndDay = new Date(endDay)
+    if (endIsExactUtcDayBoundary)
+      seriesEndDay.setUTCDate(seriesEndDay.getUTCDate() - 1)
+    const endExclusive = endIsExactUtcDayBoundary
+      ? endTimestamp
+      : new Date(endDay.getTime() + 24 * 60 * 60 * 1000)
+
+    const personalDomainsSql = sql.join(PERSONAL_EMAIL_DOMAINS.map(domain => sql`${domain}`), sql`, `)
+    const disposableDomainsSql = sql.join(DISPOSABLE_EMAIL_DOMAINS.map(domain => sql`${domain}`), sql`, `)
+
+    const query = sql`
+      WITH date_series AS (
+        SELECT generate_series(
+          ${startDay.toISOString()}::timestamptz::date,
+          ${seriesEndDay.toISOString()}::timestamptz::date,
+          interval '1 day'
+        )::date AS date
+      ),
+      normalized_users AS (
+        SELECT
+          (u.created_at AT TIME ZONE 'UTC')::date AS date,
+          split_part(lower(trim(u.email)), '@', 2) AS domain
+        FROM public.users u
+        WHERE u.created_at >= ${startDay.toISOString()}::timestamptz
+          AND u.created_at < ${endExclusive.toISOString()}::timestamptz
+          AND POSITION('@' IN u.email) > 0
+      ),
+      classified_users AS (
+        SELECT
+          nu.date,
+          CASE
+            WHEN nu.domain IN (${disposableDomainsSql}) THEN 'disposable'
+            WHEN nu.domain IN (${personalDomainsSql}) THEN 'personal'
+            ELSE 'professional'
+          END AS email_type
+        FROM normalized_users nu
+      ),
+      daily_counts AS (
+        SELECT
+          ds.date,
+          COUNT(*) FILTER (WHERE cu.email_type = 'professional')::int AS professional,
+          COUNT(*) FILTER (WHERE cu.email_type = 'personal')::int AS personal,
+          COUNT(*) FILTER (WHERE cu.email_type = 'disposable')::int AS disposable
+        FROM date_series ds
+        LEFT JOIN classified_users cu ON cu.date = ds.date
+        GROUP BY ds.date
+      )
+      SELECT
+        dc.date::text AS date,
+        dc.professional,
+        dc.personal,
+        dc.disposable,
+        (dc.professional + dc.personal + dc.disposable)::int AS total
+      FROM daily_counts dc
+      ORDER BY dc.date ASC
+    `
+
+    const result = await drizzleClient.execute(query)
+
+    const trend = result.rows.map((row: any) => ({
+      date: row.date,
+      professional: Number(row.professional) || 0,
+      personal: Number(row.personal) || 0,
+      disposable: Number(row.disposable) || 0,
+      total: Number(row.total) || 0,
+    }))
+
+    const totals = trend.reduce((acc, row) => {
+      acc.professional += row.professional
+      acc.personal += row.personal
+      acc.disposable += row.disposable
+      acc.total += row.total
+      return acc
+    }, {
+      professional: 0,
+      personal: 0,
+      disposable: 0,
+      total: 0,
+    })
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'getAdminEmailTypeBreakdown result',
+      totalRows: trend.length,
+      totals,
+    })
+
+    return {
+      totals,
+      trend,
+    }
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAdminEmailTypeBreakdown', e)
+    return emptyResult
+  }
+}
+
+export interface AdminCustomerCountryBreakdown {
+  total_organizations: number
+  countries: Array<{
+    country_code: string
+    organizations: number
+    percentage: number
+  }>
+}
+
+export async function getAdminCustomerCountryBreakdown(
+  c: Context,
+  start_date: string,
+  end_date: string,
+): Promise<AdminCustomerCountryBreakdown> {
+  const emptyResult: AdminCustomerCountryBreakdown = {
+    total_organizations: 0,
+    countries: [],
+  }
+
+  try {
+    const pgClient = getPgClient(c, true)
+    const drizzleClient = getDrizzleClient(pgClient)
+
+    const query = sql`
+      WITH country_counts AS (
+        SELECT
+          UPPER(BTRIM(si.customer_country)) AS country_code,
+          COUNT(*)::int AS organizations
+        FROM orgs o
+        INNER JOIN stripe_info si ON si.customer_id = o.customer_id
+        WHERE o.created_at >= ${start_date}::timestamptz
+          AND o.created_at < ${end_date}::timestamptz
+          AND si.customer_country IS NOT NULL
+          AND UPPER(BTRIM(si.customer_country)) ~ '^[A-Z]{2}$'
+        GROUP BY UPPER(BTRIM(si.customer_country))
+      ),
+      totals AS (
+        SELECT COALESCE(SUM(cc.organizations), 0)::int AS total_organizations
+        FROM country_counts cc
+      )
+      SELECT
+        cc.country_code,
+        cc.organizations,
+        CASE
+          WHEN totals.total_organizations > 0
+            THEN ROUND((cc.organizations::numeric / totals.total_organizations::numeric) * 100, 2)
+          ELSE 0
+        END::float AS percentage,
+        totals.total_organizations
+      FROM country_counts cc
+      CROSS JOIN totals
+      ORDER BY cc.organizations DESC, cc.country_code ASC
+    `
+
+    const result = await drizzleClient.execute(query)
+
+    const countries = result.rows.map((row: any) => ({
+      country_code: row.country_code,
+      organizations: Number(row.organizations) || 0,
+      percentage: Number(row.percentage) || 0,
+    }))
+
+    const totalOrganizations = Number((result.rows[0] as any)?.total_organizations) || 0
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'getAdminCustomerCountryBreakdown result',
+      totalOrganizations,
+      countryCount: countries.length,
+    })
+
+    return {
+      total_organizations: totalOrganizations,
+      countries,
+    }
+  }
+  catch (e: unknown) {
+    logPgError(c, 'getAdminCustomerCountryBreakdown', e)
+    return emptyResult
   }
 }
 
@@ -1156,6 +1440,26 @@ function parseBreakdownJson(value: unknown): Record<string, number> {
   return {}
 }
 
+function normalizeTimestamp(value: unknown): string | null {
+  if (!value)
+    return null
+  if (value instanceof Date)
+    return value.toISOString()
+
+  const rawValue = String(value)
+  let parsed = new Date(rawValue)
+  if (Number.isNaN(parsed.getTime())) {
+    const normalizedValue = rawValue
+      .replace(' ', 'T')
+      .replace(/([+-]\d{2})$/, '$1:00')
+    parsed = new Date(normalizedValue)
+  }
+  if (Number.isNaN(parsed.getTime()))
+    return null
+
+  return parsed.toISOString()
+}
+
 // Admin Cancelled Organizations List
 export interface AdminCancelledOrganizationRow {
   org_id: string
@@ -1164,6 +1468,9 @@ export interface AdminCancelledOrganizationRow {
   canceled_at: string
   customer_id: string
   subscription_id: string | null
+  plan_name: string | null
+  billing_type: 'monthly' | 'yearly' | null
+  subscription_or_signup_date: string
 }
 
 export interface AdminCancelledOrganizationsResult {
@@ -1189,6 +1496,9 @@ export async function getAdminCancelledOrganizations(
       ? sql`AND si.canceled_at >= ${start_date}::timestamp AND si.canceled_at < ${end_date}::timestamp`
       : sql``
 
+    // The admin dashboard intentionally falls back to creator signup date when
+    // no first payment timestamp exists, and finally to org creation if the
+    // creator row is missing.
     const query = sql`
       SELECT
         o.id AS org_id,
@@ -1196,9 +1506,25 @@ export async function getAdminCancelledOrganizations(
         o.management_email,
         si.canceled_at,
         si.customer_id,
-        si.subscription_id
+        si.subscription_id,
+        p.name AS plan_name,
+        CASE
+          WHEN si.price_id = p.price_y_id THEN 'yearly'
+          WHEN si.price_id = p.price_m_id THEN 'monthly'
+          WHEN si.subscription_anchor_start IS NOT NULL
+            AND si.subscription_anchor_end IS NOT NULL
+            AND si.subscription_anchor_end::timestamp - si.subscription_anchor_start::timestamp >= INTERVAL '330 days'
+            THEN 'yearly'
+          WHEN si.subscription_anchor_start IS NOT NULL
+            AND si.subscription_anchor_end IS NOT NULL
+            THEN 'monthly'
+          ELSE NULL
+        END AS billing_type,
+        COALESCE(si.paid_at, u.created_at, o.created_at) AS subscription_or_signup_date
       FROM orgs o
       INNER JOIN stripe_info si ON si.customer_id = o.customer_id
+      LEFT JOIN plans p ON p.stripe_id = si.product_id
+      LEFT JOIN users u ON u.id = o.created_by
       WHERE si.canceled_at IS NOT NULL
         ${dateFilter}
       ORDER BY si.canceled_at DESC
@@ -1223,9 +1549,12 @@ export async function getAdminCancelledOrganizations(
       org_id: row.org_id,
       org_name: row.org_name,
       management_email: row.management_email,
-      canceled_at: row.canceled_at instanceof Date ? row.canceled_at.toISOString() : row.canceled_at,
+      canceled_at: normalizeTimestamp(row.canceled_at) ?? '',
       customer_id: row.customer_id,
       subscription_id: row.subscription_id,
+      plan_name: row.plan_name ?? null,
+      billing_type: row.billing_type ?? null,
+      subscription_or_signup_date: normalizeTimestamp(row.subscription_or_signup_date) ?? '',
     }))
 
     const total = Number((countResult.rows[0] as any)?.total) || 0
@@ -1247,6 +1576,7 @@ export interface AdminTrialOrganization {
   trial_end_date: string
   days_remaining: number
   created_at: string
+  last_bundle_upload_at: string | null
 }
 
 export interface AdminTrialOrganizationsResult {
@@ -1278,15 +1608,26 @@ export async function getAdminTrialOrganizations(
     // - status IS NULL: new organizations that haven't attempted payment yet
     // - status != 'succeeded': organizations without an active paid subscription
     const query = sql`
+      WITH latest_bundle_uploads AS (
+        SELECT
+          a.owner_org,
+          MAX(av.created_at) AS last_bundle_upload_at
+        FROM apps a
+        INNER JOIN app_versions av ON av.app_id = a.app_id
+        WHERE av.name NOT IN ('builtin', 'unknown')
+        GROUP BY a.owner_org
+      )
       SELECT
         o.id AS org_id,
         o.name AS org_name,
         o.management_email,
         si.trial_at AS trial_end_date,
         GREATEST(0, (si.trial_at::date - CURRENT_DATE)) AS days_remaining,
-        o.created_at
+        o.created_at,
+        lbu.last_bundle_upload_at
       FROM orgs o
       INNER JOIN stripe_info si ON si.customer_id = o.customer_id
+      LEFT JOIN latest_bundle_uploads lbu ON lbu.owner_org = o.id
       WHERE si.trial_at::date >= CURRENT_DATE
         AND (si.status IS NULL OR si.status != 'succeeded')
       ORDER BY days_remaining ASC, o.created_at DESC
@@ -1312,9 +1653,10 @@ export async function getAdminTrialOrganizations(
       org_id: row.org_id,
       org_name: row.org_name,
       management_email: row.management_email,
-      trial_end_date: row.trial_end_date,
+      trial_end_date: normalizeTimestamp(row.trial_end_date) ?? '',
       days_remaining: Number(row.days_remaining),
-      created_at: row.created_at instanceof Date ? row.created_at.toISOString() : row.created_at,
+      created_at: normalizeTimestamp(row.created_at) ?? '',
+      last_bundle_upload_at: normalizeTimestamp(row.last_bundle_upload_at),
     }))
 
     const total = Number((countResult.rows[0] as any)?.total) || 0
@@ -1335,10 +1677,12 @@ export interface AdminOnboardingFunnel {
   orgs_with_app: number
   orgs_with_channel: number
   orgs_with_bundle: number
+  orgs_subscribed: number
   // Conversion rates
   app_conversion_rate: number
   channel_conversion_rate: number
   bundle_conversion_rate: number
+  subscription_conversion_rate: number
   // Trend data
   trend: Array<{
     date: string
@@ -1346,6 +1690,7 @@ export interface AdminOnboardingFunnel {
     orgs_created_app: number
     orgs_created_channel: number
     orgs_created_bundle: number
+    orgs_subscribed: number
   }>
 }
 
@@ -1362,7 +1707,7 @@ export async function getAdminOnboardingFunnel(
     // Get total funnel counts for orgs created in the date range
     const funnelQuery = sql`
       WITH orgs_in_range AS (
-        SELECT id, created_at::date as created_date
+        SELECT id, customer_id, created_at, created_at::date as created_date
         FROM orgs
         WHERE created_at >= ${start_date}::timestamp
           AND created_at < ${end_date}::timestamp
@@ -1379,17 +1724,28 @@ export async function getAdminOnboardingFunnel(
         INNER JOIN channels c ON c.app_id = a.app_id
       ),
       orgs_with_bundles AS (
-        SELECT DISTINCT o.id, o.created_date
+        SELECT DISTINCT o.id, o.customer_id, o.created_at, o.created_date
         FROM orgs_in_range o
         INNER JOIN apps a ON a.owner_org = o.id
         INNER JOIN channels c ON c.app_id = a.app_id
-        INNER JOIN app_versions av ON av.id = c.version AND av.name != 'builtin'
+        INNER JOIN app_versions av ON av.id = c.version AND av.name NOT IN ('builtin', 'unknown')
+        WHERE av.created_at >= o.created_at
+          AND av.created_at < o.created_at + interval '7 days'
+      ),
+      orgs_subscribed AS (
+        SELECT DISTINCT o.id, o.created_date
+        FROM orgs_with_bundles o
+        INNER JOIN stripe_info si ON si.customer_id = o.customer_id
+        WHERE si.paid_at IS NOT NULL
+          AND si.paid_at >= o.created_at
+          AND si.paid_at < o.created_at + interval '7 days'
       )
       SELECT
         (SELECT COUNT(*)::int FROM orgs_in_range) as total_orgs,
         (SELECT COUNT(*)::int FROM orgs_with_apps) as orgs_with_app,
         (SELECT COUNT(*)::int FROM orgs_with_channels) as orgs_with_channel,
-        (SELECT COUNT(*)::int FROM orgs_with_bundles) as orgs_with_bundle
+        (SELECT COUNT(*)::int FROM orgs_with_bundles) as orgs_with_bundle,
+        (SELECT COUNT(*)::int FROM orgs_subscribed) as orgs_subscribed
     `
 
     const funnelResult = await drizzleClient.execute(funnelQuery)
@@ -1399,6 +1755,7 @@ export async function getAdminOnboardingFunnel(
     const orgsWithApp = Number(funnelRow.orgs_with_app) || 0
     const orgsWithChannel = Number(funnelRow.orgs_with_channel) || 0
     const orgsWithBundle = Number(funnelRow.orgs_with_bundle) || 0
+    const orgsSubscribed = Number(funnelRow.orgs_subscribed) || 0
 
     // Get daily trend data
     const trendQuery = sql`
@@ -1442,11 +1799,27 @@ export async function getAdminOnboardingFunnel(
         FROM orgs o
         INNER JOIN apps a ON a.owner_org = o.id
         INNER JOIN channels c ON c.app_id = a.app_id
-        INNER JOIN app_versions av ON av.id = c.version AND av.name != 'builtin'
+        INNER JOIN app_versions av ON av.id = c.version AND av.name NOT IN ('builtin', 'unknown')
         WHERE o.created_at >= ${start_date}::timestamp
           AND o.created_at < ${end_date}::timestamp
           AND av.created_at >= o.created_at
           AND av.created_at < o.created_at + interval '7 days'
+        GROUP BY o.created_at::date
+      ),
+      daily_subscriptions AS (
+        SELECT o.created_at::date as date, COUNT(DISTINCT o.id)::int as orgs_subscribed
+        FROM orgs o
+        INNER JOIN apps a ON a.owner_org = o.id
+        INNER JOIN channels c ON c.app_id = a.app_id
+        INNER JOIN app_versions av ON av.id = c.version AND av.name NOT IN ('builtin', 'unknown')
+        INNER JOIN stripe_info si ON si.customer_id = o.customer_id
+        WHERE o.created_at >= ${start_date}::timestamp
+          AND o.created_at < ${end_date}::timestamp
+          AND av.created_at >= o.created_at
+          AND av.created_at < o.created_at + interval '7 days'
+          AND si.paid_at IS NOT NULL
+          AND si.paid_at >= o.created_at
+          AND si.paid_at < o.created_at + interval '7 days'
         GROUP BY o.created_at::date
       )
       SELECT
@@ -1454,12 +1827,14 @@ export async function getAdminOnboardingFunnel(
         COALESCE(dorgs.new_orgs, 0) as new_orgs,
         COALESCE(dapps.orgs_created_app, 0) as orgs_created_app,
         COALESCE(dchannels.orgs_created_channel, 0) as orgs_created_channel,
-        COALESCE(dbundles.orgs_created_bundle, 0) as orgs_created_bundle
+        COALESCE(dbundles.orgs_created_bundle, 0) as orgs_created_bundle,
+        COALESCE(dsubscriptions.orgs_subscribed, 0) as orgs_subscribed
       FROM date_series ds
       LEFT JOIN daily_orgs dorgs ON dorgs.date = ds.date
       LEFT JOIN daily_apps dapps ON dapps.date = ds.date
       LEFT JOIN daily_channels dchannels ON dchannels.date = ds.date
       LEFT JOIN daily_bundles dbundles ON dbundles.date = ds.date
+      LEFT JOIN daily_subscriptions dsubscriptions ON dsubscriptions.date = ds.date
       ORDER BY ds.date ASC
     `
 
@@ -1470,6 +1845,7 @@ export async function getAdminOnboardingFunnel(
       orgs_created_app: Number(row.orgs_created_app) || 0,
       orgs_created_channel: Number(row.orgs_created_channel) || 0,
       orgs_created_bundle: Number(row.orgs_created_bundle) || 0,
+      orgs_subscribed: Number(row.orgs_subscribed) || 0,
     }))
 
     const result: AdminOnboardingFunnel = {
@@ -1477,9 +1853,11 @@ export async function getAdminOnboardingFunnel(
       orgs_with_app: orgsWithApp,
       orgs_with_channel: orgsWithChannel,
       orgs_with_bundle: orgsWithBundle,
+      orgs_subscribed: orgsSubscribed,
       app_conversion_rate: totalOrgs > 0 ? (orgsWithApp / totalOrgs) * 100 : 0,
       channel_conversion_rate: orgsWithApp > 0 ? (orgsWithChannel / orgsWithApp) * 100 : 0,
       bundle_conversion_rate: orgsWithChannel > 0 ? (orgsWithBundle / orgsWithChannel) * 100 : 0,
+      subscription_conversion_rate: orgsWithBundle > 0 ? (orgsSubscribed / orgsWithBundle) * 100 : 0,
       trend,
     }
 
@@ -1494,9 +1872,11 @@ export async function getAdminOnboardingFunnel(
       orgs_with_app: 0,
       orgs_with_channel: 0,
       orgs_with_bundle: 0,
+      orgs_subscribed: 0,
       app_conversion_rate: 0,
       channel_conversion_rate: 0,
       bundle_conversion_rate: 0,
+      subscription_conversion_rate: 0,
       trend: [],
     }
   }

@@ -1,4 +1,3 @@
-import { env } from 'node:process'
 import { app as channel_self } from '../../supabase/functions/_backend/plugins/channel_self.ts'
 import { app as stats } from '../../supabase/functions/_backend/plugins/stats.ts'
 import { app as updates } from '../../supabase/functions/_backend/plugins/updates.ts'
@@ -8,7 +7,7 @@ import { createAllCatch, createHono } from '../../supabase/functions/_backend/ut
 import { version } from '../../supabase/functions/_backend/utils/version.ts'
 
 const functionName = 'plugin'
-const app = createHono(functionName, version, env.SENTRY_DSN)
+const app = createHono(functionName, version)
 
 // TODO: deprecated remove when everyone use the new endpoint
 app.route('/plugin/ok', ok)

@@ -1,4 +1,4 @@
-import type { R2HTTPMetadata, R2UploadedPart } from '@cloudflare/workers-types'
+import type { R2UploadedPart } from '@cloudflare/workers-types'
 import type { Context } from 'hono'
 import type { BlankSchema } from 'hono/types'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
@@ -30,6 +30,7 @@ import {
   ALLOWED_METHODS,
   AsyncLock,
   BUFFER_SIZE,
+  buildFileHttpMetadata,
   EXPOSED_HEADERS,
   generateParts,
   MAX_UPLOAD_LENGTH_BYTES,
@@ -642,7 +643,7 @@ export class UploadHandler extends DurableObject {
     if (uploadInfo.checksum != null) {
       customMetadata[X_CHECKSUM_SHA256] = toBase64(uploadInfo.checksum)
     }
-    const httpMetadata: R2HTTPMetadata | undefined = uploadInfo.contentType ? { contentType: uploadInfo.contentType } : undefined
+    const httpMetadata = buildFileHttpMetadata(uploadInfo.contentType)
     const upload = await this.retryBucket.createMultipartUpload(r2Key, { customMetadata, httpMetadata })
     uploadInfo.multipartUploadId = upload.r2MultipartUpload.uploadId
     await this.ctx.storage.put(UPLOAD_INFO_KEY, uploadInfo)
@@ -655,7 +656,7 @@ export class UploadHandler extends DurableObject {
 
   async r2Put(c: Context, r2Key: string, bytes: Uint8Array, checksum?: Uint8Array, contentType?: string) {
     try {
-      const httpMetadata: R2HTTPMetadata | undefined = contentType ? { contentType } : undefined
+      const httpMetadata = buildFileHttpMetadata(contentType)
       await this.retryBucket.put(r2Key, bytes, checksum as any, httpMetadata)
     }
     catch (e) {

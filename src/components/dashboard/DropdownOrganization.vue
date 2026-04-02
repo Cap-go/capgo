@@ -1,16 +1,21 @@
 <script setup lang="ts">
 import type { Organization } from '~/stores/organization'
 import { storeToRefs } from 'pinia'
-import { onMounted } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
+import IconSettings from '~icons/lucide/settings'
 import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
+import { resolveImagePath } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
+type OrganizationInvitationTarget = Pick<Organization, 'gid' | 'name' | 'role'>
+
 const router = useRouter()
+const route = useRoute()
 const organizationStore = useOrganizationStore()
 const { currentOrganization } = storeToRefs(organizationStore)
 const dialogStore = useDialogV2Store()
@@ -18,22 +23,58 @@ const { t } = useI18n()
 const supabase = useSupabase()
 const main = useMainStore()
 const dropdown = useTemplateRef('dropdown')
-const hasNewInvitation = ref(false)
-const orgNameInput = ref('')
+const hasVisibleOrganizations = computed(() => organizationStore.organizations.length > 0)
+const currentLabel = computed(() => currentOrganization.value?.name ?? t('select-organization'))
+const invitationCount = computed(() => organizationStore.organizations.filter(org => org.role.startsWith('invite')).length)
+const ORGANIZATION_LOGO_REFRESH_INTERVAL_MS = 10 * 60 * 1000
+const isRefreshingBrokenLogos = ref(false)
+const lastOrganizationLogoRefreshAt = ref(0)
+const refreshedBrokenLogoKeys = new Set<string>()
+let organizationLogoRefreshInterval: number | null = null
+let isOrganizationDropdownMounted = false
+const handledInviteOrgId = ref<string | null>(null)
+
+function refreshOnFocus() {
+  void refreshOrganizationLogosIfNeeded()
+}
+
+function refreshOnVisibilityChange() {
+  if (document.visibilityState === 'visible')
+    void refreshOrganizationLogosIfNeeded()
+}
 
 onClickOutside(dropdown, () => closeDropdown())
 
 onMounted(async () => {
+  isOrganizationDropdownMounted = true
   await organizationStore.fetchOrganizations()
-    .catch((error) => {
-      console.error('Cannot get orgs!', error)
-      createNewOrg()
-    })
-  hasNewInvitation.value = organizationStore.organizations.some(org => org.role.startsWith('invite'))
+  if (!isOrganizationDropdownMounted)
+    return
+
+  await openInvitationFromRouteIfNeeded()
+
+  lastOrganizationLogoRefreshAt.value = Date.now()
+
+  window.addEventListener('focus', refreshOnFocus)
+  document.addEventListener('visibilitychange', refreshOnVisibilityChange)
+
+  organizationLogoRefreshInterval = window.setInterval(() => {
+    void refreshOrganizationLogosIfNeeded()
+  }, ORGANIZATION_LOGO_REFRESH_INTERVAL_MS)
 })
 
-async function handleOrganizationInvitation(org: Organization) {
+onUnmounted(() => {
+  isOrganizationDropdownMounted = false
+  window.removeEventListener('focus', refreshOnFocus)
+  document.removeEventListener('visibilitychange', refreshOnVisibilityChange)
+  if (organizationLogoRefreshInterval !== null)
+    window.clearInterval(organizationLogoRefreshInterval)
+  organizationLogoRefreshInterval = null
+})
+
+async function handleOrganizationInvitation(org: OrganizationInvitationTarget) {
   const newName = t('alert-accept-invitation').replace('%ORG%', org.name)
+  let invitationHandled = false
   dialogStore.openDialog({
     title: t('alert-confirm-invite'),
     description: `${newName}`,
@@ -52,8 +93,9 @@ async function handleOrganizationInvitation(org: Organization) {
           }
 
           if (data === 'OK') {
+            invitationHandled = true
             organizationStore.setCurrentOrganization(org.gid)
-            organizationStore.fetchOrganizations()
+            await organizationStore.fetchOrganizations()
             toast.success(t('invite-accepted'))
           }
           else if (data === 'NO_INVITE') {
@@ -78,12 +120,16 @@ async function handleOrganizationInvitation(org: Organization) {
           const { error } = await supabase
             .from('org_users')
             .delete()
+            .eq('org_id', org.gid)
             .eq('user_id', userId)
 
-          if (error)
+          if (error) {
             console.log('Error delete: ', error)
+            return
+          }
 
-          organizationStore.fetchOrganizations()
+          invitationHandled = true
+          await organizationStore.fetchOrganizations()
           toast.success(t('alert-denied-invite'))
         },
       },
@@ -93,11 +139,84 @@ async function handleOrganizationInvitation(org: Organization) {
       },
     ],
   })
+
+  await dialogStore.onDialogDismiss()
+  if (invitationHandled)
+    await clearInviteOrgQuery()
+}
+
+async function clearInviteOrgQuery() {
+  if (!('invite_org' in route.query))
+    return
+
+  const nextQuery = { ...route.query }
+  delete nextQuery.invite_org
+  await router.replace({ query: nextQuery })
+  handledInviteOrgId.value = null
+}
+
+async function openInvitationFromRouteIfNeeded() {
+  const inviteOrgId = typeof route.query.invite_org === 'string' ? route.query.invite_org : ''
+  if (!inviteOrgId || inviteOrgId === handledInviteOrgId.value)
+    return
+
+  const inviteOrg = organizationStore.organizations.find(org => org.gid === inviteOrgId)
+  if (!inviteOrg)
+    return
+
+  handledInviteOrgId.value = inviteOrgId
+  if (isInvitation(inviteOrg))
+    await handleOrganizationInvitation(inviteOrg)
 }
 
 function closeDropdown() {
   if (dropdown.value) {
     dropdown.value.removeAttribute('open')
+  }
+}
+
+function getLogoRefreshKey(org?: Organization | null) {
+  if (!org)
+    return ''
+  const storagePath = resolveImagePath(org.logo_storage_path).normalized
+  if (storagePath)
+    return storagePath
+  const gid = org.gid?.trim()
+  if (gid)
+    return gid
+  const logo = resolveImagePath(org.logo).normalized
+  if (logo)
+    return logo
+  return ''
+}
+
+async function refreshBrokenOrganizationLogo(org?: Organization | null) {
+  const failedLogo = org?.logo?.trim()
+  const refreshKey = getLogoRefreshKey(org)
+  if (!failedLogo || !refreshKey || refreshedBrokenLogoKeys.has(refreshKey) || isRefreshingBrokenLogos.value)
+    return
+
+  refreshedBrokenLogoKeys.add(refreshKey)
+  await refreshOrganizationLogosIfNeeded(true)
+}
+
+async function refreshOrganizationLogosIfNeeded(force = false) {
+  if (isRefreshingBrokenLogos.value)
+    return
+
+  if (!force && Date.now() - lastOrganizationLogoRefreshAt.value < ORGANIZATION_LOGO_REFRESH_INTERVAL_MS)
+    return
+
+  isRefreshingBrokenLogos.value = true
+  try {
+    await organizationStore.refreshOrganizationLogos()
+    lastOrganizationLogoRefreshAt.value = Date.now()
+  }
+  catch (error) {
+    console.error('Failed to refresh organization logos', error)
+  }
+  finally {
+    isRefreshingBrokenLogos.value = false
   }
 }
 
@@ -118,62 +237,36 @@ function onOrganizationClick(org: Organization) {
 }
 
 async function createNewOrg() {
-  orgNameInput.value = ''
-
-  dialogStore.openDialog({
-    title: t('create-new-org'),
-    description: `${t('type-new-org-name')}`,
-    size: 'lg',
-    buttons: [
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-      },
-      {
-        text: t('button-confirm'),
-        role: 'primary',
-        id: 'confirm-button',
-        handler: async () => {
-          const orgName = orgNameInput.value
-          if (!orgName) {
-            toast.error(t('org-name-required'))
-            return false
-          }
-
-          const { error } = await supabase.from('orgs')
-            .insert({
-              name: orgName,
-              created_by: main.auth?.id ?? '',
-              management_email: main.auth?.email ?? '',
-            })
-
-          if (error) {
-            console.error('Error when creating org', error)
-            toast.error(error.code === '23505' ? t('org-with-this-name-exists') : t('cannot-create-org'))
-            return false
-          }
-
-          toast.success(t('org-created-successfully'))
-          await organizationStore.fetchOrganizations()
-          const org = organizationStore.organizations.find(org => org.name === orgName)
-          if (org) {
-            console.log('org found', org)
-            organizationStore.setCurrentOrganization(org.gid)
-            currentOrganization.value = org
-            router.push('/apps')
-          }
-          else {
-            console.log('org not found', organizationStore.organizations)
-          }
-        },
-      },
-    ],
+  closeDropdown()
+  await router.push({
+    path: '/onboarding/organization',
+    query: {
+      source: 'org-switcher',
+      to: '/dashboard',
+    },
   })
-  return dialogStore.onDialogDismiss()
+}
+
+async function openOrganizationSettings(org: Organization, e: MouseEvent) {
+  e.preventDefault()
+  e.stopPropagation()
+
+  if (org.role.startsWith('invite'))
+    return
+
+  if (!isSelected(org))
+    organizationStore.setCurrentOrganization(org.gid)
+
+  closeDropdown()
+  await router.push('/settings/organization')
 }
 
 function isSelected(org: Organization) {
   return !!(currentOrganization.value && org.gid === currentOrganization.value.gid)
+}
+
+function isInvitation(org: Organization) {
+  return org.role.startsWith('invite')
 }
 
 function acronym(name: string) {
@@ -194,31 +287,74 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
   }
   onOrganizationClick(org)
 }
+
+function isRowInteractive(org: Organization) {
+  return isInvitation(org) || !isSelected(org)
+}
+
+function onOrgItemKeydown(org: Organization, e: KeyboardEvent) {
+  if (e.target !== e.currentTarget)
+    return
+
+  if (!isRowInteractive(org))
+    return
+
+  if (e.key !== 'Enter' && e.key !== ' ')
+    return
+
+  e.preventDefault()
+  closeDropdown()
+  onOrganizationClick(org)
+}
+
+watch(
+  () => route.query.invite_org,
+  (inviteOrg) => {
+    if (typeof inviteOrg !== 'string' || !inviteOrg)
+      handledInviteOrgId.value = null
+    void openInvitationFromRouteIfNeeded()
+  },
+  { immediate: true },
+)
+
+watch(
+  () => organizationStore.organizations.map(org => `${org.gid}:${org.role}`),
+  () => {
+    void openInvitationFromRouteIfNeeded()
+  },
+)
 </script>
 
 <template>
   <div>
-    <details v-show="currentOrganization" ref="dropdown" class="w-full d-dropdown d-dropdown-end">
+    <details v-if="hasVisibleOrganizations" ref="dropdown" class="w-full d-dropdown d-dropdown-end">
       <summary class="justify-between shadow-none w-full d-btn d-btn-sm border border-gray-700 text-white bg-[#1a1d24] hover:bg-gray-700 hover:text-white active:text-white focus-visible:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-800">
-        <div class="flex items-center w-4/5 text-left">
+        <div class="flex flex-1 items-center min-w-0 text-left">
           <img
             v-if="currentOrganization?.logo"
             :src="currentOrganization.logo"
             :alt="`${currentOrganization.name} logo`"
             class="object-cover w-6 h-6 mr-2 rounded-sm d-mask d-mask-squircle shrink-0"
+            @error="refreshBrokenOrganizationLogo(currentOrganization)"
           >
           <div
             v-else
             class="flex items-center justify-center w-6 h-6 mr-2 text-xs font-semibold text-gray-300 bg-gray-700 rounded-sm d-mask d-mask-squircle shrink-0"
           >
-            {{ acronym(currentOrganization?.name ?? '') }}
+            {{ acronym(currentLabel) }}
           </div>
-          <span class="truncate">{{ currentOrganization?.name }}</span>
-          <div v-if="hasNewInvitation" class="w-3 h-3 ml-1 bg-red-500 rounded-full" />
+          <span class="truncate">{{ currentLabel }}</span>
+          <div
+            v-if="invitationCount > 0"
+            class="inline-flex items-center gap-1 px-2 py-0.5 ml-2 text-[11px] font-medium rounded-full border border-amber-400/30 bg-amber-500/10 text-amber-200 shrink-0"
+          >
+            <span class="w-1.5 h-1.5 rounded-full bg-amber-300" />
+            <span>{{ invitationCount }}</span>
+          </div>
         </div>
         <IconDown class="w-6 h-6 ml-1 fill-current shrink-0 text-slate-400" />
       </summary>
-      <div class="flex flex-col w-52 max-h-[60vh] shadow d-dropdown-content bg-[#1a1d24] rounded-box z-1 text-white" @click="closeDropdown()">
+      <div class="flex flex-col w-full min-w-0 max-h-[60vh] shadow d-dropdown-content bg-[#1a1d24] rounded-box z-1 text-white" @click="closeDropdown()">
         <ul class="flex-1 overflow-y-auto p-2 cursor-pointer">
           <li
             v-for="org in organizationStore.organizations"
@@ -226,18 +362,24 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
             class="block px-1 my-1 rounded-lg"
             :class="isSelected(org) ? 'bg-gray-700' : 'hover:bg-gray-600'"
           >
-            <a
-              class="flex items-center justify-between px-3 py-3 text-white rounded-md"
-              :class="isSelected(org) ? 'cursor-default' : 'cursor-pointer'"
+            <div
+              class="flex items-center gap-2 px-3 py-3 text-white rounded-md"
+              :class="isRowInteractive(org) ? 'cursor-pointer' : 'cursor-default'"
               :aria-current="isSelected(org) ? 'true' : undefined"
+              :role="isRowInteractive(org) ? 'button' : undefined"
+              :tabindex="isRowInteractive(org) ? 0 : -1"
               @click="onOrgItemClick(org, $event)"
+              @keydown="onOrgItemKeydown(org, $event)"
             >
-              <div class="flex items-center min-w-0">
+              <div
+                class="flex flex-1 items-center min-w-0 text-left"
+              >
                 <img
                   v-if="org.logo"
                   :src="org.logo"
                   :alt="`${org.name} logo`"
                   class="object-cover w-6 h-6 mr-2 rounded-sm d-mask d-mask-squircle shrink-0"
+                  @error="refreshBrokenOrganizationLogo(org)"
                 >
                 <div
                   v-else
@@ -245,12 +387,27 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
                 >
                   {{ acronym(org.name) }}
                 </div>
-                <span class="truncate">{{ org.name }}</span>
+                <span class="block truncate">{{ org.name }}</span>
               </div>
-              <div class="flex items-center gap-2">
-                <div v-if="org.role.startsWith('invite')" class="w-3 h-3 bg-red-500 rounded-full" />
+              <div class="flex items-center justify-end min-w-0 shrink-0">
+                <span
+                  v-if="isInvitation(org)"
+                  class="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full border border-amber-400/25 bg-amber-500/8 text-amber-200"
+                >
+                  <span class="w-1.5 h-1.5 rounded-full bg-amber-300" />
+                  {{ t('sso-status-pending') }}
+                </span>
+                <button
+                  v-else
+                  type="button"
+                  class="flex items-center justify-center w-8 h-8 rounded-md cursor-pointer text-slate-300 transition-colors hover:bg-slate-500/30 hover:text-white"
+                  :aria-label="`${t('settings')} ${org.name}`"
+                  @click="openOrganizationSettings(org, $event)"
+                >
+                  <IconSettings class="w-4 h-4" />
+                </button>
               </div>
-            </a>
+            </div>
           </li>
         </ul>
         <div class="p-2 border-t border-gray-700">
@@ -264,22 +421,10 @@ function onOrgItemClick(org: Organization, e: MouseEvent) {
         </div>
       </div>
     </details>
-    <div v-show="!currentOrganization" class="p-px rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
+    <div v-else class="p-px rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
       <button class="block w-full text-white d-btn d-btn-outline bg-slate-800 d-btn-sm" @click="createNewOrg">
-        {{ t('add-organization') }}
+        {{ t('create-new-org') }}
       </button>
     </div>
-
-    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('create-new-org')" to="#dialog-v2-content" defer>
-      <div class="w-full">
-        <input
-          v-model="orgNameInput"
-          type="text"
-          :placeholder="t('organization-name')"
-          class="w-full p-3 text-gray-900 bg-white border border-gray-300 rounded-lg dark:text-white dark:bg-gray-800 dark:border-gray-600"
-          @keydown.enter="$event.preventDefault()"
-        >
-      </div>
-    </Teleport>
   </div>
 </template>

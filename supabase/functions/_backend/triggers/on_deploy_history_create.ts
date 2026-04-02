@@ -1,13 +1,13 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
-import { isAppDemo } from '../utils/demo.ts'
+import { isDemoApp } from '../utils/demo.ts'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
-import { logsnag } from '../utils/logsnag.ts'
 import { sendEmailToOrgMembers } from '../utils/org_email_notifications.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
+import { sendEventToTracking } from '../utils/tracking.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -47,14 +47,13 @@ app.post('/', middlewareAPISecret, triggerValidator('deploy_history', 'INSERT'),
       return c.json(BRES)
     }
 
-    // Check if this is a demo app (identified by com.capdemo. prefix) - skip notifications
-    if (isAppDemo(record.app_id)) {
+    // Demo apps skip deploy notifications.
+    if (await isDemoApp(c, record.app_id)) {
       cloudlog({ requestId: c.get('requestId'), message: 'Demo app detected, skipping deploy notifications' })
       return c.json(BRES)
     }
 
-    const LogSnag = logsnag(c)
-    await backgroundTask(c, LogSnag.track({
+    await sendEventToTracking(c, {
       channel: 'bundle-deployed',
       event: 'Bundle Deployed',
       icon: '🚀',
@@ -65,7 +64,7 @@ app.post('/', middlewareAPISecret, triggerValidator('deploy_history', 'INSERT'),
         channel_id: record.channel_id,
       },
       notify: false,
-    }))
+    })
 
     const pgClient = getPgClient(c, true)
     const drizzleClient = getDrizzleClient(pgClient)
