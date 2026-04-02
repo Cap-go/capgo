@@ -1455,7 +1455,7 @@ function normalizeTimestamp(value: unknown): string | null {
     parsed = new Date(normalizedValue)
   }
   if (Number.isNaN(parsed.getTime()))
-    return rawValue
+    return null
 
   return parsed.toISOString()
 }
@@ -1470,7 +1470,7 @@ export interface AdminCancelledOrganizationRow {
   subscription_id: string | null
   plan_name: string | null
   billing_type: 'monthly' | 'yearly' | null
-  first_subscription_date: string
+  subscription_or_signup_date: string
 }
 
 export interface AdminCancelledOrganizationsResult {
@@ -1496,6 +1496,9 @@ export async function getAdminCancelledOrganizations(
       ? sql`AND si.canceled_at >= ${start_date}::timestamp AND si.canceled_at < ${end_date}::timestamp`
       : sql``
 
+    // The admin dashboard intentionally falls back to creator signup date when
+    // no first payment timestamp exists, and finally to org creation if the
+    // creator row is missing.
     const query = sql`
       SELECT
         o.id AS org_id,
@@ -1517,7 +1520,7 @@ export async function getAdminCancelledOrganizations(
           WHEN si.price_id = p.price_m_id THEN 'monthly'
           ELSE NULL
         END AS billing_type,
-        COALESCE(si.paid_at, u.created_at, o.created_at) AS first_subscription_date
+        COALESCE(si.paid_at, u.created_at, o.created_at) AS subscription_or_signup_date
       FROM orgs o
       INNER JOIN stripe_info si ON si.customer_id = o.customer_id
       LEFT JOIN plans p ON p.stripe_id = si.product_id
@@ -1551,7 +1554,7 @@ export async function getAdminCancelledOrganizations(
       subscription_id: row.subscription_id,
       plan_name: row.plan_name ?? null,
       billing_type: row.billing_type ?? null,
-      first_subscription_date: normalizeTimestamp(row.first_subscription_date) ?? '',
+      subscription_or_signup_date: normalizeTimestamp(row.subscription_or_signup_date) ?? '',
     }))
 
     const total = Number((countResult.rows[0] as any)?.total) || 0
@@ -1605,6 +1608,15 @@ export async function getAdminTrialOrganizations(
     // - status IS NULL: new organizations that haven't attempted payment yet
     // - status != 'succeeded': organizations without an active paid subscription
     const query = sql`
+      WITH latest_bundle_uploads AS (
+        SELECT
+          a.owner_org,
+          MAX(av.created_at) AS last_bundle_upload_at
+        FROM apps a
+        INNER JOIN app_versions av ON av.app_id = a.app_id
+        WHERE av.name NOT IN ('builtin', 'unknown')
+        GROUP BY a.owner_org
+      )
       SELECT
         o.id AS org_id,
         o.name AS org_name,
@@ -1612,17 +1624,10 @@ export async function getAdminTrialOrganizations(
         si.trial_at AS trial_end_date,
         GREATEST(0, (si.trial_at::date - CURRENT_DATE)) AS days_remaining,
         o.created_at,
-        (
-          SELECT MAX(av.created_at)
-          FROM apps a
-          INNER JOIN app_versions av
-            ON av.app_id = a.app_id
-            AND av.owner_org = o.id
-          WHERE a.owner_org = o.id
-            AND av.name NOT IN ('builtin', 'unknown')
-        ) AS last_bundle_upload_at
+        lbu.last_bundle_upload_at
       FROM orgs o
       INNER JOIN stripe_info si ON si.customer_id = o.customer_id
+      LEFT JOIN latest_bundle_uploads lbu ON lbu.owner_org = o.id
       WHERE si.trial_at::date >= CURRENT_DATE
         AND (si.status IS NULL OR si.status != 'succeeded')
       ORDER BY days_remaining ASC, o.created_at DESC
@@ -1702,7 +1707,7 @@ export async function getAdminOnboardingFunnel(
     // Get total funnel counts for orgs created in the date range
     const funnelQuery = sql`
       WITH orgs_in_range AS (
-        SELECT id, customer_id, created_at::date as created_date
+        SELECT id, customer_id, created_at, created_at::date as created_date
         FROM orgs
         WHERE created_at >= ${start_date}::timestamp
           AND created_at < ${end_date}::timestamp
@@ -1719,7 +1724,7 @@ export async function getAdminOnboardingFunnel(
         INNER JOIN channels c ON c.app_id = a.app_id
       ),
       orgs_with_bundles AS (
-        SELECT DISTINCT o.id, o.customer_id, o.created_date
+        SELECT DISTINCT o.id, o.customer_id, o.created_at, o.created_date
         FROM orgs_in_range o
         INNER JOIN apps a ON a.owner_org = o.id
         INNER JOIN channels c ON c.app_id = a.app_id
@@ -1730,6 +1735,8 @@ export async function getAdminOnboardingFunnel(
         FROM orgs_with_bundles o
         INNER JOIN stripe_info si ON si.customer_id = o.customer_id
         WHERE si.paid_at IS NOT NULL
+          AND si.paid_at >= o.created_at
+          AND si.paid_at < o.created_at + interval '7 days'
       )
       SELECT
         (SELECT COUNT(*)::int FROM orgs_in_range) as total_orgs,

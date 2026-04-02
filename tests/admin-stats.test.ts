@@ -2,12 +2,15 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { BASE_URL, fetchWithRetry, getAuthHeadersForCredentials, getSupabaseClient, PRODUCT_ID, TEST_EMAIL, USER_ADMIN_EMAIL, USER_ID } from './test-utils.ts'
 
+const DAY_IN_MS = 24 * 60 * 60 * 1000
+const NOW = Date.now()
+
 const TRIAL_ORG_ID = randomUUID()
 const TRIAL_CUSTOMER_ID = `cus_admin_stats_trial_${TRIAL_ORG_ID.slice(0, 8)}`
 const TRIAL_APP_ID = `com.admin.stats.trial.${TRIAL_ORG_ID.slice(0, 8)}`
-const TRIAL_END_DATE = '2026-05-15T00:00:00.000Z'
-const TRIAL_LAST_UPLOAD_AT = '2026-04-01T09:30:00.000Z'
-const TRIAL_BUILTIN_UPLOAD_AT = '2026-04-02T12:00:00.000Z'
+const TRIAL_END_DATE = new Date(NOW + (45 * DAY_IN_MS)).toISOString()
+const TRIAL_LAST_UPLOAD_AT = new Date(NOW - DAY_IN_MS).toISOString()
+const TRIAL_BUILTIN_UPLOAD_AT = new Date(NOW - (12 * 60 * 60 * 1000)).toISOString()
 
 const CANCELLED_YEARLY_ORG_ID = randomUUID()
 const CANCELLED_YEARLY_CUSTOMER_ID = `cus_admin_stats_cancelled_yearly_${CANCELLED_YEARLY_ORG_ID.slice(0, 8)}`
@@ -29,6 +32,15 @@ const ONBOARDING_NO_BUNDLE_ORG_ID = randomUUID()
 const ONBOARDING_NO_BUNDLE_CUSTOMER_ID = `cus_admin_stats_onboarding_nobundle_${ONBOARDING_NO_BUNDLE_ORG_ID.slice(0, 8)}`
 const ONBOARDING_NO_BUNDLE_CREATED_AT = '2026-02-01T12:00:00.000Z'
 const ONBOARDING_NO_BUNDLE_PAID_AT = '2026-02-06T10:00:00.000Z'
+
+const ONBOARDING_LATE_SUBSCRIPTION_ORG_ID = randomUUID()
+const ONBOARDING_LATE_SUBSCRIPTION_CUSTOMER_ID = `cus_admin_stats_onboarding_latesub_${ONBOARDING_LATE_SUBSCRIPTION_ORG_ID.slice(0, 8)}`
+const ONBOARDING_LATE_SUBSCRIPTION_APP_ID = `com.admin.stats.onboarding.latesub.${ONBOARDING_LATE_SUBSCRIPTION_ORG_ID.slice(0, 8)}`
+const ONBOARDING_LATE_SUBSCRIPTION_CREATED_AT = '2026-02-01T14:00:00.000Z'
+const ONBOARDING_LATE_SUBSCRIPTION_APP_CREATED_AT = '2026-02-02T14:00:00.000Z'
+const ONBOARDING_LATE_SUBSCRIPTION_CHANNEL_CREATED_AT = '2026-02-03T14:00:00.000Z'
+const ONBOARDING_LATE_SUBSCRIPTION_BUNDLE_CREATED_AT = '2026-02-04T14:00:00.000Z'
+const ONBOARDING_LATE_SUBSCRIPTION_PAID_AT = '2026-02-10T14:00:00.000Z'
 
 let adminHeaders: Record<string, string>
 let soloPlan: {
@@ -127,6 +139,19 @@ beforeAll(async () => {
       subscription_anchor_start: '2026-02-06T00:00:00.000Z',
       subscription_anchor_end: '2026-03-06T00:00:00.000Z',
     },
+    {
+      customer_id: ONBOARDING_LATE_SUBSCRIPTION_CUSTOMER_ID,
+      status: 'succeeded',
+      product_id: soloPlan.stripe_id,
+      price_id: soloPlan.price_m_id,
+      subscription_id: null,
+      trial_at: '2026-02-20T00:00:00.000Z',
+      paid_at: ONBOARDING_LATE_SUBSCRIPTION_PAID_AT,
+      is_good_plan: true,
+      plan_usage: 2,
+      subscription_anchor_start: '2026-02-10T00:00:00.000Z',
+      subscription_anchor_end: '2026-03-10T00:00:00.000Z',
+    },
   ])
   if (stripeError)
     throw stripeError
@@ -169,6 +194,14 @@ beforeAll(async () => {
       customer_id: ONBOARDING_NO_BUNDLE_CUSTOMER_ID,
       created_at: ONBOARDING_NO_BUNDLE_CREATED_AT,
     },
+    {
+      id: ONBOARDING_LATE_SUBSCRIPTION_ORG_ID,
+      name: `Admin Stats Onboarding Late Subscription ${ONBOARDING_LATE_SUBSCRIPTION_ORG_ID.slice(0, 8)}`,
+      created_by: USER_ID,
+      management_email: TEST_EMAIL,
+      customer_id: ONBOARDING_LATE_SUBSCRIPTION_CUSTOMER_ID,
+      created_at: ONBOARDING_LATE_SUBSCRIPTION_CREATED_AT,
+    },
   ])
   if (orgError)
     throw orgError
@@ -191,6 +224,16 @@ beforeAll(async () => {
   })
   if (onboardingAppError)
     throw onboardingAppError
+
+  const { error: onboardingLateSubscriptionAppError } = await supabase.from('apps').insert({
+    owner_org: ONBOARDING_LATE_SUBSCRIPTION_ORG_ID,
+    name: 'Admin Stats Onboarding Late Subscription App',
+    app_id: ONBOARDING_LATE_SUBSCRIPTION_APP_ID,
+    icon_url: 'https://example.com/icon.png',
+    created_at: ONBOARDING_LATE_SUBSCRIPTION_APP_CREATED_AT,
+  })
+  if (onboardingLateSubscriptionAppError)
+    throw onboardingLateSubscriptionAppError
 
   const { data: versionRows, error: versionError } = await supabase.from('app_versions').insert([
     {
@@ -217,6 +260,14 @@ beforeAll(async () => {
       storage_provider: 'r2-direct',
       created_at: ONBOARDING_BUNDLE_CREATED_AT,
     },
+    {
+      app_id: ONBOARDING_LATE_SUBSCRIPTION_APP_ID,
+      name: '1.0.0',
+      owner_org: ONBOARDING_LATE_SUBSCRIPTION_ORG_ID,
+      user_id: USER_ID,
+      storage_provider: 'r2-direct',
+      created_at: ONBOARDING_LATE_SUBSCRIPTION_BUNDLE_CREATED_AT,
+    },
   ]).select('id, app_id, name')
   if (versionError)
     throw versionError
@@ -225,14 +276,28 @@ beforeAll(async () => {
   if (!onboardingVersion)
     throw new Error('Expected onboarding app version to be created')
 
-  const { error: channelError } = await supabase.from('channels').insert({
-    name: 'production',
-    app_id: ONBOARDING_APP_ID,
-    version: onboardingVersion.id,
-    created_by: USER_ID,
-    owner_org: ONBOARDING_ORG_ID,
-    created_at: ONBOARDING_CHANNEL_CREATED_AT,
-  })
+  const onboardingLateSubscriptionVersion = versionRows?.find(version => version.app_id === ONBOARDING_LATE_SUBSCRIPTION_APP_ID && version.name === '1.0.0')
+  if (!onboardingLateSubscriptionVersion)
+    throw new Error('Expected onboarding late subscription app version to be created')
+
+  const { error: channelError } = await supabase.from('channels').insert([
+    {
+      name: 'production',
+      app_id: ONBOARDING_APP_ID,
+      version: onboardingVersion.id,
+      created_by: USER_ID,
+      owner_org: ONBOARDING_ORG_ID,
+      created_at: ONBOARDING_CHANNEL_CREATED_AT,
+    },
+    {
+      name: 'production',
+      app_id: ONBOARDING_LATE_SUBSCRIPTION_APP_ID,
+      version: onboardingLateSubscriptionVersion.id,
+      created_by: USER_ID,
+      owner_org: ONBOARDING_LATE_SUBSCRIPTION_ORG_ID,
+      created_at: ONBOARDING_LATE_SUBSCRIPTION_CHANNEL_CREATED_AT,
+    },
+  ])
   if (channelError)
     throw channelError
 }, 30000)
@@ -240,11 +305,11 @@ beforeAll(async () => {
 afterAll(async () => {
   const supabase = getSupabaseClient()
 
-  await supabase.from('channels').delete().eq('app_id', ONBOARDING_APP_ID)
-  await supabase.from('app_versions').delete().in('app_id', [TRIAL_APP_ID, ONBOARDING_APP_ID])
-  await supabase.from('apps').delete().in('app_id', [TRIAL_APP_ID, ONBOARDING_APP_ID])
-  await supabase.from('orgs').delete().in('id', [TRIAL_ORG_ID, CANCELLED_YEARLY_ORG_ID, CANCELLED_MONTHLY_ORG_ID, ONBOARDING_ORG_ID, ONBOARDING_NO_BUNDLE_ORG_ID])
-  await supabase.from('stripe_info').delete().in('customer_id', [TRIAL_CUSTOMER_ID, CANCELLED_YEARLY_CUSTOMER_ID, CANCELLED_MONTHLY_CUSTOMER_ID, ONBOARDING_CUSTOMER_ID, ONBOARDING_NO_BUNDLE_CUSTOMER_ID])
+  await supabase.from('channels').delete().in('app_id', [ONBOARDING_APP_ID, ONBOARDING_LATE_SUBSCRIPTION_APP_ID])
+  await supabase.from('app_versions').delete().in('app_id', [TRIAL_APP_ID, ONBOARDING_APP_ID, ONBOARDING_LATE_SUBSCRIPTION_APP_ID])
+  await supabase.from('apps').delete().in('app_id', [TRIAL_APP_ID, ONBOARDING_APP_ID, ONBOARDING_LATE_SUBSCRIPTION_APP_ID])
+  await supabase.from('orgs').delete().in('id', [TRIAL_ORG_ID, CANCELLED_YEARLY_ORG_ID, CANCELLED_MONTHLY_ORG_ID, ONBOARDING_ORG_ID, ONBOARDING_NO_BUNDLE_ORG_ID, ONBOARDING_LATE_SUBSCRIPTION_ORG_ID])
+  await supabase.from('stripe_info').delete().in('customer_id', [TRIAL_CUSTOMER_ID, CANCELLED_YEARLY_CUSTOMER_ID, CANCELLED_MONTHLY_CUSTOMER_ID, ONBOARDING_CUSTOMER_ID, ONBOARDING_NO_BUNDLE_CUSTOMER_ID, ONBOARDING_LATE_SUBSCRIPTION_CUSTOMER_ID])
 })
 
 describe('/private/admin_stats', () => {
@@ -278,7 +343,7 @@ describe('/private/admin_stats', () => {
     expect(organization?.last_bundle_upload_at).toBe(TRIAL_LAST_UPLOAD_AT)
   })
 
-  it.concurrent('returns cancellation billing metadata and paid-at fallback dates', async () => {
+  it.concurrent('returns cancellation billing metadata and subscription-or-signup dates', async () => {
     const response = await fetchWithRetry(`${BASE_URL}/private/admin_stats`, {
       method: 'POST',
       headers: adminHeaders,
@@ -299,7 +364,7 @@ describe('/private/admin_stats', () => {
           org_id: string
           plan_name: string | null
           billing_type: 'monthly' | 'yearly' | null
-          first_subscription_date: string
+          subscription_or_signup_date: string
         }>
       }
     }
@@ -310,13 +375,13 @@ describe('/private/admin_stats', () => {
     expect(yearlyOrganization).toBeTruthy()
     expect(yearlyOrganization?.plan_name).toBe('Solo')
     expect(yearlyOrganization?.billing_type).toBe('yearly')
-    expect(yearlyOrganization?.first_subscription_date).toBe(CANCELLED_YEARLY_PAID_AT)
+    expect(yearlyOrganization?.subscription_or_signup_date).toBe(CANCELLED_YEARLY_PAID_AT)
 
     const monthlyOrganization = payload.data.organizations.find(org => org.org_id === CANCELLED_MONTHLY_ORG_ID)
     expect(monthlyOrganization).toBeTruthy()
     expect(monthlyOrganization?.plan_name).toBe('Solo')
     expect(monthlyOrganization?.billing_type).toBe('monthly')
-    expect(monthlyOrganization?.first_subscription_date).toBe(creatorUserCreatedAt)
+    expect(monthlyOrganization?.subscription_or_signup_date).toBe(creatorUserCreatedAt)
   })
 
   it.concurrent('returns subscribed as the last onboarding funnel step without exceeding the bundle cohort', async () => {
@@ -349,16 +414,16 @@ describe('/private/admin_stats', () => {
     }
 
     expect(payload.success).toBe(true)
-    expect(payload.data.total_orgs).toBe(2)
-    expect(payload.data.orgs_with_app).toBe(1)
-    expect(payload.data.orgs_with_channel).toBe(1)
-    expect(payload.data.orgs_with_bundle).toBe(1)
+    expect(payload.data.total_orgs).toBe(3)
+    expect(payload.data.orgs_with_app).toBe(2)
+    expect(payload.data.orgs_with_channel).toBe(2)
+    expect(payload.data.orgs_with_bundle).toBe(2)
     expect(payload.data.orgs_subscribed).toBe(1)
-    expect(payload.data.subscription_conversion_rate).toBe(100)
+    expect(payload.data.subscription_conversion_rate).toBe(50)
     expect(payload.data.trend).toHaveLength(1)
     expect(payload.data.trend[0]).toMatchObject({
       date: '2026-02-01',
-      new_orgs: 2,
+      new_orgs: 3,
       orgs_subscribed: 1,
     })
   })

@@ -203,7 +203,7 @@ app.post('/', middlewareAuth, async (c) => {
               canceled_at: org.canceled_at,
               plan_name: org.plan_name,
               billing_type: org.billing_type,
-              first_subscription_date: org.first_subscription_date,
+              subscription_or_signup_date: org.subscription_or_signup_date,
               cancellation_reason: formatCancellationReason(details),
             }
           }),

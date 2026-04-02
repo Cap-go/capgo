@@ -133,7 +133,7 @@ interface CancelledOrganization {
   canceled_at: string
   plan_name: string | null
   billing_type: 'monthly' | 'yearly' | null
-  first_subscription_date: string
+  subscription_or_signup_date: string
   cancellation_reason: string | null
 }
 
@@ -197,7 +197,7 @@ function formatBillingTypeLabel(billingType: CancelledOrganization['billing_type
   if (billingType === 'yearly')
     return t('yearly')
   if (billingType === 'monthly')
-    return 'Monthly'
+    return t('monthly')
   return t('unknown')
 }
 
@@ -230,11 +230,11 @@ const cancelledOrganizationsColumns = ref<TableColumn[]>([
     displayFunction: (item: CancelledOrganization) => formatBillingTypeLabel(item.billing_type),
   },
   {
-    label: 'Subscription start',
-    key: 'first_subscription_date',
+    label: t('subscription-or-signup-date'),
+    key: 'subscription_or_signup_date',
     mobile: false,
     sortable: false,
-    displayFunction: (item: CancelledOrganization) => formatLocalDate(item.first_subscription_date) || t('unknown'),
+    displayFunction: (item: CancelledOrganization) => formatLocalDate(item.subscription_or_signup_date) || t('unknown'),
   },
   {
     label: t('cancellation-reason'),
