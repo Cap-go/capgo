@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { defineAsyncComponent, watch } from 'vue'
 import { usePageTranslation } from '~/composables/usePageTranslation'
+import { resetTrackedMessageKeys } from '~/modules/i18n'
 
 const Toast = defineAsyncComponent(() => import('~/components/Toast.vue'))
 const DialogV2 = defineAsyncComponent(() => import('~/components/DialogV2.vue'))
@@ -13,6 +14,7 @@ usePageTranslation()
 watch(
   () => route.path,
   (path) => {
+    resetTrackedMessageKeys()
     display.updatePathTitle(path)
   },
   { immediate: true },

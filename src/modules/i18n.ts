@@ -65,14 +65,21 @@ const languageAliases = new Map<string, string>([
 
 export const availableLocales = languageOptions.map(option => option.id)
 export const languages = Object.fromEntries(languageOptions.map(option => [option.id, option.label]))
+export const isLanguageChanging = ref(false)
+export const languageChangeTarget = ref<string | null>(null)
 export const selectedLanguage = ref(SOURCE_LOCALE)
 
 type MessageCatalog = Record<string, string>
+interface LoadedMessageCatalog {
+  complete: boolean
+  messages: MessageCatalog
+}
 
 const messageCatalog = sourceMessages as MessageCatalog
 const activeMessageCatalog = ref<MessageCatalog>(messageCatalog)
-const translatedMessageCatalogs = new Map<string, MessageCatalog>([[SOURCE_LOCALE, messageCatalog]])
+const translatedMessageCatalogs = new Map<string, LoadedMessageCatalog>([[SOURCE_LOCALE, { complete: true, messages: messageCatalog }]])
 const pendingCatalogLoads = new Map<string, Promise<MessageCatalog>>()
+const trackedMessageKeys = new Set<string>()
 const MESSAGE_CACHE_PREFIX = 'capgo:translated-messages'
 const MESSAGE_CACHE_VERSION = 1
 let messageCatalogTranslationDisabled = false
@@ -253,11 +260,28 @@ function persistMessageCatalog(lang: string, messages: MessageCatalog) {
 }
 
 function applyMessageCatalog(lang: string, messages?: MessageCatalog) {
-  const nextMessages = messages ?? translatedMessageCatalogs.get(lang) ?? messageCatalog
+  const nextMessages = messages ?? translatedMessageCatalogs.get(lang)?.messages ?? messageCatalog
   activeMessageCatalog.value = nextMessages
 }
 
-async function fetchTranslatedMessageCatalog(lang: string) {
+function trackMessageKey(key: string) {
+  if (key in messageCatalog)
+    trackedMessageKeys.add(key)
+}
+
+function getTrackedMessageCatalog() {
+  const trackedCatalog: MessageCatalog = {}
+
+  trackedMessageKeys.forEach((key) => {
+    const message = messageCatalog[key]
+    if (message)
+      trackedCatalog[key] = message
+  })
+
+  return trackedCatalog
+}
+
+async function fetchTranslatedMessageCatalog(lang: string, messages: MessageCatalog) {
   if (messageCatalogTranslationDisabled)
     return messageCatalog
 
@@ -269,7 +293,7 @@ async function fetchTranslatedMessageCatalog(lang: string) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        messages: messageCatalog,
+        messages,
         targetLanguage: getWorkerLanguageCode(lang),
       }),
     })
@@ -296,18 +320,40 @@ async function fetchTranslatedMessageCatalog(lang: string) {
   }
 }
 
-async function ensureMessageCatalogLoaded(lang: string) {
+async function loadPriorityMessageCatalog(lang: string) {
   const normalized = normalizeLanguage(lang)
   if (isEnglishLocale(normalized))
     return messageCatalog
 
   const existing = translatedMessageCatalogs.get(normalized)
   if (existing)
-    return existing
+    return existing.messages
+
+  const trackedCatalog = getTrackedMessageCatalog()
+  const priorityMessages = Object.keys(trackedCatalog).length > 0 ? trackedCatalog : messageCatalog
+  const messages = await fetchTranslatedMessageCatalog(normalized, priorityMessages)
+  const mergedMessages = { ...messageCatalog, ...messages }
+
+  translatedMessageCatalogs.set(normalized, {
+    complete: Object.keys(priorityMessages).length === Object.keys(messageCatalog).length,
+    messages: mergedMessages,
+  })
+
+  return mergedMessages
+}
+
+async function ensureMessageCatalogLoaded(lang: string) {
+  const normalized = normalizeLanguage(lang)
+  if (isEnglishLocale(normalized))
+    return messageCatalog
+
+  const existing = translatedMessageCatalogs.get(normalized)
+  if (existing?.complete)
+    return existing.messages
 
   const cached = readCachedMessageCatalog(normalized)
   if (cached) {
-    translatedMessageCatalogs.set(normalized, cached)
+    translatedMessageCatalogs.set(normalized, { complete: true, messages: cached })
     return cached
   }
 
@@ -315,9 +361,9 @@ async function ensureMessageCatalogLoaded(lang: string) {
   if (pending)
     return pending
 
-  const loadPromise = fetchTranslatedMessageCatalog(normalized)
+  const loadPromise = fetchTranslatedMessageCatalog(normalized, messageCatalog)
     .then((messages) => {
-      translatedMessageCatalogs.set(normalized, messages)
+      translatedMessageCatalogs.set(normalized, { complete: true, messages })
       if (messages !== messageCatalog)
         persistMessageCatalog(normalized, messages)
       return messages
@@ -382,15 +428,23 @@ export function isKnownSourceText(value: string) {
 }
 
 export function translateMessage(key: string, params?: MessageParams, defaultMessage?: string) {
+  trackMessageKey(key)
   return interpolateMessage(getSourceMessage(key, defaultMessage), params)
+}
+
+export function resetTrackedMessageKeys() {
+  trackedMessageKeys.clear()
 }
 
 export function resetDynamicTranslationRuntimeStateForTests() {
   activeMessageCatalog.value = messageCatalog
   translatedMessageCatalogs.clear()
-  translatedMessageCatalogs.set(SOURCE_LOCALE, messageCatalog)
+  translatedMessageCatalogs.set(SOURCE_LOCALE, { complete: true, messages: messageCatalog })
   pendingCatalogLoads.clear()
+  trackedMessageKeys.clear()
   messageCatalogTranslationDisabled = false
+  isLanguageChanging.value = false
+  languageChangeTarget.value = null
   selectedLanguage.value = SOURCE_LOCALE
 }
 
@@ -407,19 +461,48 @@ export function loadLanguageAsync(lang: string): Promise<Locale> {
   selectedLanguage.value = normalized
   persistLanguage(normalized)
   updateHtmlLanguage(normalized)
+  languageChangeTarget.value = normalized
 
   if (isEnglishLocale(normalized)) {
+    isLanguageChanging.value = false
     applyMessageCatalog(normalized, messageCatalog)
     return Promise.resolve(normalized)
   }
 
   const cached = readCachedMessageCatalog(normalized)
-  applyMessageCatalog(normalized, cached ?? messageCatalog)
+  if (cached) {
+    translatedMessageCatalogs.set(normalized, { complete: true, messages: cached })
+    isLanguageChanging.value = false
+    applyMessageCatalog(normalized, cached)
+    return Promise.resolve(normalized)
+  }
 
-  return ensureMessageCatalogLoaded(normalized).then((messages) => {
+  const existing = translatedMessageCatalogs.get(normalized)
+  if (existing) {
+    isLanguageChanging.value = !existing.complete
+    applyMessageCatalog(normalized, existing.messages)
+  }
+  else {
+    isLanguageChanging.value = true
+    applyMessageCatalog(normalized, messageCatalog)
+  }
+
+  return loadPriorityMessageCatalog(normalized).then((messages) => {
     if (selectedLanguage.value === normalized)
       applyMessageCatalog(normalized, messages)
+
+    if (selectedLanguage.value === normalized)
+      isLanguageChanging.value = false
+
+    void ensureMessageCatalogLoaded(normalized).then((fullMessages) => {
+      if (selectedLanguage.value === normalized)
+        applyMessageCatalog(normalized, fullMessages)
+    })
+
     return normalized
+  }).finally(() => {
+    if (selectedLanguage.value === normalized)
+      isLanguageChanging.value = false
   })
 }
 
