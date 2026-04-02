@@ -96,7 +96,9 @@ async function guard(
   const hasAuth = !!claimsData?.claims?.sub && !!sessionUser
   const hadAuth = !!main.auth
   const needsVerifiedEmail = to.path.startsWith('/settings') || to.path === '/delete_account'
-  const shouldRedirectToOrgOnboarding = !to.path.startsWith('/onboarding/organization')
+  const inviteOrgId = typeof to.query.invite_org === 'string' && to.query.invite_org.length > 0
+    ? to.query.invite_org
+    : null
   const isAdminRoute = to.path.startsWith('/admin')
 
   async function tryLoadOrganizations(fetcher: () => Promise<void>) {
@@ -108,6 +110,14 @@ async function guard(
       console.error('Failed to load organizations during auth guard:', error)
       return false
     }
+  }
+
+  function shouldRedirectToOrgOnboarding() {
+    if (to.path.startsWith('/onboarding/organization'))
+      return false
+    if (!inviteOrgId)
+      return true
+    return !organizationStore.organizations.some(org => org.gid === inviteOrgId && org.role.startsWith('invite'))
   }
 
   if (hasAuth && sessionUser) {
@@ -134,7 +144,12 @@ async function guard(
     && mfaData.nextLevel === 'aal2'
     && !isAdminForced
   ) {
-    return next(`/login?to=${to.path}`)
+    return next({
+      path: '/login',
+      query: {
+        to: to.fullPath,
+      },
+    })
   }
 
   if (hasAuth && sessionUser && !hadAuth) {
@@ -143,7 +158,7 @@ async function guard(
         path: '/resend_email',
         query: {
           reason: 'email_not_verified',
-          return_to: to.path,
+          return_to: to.fullPath,
         },
       })
     }
@@ -180,7 +195,7 @@ async function guard(
       }
     }
 
-    if (organizationsLoaded && !organizationStore.hasOrganizations && shouldRedirectToOrgOnboarding) {
+    if (organizationsLoaded && !organizationStore.hasOrganizations && shouldRedirectToOrgOnboarding()) {
       if (!isAdminRoute || !main.isAdmin) {
         return next({
           path: '/onboarding/organization',
@@ -217,7 +232,12 @@ async function guard(
   }
   else if (from.path !== 'login' && !hasAuth) {
     main.auth = undefined
-    next(`/login?to=${to.path}`)
+    next({
+      path: '/login',
+      query: {
+        to: to.fullPath,
+      },
+    })
   }
   else if (hasAuth && main.auth) {
     // User is already authenticated, but check if account got disabled
@@ -228,7 +248,7 @@ async function guard(
           path: '/resend_email',
           query: {
             reason: 'email_not_verified',
-            return_to: to.path,
+            return_to: to.fullPath,
           },
         })
       }
@@ -251,7 +271,7 @@ async function guard(
     }
 
     const organizationsLoaded = await tryLoadOrganizations(() => organizationStore.dedupFetchOrganizations())
-    if (organizationsLoaded && !organizationStore.hasOrganizations && shouldRedirectToOrgOnboarding) {
+    if (organizationsLoaded && !organizationStore.hasOrganizations && shouldRedirectToOrgOnboarding()) {
       return next('/onboarding/organization')
     }
 

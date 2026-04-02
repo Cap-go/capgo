@@ -1275,6 +1275,7 @@
   "org-changes-set-email-other-error": "Cannot set the management email, please contact support",
   "org-created-successfully": "Org created successfully!",
   "org-deleted": "Org deleted successfully",
+  "org-invite-email-notification-failed": "The invitation was created, but we could not send the email notification.",
   "org-invited-user": "Successfully invited user to org",
   "org-name": "Organization Name",
   "org-name-required": "Organization name required",
