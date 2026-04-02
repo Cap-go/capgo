@@ -686,7 +686,10 @@ async function handleSendInvitationOutput(output: string, email: string, type: D
     return false
 
   const orgId = currentOrganization.value?.gid
-  if (orgId && shouldAttemptExistingUserInviteNotification(output, type, useNewRbac.value)) {
+  const existingMember = members.value.find(member => member.email.toLowerCase() === email.toLowerCase())
+  const hasPendingInvite = existingMember ? isInviteMember(existingMember) : false
+
+  if (orgId && shouldAttemptExistingUserInviteNotification(output, type, useNewRbac.value, hasPendingInvite)) {
     const notified = await notifyExistingUserInvite(supabase, email, orgId)
     if (!notified) {
       console.warn('Failed to send invite email notification')

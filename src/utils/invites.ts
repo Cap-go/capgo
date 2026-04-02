@@ -66,8 +66,12 @@ export function shouldAttemptExistingUserInviteNotification(
   output: string,
   role: string,
   useNewRbac: boolean,
+  hasPendingInvite = false,
 ) {
-  if (output !== 'OK' && output !== 'ALREADY_INVITED')
+  if (output === 'ALREADY_INVITED')
+    return hasPendingInvite && shouldNotifyExistingUserInvite(role, useNewRbac)
+
+  if (output !== 'OK')
     return false
 
   return shouldNotifyExistingUserInvite(role, useNewRbac)

@@ -19,16 +19,18 @@ describe('shouldNotifyExistingUserInvite', () => {
 })
 
 describe('shouldAttemptExistingUserInviteNotification', () => {
-  it.concurrent('returns true for new invites and existing pending invites', () => {
+  it.concurrent('returns true for new invites and pending invite resends', () => {
     expect(shouldAttemptExistingUserInviteNotification('OK', 'invite_admin', false)).toBe(true)
-    expect(shouldAttemptExistingUserInviteNotification('ALREADY_INVITED', 'invite_admin', false)).toBe(true)
     expect(shouldAttemptExistingUserInviteNotification('OK', 'org_admin', true)).toBe(true)
-    expect(shouldAttemptExistingUserInviteNotification('ALREADY_INVITED', 'org_admin', true)).toBe(true)
+    expect(shouldAttemptExistingUserInviteNotification('ALREADY_INVITED', 'invite_admin', false, true)).toBe(true)
+    expect(shouldAttemptExistingUserInviteNotification('ALREADY_INVITED', 'org_admin', true, true)).toBe(true)
   })
 
   it.concurrent('returns false for outputs that should not send email', () => {
     expect(shouldAttemptExistingUserInviteNotification('NO_EMAIL', 'invite_admin', false)).toBe(false)
     expect(shouldAttemptExistingUserInviteNotification('CAN_NOT_INVITE_OWNER', 'org_admin', true)).toBe(false)
+    expect(shouldAttemptExistingUserInviteNotification('ALREADY_INVITED', 'invite_admin', false)).toBe(false)
+    expect(shouldAttemptExistingUserInviteNotification('ALREADY_INVITED', 'org_admin', true)).toBe(false)
   })
 
   it.concurrent('returns false for legacy direct membership roles', () => {
