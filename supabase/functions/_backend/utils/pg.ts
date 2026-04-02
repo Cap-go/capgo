@@ -1509,6 +1509,8 @@ export async function getAdminCancelledOrganizations(
         si.subscription_id,
         p.name AS plan_name,
         CASE
+          WHEN si.price_id = p.price_y_id THEN 'yearly'
+          WHEN si.price_id = p.price_m_id THEN 'monthly'
           WHEN si.subscription_anchor_start IS NOT NULL
             AND si.subscription_anchor_end IS NOT NULL
             AND si.subscription_anchor_end::timestamp - si.subscription_anchor_start::timestamp >= INTERVAL '330 days'
@@ -1516,8 +1518,6 @@ export async function getAdminCancelledOrganizations(
           WHEN si.subscription_anchor_start IS NOT NULL
             AND si.subscription_anchor_end IS NOT NULL
             THEN 'monthly'
-          WHEN si.price_id = p.price_y_id THEN 'yearly'
-          WHEN si.price_id = p.price_m_id THEN 'monthly'
           ELSE NULL
         END AS billing_type,
         COALESCE(si.paid_at, u.created_at, o.created_at) AS subscription_or_signup_date
@@ -1729,6 +1729,8 @@ export async function getAdminOnboardingFunnel(
         INNER JOIN apps a ON a.owner_org = o.id
         INNER JOIN channels c ON c.app_id = a.app_id
         INNER JOIN app_versions av ON av.id = c.version AND av.name NOT IN ('builtin', 'unknown')
+        WHERE av.created_at >= o.created_at
+          AND av.created_at < o.created_at + interval '7 days'
       ),
       orgs_subscribed AS (
         SELECT DISTINCT o.id, o.created_date

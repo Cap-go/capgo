@@ -648,25 +648,25 @@ const onboardingFunnelStages = computed(() => {
       color: '#3b82f6', // blue
     },
     {
-      label: 'Created an App',
+      label: t('created-an-app'),
       value: Number(data.orgs_with_app) || 0,
       percentage: rates.app,
       color: '#8b5cf6', // purple
     },
     {
-      label: 'Created a Channel',
+      label: t('created-a-channel'),
       value: Number(data.orgs_with_channel) || 0,
       percentage: rates.channel,
       color: '#f59e0b', // amber
     },
     {
-      label: 'Uploaded a Bundle',
+      label: t('uploaded-a-bundle'),
       value: Number(data.orgs_with_bundle) || 0,
       percentage: rates.bundle,
       color: '#10b981', // green
     },
     {
-      label: 'Subscribed',
+      label: t('subscribed'),
       value: Number(data.orgs_subscribed) || 0,
       percentage: rates.subscribed,
       color: '#ef4444', // red
@@ -684,7 +684,7 @@ const onboardingFunnelTrendSeries = computed(() => {
   const userRegistrationsByDate = new Map(globalStatsTrendData.value.map(item => [item.date, item.registers_today]))
   return [
     {
-      label: 'User registrations',
+      label: t('user-registrations'),
       data: trend.map(item => ({
         date: item.date,
         value: userRegistrationsByDate.get(item.date) ?? 0,
@@ -692,7 +692,7 @@ const onboardingFunnelTrendSeries = computed(() => {
       color: '#3b82f6', // blue
     },
     {
-      label: 'New Organizations',
+      label: t('new-organizations'),
       data: trend.map(item => ({
         date: item.date,
         value: item.new_orgs,
@@ -700,7 +700,7 @@ const onboardingFunnelTrendSeries = computed(() => {
       color: '#8b5cf6', // purple
     },
     {
-      label: 'Created App (within 7 days)',
+      label: t('created-app-within-7-days'),
       data: trend.map(item => ({
         date: item.date,
         value: item.orgs_created_app,
@@ -708,7 +708,7 @@ const onboardingFunnelTrendSeries = computed(() => {
       color: '#2563eb', // blue
     },
     {
-      label: 'Created Channel (within 7 days)',
+      label: t('created-channel-within-7-days'),
       data: trend.map(item => ({
         date: item.date,
         value: item.orgs_created_channel,
@@ -716,7 +716,7 @@ const onboardingFunnelTrendSeries = computed(() => {
       color: '#f59e0b', // amber
     },
     {
-      label: 'Uploaded Bundle (within 7 days)',
+      label: t('uploaded-bundle-within-7-days'),
       data: trend.map(item => ({
         date: item.date,
         value: item.orgs_created_bundle,
@@ -724,7 +724,7 @@ const onboardingFunnelTrendSeries = computed(() => {
       color: '#10b981', // green
     },
     {
-      label: 'Demo Apps Created',
+      label: t('demo-apps-created'),
       data: trend.map(item => ({
         date: item.date,
         value: demoAppsCreatedByDate.get(item.date) ?? 0,
@@ -732,7 +732,7 @@ const onboardingFunnelTrendSeries = computed(() => {
       color: '#ef4444', // red
     },
     {
-      label: 'Subscribed (within 7 days)',
+      label: t('subscribed-within-7-days'),
       data: trend.map(item => ({
         date: item.date,
         value: item.orgs_subscribed,
@@ -820,7 +820,7 @@ displayStore.defaultBack = '/dashboard'
                     {{ onboardingFunnelRates.channel.toFixed(1) }}%
                   </p>
                   <p class="text-xs text-gray-500 dark:text-gray-400">
-                    App → Channel
+                    {{ t('app-to-channel') }}
                   </p>
                 </div>
                 <div class="text-center">
@@ -828,7 +828,7 @@ displayStore.defaultBack = '/dashboard'
                     {{ onboardingFunnelRates.bundle.toFixed(1) }}%
                   </p>
                   <p class="text-xs text-gray-500 dark:text-gray-400">
-                    Channel → Bundle
+                    {{ t('channel-to-bundle') }}
                   </p>
                 </div>
                 <div class="text-center">
@@ -836,7 +836,7 @@ displayStore.defaultBack = '/dashboard'
                     {{ onboardingFunnelRates.subscribed.toFixed(1) }}%
                   </p>
                   <p class="text-xs text-gray-500 dark:text-gray-400">
-                    Bundle → Subscribed
+                    {{ t('bundle-to-subscribed') }}
                   </p>
                 </div>
               </div>

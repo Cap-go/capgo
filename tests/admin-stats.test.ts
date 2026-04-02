@@ -97,7 +97,7 @@ beforeAll(async () => {
       is_good_plan: true,
       plan_usage: 2,
       subscription_anchor_start: '2025-02-10T00:00:00.000Z',
-      subscription_anchor_end: '2026-02-10T00:00:00.000Z',
+      subscription_anchor_end: '2025-03-10T00:00:00.000Z',
     },
     {
       customer_id: CANCELLED_MONTHLY_CUSTOMER_ID,
