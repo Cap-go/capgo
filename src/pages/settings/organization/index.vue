@@ -233,7 +233,7 @@ async function copyOrganizationId() {
                 <img
                   v-if="!!currentOrganization?.logo"
                   id="org-avatar" class="object-cover w-20 h-20 d-mask d-mask-squircle" :src="currentOrganization.logo"
-                  width="80" height="80" alt="User upload"
+                  width="80" height="80" :alt="t('user-upload-alt')"
                 >
                 <div v-else class="p-6 text-xl bg-gray-700 d-mask d-mask-squircle">
                   <span class="font-medium text-gray-300">

@@ -16,6 +16,13 @@ const SKIP_TAGS = new Set(['CODE', 'KBD', 'NOSCRIPT', 'PRE', 'SAMP', 'SCRIPT', '
 const NO_TRANSLATE_SELECTOR = '[data-capgo-no-translate]'
 const TRANSLATE_SELECTOR = '[data-capgo-translate]'
 const TRANSLATION_ROOT_SELECTOR = '[data-capgo-translation-root]'
+const TRUSTED_TRANSLATE_SELECTOR = [
+  TRANSLATE_SELECTOR,
+  '.formkit-help',
+  '.formkit-label',
+  '.formkit-legend',
+  '.formkit-message',
+].join(', ')
 
 type AttributeName = typeof ATTRIBUTE_NAMES[number]
 type TranslationRoot = Document | Element
@@ -105,7 +112,7 @@ function isInsideNoTranslateZone(node: Node) {
 
 function isInsideTranslateZone(node: Node | Element) {
   const element = node instanceof Element ? node : node.parentElement
-  return !!element?.closest(TRANSLATE_SELECTOR)
+  return !!element?.closest(TRUSTED_TRANSLATE_SELECTOR)
 }
 
 function getTextRecord(node: Text, lang: string) {

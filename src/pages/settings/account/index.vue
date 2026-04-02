@@ -446,9 +446,9 @@ async function submit(form: { first_name: string, last_name: string, email: stri
     reset('update-account', useMainStore().user)
     if (data.error && data.error.name === 'AuthApiError') {
       isLoading.value = false
-      return toast.error('email already taken')
+      return toast.error(t('email-already-taken'))
     }
-    toast.success('A confirmation email was sent click to link to confirm your new email', {
+    toast.success(t('confirm-new-email-sent'), {
       duration: 10000,
     })
     updateData.email = form.email
@@ -498,7 +498,7 @@ onMounted(async () => {
               <div class="mr-4">
                 <img
                   v-if="main.user?.image_url" class="object-cover w-20 h-20 d-mask d-mask-squircle" :src="main.user?.image_url"
-                  width="80" height="80" alt="User upload"
+                  width="80" height="80" :alt="t('user-upload-alt')"
                 >
                 <div v-else class="p-6 text-xl bg-gray-700 d-mask d-mask-squircle">
                   <span class="font-medium text-gray-300">
@@ -660,10 +660,10 @@ onMounted(async () => {
     <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.id === 'delete-account-confirm'" to="#dialog-v2-content" defer>
       <div class="text-base text-gray-500 dark:text-gray-400">
         <p class="mb-4">
-          This action cannot be undone. Your account and all associated data will be permanently deleted.
+          {{ t('delete-account-warning-description') }}
         </p>
         <p class="font-medium text-gray-700 dark:text-gray-300">
-          Your account will be deleted after 30 days
+          {{ t('delete-account-warning-delay') }}
         </p>
         <div class="mt-6">
           <label class="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
