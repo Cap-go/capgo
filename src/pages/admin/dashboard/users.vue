@@ -516,6 +516,22 @@ const leadingCustomerCountrySubtitle = computed(() => {
 const customerCountryChartLabels = computed(() => topCustomerCountryEntries.value.map(country => `${getCountryFlag(country.country_code)} ${getCountryLabel(country.country_code)}`))
 const customerCountryChartValues = computed(() => topCustomerCountryEntries.value.map(country => country.organizations))
 
+const registrationsTrendSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Daily Registrations',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.registers_today,
+      })),
+      color: '#3b82f6', // blue
+    },
+  ]
+})
+
 const planDistributionData = computed(() => {
   if (globalStatsTrendData.value.length === 0)
     return []
