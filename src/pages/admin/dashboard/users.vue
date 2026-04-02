@@ -15,7 +15,7 @@ import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
 import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
 import Spinner from '~/components/Spinner.vue'
-import { formatLocalDate } from '~/services/date'
+import { formatLocalDate, formatLocalDateTime } from '~/services/date'
 import { getEmoji } from '~/services/i18n'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
@@ -35,15 +35,18 @@ interface OnboardingFunnelData {
   orgs_with_app: number
   orgs_with_channel: number
   orgs_with_bundle: number
+  orgs_subscribed: number
   app_conversion_rate: number
   channel_conversion_rate: number
   bundle_conversion_rate: number
+  subscription_conversion_rate: number
   trend: Array<{
     date: string
     new_orgs: number
     orgs_created_app: number
     orgs_created_channel: number
     orgs_created_bundle: number
+    orgs_subscribed: number
   }>
 }
 
@@ -112,6 +115,7 @@ interface TrialOrganization {
   trial_end_date: string
   days_remaining: number
   created_at: string
+  last_bundle_upload_at: string | null
 }
 
 interface TrialOrganizationsResponse {
@@ -127,6 +131,9 @@ interface CancelledOrganization {
   org_name: string
   management_email: string
   canceled_at: string
+  plan_name: string | null
+  billing_type: 'monthly' | 'yearly' | null
+  first_subscription_date: string
   cancellation_reason: string | null
 }
 
@@ -175,7 +182,24 @@ const trialOrganizationsColumns = ref<TableColumn[]>([
       return formatLocalDate(item.trial_end_date)
     },
   },
+  {
+    label: t('last-upload'),
+    key: 'last_bundle_upload_at',
+    mobile: false,
+    sortable: false,
+    displayFunction: (item: TrialOrganization) => {
+      return formatLocalDateTime(item.last_bundle_upload_at) || t('never')
+    },
+  },
 ])
+
+function formatBillingTypeLabel(billingType: CancelledOrganization['billing_type']) {
+  if (billingType === 'yearly')
+    return t('yearly')
+  if (billingType === 'monthly')
+    return 'Monthly'
+  return t('unknown')
+}
 
 const cancelledOrganizationsColumns = ref<TableColumn[]>([
   { label: t('org-name'), key: 'org_name', mobile: true, head: true, sortable: false },
@@ -190,6 +214,27 @@ const cancelledOrganizationsColumns = ref<TableColumn[]>([
         return t('unknown')
       return formatLocalDate(item.canceled_at)
     },
+  },
+  {
+    label: t('plan'),
+    key: 'plan_name',
+    mobile: false,
+    sortable: false,
+    displayFunction: (item: CancelledOrganization) => item.plan_name || t('unknown'),
+  },
+  {
+    label: t('billing-cycle'),
+    key: 'billing_type',
+    mobile: false,
+    sortable: false,
+    displayFunction: (item: CancelledOrganization) => formatBillingTypeLabel(item.billing_type),
+  },
+  {
+    label: 'Subscription start',
+    key: 'first_subscription_date',
+    mobile: false,
+    sortable: false,
+    displayFunction: (item: CancelledOrganization) => formatLocalDate(item.first_subscription_date) || t('unknown'),
   },
   {
     label: t('cancellation-reason'),
@@ -471,22 +516,6 @@ const leadingCustomerCountrySubtitle = computed(() => {
 const customerCountryChartLabels = computed(() => topCustomerCountryEntries.value.map(country => `${getCountryFlag(country.country_code)} ${getCountryLabel(country.country_code)}`))
 const customerCountryChartValues = computed(() => topCustomerCountryEntries.value.map(country => country.organizations))
 
-const registrationsTrendSeries = computed(() => {
-  if (globalStatsTrendData.value.length === 0)
-    return []
-
-  return [
-    {
-      label: 'Daily Registrations',
-      data: globalStatsTrendData.value.map(item => ({
-        date: item.date,
-        value: item.registers_today,
-      })),
-      color: '#3b82f6', // blue
-    },
-  ]
-})
-
 const planDistributionData = computed(() => {
   if (globalStatsTrendData.value.length === 0)
     return []
@@ -570,6 +599,7 @@ const onboardingFunnelRates = computed(() => {
       app: 0,
       channel: 0,
       bundle: 0,
+      subscribed: 0,
     }
   }
 
@@ -577,11 +607,13 @@ const onboardingFunnelRates = computed(() => {
   const orgsWithApp = Number(onboardingFunnelData.value.orgs_with_app) || 0
   const orgsWithChannel = Number(onboardingFunnelData.value.orgs_with_channel) || 0
   const orgsWithBundle = Number(onboardingFunnelData.value.orgs_with_bundle) || 0
+  const orgsSubscribed = Number(onboardingFunnelData.value.orgs_subscribed) || 0
 
   return {
     app: totalOrgs > 0 ? (orgsWithApp / totalOrgs) * 100 : 0,
     channel: orgsWithApp > 0 ? (orgsWithChannel / orgsWithApp) * 100 : 0,
     bundle: orgsWithChannel > 0 ? (orgsWithBundle / orgsWithChannel) * 100 : 0,
+    subscribed: orgsWithBundle > 0 ? (orgsSubscribed / orgsWithBundle) * 100 : 0,
   }
 })
 
@@ -617,6 +649,12 @@ const onboardingFunnelStages = computed(() => {
       percentage: rates.bundle,
       color: '#10b981', // green
     },
+    {
+      label: 'Subscribed',
+      value: Number(data.orgs_subscribed) || 0,
+      percentage: rates.subscribed,
+      color: '#ef4444', // red
+    },
   ]
 })
 
@@ -627,14 +665,23 @@ const onboardingFunnelTrendSeries = computed(() => {
 
   const trend = onboardingFunnelData.value.trend
   const demoAppsCreatedByDate = new Map(globalStatsTrendData.value.map(item => [item.date, item.demo_apps_created]))
+  const userRegistrationsByDate = new Map(globalStatsTrendData.value.map(item => [item.date, item.registers_today]))
   return [
+    {
+      label: 'User registrations',
+      data: trend.map(item => ({
+        date: item.date,
+        value: userRegistrationsByDate.get(item.date) ?? 0,
+      })),
+      color: '#3b82f6', // blue
+    },
     {
       label: 'New Organizations',
       data: trend.map(item => ({
         date: item.date,
         value: item.new_orgs,
       })),
-      color: '#3b82f6', // blue
+      color: '#8b5cf6', // purple
     },
     {
       label: 'Created App (within 7 days)',
@@ -642,7 +689,7 @@ const onboardingFunnelTrendSeries = computed(() => {
         date: item.date,
         value: item.orgs_created_app,
       })),
-      color: '#8b5cf6', // purple
+      color: '#2563eb', // blue
     },
     {
       label: 'Created Channel (within 7 days)',
@@ -667,6 +714,14 @@ const onboardingFunnelTrendSeries = computed(() => {
         value: demoAppsCreatedByDate.get(item.date) ?? 0,
       })),
       color: '#ef4444', // red
+    },
+    {
+      label: 'Subscribed (within 7 days)',
+      data: trend.map(item => ({
+        date: item.date,
+        value: item.orgs_subscribed,
+      })),
+      color: '#14b8a6', // teal
     },
   ]
 })
@@ -735,7 +790,7 @@ displayStore.defaultBack = '/dashboard'
               </div>
 
               <!-- Conversion summary -->
-              <div class="grid grid-cols-3 gap-4 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
+              <div class="grid grid-cols-2 gap-4 pt-4 mt-4 border-t border-gray-200 sm:grid-cols-4 dark:border-gray-700">
                 <div class="text-center">
                   <p class="text-2xl font-bold text-purple-500">
                     {{ onboardingFunnelRates.app.toFixed(1) }}%
@@ -758,6 +813,14 @@ displayStore.defaultBack = '/dashboard'
                   </p>
                   <p class="text-xs text-gray-500 dark:text-gray-400">
                     Channel → Bundle
+                  </p>
+                </div>
+                <div class="text-center">
+                  <p class="text-2xl font-bold text-rose-500">
+                    {{ onboardingFunnelRates.subscribed.toFixed(1) }}%
+                  </p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    Bundle → Subscribed
                   </p>
                 </div>
               </div>

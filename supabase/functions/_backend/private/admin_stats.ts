@@ -201,6 +201,9 @@ app.post('/', middlewareAuth, async (c) => {
               org_name: org.org_name,
               management_email: org.management_email,
               canceled_at: org.canceled_at,
+              plan_name: org.plan_name,
+              billing_type: org.billing_type,
+              first_subscription_date: org.first_subscription_date,
               cancellation_reason: formatCancellationReason(details),
             }
           }),
