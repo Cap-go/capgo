@@ -95,7 +95,7 @@ async function handleOrganizationInvitation(org: OrganizationInvitationTarget) {
           if (data === 'OK') {
             invitationHandled = true
             organizationStore.setCurrentOrganization(org.gid)
-            organizationStore.fetchOrganizations()
+            await organizationStore.fetchOrganizations()
             toast.success(t('invite-accepted'))
           }
           else if (data === 'NO_INVITE') {
@@ -129,7 +129,7 @@ async function handleOrganizationInvitation(org: OrganizationInvitationTarget) {
           }
 
           invitationHandled = true
-          organizationStore.fetchOrganizations()
+          await organizationStore.fetchOrganizations()
           toast.success(t('alert-denied-invite'))
         },
       },
