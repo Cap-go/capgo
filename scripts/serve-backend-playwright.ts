@@ -54,10 +54,14 @@ const child = spawn('bun', ['scripts/supabase-worktree.ts', 'functions', 'serve'
   env: process.env,
 })
 
+const signalHandlers = new Map<NodeJS.Signals, () => void>()
+
 function forwardSignal(signal: NodeJS.Signals) {
-  process.on(signal, () => {
+  const handler = () => {
     child.kill(signal)
-  })
+  }
+  signalHandlers.set(signal, handler)
+  process.on(signal, handler)
 }
 
 forwardSignal('SIGINT')
@@ -65,6 +69,8 @@ forwardSignal('SIGTERM')
 
 child.on('exit', (code, signal) => {
   if (signal) {
+    for (const [registeredSignal, handler] of signalHandlers)
+      process.off(registeredSignal, handler)
     process.kill(process.pid, signal)
     return
   }

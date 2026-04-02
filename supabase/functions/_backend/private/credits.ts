@@ -162,13 +162,18 @@ async function hasProcessedCreditTopUp(
   supabase: ReturnType<typeof supabaseClient>,
   orgId: string,
   sessionId: string,
+  paymentIntentId?: string | null,
 ) {
+  const sourceMatchFilters = [`source_ref->>sessionId.eq.${sessionId}`]
+  if (paymentIntentId)
+    sourceMatchFilters.push(`source_ref->>paymentIntentId.eq.${paymentIntentId}`)
+
   const { data, error } = await supabase
     .from('usage_credit_transactions')
     .select('id')
     .eq('org_id', orgId)
     .eq('transaction_type', 'purchase')
-    .contains('source_ref', { sessionId })
+    .or(sourceMatchFilters.join(','))
     .limit(1)
 
   if (error) {
@@ -182,6 +187,12 @@ async function hasProcessedCreditTopUp(
   }
 
   return Boolean(data?.length)
+}
+
+function getCheckoutSessionPaymentIntentId(session: Stripe.Checkout.Session): string | null {
+  return typeof session.payment_intent === 'string'
+    ? session.payment_intent
+    : session.payment_intent?.id ?? null
 }
 
 async function resolveCheckoutSession(
@@ -202,13 +213,17 @@ async function resolveCheckoutSession(
     return await stripe.checkout.sessions.retrieve(sessionId)
   }
 
-  const sessions = await stripe.checkout.sessions.list({
-    customer: customerId,
-    limit: 100,
-  })
+  const candidateSessions: Stripe.Checkout.Session[] = []
+  let startingAfter: string | undefined
 
-  const candidateSessions = sessions.data
-    .filter(session =>
+  while (true) {
+    const sessions = await stripe.checkout.sessions.list({
+      customer: customerId,
+      limit: 100,
+      ...(startingAfter ? { starting_after: startingAfter } : {}),
+    })
+
+    candidateSessions.push(...sessions.data.filter(session =>
       session.customer === customerId
       && session.mode === 'payment'
       && session.payment_status === 'paid'
@@ -217,12 +232,23 @@ async function resolveCheckoutSession(
         session.client_reference_id === orgId
         || session.metadata?.orgId === orgId
       ),
-    )
+    ))
+
+    if (!sessions.has_more || sessions.data.length === 0)
+      break
+
+    startingAfter = sessions.data[sessions.data.length - 1]?.id
+    if (!startingAfter)
+      break
+  }
+
+  candidateSessions
     .sort((a, b) => (b.created ?? 0) - (a.created ?? 0))
 
   let unresolvedSession: Stripe.Checkout.Session | null = null
   for (const candidateSession of candidateSessions) {
-    if (await hasProcessedCreditTopUp(supabase, orgId, candidateSession.id))
+    const paymentIntentId = getCheckoutSessionPaymentIntentId(candidateSession)
+    if (await hasProcessedCreditTopUp(supabase, orgId, candidateSession.id, paymentIntentId))
       continue
 
     if (unresolvedSession) {
@@ -430,9 +456,7 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
     throw simpleError('session_not_paid', 'Checkout session is not paid')
 
   const { productId } = await getCreditTopUpProductId(c, customerId, token)
-  const paymentIntentId = typeof session.payment_intent === 'string'
-    ? session.payment_intent
-    : session.payment_intent?.id ?? null
+  const paymentIntentId = getCheckoutSessionPaymentIntentId(session)
 
   const { creditQuantity, itemsSummary } = await getCreditCheckoutDetails(c, session, productId)
 

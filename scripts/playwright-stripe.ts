@@ -1,5 +1,8 @@
 export function getStripeEmulatorPort(processEnv: NodeJS.ProcessEnv): number {
-  return Number.parseInt(processEnv.STRIPE_EMULATOR_PORT || '4510', 10)
+  const parsedPort = Number.parseInt(processEnv.STRIPE_EMULATOR_PORT ?? '4510', 10)
+  if (!Number.isFinite(parsedPort) || parsedPort <= 0)
+    throw new Error('STRIPE_EMULATOR_PORT must be a positive integer')
+  return parsedPort
 }
 
 export function getPlaywrightStripeApiBaseUrl(processEnv: NodeJS.ProcessEnv): string {

@@ -1,6 +1,6 @@
-import { randomUUID } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '../../src/types/supabase.types'
+import { randomUUID } from 'node:crypto'
 import { getSupabaseClient, resetAndSeedAppData, resetAppData, USER_ID, USER_PASSWORD } from '../../tests/test-utils'
 import { expect, test } from '../support/commands'
 
@@ -41,15 +41,21 @@ test.describe('Credit Top-Up', () => {
       await resetAppData(appId)
 
     if (orgId) {
-      await supabase.from('org_users').delete().eq('org_id', orgId)
-      await supabase.from('orgs').delete().eq('id', orgId)
+      const { error: orgUsersError } = await supabase.from('org_users').delete().eq('org_id', orgId)
+      expect(orgUsersError).toBeNull()
+      const { error: orgError } = await supabase.from('orgs').delete().eq('id', orgId)
+      expect(orgError).toBeNull()
     }
 
-    if (customerId)
-      await supabase.from('stripe_info').delete().eq('customer_id', customerId)
+    if (customerId) {
+      const { error: stripeInfoError } = await supabase.from('stripe_info').delete().eq('customer_id', customerId)
+      expect(stripeInfoError).toBeNull()
+    }
 
-    if (planStripeId)
-      await supabase.from('plans').delete().eq('stripe_id', planStripeId)
+    if (planStripeId) {
+      const { error: planError } = await supabase.from('plans').delete().eq('stripe_id', planStripeId)
+      expect(planError).toBeNull()
+    }
   })
 
   test('completes a credit purchase through the Stripe emulator checkout flow', async ({ page }) => {

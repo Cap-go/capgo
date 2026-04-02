@@ -10,11 +10,15 @@ function normalizePostgresUrl(raw: string): string {
   return raw.replace('localhost', '127.0.0.1')
 }
 
-export const POSTGRES_URL = normalizePostgresUrl(
+function getPostgresUrlFromEnv(): string {
+  return normalizePostgresUrl(
   env.SUPABASE_DB_URL
   ?? env.DB_URL
   ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
-)
+  )
+}
+
+export let POSTGRES_URL = getPostgresUrlFromEnv()
 
 export function normalizeLocalhostUrl(raw: string | undefined): string | undefined {
   if (!raw)
@@ -58,50 +62,61 @@ function getLocalSupabaseStatus() {
 }
 
 function hydrateLocalSupabaseEnvFromStatus(): void {
-  if (USE_CLOUDFLARE)
-    return
-
-  const currentSupabaseUrl = normalizeLocalhostUrl(env.SUPABASE_URL) ?? ''
-  const currentAnonKey = env.SUPABASE_ANON_KEY ?? ''
-  const existingServiceKey = env.SUPABASE_SERVICE_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY ?? env.SERVICE_ROLE_KEY ?? ''
-  if (currentSupabaseUrl && currentAnonKey && existingServiceKey)
-    return
-
-  let status = getLocalSupabaseStatus()
-
-  if ((status.status ?? 1) !== 0) {
-    const start = spawnSync('bun', ['run', 'supabase:start'], {
-      cwd: process.cwd(),
-      encoding: 'utf8',
-      env: process.env,
-    })
-
-    if ((start.status ?? 1) !== 0)
+  try {
+    if (USE_CLOUDFLARE)
       return
 
-    status = getLocalSupabaseStatus()
-  }
+    const currentSupabaseUrl = normalizeLocalhostUrl(env.SUPABASE_URL) ?? ''
+    const currentAnonKey = env.SUPABASE_ANON_KEY ?? ''
+    const existingServiceKey = env.SUPABASE_SERVICE_KEY ?? env.SUPABASE_SERVICE_ROLE_KEY ?? env.SERVICE_ROLE_KEY ?? ''
+    const currentDbUrl = env.SUPABASE_DB_URL ?? env.DB_URL ?? ''
+    if (currentSupabaseUrl && currentAnonKey && existingServiceKey && currentDbUrl)
+      return
 
-  if ((status.status ?? 1) !== 0)
-    return
+    let status = getLocalSupabaseStatus()
 
-  try {
-    const parsed = parseSupabaseStatusJson(status.stdout || '')
-    const supabaseUrl = normalizeLocalhostUrl(parsed.API_URL)
-    const anonKey = parsed.ANON_KEY || parsed.PUBLISHABLE_KEY
-    const serviceKey = parsed.SERVICE_ROLE_KEY || parsed.SECRET_KEY
+    if ((status.status ?? 1) !== 0) {
+      const start = spawnSync('bun', ['run', 'supabase:start'], {
+        cwd: process.cwd(),
+        encoding: 'utf8',
+        env: process.env,
+      })
 
-    if (supabaseUrl)
-      env.SUPABASE_URL = supabaseUrl
-    if (anonKey)
-      env.SUPABASE_ANON_KEY = anonKey
-    if (serviceKey) {
-      env.SUPABASE_SERVICE_ROLE_KEY = serviceKey
-      env.SUPABASE_SERVICE_KEY = serviceKey
+      if ((start.status ?? 1) !== 0)
+        return
+
+      status = getLocalSupabaseStatus()
+    }
+
+    if ((status.status ?? 1) !== 0)
+      return
+
+    try {
+      const parsed = parseSupabaseStatusJson(status.stdout || '')
+      const supabaseUrl = normalizeLocalhostUrl(parsed.API_URL)
+      const dbUrl = parsed.DB_URL ? normalizePostgresUrl(parsed.DB_URL) : undefined
+      const anonKey = parsed.ANON_KEY || parsed.PUBLISHABLE_KEY
+      const serviceKey = parsed.SERVICE_ROLE_KEY || parsed.SECRET_KEY
+
+      if (supabaseUrl)
+        env.SUPABASE_URL = supabaseUrl
+      if (dbUrl) {
+        env.SUPABASE_DB_URL = dbUrl
+        env.DB_URL = dbUrl
+      }
+      if (anonKey)
+        env.SUPABASE_ANON_KEY = anonKey
+      if (serviceKey) {
+        env.SUPABASE_SERVICE_ROLE_KEY = serviceKey
+        env.SUPABASE_SERVICE_KEY = serviceKey
+      }
+    }
+    catch {
+      // Keep the existing environment when status output is unavailable or malformed.
     }
   }
-  catch {
-    // Keep the existing environment when status output is unavailable or malformed.
+  finally {
+    POSTGRES_URL = getPostgresUrlFromEnv()
   }
 }
 
@@ -772,6 +787,8 @@ export async function cleanup(): Promise<void> {
 let pool: Pool | null = null
 
 export async function getPostgresClient(): Promise<Pool> {
+  hydrateLocalSupabaseEnvFromStatus()
+
   if (!pool) {
     pool = new Pool({
       connectionString: POSTGRES_URL,
