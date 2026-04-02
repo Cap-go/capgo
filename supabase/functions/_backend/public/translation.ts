@@ -7,6 +7,8 @@ import { getEnv } from '../utils/utils.ts'
 
 const CACHE_TTL_SECONDS = 7 * 24 * 60 * 60
 const MAX_BATCH_CHARACTERS = 3_200
+const MAX_MESSAGE_ENTRIES = 2_500
+const MAX_MESSAGE_TOTAL_CHARACTERS = 100_000
 const MAX_STRINGS = 220
 const MAX_TOTAL_CHARACTERS = 12_000
 const TRANSLATION_MODEL = '@cf/meta/m2m100-1.2b'
@@ -49,6 +51,7 @@ const SUPPORTED_LANGUAGES = new Set([
 ])
 
 interface TranslationBody {
+  messages?: unknown
   pagePath?: string
   requestHash?: string
   strings?: unknown
@@ -66,6 +69,12 @@ interface TranslationResponsePayload {
   model: string
   requestHash: string
   translations: Record<string, string>
+}
+
+interface TranslationMessagesResponsePayload {
+  messages: Record<string, string>
+  model: string
+  requestHash: string
 }
 
 interface TranslationRateLimitEntry {
@@ -110,6 +119,38 @@ export function normalizeTranslationStrings(strings: unknown) {
     unique.add(normalized)
     filtered.push(entry)
     totalCharacters += entry.length
+  }
+
+  return filtered
+}
+
+export function normalizeTranslationMessages(messages: unknown) {
+  if (!messages || typeof messages !== 'object' || Array.isArray(messages))
+    throw quickError(400, 'invalid_translation_payload', 'messages must be an object')
+
+  const filtered: Record<string, string> = {}
+  let entryCount = 0
+  let totalCharacters = 0
+
+  for (const [key, value] of Object.entries(messages as Record<string, unknown>)) {
+    if (typeof value !== 'string')
+      continue
+
+    const normalized = normalizeWhitespace(value)
+    if (!normalized)
+      continue
+    if (normalized.length > 800)
+      continue
+    if (key.length > 200)
+      continue
+    if (entryCount >= MAX_MESSAGE_ENTRIES)
+      break
+    if (totalCharacters + value.length > MAX_MESSAGE_TOTAL_CHARACTERS)
+      break
+
+    filtered[key] = value
+    entryCount += 1
+    totalCharacters += value.length
   }
 
   return filtered
@@ -304,6 +345,17 @@ async function translateStrings(ai: { run: (model: string, input: unknown) => Pr
   return Object.fromEntries(translations)
 }
 
+async function translateMessages(ai: { run: (model: string, input: unknown) => Promise<unknown> }, messages: Record<string, string>, targetLanguage: string) {
+  const uniqueSources = [...new Set(Object.values(messages))]
+  const translations = uniqueSources.length > 0
+    ? await translateStrings(ai, uniqueSources, targetLanguage)
+    : {}
+
+  return Object.fromEntries(
+    Object.entries(messages).map(([key, source]) => [key, translations[source] ?? source]),
+  )
+}
+
 export const app = honoFactory.createApp()
 
 app.use('*', useCors)
@@ -347,14 +399,92 @@ app.post('/page', async (c) => {
     throw quickError(429, 'translation_rate_limited', 'Too many translation requests')
   }
 
-  const translations = strings.length > 0
-    ? await translateStrings(c.env.AI, strings, targetLanguage)
-    : {}
+  let translations: Record<string, string> = {}
+  try {
+    translations = strings.length > 0
+      ? await translateStrings(c.env.AI, strings, targetLanguage)
+      : {}
+  }
+  catch (error) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Workers AI page translation failed',
+      error,
+      targetLanguage,
+      stringCount: strings.length,
+    })
+    throw quickError(502, 'translation_failed', 'Workers AI translation failed')
+  }
 
   const payload: TranslationResponsePayload = {
     requestHash,
     model: TRANSLATION_MODEL,
     translations,
+  }
+
+  await cacheHelper.putJson(cacheRequest, payload, CACHE_TTL_SECONDS)
+
+  return c.json(payload)
+})
+
+app.post('/messages', async (c) => {
+  if (!c.env.AI) {
+    throw quickError(503, 'translation_unavailable', 'Workers AI binding is not configured')
+  }
+
+  const body = await parseBody<TranslationBody>(c)
+  const targetLanguage = typeof body.targetLanguage === 'string' ? body.targetLanguage.trim().toLowerCase() : ''
+  if (!SUPPORTED_LANGUAGES.has(targetLanguage)) {
+    throw quickError(400, 'unsupported_translation_language', 'Target language is not supported')
+  }
+
+  const messages = normalizeTranslationMessages(body.messages)
+  const requestHash = await sha256Hex(JSON.stringify({
+    model: TRANSLATION_MODEL,
+    targetLanguage,
+    messages,
+  }))
+
+  const cacheHelper = new CacheHelper(c)
+  const cacheRequest = cacheHelper.buildRequest('/translation/messages-cache', {
+    hash: requestHash,
+    lang: targetLanguage,
+  })
+
+  const cached = await cacheHelper.matchJson<TranslationMessagesResponsePayload>(cacheRequest)
+  c.header('Cache-Control', `public, max-age=0, s-maxage=${CACHE_TTL_SECONDS}`)
+
+  if (cached)
+    return c.json(cached)
+
+  const rateLimitStatus = await recordTranslationRequest(c)
+  if (rateLimitStatus.limited) {
+    const retryAfter = rateLimitStatus.resetAt
+      ? Math.max(1, Math.ceil((rateLimitStatus.resetAt - Date.now()) / 1000))
+      : TRANSLATION_IP_RATE_TTL_SECONDS
+    c.header('Retry-After', String(retryAfter))
+    throw quickError(429, 'translation_rate_limited', 'Too many translation requests')
+  }
+
+  let translatedMessages: Record<string, string> = {}
+  try {
+    translatedMessages = await translateMessages(c.env.AI, messages, targetLanguage)
+  }
+  catch (error) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Workers AI message catalog translation failed',
+      error,
+      targetLanguage,
+      messageCount: Object.keys(messages).length,
+    })
+    throw quickError(502, 'translation_failed', 'Workers AI translation failed')
+  }
+
+  const payload: TranslationMessagesResponsePayload = {
+    requestHash,
+    model: TRANSLATION_MODEL,
+    messages: translatedMessages,
   }
 
   await cacheHelper.putJson(cacheRequest, payload, CACHE_TTL_SECONDS)

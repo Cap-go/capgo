@@ -360,6 +360,8 @@ export function usePageTranslation() {
     }
     if (response.status === 503)
       throw new RetryableTranslationError('Translation service unavailable')
+    if (response.status === 502)
+      throw new RetryableTranslationError('Translation request failed')
 
     if (!response.ok)
       throw new Error(`Translation request failed with ${response.status}`)

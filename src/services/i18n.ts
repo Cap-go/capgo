@@ -18,8 +18,8 @@ export async function changeLanguage(lang: string, options?: { reload?: boolean 
 
   await loadLanguageAsync(nextLanguage)
 
-  // The page translator rehydrates from rendered English source content after a
-  // full reload, so callers should persist any unsaved in-memory form state first.
+  // Runtime message bundles now update `t(...)` output without a full reload.
+  // Keep opt-in reload support for callers that still need a hard refresh.
   if (options?.reload === true && typeof window !== 'undefined')
     window.location.reload()
 

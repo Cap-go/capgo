@@ -1,20 +1,27 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getWorkerLanguageCode, isKnownSourceText, normalizeLanguage } from '../src/modules/i18n'
+import { getWorkerLanguageCode, isKnownSourceText, normalizeLanguage, resetDynamicTranslationRuntimeStateForTests, translateMessage } from '../src/modules/i18n'
 import { loadLanguageAsync } from '../src/modules/i18n'
 import { changeLanguage } from '../src/services/i18n'
 import type { ProtectedEntry } from '../supabase/functions/_backend/public/translation.ts'
 import {
+  normalizeTranslationMessages,
   normalizeTranslationStrings,
   parseSegmentedTranslation,
   protectTranslationTokens,
   restoreTranslationTokens,
 } from '../supabase/functions/_backend/public/translation.ts'
 
+const originalFetch = globalThis.fetch
 const originalWindow = globalThis.window
 const originalLocalStorage = globalThis.localStorage
 
 afterEach(() => {
   vi.restoreAllMocks()
+  resetDynamicTranslationRuntimeStateForTests()
+  if (originalFetch === undefined)
+    Reflect.deleteProperty(globalThis, 'fetch')
+  else
+    Object.defineProperty(globalThis, 'fetch', { configurable: true, value: originalFetch })
   if (originalWindow === undefined)
     Reflect.deleteProperty(globalThis, 'window')
   else
@@ -78,6 +85,49 @@ describe('dynamic translation language selection', () => {
     await changeLanguage('de', { reload: true })
     expect(reload).toHaveBeenCalledTimes(1)
   })
+
+  it('loads translated runtime message catalogs and reuses the cached bundle', async () => {
+    const storage = new Map<string, string>()
+    const localStorageMock = {
+      clear: vi.fn(() => storage.clear()),
+      getItem: vi.fn((key: string) => storage.get(key) ?? null),
+      key: vi.fn(() => null),
+      length: 0,
+      removeItem: vi.fn((key: string) => storage.delete(key)),
+      setItem: vi.fn((key: string, value: string) => storage.set(key, value)),
+    } as unknown as Storage
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        messages: {
+          account: 'Compte',
+          'personal-information': 'Informations personnelles',
+        },
+      }),
+    }))
+
+    Object.defineProperty(globalThis, 'fetch', {
+      configurable: true,
+      value: fetchMock,
+    })
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: localStorageMock,
+    })
+
+    await loadLanguageAsync('fr')
+    expect(translateMessage('account')).toBe('Compte')
+    expect(translateMessage('personal-information')).toBe('Informations personnelles')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    await loadLanguageAsync('en')
+    fetchMock.mockClear()
+
+    await loadLanguageAsync('fr')
+    expect(translateMessage('account')).toBe('Compte')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
 })
 
 describe('dynamic translation worker helpers', () => {
@@ -93,6 +143,18 @@ describe('dynamic translation worker helpers', () => {
       'https://capgo.app',
       'Bundle uploads',
     ])
+  })
+
+  it.concurrent('keeps keyed message bundles intact for catalog translation', () => {
+    expect(normalizeTranslationMessages({
+      account: 'Account',
+      empty: '',
+      nested: { skip: true },
+      'personal-information': 'Personal Information',
+    })).toEqual({
+      account: 'Account',
+      'personal-information': 'Personal Information',
+    })
   })
 
   it.concurrent('protects and restores inline placeholders and commands', () => {

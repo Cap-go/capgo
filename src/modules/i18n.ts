@@ -2,6 +2,7 @@ import type { Locale } from 'vue-i18n'
 import type { UserModule } from '~/types'
 import { ref } from 'vue'
 import sourceMessages from '../../messages/en.json'
+import { defaultApiHost } from '../services/supabase'
 
 export interface LanguageOption {
   countryCode: string
@@ -66,7 +67,15 @@ export const availableLocales = languageOptions.map(option => option.id)
 export const languages = Object.fromEntries(languageOptions.map(option => [option.id, option.label]))
 export const selectedLanguage = ref(SOURCE_LOCALE)
 
-const messageCatalog = sourceMessages as Record<string, string>
+type MessageCatalog = Record<string, string>
+
+const messageCatalog = sourceMessages as MessageCatalog
+const activeMessageCatalog = ref<MessageCatalog>(messageCatalog)
+const translatedMessageCatalogs = new Map<string, MessageCatalog>([[SOURCE_LOCALE, messageCatalog]])
+const pendingCatalogLoads = new Map<string, Promise<MessageCatalog>>()
+const MESSAGE_CACHE_PREFIX = 'capgo:translated-messages'
+const MESSAGE_CACHE_VERSION = 1
+let messageCatalogTranslationDisabled = false
 const SAFE_DYNAMIC_PLACEHOLDERS = new Set([
   'amount',
   'channel',
@@ -178,6 +187,15 @@ function updateHtmlLanguage(lang: string) {
     document.documentElement.setAttribute('lang', lang)
 }
 
+function getMessageCacheKey(lang: string) {
+  return [
+    MESSAGE_CACHE_PREFIX,
+    MESSAGE_CACHE_VERSION,
+    import.meta.env.VITE_APP_VERSION ?? 'dev',
+    lang,
+  ].join(':')
+}
+
 function persistLanguage(lang: string) {
   if (typeof localStorage !== 'undefined')
     localStorage.setItem(LANGUAGE_STORAGE_KEY, lang)
@@ -193,6 +211,123 @@ function getNavigatorLanguage() {
   if (typeof navigator === 'undefined')
     return null
   return navigator.language
+}
+
+function isMessageCatalog(value: unknown): value is MessageCatalog {
+  if (!value || typeof value !== 'object' || Array.isArray(value))
+    return false
+
+  return Object.values(value).every(entry => typeof entry === 'string')
+}
+
+function readCachedMessageCatalog(lang: string) {
+  if (typeof localStorage === 'undefined')
+    return null
+
+  try {
+    const raw = localStorage.getItem(getMessageCacheKey(lang))
+    if (!raw)
+      return null
+
+    const parsed = JSON.parse(raw) as unknown
+    if (!isMessageCatalog(parsed))
+      return null
+
+    return { ...messageCatalog, ...parsed }
+  }
+  catch {
+    return null
+  }
+}
+
+function persistMessageCatalog(lang: string, messages: MessageCatalog) {
+  if (typeof localStorage === 'undefined')
+    return
+
+  try {
+    localStorage.setItem(getMessageCacheKey(lang), JSON.stringify(messages))
+  }
+  catch {
+    // Ignore quota/storage failures and keep runtime translations in memory.
+  }
+}
+
+function applyMessageCatalog(lang: string, messages?: MessageCatalog) {
+  const nextMessages = messages ?? translatedMessageCatalogs.get(lang) ?? messageCatalog
+  activeMessageCatalog.value = nextMessages
+}
+
+async function fetchTranslatedMessageCatalog(lang: string) {
+  if (messageCatalogTranslationDisabled)
+    return messageCatalog
+
+  try {
+    const translationEndpoint = `${defaultApiHost || ''}/translation/messages`
+    const response = await fetch(translationEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messages: messageCatalog,
+        targetLanguage: getWorkerLanguageCode(lang),
+      }),
+    })
+
+    if (response.status === 404 || response.status === 501 || response.status === 503) {
+      // Supabase-only/local runtimes intentionally do not expose translation
+      // bundles, and workers without AI bindings should keep the source English UI.
+      messageCatalogTranslationDisabled = true
+      return messageCatalog
+    }
+
+    if (!response.ok)
+      throw new Error(`Message translation request failed with ${response.status}`)
+
+    const payload = await response.json() as { messages?: unknown }
+    if (!isMessageCatalog(payload.messages))
+      return messageCatalog
+
+    return { ...messageCatalog, ...payload.messages }
+  }
+  catch (error) {
+    console.error('Message catalog translation failed', error)
+    return messageCatalog
+  }
+}
+
+async function ensureMessageCatalogLoaded(lang: string) {
+  const normalized = normalizeLanguage(lang)
+  if (isEnglishLocale(normalized))
+    return messageCatalog
+
+  const existing = translatedMessageCatalogs.get(normalized)
+  if (existing)
+    return existing
+
+  const cached = readCachedMessageCatalog(normalized)
+  if (cached) {
+    translatedMessageCatalogs.set(normalized, cached)
+    return cached
+  }
+
+  const pending = pendingCatalogLoads.get(normalized)
+  if (pending)
+    return pending
+
+  const loadPromise = fetchTranslatedMessageCatalog(normalized)
+    .then((messages) => {
+      translatedMessageCatalogs.set(normalized, messages)
+      if (messages !== messageCatalog)
+        persistMessageCatalog(normalized, messages)
+      return messages
+    })
+    .finally(() => {
+      pendingCatalogLoads.delete(normalized)
+    })
+
+  pendingCatalogLoads.set(normalized, loadPromise)
+  return loadPromise
 }
 
 export function normalizeLanguage(lang?: string | null): string {
@@ -231,7 +366,7 @@ export function getWorkerLanguageCode(lang?: string | null) {
 }
 
 export function getSourceMessage(key: string, defaultMessage?: string) {
-  const resolved = messageCatalog[key]
+  const resolved = activeMessageCatalog.value[key] ?? messageCatalog[key]
   if (resolved)
     return resolved
   if (defaultMessage)
@@ -250,6 +385,15 @@ export function translateMessage(key: string, params?: MessageParams, defaultMes
   return interpolateMessage(getSourceMessage(key, defaultMessage), params)
 }
 
+export function resetDynamicTranslationRuntimeStateForTests() {
+  activeMessageCatalog.value = messageCatalog
+  translatedMessageCatalogs.clear()
+  translatedMessageCatalogs.set(SOURCE_LOCALE, messageCatalog)
+  pendingCatalogLoads.clear()
+  messageCatalogTranslationDisabled = false
+  selectedLanguage.value = SOURCE_LOCALE
+}
+
 export const i18n = {
   global: {
     locale: selectedLanguage,
@@ -263,7 +407,20 @@ export function loadLanguageAsync(lang: string): Promise<Locale> {
   selectedLanguage.value = normalized
   persistLanguage(normalized)
   updateHtmlLanguage(normalized)
-  return Promise.resolve(normalized)
+
+  if (isEnglishLocale(normalized)) {
+    applyMessageCatalog(normalized, messageCatalog)
+    return Promise.resolve(normalized)
+  }
+
+  const cached = readCachedMessageCatalog(normalized)
+  applyMessageCatalog(normalized, cached ?? messageCatalog)
+
+  return ensureMessageCatalogLoaded(normalized).then((messages) => {
+    if (selectedLanguage.value === normalized)
+      applyMessageCatalog(normalized, messages)
+    return normalized
+  })
 }
 
 export const install: UserModule = () => {
@@ -271,4 +428,16 @@ export const install: UserModule = () => {
   selectedLanguage.value = initialLanguage
   persistLanguage(initialLanguage)
   updateHtmlLanguage(initialLanguage)
+
+  const cached = isEnglishLocale(initialLanguage)
+    ? messageCatalog
+    : readCachedMessageCatalog(initialLanguage) ?? messageCatalog
+  applyMessageCatalog(initialLanguage, cached)
+
+  if (!isEnglishLocale(initialLanguage)) {
+    void ensureMessageCatalogLoaded(initialLanguage).then((messages) => {
+      if (selectedLanguage.value === initialLanguage)
+        applyMessageCatalog(initialLanguage, messages)
+    })
+  }
 }
