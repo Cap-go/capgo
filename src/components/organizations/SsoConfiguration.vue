@@ -6,7 +6,7 @@ import IconCopy from '~icons/heroicons/document-duplicate'
 import IconGlobeAlt from '~icons/heroicons/globe-alt'
 import IconTrash from '~icons/heroicons/trash'
 import Spinner from '~/components/Spinner.vue'
-import { defaultApiHost, getSupabaseHost, useSupabase } from '~/services/supabase'
+import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
 interface SsoProvider {
@@ -38,18 +38,7 @@ interface SpMetadata {
 }
 
 const providers = ref<SsoProvider[]>([])
-const spMetadata = computed<SpMetadata | null>(() => {
-  const base = getSupabaseHost()
-  if (!base)
-    return null
-  const metadataUrl = `${base}/auth/v1/sso/saml/metadata`
-  return {
-    acs_url: `${base}/auth/v1/sso/saml/acs`,
-    entity_id: metadataUrl,
-    sp_metadata_url: metadataUrl,
-    nameid_format: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
-  }
-})
+const spMetadata = ref<SpMetadata | null>(null)
 const isLoading = ref(true)
 const isSubmitting = ref(false)
 const isVerifying = ref<string | null>(null)
@@ -121,6 +110,39 @@ async function fetchProviders() {
   }
   finally {
     isLoading.value = false
+  }
+}
+
+async function fetchSpMetadata() {
+  try {
+    const headers = await getAuthHeaders()
+    const response = await fetch(`${defaultApiHost}/private/sso/sp-metadata`, {
+      method: 'GET',
+      headers,
+    })
+
+    if (!response.ok) {
+      console.error('Failed to fetch SSO SP metadata:', response.status)
+      spMetadata.value = null
+      return
+    }
+
+    const data = await response.json() as {
+      acs_url: string
+      entity_id: string
+      nameid_format: string
+      sp_metadata_url?: string
+    }
+    spMetadata.value = {
+      acs_url: data.acs_url,
+      entity_id: data.entity_id,
+      sp_metadata_url: data.sp_metadata_url ?? data.entity_id,
+      nameid_format: data.nameid_format,
+    }
+  }
+  catch (error) {
+    console.error('Error fetching SSO SP metadata:', error)
+    spMetadata.value = null
   }
 }
 
@@ -336,7 +358,10 @@ function formatDate(dateString: string): string {
 }
 
 onMounted(async () => {
-  await fetchProviders()
+  await Promise.all([
+    fetchProviders(),
+    fetchSpMetadata(),
+  ])
 })
 
 // Expose showAddForm so parent can control it
