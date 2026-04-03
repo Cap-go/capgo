@@ -4,7 +4,7 @@ import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { isBentoConfigured, trackBentoEvent } from './bento.ts'
 import { CacheHelper } from './cache.ts'
 import { cloudlog } from './logging.ts'
-import { sendNotifOrg } from './notifications.ts'
+import { sendNotifOrg, sendNotifOrgOnce } from './notifications.ts'
 import { getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
 import { backgroundTask } from './utils.ts'
@@ -96,6 +96,12 @@ export interface EmailPreferences {
 interface OrgWithPreferences {
   management_email: string
   email_preferences?: EmailPreferences | null
+}
+
+interface EligibleEmailTargets {
+  allEmails: string[]
+  primaryEmail: string | null
+  additionalEmails: string[]
 }
 
 /**
@@ -347,6 +353,23 @@ async function getAllEligibleEmails(
   return { adminEmails, managementEmail, org }
 }
 
+function getEligibleEmailTargets(adminEmails: string[], managementEmail: string | null): EligibleEmailTargets {
+  const allEmails = Array.from(new Set([
+    ...adminEmails,
+    ...(managementEmail ? [managementEmail] : []),
+  ]))
+  const primaryEmail = managementEmail ?? adminEmails[0] ?? null
+  const additionalEmails = primaryEmail
+    ? allEmails.filter(email => email !== primaryEmail)
+    : allEmails
+
+  return {
+    allEmails,
+    primaryEmail,
+    additionalEmails,
+  }
+}
+
 /**
  * Send an email notification to all eligible org members (admin/super_admin with preference enabled).
  * Also sends to management_email if it's different from admin emails and org preference is enabled.
@@ -373,12 +396,7 @@ export async function sendEmailToOrgMembers(
 
   const client = drizzleClient ?? getDrizzleClient(getPgClient(c, true))
   const { adminEmails, managementEmail } = await getAllEligibleEmails(c, orgId, preferenceKey, client)
-
-  // Combine all emails (admin emails + management email if applicable)
-  const allEmails = [...adminEmails]
-  if (managementEmail) {
-    allEmails.push(managementEmail)
-  }
+  const { allEmails } = getEligibleEmailTargets(adminEmails, managementEmail)
 
   if (allEmails.length === 0) {
     cloudlog({
@@ -446,9 +464,22 @@ export async function sendNotifToOrgMembers(
     return false
   }
 
+  const { allEmails, primaryEmail, additionalEmails } = getEligibleEmailTargets(adminEmails, managementEmail)
+  if (allEmails.length === 0 || !primaryEmail) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'sendNotifToOrgMembers: no eligible recipients',
+      eventName,
+      preferenceKey,
+      orgId,
+    })
+    return false
+  }
+
   // Use sendNotifOrg to handle the notification table logic (throttling/deduplication)
-  // It will send to the org's management_email, but we also need to send to other eligible members
-  const orgEmailSent = await sendNotifOrg(c, eventName, eventData, orgId, uniqId, cron, org.management_email, drizzleClient)
+  // and send to a single eligible recipient first. Other eligible recipients are
+  // fanned out afterwards without duplicating the primary address.
+  const orgEmailSent = await sendNotifOrg(c, eventName, eventData, orgId, uniqId, cron, primaryEmail, drizzleClient)
 
   // Handle the "not sendable" case - propagate lastSendAt for caching
   if (typeof orgEmailSent === 'object' && orgEmailSent.sent === false && orgEmailSent.lastSendAt) {
@@ -460,14 +491,6 @@ export async function sendNotifToOrgMembers(
     return false
   }
 
-  // sendNotifOrg already sent to management_email, so filter it out from admin emails
-  // to avoid duplicate sends
-  const additionalEmails = adminEmails.filter(email => email !== org.management_email)
-
-  // If management_email is eligible (different from admins and org pref enabled)
-  // and wasn't in the admin list, it was already sent by sendNotifOrg, so we're good
-  // We just need to send to the additional admin emails in background
-
   for (const email of additionalEmails) {
     backgroundTask(c, trackBentoEvent(c, email, eventData, eventName))
   }
@@ -478,7 +501,60 @@ export async function sendNotifToOrgMembers(
     eventName,
     preferenceKey,
     orgId,
-    orgEmail: org.management_email,
+    primaryEmail,
+    additionalRecipients: additionalEmails.length,
+    managementEmailIncluded: !!managementEmail,
+  })
+
+  return true
+}
+
+export async function sendNotifToOrgMembersOnce(
+  c: Context,
+  eventName: string,
+  preferenceKey: EmailPreferenceKey,
+  eventData: Record<string, any>,
+  orgId: string,
+  uniqId: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+): Promise<boolean> {
+  if (!isBentoConfigured(c))
+    return false
+
+  const { adminEmails, managementEmail, org } = await getAllEligibleEmails(c, orgId, preferenceKey, drizzleClient)
+
+  if (!org) {
+    cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembersOnce: org not found', orgId })
+    return false
+  }
+
+  const { allEmails, primaryEmail, additionalEmails } = getEligibleEmailTargets(adminEmails, managementEmail)
+  if (allEmails.length === 0 || !primaryEmail) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'sendNotifToOrgMembersOnce: no eligible recipients',
+      eventName,
+      preferenceKey,
+      orgId,
+    })
+    return false
+  }
+
+  const sent = await sendNotifOrgOnce(c, eventName, eventData, orgId, uniqId, primaryEmail, drizzleClient)
+  if (!sent)
+    return false
+
+  for (const email of additionalEmails) {
+    backgroundTask(c, trackBentoEvent(c, email, eventData, eventName))
+  }
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'sendNotifToOrgMembersOnce: queued',
+    eventName,
+    preferenceKey,
+    orgId,
+    primaryEmail,
     additionalRecipients: additionalEmails.length,
     managementEmailIncluded: !!managementEmail,
   })
@@ -525,4 +601,8 @@ export async function sendNotifToOrgMembersCached(
   // For other cases (true/false), just return the boolean result
   // No need to cache "sent=true" as next check should query DB anyway
   return result === true
+}
+
+export const orgEmailNotificationTestUtils = {
+  getEligibleEmailTargets,
 }

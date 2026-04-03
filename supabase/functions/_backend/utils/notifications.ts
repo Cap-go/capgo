@@ -207,6 +207,72 @@ export async function sendNotifOrg(
   }
 }
 
+export async function sendNotifOrgOnce(
+  c: Context,
+  eventName: string,
+  eventData: EventData,
+  orgId: string,
+  uniqId: string,
+  recipientEmail: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+) {
+  const notif = await getNotification(c, drizzleClient, orgId, eventName, uniqId)
+  if (notif) {
+    cloudlog({ requestId: c.get('requestId'), message: 'notif already sent once', event: eventName, orgId, uniqId })
+    return false
+  }
+
+  const pgClient = getPgClient(c)
+  const writeClient = createDrizzleClient(pgClient)
+
+  try {
+    const inserted = await writeClient
+      .insert(schema.notifications)
+      .values({
+        event: eventName,
+        uniq_id: uniqId,
+        owner_org: orgId,
+        last_send_at: new Date(),
+        total_send: 1,
+      })
+      .onConflictDoNothing({
+        target: [schema.notifications.owner_org, schema.notifications.event, schema.notifications.uniq_id],
+      })
+      .returning()
+
+    if (inserted.length === 0) {
+      cloudlog({ requestId: c.get('requestId'), message: 'notif once insert race lost', event: eventName, orgId, uniqId })
+      return false
+    }
+
+    const res = await trackBentoEvent(c, recipientEmail, eventData, eventName)
+    if (!res) {
+      try {
+        await writeClient
+          .delete(schema.notifications)
+          .where(and(
+            eq(schema.notifications.event, eventName),
+            eq(schema.notifications.uniq_id, uniqId),
+            eq(schema.notifications.owner_org, orgId),
+          ))
+      }
+      catch (cleanupError) {
+        logPgError(c, 'sendNotifOrgOnce cleanup', cleanupError)
+      }
+
+      cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed for one-time notif', eventName, email: recipientEmail, eventData })
+      return false
+    }
+
+    cloudlog({ requestId: c.get('requestId'), message: 'send one-time notif done', eventName, email: recipientEmail, uniqId })
+    return true
+  }
+  catch (e: unknown) {
+    logPgError(c, 'sendNotifOrgOnce', e)
+    return false
+  }
+}
+
 // dayjs subtract one week
 // const last_send_at = dayjs().subtract(1, 'week').toISOString()
 // cloudlog(c.get('requestId'), 'isSendable', isSendable(last_send_at, '0 0 1 * *'))
