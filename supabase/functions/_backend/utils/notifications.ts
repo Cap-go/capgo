@@ -107,6 +107,44 @@ async function getNotification(
   }
 }
 
+async function insertNotificationClaim(
+  writeClient: ReturnType<typeof getDrizzleClient>,
+  eventName: string,
+  orgId: string,
+  uniqId: string,
+): Promise<boolean> {
+  const inserted = await writeClient
+    .insert(schema.notifications)
+    .values({
+      event: eventName,
+      uniq_id: uniqId,
+      owner_org: orgId,
+      last_send_at: new Date(),
+      total_send: 1,
+    })
+    .onConflictDoNothing({
+      target: [schema.notifications.owner_org, schema.notifications.event, schema.notifications.uniq_id],
+    })
+    .returning()
+
+  return inserted.length > 0
+}
+
+async function deleteNotificationClaim(
+  writeClient: ReturnType<typeof getDrizzleClient>,
+  eventName: string,
+  orgId: string,
+  uniqId: string,
+) {
+  await writeClient
+    .delete(schema.notifications)
+    .where(and(
+      eq(schema.notifications.event, eventName),
+      eq(schema.notifications.uniq_id, uniqId),
+      eq(schema.notifications.owner_org, orgId),
+    ))
+}
+
 export async function sendNotifOrg(
   c: Context,
   eventName: string,
@@ -132,23 +170,8 @@ export async function sendNotifOrg(
       // First time: use insert with onConflictDoNothing to avoid error logs
       isFirstSend = true
 
-      const inserted = await writeClient
-        .insert(schema.notifications)
-        .values({
-          event: eventName,
-          uniq_id: uniqId,
-          owner_org: orgId,
-          last_send_at: new Date(),
-          total_send: 1,
-        })
-        .onConflictDoNothing({
-          target: [schema.notifications.owner_org, schema.notifications.event, schema.notifications.uniq_id],
-        })
-        .returning()
-
       // Only send if we successfully inserted (won the race)
-      // If conflict occurred, inserted will be empty array
-      shouldSend = inserted.length > 0
+      shouldSend = await insertNotificationClaim(writeClient, eventName, orgId, uniqId)
       if (!shouldSend) {
         cloudlog({ requestId: c.get('requestId'), message: 'notif insert race lost', event: eventName, orgId })
         return false
@@ -207,6 +230,28 @@ export async function sendNotifOrg(
   }
 }
 
+export async function claimNotifOrgOnce(
+  c: Context,
+  eventName: string,
+  orgId: string,
+  uniqId: string,
+): Promise<boolean> {
+  const pgClient = getPgClient(c)
+  const writeClient = createDrizzleClient(pgClient)
+
+  try {
+    const claimed = await insertNotificationClaim(writeClient, eventName, orgId, uniqId)
+    if (!claimed) {
+      cloudlog({ requestId: c.get('requestId'), message: 'notif once already claimed', event: eventName, orgId, uniqId })
+    }
+    return claimed
+  }
+  catch (e: unknown) {
+    logPgError(c, 'claimNotifOrgOnce', e)
+    return false
+  }
+}
+
 export async function sendNotifOrgOnce(
   c: Context,
   eventName: string,
@@ -214,47 +259,18 @@ export async function sendNotifOrgOnce(
   orgId: string,
   uniqId: string,
   recipientEmail: string,
-  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  _drizzleClient: ReturnType<typeof getDrizzleClient>,
 ) {
-  const notif = await getNotification(c, drizzleClient, orgId, eventName, uniqId)
-  if (notif) {
-    cloudlog({ requestId: c.get('requestId'), message: 'notif already sent once', event: eventName, orgId, uniqId })
+  const claimed = await claimNotifOrgOnce(c, eventName, orgId, uniqId)
+  if (!claimed)
     return false
-  }
-
-  const pgClient = getPgClient(c)
-  const writeClient = createDrizzleClient(pgClient)
 
   try {
-    const inserted = await writeClient
-      .insert(schema.notifications)
-      .values({
-        event: eventName,
-        uniq_id: uniqId,
-        owner_org: orgId,
-        last_send_at: new Date(),
-        total_send: 1,
-      })
-      .onConflictDoNothing({
-        target: [schema.notifications.owner_org, schema.notifications.event, schema.notifications.uniq_id],
-      })
-      .returning()
-
-    if (inserted.length === 0) {
-      cloudlog({ requestId: c.get('requestId'), message: 'notif once insert race lost', event: eventName, orgId, uniqId })
-      return false
-    }
-
     const res = await trackBentoEvent(c, recipientEmail, eventData, eventName)
     if (!res) {
       try {
-        await writeClient
-          .delete(schema.notifications)
-          .where(and(
-            eq(schema.notifications.event, eventName),
-            eq(schema.notifications.uniq_id, uniqId),
-            eq(schema.notifications.owner_org, orgId),
-          ))
+        const cleanupClient = createDrizzleClient(getPgClient(c))
+        await deleteNotificationClaim(cleanupClient, eventName, orgId, uniqId)
       }
       catch (cleanupError) {
         logPgError(c, 'sendNotifOrgOnce cleanup', cleanupError)

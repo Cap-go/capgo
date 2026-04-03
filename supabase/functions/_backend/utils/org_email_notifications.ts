@@ -4,7 +4,7 @@ import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { isBentoConfigured, trackBentoEvent } from './bento.ts'
 import { CacheHelper } from './cache.ts'
 import { cloudlog } from './logging.ts'
-import { sendNotifOrg, sendNotifOrgOnce } from './notifications.ts'
+import { claimNotifOrgOnce, sendNotifOrg, sendNotifOrgOnce } from './notifications.ts'
 import { getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
 import { backgroundTask } from './utils.ts'
@@ -102,6 +102,12 @@ interface EligibleEmailTargets {
   allEmails: string[]
   primaryEmail: string | null
   additionalEmails: string[]
+}
+
+interface PreparedEligibleEmailTargets extends EligibleEmailTargets {
+  adminEmails: string[]
+  managementEmail: string | null
+  org: OrgWithPreferences
 }
 
 /**
@@ -370,6 +376,35 @@ function getEligibleEmailTargets(adminEmails: string[], managementEmail: string 
   }
 }
 
+async function getPreparedEligibleEmailTargets(
+  c: Context,
+  orgId: string,
+  preferenceKey: EmailPreferenceKey,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+): Promise<PreparedEligibleEmailTargets | null> {
+  const { adminEmails, managementEmail, org } = await getAllEligibleEmails(c, orgId, preferenceKey, drizzleClient)
+  if (!org)
+    return null
+
+  return {
+    adminEmails,
+    managementEmail,
+    org,
+    ...getEligibleEmailTargets(adminEmails, managementEmail),
+  }
+}
+
+async function buildOneTimeRecipientNotifUniqId(uniqId: string, email: string): Promise<string> {
+  const normalizedEmail = email.trim().toLowerCase()
+  const data = new TextEncoder().encode(normalizedEmail)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+  const hash = Array.from(new Uint8Array(hashBuffer))
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('')
+
+  return `${uniqId}:${hash}`
+}
+
 /**
  * Send an email notification to all eligible org members (admin/super_admin with preference enabled).
  * Also sends to management_email if it's different from admin emails and org preference is enabled.
@@ -395,8 +430,13 @@ export async function sendEmailToOrgMembers(
     return 0
 
   const client = drizzleClient ?? getDrizzleClient(getPgClient(c, true))
-  const { adminEmails, managementEmail } = await getAllEligibleEmails(c, orgId, preferenceKey, client)
-  const { allEmails } = getEligibleEmailTargets(adminEmails, managementEmail)
+  const recipients = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, client)
+  if (!recipients) {
+    cloudlog({ requestId: c.get('requestId'), message: 'sendEmailToOrgMembers: org not found', orgId })
+    return 0
+  }
+
+  const { adminEmails, managementEmail, allEmails } = recipients
 
   if (allEmails.length === 0) {
     cloudlog({
@@ -457,14 +497,13 @@ export async function sendNotifToOrgMembers(
     return false
 
   // Get all eligible emails (includes org info)
-  const { adminEmails, managementEmail, org } = await getAllEligibleEmails(c, orgId, preferenceKey, drizzleClient)
-
-  if (!org) {
+  const recipients = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, drizzleClient)
+  if (!recipients) {
     cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembers: org not found', orgId })
     return false
   }
 
-  const { allEmails, primaryEmail, additionalEmails } = getEligibleEmailTargets(adminEmails, managementEmail)
+  const { managementEmail, allEmails, primaryEmail, additionalEmails } = recipients
   if (allEmails.length === 0 || !primaryEmail) {
     cloudlog({
       requestId: c.get('requestId'),
@@ -521,14 +560,13 @@ export async function sendNotifToOrgMembersOnce(
   if (!isBentoConfigured(c))
     return false
 
-  const { adminEmails, managementEmail, org } = await getAllEligibleEmails(c, orgId, preferenceKey, drizzleClient)
-
-  if (!org) {
+  const recipients = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, drizzleClient)
+  if (!recipients) {
     cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembersOnce: org not found', orgId })
     return false
   }
 
-  const { allEmails, primaryEmail, additionalEmails } = getEligibleEmailTargets(adminEmails, managementEmail)
+  const { managementEmail, allEmails, primaryEmail, additionalEmails } = recipients
   if (allEmails.length === 0 || !primaryEmail) {
     cloudlog({
       requestId: c.get('requestId'),
@@ -540,26 +578,36 @@ export async function sendNotifToOrgMembersOnce(
     return false
   }
 
-  const sent = await sendNotifOrgOnce(c, eventName, eventData, orgId, uniqId, primaryEmail, drizzleClient)
-  if (!sent)
+  const recipientEmails = [primaryEmail, ...additionalEmails]
+  const sendResults = await Promise.all(recipientEmails.map(async (email) => {
+    const recipientUniqId = await buildOneTimeRecipientNotifUniqId(uniqId, email)
+    const sent = await sendNotifOrgOnce(c, eventName, eventData, orgId, recipientUniqId, email, drizzleClient)
+    return { email, sent }
+  }))
+
+  const sentEmails = sendResults
+    .filter(result => result.sent)
+    .map(result => result.email)
+
+  if (sentEmails.length === 0)
     return false
 
-  for (const email of additionalEmails) {
-    backgroundTask(c, trackBentoEvent(c, email, eventData, eventName))
-  }
+  const firstOrgSend = await claimNotifOrgOnce(c, eventName, orgId, uniqId)
 
   cloudlog({
     requestId: c.get('requestId'),
-    message: 'sendNotifToOrgMembersOnce: queued',
+    message: 'sendNotifToOrgMembersOnce: delivered',
     eventName,
     preferenceKey,
     orgId,
     primaryEmail,
     additionalRecipients: additionalEmails.length,
+    deliveredRecipients: sentEmails.length,
+    firstOrgSend,
     managementEmailIncluded: !!managementEmail,
   })
 
-  return true
+  return firstOrgSend
 }
 
 /**
