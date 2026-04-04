@@ -151,6 +151,31 @@ describe('sendNotifToOrgMembersOnce', () => {
     expect(claimNotifOrgOnceMock).not.toHaveBeenCalled()
   })
 
+  it('fails closed when the org-level claim lookup errors', async () => {
+    hasNotifOrgClaimMock.mockResolvedValue(null)
+
+    const { sendNotifToOrgMembersOnce } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
+
+    const sent = await sendNotifToOrgMembersOnce(
+      createContext(),
+      'user:need_onboarding',
+      'onboarding',
+      { org_id: 'org-123' },
+      'org-123',
+      'org-123',
+      {} as any,
+    )
+
+    expect(sent).toBe(false)
+    expect(sendNotifOrgOnceMock).not.toHaveBeenCalled()
+    expect(claimNotifOrgOnceMock).not.toHaveBeenCalled()
+    expect(cloudlogMock).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sendNotifToOrgMembersOnce: org claim lookup failed',
+      orgId: 'org-123',
+      uniqId: 'org-123',
+    }))
+  })
+
   it('backfills the org-level claim once all recipient claims already exist', async () => {
     hasNotifOrgClaimMock
       .mockResolvedValueOnce(false)

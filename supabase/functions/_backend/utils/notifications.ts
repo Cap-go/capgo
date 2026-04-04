@@ -88,7 +88,7 @@ async function getNotification(
   orgId: string,
   eventName: string,
   uniqId: string,
-): Promise<{ last_send_at: Date, total_send: number } | null> {
+): Promise<{ last_send_at: Date, total_send: number } | null | undefined> {
   try {
     const notif = await drizzleClient
       .select({
@@ -108,7 +108,7 @@ async function getNotification(
   }
   catch (e: unknown) {
     logPgError(c, 'getNotification', e)
-    return null
+    return undefined
   }
 }
 
@@ -118,8 +118,10 @@ export async function hasNotifOrgClaim(
   eventName: string,
   orgId: string,
   uniqId: string,
-): Promise<boolean> {
+): Promise<boolean | null> {
   const notif = await getNotification(c, drizzleClient, orgId, eventName, uniqId)
+  if (notif === undefined)
+    return null
   return notif !== null
 }
 
@@ -173,6 +175,10 @@ export async function sendNotifOrg(
 ) {
   // Check if notification has already been sent (read from replica)
   const notif = await getNotification(c, drizzleClient, orgId, eventName, uniqId)
+  if (notif === undefined) {
+    cloudlog({ requestId: c.get('requestId'), message: 'notif lookup failed', event: eventName, orgId, uniqId })
+    return false
+  }
 
   // Create write-capable drizzle client for mutations
   const pgClient = getPgClient(c)

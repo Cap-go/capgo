@@ -561,6 +561,17 @@ export async function sendNotifToOrgMembersOnce(
     return false
 
   const alreadySentForOrg = await hasNotifOrgClaim(c, drizzleClient, eventName, orgId, uniqId)
+  if (alreadySentForOrg === null) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'sendNotifToOrgMembersOnce: org claim lookup failed',
+      eventName,
+      preferenceKey,
+      orgId,
+      uniqId,
+    })
+    return false
+  }
   if (alreadySentForOrg) {
     cloudlog({
       requestId: c.get('requestId'),
@@ -623,6 +634,17 @@ export async function sendNotifToOrgMembersOnce(
   let allUnsentRecipientsAlreadyClaimed = true
   for (const result of unsentResults) {
     const recipientAlreadyClaimed = await hasNotifOrgClaim(c, writeClient, eventName, orgId, result.recipientUniqId)
+    if (recipientAlreadyClaimed === null) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'sendNotifToOrgMembersOnce: recipient claim lookup failed',
+        eventName,
+        preferenceKey,
+        orgId,
+        recipientUniqId: result.recipientUniqId,
+      })
+      return false
+    }
     if (!recipientAlreadyClaimed) {
       allUnsentRecipientsAlreadyClaimed = false
       break
