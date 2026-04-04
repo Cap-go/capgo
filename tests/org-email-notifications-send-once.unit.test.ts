@@ -142,7 +142,7 @@ describe('sendNotifToOrgMembersOnce', () => {
     expect(sent).toBe(false)
     expect(hasNotifOrgClaimMock).toHaveBeenCalledWith(
       expect.anything(),
-      expect.anything(),
+      { kind: 'write-client' },
       'user:need_onboarding',
       'org-123',
       'org-123',
@@ -180,7 +180,6 @@ describe('sendNotifToOrgMembersOnce', () => {
     hasNotifOrgClaimMock
       .mockResolvedValueOnce(false)
       .mockResolvedValue(true)
-    sendNotifOrgOnceMock.mockResolvedValue({ sent: false, cleanupFailed: false })
     claimNotifOrgOnceMock.mockResolvedValue(true)
 
     const { sendNotifToOrgMembersOnce } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
@@ -196,7 +195,7 @@ describe('sendNotifToOrgMembersOnce', () => {
     )
 
     expect(sent).toBe(true)
-    expect(sendNotifOrgOnceMock).toHaveBeenCalledTimes(1)
+    expect(sendNotifOrgOnceMock).not.toHaveBeenCalled()
     expect(claimNotifOrgOnceMock).toHaveBeenCalledWith(
       expect.anything(),
       'user:need_onboarding',
@@ -218,7 +217,6 @@ describe('sendNotifToOrgMembersOnce', () => {
     hasNotifOrgClaimMock
       .mockResolvedValueOnce(false)
       .mockResolvedValue(true)
-    sendNotifOrgOnceMock.mockResolvedValue({ sent: false, cleanupFailed: false })
     claimNotifOrgOnceMock.mockResolvedValue(false)
 
     const { sendNotifToOrgMembersOnce } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
@@ -234,7 +232,7 @@ describe('sendNotifToOrgMembersOnce', () => {
     )
 
     expect(sent).toBe(false)
-    expect(sendNotifOrgOnceMock).toHaveBeenCalledTimes(1)
+    expect(sendNotifOrgOnceMock).not.toHaveBeenCalled()
     expect(claimNotifOrgOnceMock).toHaveBeenCalledWith(
       expect.anything(),
       'user:need_onboarding',
@@ -287,7 +285,7 @@ describe('sendNotifToOrgMembersOnce', () => {
     )
 
     expect(sent).toBe(false)
-    expect(hasNotifOrgClaimMock).toHaveBeenCalledTimes(1)
+    expect(hasNotifOrgClaimMock).toHaveBeenCalledTimes(2)
     expect(claimNotifOrgOnceMock).not.toHaveBeenCalled()
     expect(cloudlogMock).toHaveBeenCalledWith(expect.objectContaining({
       message: 'sendNotifToOrgMembersOnce: recipient cleanup failed',
