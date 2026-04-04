@@ -55,18 +55,32 @@ function createContext() {
   } as any
 }
 
-function createDrizzleStub() {
+function createDrizzleStub(options?: {
+  adminUsers?: { id: string, email: string, email_preferences?: Record<string, boolean> }[]
+  managementEmail?: string
+}) {
+  const adminUsers = options?.adminUsers ?? []
+  const managementEmail = options?.managementEmail ?? 'billing@example.com'
+
   const getRowsForTable = (table: any): any[] => {
     if (table === schema.orgs) {
-      return [{ management_email: 'billing@example.com', email_preferences: { onboarding: true } }]
+      return [{ management_email: managementEmail, email_preferences: { onboarding: true } }]
+    }
+    if (table === schema.org_users) {
+      return adminUsers.map(user => ({ user_id: user.id }))
     }
     if (
-      table === schema.org_users
-      || table === schema.role_bindings
+      table === schema.role_bindings
       || table === schema.group_members
-      || table === schema.users
     ) {
       return []
+    }
+    if (table === schema.users) {
+      return adminUsers.map(user => ({
+        id: user.id,
+        email: user.email,
+        email_preferences: user.email_preferences ?? { onboarding: true },
+      }))
     }
 
     return []
@@ -110,7 +124,7 @@ describe('sendNotifToOrgMembersOnce', () => {
     getDrizzleClientMock.mockReturnValue({ kind: 'write-client' } as any)
   })
 
-  it.concurrent('does not send recipient notifications when the org-level claim already exists', async () => {
+  it('does not send recipient notifications when the org-level claim already exists', async () => {
     hasNotifOrgClaimMock.mockResolvedValue(true)
 
     const { sendNotifToOrgMembersOnce } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
@@ -137,7 +151,7 @@ describe('sendNotifToOrgMembersOnce', () => {
     expect(claimNotifOrgOnceMock).not.toHaveBeenCalled()
   })
 
-  it.concurrent('backfills the org-level claim once all recipient claims already exist', async () => {
+  it('backfills the org-level claim once all recipient claims already exist', async () => {
     hasNotifOrgClaimMock
       .mockResolvedValueOnce(false)
       .mockResolvedValue(true)
@@ -167,7 +181,7 @@ describe('sendNotifToOrgMembersOnce', () => {
     )
   })
 
-  it.concurrent('returns false when recipient claims exist but the org-level backfill claim fails', async () => {
+  it('returns false when recipient claims exist but the org-level backfill claim fails', async () => {
     hasNotifOrgClaimMock
       .mockResolvedValueOnce(false)
       .mockResolvedValue(true)
@@ -195,5 +209,32 @@ describe('sendNotifToOrgMembersOnce', () => {
       'org-123',
       expect.anything(),
     )
+  })
+
+  it('does not write the org-level claim when any unsent recipient is not already claimed', async () => {
+    sendNotifOrgOnceMock
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
+    hasNotifOrgClaimMock
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false)
+
+    const { sendNotifToOrgMembersOnce } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
+
+    const sent = await sendNotifToOrgMembersOnce(
+      createContext(),
+      'user:need_onboarding',
+      'onboarding',
+      { org_id: 'org-123' },
+      'org-123',
+      'org-123',
+      createDrizzleStub({
+        adminUsers: [{ id: 'admin-1', email: 'admin@example.com' }],
+      }),
+    )
+
+    expect(sent).toBe(false)
+    expect(sendNotifOrgOnceMock).toHaveBeenCalledTimes(2)
+    expect(claimNotifOrgOnceMock).not.toHaveBeenCalled()
   })
 })

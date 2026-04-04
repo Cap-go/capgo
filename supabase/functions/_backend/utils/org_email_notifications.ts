@@ -603,20 +603,18 @@ export async function sendNotifToOrgMembersOnce(
   const sentEmails = sendResults
     .filter(result => result.sent)
     .map(result => result.email)
+  const unsentResults = sendResults.filter(result => !result.sent)
 
-  let allRecipientsAlreadyClaimed = false
-  if (sentEmails.length === 0) {
-    allRecipientsAlreadyClaimed = true
-    for (const result of sendResults) {
-      const recipientAlreadyClaimed = await hasNotifOrgClaim(c, drizzleClient, eventName, orgId, result.recipientUniqId)
-      if (!recipientAlreadyClaimed) {
-        allRecipientsAlreadyClaimed = false
-        break
-      }
+  let allUnsentRecipientsAlreadyClaimed = true
+  for (const result of unsentResults) {
+    const recipientAlreadyClaimed = await hasNotifOrgClaim(c, drizzleClient, eventName, orgId, result.recipientUniqId)
+    if (!recipientAlreadyClaimed) {
+      allUnsentRecipientsAlreadyClaimed = false
+      break
     }
   }
 
-  if (sentEmails.length === 0 && !allRecipientsAlreadyClaimed)
+  if (!allUnsentRecipientsAlreadyClaimed)
     return false
 
   const firstOrgSend = await claimNotifOrgOnce(c, eventName, orgId, uniqId, writeClient)
@@ -630,12 +628,13 @@ export async function sendNotifToOrgMembersOnce(
     primaryEmail,
     additionalRecipients: additionalEmails.length,
     deliveredRecipients: sentEmails.length,
-    allRecipientsAlreadyClaimed,
+    alreadyClaimedRecipients: unsentResults.length,
+    allUnsentRecipientsAlreadyClaimed,
     firstOrgSend,
     managementEmailIncluded: !!managementEmail,
   })
 
-  return sentEmails.length > 0 ? firstOrgSend : firstOrgSend && allRecipientsAlreadyClaimed
+  return firstOrgSend
 }
 
 /**
