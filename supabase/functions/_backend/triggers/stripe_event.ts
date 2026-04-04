@@ -12,7 +12,7 @@ import { middlewareStripeWebhook } from '../utils/hono_middleware_stripe.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import * as schema from '../utils/postgres_schema.ts'
-import { ensureCustomerMetadata, getStripe, syncStripeCustomerCountry } from '../utils/stripe.ts'
+import { ensureCustomerMetadata, getCreditCheckoutDetails, syncStripeCustomerCountry } from '../utils/stripe.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
 
@@ -197,26 +197,7 @@ async function handleCheckoutSessionCompleted(
 
   const creditProductId = metadataProductId ?? await getCreditTopUpProductIdFromCustomer(c, customerId)
 
-  const lineItems = await getStripe(c).checkout.sessions.listLineItems(sessionId, {
-    expand: ['data.price.product'],
-    limit: 100,
-  })
-
-  let creditQuantity = 0
-  const itemsSummary = lineItems.data.map((item) => {
-    const priceProduct = typeof item.price?.product === 'string'
-      ? item.price?.product
-      : (item.price?.product as { id?: string } | null)?.id ?? null
-    if (priceProduct === creditProductId)
-      creditQuantity += item.quantity ?? 0
-
-    return {
-      id: item.id,
-      quantity: item.quantity,
-      priceId: item.price?.id ?? null,
-      productId: priceProduct,
-    }
-  })
+  const { creditQuantity, itemsSummary } = await getCreditCheckoutDetails(c, session, creditProductId)
 
   if (creditQuantity <= 0) {
     throw simpleError('credit_product_not_found', 'Checkout session does not include the credit product', {
