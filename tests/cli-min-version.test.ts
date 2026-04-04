@@ -53,15 +53,19 @@ describe('tests min version', () => {
   const APPNAME = `com.cli_min_version_${id}`
 
   beforeAll(async () => {
-    await resetAndSeedAppData(APPNAME)
-    await prepareCli(APPNAME, false, false) // Use main project dependencies instead
-  }, 60000)
+    await Promise.all([
+      resetAndSeedAppData(APPNAME),
+      prepareCli(APPNAME, false, false), // Use main project dependencies instead
+    ])
+  })
 
   afterAll(async () => {
-    await cleanupCli(APPNAME)
-    await resetAppData(APPNAME)
-    await resetAppDataStats(APPNAME)
-  }, 60000)
+    await Promise.all([
+      cleanupCli(APPNAME),
+      resetAppData(APPNAME),
+      resetAppDataStats(APPNAME),
+    ])
+  })
 
   it('should test auto min version flag', async () => {
     const supabase = getSupabaseClient()

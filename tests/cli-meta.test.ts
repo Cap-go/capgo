@@ -54,15 +54,19 @@ describe('tests CLI metadata', () => {
   const APPNAME = `com.cli_meta_${id}`
 
   beforeAll(async () => {
-    await resetAndSeedAppData(APPNAME)
-    await prepareCli(APPNAME, false, false) // Use main project dependencies instead
-  }, 60000)
+    await Promise.all([
+      resetAndSeedAppData(APPNAME),
+      prepareCli(APPNAME, false, false), // Use main project dependencies instead
+    ])
+  })
 
   afterAll(async () => {
-    await cleanupCli(APPNAME)
-    await resetAppData(APPNAME)
-    await resetAppDataStats(APPNAME)
-  }, 60000)
+    await Promise.all([
+      cleanupCli(APPNAME),
+      resetAppData(APPNAME),
+      resetAppDataStats(APPNAME),
+    ])
+  })
 
   it('should upload bundle with metadata check', async () => {
     const testSemver = getSemver()
