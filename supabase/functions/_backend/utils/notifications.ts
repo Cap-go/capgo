@@ -14,6 +14,11 @@ interface EventData {
   [key: string]: any
 }
 
+export interface SendNotifOrgOnceResult {
+  cleanupFailed: boolean
+  sent: boolean
+}
+
 const NOTIF_CACHE_PATH = '/.notif-sendable'
 
 interface NotifCachePayload {
@@ -270,35 +275,37 @@ export async function sendNotifOrgOnce(
   recipientEmail: string,
   _drizzleClient: ReturnType<typeof getDrizzleClient>,
   writeClient = createDrizzleClient(getPgClient(c)),
-) {
+): Promise<SendNotifOrgOnceResult> {
   const claimed = await claimNotifOrgOnce(c, eventName, orgId, uniqId, writeClient)
   if (!claimed)
-    return false
+    return { sent: false, cleanupFailed: false }
 
-  const cleanupClaim = async () => {
+  const cleanupClaim = async (): Promise<boolean> => {
     try {
       await deleteNotificationClaim(writeClient, eventName, orgId, uniqId)
+      return true
     }
     catch (cleanupError) {
       logPgError(c, 'sendNotifOrgOnce cleanup', cleanupError)
+      return false
     }
   }
 
   try {
     const res = await trackBentoEvent(c, recipientEmail, eventData, eventName)
     if (!res) {
-      await cleanupClaim()
+      const cleanupSucceeded = await cleanupClaim()
       cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed for one-time notif', eventName, email: recipientEmail, eventData })
-      return false
+      return { sent: false, cleanupFailed: !cleanupSucceeded }
     }
 
     cloudlog({ requestId: c.get('requestId'), message: 'send one-time notif done', eventName, email: recipientEmail, uniqId })
-    return true
+    return { sent: true, cleanupFailed: false }
   }
   catch (e: unknown) {
-    await cleanupClaim()
+    const cleanupSucceeded = await cleanupClaim()
     logPgError(c, 'sendNotifOrgOnce', e)
-    return false
+    return { sent: false, cleanupFailed: !cleanupSucceeded }
   }
 }
 

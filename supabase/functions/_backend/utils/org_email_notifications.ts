@@ -593,21 +593,36 @@ export async function sendNotifToOrgMembersOnce(
 
   const writeClient = getDrizzleClient(getPgClient(c))
   const recipientEmails = [primaryEmail, ...additionalEmails]
-  const sendResults: { email: string, recipientUniqId: string, sent: boolean }[] = []
+  const sendResults: { cleanupFailed: boolean, email: string, recipientUniqId: string, sent: boolean }[] = []
   for (const email of recipientEmails) {
     const recipientUniqId = await buildOneTimeRecipientNotifUniqId(uniqId, email)
-    const sent = await sendNotifOrgOnce(c, eventName, eventData, orgId, recipientUniqId, email, drizzleClient, writeClient)
-    sendResults.push({ email, recipientUniqId, sent })
+    const sendResult = await sendNotifOrgOnce(c, eventName, eventData, orgId, recipientUniqId, email, drizzleClient, writeClient)
+    sendResults.push({ email, recipientUniqId, ...sendResult })
   }
 
   const sentEmails = sendResults
     .filter(result => result.sent)
     .map(result => result.email)
   const unsentResults = sendResults.filter(result => !result.sent)
+  const cleanupFailedEmails = unsentResults
+    .filter(result => result.cleanupFailed)
+    .map(result => result.email)
+
+  if (cleanupFailedEmails.length > 0) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'sendNotifToOrgMembersOnce: recipient cleanup failed',
+      eventName,
+      preferenceKey,
+      orgId,
+      cleanupFailedRecipients: cleanupFailedEmails,
+    })
+    return false
+  }
 
   let allUnsentRecipientsAlreadyClaimed = true
   for (const result of unsentResults) {
-    const recipientAlreadyClaimed = await hasNotifOrgClaim(c, drizzleClient, eventName, orgId, result.recipientUniqId)
+    const recipientAlreadyClaimed = await hasNotifOrgClaim(c, writeClient, eventName, orgId, result.recipientUniqId)
     if (!recipientAlreadyClaimed) {
       allUnsentRecipientsAlreadyClaimed = false
       break

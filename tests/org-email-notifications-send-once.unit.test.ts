@@ -155,7 +155,7 @@ describe('sendNotifToOrgMembersOnce', () => {
     hasNotifOrgClaimMock
       .mockResolvedValueOnce(false)
       .mockResolvedValue(true)
-    sendNotifOrgOnceMock.mockResolvedValue(false)
+    sendNotifOrgOnceMock.mockResolvedValue({ sent: false, cleanupFailed: false })
     claimNotifOrgOnceMock.mockResolvedValue(true)
 
     const { sendNotifToOrgMembersOnce } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
@@ -179,13 +179,21 @@ describe('sendNotifToOrgMembersOnce', () => {
       'org-123',
       expect.anything(),
     )
+    expect(hasNotifOrgClaimMock).toHaveBeenNthCalledWith(
+      2,
+      expect.anything(),
+      { kind: 'write-client' },
+      'user:need_onboarding',
+      'org-123',
+      expect.any(String),
+    )
   })
 
   it('returns false when recipient claims exist but the org-level backfill claim fails', async () => {
     hasNotifOrgClaimMock
       .mockResolvedValueOnce(false)
       .mockResolvedValue(true)
-    sendNotifOrgOnceMock.mockResolvedValue(false)
+    sendNotifOrgOnceMock.mockResolvedValue({ sent: false, cleanupFailed: false })
     claimNotifOrgOnceMock.mockResolvedValue(false)
 
     const { sendNotifToOrgMembersOnce } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
@@ -213,8 +221,8 @@ describe('sendNotifToOrgMembersOnce', () => {
 
   it('does not write the org-level claim when any unsent recipient is not already claimed', async () => {
     sendNotifOrgOnceMock
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce({ sent: true, cleanupFailed: false })
+      .mockResolvedValueOnce({ sent: false, cleanupFailed: false })
     hasNotifOrgClaimMock
       .mockResolvedValueOnce(false)
       .mockResolvedValueOnce(false)
@@ -236,5 +244,29 @@ describe('sendNotifToOrgMembersOnce', () => {
     expect(sent).toBe(false)
     expect(sendNotifOrgOnceMock).toHaveBeenCalledTimes(2)
     expect(claimNotifOrgOnceMock).not.toHaveBeenCalled()
+  })
+
+  it('does not write the org-level claim when recipient cleanup fails', async () => {
+    sendNotifOrgOnceMock.mockResolvedValue({ sent: false, cleanupFailed: true })
+
+    const { sendNotifToOrgMembersOnce } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
+
+    const sent = await sendNotifToOrgMembersOnce(
+      createContext(),
+      'user:need_onboarding',
+      'onboarding',
+      { org_id: 'org-123' },
+      'org-123',
+      'org-123',
+      createDrizzleStub(),
+    )
+
+    expect(sent).toBe(false)
+    expect(hasNotifOrgClaimMock).toHaveBeenCalledTimes(1)
+    expect(claimNotifOrgOnceMock).not.toHaveBeenCalled()
+    expect(cloudlogMock).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sendNotifToOrgMembersOnce: recipient cleanup failed',
+      cleanupFailedRecipients: ['billing@example.com'],
+    }))
   })
 })
