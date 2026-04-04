@@ -110,6 +110,16 @@ interface PreparedEligibleEmailTargets extends EligibleEmailTargets {
   org: OrgWithPreferences
 }
 
+interface EligibleOrgMemberEmailsResult {
+  emails: string[]
+  resolutionFailed: boolean
+}
+
+interface PreparedEligibleEmailTargetsResult {
+  recipients: PreparedEligibleEmailTargets | null
+  resolutionFailed: boolean
+}
+
 /**
  * Get org info including management_email and email_preferences using drizzle client
  */
@@ -163,9 +173,10 @@ async function getEligibleOrgMemberEmails(
   orgId: string,
   preferenceKey: EmailPreferenceKey,
   drizzle: ReturnType<typeof getDrizzleClient>,
-): Promise<string[]> {
+): Promise<EligibleOrgMemberEmailsResult> {
   const adminRoleNames = ['org_admin', 'org_super_admin']
   const now = new Date()
+  let resolutionFailed = false
   const userIds = new Set<string>()
 
   try {
@@ -183,6 +194,7 @@ async function getEligibleOrgMemberEmails(
         )
     }
     catch (error) {
+      resolutionFailed = true
       cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails legacy error', orgId, error })
     }
 
@@ -210,6 +222,7 @@ async function getEligibleOrgMemberEmails(
         )
     }
     catch (error) {
+      resolutionFailed = true
       cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails rbac user error', orgId, error })
     }
 
@@ -241,6 +254,7 @@ async function getEligibleOrgMemberEmails(
         )
     }
     catch (error) {
+      resolutionFailed = true
       cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails rbac group error', orgId, error })
     }
 
@@ -261,6 +275,7 @@ async function getEligibleOrgMemberEmails(
           .where(inArray(schema.group_members.group_id, groupIds))
       }
       catch (error) {
+        resolutionFailed = true
         cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails group members error', orgId, error })
       }
 
@@ -272,7 +287,7 @@ async function getEligibleOrgMemberEmails(
 
     const userIdList = Array.from(userIds)
     if (userIdList.length === 0) {
-      return []
+      return { emails: [], resolutionFailed }
     }
 
     let users: { id: string, email: string, email_preferences: unknown }[] = []
@@ -287,13 +302,15 @@ async function getEligibleOrgMemberEmails(
         .where(inArray(schema.users.id, userIdList))
     }
     catch (error) {
+      resolutionFailed = true
       cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails users error', orgId, error })
-      return []
+      return { emails: [], resolutionFailed }
     }
 
     if (!users) {
+      resolutionFailed = true
       cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails users error', orgId, error: 'No users returned' })
-      return []
+      return { emails: [], resolutionFailed }
     }
 
     const eligibleEmails: string[] = []
@@ -314,11 +331,12 @@ async function getEligibleOrgMemberEmails(
       }
     }
 
-    return eligibleEmails
+    return { emails: eligibleEmails, resolutionFailed }
   }
   catch (error) {
+    resolutionFailed = true
     cloudlog({ requestId: c.get('requestId'), message: 'getEligibleOrgMemberEmails users error', orgId, error })
-    return []
+    return { emails: [], resolutionFailed }
   }
 }
 
@@ -332,15 +350,15 @@ async function getAllEligibleEmails(
   orgId: string,
   preferenceKey: EmailPreferenceKey,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
-): Promise<{ adminEmails: string[], managementEmail: string | null, org: OrgWithPreferences | null }> {
+): Promise<{ adminEmails: string[], managementEmail: string | null, org: OrgWithPreferences | null, resolutionFailed: boolean }> {
   // Get org info
   const org = await getOrgInfoWithClient(c, orgId, drizzleClient)
   if (!org) {
-    return { adminEmails: [], managementEmail: null, org: null }
+    return { adminEmails: [], managementEmail: null, org: null, resolutionFailed: false }
   }
 
   // Get eligible admin emails
-  const adminEmails = await getEligibleOrgMemberEmails(c, orgId, preferenceKey, drizzleClient)
+  const { emails: adminEmails, resolutionFailed } = await getEligibleOrgMemberEmails(c, orgId, preferenceKey, drizzleClient)
 
   // Check if management_email should receive the notification:
   // 1. Must be different from all admin emails
@@ -356,7 +374,7 @@ async function getAllEligibleEmails(
     }
   }
 
-  return { adminEmails, managementEmail, org }
+  return { adminEmails, managementEmail, org, resolutionFailed }
 }
 
 function getEligibleEmailTargets(adminEmails: string[], managementEmail: string | null): EligibleEmailTargets {
@@ -381,16 +399,19 @@ async function getPreparedEligibleEmailTargets(
   orgId: string,
   preferenceKey: EmailPreferenceKey,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
-): Promise<PreparedEligibleEmailTargets | null> {
-  const { adminEmails, managementEmail, org } = await getAllEligibleEmails(c, orgId, preferenceKey, drizzleClient)
+): Promise<PreparedEligibleEmailTargetsResult> {
+  const { adminEmails, managementEmail, org, resolutionFailed } = await getAllEligibleEmails(c, orgId, preferenceKey, drizzleClient)
   if (!org)
-    return null
+    return { recipients: null, resolutionFailed }
 
   return {
-    adminEmails,
-    managementEmail,
-    org,
-    ...getEligibleEmailTargets(adminEmails, managementEmail),
+    recipients: {
+      adminEmails,
+      managementEmail,
+      org,
+      ...getEligibleEmailTargets(adminEmails, managementEmail),
+    },
+    resolutionFailed,
   }
 }
 
@@ -430,7 +451,7 @@ export async function sendEmailToOrgMembers(
     return 0
 
   const client = drizzleClient ?? getDrizzleClient(getPgClient(c, true))
-  const recipients = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, client)
+  const { recipients } = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, client)
   if (!recipients) {
     cloudlog({ requestId: c.get('requestId'), message: 'sendEmailToOrgMembers: org not found', orgId })
     return 0
@@ -497,7 +518,7 @@ export async function sendNotifToOrgMembers(
     return false
 
   // Get all eligible emails (includes org info)
-  const recipients = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, drizzleClient)
+  const { recipients } = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, drizzleClient)
   if (!recipients) {
     cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembers: org not found', orgId })
     return false
@@ -585,9 +606,19 @@ export async function sendNotifToOrgMembersOnce(
     return false
   }
 
-  const recipients = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, writeClient)
+  const { recipients, resolutionFailed } = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, writeClient)
   if (!recipients) {
     cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembersOnce: org not found', orgId })
+    return false
+  }
+  if (resolutionFailed) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'sendNotifToOrgMembersOnce: recipient resolution failed',
+      eventName,
+      preferenceKey,
+      orgId,
+    })
     return false
   }
 

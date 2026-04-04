@@ -57,14 +57,27 @@ function createContext() {
 
 function createDrizzleStub(options?: {
   adminUsers?: { id: string, email: string, email_preferences?: Record<string, boolean> }[]
+  failTables?: string[]
   kind?: string
   managementEmail?: string
 }) {
   const adminUsers = options?.adminUsers ?? []
+  const failTables = new Set(options?.failTables ?? [])
   const kind = options?.kind
   const managementEmail = options?.managementEmail ?? 'billing@example.com'
 
   const getRowsForTable = (table: any): any[] => {
+    if (table === schema.orgs && failTables.has('orgs'))
+      throw new Error('orgs lookup failed')
+    if (table === schema.org_users && failTables.has('org_users'))
+      throw new Error('org_users lookup failed')
+    if (table === schema.role_bindings && failTables.has('role_bindings'))
+      throw new Error('role_bindings lookup failed')
+    if (table === schema.group_members && failTables.has('group_members'))
+      throw new Error('group_members lookup failed')
+    if (table === schema.users && failTables.has('users'))
+      throw new Error('users lookup failed')
+
     if (table === schema.orgs) {
       return [{ management_email: managementEmail, email_preferences: { onboarding: true } }]
     }
@@ -340,5 +353,34 @@ describe('sendNotifToOrgMembersOnce', () => {
       'org-123',
       primaryClient,
     )
+  })
+
+  it('fails closed when recipient discovery is incomplete on the one-time path', async () => {
+    const primaryClient = createDrizzleStub({
+      adminUsers: [{ id: 'admin-1', email: 'admin@example.com' }],
+      failTables: ['role_bindings'],
+      kind: 'write-client',
+    })
+    getDrizzleClientMock.mockReturnValue(primaryClient)
+
+    const { sendNotifToOrgMembersOnce } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
+
+    const sent = await sendNotifToOrgMembersOnce(
+      createContext(),
+      'user:need_onboarding',
+      'onboarding',
+      { org_id: 'org-123' },
+      'org-123',
+      'org-123',
+      createDrizzleStub(),
+    )
+
+    expect(sent).toBe(false)
+    expect(sendNotifOrgOnceMock).not.toHaveBeenCalled()
+    expect(claimNotifOrgOnceMock).not.toHaveBeenCalled()
+    expect(cloudlogMock).toHaveBeenCalledWith(expect.objectContaining({
+      message: 'sendNotifToOrgMembersOnce: recipient resolution failed',
+      orgId: 'org-123',
+    }))
   })
 })
