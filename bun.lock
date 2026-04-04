@@ -99,8 +99,6 @@
         "zod": "^4.3.6",
       },
       "devDependencies": {
-        "@emulators/core": "./scripts/vendor/emulate-core",
-        "@emulators/stripe": "./scripts/vendor/emulate-stripe",
         "@antfu/eslint-config": "6.7.3",
         "@capacitor/cli": "^8.2.0",
         "@capacitor/core": "^8.2.0",
@@ -131,7 +129,7 @@
         "adm-zip": "^0.5.16",
         "cross-env": "^10.1.0",
         "discord-api-types": "^0.38.42",
-        "emulate": "github:vercel-labs/emulate#7ff0a600ed09c053d55fa1c3c10f4235d60677ce",
+        "emulate": "0.4.1",
         "eslint": "9.39.4",
         "eslint-plugin-format": "^1.5.0",
         "sass": "1.97.3",
@@ -577,10 +575,6 @@
     "@emnapi/runtime": ["@emnapi/runtime@1.7.1", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-PVtJr5CmLwYAU9PZDMITZoR5iAOShYREoR45EyyLrbntV50mdePTgUn4AmOw90Ifcj+x2kRjdzr1HP3RrNiHGA=="],
 
     "@emnapi/wasi-threads": ["@emnapi/wasi-threads@1.1.0", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-WI0DdZ8xFSbgMjR1sFsKABJ/C5OnRrjT06JXbZKexJGrDuPTzZdDYfFlsgcCXCyf+suG5QU2e/y1Wo2V/OapLQ=="],
-
-    "@emulators/core": ["@emulators/core@file:scripts/vendor/emulate-core", {}],
-
-    "@emulators/stripe": ["@emulators/stripe@file:scripts/vendor/emulate-stripe", {}],
 
     "@epic-web/invariant": ["@epic-web/invariant@1.0.0", "", {}, "sha512-lrTPqgvfFQtR/eY/qkIzp98OGdNJu0m5ji3q/nJI8v3SXkRKEnWiOxMmbvcSoAIzv/cGiuvRy57k4suKQSAdwA=="],
 
@@ -2026,7 +2020,7 @@
 
     "empathic": ["empathic@2.0.0", "", {}, "sha512-i6UzDscO/XfAcNYD75CfICkmfLedpyPDdozrLMmQc5ORaQcdMoc21OnlEylMIqI7U8eniKrPMxxtj8k0vhmJhA=="],
 
-    "emulate": ["emulate-monorepo@github:vercel-labs/emulate#7ff0a60", {}, "vercel-labs-emulate-7ff0a60", "sha512-FIyOy7ivSIdTvRTjfoVWEhTvVm09mFpYJaKk5LKkadGnITLcK+9HPLKGoFQV/OLFJJKaARRzHjLjDLvsZy8Raw=="],
+    "emulate": ["emulate@0.4.1", "", { "dependencies": { "@hono/node-server": "^1", "commander": "^14", "picocolors": "^1.1.1", "yaml": "^2" }, "bin": { "emulate": "dist/index.js" } }, "sha512-96CEZB96M7fC5na1lFl9sL7AS5d2lRgJkZVb/e8ufbLMLLxEy2oHhN4E9d7+eJbtABne/CeumSRX2j7A9UDlEQ=="],
 
     "encodeurl": ["encodeurl@2.0.0", "", {}, "sha512-Q0n9HRi4m6JuGIV1eFlmvJB7ZEVxu93IrMyiMsGC0lrMJMWzRgx6WGquyfQgZVb31vhGgXnfmPNNXmxnOkRBrg=="],
 
@@ -4141,6 +4135,8 @@
     "dom-serializer/entities": ["entities@2.2.0", "", {}, "sha512-p92if5Nz619I0w+akJrLZH0MX0Pb5DX39XOwQTtXSdQQOaYH03S1uIQp4mhOZtAXrxq4ViO67YTiLBo2638o9A=="],
 
     "elementtree/sax": ["sax@1.1.4", "", {}, "sha512-5f3k2PbGGp+YtKJjOItpg3P99IMD84E4HOvcfleTb5joCHNXYLsR9yWFPOYGgaeMPDubQILTCMdsFb2OMeOjtg=="],
+
+    "emulate/commander": ["commander@14.0.3", "", {}, "sha512-H+y0Jo/T1RZ9qPP4Eh1pkcQcLRglraJaSLoyOtHxu6AapkjWVCy2Sit1QQ4x3Dng8qDlSsZEet7g5Pq06MvTgw=="],
 
     "eslint-compat-utils/semver": ["semver@7.7.3", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-SdsKMrI9TdgjdweUSR9MweHA4EJ8YxHn8DFaDisvhVlUOe4BF1tLD7GAj0lIqWVl+dPb/rExr0Btby5loQm20Q=="],
 

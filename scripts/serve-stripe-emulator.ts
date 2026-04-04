@@ -1,5 +1,5 @@
 import { env } from 'node:process'
-import { createEmulator } from '../node_modules/emulate/packages/emulate/src/api.ts'
+import { createEmulator } from 'emulate'
 
 const DEFAULT_PORT = 4510
 const parsedPort = Number.parseInt(env.STRIPE_EMULATOR_PORT ?? `${DEFAULT_PORT}`, 10)
