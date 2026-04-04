@@ -22,9 +22,9 @@ run_supabase_status_env() {
   fi
   # Fall back to raw CLI (CI uses this by default).
   if command -v supabase >/dev/null 2>&1; then
-    supabase status -o env 2>/dev/null && return 0
+    supabase status --workdir supabase -o env 2>/dev/null && return 0
   fi
-  bunx supabase status -o env 2>/dev/null && return 0
+  bunx supabase status --workdir supabase -o env 2>/dev/null && return 0
   return 1
 }
 

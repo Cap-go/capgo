@@ -14,7 +14,7 @@ NC='\033[0m'
 
 # 1. Reset and seed database
 echo -e "\n${YELLOW}Step 1: Resetting Supabase database...${NC}"
-PAGER=cat bunx supabase db reset
+PAGER=cat bunx supabase db reset --workdir supabase
 
 # 3. Start workers
 echo -e "\n${YELLOW}Step 3: Starting Cloudflare Workers...${NC}"
