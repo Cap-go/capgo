@@ -108,7 +108,7 @@ jobs:
           fi
 
           bunx supabase --version
-          bunx supabase link --workdir supabase --project-ref ${{ secrets.SUPABASE_PROJECT_ID_PROD }}
+          bunx supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_ID_PROD }}
           bun schemas
           BRANCH=main bun types
 
