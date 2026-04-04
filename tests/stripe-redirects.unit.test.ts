@@ -1,14 +1,19 @@
 import Stripe from 'stripe'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+const mockedEnv: Record<string, string> = {
+  WEBAPP_URL: 'https://capgo.test',
+  STRIPE_SECRET_KEY: 'sk_test_123',
+}
+const { mockedSupabaseAdmin } = vi.hoisted(() => ({
+  mockedSupabaseAdmin: vi.fn(),
+}))
+
 vi.mock('hono/adapter', async (importOriginal) => {
   const actual = await importOriginal<typeof import('hono/adapter')>()
   return {
     ...actual,
-    env: () => ({
-      WEBAPP_URL: 'https://capgo.test',
-      STRIPE_SECRET_KEY: 'sk_test_123',
-    }),
+    env: () => mockedEnv,
   }
 })
 
@@ -17,6 +22,10 @@ vi.mock('stripe', () => {
   MockStripe.createFetchHttpClient = vi.fn()
   return { default: MockStripe }
 })
+
+vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
+  supabaseAdmin: mockedSupabaseAdmin,
+}))
 
 function createContext() {
   return {
@@ -39,6 +48,8 @@ function createPriceList(recurringInterval = 'month', type = 'recurring') {
 }
 
 afterEach(() => {
+  delete mockedEnv.STRIPE_API_BASE_URL
+  mockedSupabaseAdmin.mockReset()
   vi.restoreAllMocks()
 })
 
@@ -94,7 +105,7 @@ describe('stripe redirect URL allowlist', () => {
     const createSession = vi.fn().mockResolvedValue({ url: 'https://pay.capgo.test/p/pay' })
     const stripeClient = {
       prices: {
-        search: vi.fn().mockResolvedValue({ data: createPriceList() }),
+        list: vi.fn().mockResolvedValue({ data: createPriceList() }),
       },
       checkout: {
         sessions: {
@@ -128,7 +139,7 @@ describe('stripe redirect URL allowlist', () => {
     const createSession = vi.fn()
     const stripeClient = {
       prices: {
-        search: vi.fn().mockResolvedValue({ data: createPriceList() }),
+        list: vi.fn().mockResolvedValue({ data: createPriceList() }),
       },
       checkout: {
         sessions: {
@@ -160,7 +171,7 @@ describe('stripe redirect URL allowlist', () => {
     const createSession = vi.fn()
     const stripeClient = {
       prices: {
-        search: vi.fn().mockResolvedValue({ data: createPriceList('one_time', 'one_time') }),
+        list: vi.fn().mockResolvedValue({ data: createPriceList('one_time', 'one_time') }),
       },
       checkout: {
         sessions: {
@@ -187,5 +198,181 @@ describe('stripe redirect URL allowlist', () => {
     expect(response.cause).toMatchObject({ error: 'invalid_redirect_url' })
     expect(response.status).toBe(400)
     expect(createSession).not.toHaveBeenCalled()
+  })
+
+  it('uses a custom Stripe API base URL when configured', async () => {
+    mockedEnv.STRIPE_API_BASE_URL = 'http://127.0.0.1:4510'
+
+    const stripeClient = {
+      checkout: {
+        sessions: {},
+      },
+    } as any
+
+    vi.mocked(Stripe).mockImplementation(function () {
+      return stripeClient
+    } as any)
+
+    const { getStripe } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    getStripe(createContext())
+
+    expect(Stripe).toHaveBeenCalledWith('sk_test_123', expect.objectContaining({
+      host: '127.0.0.1',
+      port: 4510,
+      protocol: 'http',
+    }))
+  })
+
+  it('falls back to checkout metadata for credit top-ups when line items are unavailable in emulator mode', async () => {
+    mockedEnv.STRIPE_API_BASE_URL = 'http://127.0.0.1:4510'
+
+    const listLineItems = vi.fn().mockRejectedValue(new Error('line_items endpoint unavailable'))
+    const stripeClient = {
+      checkout: {
+        sessions: {
+          listLineItems,
+        },
+      },
+    } as any
+
+    vi.mocked(Stripe).mockImplementation(function () {
+      return stripeClient
+    } as any)
+
+    const { getCreditCheckoutDetails } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    const details = await getCreditCheckoutDetails(
+      createContext(),
+      {
+        id: 'cs_test_123',
+        metadata: {
+          productId: 'prod_credit_123',
+          intendedQuantity: '75',
+        },
+      } as any,
+      'prod_credit_123',
+    )
+
+    expect(listLineItems).toHaveBeenCalledWith('cs_test_123', {
+      expand: ['data.price.product'],
+      limit: 100,
+    })
+    expect(details).toEqual({
+      creditQuantity: 75,
+      itemsSummary: [
+        {
+          id: null,
+          quantity: 75,
+          priceId: null,
+          productId: 'prod_credit_123',
+        },
+      ],
+    })
+  })
+
+  it('disables adjustable quantity for emulator-backed one-time checkout sessions', async () => {
+    mockedEnv.STRIPE_API_BASE_URL = 'http://127.0.0.1:4510'
+
+    const createSession = vi.fn().mockResolvedValue({ url: 'https://pay.capgo.test/p/pay' })
+    const stripeClient = {
+      prices: {
+        list: vi.fn().mockResolvedValue({ data: createPriceList('one_time', 'one_time') }),
+      },
+      checkout: {
+        sessions: {
+          create: createSession,
+        },
+      },
+    } as any
+
+    vi.mocked(Stripe).mockImplementation(function () {
+      return stripeClient
+    } as any)
+
+    const { createOneTimeCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    await createOneTimeCheckout(
+      createContext(),
+      'cus_123',
+      'prod_123',
+      5,
+      '/app/success',
+      '/app/cancel',
+      'org_123',
+    )
+
+    expect(createSession).toHaveBeenCalledWith(expect.objectContaining({
+      line_items: [
+        expect.not.objectContaining({
+          adjustable_quantity: expect.anything(),
+        }),
+      ],
+      metadata: expect.objectContaining({
+        intendedQuantity: '5',
+        orgId: 'org_123',
+      }),
+    }))
+  })
+
+  it('falls back to stored plan price ids when the Stripe emulator omits recurring metadata', async () => {
+    mockedEnv.STRIPE_API_BASE_URL = 'http://127.0.0.1:4510'
+
+    mockedSupabaseAdmin.mockReturnValue({
+      from: vi.fn().mockReturnValue({
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            single: vi.fn().mockResolvedValue({
+              data: {
+                price_m_id: 'price_monthly_from_plan',
+                price_y_id: 'price_yearly_from_plan',
+              },
+              error: null,
+            }),
+          }),
+        }),
+      }),
+    })
+
+    const createSession = vi.fn().mockResolvedValue({ url: 'https://pay.capgo.test/p/subscription' })
+    const stripeClient = {
+      prices: {
+        list: vi.fn().mockResolvedValue({
+          data: [
+            {
+              id: 'price_missing_recurring_metadata',
+              active: true,
+              type: 'recurring',
+            },
+          ],
+        }),
+      },
+      checkout: {
+        sessions: {
+          create: createSession,
+        },
+      },
+    } as any
+
+    vi.mocked(Stripe).mockImplementation(function () {
+      return stripeClient
+    } as any)
+
+    const { createCheckout } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    const result = await createCheckout(
+      createContext(),
+      'cus_123',
+      'month',
+      'plan_test',
+      '/app/success',
+      '/app/cancel',
+    )
+
+    expect(result.url).toBe('https://pay.capgo.test/p/subscription')
+    expect(createSession).toHaveBeenCalledWith(expect.objectContaining({
+      line_items: [
+        expect.objectContaining({
+          price: 'price_monthly_from_plan',
+          quantity: 1,
+        }),
+      ],
+    }))
   })
 })
