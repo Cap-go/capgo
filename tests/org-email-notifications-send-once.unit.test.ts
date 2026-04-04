@@ -56,19 +56,27 @@ function createContext() {
 }
 
 function createDrizzleStub() {
-  const rowsByTable = new Map([
-    [schema.orgs, [{ management_email: 'billing@example.com', email_preferences: { onboarding: true } }]],
-    [schema.org_users, []],
-    [schema.role_bindings, []],
-    [schema.group_members, []],
-    [schema.users, []],
-  ])
+  const getRowsForTable = (table: any): any[] => {
+    if (table === schema.orgs) {
+      return [{ management_email: 'billing@example.com', email_preferences: { onboarding: true } }]
+    }
+    if (
+      table === schema.org_users
+      || table === schema.role_bindings
+      || table === schema.group_members
+      || table === schema.users
+    ) {
+      return []
+    }
+
+    return []
+  }
 
   return {
     select() {
       const query = {
-        currentTable: undefined as unknown,
-        from(table: unknown) {
+        currentTable: undefined as any,
+        from(table: any) {
           this.currentTable = table
           return this
         },
@@ -79,11 +87,11 @@ function createDrizzleStub() {
           return this
         },
         limit(limitCount: number) {
-          const rows = rowsByTable.get(this.currentTable) ?? []
+          const rows = getRowsForTable(this.currentTable)
           return Promise.resolve(rows.slice(0, limitCount))
         },
         then(resolve: (value: unknown[]) => unknown, reject?: (reason: unknown) => unknown) {
-          const rows = rowsByTable.get(this.currentTable) ?? []
+          const rows = getRowsForTable(this.currentTable)
           return Promise.resolve(rows).then(resolve, reject)
         },
       }
