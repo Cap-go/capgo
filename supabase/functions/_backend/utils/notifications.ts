@@ -107,6 +107,17 @@ async function getNotification(
   }
 }
 
+export async function hasNotifOrgClaim(
+  c: Context,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  eventName: string,
+  orgId: string,
+  uniqId: string,
+): Promise<boolean> {
+  const notif = await getNotification(c, drizzleClient, orgId, eventName, uniqId)
+  return notif !== null
+}
+
 async function insertNotificationClaim(
   writeClient: ReturnType<typeof getDrizzleClient>,
   eventName: string,

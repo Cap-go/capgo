@@ -4,7 +4,7 @@ import { and, eq, inArray, isNull } from 'drizzle-orm'
 import { isBentoConfigured, trackBentoEvent } from './bento.ts'
 import { CacheHelper } from './cache.ts'
 import { cloudlog } from './logging.ts'
-import { claimNotifOrgOnce, sendNotifOrg, sendNotifOrgOnce } from './notifications.ts'
+import { claimNotifOrgOnce, hasNotifOrgClaim, sendNotifOrg, sendNotifOrgOnce } from './notifications.ts'
 import { getDrizzleClient, getPgClient, logPgError } from './pg.ts'
 import * as schema from './postgres_schema.ts'
 import { backgroundTask } from './utils.ts'
@@ -559,6 +559,19 @@ export async function sendNotifToOrgMembersOnce(
 ): Promise<boolean> {
   if (!isBentoConfigured(c))
     return false
+
+  const alreadySentForOrg = await hasNotifOrgClaim(c, drizzleClient, eventName, orgId, uniqId)
+  if (alreadySentForOrg) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'sendNotifToOrgMembersOnce: org already claimed',
+      eventName,
+      preferenceKey,
+      orgId,
+      uniqId,
+    })
+    return false
+  }
 
   const recipients = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, drizzleClient)
   if (!recipients) {
