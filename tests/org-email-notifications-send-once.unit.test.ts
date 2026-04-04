@@ -57,9 +57,11 @@ function createContext() {
 
 function createDrizzleStub(options?: {
   adminUsers?: { id: string, email: string, email_preferences?: Record<string, boolean> }[]
+  kind?: string
   managementEmail?: string
 }) {
   const adminUsers = options?.adminUsers ?? []
+  const kind = options?.kind
   const managementEmail = options?.managementEmail ?? 'billing@example.com'
 
   const getRowsForTable = (table: any): any[] => {
@@ -87,6 +89,7 @@ function createDrizzleStub(options?: {
   }
 
   return {
+    kind,
     select() {
       const query = {
         currentTable: undefined as any,
@@ -121,7 +124,10 @@ describe('sendNotifToOrgMembersOnce', () => {
     isBentoConfiguredMock.mockReturnValue(true)
     hasNotifOrgClaimMock.mockResolvedValue(false)
     getPgClientMock.mockReturnValue({} as any)
-    getDrizzleClientMock.mockReturnValue({ kind: 'write-client' } as any)
+    getDrizzleClientMock.mockReturnValue(createDrizzleStub({
+      adminUsers: [{ id: 'admin-1', email: 'admin@example.com' }],
+      kind: 'write-client',
+    }))
   })
 
   it('does not send recipient notifications when the org-level claim already exists', async () => {
@@ -142,7 +148,7 @@ describe('sendNotifToOrgMembersOnce', () => {
     expect(sent).toBe(false)
     expect(hasNotifOrgClaimMock).toHaveBeenCalledWith(
       expect.anything(),
-      { kind: 'write-client' },
+      expect.objectContaining({ kind: 'write-client' }),
       'user:need_onboarding',
       'org-123',
       'org-123',
@@ -206,7 +212,7 @@ describe('sendNotifToOrgMembersOnce', () => {
     expect(hasNotifOrgClaimMock).toHaveBeenNthCalledWith(
       2,
       expect.anything(),
-      { kind: 'write-client' },
+      expect.objectContaining({ kind: 'write-client' }),
       'user:need_onboarding',
       'org-123',
       expect.any(String),
@@ -285,11 +291,54 @@ describe('sendNotifToOrgMembersOnce', () => {
     )
 
     expect(sent).toBe(false)
-    expect(hasNotifOrgClaimMock).toHaveBeenCalledTimes(2)
+    expect(hasNotifOrgClaimMock).toHaveBeenCalledTimes(3)
     expect(claimNotifOrgOnceMock).not.toHaveBeenCalled()
     expect(cloudlogMock).toHaveBeenCalledWith(expect.objectContaining({
       message: 'sendNotifToOrgMembersOnce: recipient cleanup failed',
-      cleanupFailedRecipients: ['billing@example.com'],
+      cleanupFailedRecipients: ['billing@example.com', 'admin@example.com'],
     }))
+  })
+
+  it('reads one-time recipients from the primary client before finalizing the org claim', async () => {
+    const primaryClient = createDrizzleStub({
+      adminUsers: [{ id: 'admin-1', email: 'admin@example.com' }],
+      managementEmail: '',
+      kind: 'write-client',
+    })
+    getDrizzleClientMock.mockReturnValue(primaryClient)
+    claimNotifOrgOnceMock.mockResolvedValue(true)
+    sendNotifOrgOnceMock.mockResolvedValue({ sent: true, cleanupFailed: false })
+
+    const { sendNotifToOrgMembersOnce } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
+
+    const sent = await sendNotifToOrgMembersOnce(
+      createContext(),
+      'user:need_onboarding',
+      'onboarding',
+      { org_id: 'org-123' },
+      'org-123',
+      'org-123',
+      createDrizzleStub(),
+    )
+
+    expect(sent).toBe(true)
+    expect(sendNotifOrgOnceMock).toHaveBeenCalledTimes(1)
+    expect(sendNotifOrgOnceMock).toHaveBeenCalledWith(
+      expect.anything(),
+      'user:need_onboarding',
+      { org_id: 'org-123' },
+      'org-123',
+      expect.any(String),
+      'admin@example.com',
+      expect.anything(),
+      primaryClient,
+    )
+    expect(claimNotifOrgOnceMock).toHaveBeenCalledWith(
+      expect.anything(),
+      'user:need_onboarding',
+      'org-123',
+      'org-123',
+      primaryClient,
+    )
   })
 })

@@ -585,7 +585,7 @@ export async function sendNotifToOrgMembersOnce(
     return false
   }
 
-  const recipients = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, drizzleClient)
+  const recipients = await getPreparedEligibleEmailTargets(c, orgId, preferenceKey, writeClient)
   if (!recipients) {
     cloudlog({ requestId: c.get('requestId'), message: 'sendNotifToOrgMembersOnce: org not found', orgId })
     return false
