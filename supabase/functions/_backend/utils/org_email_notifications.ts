@@ -635,7 +635,7 @@ export async function sendNotifToOrgMembersOnce(
     managementEmailIncluded: !!managementEmail,
   })
 
-  return sentEmails.length > 0 ? firstOrgSend : allRecipientsAlreadyClaimed
+  return sentEmails.length > 0 ? firstOrgSend : firstOrgSend && allRecipientsAlreadyClaimed
 }
 
 /**

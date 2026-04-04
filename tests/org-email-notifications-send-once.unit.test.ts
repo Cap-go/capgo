@@ -166,4 +166,34 @@ describe('sendNotifToOrgMembersOnce', () => {
       expect.anything(),
     )
   })
+
+  it.concurrent('returns false when recipient claims exist but the org-level backfill claim fails', async () => {
+    hasNotifOrgClaimMock
+      .mockResolvedValueOnce(false)
+      .mockResolvedValue(true)
+    sendNotifOrgOnceMock.mockResolvedValue(false)
+    claimNotifOrgOnceMock.mockResolvedValue(false)
+
+    const { sendNotifToOrgMembersOnce } = await import('../supabase/functions/_backend/utils/org_email_notifications.ts')
+
+    const sent = await sendNotifToOrgMembersOnce(
+      createContext(),
+      'user:need_onboarding',
+      'onboarding',
+      { org_id: 'org-123' },
+      'org-123',
+      'org-123',
+      createDrizzleStub(),
+    )
+
+    expect(sent).toBe(false)
+    expect(sendNotifOrgOnceMock).toHaveBeenCalledTimes(1)
+    expect(claimNotifOrgOnceMock).toHaveBeenCalledWith(
+      expect.anything(),
+      'user:need_onboarding',
+      'org-123',
+      'org-123',
+      expect.anything(),
+    )
+  })
 })
