@@ -246,10 +246,8 @@ export async function claimNotifOrgOnce(
   eventName: string,
   orgId: string,
   uniqId: string,
+  writeClient = createDrizzleClient(getPgClient(c)),
 ): Promise<boolean> {
-  const pgClient = getPgClient(c)
-  const writeClient = createDrizzleClient(pgClient)
-
   try {
     const claimed = await insertNotificationClaim(writeClient, eventName, orgId, uniqId)
     if (!claimed) {
@@ -271,8 +269,9 @@ export async function sendNotifOrgOnce(
   uniqId: string,
   recipientEmail: string,
   _drizzleClient: ReturnType<typeof getDrizzleClient>,
+  writeClient = createDrizzleClient(getPgClient(c)),
 ) {
-  const claimed = await claimNotifOrgOnce(c, eventName, orgId, uniqId)
+  const claimed = await claimNotifOrgOnce(c, eventName, orgId, uniqId, writeClient)
   if (!claimed)
     return false
 
@@ -280,8 +279,7 @@ export async function sendNotifOrgOnce(
     const res = await trackBentoEvent(c, recipientEmail, eventData, eventName)
     if (!res) {
       try {
-        const cleanupClient = createDrizzleClient(getPgClient(c))
-        await deleteNotificationClaim(cleanupClient, eventName, orgId, uniqId)
+        await deleteNotificationClaim(writeClient, eventName, orgId, uniqId)
       }
       catch (cleanupError) {
         logPgError(c, 'sendNotifOrgOnce cleanup', cleanupError)

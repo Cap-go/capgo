@@ -591,21 +591,35 @@ export async function sendNotifToOrgMembersOnce(
     return false
   }
 
+  const writeClient = getDrizzleClient(getPgClient(c))
   const recipientEmails = [primaryEmail, ...additionalEmails]
-  const sendResults = await Promise.all(recipientEmails.map(async (email) => {
+  const sendResults: { email: string, recipientUniqId: string, sent: boolean }[] = []
+  for (const email of recipientEmails) {
     const recipientUniqId = await buildOneTimeRecipientNotifUniqId(uniqId, email)
-    const sent = await sendNotifOrgOnce(c, eventName, eventData, orgId, recipientUniqId, email, drizzleClient)
-    return { email, sent }
-  }))
+    const sent = await sendNotifOrgOnce(c, eventName, eventData, orgId, recipientUniqId, email, drizzleClient, writeClient)
+    sendResults.push({ email, recipientUniqId, sent })
+  }
 
   const sentEmails = sendResults
     .filter(result => result.sent)
     .map(result => result.email)
 
-  if (sentEmails.length === 0)
+  let allRecipientsAlreadyClaimed = false
+  if (sentEmails.length === 0) {
+    allRecipientsAlreadyClaimed = true
+    for (const result of sendResults) {
+      const recipientAlreadyClaimed = await hasNotifOrgClaim(c, drizzleClient, eventName, orgId, result.recipientUniqId)
+      if (!recipientAlreadyClaimed) {
+        allRecipientsAlreadyClaimed = false
+        break
+      }
+    }
+  }
+
+  if (sentEmails.length === 0 && !allRecipientsAlreadyClaimed)
     return false
 
-  const firstOrgSend = await claimNotifOrgOnce(c, eventName, orgId, uniqId)
+  const firstOrgSend = await claimNotifOrgOnce(c, eventName, orgId, uniqId, writeClient)
 
   cloudlog({
     requestId: c.get('requestId'),
@@ -616,11 +630,12 @@ export async function sendNotifToOrgMembersOnce(
     primaryEmail,
     additionalRecipients: additionalEmails.length,
     deliveredRecipients: sentEmails.length,
+    allRecipientsAlreadyClaimed,
     firstOrgSend,
     managementEmailIncluded: !!managementEmail,
   })
 
-  return firstOrgSend
+  return sentEmails.length > 0 ? firstOrgSend : allRecipientsAlreadyClaimed
 }
 
 /**
