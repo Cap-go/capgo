@@ -275,16 +275,19 @@ export async function sendNotifOrgOnce(
   if (!claimed)
     return false
 
+  const cleanupClaim = async () => {
+    try {
+      await deleteNotificationClaim(writeClient, eventName, orgId, uniqId)
+    }
+    catch (cleanupError) {
+      logPgError(c, 'sendNotifOrgOnce cleanup', cleanupError)
+    }
+  }
+
   try {
     const res = await trackBentoEvent(c, recipientEmail, eventData, eventName)
     if (!res) {
-      try {
-        await deleteNotificationClaim(writeClient, eventName, orgId, uniqId)
-      }
-      catch (cleanupError) {
-        logPgError(c, 'sendNotifOrgOnce cleanup', cleanupError)
-      }
-
+      await cleanupClaim()
       cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed for one-time notif', eventName, email: recipientEmail, eventData })
       return false
     }
@@ -293,6 +296,7 @@ export async function sendNotifOrgOnce(
     return true
   }
   catch (e: unknown) {
+    await cleanupClaim()
     logPgError(c, 'sendNotifOrgOnce', e)
     return false
   }
