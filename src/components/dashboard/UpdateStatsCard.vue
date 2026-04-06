@@ -387,34 +387,34 @@ onMounted(async () => {
         <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight dark:text-white text text-slate-600">
           {{ t('update_statistics') }}
         </h2>
-        <div class="flex flex-wrap gap-3 items-center sm:flex-nowrap sm:gap-4">
+        <div class="flex flex-wrap gap-2 items-center text-xs sm:gap-3 sm:text-sm">
           <div class="flex gap-2 items-center">
             <div class="w-3 h-3 rounded-full" style="background-color: hsl(210, 65%, 55%)" />
             <div
-              class="flex gap-1 items-center text-sm text-slate-600 dark:text-slate-300"
+              class="flex gap-1 items-center min-w-0 text-xs text-slate-600 dark:text-slate-300 sm:text-sm"
               :aria-label="`${actionDisplayNames.requested}: ${effectiveTotalRequested.toLocaleString()}`"
             >
-              <GlobeAltIcon class="w-4 h-4" aria-hidden="true" />
+              <GlobeAltIcon class="w-3.5 h-3.5 sm:w-4 sm:h-4" aria-hidden="true" />
               <span>{{ effectiveTotalRequested.toLocaleString() }}</span>
             </div>
           </div>
           <div class="flex gap-2 items-center">
             <div class="w-3 h-3 rounded-full" style="background-color: hsl(135, 55%, 50%)" />
             <div
-              class="flex gap-1 items-center text-sm text-slate-600 dark:text-slate-300"
+              class="flex gap-1 items-center min-w-0 text-xs text-slate-600 dark:text-slate-300 sm:text-sm"
               :aria-label="`${actionDisplayNames.install}: ${effectiveTotalInstalled.toLocaleString()}`"
             >
-              <ArrowDownOnSquareIcon class="w-4 h-4" aria-hidden="true" />
+              <ArrowDownOnSquareIcon class="w-3.5 h-3.5 sm:w-4 sm:h-4" aria-hidden="true" />
               <span>{{ effectiveTotalInstalled.toLocaleString() }}</span>
             </div>
           </div>
           <div class="flex gap-2 items-center">
             <div class="w-3 h-3 rounded-full" style="background-color: hsl(0, 50%, 60%)" />
             <div
-              class="flex gap-1 items-center text-sm text-slate-600 dark:text-slate-300"
+              class="flex gap-1 items-center min-w-0 text-xs text-slate-600 dark:text-slate-300 sm:text-sm"
               :aria-label="`${actionDisplayNames.fail}: ${effectiveTotalFailed.toLocaleString()}`"
             >
-              <XCircleIcon class="w-4 h-4" aria-hidden="true" />
+              <XCircleIcon class="w-3.5 h-3.5 sm:w-4 sm:h-4" aria-hidden="true" />
               <span>{{ effectiveTotalFailed.toLocaleString() }}</span>
             </div>
           </div>
