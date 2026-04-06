@@ -543,6 +543,7 @@
   "continue-with-sso": "SSOで続行",
   "copied-to-clipboard": "クリップボードにコピーされました",
   "copy-account-id": "アカウントIDをコピーする",
+  "copy": "コピー",
   "copy-and-close": "コピーして閉じる",
   "copy-command": "コピー コマンド",
   "copy-curl": "Curlコマンドをコピーします",

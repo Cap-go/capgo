@@ -543,6 +543,7 @@
   "continue-with-sso": "使用 SSO 继续",
   "copied-to-clipboard": "复制到剪贴板",
   "copy-account-id": "复制帐户 ID",
+  "copy": "复制",
   "copy-and-close": "复制并关闭",
   "copy-command": "复制指令",
   "copy-curl": "复制 curl 命令",

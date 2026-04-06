@@ -543,6 +543,7 @@
   "continue-with-sso": "SSO로 계속하기",
   "copied-to-clipboard": "클립보드에 복사됨",
   "copy-account-id": "계정 ID 복사",
+  "copy": "복사",
   "copy-and-close": "복사하고 닫기",
   "copy-command": "복사 명령",
   "copy-curl": "Curl 명령어 복사",

@@ -322,6 +322,30 @@ function getActionTitle(action: NonNullable<TableColumn['actions']>[number], ele
   return typeof action.title === 'function' ? action.title(elem) : action.title
 }
 
+function isActionDisabled(action: NonNullable<TableColumn['actions']>[number], elem: any): boolean {
+  return Boolean(action.disabled && action.disabled(elem))
+}
+
+function tooltipIdFor(rowIndex: number, actionIndex: number): string {
+  return `datatable-action-tooltip-${rowIndex}-${actionIndex}`
+}
+
+function handleActionWrapperKeydown(
+  event: KeyboardEvent,
+  action: NonNullable<TableColumn['actions']>[number],
+  elem: any,
+) {
+  if (event.target !== event.currentTarget)
+    return
+  if (event.key !== 'Enter' && event.key !== ' ')
+    return
+  if (isActionDisabled(action, elem))
+    return
+  event.preventDefault()
+  event.stopPropagation()
+  action.onClick(elem)
+}
+
 const displayElemRange = computed(() => {
   const begin = (props.currentPage - 1) * props.elementList.length
   const end = begin + props.elementList.length
@@ -595,10 +619,14 @@ const paginationClass = computed(() => props.mobileFixedPagination
                         v-for="(action, actionIndex) in col.actions"
                         v-show="!action.visible || action.visible(elem)" :key="actionIndex"
                       >
-                        <div class="relative inline-flex group">
+                        <div
+                          class="relative inline-flex group"
+                          tabindex="0"
+                          @keydown="handleActionWrapperKeydown($event, action, elem)"
+                        >
                           <button
-                            :disabled="action.disabled && action.disabled(elem)"
-                            :title="getActionTitle(action, elem)"
+                            :disabled="isActionDisabled(action, elem)"
+                            :aria-describedby="getActionTitle(action, elem) ? tooltipIdFor(i, actionIndex) : undefined"
                             class="p-2 text-gray-500 rounded-md cursor-pointer dark:text-gray-400 hover:text-gray-600 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed dark:hover:bg-gray-700 dark:hover:text-gray-300 dark:disabled:hover:text-gray-400 disabled:hover:bg-transparent disabled:hover:text-gray-500"
                             @click.stop="action.onClick(elem)"
                           >
@@ -606,6 +634,8 @@ const paginationClass = computed(() => props.mobileFixedPagination
                           </button>
                           <span
                             v-if="getActionTitle(action, elem)"
+                            :id="tooltipIdFor(i, actionIndex)"
+                            role="tooltip"
                             class="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden -translate-x-1/2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-xs font-medium text-white shadow-lg transition-opacity duration-150 group-hover:block group-focus-within:block dark:bg-slate-100 dark:text-slate-900"
                           >
                             {{ getActionTitle(action, elem) }}

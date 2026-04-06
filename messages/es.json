@@ -543,6 +543,7 @@
   "continue-with-sso": "Continuar con SSO",
   "copied-to-clipboard": "Copiado al portapapeles",
   "copy-account-id": "copiar id de cuenta",
+  "copy": "Copiar",
   "copy-and-close": "Copiar y Cerrar",
   "copy-command": "Comando de copia",
   "copy-curl": "Copia el comando curl",
