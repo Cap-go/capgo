@@ -49,36 +49,50 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
 </script>
 
 <template>
-  <div class="flex flex-col col-span-full bg-white rounded-lg border shadow-lg sm:col-span-6 xl:col-span-4 dark:bg-gray-800 border-slate-300 h-[460px] dark:border-slate-900">
+  <div class="relative col-span-full flex min-h-[24rem] flex-col overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white/95 shadow-[0_20px_60px_-38px_rgba(15,23,42,0.3)] backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/85 dark:shadow-[0_24px_70px_-42px_rgba(2,6,23,0.72)]">
+    <div class="pointer-events-none absolute inset-x-0 top-0 h-28 bg-gradient-to-br from-slate-50 via-white to-transparent dark:from-slate-800/70 dark:via-slate-900/40 dark:to-transparent" />
+
     <!-- Header with title and stats -->
-    <div class="overflow-hidden flex flex-col gap-2 px-4 pt-4 sm:flex-row sm:gap-4 sm:justify-between sm:items-start">
+    <div class="relative overflow-hidden px-5 pt-5">
       <!-- Custom header slot or default header -->
       <slot name="header">
-        <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight dark:text-white text-slate-600">
-          {{ title }}
-        </h2>
+        <div class="flex flex-col gap-4">
+          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div class="min-w-0">
+              <p class="text-[0.68rem] font-semibold tracking-[0.24em] text-slate-400 uppercase dark:text-slate-500">
+                {{ t('dashboard-card-kicker') }}
+              </p>
+              <h2 class="mt-3 max-w-[18rem] text-xl font-semibold leading-tight text-slate-900 dark:text-white sm:text-2xl">
+                {{ title }}
+              </h2>
+            </div>
+
+            <div class="flex items-center gap-2 sm:justify-end">
+              <div
+                v-if="showEvolutionBadge"
+                class="inline-flex justify-center items-center rounded-full px-3 py-1 text-xs font-bold text-white shadow-sm"
+                :class="{ 'bg-cyan-500': (lastDayEvolution ?? 0) >= 0, 'bg-amber-500': (lastDayEvolution ?? 0) < 0 }"
+              >
+                {{ (lastDayEvolution ?? 0) < 0 ? '-' : '+' }}{{ Math.abs(lastDayEvolution ?? 0).toFixed(2) }}%
+              </div>
+              <div v-else class="inline-flex rounded-full px-3 py-1 text-xs font-semibold opacity-0" aria-hidden="true" />
+            </div>
+          </div>
+
+          <div v-if="total !== undefined" class="flex items-end gap-2">
+            <div class="max-w-full text-3xl font-semibold leading-none tracking-tight break-words text-slate-900 dark:text-white sm:text-4xl">
+              {{ total?.toLocaleString() }}
+            </div>
+            <span v-if="unit" class="pb-1 text-sm font-semibold tracking-[0.2em] text-slate-400 uppercase dark:text-slate-500">
+              {{ unit }}
+            </span>
+          </div>
+        </div>
       </slot>
-
-      <div v-if="total !== undefined" class="flex flex-col items-start min-w-0 text-left sm:items-end sm:text-right shrink-0">
-        <!-- Evolution badge -->
-        <div
-          v-if="showEvolutionBadge"
-          class="inline-flex justify-center items-center py-1 px-2 text-xs font-bold text-white whitespace-nowrap rounded-full shadow-lg"
-          :class="{ 'bg-cyan-500': (lastDayEvolution ?? 0) >= 0, 'bg-yellow-500': (lastDayEvolution ?? 0) < 0 }"
-        >
-          {{ (lastDayEvolution ?? 0) < 0 ? '-' : '+' }}{{ Math.abs(lastDayEvolution ?? 0).toFixed(2) }}%
-        </div>
-        <div v-else class="inline-flex py-1 px-2 text-xs font-semibold rounded-full opacity-0" aria-hidden="true" />
-
-        <!-- Total value -->
-        <div class="max-w-full text-2xl font-bold break-words dark:text-white text-slate-600 sm:text-3xl">
-          {{ total?.toLocaleString() }}<span v-if="unit" class="text-2xl font-normal"> {{ unit }}</span>
-        </div>
-      </div>
     </div>
 
     <!-- Chart content area -->
-    <div class="relative p-6 pt-2 w-full h-full">
+    <div class="relative flex-1 px-5 pb-5 pt-4">
       <!-- Loading state -->
       <div v-if="isLoading" class="flex justify-center items-center h-full">
         <Spinner size="w-24 h-24" />
