@@ -61,8 +61,11 @@ export async function checkWebhookPermissionV2(
   orgId: string,
   auth: AuthInfo,
 ): Promise<void> {
-  if (auth.authType === 'apikey' && auth.apikey) {
-    const orgCheck = await apikeyHasOrgRightWithPolicy(c, auth.apikey, orgId, supabaseApikey(c, c.get('capgkey') as string))
+  const parentApikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
+  const policyApikey = parentApikey ?? auth.apikey
+
+  if (auth.authType === 'apikey' && policyApikey) {
+    const orgCheck = await apikeyHasOrgRightWithPolicy(c, policyApikey, orgId, supabaseApikey(c, c.get('capgkey') as string))
     if (!orgCheck.valid) {
       if (orgCheck.error === 'org_requires_expiring_key') {
         throw quickError(401, 'org_requires_expiring_key', 'This organization requires API keys with an expiration date. Please use a different key or update this key with an expiration date.')

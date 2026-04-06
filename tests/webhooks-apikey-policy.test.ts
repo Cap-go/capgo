@@ -8,6 +8,7 @@ const policyCustomerId = `cus_webhook_policy_${globalId}`
 
 let legacyApiKeyId: number | null = null
 let legacyApiKeyValue: string | null = null
+let expiringSubkeyId: number | null = null
 let createdWebhookId: string | null = null
 
 beforeAll(async () => {
@@ -75,6 +76,19 @@ beforeAll(async () => {
   }).eq('id', policyOrgId)
   if (policyError)
     throw policyError
+
+  const subkeyResponse = await fetch(`${BASE_URL}/apikey`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      name: `expiring-webhook-subkey-${globalId}`,
+      limited_to_orgs: [policyOrgId],
+      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    }),
+  })
+  expect(subkeyResponse.status).toBe(200)
+  const subkeyData = await subkeyResponse.json() as { id: number }
+  expiringSubkeyId = subkeyData.id
 }, 60000)
 
 afterAll(async () => {
@@ -86,6 +100,10 @@ afterAll(async () => {
 
   if (legacyApiKeyId) {
     await supabase.from('apikeys').delete().eq('id', legacyApiKeyId)
+  }
+
+  if (expiringSubkeyId) {
+    await supabase.from('apikeys').delete().eq('id', expiringSubkeyId)
   }
 
   await supabase.from('org_users').delete().eq('org_id', policyOrgId)
@@ -142,6 +160,28 @@ describe('webhook endpoints enforce org API key expiration policy', () => {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': legacyApiKeyValue,
+      },
+      body: JSON.stringify({
+        orgId: policyOrgId,
+        webhookId: createdWebhookId,
+      }),
+    })
+
+    expect(response.status).toBe(401)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('org_requires_expiring_key')
+  })
+
+  it('rejects webhook test when a legacy parent key attaches an expiring subkey', async () => {
+    if (!legacyApiKeyValue || !expiringSubkeyId || !createdWebhookId)
+      throw new Error('Webhook subkey policy prerequisites were not created')
+
+    const response = await fetch(`${BASE_URL}/webhooks/test`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': legacyApiKeyValue,
+        'x-limited-key-id': String(expiringSubkeyId),
       },
       body: JSON.stringify({
         orgId: policyOrgId,
