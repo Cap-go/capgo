@@ -55,40 +55,42 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
     <!-- Header with title and stats -->
     <div class="relative overflow-hidden px-5 pt-5">
       <!-- Custom header slot or default header -->
-      <slot name="header">
-        <div class="flex flex-col gap-4">
-          <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div class="min-w-0">
-              <p class="text-[0.68rem] font-semibold tracking-[0.24em] text-slate-400 uppercase dark:text-slate-500">
-                {{ t('dashboard-card-kicker') }}
-              </p>
-              <h2 class="mt-3 max-w-[18rem] text-xl font-semibold leading-tight text-slate-900 dark:text-white sm:text-2xl">
-                {{ title }}
-              </h2>
-            </div>
-
-            <div class="flex items-center gap-2 sm:justify-end">
-              <div
-                v-if="showEvolutionBadge"
-                class="inline-flex justify-center items-center rounded-full px-3 py-1 text-xs font-bold text-white shadow-sm"
-                :class="{ 'bg-cyan-500': (lastDayEvolution ?? 0) >= 0, 'bg-amber-500': (lastDayEvolution ?? 0) < 0 }"
-              >
-                {{ (lastDayEvolution ?? 0) < 0 ? '-' : '+' }}{{ Math.abs(lastDayEvolution ?? 0).toFixed(2) }}%
+      <div class="flex flex-col gap-4">
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div class="min-w-0 flex-1">
+            <slot name="header">
+              <div class="min-w-0">
+                <p class="text-[0.68rem] font-semibold tracking-[0.24em] text-slate-400 uppercase dark:text-slate-500">
+                  {{ t('dashboard-card-kicker') }}
+                </p>
+                <h2 class="mt-3 max-w-[18rem] text-xl font-semibold leading-tight text-slate-900 dark:text-white sm:text-2xl">
+                  {{ title }}
+                </h2>
               </div>
-              <div v-else class="inline-flex rounded-full px-3 py-1 text-xs font-semibold opacity-0" aria-hidden="true" />
-            </div>
+            </slot>
           </div>
 
-          <div v-if="total !== undefined" class="flex items-end gap-2">
-            <div class="max-w-full text-3xl font-semibold leading-none tracking-tight break-words text-slate-900 dark:text-white sm:text-4xl">
-              {{ total?.toLocaleString() }}
+          <div class="flex items-center gap-2 sm:justify-end">
+            <div
+              v-if="showEvolutionBadge"
+              class="inline-flex justify-center items-center rounded-full px-3 py-1 text-xs font-bold text-white shadow-sm"
+              :class="{ 'bg-cyan-500': (lastDayEvolution ?? 0) >= 0, 'bg-amber-500': (lastDayEvolution ?? 0) < 0 }"
+            >
+              {{ (lastDayEvolution ?? 0) < 0 ? '-' : '+' }}{{ Math.abs(lastDayEvolution ?? 0).toFixed(2) }}%
             </div>
-            <span v-if="unit" class="pb-1 text-sm font-semibold tracking-[0.2em] text-slate-400 uppercase dark:text-slate-500">
-              {{ unit }}
-            </span>
+            <div v-else class="inline-flex rounded-full px-3 py-1 text-xs font-semibold opacity-0" aria-hidden="true" />
           </div>
         </div>
-      </slot>
+
+        <div v-if="total !== undefined" class="flex items-end gap-2">
+          <div class="max-w-full text-3xl font-semibold leading-none tracking-tight break-words text-slate-900 dark:text-white sm:text-4xl">
+            {{ total?.toLocaleString() }}
+          </div>
+          <span v-if="unit" class="pb-1 text-sm font-semibold tracking-[0.2em] text-slate-400 uppercase dark:text-slate-500">
+            {{ unit }}
+          </span>
+        </div>
+      </div>
     </div>
 
     <!-- Chart content area -->

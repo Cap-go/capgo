@@ -661,7 +661,7 @@ onMounted(checkLogin)
             <div v-if="hasQuerySession" class="auth-step-card">
               <div class="auth-card-body space-y-4 text-gray-500">
                 <p class="text-sm">
-                  This link contains a login session. Continue to sign in with this session?
+                  {{ t('login-query-session-prompt') }}
                 </p>
                 <button
                   type="button" data-test="accept-query-session" :disabled="isLoading" :aria-busy="isLoading ? 'true' : 'false'"
@@ -678,14 +678,14 @@ onMounted(checkLogin)
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                     />
                   </svg>
-                  Continue
+                  {{ t('continue') }}
                 </button>
                 <button
                   type="button" :disabled="isLoading"
                   class="auth-secondary-button"
                   @click="declineQuerySession"
                 >
-                  Cancel
+                  {{ t('cancel') }}
                 </button>
               </div>
             </div>
@@ -786,9 +786,9 @@ onMounted(checkLogin)
                       </div>
                     </div>
                     <div class="text-center">
-                      <p class="auth-inline-link cursor-pointer" @click="goBackToEmail()">
+                      <button type="button" class="auth-inline-link auth-inline-button" @click="goBackToEmail">
                         ← {{ t('go-back') }}
-                      </p>
+                      </button>
                     </div>
                   </div>
 
@@ -829,7 +829,7 @@ onMounted(checkLogin)
                           </button>
                           <div class="flex items-center my-4">
                             <div class="flex-1 h-px bg-gray-200 dark:bg-gray-600" />
-                            <span class="px-3 text-sm text-gray-400">or</span>
+                            <span class="px-3 text-sm text-gray-400">{{ t('login-or-separator') }}</span>
                             <div class="flex-1 h-px bg-gray-200 dark:bg-gray-600" />
                           </div>
                         </div>
@@ -875,9 +875,9 @@ onMounted(checkLogin)
 
                         <div class="rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-4 text-center dark:border-slate-700 dark:bg-slate-900/70">
                           <div>
-                            <p class="auth-inline-link cursor-pointer" @click="goBackToEmail()">
+                            <button type="button" class="auth-inline-link auth-inline-button" @click="goBackToEmail">
                               ← {{ t('go-back') }}
-                            </p>
+                            </button>
                           </div>
                           <div class="mt-3">
                             <a
@@ -914,7 +914,7 @@ onMounted(checkLogin)
                         :prefix-icon="mfaIcon" inputmode="text" :label="t('2fa-code')"
                         :validation-rules="{ mfa_code_validation }"
                         :validation-messages="{
-                          mfa_code_validation: '2FA authentication code is not formatted properly',
+                          mfa_code_validation: t('login-2fa-code-invalid'),
                         }"
                         placeholder="xxx xxx"
                         autocomplete="off"
@@ -946,9 +946,9 @@ onMounted(checkLogin)
 
                       <div class="rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-4 text-center dark:border-slate-700 dark:bg-slate-900/70">
                         <p class="text-base text-gray-600" />
-                        <p class="auth-inline-link cursor-pointer" @click="goback()">
+                        <button type="button" class="auth-inline-link auth-inline-button" @click="goback">
                           {{ t('go-back') }}
-                        </p>
+                        </button>
                       </div>
                     </div>
                   </FormKit>
@@ -985,7 +985,7 @@ onMounted(checkLogin)
   );
 }
 
-.dark .login-shell {
+:global(.dark) .login-shell {
   background: linear-gradient(
     180deg,
     rgba(15, 23, 42, 0.98) 0%,
@@ -1044,7 +1044,7 @@ onMounted(checkLogin)
   padding: 1.5rem;
 }
 
-.dark .auth-card-shell {
+:global(.dark) .auth-card-shell {
   border-color: rgba(71, 85, 105, 0.7);
   background: linear-gradient(180deg, rgba(15, 23, 42, 0.88) 0%, rgba(15, 23, 42, 0.7) 100%);
 }
@@ -1063,7 +1063,7 @@ onMounted(checkLogin)
   color: rgb(100 116 139);
 }
 
-.dark .auth-card-kicker {
+:global(.dark) .auth-card-kicker {
   color: rgb(148 163 184);
 }
 
@@ -1078,7 +1078,7 @@ onMounted(checkLogin)
   color: rgb(71 85 105);
 }
 
-.dark .auth-version-badge {
+:global(.dark) .auth-version-badge {
   border-color: rgba(71, 85, 105, 0.9);
   background: rgba(30, 41, 59, 0.9);
   color: rgb(226 232 240);
@@ -1092,7 +1092,7 @@ onMounted(checkLogin)
   box-shadow: 0 26px 60px -40px rgba(15, 23, 42, 0.42);
 }
 
-.dark .auth-step-card {
+:global(.dark) .auth-step-card {
   border-color: rgba(71, 85, 105, 0.68);
   background: rgba(15, 23, 42, 0.8);
 }
@@ -1159,24 +1159,37 @@ onMounted(checkLogin)
   outline: none;
 }
 
-.dark .auth-secondary-button {
+:global(.dark) .auth-secondary-button {
   border-color: rgba(71, 85, 105, 0.9);
   background: rgba(15, 23, 42, 0.85);
   color: rgb(226 232 240);
 }
 
-.dark .auth-secondary-button:hover,
-.dark .auth-secondary-button:focus-visible {
+:global(.dark) .auth-secondary-button:hover,
+:global(.dark) .auth-secondary-button:focus-visible {
   background: rgba(30, 41, 59, 0.95);
 }
 
 .auth-inline-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: none;
+  background: transparent;
+  padding: 0;
   font-size: 0.95rem;
   font-weight: 600;
   color: rgb(255 114 17);
+  cursor: pointer;
+  text-decoration: none;
   transition:
     color 0.2s ease,
     opacity 0.2s ease;
+}
+
+.auth-inline-button {
+  appearance: none;
 }
 
 .auth-inline-link:hover,
@@ -1203,12 +1216,12 @@ onMounted(checkLogin)
   outline: none;
 }
 
-.dark .auth-ghost-button {
+:global(.dark) .auth-ghost-button {
   color: rgb(203 213 225);
 }
 
-.dark .auth-ghost-button:hover,
-.dark .auth-ghost-button:focus-visible {
+:global(.dark) .auth-ghost-button:hover,
+:global(.dark) .auth-ghost-button:focus-visible {
   background: rgba(30, 41, 59, 0.85);
   color: white;
 }

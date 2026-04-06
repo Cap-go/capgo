@@ -760,8 +760,9 @@ onMounted(async () => {
           <!-- Daily vs Cumulative Switch -->
           <div class="flex items-center p-1 space-x-1 rounded-2xl bg-white/90 shadow-sm dark:bg-slate-900/80">
             <button
-              class="flex gap-1 justify-center items-center py-2 px-3 text-xs font-medium text-center whitespace-nowrap rounded-xl transition-colors cursor-pointer sm:px-4"
-              :class="[!showCumulative || !useBillingPeriod ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white']"
+              type="button"
+              class="d-btn d-btn-sm min-h-10 h-10 rounded-xl border-0 px-3 text-xs font-medium normal-case sm:px-4"
+              :class="[!showCumulative || !useBillingPeriod ? 'd-btn-neutral shadow-sm' : 'd-btn-ghost text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white']"
               :aria-label="t('daily')"
               @click="showCumulative = false"
             >
@@ -769,11 +770,12 @@ onMounted(async () => {
               <span>{{ t('daily') }}</span>
             </button>
             <button
-              class="flex gap-1 justify-center items-center py-2 px-3 text-xs font-medium text-center whitespace-nowrap rounded-xl transition-colors cursor-pointer sm:px-4"
+              type="button"
+              class="d-btn d-btn-sm min-h-10 h-10 rounded-xl border-0 px-3 text-xs font-medium normal-case sm:px-4"
               :class="[
                 showCumulative && useBillingPeriod
-                  ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white',
+                  ? 'd-btn-neutral shadow-sm'
+                  : 'd-btn-ghost text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white',
               ]"
               :aria-label="t('cumulative')"
               @click="handleCumulativeClick"
@@ -786,7 +788,9 @@ onMounted(async () => {
           <!-- Billing Period vs Last 30 Days Switch -->
           <div class="flex items-center p-1 space-x-1 rounded-2xl bg-white/90 shadow-sm dark:bg-slate-900/80">
             <button
-              class="flex gap-1 justify-center items-center py-2 px-3 text-xs font-medium text-center whitespace-nowrap rounded-xl transition-colors cursor-pointer sm:px-4" :class="[useBillingPeriod ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white']"
+              type="button"
+              class="d-btn d-btn-sm min-h-10 h-10 rounded-xl border-0 px-3 text-xs font-medium normal-case sm:px-4"
+              :class="[useBillingPeriod ? 'd-btn-neutral shadow-sm' : 'd-btn-ghost text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white']"
               :aria-label="t('billing-period')"
               @click="useBillingPeriod = true"
             >
@@ -794,7 +798,9 @@ onMounted(async () => {
               <span>{{ t('billing-period') }}</span>
             </button>
             <button
-              class="flex gap-1 justify-center items-center py-2 px-3 text-xs font-medium text-center whitespace-nowrap rounded-xl transition-colors cursor-pointer sm:px-4" :class="[!useBillingPeriod ? 'bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white']"
+              type="button"
+              class="d-btn d-btn-sm min-h-10 h-10 rounded-xl border-0 px-3 text-xs font-medium normal-case sm:px-4"
+              :class="[!useBillingPeriod ? 'd-btn-neutral shadow-sm' : 'd-btn-ghost text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white']"
               :aria-label="t('last-30-days')"
               @click="useBillingPeriod = false"
             >
@@ -807,7 +813,7 @@ onMounted(async () => {
         <div class="flex items-center gap-2 self-end lg:self-auto">
           <button
             type="button"
-            class="flex items-center justify-center h-10 w-10 rounded-2xl border border-slate-200 bg-white/90 text-slate-700 shadow-sm transition-colors cursor-pointer hover:bg-slate-50 hover:text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white dark:focus:ring-blue-400"
+            class="d-btn d-btn-outline d-btn-sm h-10 min-h-10 w-10 rounded-2xl border-slate-200 bg-white/90 p-0 text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white dark:focus:ring-blue-400"
             :aria-label="t('reload')"
             @click="reloadAllCharts"
           >
@@ -817,7 +823,7 @@ onMounted(async () => {
           <div class="relative flex items-center group">
             <button
               type="button"
-              class="flex items-center justify-center h-10 w-10 rounded-2xl border border-slate-200 bg-white/90 text-slate-700 shadow-sm transition-colors cursor-pointer hover:bg-slate-50 hover:text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white dark:focus:ring-blue-400"
+              class="d-btn d-btn-outline d-btn-sm h-10 min-h-10 w-10 rounded-2xl border-slate-200 bg-white/90 p-0 text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white dark:focus:ring-blue-400"
               :aria-label="t('info')"
             >
               <InformationInfo class="w-4 h-4" />
