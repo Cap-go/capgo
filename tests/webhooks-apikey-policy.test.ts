@@ -1,14 +1,19 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, headers, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { getEndpointUrl, getSupabaseClient, headers, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const globalId = randomUUID()
 const policyOrgId = randomUUID()
 const policyCustomerId = `cus_webhook_policy_${globalId}`
+const APIKEY_URL = getEndpointUrl('/apikey')
+const WEBHOOKS_URL = getEndpointUrl('/webhooks')
+const WEBHOOKS_TEST_URL = getEndpointUrl('/webhooks/test')
+const WEBHOOKS_RETRY_URL = getEndpointUrl('/webhooks/deliveries/retry')
 
 let legacyApiKeyId: number | null = null
 let legacyApiKeyValue: string | null = null
 let expiringSubkeyId: number | null = null
+let expiringSubkeyValue: string | null = null
 let createdWebhookId: string | null = null
 let createdDeliveryId: string | null = null
 
@@ -44,7 +49,7 @@ beforeAll(async () => {
   if (memberError)
     throw memberError
 
-  const keyResponse = await fetch(`${BASE_URL}/apikey`, {
+  const keyResponse = await fetch(APIKEY_URL, {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -57,7 +62,7 @@ beforeAll(async () => {
   legacyApiKeyId = keyData.id
   legacyApiKeyValue = keyData.key
 
-  const webhookResponse = await fetch(`${BASE_URL}/webhooks`, {
+  const webhookResponse = await fetch(WEBHOOKS_URL, {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -71,7 +76,7 @@ beforeAll(async () => {
   const webhookData = await webhookResponse.json() as { webhook: { id: string } }
   createdWebhookId = webhookData.webhook.id
 
-  const testWebhookResponse = await fetch(`${BASE_URL}/webhooks/test`, {
+  const testWebhookResponse = await fetch(WEBHOOKS_TEST_URL, {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -90,7 +95,7 @@ beforeAll(async () => {
   if (policyError)
     throw policyError
 
-  const subkeyResponse = await fetch(`${BASE_URL}/apikey`, {
+  const subkeyResponse = await fetch(APIKEY_URL, {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -100,8 +105,9 @@ beforeAll(async () => {
     }),
   })
   expect(subkeyResponse.status).toBe(200)
-  const subkeyData = await subkeyResponse.json() as { id: number }
+  const subkeyData = await subkeyResponse.json() as { id: number, key: string }
   expiringSubkeyId = subkeyData.id
+  expiringSubkeyValue = subkeyData.key
 }, 60000)
 
 afterAll(async () => {
@@ -129,7 +135,7 @@ describe('webhook endpoints enforce org API key expiration policy', () => {
     if (!legacyApiKeyValue)
       throw new Error('Legacy API key was not created')
 
-    const response = await fetch(`${BASE_URL}/webhooks?orgId=${policyOrgId}`, {
+    const response = await fetch(`${WEBHOOKS_URL}?orgId=${policyOrgId}`, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': legacyApiKeyValue,
@@ -145,7 +151,7 @@ describe('webhook endpoints enforce org API key expiration policy', () => {
     if (!legacyApiKeyValue)
       throw new Error('Legacy API key was not created')
 
-    const response = await fetch(`${BASE_URL}/webhooks`, {
+    const response = await fetch(WEBHOOKS_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -168,7 +174,7 @@ describe('webhook endpoints enforce org API key expiration policy', () => {
     if (!legacyApiKeyValue || !createdWebhookId)
       throw new Error('Webhook deletion prerequisites were not created')
 
-    const response = await fetch(`${BASE_URL}/webhooks`, {
+    const response = await fetch(WEBHOOKS_URL, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -189,7 +195,7 @@ describe('webhook endpoints enforce org API key expiration policy', () => {
     if (!legacyApiKeyValue || !createdWebhookId)
       throw new Error('Webhook test prerequisites were not created')
 
-    const response = await fetch(`${BASE_URL}/webhooks/test`, {
+    const response = await fetch(WEBHOOKS_TEST_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -210,7 +216,7 @@ describe('webhook endpoints enforce org API key expiration policy', () => {
     if (!legacyApiKeyValue || !createdDeliveryId)
       throw new Error('Webhook delivery prerequisites were not created')
 
-    const response = await fetch(`${BASE_URL}/webhooks/deliveries/retry`, {
+    const response = await fetch(WEBHOOKS_RETRY_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -231,7 +237,7 @@ describe('webhook endpoints enforce org API key expiration policy', () => {
     if (!legacyApiKeyValue || !expiringSubkeyId || !createdWebhookId)
       throw new Error('Webhook subkey policy prerequisites were not created')
 
-    const response = await fetch(`${BASE_URL}/webhooks/test`, {
+    const response = await fetch(WEBHOOKS_TEST_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -247,5 +253,21 @@ describe('webhook endpoints enforce org API key expiration policy', () => {
     expect(response.status).toBe(401)
     const data = await response.json() as { error: string }
     expect(data.error).toBe('org_requires_expiring_key')
+  })
+
+  it('allows webhook listing for a compliant expiring org key', async () => {
+    if (!expiringSubkeyValue)
+      throw new Error('Expiring API key was not created')
+
+    const response = await fetch(`${WEBHOOKS_URL}?orgId=${policyOrgId}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': expiringSubkeyValue,
+      },
+    })
+
+    expect(response.status).toBe(200)
+    const data = await response.json()
+    expect(Array.isArray(data)).toBe(true)
   })
 })
