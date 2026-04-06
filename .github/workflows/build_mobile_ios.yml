@@ -18,8 +18,8 @@ env:
 
 jobs:
   build_ios:
-    runs-on: macos-latest-xlarge
-    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
     permissions:
       contents: read
       actions: write
@@ -39,33 +39,54 @@ jobs:
         with:
           bun-version: latest
       - name: Install dependencies
-        id: install_code
-        run: bun install
-      - name: Build
-        id: build_code
-        run: bun mobile
-      - name: Sync
-        id: sync_code
-        run: bun x cap sync ios
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.4.9"
-          bundler-cache: true
-      - uses: maierj/fastlane-action@v3.1.0
+        run: bun install --frozen-lockfile
+      - name: Resolve app id
+        id: app_config
+        run: echo "app_id=$(bun -e \"import config from './capacitor.config.ts'; console.log(config.appId)\")" >> "$GITHUB_OUTPUT"
+      - name: Prepare mobile project
+        run: bun run build:mobile
+      - name: Save iOS build credentials for Capgo CLI
         env:
           APP_STORE_CONNECT_TEAM_ID: ${{ secrets.APP_STORE_CONNECT_TEAM_ID }}
-          BUNDLE_IDENTIFIER: ${{ secrets.BUNDLE_IDENTIFIER }}
           BUILD_CERTIFICATE_BASE64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
           BUILD_PROVISION_PROFILE_BASE64: ${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}
           APPLE_KEY_ID: ${{ secrets.APPLE_KEY_ID }}
           APPLE_ISSUER_ID: ${{ secrets.APPLE_ISSUER_ID }}
           APPLE_KEY_CONTENT: ${{ secrets.APPLE_KEY_CONTENT }}
-          APPLE_PROFILE_NAME: ${{ secrets.APPLE_PROFILE_NAME }}
-        with:
-          lane: ios beta
-      - name: Upload release bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-release
-          path: ./App.ipa
-          retention-days: 10
+          P12_PASSWORD: ${{ secrets.P12_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          certificate_path="$RUNNER_TEMP/build_certificate.p12"
+          provisioning_profile_path="$RUNNER_TEMP/build_profile.mobileprovision"
+          apple_key_path="$RUNNER_TEMP/AuthKey.p8"
+
+          printf '%s' "$BUILD_CERTIFICATE_BASE64" | base64 --decode > "$certificate_path"
+          printf '%s' "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode > "$provisioning_profile_path"
+          printf '%s' "$APPLE_KEY_CONTENT" | base64 --decode > "$apple_key_path"
+
+          args=(
+            build credentials save
+            --local
+            --appId "${{ steps.app_config.outputs.app_id }}"
+            --platform ios
+            --apple-team-id "$APP_STORE_CONNECT_TEAM_ID"
+            --apple-key "$apple_key_path"
+            --apple-key-id "$APPLE_KEY_ID"
+            --apple-issuer-id "$APPLE_ISSUER_ID"
+            --certificate "$certificate_path"
+            --ios-provisioning-profile "$provisioning_profile_path"
+            --output-upload
+            --output-retention 7d
+          )
+
+          if [[ -n "${P12_PASSWORD:-}" ]]; then
+            args+=(--p12-password "$P12_PASSWORD")
+          fi
+
+          bunx @capgo/cli@latest "${args[@]}"
+      - name: Request iOS build through Capgo CLI
+        env:
+          CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
+        run: bunx @capgo/cli@latest build request "${{ steps.app_config.outputs.app_id }}" --platform ios --path . --output-upload --output-retention 7d

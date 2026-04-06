@@ -39,26 +39,6 @@ interface SpMetadata {
 
 const providers = ref<SsoProvider[]>([])
 const spMetadata = ref<SpMetadata | null>(null)
-
-async function fetchSpMetadata() {
-  try {
-    const headers = await getAuthHeaders()
-    const response = await fetch(`${defaultApiHost}/private/sso/sp-metadata`, {
-      method: 'GET',
-      headers,
-    })
-    if (!response.ok) {
-      console.error('Failed to fetch SP metadata:', response.status)
-      toast.error(t('sso-error-loading-sp-metadata'))
-      return
-    }
-    spMetadata.value = await response.json() as SpMetadata
-  }
-  catch (error) {
-    console.error('Error fetching SP metadata:', error)
-    toast.error(t('sso-error-loading-sp-metadata'))
-  }
-}
 const isLoading = ref(true)
 const isSubmitting = ref(false)
 const isVerifying = ref<string | null>(null)
@@ -130,6 +110,41 @@ async function fetchProviders() {
   }
   finally {
     isLoading.value = false
+  }
+}
+
+async function fetchSpMetadata() {
+  try {
+    const headers = await getAuthHeaders()
+    const response = await fetch(`${defaultApiHost}/private/sso/sp-metadata`, {
+      method: 'GET',
+      headers,
+    })
+
+    if (!response.ok) {
+      console.error('Failed to fetch SSO SP metadata:', response.status)
+      spMetadata.value = null
+      toast.error(t('sso-error-loading-sp-metadata'))
+      return
+    }
+
+    const data = await response.json() as {
+      acs_url: string
+      entity_id: string
+      nameid_format: string
+      sp_metadata_url?: string
+    }
+    spMetadata.value = {
+      acs_url: data.acs_url,
+      entity_id: data.entity_id,
+      sp_metadata_url: data.sp_metadata_url ?? data.entity_id,
+      nameid_format: data.nameid_format,
+    }
+  }
+  catch (error) {
+    console.error('Error fetching SSO SP metadata:', error)
+    spMetadata.value = null
+    toast.error(t('sso-error-loading-sp-metadata'))
   }
 }
 

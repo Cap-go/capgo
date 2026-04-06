@@ -1598,14 +1598,20 @@ export async function checkApikeyMeetsOrgPolicy(
   orgId: string,
   supabase: SupabaseClient<Database>,
 ): Promise<{ valid: boolean, error?: string }> {
-  const { data: org } = await supabase
+  const { data: org, error } = await supabase
     .from('orgs')
     .select('require_apikey_expiration')
     .eq('id', orgId)
     .single()
 
-  if (!org) {
-    return { valid: true }
+  if (error || !org) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'checkApikeyMeetsOrgPolicy: unable to load org policy',
+      error,
+      orgId,
+    })
+    return { valid: false, error: 'org_policy_lookup_failed' }
   }
 
   if (org.require_apikey_expiration && !key.expires_at) {

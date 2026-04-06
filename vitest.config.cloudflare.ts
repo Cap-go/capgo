@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => ({
     watch: false,
     bail: 0, // Run all tests to see full results
     testTimeout: 30_000, // Increased timeout for Cloudflare Workers
-    hookTimeout: 10_000,
+    hookTimeout: 15_000, // Match the main config for slower CI setup hooks
     retry: 2,
     maxConcurrency: 10, // Reduced for replica sync reliability
     maxWorkers: 5, // Reduced for replica sync reliability
