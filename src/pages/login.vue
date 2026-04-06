@@ -1124,7 +1124,14 @@ onMounted(checkLogin)
 .auth-primary-button:focus-visible {
   transform: translateY(-1px);
   filter: brightness(1.04);
-  outline: none;
+}
+
+.auth-primary-button:focus-visible,
+.auth-secondary-button:focus-visible,
+.auth-inline-link:focus-visible,
+.auth-ghost-button:focus-visible {
+  outline: 2px solid var(--color-azure-500);
+  outline-offset: 3px;
 }
 
 .auth-primary-button:disabled {
@@ -1156,7 +1163,6 @@ onMounted(checkLogin)
 .auth-secondary-button:focus-visible {
   border-color: rgba(17, 158, 255, 0.45);
   background: rgba(241, 245, 249, 0.96);
-  outline: none;
 }
 
 :global(.dark) .auth-secondary-button {
@@ -1195,7 +1201,6 @@ onMounted(checkLogin)
 .auth-inline-link:hover,
 .auth-inline-link:focus-visible {
   color: rgb(235 94 0);
-  outline: none;
 }
 
 .auth-ghost-button {
@@ -1213,7 +1218,6 @@ onMounted(checkLogin)
 .auth-ghost-button:focus-visible {
   background: rgba(226, 232, 240, 0.75);
   color: rgb(30 41 59);
-  outline: none;
 }
 
 :global(.dark) .auth-ghost-button {
