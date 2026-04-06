@@ -4,7 +4,7 @@ import type { PlanUsage } from './supabase.ts'
 import type { Database } from './supabase.types.ts'
 import { quickError } from './hono.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
-import { sendNotifToOrgMembers } from './org_email_notifications.ts'
+import { sendNotifToOrgMembers, sendNotifToOrgMembersOnce } from './org_email_notifications.ts'
 import { syncSubscriptionData } from './stripe.ts'
 import {
   getCurrentPlanNameOrg,
@@ -379,7 +379,7 @@ async function userIsAtPlanUsage(c: Context, orgId: string, customerId: string |
 export async function getOrgWithCustomerInfo(c: Context, orgId: string) {
   const { data: org, error: userError } = await supabaseAdmin(c)
     .from('orgs')
-    .select('customer_id, stripe_info(status, subscription_id, subscription_anchor_start, subscription_anchor_end)')
+    .select('customer_id, name, website, stripe_info(status, subscription_id, subscription_anchor_start, subscription_anchor_end)')
     .eq('id', orgId)
     .single()
   if (userError || !org)
@@ -444,7 +444,11 @@ export async function handleOrgNotificationsAndEvents(c: Context, org: any, orgI
     finalIsGoodPlan = !needsUpgrade
   }
   else if (!is_onboarded && is_onboarding_needed) {
-    const sent = await sendNotifToOrgMembers(c, 'user:need_onboarding', 'onboarding', {}, orgId, orgId, '0 0 1 * *', drizzleClient)
+    const sent = await sendNotifToOrgMembersOnce(c, 'user:need_onboarding', 'onboarding', {
+      org_id: orgId,
+      org_name: org.name ?? '',
+      org_website: org.website ?? null,
+    }, orgId, orgId, drizzleClient)
     if (sent) {
       await sendEventToTracking(c, {
         channel: 'usage',

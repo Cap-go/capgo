@@ -22,7 +22,7 @@ import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
 import { getRbacRoleI18nKey, isAdminRole, isSuperAdminRole, useOrganizationStore } from '~/stores/organization'
-import { resolveInviteNewUserErrorMessage } from '~/utils/invites'
+import { notifyExistingUserInvite, resolveInviteNewUserErrorMessage, shouldAttemptExistingUserInviteNotification } from '~/utils/invites'
 import DeleteOrgDialog from './DeleteOrgDialog.vue'
 
 const { t } = useI18n()
@@ -135,6 +135,45 @@ function isInviteMember(member: OrganizationMemberRow) {
   if (typeof member.role === 'string')
     return member.role.includes('invite')
   return false
+}
+
+function getMemberRoleLabel(member: OrganizationMemberRow) {
+  if (useNewRbac.value) {
+    const normalizedRole = member.role.replace(/^invite_/, '')
+    const i18nKey = getRbacRoleI18nKey(normalizedRole)
+    return i18nKey ? t(i18nKey) : normalizedRole.replaceAll('_', ' ')
+  }
+  return member.role.replaceAll('_', ' ')
+}
+
+function getMemberStatusLabel(member: OrganizationMemberRow) {
+  return isInviteMember(member) ? t('sso-status-pending') : t('sso-status-active')
+}
+
+function getMemberStatusClasses(member: OrganizationMemberRow) {
+  if (isInviteMember(member)) {
+    return {
+      pill: 'border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-400/25 dark:bg-amber-500/8 dark:text-amber-200',
+      dot: 'bg-amber-400 dark:bg-amber-300',
+    }
+  }
+
+  return {
+    pill: 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-400/25 dark:bg-emerald-500/8 dark:text-emerald-200',
+    dot: 'bg-emerald-500 dark:bg-emerald-300',
+  }
+}
+
+function renderRoleCell(member: OrganizationMemberRow) {
+  const statusClasses = getMemberStatusClasses(member)
+
+  return h('div', { class: 'flex flex-wrap items-center gap-2 min-w-0 whitespace-normal' }, [
+    h('span', { class: 'truncate text-slate-700 dark:text-slate-200' }, getMemberRoleLabel(member)),
+    h('span', { class: `inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-medium rounded-full border shrink-0 ${statusClasses.pill}` }, [
+      h('span', { class: `w-1.5 h-1.5 rounded-full ${statusClasses.dot}` }),
+      h('span', getMemberStatusLabel(member)),
+    ]),
+  ])
 }
 
 async function checkRbacEnabled() {
@@ -336,14 +375,8 @@ columns.value = [
     key: 'role',
     mobile: true,
     sortable: 'desc',
-    displayFunction: (member: OrganizationMemberRow) => {
-      if (useNewRbac.value) {
-        const normalizedRole = member.role.replace(/^invite_/, '')
-        const i18nKey = getRbacRoleI18nKey(normalizedRole)
-        return i18nKey ? t(i18nKey) : normalizedRole.replaceAll('_', ' ')
-      }
-      return member.role.replaceAll('_', ' ')
-    },
+    displayFunction: (member: OrganizationMemberRow) => getMemberRoleLabel(member),
+    renderFunction: (member: OrganizationMemberRow) => renderRoleCell(member),
   },
   {
     key: 'actions',
@@ -651,6 +684,23 @@ async function handleSendInvitationOutput(output: string, email: string, type: D
   console.log('Output: ', output)
   if (!output)
     return false
+
+  const orgId = currentOrganization.value?.gid
+  const existingMember = members.value.find(member => member.email.toLowerCase() === email.toLowerCase())
+  const hasPendingInvite = existingMember ? isInviteMember(existingMember) : false
+
+  if (orgId && shouldAttemptExistingUserInviteNotification(output, type, useNewRbac.value, hasPendingInvite)) {
+    const notified = await notifyExistingUserInvite(supabase, email, orgId)
+    if (!notified) {
+      console.warn('Failed to send invite email notification')
+      toast.warning(t('org-invite-email-notification-failed'))
+    }
+    else {
+      toast.success(t('org-invited-user'))
+      return true
+    }
+  }
+
   if (output === 'OK') {
     toast.success(t('org-invited-user'))
     return true

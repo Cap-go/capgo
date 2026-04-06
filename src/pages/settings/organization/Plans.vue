@@ -211,73 +211,6 @@ async function openChangePlan(plan: Database['public']['Tables']['plans']['Row']
     return
   }
 
-  // Check if user has apps in this organization
-  if (currentOrganization.value?.app_count === 0) {
-    // Get other organizations where user is admin and has apps
-    const orgsMap = organizationStore.getAllOrgs()
-    const otherOrgsWithApps = [...orgsMap]
-      .map(([_, org]) => org)
-      .filter(org =>
-        org.gid !== currentOrganization.value?.gid
-        && org.app_count > 0
-        && isSuperAdminRole(org.role),
-      )
-      .sort((a, b) => b.app_count - a.app_count)
-
-    // Build the description with list of other orgs if any
-    let description = t('no-apps-confirm-subscription')
-    if (otherOrgsWithApps.length > 0) {
-      description += `\n\n${t('other-orgs-with-apps')}:`
-      otherOrgsWithApps.slice(0, 5).forEach((org) => {
-        description += `\n• ${org.name} (${org.app_count} ${org.app_count === 1 ? t('app') : t('apps')})`
-      })
-    }
-
-    // Build buttons dynamically - start with cancel button
-    const buttons = [
-      {
-        text: t('cancel'),
-        role: 'cancel' as const,
-      },
-      // Add switch buttons for other orgs with apps (max 3)
-      ...otherOrgsWithApps.slice(0, 3).map(org => ({
-        text: `${t('switch-to')} ${org.name}`,
-        id: `switch-${org.gid}`,
-        handler: () => {
-          organizationStore.setCurrentOrganization(org.gid)
-          return true
-        },
-      })),
-      // Add the "Add app" button
-      {
-        text: t('add-another-app'),
-        id: 'add-app-button',
-        handler: () => {
-          router.push('/apps')
-          return true
-        },
-      },
-      // Add "Proceed anyway" button at the end
-      {
-        text: t('proceed-anyway'),
-        id: 'proceed-anyway-button',
-        role: 'primary' as const,
-        handler: () => true,
-      },
-    ]
-
-    dialogStore.openDialog({
-      title: t('no-apps-in-org'),
-      description,
-      buttons,
-    })
-
-    await dialogStore.onDialogDismiss()
-    // Only proceed if user clicked "Proceed anyway"
-    if (dialogStore.lastButtonRole !== 'proceed-anyway-button')
-      return
-  }
-
   // get the current url
   isSubscribeLoading.value[index] = true
   if (plan.stripe_id) {
@@ -542,6 +475,8 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
         <div
           v-for="(p, index) in mainStore.plans"
           :key="p.price_m"
+          data-test="plan-card"
+          :data-plan-name="p.name"
           class="relative flex flex-col p-5 overflow-hidden transition-all duration-200 bg-gray-100 border rounded-2xl group dark:bg-base-200"
           :class="[
             // Don't highlight the plan card for credits-only orgs — they are not actually
@@ -586,6 +521,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
 
           <!-- Action Button -->
           <button
+            data-test="plan-action-button"
             :class="buttonStyle(p)"
             class="flex items-center justify-center w-full gap-2 px-4 py-2 mb-6 text-sm font-semibold transition-all duration-200 rounded-lg shadow-sm shrink-0"
             :disabled="isDisabled(p)"
