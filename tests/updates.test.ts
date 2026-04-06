@@ -220,6 +220,7 @@ describe('[POST] /updates', () => {
     expect(response.status).toBe(200)
 
     const json = await response.json<UpdateRes>()
+    expect(json.version).not.toBe(versionName)
     expect(json.version).toBe('1.0.0')
     expect(json.error).toBeUndefined()
   })
