@@ -475,6 +475,8 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
         <div
           v-for="(p, index) in mainStore.plans"
           :key="p.price_m"
+          data-test="plan-card"
+          :data-plan-name="p.name"
           class="relative flex flex-col p-5 overflow-hidden transition-all duration-200 bg-gray-100 border rounded-2xl group dark:bg-base-200"
           :class="[
             // Don't highlight the plan card for credits-only orgs — they are not actually
@@ -519,6 +521,7 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
 
           <!-- Action Button -->
           <button
+            data-test="plan-action-button"
             :class="buttonStyle(p)"
             class="flex items-center justify-center w-full gap-2 px-4 py-2 mb-6 text-sm font-semibold transition-all duration-200 rounded-lg shadow-sm shrink-0"
             :disabled="isDisabled(p)"

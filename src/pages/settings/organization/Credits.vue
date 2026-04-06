@@ -572,14 +572,8 @@ async function handleCreditCheckoutReturn() {
   const sessionIdParam = Array.isArray(sessionIdRaw) ? sessionIdRaw[0] : sessionIdRaw
   // Stripe may append unexpected query fragments after the session id; keep only the valid prefix.
   const sessionId = typeof sessionIdParam === 'string'
-    ? (sessionIdParam.match(/^cs_\w+/)?.[0] ?? '')
-    : ''
-  if (!sessionId) {
-    delete newQuery.creditCheckout
-    delete newQuery.session_id
-    await router.replace({ query: newQuery })
-    return
-  }
+    ? (sessionIdParam.match(/^cs_[\w-]+/)?.[0] ?? null)
+    : null
   if (!currentOrganization.value?.gid)
     return
 
@@ -704,6 +698,7 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
                   v-model="topUpQuantityInput"
                   type="number"
                   name="creditsTopUpQuantity"
+                  data-test="credits-top-up-quantity"
                   inputmode="numeric"
                   min="1"
                   step="1"
@@ -738,6 +733,7 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
             </div>
             <button
               type="submit"
+              data-test="credits-top-up-submit"
               :disabled="isProcessingCheckout || !isTopUpQuantityValid"
               :class="{ 'opacity-75 pointer-events-none': isProcessingCheckout || !isTopUpQuantityValid }"
               class="inline-flex w-full justify-center items-center py-2 px-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed sm:w-auto"
