@@ -64,7 +64,7 @@ BEGIN
     WHEN public.rbac_perm_channel_rollback_bundle() THEN RETURN public.rbac_right_write();
     WHEN public.rbac_perm_channel_manage_forced_devices() THEN RETURN public.rbac_right_write();
 
-    WHEN public.rbac_perm_org_create_app() THEN RETURN public.rbac_right_admin();
+    WHEN public.rbac_perm_org_create_app() THEN RETURN public.rbac_right_write();
     WHEN public.rbac_perm_org_update_settings() THEN RETURN public.rbac_right_admin();
     WHEN public.rbac_perm_org_invite_user() THEN RETURN public.rbac_right_admin();
     WHEN public.rbac_perm_org_read_billing() THEN RETURN public.rbac_right_admin();

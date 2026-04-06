@@ -83,6 +83,7 @@ const isLoading = ref(false)
 const isSubmitting = ref(false)
 const showAppDropdown = ref(false)
 const createdPlainKey = ref('')
+const createdKeyDialogMode = ref<'success' | 'partial-failure-plain' | 'partial-failure-hashed'>('success')
 
 // Key data
 const apiKey = ref<OrgApiKey | null>(null)
@@ -96,6 +97,7 @@ const roles = ref<Role[]>([])
 const roleBindings = ref<RoleBinding[]>([])
 const apps = ref<OrgApp[]>([])
 const selectedOrgRole = ref('')
+const originalUnsupportedOrgRole = ref('')
 const pendingAppBindings = ref<Record<string, string>>({})
 const unsupportedApiKeyOrgRoles = new Set(['org_billing_admin'])
 
@@ -195,18 +197,19 @@ watch([rbacId, () => currentOrganization.value?.gid], async ([id, orgId]) => {
     apiKey.value = null
     editName.value = ''
     selectedOrgRole.value = ''
+    originalUnsupportedOrgRole.value = ''
     pendingAppBindings.value = {}
     createAsHashed.value = false
     setExpiration.value = false
     expirationDate.value = null
-    displayStore.NavTitle = t('create-api-key', 'Create API key')
+    displayStore.NavTitle = t('create-api-key')
     await Promise.all([fetchRoles(), fetchApps(orgId)])
   }
   else if (UUID_REGEX.test(id)) {
     await loadAll()
   }
   else {
-    toast.error(t('invalid-api-key-id', 'Invalid API key ID'))
+    toast.error(t('invalid-api-key-id'))
     router.replace('/settings/organization/api-keys')
   }
 }, { immediate: true })
@@ -229,7 +232,7 @@ async function loadAll() {
   }
   catch (error) {
     console.error('Error loading API key data:', error)
-    toast.error(t('error-loading-data', 'Error loading data'))
+    toast.error(t('error-loading-data'))
   }
   finally {
     isLoading.value = false
@@ -246,7 +249,7 @@ async function fetchApiKey() {
   const keys = (Array.isArray(data) ? data : []) as OrgApiKey[]
   const found = keys.find(k => k.rbac_id === rbacId.value)
   if (!found) {
-    toast.error(t('api-key-not-found', 'API key not found'))
+    toast.error(t('api-key-not-found'))
     router.replace('/settings/organization/api-keys')
     return
   }
@@ -291,9 +294,13 @@ async function fetchRoleBindings() {
     app_id: row.app_id,
     role_name: row.roles?.name || '',
   }))
-  selectedOrgRole.value = unsupportedApiKeyOrgRoles.has(keyOrgBinding.value?.role_name || '')
+  const currentOrgRoleName = keyOrgBinding.value?.role_name ?? ''
+  originalUnsupportedOrgRole.value = unsupportedApiKeyOrgRoles.has(currentOrgRoleName)
+    ? currentOrgRoleName
+    : ''
+  selectedOrgRole.value = originalUnsupportedOrgRole.value
     ? ''
-    : (keyOrgBinding.value?.role_name ?? '')
+    : currentOrgRoleName
   const map: Record<string, string> = {}
   keyAppBindings.value.forEach((b) => {
     if (b.app_id)
@@ -357,6 +364,7 @@ function hasIncompleteAppBindings() {
 }
 
 async function showOneTimeKeyModal(plainKey: string) {
+  createdKeyDialogMode.value = 'success'
   createdPlainKey.value = plainKey
   dialogStore.openDialog({
     id: 'org-apikey-created',
@@ -365,7 +373,7 @@ async function showOneTimeKeyModal(plainKey: string) {
     preventAccidentalClose: true,
     buttons: [
       {
-        text: t('ok', 'OK'),
+        text: t('ok'),
         role: 'primary',
       },
     ],
@@ -373,6 +381,7 @@ async function showOneTimeKeyModal(plainKey: string) {
 
   await dialogStore.onDialogDismiss()
   createdPlainKey.value = ''
+  createdKeyDialogMode.value = 'success'
 }
 
 async function copyCreatedKey() {
@@ -389,13 +398,64 @@ async function copyCreatedKey() {
   }
 }
 
+async function showPartialFailureKeyModal(plainKey: string, isHashed: boolean) {
+  createdKeyDialogMode.value = isHashed ? 'partial-failure-hashed' : 'partial-failure-plain'
+  createdPlainKey.value = plainKey
+  dialogStore.openDialog({
+    id: 'org-apikey-created',
+    title: t('api-key-create-partial-failure-title'),
+    size: 'lg',
+    preventAccidentalClose: true,
+    buttons: [
+      {
+        text: t('ok'),
+        role: 'primary',
+      },
+    ],
+  })
+
+  await dialogStore.onDialogDismiss()
+  createdPlainKey.value = ''
+  createdKeyDialogMode.value = 'success'
+}
+
+async function rollbackCreatedApiKey(apikeyId: number | string | null) {
+  if (!apikeyId)
+    return null
+
+  const { error } = await supabase.functions.invoke(`apikey/${apikeyId}`, {
+    method: 'DELETE',
+  })
+
+  return error ?? null
+}
+
+async function getUserFacingErrorMessage(error: unknown, fallbackMessage: string) {
+  if (error && typeof error === 'object' && 'context' in error && error.context instanceof Response) {
+    try {
+      const payload = await error.context.clone().json() as { message?: string, error_description?: string }
+      if (typeof payload.message === 'string' && payload.message)
+        return payload.message
+      if (typeof payload.error_description === 'string' && payload.error_description)
+        return payload.error_description
+    }
+    catch {
+    }
+  }
+
+  if (error instanceof Error && error.message)
+    return error.message
+
+  return fallbackMessage
+}
+
 async function createKey() {
   if (!editName.value.trim()) {
-    toast.error(t('please-enter-api-key-name', 'Please enter a key name'))
+    toast.error(t('please-enter-api-key-name'))
     return
   }
   if (hasIncompleteAppBindings()) {
-    toast.error(t('select-role-for-each-app', 'Select a role for each app'))
+    toast.error(t('select-role-for-each-app'))
     return
   }
   const orgId = currentOrganization.value?.gid
@@ -431,44 +491,62 @@ async function createKey() {
       return
     }
 
-    // Assign org role
-    if (selectedOrgRole.value) {
-      const { error: orgBindingError } = await supabase.functions.invoke('private/role_bindings', {
-        method: 'POST',
-        body: {
-          principal_type: 'apikey',
-          principal_id: newRbacId,
-          role_name: selectedOrgRole.value,
-          scope_type: 'org',
-          org_id: orgId,
-        },
-      })
-      if (orgBindingError)
-        throw orgBindingError
+    const createdApiKeyId = typeof data.id === 'number' || typeof data.id === 'string'
+      ? data.id
+      : null
+    const createdPlainKeyValue = typeof data.key === 'string' && data.key.length > 0
+      ? data.key
+      : null
+
+    try {
+      // Assign org role
+      if (selectedOrgRole.value) {
+        const { error: orgBindingError } = await supabase.functions.invoke('private/role_bindings', {
+          method: 'POST',
+          body: {
+            principal_type: 'apikey',
+            principal_id: newRbacId,
+            role_name: selectedOrgRole.value,
+            scope_type: 'org',
+            org_id: orgId,
+          },
+        })
+        if (orgBindingError)
+          throw orgBindingError
+      }
+
+      // Assign app roles
+      for (const appId of Object.keys(pendingAppBindings.value)) {
+        const roleName = pendingAppBindings.value[appId]
+        if (!roleName)
+          continue
+        const { error: appBindingError } = await supabase.functions.invoke('private/role_bindings', {
+          method: 'POST',
+          body: {
+            principal_type: 'apikey',
+            principal_id: newRbacId,
+            role_name: roleName,
+            scope_type: 'app',
+            org_id: orgId,
+            app_id: appId,
+          },
+        })
+        if (appBindingError)
+          throw appBindingError
+      }
+    }
+    catch (bindingError) {
+      const rollbackError = await rollbackCreatedApiKey(createdApiKeyId)
+      if (rollbackError) {
+        console.error('Failed to rollback API key after binding error:', rollbackError)
+        if (createdPlainKeyValue)
+          await showPartialFailureKeyModal(createdPlainKeyValue, createAsHashed.value)
+      }
+      throw bindingError
     }
 
-    // Assign app roles
-    for (const appId of Object.keys(pendingAppBindings.value)) {
-      const roleName = pendingAppBindings.value[appId]
-      if (!roleName)
-        continue
-      const { error: appBindingError } = await supabase.functions.invoke('private/role_bindings', {
-        method: 'POST',
-        body: {
-          principal_type: 'apikey',
-          principal_id: newRbacId,
-          role_name: roleName,
-          scope_type: 'app',
-          org_id: orgId,
-          app_id: appId,
-        },
-      })
-      if (appBindingError)
-        throw appBindingError
-    }
-
-    if (typeof data.key === 'string' && data.key.length > 0)
-      await showOneTimeKeyModal(data.key)
+    if (createdPlainKeyValue)
+      await showOneTimeKeyModal(createdPlainKeyValue)
     else
       toast.success(t('add-api-key'))
 
@@ -476,7 +554,7 @@ async function createKey() {
   }
   catch (err) {
     console.error('Error creating API key:', err)
-    toast.error(t('failed-to-create-api-key'))
+    toast.error(await getUserFacingErrorMessage(err, t('failed-to-create-api-key')))
   }
   finally {
     isSubmitting.value = false
@@ -485,11 +563,11 @@ async function createKey() {
 
 async function saveKey() {
   if (!apiKey.value || !editName.value.trim()) {
-    toast.error(t('please-enter-api-key-name', 'Please enter a key name'))
+    toast.error(t('please-enter-api-key-name'))
     return
   }
   if (hasIncompleteAppBindings()) {
-    toast.error(t('select-role-for-each-app', 'Select a role for each app'))
+    toast.error(t('select-role-for-each-app'))
     return
   }
   isSubmitting.value = true
@@ -513,11 +591,11 @@ async function saveKey() {
     await saveOrgRole()
     await syncAppBindings()
 
-    toast.success(t('api-key-updated', 'API key updated'))
+    toast.success(t('api-key-updated'))
   }
   catch (err) {
     console.error('Error saving API key:', err)
-    toast.error(t('error-updating-api-key', 'Error updating API key'))
+    toast.error(t('error-updating-api-key'))
   }
   finally {
     isSubmitting.value = false
@@ -527,8 +605,12 @@ async function saveKey() {
 async function saveOrgRole() {
   const existing = keyOrgBinding.value
   const target = selectedOrgRole.value
+  const preservedUnsupportedRole = originalUnsupportedOrgRole.value
 
   if (!target) {
+    if (preservedUnsupportedRole && existing?.role_name === preservedUnsupportedRole)
+      return
+
     if (existing) {
       const { error } = await supabase.functions.invoke(`private/role_bindings/${existing.id}`, { method: 'DELETE' })
       if (error)
@@ -654,13 +736,13 @@ async function syncAppBindings() {
 
         <template v-else-if="isCreateMode || apiKey">
           <h1 class="mb-6 text-2xl font-bold dark:text-white text-slate-800">
-            {{ isCreateMode ? t('create-api-key', 'Create API key') : apiKey!.name }}
+            {{ isCreateMode ? t('create-api-key') : apiKey!.name }}
           </h1>
 
           <!-- Key info -->
           <section class="mb-8">
             <h2 class="mb-4 text-sm font-semibold uppercase text-slate-500">
-              {{ t('key-information', 'Key information') }}
+              {{ t('key-information') }}
             </h2>
             <div class="space-y-4 max-w-lg">
               <div>
@@ -750,10 +832,10 @@ async function syncAppBindings() {
           <!-- Org role -->
           <section class="mb-8">
             <h2 class="mb-2 text-sm font-semibold uppercase text-slate-500">
-              {{ t('organization', 'Organization') }}
+              {{ t('organization') }}
             </h2>
             <p class="mb-3 text-sm text-slate-500">
-              {{ t('select-user-role', 'Select a role') }}
+              {{ t('select-user-role') }}
             </p>
             <div class="space-y-2">
               <label class="flex items-center gap-3 cursor-pointer">
@@ -788,11 +870,11 @@ async function syncAppBindings() {
           <!-- App access -->
           <section class="mb-8">
             <h2 class="mb-4 text-sm font-semibold uppercase text-slate-500">
-              {{ t('app-access-control', 'App access') }}
+              {{ t('app-access-control') }}
             </h2>
 
             <div v-if="!showAppAccessForm" class="py-4 text-sm text-slate-500">
-              {{ t('app-access-member-only', 'App access control is only available for member roles.') }}
+              {{ t('app-access-member-only') }}
             </div>
 
             <template v-else>
@@ -806,7 +888,7 @@ async function syncAppBindings() {
                     <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
                       <path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" />
                     </svg>
-                    {{ t('add-app', 'Add app') }}
+                    {{ t('add-app') }}
                   </button>
                   <div v-if="showAppDropdown" class="fixed inset-0 z-10" @click="showAppDropdown = false" />
                   <div
@@ -814,7 +896,7 @@ async function syncAppBindings() {
                     class="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg min-w-[240px] max-h-60 overflow-y-auto"
                   >
                     <div v-if="apps.length === 0" class="px-4 py-3 text-sm text-slate-500">
-                      {{ t('no-apps', 'No apps available') }}
+                      {{ t('no-apps') }}
                     </div>
                     <label
                       v-for="app in apps"
@@ -841,7 +923,7 @@ async function syncAppBindings() {
               </div>
 
               <div v-if="selectedAppIds.length === 0" class="py-4 text-sm text-slate-500">
-                {{ t('app-access-none', 'No app access configured') }}
+                {{ t('app-access-none') }}
               </div>
               <div v-else class="border rounded-lg border-slate-200 dark:border-slate-700 overflow-hidden">
                 <div
@@ -891,7 +973,7 @@ async function syncAppBindings() {
         </template>
 
         <div v-else class="py-12 text-center text-slate-500">
-          {{ t('api-key-not-found', 'API key not found') }}
+          {{ t('api-key-not-found') }}
         </div>
       </div>
     </div>
@@ -903,7 +985,13 @@ async function syncAppBindings() {
     >
       <div class="space-y-4">
         <p class="text-sm text-slate-600 dark:text-slate-300">
-          {{ t('secure-key-warning') }}
+          {{
+            createdKeyDialogMode === 'partial-failure-hashed'
+              ? t('api-key-create-partial-failure-warning-hashed')
+              : createdKeyDialogMode === 'partial-failure-plain'
+                ? t('api-key-create-partial-failure-warning-plain')
+                : t('secure-key-warning')
+          }}
         </p>
 
         <div class="p-4 border rounded-lg border-blue-200 bg-blue-50 dark:border-blue-700 dark:bg-blue-900/20">

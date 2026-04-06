@@ -1,14 +1,16 @@
 BEGIN;
 
-SELECT plan(6);
+SELECT plan(9);
 
 SELECT tests.create_supabase_user('org_create_app_admin', 'org_create_app_admin@test.local');
 SELECT tests.create_supabase_user('org_create_app_member', 'org_create_app_member@test.local');
+SELECT tests.create_supabase_user('org_create_app_writer', 'org_create_app_writer@test.local');
 
 INSERT INTO public.users (id, email, created_at, updated_at)
 VALUES
   (tests.get_supabase_uid('org_create_app_admin'), 'org_create_app_admin@test.local', NOW(), NOW()),
-  (tests.get_supabase_uid('org_create_app_member'), 'org_create_app_member@test.local', NOW(), NOW())
+  (tests.get_supabase_uid('org_create_app_member'), 'org_create_app_member@test.local', NOW(), NOW()),
+  (tests.get_supabase_uid('org_create_app_writer'), 'org_create_app_writer@test.local', NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.orgs (id, created_by, name, management_email, use_new_rbac)
@@ -19,7 +21,8 @@ ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO public.org_users (user_id, org_id, user_right)
 VALUES
-  (tests.get_supabase_uid('org_create_app_member'), '70000000-0000-4000-8000-000000000002', 'read'::public.user_min_right)
+  (tests.get_supabase_uid('org_create_app_member'), '70000000-0000-4000-8000-000000000002', 'read'::public.user_min_right),
+  (tests.get_supabase_uid('org_create_app_writer'), '70000000-0000-4000-8000-000000000002', 'write'::public.user_min_right)
 ON CONFLICT DO NOTHING;
 
 DELETE FROM public.role_bindings
@@ -47,6 +50,17 @@ VALUES (
   'all'::public.key_mode,
   'org-create-app-rbac-key',
   ARRAY['70000000-0000-4000-8000-000000000001'::uuid]
+)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.apikeys (id, user_id, key, mode, name, limited_to_orgs)
+VALUES (
+  45002,
+  tests.get_supabase_uid('org_create_app_writer'),
+  'org-create-app-legacy-key',
+  'all'::public.key_mode,
+  'org-create-app-legacy-key',
+  ARRAY['70000000-0000-4000-8000-000000000002'::uuid]
 )
 ON CONFLICT (id) DO NOTHING;
 
@@ -100,6 +114,18 @@ SELECT ok(
   'Legacy fallback for org.create_app remains stricter than org_member/read'
 );
 
+SELECT ok(
+  public.rbac_check_permission_direct(
+    public.rbac_perm_org_create_app(),
+    tests.get_supabase_uid('org_create_app_writer'),
+    '70000000-0000-4000-8000-000000000002',
+    NULL::varchar,
+    NULL::bigint,
+    NULL::text
+  ),
+  'Legacy write membership still grants org.create_app'
+);
+
 SELECT tests.authenticate_as('org_create_app_member');
 
 INSERT INTO public.apps (app_id, icon_url, user_id, name, owner_org)
@@ -141,6 +167,51 @@ SELECT ok(
       AND owner_org = '70000000-0000-4000-8000-000000000001'
   ),
   'apps INSERT RLS allows RBAC org_member via API key fallback'
+);
+
+SELECT set_config('request.headers', '{}', true);
+SELECT tests.clear_authentication();
+SELECT tests.authenticate_as('org_create_app_writer');
+
+INSERT INTO public.apps (app_id, icon_url, user_id, name, owner_org)
+VALUES (
+  'com.test.orgcreateapp.legacy.user',
+  '',
+  tests.get_supabase_uid('org_create_app_writer'),
+  'Org Create App Legacy User',
+  '70000000-0000-4000-8000-000000000002'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM public.apps
+    WHERE app_id = 'com.test.orgcreateapp.legacy.user'
+      AND owner_org = '70000000-0000-4000-8000-000000000002'
+  ),
+  'apps INSERT RLS allows legacy write user to create apps'
+);
+
+SELECT tests.clear_authentication();
+SELECT set_config('request.headers', '{"capgkey": "org-create-app-legacy-key"}', true);
+
+INSERT INTO public.apps (app_id, icon_url, user_id, name, owner_org)
+VALUES (
+  'com.test.orgcreateapp.legacy.apikey',
+  '',
+  tests.get_supabase_uid('org_create_app_writer'),
+  'Org Create App Legacy API Key',
+  '70000000-0000-4000-8000-000000000002'
+);
+
+SELECT ok(
+  EXISTS (
+    SELECT 1
+    FROM public.apps
+    WHERE app_id = 'com.test.orgcreateapp.legacy.apikey'
+      AND owner_org = '70000000-0000-4000-8000-000000000002'
+  ),
+  'apps INSERT RLS allows legacy all key owned by a write user'
 );
 
 SELECT set_config('request.headers', '{}', true);

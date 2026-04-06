@@ -23,6 +23,7 @@ interface RoleBindingBody {
 }
 
 type ValidationResult<T> = { ok: true, data: T } | { ok: false, status: number, error: string }
+const INVALID_APIKEY_ACCESS_ERROR = 'Invalid API key or access'
 
 export const app = createHono('', version)
 
@@ -144,7 +145,13 @@ async function validatePrincipalAccess(
       .limit(1)
 
     if (!apiKey) {
-      return { ok: false, status: 400, error: 'API key not found' }
+      cloudlogErr({
+        message: 'validatePrincipalAccess: missing apiKey for role binding principal',
+        principalType,
+        principalId,
+        orgId,
+      })
+      return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
     }
 
     const [membership] = await drizzle
@@ -162,6 +169,14 @@ async function validatePrincipalAccess(
       return { ok: true, data: null }
     }
 
+    cloudlogErr({
+      message: 'validatePrincipalAccess: apiKey owner legacy membership not found',
+      principalType,
+      principalId,
+      orgId,
+      apiKeyUserId: apiKey.user_id,
+    })
+
     const [ownerRbacAccess] = await drizzle
       .select({ id: schema.role_bindings.id })
       .from(schema.role_bindings)
@@ -175,7 +190,14 @@ async function validatePrincipalAccess(
       .limit(1)
 
     if (!ownerRbacAccess) {
-      return { ok: false, status: 400, error: 'API key owner is not a member of this org' }
+      cloudlogErr({
+        message: 'validatePrincipalAccess: apiKey owner RBAC access not found',
+        principalType,
+        principalId,
+        orgId,
+        apiKeyUserId: apiKey.user_id,
+      })
+      return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
     }
   }
 

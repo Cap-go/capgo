@@ -280,11 +280,11 @@ BEGIN
     END IF;
 
     IF p_apikey IS NOT NULL AND p_app_id IS NOT NULL THEN
-      RETURN public.has_app_right_apikey(p_app_id, v_legacy_right, p_user_id, p_apikey);
+      RETURN public.has_app_right_apikey(p_app_id, v_legacy_right, COALESCE(v_effective_user_id, p_user_id), p_apikey);
     ELSIF p_app_id IS NOT NULL THEN
       RETURN public.has_app_right_userid(p_app_id, v_legacy_right, p_user_id);
     ELSE
-      RETURN public.check_min_rights_legacy(v_legacy_right, p_user_id, v_effective_org_id, p_app_id, p_channel_id);
+      RETURN public.check_min_rights_legacy(v_legacy_right, COALESCE(v_effective_user_id, p_user_id), v_effective_org_id, p_app_id, p_channel_id);
     END IF;
   END IF;
 END;
@@ -408,9 +408,14 @@ CREATE OR REPLACE FUNCTION "public"."get_org_apikeys"(
     SET "search_path" TO ''
     AS $$
 BEGIN
-  -- Permission check: caller must be a member of the org with at least read access.
-  IF NOT public.check_min_rights(
-    'read'::public.user_min_right, auth.uid(), p_org_id, NULL::varchar, NULL::bigint
+  -- Permission check: caller must be allowed to manage org roles/API keys.
+  IF NOT public.rbac_check_permission_direct(
+    public.rbac_perm_org_update_user_roles(),
+    auth.uid(),
+    p_org_id,
+    NULL::varchar,
+    NULL::bigint,
+    public.get_apikey_header()
   ) THEN
     RAISE EXCEPTION 'NO_RIGHTS';
   END IF;
@@ -444,6 +449,14 @@ BEGIN
           WHERE rb.principal_type = public.rbac_principal_user()
             AND rb.scope_type = public.rbac_scope_org()
             AND rb.principal_id = ak.user_id
+            AND rb.org_id = p_org_id
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM public.role_bindings rb
+          WHERE rb.principal_type = public.rbac_principal_apikey()
+            AND rb.scope_type = public.rbac_scope_org()
+            AND rb.principal_id = ak.rbac_id
             AND rb.org_id = p_org_id
         )
       )
