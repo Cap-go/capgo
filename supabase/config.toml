@@ -160,27 +160,27 @@ otp_expiry = 3600
 
 [auth.email.template.confirmation]
 subject = "[Capgo]: Confirm your Signup to Capgo.app"
-content_path = "./templates/confirmation.html"
+content_path = "./supabase/templates/confirmation.html"
 
 [auth.email.template.invite]
 subject = "[Capgo]: You have been invited to Capgo.app"
-content_path = "./templates/invite.html"
+content_path = "./supabase/templates/invite.html"
 
 [auth.email.template.magic_link]
 subject = "[Capgo]: Magic Link to log into your Capgo.app account"
-content_path = "./templates/magic_link.html"
+content_path = "./supabase/templates/magic_link.html"
 
 [auth.email.template.email_change]
 subject = "[Capgo]: Confirm change of your Email with Capgo.app account"
-content_path = "./templates/email_change.html"
+content_path = "./supabase/templates/email_change.html"
 
 [auth.email.template.recovery]
 subject = "[Capgo]: Instructions to change your Capgo.app password"
-content_path = "./templates/recovery.html"
+content_path = "./supabase/templates/recovery.html"
 
 [auth.email.template.reauthentication]
 subject = "[Capgo]: Confirm Reauthentication of your Capgo.app account"
-content_path = "./templates/reauthentication.html"
+content_path = "./supabase/templates/reauthentication.html"
 
 [auth.email.notification.password_changed]
 enabled = true
