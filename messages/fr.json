@@ -355,7 +355,7 @@
   "builds-last-month-trend": "Builds Natifs des 30 Derniers Jours (Total, iOS, Android)",
   "builds-trend": "Tendance des Builds Natifs (Total, iOS, Android)",
   "bundle": "Paquet",
-  "bundle_uploads": "Téléchargements groupés",
+  "bundle_uploads": "Téléversements de bundles",
   "bundle-active": "Actif",
   "bundle-comment": "Commentaire",
   "bundle-compatible-with-channel": "Lot compatible avec le canal (%)",
