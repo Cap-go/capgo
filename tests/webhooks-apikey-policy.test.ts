@@ -10,6 +10,7 @@ let legacyApiKeyId: number | null = null
 let legacyApiKeyValue: string | null = null
 let expiringSubkeyId: number | null = null
 let createdWebhookId: string | null = null
+let createdDeliveryId: string | null = null
 
 beforeAll(async () => {
   const supabase = getSupabaseClient()
@@ -70,6 +71,18 @@ beforeAll(async () => {
   const webhookData = await webhookResponse.json() as { webhook: { id: string } }
   createdWebhookId = webhookData.webhook.id
 
+  const testWebhookResponse = await fetch(`${BASE_URL}/webhooks/test`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      orgId: policyOrgId,
+      webhookId: createdWebhookId,
+    }),
+  })
+  expect(testWebhookResponse.status).toBe(200)
+  const testWebhookData = await testWebhookResponse.json() as { delivery_id: string }
+  createdDeliveryId = testWebhookData.delivery_id
+
   const { error: policyError } = await supabase.from('orgs').update({
     require_apikey_expiration: true,
     max_apikey_expiration_days: 30,
@@ -109,7 +122,7 @@ afterAll(async () => {
   await supabase.from('org_users').delete().eq('org_id', policyOrgId)
   await supabase.from('orgs').delete().eq('id', policyOrgId)
   await supabase.from('stripe_info').delete().eq('customer_id', policyCustomerId)
-})
+}, 60000)
 
 describe('webhook endpoints enforce org API key expiration policy', () => {
   it('rejects webhook listing for legacy non-expiring org key', async () => {
@@ -164,6 +177,48 @@ describe('webhook endpoints enforce org API key expiration policy', () => {
       body: JSON.stringify({
         orgId: policyOrgId,
         webhookId: createdWebhookId,
+      }),
+    })
+
+    expect(response.status).toBe(401)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('org_requires_expiring_key')
+  })
+
+  it('rejects webhook test for legacy non-expiring org key', async () => {
+    if (!legacyApiKeyValue || !createdWebhookId)
+      throw new Error('Webhook test prerequisites were not created')
+
+    const response = await fetch(`${BASE_URL}/webhooks/test`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': legacyApiKeyValue,
+      },
+      body: JSON.stringify({
+        orgId: policyOrgId,
+        webhookId: createdWebhookId,
+      }),
+    })
+
+    expect(response.status).toBe(401)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('org_requires_expiring_key')
+  })
+
+  it('rejects delivery retry for legacy non-expiring org key', async () => {
+    if (!legacyApiKeyValue || !createdDeliveryId)
+      throw new Error('Webhook delivery prerequisites were not created')
+
+    const response = await fetch(`${BASE_URL}/webhooks/deliveries/retry`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': legacyApiKeyValue,
+      },
+      body: JSON.stringify({
+        orgId: policyOrgId,
+        deliveryId: createdDeliveryId,
       }),
     })
 
