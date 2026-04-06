@@ -9,6 +9,14 @@ import IconArrowPath from '~icons/heroicons/arrow-path'
 import IconTrash from '~icons/heroicons/trash'
 import IconWrench from '~icons/heroicons/wrench'
 import DataTable from '~/components/DataTable.vue'
+import {
+  confirmApiKeyDeletion,
+  confirmApiKeyRegeneration,
+  formatApiKeyScope,
+  isApiKeyExpired,
+  showApiKeySecretModal,
+  sortApiKeyRows,
+} from '~/services/apikeys'
 import { formatDate, formatLocalDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -123,6 +131,9 @@ function filterApiKeys(keyType: ApiKeyRow['key_type'], query: string) {
 const v2Keys = computed(() => filterApiKeys('v2', searchV2.value))
 const legacyKeys = computed(() => filterApiKeys('legacy', searchLegacy.value))
 
+const sortedV2Keys = computed(() => sortApiKeyRows(v2Keys.value, v2Columns.value))
+const sortedLegacyKeys = computed(() => sortApiKeyRows(legacyKeys.value, legacyColumns.value))
+
 const computedV2Columns = computed<TableColumn[]>(() => {
   const tableColumns: TableColumn[] = [
     {
@@ -146,7 +157,7 @@ const computedV2Columns = computed<TableColumn[]>(() => {
         if (!apiKey.expires_at)
           return t('never')
 
-        return isExpired(apiKey.expires_at)
+        return isApiKeyExpired(apiKey.expires_at)
           ? `${formatDate(apiKey.expires_at)} (${t('expired')})`
           : formatDate(apiKey.expires_at)
       },
@@ -180,7 +191,7 @@ const computedV2Columns = computed<TableColumn[]>(() => {
       actions: [
         {
           icon: IconWrench,
-          title: t('manage', 'Manage'),
+          title: t('manage'),
           onClick: (apiKey: ApiKeyRow) => router.push(`/settings/organization/api-keys/${apiKey.rbac_id}`),
         },
         {
@@ -222,7 +233,7 @@ const computedLegacyColumns = computed<TableColumn[]>(() => {
         if (!apiKey.expires_at)
           return t('never')
 
-        return isExpired(apiKey.expires_at)
+        return isApiKeyExpired(apiKey.expires_at)
           ? `${formatDate(apiKey.expires_at)} (${t('expired')})`
           : formatDate(apiKey.expires_at)
       },
@@ -300,24 +311,12 @@ function getRoleDisplayName(roleName: string): string {
   return i18nKey ? t(i18nKey) : normalized.replaceAll('_', ' ')
 }
 
-function isExpired(expiresAt: string | null): boolean {
-  if (!expiresAt)
-    return false
-  return new Date(expiresAt) < new Date()
-}
-
-function getScopeDisplay(items: string[] | null | undefined, formatItem: (item: string) => string) {
-  if (!items || items.length === 0)
-    return '*'
-  return items.map(formatItem).join(', ')
-}
-
 function getOrgScopeDisplay(apiKey: OrgApiKey) {
-  return getScopeDisplay(apiKey.limited_to_orgs, orgId => orgId === props.orgId ? props.orgName : orgId)
+  return formatApiKeyScope(apiKey.limited_to_orgs, orgId => orgId === props.orgId ? props.orgName : orgId, '*')
 }
 
 function getAppScopeDisplay(apiKey: OrgApiKey) {
-  return getScopeDisplay(apiKey.limited_to_apps, appId => appNamesByAppId.value.get(appId) || appId)
+  return formatApiKeyScope(apiKey.limited_to_apps, appId => appNamesByAppId.value.get(appId) || appId, '*')
 }
 
 async function refreshData() {
@@ -382,16 +381,7 @@ function navigateToCreate() {
 }
 
 async function deleteKey(apiKey: OrgApiKey) {
-  dialogStore.openDialog({
-    title: t('alert-confirm-delete'),
-    description: `${t('alert-not-reverse-message')} ${t('alert-delete-message')}?`,
-    buttons: [
-      { text: t('button-cancel'), role: 'cancel' },
-      { text: t('button-delete'), role: 'danger' },
-    ],
-  })
-  const wasCanceled = await dialogStore.onDialogDismiss()
-  if (wasCanceled || dialogStore.lastButtonRole !== 'danger')
+  if (!await confirmApiKeyDeletion(dialogStore, t))
     return
 
   isSubmitting.value = true
@@ -404,7 +394,7 @@ async function deleteKey(apiKey: OrgApiKey) {
   }
   catch (error) {
     console.error('Error deleting API key:', error)
-    toast.error(t('error-removing-apikey', 'Error removing API key'))
+    toast.error(t('error-removing-apikey'))
   }
   finally {
     isSubmitting.value = false
@@ -412,16 +402,7 @@ async function deleteKey(apiKey: OrgApiKey) {
 }
 
 async function regenerateKey(apiKey: OrgApiKey) {
-  dialogStore.openDialog({
-    title: t('alert-confirm-regenerate'),
-    description: `${t('alert-not-reverse-message')}. ${t('alert-regenerate-key')}?`,
-    buttons: [
-      { text: t('button-cancel'), role: 'cancel' },
-      { text: t('button-regenerate'), role: 'primary' },
-    ],
-  })
-  const wasCanceled = await dialogStore.onDialogDismiss()
-  if (wasCanceled || dialogStore.lastButtonRole !== 'primary')
+  if (!await confirmApiKeyRegeneration(dialogStore, t))
     return
 
   const { data, error } = await supabase.functions.invoke('apikey', {
@@ -434,20 +415,9 @@ async function regenerateKey(apiKey: OrgApiKey) {
   }
 
   if (typeof data.key === 'string') {
-    dialogStore.openDialog({
-      title: t('secure-key-created'),
-      description: `${t('secure-key-warning')}\n\n${t('your-api-key')}: ${data.key}`,
-      size: 'lg',
-      buttons: [{
-        text: t('copy-and-close'),
-        role: 'primary',
-        handler: async () => {
-          await navigator.clipboard.writeText(data.key).catch(() => {})
-          toast.success(t('key-copied'))
-        },
-      }],
+    await showApiKeySecretModal(dialogStore, t, data.key, () => {
+      toast.success(t('key-copied'))
     })
-    await dialogStore.onDialogDismiss()
   }
 
   toast.success(t('generated-new-apikey'))
@@ -488,8 +458,8 @@ async function reload() {
           v-model:current-page="currentPageV2"
           v-model:search="searchV2"
           :show-add="props.canManage"
-          :total="v2Keys.length"
-          :element-list="v2Keys"
+          :total="sortedV2Keys.length"
+          :element-list="sortedV2Keys"
           :search-placeholder="t('search-api-keys')"
           :is-loading="isLoading"
           :auto-reload="false"
@@ -520,8 +490,8 @@ async function reload() {
           v-model:current-page="currentPageLegacy"
           v-model:search="searchLegacy"
           :show-add="false"
-          :total="legacyKeys.length"
-          :element-list="legacyKeys"
+          :total="sortedLegacyKeys.length"
+          :element-list="sortedLegacyKeys"
           :search-placeholder="t('search-api-keys')"
           :is-loading="isLoading"
           :auto-reload="false"

@@ -13,6 +13,14 @@ import IconCalendar from '~icons/heroicons/calendar'
 import IconClipboard from '~icons/heroicons/clipboard-document'
 import IconPencil from '~icons/heroicons/pencil'
 import IconTrash from '~icons/heroicons/trash'
+import {
+  confirmApiKeyDeletion,
+  confirmApiKeyRegeneration,
+  formatApiKeyScope,
+  isApiKeyExpired,
+  showApiKeySecretModal,
+  sortApiKeyRows,
+} from '~/services/apikeys'
 import { formatLocalDate } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -53,14 +61,6 @@ const expirationDate = ref<Date | null>(null)
 const minExpirationDate = computed(() => {
   return dayjs().add(1, 'day').toDate()
 })
-
-// Check if a key is expired
-function isKeyExpired(expiresAt: string | null): boolean {
-  if (!expiresAt)
-    return false
-
-  return new Date(expiresAt) < new Date()
-}
 
 // State for hashed key creation
 const createAsHashed = ref(false)
@@ -201,41 +201,7 @@ const filteredAndSortedKeys = computed(() => {
   }
 
   // Then sort based on column state
-  if (columns.value.length) {
-    columns.value.forEach((col) => {
-      if (col.sortable && typeof col.sortable === 'string') {
-        result = [...result].sort((a, b) => {
-          let aValue: any = ''
-          let bValue: any = ''
-
-          switch (col.key) {
-            case 'name':
-              aValue = a.name?.toLowerCase() || ''
-              bValue = b.name?.toLowerCase() || ''
-              break
-            case 'mode':
-              aValue = a.mode.toLowerCase()
-              bValue = b.mode.toLowerCase()
-              break
-            case 'created_at':
-              aValue = new Date(a.created_at || 0)
-              bValue = new Date(b.created_at || 0)
-              break
-            default:
-              return 0
-          }
-
-          if (aValue < bValue)
-            return col.sortable === 'asc' ? -1 : 1
-          if (aValue > bValue)
-            return col.sortable === 'asc' ? 1 : -1
-          return 0
-        })
-      }
-    })
-  }
-
-  return result
+  return columns.value.length ? sortApiKeyRows(result, columns.value) : result
 })
 
 // Computed property to filter apps based on selected organizations
@@ -247,6 +213,15 @@ const filteredAppsForSelectedOrgs = computed(() => {
     displayStore.selectedOrganizations.includes(app.owner_org),
   )
 })
+
+function pruneSelectedApps() {
+  const allowedAppIds = new Set(
+    filteredAppsForSelectedOrgs.value.map((app: Database['public']['Tables']['apps']['Row']) => app.app_id),
+  )
+
+  displayStore.selectedApps = (displayStore.selectedApps as any)
+    .filter((app: Database['public']['Tables']['apps']['Row']) => allowedAppIds.has(app.app_id))
+}
 
 columns.value = [
   {
@@ -291,7 +266,7 @@ columns.value = [
       if (!row.expires_at)
         return t('never')
 
-      const expired = isKeyExpired(row.expires_at)
+      const expired = isApiKeyExpired(row.expires_at)
       const dateStr = formatLocalDate(row.expires_at)
       return expired ? `${dateStr} (${t('expired')})` : dateStr
     },
@@ -300,18 +275,14 @@ columns.value = [
     key: 'limited_to_orgs',
     label: t('organizations'),
     displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
-      if (!row.limited_to_orgs || row.limited_to_orgs.length === 0)
-        return ''
-      return row.limited_to_orgs.map(orgId => getOrgName.value(orgId)).join(', ')
+      return formatApiKeyScope(row.limited_to_orgs, orgId => getOrgName.value(orgId))
     },
   },
   {
     key: 'limited_to_apps',
     label: t('apps'),
     displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
-      if (!row.limited_to_apps || row.limited_to_apps.length === 0)
-        return ''
-      return row.limited_to_apps.map(appId => getAppName.value(appId)).join(', ')
+      return formatApiKeyScope(row.limited_to_apps, appId => getAppName.value(appId))
     },
   },
   {
@@ -321,18 +292,22 @@ columns.value = [
     actions: [
       {
         icon: IconClipboard,
+        title: t('copy'),
         onClick: (key: Database['public']['Tables']['apikeys']['Row']) => copyKey(key),
       },
       {
         icon: IconPencil,
+        title: t('edit'),
         onClick: (key: Database['public']['Tables']['apikeys']['Row']) => changeName(key),
       },
       {
         icon: IconArrowPath,
+        title: t('button-regenerate'),
         onClick: (key: Database['public']['Tables']['apikeys']['Row']) => regenrateKey(key),
       },
       {
         icon: IconTrash,
+        title: t('delete'),
         onClick: (key: Database['public']['Tables']['apikeys']['Row']) => deleteKey(key),
       },
     ],
@@ -395,6 +370,9 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
   const limitToOrg = limitToOrgCheckbox.value
   const limitToApp = limitToAppCheckbox.value
   const isHashed = createAsHashed.value
+
+  if (limitToApp)
+    pruneSelectedApps()
 
   let finalSelectedOrganizations: string[] = []
   if (limitToOrg) {
@@ -480,27 +458,9 @@ async function createApiKey(keyType: 'read' | 'write' | 'all' | 'upload') {
 }
 
 async function showOneTimeKeyModal(plainKey: string) {
-  dialogStore.openDialog({
-    title: t('secure-key-created'),
-    description: `${t('secure-key-warning')}\n\n${t('your-api-key')}: ${plainKey}`,
-    size: 'lg',
-    buttons: [
-      {
-        text: t('copy-and-close'),
-        role: 'primary',
-        handler: async () => {
-          try {
-            await navigator.clipboard.writeText(plainKey)
-            toast.success(t('key-copied'))
-          }
-          catch (err) {
-            console.error('Failed to copy:', err)
-          }
-        },
-      },
-    ],
+  return showApiKeySecretModal(dialogStore, t, plainKey, () => {
+    toast.success(t('key-copied'))
   })
-  return dialogStore.onDialogDismiss()
 }
 
 async function addNewApiKey() {
@@ -522,7 +482,7 @@ async function addNewApiKey() {
 }
 
 async function regenrateKey(apikey: Database['public']['Tables']['apikeys']['Row']) {
-  if (await showRegenerateKeyModal())
+  if (!await confirmApiKeyRegeneration(dialogStore, t))
     return
 
   const { data: claimsData } = await supabase.auth.getClaims()
@@ -571,7 +531,7 @@ async function regenrateKey(apikey: Database['public']['Tables']['apikeys']['Row
 }
 
 async function deleteKey(key: Database['public']['Tables']['apikeys']['Row']) {
-  if (await showDeleteKeyModal())
+  if (!await confirmApiKeyDeletion(dialogStore, t))
     return
 
   const { error } = await supabase
@@ -636,43 +596,6 @@ async function changeName(key: Database['public']['Tables']['apikeys']['Row']) {
             return k
           })
         },
-      },
-    ],
-  })
-  return dialogStore.onDialogDismiss()
-}
-
-// This returns true if user has canceled the action
-async function showRegenerateKeyModal() {
-  dialogStore.openDialog({
-    title: t('alert-confirm-regenerate'),
-    description: `${t('alert-not-reverse-message')}. ${t('alert-regenerate-key')}?`,
-    buttons: [
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-      },
-      {
-        text: t('button-regenerate'),
-        role: 'primary',
-      },
-    ],
-  })
-  return dialogStore.onDialogDismiss()
-}
-
-async function showDeleteKeyModal() {
-  dialogStore.openDialog({
-    title: t('alert-confirm-delete'),
-    description: `${t('alert-not-reverse-message')} ${t('alert-delete-message')}?`,
-    buttons: [
-      {
-        text: t('button-cancel'),
-        role: 'cancel',
-      },
-      {
-        text: t('button-delete'),
-        role: 'danger',
       },
     ],
   })
@@ -763,6 +686,10 @@ watch(() => limitToOrgCheckbox.value, (newVal) => {
     limitToAppCheckbox.value = false
     displayStore.selectedApps = []
   }
+})
+
+watch(filteredAppsForSelectedOrgs, () => {
+  pruneSelectedApps()
 })
 
 displayStore.NavTitle = t('api-keys')
