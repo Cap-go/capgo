@@ -1108,7 +1108,7 @@ onMounted(checkLogin)
   justify-content: center;
   gap: 0.5rem;
   border-radius: 1rem;
-  background: linear-gradient(135deg, rgb(49 87 134) 0%, rgb(17 158 255) 100%);
+  background: linear-gradient(135deg, rgb(36 67 102) 0%, rgb(12 110 184) 100%);
   padding: 1rem;
   font-size: 1rem;
   font-weight: 600;
