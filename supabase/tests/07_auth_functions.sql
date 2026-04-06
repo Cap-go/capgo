@@ -8,7 +8,7 @@ SELECT tests.authenticate_as('test_admin');
 
 SELECT
     is(
-        is_platform_admin(),
+        public.is_platform_admin(),
         true,
         'is_platform_admin test - admin secret user is platform admin'
     );
@@ -19,7 +19,7 @@ SELECT tests.authenticate_as('test_user');
 
 SELECT
     is(
-        is_platform_admin(),
+        public.is_platform_admin(),
         false,
         'is_platform_admin test - user is not platform admin without admin_users secret'
     );
@@ -67,7 +67,7 @@ SELECT tests.authenticate_as('test_user');
 
 SELECT
     is(
-        is_platform_admin(),
+        public.is_platform_admin(),
         false,
         'is_platform_admin wrapper test - RBAC roles are not checked in admin secret function'
     );

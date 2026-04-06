@@ -139,7 +139,10 @@ async function validatePrincipalAccess(
 
   if (principalType === 'apikey') {
     const [apiKey] = await drizzle
-      .select({ user_id: schema.apikeys.user_id })
+      .select({
+        user_id: schema.apikeys.user_id,
+        limited_to_orgs: schema.apikeys.limited_to_orgs,
+      })
       .from(schema.apikeys)
       .where(eq(schema.apikeys.rbac_id, principalId))
       .limit(1)
@@ -150,6 +153,17 @@ async function validatePrincipalAccess(
         principalType,
         principalId,
         orgId,
+      })
+      return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
+    }
+
+    if (apiKey.limited_to_orgs?.length && !apiKey.limited_to_orgs.includes(orgId)) {
+      cloudlogErr({
+        message: 'validatePrincipalAccess: apiKey limited_to_orgs scope excludes target org',
+        principalType,
+        principalId,
+        orgId,
+        apiKeyUserId: apiKey.user_id,
       })
       return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
     }

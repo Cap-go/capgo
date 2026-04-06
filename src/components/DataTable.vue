@@ -330,22 +330,6 @@ function tooltipIdFor(rowIndex: number, actionIndex: number): string {
   return `datatable-action-tooltip-${rowIndex}-${actionIndex}`
 }
 
-function handleActionWrapperKeydown(
-  event: KeyboardEvent,
-  action: NonNullable<TableColumn['actions']>[number],
-  elem: any,
-) {
-  if (event.target !== event.currentTarget)
-    return
-  if (event.key !== 'Enter' && event.key !== ' ')
-    return
-  if (isActionDisabled(action, elem))
-    return
-  event.preventDefault()
-  event.stopPropagation()
-  action.onClick(elem)
-}
-
 const displayElemRange = computed(() => {
   const begin = (props.currentPage - 1) * props.elementList.length
   const end = begin + props.elementList.length
@@ -621,8 +605,6 @@ const paginationClass = computed(() => props.mobileFixedPagination
                       >
                         <div
                           class="relative inline-flex group"
-                          tabindex="0"
-                          @keydown="handleActionWrapperKeydown($event, action, elem)"
                         >
                           <button
                             :disabled="isActionDisabled(action, elem)"

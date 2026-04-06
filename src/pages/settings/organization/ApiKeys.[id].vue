@@ -53,6 +53,12 @@ interface OrgApp {
   name: string | null
 }
 
+interface CreatedApiKeyResult {
+  id: number | string | null
+  key: string | null
+  rbacId: string
+}
+
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
@@ -430,6 +436,182 @@ async function rollbackCreatedApiKey(apikeyId: number | string | null) {
   return error ?? null
 }
 
+function validateApiKeyForm() {
+  if (!editName.value.trim()) {
+    toast.error(t('please-enter-api-key-name'))
+    return false
+  }
+
+  if (hasIncompleteAppBindings()) {
+    toast.error(t('select-role-for-each-app'))
+    return false
+  }
+
+  return true
+}
+
+function getApiKeyExpirationValue() {
+  return setExpiration.value && expirationDate.value
+    ? dayjs(expirationDate.value).toISOString()
+    : null
+}
+
+function parseCreatedApiKeyResult(data: unknown): CreatedApiKeyResult | null {
+  if (!data || typeof data !== 'object')
+    return null
+
+  const createdApiKey = data as { id?: number | string, key?: string, rbac_id?: string }
+  if (typeof createdApiKey.rbac_id !== 'string' || !createdApiKey.rbac_id)
+    return null
+
+  return {
+    id: typeof createdApiKey.id === 'number' || typeof createdApiKey.id === 'string'
+      ? createdApiKey.id
+      : null,
+    key: typeof createdApiKey.key === 'string' && createdApiKey.key.length > 0
+      ? createdApiKey.key
+      : null,
+    rbacId: createdApiKey.rbac_id,
+  }
+}
+
+async function deleteRoleBinding(bindingId: string) {
+  const { error } = await supabase.functions.invoke(`private/role_bindings/${bindingId}`, { method: 'DELETE' })
+  if (error)
+    throw error
+}
+
+async function updateRoleBindingRole(bindingId: string, roleName: string) {
+  const { error } = await supabase.functions.invoke(`private/role_bindings/${bindingId}`, {
+    method: 'PATCH',
+    body: { role_name: roleName },
+  })
+  if (error)
+    throw error
+}
+
+async function createRoleBinding(roleBinding: Record<string, unknown>) {
+  const { error } = await supabase.functions.invoke('private/role_bindings', {
+    method: 'POST',
+    body: roleBinding,
+  })
+  if (error)
+    throw error
+}
+
+async function createOrgRoleBinding(principalId: string, orgId: string, roleName: string) {
+  await createRoleBinding({
+    principal_type: 'apikey',
+    principal_id: principalId,
+    role_name: roleName,
+    scope_type: 'org',
+    org_id: orgId,
+  })
+}
+
+async function createAppRoleBinding(principalId: string, orgId: string, appId: string, roleName: string) {
+  await createRoleBinding({
+    principal_type: 'apikey',
+    principal_id: principalId,
+    role_name: roleName,
+    scope_type: 'app',
+    org_id: orgId,
+    app_id: appId,
+  })
+}
+
+async function createApiKeyRecord(orgId: string) {
+  const { data, error } = await supabase.functions.invoke('apikey', {
+    method: 'POST',
+    body: {
+      mode: 'all',
+      name: editName.value.trim(),
+      limited_to_orgs: [orgId],
+      limited_to_apps: configuredLimitedAppIds.value,
+      expires_at: getApiKeyExpirationValue(),
+      hashed: createAsHashed.value,
+    },
+  })
+
+  if (error)
+    throw error
+
+  const createdApiKey = parseCreatedApiKeyResult(data)
+  if (!createdApiKey)
+    throw new Error(t('failed-to-create-api-key'))
+
+  return createdApiKey
+}
+
+async function assignBindingsForNewApiKey(orgId: string, principalId: string) {
+  if (selectedOrgRole.value)
+    await createOrgRoleBinding(principalId, orgId, selectedOrgRole.value)
+
+  for (const [appId, roleName] of Object.entries(pendingAppBindings.value)) {
+    if (!roleName)
+      continue
+    await createAppRoleBinding(principalId, orgId, appId, roleName)
+  }
+}
+
+async function rollbackCreatedApiKeyAfterBindingFailure(
+  bindingError: unknown,
+  createdApiKey: CreatedApiKeyResult,
+) {
+  const rollbackError = await rollbackCreatedApiKey(createdApiKey.id)
+  if (rollbackError) {
+    console.error('Failed to rollback API key after binding error:', rollbackError)
+    if (createdApiKey.key)
+      await showPartialFailureKeyModal(createdApiKey.key, createAsHashed.value)
+  }
+  throw bindingError
+}
+
+async function finalizeCreatedApiKey(createdPlainKey: string | null) {
+  if (createdPlainKey)
+    await showOneTimeKeyModal(createdPlainKey)
+  else
+    toast.success(t('add-api-key'))
+
+  await router.replace('/settings/organization/api-keys')
+}
+
+function shouldKeepUnsupportedOrgRole(existingRoleName: string | undefined, targetRoleName: string) {
+  return !targetRoleName
+    && !!originalUnsupportedOrgRole.value
+    && existingRoleName === originalUnsupportedOrgRole.value
+}
+
+async function persistOrgRoleBinding(existingBinding: RoleBinding | undefined, orgId: string, targetRoleName: string) {
+  if (existingBinding)
+    await updateRoleBindingRole(existingBinding.id, targetRoleName)
+  else
+    await createOrgRoleBinding(rbacId.value, orgId, targetRoleName)
+}
+
+async function deleteRemovedAppBindings(existingBindings: RoleBinding[], pendingBindings: Record<string, string>) {
+  for (const binding of existingBindings) {
+    if (!binding.app_id || !(binding.app_id in pendingBindings))
+      await deleteRoleBinding(binding.id)
+  }
+}
+
+async function upsertPendingAppBindings(existingBindings: RoleBinding[], pendingBindings: Record<string, string>, orgId: string) {
+  for (const [appId, roleName] of Object.entries(pendingBindings)) {
+    if (!roleName)
+      continue
+
+    const existingBinding = existingBindings.find(binding => binding.app_id === appId)
+    if (existingBinding) {
+      if (existingBinding.role_name !== roleName)
+        await updateRoleBindingRole(existingBinding.id, roleName)
+      continue
+    }
+
+    await createAppRoleBinding(rbacId.value, orgId, appId, roleName)
+  }
+}
+
 async function getUserFacingErrorMessage(error: unknown, fallbackMessage: string) {
   if (error && typeof error === 'object' && 'context' in error && error.context instanceof Response) {
     try {
@@ -450,107 +632,25 @@ async function getUserFacingErrorMessage(error: unknown, fallbackMessage: string
 }
 
 async function createKey() {
-  if (!editName.value.trim()) {
-    toast.error(t('please-enter-api-key-name'))
+  if (!validateApiKeyForm())
     return
-  }
-  if (hasIncompleteAppBindings()) {
-    toast.error(t('select-role-for-each-app'))
-    return
-  }
+
   const orgId = currentOrganization.value?.gid
   if (!orgId)
     return
 
   isSubmitting.value = true
   try {
-    const expiresAt = setExpiration.value && expirationDate.value
-      ? dayjs(expirationDate.value).toISOString()
-      : null
-
-    const { data, error } = await supabase.functions.invoke('apikey', {
-      method: 'POST',
-      body: {
-        mode: 'all',
-        name: editName.value.trim(),
-        limited_to_orgs: [orgId],
-        limited_to_apps: configuredLimitedAppIds.value,
-        expires_at: expiresAt,
-        hashed: createAsHashed.value,
-      },
-    })
-
-    if (error || !data) {
-      toast.error(t('failed-to-create-api-key'))
-      return
-    }
-
-    const newRbacId = data.rbac_id as string
-    if (!newRbacId) {
-      toast.error(t('failed-to-create-api-key'))
-      return
-    }
-
-    const createdApiKeyId = typeof data.id === 'number' || typeof data.id === 'string'
-      ? data.id
-      : null
-    const createdPlainKeyValue = typeof data.key === 'string' && data.key.length > 0
-      ? data.key
-      : null
+    const createdApiKey = await createApiKeyRecord(orgId)
 
     try {
-      // Assign org role
-      if (selectedOrgRole.value) {
-        const { error: orgBindingError } = await supabase.functions.invoke('private/role_bindings', {
-          method: 'POST',
-          body: {
-            principal_type: 'apikey',
-            principal_id: newRbacId,
-            role_name: selectedOrgRole.value,
-            scope_type: 'org',
-            org_id: orgId,
-          },
-        })
-        if (orgBindingError)
-          throw orgBindingError
-      }
-
-      // Assign app roles
-      for (const appId of Object.keys(pendingAppBindings.value)) {
-        const roleName = pendingAppBindings.value[appId]
-        if (!roleName)
-          continue
-        const { error: appBindingError } = await supabase.functions.invoke('private/role_bindings', {
-          method: 'POST',
-          body: {
-            principal_type: 'apikey',
-            principal_id: newRbacId,
-            role_name: roleName,
-            scope_type: 'app',
-            org_id: orgId,
-            app_id: appId,
-          },
-        })
-        if (appBindingError)
-          throw appBindingError
-      }
+      await assignBindingsForNewApiKey(orgId, createdApiKey.rbacId)
     }
     catch (bindingError) {
-      const rollbackError = await rollbackCreatedApiKey(createdApiKeyId)
-      if (rollbackError) {
-        console.error('Failed to rollback API key after binding error:', rollbackError)
-        if (createdPlainKeyValue)
-          await showPartialFailureKeyModal(createdPlainKeyValue, createAsHashed.value)
-      }
-      throw bindingError
+      await rollbackCreatedApiKeyAfterBindingFailure(bindingError, createdApiKey)
     }
 
-    if (createdPlainKeyValue)
-      await showOneTimeKeyModal(createdPlainKeyValue)
-    else
-      toast.success(t('add-api-key'))
-
-    await router.replace('/settings/organization/api-keys')
+    await finalizeCreatedApiKey(createdApiKey.key)
   }
   catch (err) {
     console.error('Error creating API key:', err)
@@ -562,14 +662,9 @@ async function createKey() {
 }
 
 async function saveKey() {
-  if (!apiKey.value || !editName.value.trim()) {
-    toast.error(t('please-enter-api-key-name'))
+  if (!apiKey.value || !validateApiKeyForm())
     return
-  }
-  if (hasIncompleteAppBindings()) {
-    toast.error(t('select-role-for-each-app'))
-    return
-  }
+
   isSubmitting.value = true
   try {
     const { error } = await supabase
@@ -605,46 +700,21 @@ async function saveKey() {
 async function saveOrgRole() {
   const existing = keyOrgBinding.value
   const target = selectedOrgRole.value
-  const preservedUnsupportedRole = originalUnsupportedOrgRole.value
+  const orgId = currentOrganization.value?.gid
+
+  if (shouldKeepUnsupportedOrgRole(existing?.role_name, target))
+    return
 
   if (!target) {
-    if (preservedUnsupportedRole && existing?.role_name === preservedUnsupportedRole)
-      return
-
-    if (existing) {
-      const { error } = await supabase.functions.invoke(`private/role_bindings/${existing.id}`, { method: 'DELETE' })
-      if (error)
-        throw error
-    }
+    if (existing)
+      await deleteRoleBinding(existing.id)
     return
   }
 
-  if (existing && existing.role_name === target)
+  if (!orgId || existing?.role_name === target)
     return
 
-  if (existing) {
-    const { error } = await supabase.functions.invoke(`private/role_bindings/${existing.id}`, {
-      method: 'PATCH',
-      body: { role_name: target },
-    })
-    if (error)
-      throw error
-  }
-  else {
-    const orgId = currentOrganization.value?.gid
-    const { error } = await supabase.functions.invoke('private/role_bindings', {
-      method: 'POST',
-      body: {
-        principal_type: 'apikey',
-        principal_id: rbacId.value,
-        role_name: target,
-        scope_type: 'org',
-        org_id: orgId,
-      },
-    })
-    if (error)
-      throw error
-  }
+  await persistOrgRoleBinding(existing, orgId, target)
   await fetchRoleBindings()
 }
 
@@ -653,47 +723,11 @@ async function syncAppBindings() {
   const pending = pendingAppBindings.value
   const orgId = currentOrganization.value?.gid
 
-  // Delete removed
-  for (const binding of existing) {
-    if (!binding.app_id || !(binding.app_id in pending)) {
-      const { error } = await supabase.functions.invoke(`private/role_bindings/${binding.id}`, { method: 'DELETE' })
-      if (error)
-        throw error
-    }
-  }
+  if (!orgId)
+    return
 
-  // Upsert pending
-  for (const appId of Object.keys(pending)) {
-    const roleName = pending[appId]
-    if (!roleName)
-      continue
-    const existingBinding = existing.find(b => b.app_id === appId)
-    if (existingBinding) {
-      if (existingBinding.role_name !== roleName) {
-        const { error } = await supabase.functions.invoke(`private/role_bindings/${existingBinding.id}`, {
-          method: 'PATCH',
-          body: { role_name: roleName },
-        })
-        if (error)
-          throw error
-      }
-    }
-    else {
-      const { error } = await supabase.functions.invoke('private/role_bindings', {
-        method: 'POST',
-        body: {
-          principal_type: 'apikey',
-          principal_id: rbacId.value,
-          role_name: roleName,
-          scope_type: 'app',
-          org_id: orgId,
-          app_id: appId,
-        },
-      })
-      if (error)
-        throw error
-    }
-  }
+  await deleteRemovedAppBindings(existing, pending)
+  await upsertPendingAppBindings(existing, pending, orgId)
 
   await fetchRoleBindings()
 }
@@ -746,10 +780,11 @@ async function syncAppBindings() {
             </h2>
             <div class="space-y-4 max-w-lg">
               <div>
-                <label class="block mb-1 text-sm font-medium dark:text-white text-slate-800">
+                <label for="apikey-name" class="block mb-1 text-sm font-medium dark:text-white text-slate-800">
                   {{ t('name') }} *
                 </label>
                 <input
+                  id="apikey-name"
                   v-model="editName"
                   type="text"
                   class="w-full d-input d-input-bordered"

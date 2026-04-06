@@ -29,11 +29,19 @@ CREATE OR REPLACE FUNCTION "public"."rbac_check_permission_direct"(
     SET "search_path" TO ''
     AS $$
 DECLARE
+  c_empty_text constant text := '';
+  c_permission_key constant text := 'permission';
+  c_org_id_key constant text := 'org_id';
+  c_app_id_key constant text := 'app_id';
+  c_channel_id_key constant text := 'channel_id';
+  c_user_id_key constant text := 'user_id';
+  c_has_apikey_key constant text := 'has_apikey';
   v_allowed boolean := false;
   v_use_rbac boolean;
   v_effective_org_id uuid := p_org_id;
   v_effective_user_id uuid := p_user_id;
   v_legacy_right public.user_min_right;
+  v_apikey_user_id uuid;
   v_apikey_principal uuid;
   v_apikey_has_bindings boolean := false;
   v_api_limited_orgs uuid[];
@@ -44,13 +52,45 @@ DECLARE
   v_password_policy_ok boolean;
 BEGIN
   -- Validate permission key
-  IF p_permission_key IS NULL OR p_permission_key = '' THEN
-    PERFORM public.pg_log('deny: RBAC_CHECK_PERM_NO_KEY', jsonb_build_object('user_id', p_user_id));
+  IF p_permission_key IS NULL OR p_permission_key = c_empty_text THEN
+    PERFORM public.pg_log('deny: RBAC_CHECK_PERM_NO_KEY', jsonb_build_object(c_user_id_key, p_user_id));
     RETURN false;
   END IF;
 
   IF p_channel_id IS NOT NULL AND p_permission_key LIKE 'channel.%' THEN
     v_channel_scope := true;
+  END IF;
+
+  -- Resolve API key first (handles hashed keys too) so it cannot be bypassed by p_user_id.
+  IF p_apikey IS NOT NULL THEN
+    SELECT user_id, rbac_id, limited_to_orgs, limited_to_apps
+    INTO v_apikey_user_id, v_apikey_principal, v_api_limited_orgs, v_api_limited_apps
+    FROM public.find_apikey_by_value(p_apikey)
+    LIMIT 1;
+
+    IF v_apikey_user_id IS NULL THEN
+      PERFORM public.pg_log('deny: RBAC_CHECK_PERM_INVALID_APIKEY', jsonb_build_object(
+        c_permission_key, p_permission_key,
+        c_org_id_key, v_effective_org_id,
+        c_app_id_key, p_app_id,
+        c_channel_id_key, p_channel_id
+      ));
+      RETURN false;
+    END IF;
+
+    IF p_user_id IS NOT NULL AND p_user_id IS DISTINCT FROM v_apikey_user_id THEN
+      PERFORM public.pg_log('deny: RBAC_CHECK_PERM_APIKEY_USER_MISMATCH', jsonb_build_object(
+        c_permission_key, p_permission_key,
+        'session_user_id', p_user_id,
+        'apikey_user_id', v_apikey_user_id,
+        c_org_id_key, v_effective_org_id,
+        c_app_id_key, p_app_id,
+        c_channel_id_key, p_channel_id
+      ));
+      RETURN false;
+    END IF;
+
+    v_effective_user_id := v_apikey_user_id;
   END IF;
 
   -- Derive org from app/channel when not provided
@@ -68,13 +108,6 @@ BEGIN
     LIMIT 1;
   END IF;
 
-  -- Resolve user from API key when needed (handles hashed keys too).
-  IF v_effective_user_id IS NULL AND p_apikey IS NOT NULL THEN
-    SELECT user_id INTO v_effective_user_id
-    FROM public.find_apikey_by_value(p_apikey)
-    LIMIT 1;
-  END IF;
-
   -- Enforce 2FA if the org requires it.
   IF v_effective_org_id IS NOT NULL THEN
     SELECT enforcing_2fa INTO v_org_enforcing_2fa
@@ -83,12 +116,12 @@ BEGIN
 
     IF v_org_enforcing_2fa = true AND (v_effective_user_id IS NULL OR NOT public.has_2fa_enabled(v_effective_user_id)) THEN
       PERFORM public.pg_log('deny: RBAC_CHECK_PERM_2FA_ENFORCEMENT', jsonb_build_object(
-        'permission', p_permission_key,
-        'org_id', v_effective_org_id,
-        'app_id', p_app_id,
-        'channel_id', p_channel_id,
-        'user_id', v_effective_user_id,
-        'has_apikey', p_apikey IS NOT NULL
+        c_permission_key, p_permission_key,
+        c_org_id_key, v_effective_org_id,
+        c_app_id_key, p_app_id,
+        c_channel_id_key, p_channel_id,
+        c_user_id_key, v_effective_user_id,
+        c_has_apikey_key, p_apikey IS NOT NULL
       ));
       RETURN false;
     END IF;
@@ -99,12 +132,12 @@ BEGIN
     v_password_policy_ok := public.user_meets_password_policy(v_effective_user_id, v_effective_org_id);
     IF v_password_policy_ok = false THEN
       PERFORM public.pg_log('deny: RBAC_CHECK_PERM_PASSWORD_POLICY_ENFORCEMENT', jsonb_build_object(
-        'permission', p_permission_key,
-        'org_id', v_effective_org_id,
-        'app_id', p_app_id,
-        'channel_id', p_channel_id,
-        'user_id', v_effective_user_id,
-        'has_apikey', p_apikey IS NOT NULL
+        c_permission_key, p_permission_key,
+        c_org_id_key, v_effective_org_id,
+        c_app_id_key, p_app_id,
+        c_channel_id_key, p_channel_id,
+        c_user_id_key, v_effective_user_id,
+        c_has_apikey_key, p_apikey IS NOT NULL
       ));
       RETURN false;
     END IF;
@@ -114,12 +147,8 @@ BEGIN
   v_use_rbac := public.rbac_is_enabled_for_org(v_effective_org_id);
 
   IF v_use_rbac THEN
-    -- Resolve API key principal early so we can decide the check path.
+    -- API key principal was resolved early so it cannot be bypassed by p_user_id.
     IF p_apikey IS NOT NULL THEN
-      SELECT rbac_id INTO v_apikey_principal
-      FROM public.find_apikey_by_value(p_apikey)
-      LIMIT 1;
-
       IF v_apikey_principal IS NOT NULL THEN
         -- Does this key have any explicit RBAC role bindings?
         SELECT EXISTS(
@@ -152,12 +181,12 @@ BEGIN
 
           IF NOT v_allowed THEN
             PERFORM public.pg_log('deny: RBAC_CHECK_PERM_DIRECT', jsonb_build_object(
-              'permission', p_permission_key,
-              'user_id', v_effective_user_id,
-              'org_id', v_effective_org_id,
-              'app_id', p_app_id,
-              'channel_id', p_channel_id,
-              'has_apikey', true,
+              c_permission_key, p_permission_key,
+              c_user_id_key, v_effective_user_id,
+              c_org_id_key, v_effective_org_id,
+              c_app_id_key, p_app_id,
+              c_channel_id_key, p_channel_id,
+              c_has_apikey_key, true,
               'apikey_has_bindings', true
             ));
           END IF;
@@ -167,21 +196,15 @@ BEGIN
         ELSE
           -- No explicit bindings: enforce limited_to_orgs / limited_to_apps scope
           -- before falling through to the owner's user permissions.
-          SELECT ak.limited_to_orgs, ak.limited_to_apps
-          INTO v_api_limited_orgs, v_api_limited_apps
-          FROM public.apikeys ak
-          WHERE ak.rbac_id = v_apikey_principal
-          LIMIT 1;
-
           -- Enforce org scope restriction
           IF v_effective_org_id IS NOT NULL
             AND v_api_limited_orgs IS NOT NULL
             AND cardinality(v_api_limited_orgs) > 0
             AND NOT (v_effective_org_id = ANY(v_api_limited_orgs)) THEN
             PERFORM public.pg_log('deny: RBAC_CHECK_PERM_APIKEY_ORG_SCOPE', jsonb_build_object(
-              'permission', p_permission_key,
+              c_permission_key, p_permission_key,
               'apikey_rbac_id', v_apikey_principal,
-              'org_id', v_effective_org_id
+              c_org_id_key, v_effective_org_id
             ));
             RETURN false;
           END IF;
@@ -192,9 +215,9 @@ BEGIN
             AND cardinality(v_api_limited_apps) > 0
             AND NOT (p_app_id = ANY(v_api_limited_apps)) THEN
             PERFORM public.pg_log('deny: RBAC_CHECK_PERM_APIKEY_APP_SCOPE', jsonb_build_object(
-              'permission', p_permission_key,
+              c_permission_key, p_permission_key,
               'apikey_rbac_id', v_apikey_principal,
-              'app_id', p_app_id
+              c_app_id_key, p_app_id
             ));
             RETURN false;
           END IF;
@@ -256,12 +279,12 @@ BEGIN
 
     IF NOT v_allowed THEN
       PERFORM public.pg_log('deny: RBAC_CHECK_PERM_DIRECT', jsonb_build_object(
-        'permission', p_permission_key,
-        'user_id', v_effective_user_id,
-        'org_id', v_effective_org_id,
-        'app_id', p_app_id,
-        'channel_id', p_channel_id,
-        'has_apikey', p_apikey IS NOT NULL
+        c_permission_key, p_permission_key,
+        c_user_id_key, v_effective_user_id,
+        c_org_id_key, v_effective_org_id,
+        c_app_id_key, p_app_id,
+        c_channel_id_key, p_channel_id,
+        c_has_apikey_key, p_apikey IS NOT NULL
       ));
     END IF;
 
@@ -273,8 +296,8 @@ BEGIN
 
     IF v_legacy_right IS NULL THEN
       PERFORM public.pg_log('deny: RBAC_CHECK_PERM_UNKNOWN_LEGACY', jsonb_build_object(
-        'permission', p_permission_key,
-        'user_id', p_user_id
+        c_permission_key, p_permission_key,
+        c_user_id_key, p_user_id
       ));
       RETURN false;
     END IF;
@@ -380,13 +403,13 @@ $$;
 ALTER FUNCTION "public"."get_org_perm_for_apikey_v2"("apikey" "text", "app_id" "text") OWNER TO "postgres";
 REVOKE ALL ON FUNCTION "public"."get_org_perm_for_apikey_v2"("apikey" "text", "app_id" "text") FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION "public"."get_org_perm_for_apikey_v2"("apikey" "text", "app_id" "text") FROM "anon";
-GRANT EXECUTE ON FUNCTION "public"."get_org_perm_for_apikey_v2"("apikey" "text", "app_id" "text") TO "authenticated";
 GRANT EXECUTE ON FUNCTION "public"."get_org_perm_for_apikey_v2"("apikey" "text", "app_id" "text") TO "service_role";
 
 -- =============================================================================
 -- 3. get_org_apikeys
 --    Returns API keys relevant to an org for the RBAC management UI.
---    "Relevant" = key owner is an org member AND key scope includes this org.
+--    "Relevant" includes owner membership, org/app-scoped RBAC bindings, or
+--    app/org limits that point to apps in this org.
 --    key/key_hash are intentionally excluded (sensitive).
 -- =============================================================================
 
@@ -458,6 +481,23 @@ BEGIN
             AND rb.scope_type = public.rbac_scope_org()
             AND rb.principal_id = ak.rbac_id
             AND rb.org_id = p_org_id
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM public.role_bindings rb
+          INNER JOIN public.apps a
+            ON a.id = rb.app_id
+           AND a.owner_org = p_org_id
+          WHERE rb.principal_type = public.rbac_principal_apikey()
+            AND rb.scope_type = public.rbac_scope_app()
+            AND rb.principal_id = ak.rbac_id
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM public.apps a
+          WHERE a.owner_org = p_org_id
+            AND ak.limited_to_apps IS NOT NULL
+            AND a.app_id = ANY(ak.limited_to_apps)
         )
       )
       -- Key scope: either unlimited (no org restriction) or includes this org
