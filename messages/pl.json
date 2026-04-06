@@ -683,7 +683,7 @@
   "dashboard-overview-cumulative-copy": "Tryb skumulowany pomaga zobaczyć, jak szybko zużycie zbliża się do limitu bieżącego cyklu.",
   "dashboard-overview-daily-copy": "Tryb dzienny lepiej nadaje się do wykrywania skoków, spokojnych okresów i regresji operacyjnych, zanim przerodzą się w trendy.",
   "dashboard-overview-kicker": "Przegląd użycia",
-  "dashboard-overview-thirty-day-copy": "Ostatnie 30 dni daje szybszy operacyjny odczyt ostatniej adopcji, aktywności dostaw i zmian w pamięci.",
+  "dashboard-overview-thirty-day-copy": "Ostatnie 30 dni dają szybszy operacyjny odczyt ostatniej adopcji, aktywności dostaw i zmian w przechowywaniu.",
   "dashboard-overview-title": "Miej na oku wydania, instalacje i pojemność",
   "date": "Data",
   "day": "dzień",
