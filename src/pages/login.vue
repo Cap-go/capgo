@@ -64,6 +64,43 @@ const loginHeroHighlights = computed(() => [
     description: t('login-highlight-team-description'),
   },
 ])
+const authCardShellClass = [
+  'rounded-[1.75rem] border border-slate-200/75 p-6 backdrop-blur-[18px] shadow-[0_34px_80px_-42px_rgba(15,23,42,0.5)]',
+  'bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(255,255,255,0.84)_100%)]',
+  'dark:border-slate-600/70 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.88)_0%,rgba(15,23,42,0.7)_100%)]',
+  'sm:p-7',
+].join(' ')
+const authCardHeaderClass = 'flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'
+const authStepCardClass = [
+  'overflow-hidden rounded-3xl border border-slate-200/75 bg-white/88 shadow-[0_26px_60px_-40px_rgba(15,23,42,0.42)]',
+  'dark:border-slate-600/70 dark:bg-slate-950/80',
+].join(' ')
+const authCardBodyClass = 'px-5 py-6 sm:p-7'
+const authPanelClass = 'rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-4 text-center dark:border-slate-700 dark:bg-slate-900/70'
+const authPrimaryButtonClass = [
+  'inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-4 text-base font-semibold text-white',
+  'bg-[linear-gradient(135deg,rgba(36,67,102,1)_0%,rgba(12,110,184,1)_100%)] shadow-[0_20px_38px_-26px_rgba(17,158,255,0.85)]',
+  'transition duration-200 hover:-translate-y-0.5 hover:brightness-105',
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--color-azure-500)]',
+  'disabled:pointer-events-none disabled:opacity-60',
+].join(' ')
+const authSecondaryButtonClass = [
+  'inline-flex w-full items-center justify-center rounded-2xl border border-slate-400/55 bg-white/92 px-4 py-4 text-base font-semibold text-slate-700',
+  'transition duration-200 hover:border-[rgba(17,158,255,0.45)] hover:bg-slate-100/95',
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--color-azure-500)]',
+  'dark:border-slate-600/90 dark:bg-slate-950/85 dark:text-slate-200 dark:hover:bg-slate-800/95',
+  'disabled:pointer-events-none disabled:opacity-60',
+].join(' ')
+const authInlineLinkClass = [
+  'inline-flex items-center justify-center gap-1 border-none bg-transparent p-0 text-[0.95rem] font-semibold text-[rgb(255,114,17)]',
+  'transition-colors duration-200 hover:text-[rgb(235,94,0)]',
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--color-azure-500)]',
+].join(' ')
+const authGhostButtonClass = [
+  'rounded-full px-4 py-[0.55rem] text-[0.95rem] font-medium text-slate-500 transition-colors duration-200',
+  'hover:bg-slate-200/75 hover:text-slate-800 dark:text-slate-300 dark:hover:bg-slate-800/85 dark:hover:text-white',
+  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--color-azure-500)]',
+].join(' ')
 
 const registerUrl = window.location.host === 'console.capgo.app' ? 'https://capgo.app/register/' : `/register/`
 
@@ -572,11 +609,15 @@ onMounted(checkLogin)
 </script>
 
 <template>
-  <section class="login-shell flex overflow-y-auto min-h-full w-full">
-    <div class="login-backdrop" aria-hidden="true">
-      <div class="login-glow login-glow-primary" />
-      <div class="login-glow login-glow-secondary" />
-      <div class="login-grid-pattern" />
+  <section
+    class="relative flex min-h-full w-full overflow-y-auto bg-[linear-gradient(180deg,rgba(248,250,252,0.98)_0%,rgba(238,244,255,0.92)_55%,rgba(248,250,252,0.98)_100%)] dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.98)_0%,rgba(20,29,53,0.96)_52%,rgba(15,23,42,0.98)_100%)]"
+  >
+    <div class="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+      <div class="absolute top-[10%] -left-32 h-[22rem] w-[22rem] rounded-full bg-[rgba(17,158,255,0.22)] opacity-55 blur-[52px]" />
+      <div class="absolute right-[-7rem] bottom-[8%] h-[18rem] w-[18rem] rounded-full bg-[rgba(104,118,225,0.18)] opacity-55 blur-[52px]" />
+      <div
+        class="absolute inset-0 opacity-40 [background-image:linear-gradient(rgba(148,163,184,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(148,163,184,0.12)_1px,transparent_1px)] [background-size:3rem_3rem] [mask-image:radial-gradient(circle_at_center,black_40%,transparent_82%)]"
+      />
     </div>
 
     <div class="relative mx-auto grid w-full max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:min-h-full lg:grid-cols-[minmax(0,1.08fr)_minmax(24rem,30rem)] lg:items-center lg:px-8 lg:py-10">
@@ -641,10 +682,10 @@ onMounted(checkLogin)
           </p>
         </div>
 
-        <div class="auth-card-shell">
-          <div class="auth-card-header">
+        <div :class="authCardShellClass">
+          <div :class="authCardHeaderClass">
             <div>
-              <p class="auth-card-kicker">
+              <p class="text-[0.72rem] font-bold tracking-[0.22em] text-slate-500 uppercase dark:text-slate-400">
                 {{ t('login-auth-kicker') }}
               </p>
               <h2 class="mt-3 text-2xl font-semibold text-slate-950 dark:text-white">
@@ -654,18 +695,20 @@ onMounted(checkLogin)
                 {{ t('login-auth-description') }}
               </p>
             </div>
-            <span class="auth-version-badge">{{ version }}</span>
+            <span class="self-start rounded-full border border-slate-300/90 bg-slate-50/95 px-3.5 py-2 text-[0.78rem] font-semibold text-slate-600 dark:border-slate-600/90 dark:bg-slate-800/90 dark:text-slate-200">
+              {{ version }}
+            </span>
           </div>
 
           <div class="relative mt-6">
-            <div v-if="hasQuerySession" class="auth-step-card">
-              <div class="auth-card-body space-y-4 text-gray-500">
+            <div v-if="hasQuerySession" :class="authStepCardClass">
+              <div class="space-y-4 text-slate-500 dark:text-slate-300" :class="authCardBodyClass">
                 <p class="text-sm">
                   {{ t('login-query-session-prompt') }}
                 </p>
                 <button
                   type="button" data-test="accept-query-session" :disabled="isLoading" :aria-busy="isLoading ? 'true' : 'false'"
-                  class="auth-primary-button"
+                  :class="authPrimaryButtonClass"
                   @click="acceptQuerySession"
                 >
                   <svg
@@ -682,7 +725,7 @@ onMounted(checkLogin)
                 </button>
                 <button
                   type="button" :disabled="isLoading"
-                  class="auth-secondary-button"
+                  :class="authSecondaryButtonClass"
                   @click="declineQuerySession"
                 >
                   {{ t('cancel') }}
@@ -692,8 +735,8 @@ onMounted(checkLogin)
 
             <Transition v-else name="step-slide" mode="out-in">
               <!-- Step 1: Email -->
-              <div v-if="statusAuth === 'email'" key="step-email" class="auth-step-card">
-                <div class="auth-card-body text-gray-500">
+              <div v-if="statusAuth === 'email'" key="step-email" :class="authStepCardClass">
+                <div class="text-slate-500 dark:text-slate-300" :class="authCardBodyClass">
                   <FormKit id="email-step" type="form" :actions="false" @submit="handleEmailContinue">
                     <div class="space-y-5">
                       <FormKit
@@ -706,7 +749,7 @@ onMounted(checkLogin)
                         <div class="inline-flex justify-center items-center w-full">
                           <button
                             type="submit" data-test="continue" :disabled="isEmailStepBusy" :aria-busy="isEmailStepBusy ? 'true' : 'false'"
-                            class="auth-primary-button"
+                            :class="authPrimaryButtonClass"
                           >
                             <svg
                               v-if="isEmailStepBusy" class="inline-block mr-3 -ml-1 w-5 h-5 text-white align-middle animate-spin"
@@ -723,7 +766,7 @@ onMounted(checkLogin)
                         </div>
                       </div>
 
-                      <div class="rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-4 text-center dark:border-slate-700 dark:bg-slate-900/70">
+                      <div :class="authPanelClass">
                         <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase dark:text-slate-500">
                           {{ t('login-auth-kicker') }}
                         </p>
@@ -731,7 +774,7 @@ onMounted(checkLogin)
                           <a
                             :href="registerUrl"
                             data-test="register"
-                            class="auth-inline-link"
+                            :class="authInlineLinkClass"
                           >
                             {{ t('create-a-free-account') }}
                           </a>
@@ -743,15 +786,15 @@ onMounted(checkLogin)
               </div>
 
               <!-- Step 2: Credentials (SSO or Password) -->
-              <div v-else-if="statusAuth === 'credentials'" key="step-credentials" class="auth-step-card">
-                <div class="auth-card-body text-gray-500">
+              <div v-else-if="statusAuth === 'credentials'" key="step-credentials" :class="authStepCardClass">
+                <div class="text-slate-500 dark:text-slate-300" :class="authCardBodyClass">
                   <!-- SSO path (enforce_sso=true: SSO only) -->
                   <div v-if="hasSso && enforceSso" class="space-y-5">
                     <!-- Show email context -->
-                    <p class="mb-4 rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-sm text-gray-400 truncate dark:border-slate-700 dark:bg-slate-900/70">
+                    <p class="mb-4 truncate rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-sm text-slate-400 dark:border-slate-700 dark:bg-slate-900/70">
                       {{ emailForLogin }}
                     </p>
-                    <p class="text-sm text-gray-600 dark:text-gray-300">
+                    <p class="text-sm text-slate-600 dark:text-slate-300">
                       {{ t('sso-detected') }}
                     </p>
                     <div v-if="!!captchaKey">
@@ -768,7 +811,7 @@ onMounted(checkLogin)
                       <div class="inline-flex justify-center items-center w-full">
                         <button
                           type="button" data-test="sso-login" :disabled="isLoading || shouldBlockForCaptcha" :aria-busy="isLoading ? 'true' : 'false'"
-                          class="auth-primary-button"
+                          :class="authPrimaryButtonClass"
                           @click="handleSsoLogin"
                         >
                           <svg
@@ -786,7 +829,7 @@ onMounted(checkLogin)
                       </div>
                     </div>
                     <div class="text-center">
-                      <button type="button" class="auth-inline-link auth-inline-button" @click="goBackToEmail">
+                      <button type="button" class="appearance-none" :class="authInlineLinkClass" @click="goBackToEmail">
                         ← {{ t('go-back') }}
                       </button>
                     </div>
@@ -813,7 +856,7 @@ onMounted(checkLogin)
                           style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;pointer-events:none;"
                         >
                         <!-- Show email context -->
-                        <p class="rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-sm text-gray-400 truncate dark:border-slate-700 dark:bg-slate-900/70">
+                        <p class="truncate rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-sm text-slate-400 dark:border-slate-700 dark:bg-slate-900/70">
                           {{ emailForLogin }}
                         </p>
                         <!-- Optional SSO button when SSO exists but is not enforced -->
@@ -822,7 +865,7 @@ onMounted(checkLogin)
                             type="button" data-test="sso-login"
                             :disabled="isLoading || shouldBlockForCaptcha"
                             :aria-busy="isLoading ? 'true' : 'false'"
-                            class="auth-primary-button"
+                            :class="authPrimaryButtonClass"
                             @click="handleSsoLogin"
                           >
                             {{ t('continue-with-sso') }}
@@ -856,7 +899,7 @@ onMounted(checkLogin)
                           <div class="inline-flex justify-center items-center w-full">
                             <button
                               type="submit" data-test="submit" :disabled="isLoading || shouldBlockForCaptcha" :aria-busy="isLoading ? 'true' : 'false'"
-                              class="auth-primary-button"
+                              :class="authPrimaryButtonClass"
                             >
                               <svg
                                 v-if="isLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-white align-middle animate-spin"
@@ -873,9 +916,9 @@ onMounted(checkLogin)
                           </div>
                         </div>
 
-                        <div class="rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-4 text-center dark:border-slate-700 dark:bg-slate-900/70">
+                        <div :class="authPanelClass">
                           <div>
-                            <button type="button" class="auth-inline-link auth-inline-button" @click="goBackToEmail">
+                            <button type="button" class="appearance-none" :class="authInlineLinkClass" @click="goBackToEmail">
                               ← {{ t('go-back') }}
                             </button>
                           </div>
@@ -883,7 +926,7 @@ onMounted(checkLogin)
                             <a
                               :href="registerUrl"
                               data-test="register"
-                              class="auth-inline-link"
+                              :class="authInlineLinkClass"
                             >
                               {{ t('create-a-free-account') }}
                             </a>
@@ -892,7 +935,7 @@ onMounted(checkLogin)
                             <router-link
                               to="/forgot_password"
                               data-test="forgot-password"
-                              class="auth-inline-link"
+                              :class="authInlineLinkClass"
                             >
                               {{ t('forgot') }} {{ t('password') }} ?
                             </router-link>
@@ -905,10 +948,10 @@ onMounted(checkLogin)
               </div>
 
               <!-- Step 3: 2FA -->
-              <div v-else key="step-2fa" class="auth-step-card">
-                <div class="auth-card-body">
+              <div v-else key="step-2fa" :class="authStepCardClass">
+                <div :class="authCardBodyClass">
                   <FormKit id="2fa-account" type="form" :actions="false" autocapitalize="off" data-test="2fa-form" @submit="handleMfaSubmit">
-                    <div class="space-y-5 text-gray-500">
+                    <div class="space-y-5 text-slate-500 dark:text-slate-300">
                       <FormKit
                         type="text" name="code" :disabled="isLoading"
                         :prefix-icon="mfaIcon" inputmode="text" :label="t('2fa-code')"
@@ -927,7 +970,7 @@ onMounted(checkLogin)
                         <div class="inline-flex justify-center items-center w-full">
                           <button
                             type="submit" data-test="verify" :disabled="isLoading" :aria-busy="isLoading ? 'true' : 'false'"
-                            class="auth-primary-button"
+                            :class="authPrimaryButtonClass"
                           >
                             <svg
                               v-if="isLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-white align-middle animate-spin"
@@ -944,9 +987,9 @@ onMounted(checkLogin)
                         </div>
                       </div>
 
-                      <div class="rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-4 text-center dark:border-slate-700 dark:bg-slate-900/70">
-                        <p class="text-base text-gray-600" />
-                        <button type="button" class="auth-inline-link auth-inline-button" @click="goback">
+                      <div :class="authPanelClass">
+                        <p class="text-base text-slate-600 dark:text-slate-300" />
+                        <button type="button" class="appearance-none" :class="authInlineLinkClass" @click="goback">
                           {{ t('go-back') }}
                         </button>
                       </div>
@@ -961,10 +1004,10 @@ onMounted(checkLogin)
               <div class="mx-auto">
                 <LangSelector />
               </div>
-              <button class="auth-ghost-button mt-3" @click="openSupport">
+              <button class="mt-3" :class="authGhostButtonClass" @click="openSupport">
                 {{ t("support") }}
               </button>
-              <button v-if="isMobile" class="auth-ghost-button mt-3" @click="openScan">
+              <button v-if="isMobile" class="mt-3" :class="authGhostButtonClass" @click="openScan">
                 {{ t("test-bundle") }}
               </button>
             </section>
@@ -976,260 +1019,6 @@ onMounted(checkLogin)
 </template>
 
 <style scoped>
-.login-shell {
-  background: linear-gradient(
-    180deg,
-    rgba(248, 250, 252, 0.98) 0%,
-    rgba(238, 244, 255, 0.92) 55%,
-    rgba(248, 250, 252, 0.98) 100%
-  );
-}
-
-:global(.dark) .login-shell {
-  background: linear-gradient(
-    180deg,
-    rgba(15, 23, 42, 0.98) 0%,
-    rgba(20, 29, 53, 0.96) 52%,
-    rgba(15, 23, 42, 0.98) 100%
-  );
-}
-
-.login-backdrop {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.login-glow {
-  position: absolute;
-  border-radius: 9999px;
-  filter: blur(52px);
-  opacity: 0.55;
-}
-
-.login-glow-primary {
-  top: 10%;
-  left: -8rem;
-  height: 22rem;
-  width: 22rem;
-  background: rgba(17, 158, 255, 0.22);
-}
-
-.login-glow-secondary {
-  right: -7rem;
-  bottom: 8%;
-  height: 18rem;
-  width: 18rem;
-  background: rgba(104, 118, 225, 0.18);
-}
-
-.login-grid-pattern {
-  position: absolute;
-  inset: 0;
-  opacity: 0.4;
-  background-image:
-    linear-gradient(rgba(148, 163, 184, 0.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.12) 1px, transparent 1px);
-  background-size: 3rem 3rem;
-  mask-image: radial-gradient(circle at center, black 40%, transparent 82%);
-}
-
-.auth-card-shell {
-  border: 1px solid rgba(226, 232, 240, 0.75);
-  border-radius: 1.75rem;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(255, 255, 255, 0.84) 100%);
-  box-shadow: 0 34px 80px -42px rgba(15, 23, 42, 0.5);
-  backdrop-filter: blur(18px);
-  padding: 1.5rem;
-}
-
-:global(.dark) .auth-card-shell {
-  border-color: rgba(71, 85, 105, 0.7);
-  background: linear-gradient(180deg, rgba(15, 23, 42, 0.88) 0%, rgba(15, 23, 42, 0.7) 100%);
-}
-
-.auth-card-header {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.auth-card-kicker {
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: rgb(100 116 139);
-}
-
-:global(.dark) .auth-card-kicker {
-  color: rgb(148 163 184);
-}
-
-.auth-version-badge {
-  align-self: flex-start;
-  border-radius: 9999px;
-  border: 1px solid rgba(203, 213, 225, 0.9);
-  background: rgba(248, 250, 252, 0.96);
-  padding: 0.45rem 0.85rem;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: rgb(71 85 105);
-}
-
-:global(.dark) .auth-version-badge {
-  border-color: rgba(71, 85, 105, 0.9);
-  background: rgba(30, 41, 59, 0.9);
-  color: rgb(226 232 240);
-}
-
-.auth-step-card {
-  overflow: hidden;
-  border-radius: 1.5rem;
-  border: 1px solid rgba(226, 232, 240, 0.75);
-  background: rgba(255, 255, 255, 0.88);
-  box-shadow: 0 26px 60px -40px rgba(15, 23, 42, 0.42);
-}
-
-:global(.dark) .auth-step-card {
-  border-color: rgba(71, 85, 105, 0.68);
-  background: rgba(15, 23, 42, 0.8);
-}
-
-.auth-card-body {
-  padding: 1.5rem 1.25rem;
-}
-
-.auth-primary-button {
-  display: inline-flex;
-  width: 100%;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  border-radius: 1rem;
-  background: linear-gradient(135deg, rgb(36 67 102) 0%, rgb(12 110 184) 100%);
-  padding: 1rem;
-  font-size: 1rem;
-  font-weight: 600;
-  color: white;
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
-    filter 0.2s ease;
-  box-shadow: 0 20px 38px -26px rgba(17, 158, 255, 0.85);
-}
-
-.auth-primary-button:hover,
-.auth-primary-button:focus-visible {
-  transform: translateY(-1px);
-  filter: brightness(1.04);
-}
-
-.auth-primary-button:focus-visible,
-.auth-secondary-button:focus-visible,
-.auth-inline-link:focus-visible,
-.auth-ghost-button:focus-visible {
-  outline: 2px solid var(--color-azure-500);
-  outline-offset: 3px;
-}
-
-.auth-primary-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-  transform: none;
-  filter: none;
-}
-
-.auth-secondary-button {
-  display: inline-flex;
-  width: 100%;
-  align-items: center;
-  justify-content: center;
-  border-radius: 1rem;
-  border: 1px solid rgba(148, 163, 184, 0.55);
-  background: rgba(255, 255, 255, 0.92);
-  padding: 1rem;
-  font-size: 1rem;
-  font-weight: 600;
-  color: rgb(51 65 85);
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease;
-}
-
-.auth-secondary-button:hover,
-.auth-secondary-button:focus-visible {
-  border-color: rgba(17, 158, 255, 0.45);
-  background: rgba(241, 245, 249, 0.96);
-}
-
-:global(.dark) .auth-secondary-button {
-  border-color: rgba(71, 85, 105, 0.9);
-  background: rgba(15, 23, 42, 0.85);
-  color: rgb(226 232 240);
-}
-
-:global(.dark) .auth-secondary-button:hover,
-:global(.dark) .auth-secondary-button:focus-visible {
-  background: rgba(30, 41, 59, 0.95);
-}
-
-.auth-inline-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.35rem;
-  border: none;
-  background: transparent;
-  padding: 0;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: rgb(255 114 17);
-  cursor: pointer;
-  text-decoration: none;
-  transition:
-    color 0.2s ease,
-    opacity 0.2s ease;
-}
-
-.auth-inline-button {
-  appearance: none;
-}
-
-.auth-inline-link:hover,
-.auth-inline-link:focus-visible {
-  color: rgb(235 94 0);
-}
-
-.auth-ghost-button {
-  border-radius: 9999px;
-  padding: 0.55rem 1rem;
-  font-size: 0.95rem;
-  font-weight: 500;
-  color: rgb(100 116 139);
-  transition:
-    background-color 0.2s ease,
-    color 0.2s ease;
-}
-
-.auth-ghost-button:hover,
-.auth-ghost-button:focus-visible {
-  background: rgba(226, 232, 240, 0.75);
-  color: rgb(30 41 59);
-}
-
-:global(.dark) .auth-ghost-button {
-  color: rgb(203 213 225);
-}
-
-:global(.dark) .auth-ghost-button:hover,
-:global(.dark) .auth-ghost-button:focus-visible {
-  background: rgba(30, 41, 59, 0.85);
-  color: white;
-}
-
 .step-slide-enter-active,
 .step-slide-leave-active {
   transition: all 0.25s ease;
@@ -1241,22 +1030,6 @@ onMounted(checkLogin)
 .step-slide-leave-to {
   opacity: 0;
   transform: translateX(-24px);
-}
-
-@media (min-width: 640px) {
-  .auth-card-shell {
-    padding: 1.75rem;
-  }
-
-  .auth-card-body {
-    padding: 1.75rem;
-  }
-
-  .auth-card-header {
-    align-items: flex-start;
-    justify-content: space-between;
-    flex-direction: row;
-  }
 }
 </style>
 
