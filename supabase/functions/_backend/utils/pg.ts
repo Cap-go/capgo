@@ -411,6 +411,15 @@ function getSchemaUpdatesAlias(includeMetadata = false) {
   return { versionSelect, channelDevicesAlias, channelAlias, channelSelect, manifestSelect, versionAlias }
 }
 
+function activeChannelVersionJoin(
+  channelVersionColumn: typeof schema.channels.version,
+  versionAlias: ReturnType<typeof getAlias>['versionAlias'],
+) {
+  // /updates still reaches app_versions through the channel/version PK join.
+  // The deleted filter is only applied to that single matched row, so it does not widen the hot-path scan.
+  return and(eq(channelVersionColumn, versionAlias.id), eq(versionAlias.deleted, false))
+}
+
 export function requestInfosChannelDevicePostgres(
   c: Context,
   app_id: string,
@@ -434,7 +443,7 @@ export function requestInfosChannelDevicePostgres(
     .select(selectShape)
     .from(channelDevicesAlias)
     .innerJoin(channelAlias, eq(channelDevicesAlias.channel_id, channelAlias.id))
-    .innerJoin(versionAlias, and(eq(channelAlias.version, versionAlias.id), eq(versionAlias.deleted, false)))
+    .innerJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
 
   const channelDevice = (includeManifest
     ? baseQuery.leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
@@ -467,7 +476,7 @@ export function requestInfosChannelPostgres(
   const baseQuery = drizzleClient
     .select(selectShape)
     .from(channelAlias)
-    .innerJoin(versionAlias, and(eq(channelAlias.version, versionAlias.id), eq(versionAlias.deleted, false)))
+    .innerJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
 
   const channelQuery = (includeManifest
     ? baseQuery.leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))

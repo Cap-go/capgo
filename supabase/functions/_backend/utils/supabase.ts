@@ -116,11 +116,6 @@ export function supabaseAdmin(c: Context) {
       persistSession: false,
       detectSessionInUrl: false,
     },
-    global: {
-      headers: {
-        Authorization: `Bearer ${serviceRoleKey}`,
-      },
-    },
   }
   return createClient<Database>(getEnv(c, 'SUPABASE_URL'), serviceRoleKey, options)
 }
