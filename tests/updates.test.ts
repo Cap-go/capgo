@@ -154,6 +154,75 @@ describe('[POST] /updates', () => {
     expect(json.error).toBe('no_channel')
     expect(json.version).toBeUndefined()
   })
+
+  it('ignores deleted device override bundles and falls back to the normal channel selection', async () => {
+    const supabase = getSupabaseClient()
+    const versionName = `1.0.${Math.floor(Math.random() * 100000) + 1000}`
+    const channelName = `deleted-override-${randomUUID().slice(0, 8)}`
+    const deviceId = randomUUID().toLowerCase()
+
+    const version = await createAppVersions(versionName, APP_NAME_UPDATE)
+    await supabase
+      .from('app_versions')
+      .update({ external_url: `https://example.com/${channelName}.zip` })
+      .eq('id', version.id)
+      .throwOnError()
+
+    const { data: insertedChannel } = await supabase
+      .from('channels')
+      .insert({
+        name: channelName,
+        app_id: APP_NAME_UPDATE,
+        version: version.id,
+        owner_org: ORG_ID,
+        created_by: USER_ID,
+        public: false,
+        disable_auto_update_under_native: false,
+        disable_auto_update: 'none',
+        allow_device_self_set: true,
+        allow_emulator: false,
+        allow_device: true,
+        allow_dev: false,
+        allow_prod: true,
+        ios: true,
+        android: false,
+      })
+      .select('id')
+      .single()
+      .throwOnError()
+
+    await supabase
+      .from('channel_devices')
+      .insert({
+        channel_id: insertedChannel.id,
+        app_id: APP_NAME_UPDATE,
+        device_id: deviceId,
+        owner_org: ORG_ID,
+      })
+      .throwOnError()
+
+    const deleteResponse = await fetch(`${BASE_URL}/bundle`, {
+      method: 'DELETE',
+      headers,
+      body: JSON.stringify({
+        app_id: APP_NAME_UPDATE,
+        version: versionName,
+      }),
+    })
+    expect(deleteResponse.status).toBe(200)
+
+    const baseData = getBaseData(APP_NAME_UPDATE)
+    baseData.device_id = deviceId
+    baseData.version_build = '0.0.0'
+    baseData.version_name = '0.0.0'
+
+    const response = await postUpdate(baseData)
+    expect(response.status).toBe(200)
+
+    const json = await response.json<UpdateRes>()
+    expect(json.version).toBe('1.0.0')
+    expect(json.error).toBeUndefined()
+  })
 })
 
 describe('channel device count gating', () => {
