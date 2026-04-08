@@ -4,7 +4,8 @@
 -- continue pricing build_time without any special-case logic.
 
 DELETE FROM public.capgo_credits_steps
-WHERE type = 'build_time';
+WHERE type = 'build_time'
+  AND org_id IS NULL;
 
 INSERT INTO public.capgo_credits_steps (
   type,

@@ -409,6 +409,7 @@ export interface CreditCostCalculationRequest {
   bandwidth: number
   storage: number
   build_time?: number
+  org_id?: string
 }
 
 export interface CreditCostCalculationResponse {

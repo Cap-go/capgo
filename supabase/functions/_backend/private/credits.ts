@@ -27,6 +27,7 @@ interface CostCalculationRequest {
   bandwidth: number // in bytes
   storage: number // in bytes
   build_time?: number // in seconds
+  org_id?: string
 }
 
 interface TierUsage {
@@ -74,6 +75,75 @@ const DEFAULT_TOP_UP_QUANTITY = 100
 const MAX_TOP_UP_QUANTITY = 100000
 
 type AppContext = Context<MiddlewareKeyVariables, any, any>
+
+function preferScopedCreditSteps(steps: CreditStep[], orgId?: string): CreditStep[] {
+  const sortedSteps = [...steps].sort((a, b) => {
+    if (a.type !== b.type)
+      return a.type.localeCompare(b.type)
+
+    if (a.step_min !== b.step_min)
+      return a.step_min - b.step_min
+
+    if (a.step_max !== b.step_max)
+      return a.step_max - b.step_max
+
+    const aOrgPriority = orgId && a.org_id === orgId ? 0 : 1
+    const bOrgPriority = orgId && b.org_id === orgId ? 0 : 1
+    return aOrgPriority - bOrgPriority
+  })
+
+  const seenStepKeys = new Set<string>()
+
+  return sortedSteps.filter((step) => {
+    const key = `${step.type}:${step.step_min}:${step.step_max}`
+    if (seenStepKeys.has(key))
+      return false
+
+    seenStepKeys.add(key)
+    return true
+  })
+}
+
+async function getScopedCreditSteps(c: AppContext, orgId?: string): Promise<CreditStep[]> {
+  const authorization = c.req.header('authorization')
+    ?? c.req.header('Authorization')
+    ?? c.get('authorization')
+
+  const pricingClient = orgId
+    ? authorization
+      ? supabaseClient(c, authorization)
+      : undefined
+    : supabaseAdmin(c)
+
+  if (!pricingClient)
+    throw simpleError('not_authorized', 'Not authorized')
+
+  const scopedPricingClient = pricingClient
+
+  const [globalCreditsResult, orgCreditsResult] = await Promise.all([
+    scopedPricingClient
+      .from('capgo_credits_steps')
+      .select()
+      .is('org_id', null),
+    orgId
+      ? scopedPricingClient
+          .from('capgo_credits_steps')
+          .select()
+          .eq('org_id', orgId)
+      : Promise.resolve({ data: [] as CreditStep[], error: null }),
+  ])
+
+  const { data: globalCredits, error: globalCreditsError } = globalCreditsResult
+  const { data: orgCredits, error: orgCreditsError } = orgCreditsResult
+
+  if (globalCreditsError || orgCreditsError)
+    throw simpleError('failed_to_fetch_pricing_data', 'Failed to fetch pricing data')
+
+  return preferScopedCreditSteps([
+    ...((globalCredits ?? []) as CreditStep[]),
+    ...((orgCredits ?? []) as CreditStep[]),
+  ], orgId)
+}
 
 async function getCreditTopUpProductId(c: AppContext, customerId: string, token: string): Promise<{ productId: string }> {
   const supabase = supabaseClient(c, token)
@@ -273,11 +343,9 @@ app.use('*', useCors)
 
 app.get('/', async (c) => {
   try {
-    const { data: credits } = await supabaseAdmin(c)
-      .from('capgo_credits_steps')
-      .select()
-      .order('price_per_unit')
-    return c.json(credits ?? [])
+    const orgId = c.req.query('org_id') ?? undefined
+    const credits = await getScopedCreditSteps(c as AppContext, orgId)
+    return c.json(credits)
   }
   catch (e) {
     throw simpleError('failed_to_fetch_pricing_data', 'Failed to fetch pricing data', {}, e)
@@ -287,25 +355,14 @@ app.get('/', async (c) => {
 app.post('/', async (c) => {
   const body = await parseBody<CostCalculationRequest>(c)
   const buildTime = Number(body.build_time ?? 0)
-  const { mau, bandwidth, storage } = body
+  const { mau, bandwidth, org_id: orgId, storage } = body
 
   // Validate inputs
   if (mau === undefined || bandwidth === undefined || storage === undefined) {
     throw simpleError('missing_required_fields', 'Missing required fields: mau, bandwidth, storage')
   }
 
-  // Get pricing steps from database
-  const { data: credits, error } = await supabaseAdmin(c)
-    .from('capgo_credits_steps')
-    .select()
-    .order('type, step_min')
-
-  if (error || !credits) {
-    throw simpleError('failed_to_fetch_pricing_data', 'Failed to fetch pricing data')
-  }
-
-  // Type assertion for credits
-  const typedCredits = credits as CreditStep[]
+  const typedCredits = await getScopedCreditSteps(c as AppContext, orgId)
 
   // Calculate cost for each metric type with tier breakdown
   const calculateMetricCost = (value: number, type: string): MetricBreakdown => {
