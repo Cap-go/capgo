@@ -14,24 +14,37 @@ function isLocalHost(host: string | undefined): boolean {
   return !!host && /^(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::\d+)?$/i.test(host)
 }
 
+function isLocalSupabaseUrl(url: string): boolean {
+  if (url.includes('kong:8000'))
+    return true
+
+  try {
+    return isLocalHost(new URL(url).host)
+  }
+  catch {
+    return false
+  }
+}
+
 function getPublicSupabaseUrl(c: Context<MiddlewareKeyVariables>): string {
   const supabaseUrl = getEnv(c, 'SUPABASE_URL').replace(/\/$/, '')
-  const isLocalDev = supabaseUrl.includes('kong:8000')
+  const isLocalSupabase = isLocalSupabaseUrl(supabaseUrl)
   let forwardedHost = c.req.header('X-Forwarded-Host')
   const forwardedPort = c.req.header('X-Forwarded-Port')
   const forwardedProto = c.req.header('X-Forwarded-Proto')?.split(',')[0]?.trim()
   const hostHeader = c.req.header('Host')
-  const isLocalRequest = isLocalDev || isLocalHost(forwardedHost) || isLocalHost(hostHeader)
+  const isLocalRequest = isLocalSupabase || isLocalHost(forwardedHost) || isLocalHost(hostHeader)
 
-  if (isLocalDev && forwardedHost && !forwardedHost.includes(':')) {
+  if (isLocalSupabase && forwardedHost && !forwardedHost.includes(':')) {
     const hostPort = hostHeader?.includes(':') ? hostHeader.split(':').pop() : undefined
     const portToUse = forwardedPort || hostPort
     if (portToUse)
       forwardedHost = `${forwardedHost}:${portToUse}`
   }
 
-  // In production, always use SUPABASE_URL as source of truth for SAML endpoints.
-  if (!isLocalDev)
+  // Use SUPABASE_URL as source of truth on non-local hosts (production/preprod/custom domains).
+  // Keep local request hosts (tests/dev) to preserve runtime-local expectations.
+  if (!isLocalSupabase)
     return supabaseUrl
 
   if (forwardedHost)
