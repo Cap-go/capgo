@@ -11,16 +11,49 @@ AS $$
   )
 $$;
 
+CREATE OR REPLACE FUNCTION "public"."internal_request_role_names"()
+RETURNS text[]
+LANGUAGE "sql" IMMUTABLE
+SET "search_path" TO ''
+AS $$
+  SELECT ARRAY['service_role', 'postgres', 'supabase_admin']::text[]
+$$;
+
+ALTER FUNCTION "public"."internal_request_role_names"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."internal_request_role_names"() FROM PUBLIC;
+
+CREATE OR REPLACE FUNCTION "public"."internal_request_db_user_names"()
+RETURNS text[]
+LANGUAGE "sql" IMMUTABLE
+SET "search_path" TO ''
+AS $$
+  SELECT ARRAY['postgres', 'supabase_admin']::text[]
+$$;
+
+ALTER FUNCTION "public"."internal_request_db_user_names"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."internal_request_db_user_names"() FROM PUBLIC;
+
+CREATE OR REPLACE FUNCTION "public"."request_read_key_modes"()
+RETURNS public.key_mode[]
+LANGUAGE "sql" IMMUTABLE
+SET "search_path" TO ''
+AS $$
+  SELECT '{read,upload,write,all}'::public.key_mode[]
+$$;
+
+ALTER FUNCTION "public"."request_read_key_modes"() OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."request_read_key_modes"() FROM PUBLIC;
+
 CREATE OR REPLACE FUNCTION "public"."is_internal_request_role"("caller_role" text)
 RETURNS boolean
 LANGUAGE "sql" STABLE
 SET "search_path" TO ''
 AS $$
   SELECT (
-    caller_role = ANY (ARRAY['service_role', 'postgres', 'supabase_admin']::text[])
+    caller_role = ANY (public.internal_request_role_names())
     OR (
       caller_role = ANY (ARRAY['', 'none']::text[])
-      AND COALESCE(session_user, current_user) = ANY (ARRAY['postgres', 'supabase_admin']::text[])
+      AND COALESCE(session_user, current_user) = ANY (public.internal_request_db_user_names())
     )
   )
 $$;
@@ -38,7 +71,7 @@ DECLARE
   caller_id uuid;
 BEGIN
   SELECT public.get_identity_org_allowed(
-    '{read,upload,write,all}'::public.key_mode[],
+    public.request_read_key_modes(),
     request_has_org_read_access.orgid
   )
   INTO caller_id;
@@ -69,7 +102,7 @@ DECLARE
   caller_id uuid;
 BEGIN
   SELECT public.get_identity_org_appid(
-    '{read,upload,write,all}'::public.key_mode[],
+    public.request_read_key_modes(),
     request_has_app_read_access.orgid,
     request_has_app_read_access.appid
   )
@@ -222,7 +255,7 @@ BEGIN
 
   IF NOT v_is_internal THEN
     v_request_user := public.get_identity_org_allowed(
-      '{read,upload,write,all}'::public.key_mode[],
+      public.request_read_key_modes(),
       get_current_plan_max_org.orgid
     );
 
@@ -262,7 +295,6 @@ SET "search_path" TO ''
 AS $$
 DECLARE
   caller_role text;
-  caller_id uuid;
 BEGIN
   SELECT public.current_request_role() INTO caller_role;
 
@@ -307,7 +339,6 @@ AS $$
 DECLARE
   total_size double precision := 0;
   caller_role text;
-  caller_id uuid;
 BEGIN
   SELECT public.current_request_role() INTO caller_role;
 
@@ -341,7 +372,6 @@ AS $$
 DECLARE
   total_size double precision := 0;
   caller_role text;
-  caller_id uuid;
 BEGIN
   SELECT public.current_request_role() INTO caller_role;
 
@@ -406,14 +436,8 @@ DECLARE
 BEGIN
   SELECT public.current_request_role() INTO caller_role;
 
-  IF NOT (
-    caller_role IN ('service_role', 'postgres', 'supabase_admin')
-    OR (
-      caller_role IN ('', 'none')
-      AND COALESCE(session_user, current_user) IN ('postgres', 'supabase_admin')
-    )
-  ) THEN
-    SELECT public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], is_member_of_org.org_id)
+  IF NOT public.is_internal_request_role(caller_role) THEN
+    SELECT public.get_identity_org_allowed(public.request_read_key_modes(), is_member_of_org.org_id)
     INTO caller_id;
 
     IF caller_id IS NULL OR caller_id <> is_member_of_org.user_id OR NOT public.check_min_rights(
@@ -449,13 +473,7 @@ DECLARE
 BEGIN
   SELECT public.current_request_role() INTO caller_role;
 
-  IF NOT (
-    caller_role IN ('service_role', 'postgres', 'supabase_admin')
-    OR (
-      caller_role IN ('', 'none')
-      AND COALESCE(session_user, current_user) IN ('postgres', 'supabase_admin')
-    )
-  ) THEN
+  IF NOT public.is_internal_request_role(caller_role) THEN
     SELECT auth.uid() INTO caller_id;
     IF caller_id IS NULL OR caller_id <> is_account_disabled.user_id THEN
       RETURN false;
