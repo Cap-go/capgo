@@ -21,6 +21,18 @@ describe('credits pricing API', () => {
     expect(buildSteps.map(step => step.price_per_unit)).toEqual([0.16, 0.14, 0.12, 0.10, 0.09, 0.08])
   })
 
+  it.concurrent('preserves not_authorized for org-scoped pricing queries without auth', async () => {
+    const response = await fetchWithRetry(getEndpointUrl(`/private/credits?org_id=${ORG_ID}`))
+
+    expect(response.status).toBe(400)
+
+    const data = await response.json() as {
+      error: string
+    }
+
+    expect(data.error).toBe('not_authorized')
+  })
+
   it.concurrent('prices build_time overage through the shared calculator endpoint', async () => {
     const response = await fetchWithRetry(getEndpointUrl('/private/credits'), {
       method: 'POST',

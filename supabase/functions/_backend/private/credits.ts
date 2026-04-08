@@ -390,14 +390,9 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.use('*', useCors)
 
 app.get('/', async (c) => {
-  try {
-    const orgId = c.req.query('org_id') ?? undefined
-    const credits = await getScopedCreditSteps(c as AppContext, orgId)
-    return c.json(credits)
-  }
-  catch (e) {
-    throw simpleError('failed_to_fetch_pricing_data', 'Failed to fetch pricing data', {}, e)
-  }
+  const orgId = c.req.query('org_id') ?? undefined
+  const credits = await getScopedCreditSteps(c as AppContext, orgId)
+  return c.json(credits)
 })
 
 app.post('/', async (c) => {
