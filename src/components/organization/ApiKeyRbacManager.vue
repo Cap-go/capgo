@@ -51,6 +51,8 @@ interface RoleBinding {
   scope_type: string
 }
 
+type ApiKeyAction = NonNullable<TableColumn['actions']>[number]
+
 const props = defineProps<{
   orgId: string
   orgName: string
@@ -134,21 +136,8 @@ const legacyKeys = computed(() => filterApiKeys('legacy', searchLegacy.value))
 const sortedV2Keys = computed(() => sortApiKeyRows(v2Keys.value, v2Columns.value))
 const sortedLegacyKeys = computed(() => sortApiKeyRows(legacyKeys.value, legacyColumns.value))
 
-const computedV2Columns = computed<TableColumn[]>(() => {
-  const tableColumns: TableColumn[] = [
-    {
-      key: 'name',
-      label: t('name'),
-      sortable: true,
-      mobile: true,
-      head: true,
-    },
-    {
-      key: 'org_role',
-      label: t('role'),
-      mobile: true,
-      displayFunction: (apiKey: ApiKeyRow) => apiKey.org_role ? getRoleDisplayName(apiKey.org_role) : t('none'),
-    },
+function createSharedScopeColumns(): TableColumn[] {
+  return [
     {
       key: 'expires_at',
       label: t('expires'),
@@ -182,30 +171,53 @@ const computedV2Columns = computed<TableColumn[]>(() => {
       displayFunction: (apiKey: ApiKeyRow) => getAppScopeDisplay(apiKey),
     },
   ]
+}
+
+function createActionsColumn(actions: ApiKeyAction[]): TableColumn {
+  return {
+    key: 'actions',
+    label: t('actions'),
+    mobile: true,
+    actions,
+  }
+}
+
+const computedV2Columns = computed<TableColumn[]>(() => {
+  const tableColumns: TableColumn[] = [
+    {
+      key: 'name',
+      label: t('name'),
+      sortable: true,
+      mobile: true,
+      head: true,
+    },
+    {
+      key: 'org_role',
+      label: t('role'),
+      mobile: true,
+      displayFunction: (apiKey: ApiKeyRow) => apiKey.org_role ? getRoleDisplayName(apiKey.org_role) : t('none'),
+    },
+    ...createSharedScopeColumns(),
+  ]
 
   if (props.canManage) {
-    tableColumns.push({
-      key: 'actions',
-      label: t('actions'),
-      mobile: true,
-      actions: [
-        {
-          icon: IconWrench,
-          title: t('manage'),
-          onClick: (apiKey: ApiKeyRow) => router.push(`/settings/organization/api-keys/${apiKey.rbac_id}`),
-        },
-        {
-          icon: IconArrowPath,
-          title: t('button-regenerate'),
-          onClick: (apiKey: ApiKeyRow) => regenerateKey(apiKey),
-        },
-        {
-          icon: IconTrash,
-          title: t('delete'),
-          onClick: (apiKey: ApiKeyRow) => deleteKey(apiKey),
-        },
-      ],
-    })
+    tableColumns.push(createActionsColumn([
+      {
+        icon: IconWrench,
+        title: t('manage'),
+        onClick: (apiKey: ApiKeyRow) => router.push(`/settings/organization/api-keys/${apiKey.rbac_id}`),
+      },
+      {
+        icon: IconArrowPath,
+        title: t('button-regenerate'),
+        onClick: (apiKey: ApiKeyRow) => regenerateKey(apiKey),
+      },
+      {
+        icon: IconTrash,
+        title: t('delete'),
+        onClick: (apiKey: ApiKeyRow) => deleteKey(apiKey),
+      },
+    ]))
   }
 
   return tableColumns
@@ -225,58 +237,22 @@ const computedLegacyColumns = computed<TableColumn[]>(() => {
       label: t('mode'),
       mobile: true,
     },
-    {
-      key: 'expires_at',
-      label: t('expires'),
-      mobile: true,
-      displayFunction: (apiKey: ApiKeyRow) => {
-        if (!apiKey.expires_at)
-          return t('never')
-
-        return isApiKeyExpired(apiKey.expires_at)
-          ? `${formatDate(apiKey.expires_at)} (${t('expired')})`
-          : formatDate(apiKey.expires_at)
-      },
-    },
-    {
-      key: 'created_at',
-      label: t('created'),
-      sortable: true,
-      mobile: true,
-      displayFunction: (apiKey: ApiKeyRow) => apiKey.created_at ? formatLocalDate(apiKey.created_at) : t('none'),
-    },
-    {
-      key: 'limited_to_orgs',
-      label: t('organizations'),
-      mobile: true,
-      displayFunction: (apiKey: ApiKeyRow) => getOrgScopeDisplay(apiKey),
-    },
-    {
-      key: 'limited_to_apps',
-      label: t('apps'),
-      mobile: true,
-      displayFunction: (apiKey: ApiKeyRow) => getAppScopeDisplay(apiKey),
-    },
+    ...createSharedScopeColumns(),
   ]
 
   if (props.canManage) {
-    tableColumns.push({
-      key: 'actions',
-      label: t('actions'),
-      mobile: true,
-      actions: [
-        {
-          icon: IconArrowPath,
-          title: t('button-regenerate'),
-          onClick: (apiKey: ApiKeyRow) => regenerateKey(apiKey),
-        },
-        {
-          icon: IconTrash,
-          title: t('delete'),
-          onClick: (apiKey: ApiKeyRow) => deleteKey(apiKey),
-        },
-      ],
-    })
+    tableColumns.push(createActionsColumn([
+      {
+        icon: IconArrowPath,
+        title: t('button-regenerate'),
+        onClick: (apiKey: ApiKeyRow) => regenerateKey(apiKey),
+      },
+      {
+        icon: IconTrash,
+        title: t('delete'),
+        onClick: (apiKey: ApiKeyRow) => deleteKey(apiKey),
+      },
+    ]))
   }
 
   return tableColumns

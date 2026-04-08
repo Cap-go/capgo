@@ -23,6 +23,8 @@ interface RoleBindingBody {
 }
 
 type ValidationResult<T> = { ok: true, data: T } | { ok: false, status: number, error: string }
+type RouteValidationResult<T> = { ok: true, data: T } | { ok: false, response: Response }
+type RoleBindingRecord = typeof schema.role_bindings.$inferSelect
 const INVALID_APIKEY_ACCESS_ERROR = 'Invalid API key or access'
 
 export const app = createHono('', version)
@@ -240,6 +242,28 @@ async function validatePrincipalAccess(
   }
 
   return { ok: true, data: null }
+}
+
+async function loadManagedBinding(
+  c: Context<MiddlewareKeyVariables>,
+  drizzle: ReturnType<typeof getDrizzleClient>,
+  bindingId: string,
+): Promise<RouteValidationResult<RoleBindingRecord>> {
+  const [binding] = await drizzle
+    .select()
+    .from(schema.role_bindings)
+    .where(eq(schema.role_bindings.id, bindingId))
+    .limit(1)
+
+  if (!binding) {
+    return { ok: false, response: c.json({ error: 'Role binding not found' }, 404) }
+  }
+
+  if (!(await checkPermission(c, 'org.update_user_roles', { orgId: binding.org_id ?? undefined }))) {
+    return { ok: false, response: c.json({ error: 'Forbidden - Admin rights required' }, 403) }
+  }
+
+  return { ok: true, data: binding }
 }
 
 async function getCallerMaxPriorityRank(
@@ -502,20 +526,10 @@ app.patch('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
   try {
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
-
-    const [binding] = await drizzle
-      .select()
-      .from(schema.role_bindings)
-      .where(eq(schema.role_bindings.id, bindingId))
-      .limit(1)
-
-    if (!binding) {
-      return c.json({ error: 'Role binding not found' }, 404)
-    }
-
-    if (!(await checkPermission(c, 'org.update_user_roles', { orgId: binding.org_id ?? undefined }))) {
-      return c.json({ error: 'Forbidden - Admin rights required' }, 403)
-    }
+    const bindingResult = await loadManagedBinding(c, drizzle, bindingId)
+    if (!bindingResult.ok)
+      return bindingResult.response
+    const binding = bindingResult.data
 
     const [role] = await drizzle
       .select()
@@ -593,21 +607,11 @@ app.delete('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
   try {
     pgClient = getPgClient(c)
     const drizzle = getDrizzleClient(pgClient)
+    const bindingResult = await loadManagedBinding(c, drizzle, bindingId)
+    if (!bindingResult.ok)
+      return bindingResult.response
+    const binding = bindingResult.data
 
-    // Retrieve the binding and verify access
-    const [binding] = await drizzle
-      .select()
-      .from(schema.role_bindings)
-      .where(eq(schema.role_bindings.id, bindingId))
-      .limit(1)
-
-    if (!binding) {
-      return c.json({ error: 'Role binding not found' }, 404)
-    }
-
-    if (!(await checkPermission(c, 'org.update_user_roles', { orgId: binding.org_id ?? undefined }))) {
-      return c.json({ error: 'Forbidden - Admin rights required' }, 403)
-    }
     // Prevent privilege escalation: caller cannot delete a binding for a role with higher priority than their own
     const auth = c.get('auth')!
     const callerPrincipalId = auth.authType === 'apikey' ? auth.apikey!.rbac_id : auth.userId
