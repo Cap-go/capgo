@@ -1,9 +1,9 @@
 import type { Context } from 'hono'
 import type Stripe from 'stripe'
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { AuthInfo, MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { getFallbackCreditProductId } from '../utils/credits.ts'
-import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { getClaimsFromJWT, middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { createOneTimeCheckout, getCreditCheckoutDetails, getStripe, isStripeEmulatorEnabled } from '../utils/stripe.ts'
@@ -135,8 +135,8 @@ function preferScopedCreditSteps(steps: CreditStep[], orgId?: string): CreditSte
 
   const normalizedSteps: CreditStep[] = []
 
-  for (const [type, group] of stepGroups.entries()) {
-    const scopedSteps = sortCreditSteps(group.scoped.filter(step => step.type === type))
+  for (const [, group] of stepGroups.entries()) {
+    const scopedSteps = sortCreditSteps(group.scoped)
     if (scopedSteps.length === 0) {
       normalizedSteps.push(...sortCreditSteps(group.global))
       continue
@@ -152,16 +152,43 @@ function preferScopedCreditSteps(steps: CreditStep[], orgId?: string): CreditSte
   return sortCreditSteps(normalizedSteps)
 }
 
+async function requireOrgScopedPricingAccess(c: AppContext, orgId: string, authorization: string) {
+  c.set('authorization', authorization)
+
+  const claims = await getClaimsFromJWT(c, authorization)
+  if (!claims?.sub) {
+    throw simpleError('not_authorized', 'Not authorized')
+  }
+
+  c.set('auth', {
+    userId: claims.sub,
+    authType: 'jwt',
+    apikey: null,
+    jwt: authorization,
+  } satisfies AuthInfo)
+
+  if (!await checkPermission(c, 'org.read', { orgId })) {
+    throw simpleError('not_authorized', 'Not authorized')
+  }
+}
+
 async function getScopedCreditSteps(c: AppContext, orgId?: string): Promise<CreditStep[]> {
   const authorization = c.req.header('authorization')
     ?? c.req.header('Authorization')
     ?? c.get('authorization')
 
-  const pricingClient = orgId
-    ? authorization
-      ? supabaseClient(c, authorization)
-      : undefined
-    : supabaseAdmin(c)
+  let pricingClient: ReturnType<typeof supabaseAdmin> | ReturnType<typeof supabaseClient> | undefined
+  if (orgId) {
+    if (!authorization) {
+      throw simpleError('not_authorized', 'Not authorized')
+    }
+
+    await requireOrgScopedPricingAccess(c, orgId, authorization)
+    pricingClient = supabaseClient(c, authorization)
+  }
+  else {
+    pricingClient = supabaseAdmin(c)
+  }
 
   if (!pricingClient)
     throw simpleError('not_authorized', 'Not authorized')

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { executeSQL, fetchWithRetry, getAuthHeaders, getEndpointUrl, ORG_ID } from './test-utils'
+import { executeSQL, fetchWithRetry, getAuthHeaders, getAuthHeadersForCredentials, getEndpointUrl, ORG_ID, USER_EMAIL_NONMEMBER, USER_PASSWORD_NONMEMBER } from './test-utils'
 
 interface CreditStep {
   type: string
@@ -23,6 +23,20 @@ describe('credits pricing API', () => {
 
   it.concurrent('preserves not_authorized for org-scoped pricing queries without auth', async () => {
     const response = await fetchWithRetry(getEndpointUrl(`/private/credits?org_id=${ORG_ID}`))
+
+    expect(response.status).toBe(400)
+
+    const data = await response.json() as {
+      error: string
+    }
+
+    expect(data.error).toBe('not_authorized')
+  })
+
+  it.concurrent('rejects org-scoped pricing queries for authenticated non-members', async () => {
+    const response = await fetchWithRetry(getEndpointUrl(`/private/credits?org_id=${ORG_ID}`), {
+      headers: await getAuthHeadersForCredentials(USER_EMAIL_NONMEMBER, USER_PASSWORD_NONMEMBER),
+    })
 
     expect(response.status).toBe(400)
 
@@ -87,6 +101,28 @@ describe('credits pricing API', () => {
     }
 
     expect(data.error).toBe('invalid_build_time')
+  })
+
+  it.concurrent('rejects org-scoped cost calculation for authenticated non-members', async () => {
+    const response = await fetchWithRetry(getEndpointUrl('/private/credits'), {
+      method: 'POST',
+      headers: await getAuthHeadersForCredentials(USER_EMAIL_NONMEMBER, USER_PASSWORD_NONMEMBER),
+      body: JSON.stringify({
+        org_id: ORG_ID,
+        mau: 0,
+        bandwidth: 0,
+        storage: 0,
+        build_time: 6000,
+      }),
+    })
+
+    expect(response.status).toBe(400)
+
+    const data = await response.json() as {
+      error: string
+    }
+
+    expect(data.error).toBe('not_authorized')
   })
 
   it('uses org-scoped build_time tiers when an authorized org_id is supplied', async () => {
