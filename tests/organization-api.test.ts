@@ -171,21 +171,21 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     expect(response.status).toBe(401)
   })
 
-	  it.concurrent('rejects POST /organization', async () => {
-	    const response = await fetch(`${BASE_URL}/organization`, {
-	      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
-	      method: 'POST',
-	      body: JSON.stringify({
-	        orgId: readOnlyOrgId,
-	        name: `Blocked create ${randomUUID()}`,
-	      }),
-	    })
+  it.concurrent('rejects POST /organization', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'POST',
+      body: JSON.stringify({
+        orgId: readOnlyOrgId,
+        name: `Blocked create ${randomUUID()}`,
+      }),
+    })
 
-	    expect(response.status).toBe(401)
-	    // Ensure this is blocked by API-key auth (key mode allowlist), not by RLS deeper in the handler.
-	    const payload = await response.json() as { error?: string }
-	    expect(payload.error).toBe('invalid_apikey')
-	  })
+    expect(response.status).toBe(401)
+    // Ensure this is blocked by API-key auth (key mode allowlist), not by RLS deeper in the handler.
+    const payload = await response.json() as { error?: string }
+    expect(payload.error).toBe('invalid_apikey')
+  })
 
   it.concurrent('rejects DELETE /organization', async () => {
     const response = await fetch(`${BASE_URL}/organization?orgId=${readOnlyOrgId}`, {
@@ -829,6 +829,8 @@ describe('[DELETE] /organization', () => {
   it('delete organization successfully', async () => {
     const id = randomUUID()
     const customerId = `cus_test_${id}`
+    const startDate = '2026-01-01'
+    const endDate = '2026-01-31'
 
     // Create stripe_info for this test org
     const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
@@ -854,6 +856,21 @@ describe('[DELETE] /organization', () => {
     expect(errorOrg).toBeNull()
     expect(dataOrg).toBeTruthy()
 
+    const { error: metricsCacheError } = await getSupabaseClient().from('org_metrics_cache').insert({
+      org_id: id,
+      start_date: startDate,
+      end_date: endDate,
+      mau: 1,
+      storage: 2,
+      bandwidth: 3,
+      build_time_unit: 4,
+      get: 5,
+      fail: 6,
+      install: 7,
+      uninstall: 8,
+    })
+    expect(metricsCacheError).toBeNull()
+
     const response = await fetch(`${BASE_URL}/organization?orgId=${id}`, {
       headers,
       method: 'DELETE',
@@ -865,6 +882,14 @@ describe('[DELETE] /organization', () => {
     const { data: dataOrg2, error: errorOrg2 } = await getSupabaseClient().from('orgs').select().eq('id', id).single()
     expect(errorOrg2).toBeTruthy()
     expect(dataOrg2).toBeNull()
+
+    const { data: cachedMetrics, error: cachedMetricsError } = await getSupabaseClient()
+      .from('org_metrics_cache')
+      .select('org_id')
+      .eq('org_id', id)
+      .maybeSingle()
+    expect(cachedMetricsError).toBeNull()
+    expect(cachedMetrics).toBeNull()
 
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
   })
