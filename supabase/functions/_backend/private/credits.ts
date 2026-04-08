@@ -361,6 +361,8 @@ app.post('/', async (c) => {
   if (mau === undefined || bandwidth === undefined || storage === undefined) {
     throw simpleError('missing_required_fields', 'Missing required fields: mau, bandwidth, storage')
   }
+  if (!Number.isFinite(buildTime) || buildTime < 0)
+    throw simpleError('invalid_build_time', 'build_time must be a non-negative number')
 
   const typedCredits = await getScopedCreditSteps(c as AppContext, orgId)
 

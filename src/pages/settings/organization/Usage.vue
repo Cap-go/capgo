@@ -136,24 +136,30 @@ async function getUsage(orgId: string) {
   })
 
   const basePrice = currentPlan?.price_m ?? 0
-  let estimatedUsagePrice = 0
+  let estimatedUsagePrice: number | null = null
 
-  try {
-    const overageCost = await calculateCreditCost({
-      org_id: orgId,
-      mau: Math.max(totalMau - (currentPlan?.mau ?? 0), 0),
-      bandwidth: Math.max(totalBandwidthBytes - Math.round((currentPlan?.bandwidth ?? 0) * 1073741824), 0),
-      storage: Math.max(totalStorageBytes - Math.round((currentPlan?.storage ?? 0) * 1073741824), 0),
-      build_time: Math.max(totalBuildTime - (currentPlan?.build_time_unit ?? 0), 0),
-    })
-    estimatedUsagePrice = roundNumber(overageCost.total_cost)
-  }
-  catch (err) {
-    console.error('Error estimating credit overage cost:', err)
+  if (currentPlan) {
+    try {
+      const overageCost = await calculateCreditCost({
+        org_id: orgId,
+        mau: Math.max(totalMau - currentPlan.mau, 0),
+        bandwidth: Math.max(totalBandwidthBytes - Math.round(currentPlan.bandwidth * 1073741824), 0),
+        storage: Math.max(totalStorageBytes - Math.round(currentPlan.storage * 1073741824), 0),
+        build_time: Math.max(totalBuildTime - currentPlan.build_time_unit, 0),
+      })
+      estimatedUsagePrice = roundNumber(overageCost.total_cost)
+    }
+    catch (err) {
+      console.error('Error estimating credit overage cost:', err)
+    }
   }
 
-  const totalUsagePrice = roundNumber(creditDeductions.length > 0 ? totalCreditDeductions : estimatedUsagePrice)
-  const totalPrice = roundNumber(basePrice + totalUsagePrice)
+  const totalUsagePrice = creditDeductions.length > 0
+    ? roundNumber(totalCreditDeductions)
+    : estimatedUsagePrice
+  const totalPrice = totalUsagePrice !== null && currentPlan
+    ? roundNumber(basePrice + totalUsagePrice)
+    : null
 
   return {
     currentPlan,
@@ -180,6 +186,20 @@ const currentPlanSuggest = computed(() => main.plans.find(plan => plan.name === 
 
 function roundNumber(number: number) {
   return Math.round(number * 100) / 100
+}
+
+function formatCurrency(value?: number | null) {
+  if (typeof value !== 'number' || !Number.isFinite(value))
+    return t('unknown')
+
+  return `$${value.toLocaleString()}`
+}
+
+function formatMonthlyPrice(value?: number | null) {
+  if (typeof value !== 'number' || !Number.isFinite(value))
+    return t('unknown')
+
+  return `$${value}/${t('mo')}`
 }
 
 function percent(usage: number, limit: number) {
@@ -364,7 +384,7 @@ function nextRunDate() {
                 {{ t('base') }}
               </div>
               <div class="text-2xl font-bold text-gray-900 dark:text-white">
-                ${{ currentPlan?.price_m }}/{{ t('mo') }}
+                {{ formatMonthlyPrice(currentPlan?.price_m) }}
               </div>
             </div>
             <div class="flex flex-col">
@@ -372,7 +392,7 @@ function nextRunDate() {
                 {{ t('credits-used-in-period') }}
               </div>
               <div class="text-2xl font-bold text-gray-900 dark:text-white">
-                ${{ planUsage?.totalUsagePrice.toLocaleString() }}
+                {{ formatCurrency(planUsage?.totalUsagePrice) }}
               </div>
             </div>
           </div>
@@ -381,7 +401,7 @@ function nextRunDate() {
               {{ t('total') }}
             </div>
             <div class="text-xl font-semibold text-gray-900 dark:text-white">
-              ${{ planUsage?.totalPrice.toLocaleString() }}
+              {{ formatCurrency(planUsage?.totalPrice) }}
             </div>
           </div>
         </div>

@@ -8,7 +8,7 @@ interface CreditStep {
 }
 
 describe('credits pricing API', () => {
-  it('returns the updated build_time tiers from the shared pricing table', async () => {
+  it.concurrent('returns the updated build_time tiers from the shared pricing table', async () => {
     const response = await fetchWithRetry(getEndpointUrl('/private/credits'))
 
     expect(response.status).toBe(200)
@@ -21,7 +21,7 @@ describe('credits pricing API', () => {
     expect(buildSteps.map(step => step.price_per_unit)).toEqual([0.16, 0.14, 0.12, 0.10, 0.09, 0.08])
   })
 
-  it('prices build_time overage through the shared calculator endpoint', async () => {
+  it.concurrent('prices build_time overage through the shared calculator endpoint', async () => {
     const response = await fetchWithRetry(getEndpointUrl('/private/credits'), {
       method: 'POST',
       headers: {
@@ -52,6 +52,29 @@ describe('credits pricing API', () => {
     expect(data.usage.build_time).toBe(6000)
     expect(data.breakdown.build_time.cost).toBe(16)
     expect(data.total_cost).toBe(16)
+  })
+
+  it.concurrent('rejects negative build_time input', async () => {
+    const response = await fetchWithRetry(getEndpointUrl('/private/credits'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        mau: 0,
+        bandwidth: 0,
+        storage: 0,
+        build_time: -60,
+      }),
+    })
+
+    expect(response.status).toBe(400)
+
+    const data = await response.json() as {
+      error: string
+    }
+
+    expect(data.error).toBe('invalid_build_time')
   })
 
   it('uses org-scoped build_time tiers when an authorized org_id is supplied', async () => {

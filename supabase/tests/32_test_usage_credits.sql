@@ -43,14 +43,25 @@ SELECT
 
 SELECT
     results_eq(
-        $$SELECT price_per_unit FROM public.capgo_credits_steps WHERE type = 'build_time' AND step_min = 0$$,
+        $$SELECT price_per_unit
+          FROM public.capgo_credits_steps
+         WHERE type = 'build_time'
+           AND org_id IS NULL
+           AND step_min = 0
+         ORDER BY step_max ASC
+         LIMIT 1$$,
         $$VALUES (0.16::double precision)$$,
         'build_time credit pricing starts at $0.16 per minute'
     );
 
 SELECT
     results_eq(
-        $$SELECT price_per_unit FROM public.capgo_credits_steps WHERE type = 'build_time' ORDER BY step_max DESC LIMIT 1$$,
+        $$SELECT price_per_unit
+          FROM public.capgo_credits_steps
+         WHERE type = 'build_time'
+           AND org_id IS NULL
+         ORDER BY step_max DESC, step_min DESC
+         LIMIT 1$$,
         $$VALUES (0.08::double precision)$$,
         'build_time credit pricing floors at $0.08 per minute'
     );
