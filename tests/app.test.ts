@@ -4,9 +4,13 @@ import { APIKEY_TEST2_ALL, BASE_URL, fetchWithRetry, getSupabaseClient, headers,
 
 function isDuplicateAppCreationError(body: any): boolean {
   return body?.error === 'app_id_already_exists'
-    || body?.error === 'cannot_create_app'
     || body?.supabaseError?.code === '23505'
     || body?.moreInfo?.constraint === 'apps_pkey'
+    || (body?.cannot_create_app && (
+      body?.supabaseError?.code === '23505'
+      || body?.moreInfo?.constraint === 'apps_pkey'
+      || body?.error === 'app_id_already_exists'
+    ))
 }
 
 describe('[DELETE] /app operations', () => {
