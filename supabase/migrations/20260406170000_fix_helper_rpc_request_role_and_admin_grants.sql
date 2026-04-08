@@ -327,9 +327,9 @@ $$;
 
 ALTER FUNCTION "public"."is_paying_and_good_plan_org"("orgid" "uuid") OWNER TO "postgres";
 REVOKE ALL ON FUNCTION "public"."is_paying_and_good_plan_org"("orgid" "uuid") FROM PUBLIC;
-REVOKE ALL ON FUNCTION "public"."is_paying_and_good_plan_org"("orgid" "uuid") FROM "anon";
-GRANT EXECUTE ON FUNCTION "public"."is_paying_and_good_plan_org"("orgid" "uuid") TO "authenticated";
-GRANT EXECUTE ON FUNCTION "public"."is_paying_and_good_plan_org"("orgid" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."is_paying_and_good_plan_org"("orgid" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."is_paying_and_good_plan_org"("orgid" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."is_paying_and_good_plan_org"("orgid" "uuid") TO "service_role";
 
 CREATE OR REPLACE FUNCTION "public"."get_total_storage_size_org"("org_id" "uuid")
 RETURNS double precision
@@ -360,9 +360,9 @@ $$;
 
 ALTER FUNCTION "public"."get_total_storage_size_org"("org_id" "uuid") OWNER TO "postgres";
 REVOKE ALL ON FUNCTION "public"."get_total_storage_size_org"("org_id" "uuid") FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION "public"."get_total_storage_size_org"("org_id" "uuid") TO "postgres";
-GRANT EXECUTE ON FUNCTION "public"."get_total_storage_size_org"("org_id" "uuid") TO "supabase_admin";
-GRANT EXECUTE ON FUNCTION "public"."get_total_storage_size_org"("org_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."get_total_storage_size_org"("org_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."get_total_storage_size_org"("org_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_total_storage_size_org"("org_id" "uuid") TO "service_role";
 
 CREATE OR REPLACE FUNCTION "public"."get_total_app_storage_size_orgs"("org_id" "uuid", "app_id" character varying)
 RETURNS double precision
@@ -397,7 +397,9 @@ $$;
 
 ALTER FUNCTION "public"."get_total_app_storage_size_orgs"("org_id" "uuid", "app_id" character varying) OWNER TO "postgres";
 REVOKE ALL ON FUNCTION "public"."get_total_app_storage_size_orgs"("org_id" "uuid", "app_id" character varying) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION "public"."get_total_app_storage_size_orgs"("org_id" "uuid", "app_id" character varying) TO "service_role";
+GRANT ALL ON FUNCTION "public"."get_total_app_storage_size_orgs"("org_id" "uuid", "app_id" character varying) TO "anon";
+GRANT ALL ON FUNCTION "public"."get_total_app_storage_size_orgs"("org_id" "uuid", "app_id" character varying) TO "authenticated";
+GRANT ALL ON FUNCTION "public"."get_total_app_storage_size_orgs"("org_id" "uuid", "app_id" character varying) TO "service_role";
 
 CREATE OR REPLACE FUNCTION "public"."get_user_main_org_id"("user_id" "uuid")
 RETURNS "uuid"
@@ -474,9 +476,9 @@ $$;
 
 ALTER FUNCTION "public"."is_member_of_org"("user_id" "uuid", "org_id" "uuid") OWNER TO "postgres";
 REVOKE ALL ON FUNCTION "public"."is_member_of_org"("user_id" "uuid", "org_id" "uuid") FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION "public"."is_member_of_org"("user_id" "uuid", "org_id" "uuid") TO "postgres";
-GRANT EXECUTE ON FUNCTION "public"."is_member_of_org"("user_id" "uuid", "org_id" "uuid") TO "supabase_admin";
-GRANT EXECUTE ON FUNCTION "public"."is_member_of_org"("user_id" "uuid", "org_id" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."is_member_of_org"("user_id" "uuid", "org_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."is_member_of_org"("user_id" "uuid", "org_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."is_member_of_org"("user_id" "uuid", "org_id" "uuid") TO "service_role";
 
 CREATE OR REPLACE FUNCTION "public"."is_account_disabled"("user_id" "uuid")
 RETURNS boolean
