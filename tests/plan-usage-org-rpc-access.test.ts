@@ -36,6 +36,17 @@ let planName: string
 let ownerSupabase: Awaited<ReturnType<typeof createAuthenticatedClient>>
 let attackerSupabase: Awaited<ReturnType<typeof createAuthenticatedClient>>
 
+function isRetryableAuthError(error: unknown): boolean {
+  if (!error || typeof error !== 'object')
+    return false
+
+  const maybeError = error as { message?: string, status?: number }
+  if (maybeError.status === 0)
+    return true
+
+  return /fetch failed|network/i.test(maybeError.message ?? '')
+}
+
 async function createAuthenticatedClient(email: string, password: string) {
   const client = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
@@ -45,9 +56,15 @@ async function createAuthenticatedClient(email: string, password: string) {
     },
   })
 
-  const { error } = await client.auth.signInWithPassword({ email, password })
-  if (error)
-    throw error
+  const maxRetries = 3
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const { error } = await client.auth.signInWithPassword({ email, password })
+    if (!error)
+      return client
+    if (!isRetryableAuthError(error) || attempt === maxRetries - 1)
+      throw error
+    await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)))
+  }
 
   return client
 }

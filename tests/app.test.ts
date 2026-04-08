@@ -2,6 +2,26 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
 import { APIKEY_TEST2_ALL, BASE_URL, fetchWithRetry, getSupabaseClient, headers, NON_OWNER_ORG_ID, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils.ts'
 
+function isDuplicateAppCreationError(body: any): boolean {
+  if (!body || typeof body !== 'object')
+    return false
+
+  const errorCode = typeof body.error === 'string' ? body.error : ''
+  const supabaseCode = typeof body?.supabaseError?.code === 'string' ? body.supabaseError.code : ''
+  const moreInfoConstraint = typeof body?.moreInfo?.constraint === 'string' ? body.moreInfo.constraint : ''
+  const constraint = typeof body?.constraint === 'string' ? body.constraint : ''
+
+  if (errorCode === 'app_id_already_exists')
+    return true
+
+  const hasExplicitDuplicateSignal
+    = supabaseCode === '23505'
+      || moreInfoConstraint === 'apps_pkey'
+      || constraint === 'apps_pkey'
+
+  return errorCode === 'cannot_create_app' && hasExplicitDuplicateSignal
+}
+
 describe('[DELETE] /app operations', () => {
   const id = randomUUID()
   const APPNAME = `com.app.${id}`
@@ -26,7 +46,7 @@ describe('[DELETE] /app operations', () => {
     })
     if (createApp.status !== 200) {
       const body = await createApp.json().catch(() => null) as any
-      const isDuplicate = body?.error === 'cannot_create_app' && body?.supabaseError?.code === '23505'
+      const isDuplicate = isDuplicateAppCreationError(body)
       if (!isDuplicate) {
         expect(createApp.status, JSON.stringify(body)).toBe(200)
       }
@@ -99,7 +119,7 @@ describe('[GET] /app operations with subkey', () => {
     // Handle duplicate app creation gracefully on retry (app may already exist from a previous attempt)
     if (createApp.status !== 200) {
       const body = await createApp.json().catch(() => null) as any
-      const isDuplicate = body?.error === 'cannot_create_app'
+      const isDuplicate = isDuplicateAppCreationError(body)
       if (!isDuplicate) {
         expect(createApp.status, JSON.stringify(body)).toBe(200)
       }
@@ -146,7 +166,13 @@ describe('[GET] /app operations with subkey', () => {
         icon: 'test-icon',
       }),
     })
-    expect(createOtherApp.status).toBe(200)
+    if (createOtherApp.status !== 200) {
+      const body = await createOtherApp.json().catch(() => null) as any
+      const isDuplicate = isDuplicateAppCreationError(body)
+      if (!isDuplicate) {
+        expect(createOtherApp.status, JSON.stringify(body)).toBe(200)
+      }
+    }
 
     // Try to access the other app with the subkey
     const subkeyHeaders = { 'x-limited-key-id': String(subkey) }
