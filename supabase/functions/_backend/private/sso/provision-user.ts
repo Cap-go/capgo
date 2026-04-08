@@ -86,6 +86,34 @@ async function setAuthUserSsoOnly(pgClient: ReturnType<typeof getPgClient>, user
   )
 }
 
+async function ensurePublicUserProfileFromAuth(pgClient: ReturnType<typeof getPgClient>, userId: string): Promise<void> {
+  await pgClient.query(
+    `
+      insert into public.users (
+        id,
+        email,
+        first_name,
+        last_name,
+        country,
+        enable_notifications,
+        opt_for_newsletters
+      )
+      select
+        au.id,
+        coalesce(au.email, ''),
+        coalesce(au.raw_user_meta_data ->> 'first_name', ''),
+        coalesce(au.raw_user_meta_data ->> 'last_name', ''),
+        null,
+        true,
+        true
+      from auth.users au
+      where au.id = $1
+      on conflict (id) do nothing
+    `,
+    [userId],
+  )
+}
+
 app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
   const auth = c.get('auth')
   if (!auth) {
@@ -133,6 +161,14 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     const userEmail = userAuth.user.email
     if (!userEmail) {
       return quickError(400, 'no_email', 'User has no email address')
+    }
+
+    try {
+      await ensurePublicUserProfileFromAuth(getSharedPgClient(), userId)
+    }
+    catch (profileEnsureError) {
+      cloudlogErr({ requestId, message: 'Failed to ensure public.users profile for SSO user', userId, error: profileEnsureError })
+      return quickError(500, 'user_profile_sync_failed', 'Failed to provision user profile')
     }
 
     const userDomain = userEmail.split('@')[1]?.toLowerCase().trim()
@@ -201,6 +237,14 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       }
 
       if (!mergeProviderError && mergeProvider) {
+        try {
+          await ensurePublicUserProfileFromAuth(getSharedPgClient(), originalUserId)
+        }
+        catch (profileEnsureError) {
+          cloudlogErr({ requestId, message: 'Failed to ensure public.users profile for original user during SSO merge', originalUserId, error: profileEnsureError })
+          return quickError(500, 'user_profile_sync_failed', 'Failed to provision merged user profile')
+        }
+
         const { data: existingMembership } = await (admin as any)
           .from('org_users')
           .select('id')

@@ -489,6 +489,126 @@ describe('[POST] /private/sso/provision-user', () => {
     }
   })
 
+  it('creates missing public.users profile before assigning org membership', async () => {
+    const managedOrgId = randomUUID()
+    const managedCustomerId = `cus_sso_missing_profile_${randomUUID()}`
+    const providerId = randomUUID()
+    const domain = `${randomUUID()}.sso.test`
+    const email = `missing-profile-${randomUUID()}@${domain}`
+    const password = 'testtest'
+    const identityProvider = `sso:${providerId}`
+    const identityProviderId = `nameid-${randomUUID()}`
+    const pool = new Pool({ connectionString: POSTGRES_URL })
+
+    const { data: createdUser, error: createUserError } = await getSupabaseClient().auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        first_name: 'Missing',
+        last_name: 'Profile',
+      },
+    })
+    if (createUserError || !createdUser.user) {
+      await pool.end()
+      throw createUserError ?? new Error('Failed to create SSO auth user for missing profile provisioning test')
+    }
+
+    try {
+      const ssoAuthHeaders = await getAuthHeadersForCredentials(email, password)
+
+      const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
+        customer_id: managedCustomerId,
+        status: 'succeeded',
+        product_id: 'prod_LQIregjtNduh4q',
+        subscription_id: `sub_sso_missing_profile_${randomUUID()}`,
+        trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+        is_good_plan: true,
+      })
+      if (stripeError)
+        throw stripeError
+
+      const { error: orgError } = await getSupabaseClient().from('orgs').insert({
+        id: managedOrgId,
+        name: `SSO Missing Profile Org ${managedOrgId}`,
+        management_email: `sso-missing-profile-${managedOrgId}@capgo.app`,
+        created_by: USER_ID,
+        customer_id: managedCustomerId,
+        sso_enabled: true,
+      })
+      if (orgError)
+        throw orgError
+
+      const { error: providerError } = await (getSupabaseClient().from as any)('sso_providers').insert({
+        id: providerId,
+        org_id: managedOrgId,
+        domain,
+        provider_id: randomUUID(),
+        status: 'active',
+        enforce_sso: false,
+        dns_verification_token: `dns-${randomUUID()}`,
+      })
+      if (providerError)
+        throw providerError
+
+      const { error: providerMetadataError } = await getSupabaseClient().auth.admin.updateUserById(createdUser.user.id, {
+        app_metadata: {
+          provider: identityProvider,
+        },
+      })
+      if (providerMetadataError)
+        throw providerMetadataError
+
+      await pool.query(
+        'update auth.identities set provider = $1, provider_id = $2, identity_data = jsonb_build_object($$sub$$, $2::text, $$email$$, $3::text, $$email_verified$$, true) where user_id = $4',
+        [identityProvider, identityProviderId, email, createdUser.user.id],
+      )
+
+      // Ensure the test really covers the missing-profile path.
+      await getSupabaseClient().from('users').delete().eq('id', createdUser.user.id)
+
+      const response = await fetchWithRetry(getEndpointUrl('/private/sso/provision-user'), {
+        method: 'POST',
+        headers: ssoAuthHeaders,
+        body: JSON.stringify({}),
+      })
+
+      expect(response.status).toBe(200)
+      const responseBody = await response.json()
+      expect(responseBody).toMatchObject({ success: true })
+
+      const { data: publicUser, error: publicUserError } = await getSupabaseClient()
+        .from('users')
+        .select('id, email')
+        .eq('id', createdUser.user.id)
+        .maybeSingle()
+
+      expect(publicUserError).toBeNull()
+      expect(publicUser?.id).toBe(createdUser.user.id)
+      expect(publicUser?.email).toBe(email)
+
+      const { data: membership, error: membershipError } = await getSupabaseClient()
+        .from('org_users')
+        .select('id, org_id, user_id')
+        .eq('org_id', managedOrgId)
+        .eq('user_id', createdUser.user.id)
+        .maybeSingle()
+
+      expect(membershipError).toBeNull()
+      expect(membership?.org_id).toBe(managedOrgId)
+      expect(membership?.user_id).toBe(createdUser.user.id)
+    }
+    finally {
+      await Promise.allSettled([
+        getSupabaseClient().auth.admin.deleteUser(createdUser.user.id),
+        (getSupabaseClient().from as any)('sso_providers').delete().eq('id', providerId),
+        getSupabaseClient().from('orgs').delete().eq('id', managedOrgId),
+        getSupabaseClient().from('stripe_info').delete().eq('customer_id', managedCustomerId),
+        pool.end(),
+      ])
+    }
+  })
+
   it('merges an existing password account when a new SSO auth user arrives with the same email', async () => {
     const managedOrgId = randomUUID()
     const managedCustomerId = `cus_sso_merge_${randomUUID()}`
