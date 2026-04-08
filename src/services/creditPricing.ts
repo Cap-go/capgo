@@ -36,10 +36,6 @@ function toBilledUnits(step: Pick<CreditPricingStep, 'unit_factor'>, rawValue: n
   return Math.ceil(rawValue / factor)
 }
 
-function getTierSpanUnits(step: Pick<CreditPricingStep, 'step_min' | 'step_max' | 'unit_factor'>) {
-  return toBilledUnits(step, Math.max(step.step_max - step.step_min, 0))
-}
-
 function formatCreditTierAmount(metric: CreditMetricType, billedUnits: number, t: Translate, locale?: string) {
   const formatter = new Intl.NumberFormat(locale, {
     maximumFractionDigits: 0,
@@ -116,18 +112,19 @@ export function formatCreditPricingTierLabel(
 
   if (step.step_min === 0) {
     return t('credits-pricing-tier-first', {
-      amount: formatCreditTierAmount(step.type, maxUnits, t, locale),
+      to: formatCreditTierAmount(step.type, maxUnits, t, locale),
     })
   }
 
   if (openEnded) {
     return t('credits-pricing-tier-over', {
-      amount: formatCreditTierAmount(step.type, minUnits, t, locale),
+      from: formatCreditTierAmount(step.type, minUnits, t, locale),
     })
   }
 
-  return t('credits-pricing-tier-next', {
-    amount: formatCreditTierAmount(step.type, getTierSpanUnits(step), t, locale),
+  return t('credits-pricing-tier-range', {
+    from: formatCreditTierAmount(step.type, minUnits, t, locale),
+    to: formatCreditTierAmount(step.type, maxUnits, t, locale),
   })
 }
 

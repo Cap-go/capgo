@@ -5,9 +5,9 @@ const messages: Record<string, string> = {
   'credits-plan-overage': '{included}, then {price}',
   'minutes-short': '{minutes}m',
   'credits-pricing-price': '{price} {unit}',
-  'credits-pricing-tier-first': 'First {amount}',
-  'credits-pricing-tier-next': 'Next {amount}',
-  'credits-pricing-tier-over': 'Over {amount}',
+  'credits-pricing-tier-first': 'Up to {to}',
+  'credits-pricing-tier-range': 'From {from} to {to}',
+  'credits-pricing-tier-over': 'Over {from}',
   'credits-pricing-unit-per-gib': 'per GiB',
   'credits-pricing-unit-per-mau': 'per MAU',
   'credits-pricing-unit-per-minute': 'per minute',
@@ -26,7 +26,7 @@ describe('credit pricing UI helpers', () => {
       step_min: 0,
       step_max: 6000,
       unit_factor: 60,
-    }, t)).toBe('First 100m')
+    }, t)).toBe('Up to 100m')
 
     expect(formatCreditPricingPrice('build_time', 0.16, t)).toBe('$0.16 per minute')
   })
@@ -37,7 +37,7 @@ describe('credit pricing UI helpers', () => {
       step_min: 3000,
       step_max: 9000,
       unit_factor: 60,
-    }, t)).toBe('Next 100m')
+    }, t)).toBe('From 50m to 150m')
 
     expect(formatCreditPricingTierLabel({
       type: 'build_time',
@@ -47,13 +47,13 @@ describe('credit pricing UI helpers', () => {
     }, t)).toBe('Over 150m')
   })
 
-  it.concurrent('rounds bounded custom spans from the raw tier width', () => {
+  it.concurrent('formats bounded custom ranges with both dynamic endpoints', () => {
     expect(formatCreditPricingTierLabel({
       type: 'build_time',
       step_min: 5000,
       step_max: 6000,
       unit_factor: 60,
-    }, t)).toBe('Next 17m')
+    }, t)).toBe('From 84m to 100m')
   })
 
   it.concurrent('derives the visible first-tier pricing from the shared step list', () => {
