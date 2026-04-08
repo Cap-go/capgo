@@ -11,6 +11,86 @@ AS $$
   )
 $$;
 
+CREATE OR REPLACE FUNCTION "public"."is_internal_request_role"("caller_role" text)
+RETURNS boolean
+LANGUAGE "sql" STABLE
+SET "search_path" TO ''
+AS $$
+  SELECT (
+    caller_role = ANY (ARRAY['service_role', 'postgres', 'supabase_admin']::text[])
+    OR (
+      caller_role = ANY (ARRAY['', 'none']::text[])
+      AND COALESCE(session_user, current_user) = ANY (ARRAY['postgres', 'supabase_admin']::text[])
+    )
+  )
+$$;
+
+ALTER FUNCTION "public"."is_internal_request_role"(text) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."is_internal_request_role"(text) FROM PUBLIC;
+
+CREATE OR REPLACE FUNCTION "public"."request_has_org_read_access"("orgid" "uuid")
+RETURNS boolean
+LANGUAGE "plpgsql" STABLE
+SECURITY DEFINER
+SET "search_path" TO ''
+AS $$
+DECLARE
+  caller_id uuid;
+BEGIN
+  SELECT public.get_identity_org_allowed(
+    '{read,upload,write,all}'::public.key_mode[],
+    request_has_org_read_access.orgid
+  )
+  INTO caller_id;
+
+  RETURN (
+    caller_id IS NOT NULL
+    AND public.check_min_rights(
+      'read'::public.user_min_right,
+      caller_id,
+      request_has_org_read_access.orgid,
+      NULL::character varying,
+      NULL::bigint
+    )
+  );
+END;
+$$;
+
+ALTER FUNCTION "public"."request_has_org_read_access"("orgid" "uuid") OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."request_has_org_read_access"("orgid" "uuid") FROM PUBLIC;
+
+CREATE OR REPLACE FUNCTION "public"."request_has_app_read_access"("orgid" "uuid", "appid" character varying)
+RETURNS boolean
+LANGUAGE "plpgsql" STABLE
+SECURITY DEFINER
+SET "search_path" TO ''
+AS $$
+DECLARE
+  caller_id uuid;
+BEGIN
+  SELECT public.get_identity_org_appid(
+    '{read,upload,write,all}'::public.key_mode[],
+    request_has_app_read_access.orgid,
+    request_has_app_read_access.appid
+  )
+  INTO caller_id;
+
+  RETURN (
+    caller_id IS NOT NULL
+    AND public.check_min_rights(
+      'read'::public.user_min_right,
+      caller_id,
+      request_has_app_read_access.orgid,
+      request_has_app_read_access.appid,
+      NULL::bigint
+    )
+  );
+END;
+$$;
+
+ALTER FUNCTION "public"."request_has_app_read_access"("orgid" "uuid", "appid" character varying) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."request_has_app_read_access"("orgid" "uuid", "appid" character varying) FROM PUBLIC;
+
 CREATE OR REPLACE FUNCTION "public"."is_platform_admin"("userid" "uuid")
 RETURNS boolean
 LANGUAGE "plpgsql"
@@ -69,27 +149,8 @@ DECLARE
 BEGIN
   SELECT public.current_request_role() INTO caller_role;
 
-  IF NOT (
-    caller_role IN ('service_role', 'postgres', 'supabase_admin')
-    OR (
-      caller_role IN ('', 'none')
-      AND COALESCE(session_user, current_user) IN ('postgres', 'supabase_admin')
-    )
-  ) THEN
-    IF NOT (
-      public.check_min_rights(
-        'read'::public.user_min_right,
-        (
-          SELECT public.get_identity_org_allowed(
-            '{read,upload,write,all}'::public.key_mode[],
-            is_paying_org.orgid
-          )
-        ),
-        is_paying_org.orgid,
-        NULL::character varying,
-        NULL::bigint
-      )
-    ) THEN
+  IF NOT public.is_internal_request_role(caller_role) THEN
+    IF NOT public.request_has_org_read_access(is_paying_org.orgid) THEN
       RETURN false;
     END IF;
   END IF;
@@ -122,27 +183,8 @@ DECLARE
 BEGIN
   SELECT public.current_request_role() INTO caller_role;
 
-  IF NOT (
-    caller_role IN ('service_role', 'postgres', 'supabase_admin')
-    OR (
-      caller_role IN ('', 'none')
-      AND COALESCE(session_user, current_user) IN ('postgres', 'supabase_admin')
-    )
-  ) THEN
-    IF NOT (
-      public.check_min_rights(
-        'read'::public.user_min_right,
-        (
-          SELECT public.get_identity_org_allowed(
-            '{read,upload,write,all}'::public.key_mode[],
-            is_trial_org.orgid
-          )
-        ),
-        is_trial_org.orgid,
-        NULL::character varying,
-        NULL::bigint
-      )
-    ) THEN
+  IF NOT public.is_internal_request_role(caller_role) THEN
+    IF NOT public.request_has_org_read_access(is_trial_org.orgid) THEN
       RETURN 0;
     END IF;
   END IF;
@@ -176,13 +218,7 @@ DECLARE
 BEGIN
   SELECT public.current_request_role() INTO v_request_role;
 
-  v_is_internal := (
-    v_request_role IN ('service_role', 'postgres', 'supabase_admin')
-    OR (
-      v_request_role IN ('', 'none')
-      AND COALESCE(session_user, current_user) IN ('postgres', 'supabase_admin')
-    )
-  );
+  v_is_internal := public.is_internal_request_role(v_request_role);
 
   IF NOT v_is_internal THEN
     v_request_user := public.get_identity_org_allowed(
@@ -190,13 +226,7 @@ BEGIN
       get_current_plan_max_org.orgid
     );
 
-    IF v_request_user IS NULL OR NOT public.check_min_rights(
-      'read'::public.user_min_right,
-      v_request_user,
-      get_current_plan_max_org.orgid,
-      NULL::varchar,
-      NULL::bigint
-    ) THEN
+    IF NOT public.request_has_org_read_access(get_current_plan_max_org.orgid) THEN
       PERFORM public.pg_log(
         'deny: NO_RIGHTS',
         pg_catalog.jsonb_build_object(
@@ -236,23 +266,8 @@ DECLARE
 BEGIN
   SELECT public.current_request_role() INTO caller_role;
 
-  IF NOT (
-    caller_role IN ('service_role', 'postgres', 'supabase_admin')
-    OR (
-      caller_role IN ('', 'none')
-      AND COALESCE(session_user, current_user) IN ('postgres', 'supabase_admin')
-    )
-  ) THEN
-    SELECT public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], is_paying_and_good_plan_org.orgid)
-    INTO caller_id;
-
-    IF caller_id IS NULL OR NOT public.check_min_rights(
-      'read'::public.user_min_right,
-      caller_id,
-      is_paying_and_good_plan_org.orgid,
-      NULL::character varying,
-      NULL::bigint
-    ) THEN
+  IF NOT public.is_internal_request_role(caller_role) THEN
+    IF NOT public.request_has_org_read_access(is_paying_and_good_plan_org.orgid) THEN
       RETURN false;
     END IF;
   END IF;
@@ -296,23 +311,8 @@ DECLARE
 BEGIN
   SELECT public.current_request_role() INTO caller_role;
 
-  IF NOT (
-    caller_role IN ('service_role', 'postgres', 'supabase_admin')
-    OR (
-      caller_role IN ('', 'none')
-      AND COALESCE(session_user, current_user) IN ('postgres', 'supabase_admin')
-    )
-  ) THEN
-    SELECT public.get_identity_org_allowed('{read,upload,write,all}'::public.key_mode[], get_total_storage_size_org.org_id)
-    INTO caller_id;
-
-    IF caller_id IS NULL OR NOT public.check_min_rights(
-      'read'::public.user_min_right,
-      caller_id,
-      get_total_storage_size_org.org_id,
-      NULL::character varying,
-      NULL::bigint
-    ) THEN
+  IF NOT public.is_internal_request_role(caller_role) THEN
+    IF NOT public.request_has_org_read_access(get_total_storage_size_org.org_id) THEN
       RETURN 0;
     END IF;
   END IF;
@@ -345,26 +345,10 @@ DECLARE
 BEGIN
   SELECT public.current_request_role() INTO caller_role;
 
-  IF NOT (
-    caller_role IN ('service_role', 'postgres', 'supabase_admin')
-    OR (
-      caller_role IN ('', 'none')
-      AND COALESCE(session_user, current_user) IN ('postgres', 'supabase_admin')
-    )
-  ) THEN
-    SELECT public.get_identity_org_appid(
-      '{read,upload,write,all}'::public.key_mode[],
+  IF NOT public.is_internal_request_role(caller_role) THEN
+    IF NOT public.request_has_app_read_access(
       get_total_app_storage_size_orgs.org_id,
       get_total_app_storage_size_orgs.app_id
-    )
-    INTO caller_id;
-
-    IF caller_id IS NULL OR NOT public.check_min_rights(
-      'read'::public.user_min_right,
-      caller_id,
-      get_total_app_storage_size_orgs.org_id,
-      get_total_app_storage_size_orgs.app_id,
-      NULL::bigint
     ) THEN
       RETURN 0;
     END IF;
@@ -393,13 +377,7 @@ DECLARE
 BEGIN
   SELECT public.current_request_role() INTO caller_role;
 
-  IF NOT (
-    caller_role IN ('service_role', 'postgres', 'supabase_admin')
-    OR (
-      caller_role IN ('', 'none')
-      AND COALESCE(session_user, current_user) IN ('postgres', 'supabase_admin')
-    )
-  ) THEN
+  IF NOT public.is_internal_request_role(caller_role) THEN
     SELECT auth.uid() INTO caller_id;
     IF caller_id IS NULL OR caller_id <> get_user_main_org_id.user_id THEN
       RETURN NULL;

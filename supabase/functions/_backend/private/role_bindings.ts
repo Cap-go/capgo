@@ -79,6 +79,148 @@ function validateScope(scopeType: RoleBindingBody['scope_type'], appId?: string,
   return { ok: true, data: null }
 }
 
+async function validateUserPrincipalAccess(
+  drizzle: ReturnType<typeof getDrizzleClient>,
+  principalId: string,
+  orgId: string,
+): Promise<ValidationResult<null>> {
+  const targetRbacAccess = await drizzle
+    .select({ id: schema.role_bindings.id })
+    .from(schema.role_bindings)
+    .where(
+      and(
+        eq(schema.role_bindings.principal_type, 'user'),
+        eq(schema.role_bindings.principal_id, principalId),
+        eq(schema.role_bindings.org_id, orgId),
+      ),
+    )
+    .limit(1)
+
+  if (targetRbacAccess.length) {
+    return { ok: true, data: null }
+  }
+
+  const targetLegacyAccess = await drizzle
+    .select({ id: schema.org_users.id })
+    .from(schema.org_users)
+    .where(
+      and(
+        eq(schema.org_users.user_id, principalId),
+        eq(schema.org_users.org_id, orgId),
+      ),
+    )
+    .limit(1)
+
+  if (!targetLegacyAccess.length) {
+    return { ok: false, status: 400, error: 'User is not a member of this org' }
+  }
+
+  return { ok: true, data: null }
+}
+
+async function validateGroupPrincipalAccess(
+  drizzle: ReturnType<typeof getDrizzleClient>,
+  principalId: string,
+  orgId: string,
+): Promise<ValidationResult<null>> {
+  const [group] = await drizzle
+    .select()
+    .from(schema.groups)
+    .where(
+      and(
+        eq(schema.groups.id, principalId),
+        eq(schema.groups.org_id, orgId),
+      ),
+    )
+    .limit(1)
+
+  if (!group) {
+    return { ok: false, status: 400, error: 'Group not found in this org' }
+  }
+
+  return { ok: true, data: null }
+}
+
+async function validateApiKeyPrincipalAccess(
+  drizzle: ReturnType<typeof getDrizzleClient>,
+  principalId: string,
+  orgId: string,
+): Promise<ValidationResult<null>> {
+  const [apiKey] = await drizzle
+    .select({
+      user_id: schema.apikeys.user_id,
+      limited_to_orgs: schema.apikeys.limited_to_orgs,
+    })
+    .from(schema.apikeys)
+    .where(eq(schema.apikeys.rbac_id, principalId))
+    .limit(1)
+
+  if (!apiKey) {
+    cloudlogErr({
+      message: 'validatePrincipalAccess: missing apiKey for role binding principal',
+      principalId,
+      orgId,
+    })
+    return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
+  }
+
+  if (apiKey.limited_to_orgs?.length && !apiKey.limited_to_orgs.includes(orgId)) {
+    cloudlogErr({
+      message: 'validatePrincipalAccess: apiKey limited_to_orgs scope excludes target org',
+      principalId,
+      orgId,
+      apiKeyUserId: apiKey.user_id,
+    })
+    return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
+  }
+
+  const [membership] = await drizzle
+    .select({ id: schema.org_users.id })
+    .from(schema.org_users)
+    .where(
+      and(
+        eq(schema.org_users.user_id, apiKey.user_id),
+        eq(schema.org_users.org_id, orgId),
+      ),
+    )
+    .limit(1)
+
+  if (membership) {
+    return { ok: true, data: null }
+  }
+
+  cloudlogErr({
+    message: 'validatePrincipalAccess: apiKey owner legacy membership not found',
+    principalId,
+    orgId,
+    apiKeyUserId: apiKey.user_id,
+  })
+
+  const [ownerRbacAccess] = await drizzle
+    .select({ id: schema.role_bindings.id })
+    .from(schema.role_bindings)
+    .where(
+      and(
+        eq(schema.role_bindings.principal_type, 'user'),
+        eq(schema.role_bindings.principal_id, apiKey.user_id),
+        eq(schema.role_bindings.org_id, orgId),
+      ),
+    )
+    .limit(1)
+
+  if (!ownerRbacAccess) {
+    cloudlogErr({
+      message: 'validatePrincipalAccess: apiKey owner RBAC access not found',
+      principalId,
+      orgId,
+      apiKeyUserId: apiKey.user_id,
+    })
+    return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
+  }
+
+  return { ok: true, data: null }
+}
+
 async function validatePrincipalAccess(
   drizzle: ReturnType<typeof getDrizzleClient>,
   principalType: RoleBindingBody['principal_type'],
@@ -86,133 +228,15 @@ async function validatePrincipalAccess(
   orgId: string,
 ): Promise<ValidationResult<null>> {
   if (principalType === 'user') {
-    const targetRbacAccess = await drizzle
-      .select({ id: schema.role_bindings.id })
-      .from(schema.role_bindings)
-      .where(
-        and(
-          eq(schema.role_bindings.principal_type, 'user'),
-          eq(schema.role_bindings.principal_id, principalId),
-          eq(schema.role_bindings.org_id, orgId),
-        ),
-      )
-      .limit(1)
-
-    if (targetRbacAccess.length) {
-      return { ok: true, data: null }
-    }
-
-    const targetLegacyAccess = await drizzle
-      .select({ id: schema.org_users.id })
-      .from(schema.org_users)
-      .where(
-        and(
-          eq(schema.org_users.user_id, principalId),
-          eq(schema.org_users.org_id, orgId),
-        ),
-      )
-      .limit(1)
-
-    if (!targetLegacyAccess.length) {
-      return { ok: false, status: 400, error: 'User is not a member of this org' }
-    }
-
-    return { ok: true, data: null }
+    return validateUserPrincipalAccess(drizzle, principalId, orgId)
   }
 
   if (principalType === 'group') {
-    const [group] = await drizzle
-      .select()
-      .from(schema.groups)
-      .where(
-        and(
-          eq(schema.groups.id, principalId),
-          eq(schema.groups.org_id, orgId),
-        ),
-      )
-      .limit(1)
-
-    if (!group) {
-      return { ok: false, status: 400, error: 'Group not found in this org' }
-    }
+    return validateGroupPrincipalAccess(drizzle, principalId, orgId)
   }
 
   if (principalType === 'apikey') {
-    const [apiKey] = await drizzle
-      .select({
-        user_id: schema.apikeys.user_id,
-        limited_to_orgs: schema.apikeys.limited_to_orgs,
-      })
-      .from(schema.apikeys)
-      .where(eq(schema.apikeys.rbac_id, principalId))
-      .limit(1)
-
-    if (!apiKey) {
-      cloudlogErr({
-        message: 'validatePrincipalAccess: missing apiKey for role binding principal',
-        principalType,
-        principalId,
-        orgId,
-      })
-      return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
-    }
-
-    if (apiKey.limited_to_orgs?.length && !apiKey.limited_to_orgs.includes(orgId)) {
-      cloudlogErr({
-        message: 'validatePrincipalAccess: apiKey limited_to_orgs scope excludes target org',
-        principalType,
-        principalId,
-        orgId,
-        apiKeyUserId: apiKey.user_id,
-      })
-      return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
-    }
-
-    const [membership] = await drizzle
-      .select({ id: schema.org_users.id })
-      .from(schema.org_users)
-      .where(
-        and(
-          eq(schema.org_users.user_id, apiKey.user_id),
-          eq(schema.org_users.org_id, orgId),
-        ),
-      )
-      .limit(1)
-
-    if (membership) {
-      return { ok: true, data: null }
-    }
-
-    cloudlogErr({
-      message: 'validatePrincipalAccess: apiKey owner legacy membership not found',
-      principalType,
-      principalId,
-      orgId,
-      apiKeyUserId: apiKey.user_id,
-    })
-
-    const [ownerRbacAccess] = await drizzle
-      .select({ id: schema.role_bindings.id })
-      .from(schema.role_bindings)
-      .where(
-        and(
-          eq(schema.role_bindings.principal_type, 'user'),
-          eq(schema.role_bindings.principal_id, apiKey.user_id),
-          eq(schema.role_bindings.org_id, orgId),
-        ),
-      )
-      .limit(1)
-
-    if (!ownerRbacAccess) {
-      cloudlogErr({
-        message: 'validatePrincipalAccess: apiKey owner RBAC access not found',
-        principalType,
-        principalId,
-        orgId,
-        apiKeyUserId: apiKey.user_id,
-      })
-      return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
-    }
+    return validateApiKeyPrincipalAccess(drizzle, principalId, orgId)
   }
 
   return { ok: true, data: null }
