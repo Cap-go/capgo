@@ -137,6 +137,8 @@ VALUES (
   '70000000-0000-4000-8000-000000000001'
 );
 
+SELECT tests.authenticate_as_service_role();
+
 SELECT ok(
   EXISTS (
     SELECT 1
@@ -158,6 +160,8 @@ VALUES (
   'Org Create App API Key',
   '70000000-0000-4000-8000-000000000001'
 );
+
+SELECT tests.authenticate_as_service_role();
 
 SELECT ok(
   EXISTS (
