@@ -171,21 +171,21 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     expect(response.status).toBe(401)
   })
 
-	  it.concurrent('rejects POST /organization', async () => {
-	    const response = await fetch(`${BASE_URL}/organization`, {
-	      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
-	      method: 'POST',
-	      body: JSON.stringify({
-	        orgId: readOnlyOrgId,
-	        name: `Blocked create ${randomUUID()}`,
-	      }),
-	    })
+  it.concurrent('rejects POST /organization', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'POST',
+      body: JSON.stringify({
+        orgId: readOnlyOrgId,
+        name: `Blocked create ${randomUUID()}`,
+      }),
+    })
 
-	    expect(response.status).toBe(401)
-	    // Ensure this is blocked by API-key auth (key mode allowlist), not by RLS deeper in the handler.
-	    const payload = await response.json() as { error?: string }
-	    expect(payload.error).toBe('invalid_apikey')
-	  })
+    expect(response.status).toBe(401)
+    // Ensure this is blocked by API-key auth (key mode allowlist), not by RLS deeper in the handler.
+    const payload = await response.json() as { error?: string }
+    expect(payload.error).toBe('invalid_apikey')
+  })
 
   it.concurrent('rejects DELETE /organization', async () => {
     const response = await fetch(`${BASE_URL}/organization?orgId=${readOnlyOrgId}`, {

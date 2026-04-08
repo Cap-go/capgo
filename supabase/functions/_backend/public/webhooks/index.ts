@@ -1,9 +1,9 @@
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
-import { getBodyOrQuery, honoFactory, simpleError } from '../../utils/hono.ts'
+import { getBodyOrQuery, honoFactory, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareKey, middlewareV2 } from '../../utils/hono_middleware.ts'
-import { apikeyHasOrgRight, hasOrgRight, hasOrgRightApikey } from '../../utils/supabase.ts'
+import { apikeyHasOrgRight, apikeyHasOrgRightWithPolicy, hasOrgRight, hasOrgRightApikey, supabaseApikey } from '../../utils/supabase.ts'
 import { deleteWebhook } from './delete.ts'
 import { getDeliveries, retryDelivery } from './deliveries.ts'
 import { get } from './get.ts'
@@ -35,11 +35,21 @@ export async function checkWebhookPermission(
   orgId: string,
   apikey: Database['public']['Tables']['apikeys']['Row'],
 ): Promise<void> {
+  const orgCheck = await apikeyHasOrgRightWithPolicy(c, apikey, orgId, supabaseApikey(c, c.get('capgkey') as string))
+  if (!orgCheck.valid) {
+    if (orgCheck.error === 'org_requires_expiring_key') {
+      throw quickError(401, 'org_requires_expiring_key', 'This organization requires API keys with an expiration date. Please use a different key or update this key with an expiration date.')
+    }
+    throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: orgId })
+  }
+
   if (!(await hasOrgRightApikey(c, orgId, apikey.user_id, 'admin', c.get('capgkey') as string))) {
     throw simpleError('no_permission', 'You need admin access to manage webhooks', { org_id: orgId })
   }
 
-  assertOrgWebhookScope(orgId, apikey)
+  if (apikey.limited_to_apps?.length) {
+    throw simpleError('no_permission', 'App-scoped API keys cannot manage organization webhooks', { org_id: orgId })
+  }
 }
 
 /**
@@ -51,6 +61,19 @@ export async function checkWebhookPermissionV2(
   orgId: string,
   auth: AuthInfo,
 ): Promise<void> {
+  const parentApikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
+  const policyApikey = parentApikey ?? auth.apikey
+
+  if (auth.authType === 'apikey' && policyApikey) {
+    const orgCheck = await apikeyHasOrgRightWithPolicy(c, policyApikey, orgId, supabaseApikey(c, c.get('capgkey') as string))
+    if (!orgCheck.valid) {
+      if (orgCheck.error === 'org_requires_expiring_key') {
+        throw quickError(401, 'org_requires_expiring_key', 'This organization requires API keys with an expiration date. Please use a different key or update this key with an expiration date.')
+      }
+      throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: orgId })
+    }
+  }
+
   // Check org admin access
   if (!(await hasOrgRight(c, orgId, auth.userId, 'admin'))) {
     throw simpleError('no_permission', 'You need admin access to manage webhooks', { org_id: orgId })
