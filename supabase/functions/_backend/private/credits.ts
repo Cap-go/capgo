@@ -76,32 +76,80 @@ const MAX_TOP_UP_QUANTITY = 100000
 
 type AppContext = Context<MiddlewareKeyVariables, any, any>
 
-function preferScopedCreditSteps(steps: CreditStep[], orgId?: string): CreditStep[] {
-  const sortedSteps = [...steps].sort((a, b) => {
+function sortCreditSteps(steps: CreditStep[]): CreditStep[] {
+  return [...steps].sort((a, b) => {
     if (a.type !== b.type)
       return a.type.localeCompare(b.type)
 
     if (a.step_min !== b.step_min)
       return a.step_min - b.step_min
 
-    if (a.step_max !== b.step_max)
-      return a.step_max - b.step_max
-
-    const aOrgPriority = orgId && a.org_id === orgId ? 0 : 1
-    const bOrgPriority = orgId && b.org_id === orgId ? 0 : 1
-    return aOrgPriority - bOrgPriority
+    return a.step_max - b.step_max
   })
+}
 
-  const seenStepKeys = new Set<string>()
+function subtractScopedRange(baseStep: CreditStep, scopedStep: CreditStep): CreditStep[] {
+  const overlapStart = Math.max(baseStep.step_min, scopedStep.step_min)
+  const overlapEnd = Math.min(baseStep.step_max, scopedStep.step_max)
 
-  return sortedSteps.filter((step) => {
-    const key = `${step.type}:${step.step_min}:${step.step_max}`
-    if (seenStepKeys.has(key))
-      return false
+  if (overlapStart >= overlapEnd)
+    return [baseStep]
 
-    seenStepKeys.add(key)
-    return true
-  })
+  const remainingSteps: CreditStep[] = []
+
+  if (baseStep.step_min < overlapStart) {
+    remainingSteps.push({
+      ...baseStep,
+      step_min: baseStep.step_min,
+      step_max: overlapStart,
+    })
+  }
+
+  if (overlapEnd < baseStep.step_max) {
+    remainingSteps.push({
+      ...baseStep,
+      step_min: overlapEnd,
+      step_max: baseStep.step_max,
+    })
+  }
+
+  return remainingSteps
+}
+
+function preferScopedCreditSteps(steps: CreditStep[], orgId?: string): CreditStep[] {
+  if (!orgId)
+    return sortCreditSteps(steps)
+
+  const stepGroups = new Map<string, { global: CreditStep[], scoped: CreditStep[] }>()
+
+  for (const step of steps) {
+    const currentGroup = stepGroups.get(step.type) ?? { global: [], scoped: [] }
+
+    if (step.org_id === orgId)
+      currentGroup.scoped.push(step)
+    else
+      currentGroup.global.push(step)
+
+    stepGroups.set(step.type, currentGroup)
+  }
+
+  const normalizedSteps: CreditStep[] = []
+
+  for (const [type, group] of stepGroups.entries()) {
+    const scopedSteps = sortCreditSteps(group.scoped.filter(step => step.type === type))
+    if (scopedSteps.length === 0) {
+      normalizedSteps.push(...sortCreditSteps(group.global))
+      continue
+    }
+
+    let remainingGlobalSteps = sortCreditSteps(group.global)
+    for (const scopedStep of scopedSteps)
+      remainingGlobalSteps = remainingGlobalSteps.flatMap(globalStep => subtractScopedRange(globalStep, scopedStep))
+
+    normalizedSteps.push(...sortCreditSteps([...remainingGlobalSteps, ...scopedSteps]))
+  }
+
+  return sortCreditSteps(normalizedSteps)
 }
 
 async function getScopedCreditSteps(c: AppContext, orgId?: string): Promise<CreditStep[]> {

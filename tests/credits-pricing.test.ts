@@ -120,4 +120,58 @@ describe('credits pricing API', () => {
       await executeSQL('DELETE FROM public.capgo_credits_steps WHERE org_id = $1 AND type = $2', [ORG_ID, 'build_time'])
     }
   })
+
+  it('falls back to the correct global tiers after a partial org-scoped override', async () => {
+    await executeSQL('DELETE FROM public.capgo_credits_steps WHERE org_id = $1 AND type = $2', [ORG_ID, 'build_time'])
+
+    await executeSQL(`
+      INSERT INTO public.capgo_credits_steps (type, step_min, step_max, price_per_unit, unit_factor, org_id)
+      VALUES ($1, $2, $3, $4, $5, $6)
+    `, ['build_time', 0, 5000, 0.05, 60, ORG_ID])
+
+    try {
+      const response = await fetchWithRetry(getEndpointUrl('/private/credits'), {
+        method: 'POST',
+        headers: await getAuthHeaders(),
+        body: JSON.stringify({
+          org_id: ORG_ID,
+          mau: 0,
+          bandwidth: 0,
+          storage: 0,
+          build_time: 8000,
+        }),
+      })
+
+      expect(response.status).toBe(200)
+
+      const data = await response.json() as {
+        total_cost: number
+        breakdown: {
+          build_time: {
+            cost: number
+            tiers: {
+              step_min: number
+              step_max: number
+              price_per_unit: number
+            }[]
+          }
+        }
+      }
+
+      expect(data.breakdown.build_time.tiers.map(tier => ({
+        step_min: tier.step_min,
+        step_max: tier.step_max,
+        price_per_unit: tier.price_per_unit,
+      }))).toEqual([
+        { step_min: 0, step_max: 5000, price_per_unit: 0.05 },
+        { step_min: 5000, step_max: 6000, price_per_unit: 0.16 },
+        { step_min: 6000, step_max: 30000, price_per_unit: 0.14 },
+      ])
+      expect(data.breakdown.build_time.cost).toBeCloseTo(11.68, 5)
+      expect(data.total_cost).toBeCloseTo(11.68, 5)
+    }
+    finally {
+      await executeSQL('DELETE FROM public.capgo_credits_steps WHERE org_id = $1 AND type = $2', [ORG_ID, 'build_time'])
+    }
+  })
 })
