@@ -15,47 +15,6 @@ type Translate = (key: string, values?: Record<string, string | number>) => stri
 
 export const creditPricingMetricOrder: CreditMetricType[] = ['mau', 'bandwidth', 'storage', 'build_time']
 
-const creditPricingTierLabelKeys: Partial<Record<CreditMetricType, Record<string, string>>> = {
-  mau: {
-    '0:1000000': 'credits-pricing-mau-tier-first',
-    '1000000:3000000': 'credits-pricing-mau-tier-next-2m',
-    '3000000:10000000': 'credits-pricing-mau-tier-next-7m',
-    '10000000:15000000': 'credits-pricing-mau-tier-next-5m',
-    '15000000:25000000': 'credits-pricing-mau-tier-next-10m',
-    '25000000:40000000': 'credits-pricing-mau-tier-next-15m',
-    '40000000:100000000': 'credits-pricing-mau-tier-next-60m',
-    '100000000:open': 'credits-pricing-mau-tier-over-100m',
-  },
-  bandwidth: {
-    '0:1024': 'credits-pricing-bandwidth-tier-first',
-    '1024:2048': 'credits-pricing-bandwidth-tier-next-1tb',
-    '2048:6144': 'credits-pricing-bandwidth-tier-next-4tb',
-    '6144:12288': 'credits-pricing-bandwidth-tier-next-6tb',
-    '12288:25600': 'credits-pricing-bandwidth-tier-next-13tb',
-    '25600:64512': 'credits-pricing-bandwidth-tier-next-38tb',
-    '64512:130048': 'credits-pricing-bandwidth-tier-next-64tb',
-    '130048:open': 'credits-pricing-bandwidth-tier-over-128tb',
-  },
-  storage: {
-    '0:1': 'credits-pricing-storage-tier-first',
-    '1:6': 'credits-pricing-storage-tier-next-5gib',
-    '6:25': 'credits-pricing-storage-tier-next-19gib',
-    '25:63': 'credits-pricing-storage-tier-next-38gib',
-    '63:250': 'credits-pricing-storage-tier-next-187gib',
-    '250:640': 'credits-pricing-storage-tier-next-390gib',
-    '640:1280': 'credits-pricing-storage-tier-next-640gib',
-    '1280:open': 'credits-pricing-storage-tier-over-1tb',
-  },
-  build_time: {
-    '0:100': 'credits-pricing-build-tier-first-100',
-    '100:500': 'credits-pricing-build-tier-next-400',
-    '500:1000': 'credits-pricing-build-tier-next-500',
-    '1000:5000': 'credits-pricing-build-tier-next-4000',
-    '5000:10000': 'credits-pricing-build-tier-next-5000',
-    '10000:open': 'credits-pricing-build-tier-over-10000',
-  },
-}
-
 const creditPricingUnitLabelKeys: Record<CreditMetricType, string> = {
   mau: 'credits-pricing-unit-per-mau',
   bandwidth: 'credits-pricing-unit-per-gib',
@@ -77,20 +36,15 @@ function toBilledUnits(step: Pick<CreditPricingStep, 'unit_factor'>, rawValue: n
   return Math.ceil(rawValue / factor)
 }
 
-function getTierLookupKey(step: Pick<CreditPricingStep, 'type' | 'step_min' | 'step_max' | 'unit_factor'>) {
-  const minUnits = toBilledUnits(step, step.step_min)
-  if (isOpenEndedTier(step))
-    return `${minUnits}:open`
+function formatCreditTierAmount(metric: CreditMetricType, billedUnits: number, t: Translate, locale?: string) {
+  const formatter = new Intl.NumberFormat(locale, {
+    maximumFractionDigits: 0,
+    notation: metric === 'mau' ? 'compact' : 'standard',
+    compactDisplay: 'short',
+  })
 
-  const maxUnits = toBilledUnits(step, step.step_max)
-  return `${minUnits}:${maxUnits}`
-}
-
-function formatCreditTierAmount(metric: CreditMetricType, billedUnits: number, locale?: string) {
-  const formatter = new Intl.NumberFormat(locale, { maximumFractionDigits: 0 })
-
-  if (metric === 'mau' && billedUnits >= 1_000_000 && billedUnits % 1_000_000 === 0)
-    return `${formatter.format(billedUnits / 1_000_000)}M`
+  if (metric === 'mau')
+    return formatter.format(billedUnits)
 
   if ((metric === 'bandwidth' || metric === 'storage') && billedUnits >= 1024 && billedUnits % 1024 === 0)
     return `${formatter.format(billedUnits / 1024)} TB`
@@ -99,7 +53,7 @@ function formatCreditTierAmount(metric: CreditMetricType, billedUnits: number, l
     return `${formatter.format(billedUnits)} GiB`
 
   if (metric === 'build_time')
-    return `${formatter.format(billedUnits)} ${billedUnits === 1 ? 'minute' : 'minutes'}`
+    return t('minutes-short', { minutes: formatter.format(billedUnits) })
 
   return formatter.format(billedUnits)
 }
@@ -124,10 +78,6 @@ export function getFirstTierCreditUnitPricing(steps: CreditPricingStep[]) {
 
     return pricing
   }, {})
-}
-
-export function getCreditPricingTierLabelKey(step: Pick<CreditPricingStep, 'type' | 'step_min' | 'step_max' | 'unit_factor'>) {
-  return creditPricingTierLabelKeys[step.type]?.[getTierLookupKey(step)] ?? null
 }
 
 export function formatCreditPriceValue(pricePerUnit: number, locale?: string) {
@@ -156,31 +106,24 @@ export function formatCreditPricingTierLabel(
   t: Translate,
   locale?: string,
 ) {
-  const translatedTierKey = getCreditPricingTierLabelKey(step)
-  if (translatedTierKey) {
-    const translated = t(translatedTierKey)
-    if (translated !== translatedTierKey)
-      return translated
-  }
-
   const minUnits = toBilledUnits(step, step.step_min)
   const maxUnits = toBilledUnits(step, step.step_max)
   const openEnded = isOpenEndedTier(step)
 
   if (step.step_min === 0) {
     return t('credits-pricing-tier-first', {
-      amount: formatCreditTierAmount(step.type, maxUnits, locale),
+      amount: formatCreditTierAmount(step.type, maxUnits, t, locale),
     })
   }
 
   if (openEnded) {
     return t('credits-pricing-tier-over', {
-      amount: formatCreditTierAmount(step.type, minUnits, locale),
+      amount: formatCreditTierAmount(step.type, minUnits, t, locale),
     })
   }
 
   return t('credits-pricing-tier-next', {
-    amount: formatCreditTierAmount(step.type, maxUnits - minUnits, locale),
+    amount: formatCreditTierAmount(step.type, maxUnits - minUnits, t, locale),
   })
 }
 

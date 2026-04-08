@@ -3,7 +3,7 @@ import { formatCreditPricingPrice, formatCreditPricingTierLabel, formatIncludedT
 
 const messages: Record<string, string> = {
   'credits-plan-overage': '{included}, then {price}',
-  'credits-pricing-build-tier-first-100': 'First 100 minutes',
+  'minutes-short': '{minutes}m',
   'credits-pricing-price': '{price} {unit}',
   'credits-pricing-tier-first': 'First {amount}',
   'credits-pricing-tier-next': 'Next {amount}',
@@ -20,13 +20,13 @@ function t(key: string, values: Record<string, string | number> = {}) {
 }
 
 describe('credit pricing UI helpers', () => {
-  it.concurrent('formats known build_time tiers using the existing translated labels', () => {
+  it.concurrent('formats first build_time tiers with generic translated labels', () => {
     expect(formatCreditPricingTierLabel({
       type: 'build_time',
       step_min: 0,
       step_max: 6000,
       unit_factor: 60,
-    }, t)).toBe('First 100 minutes')
+    }, t)).toBe('First 100m')
 
     expect(formatCreditPricingPrice('build_time', 0.16, t)).toBe('$0.16 per minute')
   })
@@ -37,14 +37,14 @@ describe('credit pricing UI helpers', () => {
       step_min: 3000,
       step_max: 9000,
       unit_factor: 60,
-    }, t)).toBe('Next 100 minutes')
+    }, t)).toBe('Next 100m')
 
     expect(formatCreditPricingTierLabel({
       type: 'build_time',
       step_min: 9000,
       step_max: Number.MAX_SAFE_INTEGER,
       unit_factor: 60,
-    }, t)).toBe('Over 150 minutes')
+    }, t)).toBe('Over 150m')
   })
 
   it.concurrent('derives the visible first-tier pricing from the shared step list', () => {
