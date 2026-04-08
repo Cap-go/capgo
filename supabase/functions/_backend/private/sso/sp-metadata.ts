@@ -30,13 +30,15 @@ function getPublicSupabaseUrl(c: Context<MiddlewareKeyVariables>): string {
       forwardedHost = `${forwardedHost}:${portToUse}`
   }
 
-  if (forwardedHost) {
-    return `${forwardedProto || (isLocalRequest ? 'http' : 'https')}://${forwardedHost}`
-  }
+  // In production, always use SUPABASE_URL as source of truth for SAML endpoints.
+  if (!isLocalDev)
+    return supabaseUrl
 
-  if (hostHeader) {
+  if (forwardedHost)
+    return `${forwardedProto || (isLocalRequest ? 'http' : 'https')}://${forwardedHost}`
+
+  if (hostHeader)
     return `${isLocalRequest ? 'http' : 'https'}://${hostHeader}`
-  }
 
   return supabaseUrl
 }
