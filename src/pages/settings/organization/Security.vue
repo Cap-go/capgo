@@ -422,12 +422,8 @@ async function save2faEnforcement(value: boolean) {
   isSaving.value = true
 
   try {
-    const { error } = await supabase.functions.invoke('organization', {
-      method: 'PUT',
-      body: {
-        orgId: currentOrganization.value.gid,
-        enforcing_2fa: value,
-      },
+    const { error } = await updateOrganizationSettings({
+      enforcing_2fa: value,
     })
 
     if (error) {
@@ -460,6 +456,19 @@ async function save2faEnforcement(value: boolean) {
   }
 }
 
+async function updateOrganizationSettings(body: Record<string, unknown>) {
+  if (!currentOrganization.value?.gid)
+    return { error: new Error('No organization selected') }
+
+  return await supabase.functions.invoke('organization', {
+    method: 'PUT',
+    body: {
+      orgId: currentOrganization.value.gid,
+      ...body,
+    },
+  })
+}
+
 async function toggleEnforceHashedApiKeys() {
   if (!currentOrganization.value || !hasOrgPerm.value) {
     toast.error(t('no-permission'))
@@ -475,10 +484,9 @@ async function toggleEnforceHashedApiKeys() {
   isSaving.value = true
 
   try {
-    const { error } = await supabase
-      .from('orgs')
-      .update({ enforce_hashed_api_keys: newValue })
-      .eq('id', currentOrganization.value.gid)
+    const { error } = await updateOrganizationSettings({
+      enforce_hashed_api_keys: newValue,
+    })
 
     if (error) {
       console.error('Failed to update enforce_hashed_api_keys:', error)
@@ -488,6 +496,7 @@ async function toggleEnforceHashedApiKeys() {
       return
     }
 
+    await organizationStore.fetchOrganizations()
     toast.success(newValue ? t('hashed-api-keys-enforcement-enabled') : t('hashed-api-keys-enforcement-disabled'))
   }
   catch (error) {
@@ -611,13 +620,10 @@ async function saveEncryptedBundlesEnforcement(enable: boolean, keyFingerprint: 
     }
 
     // Update the org settings
-    const { error } = await supabase
-      .from('orgs')
-      .update({
-        enforce_encrypted_bundles: enable,
-        required_encryption_key: keyFingerprint || null,
-      })
-      .eq('id', currentOrganization.value.gid)
+    const { error } = await updateOrganizationSettings({
+      enforce_encrypted_bundles: enable,
+      required_encryption_key: keyFingerprint || null,
+    })
 
     if (error) {
       console.error('Failed to update enforce_encrypted_bundles:', error)
@@ -627,6 +633,7 @@ async function saveEncryptedBundlesEnforcement(enable: boolean, keyFingerprint: 
       return
     }
 
+    await organizationStore.fetchOrganizations()
     if (enable) {
       const deletedCount = nonCompliantBundleCounts.value?.total_non_compliant ?? 0
       if (deletedCount > 0) {
@@ -869,13 +876,10 @@ async function saveApikeyPolicy() {
 
   isSaving.value = true
 
-  const { error } = await supabase
-    .from('orgs')
-    .update({
-      require_apikey_expiration: requireApikeyExpiration.value,
-      max_apikey_expiration_days: maxApikeyExpirationDays.value,
-    })
-    .eq('id', currentOrganization.value.gid)
+  const { error } = await updateOrganizationSettings({
+    require_apikey_expiration: requireApikeyExpiration.value,
+    max_apikey_expiration_days: maxApikeyExpirationDays.value,
+  })
 
   isSaving.value = false
 

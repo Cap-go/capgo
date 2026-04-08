@@ -17,6 +17,8 @@ const bodySchema = z.object({
   require_apikey_expiration: z.optional(z.boolean()),
   max_apikey_expiration_days: z.optional(z.nullable(z.number())),
   enforce_hashed_api_keys: z.optional(z.boolean()),
+  enforce_encrypted_bundles: z.optional(z.boolean()),
+  required_encryption_key: z.optional(z.nullable(z.string())),
   enforcing_2fa: z.optional(z.boolean()),
 })
 
@@ -61,6 +63,22 @@ function validateMaxExpirationDays(maxDays?: number | null) {
   }
 }
 
+function normalizeRequiredEncryptionKey(requiredEncryptionKey?: string | null) {
+  const normalized = requiredEncryptionKey?.trim() ?? null
+  return normalized === '' ? null : normalized
+}
+
+function validateRequiredEncryptionKey(requiredEncryptionKey?: string | null) {
+  const normalized = normalizeRequiredEncryptionKey(requiredEncryptionKey)
+  if (normalized === null) {
+    return normalized
+  }
+  if (normalized.length !== 21) {
+    throw simpleError('invalid_required_encryption_key', 'Required encryption key must be exactly 21 characters')
+  }
+  return normalized
+}
+
 function buildUpdateFields(body: z.infer<typeof bodySchema>) {
   const updateFields: Partial<Database['public']['Tables']['orgs']['Update']> = {}
   if (body.name !== undefined)
@@ -77,6 +95,10 @@ function buildUpdateFields(body: z.infer<typeof bodySchema>) {
     updateFields.max_apikey_expiration_days = body.max_apikey_expiration_days
   if (body.enforce_hashed_api_keys !== undefined)
     updateFields.enforce_hashed_api_keys = body.enforce_hashed_api_keys
+  if (body.enforce_encrypted_bundles !== undefined)
+    updateFields.enforce_encrypted_bundles = body.enforce_encrypted_bundles
+  if (body.required_encryption_key !== undefined)
+    updateFields.required_encryption_key = validateRequiredEncryptionKey(body.required_encryption_key)
   if (body.enforcing_2fa !== undefined)
     updateFields.enforcing_2fa = body.enforcing_2fa
   return updateFields
