@@ -47,6 +47,15 @@ describe('credit pricing UI helpers', () => {
     }, t)).toBe('Over 150m')
   })
 
+  it.concurrent('rounds bounded custom spans from the raw tier width', () => {
+    expect(formatCreditPricingTierLabel({
+      type: 'build_time',
+      step_min: 5000,
+      step_max: 6000,
+      unit_factor: 60,
+    }, t)).toBe('Next 17m')
+  })
+
   it.concurrent('derives the visible first-tier pricing from the shared step list', () => {
     expect(getFirstTierCreditUnitPricing([
       {
