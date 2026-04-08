@@ -94,9 +94,9 @@ async function getUsage(orgId: string) {
 
   const relevantUsage = usageInCycle.length > 0 ? usageInCycle : usage
 
-  const totalCreditDeductions = creditDeductions.reduce((acc, entry) => {
+  const creditDeductionsInCycle = creditDeductions.filter((entry) => {
     if (entry.amount === null)
-      return acc
+      return false
 
     const entryStart = entry.billing_cycle_start
       ? dayjs(entry.billing_cycle_start).startOf('day')
@@ -111,13 +111,14 @@ async function getUsage(orgId: string) {
         : null
 
     if (billingStart && entryEnd && entryEnd.isBefore(billingStart))
-      return acc
+      return false
 
     if (billingEnd && entryStart && entryStart.isAfter(billingEnd))
-      return acc
+      return false
 
-    return acc + Math.abs(entry.amount)
-  }, 0)
+    return true
+  })
+  const totalCreditDeductions = creditDeductionsInCycle.reduce((acc, entry) => acc + Math.abs(entry.amount ?? 0), 0)
 
   const totalMau = relevantUsage.reduce((acc, entry) => acc + (entry.mau ?? 0), 0)
   const totalBandwidthBytes = relevantUsage.reduce((acc, entry) => acc + (entry.bandwidth ?? 0), 0)
@@ -154,7 +155,7 @@ async function getUsage(orgId: string) {
     }
   }
 
-  const totalUsagePrice = creditDeductions.length > 0
+  const totalUsagePrice = creditDeductionsInCycle.length > 0
     ? roundNumber(totalCreditDeductions)
     : estimatedUsagePrice
   const totalPrice = totalUsagePrice !== null && currentPlan
