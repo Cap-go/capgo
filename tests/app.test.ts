@@ -3,14 +3,23 @@ import { afterAll, describe, expect, it } from 'vitest'
 import { APIKEY_TEST2_ALL, BASE_URL, fetchWithRetry, getSupabaseClient, headers, NON_OWNER_ORG_ID, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils.ts'
 
 function isDuplicateAppCreationError(body: any): boolean {
-  return body?.error === 'app_id_already_exists'
-    || body?.supabaseError?.code === '23505'
-    || body?.moreInfo?.constraint === 'apps_pkey'
-    || (body?.cannot_create_app && (
-      body?.supabaseError?.code === '23505'
-      || body?.moreInfo?.constraint === 'apps_pkey'
-      || body?.error === 'app_id_already_exists'
-    ))
+  if (!body || typeof body !== 'object')
+    return false
+
+  const errorCode = typeof body.error === 'string' ? body.error : ''
+  const supabaseCode = typeof body?.supabaseError?.code === 'string' ? body.supabaseError.code : ''
+  const moreInfoConstraint = typeof body?.moreInfo?.constraint === 'string' ? body.moreInfo.constraint : ''
+  const constraint = typeof body?.constraint === 'string' ? body.constraint : ''
+
+  if (errorCode === 'app_id_already_exists')
+    return true
+
+  const hasExplicitDuplicateSignal
+    = supabaseCode === '23505'
+      || moreInfoConstraint === 'apps_pkey'
+      || constraint === 'apps_pkey'
+
+  return errorCode === 'cannot_create_app' && hasExplicitDuplicateSignal
 }
 
 describe('[DELETE] /app operations', () => {
