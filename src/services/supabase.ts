@@ -1,10 +1,12 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
+import type { CreditMetricType, CreditPricingStep } from './creditPricing'
 import type { Database } from '~/types/supabase.types'
 import { format, parse } from '@std/semver'
 import { createClient } from '@supabase/supabase-js'
 import subset from 'semver/ranges/subset'
 import { ref } from 'vue'
+import { getFirstTierCreditUnitPricing, sortCreditPricingSteps } from './creditPricing'
 
 let supaClient: SupabaseClient<Database> = null as any
 
@@ -385,9 +387,8 @@ export async function getPlans(): Promise<Database['public']['Tables']['plans'][
   }
 }
 
-export type CreditUnitPricing = Partial<Record<Database['public']['Enums']['credit_metric_type'], number>>
+export type CreditUnitPricing = Partial<Record<CreditMetricType, number>>
 export type UsageCreditLedgerRow = Database['public']['Views']['usage_credit_ledger']['Row']
-export type CreditMetricType = Database['public']['Enums']['credit_metric_type']
 
 export interface CreditTierUsage {
   tier_id: number
@@ -423,35 +424,39 @@ export interface CreditCostCalculationResponse {
   }
 }
 
-export async function getCreditUnitPricing(orgId?: string): Promise<CreditUnitPricing> {
+export async function getCreditPricingSteps(orgId?: string): Promise<CreditPricingStep[]> {
   try {
-    const { data, error } = await useSupabase()
-      .from('capgo_credits_steps')
-      .select('type, price_per_unit, step_min, org_id')
-      .eq('step_min', 0)
-      .order('step_min', { ascending: true })
+    const supabase = useSupabase()
+    const { data: currentSession } = await supabase.auth.getSession()
+    const endpoint = new URL(`${defaultApiHost}/private/credits`)
 
-    if (error || !data)
-      throw new Error(error?.message ?? 'Failed to fetch credit pricing')
+    if (orgId)
+      endpoint.searchParams.set('org_id', orgId)
 
-    const sortedSteps = [...data].sort((a, b) => {
-      const aOrgPriority = a.org_id && orgId && a.org_id === orgId ? 0 : 1
-      const bOrgPriority = b.org_id && orgId && b.org_id === orgId ? 0 : 1
-
-      if (aOrgPriority !== bOrgPriority)
-        return aOrgPriority - bOrgPriority
-
-      return (a.step_min ?? 0) - (b.step_min ?? 0)
+    const response = await fetch(endpoint.toString(), {
+      headers: currentSession.session?.access_token
+        ? {
+            Authorization: `Bearer ${currentSession.session.access_token}`,
+          }
+        : undefined,
     })
 
-    return sortedSteps.reduce<CreditUnitPricing>((pricing, step) => {
-      const metric = step.type as Database['public']['Enums']['credit_metric_type']
+    if (!response.ok)
+      throw new Error(`Failed to fetch credit pricing: HTTP ${response.status}`)
 
-      if (pricing[metric] === undefined)
-        pricing[metric] = step.price_per_unit
+    const data = await response.json() as CreditPricingStep[]
+    return sortCreditPricingSteps(data ?? [])
+  }
+  catch (err) {
+    console.error('getCreditPricingSteps error', err)
+    return []
+  }
+}
 
-      return pricing
-    }, {})
+export async function getCreditUnitPricing(orgId?: string): Promise<CreditUnitPricing> {
+  try {
+    const steps = await getCreditPricingSteps(orgId)
+    return getFirstTierCreditUnitPricing(steps)
   }
   catch (err) {
     console.error('getCreditUnitPricing error', err)
