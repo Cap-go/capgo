@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(19);
+SELECT plan(22);
 
 DO $$
 BEGIN
@@ -39,6 +39,27 @@ SELECT
         )
         > 0,
         'top_up_usage_credits qualifies source_ref lookups to avoid ambiguity'
+    );
+
+SELECT
+    results_eq(
+        $$SELECT price_per_unit FROM public.capgo_credits_steps WHERE type = 'build_time' AND step_min = 0$$,
+        $$VALUES (0.16::double precision)$$,
+        'build_time credit pricing starts at $0.16 per minute'
+    );
+
+SELECT
+    results_eq(
+        $$SELECT price_per_unit FROM public.capgo_credits_steps WHERE type = 'build_time' ORDER BY step_max DESC LIMIT 1$$,
+        $$VALUES (0.08::double precision)$$,
+        'build_time credit pricing floors at $0.08 per minute'
+    );
+
+SELECT
+    results_eq(
+        $$SELECT credits_required FROM public.calculate_credit_cost('build_time', 6000)$$,
+        $$VALUES (16.0::numeric)$$,
+        'calculate_credit_cost prices build_time through the shared credit ladder'
     );
 
 CREATE TEMP TABLE test_credit_context (

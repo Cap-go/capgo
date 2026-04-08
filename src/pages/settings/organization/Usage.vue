@@ -10,7 +10,7 @@ import { toast } from 'vue-sonner'
 import CreditsCta from '~/components/CreditsCta.vue'
 import Spinner from '~/components/Spinner.vue'
 import { bytesToGb } from '~/services/conversion'
-import { getCreditUnitPricing, getCurrentPlanNameOrg, getPlans, getPlanUsagePercent, getTotalStorage, getUsageCreditDeductions } from '~/services/supabase'
+import { calculateCreditCost, getCurrentPlanNameOrg, getPlans, getPlanUsagePercent, getTotalStorage, getUsageCreditDeductions } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
@@ -18,7 +18,6 @@ import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
 const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
-const creditUnitPrices = ref<Partial<Record<Database['public']['Enums']['credit_metric_type'], number>>>({})
 
 const isLoading = ref(false)
 const initialLoad = ref(true)
@@ -72,20 +71,6 @@ async function getUsage(orgId: string) {
     console.log('Error getting plan usage percent:', err)
   }
   detailPlanUsage = roundUsagePercents(detailPlanUsage)
-
-  const enterprise_base = {
-    mau: currentPlan?.mau ?? 0,
-    storage: currentPlan?.storage ?? 0,
-    bandwidth: currentPlan?.bandwidth ?? 0,
-    build_time: currentPlan?.build_time_unit ?? 0,
-  }
-
-  const enterprise_units = {
-    mau: creditUnitPrices.value.mau ?? 0,
-    storage: creditUnitPrices.value.storage ?? 0,
-    bandwidth: creditUnitPrices.value.bandwidth ?? 0,
-    build_time: creditUnitPrices.value?.build_time ?? 0,
-  }
 
   const creditDeductions = await getUsageCreditDeductions(orgId)
 
@@ -151,31 +136,23 @@ async function getUsage(orgId: string) {
   })
 
   const basePrice = currentPlan?.price_m ?? 0
+  let estimatedUsagePrice = 0
 
-  const calculatePrice = (total: number, base: number, unit: number) => {
-    if (unit <= 0)
-      return 0
-    return total <= base ? 0 : (total - base) * unit
+  try {
+    const overageCost = await calculateCreditCost({
+      mau: Math.max(totalMau - (currentPlan?.mau ?? 0), 0),
+      bandwidth: Math.max(totalBandwidthBytes - Math.round((currentPlan?.bandwidth ?? 0) * 1073741824), 0),
+      storage: Math.max(totalStorageBytes - Math.round((currentPlan?.storage ?? 0) * 1073741824), 0),
+      build_time: Math.max(totalBuildTime - (currentPlan?.build_time_unit ?? 0), 0),
+    })
+    estimatedUsagePrice = roundNumber(overageCost.total_cost)
+  }
+  catch (err) {
+    console.error('Error estimating credit overage cost:', err)
   }
 
-  const estimatedUsagePrice = computed(() => {
-    const mauPrice = calculatePrice(totalMau, enterprise_base.mau, enterprise_units.mau)
-    const storagePrice = calculatePrice(totalStorage, enterprise_base.storage, enterprise_units.storage)
-    const bandwidthPrice = calculatePrice(totalBandwidth, enterprise_base.bandwidth, enterprise_units.bandwidth)
-    const buildTimePrice = calculatePrice(totalBuildTime, enterprise_base.build_time, enterprise_units.build_time)
-    const sum = mauPrice + storagePrice + bandwidthPrice + buildTimePrice
-    return roundNumber(sum)
-  })
-
-  const totalUsagePrice = computed(() => {
-    if (creditDeductions.length > 0)
-      return roundNumber(totalCreditDeductions)
-    return estimatedUsagePrice.value
-  })
-
-  const totalPrice = computed(() => {
-    return roundNumber(basePrice + totalUsagePrice.value)
-  })
+  const totalUsagePrice = roundNumber(creditDeductions.length > 0 ? totalCreditDeductions : estimatedUsagePrice)
+  const totalPrice = roundNumber(basePrice + totalUsagePrice)
 
   return {
     currentPlan,
@@ -185,7 +162,6 @@ async function getUsage(orgId: string) {
     totalBandwidth,
     totalStorage,
     totalBuildTime,
-    enterprise_units,
     detailPlanUsage,
     cycle: {
       subscription_anchor_start: dayjs(organizationStore.currentOrganization?.subscription_start).format('YYYY/MM/D'),
@@ -308,16 +284,11 @@ async function loadData() {
   isLoading.value = true
 
   if (initialLoad.value) {
-    const [pls, pricing] = await Promise.all([
+    const [pls] = await Promise.all([
       getPlans(),
-      getCreditUnitPricing(gid || undefined),
     ])
     plans.value.length = 0
     plans.value.push(...pls)
-    creditUnitPrices.value = pricing
-  }
-  else if (!Object.keys(creditUnitPrices.value).length) {
-    creditUnitPrices.value = await getCreditUnitPricing(gid || undefined)
   }
 
   const usageDetails = await getUsage(gid)

@@ -26,6 +26,7 @@ interface CostCalculationRequest {
   mau: number
   bandwidth: number // in bytes
   storage: number // in bytes
+  build_time?: number // in seconds
 }
 
 interface TierUsage {
@@ -33,7 +34,7 @@ interface TierUsage {
   step_min: number
   step_max: number
   unit_factor: number
-  units_used: number // billing units (GB for bandwidth/storage, count for MAU)
+  units_used: number // billing units (GiB/minutes/count)
   price_per_unit: number // Price per billing unit
   cost: number
 }
@@ -49,11 +50,13 @@ interface CostCalculationResponse {
     mau: MetricBreakdown
     bandwidth: MetricBreakdown
     storage: MetricBreakdown
+    build_time: MetricBreakdown
   }
   usage: {
     mau: number
     bandwidth: number
     storage: number
+    build_time: number
   }
 }
 
@@ -283,6 +286,7 @@ app.get('/', async (c) => {
 
 app.post('/', async (c) => {
   const body = await parseBody<CostCalculationRequest>(c)
+  const buildTime = Number(body.build_time ?? 0)
   const { mau, bandwidth, storage } = body
 
   // Validate inputs
@@ -376,8 +380,9 @@ app.post('/', async (c) => {
   const mauResult = calculateMetricCost(mau, 'mau')
   const bandwidthResult = calculateMetricCost(bandwidth, 'bandwidth')
   const storageResult = calculateMetricCost(storage, 'storage')
+  const buildTimeResult = calculateMetricCost(buildTime, 'build_time')
 
-  const totalCost = mauResult.cost + bandwidthResult.cost + storageResult.cost
+  const totalCost = mauResult.cost + bandwidthResult.cost + storageResult.cost + buildTimeResult.cost
 
   const response: CostCalculationResponse = {
     total_cost: totalCost,
@@ -385,11 +390,13 @@ app.post('/', async (c) => {
       mau: mauResult,
       bandwidth: bandwidthResult,
       storage: storageResult,
+      build_time: buildTimeResult,
     },
     usage: {
       mau,
       bandwidth,
       storage,
+      build_time: buildTime,
     },
   }
 

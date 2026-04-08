@@ -387,6 +387,40 @@ export async function getPlans(): Promise<Database['public']['Tables']['plans'][
 
 export type CreditUnitPricing = Partial<Record<Database['public']['Enums']['credit_metric_type'], number>>
 export type UsageCreditLedgerRow = Database['public']['Views']['usage_credit_ledger']['Row']
+export type CreditMetricType = Database['public']['Enums']['credit_metric_type']
+
+export interface CreditTierUsage {
+  tier_id: number
+  step_min: number
+  step_max: number
+  unit_factor: number
+  units_used: number
+  price_per_unit: number
+  cost: number
+}
+
+export interface CreditMetricBreakdown {
+  cost: number
+  tiers: CreditTierUsage[]
+}
+
+export interface CreditCostCalculationRequest {
+  mau: number
+  bandwidth: number
+  storage: number
+  build_time?: number
+}
+
+export interface CreditCostCalculationResponse {
+  total_cost: number
+  breakdown: Record<CreditMetricType, CreditMetricBreakdown>
+  usage: {
+    mau: number
+    bandwidth: number
+    storage: number
+    build_time: number
+  }
+}
 
 export async function getCreditUnitPricing(orgId?: string): Promise<CreditUnitPricing> {
   try {
@@ -445,6 +479,20 @@ export async function getUsageCreditDeductions(orgId: string): Promise<UsageCred
     console.error('getUsageCreditDeductions error', err)
     return []
   }
+}
+
+export async function calculateCreditCost(request: CreditCostCalculationRequest): Promise<CreditCostCalculationResponse> {
+  const response = await useSupabase().functions.invoke('private/credits', {
+    body: {
+      ...request,
+      build_time: request.build_time ?? 0,
+    },
+  })
+
+  if (response.error)
+    throw new Error(response.error.message)
+
+  return response.data as CreditCostCalculationResponse
 }
 
 interface PlanUsage {
