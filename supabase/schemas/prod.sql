@@ -15295,7 +15295,7 @@ ALTER TABLE ONLY "public"."manifest"
 
 
 ALTER TABLE ONLY "public"."org_metrics_cache"
-    ADD CONSTRAINT "org_metrics_cache_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id");
+    ADD CONSTRAINT "org_metrics_cache_org_id_fkey" FOREIGN KEY ("org_id") REFERENCES "public"."orgs"("id") ON DELETE CASCADE;
 
 
 
