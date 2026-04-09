@@ -9,7 +9,7 @@ if (typeof Object.groupBy !== 'function') {
       }
       groups[key].push(item)
       return groups
-    }, {})
+    }, Object.create(null))
   }
 }
 
