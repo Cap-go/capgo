@@ -20,6 +20,14 @@ export default antfu(
     vue: true,
     formatters: true,
     rules: {
+      // These micro-optimisation rules create broad churn across the legacy UI codebase.
+      // Keep lint focused on signal over noise for now.
+      'e18e/prefer-array-some': 'off',
+      'e18e/prefer-date-now': 'off',
+      'e18e/prefer-nullish-coalescing': 'off',
+      'e18e/prefer-object-has-own': 'off',
+      'e18e/prefer-static-regex': 'off',
+      'e18e/prefer-timer-args': 'off',
       'no-console': env.NODE_ENV === 'production' ? 'warn' : 'off',
       'no-debugger': env.NODE_ENV === 'production' ? 'warn' : 'off',
     },
