@@ -94,10 +94,11 @@ export function getStripe(c: Context): Stripe {
   const apiPort = apiBaseUrl
     ? Number.parseInt(apiBaseUrl.port || (apiBaseUrl.protocol === 'https:' ? '443' : '80'), 10)
     : undefined
+  type StripeApiVersion = NonNullable<ConstructorParameters<typeof Stripe>[1]>['apiVersion']
 
   return new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'), {
     // Keep the pinned runtime API version even when the installed SDK types lag behind it.
-    apiVersion: '2026-03-25.dahlia' as Stripe.LatestApiVersion,
+    apiVersion: '2026-03-25.dahlia' as StripeApiVersion,
     httpClient: Stripe.createFetchHttpClient(),
     ...(apiBaseUrl
       ? {
