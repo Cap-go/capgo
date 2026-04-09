@@ -1,5 +1,4 @@
-import type { Context } from 'hono'
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { sValidator } from '@hono/standard-validator'
 import { and, eq, sql } from 'drizzle-orm'
 import { createHono, middlewareAuth, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
@@ -7,20 +6,16 @@ import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { schema } from '../utils/postgres_schema.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { version } from '../utils/version.ts'
-
-const PRINCIPAL_TYPES = ['user', 'group', 'apikey'] as const
-const SCOPE_TYPES = ['org', 'app', 'channel'] as const
-
-interface RoleBindingBody {
-  principal_type: (typeof PRINCIPAL_TYPES)[number]
-  principal_id: string
-  role_name: string
-  scope_type: (typeof SCOPE_TYPES)[number]
-  org_id: string
-  app_id?: string
-  channel_id?: number
-  reason?: string
-}
+import {
+  bindingIdParamSchema,
+  createRoleBindingBodyHook,
+  createRoleBindingBodySchema,
+  invalidBindingIdHook,
+  invalidOrgIdHook,
+  orgIdParamSchema,
+  updateRoleBindingBodyHook,
+  updateRoleBindingBodySchema,
+} from './rbac_validation.ts'
 
 type ValidationResult<T> = { ok: true, data: T } | { ok: false, status: number, error: string }
 
@@ -29,46 +24,7 @@ export const app = createHono('', version)
 app.use('*', useCors)
 app.use('*', middlewareAuth)
 
-function parseRoleBindingBody(body: any): ValidationResult<RoleBindingBody> {
-  const {
-    principal_type,
-    principal_id,
-    role_name,
-    scope_type,
-    org_id,
-    app_id,
-    channel_id,
-    reason,
-  } = body ?? {}
-
-  if (!principal_type || !principal_id || !role_name || !scope_type || !org_id) {
-    return { ok: false, status: 400, error: 'Missing required fields' }
-  }
-
-  if (!PRINCIPAL_TYPES.includes(principal_type)) {
-    return { ok: false, status: 400, error: 'Invalid principal_type' }
-  }
-
-  if (!SCOPE_TYPES.includes(scope_type)) {
-    return { ok: false, status: 400, error: 'Invalid scope_type' }
-  }
-
-  return {
-    ok: true,
-    data: {
-      principal_type,
-      principal_id,
-      role_name,
-      scope_type,
-      org_id,
-      app_id,
-      channel_id,
-      reason,
-    },
-  }
-}
-
-function validateScope(scopeType: RoleBindingBody['scope_type'], appId?: string, channelId?: number): ValidationResult<null> {
+function validateScope(scopeType: string, appId?: string | null, channelId?: number | null): ValidationResult<null> {
   if (scopeType === 'app' && !appId) {
     return { ok: false, status: 400, error: 'app_id required for app scope' }
   }
@@ -80,7 +36,7 @@ function validateScope(scopeType: RoleBindingBody['scope_type'], appId?: string,
 
 async function validatePrincipalAccess(
   drizzle: ReturnType<typeof getDrizzleClient>,
-  principalType: RoleBindingBody['principal_type'],
+  principalType: string,
   principalId: string,
   orgId: string,
 ): Promise<ValidationResult<null>> {
@@ -163,15 +119,12 @@ async function getCallerMaxPriorityRank(
 }
 
 // GET /private/role_bindings/:org_id - List role bindings for an org
-app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
-  const orgId = c.req.param('org_id')
+app.get('/:org_id', sValidator('param', orgIdParamSchema, invalidOrgIdHook), async (c) => {
+  const { org_id: orgId } = c.req.valid('param')
   const userId = c.get('auth')?.userId
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
-  }
-  if (!orgId) {
-    return c.json({ error: 'org_id is required' }, 400)
   }
 
   let pgClient
@@ -233,25 +186,12 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
 })
 
 // POST /private/role_bindings - Assign a role
-app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
+app.post('/', sValidator('json', createRoleBindingBodySchema, createRoleBindingBodyHook), async (c) => {
   const auth = c.get('auth')
   const userId = auth?.userId
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
-  }
-
-  let body
-  try {
-    body = await c.req.json()
-  }
-  catch {
-    return c.json({ error: 'Invalid JSON' }, 400)
-  }
-
-  const parsedBody = parseRoleBindingBody(body)
-  if (!parsedBody.ok) {
-    return c.json({ error: parsedBody.error }, parsedBody.status as any)
   }
 
   const {
@@ -263,7 +203,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     app_id,
     channel_id,
     reason,
-  } = parsedBody.data
+  } = c.req.valid('json')
 
   let pgClient
   try {
@@ -376,123 +316,111 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
 })
 
 // PATCH /private/role_bindings/:binding_id - Update a role binding
-app.patch('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
-  const bindingId = c.req.param('binding_id')
-  const auth = c.get('auth')
-  const userId = auth?.userId
+app.patch(
+  '/:binding_id',
+  sValidator('param', bindingIdParamSchema, invalidBindingIdHook),
+  sValidator('json', updateRoleBindingBodySchema, updateRoleBindingBodyHook),
+  async (c) => {
+    const { binding_id: bindingId } = c.req.valid('param')
+    const auth = c.get('auth')
+    const userId = auth?.userId
 
-  if (!userId) {
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
-  if (!bindingId) {
-    return c.json({ error: 'binding_id is required' }, 400)
-  }
-
-  let body
-  try {
-    body = await c.req.json()
-  }
-  catch {
-    return c.json({ error: 'Invalid JSON' }, 400)
-  }
-
-  const roleName = typeof body?.role_name === 'string' ? body.role_name : undefined
-  if (!roleName) {
-    return c.json({ error: 'role_name is required' }, 400)
-  }
-
-  let pgClient
-  try {
-    pgClient = getPgClient(c)
-    const drizzle = getDrizzleClient(pgClient)
-
-    const [binding] = await drizzle
-      .select()
-      .from(schema.role_bindings)
-      .where(eq(schema.role_bindings.id, bindingId))
-      .limit(1)
-
-    if (!binding) {
-      return c.json({ error: 'Role binding not found' }, 404)
+    if (!userId) {
+      return c.json({ error: 'Unauthorized' }, 401)
     }
 
-    if (!(await checkPermission(c, 'org.update_user_roles', { orgId: binding.org_id ?? undefined }))) {
-      return c.json({ error: 'Forbidden - Admin rights required' }, 403)
+    const { role_name: roleName } = c.req.valid('json')
+
+    let pgClient
+    try {
+      pgClient = getPgClient(c)
+      const drizzle = getDrizzleClient(pgClient)
+
+      const [binding] = await drizzle
+        .select()
+        .from(schema.role_bindings)
+        .where(eq(schema.role_bindings.id, bindingId))
+        .limit(1)
+
+      if (!binding) {
+        return c.json({ error: 'Role binding not found' }, 404)
+      }
+
+      if (!(await checkPermission(c, 'org.update_user_roles', { orgId: binding.org_id ?? undefined }))) {
+        return c.json({ error: 'Forbidden - Admin rights required' }, 403)
+      }
+
+      const [role] = await drizzle
+        .select()
+        .from(schema.roles)
+        .where(eq(schema.roles.name, roleName))
+        .limit(1)
+
+      if (!role) {
+        return c.json({ error: 'Role not found' }, 404)
+      }
+
+      if (!role.is_assignable) {
+        return c.json({ error: 'Role is not assignable' }, 403)
+      }
+
+      if (role.scope_type !== binding.scope_type) {
+        return c.json({ error: 'Role scope_type does not match the existing binding scope' }, 400)
+      }
+
+      // Prevent privilege escalation: caller cannot assign a role with higher priority than their own
+      const callerPrincipalId = auth!.authType === 'apikey' ? auth!.apikey!.rbac_id : auth!.userId
+      const callerMaxRank = await getCallerMaxPriorityRank(drizzle, auth!.authType, callerPrincipalId, binding.org_id!)
+      if (role.priority_rank > callerMaxRank) {
+        return c.json({ error: 'Cannot assign a role with higher privileges than your own' }, 403)
+      }
+
+      const [updated] = await drizzle
+        .update(schema.role_bindings)
+        .set({ role_id: role.id })
+        .where(eq(schema.role_bindings.id, bindingId))
+        .returning()
+
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'role_binding_updated',
+        bindingId,
+        orgId: binding.org_id,
+        principal_type: binding.principal_type,
+        principal_id: binding.principal_id,
+        old_role_id: binding.role_id,
+        new_role_id: role.id,
+        scope_type: binding.scope_type,
+        app_id: binding.app_id,
+        channel_id: binding.channel_id,
+      })
+
+      return c.json(updated)
     }
-
-    const [role] = await drizzle
-      .select()
-      .from(schema.roles)
-      .where(eq(schema.roles.name, roleName))
-      .limit(1)
-
-    if (!role) {
-      return c.json({ error: 'Role not found' }, 404)
+    catch (error) {
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'role_binding_update_failed',
+        bindingId,
+        error,
+      })
+      return c.json({ error: 'Internal server error' }, 500)
     }
-
-    if (!role.is_assignable) {
-      return c.json({ error: 'Role is not assignable' }, 403)
+    finally {
+      if (pgClient) {
+        await closeClient(c, pgClient)
+      }
     }
-
-    if (role.scope_type !== binding.scope_type) {
-      return c.json({ error: 'Role scope_type does not match the existing binding scope' }, 400)
-    }
-
-    // Prevent privilege escalation: caller cannot assign a role with higher priority than their own
-    const callerPrincipalId = auth!.authType === 'apikey' ? auth!.apikey!.rbac_id : auth!.userId
-    const callerMaxRank = await getCallerMaxPriorityRank(drizzle, auth!.authType, callerPrincipalId, binding.org_id!)
-    if (role.priority_rank > callerMaxRank) {
-      return c.json({ error: 'Cannot assign a role with higher privileges than your own' }, 403)
-    }
-
-    const [updated] = await drizzle
-      .update(schema.role_bindings)
-      .set({ role_id: role.id })
-      .where(eq(schema.role_bindings.id, bindingId))
-      .returning()
-
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'role_binding_updated',
-      bindingId,
-      orgId: binding.org_id,
-      principal_type: binding.principal_type,
-      principal_id: binding.principal_id,
-      old_role_id: binding.role_id,
-      new_role_id: role.id,
-      scope_type: binding.scope_type,
-      app_id: binding.app_id,
-      channel_id: binding.channel_id,
-    })
-
-    return c.json(updated)
-  }
-  catch (error) {
-    cloudlogErr({
-      requestId: c.get('requestId'),
-      message: 'role_binding_update_failed',
-      bindingId,
-      error,
-    })
-    return c.json({ error: 'Internal server error' }, 500)
-  }
-  finally {
-    if (pgClient) {
-      await closeClient(c, pgClient)
-    }
-  }
-})
+  },
+)
 
 // DELETE /private/role_bindings/:binding_id - Remove a role
-app.delete('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
-  const bindingId = c.req.param('binding_id')
+app.delete('/:binding_id', sValidator('param', bindingIdParamSchema, invalidBindingIdHook), async (c) => {
+  const { binding_id: bindingId } = c.req.valid('param')
   const userId = c.get('auth')?.userId
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
-  }
-  if (!bindingId) {
-    return c.json({ error: 'binding_id is required' }, 400)
   }
 
   let pgClient

@@ -1,5 +1,4 @@
-import type { Context } from 'hono'
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { sValidator } from '@hono/standard-validator'
 import { and, eq } from 'drizzle-orm'
 import { createHono, middlewareAuth, useCors } from '../utils/hono.ts'
 import { cloudlogErr } from '../utils/logging.ts'
@@ -7,21 +6,20 @@ import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { schema } from '../utils/postgres_schema.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { version } from '../utils/version.ts'
-
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-function isUuid(value: string | undefined): value is string {
-  return !!value && UUID_REGEX.test(value)
-}
-
-async function parseJsonBody(c: Context<MiddlewareKeyVariables>) {
-  try {
-    return { ok: true as const, data: await c.req.json() }
-  }
-  catch {
-    return { ok: false as const, error: 'Invalid JSON body' }
-  }
-}
+import {
+  addGroupMemberBodyHook,
+  addGroupMemberBodySchema,
+  createGroupBodyHook,
+  createGroupBodySchema,
+  groupIdParamSchema,
+  groupMemberParamSchema,
+  invalidGroupIdHook,
+  invalidGroupMemberParamHook,
+  invalidOrgIdHook,
+  orgIdParamSchema,
+  updateGroupBodyHook,
+  updateGroupBodySchema,
+} from './rbac_validation.ts'
 
 export const app = createHono('', version)
 
@@ -29,16 +27,12 @@ app.use('*', useCors)
 app.use('*', middlewareAuth)
 
 // GET /private/groups/:org_id - List groups for an org
-app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
-  const orgId = c.req.param('org_id')
+app.get('/:org_id', sValidator('param', orgIdParamSchema, invalidOrgIdHook), async (c) => {
+  const { org_id: orgId } = c.req.valid('param')
   const userId = c.get('auth')?.userId
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
-  }
-
-  if (!isUuid(orgId)) {
-    return c.json({ error: 'Invalid org_id' }, 400)
   }
 
   if (!(await checkPermission(c, 'org.read_members', { orgId }))) {
@@ -82,151 +76,135 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
 })
 
 // POST /private/groups/:org_id - Create a group
-app.post('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
-  const orgId = c.req.param('org_id')
-  const userId = c.get('auth')?.userId
+app.post(
+  '/:org_id',
+  sValidator('param', orgIdParamSchema, invalidOrgIdHook),
+  sValidator('json', createGroupBodySchema, createGroupBodyHook),
+  async (c) => {
+    const { org_id: orgId } = c.req.valid('param')
+    const userId = c.get('auth')?.userId
 
-  if (!userId) {
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
-
-  if (!isUuid(orgId)) {
-    return c.json({ error: 'Invalid org_id' }, 400)
-  }
-
-  if (!(await checkPermission(c, 'org.update_user_roles', { orgId }))) {
-    return c.json({ error: 'Forbidden - Admin rights required' }, 403)
-  }
-
-  const parsedBody = await parseJsonBody(c)
-  if (!parsedBody.ok) {
-    return c.json({ error: parsedBody.error }, 400)
-  }
-  const body = parsedBody.data
-
-  const { name, description } = body
-
-  if (!name) {
-    return c.json({ error: 'Name is required' }, 400)
-  }
-
-  let pgClient
-  try {
-    pgClient = getPgClient(c)
-    const drizzle = getDrizzleClient(pgClient)
-
-    // Create the group
-    const [group] = await drizzle
-      .insert(schema.groups)
-      .values({
-        org_id: orgId,
-        name,
-        description: description || null,
-        created_by: userId,
-        is_system: false,
-      })
-      .returning()
-
-    return c.json(group)
-  }
-  catch (error) {
-    cloudlogErr({
-      requestId: c.get('requestId'),
-      message: 'group_create_failed',
-      orgId,
-      error,
-    })
-    return c.json({ error: 'Internal server error' }, 500)
-  }
-  finally {
-    if (pgClient) {
-      await closeClient(c, pgClient)
-    }
-  }
-})
-
-// PUT /private/groups/:group_id - Update a group
-app.put('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
-  const groupId = c.req.param('group_id')
-  const userId = c.get('auth')?.userId
-
-  if (!userId) {
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
-
-  if (!isUuid(groupId)) {
-    return c.json({ error: 'Invalid group_id' }, 400)
-  }
-
-  let pgClient
-  try {
-    pgClient = getPgClient(c)
-    const drizzle = getDrizzleClient(pgClient)
-
-    // Fetch the group and verify access
-    const [group] = await drizzle
-      .select()
-      .from(schema.groups)
-      .where(eq(schema.groups.id, groupId))
-      .limit(1)
-
-    if (!group) {
-      return c.json({ error: 'Group not found' }, 404)
+    if (!userId) {
+      return c.json({ error: 'Unauthorized' }, 401)
     }
 
-    if (group.is_system) {
-      return c.json({ error: 'Cannot modify system group' }, 403)
-    }
-
-    if (!(await checkPermission(c, 'org.update_user_roles', { orgId: group.org_id }))) {
+    if (!(await checkPermission(c, 'org.update_user_roles', { orgId }))) {
       return c.json({ error: 'Forbidden - Admin rights required' }, 403)
     }
 
-    const parsedBody = await parseJsonBody(c)
-    if (!parsedBody.ok) {
-      return c.json({ error: parsedBody.error }, 400)
-    }
-    const { name, description } = parsedBody.data
+    const { name, description } = c.req.valid('json')
 
-    // Update
-    const [updated] = await drizzle
-      .update(schema.groups)
-      .set({
-        name: name || group.name,
-        description: description !== undefined ? description : group.description,
+    let pgClient
+    try {
+      pgClient = getPgClient(c)
+      const drizzle = getDrizzleClient(pgClient)
+
+      // Create the group
+      const [group] = await drizzle
+        .insert(schema.groups)
+        .values({
+          org_id: orgId,
+          name,
+          description: description || null,
+          created_by: userId,
+          is_system: false,
+        })
+        .returning()
+
+      return c.json(group)
+    }
+    catch (error) {
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'group_create_failed',
+        orgId,
+        error,
       })
-      .where(eq(schema.groups.id, groupId))
-      .returning()
-
-    return c.json(updated)
-  }
-  catch (error) {
-    cloudlogErr({
-      requestId: c.get('requestId'),
-      message: 'group_update_failed',
-      groupId,
-      error,
-    })
-    return c.json({ error: 'Internal server error' }, 500)
-  }
-  finally {
-    if (pgClient) {
-      await closeClient(c, pgClient)
+      return c.json({ error: 'Internal server error' }, 500)
     }
-  }
-})
+    finally {
+      if (pgClient) {
+        await closeClient(c, pgClient)
+      }
+    }
+  },
+)
+
+// PUT /private/groups/:group_id - Update a group
+app.put(
+  '/:group_id',
+  sValidator('param', groupIdParamSchema, invalidGroupIdHook),
+  sValidator('json', updateGroupBodySchema, updateGroupBodyHook),
+  async (c) => {
+    const { group_id: groupId } = c.req.valid('param')
+    const userId = c.get('auth')?.userId
+
+    if (!userId) {
+      return c.json({ error: 'Unauthorized' }, 401)
+    }
+
+    let pgClient
+    try {
+      pgClient = getPgClient(c)
+      const drizzle = getDrizzleClient(pgClient)
+
+      // Fetch the group and verify access
+      const [group] = await drizzle
+        .select()
+        .from(schema.groups)
+        .where(eq(schema.groups.id, groupId))
+        .limit(1)
+
+      if (!group) {
+        return c.json({ error: 'Group not found' }, 404)
+      }
+
+      if (group.is_system) {
+        return c.json({ error: 'Cannot modify system group' }, 403)
+      }
+
+      if (!(await checkPermission(c, 'org.update_user_roles', { orgId: group.org_id }))) {
+        return c.json({ error: 'Forbidden - Admin rights required' }, 403)
+      }
+
+      const { name, description } = c.req.valid('json')
+
+      // Update
+      const [updated] = await drizzle
+        .update(schema.groups)
+        .set({
+          name: name || group.name,
+          description: description !== undefined ? description : group.description,
+        })
+        .where(eq(schema.groups.id, groupId))
+        .returning()
+
+      return c.json(updated)
+    }
+    catch (error) {
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'group_update_failed',
+        groupId,
+        error,
+      })
+      return c.json({ error: 'Internal server error' }, 500)
+    }
+    finally {
+      if (pgClient) {
+        await closeClient(c, pgClient)
+      }
+    }
+  },
+)
 
 // DELETE /private/groups/:group_id - Delete a group
-app.delete('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
-  const groupId = c.req.param('group_id')
+app.delete('/:group_id', sValidator('param', groupIdParamSchema, invalidGroupIdHook), async (c) => {
+  const { group_id: groupId } = c.req.valid('param')
   const userId = c.get('auth')?.userId
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
-  }
-
-  if (!isUuid(groupId)) {
-    return c.json({ error: 'Invalid group_id' }, 400)
   }
 
   let pgClient
@@ -288,16 +266,12 @@ app.delete('/:group_id', async (c: Context<MiddlewareKeyVariables>) => {
 })
 
 // GET /private/groups/:group_id/members - Group members
-app.get('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
-  const groupId = c.req.param('group_id')
+app.get('/:group_id/members', sValidator('param', groupIdParamSchema, invalidGroupIdHook), async (c) => {
+  const { group_id: groupId } = c.req.valid('param')
   const userId = c.get('auth')?.userId
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
-  }
-
-  if (!isUuid(groupId)) {
-    return c.json({ error: 'Invalid group_id' }, 400)
   }
 
   let pgClient
@@ -351,130 +325,109 @@ app.get('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
 })
 
 // POST /private/groups/:group_id/members - Add a member
-app.post('/:group_id/members', async (c: Context<MiddlewareKeyVariables>) => {
-  const groupId = c.req.param('group_id')
-  const userId = c.get('auth')?.userId
+app.post(
+  '/:group_id/members',
+  sValidator('param', groupIdParamSchema, invalidGroupIdHook),
+  sValidator('json', addGroupMemberBodySchema, addGroupMemberBodyHook),
+  async (c) => {
+    const { group_id: groupId } = c.req.valid('param')
+    const userId = c.get('auth')?.userId
 
-  if (!userId) {
-    return c.json({ error: 'Unauthorized' }, 401)
-  }
-
-  if (!isUuid(groupId)) {
-    return c.json({ error: 'Invalid group_id' }, 400)
-  }
-
-  let pgClient
-  let targetUserId: string | undefined
-  try {
-    pgClient = getPgClient(c)
-    const drizzle = getDrizzleClient(pgClient)
-
-    // Fetch the group and verify access
-    const [group] = await drizzle
-      .select()
-      .from(schema.groups)
-      .where(eq(schema.groups.id, groupId))
-      .limit(1)
-
-    if (!group) {
-      return c.json({ error: 'Group not found' }, 404)
+    if (!userId) {
+      return c.json({ error: 'Unauthorized' }, 401)
     }
 
-    if (!(await checkPermission(c, 'org.update_user_roles', { orgId: group.org_id }))) {
-      return c.json({ error: 'Forbidden - Admin rights required' }, 403)
-    }
+    let pgClient
+    let targetUserId: string | undefined
+    try {
+      pgClient = getPgClient(c)
+      const drizzle = getDrizzleClient(pgClient)
 
-    const parsedBody = await parseJsonBody(c)
-    if (!parsedBody.ok) {
-      return c.json({ error: parsedBody.error }, 400)
-    }
+      // Fetch the group and verify access
+      const [group] = await drizzle
+        .select()
+        .from(schema.groups)
+        .where(eq(schema.groups.id, groupId))
+        .limit(1)
 
-    targetUserId = parsedBody.data?.user_id
+      if (!group) {
+        return c.json({ error: 'Group not found' }, 404)
+      }
 
-    if (!targetUserId) {
-      return c.json({ error: 'user_id is required' }, 400)
-    }
+      if (!(await checkPermission(c, 'org.update_user_roles', { orgId: group.org_id }))) {
+        return c.json({ error: 'Forbidden - Admin rights required' }, 403)
+      }
 
-    if (!isUuid(targetUserId)) {
-      return c.json({ error: 'Invalid user_id' }, 400)
-    }
+      targetUserId = c.req.valid('json').user_id
 
-    // Verify the target user belongs to the org
-    const targetRbacAccess = await drizzle
-      .select({ id: schema.role_bindings.id })
-      .from(schema.role_bindings)
-      .where(
-        and(
-          eq(schema.role_bindings.principal_type, 'user'),
-          eq(schema.role_bindings.principal_id, targetUserId),
-          eq(schema.role_bindings.org_id, group.org_id),
-        ),
-      )
-      .limit(1)
-
-    if (!targetRbacAccess.length) {
-      const targetLegacyAccess = await drizzle
-        .select({ id: schema.org_users.id })
-        .from(schema.org_users)
+      // Verify the target user belongs to the org
+      const targetRbacAccess = await drizzle
+        .select({ id: schema.role_bindings.id })
+        .from(schema.role_bindings)
         .where(
           and(
-            eq(schema.org_users.user_id, targetUserId),
-            eq(schema.org_users.org_id, group.org_id),
+            eq(schema.role_bindings.principal_type, 'user'),
+            eq(schema.role_bindings.principal_id, targetUserId),
+            eq(schema.role_bindings.org_id, group.org_id),
           ),
         )
         .limit(1)
 
-      if (!targetLegacyAccess.length) {
-        return c.json({ error: 'User is not a member of this org' }, 400)
+      if (!targetRbacAccess.length) {
+        const targetLegacyAccess = await drizzle
+          .select({ id: schema.org_users.id })
+          .from(schema.org_users)
+          .where(
+            and(
+              eq(schema.org_users.user_id, targetUserId),
+              eq(schema.org_users.org_id, group.org_id),
+            ),
+          )
+          .limit(1)
+
+        if (!targetLegacyAccess.length) {
+          return c.json({ error: 'User is not a member of this org' }, 400)
+        }
+      }
+
+      // Add member (ON CONFLICT DO NOTHING for idempotency)
+      const [member] = await drizzle
+        .insert(schema.group_members)
+        .values({
+          group_id: groupId,
+          user_id: targetUserId,
+          added_by: userId,
+        })
+        .onConflictDoNothing()
+        .returning()
+
+      return c.json(member || { message: 'User already in group' })
+    }
+    catch (error) {
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'group_member_add_failed',
+        groupId,
+        targetUserId,
+        error,
+      })
+      return c.json({ error: 'Internal server error' }, 500)
+    }
+    finally {
+      if (pgClient) {
+        await closeClient(c, pgClient)
       }
     }
-
-    // Add member (ON CONFLICT DO NOTHING for idempotency)
-    const [member] = await drizzle
-      .insert(schema.group_members)
-      .values({
-        group_id: groupId,
-        user_id: targetUserId,
-        added_by: userId,
-      })
-      .onConflictDoNothing()
-      .returning()
-
-    return c.json(member || { message: 'User already in group' })
-  }
-  catch (error) {
-    cloudlogErr({
-      requestId: c.get('requestId'),
-      message: 'group_member_add_failed',
-      groupId,
-      targetUserId,
-      error,
-    })
-    return c.json({ error: 'Internal server error' }, 500)
-  }
-  finally {
-    if (pgClient) {
-      await closeClient(c, pgClient)
-    }
-  }
-})
+  },
+)
 
 // DELETE /private/groups/:group_id/members/:user_id - Remove a member
-app.delete('/:group_id/members/:user_id', async (c: Context<MiddlewareKeyVariables>) => {
-  const groupId = c.req.param('group_id')
-  const targetUserId = c.req.param('user_id')
+app.delete('/:group_id/members/:user_id', sValidator('param', groupMemberParamSchema, invalidGroupMemberParamHook), async (c) => {
+  const { group_id: groupId, user_id: targetUserId } = c.req.valid('param')
   const userId = c.get('auth')?.userId
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
-  }
-
-  if (!isUuid(groupId)) {
-    return c.json({ error: 'Invalid group_id' }, 400)
-  }
-
-  if (!isUuid(targetUserId)) {
-    return c.json({ error: 'Invalid user_id' }, 400)
   }
 
   let pgClient

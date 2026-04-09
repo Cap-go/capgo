@@ -1,0 +1,186 @@
+import type { StandardSchemaV1 } from '@standard-schema/spec'
+import type { Context } from 'hono'
+import { type } from 'arktype'
+import { createInsertSchema, createUpdateSchema } from 'drizzle-orm/arktype'
+import { schema } from '../utils/postgres_schema.ts'
+
+type ValidationIssue = StandardSchemaV1.Issue & { readonly code?: string }
+type ValidationIssues = readonly ValidationIssue[]
+
+const ROLE_SCOPE_TYPE_SCHEMA = type('"org" | "app" | "channel"')
+const PRINCIPAL_TYPE_SCHEMA = type('"user" | "group" | "apikey"')
+
+function firstIssueField(issues: ValidationIssues): string | undefined {
+  const field = issues[0]?.path?.[0]
+  if (typeof field === 'string') {
+    return field
+  }
+
+  if (typeof field === 'object' && field !== null && 'key' in field && typeof field.key === 'string') {
+    return field.key
+  }
+
+  return undefined
+}
+
+function issueField(issue: ValidationIssue): string | undefined {
+  const field = issue.path?.[0]
+  if (typeof field === 'string') {
+    return field
+  }
+
+  if (typeof field === 'object' && field !== null && 'key' in field && typeof field.key === 'string') {
+    return field.key
+  }
+
+  return undefined
+}
+
+function hasRequiredIssue(issues: ValidationIssues, field: string): boolean {
+  return issues.some(issue => issue.code === 'required' && issueField(issue) === field)
+}
+
+function hasIssueForField(issues: ValidationIssues, field: string): boolean {
+  return issues.some(issue => issueField(issue) === field)
+}
+
+function createErrorHook(resolveMessage: (issues: ValidationIssues) => string) {
+  return (result: { success: true } | { success: false, error: ValidationIssues }, c: Context) => {
+    if (result.success) {
+      return
+    }
+    return c.json({ error: resolveMessage(result.error) }, 400)
+  }
+}
+
+export const orgIdParamSchema = type({
+  org_id: 'string.uuid',
+})
+
+export const groupIdParamSchema = type({
+  group_id: 'string.uuid',
+})
+
+export const groupMemberParamSchema = type({
+  group_id: 'string.uuid',
+  user_id: 'string.uuid',
+})
+
+export const bindingIdParamSchema = type({
+  binding_id: 'string.uuid',
+})
+
+export const roleScopeParamSchema = type({
+  scope_type: ROLE_SCOPE_TYPE_SCHEMA,
+})
+
+export const createGroupBodySchema = createInsertSchema(schema.groups).pick('name', 'description')
+
+export const updateGroupBodySchema = createUpdateSchema(schema.groups).pick('name', 'description')
+
+export const addGroupMemberBodySchema = createInsertSchema(schema.group_members).pick('user_id')
+
+export const createRoleBindingBodySchema = createInsertSchema(schema.role_bindings, {
+  principal_type: PRINCIPAL_TYPE_SCHEMA,
+  principal_id: type('string.uuid'),
+  scope_type: ROLE_SCOPE_TYPE_SCHEMA,
+  org_id: type('string.uuid'),
+  app_id: type('string.uuid | null | undefined'),
+  channel_id: type('number | null | undefined'),
+  reason: type('string | null | undefined'),
+})
+  .pick('principal_type', 'principal_id', 'scope_type', 'org_id', 'app_id', 'channel_id', 'reason')
+  .and(type({
+    role_name: 'string',
+  }))
+
+export const updateRoleBindingBodySchema = type({
+  role_name: 'string',
+})
+
+export const invalidOrgIdHook = createErrorHook(() => 'Invalid org_id')
+
+export const invalidGroupIdHook = createErrorHook(() => 'Invalid group_id')
+
+export const invalidBindingIdHook = createErrorHook(() => 'Invalid binding_id')
+
+export const invalidScopeTypeHook = createErrorHook(() => 'Invalid scope_type')
+
+export const invalidGroupMemberParamHook = createErrorHook((issues) => {
+  return firstIssueField(issues) === 'user_id' ? 'Invalid user_id' : 'Invalid group_id'
+})
+
+export const createGroupBodyHook = createErrorHook((issues) => {
+  if (hasRequiredIssue(issues, 'name')) {
+    return 'Name is required'
+  }
+
+  switch (firstIssueField(issues)) {
+    case 'name':
+      return 'Invalid name'
+    case 'description':
+      return 'Invalid description'
+    default:
+      return 'Invalid request body'
+  }
+})
+
+export const updateGroupBodyHook = createErrorHook((issues) => {
+  switch (firstIssueField(issues)) {
+    case 'name':
+      return 'Invalid name'
+    case 'description':
+      return 'Invalid description'
+    default:
+      return 'Invalid request body'
+  }
+})
+
+export const addGroupMemberBodyHook = createErrorHook((issues) => {
+  if (hasRequiredIssue(issues, 'user_id')) {
+    return 'user_id is required'
+  }
+
+  switch (firstIssueField(issues)) {
+    case 'user_id':
+      return 'Invalid user_id'
+    default:
+      return 'Invalid request body'
+  }
+})
+
+export const createRoleBindingBodyHook = createErrorHook((issues) => {
+  if (['principal_type', 'principal_id', 'role_name', 'scope_type', 'org_id'].some(field => hasRequiredIssue(issues, field))) {
+    return 'Missing required fields'
+  }
+
+  for (const [field, message] of [
+    ['principal_type', 'Invalid principal_type'],
+    ['principal_id', 'Invalid principal_id'],
+    ['role_name', 'Invalid role_name'],
+    ['scope_type', 'Invalid scope_type'],
+    ['org_id', 'Invalid org_id'],
+    ['app_id', 'Invalid app_id'],
+    ['channel_id', 'Invalid channel_id'],
+    ['reason', 'Invalid reason'],
+  ] as const) {
+    if (hasIssueForField(issues, field)) {
+      return message
+    }
+  }
+
+  return 'Invalid request body'
+})
+
+export const updateRoleBindingBodyHook = createErrorHook((issues) => {
+  if (hasRequiredIssue(issues, 'role_name')) {
+    return 'role_name is required'
+  }
+
+  switch (firstIssueField(issues)) {
+    case 'role_name':
+      return 'Invalid role_name'
+    default:
+      return 'Invalid request body'
+  }
+})
