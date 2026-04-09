@@ -94,16 +94,18 @@ export function getStripe(c: Context): Stripe {
   const apiPort = apiBaseUrl
     ? Number.parseInt(apiBaseUrl.port || (apiBaseUrl.protocol === 'https:' ? '443' : '80'), 10)
     : undefined
+  type StripeApiVersion = NonNullable<ConstructorParameters<typeof Stripe>[1]>['apiVersion']
 
   return new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'), {
-    apiVersion: '2026-03-25.dahlia',
+    // Keep the pinned runtime API version even when the installed SDK types lag behind it.
+    apiVersion: '2026-03-25.dahlia' as StripeApiVersion,
     httpClient: Stripe.createFetchHttpClient(),
     ...(apiBaseUrl
       ? {
-        host: apiBaseUrl.hostname,
-        port: apiPort,
-        protocol: apiBaseUrl.protocol.replace(':', '') as 'http' | 'https',
-      }
+          host: apiBaseUrl.hostname,
+          port: apiPort,
+          protocol: apiBaseUrl.protocol.replace(':', '') as 'http' | 'https',
+        }
       : {}),
   })
 }
@@ -557,12 +559,12 @@ export async function createOneTimeCheckout(
         ...(isStripeEmulatorEnabled(c)
           ? {}
           : {
-            adjustable_quantity: {
-              enabled: true,
-              minimum: 1,
-              maximum: 100000,
-            },
-          }),
+              adjustable_quantity: {
+                enabled: true,
+                minimum: 1,
+                maximum: 100000,
+              },
+            }),
       },
     ],
     metadata: {
