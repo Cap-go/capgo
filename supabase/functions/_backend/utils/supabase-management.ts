@@ -31,10 +31,28 @@ export class ManagementAPIError extends Error {
 }
 
 function getProjectRef(c: Context): string | null {
-  const supabaseUrl = getEnv(c, 'SUPABASE_URL')
-  if (!supabaseUrl)
+  const supabaseDbUrl = getEnv(c, 'MAIN_SUPABASE_DB_URL')
+  if (!supabaseDbUrl)
     return null
-  return supabaseUrl.split('//')[1]?.split('.')[0]?.split(':')[0] || null
+
+  try {
+    const dbUrl = new URL(supabaseDbUrl)
+
+    // Direct Supabase connections use db.<project-ref>.supabase.co.
+    const hostParts = dbUrl.hostname.split('.')
+    if (hostParts[0] === 'db' && hostParts[1])
+      return hostParts[1]
+
+    // Pooled connections may encode the project ref in the username, e.g. postgres.<project-ref>.
+    const usernameParts = dbUrl.username.split('.')
+    if (usernameParts.length > 1 && usernameParts[1])
+      return usernameParts[1]
+  }
+  catch {
+    return null
+  }
+
+  return null
 }
 
 async function callManagementAPI(
@@ -57,7 +75,7 @@ async function callManagementAPI(
   if (!projectRef) {
     cloudlogErr({
       requestId: c.get('requestId'),
-      message: 'SUPABASE_URL not configured or invalid',
+      message: 'SUPABASE_DB_URL not configured or invalid',
     })
     throw new ManagementAPIError(500, 'project_ref_not_configured', 'Project reference not configured')
   }
