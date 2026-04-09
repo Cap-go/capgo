@@ -1,5 +1,19 @@
 import { env } from 'node:process'
-import antfu from '@antfu/eslint-config'
+
+if (typeof Object.groupBy !== 'function') {
+  Object.groupBy = function groupBy(items, callbackfn) {
+    return Array.from(items).reduce((groups, item, index) => {
+      const key = callbackfn(item, index)
+      if (!Object.hasOwn(groups, key)) {
+        groups[key] = []
+      }
+      groups[key].push(item)
+      return groups
+    }, {})
+  }
+}
+
+const { default: antfu } = await import('@antfu/eslint-config')
 
 export default antfu(
   {

@@ -850,6 +850,32 @@ describe('[POST] /private/sso/provision-user', () => {
       )
 
       const ssoAuthHeaders = await getAuthHeadersForCredentials(email, password)
+      const supabase = getSupabaseClient()
+      const { data: existingPublicUser, error: existingPublicUserError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', createdUser.user.id)
+        .maybeSingle()
+
+      expect(existingPublicUserError).toBeNull()
+
+      if (existingPublicUser) {
+        const { error: deletePublicUserError } = await supabase
+          .from('users')
+          .delete()
+          .eq('id', createdUser.user.id)
+
+        expect(deletePublicUserError).toBeNull()
+      }
+
+      const { data: missingPublicUser, error: missingPublicUserError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', createdUser.user.id)
+        .maybeSingle()
+
+      expect(missingPublicUserError).toBeNull()
+      expect(missingPublicUser).toBeNull()
 
       const response = await fetchWithRetry(getEndpointUrl('/private/sso/provision-user'), {
         method: 'POST',

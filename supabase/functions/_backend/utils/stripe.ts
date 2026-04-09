@@ -100,10 +100,10 @@ export function getStripe(c: Context): Stripe {
     httpClient: Stripe.createFetchHttpClient(),
     ...(apiBaseUrl
       ? {
-        host: apiBaseUrl.hostname,
-        port: apiPort,
-        protocol: apiBaseUrl.protocol.replace(':', '') as 'http' | 'https',
-      }
+          host: apiBaseUrl.hostname,
+          port: apiPort,
+          protocol: apiBaseUrl.protocol.replace(':', '') as 'http' | 'https',
+        }
       : {}),
   })
 }
@@ -557,12 +557,12 @@ export async function createOneTimeCheckout(
         ...(isStripeEmulatorEnabled(c)
           ? {}
           : {
-            adjustable_quantity: {
-              enabled: true,
-              minimum: 1,
-              maximum: 100000,
-            },
-          }),
+              adjustable_quantity: {
+                enabled: true,
+                minimum: 1,
+                maximum: 100000,
+              },
+            }),
       },
     ],
     metadata: {
