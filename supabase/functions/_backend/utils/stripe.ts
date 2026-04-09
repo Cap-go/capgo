@@ -96,7 +96,8 @@ export function getStripe(c: Context): Stripe {
     : undefined
 
   return new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'), {
-    apiVersion: '2026-03-25.dahlia',
+    // Keep the pinned runtime API version even when the installed SDK types lag behind it.
+    apiVersion: '2026-03-25.dahlia' as Stripe.LatestApiVersion,
     httpClient: Stripe.createFetchHttpClient(),
     ...(apiBaseUrl
       ? {
