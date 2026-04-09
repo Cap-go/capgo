@@ -6,6 +6,9 @@ import { cloudlog, cloudlogErr } from './logging.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { getEnv, isStripeConfigured } from './utils.ts'
 
+const ISO_COUNTRY_CODE_REGEX = /^[A-Z]{2}$/
+const TRAILING_SLASHES_REGEX = /\/+$/
+
 // Checks if SUPABASE_URL points to a local instance
 function isLocalSupabase(c: Context): boolean {
   const supabaseUrl = getEnv(c, 'SUPABASE_URL')
@@ -86,21 +89,21 @@ export function isStripeEmulatorEnabled(c: Context): boolean {
   return getStripeApiBaseUrl(c) !== null
 }
 
-export function getStripe(c: Context) {
+export function getStripe(c: Context): Stripe {
   const apiBaseUrl = getStripeApiBaseUrl(c)
   const apiPort = apiBaseUrl
     ? Number.parseInt(apiBaseUrl.port || (apiBaseUrl.protocol === 'https:' ? '443' : '80'), 10)
     : undefined
 
   return new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'), {
-    apiVersion: '2025-10-29.clover',
+    apiVersion: '2026-03-25.dahlia',
     httpClient: Stripe.createFetchHttpClient(),
     ...(apiBaseUrl
       ? {
-          host: apiBaseUrl.hostname,
-          port: apiPort,
-          protocol: apiBaseUrl.protocol.replace(':', '') as 'http' | 'https',
-        }
+        host: apiBaseUrl.hostname,
+        port: apiPort,
+        protocol: apiBaseUrl.protocol.replace(':', '') as 'http' | 'https',
+      }
       : {}),
   })
 }
@@ -309,7 +312,7 @@ export function normalizeStripeCountryCode(country: string | null | undefined): 
     return null
 
   const normalized = country.trim().toUpperCase()
-  if (!normalized || !/^[A-Z]{2}$/.test(normalized))
+  if (!normalized || !ISO_COUNTRY_CODE_REGEX.test(normalized))
     return null
 
   return normalized
@@ -554,12 +557,12 @@ export async function createOneTimeCheckout(
         ...(isStripeEmulatorEnabled(c)
           ? {}
           : {
-              adjustable_quantity: {
-                enabled: true,
-                minimum: 1,
-                maximum: 100000,
-              },
-            }),
+            adjustable_quantity: {
+              enabled: true,
+              minimum: 1,
+              maximum: 100000,
+            },
+          }),
       },
     ],
     metadata: {
@@ -674,7 +677,7 @@ export interface StripeCustomer {
 
 export async function createCustomer(c: Context, email: string, userId: string, orgId: string, name: string) {
   cloudlog({ requestId: c.get('requestId'), message: 'createCustomer', email, userId, orgId, name })
-  const baseConsoleUrl = (getEnv(c, 'WEBAPP_URL') || '').replace(/\/+$/, '')
+  const baseConsoleUrl = (getEnv(c, 'WEBAPP_URL') || '').replace(TRAILING_SLASHES_REGEX, '')
   const metadata: Record<string, string> = {
     user_id: userId,
     org_id: orgId,
@@ -708,7 +711,7 @@ export async function ensureCustomerMetadata(c: Context, customerId: string, org
   if (!isStripeConfigured(c))
     return
 
-  const baseConsoleUrl = (getEnv(c, 'WEBAPP_URL') || '').replace(/\/+$/, '')
+  const baseConsoleUrl = (getEnv(c, 'WEBAPP_URL') || '').replace(TRAILING_SLASHES_REGEX, '')
   const metadata: Record<string, string> = {
     org_id: orgId,
   }
