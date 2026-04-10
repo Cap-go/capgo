@@ -119,6 +119,55 @@ describe('rBAC validation hooks', () => {
     })
   })
 
+  it.concurrent('keeps the legacy parse error code for malformed JSON requests', async () => {
+    const app = new Hono()
+
+    app.put('/groups/:group_id', async (c) => {
+      const result = await validateJsonBody(c, updateGroupBodySchema, updateGroupBodyHook)
+      if (!result.ok) {
+        return result.response
+      }
+
+      return c.json(result.data)
+    })
+
+    const response = await app.request(new Request('http://localhost/groups/550e8400-e29b-41d4-a716-446655440000', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"name":',
+    }))
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({
+      error: 'invalid_json_parse_body',
+      message: 'Invalid JSON body',
+    })
+  })
+
+  it.concurrent('keeps the legacy parse error code for malformed headerless JSON bodies', async () => {
+    const app = new Hono()
+
+    app.put('/groups/:group_id', async (c) => {
+      const result = await validateJsonBody(c, updateGroupBodySchema, updateGroupBodyHook)
+      if (!result.ok) {
+        return result.response
+      }
+
+      return c.json(result.data)
+    })
+
+    const response = await app.request(new Request('http://localhost/groups/550e8400-e29b-41d4-a716-446655440000', {
+      method: 'PUT',
+      body: '{"name":',
+    }))
+
+    expect(response.status).toBe(400)
+    expect(await response.json()).toEqual({
+      error: 'invalid_json_parse_body',
+      message: 'Invalid JSON body',
+    })
+  })
+
   it.concurrent('keeps the add-group-member invalid user error', async () => {
     const issues = await getIssues(addGroupMemberBodySchema, { user_id: 'bad-user-id' })
     const error = await getErrorMessage(addGroupMemberBodyHook, issues)

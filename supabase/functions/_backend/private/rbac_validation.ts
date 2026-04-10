@@ -73,8 +73,8 @@ async function parseJsonBodyWithHeaderFallback(c: Context): Promise<{ ok: true, 
     try {
       return { ok: true, data: await c.req.json() }
     }
-    catch (error) {
-      return { ok: false, response: simpleErrorWithStatus(c, 400, 'invalid_json_parse_body', 'Invalid JSON body', { error }) }
+    catch {
+      return { ok: false, response: simpleErrorWithStatus(c, 400, 'invalid_json_parse_body', 'Invalid JSON body') }
     }
   }
 
@@ -86,8 +86,8 @@ async function parseJsonBodyWithHeaderFallback(c: Context): Promise<{ ok: true, 
   try {
     return { ok: true, data: JSON.parse(rawBody) }
   }
-  catch (error) {
-    return { ok: false, response: simpleErrorWithStatus(c, 400, 'invalid_json_parse_body', 'Invalid JSON body', { error }) }
+  catch {
+    return { ok: false, response: simpleErrorWithStatus(c, 400, 'invalid_json_parse_body', 'Invalid JSON body') }
   }
 }
 
