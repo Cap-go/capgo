@@ -9,6 +9,7 @@ type ValidationIssues = readonly ValidationIssue[]
 
 const ROLE_SCOPE_TYPE_SCHEMA = type('"org" | "app" | "channel"')
 const PRINCIPAL_TYPE_SCHEMA = type('"user" | "group" | "apikey"')
+const NON_EMPTY_STRING_SCHEMA = type('string > 0')
 
 function firstIssueField(issues: ValidationIssues): string | undefined {
   const field = issues[0]?.path?.[0]
@@ -38,6 +39,10 @@ function issueField(issue: ValidationIssue): string | undefined {
 
 function hasRequiredIssue(issues: ValidationIssues, field: string): boolean {
   return issues.some(issue => issue.code === 'required' && issueField(issue) === field)
+}
+
+function hasRequiredValueIssue(issues: ValidationIssues, field: string): boolean {
+  return issues.some(issue => ['required', 'minLength'].includes(issue.code ?? '') && issueField(issue) === field)
 }
 
 function hasIssueForField(issues: ValidationIssues, field: string): boolean {
@@ -74,7 +79,11 @@ export const roleScopeParamSchema = type({
   scope_type: ROLE_SCOPE_TYPE_SCHEMA,
 })
 
-export const createGroupBodySchema = createInsertSchema(schema.groups).pick('name', 'description')
+export const createGroupBodySchema = createInsertSchema(schema.groups)
+  .pick('name', 'description')
+  .and(type({
+    name: NON_EMPTY_STRING_SCHEMA,
+  }))
 
 export const updateGroupBodySchema = createUpdateSchema(schema.groups).pick('name', 'description')
 
@@ -91,11 +100,11 @@ export const createRoleBindingBodySchema = createInsertSchema(schema.role_bindin
 })
   .pick('principal_type', 'principal_id', 'scope_type', 'org_id', 'app_id', 'channel_id', 'reason')
   .and(type({
-    role_name: 'string',
+    role_name: NON_EMPTY_STRING_SCHEMA,
   }))
 
 export const updateRoleBindingBodySchema = type({
-  role_name: 'string',
+  role_name: NON_EMPTY_STRING_SCHEMA,
 })
 
 export const invalidOrgIdHook = createErrorHook(() => 'Invalid org_id')
@@ -111,7 +120,7 @@ export const invalidGroupMemberParamHook = createErrorHook((issues) => {
 })
 
 export const createGroupBodyHook = createErrorHook((issues) => {
-  if (hasRequiredIssue(issues, 'name')) {
+  if (hasRequiredValueIssue(issues, 'name')) {
     return 'Name is required'
   }
 
@@ -150,7 +159,10 @@ export const addGroupMemberBodyHook = createErrorHook((issues) => {
 })
 
 export const createRoleBindingBodyHook = createErrorHook((issues) => {
-  if (['principal_type', 'principal_id', 'role_name', 'scope_type', 'org_id'].some(field => hasRequiredIssue(issues, field))) {
+  if (
+    ['principal_type', 'principal_id', 'scope_type', 'org_id'].some(field => hasRequiredIssue(issues, field))
+    || hasRequiredValueIssue(issues, 'role_name')
+  ) {
     return 'Missing required fields'
   }
 
@@ -173,7 +185,7 @@ export const createRoleBindingBodyHook = createErrorHook((issues) => {
 })
 
 export const updateRoleBindingBodyHook = createErrorHook((issues) => {
-  if (hasRequiredIssue(issues, 'role_name')) {
+  if (hasRequiredValueIssue(issues, 'role_name')) {
     return 'role_name is required'
   }
 

@@ -16,7 +16,8 @@ import {
 } from '../supabase/functions/_backend/private/rbac_validation.ts'
 
 type ValidationIssues = readonly StandardSchemaV1.Issue[]
-type StandardSchema = {
+
+interface StandardSchema {
   '~standard': {
     validate: (value: unknown) => StandardSchemaV1.Result<unknown> | Promise<StandardSchemaV1.Result<unknown>>
   }
@@ -60,6 +61,12 @@ describe('rBAC validation hooks', () => {
     expect(error).toBe('Name is required')
   })
 
+  it.concurrent('keeps the create-group empty name error', async () => {
+    const issues = await getIssues(createGroupBodySchema, { name: '' })
+    const error = await getErrorMessage(createGroupBodyHook, issues)
+    expect(error).toBe('Name is required')
+  })
+
   it.concurrent('keeps the update-group invalid description error', async () => {
     const issues = await getIssues(updateGroupBodySchema, { description: 42 })
     const error = await getErrorMessage(updateGroupBodyHook, issues)
@@ -78,6 +85,18 @@ describe('rBAC validation hooks', () => {
     expect(error).toBe('Missing required fields')
   })
 
+  it.concurrent('keeps the role-binding empty role name create error', async () => {
+    const issues = await getIssues(createRoleBindingBodySchema, {
+      principal_type: 'user',
+      principal_id: '550e8400-e29b-41d4-a716-446655440001',
+      role_name: '',
+      scope_type: 'org',
+      org_id: '550e8400-e29b-41d4-a716-446655440000',
+    })
+    const error = await getErrorMessage(createRoleBindingBodyHook, issues)
+    expect(error).toBe('Missing required fields')
+  })
+
   it.concurrent('keeps the role-binding invalid principal type error', async () => {
     const issues = await getIssues(createRoleBindingBodySchema, {
       principal_type: 'device',
@@ -92,6 +111,12 @@ describe('rBAC validation hooks', () => {
 
   it.concurrent('keeps the role-binding update missing role name error', async () => {
     const issues = await getIssues(updateRoleBindingBodySchema, {})
+    const error = await getErrorMessage(updateRoleBindingBodyHook, issues)
+    expect(error).toBe('role_name is required')
+  })
+
+  it.concurrent('keeps the role-binding update empty role name error', async () => {
+    const issues = await getIssues(updateRoleBindingBodySchema, { role_name: '' })
     const error = await getErrorMessage(updateRoleBindingBodyHook, issues)
     expect(error).toBe('role_name is required')
   })
