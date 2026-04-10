@@ -88,13 +88,13 @@ app.post(
       return c.json({ error: 'Unauthorized' }, 401)
     }
 
+    if (!(await checkPermission(c, 'org.update_user_roles', { orgId }))) {
+      return c.json({ error: 'Forbidden - Admin rights required' }, 403)
+    }
+
     const bodyResult = await validateJsonBody(c, createGroupBodySchema, createGroupBodyHook)
     if (!bodyResult.ok) {
       return bodyResult.response
-    }
-
-    if (!(await checkPermission(c, 'org.update_user_roles', { orgId }))) {
-      return c.json({ error: 'Forbidden - Admin rights required' }, 403)
     }
 
     const { name, description } = bodyResult.data
@@ -147,11 +147,6 @@ app.put(
       return c.json({ error: 'Unauthorized' }, 401)
     }
 
-    const bodyResult = await validateJsonBody(c, updateGroupBodySchema, updateGroupBodyHook)
-    if (!bodyResult.ok) {
-      return bodyResult.response
-    }
-
     let pgClient
     try {
       pgClient = getPgClient(c)
@@ -174,6 +169,11 @@ app.put(
 
       if (!(await checkPermission(c, 'org.update_user_roles', { orgId: group.org_id }))) {
         return c.json({ error: 'Forbidden - Admin rights required' }, 403)
+      }
+
+      const bodyResult = await validateJsonBody(c, updateGroupBodySchema, updateGroupBodyHook)
+      if (!bodyResult.ok) {
+        return bodyResult.response
       }
 
       const { name, description } = bodyResult.data
