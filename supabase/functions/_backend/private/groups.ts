@@ -345,11 +345,6 @@ app.post(
       return c.json({ error: 'Unauthorized' }, 401)
     }
 
-    const bodyResult = await validateJsonBody(c, addGroupMemberBodySchema, addGroupMemberBodyHook)
-    if (!bodyResult.ok) {
-      return bodyResult.response
-    }
-
     let pgClient
     let targetUserId: string | undefined
     try {
@@ -369,6 +364,11 @@ app.post(
 
       if (!(await checkPermission(c, 'org.update_user_roles', { orgId: group.org_id }))) {
         return c.json({ error: 'Forbidden - Admin rights required' }, 403)
+      }
+
+      const bodyResult = await validateJsonBody(c, addGroupMemberBodySchema, addGroupMemberBodyHook)
+      if (!bodyResult.ok) {
+        return bodyResult.response
       }
 
       targetUserId = bodyResult.data.user_id

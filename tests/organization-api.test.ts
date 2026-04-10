@@ -121,10 +121,11 @@ describe('read-mode API keys cannot access destructive organization routes', () 
         limited_to_orgs: [readOnlyOrgId],
       }),
     })
-    expect(createResponse.status).toBe(200)
-    const createdKey = await createResponse.json<{ id: number, key: string }>()
-    readOnlyKey = createdKey.key
-    readOnlyKeyId = createdKey.id
+    const createdKey = await createResponse.json<{ id?: number, key?: string, error?: string, message?: string }>()
+    expect(createResponse.status, JSON.stringify(createdKey)).toBe(200)
+    const parsedKey = z.object({ id: z.number(), key: z.string() }).parse(createdKey)
+    readOnlyKey = parsedKey.key
+    readOnlyKeyId = parsedKey.id
   })
 
   afterAll(async () => {
