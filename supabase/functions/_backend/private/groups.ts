@@ -19,6 +19,7 @@ import {
   orgIdParamSchema,
   updateGroupBodyHook,
   updateGroupBodySchema,
+  validateJsonBody,
 } from './rbac_validation.ts'
 
 export const app = createHono('', version)
@@ -79,7 +80,6 @@ app.get('/:org_id', sValidator('param', orgIdParamSchema, invalidOrgIdHook), asy
 app.post(
   '/:org_id',
   sValidator('param', orgIdParamSchema, invalidOrgIdHook),
-  sValidator('json', createGroupBodySchema, createGroupBodyHook),
   async (c) => {
     const { org_id: orgId } = c.req.valid('param')
     const userId = c.get('auth')?.userId
@@ -88,11 +88,16 @@ app.post(
       return c.json({ error: 'Unauthorized' }, 401)
     }
 
+    const bodyResult = await validateJsonBody(c, createGroupBodySchema, createGroupBodyHook)
+    if (!bodyResult.ok) {
+      return bodyResult.response
+    }
+
     if (!(await checkPermission(c, 'org.update_user_roles', { orgId }))) {
       return c.json({ error: 'Forbidden - Admin rights required' }, 403)
     }
 
-    const { name, description } = c.req.valid('json')
+    const { name, description } = bodyResult.data
 
     let pgClient
     try {
@@ -134,13 +139,17 @@ app.post(
 app.put(
   '/:group_id',
   sValidator('param', groupIdParamSchema, invalidGroupIdHook),
-  sValidator('json', updateGroupBodySchema, updateGroupBodyHook),
   async (c) => {
     const { group_id: groupId } = c.req.valid('param')
     const userId = c.get('auth')?.userId
 
     if (!userId) {
       return c.json({ error: 'Unauthorized' }, 401)
+    }
+
+    const bodyResult = await validateJsonBody(c, updateGroupBodySchema, updateGroupBodyHook)
+    if (!bodyResult.ok) {
+      return bodyResult.response
     }
 
     let pgClient
@@ -167,7 +176,7 @@ app.put(
         return c.json({ error: 'Forbidden - Admin rights required' }, 403)
       }
 
-      const { name, description } = c.req.valid('json')
+      const { name, description } = bodyResult.data
 
       // Update
       const [updated] = await drizzle
@@ -328,13 +337,17 @@ app.get('/:group_id/members', sValidator('param', groupIdParamSchema, invalidGro
 app.post(
   '/:group_id/members',
   sValidator('param', groupIdParamSchema, invalidGroupIdHook),
-  sValidator('json', addGroupMemberBodySchema, addGroupMemberBodyHook),
   async (c) => {
     const { group_id: groupId } = c.req.valid('param')
     const userId = c.get('auth')?.userId
 
     if (!userId) {
       return c.json({ error: 'Unauthorized' }, 401)
+    }
+
+    const bodyResult = await validateJsonBody(c, addGroupMemberBodySchema, addGroupMemberBodyHook)
+    if (!bodyResult.ok) {
+      return bodyResult.response
     }
 
     let pgClient
@@ -358,7 +371,7 @@ app.post(
         return c.json({ error: 'Forbidden - Admin rights required' }, 403)
       }
 
-      targetUserId = c.req.valid('json').user_id
+      targetUserId = bodyResult.data.user_id
 
       // Verify the target user belongs to the org
       const targetRbacAccess = await drizzle

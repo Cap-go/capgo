@@ -2,6 +2,7 @@ import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { Context } from 'hono'
 import { type } from 'arktype'
 import { createInsertSchema, createUpdateSchema } from 'drizzle-orm/arktype'
+import { HTTPException } from 'hono/http-exception'
 import { schema } from '../utils/postgres_schema.ts'
 
 type ValidationIssue = StandardSchemaV1.Issue & { readonly code?: string }
@@ -10,6 +11,13 @@ type ValidationIssues = readonly ValidationIssue[]
 const ROLE_SCOPE_TYPE_SCHEMA = type('"org" | "app" | "channel"')
 const PRINCIPAL_TYPE_SCHEMA = type('"user" | "group" | "apikey"')
 const NON_EMPTY_STRING_SCHEMA = type('string > 0')
+const JSON_CONTENT_TYPE_REGEX = /^application\/(?:[a-z-.]+\+)?json(?:;\s*[a-zA-Z0-9\-]+=[^;]+)*$/
+
+interface StandardSchema<T> {
+  '~standard': {
+    validate: (value: unknown) => Promise<StandardSchemaV1.Result<T>> | StandardSchemaV1.Result<T>
+  }
+}
 
 function firstIssueField(issues: ValidationIssues): string | undefined {
   const field = issues[0]?.path?.[0]
@@ -56,6 +64,60 @@ function createErrorHook(resolveMessage: (issues: ValidationIssues) => string) {
     }
     return c.json({ error: resolveMessage(result.error) }, 400)
   }
+}
+
+async function parseJsonBodyWithHeaderFallback(c: Context): Promise<unknown> {
+  const contentType = c.req.header('Content-Type')
+
+  if (contentType && JSON_CONTENT_TYPE_REGEX.test(contentType)) {
+    try {
+      return await c.req.json()
+    }
+    catch {
+      throw new HTTPException(400, { message: 'Malformed JSON in request body' })
+    }
+  }
+
+  const rawBody = await c.req.raw.clone().text()
+  if (!rawBody) {
+    return {}
+  }
+
+  try {
+    return JSON.parse(rawBody)
+  }
+  catch {
+    throw new HTTPException(400, { message: 'Malformed JSON in request body' })
+  }
+}
+
+export async function validateJsonBody<T>(
+  c: Context,
+  schema: StandardSchema<T>,
+  hook?: (result: { success: true } | { success: false, error: ValidationIssues }, c: Context) => Response | void | Promise<Response | void>,
+): Promise<{ ok: true, data: T } | { ok: false, response: Response }> {
+  const value = await parseJsonBodyWithHeaderFallback(c)
+  const result = await Promise.resolve(schema['~standard'].validate(value))
+
+  if (hook) {
+    const hookResult = await hook(result.issues ? { success: false, error: result.issues as ValidationIssues } : { success: true }, c)
+    if (hookResult) {
+      return { ok: false, response: hookResult }
+    }
+  }
+
+  if (result.issues) {
+    return {
+      ok: false,
+      response: c.json({
+        data: value,
+        error: result.issues,
+        success: false,
+      }, 400),
+    }
+  }
+
+  return { ok: true, data: result.value }
 }
 
 export const orgIdParamSchema = type({

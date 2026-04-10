@@ -15,6 +15,7 @@ import {
   orgIdParamSchema,
   updateRoleBindingBodyHook,
   updateRoleBindingBodySchema,
+  validateJsonBody,
 } from './rbac_validation.ts'
 
 type ValidationResult<T> = { ok: true, data: T } | { ok: false, status: number, error: string }
@@ -186,12 +187,17 @@ app.get('/:org_id', sValidator('param', orgIdParamSchema, invalidOrgIdHook), asy
 })
 
 // POST /private/role_bindings - Assign a role
-app.post('/', sValidator('json', createRoleBindingBodySchema, createRoleBindingBodyHook), async (c) => {
+app.post('/', async (c) => {
   const auth = c.get('auth')
   const userId = auth?.userId
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  const bodyResult = await validateJsonBody(c, createRoleBindingBodySchema, createRoleBindingBodyHook)
+  if (!bodyResult.ok) {
+    return bodyResult.response
   }
 
   const {
@@ -203,7 +209,7 @@ app.post('/', sValidator('json', createRoleBindingBodySchema, createRoleBindingB
     app_id,
     channel_id,
     reason,
-  } = c.req.valid('json')
+  } = bodyResult.data
 
   let pgClient
   try {
@@ -319,7 +325,6 @@ app.post('/', sValidator('json', createRoleBindingBodySchema, createRoleBindingB
 app.patch(
   '/:binding_id',
   sValidator('param', bindingIdParamSchema, invalidBindingIdHook),
-  sValidator('json', updateRoleBindingBodySchema, updateRoleBindingBodyHook),
   async (c) => {
     const { binding_id: bindingId } = c.req.valid('param')
     const auth = c.get('auth')
@@ -329,7 +334,12 @@ app.patch(
       return c.json({ error: 'Unauthorized' }, 401)
     }
 
-    const { role_name: roleName } = c.req.valid('json')
+    const bodyResult = await validateJsonBody(c, updateRoleBindingBodySchema, updateRoleBindingBodyHook)
+    if (!bodyResult.ok) {
+      return bodyResult.response
+    }
+
+    const { role_name: roleName } = bodyResult.data
 
     let pgClient
     try {

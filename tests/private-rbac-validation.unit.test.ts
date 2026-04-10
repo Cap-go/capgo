@@ -1,4 +1,5 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
+import { Hono } from 'hono'
 import { describe, expect, it } from 'vitest'
 import {
   addGroupMemberBodyHook,
@@ -13,6 +14,7 @@ import {
   updateGroupBodySchema,
   updateRoleBindingBodyHook,
   updateRoleBindingBodySchema,
+  validateJsonBody,
 } from '../supabase/functions/_backend/private/rbac_validation.ts'
 
 type ValidationIssues = readonly StandardSchemaV1.Issue[]
@@ -71,6 +73,27 @@ describe('rBAC validation hooks', () => {
     const issues = await getIssues(updateGroupBodySchema, { description: 42 })
     const error = await getErrorMessage(updateGroupBodyHook, issues)
     expect(error).toBe('Invalid description')
+  })
+
+  it.concurrent('parses headerless JSON bodies for update validation', async () => {
+    const app = new Hono()
+
+    app.put('/groups/:group_id', async (c) => {
+      const result = await validateJsonBody(c, updateGroupBodySchema, updateGroupBodyHook)
+      if (!result.ok) {
+        return result.response
+      }
+
+      return c.json(result.data)
+    })
+
+    const response = await app.request(new Request('http://localhost/groups/550e8400-e29b-41d4-a716-446655440000', {
+      method: 'PUT',
+      body: JSON.stringify({ name: 'Renamed group' }),
+    }))
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ name: 'Renamed group' })
   })
 
   it.concurrent('keeps the add-group-member invalid user error', async () => {
