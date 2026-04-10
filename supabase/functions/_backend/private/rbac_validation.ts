@@ -2,7 +2,7 @@ import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { Context } from 'hono'
 import { type } from 'arktype'
 import { createInsertSchema, createUpdateSchema } from 'drizzle-orm/arktype'
-import { HTTPException } from 'hono/http-exception'
+import { simpleErrorWithStatus } from '../utils/hono.ts'
 import { schema } from '../utils/postgres_schema.ts'
 
 type ValidationIssue = StandardSchemaV1.Issue & { readonly code?: string }
@@ -66,28 +66,28 @@ function createErrorHook(resolveMessage: (issues: ValidationIssues) => string) {
   }
 }
 
-async function parseJsonBodyWithHeaderFallback(c: Context): Promise<unknown> {
+async function parseJsonBodyWithHeaderFallback(c: Context): Promise<{ ok: true, data: unknown } | { ok: false, response: Response }> {
   const contentType = c.req.header('Content-Type')
 
   if (contentType && JSON_CONTENT_TYPE_REGEX.test(contentType)) {
     try {
-      return await c.req.json()
+      return { ok: true, data: await c.req.json() }
     }
-    catch {
-      throw new HTTPException(400, { message: 'Malformed JSON in request body' })
+    catch (error) {
+      return { ok: false, response: simpleErrorWithStatus(c, 400, 'invalid_json_parse_body', 'Invalid JSON body', { error }) }
     }
   }
 
   const rawBody = await c.req.raw.clone().text()
   if (!rawBody) {
-    return {}
+    return { ok: false, response: simpleErrorWithStatus(c, 400, 'invalid_json_parse_body', 'Invalid JSON body') }
   }
 
   try {
-    return JSON.parse(rawBody)
+    return { ok: true, data: JSON.parse(rawBody) }
   }
-  catch {
-    throw new HTTPException(400, { message: 'Malformed JSON in request body' })
+  catch (error) {
+    return { ok: false, response: simpleErrorWithStatus(c, 400, 'invalid_json_parse_body', 'Invalid JSON body', { error }) }
   }
 }
 
@@ -96,7 +96,12 @@ export async function validateJsonBody<T>(
   schema: StandardSchema<T>,
   hook?: (result: { success: true } | { success: false, error: ValidationIssues }, c: Context) => Response | void | Promise<Response | void>,
 ): Promise<{ ok: true, data: T } | { ok: false, response: Response }> {
-  const value = await parseJsonBodyWithHeaderFallback(c)
+  const bodyResult = await parseJsonBodyWithHeaderFallback(c)
+  if (!bodyResult.ok) {
+    return bodyResult
+  }
+
+  const value = bodyResult.data
   const result = await Promise.resolve(schema['~standard'].validate(value))
 
   if (hook) {
