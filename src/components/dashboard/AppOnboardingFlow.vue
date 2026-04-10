@@ -54,7 +54,7 @@ const appIdFeedback = ref('')
 const hasEditedAppId = ref(false)
 
 const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ''
-const cliCommand = computed(() => `npx @capgo/cli@latest i ${apiKey.value ?? '[APIKEY]'}${localCommand}`)
+const cliCommand = computed(() => `npx @capgo/cli@latest init ${apiKey.value ?? '[APIKEY]'}${localCommand}`)
 const cliCommandArgs = computed(() => {
   const args: string[] = []
 
@@ -660,7 +660,7 @@ watch(suggestedAppId, (value) => {
                     <code class="block whitespace-pre-wrap break-all text-sm">
                       <span class="text-slate-500">npx</span>
                       <span class="text-sky-300"> @capgo/cli@latest</span>
-                      <span class="text-violet-300"> i</span>
+                      <span class="text-violet-300"> init</span>
                       <span class="text-emerald-300"> {{ apiKey ?? '[APIKEY]' }}</span>
                       <template v-for="(arg, index) in cliCommandArgs" :key="`${arg}-${index}`">
                         <span :class="index % 2 === 0 ? 'text-amber-300' : 'text-cyan-300'"> {{ arg }}</span>
@@ -868,7 +868,7 @@ watch(suggestedAppId, (value) => {
             <code class="block whitespace-pre-wrap break-all text-sm">
               <span class="text-slate-500">npx</span>
               <span class="text-sky-300"> @capgo/cli@latest</span>
-              <span class="text-violet-300"> i</span>
+              <span class="text-violet-300"> init</span>
               <span class="text-emerald-300"> {{ apiKey ?? '[APIKEY]' }}</span>
               <template v-for="(arg, index) in cliCommandArgs" :key="`${arg}-${index}`">
                 <span :class="index % 2 === 0 ? 'text-amber-300' : 'text-cyan-300'"> {{ arg }}</span>
