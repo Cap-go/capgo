@@ -26,6 +26,7 @@ interface DataStats {
 
 const ORDER_KEYS = ['created_at', 'app_id', 'device_id', 'action', 'version_name'] as const
 const EXPORT_FORMATS = ['csv', 'json'] as const
+const NUMERIC_RANGE_INPUT = /^-?(?:(?:0|[1-9]\d*)(?:\.\d+)?|\.\d+)$/
 
 const statsBodyShape = {
   'appId': appIdSchema,
@@ -35,8 +36,8 @@ const statsBodyShape = {
     key: literalUnion(ORDER_KEYS),
     sortable: literalUnion(['asc', 'desc']),
   }).array(),
-  'rangeStart?': safeQueryDateSchema.or(type('number').or(type('string.numeric.parse'))),
-  'rangeEnd?': safeQueryDateSchema.or(type('number').or(type('string.numeric.parse'))),
+  'rangeStart?': safeQueryDateSchema.or(type('number')),
+  'rangeEnd?': safeQueryDateSchema.or(type('number')),
   'limit?': queryLimitSchema,
   'actions?': statsActionSchema.array(),
 } as const
@@ -112,7 +113,7 @@ function normalizeRangeDate(value: string | number | undefined): string | undefi
   if (value === undefined)
     return undefined
 
-  const normalizedValue = typeof value === 'string' && /^\d+$/.test(value.trim())
+  const normalizedValue = typeof value === 'string' && NUMERIC_RANGE_INPUT.test(value.trim())
     ? Number(value)
     : value
 
