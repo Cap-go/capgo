@@ -2,8 +2,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
+import { type } from 'arktype'
 import { Hono } from 'hono/tiny'
-import { z } from 'zod/mini'
+import { safeParseSchema } from '../utils/ark_validation.ts'
 import { parseBody, quickError, simpleError, simpleRateLimit, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { getEffectivePasswordMinLength, getPasswordPolicyValidationErrors } from '../utils/password_policy.ts'
@@ -100,11 +101,11 @@ async function validateOrigin(c: BackendContext, next: () => Promise<void>) {
   return next()
 }
 
-const bodySchema = z.object({
-  email: z.string().check(z.email()),
-  password: z.string().check(z.minLength(1)),
-  org_id: z.string().check(z.uuid()),
-  captcha_token: z.optional(z.string().check(z.minLength(1))),
+const bodySchema = type({
+  'email': 'string.email',
+  'password': 'string > 0',
+  'org_id': 'string.uuid',
+  'captcha_token?': 'string > 0',
 })
 
 /**
@@ -142,9 +143,9 @@ app.post('/', async (c) => {
   }
 
   // Validate request body
-  const validationResult = bodySchema.safeParse(rawBody)
+  const validationResult = safeParseSchema(bodySchema, rawBody)
   if (!validationResult.success) {
-    throw simpleError('invalid_body', 'Invalid request body', { errors: z.prettifyError(validationResult.error) })
+    throw simpleError('invalid_body', 'Invalid request body', { errors: validationResult.error.message })
   }
 
   const body = validationResult.data

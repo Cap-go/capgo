@@ -1,8 +1,9 @@
 import type { Context } from 'hono'
+import type { ValidationIssue } from '../../utils/ark_validation.ts'
 import type { AuthInfo } from '../../utils/hono.ts'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc.js'
-import { z } from 'zod/mini'
+import { createSchema, makeIssue, safeParseSchema } from '../../utils/ark_validation.ts'
 import { honoFactory, quickError, simpleError, useCors } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
 import { cloudlog } from '../../utils/logging.ts'
@@ -17,16 +18,90 @@ export const app = honoFactory.createApp()
 app.use('*', useCors)
 app.use('*', middlewareV2(['all', 'read']))
 
-const bundleUsageSchema = z.object({
-  from: z.coerce.date(),
-  to: z.coerce.date(),
+function parseQueryDate(query: Record<string, string>, key: 'from' | 'to', issues: ValidationIssue[]): Date | undefined {
+  const value = query[key]
+  if (typeof value !== 'string') {
+    issues.push(makeIssue(`${key} is required`, [key]))
+    return undefined
+  }
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    issues.push(makeIssue(`${key} must be a valid date`, [key]))
+    return undefined
+  }
+
+  return parsed
+}
+
+function parseOptionalQueryBoolean(query: Record<string, string>, key: 'breakdown' | 'noAccumulate', issues: ValidationIssue[]): boolean | undefined {
+  const value = query[key]
+  if (value === undefined) {
+    return undefined
+  }
+
+  if (value === 'true') {
+    return true
+  }
+  if (value === 'false') {
+    return false
+  }
+
+  issues.push(makeIssue(`${key} must be true or false`, [key]))
+  return undefined
+}
+
+const bundleUsageSchema = createSchema<{ from: Date, to: Date }>((value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { issues: [makeIssue('Expected query object')] }
+  }
+
+  const query = value as Record<string, string>
+  const issues: ValidationIssue[] = []
+  const from = parseQueryDate(query, 'from', issues)
+  const to = parseQueryDate(query, 'to', issues)
+
+  if (issues.length > 0) {
+    return { issues }
+  }
+
+  return {
+    value: {
+      from: from!,
+      to: to!,
+    },
+  }
 })
 
-const normalStatsSchema = z.object({
-  from: z.coerce.date(),
-  to: z.coerce.date(),
-  breakdown: z.optional(z.coerce.boolean()),
-  noAccumulate: z.optional(z.coerce.boolean()), // Default to true for backward compatibility
+const normalStatsSchema = createSchema<{
+  from: Date
+  to: Date
+  breakdown?: boolean
+  noAccumulate?: boolean
+}>((value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { issues: [makeIssue('Expected query object')] }
+  }
+
+  const query = value as Record<string, string>
+  const issues: ValidationIssue[] = []
+  const from = parseQueryDate(query, 'from', issues)
+  const to = parseQueryDate(query, 'to', issues)
+  const breakdown = parseOptionalQueryBoolean(query, 'breakdown', issues)
+  const noAccumulate = parseOptionalQueryBoolean(query, 'noAccumulate', issues)
+
+  if (issues.length > 0) {
+    return { issues }
+  }
+
+  return {
+    value: {
+      from: from!,
+      to: to!,
+      breakdown,
+      noAccumulate,
+    },
+  }
 })
 
 interface AppUsageByVersion {
@@ -540,7 +615,7 @@ function getDaysBetweenDates(firstDate: Date, secondDate: Date) {
 app.get('/app/:app_id', async (c) => {
   const appId = c.req.param('app_id')
   const query = c.req.query()
-  const bodyParsed = normalStatsSchema.safeParse(query)
+  const bodyParsed = safeParseSchema(normalStatsSchema, query)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
@@ -579,7 +654,7 @@ app.get('/org/:org_id', async (c) => {
   const orgId = c.req.param('org_id')
   const query = c.req.query()
 
-  const bodyParsed = normalStatsSchema.safeParse(query)
+  const bodyParsed = safeParseSchema(normalStatsSchema, query)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
@@ -621,7 +696,7 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
   const query = c.req.query()
   const useDashboard = false
 
-  const bodyParsed = bundleUsageSchema.safeParse(query)
+  const bodyParsed = safeParseSchema(bundleUsageSchema, query)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
@@ -662,7 +737,7 @@ app.get('/user', async (c) => {
   const supabase = getAuthenticatedSupabase(c, auth)
 
   const query = c.req.query()
-  const bodyParsed = normalStatsSchema.safeParse(query)
+  const bodyParsed = safeParseSchema(normalStatsSchema, query)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }

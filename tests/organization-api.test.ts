@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { createClient } from '@supabase/supabase-js'
+import { type } from 'arktype'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { z } from 'zod'
+import { parseSchema, safeParseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
 
 import {
   BASE_URL,
@@ -123,7 +124,7 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     })
     const createdKey = await createResponse.json<{ id?: number, key?: string, error?: string, message?: string }>()
     expect(createResponse.status, JSON.stringify(createdKey)).toBe(200)
-    const parsedKey = z.object({ id: z.number(), key: z.string() }).parse(createdKey)
+    const parsedKey = parseSchema(type({ id: 'number', key: 'string' }), createdKey)
     readOnlyKey = parsedKey.key
     readOnlyKeyId = parsedKey.id
   })
@@ -208,8 +209,8 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     })
 
     expect(response.status).toBe(200)
-    const type = z.object({ id: z.string(), name: z.string() })
-    expect(type.parse(await response.json())).toEqual({ id: readOnlyOrgId, name: readOnlyName })
+    const responseType = type({ id: 'string', name: 'string' })
+    expect(parseSchema(responseType, await response.json())).toEqual({ id: readOnlyOrgId, name: readOnlyName })
   })
 
   it.concurrent('allows GET /organization/members for accessible organizations', async () => {
@@ -219,12 +220,12 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     })
 
     expect(response.status).toBe(200)
-    const members = z.array(z.object({
-      uid: z.string(),
-      email: z.string(),
-      role: z.string(),
-    }))
-    expect(members.parse(await response.json()).some(member => member.uid === USER_ID)).toBe(true)
+    const members = type({
+      uid: 'string',
+      email: 'string',
+      role: 'string',
+    }).array()
+    expect(parseSchema(members, await response.json()).some(member => member.uid === USER_ID)).toBe(true)
   })
 
   it.concurrent('allows GET /organization/members for same user without org scope limits', async () => {
@@ -234,12 +235,12 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     })
 
     expect(response.status).toBe(200)
-    const members = z.array(z.object({
-      uid: z.string(),
-      email: z.string(),
-      role: z.string(),
-    }))
-    expect(members.parse(await response.json()).some(member => member.uid === USER_ID)).toBe(true)
+    const members = type({
+      uid: 'string',
+      email: 'string',
+      role: 'string',
+    }).array()
+    expect(parseSchema(members, await response.json()).some(member => member.uid === USER_ID)).toBe(true)
   })
 
   it.concurrent('rejects GET /organization/members outside limited_to_orgs scope', async () => {
@@ -271,8 +272,8 @@ describe('[GET] /organization', () => {
       headers,
     })
     expect(response.status).toBe(200)
-    const type = z.array(z.object({ id: z.string(), name: z.string() }))
-    expect(type.parse(await response.json()).length).toBeGreaterThan(0)
+    const responseType = type({ id: 'string', name: 'string' }).array()
+    expect(parseSchema(responseType, await response.json()).length).toBeGreaterThan(0)
   })
 
   it('get organization by id', async () => {
@@ -280,9 +281,11 @@ describe('[GET] /organization', () => {
       headers,
     })
     expect(response.status).toBe(200)
-    const type = z.object({ id: z.string(), name: z.string(), website: z.string().nullable() })
-    const safe = type.safeParse(await response.json())
+    const responseType = type({ id: 'string', name: 'string', website: 'string | null' })
+    const safe = safeParseSchema(responseType, await response.json())
     expect(safe.success).toBe(true)
+    if (!safe.success)
+      throw safe.error
     expect(safe.data).toEqual({ id: ORG_ID, name, website })
   })
 
@@ -303,17 +306,19 @@ describe('[GET] /organization/members', () => {
       headers,
     })
     expect(response.status).toBe(200)
-    const type = z.array(z.object({
-      uid: z.string(),
-      email: z.string(),
-      image_url: z.string(),
-      role: z.string(),
-    }))
-    const safe = type.safeParse(await response.json())
+    const responseType = type({
+      uid: 'string',
+      email: 'string',
+      image_url: 'string',
+      role: 'string',
+    }).array()
+    const safe = safeParseSchema(responseType, await response.json())
     expect(safe.success).toBe(true)
-    expect(safe.data?.length).toBeGreaterThanOrEqual(1)
+    if (!safe.success)
+      throw safe.error
+    expect(safe.data.length).toBeGreaterThanOrEqual(1)
 
-    const testUser = safe.data?.find(m => m.uid === USER_ID)
+    const testUser = safe.data.find(m => m.uid === USER_ID)
     expect(testUser).toBeTruthy()
     expect(testUser?.email).toBe(USER_EMAIL)
     expect(testUser?.role).toBe('super_admin')
@@ -463,12 +468,14 @@ describe('[POST] /organization/members', () => {
 
     const responseData = await response.json()
     expect(response.status).toBe(200)
-    const type = z.object({
-      status: z.string(),
+    const responseType = type({
+      status: 'string',
     })
-    const safe = type.safeParse(responseData)
+    const safe = safeParseSchema(responseType, responseData)
     expect(safe.success).toBe(true)
-    expect(safe.data?.status).toBe('ok')
+    if (!safe.success)
+      throw safe.error
+    expect(safe.data.status).toBe('ok')
 
     const { data: userData, error: userError } = await getSupabaseClient().from('users').select().eq('email', USER_ADMIN_EMAIL).single()
     expect(userError).toBeNull()
@@ -558,12 +565,14 @@ describe('[DELETE] /organization/members', () => {
       method: 'DELETE',
     })
     expect(response.status).toBe(200)
-    const type = z.object({
-      status: z.string(),
+    const responseType = type({
+      status: 'string',
     })
-    const safe = type.safeParse(await response.json())
+    const safe = safeParseSchema(responseType, await response.json())
     expect(safe.success).toBe(true)
-    expect(safe.data?.status).toBe('ok')
+    if (!safe.success)
+      throw safe.error
+    expect(safe.data.status).toBe('ok')
 
     const { data, error: orgUserError } = await getSupabaseClient().from('org_users').select().eq('org_id', ORG_ID).eq('user_id', userData!.id).single()
     expect(orgUserError).toBeTruthy()
@@ -617,15 +626,17 @@ describe('[POST] /organization', () => {
       body: JSON.stringify({ name, website }),
     })
     expect(response.status).toBe(200)
-    const type = z.object({
-      id: z.uuid(),
+    const responseType = type({
+      id: 'string.uuid',
     })
-    const safe = type.safeParse(await response.json())
+    const safe = safeParseSchema(responseType, await response.json())
     expect(safe.success).toBe(true)
-    expect(safe.data?.id).toBeDefined()
+    if (!safe.success)
+      throw safe.error
+    expect(safe.data.id).toBeDefined()
 
     try {
-      const { data, error } = await getSupabaseClient().from('orgs').select().eq('id', safe.data!.id).single()
+      const { data, error } = await getSupabaseClient().from('orgs').select().eq('id', safe.data.id).single()
       expect(error).toBeNull()
       expect(data).toBeTruthy()
       expect(data?.name).toBe(name)
@@ -634,7 +645,7 @@ describe('[POST] /organization', () => {
       expect(data?.use_new_rbac).toBe(true)
     }
     finally {
-      await getSupabaseClient().from('orgs').delete().eq('id', safe.data!.id)
+      await getSupabaseClient().from('orgs').delete().eq('id', safe.data.id)
     }
   })
 
@@ -729,13 +740,15 @@ describe('[PUT] /organization', () => {
         body: JSON.stringify({ orgId, name, website }),
       })
       expect(response.status).toBe(200)
-      const type = z.object({
-        id: z.uuid(),
-        data: z.any(),
+      const responseType = type({
+        id: 'string.uuid',
+        data: 'unknown',
       })
-      const safe = type.safeParse(await response.json())
+      const safe = safeParseSchema(responseType, await response.json())
       expect(safe.success).toBe(true)
-      expect(safe.data?.id).toBe(orgId)
+      if (!safe.success)
+        throw safe.error
+      expect(safe.data.id).toBe(orgId)
 
       const { data, error } = await getSupabaseClient().from('orgs').select().eq('id', orgId).single()
       expect(error).toBeNull()
@@ -1142,9 +1155,11 @@ describe('rbac mode - organization member operations', () => {
       headers,
     })
     expect(response.status).toBe(200)
-    const type = z.object({ id: z.string(), name: z.string() })
-    const safe = type.safeParse(await response.json())
+    const responseType = type({ id: 'string', name: 'string' })
+    const safe = safeParseSchema(responseType, await response.json())
     expect(safe.success).toBe(true)
+    if (!safe.success)
+      throw safe.error
     expect(safe.data).toEqual({ id: ORG_ID_RBAC, name: nameRbac })
   })
 
@@ -1153,16 +1168,18 @@ describe('rbac mode - organization member operations', () => {
       headers,
     })
     expect(response.status).toBe(200)
-    const type = z.array(z.object({
-      uid: z.string(),
-      email: z.string(),
-      image_url: z.string(),
-      role: z.string(),
-    }))
-    const safe = type.safeParse(await response.json())
+    const responseType = type({
+      uid: 'string',
+      email: 'string',
+      image_url: 'string',
+      role: 'string',
+    }).array()
+    const safe = safeParseSchema(responseType, await response.json())
     expect(safe.success).toBe(true)
+    if (!safe.success)
+      throw safe.error
 
-    const testUser = safe.data?.find(m => m.uid === USER_ID)
+    const testUser = safe.data.find(m => m.uid === USER_ID)
     expect(testUser).toBeTruthy()
     expect(testUser?.email).toBe(USER_EMAIL)
     expect(testUser?.role).toBe('super_admin')
@@ -1176,10 +1193,12 @@ describe('rbac mode - organization member operations', () => {
       body: JSON.stringify({ orgId: ORG_ID_RBAC, name: updatedName }),
     })
     expect(response.status).toBe(200)
-    const type = z.object({ id: z.uuid(), data: z.any() })
-    const safe = type.safeParse(await response.json())
+    const responseType = type({ id: 'string.uuid', data: 'unknown' })
+    const safe = safeParseSchema(responseType, await response.json())
     expect(safe.success).toBe(true)
-    expect(safe.data?.id).toBe(ORG_ID_RBAC)
+    if (!safe.success)
+      throw safe.error
+    expect(safe.data.id).toBe(ORG_ID_RBAC)
   })
 
   it('[POST] /organization/members - add member in RBAC mode (sync trigger creates role_binding)', async () => {

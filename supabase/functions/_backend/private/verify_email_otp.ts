@@ -1,13 +1,14 @@
-import { z } from 'zod/mini'
+import { type } from 'arktype'
+import { safeParseSchema } from '../utils/ark_validation.ts'
 import { createHono, getClaimsFromJWT, middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { emptySupabase, supabaseAdmin } from '../utils/supabase.ts'
 import { version } from '../utils/version.ts'
 
-const bodySchema = z.object({
-  token: z.optional(z.string()),
-  token_hash: z.optional(z.string()),
-  type: z.optional(z.enum(['email', 'magiclink'])),
+const bodySchema = type({
+  'token?': 'string',
+  'token_hash?': 'string',
+  'type?': '"email" | "magiclink"',
 })
 
 export const app = createHono('', version)
@@ -19,9 +20,9 @@ app.post('/', middlewareAuth, async (c) => {
   const token = rawBody.token?.replaceAll(' ', '') ?? ''
   const tokenHash = rawBody.token_hash?.trim() ?? ''
 
-  const validation = bodySchema.safeParse({ token, token_hash: tokenHash, type: rawBody.type })
+  const validation = safeParseSchema(bodySchema, { token, token_hash: tokenHash, type: rawBody.type })
   if (!validation.success) {
-    throw simpleError('invalid_body', 'Invalid request body', { errors: z.prettifyError(validation.error) })
+    throw simpleError('invalid_body', 'Invalid request body', { errors: validation.error.message })
   }
   const otpType = validation.data.type ?? 'email'
   if (!token && !tokenHash) {

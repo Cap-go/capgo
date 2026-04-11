@@ -1,8 +1,9 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { type } from 'arktype'
 import { Hono } from 'hono/tiny'
 // --- Worker logic imports ---
-import { z } from 'zod/mini'
+import { safeParseSchema } from '../utils/ark_validation.ts'
 import { sendDiscordAlert } from '../utils/discord.ts'
 import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
@@ -13,14 +14,15 @@ import { backgroundTask, getEnv } from '../utils/utils.ts'
 const DEFAULT_BATCH_SIZE = 950 // Default batch size for queue reads limit of CF is 1000 fetches so we take a safe margin
 const DISCORD_IGNORED_ERROR_CODES = new Set(['version_not_found', 'no_channel'])
 
-// Zod schema for a message object
-export const messageSchema = z.object({
-  msg_id: z.coerce.number(),
-  read_ct: z.coerce.number(),
-  message: z.looseObject({
-    payload: z.optional(z.unknown()),
-    function_name: z.string(),
-    function_type: z.nullable(z.optional(z.enum(['cloudflare', 'cloudflare_pp', '']))),
+const integerLikeSchema = type('number.integer').or(type('string.numeric.parse |> number.integer'))
+
+export const messageSchema = type({
+  msg_id: integerLikeSchema,
+  read_ct: integerLikeSchema,
+  message: type({
+    'payload?': 'unknown',
+    'function_name': 'string',
+    'function_type?': '"cloudflare" | "cloudflare_pp" | "" | null',
   }),
 })
 
@@ -35,7 +37,7 @@ interface Message {
   }
 }
 
-export const messagesArraySchema = z.array(messageSchema)
+export const messagesArraySchema = messageSchema.array()
 
 function extractMessageBody(message: Message): Record<string, unknown> {
   if (message.message?.payload !== undefined)
@@ -274,7 +276,7 @@ async function readQueue(c: Context, db: ReturnType<typeof getPgClient>, queueNa
     }
 
     cloudlog({ requestId: c.get('requestId'), message: `[${queueKey}] Received ${messages.length} messages from queue ${queueName}.` })
-    const parsed = messagesArraySchema.safeParse(messages)
+    const parsed = safeParseSchema(messagesArraySchema, messages)
     if (parsed.success) {
       return parsed.data as Message[]
     }

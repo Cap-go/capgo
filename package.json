@@ -205,8 +205,7 @@
     "vue-i18n": "^11.3.2",
     "vue-router": "^5.0.4",
     "vue-sonner": "^2.0.9",
-    "vue-turnstile": "^1.0.11",
-    "zod": "^4.3.6"
+    "vue-turnstile": "^1.0.11"
   },
   "devDependencies": {
     "@antfu/eslint-config": "8.2.0",

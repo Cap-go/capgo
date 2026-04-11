@@ -1,8 +1,10 @@
 import type { Context } from 'hono'
+import type { StandardSchema } from '../utils/ark_validation.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Order } from '../utils/types.ts'
+import { type } from 'arktype'
 import { Hono } from 'hono/tiny'
-import { z } from 'zod/mini'
+import { literalUnion, safeParseSchema } from '../utils/ark_validation.ts'
 import { toCsv } from '../utils/csv.ts'
 import { parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
@@ -26,20 +28,20 @@ const ORDER_KEYS = ['created_at', 'app_id', 'device_id', 'action', 'version_name
 const EXPORT_FORMATS = ['csv', 'json'] as const
 
 const statsBodyShape = {
-  appId: appIdSchema,
-  devicesId: z.optional(z.array(deviceIdSchema)),
-  search: z.optional(safeQueryTextSchema),
-  order: z.optional(z.array(z.object({
-    key: z.enum(ORDER_KEYS),
-    sortable: z.enum(['asc', 'desc']),
-  }))),
-  rangeStart: z.optional(z.union([safeQueryDateSchema, z.coerce.number()])),
-  rangeEnd: z.optional(z.union([safeQueryDateSchema, z.coerce.number()])),
-  limit: z.optional(queryLimitSchema),
-  actions: z.optional(z.array(statsActionSchema)),
+  'appId': appIdSchema,
+  'devicesId?': deviceIdSchema.array(),
+  'search?': safeQueryTextSchema,
+  'order?': type({
+    key: literalUnion(ORDER_KEYS),
+    sortable: literalUnion(['asc', 'desc']),
+  }).array(),
+  'rangeStart?': safeQueryDateSchema.or(type('number').or(type('string.numeric.parse'))),
+  'rangeEnd?': safeQueryDateSchema.or(type('number').or(type('string.numeric.parse'))),
+  'limit?': queryLimitSchema,
+  'actions?': statsActionSchema.array(),
 } as const
 
-const statsBodySchema = z.object(statsBodyShape)
+const statsBodySchema = type(statsBodyShape)
 
 function stripControlChars(input: string): string {
   const out: string[] = []
@@ -73,14 +75,27 @@ function sanitizeFilename(input: string | undefined, extension: 'csv' | 'json'):
   return `${safe}${ext}`
 }
 
-const exportSchema = z.object({
+const exportSchema = type({
   ...statsBodyShape,
-  format: z.optional(z.enum(EXPORT_FORMATS)),
-  filename: z.optional(z.string()),
+  'format?': literalUnion(EXPORT_FORMATS),
+  'filename?': 'string',
 })
 
-type StatsBody = z.infer<typeof statsBodySchema>
-type ExportBody = z.infer<typeof exportSchema>
+interface StatsBody {
+  appId: string
+  devicesId?: string[]
+  search?: string
+  order?: { key: typeof ORDER_KEYS[number], sortable: 'asc' | 'desc' }[]
+  rangeStart?: string | number
+  rangeEnd?: string | number
+  limit?: number
+  actions?: string[]
+}
+
+interface ExportBody extends StatsBody {
+  format?: typeof EXPORT_FORMATS[number]
+  filename?: string
+}
 interface ValidatedStatsRequest<T extends StatsBody | ExportBody> {
   body: T
   startDate: string | undefined
@@ -110,13 +125,13 @@ function normalizeRangeDate(value: string | number | undefined): string | undefi
 
 async function getValidatedStatsRequestBody<T extends StatsBody | ExportBody>(
   c: Context,
-  schema: z.ZodMiniType<T>,
+  schema: StandardSchema<T>,
   logMessage: string,
 ): Promise<ValidatedStatsRequest<T>> {
   const bodyRaw = await parseBody<DataStats>(c)
   if (hasInvalidQueryLimitInput(bodyRaw.limit))
     throw simpleError('invalid_body', 'Invalid body')
-  const parsed = schema.safeParse(bodyRaw)
+  const parsed = safeParseSchema(schema, bodyRaw)
   if (!parsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: parsed.error })
   }
@@ -161,7 +176,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
 
 app.post('/export', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   const { body, startDate, endDate } = await getValidatedStatsRequestBody(c, exportSchema, 'post private/stats/export body')
-  const format = body.format ?? 'csv'
+  const format: NonNullable<ExportBody['format']> = body.format ?? 'csv'
   const limit = Math.min(Math.max(body.limit ?? 10_000, 1), MAX_QUERY_LIMIT)
   const data = await readStats(c, createStatsReadParams(body, startDate, endDate, limit))
 
