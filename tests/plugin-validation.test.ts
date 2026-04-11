@@ -209,6 +209,13 @@ describe('test schemas', () => {
       expectError(response, NON_STRING_VERSION_NAME)
     })
 
+    it(`version_name invalid #3 ${suffix}`, () => {
+      const body = getJSON()
+      body.version_name = ''
+      const response = parseJSON(body, schema)
+      expectError(response, MISSING_STRING_VERSION_NAME)
+    })
+
     it(`app_id and device_id missing ${suffix}`, () => {
       const body = getJSON()
       delete body.app_id
@@ -249,6 +256,13 @@ describe('test version_build - /updates', () => {
     body.version_build = true
     const response = parseJSON(body, updateRequestSchema)
     expectError(response, NON_STRING_VERSION_BUILD)
+  })
+
+  it('version_build invalid #3', () => {
+    const body = getJSON()
+    body.version_build = ''
+    const response = parseJSON(body, updateRequestSchema)
+    expectError(response, MISSING_STRING_VERSION_BUILD)
   })
 })
 

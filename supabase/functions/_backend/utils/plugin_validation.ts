@@ -127,11 +127,27 @@ function validateRequiredDeviceId(input: UnknownRecord, issues: ValidationIssue[
 }
 
 function validateRequiredVersionName(input: UnknownRecord, issues: ValidationIssue[]): string | undefined {
-  return validateRequiredString(input, 'version_name', issues, MISSING_STRING_VERSION_NAME, NON_STRING_VERSION_NAME)
+  const value = validateRequiredString(input, 'version_name', issues, MISSING_STRING_VERSION_NAME, NON_STRING_VERSION_NAME)
+  if (value === undefined) {
+    return undefined
+  }
+  if (value.length === 0) {
+    issues.push(fieldIssue('version_name', MISSING_STRING_VERSION_NAME))
+    return undefined
+  }
+  return value
 }
 
 function validateRequiredVersionBuild(input: UnknownRecord, issues: ValidationIssue[]): string | undefined {
-  return validateRequiredString(input, 'version_build', issues, MISSING_STRING_VERSION_BUILD, NON_STRING_VERSION_BUILD)
+  const value = validateRequiredString(input, 'version_build', issues, MISSING_STRING_VERSION_BUILD, NON_STRING_VERSION_BUILD)
+  if (value === undefined) {
+    return undefined
+  }
+  if (value.length === 0) {
+    issues.push(fieldIssue('version_build', MISSING_STRING_VERSION_BUILD))
+    return undefined
+  }
+  return value
 }
 
 function validateRequiredVersionOs(input: UnknownRecord, issues: ValidationIssue[]): string | undefined {
