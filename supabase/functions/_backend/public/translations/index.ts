@@ -7,7 +7,7 @@ export const app = honoFactory.createApp()
 
 app.use('*', useCors)
 
-app.get('/:locale', (c) => {
+app.get('/:locale', async (c) => {
   const requestId = c.get('requestId')
   const requestedLocale = c.req.param('locale')
   const locale = resolveLocale(requestedLocale)
@@ -22,5 +22,5 @@ app.get('/:locale', (c) => {
   c.header('Cache-Control', 'public, max-age=300, s-maxage=86400')
   c.header('Content-Language', locale)
   cloudlog({ requestId, message: 'translations response', locale })
-  return c.json(getLocaleMessages(locale))
+  return c.json(await getLocaleMessages(locale))
 })
