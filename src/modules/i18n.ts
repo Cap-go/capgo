@@ -1,43 +1,26 @@
 import type { Locale } from 'vue-i18n'
+import type { SupportedLocale } from '../constants/locales'
 import type { UserModule } from '~/types'
 import { createI18n } from 'vue-i18n'
+import { defaultApiHost } from '~/services/supabase'
+import enMessages from '../../messages/en.json'
+import { defaultLocale, languages, normalizeLocale, supportedLocales } from '../constants/locales'
 
-// Import i18n resources
-// https://vitejs.dev/guide/features.html#glob-import
-//
-// Don't need this? Try vitesse-lite: https://github.com/antfu/vitesse-lite
 export const i18n = createI18n({
   legacy: false,
-  fallbackLocale: 'en',
-  locale: '',
-  messages: {},
+  fallbackLocale: defaultLocale,
+  locale: defaultLocale,
+  messages: {
+    [defaultLocale]: enMessages,
+  },
 })
 
-const localesMap = Object.fromEntries(
-  Object.entries(import.meta.glob('../../messages/*.json'))
-    .map(([path, loadLocale]) => [/([\w-]*)\.json$/.exec(path)?.[1], loadLocale]),
-) as Record<Locale, () => Promise<{ default: Record<string, string> }>>
+type MessageDictionary = Record<string, string>
 
-export const availableLocales = Object.keys(localesMap)
-export const languages = {
-  'de': 'Deutsch',
-  'en': 'English',
-  'es': 'Español',
-  'id': 'Bahasa Indonesia',
-  'it': 'Italiano',
-  'fr': 'Français',
-  'ja': '日本語',
-  'ko': '한국어',
-  'pl': 'Polski',
-  'pt-br': 'Português (Brasil)',
-  'ru': 'Русский',
-  'tr': 'Türkçe',
-  'vi': 'Tiếng Việt',
-  'zh-cn': '简体中文',
-  'hi': 'हिन्दी',
-}
+export const availableLocales = supportedLocales
+export { languages }
 
-const loadedLanguages: string[] = []
+const loadedLanguages: SupportedLocale[] = [defaultLocale]
 
 function setI18nLanguage(lang: Locale) {
   i18n.global.locale.value = lang as any
@@ -47,26 +30,49 @@ function setI18nLanguage(lang: Locale) {
   return lang
 }
 
+async function loadLocaleMessages(locale: SupportedLocale): Promise<MessageDictionary> {
+  if (locale === defaultLocale)
+    return enMessages
+
+  const response = await fetch(`${defaultApiHost}/translations/${locale}`, {
+    headers: {
+      Accept: 'application/json',
+    },
+  })
+
+  if (!response.ok)
+    throw new Error(`Failed to load locale "${locale}" (HTTP ${response.status})`)
+
+  return await response.json() as MessageDictionary
+}
+
 export async function loadLanguageAsync(lang: string): Promise<Locale> {
+  const locale = normalizeLocale(lang)
+
   // If the same language
-  if (i18n.global.locale.value === lang)
-    return setI18nLanguage(lang)
+  if (i18n.global.locale.value === locale)
+    return setI18nLanguage(locale)
 
   // If the language was already loaded
-  if (loadedLanguages.includes(lang))
-    return setI18nLanguage(lang)
+  if (loadedLanguages.includes(locale))
+    return setI18nLanguage(locale)
 
-  // If the language hasn't been loaded yet
-  const messages = await localesMap[lang]()
-  i18n.global.setLocaleMessage(lang, messages.default)
-  loadedLanguages.push(lang)
-  return setI18nLanguage(lang)
+  const fallbackLocale = normalizeLocale(i18n.global.locale.value)
+
+  try {
+    const messages = await loadLocaleMessages(locale)
+    i18n.global.setLocaleMessage(locale, messages)
+    loadedLanguages.push(locale)
+    return setI18nLanguage(locale)
+  }
+  catch (error) {
+    console.error('Failed to load locale messages', { locale, error })
+    return setI18nLanguage(fallbackLocale)
+  }
 }
 
 export const install: UserModule = ({ app }) => {
   app.use(i18n)
-  let lang = localStorage.getItem('lang') ?? window.navigator.language.split('-')[0]
-  if (!(lang in languages))
-    lang = 'en'
+  const lang = normalizeLocale(localStorage.getItem('lang') ?? window.navigator.language)
   loadLanguageAsync(lang)
 }
