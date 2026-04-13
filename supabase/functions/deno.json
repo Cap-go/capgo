@@ -12,14 +12,11 @@
     "dayjs/": "npm:/dayjs@1.11.20/",
     "drizzle-orm": "npm:drizzle-orm@0.45.2",
     "drizzle-orm/": "npm:/drizzle-orm@0.45.2/",
-    "adm-zip": "npm:adm-zip@0.5.17",
     "pg": "npm:pg@8.20.0",
     "type/pg": "npm:@types/pg@8.20.0",
     "@supabase/supabase-js": "npm:@supabase/supabase-js@2.103.0",
-    "crypto-random-string": "npm:crypto-random-string@5.0.0",
     "@std/semver": "jsr:@std/semver@1.0.6",
     "@bradenmacdonald/s3-lite-client": "jsr:@bradenmacdonald/s3-lite-client@0.9.6",
-    "discord-api-types/": "npm:/discord-api-types@^0.38.44/",
-    "jose": "npm:jose@^6.2.2"
+    "discord-api-types/": "npm:/discord-api-types@^0.38.44/"
   }
 }
