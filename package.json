@@ -206,7 +206,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@antfu/eslint-config": "8.1.1",
+    "@antfu/eslint-config": "8.2.0",
     "@aws-sdk/client-s3": "^3.1027.0",
     "@capacitor/cli": "^8.3.0",
     "@capacitor/core": "^8.3.0",
