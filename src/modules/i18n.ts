@@ -1,10 +1,10 @@
 import type { Locale } from 'vue-i18n'
-import type { SupportedLocale } from '../constants/locales'
+import type { SupportedLocale } from '~/constants/locales'
 import type { UserModule } from '~/types'
 import { createI18n } from 'vue-i18n'
+import { defaultLocale, languages, normalizeLocale, supportedLocales } from '~/constants/locales'
 import { defaultApiHost } from '~/services/supabase'
 import enMessages from '../../messages/en.json'
-import { defaultLocale, languages, normalizeLocale, supportedLocales } from '../constants/locales'
 
 export const i18n = createI18n({
   legacy: false,
@@ -21,6 +21,7 @@ export const availableLocales = supportedLocales
 export { languages }
 
 const loadedLanguages: SupportedLocale[] = [defaultLocale]
+let latestLocaleRequestId = 0
 
 function setI18nLanguage(lang: Locale) {
   i18n.global.locale.value = lang as any
@@ -34,7 +35,11 @@ async function loadLocaleMessages(locale: SupportedLocale): Promise<MessageDicti
   if (locale === defaultLocale)
     return enMessages
 
-  const response = await fetch(`${defaultApiHost}/translations/${locale}`, {
+  const translationBaseUrl = defaultApiHost?.trim()
+  if (!translationBaseUrl)
+    throw new Error('VITE_API_HOST is not configured')
+
+  const response = await fetch(`${translationBaseUrl.replace(/\/$/, '')}/translations/${locale}`, {
     headers: {
       Accept: 'application/json',
     },
@@ -48,25 +53,31 @@ async function loadLocaleMessages(locale: SupportedLocale): Promise<MessageDicti
 
 export async function loadLanguageAsync(lang: string): Promise<Locale> {
   const locale = normalizeLocale(lang)
+  const requestId = ++latestLocaleRequestId
 
   // If the same language
   if (i18n.global.locale.value === locale)
-    return setI18nLanguage(locale)
+    return requestId === latestLocaleRequestId ? setI18nLanguage(locale) : i18n.global.locale.value
 
   // If the language was already loaded
   if (loadedLanguages.includes(locale))
-    return setI18nLanguage(locale)
+    return requestId === latestLocaleRequestId ? setI18nLanguage(locale) : i18n.global.locale.value
 
   const fallbackLocale = normalizeLocale(i18n.global.locale.value)
 
   try {
     const messages = await loadLocaleMessages(locale)
     i18n.global.setLocaleMessage(locale, messages)
-    loadedLanguages.push(locale)
+    if (!loadedLanguages.includes(locale))
+      loadedLanguages.push(locale)
+    if (requestId !== latestLocaleRequestId)
+      return i18n.global.locale.value
     return setI18nLanguage(locale)
   }
   catch (error) {
     console.error('Failed to load locale messages', { locale, error })
+    if (requestId !== latestLocaleRequestId)
+      return i18n.global.locale.value
     return setI18nLanguage(fallbackLocale)
   }
 }

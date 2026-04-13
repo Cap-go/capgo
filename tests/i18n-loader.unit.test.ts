@@ -56,4 +56,51 @@ describe('i18n locale loader', () => {
     expect(i18n.global.locale.value).toBe('en')
     expect(i18n.global.t('accept-invitation')).toBe('Accept Invitation')
   })
+
+  it('keeps the latest locale selection when async fetches resolve out of order', async () => {
+    let resolveFrench: ((value: Response) => void) | undefined
+    let resolveGerman: ((value: Response) => void) | undefined
+
+    vi.mocked(fetch).mockImplementation((url) => {
+      const requestUrl = String(url)
+
+      if (requestUrl.endsWith('/translations/fr')) {
+        return new Promise((resolve) => {
+          resolveFrench = resolve
+        })
+      }
+
+      if (requestUrl.endsWith('/translations/de')) {
+        return new Promise((resolve) => {
+          resolveGerman = resolve
+        })
+      }
+
+      throw new Error(`Unexpected locale request: ${requestUrl}`)
+    })
+
+    const { i18n, loadLanguageAsync } = await import('../src/modules/i18n.ts')
+
+    const frenchLoad = loadLanguageAsync('fr')
+    const germanLoad = loadLanguageAsync('de')
+
+    resolveGerman?.({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        'accept-invitation': 'Einladung annehmen',
+      }),
+    } as unknown as Response)
+    await germanLoad
+
+    resolveFrench?.({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        'accept-invitation': 'Accepter l\'invitation',
+      }),
+    } as unknown as Response)
+    await frenchLoad
+
+    expect(i18n.global.locale.value).toBe('de')
+    expect(i18n.global.t('accept-invitation')).toBe('Einladung annehmen')
+  })
 })

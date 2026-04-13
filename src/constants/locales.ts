@@ -22,7 +22,7 @@ export const defaultLocale: SupportedLocale = 'en'
 export const supportedLocales = Object.keys(languages) as SupportedLocale[]
 
 export function isSupportedLocale(locale: string): locale is SupportedLocale {
-  return locale in languages
+  return Object.prototype.hasOwnProperty.call(languages, locale)
 }
 
 export function resolveLocale(locale?: string | null): SupportedLocale | null {
