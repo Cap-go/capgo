@@ -1,10 +1,10 @@
 import type { Locale } from 'vue-i18n'
-import type { SupportedLocale } from '~/constants/locales'
+import type { SupportedLocale } from '../constants/locales'
 import type { UserModule } from '~/types'
 import { createI18n } from 'vue-i18n'
-import { defaultLocale, languages, normalizeLocale, supportedLocales } from '~/constants/locales'
 import { defaultApiHost } from '~/services/supabase'
 import enMessages from '../../messages/en.json'
+import { defaultLocale, languages, normalizeLocale, supportedLocales } from '../constants/locales'
 
 export const i18n = createI18n({
   legacy: false,
