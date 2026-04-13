@@ -6,6 +6,13 @@ import { getPgClient } from '../../utils/pg.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 import { version } from '../../utils/version.ts'
 
+interface PublicUserSeed {
+  id: string
+  email: string
+  first_name: string | null
+  last_name: string | null
+}
+
 export const app = createHono('', version)
 
 app.use('*', useCors)
@@ -86,32 +93,63 @@ async function setAuthUserSsoOnly(pgClient: ReturnType<typeof getPgClient>, user
   )
 }
 
-async function ensurePublicUserProfileFromAuth(pgClient: ReturnType<typeof getPgClient>, userId: string): Promise<void> {
-  await pgClient.query(
-    `
-      insert into public.users (
-        id,
-        email,
-        first_name,
-        last_name,
-        country,
-        enable_notifications,
-        opt_for_newsletters
-      )
-      select
-        au.id,
-        coalesce(au.email, ''),
-        coalesce(au.raw_user_meta_data ->> 'first_name', ''),
-        coalesce(au.raw_user_meta_data ->> 'last_name', ''),
-        null,
-        true,
-        true
-      from auth.users au
-      where au.id = $1
-      on conflict (id) do nothing
-    `,
-    [userId],
-  )
+function buildPublicUserSeed(userId: string, email: string, userMetadata: Record<string, unknown> | undefined): PublicUserSeed {
+  return {
+    id: userId,
+    email,
+    first_name: typeof userMetadata?.first_name === 'string' ? userMetadata.first_name : null,
+    last_name: typeof userMetadata?.last_name === 'string' ? userMetadata.last_name : null,
+  }
+}
+
+async function ensurePublicUserRowExists(
+  admin: ReturnType<typeof supabaseAdmin>,
+  requestId: string,
+  user: PublicUserSeed,
+): Promise<void> {
+  const { data: existingUser, error: existingUserError } = await (admin as any)
+    .from('users')
+    .select('id, email')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (existingUserError) {
+    cloudlogErr({ requestId, message: 'Failed to check public.users row during SSO provisioning', userId: user.id, error: existingUserError })
+    throw new Error('public_user_lookup_failed')
+  }
+
+  if (!existingUser) {
+    const { error: insertError } = await (admin as any)
+      .from('users')
+      .insert({
+        id: user.id,
+        email: user.email,
+        first_name: user.first_name,
+        last_name: user.last_name,
+        enable_notifications: true,
+        opt_for_newsletters: true,
+      })
+
+    if (insertError) {
+      const isDuplicate = insertError.code === '23505' || insertError.message?.toLowerCase().includes('duplicate')
+      if (!isDuplicate) {
+        cloudlogErr({ requestId, message: 'Failed to create public.users row during SSO provisioning', userId: user.id, email: user.email, error: insertError })
+        throw new Error('public_user_insert_failed')
+      }
+    }
+  }
+
+  if (existingUser?.email !== user.email) {
+    const { error: updateError } = await (admin as any)
+      .from('users')
+      .update({ email: user.email })
+      .eq('id', user.id)
+
+    if (updateError) {
+      cloudlogErr({ requestId, message: 'Failed to sync public.users email during SSO provisioning', userId: user.id, email: user.email, error: updateError })
+      throw new Error('public_user_update_failed')
+    }
+  }
 }
 
 app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
@@ -162,14 +200,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     if (!userEmail) {
       return quickError(400, 'no_email', 'User has no email address')
     }
-
-    try {
-      await ensurePublicUserProfileFromAuth(getSharedPgClient(), userId)
-    }
-    catch (profileEnsureError) {
-      cloudlogErr({ requestId, message: 'Failed to ensure public.users profile for SSO user', userId, error: profileEnsureError })
-      return quickError(500, 'user_profile_sync_failed', 'Failed to provision user profile')
-    }
+    const publicUserSeed = buildPublicUserSeed(userId, userEmail, userAuth.user.user_metadata)
 
     const userDomain = userEmail.split('@')[1]?.toLowerCase().trim()
     if (!userDomain) {
@@ -238,11 +269,13 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
 
       if (!mergeProviderError && mergeProvider) {
         try {
-          await ensurePublicUserProfileFromAuth(getSharedPgClient(), originalUserId)
+          await ensurePublicUserRowExists(admin, requestId, {
+            ...publicUserSeed,
+            id: originalUserId,
+          })
         }
-        catch (profileEnsureError) {
-          cloudlogErr({ requestId, message: 'Failed to ensure public.users profile for original user during SSO merge', originalUserId, error: profileEnsureError })
-          return quickError(500, 'user_profile_sync_failed', 'Failed to provision merged user profile')
+        catch {
+          return quickError(500, 'public_user_sync_failed', 'Failed to create user profile for merged SSO account')
         }
 
         const { data: existingMembership } = await (admin as any)
@@ -326,6 +359,13 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     if (providerError || !provider) {
       cloudlog({ requestId, message: 'No active SSO provider found for domain', userId, domain: userDomain })
       return quickError(404, 'provider_not_found', 'No active SSO provider found for your email domain')
+    }
+
+    try {
+      await ensurePublicUserRowExists(admin, requestId, publicUserSeed)
+    }
+    catch {
+      return quickError(500, 'public_user_sync_failed', 'Failed to create user profile for SSO account')
     }
 
     const { data: existingMembership, error: membershipCheckError } = await (admin as any)
