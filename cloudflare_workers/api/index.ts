@@ -41,6 +41,7 @@ import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
 import { app as organization } from '../../supabase/functions/_backend/public/organization/index.ts'
 import { app as replication } from '../../supabase/functions/_backend/public/replication.ts'
 import { app as statistics } from '../../supabase/functions/_backend/public/statistics/index.ts'
+import { app as translations } from '../../supabase/functions/_backend/public/translations/index.ts'
 import { app as webhooks } from '../../supabase/functions/_backend/public/webhooks/index.ts'
 import { app as credit_usage_alerts } from '../../supabase/functions/_backend/triggers/credit_usage_alerts.ts'
 import { app as cron_clean_orphan_images } from '../../supabase/functions/_backend/triggers/cron_clean_orphan_images.ts'
@@ -88,6 +89,7 @@ app.route('/app', appEndpoint)
 app.route('/build', build)
 app.route('/replication', replication)
 app.route('/check_cpu_usage', check_cpu_usage)
+app.route('/translations', translations)
 
 // Private API
 const functionNamePrivate = 'private'
