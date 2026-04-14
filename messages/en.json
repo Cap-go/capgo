@@ -390,6 +390,8 @@
   "build-setup-invite-android-title": "Set up Android",
   "build-setup-invite-android-description": "Build Android APKs and AABs with Capgo's cloud infrastructure. Follow the documentation to configure signing and get started.",
   "bundle-to-subscribed": "Bundle → Subscribed",
+  "build-step-onboarding-title": "Run the iOS onboarding wizard",
+  "build-step-onboarding-subtitle": "Automated interactive setup of your iOS signing credentials from a single App Store Connect API key",
   "build-step-request-build": "Request a native build",
   "build-step-request-subtitle": "Use the CLI to request a build for iOS or Android",
   "build-step-wait": "Waiting for your build",

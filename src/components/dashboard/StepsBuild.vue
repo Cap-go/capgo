@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onUnmounted, ref, watchEffect } from 'vue'
+import { computed, onUnmounted, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
@@ -40,31 +40,46 @@ interface Step {
 
 const config = getLocalConfig()
 const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ``
-const steps = ref<Step[]>([
-  {
-    title: t('build-step-request-build'),
-    // keep NPX for better support of our customers env, everyone has npx but not everyone has bunx, and bunx has some issues with pnpm
-    command: `npx @capgo/cli@latest build request -a [APIKEY] --platform ios${localCommand}`,
-    subtitle: t('build-step-request-subtitle'),
-  },
-  {
-    title: t('build-step-wait'),
-    command: '',
-    subtitle: t('build-step-wait-subtitle'),
-  },
-])
+
+// The onboarding wizard (`build init`) takes no CLI args — it auto-detects the
+// app ID from capacitor.config.ts and reads the Capgo API key from CAPGO_TOKEN.
+// Prefixing the env var inline lets the user copy a single command without
+// running `capgo login` first.
+const onboardingStep: Step = {
+  title: t('build-step-onboarding-title'),
+  command: `CAPGO_TOKEN=[APIKEY] npx @capgo/cli@latest build init`,
+  subtitle: t('build-step-onboarding-subtitle'),
+}
+
+const requestStep: Step = {
+  title: t('build-step-request-build'),
+  // keep NPX for better support of our customers env, everyone has npx but not everyone has bunx, and bunx has some issues with pnpm
+  command: `npx @capgo/cli@latest build request -a [APIKEY] --platform ios${localCommand}`,
+  subtitle: t('build-step-request-subtitle'),
+}
+
+const waitStep: Step = {
+  title: t('build-step-wait'),
+  command: '',
+  subtitle: t('build-step-wait-subtitle'),
+}
+
+// When invoked from the "Start onboarding" flow (first-time user, no builds
+// yet), prepend the build-init wizard step so users set up iOS credentials
+// before requesting a build. For regular "add a build" flows, start at request.
+const steps = ref<Step[]>(
+  props.onboarding ? [onboardingStep, requestStep, waitStep] : [requestStep, waitStep],
+)
+
+// Index of the polling/wait step — depends on whether we're in onboarding mode.
+const waitStepIndex = computed(() => (props.onboarding ? 2 : 1))
+const completedStepIndex = computed(() => waitStepIndex.value + 1)
 
 function stepToName(stepNumber: number): string {
-  switch (stepNumber) {
-    case 0:
-      return 'request-build'
-    case 1:
-      return 'wait-for-build'
-    case 2:
-      return 'build-completed'
-    default:
-      return 'unknown-step'
-  }
+  const stepNames = props.onboarding
+    ? ['run-onboarding', 'request-build', 'wait-for-build', 'build-completed']
+    : ['request-build', 'wait-for-build', 'build-completed']
+  return stepNames[stepNumber] ?? 'unknown-step'
 }
 
 function setLog() {
@@ -79,7 +94,7 @@ function setLog() {
     }).catch()
     pushEvent(`user:onboarding-build-${stepToName(step.value)}`, config.supaHost)
   }
-  if (step.value === 2) {
+  if (step.value === completedStepIndex.value) {
     emit('done')
   }
 }
@@ -162,7 +177,11 @@ async function getKey(retry = true): Promise<void> {
       await addNewApiKey()
       return getKey(false)
     }
-    steps.value[0].command = steps.value[0].command?.replace('[APIKEY]', data[0].key ?? '')
+    const key = data[0].key ?? ''
+    steps.value = steps.value.map(s => ({
+      ...s,
+      command: s.command?.replace('[APIKEY]', key),
+    }))
   }
   else if (retry && main?.user?.id) {
     return getKey(false)
@@ -204,8 +223,8 @@ async function getLatestBuildId(): Promise<string | undefined> {
 }
 
 watchEffect(async () => {
-  if (step.value === 1 && !realtimeListener.value) {
-    console.log('watch build change step 1 via polling')
+  if (step.value === waitStepIndex.value && !realtimeListener.value) {
+    console.log('watch build change wait-step via polling')
     realtimeListener.value = true
     await organizationStore.awaitInitialLoad()
 
@@ -287,7 +306,7 @@ onUnmounted(() => {
                 <template v-if="i + 1 !== steps.length">
                   {{ i + 1 }}
                 </template>
-                <template v-else-if="step === 1 && i === 1">
+                <template v-else-if="step === waitStepIndex && i === waitStepIndex">
                   <div class="flex justify-center">
                     <IconLoader class="w-10 h-10 text-blue-500 animate-spin" />
                   </div>
