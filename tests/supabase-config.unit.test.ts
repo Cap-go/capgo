@@ -1,6 +1,6 @@
-import type { CapgoConfig } from '../src/services/supabase'
+import type { CapgoConfig } from '~/services/supabase'
 import { describe, expect, it } from 'vitest'
-import { mergeRemoteConfig } from '../src/services/supabase'
+import { mergeRemoteConfig } from '~/services/supabase'
 
 describe('supabase config merging', () => {
   const localConfig: CapgoConfig = {
@@ -12,7 +12,7 @@ describe('supabase config merging', () => {
     stripeEnabled: true,
   }
 
-  it('keeps Supabase connection parameters from the local build config', () => {
+  it.concurrent('keeps Supabase connection parameters from the local build config', () => {
     const merged = mergeRemoteConfig(localConfig, {
       supaHost: 'https://evil.example.com',
       supaKey: 'evil-key',
@@ -30,7 +30,7 @@ describe('supabase config merging', () => {
     expect(merged.stripeEnabled).toBe(false)
   })
 
-  it('falls back to local values when remote config omits optional fields', () => {
+  it.concurrent('falls back to local values when remote config omits optional fields', () => {
     const merged = mergeRemoteConfig(localConfig, {})
 
     expect(merged).toEqual(localConfig)
