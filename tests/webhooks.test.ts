@@ -78,7 +78,7 @@ afterAll(async () => {
   // Clean up test organization and stripe_info
   await getSupabaseClient().from('orgs').delete().eq('id', WEBHOOK_TEST_ORG_ID)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
-})
+}, 60000)
 
 describe('[GET] /webhooks', () => {
   it('list webhooks for organization', async () => {

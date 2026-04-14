@@ -26,6 +26,7 @@ interface Org {
 }
 
 type StripeInfoRow = Database['public']['Tables']['stripe_info']['Row']
+type StripeInfoUpdate = Database['public']['Tables']['stripe_info']['Update']
 
 const checkoutSessionEventTypes = new Set([
   'checkout.session.completed',
@@ -60,6 +61,12 @@ function getPaidAtUpdate(
     return undefined
 
   return eventOccurredAtIso
+}
+
+function toStripeInfoUpdate(data: StripeData['data']): StripeInfoUpdate {
+  return Object.fromEntries(
+    Object.entries(data).filter(([_, value]) => value !== undefined),
+  ) as StripeInfoUpdate
 }
 
 async function writePaidAtAtomically(c: Context, customerId: string, eventOccurredAtIso: string) {
@@ -346,10 +353,7 @@ async function createdOrUpdated(
     .eq('stripe_id', stripeData.data.product_id)
     .single()
   if (plan) {
-    // Filter out undefined values to avoid FK constraint violations
-    const updateData = Object.fromEntries(
-      Object.entries(stripeData.data).filter(([_, v]) => v !== undefined),
-    )
+    const updateData = toStripeInfoUpdate(stripeData.data)
     const paidAt = getPaidAtUpdate(currentStripeInfo, status, eventOccurredAtIso)
     if (paidAt)
       updateData.paid_at = paidAt
@@ -427,10 +431,7 @@ async function createdOrUpdated(
 }
 
 async function updateStripeInfo(c: Context, stripeData: StripeData) {
-  // Filter out undefined values to avoid FK constraint violations
-  const updateData = Object.fromEntries(
-    Object.entries(stripeData.data).filter(([_, v]) => v !== undefined),
-  )
+  const updateData = toStripeInfoUpdate(stripeData.data)
   const { error: dbError2 } = await supabaseAdmin(c)
     .from('stripe_info')
     .update(updateData)

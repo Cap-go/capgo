@@ -2,7 +2,6 @@ import type { Ref } from 'vue'
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
 import { Filesystem } from '@capacitor/filesystem'
 import { setErrors } from '@formkit/core'
-import { decode } from 'base64-arraybuffer'
 import mime from 'mime'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
@@ -10,18 +9,29 @@ import { createSignedImageUrl } from './storage'
 import { useSupabase } from './supabase'
 
 const supabase = useSupabase()
+const SIGNED_IMAGE_STORAGE_PATH_REGEX = /\/storage\/v1\/object\/(?:public\/|sign\/)?images\/(.+)$/
+const LEADING_SLASHES_REGEX = /^\/+/
+const IMAGES_PREFIX_REGEX = /^images\//
 
 function normalizeImageStoragePath(path?: string | null) {
   if (!path)
     return ''
 
   const pathWithoutQuery = path.split('?')[0]
-  const signedUrlRegex = /\/storage\/v1\/object\/(?:public\/|sign\/)?images\/(.+)$/
-  const signedUrlMatch = signedUrlRegex.exec(pathWithoutQuery)
+  const signedUrlMatch = SIGNED_IMAGE_STORAGE_PATH_REGEX.exec(pathWithoutQuery)
   if (signedUrlMatch?.[1])
-    return signedUrlMatch[1].replace(/^\/+/, '')
+    return signedUrlMatch[1].replace(LEADING_SLASHES_REGEX, '')
 
-  return pathWithoutQuery.replace(/^images\//, '').replace(/^\/+/, '')
+  return pathWithoutQuery.replace(IMAGES_PREFIX_REGEX, '').replace(LEADING_SLASHES_REGEX, '')
+}
+
+function base64ToArrayBuffer(base64: string) {
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return bytes.buffer
 }
 
 async function uploadPhotoShared(
@@ -33,7 +43,7 @@ async function uploadPhotoShared(
 ) {
   const { error } = await supabase.storage
     .from('images')
-    .upload(storagePath, decode(data), {
+    .upload(storagePath, base64ToArrayBuffer(data), {
       contentType,
     })
 
@@ -210,7 +220,7 @@ export async function takePhoto(formId: string, isLoading: Ref<boolean>, type: '
 
   isLoading.value = true
 
-  const fileName = `${new Date().getTime()}.${cameraPhoto.format}`
+  const fileName = `${Date.now()}.${cameraPhoto.format}`
 
   if (!cameraPhoto.dataUrl)
     return
@@ -254,7 +264,7 @@ export async function pickPhoto(formId: string, isLoading: Ref<boolean>, type: '
     await uploadPhoto(
       formId,
       contents.data as any,
-      `${new Date().getTime()}.${photos[0].format}`,
+      `${Date.now()}.${photos[0].format}`,
       contentType,
       isLoading,
       wentWrong,
