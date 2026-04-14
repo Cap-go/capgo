@@ -20,7 +20,15 @@ app.post('/', middlewareAuth, async (c) => {
   const token = rawBody.token?.replaceAll(' ', '') ?? ''
   const tokenHash = rawBody.token_hash?.trim() ?? ''
 
-  const validation = safeParseSchema(bodySchema, { token, token_hash: tokenHash, type: rawBody.type })
+  const validationPayload: { token: string, token_hash: string, type?: 'email' | 'magiclink' } = {
+    token,
+    token_hash: tokenHash,
+  }
+  if (rawBody.type !== undefined) {
+    validationPayload.type = rawBody.type
+  }
+
+  const validation = safeParseSchema(bodySchema, validationPayload)
   if (!validation.success) {
     throw simpleError('invalid_body', 'Invalid request body', { errors: validation.error.message })
   }
