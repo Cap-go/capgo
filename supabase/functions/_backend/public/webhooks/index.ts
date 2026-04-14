@@ -26,6 +26,24 @@ function assertOrgWebhookScope(
   }
 }
 
+async function assertWebhookOrgPolicy(
+  c: Context<MiddlewareKeyVariables, any, any>,
+  orgId: string,
+  apikey: Database['public']['Tables']['apikeys']['Row'],
+): Promise<void> {
+  const supabase = supabaseApikey(c, c.get('capgkey') as string)
+  const orgCheck = await apikeyHasOrgRightWithPolicy(c, apikey, orgId, supabase)
+  if (orgCheck.valid) {
+    return
+  }
+
+  if (orgCheck.error === 'org_requires_expiring_key') {
+    throw quickError(401, 'org_requires_expiring_key', 'This organization requires API keys with an expiration date. Please use a different key or update this key with an expiration date.')
+  }
+
+  throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: orgId })
+}
+
 /**
  * Shared permission check for webhook endpoints (API key auth)
  * Validates admin access to organization
@@ -82,6 +100,8 @@ export async function checkWebhookPermissionV2(
   // If using API key, also check the key has org access
   if (auth.authType === 'apikey' && auth.apikey) {
     assertOrgWebhookScope(orgId, auth.apikey)
+    const policyKey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
+    await assertWebhookOrgPolicy(c, orgId, policyKey ?? auth.apikey)
   }
 }
 
