@@ -64,27 +64,33 @@ const waitStep: Step = {
   subtitle: t('build-step-wait-subtitle'),
 }
 
+// Freeze the onboarding mode at setup time. The parent binds this prop to a
+// reactive value (totalAllBuilds === 0), which can flip mid-flow once a build
+// is detected. Recomputing steps / indices against a live prop would cause
+// drift (e.g. waitStepIndex shrinks while the steps array stays long).
+const initialOnboarding = props.onboarding
+
 // When invoked from the "Start onboarding" flow (first-time user, no builds
 // yet), prepend the build-init wizard step so users set up iOS credentials
 // before requesting a build. For regular "add a build" flows, start at request.
 const steps = ref<Step[]>(
-  props.onboarding ? [onboardingStep, requestStep, waitStep] : [requestStep, waitStep],
+  initialOnboarding ? [onboardingStep, requestStep, waitStep] : [requestStep, waitStep],
 )
 
 // Index of the polling/wait step — depends on whether we're in onboarding mode.
-const waitStepIndex = computed(() => (props.onboarding ? 2 : 1))
+const waitStepIndex = computed(() => (initialOnboarding ? 2 : 1))
 const completedStepIndex = computed(() => waitStepIndex.value + 1)
 
 function stepToName(stepNumber: number): string {
-  const stepNames = props.onboarding
+  const stepNames = initialOnboarding
     ? ['run-onboarding', 'request-build', 'wait-for-build', 'build-completed']
     : ['request-build', 'wait-for-build', 'build-completed']
   return stepNames[stepNumber] ?? 'unknown-step'
 }
 
 function setLog() {
-  console.log('setLog', props.onboarding, main.user?.id, step.value)
-  if (props.onboarding && main.user?.id) {
+  console.log('setLog', initialOnboarding, main.user?.id, step.value)
+  if (initialOnboarding && main.user?.id) {
     sendEvent({
       channel: 'onboarding-build',
       event: `onboarding-build-step-${stepToName(step.value)}`,
@@ -269,10 +275,10 @@ onUnmounted(() => {
   <section class="overflow-y-auto py-12 h-full sm:py-16 lg:py-20 max-h-fit bg-slate-100 dark:bg-slate-900">
     <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
       <div class="flex justify-items-center items-center place-content-center">
-        <button v-if="!onboarding" class="mr-6 text-white bg-gray-800 d-btn d-btn-outline" @click="emit('closeStep')">
+        <button v-if="!initialOnboarding" class="mr-6 text-white bg-gray-800 d-btn d-btn-outline" @click="emit('closeStep')">
           <arrowBack />
         </button>
-        <div v-if="props.onboarding" class="text-center">
+        <div v-if="initialOnboarding" class="text-center">
           <h2 class="text-3xl font-bold text-gray-900 sm:text-4xl xl:text-5xl dark:text-gray-50 font-pj">
             {{ t('start-your-first-build') }}
             <span class="inline-flex items-center py-0.5 px-2.5 ml-3 text-xs font-medium text-yellow-800 bg-yellow-100 rounded-full dark:text-yellow-200 dark:bg-yellow-900">
