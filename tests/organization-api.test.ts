@@ -699,26 +699,11 @@ describe('[PUT] /organization', () => {
     const originalName = `Update Base Organization ${new Date().toISOString()}`
     const name = `Updated Organization ${new Date().toISOString()}`
     const website = 'https://www.capgo.app/docs'
-    const customerId = `cus_test_${orgId}`
-    const subscriptionId = `sub_${orgId}`
-    const trialAt = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
-    const stripeInfo = {
-      customer_id: customerId,
-      status: 'succeeded' as const,
-      product_id: 'prod_LQIregjtNduh4q',
-      subscription_id: subscriptionId,
-      trial_at: trialAt,
-      is_good_plan: true,
-    }
-    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert(stripeInfo)
-    if (stripeError)
-      throw stripeError
     const { error: createError } = await getSupabaseClient().from('orgs').insert({
       id: orgId,
       name: originalName,
       management_email: TEST_EMAIL,
       created_by: USER_ID,
-      customer_id: customerId,
       website: 'https://base.example/',
       use_new_rbac: false,
     })
@@ -756,7 +741,6 @@ describe('[PUT] /organization', () => {
     finally {
       await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
       await getSupabaseClient().from('orgs').delete().eq('id', orgId)
-      await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
     }
   })
 
@@ -1125,27 +1109,14 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
 const ORG_ID_RBAC = randomUUID()
 const globalIdRbac = randomUUID()
 const nameRbac = `RBAC Test Organization ${globalIdRbac}`
-const customerIdRbac = `cus_test_rbac_${ORG_ID_RBAC}`
 
 describe('rbac mode - organization member operations', () => {
   beforeAll(async () => {
-    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
-      customer_id: customerIdRbac,
-      status: 'succeeded',
-      product_id: 'prod_LQIregjtNduh4q',
-      subscription_id: `sub_${globalIdRbac}`,
-      trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-      is_good_plan: true,
-    })
-    if (stripeError)
-      throw stripeError
-
     const { error } = await getSupabaseClient().from('orgs').insert({
       id: ORG_ID_RBAC,
       name: nameRbac,
       management_email: TEST_EMAIL,
       created_by: USER_ID,
-      customer_id: customerIdRbac,
       use_new_rbac: true, // Explicitly RBAC — tests the RBAC permission path
     })
     if (error)
@@ -1159,7 +1130,6 @@ describe('rbac mode - organization member operations', () => {
     await getSupabaseClient().from('role_bindings').delete().eq('org_id', ORG_ID_RBAC)
     await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID_RBAC)
     await getSupabaseClient().from('orgs').delete().eq('id', ORG_ID_RBAC)
-    await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerIdRbac)
   })
 
   it('[GET] /organization - get RBAC org by id', async () => {

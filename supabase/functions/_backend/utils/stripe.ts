@@ -305,8 +305,14 @@ export async function createPortal(c: Context, customerId: string, callbackUrl: 
 export function updateCustomerEmail(c: Context, customerId: string, newEmail: string) {
   if (!isStripeConfigured(c))
     return Promise.resolve()
-  return getStripe(c).customers.update(customerId, { email: newEmail, name: newEmail, metadata: { email: newEmail } },
+  return getStripe(c).customers.update(customerId, { email: newEmail, metadata: { email: newEmail } },
   )
+}
+
+export function updateCustomerOrganizationName(c: Context, customerId: string, newName: string) {
+  if (!isStripeConfigured(c))
+    return Promise.resolve()
+  return getStripe(c).customers.update(customerId, { name: newName })
 }
 
 export function normalizeStripeCountryCode(country: string | null | undefined): string | null {

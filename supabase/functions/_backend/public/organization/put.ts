@@ -5,6 +5,7 @@ import { z } from 'zod/mini'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { createSignedImageUrl, normalizeImagePath } from '../../utils/storage.ts'
+import { updateCustomerOrganizationName } from '../../utils/stripe.ts'
 import { apikeyHasOrgRightWithPolicy, supabaseAdmin, supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
 import { normalizeWebsiteUrl } from './website.ts'
 
@@ -113,6 +114,23 @@ async function updateOrg(
   return data
 }
 
+async function getOrgForNameSync(
+  supabase: ReturnType<typeof supabaseApikey>,
+  orgId: string,
+) {
+  const { error, data } = await supabase
+    .from('orgs')
+    .select('id, name, customer_id')
+    .eq('id', orgId)
+    .single()
+
+  if (error) {
+    throw simpleError('cannot_get_org', 'Cannot get org', { error: error.message })
+  }
+
+  return data
+}
+
 export async function put(
   c: Context<MiddlewareKeyVariables>,
   bodyRaw: any,
@@ -138,7 +156,37 @@ export async function put(
 
   validateMaxExpirationDays(body.max_apikey_expiration_days)
   const updateFields = buildUpdateFields(body)
-  const dataOrg = await updateOrg(supabase, body.orgId, updateFields)
+  const shouldSyncStripeName = body.name !== undefined
+  const currentOrg = shouldSyncStripeName
+    ? await getOrgForNameSync(supabase, body.orgId)
+    : null
+  const shouldUpdateStripeCustomerName = shouldSyncStripeName
+    && !!currentOrg?.customer_id
+    && body.name !== currentOrg.name
+
+  if (shouldUpdateStripeCustomerName) {
+    await updateCustomerOrganizationName(c, currentOrg.customer_id!, body.name!)
+  }
+
+  let dataOrg: Database['public']['Tables']['orgs']['Row']
+  try {
+    dataOrg = await updateOrg(supabase, body.orgId, updateFields)
+  }
+  catch (error) {
+    if (shouldUpdateStripeCustomerName) {
+      try {
+        await updateCustomerOrganizationName(c, currentOrg.customer_id!, currentOrg.name)
+      }
+      catch (rollbackError) {
+        throw simpleError('cannot_update_org', 'Cannot update org', {
+          error: error instanceof Error ? error.message : error,
+          rollbackError: rollbackError instanceof Error ? rollbackError.message : rollbackError,
+        })
+      }
+    }
+    throw error
+  }
+
   if (dataOrg.logo) {
     const signedLogo = await createSignedImageUrl(c, dataOrg.logo)
     dataOrg.logo = signedLogo ?? null
