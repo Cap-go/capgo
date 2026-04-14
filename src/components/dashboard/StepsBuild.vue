@@ -41,13 +41,9 @@ interface Step {
 const config = getLocalConfig()
 const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ``
 
-// The onboarding wizard (`build init`) takes no CLI args — it auto-detects the
-// app ID from capacitor.config.ts and reads the Capgo API key from CAPGO_TOKEN.
-// Prefixing the env var inline lets the user copy a single command without
-// running `capgo login` first.
 const onboardingStep: Step = {
   title: t('build-step-onboarding-title'),
-  command: `CAPGO_TOKEN=[APIKEY] npx @capgo/cli@latest build init`,
+  command: `npx @capgo/cli@latest build init -a [APIKEY]`,
   subtitle: t('build-step-onboarding-subtitle'),
 }
 
