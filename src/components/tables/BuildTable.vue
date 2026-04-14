@@ -3,7 +3,7 @@ import type { Ref } from 'vue'
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconEye from '~icons/heroicons/eye'
@@ -246,6 +246,14 @@ columns.value = [
 
 // Watch props change (app switching) - same pattern as BundleTable
 watch(props, async () => {
+  await reload()
+})
+
+// Ensure totalAllBuilds is populated on initial mount so the setup invite
+// renders when the org has no builds yet. watch(props, ...) doesn't fire
+// for the initial value, and DataTable's @reload hook only calls getData().
+onMounted(async () => {
+  await organizationStore.awaitInitialLoad()
   await reload()
 })
 
