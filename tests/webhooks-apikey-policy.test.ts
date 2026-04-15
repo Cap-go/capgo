@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { getEndpointUrl, getSupabaseClient, headers, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { getAuthHeaders, getEndpointUrl, getSupabaseClient, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const globalId = randomUUID()
 const policyOrgId = randomUUID()
@@ -16,8 +16,10 @@ let expiringSubkeyId: number | null = null
 let expiringSubkeyValue: string | null = null
 let createdWebhookId: string | null = null
 let createdDeliveryId: string | null = null
+let authHeaders: Record<string, string>
 
 beforeAll(async () => {
+  authHeaders = await getAuthHeaders()
   const supabase = getSupabaseClient()
 
   const { error: stripeError } = await supabase.from('stripe_info').insert({
@@ -51,7 +53,7 @@ beforeAll(async () => {
 
   const keyResponse = await fetch(APIKEY_URL, {
     method: 'POST',
-    headers,
+    headers: authHeaders,
     body: JSON.stringify({
       name: `legacy-webhook-key-${globalId}`,
       limited_to_orgs: [policyOrgId],
@@ -64,7 +66,7 @@ beforeAll(async () => {
 
   const webhookResponse = await fetch(WEBHOOKS_URL, {
     method: 'POST',
-    headers,
+    headers: authHeaders,
     body: JSON.stringify({
       orgId: policyOrgId,
       name: `policy-webhook-${globalId}`,
@@ -78,7 +80,7 @@ beforeAll(async () => {
 
   const testWebhookResponse = await fetch(WEBHOOKS_TEST_URL, {
     method: 'POST',
-    headers,
+    headers: authHeaders,
     body: JSON.stringify({
       orgId: policyOrgId,
       webhookId: createdWebhookId,
@@ -97,7 +99,7 @@ beforeAll(async () => {
 
   const subkeyResponse = await fetch(APIKEY_URL, {
     method: 'POST',
-    headers,
+    headers: authHeaders,
     body: JSON.stringify({
       name: `expiring-webhook-subkey-${globalId}`,
       limited_to_orgs: [policyOrgId],
