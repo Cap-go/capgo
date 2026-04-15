@@ -54,8 +54,9 @@ const appIdFeedback = ref('')
 const hasEditedAppId = ref(false)
 
 const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ''
+const redactedLocalCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon [YOUR_SUPABASE_ANON_KEY]` : ''
 const cliCommand = computed(() => `npx @capgo/cli@latest i ${apiKey.value ?? '[APIKEY]'}${localCommand}`)
-const redactedCliCommand = computed(() => `npx @capgo/cli@latest i [YOUR_CAPGO_API_KEY]${localCommand}`)
+const redactedCliCommand = computed(() => `npx @capgo/cli@latest i [YOUR_CAPGO_API_KEY]${redactedLocalCommand}`)
 const cliCommandArgs = computed(() => {
   const args: string[] = []
 
