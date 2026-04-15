@@ -524,17 +524,17 @@ onUnmounted(() => {
             <IconBack class="w-5 h-5 fill-current" />
             <span>{{ t('button-back') }}</span>
           </button>
-          <div v-else />
 
           <button
             type="button"
-            class="d-btn d-btn-ghost text-slate-600 hover:text-slate-900"
+            class="d-btn d-btn-ghost ml-auto text-slate-600 hover:text-slate-900"
             data-test="onboarding-logout"
+            :aria-label="t('logout')"
             :disabled="isLoggingOut"
             @click="logoutFromOnboarding"
           >
             <IconLoader v-if="isLoggingOut" class="w-4 h-4 animate-spin" />
-            <span v-else>{{ t('logout') }}</span>
+            <span :class="{ 'sr-only': isLoggingOut }">{{ t('logout') }}</span>
           </button>
         </div>
 
