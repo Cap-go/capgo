@@ -406,6 +406,35 @@ describe('organization put Stripe sync', () => {
     expect(from).toHaveBeenCalledTimes(2)
   })
 
+  it('retries Stripe sync when the requested name already matches the committed org row', async () => {
+    const selectBuilder = createOrgSelectBuilder(createOrgRow({
+      id: 'org-123',
+      name: 'New Name',
+      customer_id: 'cus_123',
+    }))
+    const updateBuilder = createOrgUpdateBuilder(createOrgRow({
+      id: 'org-123',
+      name: 'New Name',
+      customer_id: 'cus_123',
+      updated_at: '2026-04-15T13:00:00Z',
+    }))
+
+    supabaseClientMock.mockReturnValue(createSupabaseClientStub(
+      vi.fn()
+        .mockReturnValueOnce(selectBuilder)
+        .mockReturnValueOnce(updateBuilder),
+    ))
+
+    const response = await put(createContext(), {
+      orgId: 'org-123',
+      name: 'New Name',
+    }, undefined)
+
+    expect(response.status).toBe(200)
+    expect(updateCustomerOrganizationNameMock).toHaveBeenCalledTimes(1)
+    expect(updateCustomerOrganizationNameMock).toHaveBeenCalledWith(expect.anything(), 'cus_123', 'New Name')
+  })
+
   it('rejects blank names after HTML stripping', async () => {
     const from = vi.fn()
     const rpc = vi.fn().mockResolvedValue({ data: '   ', error: null })

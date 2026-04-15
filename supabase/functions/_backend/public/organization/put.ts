@@ -256,7 +256,7 @@ export async function put(
 
   const committedCustomerId = dataOrg.customer_id
 
-  if (shouldSyncStripeName && currentOrg && committedCustomerId && !committedCustomerId.startsWith('pending_') && dataOrg.name !== currentOrg.name) {
+  if (shouldSyncStripeName && currentOrg && committedCustomerId && !committedCustomerId.startsWith('pending_')) {
     try {
       await updateCustomerOrganizationName(c, committedCustomerId, dataOrg.name)
     }
