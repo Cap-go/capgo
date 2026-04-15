@@ -291,7 +291,7 @@ describe('organization put Stripe sync', () => {
       website: 'https://old.example',
     })
     expect(rollbackBuilder.eq).toHaveBeenCalledWith('name', 'New Name')
-    expect(rollbackBuilder.eq).toHaveBeenCalledWith('updated_at', '2026-04-15T13:00:00Z')
+    expect(rollbackBuilder.eq).toHaveBeenCalledWith('website', 'https://new.example')
     expect(error.cause.moreInfo).toMatchObject({
       error: 'Stripe update failed',
     })

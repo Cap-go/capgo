@@ -125,7 +125,7 @@ async function updateOrg(
   supabase: ReturnType<typeof supabaseApikey>,
   orgId: string,
   updateFields: OrgUpdateFields,
-  options?: { expectedCurrentName?: string, expectedCurrentUpdatedAt?: string | null },
+  options?: { expectedCurrentName?: string, expectedCurrentFields?: OrgUpdateFields },
 ) {
   let query = supabase
     .from('orgs')
@@ -133,10 +133,15 @@ async function updateOrg(
     .eq('id', orgId)
   if (options?.expectedCurrentName !== undefined)
     query = query.eq('name', options.expectedCurrentName)
-  if (options?.expectedCurrentUpdatedAt !== undefined) {
-    query = options.expectedCurrentUpdatedAt === null
-      ? query.is('updated_at', null)
-      : query.eq('updated_at', options.expectedCurrentUpdatedAt)
+  if (options?.expectedCurrentFields) {
+    for (const key of Object.keys(options.expectedCurrentFields) as Array<keyof OrgUpdateFields>) {
+      const fieldValue = options.expectedCurrentFields[key]
+      if (fieldValue === undefined)
+        continue
+      query = fieldValue === null
+        ? query.is(key, null)
+        : query.eq(key, fieldValue)
+    }
   }
 
   const { error, data } = await query
@@ -167,6 +172,19 @@ function buildRollbackFields(
   }
 
   return rollbackFields
+}
+
+function buildExpectedCurrentFields(
+  currentOrg: OrgRow,
+  updateFields: OrgUpdateFields,
+) {
+  const expectedCurrentFields: OrgUpdateFields = {}
+
+  for (const key of Object.keys(updateFields) as Array<keyof OrgUpdateFields>) {
+    expectedCurrentFields[key] = currentOrg[key as keyof OrgRow] as never
+  }
+
+  return expectedCurrentFields
 }
 
 async function getOrgForNameSync(
@@ -254,7 +272,7 @@ export async function put(
         try {
           await updateOrg(supabase, body.orgId, rollbackFields, {
             expectedCurrentName: dataOrg.name,
-            expectedCurrentUpdatedAt: dataOrg.updated_at,
+            expectedCurrentFields: buildExpectedCurrentFields(dataOrg, updateFields),
           })
         }
         catch (rollbackError) {
