@@ -40,6 +40,15 @@ export function getLocalConfig() {
 let config: CapgoConfig = getLocalConfig()
 export const stripeEnabled = ref<boolean>(config.stripeEnabled ?? true)
 
+export function mergeRemoteConfig(localConfig: CapgoConfig, remoteConfig: Partial<CapgoConfig> | null | undefined): CapgoConfig {
+  return {
+    ...localConfig,
+    host: typeof remoteConfig?.host === 'string' ? remoteConfig.host : localConfig.host,
+    hostWeb: typeof remoteConfig?.hostWeb === 'string' ? remoteConfig.hostWeb : localConfig.hostWeb,
+    stripeEnabled: typeof remoteConfig?.stripeEnabled === 'boolean' ? remoteConfig.stripeEnabled : localConfig.stripeEnabled,
+  }
+}
+
 export async function getRemoteConfig() {
   const localConfig = getLocalConfig()
   if (import.meta.env.MODE === 'development')
@@ -52,8 +61,8 @@ export async function getRemoteConfig() {
       stripeEnabled.value = localConfig.stripeEnabled ?? stripeEnabled.value
       return localConfig as CapgoConfig
     }
-    const data = await response.json() as CapgoConfig
-    const merged = { ...localConfig, ...data } as CapgoConfig
+    const data = await response.json() as Partial<CapgoConfig>
+    const merged = mergeRemoteConfig(localConfig, data)
     config = merged
     stripeEnabled.value = merged.stripeEnabled ?? stripeEnabled.value
     return merged
@@ -83,7 +92,7 @@ export function useSupabase() {
   if (supaClient)
     return supaClient
 
-  supaClient = createClient<Database>(config.supaHost, config.supaKey, options)
+  supaClient = createClient<Database>(getSupabaseHost(), config.supaKey, options)
   return supaClient
 }
 

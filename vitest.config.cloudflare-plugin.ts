@@ -1,14 +1,20 @@
-import { cwd } from 'node:process'
+import path from 'node:path'
+import { cwd, env } from 'node:process'
 import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig(({ mode }) => ({
+  resolve: {
+    alias: {
+      '~/': `${path.resolve(cwd(), 'src')}/`,
+    },
+  },
   test: {
     include: ['tests/*.test.ts'],
     environment: 'node',
     watch: false,
     bail: 0,
-    testTimeout: process.env.CI ? 60_000 : 30_000, // 60s in CI, 30s locally
+    testTimeout: env.CI ? 60_000 : 30_000, // 60s in CI, 30s locally
     hookTimeout: 10_000,
     retry: 2,
     // Very low concurrency for plugin tests that hit shared replica state
