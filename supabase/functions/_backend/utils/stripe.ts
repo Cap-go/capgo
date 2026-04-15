@@ -305,8 +305,37 @@ export async function createPortal(c: Context, customerId: string, callbackUrl: 
 export function updateCustomerEmail(c: Context, customerId: string, newEmail: string) {
   if (!isStripeConfigured(c))
     return Promise.resolve()
-  return getStripe(c).customers.update(customerId, { email: newEmail, name: newEmail, metadata: { email: newEmail } },
+  return getStripe(c).customers.update(customerId, { email: newEmail, metadata: { email: newEmail } },
   )
+}
+
+export function updateCustomerOrganizationName(c: Context, customerId: string, newName: string) {
+  if (!isStripeConfigured(c))
+    return Promise.resolve()
+  return getStripe(c).customers.update(customerId, { name: newName })
+}
+
+export async function getStripeCustomerName(c: Context, customerId: string | null | undefined): Promise<string | null | undefined> {
+  if (!customerId || !isStripeConfigured(c))
+    return undefined
+
+  try {
+    const customer = await getStripe(c).customers.retrieve(customerId)
+    if (customer.deleted)
+      return null
+    return customer.name ?? null
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getStripeCustomerName', customerId, error })
+    return undefined
+  }
+}
+
+export function isDeterministicStripeCustomerUpdateError(error: unknown) {
+  return error instanceof Stripe.errors.StripeAuthenticationError
+    || error instanceof Stripe.errors.StripeInvalidRequestError
+    || error instanceof Stripe.errors.StripePermissionError
+    || error instanceof Stripe.errors.StripeRateLimitError
 }
 
 export function normalizeStripeCountryCode(country: string | null | undefined): string | null {

@@ -72,6 +72,7 @@
     "test:cloudflare:plugin": "USE_CLOUDFLARE_WORKERS=true vitest run tests/updates*.test.ts tests/stats*.test.ts tests/channel_self*.test.ts --config vitest.config.cloudflare-plugin.ts",
     "test:cloudflare:api": "vitest run --exclude=tests/cli* --exclude=tests/updates* --exclude=tests/stats* --exclude=tests/channel_self* --config vitest.config.cloudflare.ts",
     "test:cloudflare:updates": "vitest run tests/updates* --config vitest.config.cloudflare.ts",
+    "stripe:sync-org-names": "bun scripts/sync_stripe_org_names.ts",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",
     "fmt": "bun run lint:fix && bun run lint:sql",
     "lint:fix": "eslint \"src/**/*.{vue,ts,js}\" --fix",

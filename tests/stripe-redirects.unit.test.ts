@@ -20,6 +20,12 @@ vi.mock('hono/adapter', async (importOriginal) => {
 vi.mock('stripe', () => {
   const MockStripe: any = vi.fn()
   MockStripe.createFetchHttpClient = vi.fn()
+  MockStripe.errors = {
+    StripeAuthenticationError: class StripeAuthenticationError extends Error {},
+    StripeInvalidRequestError: class StripeInvalidRequestError extends Error {},
+    StripePermissionError: class StripePermissionError extends Error {},
+    StripeRateLimitError: class StripeRateLimitError extends Error {},
+  }
   return { default: MockStripe }
 })
 
@@ -374,5 +380,55 @@ describe('stripe redirect URL allowlist', () => {
         }),
       ],
     }))
+  })
+
+  it('updates Stripe customer email without overwriting the organization name', async () => {
+    const updateCustomer = vi.fn().mockResolvedValue({ id: 'cus_123' })
+    const stripeClient = {
+      customers: {
+        update: updateCustomer,
+      },
+    } as any
+
+    vi.mocked(Stripe).mockImplementation(function () {
+      return stripeClient
+    } as any)
+
+    const { updateCustomerEmail } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    await updateCustomerEmail(createContext(), 'cus_123', 'billing@capgo.app')
+
+    expect(updateCustomer).toHaveBeenCalledWith('cus_123', {
+      email: 'billing@capgo.app',
+      metadata: {
+        email: 'billing@capgo.app',
+      },
+    })
+  })
+
+  it('updates Stripe customer name when the organization name changes', async () => {
+    const updateCustomer = vi.fn().mockResolvedValue({ id: 'cus_123' })
+    const stripeClient = {
+      customers: {
+        update: updateCustomer,
+      },
+    } as any
+
+    vi.mocked(Stripe).mockImplementation(function () {
+      return stripeClient
+    } as any)
+
+    const { updateCustomerOrganizationName } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    await updateCustomerOrganizationName(createContext(), 'cus_123', 'Capgo Org')
+
+    expect(updateCustomer).toHaveBeenCalledWith('cus_123', {
+      name: 'Capgo Org',
+    })
+  })
+
+  it('treats Stripe rate-limit errors as deterministic customer update failures', async () => {
+    const { isDeterministicStripeCustomerUpdateError } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    const rateLimitError = new Stripe.errors.StripeRateLimitError({ message: 'rate limited' } as any)
+
+    expect(isDeterministicStripeCustomerUpdateError(rateLimitError)).toBe(true)
   })
 })

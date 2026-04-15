@@ -3,12 +3,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { getEndpointUrl, getSupabaseClient, headers, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const globalId = randomUUID()
+const numericGlobalId = Number.parseInt(globalId.replaceAll('-', '').slice(0, 12), 16)
 const policyOrgId = randomUUID()
 const policyCustomerId = `cus_webhook_policy_${globalId}`
-const APIKEY_URL = getEndpointUrl('/apikey')
 const WEBHOOKS_URL = getEndpointUrl('/webhooks')
 const WEBHOOKS_TEST_URL = getEndpointUrl('/webhooks/test')
 const WEBHOOKS_RETRY_URL = getEndpointUrl('/webhooks/deliveries/retry')
+const legacyApiKeySeedId = numericGlobalId * 2
+const expiringSubkeySeedId = legacyApiKeySeedId + 1
 
 let legacyApiKeyId: number | null = null
 let legacyApiKeyValue: string | null = null
@@ -49,18 +51,22 @@ beforeAll(async () => {
   if (memberError)
     throw memberError
 
-  const keyResponse = await fetch(APIKEY_URL, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      name: `legacy-webhook-key-${globalId}`,
-      limited_to_orgs: [policyOrgId],
-    }),
-  })
-  expect(keyResponse.status).toBe(200)
-  const keyData = await keyResponse.json() as { id: number, key: string }
-  legacyApiKeyId = keyData.id
-  legacyApiKeyValue = keyData.key
+  const { data: legacyKeyData, error: legacyKeyError } = await supabase.from('apikeys').insert({
+    id: legacyApiKeySeedId,
+    user_id: USER_ID,
+    key: `legacy-webhook-key-${globalId}`,
+    key_hash: null,
+    mode: 'all',
+    name: `legacy-webhook-key-${globalId}`,
+    limited_to_apps: [],
+    limited_to_orgs: [policyOrgId],
+    expires_at: null,
+  }).select('id, key').single()
+  if (legacyKeyError || !legacyKeyData) {
+    throw new Error(`Failed to seed legacy webhook API key: ${legacyKeyError?.message ?? 'missing key data'}`)
+  }
+  legacyApiKeyId = legacyKeyData.id
+  legacyApiKeyValue = legacyKeyData.key
 
   const webhookResponse = await fetch(WEBHOOKS_URL, {
     method: 'POST',
@@ -95,19 +101,22 @@ beforeAll(async () => {
   if (policyError)
     throw policyError
 
-  const subkeyResponse = await fetch(APIKEY_URL, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      name: `expiring-webhook-subkey-${globalId}`,
-      limited_to_orgs: [policyOrgId],
-      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    }),
-  })
-  expect(subkeyResponse.status).toBe(200)
-  const subkeyData = await subkeyResponse.json() as { id: number, key: string }
-  expiringSubkeyId = subkeyData.id
-  expiringSubkeyValue = subkeyData.key
+  const { data: expiringKeyData, error: expiringKeyError } = await supabase.from('apikeys').insert({
+    id: expiringSubkeySeedId,
+    user_id: USER_ID,
+    key: `expiring-webhook-subkey-${globalId}`,
+    key_hash: null,
+    mode: 'all',
+    name: `expiring-webhook-subkey-${globalId}`,
+    limited_to_apps: [],
+    limited_to_orgs: [policyOrgId],
+    expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+  }).select('id, key').single()
+  if (expiringKeyError || !expiringKeyData) {
+    throw new Error(`Failed to seed expiring webhook API key: ${expiringKeyError?.message ?? 'missing key data'}`)
+  }
+  expiringSubkeyId = expiringKeyData.id
+  expiringSubkeyValue = expiringKeyData.key
 }, 60000)
 
 afterAll(async () => {
