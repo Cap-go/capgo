@@ -50,6 +50,7 @@ const createdOrgId = ref('')
 const isSubmitting = ref(false)
 const isUploadingLogo = ref(false)
 const isLoadingWebsitePreview = ref(false)
+const isLoggingOut = ref(false)
 const selectedLogoPreview = ref('')
 const sentInvites = ref<SentInvite[]>([])
 const websitePreview = ref<WebsitePreview | null>(null)
@@ -176,6 +177,25 @@ async function goBack() {
     ? route.query.to
     : '/login'
   await router.push(fallbackPath)
+}
+
+async function logoutFromOnboarding() {
+  if (isLoggingOut.value)
+    return
+
+  isLoggingOut.value = true
+
+  try {
+    await main.logout()
+    await router.replace('/login')
+  }
+  catch (error) {
+    console.error('Failed to log out from organization onboarding', error)
+    toast.error(t('cannot-sign-off'))
+  }
+  finally {
+    isLoggingOut.value = false
+  }
 }
 
 async function syncRouteQuery(nextStep: OnboardingStep, orgId = createdOrgId.value) {
@@ -493,8 +513,9 @@ onUnmounted(() => {
       >
 
       <div class="space-y-6">
-        <div v-if="hasExistingOrganization" class="flex justify-start">
+        <div class="flex items-center justify-between gap-3">
           <button
+            v-if="hasExistingOrganization"
             type="button"
             class="inline-flex items-center gap-1 rounded-sm p-2 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700 dark:text-slate-300 dark:hover:bg-white/8 dark:hover:text-white"
             :aria-label="t('button-back')"
@@ -502,6 +523,18 @@ onUnmounted(() => {
           >
             <IconBack class="w-5 h-5 fill-current" />
             <span>{{ t('button-back') }}</span>
+          </button>
+          <div v-else />
+
+          <button
+            type="button"
+            class="d-btn d-btn-ghost text-slate-600 hover:text-slate-900"
+            data-test="onboarding-logout"
+            :disabled="isLoggingOut"
+            @click="logoutFromOnboarding"
+          >
+            <IconLoader v-if="isLoggingOut" class="w-4 h-4 animate-spin" />
+            <span v-else>{{ t('logout') }}</span>
           </button>
         </div>
 

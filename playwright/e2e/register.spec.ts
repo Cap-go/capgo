@@ -29,7 +29,26 @@ test.describe('Registration', () => {
 
     await page.waitForURL(/step=invite/)
     await page.click('[data-test="onboarding-finish"]')
-    await page.waitForURL('/apps')
+    await page.waitForURL('/app/new')
+  })
+
+  test('should allow new users to log out from org onboarding', async ({ page }) => {
+    const uniqueSuffix = Date.now()
+    const email = `no-org-logout-e2e-${uniqueSuffix}@example.com`
+
+    await page.fill('[data-test="email"]', email)
+    await page.fill('[data-test="first_name"]', 'Wrong')
+    await page.fill('[data-test="last_name"]', 'Account')
+    await page.fill('[data-test="password"]', 'Password123!')
+    await page.fill('[data-test="confirm-password"]', 'Password123!')
+    await page.click('[data-test="submit"]')
+
+    await page.waitForURL(/\/onboarding\/organization/)
+    await page.click('[data-test="onboarding-logout"]')
+
+    await page.waitForURL(/\/login\/?$/)
+    await page.goto('/apps')
+    await page.waitForURL(/\/login/)
   })
 
   test('should show error for existing email', async ({ page }) => {
