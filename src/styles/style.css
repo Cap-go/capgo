@@ -20,6 +20,11 @@ layer(base);
   padding-top: max(var(--safe-area-top), 0px);
 }
 
+/* Sonner adds a hover spacer above expanded toasts; it reads as a broken top margin on this single status toast. */
+[data-sonner-toast].replication-toast[data-front='true'][data-expanded='true']::after {
+  content: none;
+}
+
 @plugin "daisyui" {
   themes: capgolight --default, capgodark --prefersdark;
   logs: true;

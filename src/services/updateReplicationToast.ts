@@ -32,6 +32,10 @@ const DEPLOYMENT_REGIONS: DeploymentRegion[] = [
 
 const TOTAL_REPLICATION_MS = 60_000
 const UPDATE_INTERVAL_MS = 500
+const REPLICATION_TOAST_CLASSES = {
+  content: 'w-full min-w-0',
+  toast: 'replication-toast',
+}
 
 function getCurrentTimeZone(): string | null {
   if (typeof Intl === 'undefined')
@@ -229,7 +233,7 @@ export function showUploadReplicationToast({
     toast(getToastTitle(), {
       id: toastId,
       descriptionClass: 'w-full',
-      classes: { content: 'w-full min-w-0' },
+      classes: REPLICATION_TOAST_CLASSES,
       description: buildDescription(
         regions,
         completed,
@@ -258,7 +262,7 @@ export function showUploadReplicationToast({
     toast(i18n.global.t('replication-toast-globally-available'), {
       id: toastId,
       descriptionClass: 'w-full',
-      classes: { content: 'w-full min-w-0' },
+      classes: REPLICATION_TOAST_CLASSES,
       description: buildDoneDescription(
         regions,
         hasAction ? actionLabel : undefined,
@@ -271,7 +275,7 @@ export function showUploadReplicationToast({
   const toastTitle = getToastTitle()
   toastId = toast(toastTitle, {
     descriptionClass: 'w-full',
-    classes: { content: 'w-full min-w-0' },
+    classes: REPLICATION_TOAST_CLASSES,
     description: buildDescription(
       regions,
       0,
