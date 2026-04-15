@@ -102,16 +102,27 @@ async function updateOrg(
   supabase: ReturnType<typeof supabaseApikey>,
   orgId: string,
   updateFields: Partial<Database['public']['Tables']['orgs']['Update']>,
+  options?: { expectedCurrentName?: string },
 ) {
-  const { error, data } = await supabase
+  let query = supabase
     .from('orgs')
     .update(updateFields)
     .eq('id', orgId)
+  if (options?.expectedCurrentName !== undefined)
+    query = query.eq('name', options.expectedCurrentName)
+
+  const { error, data } = await query
     .select()
-    .single()
+    .maybeSingle()
 
   if (error) {
     throw simpleError('cannot_update_org', 'Cannot update org', { error: error.message })
+  }
+  if (!data) {
+    throw simpleError('cannot_update_org', 'Cannot update org', {
+      error: 'org_name_changed',
+      orgId,
+    })
   }
 
   return data
@@ -187,7 +198,9 @@ export async function put(
 
   let dataOrg: Database['public']['Tables']['orgs']['Row']
   try {
-    dataOrg = await updateOrg(supabase, body.orgId, updateFields)
+    dataOrg = await updateOrg(supabase, body.orgId, updateFields, {
+      expectedCurrentName: shouldSyncStripeName ? currentOrg?.name : undefined,
+    })
   }
   catch (error) {
     if (shouldUpdateStripeCustomerName) {

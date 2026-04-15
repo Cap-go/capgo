@@ -66,7 +66,7 @@ function createOrgUpdateBuilder(data: any, error: { message: string } | null = n
     update: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     select: vi.fn().mockReturnThis(),
-    single: vi.fn().mockResolvedValue({ data, error }),
+    maybeSingle: vi.fn().mockResolvedValue({ data, error }),
   }
 }
 
@@ -106,6 +106,41 @@ describe('organization put Stripe sync', () => {
     expect(updateCustomerOrganizationNameMock).toHaveBeenCalledTimes(1)
     expect(updateCustomerOrganizationNameMock).toHaveBeenCalledWith(expect.anything(), 'cus_123', 'New Name')
     expect(updateBuilder.update).toHaveBeenCalledWith({ name: 'New Name' })
+    expect(updateBuilder.eq).toHaveBeenCalledWith('name', 'Old Name')
+  })
+
+  it('rolls Stripe back when a competing rename wins the database write', async () => {
+    const selectBuilder = createOrgSelectBuilder({
+      id: 'org-123',
+      name: 'Old Name',
+      customer_id: 'cus_123',
+    })
+    const rollbackSelectBuilder = createOrgSelectBuilder({
+      id: 'org-123',
+      name: 'Concurrent Name',
+      customer_id: 'cus_123',
+    })
+    const updateBuilder = createOrgUpdateBuilder(null)
+
+    supabaseClientMock.mockReturnValue({
+      from: vi.fn()
+        .mockReturnValueOnce(selectBuilder)
+        .mockReturnValueOnce(updateBuilder)
+        .mockReturnValueOnce(rollbackSelectBuilder),
+    })
+
+    const error = await put(createContext(), {
+      orgId: 'org-123',
+      name: 'New Name',
+    }, undefined).catch(caught => caught)
+
+    expect(error).toBeInstanceOf(HTTPException)
+    expect(updateCustomerOrganizationNameMock).toHaveBeenNthCalledWith(1, expect.anything(), 'cus_123', 'New Name')
+    expect(updateCustomerOrganizationNameMock).toHaveBeenNthCalledWith(2, expect.anything(), 'cus_123', 'Concurrent Name')
+    expect(error.cause.moreInfo).toMatchObject({
+      error: 'org_name_changed',
+      orgId: 'org-123',
+    })
   })
 
   it('rolls Stripe back when the database update fails', async () => {
@@ -136,6 +171,9 @@ describe('organization put Stripe sync', () => {
     expect(error).toBeInstanceOf(HTTPException)
     expect(updateCustomerOrganizationNameMock).toHaveBeenNthCalledWith(1, expect.anything(), 'cus_123', 'New Name')
     expect(updateCustomerOrganizationNameMock).toHaveBeenNthCalledWith(2, expect.anything(), 'cus_123', 'Concurrent Name')
+    expect(error.cause.moreInfo).toMatchObject({
+      error: 'db write failed',
+    })
   })
 
   it('includes both errors when Stripe rollback fails', async () => {
