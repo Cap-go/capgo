@@ -5,6 +5,7 @@ import { z } from 'zod'
 
 import {
   BASE_URL,
+  getAuthHeaders,
   getSupabaseClient,
   headers,
   normalizeLocalhostUrl,
@@ -74,11 +75,14 @@ describe('read-mode API keys cannot access destructive organization routes', () 
   const readOnlyCustomerId = `cus_test_${readOnlyOrgId}`
   let readOnlyKey = ''
   let readOnlyKeyId = 0
+  let authHeaders: Record<string, string>
   const readOnlyHeaders = {
     'Content-Type': 'application/json',
   }
 
   beforeAll(async () => {
+    authHeaders = await getAuthHeaders()
+
     const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
       customer_id: readOnlyCustomerId,
       status: 'succeeded',
@@ -109,7 +113,7 @@ describe('read-mode API keys cannot access destructive organization routes', () 
 
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: `Organization read-only regression ${randomUUID()}`,
         mode: 'read',
@@ -127,7 +131,7 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     if (readOnlyKeyId) {
       await fetch(`${BASE_URL}/apikey/${readOnlyKeyId}`, {
         method: 'DELETE',
-        headers,
+        headers: authHeaders,
       })
     }
     await getSupabaseClient().from('org_users').delete().eq('org_id', readOnlyOrgId)
