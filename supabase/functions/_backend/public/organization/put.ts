@@ -189,11 +189,10 @@ export async function put(
   }
   catch (error) {
     if (shouldUpdateStripeCustomerName) {
-      let rollbackOrgName = currentOrg.name
+      let rollbackOrg: Database['public']['Tables']['orgs']['Row']
 
       try {
-        const rollbackOrg = await getOrgForNameSync(supabase, body.orgId)
-        rollbackOrgName = rollbackOrg.name
+        rollbackOrg = await getOrgForNameSync(supabase, body.orgId)
       }
       catch (rollbackLookupError) {
         throw simpleError('cannot_update_org', 'Cannot update org', {
@@ -203,7 +202,7 @@ export async function put(
       }
 
       try {
-        await updateCustomerOrganizationName(c, currentOrg.customer_id!, rollbackOrgName)
+        await updateCustomerOrganizationName(c, currentOrg.customer_id!, rollbackOrg.name)
       }
       catch (rollbackError) {
         throw simpleError('cannot_update_org', 'Cannot update org', {
