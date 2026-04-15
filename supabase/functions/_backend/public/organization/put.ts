@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
+import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod/mini'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
@@ -131,6 +132,19 @@ async function getOrgForNameSync(
   return data
 }
 
+function getErrorDetail(error: unknown) {
+  if (error instanceof HTTPException) {
+    const httpErrorDetail = (error.cause as { moreInfo?: { error?: unknown } } | undefined)?.moreInfo?.error
+    if (httpErrorDetail !== undefined)
+      return httpErrorDetail
+  }
+
+  if (error instanceof Error)
+    return error.message
+
+  return error
+}
+
 export async function put(
   c: Context<MiddlewareKeyVariables>,
   bodyRaw: any,
@@ -180,7 +194,7 @@ export async function put(
       }
       catch (rollbackError) {
         throw simpleError('cannot_update_org', 'Cannot update org', {
-          error: error instanceof Error ? error.message : error,
+          error: getErrorDetail(error),
           rollbackError: rollbackError instanceof Error ? rollbackError.message : rollbackError,
         })
       }

@@ -132,6 +132,38 @@ describe('organization put Stripe sync', () => {
     expect(updateCustomerOrganizationNameMock).toHaveBeenNthCalledWith(2, expect.anything(), 'cus_123', 'Old Name')
   })
 
+  it('includes both errors when Stripe rollback fails', async () => {
+    const selectBuilder = createOrgSelectBuilder({
+      id: 'org-123',
+      name: 'Old Name',
+      customer_id: 'cus_123',
+    })
+    const updateBuilder = createOrgUpdateBuilder(null, { message: 'db write failed' })
+
+    supabaseClientMock.mockReturnValue({
+      from: vi.fn()
+        .mockReturnValueOnce(selectBuilder)
+        .mockReturnValueOnce(updateBuilder),
+    })
+
+    updateCustomerOrganizationNameMock
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error('Stripe rollback failed'))
+
+    const error = await put(createContext(), {
+      orgId: 'org-123',
+      name: 'New Name',
+    }, undefined).catch(caught => caught)
+
+    expect(error).toBeInstanceOf(HTTPException)
+    expect(error.cause.moreInfo).toMatchObject({
+      error: 'db write failed',
+      rollbackError: 'Stripe rollback failed',
+    })
+    expect(updateCustomerOrganizationNameMock).toHaveBeenNthCalledWith(1, expect.anything(), 'cus_123', 'New Name')
+    expect(updateCustomerOrganizationNameMock).toHaveBeenNthCalledWith(2, expect.anything(), 'cus_123', 'Old Name')
+  })
+
   it('skips Stripe sync for pending customer ids', async () => {
     const selectBuilder = createOrgSelectBuilder({
       id: 'org-123',

@@ -122,14 +122,20 @@ async function fetchTargetOrgs(supabase: ReturnType<typeof createClient<Database
   }
 
   const rows: OrgRow[] = []
-  let offset = 0
+  let lastSeenOrgId: string | null = null
 
   while (true) {
-    const { data, error } = await supabase
+    let query = supabase
       .from('orgs')
       .select('id, name, customer_id')
       .not('customer_id', 'is', null)
-      .range(offset, offset + DEFAULT_PAGE_SIZE - 1)
+      .order('id', { ascending: true })
+      .limit(DEFAULT_PAGE_SIZE)
+
+    if (lastSeenOrgId)
+      query = query.gt('id', lastSeenOrgId)
+
+    const { data, error } = await query
 
     if (error)
       throw error
@@ -138,7 +144,7 @@ async function fetchTargetOrgs(supabase: ReturnType<typeof createClient<Database
       break
 
     rows.push(...data)
-    offset += DEFAULT_PAGE_SIZE
+    lastSeenOrgId = data.at(-1)?.id ?? null
   }
 
   return rows
