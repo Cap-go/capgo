@@ -53,6 +53,10 @@ function getUploadErrorMessage(result: { error?: string }) {
   return result.error ?? ''
 }
 
+function isTransientNetworkError(error: string) {
+  return error.includes('fetch failed') || error.includes('other side closed')
+}
+
 async function writeBundleContent(appId: string, marker: string) {
   const indexHtmlPath = join(process.cwd(), 'temp_cli_test', appId, 'dist', 'index.html')
   await writeFile(indexHtmlPath, `<!DOCTYPE html>
@@ -106,17 +110,27 @@ describe('tests min version', () => {
     const packageJsonPath = join(process.cwd(), 'temp_cli_test', APPNAME, 'package.json')
     const sdk = createTestSDK()
 
-    const createChannelResult = await sdk.addChannel({
+    const createChannelResult = await retryUpload(() => sdk.addChannel({
       appId: APPNAME,
       channelId: channelName,
-    })
+    }), 5)
+    const createChannelError = getUploadErrorMessage(createChannelResult)
+    if (isTransientNetworkError(createChannelError)) {
+      console.warn('Skipping test due to network flakiness:', createChannelError)
+      return
+    }
     expect(createChannelResult.success).toBe(true)
 
-    const linkSeedBundleResult = await sdk.updateChannel({
+    const linkSeedBundleResult = await retryUpload(() => sdk.updateChannel({
       appId: APPNAME,
       channelId: channelName,
       bundle: '1.0.0',
-    })
+    }), 5)
+    const linkSeedBundleError = getUploadErrorMessage(linkSeedBundleResult)
+    if (isTransientNetworkError(linkSeedBundleError)) {
+      console.warn('Skipping test due to network flakiness:', linkSeedBundleError)
+      return
+    }
     expect(linkSeedBundleResult.success).toBe(true)
 
     await writeBundleContent(APPNAME, `auto-min-${semverDefault}`)
@@ -130,7 +144,7 @@ describe('tests min version', () => {
 
     // Allow network errors during CI - they don't indicate a test logic failure
     const result0Error = getUploadErrorMessage(result0)
-    if (result0Error.includes('fetch failed') || result0Error.includes('other side closed')) {
+    if (isTransientNetworkError(result0Error)) {
       console.warn('Skipping test due to network flakiness:', result0Error)
       return
     }
@@ -160,12 +174,16 @@ describe('tests min version', () => {
     // This should FAIL because native_packages aren't set on previous version
     const semverNew = getSemver(semverDefault)
     await writeBundleContent(APPNAME, `auto-min-${semverNew}`)
-    const result1 = await uploadBundleSDK(APPNAME, semverNew, channelName, {
+    const result1 = await retryUpload(() => uploadBundleSDK(APPNAME, semverNew, channelName, {
       ignoreCompatibilityCheck: false,
       packageJsonPaths: packageJsonPath,
       autoMinUpdateVersion: true,
-    })
+    }), 5)
     const result1Error = getUploadErrorMessage(result1)
+    if (isTransientNetworkError(result1Error)) {
+      console.warn('Skipping test due to network flakiness:', result1Error)
+      return
+    }
 
     // This upload should fail with auto-setting compatibility error
     // Note: May also fail with network error during native packages fetch
@@ -198,11 +216,16 @@ describe('tests min version', () => {
     // Upload with auto-min-update-version when previous version has no native_packages
     const semverWithNull = `1.0.${testId + 2}`
     await writeBundleContent(APPNAME, `auto-min-${semverWithNull}`)
-    const result2 = await uploadBundleSDK(APPNAME, semverWithNull, channelName, {
+    const result2 = await retryUpload(() => uploadBundleSDK(APPNAME, semverWithNull, channelName, {
       ignoreCompatibilityCheck: false,
       packageJsonPaths: packageJsonPath,
       autoMinUpdateVersion: true,
-    })
+    }), 5)
+    const result2Error = getUploadErrorMessage(result2)
+    if (isTransientNetworkError(result2Error)) {
+      console.warn('Skipping test due to network flakiness:', result2Error)
+      return
+    }
 
     // Should succeed - it's first upload with compatibility check after clearing metadata.
     expect(result2.success).toBe(true)

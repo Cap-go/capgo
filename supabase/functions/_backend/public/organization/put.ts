@@ -22,7 +22,8 @@ const bodySchema = z.object({
   enforcing_2fa: z.optional(z.boolean()),
 })
 
-type OrgNameSyncRow = Pick<Database['public']['Tables']['orgs']['Row'], 'id' | 'name' | 'customer_id'>
+type OrgRow = Database['public']['Tables']['orgs']['Row']
+type OrgUpdateFields = Partial<Database['public']['Tables']['orgs']['Update']>
 
 function parseBody(bodyRaw: unknown) {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
@@ -66,7 +67,7 @@ function validateMaxExpirationDays(maxDays?: number | null) {
 }
 
 function buildUpdateFields(body: z.infer<typeof bodySchema>, sanitizedName?: string) {
-  const updateFields: Partial<Database['public']['Tables']['orgs']['Update']> = {}
+  const updateFields: OrgUpdateFields = {}
   if (body.name !== undefined)
     updateFields.name = sanitizedName ?? body.name
   if (body.website !== undefined)
@@ -98,7 +99,14 @@ async function sanitizeOrgNameForSync(
     })
   }
 
-  return data
+  const sanitizedName = data.trim()
+  if (!sanitizedName) {
+    throw simpleError('invalid_body', 'Invalid body', {
+      error: 'sanitized_name_empty',
+    })
+  }
+
+  return sanitizedName
 }
 
 async function enforceSelf2faRequirement(authUserId: string, c: Context<MiddlewareKeyVariables>) {
@@ -116,7 +124,7 @@ async function enforceSelf2faRequirement(authUserId: string, c: Context<Middlewa
 async function updateOrg(
   supabase: ReturnType<typeof supabaseApikey>,
   orgId: string,
-  updateFields: Partial<Database['public']['Tables']['orgs']['Update']>,
+  updateFields: OrgUpdateFields,
   options?: { expectedCurrentName?: string },
 ) {
   let query = supabase
@@ -143,13 +151,26 @@ async function updateOrg(
   return data
 }
 
+function buildRollbackFields(
+  currentOrg: OrgRow,
+  updateFields: OrgUpdateFields,
+) {
+  const rollbackFields: OrgUpdateFields = {}
+
+  for (const key of Object.keys(updateFields) as Array<keyof OrgUpdateFields>) {
+    rollbackFields[key] = currentOrg[key as keyof OrgRow] as never
+  }
+
+  return rollbackFields
+}
+
 async function getOrgForNameSync(
   supabase: ReturnType<typeof supabaseApikey>,
   orgId: string,
-): Promise<OrgNameSyncRow> {
+): Promise<OrgRow> {
   const { error, data } = await supabase
     .from('orgs')
-    .select('id, name, customer_id')
+    .select('*')
     .eq('id', orgId)
     .single()
 
@@ -210,41 +231,33 @@ export async function put(
     && !currentOrg.customer_id.startsWith('pending_')
     && sanitizedOrgName !== currentOrg.name
 
+  const dataOrg: Database['public']['Tables']['orgs']['Row'] = await updateOrg(supabase, body.orgId, updateFields, {
+    expectedCurrentName: shouldSyncStripeName ? currentOrg?.name : undefined,
+  })
+
   if (shouldUpdateStripeCustomerName) {
-    await updateCustomerOrganizationName(c, currentOrg.customer_id!, sanitizedOrgName!)
-  }
-
-  let dataOrg: Database['public']['Tables']['orgs']['Row']
-  try {
-    dataOrg = await updateOrg(supabase, body.orgId, updateFields, {
-      expectedCurrentName: shouldSyncStripeName ? currentOrg?.name : undefined,
-    })
-  }
-  catch (error) {
-    if (shouldUpdateStripeCustomerName) {
-      let rollbackOrg: OrgNameSyncRow
+    try {
+      await updateCustomerOrganizationName(c, currentOrg.customer_id!, dataOrg.name)
+    }
+    catch (stripeError) {
+      const rollbackFields = buildRollbackFields(currentOrg, updateFields)
 
       try {
-        rollbackOrg = await getOrgForNameSync(supabase, body.orgId)
-      }
-      catch (rollbackLookupError) {
-        throw simpleError('cannot_update_org', 'Cannot update org', {
-          error: getErrorDetail(error),
-          rollbackLookupError: getErrorDetail(rollbackLookupError),
+        await updateOrg(supabase, body.orgId, rollbackFields, {
+          expectedCurrentName: dataOrg.name,
         })
-      }
-
-      try {
-        await updateCustomerOrganizationName(c, currentOrg.customer_id!, rollbackOrg.name)
       }
       catch (rollbackError) {
         throw simpleError('cannot_update_org', 'Cannot update org', {
-          error: getErrorDetail(error),
-          rollbackError: rollbackError instanceof Error ? rollbackError.message : rollbackError,
+          error: getErrorDetail(stripeError),
+          rollbackError: getErrorDetail(rollbackError),
         })
       }
+
+      throw simpleError('cannot_update_org', 'Cannot update org', {
+        error: getErrorDetail(stripeError),
+      })
     }
-    throw error
   }
 
   if (dataOrg.logo) {
