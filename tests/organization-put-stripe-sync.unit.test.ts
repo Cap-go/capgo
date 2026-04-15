@@ -99,7 +99,7 @@ describe('organization put Stripe sync', () => {
 
     const response = await put(createContext(), {
       orgId: 'org-123',
-      name: 'New Name',
+      name: '  <b>New Name</b>  ',
     }, undefined)
 
     expect(response.status).toBe(200)

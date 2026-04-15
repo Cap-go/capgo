@@ -23,6 +23,11 @@ const bodySchema = z.object({
 })
 
 type OrgNameSyncRow = Pick<Database['public']['Tables']['orgs']['Row'], 'id' | 'name' | 'customer_id'>
+const HTML_TAG_REGEX = /<[^>]*>/g
+
+function sanitizeOrgTextField(value: string) {
+  return value.replace(HTML_TAG_REGEX, '').trim()
+}
 
 function parseBody(bodyRaw: unknown) {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
@@ -65,10 +70,10 @@ function validateMaxExpirationDays(maxDays?: number | null) {
   }
 }
 
-function buildUpdateFields(body: z.infer<typeof bodySchema>) {
+function buildUpdateFields(body: z.infer<typeof bodySchema>, sanitizedName?: string) {
   const updateFields: Partial<Database['public']['Tables']['orgs']['Update']> = {}
   if (body.name !== undefined)
-    updateFields.name = body.name
+    updateFields.name = sanitizedName ?? body.name
   if (body.website !== undefined)
     updateFields.website = normalizeWebsiteUrl(body.website)
   if (body.logo !== undefined)
@@ -182,7 +187,10 @@ export async function put(
   }
 
   validateMaxExpirationDays(body.max_apikey_expiration_days)
-  const updateFields = buildUpdateFields(body)
+  const sanitizedOrgName = body.name !== undefined
+    ? sanitizeOrgTextField(body.name)
+    : undefined
+  const updateFields = buildUpdateFields(body, sanitizedOrgName)
   const shouldSyncStripeName = body.name !== undefined
   const currentOrg = shouldSyncStripeName
     ? await getOrgForNameSync(supabase, body.orgId)
@@ -190,10 +198,10 @@ export async function put(
   const shouldUpdateStripeCustomerName = shouldSyncStripeName
     && !!currentOrg?.customer_id
     && !currentOrg.customer_id.startsWith('pending_')
-    && body.name !== currentOrg.name
+    && sanitizedOrgName !== currentOrg.name
 
   if (shouldUpdateStripeCustomerName) {
-    await updateCustomerOrganizationName(c, currentOrg.customer_id!, body.name!)
+    await updateCustomerOrganizationName(c, currentOrg.customer_id!, sanitizedOrgName!)
   }
 
   let dataOrg: Database['public']['Tables']['orgs']['Row']
