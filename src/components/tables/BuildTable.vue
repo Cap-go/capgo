@@ -73,10 +73,10 @@ function onboardingDone() {
 }
 
 function applyAutoOnboardingState() {
-  if ((totalAllBuilds.value ?? 0) === 0 && !autoShowSteps.value && !showSteps.value) {
+  if (totalAllBuilds.value === 0 && !autoShowSteps.value && !showSteps.value) {
     showSetupInvite.value = true
   }
-  else if ((totalAllBuilds.value ?? 0) > 0) {
+  else if (typeof totalAllBuilds.value === 'number' && totalAllBuilds.value > 0) {
     showSetupInvite.value = false
   }
 }
