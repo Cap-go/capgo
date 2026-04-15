@@ -30,7 +30,41 @@ const auditLogsResponseSchema = z.object({
   limit: z.number(),
 })
 
+type AuditLog = z.infer<typeof auditLogSchema>
+
 let authHeaders: Record<string, string>
+
+async function waitForAuditLog(
+  url: string,
+  matcher: (log: AuditLog) => boolean,
+  maxAttempts = 8,
+  delayMs = 200,
+) {
+  let lastStatus = 0
+  let lastBody: unknown = null
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const response = await fetchWithRetry(url, {
+      headers: authHeaders,
+    })
+    lastStatus = response.status
+    lastBody = await response.json()
+
+    if (response.status === 200) {
+      const safe = auditLogsResponseSchema.safeParse(lastBody)
+      if (safe.success) {
+        const matchedLog = safe.data.data.find(matcher)
+        if (matchedLog)
+          return matchedLog
+      }
+    }
+
+    if (attempt < maxAttempts - 1)
+      await new Promise(resolve => setTimeout(resolve, delayMs * (attempt + 1)))
+  }
+
+  throw new Error(`Audit log did not reach expected state. Last status: ${lastStatus}. Last body: ${JSON.stringify(lastBody)}`)
+}
 
 beforeAll(async () => {
   authHeaders = await getAuthHeaders()
@@ -438,38 +472,21 @@ describe('audit logs for app_versions via API key', () => {
 
     expect(response.status).toBe(200)
 
-    // Wait for the trigger to execute
-    await new Promise(resolve => setTimeout(resolve, 200))
+    const updateAuditLog = await waitForAuditLog(
+      `${BASE_URL}/organization/audit?orgId=${SEED_ORG_ID}&tableName=app_versions&operation=UPDATE`,
+      log => log.record_id === createdVersionId?.toString() && log.changed_fields?.includes('comment') === true,
+    )
 
-    // Fetch audit logs for UPDATE operations
-    const auditResponse = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${SEED_ORG_ID}&tableName=app_versions&operation=UPDATE`, {
-      headers: authHeaders,
-    })
-    expect(auditResponse.status).toBe(200)
-    const auditData = await auditResponse.json()
-    const safe = auditLogsResponseSchema.safeParse(auditData)
-    expect(safe.success).toBe(true)
-
-    if (safe.success) {
-      // Find the audit log for our updated version
-      const updateAuditLog = safe.data.data.find(
-        log => log.record_id === createdVersionId?.toString(),
-      )
-
-      expect(updateAuditLog).toBeTruthy()
-      if (updateAuditLog) {
-        expect(updateAuditLog.operation).toBe('UPDATE')
-        expect(updateAuditLog.table_name).toBe('app_versions')
-        expect(updateAuditLog.org_id).toBe(SEED_ORG_ID)
-        // user_id should be set from the API key
-        expect(updateAuditLog.user_id).toBe(USER_ID)
-        expect(updateAuditLog.old_record).toBeTruthy()
-        expect(updateAuditLog.new_record).toBeTruthy()
-        // changed_fields should include 'comment'
-        expect(Array.isArray(updateAuditLog.changed_fields)).toBe(true)
-        expect(updateAuditLog.changed_fields).toContain('comment')
-      }
-    }
+    expect(updateAuditLog.operation).toBe('UPDATE')
+    expect(updateAuditLog.table_name).toBe('app_versions')
+    expect(updateAuditLog.org_id).toBe(SEED_ORG_ID)
+    // user_id should be set from the API key
+    expect(updateAuditLog.user_id).toBe(USER_ID)
+    expect(updateAuditLog.old_record).toBeTruthy()
+    expect(updateAuditLog.new_record).toBeTruthy()
+    // changed_fields should include 'comment'
+    expect(Array.isArray(updateAuditLog.changed_fields)).toBe(true)
+    expect(updateAuditLog.changed_fields).toContain('comment')
   })
 
   it('app_version soft-DELETE via API creates UPDATE audit log with user_id from API key', async () => {

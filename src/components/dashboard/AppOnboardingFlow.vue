@@ -54,7 +54,9 @@ const appIdFeedback = ref('')
 const hasEditedAppId = ref(false)
 
 const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ''
+const redactedLocalCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon [YOUR_SUPABASE_ANON_KEY]` : ''
 const cliCommand = computed(() => `npx @capgo/cli@latest i ${apiKey.value ?? '[APIKEY]'}${localCommand}`)
+const redactedCliCommand = computed(() => `npx @capgo/cli@latest i [YOUR_CAPGO_API_KEY]${redactedLocalCommand}`)
 const cliCommandArgs = computed(() => {
   const args: string[] = []
 
@@ -91,6 +93,20 @@ const suggestedAppId = computed(() => {
   return `com.${orgSlug}.${appSlug}`
 })
 const generatedAppId = computed(() => createdApp.value?.app_id || manualAppId.value.trim() || suggestedAppId.value)
+const aiHelpPrompt = computed(() => {
+  const resolvedAppId = createdApp.value?.app_id || generatedAppId.value || '[APP_ID]'
+  const resolvedAppName = createdApp.value?.name?.trim() || appName.value.trim() || resolvedAppId
+  const appStatus = createdApp.value?.existing_app
+    ? t('app-onboarding-ai-help-status-existing')
+    : t('app-onboarding-ai-help-status-new')
+
+  return t('app-onboarding-ai-help-prompt', {
+    appName: resolvedAppName,
+    appId: resolvedAppId,
+    appStatus,
+    command: redactedCliCommand.value,
+  })
+})
 
 function whiteCardToggleButtonClass(active: boolean) {
   return active
@@ -524,16 +540,16 @@ async function seedDemoData() {
   }
 }
 
-async function copyCliCommand() {
+async function copyText(text: string) {
   try {
-    await navigator.clipboard.writeText(cliCommand.value)
+    await navigator.clipboard.writeText(text)
     toast.success(t('copied-to-clipboard'))
   }
   catch (error) {
-    console.error('Failed to copy CLI command', error)
+    console.error('Failed to copy text', error)
     dialogStore.openDialog({
       title: t('cannot-copy'),
-      description: cliCommand.value,
+      description: text,
       buttons: [
         {
           text: t('button-cancel'),
@@ -543,6 +559,14 @@ async function copyCliCommand() {
     })
     await dialogStore.onDialogDismiss()
   }
+}
+
+async function copyCliCommand() {
+  await copyText(cliCommand.value)
+}
+
+async function copyAiInstructions() {
+  await copyText(aiHelpPrompt.value)
 }
 
 function goToInstallStep() {
@@ -875,6 +899,23 @@ watch(suggestedAppId, (value) => {
               </template>
             </code>
             <IconCopy class="absolute right-4 top-4 h-5 w-5 text-muted-blue-300 transition group-hover:text-white" />
+          </div>
+
+          <div class="rounded-2xl border border-azure-100 bg-azure-50/80 p-4 text-sm text-slate-700 dark:border-azure-900/30 dark:bg-azure-950/20 dark:text-slate-200">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+              <div class="max-w-2xl">
+                <p class="font-medium text-slate-900 dark:text-slate-50">
+                  {{ t('app-onboarding-ai-help-title') }}
+                </p>
+                <p class="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                  {{ t('app-onboarding-ai-help-caption') }}
+                </p>
+              </div>
+              <button class="d-btn" :class="whiteCardSecondaryButtonClass()" @click="copyAiInstructions">
+                <IconCopy class="h-4 w-4" />
+                {{ t('app-onboarding-ai-help-button') }}
+              </button>
+            </div>
           </div>
 
           <div class="rounded-2xl bg-slate-50 p-4 text-sm text-slate-700 dark:bg-slate-950/60 dark:text-slate-300">
