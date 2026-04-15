@@ -13,6 +13,22 @@ interface PublicUserSeed {
   last_name: string | null
 }
 
+type OrgMembershipRight
+  = 'read'
+    | 'upload'
+    | 'write'
+    | 'admin'
+    | 'super_admin'
+    | 'invite_read'
+    | 'invite_upload'
+    | 'invite_write'
+    | 'invite_admin'
+    | 'invite_super_admin'
+
+interface EnsureOrgMembershipResult {
+  alreadyMember: boolean
+}
+
 export const app = createHono('', version)
 
 app.use('*', useCors)
@@ -100,6 +116,89 @@ function buildPublicUserSeed(userId: string, email: string, userMetadata: Record
     first_name: typeof userMetadata?.first_name === 'string' ? userMetadata.first_name : null,
     last_name: typeof userMetadata?.last_name === 'string' ? userMetadata.last_name : null,
   }
+}
+
+function isInviteRole(role: string | null | undefined): role is Extract<OrgMembershipRight, `invite_${string}`> {
+  return !!role && role.startsWith('invite_')
+}
+
+function promoteInviteRole(role: Extract<OrgMembershipRight, `invite_${string}`>): Exclude<OrgMembershipRight, `invite_${string}`> {
+  switch (role) {
+    case 'invite_read':
+      return 'read'
+    case 'invite_upload':
+      return 'upload'
+    case 'invite_write':
+      return 'write'
+    case 'invite_admin':
+      return 'admin'
+    case 'invite_super_admin':
+      return 'super_admin'
+  }
+}
+
+async function ensureOrgMembership(
+  admin: ReturnType<typeof supabaseAdmin>,
+  requestId: string,
+  userId: string,
+  orgId: string,
+  fallbackRole: Exclude<OrgMembershipRight, `invite_${string}`> = 'read',
+  allowRetry = true,
+): Promise<EnsureOrgMembershipResult> {
+  const { data: existingMembership, error: membershipCheckError } = await (admin as any)
+    .from('org_users')
+    .select('id, user_right')
+    .eq('user_id', userId)
+    .eq('org_id', orgId)
+    .maybeSingle()
+
+  if (membershipCheckError) {
+    cloudlogErr({ requestId, message: 'Failed to check existing org membership', userId, orgId, error: membershipCheckError })
+    throw new Error('membership_check_failed')
+  }
+
+  const currentRight = typeof existingMembership?.user_right === 'string'
+    ? existingMembership.user_right as OrgMembershipRight
+    : null
+
+  if (existingMembership) {
+    if (!isInviteRole(currentRight)) {
+      return { alreadyMember: true }
+    }
+
+    const promotedRole = promoteInviteRole(currentRight)
+    const { error: promotionError } = await (admin as any)
+      .from('org_users')
+      .update({ user_right: promotedRole })
+      .eq('id', existingMembership.id)
+
+    if (promotionError) {
+      cloudlogErr({ requestId, message: 'Failed to promote invited org membership during SSO provisioning', userId, orgId, fromRole: currentRight, toRole: promotedRole, error: promotionError })
+      throw new Error('membership_promotion_failed')
+    }
+
+    return { alreadyMember: false }
+  }
+
+  const { error: insertError } = await (admin as any)
+    .from('org_users')
+    .insert({
+      user_id: userId,
+      org_id: orgId,
+      user_right: fallbackRole,
+    })
+
+  if (!insertError) {
+    return { alreadyMember: false }
+  }
+
+  const isDuplicate = insertError.code === '23505' || insertError.message?.toLowerCase().includes('duplicate')
+  if (isDuplicate && allowRetry) {
+    return ensureOrgMembership(admin, requestId, userId, orgId, fallbackRole, false)
+  }
+
+  cloudlogErr({ requestId, message: 'Failed to insert user into org_users during SSO provisioning', userId, orgId, fallbackRole, error: insertError })
+  throw new Error('membership_insert_failed')
 }
 
 async function ensurePublicUserRowExists(
@@ -261,42 +360,33 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
         .select('id, org_id, enforce_sso')
         .eq('domain', userDomain)
         .eq('status', 'active')
-        .single()
+        .maybeSingle()
 
       if (mergeProviderError) {
-        cloudlogErr({ requestId, message: 'Failed to resolve SSO provider during merge — skipping org membership insert', originalUserId, domain: userDomain, error: mergeProviderError })
+        cloudlogErr({ requestId, message: 'Failed to resolve SSO provider during merge', originalUserId, domain: userDomain, error: mergeProviderError })
+        return quickError(500, 'provider_lookup_failed', 'Failed to resolve SSO provider for your email domain')
       }
 
-      if (!mergeProviderError && mergeProvider) {
-        try {
-          await ensurePublicUserRowExists(admin, requestId, {
-            ...publicUserSeed,
-            id: originalUserId,
-          })
-        }
-        catch {
-          return quickError(500, 'public_user_sync_failed', 'Failed to create user profile for merged SSO account')
-        }
+      if (!mergeProvider) {
+        cloudlogErr({ requestId, message: 'No active SSO provider found during merge', originalUserId, domain: userDomain })
+        return quickError(404, 'provider_not_found', 'No active SSO provider found for your email domain')
+      }
 
-        const { data: existingMembership } = await (admin as any)
-          .from('org_users')
-          .select('id')
-          .eq('user_id', originalUserId)
-          .eq('org_id', mergeProvider.org_id)
-          .maybeSingle()
+      try {
+        await ensurePublicUserRowExists(admin, requestId, {
+          ...publicUserSeed,
+          id: originalUserId,
+        })
+      }
+      catch {
+        return quickError(500, 'public_user_sync_failed', 'Failed to create user profile for merged SSO account')
+      }
 
-        if (!existingMembership) {
-          const { error: mergeInsertError } = await (admin as any)
-            .from('org_users')
-            .insert({ user_id: originalUserId, org_id: mergeProvider.org_id, user_right: 'read' })
-
-          if (mergeInsertError) {
-            const isDuplicate = mergeInsertError.code === '23505' || mergeInsertError.message?.toLowerCase().includes('duplicate')
-            if (!isDuplicate) {
-              cloudlogErr({ requestId, message: 'Failed to insert original user into org_users during merge', originalUserId, orgId: mergeProvider.org_id, error: mergeInsertError })
-            }
-          }
-        }
+      try {
+        await ensureOrgMembership(admin, requestId, originalUserId, mergeProvider.org_id)
+      }
+      catch {
+        return quickError(500, 'provision_failed', 'Failed to provision user to organization')
       }
 
       // Step 2: Transfer SSO identity from duplicate user (userId) → original user (originalUserId)
@@ -354,9 +444,14 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       .select('id, org_id, domain, status')
       .eq('domain', userDomain)
       .eq('status', 'active')
-      .single()
+      .maybeSingle()
 
-    if (providerError || !provider) {
+    if (providerError) {
+      cloudlogErr({ requestId, message: 'Failed to resolve SSO provider for domain', userId, domain: userDomain, error: providerError })
+      return quickError(500, 'provider_lookup_failed', 'Failed to resolve SSO provider for your email domain')
+    }
+
+    if (!provider) {
       cloudlog({ requestId, message: 'No active SSO provider found for domain', userId, domain: userDomain })
       return quickError(404, 'provider_not_found', 'No active SSO provider found for your email domain')
     }
@@ -368,40 +463,17 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       return quickError(500, 'public_user_sync_failed', 'Failed to create user profile for SSO account')
     }
 
-    const { data: existingMembership, error: membershipCheckError } = await (admin as any)
-      .from('org_users')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('org_id', provider.org_id)
-      .maybeSingle()
-
-    if (membershipCheckError) {
-      cloudlogErr({ requestId, message: 'Failed to check existing org membership', userId, orgId: provider.org_id, error: membershipCheckError })
-      return quickError(500, 'membership_check_failed', 'Failed to check organization membership')
+    let membershipResult: EnsureOrgMembershipResult
+    try {
+      membershipResult = await ensureOrgMembership(admin, requestId, userId, provider.org_id)
+    }
+    catch {
+      return quickError(500, 'provision_failed', 'Failed to provision user to organization')
     }
 
-    if (existingMembership) {
+    if (membershipResult.alreadyMember) {
       cloudlog({ requestId, message: 'User already belongs to org', userId, orgId: provider.org_id })
       return c.json({ success: true, already_member: true })
-    }
-
-    const { error: insertError } = await (admin as any)
-      .from('org_users')
-      .insert({
-        user_id: userId,
-        org_id: provider.org_id,
-        user_right: 'read',
-      })
-
-    if (insertError) {
-      // SQLSTATE 23505 = unique_violation — user was inserted between our check and insert (race condition)
-      const isDuplicate = insertError.code === '23505' || insertError.message?.toLowerCase().includes('duplicate')
-      if (isDuplicate) {
-        cloudlog({ requestId, message: 'User already member (concurrent insert)', userId, orgId: provider.org_id })
-        return c.json({ success: true, already_member: true })
-      }
-      cloudlogErr({ requestId, message: 'Failed to insert user into org_users', userId, orgId: provider.org_id, error: insertError })
-      return quickError(500, 'provision_failed', 'Failed to provision user to organization')
     }
 
     cloudlog({ requestId, message: 'SSO user provisioned successfully', userId, orgId: provider.org_id, providerId: provider.id })
