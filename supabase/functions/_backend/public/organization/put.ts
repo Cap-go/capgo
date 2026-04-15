@@ -23,11 +23,6 @@ const bodySchema = z.object({
 })
 
 type OrgNameSyncRow = Pick<Database['public']['Tables']['orgs']['Row'], 'id' | 'name' | 'customer_id'>
-const HTML_TAG_REGEX = /<[^>]*>/g
-
-function sanitizeOrgTextField(value: string) {
-  return value.replace(HTML_TAG_REGEX, '').trim()
-}
 
 function parseBody(bodyRaw: unknown) {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
@@ -89,6 +84,21 @@ function buildUpdateFields(body: z.infer<typeof bodySchema>, sanitizedName?: str
   if (body.enforcing_2fa !== undefined)
     updateFields.enforcing_2fa = body.enforcing_2fa
   return updateFields
+}
+
+async function sanitizeOrgNameForSync(
+  supabase: ReturnType<typeof supabaseApikey>,
+  name: string,
+) {
+  const { data, error } = await supabase.rpc('strip_html', { input: name })
+
+  if (error || data === null) {
+    throw simpleError('cannot_update_org', 'Cannot update org', {
+      error: error?.message ?? 'cannot_sanitize_org_name',
+    })
+  }
+
+  return data
 }
 
 async function enforceSelf2faRequirement(authUserId: string, c: Context<MiddlewareKeyVariables>) {
@@ -188,7 +198,7 @@ export async function put(
 
   validateMaxExpirationDays(body.max_apikey_expiration_days)
   const sanitizedOrgName = body.name !== undefined
-    ? sanitizeOrgTextField(body.name)
+    ? await sanitizeOrgNameForSync(supabase, body.name)
     : undefined
   const updateFields = buildUpdateFields(body, sanitizedOrgName)
   const shouldSyncStripeName = body.name !== undefined

@@ -70,6 +70,16 @@ function createOrgUpdateBuilder(data: any, error: { message: string } | null = n
   }
 }
 
+function createSupabaseClientStub(
+  from: ReturnType<typeof vi.fn>,
+  sanitizedName = 'New Name',
+) {
+  return {
+    from,
+    rpc: vi.fn().mockResolvedValue({ data: sanitizedName, error: null }),
+  }
+}
+
 describe('organization put Stripe sync', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -91,11 +101,11 @@ describe('organization put Stripe sync', () => {
       logo: null,
     })
 
-    supabaseClientMock.mockReturnValue({
-      from: vi.fn()
+    supabaseClientMock.mockReturnValue(createSupabaseClientStub(
+      vi.fn()
         .mockReturnValueOnce(selectBuilder)
         .mockReturnValueOnce(updateBuilder),
-    })
+    ))
 
     const response = await put(createContext(), {
       orgId: 'org-123',
@@ -122,12 +132,12 @@ describe('organization put Stripe sync', () => {
     })
     const updateBuilder = createOrgUpdateBuilder(null)
 
-    supabaseClientMock.mockReturnValue({
-      from: vi.fn()
+    supabaseClientMock.mockReturnValue(createSupabaseClientStub(
+      vi.fn()
         .mockReturnValueOnce(selectBuilder)
         .mockReturnValueOnce(updateBuilder)
         .mockReturnValueOnce(rollbackSelectBuilder),
-    })
+    ))
 
     const error = await put(createContext(), {
       orgId: 'org-123',
@@ -156,12 +166,12 @@ describe('organization put Stripe sync', () => {
     })
     const updateBuilder = createOrgUpdateBuilder(null, { message: 'db write failed' })
 
-    supabaseClientMock.mockReturnValue({
-      from: vi.fn()
+    supabaseClientMock.mockReturnValue(createSupabaseClientStub(
+      vi.fn()
         .mockReturnValueOnce(selectBuilder)
         .mockReturnValueOnce(updateBuilder)
         .mockReturnValueOnce(rollbackSelectBuilder),
-    })
+    ))
 
     const error = await put(createContext(), {
       orgId: 'org-123',
@@ -189,12 +199,12 @@ describe('organization put Stripe sync', () => {
     })
     const updateBuilder = createOrgUpdateBuilder(null, { message: 'db write failed' })
 
-    supabaseClientMock.mockReturnValue({
-      from: vi.fn()
+    supabaseClientMock.mockReturnValue(createSupabaseClientStub(
+      vi.fn()
         .mockReturnValueOnce(selectBuilder)
         .mockReturnValueOnce(updateBuilder)
         .mockReturnValueOnce(rollbackSelectBuilder),
-    })
+    ))
 
     updateCustomerOrganizationNameMock
       .mockResolvedValueOnce(undefined)
@@ -227,11 +237,11 @@ describe('organization put Stripe sync', () => {
       logo: null,
     })
 
-    supabaseClientMock.mockReturnValue({
-      from: vi.fn()
+    supabaseClientMock.mockReturnValue(createSupabaseClientStub(
+      vi.fn()
         .mockReturnValueOnce(selectBuilder)
         .mockReturnValueOnce(updateBuilder),
-    })
+    ))
 
     const response = await put(createContext(), {
       orgId: 'org-123',
