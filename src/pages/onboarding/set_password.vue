@@ -6,7 +6,9 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import iconPassword from '~icons/ph/key?raw'
+import { authGhostButtonClass, authPanelClass, authPrimaryButtonClass } from '~/components/auth/pageStyles'
 import { useSupabase } from '~/services/supabase'
+import { openSupport } from '~/services/support'
 
 const isLoading = ref(false)
 const supabase = useSupabase()
@@ -58,95 +60,77 @@ watchEffect(async () => {
 </script>
 
 <template>
-  <div>
-    <section v-if="isLoading" class="flex justify-center">
-      <Spinner size="w-40 h-40" class="my-auto" />
-    </section>
-    <div v-else>
-      <section class="flex overflow-y-auto py-10 my-auto w-full h-full sm:py-8 lg:py-2">
-        <div class="px-4 my-auto mx-auto max-w-7xl sm:px-6 lg:px-8">
-          <div class="mx-auto max-w-2xl text-center">
-            <img src="/capgo.webp" alt="logo" class="mx-auto mb-6 w-1/6 rounded-sm invert dark:invert-0">
-            <h1 class="text-3xl font-bold leading-tight text-black sm:text-4xl lg:text-5xl dark:text-white">
-              {{ t('password-heading') }}
-            </h1>
-            <p>
-              {{ t('enter-your-new-passw') }}
-            </p>
-          </div>
+  <AuthPageShell
+    card-width-class="max-w-md"
+    :card-kicker="t('password-heading')"
+    :card-title="t('password-heading')"
+    :card-description="t('enter-your-new-passw')"
+  >
+    <FormKit id="set-password" type="form" :actions="false" @submit="submit">
+      <div class="space-y-5 text-slate-500 dark:text-slate-300">
+        <FormKitMessages />
+        <FormKit
+          type="password"
+          name="password"
+          :prefix-icon="iconPassword"
+          autocomplete="new-password"
+          enterkeyhint="send"
+          :disabled="isLoading"
+          :label="t('password')"
+          :help="t('6-characters-minimum')"
+          validation="required|length:6|contain_alphanumeric|contain_uppercase|contain_lowercase|contain_symbol"
+          validation-visibility="dirty"
+        />
 
-          <div class="relative mx-auto mt-8 max-w-md md:mt-4">
-            <div class="overflow-hidden bg-white rounded-md shadow-md">
-              <div class="py-6 px-4 sm:py-7 sm:px-8">
-                <FormKit id="set-password" type="form" :actions="false" @submit="submit">
-                  <div class="space-y-5">
-                    <FormKitMessages />
-                    <div>
-                      <div class="relative mt-2.5 text-gray-400 focus-within:text-gray-600">
-                        <FormKit
-                          type="password"
-                          name="password"
-                          :prefix-icon="iconPassword"
-                          autocomplete="new-password"
-                          enterkeyhint="send"
-                          :disabled="isLoading"
-                          :label="t('password')"
-                          :help="t('6-characters-minimum')"
-                          validation="required|length:6|contain_alphanumeric|contain_uppercase|contain_lowercase|contain_symbol"
-                          validation-visibility="live"
-                        />
-                      </div>
-                    </div>
+        <FormKit
+          type="password"
+          name="password_confirm"
+          :prefix-icon="iconPassword"
+          autocomplete="new-password"
+          :disabled="isLoading"
+          :label="t('confirm-password')"
+          :help="t('confirm-password')"
+          validation="required|confirm"
+          validation-visibility="dirty"
+          :validation-label="t('password-confirmatio')"
+        />
 
-                    <div>
-                      <div class="relative mt-2.5 text-gray-400 focus-within:text-gray-600">
-                        <FormKit
-                          type="password"
-                          name="password_confirm"
-                          :prefix-icon="iconPassword"
-                          autocomplete="new-password"
-                          :disabled="isLoading"
-                          :label="t('confirm-password')"
-                          :help="t('confirm-password')"
-                          validation="required|confirm"
-                          validation-visibility="live"
-                          :validation-label="t('password-confirmatio')"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <button type="submit" class="inline-flex justify-center items-center w-full">
-                        <svg v-if="isLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-gray-900 align-middle animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle
-                            class="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            stroke-width="4"
-                          />
-                          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                        </svg>
-                        <button v-if="!isLoading" type="submit" class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md border border-transparent transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden">
-                          {{ t('validate') }}
-                        </button>
-                      </button>
-                    </div>
-                  </div>
-                </FormKit>
-              </div>
-            </div>
-            <div class="flex flex-row justify-center mt-5 w-full">
-              <router-link to="/login" class="font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline">
-                {{ t('back-to-login-page') }}
-              </router-link>
-            </div>
-          </div>
+        <div>
+          <button type="submit" :disabled="isLoading" :aria-busy="isLoading ? 'true' : 'false'" :class="authPrimaryButtonClass">
+            <svg v-if="isLoading" class="inline-block mr-1 h-5 w-5 animate-spin align-middle text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            {{ t('validate') }}
+          </button>
         </div>
+
+        <div :class="authPanelClass">
+          <router-link to="/login" class="text-sm font-semibold text-[rgb(255,114,17)] transition-colors duration-200 hover:text-[rgb(235,94,0)]">
+            {{ t('back-to-login-page') }}
+          </router-link>
+        </div>
+      </div>
+    </FormKit>
+
+    <template #footer>
+      <section class="mt-6 flex flex-col items-center">
+        <div class="mx-auto">
+          <LangSelector />
+        </div>
+        <button class="mt-3" :class="authGhostButtonClass" @click="openSupport">
+          {{ t('support') }}
+        </button>
       </section>
-    </div>
-  </div>
+    </template>
+  </AuthPageShell>
 </template>
 
 <route lang="yaml">
