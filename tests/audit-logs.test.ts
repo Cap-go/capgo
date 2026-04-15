@@ -356,6 +356,44 @@ describe('audit logs for app_versions via API key', () => {
   const testVersionName = `99.0.0-audit-test-${randomUUID()}`
   let createdVersionId: number | null = null
 
+  async function waitForVersionAuditLog(
+    operation: 'INSERT' | 'UPDATE',
+    matches: (log: z.infer<typeof auditLogSchema>) => boolean,
+  ) {
+    const timeoutMs = 5000
+    const start = Date.now()
+
+    while (Date.now() - start < timeoutMs) {
+      const { data, error } = await getSupabaseClient()
+        .from('audit_logs')
+        .select('*')
+        .eq('org_id', SEED_ORG_ID)
+        .eq('table_name', 'app_versions')
+        .eq('operation', operation)
+        .order('created_at', { ascending: false })
+
+      expect(error).toBeNull()
+
+      const safe = auditLogsResponseSchema.safeParse({
+        data: data ?? [],
+        total: data?.length ?? 0,
+        page: 0,
+        limit: data?.length ?? 0,
+      })
+      expect(safe.success).toBe(true)
+
+      if (safe.success) {
+        const auditLog = safe.data.data.find(matches)
+        if (auditLog)
+          return auditLog
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 200))
+    }
+
+    throw new Error(`Timed out waiting for app_versions ${operation} audit log`)
+  }
+
   afterAll(async () => {
     // Clean up: delete the test version if it was created
     if (createdVersionId) {
@@ -384,37 +422,20 @@ describe('audit logs for app_versions via API key', () => {
     expect(responseData.bundle).toBeTruthy()
     createdVersionId = responseData.bundle.id
 
-    // Wait for the trigger to execute
-    await new Promise(resolve => setTimeout(resolve, 200))
+    const versionAuditLog = await waitForVersionAuditLog(
+      'INSERT',
+      log => log.record_id === createdVersionId?.toString(),
+    )
 
-    // Fetch audit logs for this org - use the seed org ID since that's where the app belongs
-    const auditResponse = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${SEED_ORG_ID}&tableName=app_versions&operation=INSERT`, {
-      headers: authHeaders,
-    })
-    expect(auditResponse.status).toBe(200)
-    const auditData = await auditResponse.json()
-    const safe = auditLogsResponseSchema.safeParse(auditData)
-    expect(safe.success).toBe(true)
-
-    if (safe.success) {
-      // Find the audit log for our created version
-      const versionAuditLog = safe.data.data.find(
-        log => log.record_id === createdVersionId?.toString(),
-      )
-
-      expect(versionAuditLog).toBeTruthy()
-      if (versionAuditLog) {
-        expect(versionAuditLog.operation).toBe('INSERT')
-        expect(versionAuditLog.table_name).toBe('app_versions')
-        expect(versionAuditLog.org_id).toBe(SEED_ORG_ID)
-        // This is the key assertion: user_id should be set from the API key
-        expect(versionAuditLog.user_id).toBe(USER_ID)
-        expect(versionAuditLog.old_record).toBeNull()
-        expect(versionAuditLog.new_record).toBeTruthy()
-        if (versionAuditLog.new_record && typeof versionAuditLog.new_record === 'object') {
-          expect((versionAuditLog.new_record as Record<string, unknown>).name).toBe(testVersionName)
-        }
-      }
+    expect(versionAuditLog.operation).toBe('INSERT')
+    expect(versionAuditLog.table_name).toBe('app_versions')
+    expect(versionAuditLog.org_id).toBe(SEED_ORG_ID)
+    // This is the key assertion: user_id should be set from the API key
+    expect(versionAuditLog.user_id).toBe(USER_ID)
+    expect(versionAuditLog.old_record).toBeNull()
+    expect(versionAuditLog.new_record).toBeTruthy()
+    if (versionAuditLog.new_record && typeof versionAuditLog.new_record === 'object') {
+      expect((versionAuditLog.new_record as Record<string, unknown>).name).toBe(testVersionName)
     }
   })
 
@@ -438,38 +459,22 @@ describe('audit logs for app_versions via API key', () => {
 
     expect(response.status).toBe(200)
 
-    // Wait for the trigger to execute
-    await new Promise(resolve => setTimeout(resolve, 200))
+    const updateAuditLog = await waitForVersionAuditLog(
+      'UPDATE',
+      log => log.record_id === createdVersionId?.toString()
+        && log.changed_fields?.includes('comment') === true,
+    )
 
-    // Fetch audit logs for UPDATE operations
-    const auditResponse = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${SEED_ORG_ID}&tableName=app_versions&operation=UPDATE`, {
-      headers: authHeaders,
-    })
-    expect(auditResponse.status).toBe(200)
-    const auditData = await auditResponse.json()
-    const safe = auditLogsResponseSchema.safeParse(auditData)
-    expect(safe.success).toBe(true)
-
-    if (safe.success) {
-      // Find the audit log for our updated version
-      const updateAuditLog = safe.data.data.find(
-        log => log.record_id === createdVersionId?.toString(),
-      )
-
-      expect(updateAuditLog).toBeTruthy()
-      if (updateAuditLog) {
-        expect(updateAuditLog.operation).toBe('UPDATE')
-        expect(updateAuditLog.table_name).toBe('app_versions')
-        expect(updateAuditLog.org_id).toBe(SEED_ORG_ID)
-        // user_id should be set from the API key
-        expect(updateAuditLog.user_id).toBe(USER_ID)
-        expect(updateAuditLog.old_record).toBeTruthy()
-        expect(updateAuditLog.new_record).toBeTruthy()
-        // changed_fields should include 'comment'
-        expect(Array.isArray(updateAuditLog.changed_fields)).toBe(true)
-        expect(updateAuditLog.changed_fields).toContain('comment')
-      }
-    }
+    expect(updateAuditLog.operation).toBe('UPDATE')
+    expect(updateAuditLog.table_name).toBe('app_versions')
+    expect(updateAuditLog.org_id).toBe(SEED_ORG_ID)
+    // user_id should be set from the API key
+    expect(updateAuditLog.user_id).toBe(USER_ID)
+    expect(updateAuditLog.old_record).toBeTruthy()
+    expect(updateAuditLog.new_record).toBeTruthy()
+    // changed_fields should include 'comment'
+    expect(Array.isArray(updateAuditLog.changed_fields)).toBe(true)
+    expect(updateAuditLog.changed_fields).toContain('comment')
   })
 
   it('app_version soft-DELETE via API creates UPDATE audit log with user_id from API key', async () => {
@@ -493,42 +498,25 @@ describe('audit logs for app_versions via API key', () => {
 
     expect(response.status).toBe(200)
 
-    // Wait for the trigger to execute
-    await new Promise(resolve => setTimeout(resolve, 200))
+    const deleteAuditLog = await waitForVersionAuditLog(
+      'UPDATE',
+      log => log.record_id === versionIdToDelete.toString()
+        && log.changed_fields?.includes('deleted') === true,
+    )
 
-    // Fetch audit logs for UPDATE operations (soft-delete creates UPDATE, not DELETE)
-    const auditResponse = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${SEED_ORG_ID}&tableName=app_versions&operation=UPDATE`, {
-      headers: authHeaders,
-    })
-    expect(auditResponse.status).toBe(200)
-    const auditData = await auditResponse.json()
-    const safe = auditLogsResponseSchema.safeParse(auditData)
-    expect(safe.success).toBe(true)
-
-    if (safe.success) {
-      // Find the audit log for our soft-deleted version (look for 'deleted' in changed_fields)
-      const deleteAuditLog = safe.data.data.find(
-        log => log.record_id === versionIdToDelete.toString()
-          && log.changed_fields?.includes('deleted'),
-      )
-
-      expect(deleteAuditLog).toBeTruthy()
-      if (deleteAuditLog) {
-        expect(deleteAuditLog.operation).toBe('UPDATE')
-        expect(deleteAuditLog.table_name).toBe('app_versions')
-        expect(deleteAuditLog.org_id).toBe(SEED_ORG_ID)
-        // user_id should be set from the API key
-        expect(deleteAuditLog.user_id).toBe(USER_ID)
-        // Both old and new record should exist for UPDATE
-        expect(deleteAuditLog.old_record).toBeTruthy()
-        expect(deleteAuditLog.new_record).toBeTruthy()
-        // changed_fields should include 'deleted'
-        expect(deleteAuditLog.changed_fields).toContain('deleted')
-        // Verify the deleted flag was set to true
-        if (deleteAuditLog.new_record && typeof deleteAuditLog.new_record === 'object') {
-          expect((deleteAuditLog.new_record as Record<string, unknown>).deleted).toBe(true)
-        }
-      }
+    expect(deleteAuditLog.operation).toBe('UPDATE')
+    expect(deleteAuditLog.table_name).toBe('app_versions')
+    expect(deleteAuditLog.org_id).toBe(SEED_ORG_ID)
+    // user_id should be set from the API key
+    expect(deleteAuditLog.user_id).toBe(USER_ID)
+    // Both old and new record should exist for UPDATE
+    expect(deleteAuditLog.old_record).toBeTruthy()
+    expect(deleteAuditLog.new_record).toBeTruthy()
+    // changed_fields should include 'deleted'
+    expect(deleteAuditLog.changed_fields).toContain('deleted')
+    // Verify the deleted flag was set to true
+    if (deleteAuditLog.new_record && typeof deleteAuditLog.new_record === 'object') {
+      expect((deleteAuditLog.new_record as Record<string, unknown>).deleted).toBe(true)
     }
   })
 })
