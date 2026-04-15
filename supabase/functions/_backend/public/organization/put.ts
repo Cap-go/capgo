@@ -22,6 +22,8 @@ const bodySchema = z.object({
   enforcing_2fa: z.optional(z.boolean()),
 })
 
+type OrgNameSyncRow = Pick<Database['public']['Tables']['orgs']['Row'], 'id' | 'name' | 'customer_id'>
+
 function parseBody(bodyRaw: unknown) {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
   if (!bodyParsed.success) {
@@ -118,7 +120,7 @@ async function updateOrg(
 async function getOrgForNameSync(
   supabase: ReturnType<typeof supabaseApikey>,
   orgId: string,
-) {
+): Promise<OrgNameSyncRow> {
   const { error, data } = await supabase
     .from('orgs')
     .select('id, name, customer_id')
