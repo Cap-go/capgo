@@ -37,6 +37,7 @@ const normalizedManualUrl = computed(() => {
   return /^https?:\/\//i.test(value) ? value : `https://${value}`
 })
 const canSubmitManualUrl = computed(() => !isLoading.value && URL.canParse(normalizedManualUrl.value))
+const manualActionLabel = computed(() => (isNativePlatform ? 'Download update' : 'Open update URL'))
 const scannerStatusLabel = computed(() => {
   if (isLoading.value)
     return 'Applying update'
@@ -62,7 +63,7 @@ onMounted(async () => {
     return
   }
 
-  errorMessage.value = 'Live camera scanning is available in the iOS and Android app. Paste an update URL below to continue from this environment.'
+  errorMessage.value = 'Live camera scanning is available in the iOS and Android app. Paste an update URL below to open it from this environment.'
 })
 
 onUnmounted(async () => {
@@ -158,6 +159,13 @@ async function submitManualUrl() {
 
   errorMessage.value = ''
   scannedUrl.value = normalizedManualUrl.value
+
+  if (!isNativePlatform) {
+    toast.success(`Opening ${new URL(normalizedManualUrl.value).host}`)
+    window.location.assign(normalizedManualUrl.value)
+    return
+  }
+
   await downloadUpdate(normalizedManualUrl.value)
 }
 
@@ -288,7 +296,9 @@ async function goBack() {
                 Install behavior
               </p>
               <p class="mt-2 text-sm leading-6 text-slate-200">
-                The app downloads the bundle, switches to the new version, and reloads automatically when the update is ready.
+                {{ isNativePlatform
+                  ? 'The app downloads the bundle, switches to the new version, and reloads automatically when the update is ready.'
+                  : 'This page can open the bundle URL in the browser, but applying the update still requires the native app.' }}
               </p>
             </div>
           </div>
@@ -332,7 +342,7 @@ async function goBack() {
               @click="submitManualUrl"
             >
               <IconDownload class="h-5 w-5" />
-              Download update
+              {{ manualActionLabel }}
             </button>
             <button
               v-if="isNativePlatform"
