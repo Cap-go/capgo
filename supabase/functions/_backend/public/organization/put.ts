@@ -125,7 +125,7 @@ async function updateOrg(
   supabase: ReturnType<typeof supabaseApikey>,
   orgId: string,
   updateFields: OrgUpdateFields,
-  options?: { expectedCurrentName?: string },
+  options?: { expectedCurrentName?: string, expectedCurrentUpdatedAt?: string | null },
 ) {
   let query = supabase
     .from('orgs')
@@ -133,6 +133,11 @@ async function updateOrg(
     .eq('id', orgId)
   if (options?.expectedCurrentName !== undefined)
     query = query.eq('name', options.expectedCurrentName)
+  if (options?.expectedCurrentUpdatedAt !== undefined) {
+    query = options.expectedCurrentUpdatedAt === null
+      ? query.is('updated_at', null)
+      : query.eq('updated_at', options.expectedCurrentUpdatedAt)
+  }
 
   const { error, data } = await query
     .select()
@@ -245,6 +250,7 @@ export async function put(
       try {
         await updateOrg(supabase, body.orgId, rollbackFields, {
           expectedCurrentName: dataOrg.name,
+          expectedCurrentUpdatedAt: dataOrg.updated_at,
         })
       }
       catch (rollbackError) {

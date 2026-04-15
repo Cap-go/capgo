@@ -91,6 +91,7 @@ function createOrgSelectBuilder(data: OrgRow) {
   return {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    is: vi.fn().mockReturnThis(),
     single: vi.fn().mockResolvedValue({ data, error: null }),
   }
 }
@@ -99,6 +100,7 @@ function createOrgUpdateBuilder(data: any, error: { message: string } | null = n
   return {
     update: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
+    is: vi.fn().mockReturnThis(),
     select: vi.fn().mockReturnThis(),
     maybeSingle: vi.fn().mockResolvedValue({ data, error }),
   }
@@ -219,6 +221,7 @@ describe('organization put Stripe sync', () => {
         id: 'org-123',
         name: 'New Name',
         customer_id: 'cus_123',
+        updated_at: '2026-04-15T13:00:00Z',
         website: 'https://new.example',
       }),
     })
@@ -252,6 +255,7 @@ describe('organization put Stripe sync', () => {
       website: 'https://old.example',
     })
     expect(rollbackBuilder.eq).toHaveBeenCalledWith('name', 'New Name')
+    expect(rollbackBuilder.eq).toHaveBeenCalledWith('updated_at', '2026-04-15T13:00:00Z')
     expect(error.cause.moreInfo).toMatchObject({
       error: 'Stripe update failed',
     })
@@ -268,6 +272,7 @@ describe('organization put Stripe sync', () => {
         id: 'org-123',
         name: 'New Name',
         customer_id: 'cus_123',
+        updated_at: '2026-04-15T13:00:00Z',
       }),
     })
     const rollbackBuilder = createOrgUpdateBuilder(null, { message: 'rollback failed' })
