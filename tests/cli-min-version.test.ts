@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
+import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { uploadBundleSDK } from './cli-sdk-utils'
+import { createTestSDK, uploadBundleSDK } from './cli-sdk-utils'
 import { cleanupCli, getSemver, prepareCli } from './cli-utils'
 import { getSupabaseClient, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils'
 
@@ -48,6 +49,29 @@ async function retryUpload<T extends { success: boolean, error?: string }>(
   return lastResult!
 }
 
+function getUploadErrorMessage(result: { error?: string }) {
+  return result.error ?? ''
+}
+
+async function writeBundleContent(appId: string, marker: string) {
+  const indexHtmlPath = join(process.cwd(), 'temp_cli_test', appId, 'dist', 'index.html')
+  await writeFile(indexHtmlPath, `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>CLI Min Version Test</title>
+</head>
+<body>
+  <h1>${marker}</h1>
+  <script>
+    if (window.CapacitorUpdater) {
+      window.CapacitorUpdater.notifyAppReady();
+    }
+  </script>
+</body>
+</html>`)
+}
+
 describe('tests min version', () => {
   const id = randomUUID()
   const APPNAME = `com.cli_min_version_${id}`
@@ -69,24 +93,45 @@ describe('tests min version', () => {
 
   it('should test auto min version flag', async () => {
     const supabase = getSupabaseClient()
+    await resetAppData(APPNAME)
+    await resetAndSeedAppData(APPNAME)
+
     const { error } = await supabase.from('app_versions').update({ min_update_version: '1.0.0' }).eq('name', '1.0.0').eq('app_id', APPNAME).throwOnError()
     expect(error).toBeNull()
 
     // Use a fixed version instead of timestamp-based to avoid timing issues
     const testId = Math.floor(Math.random() * 1000000)
     const semverDefault = `1.0.${testId}`
+    const channelName = `min-version-${testId}`
     const packageJsonPath = join(process.cwd(), 'temp_cli_test', APPNAME, 'package.json')
+    const sdk = createTestSDK()
+
+    const createChannelResult = await sdk.addChannel({
+      appId: APPNAME,
+      channelId: channelName,
+    })
+    expect(createChannelResult.success).toBe(true)
+
+    const linkSeedBundleResult = await sdk.updateChannel({
+      appId: APPNAME,
+      channelId: channelName,
+      bundle: '1.0.0',
+    })
+    expect(linkSeedBundleResult.success).toBe(true)
+
+    await writeBundleContent(APPNAME, `auto-min-${semverDefault}`)
 
     // Upload with auto-min-update-version (needs metadata check enabled)
-    const result0 = await retryUpload(() => uploadBundleSDK(APPNAME, semverDefault, 'production', {
+    const result0 = await retryUpload(() => uploadBundleSDK(APPNAME, semverDefault, channelName, {
       ignoreCompatibilityCheck: false,
       packageJsonPaths: packageJsonPath,
       autoMinUpdateVersion: true,
     }), 5) // Increase retries for network flakiness
 
     // Allow network errors during CI - they don't indicate a test logic failure
-    if (result0.error?.includes('fetch failed') || result0.error?.includes('other side closed')) {
-      console.warn('Skipping test due to network flakiness:', result0.error)
+    const result0Error = getUploadErrorMessage(result0)
+    if (result0Error.includes('fetch failed') || result0Error.includes('other side closed')) {
+      console.warn('Skipping test due to network flakiness:', result0Error)
       return
     }
 
@@ -114,18 +159,21 @@ describe('tests min version', () => {
     // Upload a new version with auto-min-update-version
     // This should FAIL because native_packages aren't set on previous version
     const semverNew = getSemver(semverDefault)
-    const result1 = await uploadBundleSDK(APPNAME, semverNew, 'production', {
+    await writeBundleContent(APPNAME, `auto-min-${semverNew}`)
+    const result1 = await uploadBundleSDK(APPNAME, semverNew, channelName, {
       ignoreCompatibilityCheck: false,
       packageJsonPaths: packageJsonPath,
       autoMinUpdateVersion: true,
     })
+    const result1Error = getUploadErrorMessage(result1)
 
     // This upload should fail with auto-setting compatibility error
     // Note: May also fail with network error during native packages fetch
     expect(result1.success).toBe(false)
     expect(
-      result1.error?.includes('Cannot auto set compatibility')
-      || result1.error?.includes('Error fetching native packages'),
+      result1Error.includes('Cannot auto set compatibility')
+      || result1Error.includes('Error fetching native packages')
+      || result1Error.includes('Invalid remote min update version'),
     ).toBe(true)
 
     // The new version should NOT exist because upload failed
@@ -143,27 +191,20 @@ describe('tests min version', () => {
       .from('app_versions')
       .update({ min_update_version: null, native_packages: null })
       .eq('name', semverDefault)
+      .eq('app_id', APPNAME)
       .throwOnError()
     expect(error2).toBeNull()
 
     // Upload with auto-min-update-version when previous version has no native_packages
     const semverWithNull = `1.0.${testId + 2}`
-    const result2 = await uploadBundleSDK(APPNAME, semverWithNull, 'production', {
+    await writeBundleContent(APPNAME, `auto-min-${semverWithNull}`)
+    const result2 = await uploadBundleSDK(APPNAME, semverWithNull, channelName, {
       ignoreCompatibilityCheck: false,
       packageJsonPaths: packageJsonPath,
       autoMinUpdateVersion: true,
     })
 
-    // Should succeed - it's first upload with compatibility check
-    // Note: May fail with checksum error if running test repeatedly since
-    // SDK doesn't have ignoreChecksumCheck option (would need --dry-upload which SDK also doesn't support)
-    if (result2.error?.includes('same bundle content')) {
-      // Checksum error is acceptable - it means the bundle was uploaded before
-      // The important part is that autoMinUpdateVersion logic ran
-      expect(result2.success).toBe(false)
-    }
-    else {
-      expect(result2.success).toBe(true)
-    }
+    // Should succeed - it's first upload with compatibility check after clearing metadata.
+    expect(result2.success).toBe(true)
   }, 30000)
 })
