@@ -3,6 +3,7 @@ import type { NavigationGuardNext, RouteLocationNormalized } from 'vue-router'
 import type { UserModule } from '~/types'
 import { hideLoader } from '~/services/loader'
 import { setUser } from '~/services/posthog'
+import { isSsoUser, provisionSsoUser } from '~/services/ssoProvisioning'
 import { createSignedImageUrl } from '~/services/storage'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
@@ -80,6 +81,27 @@ async function updateUser(
   catch (error) {
     console.error('auth', error)
   }
+}
+
+async function maybeProvisionSsoMembership(
+  supabase: SupabaseClient,
+  session: Awaited<ReturnType<SupabaseClient['auth']['getSession']>>['data']['session'] | null,
+): Promise<'continue' | 'redirect_login'> {
+  if (!session || !isSsoUser(session.user))
+    return 'continue'
+
+  const result = await provisionSsoUser(session)
+
+  if (result.merged) {
+    await supabase.auth.signOut()
+    return 'redirect_login'
+  }
+
+  if (result.error) {
+    console.error('Failed to provision SSO membership during auth guard:', result.error)
+  }
+
+  return 'continue'
 }
 
 async function guard(
@@ -180,6 +202,10 @@ async function guard(
       console.error('Error checking if account is disabled:', error)
     }
 
+    if (await maybeProvisionSsoMembership(supabase, sessionData?.session ?? null) === 'redirect_login') {
+      return next('/login?message=sso_account_linked')
+    }
+
     if (!main.user) {
       await updateUser(main, supabase)
     }
@@ -270,7 +296,16 @@ async function guard(
       }
     }
 
-    const organizationsLoaded = await tryLoadOrganizations(() => organizationStore.dedupFetchOrganizations())
+    let organizationsLoaded = await tryLoadOrganizations(() => organizationStore.dedupFetchOrganizations())
+    if (organizationsLoaded && !organizationStore.hasOrganizations && isSsoUser(sessionUser)) {
+      const didProvisionSsoMembership = await maybeProvisionSsoMembership(supabase, sessionData?.session ?? null)
+      if (didProvisionSsoMembership === 'redirect_login') {
+        return next('/login?message=sso_account_linked')
+      }
+
+      organizationsLoaded = await tryLoadOrganizations(() => organizationStore.fetchOrganizations())
+    }
+
     if (organizationsLoaded && !organizationStore.hasOrganizations && shouldRedirectToOrgOnboarding()) {
       return next('/onboarding/organization')
     }
