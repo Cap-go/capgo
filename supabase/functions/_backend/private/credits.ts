@@ -1,9 +1,9 @@
 import type { Context } from 'hono'
 import type Stripe from 'stripe'
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { AuthInfo, MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { getFallbackCreditProductId } from '../utils/credits.ts'
-import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { getClaimsFromJWT, middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { checkPermission } from '../utils/rbac.ts'
 import { createOneTimeCheckout, getCreditCheckoutDetails, getStripe, isStripeEmulatorEnabled } from '../utils/stripe.ts'
@@ -26,6 +26,8 @@ interface CostCalculationRequest {
   mau: number
   bandwidth: number // in bytes
   storage: number // in bytes
+  build_time?: number // in seconds
+  org_id?: string
 }
 
 interface TierUsage {
@@ -33,7 +35,7 @@ interface TierUsage {
   step_min: number
   step_max: number
   unit_factor: number
-  units_used: number // billing units (GB for bandwidth/storage, count for MAU)
+  units_used: number // billing units (GiB/minutes/count)
   price_per_unit: number // Price per billing unit
   cost: number
 }
@@ -49,11 +51,13 @@ interface CostCalculationResponse {
     mau: MetricBreakdown
     bandwidth: MetricBreakdown
     storage: MetricBreakdown
+    build_time: MetricBreakdown
   }
   usage: {
     mau: number
     bandwidth: number
     storage: number
+    build_time: number
   }
 }
 
@@ -71,6 +75,150 @@ const DEFAULT_TOP_UP_QUANTITY = 100
 const MAX_TOP_UP_QUANTITY = 100000
 
 type AppContext = Context<MiddlewareKeyVariables, any, any>
+
+function sortCreditSteps(steps: CreditStep[]): CreditStep[] {
+  return [...steps].sort((a, b) => {
+    if (a.type !== b.type)
+      return a.type.localeCompare(b.type)
+
+    if (a.step_min !== b.step_min)
+      return a.step_min - b.step_min
+
+    return a.step_max - b.step_max
+  })
+}
+
+function subtractScopedRange(baseStep: CreditStep, scopedStep: CreditStep): CreditStep[] {
+  const overlapStart = Math.max(baseStep.step_min, scopedStep.step_min)
+  const overlapEnd = Math.min(baseStep.step_max, scopedStep.step_max)
+
+  if (overlapStart >= overlapEnd)
+    return [baseStep]
+
+  const remainingSteps: CreditStep[] = []
+
+  if (baseStep.step_min < overlapStart) {
+    remainingSteps.push({
+      ...baseStep,
+      step_min: baseStep.step_min,
+      step_max: overlapStart,
+    })
+  }
+
+  if (overlapEnd < baseStep.step_max) {
+    remainingSteps.push({
+      ...baseStep,
+      step_min: overlapEnd,
+      step_max: baseStep.step_max,
+    })
+  }
+
+  return remainingSteps
+}
+
+function preferScopedCreditSteps(steps: CreditStep[], orgId?: string): CreditStep[] {
+  if (!orgId)
+    return sortCreditSteps(steps)
+
+  const stepGroups = new Map<string, { global: CreditStep[], scoped: CreditStep[] }>()
+
+  for (const step of steps) {
+    const currentGroup = stepGroups.get(step.type) ?? { global: [], scoped: [] }
+
+    if (step.org_id === orgId)
+      currentGroup.scoped.push(step)
+    else
+      currentGroup.global.push(step)
+
+    stepGroups.set(step.type, currentGroup)
+  }
+
+  const normalizedSteps: CreditStep[] = []
+
+  for (const [, group] of stepGroups.entries()) {
+    const scopedSteps = sortCreditSteps(group.scoped)
+    if (scopedSteps.length === 0) {
+      normalizedSteps.push(...sortCreditSteps(group.global))
+      continue
+    }
+
+    let remainingGlobalSteps = sortCreditSteps(group.global)
+    for (const scopedStep of scopedSteps)
+      remainingGlobalSteps = remainingGlobalSteps.flatMap(globalStep => subtractScopedRange(globalStep, scopedStep))
+
+    normalizedSteps.push(...sortCreditSteps([...remainingGlobalSteps, ...scopedSteps]))
+  }
+
+  return sortCreditSteps(normalizedSteps)
+}
+
+async function requireOrgScopedPricingAccess(c: AppContext, orgId: string, authorization: string) {
+  c.set('authorization', authorization)
+
+  const claims = await getClaimsFromJWT(c, authorization)
+  if (!claims?.sub) {
+    throw simpleError('not_authorized', 'Not authorized')
+  }
+
+  c.set('auth', {
+    userId: claims.sub,
+    authType: 'jwt',
+    apikey: null,
+    jwt: authorization,
+  } satisfies AuthInfo)
+
+  if (!await checkPermission(c, 'org.read', { orgId })) {
+    throw simpleError('not_authorized', 'Not authorized')
+  }
+}
+
+async function getScopedCreditSteps(c: AppContext, orgId?: string): Promise<CreditStep[]> {
+  const authorization = c.req.header('authorization')
+    ?? c.req.header('Authorization')
+    ?? c.get('authorization')
+
+  let pricingClient: ReturnType<typeof supabaseAdmin> | ReturnType<typeof supabaseClient> | undefined
+  if (orgId) {
+    if (!authorization) {
+      throw simpleError('not_authorized', 'Not authorized')
+    }
+
+    await requireOrgScopedPricingAccess(c, orgId, authorization)
+    pricingClient = supabaseClient(c, authorization)
+  }
+  else {
+    pricingClient = supabaseAdmin(c)
+  }
+
+  if (!pricingClient)
+    throw simpleError('not_authorized', 'Not authorized')
+
+  const scopedPricingClient = pricingClient
+
+  const [globalCreditsResult, orgCreditsResult] = await Promise.all([
+    scopedPricingClient
+      .from('capgo_credits_steps')
+      .select()
+      .is('org_id', null),
+    orgId
+      ? scopedPricingClient
+          .from('capgo_credits_steps')
+          .select()
+          .eq('org_id', orgId)
+      : Promise.resolve({ data: [] as CreditStep[], error: null }),
+  ])
+
+  const { data: globalCredits, error: globalCreditsError } = globalCreditsResult
+  const { data: orgCredits, error: orgCreditsError } = orgCreditsResult
+
+  if (globalCreditsError || orgCreditsError)
+    throw simpleError('failed_to_fetch_pricing_data', 'Failed to fetch pricing data')
+
+  return preferScopedCreditSteps([
+    ...((globalCredits ?? []) as CreditStep[]),
+    ...((orgCredits ?? []) as CreditStep[]),
+  ], orgId)
+}
 
 async function getCreditTopUpProductId(c: AppContext, customerId: string, token: string): Promise<{ productId: string }> {
   const supabase = supabaseClient(c, token)
@@ -269,39 +417,24 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.use('*', useCors)
 
 app.get('/', async (c) => {
-  try {
-    const { data: credits } = await supabaseAdmin(c)
-      .from('capgo_credits_steps')
-      .select()
-      .order('price_per_unit')
-    return c.json(credits ?? [])
-  }
-  catch (e) {
-    throw simpleError('failed_to_fetch_pricing_data', 'Failed to fetch pricing data', {}, e)
-  }
+  const orgId = c.req.query('org_id') ?? undefined
+  const credits = await getScopedCreditSteps(c as AppContext, orgId)
+  return c.json(credits)
 })
 
 app.post('/', async (c) => {
   const body = await parseBody<CostCalculationRequest>(c)
-  const { mau, bandwidth, storage } = body
+  const buildTime = Number(body.build_time ?? 0)
+  const { mau, bandwidth, org_id: orgId, storage } = body
 
   // Validate inputs
   if (mau === undefined || bandwidth === undefined || storage === undefined) {
     throw simpleError('missing_required_fields', 'Missing required fields: mau, bandwidth, storage')
   }
+  if (!Number.isFinite(buildTime) || buildTime < 0)
+    throw simpleError('invalid_build_time', 'build_time must be a non-negative number')
 
-  // Get pricing steps from database
-  const { data: credits, error } = await supabaseAdmin(c)
-    .from('capgo_credits_steps')
-    .select()
-    .order('type, step_min')
-
-  if (error || !credits) {
-    throw simpleError('failed_to_fetch_pricing_data', 'Failed to fetch pricing data')
-  }
-
-  // Type assertion for credits
-  const typedCredits = credits as CreditStep[]
+  const typedCredits = await getScopedCreditSteps(c as AppContext, orgId)
 
   // Calculate cost for each metric type with tier breakdown
   const calculateMetricCost = (value: number, type: string): MetricBreakdown => {
@@ -376,8 +509,9 @@ app.post('/', async (c) => {
   const mauResult = calculateMetricCost(mau, 'mau')
   const bandwidthResult = calculateMetricCost(bandwidth, 'bandwidth')
   const storageResult = calculateMetricCost(storage, 'storage')
+  const buildTimeResult = calculateMetricCost(buildTime, 'build_time')
 
-  const totalCost = mauResult.cost + bandwidthResult.cost + storageResult.cost
+  const totalCost = mauResult.cost + bandwidthResult.cost + storageResult.cost + buildTimeResult.cost
 
   const response: CostCalculationResponse = {
     total_cost: totalCost,
@@ -385,11 +519,13 @@ app.post('/', async (c) => {
       mau: mauResult,
       bandwidth: bandwidthResult,
       storage: storageResult,
+      build_time: buildTimeResult,
     },
     usage: {
       mau,
       bandwidth,
       storage,
+      build_time: buildTime,
     },
   }
 

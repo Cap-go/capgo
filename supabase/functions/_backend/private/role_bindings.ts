@@ -170,6 +170,9 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
+  if (!orgId) {
+    return c.json({ error: 'org_id is required' }, 400)
+  }
 
   let pgClient
   try {
@@ -381,6 +384,9 @@ app.patch('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
+  if (!bindingId) {
+    return c.json({ error: 'binding_id is required' }, 400)
+  }
 
   let body
   try {
@@ -390,8 +396,8 @@ app.patch('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json({ error: 'Invalid JSON' }, 400)
   }
 
-  const { role_name } = body ?? {}
-  if (!role_name) {
+  const roleName = typeof body?.role_name === 'string' ? body.role_name : undefined
+  if (!roleName) {
     return c.json({ error: 'role_name is required' }, 400)
   }
 
@@ -417,7 +423,7 @@ app.patch('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
     const [role] = await drizzle
       .select()
       .from(schema.roles)
-      .where(eq(schema.roles.name, role_name))
+      .where(eq(schema.roles.name, roleName))
       .limit(1)
 
     if (!role) {
@@ -484,6 +490,9 @@ app.delete('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
+  }
+  if (!bindingId) {
+    return c.json({ error: 'binding_id is required' }, 400)
   }
 
   let pgClient

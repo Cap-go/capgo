@@ -49,19 +49,18 @@ beforeAll(async () => {
   if (appError)
     throw appError
 
-  const appScopedKeyResponse = await fetch(`${BASE_URL}/apikey`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      name: `webhook-app-scoped-${globalId}`,
-      limited_to_apps: [webhookAppId],
-    }),
+  const { data: appScopedKeyData, error: appScopedKeyError } = await getSupabaseClient().rpc('create_hashed_apikey_for_user', {
+    p_user_id: USER_ID,
+    p_mode: 'all',
+    p_name: `webhook-app-scoped-${globalId}`,
+    p_limited_to_orgs: [],
+    p_limited_to_apps: [webhookAppId],
+    p_expires_at: null as unknown as string,
   })
-  if (appScopedKeyResponse.status !== 200) {
-    throw new Error(`Failed to create app-scoped API key for webhook tests: ${await appScopedKeyResponse.text()}`)
+  if (appScopedKeyError || !appScopedKeyData?.key) {
+    throw new Error(`Failed to create app-scoped API key for webhook tests: ${appScopedKeyError?.message ?? 'missing key data'}`)
   }
 
-  const appScopedKeyData = await appScopedKeyResponse.json() as { id: number, key: string }
   appScopedKeyId = appScopedKeyData.id
   appScopedKey = appScopedKeyData.key
 })
@@ -73,16 +72,13 @@ afterAll(async () => {
     await (getSupabaseClient() as any).from('webhooks').delete().eq('id', createdWebhookId)
   }
   if (appScopedKeyId) {
-    await fetch(`${BASE_URL}/apikey/${appScopedKeyId}`, {
-      method: 'DELETE',
-      headers,
-    })
+    await getSupabaseClient().from('apikeys').delete().eq('id', appScopedKeyId)
   }
   await getSupabaseClient().from('apps').delete().eq('app_id', webhookAppId)
   // Clean up test organization and stripe_info
   await getSupabaseClient().from('orgs').delete().eq('id', WEBHOOK_TEST_ORG_ID)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
-})
+}, 60000)
 
 describe('[GET] /webhooks', () => {
   it('list webhooks for organization', async () => {

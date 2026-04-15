@@ -1,3 +1,4 @@
+import type { Database } from '../src/types/supabase.types'
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { BASE_URL, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
@@ -5,6 +6,7 @@ import { BASE_URL, getSupabaseClient, headers, resetAndSeedAppData, resetAppData
 const id = randomUUID()
 const APPNAME = `com.bundle.create.${id}`
 let testOrgId: string
+type AppInsert = Database['public']['Tables']['apps']['Insert']
 
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
@@ -22,14 +24,13 @@ beforeAll(async () => {
   testOrgId = orgData.id
 
   // Create test app
-  await getSupabaseClient().from('apps').insert({
-    id: randomUUID(),
+  const appInsert: AppInsert = {
     app_id: APPNAME,
     name: `Test Bundle Create App`,
-    checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd', // in sha256
     icon_url: 'https://example.com/icon.png',
     owner_org: testOrgId,
-  })
+  }
+  await getSupabaseClient().from('apps').insert(appInsert)
 })
 
 afterAll(async () => {
