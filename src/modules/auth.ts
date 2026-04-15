@@ -93,7 +93,12 @@ async function maybeProvisionSsoMembership(
   const result = await provisionSsoUser(session)
 
   if (result.merged) {
-    await supabase.auth.signOut()
+    const { error: signOutError } = await supabase.auth.signOut()
+    if (signOutError) {
+      console.error('Failed to sign out merged SSO session during auth guard:', signOutError)
+      return 'abort_navigation'
+    }
+
     return 'redirect_login'
   }
 

@@ -255,4 +255,26 @@ describe('auth guard SSO provisioning', () => {
       },
     })
   })
+
+  it('aborts navigation when merged-session sign out fails instead of redirecting with a stale SSO session', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ success: true, merged: true }),
+    })))
+    mockSignOut.mockResolvedValueOnce({
+      error: new Error('sign out failed'),
+    })
+
+    const guard = await getGuard()
+    const next = vi.fn()
+
+    await guard(
+      { path: '/dashboard', fullPath: '/dashboard', meta: { middleware: 'auth' }, query: {} },
+      { path: '/login', fullPath: '/login', meta: {}, query: {} },
+      next,
+    )
+
+    expect(next).toHaveBeenCalledWith(false)
+    expect(next).not.toHaveBeenCalledWith('/login?message=sso_account_linked')
+  })
 })
