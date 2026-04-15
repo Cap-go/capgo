@@ -191,7 +191,7 @@ export async function put(
   }
   catch (error) {
     if (shouldUpdateStripeCustomerName) {
-      let rollbackOrg: Database['public']['Tables']['orgs']['Row']
+      let rollbackOrg: OrgNameSyncRow
 
       try {
         rollbackOrg = await getOrgForNameSync(supabase, body.orgId)
