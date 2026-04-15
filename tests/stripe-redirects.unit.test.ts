@@ -20,6 +20,12 @@ vi.mock('hono/adapter', async (importOriginal) => {
 vi.mock('stripe', () => {
   const MockStripe: any = vi.fn()
   MockStripe.createFetchHttpClient = vi.fn()
+  MockStripe.errors = {
+    StripeAuthenticationError: class StripeAuthenticationError extends Error {},
+    StripeInvalidRequestError: class StripeInvalidRequestError extends Error {},
+    StripePermissionError: class StripePermissionError extends Error {},
+    StripeRateLimitError: class StripeRateLimitError extends Error {},
+  }
   return { default: MockStripe }
 })
 
@@ -417,5 +423,12 @@ describe('stripe redirect URL allowlist', () => {
     expect(updateCustomer).toHaveBeenCalledWith('cus_123', {
       name: 'Capgo Org',
     })
+  })
+
+  it('treats Stripe rate-limit errors as deterministic customer update failures', async () => {
+    const { isDeterministicStripeCustomerUpdateError } = await import('../supabase/functions/_backend/utils/stripe.ts')
+    const rateLimitError = new Stripe.errors.StripeRateLimitError({ message: 'rate limited' } as any)
+
+    expect(isDeterministicStripeCustomerUpdateError(rateLimitError)).toBe(true)
   })
 })

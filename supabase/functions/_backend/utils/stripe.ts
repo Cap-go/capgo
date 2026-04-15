@@ -335,6 +335,7 @@ export function isDeterministicStripeCustomerUpdateError(error: unknown) {
   return error instanceof Stripe.errors.StripeAuthenticationError
     || error instanceof Stripe.errors.StripeInvalidRequestError
     || error instanceof Stripe.errors.StripePermissionError
+    || error instanceof Stripe.errors.StripeRateLimitError
 }
 
 export function normalizeStripeCountryCode(country: string | null | undefined): string | null {
