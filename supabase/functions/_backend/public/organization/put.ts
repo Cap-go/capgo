@@ -162,6 +162,7 @@ export async function put(
     : null
   const shouldUpdateStripeCustomerName = shouldSyncStripeName
     && !!currentOrg?.customer_id
+    && !currentOrg.customer_id.startsWith('pending_')
     && body.name !== currentOrg.name
 
   if (shouldUpdateStripeCustomerName) {

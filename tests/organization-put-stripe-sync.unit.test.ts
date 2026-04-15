@@ -131,4 +131,33 @@ describe('organization put Stripe sync', () => {
     expect(updateCustomerOrganizationNameMock).toHaveBeenNthCalledWith(1, expect.anything(), 'cus_123', 'New Name')
     expect(updateCustomerOrganizationNameMock).toHaveBeenNthCalledWith(2, expect.anything(), 'cus_123', 'Old Name')
   })
+
+  it('skips Stripe sync for pending customer ids', async () => {
+    const selectBuilder = createOrgSelectBuilder({
+      id: 'org-123',
+      name: 'Old Name',
+      customer_id: 'pending_org-123',
+    })
+    const updateBuilder = createOrgUpdateBuilder({
+      id: 'org-123',
+      name: 'New Name',
+      customer_id: 'pending_org-123',
+      logo: null,
+    })
+
+    supabaseClientMock.mockReturnValue({
+      from: vi.fn()
+        .mockReturnValueOnce(selectBuilder)
+        .mockReturnValueOnce(updateBuilder),
+    })
+
+    const response = await put(createContext(), {
+      orgId: 'org-123',
+      name: 'New Name',
+    }, undefined)
+
+    expect(response.status).toBe(200)
+    expect(updateCustomerOrganizationNameMock).not.toHaveBeenCalled()
+    expect(updateBuilder.update).toHaveBeenCalledWith({ name: 'New Name' })
+  })
 })

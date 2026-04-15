@@ -181,7 +181,7 @@ async function main() {
   const orgs = await fetchTargetOrgs(supabase, orgId)
   const actionableOrgs = orgs
     .filter(org => !!org.customer_id && !org.customer_id.startsWith('pending_'))
-    .filter(org => !!org.name.trim())
+    .filter(org => !!org.name?.trim())
 
   const limitedOrgs = limit ? actionableOrgs.slice(0, limit) : actionableOrgs
 
@@ -230,6 +230,7 @@ async function main() {
   console.log(`Done. Updated ${updated}/${limitedOrgs.length}. Failures: ${failures.length}`)
 
   if (failures.length > 0) {
+    await Bun.mkdir('./tmp', { recursive: true })
     await Bun.write(FAILURE_OUTPUT, `${JSON.stringify(failures, null, 2)}\n`)
     console.log(`Failure details written to ${FAILURE_OUTPUT}`)
     throw new Error(`Stripe org name sync completed with ${failures.length} failures`)
