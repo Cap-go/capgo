@@ -8,6 +8,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import AdminOnlyModal from '~/components/AdminOnlyModal.vue'
 import CreditsCta from '~/components/CreditsCta.vue'
+import { formatCreditPricingPrice, formatIncludedThenPrice } from '~/services/creditPricing'
 import { checkPermissions } from '~/services/permissions'
 import { openCheckout } from '~/services/stripe'
 import { getCreditUnitPricing, getCurrentPlanNameOrg, useSupabase } from '~/services/supabase'
@@ -62,24 +63,32 @@ function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
     }
   }
 
+  const mauFeature = creditUnitPrices.value.mau !== undefined
+    ? `${plan.mau.toLocaleString()} ${t('mau')} · ${formatIncludedThenPrice('mau', creditUnitPrices.value.mau, t)}`
+    : `${plan.mau.toLocaleString()} ${t('mau')}`
+
+  const storageFeature = creditUnitPrices.value.storage !== undefined
+    ? `${plan.storage.toLocaleString()} ${t('plan-storage')} · ${formatIncludedThenPrice('storage', creditUnitPrices.value.storage, t)}`
+    : `${plan.storage.toLocaleString()} ${t('plan-storage')}`
+
+  const bandwidthFeature = creditUnitPrices.value.bandwidth !== undefined
+    ? `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')} · ${formatIncludedThenPrice('bandwidth', creditUnitPrices.value.bandwidth, t)}`
+    : `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')}`
+
+  const buildTimeFeature = buildTimeDisplay
+    ? creditUnitPrices.value.build_time !== undefined
+      ? `${buildTimeDisplay} · ${formatIncludedThenPrice('build_time', creditUnitPrices.value.build_time, t)}`
+      : buildTimeDisplay
+    : creditUnitPrices.value.build_time !== undefined
+      ? `${t('build-time')} · ${formatCreditPricingPrice('build_time', creditUnitPrices.value.build_time, t)}`
+      : ''
+
   const features = [
-    `${plan.mau.toLocaleString()} ${t('mau')}`,
-    `${plan.storage.toLocaleString()} ${t('plan-storage')}`,
-    `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')}`,
-    buildTimeDisplay, // Will be empty string if 0, filtered out below
+    mauFeature,
+    storageFeature,
+    bandwidthFeature,
+    buildTimeFeature,
   ]
-
-  if (creditUnitPrices.value.mau)
-    features[0] += ` included, then $${creditUnitPrices.value.mau}/user`
-
-  if (creditUnitPrices.value.storage)
-    features[1] += ` included, then $${creditUnitPrices.value.storage} per GB`
-
-  if (creditUnitPrices.value.bandwidth)
-    features[2] += ` included, then $${creditUnitPrices.value.bandwidth} per GB`
-
-  if (creditUnitPrices.value.build_time)
-    features[3] += ` included, then $${creditUnitPrices.value.build_time} per minute`
 
   const planName = plan.name?.toLowerCase() ?? ''
   if (planName === 'solo') {

@@ -2,13 +2,15 @@ import type { Locale } from 'vue-i18n'
 import type { UserModule } from '~/types'
 import { createI18n } from 'vue-i18n'
 
+const FALLBACK_LOCALE = 'en' as const
+
 // Import i18n resources
 // https://vitejs.dev/guide/features.html#glob-import
 //
 // Don't need this? Try vitesse-lite: https://github.com/antfu/vitesse-lite
 export const i18n = createI18n({
   legacy: false,
-  fallbackLocale: 'en',
+  fallbackLocale: FALLBACK_LOCALE,
   locale: '',
   messages: {},
 })
@@ -39,6 +41,15 @@ export const languages = {
 
 const loadedLanguages: string[] = []
 
+async function ensureLanguageLoaded(lang: Locale) {
+  if (loadedLanguages.includes(lang))
+    return
+
+  const messages = await localesMap[lang]()
+  i18n.global.setLocaleMessage(lang, messages.default)
+  loadedLanguages.push(lang)
+}
+
 function setI18nLanguage(lang: Locale) {
   i18n.global.locale.value = lang as any
   localStorage.setItem('lang', lang)
@@ -48,8 +59,11 @@ function setI18nLanguage(lang: Locale) {
 }
 
 export async function loadLanguageAsync(lang: string): Promise<Locale> {
+  if (lang !== FALLBACK_LOCALE)
+    await ensureLanguageLoaded(FALLBACK_LOCALE)
+
   // If the same language
-  if (i18n.global.locale.value === lang)
+  if (i18n.global.locale.value === lang && loadedLanguages.includes(lang))
     return setI18nLanguage(lang)
 
   // If the language was already loaded
@@ -57,9 +71,7 @@ export async function loadLanguageAsync(lang: string): Promise<Locale> {
     return setI18nLanguage(lang)
 
   // If the language hasn't been loaded yet
-  const messages = await localesMap[lang]()
-  i18n.global.setLocaleMessage(lang, messages.default)
-  loadedLanguages.push(lang)
+  await ensureLanguageLoaded(lang as Locale)
   return setI18nLanguage(lang)
 }
 

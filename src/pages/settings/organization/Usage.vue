@@ -10,7 +10,7 @@ import { toast } from 'vue-sonner'
 import CreditsCta from '~/components/CreditsCta.vue'
 import Spinner from '~/components/Spinner.vue'
 import { bytesToGb } from '~/services/conversion'
-import { getCreditUnitPricing, getCurrentPlanNameOrg, getPlans, getPlanUsagePercent, getTotalStorage, getUsageCreditDeductions } from '~/services/supabase'
+import { calculateCreditCost, getCurrentPlanNameOrg, getPlans, getPlanUsagePercent, getTotalStorage, getUsageCreditDeductions } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
@@ -18,7 +18,6 @@ import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
 const plans = ref<Database['public']['Tables']['plans']['Row'][]>([])
-const creditUnitPrices = ref<Partial<Record<Database['public']['Enums']['credit_metric_type'], number>>>({})
 
 const isLoading = ref(false)
 const initialLoad = ref(true)
@@ -73,20 +72,6 @@ async function getUsage(orgId: string) {
   }
   detailPlanUsage = roundUsagePercents(detailPlanUsage)
 
-  const enterprise_base = {
-    mau: currentPlan?.mau ?? 0,
-    storage: currentPlan?.storage ?? 0,
-    bandwidth: currentPlan?.bandwidth ?? 0,
-    build_time: currentPlan?.build_time_unit ?? 0,
-  }
-
-  const enterprise_units = {
-    mau: creditUnitPrices.value.mau ?? 0,
-    storage: creditUnitPrices.value.storage ?? 0,
-    bandwidth: creditUnitPrices.value.bandwidth ?? 0,
-    build_time: creditUnitPrices.value?.build_time ?? 0,
-  }
-
   const creditDeductions = await getUsageCreditDeductions(orgId)
 
   const nowEndOfDay = dayjs().endOf('day')
@@ -109,9 +94,9 @@ async function getUsage(orgId: string) {
 
   const relevantUsage = usageInCycle.length > 0 ? usageInCycle : usage
 
-  const totalCreditDeductions = creditDeductions.reduce((acc, entry) => {
+  const creditDeductionsInCycle = creditDeductions.filter((entry) => {
     if (entry.amount === null)
-      return acc
+      return false
 
     const entryStart = entry.billing_cycle_start
       ? dayjs(entry.billing_cycle_start).startOf('day')
@@ -126,13 +111,14 @@ async function getUsage(orgId: string) {
         : null
 
     if (billingStart && entryEnd && entryEnd.isBefore(billingStart))
-      return acc
+      return false
 
     if (billingEnd && entryStart && entryStart.isAfter(billingEnd))
-      return acc
+      return false
 
-    return acc + Math.abs(entry.amount)
-  }, 0)
+    return true
+  })
+  const totalCreditDeductions = creditDeductionsInCycle.reduce((acc, entry) => acc + Math.abs(entry.amount ?? 0), 0)
 
   const totalMau = relevantUsage.reduce((acc, entry) => acc + (entry.mau ?? 0), 0)
   const totalBandwidthBytes = relevantUsage.reduce((acc, entry) => acc + (entry.bandwidth ?? 0), 0)
@@ -151,31 +137,30 @@ async function getUsage(orgId: string) {
   })
 
   const basePrice = currentPlan?.price_m ?? 0
+  let estimatedUsagePrice: number | null = null
 
-  const calculatePrice = (total: number, base: number, unit: number) => {
-    if (unit <= 0)
-      return 0
-    return total <= base ? 0 : (total - base) * unit
+  if (currentPlan) {
+    try {
+      const overageCost = await calculateCreditCost({
+        org_id: orgId,
+        mau: Math.max(totalMau - currentPlan.mau, 0),
+        bandwidth: Math.max(totalBandwidthBytes - Math.round(currentPlan.bandwidth * 1073741824), 0),
+        storage: Math.max(totalStorageBytes - Math.round(currentPlan.storage * 1073741824), 0),
+        build_time: Math.max(totalBuildTime - currentPlan.build_time_unit, 0),
+      })
+      estimatedUsagePrice = roundNumber(overageCost.total_cost)
+    }
+    catch (err) {
+      console.error('Error estimating credit overage cost:', err)
+    }
   }
 
-  const estimatedUsagePrice = computed(() => {
-    const mauPrice = calculatePrice(totalMau, enterprise_base.mau, enterprise_units.mau)
-    const storagePrice = calculatePrice(totalStorage, enterprise_base.storage, enterprise_units.storage)
-    const bandwidthPrice = calculatePrice(totalBandwidth, enterprise_base.bandwidth, enterprise_units.bandwidth)
-    const buildTimePrice = calculatePrice(totalBuildTime, enterprise_base.build_time, enterprise_units.build_time)
-    const sum = mauPrice + storagePrice + bandwidthPrice + buildTimePrice
-    return roundNumber(sum)
-  })
-
-  const totalUsagePrice = computed(() => {
-    if (creditDeductions.length > 0)
-      return roundNumber(totalCreditDeductions)
-    return estimatedUsagePrice.value
-  })
-
-  const totalPrice = computed(() => {
-    return roundNumber(basePrice + totalUsagePrice.value)
-  })
+  const totalUsagePrice = creditDeductionsInCycle.length > 0
+    ? roundNumber(totalCreditDeductions)
+    : estimatedUsagePrice
+  const totalPrice = totalUsagePrice !== null && currentPlan
+    ? roundNumber(basePrice + totalUsagePrice)
+    : null
 
   return {
     currentPlan,
@@ -185,7 +170,6 @@ async function getUsage(orgId: string) {
     totalBandwidth,
     totalStorage,
     totalBuildTime,
-    enterprise_units,
     detailPlanUsage,
     cycle: {
       subscription_anchor_start: dayjs(organizationStore.currentOrganization?.subscription_start).format('YYYY/MM/D'),
@@ -203,6 +187,20 @@ const currentPlanSuggest = computed(() => main.plans.find(plan => plan.name === 
 
 function roundNumber(number: number) {
   return Math.round(number * 100) / 100
+}
+
+function formatCurrency(value?: number | null) {
+  if (typeof value !== 'number' || !Number.isFinite(value))
+    return t('unknown')
+
+  return `$${value.toLocaleString()}`
+}
+
+function formatMonthlyPrice(value?: number | null) {
+  if (typeof value !== 'number' || !Number.isFinite(value))
+    return t('unknown')
+
+  return `$${value}/${t('mo')}`
 }
 
 function percent(usage: number, limit: number) {
@@ -308,16 +306,11 @@ async function loadData() {
   isLoading.value = true
 
   if (initialLoad.value) {
-    const [pls, pricing] = await Promise.all([
+    const [pls] = await Promise.all([
       getPlans(),
-      getCreditUnitPricing(gid || undefined),
     ])
     plans.value.length = 0
     plans.value.push(...pls)
-    creditUnitPrices.value = pricing
-  }
-  else if (!Object.keys(creditUnitPrices.value).length) {
-    creditUnitPrices.value = await getCreditUnitPricing(gid || undefined)
   }
 
   const usageDetails = await getUsage(gid)
@@ -392,7 +385,7 @@ function nextRunDate() {
                 {{ t('base') }}
               </div>
               <div class="text-2xl font-bold text-gray-900 dark:text-white">
-                ${{ currentPlan?.price_m }}/{{ t('mo') }}
+                {{ formatMonthlyPrice(currentPlan?.price_m) }}
               </div>
             </div>
             <div class="flex flex-col">
@@ -400,7 +393,7 @@ function nextRunDate() {
                 {{ t('credits-used-in-period') }}
               </div>
               <div class="text-2xl font-bold text-gray-900 dark:text-white">
-                ${{ planUsage?.totalUsagePrice.toLocaleString() }}
+                {{ formatCurrency(planUsage?.totalUsagePrice) }}
               </div>
             </div>
           </div>
@@ -409,7 +402,7 @@ function nextRunDate() {
               {{ t('total') }}
             </div>
             <div class="text-xl font-semibold text-gray-900 dark:text-white">
-              ${{ planUsage?.totalPrice.toLocaleString() }}
+              {{ formatCurrency(planUsage?.totalPrice) }}
             </div>
           </div>
         </div>
