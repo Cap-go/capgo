@@ -86,7 +86,7 @@ async function updateUser(
 async function maybeProvisionSsoMembership(
   supabase: SupabaseClient,
   session: Awaited<ReturnType<SupabaseClient['auth']['getSession']>>['data']['session'] | null,
-): Promise<'continue' | 'redirect_login'> {
+): Promise<'continue' | 'redirect_login' | 'abort_navigation'> {
   if (!session || !isSsoUser(session.user))
     return 'continue'
 
@@ -99,6 +99,7 @@ async function maybeProvisionSsoMembership(
 
   if (result.error) {
     console.error('Failed to provision SSO membership during auth guard:', result.error)
+    return 'abort_navigation'
   }
 
   return 'continue'
@@ -202,8 +203,13 @@ async function guard(
       console.error('Error checking if account is disabled:', error)
     }
 
-    if (await maybeProvisionSsoMembership(supabase, sessionData?.session ?? null) === 'redirect_login') {
+    const provisioningResult = await maybeProvisionSsoMembership(supabase, sessionData?.session ?? null)
+    if (provisioningResult === 'redirect_login') {
       return next('/login?message=sso_account_linked')
+    }
+    if (provisioningResult === 'abort_navigation') {
+      hideLoader()
+      return next(false)
     }
 
     if (!main.user) {
@@ -301,6 +307,10 @@ async function guard(
       const didProvisionSsoMembership = await maybeProvisionSsoMembership(supabase, sessionData?.session ?? null)
       if (didProvisionSsoMembership === 'redirect_login') {
         return next('/login?message=sso_account_linked')
+      }
+      if (didProvisionSsoMembership === 'abort_navigation') {
+        hideLoader()
+        return next(false)
       }
 
       organizationsLoaded = await tryLoadOrganizations(() => organizationStore.fetchOrganizations())

@@ -225,4 +225,34 @@ describe('auth guard SSO provisioning', () => {
       },
     })
   })
+
+  it('aborts navigation for managed SSO users when provisioning fails instead of redirecting to org onboarding', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => ({
+      ok: false,
+      json: async () => ({ error: 'provider_lookup_failed' }),
+    })))
+
+    organizationStore.fetchOrganizations = vi.fn(async () => {
+      organizationStore.organizations = []
+      organizationStore.hasOrganizations = false
+    })
+
+    const guard = await getGuard()
+    const next = vi.fn()
+
+    await guard(
+      { path: '/dashboard', fullPath: '/dashboard', meta: { middleware: 'auth' }, query: {} },
+      { path: '/login', fullPath: '/login', meta: {}, query: {} },
+      next,
+    )
+
+    expect(fetch).toHaveBeenCalled()
+    expect(next).toHaveBeenCalledWith(false)
+    expect(next).not.toHaveBeenCalledWith({
+      path: '/onboarding/organization',
+      query: {
+        to: '/dashboard',
+      },
+    })
+  })
 })
