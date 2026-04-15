@@ -36,6 +36,9 @@ const REPLICATION_TOAST_CLASSES = {
   content: 'w-full min-w-0',
   toast: 'replication-toast',
 }
+const REPLICATION_DONE_TOAST_STYLE = {
+  '--initial-height': 'auto',
+}
 
 function getCurrentTimeZone(): string | null {
   if (typeof Intl === 'undefined')
@@ -263,6 +266,7 @@ export function showUploadReplicationToast({
       id: toastId,
       descriptionClass: 'w-full',
       classes: REPLICATION_TOAST_CLASSES,
+      style: REPLICATION_DONE_TOAST_STYLE,
       description: buildDoneDescription(
         regions,
         hasAction ? actionLabel : undefined,
