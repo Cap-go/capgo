@@ -114,12 +114,18 @@ describe('organization put Stripe sync', () => {
       name: 'Old Name',
       customer_id: 'cus_123',
     })
+    const rollbackSelectBuilder = createOrgSelectBuilder({
+      id: 'org-123',
+      name: 'Concurrent Name',
+      customer_id: 'cus_123',
+    })
     const updateBuilder = createOrgUpdateBuilder(null, { message: 'db write failed' })
 
     supabaseClientMock.mockReturnValue({
       from: vi.fn()
         .mockReturnValueOnce(selectBuilder)
-        .mockReturnValueOnce(updateBuilder),
+        .mockReturnValueOnce(updateBuilder)
+        .mockReturnValueOnce(rollbackSelectBuilder),
     })
 
     const error = await put(createContext(), {
@@ -129,7 +135,7 @@ describe('organization put Stripe sync', () => {
 
     expect(error).toBeInstanceOf(HTTPException)
     expect(updateCustomerOrganizationNameMock).toHaveBeenNthCalledWith(1, expect.anything(), 'cus_123', 'New Name')
-    expect(updateCustomerOrganizationNameMock).toHaveBeenNthCalledWith(2, expect.anything(), 'cus_123', 'Old Name')
+    expect(updateCustomerOrganizationNameMock).toHaveBeenNthCalledWith(2, expect.anything(), 'cus_123', 'Concurrent Name')
   })
 
   it('includes both errors when Stripe rollback fails', async () => {
@@ -138,12 +144,18 @@ describe('organization put Stripe sync', () => {
       name: 'Old Name',
       customer_id: 'cus_123',
     })
+    const rollbackSelectBuilder = createOrgSelectBuilder({
+      id: 'org-123',
+      name: 'Concurrent Name',
+      customer_id: 'cus_123',
+    })
     const updateBuilder = createOrgUpdateBuilder(null, { message: 'db write failed' })
 
     supabaseClientMock.mockReturnValue({
       from: vi.fn()
         .mockReturnValueOnce(selectBuilder)
-        .mockReturnValueOnce(updateBuilder),
+        .mockReturnValueOnce(updateBuilder)
+        .mockReturnValueOnce(rollbackSelectBuilder),
     })
 
     updateCustomerOrganizationNameMock
@@ -161,7 +173,7 @@ describe('organization put Stripe sync', () => {
       rollbackError: 'Stripe rollback failed',
     })
     expect(updateCustomerOrganizationNameMock).toHaveBeenNthCalledWith(1, expect.anything(), 'cus_123', 'New Name')
-    expect(updateCustomerOrganizationNameMock).toHaveBeenNthCalledWith(2, expect.anything(), 'cus_123', 'Old Name')
+    expect(updateCustomerOrganizationNameMock).toHaveBeenNthCalledWith(2, expect.anything(), 'cus_123', 'Concurrent Name')
   })
 
   it('skips Stripe sync for pending customer ids', async () => {
