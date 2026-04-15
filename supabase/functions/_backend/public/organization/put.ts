@@ -6,7 +6,7 @@ import { z } from 'zod/mini'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { createSignedImageUrl, normalizeImagePath } from '../../utils/storage.ts'
-import { updateCustomerOrganizationName } from '../../utils/stripe.ts'
+import { getStripeCustomerName, isDeterministicStripeCustomerUpdateError, updateCustomerOrganizationName } from '../../utils/stripe.ts'
 import { apikeyHasOrgRightWithPolicy, supabaseAdmin, supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
 import { normalizeWebsiteUrl } from './website.ts'
 
@@ -231,38 +231,49 @@ export async function put(
   const currentOrg = shouldSyncStripeName
     ? await getOrgForNameSync(supabase, body.orgId)
     : null
-  const shouldUpdateStripeCustomerName = shouldSyncStripeName
-    && !!currentOrg?.customer_id
-    && !currentOrg.customer_id.startsWith('pending_')
-    && sanitizedOrgName !== currentOrg.name
 
   const dataOrg: Database['public']['Tables']['orgs']['Row'] = await updateOrg(supabase, body.orgId, updateFields, {
     expectedCurrentName: shouldSyncStripeName ? currentOrg?.name : undefined,
   })
 
-  if (shouldUpdateStripeCustomerName) {
+  const committedCustomerId = dataOrg.customer_id
+
+  if (shouldSyncStripeName && currentOrg && committedCustomerId && !committedCustomerId.startsWith('pending_') && dataOrg.name !== currentOrg.name) {
     try {
-      await updateCustomerOrganizationName(c, currentOrg.customer_id!, dataOrg.name)
+      await updateCustomerOrganizationName(c, committedCustomerId, dataOrg.name)
     }
     catch (stripeError) {
-      const rollbackFields = buildRollbackFields(currentOrg, updateFields)
+      const stripeCustomerName = await getStripeCustomerName(c, committedCustomerId)
 
-      try {
-        await updateOrg(supabase, body.orgId, rollbackFields, {
-          expectedCurrentName: dataOrg.name,
-          expectedCurrentUpdatedAt: dataOrg.updated_at,
-        })
+      if (stripeCustomerName === dataOrg.name) {
+        // Stripe can time out after persisting the update; don't roll back the DB in that case.
       }
-      catch (rollbackError) {
+      else if (stripeCustomerName !== undefined || isDeterministicStripeCustomerUpdateError(stripeError)) {
+        const rollbackFields = buildRollbackFields(currentOrg, updateFields)
+
+        try {
+          await updateOrg(supabase, body.orgId, rollbackFields, {
+            expectedCurrentName: dataOrg.name,
+            expectedCurrentUpdatedAt: dataOrg.updated_at,
+          })
+        }
+        catch (rollbackError) {
+          throw simpleError('cannot_update_org', 'Cannot update org', {
+            error: getErrorDetail(stripeError),
+            rollbackError: getErrorDetail(rollbackError),
+          })
+        }
+
         throw simpleError('cannot_update_org', 'Cannot update org', {
           error: getErrorDetail(stripeError),
-          rollbackError: getErrorDetail(rollbackError),
         })
       }
-
-      throw simpleError('cannot_update_org', 'Cannot update org', {
-        error: getErrorDetail(stripeError),
-      })
+      else {
+        throw simpleError('cannot_update_org', 'Cannot update org', {
+          error: getErrorDetail(stripeError),
+          stripeSyncState: 'unknown',
+        })
+      }
     }
   }
 

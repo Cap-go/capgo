@@ -9,6 +9,8 @@ const {
   apikeyHasOrgRightWithPolicyMock,
   supabaseAdminMock,
   updateCustomerOrganizationNameMock,
+  getStripeCustomerNameMock,
+  isDeterministicStripeCustomerUpdateErrorMock,
 } = vi.hoisted(() => ({
   checkPermissionMock: vi.fn(),
   supabaseClientMock: vi.fn(),
@@ -16,6 +18,8 @@ const {
   apikeyHasOrgRightWithPolicyMock: vi.fn(),
   supabaseAdminMock: vi.fn(),
   updateCustomerOrganizationNameMock: vi.fn(),
+  getStripeCustomerNameMock: vi.fn(),
+  isDeterministicStripeCustomerUpdateErrorMock: vi.fn(),
 }))
 
 vi.mock('../supabase/functions/_backend/utils/rbac.ts', () => ({
@@ -24,6 +28,8 @@ vi.mock('../supabase/functions/_backend/utils/rbac.ts', () => ({
 
 vi.mock('../supabase/functions/_backend/utils/stripe.ts', () => ({
   updateCustomerOrganizationName: (...args: unknown[]) => updateCustomerOrganizationNameMock(...args),
+  getStripeCustomerName: (...args: unknown[]) => getStripeCustomerNameMock(...args),
+  isDeterministicStripeCustomerUpdateError: (...args: unknown[]) => isDeterministicStripeCustomerUpdateErrorMock(...args),
 }))
 
 vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
@@ -121,6 +127,8 @@ describe('organization put Stripe sync', () => {
     vi.clearAllMocks()
     checkPermissionMock.mockResolvedValue(true)
     updateCustomerOrganizationNameMock.mockResolvedValue(undefined)
+    getStripeCustomerNameMock.mockResolvedValue(undefined)
+    isDeterministicStripeCustomerUpdateErrorMock.mockReturnValue(false)
     apikeyHasOrgRightWithPolicyMock.mockResolvedValue({ valid: true })
   })
 
@@ -154,6 +162,33 @@ describe('organization put Stripe sync', () => {
     expect(updateBuilder.update).toHaveBeenCalledWith({ name: 'New Name' })
     expect(updateBuilder.eq).toHaveBeenCalledWith('name', 'Old Name')
     expect(updateBuilder.maybeSingle.mock.invocationCallOrder[0]).toBeLessThan(updateCustomerOrganizationNameMock.mock.invocationCallOrder[0])
+  })
+
+  it('syncs Stripe using the committed customer id when it becomes available during the rename', async () => {
+    const selectBuilder = createOrgSelectBuilder(createOrgRow({
+      id: 'org-123',
+      name: 'Old Name',
+      customer_id: 'pending_org-123',
+    }))
+    const updateBuilder = createOrgUpdateBuilder(createOrgRow({
+      id: 'org-123',
+      name: 'New Name',
+      customer_id: 'cus_123',
+    }))
+
+    supabaseClientMock.mockReturnValue(createSupabaseClientStub(
+      vi.fn()
+        .mockReturnValueOnce(selectBuilder)
+        .mockReturnValueOnce(updateBuilder),
+    ))
+
+    const response = await put(createContext(), {
+      orgId: 'org-123',
+      name: 'New Name',
+    }, undefined)
+
+    expect(response.status).toBe(200)
+    expect(updateCustomerOrganizationNameMock).toHaveBeenCalledWith(expect.anything(), 'cus_123', 'New Name')
   })
 
   it('does not touch Stripe when a competing rename wins the database write', async () => {
@@ -241,6 +276,7 @@ describe('organization put Stripe sync', () => {
 
     updateCustomerOrganizationNameMock
       .mockRejectedValueOnce(new Error('Stripe update failed'))
+    getStripeCustomerNameMock.mockResolvedValueOnce('Old Name')
 
     const error = await put(createContext(), {
       orgId: 'org-123',
@@ -259,6 +295,39 @@ describe('organization put Stripe sync', () => {
     expect(error.cause.moreInfo).toMatchObject({
       error: 'Stripe update failed',
     })
+  })
+
+  it('keeps the org row when Stripe already persisted the renamed customer name', async () => {
+    const selectBuilder = createOrgSelectBuilder(createOrgRow({
+      id: 'org-123',
+      name: 'Old Name',
+      customer_id: 'cus_123',
+    }))
+    const updateBuilder = createOrgUpdateBuilder(createOrgRow({
+      id: 'org-123',
+      name: 'New Name',
+      customer_id: 'cus_123',
+      updated_at: '2026-04-15T13:00:00Z',
+    }))
+
+    const from = vi.fn()
+      .mockReturnValueOnce(selectBuilder)
+      .mockReturnValueOnce(updateBuilder)
+
+    supabaseClientMock.mockReturnValue(createSupabaseClientStub(from))
+
+    updateCustomerOrganizationNameMock
+      .mockRejectedValueOnce(new Error('connection reset'))
+    getStripeCustomerNameMock.mockResolvedValueOnce('New Name')
+
+    const response = await put(createContext(), {
+      orgId: 'org-123',
+      name: 'New Name',
+    }, undefined)
+
+    expect(response.status).toBe(200)
+    expect(getStripeCustomerNameMock).toHaveBeenCalledWith(expect.anything(), 'cus_123')
+    expect(from).toHaveBeenCalledTimes(2)
   })
 
   it('includes both errors when the database rollback fails after Stripe sync error', async () => {
@@ -286,6 +355,7 @@ describe('organization put Stripe sync', () => {
 
     updateCustomerOrganizationNameMock
       .mockRejectedValueOnce(new Error('Stripe update failed'))
+    getStripeCustomerNameMock.mockResolvedValueOnce('Old Name')
 
     const error = await put(createContext(), {
       orgId: 'org-123',
@@ -297,6 +367,43 @@ describe('organization put Stripe sync', () => {
       error: 'Stripe update failed',
       rollbackError: 'rollback failed',
     })
+  })
+
+  it('does not roll back the org row when Stripe state is unknown after a transport failure', async () => {
+    const selectBuilder = createOrgSelectBuilder(createOrgRow({
+      id: 'org-123',
+      name: 'Old Name',
+      customer_id: 'cus_123',
+    }))
+    const updateBuilder = createOrgUpdateBuilder(createOrgRow({
+      id: 'org-123',
+      name: 'New Name',
+      customer_id: 'cus_123',
+      updated_at: '2026-04-15T13:00:00Z',
+    }))
+
+    const from = vi.fn()
+      .mockReturnValueOnce(selectBuilder)
+      .mockReturnValueOnce(updateBuilder)
+
+    supabaseClientMock.mockReturnValue(createSupabaseClientStub(from))
+
+    updateCustomerOrganizationNameMock
+      .mockRejectedValueOnce(new Error('connection reset'))
+    getStripeCustomerNameMock.mockResolvedValueOnce(undefined)
+    isDeterministicStripeCustomerUpdateErrorMock.mockReturnValueOnce(false)
+
+    const error = await put(createContext(), {
+      orgId: 'org-123',
+      name: 'New Name',
+    }, undefined).catch(caught => caught)
+
+    expect(error).toBeInstanceOf(HTTPException)
+    expect(error.cause.moreInfo).toMatchObject({
+      error: 'connection reset',
+      stripeSyncState: 'unknown',
+    })
+    expect(from).toHaveBeenCalledTimes(2)
   })
 
   it('rejects blank names after HTML stripping', async () => {

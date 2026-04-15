@@ -315,6 +315,28 @@ export function updateCustomerOrganizationName(c: Context, customerId: string, n
   return getStripe(c).customers.update(customerId, { name: newName })
 }
 
+export async function getStripeCustomerName(c: Context, customerId: string | null | undefined): Promise<string | null | undefined> {
+  if (!customerId || !isStripeConfigured(c))
+    return undefined
+
+  try {
+    const customer = await getStripe(c).customers.retrieve(customerId)
+    if (customer.deleted)
+      return null
+    return customer.name ?? null
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getStripeCustomerName', customerId, error })
+    return undefined
+  }
+}
+
+export function isDeterministicStripeCustomerUpdateError(error: unknown) {
+  return error instanceof Stripe.errors.StripeAuthenticationError
+    || error instanceof Stripe.errors.StripeInvalidRequestError
+    || error instanceof Stripe.errors.StripePermissionError
+}
+
 export function normalizeStripeCountryCode(country: string | null | undefined): string | null {
   if (!country)
     return null
