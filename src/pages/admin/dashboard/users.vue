@@ -5,7 +5,7 @@ meta:
 
 <script setup lang="ts">
 import type { TableColumn } from '~/components/comp_def'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, h, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import AdminBarChart from '~/components/admin/AdminBarChart.vue'
@@ -114,6 +114,7 @@ interface TrialOrganization {
   management_email: string
   trial_end_date: string
   days_remaining: number
+  trial_extension_count: number
   created_at: string
   last_bundle_upload_at: string | null
 }
@@ -157,8 +158,26 @@ const cancelledOrganizationsCurrentPage = ref(1)
 const isLoadingCancelledOrganizations = ref(false)
 const CANCELLED_PAGE_SIZE = 20
 
+function getTrialExtensionBadgeLabel(extensionCount: number) {
+  return t('trial-extended-badge', { count: extensionCount })
+}
+
 const trialOrganizationsColumns = ref<TableColumn[]>([
-  { label: t('org-name'), key: 'org_name', mobile: true, head: true, sortable: false },
+  {
+    label: t('org-name'),
+    key: 'org_name',
+    mobile: true,
+    head: true,
+    sortable: false,
+    renderFunction: (item: TrialOrganization) => h('div', { class: 'flex flex-wrap items-center gap-2 text-slate-800 dark:text-white' }, [
+      h('span', { class: 'font-medium' }, item.org_name),
+      item.trial_extension_count > 0
+        ? h('span', {
+            class: 'inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-200',
+          }, getTrialExtensionBadgeLabel(item.trial_extension_count))
+        : null,
+    ]),
+  },
   { label: t('email'), key: 'management_email', mobile: false, sortable: false },
   {
     label: t('days-remaining'),

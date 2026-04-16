@@ -8,6 +8,7 @@ const NOW = Date.now()
 const TRIAL_ORG_ID = randomUUID()
 const TRIAL_CUSTOMER_ID = `cus_admin_stats_trial_${TRIAL_ORG_ID.slice(0, 8)}`
 const TRIAL_APP_ID = `com.admin.stats.trial.${TRIAL_ORG_ID.slice(0, 8)}`
+const TRIAL_ORG_CREATED_AT = new Date(NOW).toISOString()
 const TRIAL_END_DATE = new Date(NOW + (45 * DAY_IN_MS)).toISOString()
 const TRIAL_LAST_UPLOAD_AT = new Date(NOW - DAY_IN_MS).toISOString()
 const TRIAL_BUILTIN_UPLOAD_AT = new Date(NOW - (12 * 60 * 60 * 1000)).toISOString()
@@ -163,6 +164,7 @@ beforeAll(async () => {
       created_by: USER_ID,
       management_email: TEST_EMAIL,
       customer_id: TRIAL_CUSTOMER_ID,
+      created_at: TRIAL_ORG_CREATED_AT,
     },
     {
       id: CANCELLED_YEARLY_ORG_ID,
@@ -333,6 +335,7 @@ describe('/private/admin_stats', () => {
         organizations: Array<{
           org_id: string
           last_bundle_upload_at: string | null
+          trial_extension_count: number
         }>
       }
     }
@@ -341,6 +344,7 @@ describe('/private/admin_stats', () => {
     const organization = payload.data.organizations.find(org => org.org_id === TRIAL_ORG_ID)
     expect(organization).toBeTruthy()
     expect(organization?.last_bundle_upload_at).toBe(TRIAL_LAST_UPLOAD_AT)
+    expect(organization?.trial_extension_count).toBe(2)
   })
 
   it.concurrent('returns cancellation billing metadata and subscription-or-signup dates', async () => {

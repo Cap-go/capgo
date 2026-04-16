@@ -1575,6 +1575,7 @@ export interface AdminTrialOrganization {
   management_email: string
   trial_end_date: string
   days_remaining: number
+  trial_extension_count: number
   created_at: string
   last_bundle_upload_at: string | null
 }
@@ -1623,6 +1624,11 @@ export async function getAdminTrialOrganizations(
         o.management_email,
         si.trial_at AS trial_end_date,
         GREATEST(0, (si.trial_at::date - CURRENT_DATE)) AS days_remaining,
+        CASE
+          WHEN si.trial_at::date - o.created_at::date > 15
+            THEN ((si.trial_at::date - o.created_at::date - 15) / 15)
+          ELSE 0
+        END AS trial_extension_count,
         o.created_at,
         lbu.last_bundle_upload_at
       FROM orgs o
@@ -1655,6 +1661,7 @@ export async function getAdminTrialOrganizations(
       management_email: row.management_email,
       trial_end_date: normalizeTimestamp(row.trial_end_date) ?? '',
       days_remaining: Number(row.days_remaining),
+      trial_extension_count: Number(row.trial_extension_count) || 0,
       created_at: normalizeTimestamp(row.created_at) ?? '',
       last_bundle_upload_at: normalizeTimestamp(row.last_bundle_upload_at),
     }))
