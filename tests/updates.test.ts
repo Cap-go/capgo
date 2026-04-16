@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { APP_NAME, BASE_URL, createAppVersions, getBaseData, getSupabaseClient, getVersionFromAction, headers, ORG_ID, postUpdate, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils.ts'
+import { APP_NAME, createAppVersions, getBaseData, getEndpointUrl, getSupabaseClient, getVersionFromAction, headers, ORG_ID, postUpdate, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APP_NAME_UPDATE = `${APP_NAME}.${id}`
@@ -54,7 +54,7 @@ async function updateChannel(
       throw new Error(`Missing current version for channel ${channel}`)
   }
 
-  const response = await fetch(`${BASE_URL}/channel`, {
+  const response = await fetch(getEndpointUrl('/channel'), {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -132,7 +132,7 @@ describe('[POST] /updates', () => {
       })
       .throwOnError()
 
-    const deleteResponse = await fetch(`${BASE_URL}/bundle`, {
+    const deleteResponse = await fetch(getEndpointUrl('/bundle'), {
       method: 'DELETE',
       headers,
       body: JSON.stringify({
@@ -201,7 +201,7 @@ describe('[POST] /updates', () => {
       })
       .throwOnError()
 
-    const deleteResponse = await fetch(`${BASE_URL}/bundle`, {
+    const deleteResponse = await fetch(getEndpointUrl('/bundle'), {
       method: 'DELETE',
       headers,
       body: JSON.stringify({
@@ -210,6 +210,14 @@ describe('[POST] /updates', () => {
       }),
     })
     expect(deleteResponse.status).toBe(200)
+
+    const expectedFallbackData = getBaseData(APP_NAME_UPDATE)
+    expectedFallbackData.version_build = '0.0.0'
+    expectedFallbackData.version_name = '0.0.0'
+
+    const expectedFallbackResponse = await postUpdate(expectedFallbackData)
+    expect(expectedFallbackResponse.status).toBe(200)
+    const expectedFallbackJson = await expectedFallbackResponse.json<UpdateRes>()
 
     const baseData = getBaseData(APP_NAME_UPDATE)
     baseData.device_id = deviceId
@@ -221,8 +229,56 @@ describe('[POST] /updates', () => {
 
     const json = await response.json<UpdateRes>()
     expect(json.version).not.toBe(versionName)
-    expect(json.version).toBe('1.0.0')
-    expect(json.error).toBeUndefined()
+    expect(json.version).toBe(expectedFallbackJson.version)
+    expect(json.error).toBe(expectedFallbackJson.error)
+    expect(json.url).toBe(expectedFallbackJson.url)
+    expect(json.checksum).toBe(expectedFallbackJson.checksum)
+  })
+
+  it('keeps builtin channel targets addressable', async () => {
+    const supabase = getSupabaseClient()
+    const { data: productionChannel } = await supabase
+      .from('channels')
+      .select('id,version')
+      .eq('app_id', APP_NAME_UPDATE)
+      .eq('name', 'production')
+      .single()
+      .throwOnError()
+
+    const { data: builtinVersion } = await supabase
+      .from('app_versions')
+      .select('id')
+      .eq('app_id', APP_NAME_UPDATE)
+      .eq('name', 'builtin')
+      .single()
+      .throwOnError()
+
+    await supabase
+      .from('channels')
+      .update({ version: builtinVersion.id })
+      .eq('id', productionChannel.id)
+      .eq('app_id', APP_NAME_UPDATE)
+      .throwOnError()
+
+    try {
+      const baseData = getBaseData(APP_NAME_UPDATE)
+      baseData.version_name = '1.1.0'
+
+      const response = await postUpdate(baseData)
+      expect(response.status).toBe(200)
+
+      const json = await response.json<UpdateRes>()
+      expect(json.error).toBe('already_on_builtin')
+      expect(json.version).toBe('builtin')
+    }
+    finally {
+      await supabase
+        .from('channels')
+        .update({ version: productionChannel.version })
+        .eq('id', productionChannel.id)
+        .eq('app_id', APP_NAME_UPDATE)
+        .throwOnError()
+    }
   })
 })
 
@@ -774,21 +830,24 @@ describe('update scenarios', () => {
     // Need to specify defaultChannel so the non-public channel can be found
     ;(baseData as any).defaultChannel = 'production'
 
-    const response = await postUpdate(baseData)
-    expect(response.status).toBe(200)
-    const json = await response.json<UpdateRes>()
-    expect(json.error).toBe('cannot_update_via_private_channel')
-    expect(json.message).toContain('Cannot update via a private channel')
-
-    // Clean up - restore channel to default state
-    await updateChannel('production', {
-      public: true,
-      allow_device_self_set: true,
-    })
+    try {
+      const response = await postUpdate(baseData)
+      expect(response.status).toBe(200)
+      const json = await response.json<UpdateRes>()
+      expect(json.error).toBe('cannot_update_via_private_channel')
+      expect(json.message).toContain('Cannot update via a private channel')
+    }
+    finally {
+      await updateChannel('production', {
+        public: true,
+        allow_device_self_set: true,
+      })
+    }
   })
 
   it('private channel with device override should succeed', async () => {
     const uuid = randomUUID().toLowerCase()
+    const supabase = getSupabaseClient()
 
     // Set up the channel as private and not allowing device self-set
     await updateChannel('production', {
@@ -797,53 +856,55 @@ describe('update scenarios', () => {
       version: '1.0.0',
     })
 
-    // Get the channel id
-    const { data: channelData, error: channelError } = await getSupabaseClient()
-      .from('channels')
-      .select('id')
-      .eq('name', 'production')
-      .eq('app_id', APP_NAME_UPDATE)
-      .single()
+    try {
+      // Get the channel id
+      const { data: channelData, error: channelError } = await supabase
+        .from('channels')
+        .select('id')
+        .eq('name', 'production')
+        .eq('app_id', APP_NAME_UPDATE)
+        .single()
 
-    expect(channelError).toBeNull()
-    expect(channelData).toBeTruthy()
+      expect(channelError).toBeNull()
+      expect(channelData).toBeTruthy()
 
-    // Create a device override
-    const { error: overrideError } = await getSupabaseClient()
-      .from('channel_devices')
-      .insert({
-        device_id: uuid,
-        channel_id: channelData!.id,
-        app_id: APP_NAME_UPDATE,
-        owner_org: ORG_ID,
+      // Create a device override
+      const { error: overrideError } = await supabase
+        .from('channel_devices')
+        .insert({
+          device_id: uuid,
+          channel_id: channelData!.id,
+          app_id: APP_NAME_UPDATE,
+          owner_org: ORG_ID,
+        })
+
+      expect(overrideError).toBeNull()
+      await supabase.rpc('process_channel_device_counts_queue' as any, { batch_size: 10 })
+
+      // Test that update succeeds with device override
+      const baseData = getBaseData(APP_NAME_UPDATE)
+      baseData.device_id = uuid
+      baseData.version_name = '1.1.0'
+      ;(baseData as any).defaultChannel = 'production'
+
+      const response = await postUpdate(baseData)
+      expect(response.status).toBe(200)
+
+      const json = await response.json<UpdateRes>()
+      // Should succeed with the new version, not error
+      expect(() => updateNewScheme.parse(json)).not.toThrow()
+      expect(json.version).toBe('1.0.0')
+      expect(json.error).toBeUndefined()
+    }
+    finally {
+      await supabase.from('channel_devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_UPDATE)
+      await supabase.rpc('process_channel_device_counts_queue' as any, { batch_size: 10 })
+      await updateChannel('production', {
+        public: true,
+        allow_device_self_set: true,
+        version: '1.0.0',
       })
-
-    expect(overrideError).toBeNull()
-    await getSupabaseClient().rpc('process_channel_device_counts_queue' as any, { batch_size: 10 })
-
-    // Test that update succeeds with device override
-    const baseData = getBaseData(APP_NAME_UPDATE)
-    baseData.device_id = uuid
-    baseData.version_name = '1.1.0'
-    ;(baseData as any).defaultChannel = 'production'
-
-    const response = await postUpdate(baseData)
-    expect(response.status).toBe(200)
-
-    const json = await response.json<UpdateRes>()
-    // Should succeed with the new version, not error
-    expect(() => updateNewScheme.parse(json)).not.toThrow()
-    expect(json.version).toBe('1.0.0')
-    expect(json.error).toBeUndefined()
-
-    // Clean up
-    await getSupabaseClient().from('channel_devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_UPDATE)
-    await getSupabaseClient().rpc('process_channel_device_counts_queue' as any, { batch_size: 10 })
-    await updateChannel('production', {
-      public: true,
-      allow_device_self_set: true,
-      version: '1.0.0',
-    })
+    }
   })
 
   it('saves default_channel when provided', async () => {

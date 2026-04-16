@@ -417,7 +417,10 @@ function activeChannelVersionJoin(
 ) {
   // /updates still reaches app_versions through the channel/version PK join.
   // The deleted filter is only applied to that single matched row, so it does not widen the hot-path scan.
-  return and(eq(channelVersionColumn, versionAlias.id), eq(versionAlias.deleted, false))
+  return and(
+    eq(channelVersionColumn, versionAlias.id),
+    or(eq(versionAlias.deleted, false), eq(versionAlias.name, 'builtin')),
+  )
 }
 
 export function requestInfosChannelDevicePostgres(
