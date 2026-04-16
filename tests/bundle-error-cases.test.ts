@@ -1,10 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
+import { BASE_URL, createAppVersions, getSupabaseClient, headers, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.bundle.error.${id}`
 let testOrgId: string
+let metadataVersionId: number
+let channelVersionId: number
+let testChannelId: number
 
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
@@ -20,6 +23,26 @@ beforeAll(async () => {
     throw new Error('App not found after seeding')
 
   testOrgId = app.owner_org
+
+  metadataVersionId = (await createAppVersions(`1.0.0-test-metadata-${id}`, APPNAME)).id
+  channelVersionId = (await createAppVersions(`1.0.0-test-channel-${id}`, APPNAME)).id
+
+  const { data: channel, error: channelError } = await getSupabaseClient()
+    .from('channels')
+    .insert({
+      name: `test-channel-${id}`,
+      app_id: APPNAME,
+      version: channelVersionId,
+      created_by: USER_ID,
+      owner_org: testOrgId,
+    })
+    .select('id')
+    .single()
+
+  if (channelError || !channel)
+    throw channelError ?? new Error('Failed to create test channel')
+
+  testChannelId = channel.id
 })
 
 afterAll(async () => {
@@ -124,27 +147,12 @@ describe('[DELETE] /bundle - Error Cases', () => {
 
 describe('[POST] /bundle/metadata - Extended Error Cases', () => {
   it('should return 400 when no fields to update', async () => {
-    // First create a version to test with
-    const supabase = getSupabaseClient()
-    const { data: version, error } = await supabase
-      .from('app_versions')
-      .insert({
-        app_id: APPNAME,
-        name: '1.0.0-test-metadata',
-        owner_org: testOrgId,
-      })
-      .select()
-      .single()
-
-    if (error)
-      throw error
-
     const response = await fetch(`${BASE_URL}/bundle/metadata`, {
       method: 'POST',
       headers,
       body: JSON.stringify({
         app_id: APPNAME,
-        version_id: version.id,
+        version_id: metadataVersionId,
         // No updateable fields provided
       }),
     })
@@ -210,37 +218,6 @@ describe('[PUT] /bundle - Extended Error Cases', () => {
   })
 
   it('should return 500 when bundle cannot be set to channel', async () => {
-    // Create a version and channel first
-    const supabase = getSupabaseClient()
-
-    const { data: version, error: versionError } = await supabase
-      .from('app_versions')
-      .insert({
-        app_id: APPNAME,
-        name: '1.0.0-test-channel',
-        owner_org: testOrgId,
-      })
-      .select()
-      .single()
-
-    if (versionError)
-      throw versionError
-
-    const { data: channel, error: channelError } = await supabase
-      .from('channels')
-      .insert({
-        name: 'test-channel',
-        app_id: APPNAME,
-        version: version.id,
-        created_by: USER_ID,
-        owner_org: testOrgId,
-      })
-      .select()
-      .single()
-
-    if (channelError)
-      throw channelError
-
     // Try to set bundle to channel with conflicting data
     const response = await fetch(`${BASE_URL}/bundle`, {
       method: 'PUT',
@@ -248,7 +225,7 @@ describe('[PUT] /bundle - Extended Error Cases', () => {
       body: JSON.stringify({
         app_id: APPNAME,
         version_id: 999999, // Non-existent version ID
-        channel_id: channel.id,
+        channel_id: testChannelId,
       }),
     })
 

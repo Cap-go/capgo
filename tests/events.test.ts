@@ -18,7 +18,8 @@ const APPNAME_EVENT = `${APP_NAME}.e.${id}`
 const FOREIGN_ORG_ID = randomUUID()
 
 beforeAll(async () => {
-  await Promise.all([resetAndSeedAppData(APPNAME_EVENT), resetAndSeedAppDataStats(APPNAME_EVENT)])
+  await resetAndSeedAppData(APPNAME_EVENT)
+  await resetAndSeedAppDataStats(APPNAME_EVENT)
 }, 60_000)
 afterAll(async () => {
   await resetAppData(APPNAME_EVENT)

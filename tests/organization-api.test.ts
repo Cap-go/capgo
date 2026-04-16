@@ -5,6 +5,7 @@ import { z } from 'zod'
 
 import {
   BASE_URL,
+  getAuthHeaders,
   getSupabaseClient,
   headers,
   normalizeLocalhostUrl,
@@ -74,11 +75,14 @@ describe('read-mode API keys cannot access destructive organization routes', () 
   const readOnlyCustomerId = `cus_test_${readOnlyOrgId}`
   let readOnlyKey = ''
   let readOnlyKeyId = 0
+  let authHeaders: Record<string, string>
   const readOnlyHeaders = {
     'Content-Type': 'application/json',
   }
 
   beforeAll(async () => {
+    authHeaders = await getAuthHeaders()
+
     const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
       customer_id: readOnlyCustomerId,
       status: 'succeeded',
@@ -109,7 +113,7 @@ describe('read-mode API keys cannot access destructive organization routes', () 
 
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: `Organization read-only regression ${randomUUID()}`,
         mode: 'read',
@@ -127,7 +131,7 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     if (readOnlyKeyId) {
       await fetch(`${BASE_URL}/apikey/${readOnlyKeyId}`, {
         method: 'DELETE',
-        headers,
+        headers: authHeaders,
       })
     }
     await getSupabaseClient().from('org_users').delete().eq('org_id', readOnlyOrgId)
@@ -171,21 +175,21 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     expect(response.status).toBe(401)
   })
 
-	  it.concurrent('rejects POST /organization', async () => {
-	    const response = await fetch(`${BASE_URL}/organization`, {
-	      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
-	      method: 'POST',
-	      body: JSON.stringify({
-	        orgId: readOnlyOrgId,
-	        name: `Blocked create ${randomUUID()}`,
-	      }),
-	    })
+  it.concurrent('rejects POST /organization', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'POST',
+      body: JSON.stringify({
+        orgId: readOnlyOrgId,
+        name: `Blocked create ${randomUUID()}`,
+      }),
+    })
 
-	    expect(response.status).toBe(401)
-	    // Ensure this is blocked by API-key auth (key mode allowlist), not by RLS deeper in the handler.
-	    const payload = await response.json() as { error?: string }
-	    expect(payload.error).toBe('invalid_apikey')
-	  })
+    expect(response.status).toBe(401)
+    // Ensure this is blocked by API-key auth (key mode allowlist), not by RLS deeper in the handler.
+    const payload = await response.json() as { error?: string }
+    expect(payload.error).toBe('invalid_apikey')
+  })
 
   it.concurrent('rejects DELETE /organization', async () => {
     const response = await fetch(`${BASE_URL}/organization?orgId=${readOnlyOrgId}`, {
@@ -699,26 +703,11 @@ describe('[PUT] /organization', () => {
     const originalName = `Update Base Organization ${new Date().toISOString()}`
     const name = `Updated Organization ${new Date().toISOString()}`
     const website = 'https://www.capgo.app/docs'
-    const customerId = `cus_test_${orgId}`
-    const subscriptionId = `sub_${orgId}`
-    const trialAt = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
-    const stripeInfo = {
-      customer_id: customerId,
-      status: 'succeeded' as const,
-      product_id: 'prod_LQIregjtNduh4q',
-      subscription_id: subscriptionId,
-      trial_at: trialAt,
-      is_good_plan: true,
-    }
-    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert(stripeInfo)
-    if (stripeError)
-      throw stripeError
     const { error: createError } = await getSupabaseClient().from('orgs').insert({
       id: orgId,
       name: originalName,
       management_email: TEST_EMAIL,
       created_by: USER_ID,
-      customer_id: customerId,
       website: 'https://base.example/',
       use_new_rbac: false,
     })
@@ -756,7 +745,6 @@ describe('[PUT] /organization', () => {
     finally {
       await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
       await getSupabaseClient().from('orgs').delete().eq('id', orgId)
-      await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
     }
   })
 
@@ -829,6 +817,8 @@ describe('[DELETE] /organization', () => {
   it('delete organization successfully', async () => {
     const id = randomUUID()
     const customerId = `cus_test_${id}`
+    const startDate = '2026-01-01'
+    const endDate = '2026-01-31'
 
     // Create stripe_info for this test org
     const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
@@ -854,6 +844,21 @@ describe('[DELETE] /organization', () => {
     expect(errorOrg).toBeNull()
     expect(dataOrg).toBeTruthy()
 
+    const { error: metricsCacheError } = await getSupabaseClient().from('org_metrics_cache').insert({
+      org_id: id,
+      start_date: startDate,
+      end_date: endDate,
+      mau: 1,
+      storage: 2,
+      bandwidth: 3,
+      build_time_unit: 4,
+      get: 5,
+      fail: 6,
+      install: 7,
+      uninstall: 8,
+    })
+    expect(metricsCacheError).toBeNull()
+
     const response = await fetch(`${BASE_URL}/organization?orgId=${id}`, {
       headers,
       method: 'DELETE',
@@ -865,6 +870,14 @@ describe('[DELETE] /organization', () => {
     const { data: dataOrg2, error: errorOrg2 } = await getSupabaseClient().from('orgs').select().eq('id', id).single()
     expect(errorOrg2).toBeTruthy()
     expect(dataOrg2).toBeNull()
+
+    const { data: cachedMetrics, error: cachedMetricsError } = await getSupabaseClient()
+      .from('org_metrics_cache')
+      .select('org_id')
+      .eq('org_id', id)
+      .maybeSingle()
+    expect(cachedMetricsError).toBeNull()
+    expect(cachedMetrics).toBeNull()
 
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
   })
@@ -1100,27 +1113,14 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
 const ORG_ID_RBAC = randomUUID()
 const globalIdRbac = randomUUID()
 const nameRbac = `RBAC Test Organization ${globalIdRbac}`
-const customerIdRbac = `cus_test_rbac_${ORG_ID_RBAC}`
 
 describe('rbac mode - organization member operations', () => {
   beforeAll(async () => {
-    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
-      customer_id: customerIdRbac,
-      status: 'succeeded',
-      product_id: 'prod_LQIregjtNduh4q',
-      subscription_id: `sub_${globalIdRbac}`,
-      trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-      is_good_plan: true,
-    })
-    if (stripeError)
-      throw stripeError
-
     const { error } = await getSupabaseClient().from('orgs').insert({
       id: ORG_ID_RBAC,
       name: nameRbac,
       management_email: TEST_EMAIL,
       created_by: USER_ID,
-      customer_id: customerIdRbac,
       use_new_rbac: true, // Explicitly RBAC — tests the RBAC permission path
     })
     if (error)
@@ -1134,7 +1134,6 @@ describe('rbac mode - organization member operations', () => {
     await getSupabaseClient().from('role_bindings').delete().eq('org_id', ORG_ID_RBAC)
     await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID_RBAC)
     await getSupabaseClient().from('orgs').delete().eq('id', ORG_ID_RBAC)
-    await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerIdRbac)
   })
 
   it('[GET] /organization - get RBAC org by id', async () => {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import QRCode from 'qrcode'
+import { toSvg } from 'better-qr'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconExternalLink from '~icons/lucide/external-link'
@@ -68,17 +68,19 @@ const previewUrl = computed(() => {
   return `https://${subdomain}.preview.${baseDomain}/`
 })
 
+function svgToDataUrl(svg: string): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+}
+
 // Generate QR code linking to the preview URL
-async function generateQRCode() {
+function generateQRCode() {
   try {
-    qrCodeDataUrl.value = await QRCode.toDataURL(previewUrl.value, {
-      width: 150,
+    qrCodeDataUrl.value = svgToDataUrl(toSvg(previewUrl.value, {
       margin: 2,
-      color: {
-        dark: '#000000',
-        light: '#ffffff',
-      },
-    })
+      moduleSize: 4,
+      foreground: '#000000',
+      background: '#ffffff',
+    }))
   }
   catch (error) {
     console.error('Failed to generate QR code:', error)

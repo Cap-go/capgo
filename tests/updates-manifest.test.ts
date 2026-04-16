@@ -1,4 +1,4 @@
-import type { ManifestEntry } from 'supabase/functions/_backend/utils/downloadUrl.ts'
+import type { ManifestEntry } from '../supabase/functions/_backend/utils/downloadUrl.ts'
 
 import { randomUUID } from 'node:crypto'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'

@@ -114,7 +114,7 @@ jobs:
 
           echo "✅ Migration filename timestamps are unique and strictly newer than main."
       - name: Check for typos
-        uses: crate-ci/typos@631208b7aac2daa8b707f55e7331f9112b0e062d # v1.44.0
+        uses: crate-ci/typos@02ea592e44b3a53c302f697cddca7641cd051c3d # v1.45.0
       - name: Show bun version
         run: bun --version
       - name: Show capgo version
@@ -141,7 +141,10 @@ jobs:
       - name: Install Supabase CLI
         uses: supabase/setup-cli@v1.6.0
         with:
-          version: latest
+          # Supabase CLI 2.90.0 regressed our local test-db startup on GitHub
+          # Actions runners; pin to the last known-good version until upstream is
+          # stable again.
+          version: 2.84.2
       - name: Show Supabase CLI version
         run: supabase --version
       - name: Link Supabase templates

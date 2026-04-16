@@ -2,10 +2,28 @@
 layer(base);
 
 @import 'tailwindcss';
-@import 'konsta/vue/theme.css';
-@plugin "@tailwindcss/typography";
-@plugin "@tailwindcss/aspect-ratio";
-@plugin "@tailwindcss/container-queries";
+
+:root {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+}
+
+.safe-areas {
+  padding-right: max(var(--safe-area-right), 0px);
+  padding-bottom: max(var(--safe-area-bottom), 0px);
+  padding-left: max(var(--safe-area-left), 0px);
+}
+
+.pt-safe {
+  padding-top: max(var(--safe-area-top), 0px);
+}
+
+/* Sonner adds a hover spacer above expanded toasts; it reads as a broken top margin on this single status toast. */
+[data-sonner-toast].replication-toast[data-front='true'][data-expanded='true']::after {
+  content: none;
+}
 
 @plugin "daisyui" {
   themes: capgolight --default, capgodark --prefersdark;

@@ -358,6 +358,8 @@ export class UploadHandler extends DurableObject {
   async head(c: Context): Promise<Response> {
     cloudlog({ requestId: c.get('requestId'), message: 'in DO head detected' })
     const r2Key = c.req.param('id')
+    if (!r2Key)
+      return quickError(400, 'missing_upload_id', 'Missing upload id')
 
     let offset: number | undefined = await this.ctx.storage.get(UPLOAD_OFFSET_KEY)
     let uploadLength: number | undefined
@@ -394,6 +396,8 @@ export class UploadHandler extends DurableObject {
   // append to the upload at the current upload offset
   async patch(c: Context): Promise<Response> {
     const r2Key = c.req.param('id')
+    if (!r2Key)
+      return quickError(400, 'missing_upload_id', 'Missing upload id')
     cloudlog({ requestId: c.get('requestId'), message: 'in DO patch', r2Key })
 
     let uploadOffset: number | undefined = await this.ctx.storage.get(UPLOAD_OFFSET_KEY)
@@ -401,6 +405,7 @@ export class UploadHandler extends DurableObject {
       cloudlog({ requestId: c.get('requestId'), message: 'in DO files patch uploadOffset is null' })
       return c.text('Not Found', 404)
     }
+    const currentUploadOffset = uploadOffset
 
     const headerOffset = readIntFromHeader(c.req.raw.headers, 'Upload-Offset')
     if (uploadOffset !== headerOffset) {
@@ -428,7 +433,7 @@ export class UploadHandler extends DurableObject {
       return c.text('Must provide request body', 400)
     }
 
-    uploadOffset = await this.appendBody(c, r2Key, c.req.raw.body, uploadOffset, uploadInfo)
+    uploadOffset = await this.appendBody(c, r2Key, c.req.raw.body, currentUploadOffset, uploadInfo)
 
     return new Response(null, {
       status: 204,

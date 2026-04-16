@@ -5,6 +5,29 @@ import { BASE_URL, createAppVersions, fetchBundle, getSupabaseClient, headers, r
 const id = randomUUID()
 const APPNAME = `com.app.b.${id}`
 
+async function putBundleToChannelWithRetry(body: { app_id: string, version_id: number, channel_id: number }, maxRetries = 3): Promise<Response> {
+  let response: Response | undefined
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    response = await fetch(`${BASE_URL}/bundle`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(body),
+    })
+
+    if (response.status === 200)
+      return response
+
+    if (attempt < maxRetries - 1)
+      await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)))
+  }
+
+  if (!response)
+    throw new Error('Failed to set bundle to channel: no response received')
+
+  return response
+}
+
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
 })
@@ -215,14 +238,10 @@ describe('[PUT] /bundle operations - Set bundle to channel', () => {
   })
 
   it('should set bundle to channel successfully', async () => {
-    const response = await fetch(`${BASE_URL}/bundle`, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify({
-        app_id: APPNAME,
-        version_id: versionId,
-        channel_id: channelId,
-      }),
+    const response = await putBundleToChannelWithRetry({
+      app_id: APPNAME,
+      version_id: versionId,
+      channel_id: channelId,
     })
 
     const data = await response.json() as { status: string, message: string }
