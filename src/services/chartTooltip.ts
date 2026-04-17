@@ -21,6 +21,25 @@ export interface TooltipClickHandler {
   appIdByLabel?: Record<string, string> // Maps app label/name to app ID
 }
 
+function getCanvasContext(ctx: unknown): CanvasRenderingContext2D | null {
+  if (ctx && typeof (ctx as CanvasRenderingContext2D).save === 'function')
+    return ctx as CanvasRenderingContext2D
+
+  return null
+}
+
+function canSafelyUpdateChart(chart: Chart): boolean {
+  return !!getCanvasContext(chart.ctx) && !!chart.canvas?.isConnected
+}
+
+function clearTooltipSelection(chart: Chart) {
+  if (!canSafelyUpdateChart(chart))
+    return
+
+  chart.setActiveElements([])
+  chart.update('none')
+}
+
 function formatTooltipValue(value: unknown) {
   if (typeof value !== 'number' || Number.isNaN(value))
     return '0'
@@ -138,8 +157,7 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
         // Check if the touch is not on the chart canvas
         if (!canvas.contains(e.target as Node)) {
           tooltipEl!.style.opacity = '0'
-          chart.setActiveElements([])
-          chart.update('none')
+          clearTooltipSelection(chart)
         }
       }
 
@@ -169,8 +187,7 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
     (tooltipEl as any).hideTimer = setTimeout(() => {
       tooltipEl.style.opacity = '0'
       // Trigger chart update to clear tooltip
-      chart.setActiveElements([])
-      chart.update('none')
+      clearTooltipSelection(chart)
     }, 3000)
   }
 
@@ -391,8 +408,7 @@ export function createCustomTooltip(context: TooltipContext, isAccumulated: bool
       ;(tooltipEl as any).hideTimer = setTimeout(() => {
         if (!(tooltipEl as any).isHovered) {
           tooltipEl!.style.opacity = '0'
-          chart.setActiveElements([])
-          chart.update('none')
+          clearTooltipSelection(chart)
         }
       }, 100)
     })
@@ -494,7 +510,9 @@ export const verticalLinePlugin = {
     const active = chart.tooltip?.getActiveElements()
     if (chart.tooltip && active && active.length > 0) {
       const activePoint = active[0]
-      const ctx = chart.ctx
+      const ctx = getCanvasContext(chart.ctx)
+      if (!ctx)
+        return
       const x = activePoint.element.x
       const topY = chart.scales.y.top
       const bottomY = chart.scales.y.bottom
@@ -599,7 +617,9 @@ export const todayLinePlugin = {
     if (typeof x !== 'number' || Number.isNaN(x))
       return
 
-    const ctx = chart.ctx
+    const ctx = getCanvasContext(chart.ctx)
+    if (!ctx)
+      return
     const topY = yScale.top ?? chart.chartArea?.top
     const bottomY = yScale.bottom ?? chart.chartArea?.bottom
     if (typeof topY !== 'number' || typeof bottomY !== 'number')

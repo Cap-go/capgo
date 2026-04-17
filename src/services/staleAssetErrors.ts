@@ -8,11 +8,22 @@ const STALE_ASSET_ERROR_PATTERNS = [
   /Loading CSS chunk [\w-]+ failed/i,
 ]
 
+const KNOWN_CRAWLER_ERROR_PATTERNS = [
+  /Object Not Found Matching Id:\d+(?:,\s*MethodName:[^,]+,\s*ParamCount:\d+)?/i,
+]
+
 export function isStaleAssetErrorMessage(message: string | undefined): boolean {
   if (!message)
     return false
 
   return STALE_ASSET_ERROR_PATTERNS.some(pattern => pattern.test(message))
+}
+
+export function isKnownCrawlerNoiseErrorMessage(message: string | undefined): boolean {
+  if (!message)
+    return false
+
+  return KNOWN_CRAWLER_ERROR_PATTERNS.some(pattern => pattern.test(message))
 }
 
 export function getErrorMessage(value: unknown): string | undefined {
@@ -50,9 +61,9 @@ export function shouldSuppressPostHogExceptionEvent(event: PostHogEventLike): bo
 
   const exception = event.properties?.$exception_list?.[0]
   const exceptionValue = getErrorMessage(exception?.value) ?? getErrorMessage(exception?.$exception_value)
-  if (isStaleAssetErrorMessage(exceptionValue))
+  if (isStaleAssetErrorMessage(exceptionValue) || isKnownCrawlerNoiseErrorMessage(exceptionValue))
     return true
 
   const fallbackValue = getErrorMessage(event.properties?.$exception_values?.[0])
-  return isStaleAssetErrorMessage(fallbackValue)
+  return isStaleAssetErrorMessage(fallbackValue) || isKnownCrawlerNoiseErrorMessage(fallbackValue)
 }
