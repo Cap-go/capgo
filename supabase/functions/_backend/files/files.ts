@@ -270,11 +270,30 @@ function optionsHandler(c: Context) {
   })
 }
 
+function decodeUriComponentSafely(value: string, requestId: string, context: string): string {
+  if (!value.includes('%')) {
+    return value
+  }
+
+  try {
+    return decodeURIComponent(value)
+  }
+  catch (error) {
+    cloudlog({
+      requestId,
+      message: `${context} - invalid percent encoding, using raw value`,
+      value,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return value
+  }
+}
+
 // TUS protocol requests (POST/PATCH/HEAD) that get forwarded to a durable object
 async function uploadHandler(c: Context) {
   const requestId = c.get('fileId') as string
   // make requestId safe
-  const normalizedRequestId = decodeURIComponent(requestId)
+  const normalizedRequestId = decodeUriComponentSafely(requestId, c.get('requestId'), 'uploadHandler')
   const durableObjNs: DurableObjectNamespace = c.env.ATTACHMENT_UPLOAD_HANDLER
 
   if (durableObjNs == null) {
@@ -346,7 +365,7 @@ async function setKeyFromMetadata(c: Context, next: Next) {
     })
   }
 
-  const normalizedFileId = decodeURIComponent(decodedFileId)
+  const normalizedFileId = decodeUriComponentSafely(decodedFileId, c.get('requestId'), 'setKeyFromMetadata')
   cloudlog({ requestId: c.get('requestId'), message: 'setKeyFromMetadata - final normalized fileId', normalizedFileId })
   c.set('fileId', normalizedFileId)
   await next()
@@ -366,7 +385,7 @@ async function setKeyFromIdParam(c: Context, next: Next) {
     return c.json({ error: 'not_found', message: 'Not found' }, 404)
   }
 
-  const normalizedFileId = decodeURIComponent(fileId)
+  const normalizedFileId = decodeUriComponentSafely(fileId, c.get('requestId'), 'setKeyFromIdParam')
 
   // Check if this is a Supabase TUS upload ID (base64 encoded)
   // TUS upload IDs from Supabase are base64-encoded paths like: capgo/orgs/xxx/apps/yyy/file.zip/uuid
