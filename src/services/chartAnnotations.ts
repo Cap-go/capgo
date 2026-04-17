@@ -18,10 +18,21 @@ export interface AnnotationOptions {
   }
 }
 
+function getCanvasContext(ctx: unknown): CanvasRenderingContext2D | null {
+  if (ctx && typeof (ctx as CanvasRenderingContext2D).save === 'function')
+    return ctx as CanvasRenderingContext2D
+
+  return null
+}
+
 export const inlineAnnotationPlugin = {
   id: 'inlineAnnotationPlugin',
   afterDatasetsDraw: (chart: any, args: any, options: AnnotationOptions) => {
-    const { ctx, chartArea } = chart
+    const ctx = getCanvasContext(chart?.ctx)
+    if (!ctx)
+      return
+
+    const { chartArea } = chart
     const { left, right } = chartArea
 
     Object.entries(options).forEach(([key, val]) => {
