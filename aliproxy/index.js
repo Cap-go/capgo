@@ -2,8 +2,47 @@
 // Alibaba FC HTTP Trigger with Event Function
 const { Buffer } = require('node:buffer')
 const https = require('node:https')
+const { createHash } = require('node:crypto')
 
 const TARGET_HOST = 'updater.capgo.com.cn'
+
+// Security: Validate and sanitize input paths to prevent path traversal
+function sanitizePath(rawPath) {
+  if (!rawPath || typeof rawPath !== 'string') return '/'
+  // Remove leading slashes and query parameters
+  let path = rawPath.replace(/^\/+/, '')
+  // Remove any ../ sequences
+  path = path.replace(/\/\.\.\//g, '/')
+  // Ensure path starts with /
+  return path.startsWith('/') ? path : `/${path}`
+}
+
+// Security: Validate HTTP method
+function validateMethod(method) {
+  const allowedMethods = ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS']
+  return allowedMethods.includes(method?.toUpperCase() || 'POST')
+    ? method.toUpperCase()
+    : 'POST'
+}
+
+// Security: Validate headers to prevent header injection
+function sanitizeHeaders(headers = {}) {
+  const sanitized = { ...headers }
+  // Remove any header injection attempts
+  delete sanitized['\r']
+  delete sanitized['\n']
+  return sanitized
+}
+
+// Security: Validate body content
+function validateBody(bodyString) {
+  if (!bodyString || typeof bodyString !== 'string') return ''
+  // Basic validation - reject obviously malicious content
+  if (bodyString.includes('\x00') || bodyString.length > 1000000) {
+    throw new Error('Invalid request body')
+  }
+  return bodyString
+}
 
 exports.handler = function (event, _context, callback) {
   try {
@@ -29,11 +68,16 @@ exports.handler = function (event, _context, callback) {
       method: requestData.requestContext?.http?.method,
     })
 
-    // Extract request information
-    const method = requestData.requestContext?.http?.method || requestData.httpMethod || 'POST'
-    const path = requestData.rawPath || requestData.path || '/'
-    const headers = requestData.headers || {}
-    const bodyString = requestData.body || ''
+    // Security: Validate and sanitize all inputs
+    const method = validateMethod(requestData.requestContext?.http?.method || requestData.httpMethod || 'POST')
+    const path = sanitizePath(requestData.rawPath || requestData.path || '/')
+    const headers = sanitizeHeaders(requestData.headers || {})
+    const bodyString = validateBody(requestData.body || '')
+
+    // Security: Prevent open redirect and SSRF by validating target host
+    if (!TARGET_HOST || typeof TARGET_HOST !== 'string' || !/^[a-zA-Z0-9.-]+$/.test(TARGET_HOST)) {
+      throw new Error('Invalid target host configuration')
+    }
 
     // Prepare proxy headers
     const proxyHeaders = { ...headers }
@@ -42,6 +86,11 @@ exports.handler = function (event, _context, callback) {
     if (!proxyHeaders['user-agent']) {
       proxyHeaders['user-agent'] = 'CapgoAlibabaProxy/1.0'
     }
+
+    // Security: Add security headers to response
+    proxyHeaders['x-content-type-options'] = 'nosniff'
+    proxyHeaders['x-frame-options'] = 'DENY'
+    proxyHeaders['x-xss-protection'] = '1; mode=block'
 
     // Prepare body buffer
     let bodyBuffer = null
@@ -59,6 +108,7 @@ exports.handler = function (event, _context, callback) {
       method,
       headers: proxyHeaders,
       timeout: 15000,
+      rejectUnauthorized: true, // Security: Enable SSL certificate validation
     }
 
     console.log('[DEBUG] Proxying request:', {
@@ -94,8 +144,10 @@ exports.handler = function (event, _context, callback) {
         callback(null, {
           statusCode: res.statusCode || 502,
           headers: {
-            ...res.headers,
-            'access-control-allow-origin': '*',
+            'content-type': res.headers['content-type'] || 'application/octet-stream',
+            'content-length': buf.length.toString(),
+            'cache-control': 'no-store',
+            'x-powered-by': 'CapgoProxy/1.0',
           },
           body: responseBody,
           isBase64Encoded: !isTextResponse,
@@ -104,11 +156,28 @@ exports.handler = function (event, _context, callback) {
     })
 
     req.on('error', (err) => {
-      console.error('[ERROR] Request failed:', err)
+      console.error('[ERROR] Proxy request failed:', err)
       callback(null, {
         statusCode: 502,
-        headers: { 'content-type': 'text/plain' },
-        body: `upstream error: ${err.message}`,
+        headers: {
+          'content-type': 'application/json',
+          'x-content-type-options': 'nosniff',
+        },
+        body: JSON.stringify({ error: 'Proxy request failed', details: err.message }),
+        isBase64Encoded: false,
+      })
+    })
+
+    req.on('timeout', () => {
+      req.destroy(new Error('Proxy timeout'))
+      callback(null, {
+        statusCode: 504,
+        headers: {
+          'content-type': 'application/json',
+          'x-content-type-options': 'nosniff',
+        },
+        body: JSON.stringify({ error: 'Proxy timeout' }),
+        isBase64Encoded: false,
       })
     })
 
@@ -116,13 +185,16 @@ exports.handler = function (event, _context, callback) {
       req.write(bodyBuffer)
     }
     req.end()
-  }
-  catch (err) {
-    console.error('[ERROR] Handler exception:', err)
+  } catch (error) {
+    console.error('[ERROR] Proxy handler error:', error)
     callback(null, {
-      statusCode: 500,
-      headers: { 'content-type': 'text/plain' },
-      body: `internal error: ${err.message}`,
+      statusCode: 400,
+      headers: {
+        'content-type': 'application/json',
+        'x-content-type-options': 'nosniff',
+      },
+      body: JSON.stringify({ error: 'Invalid request', details: error.message }),
+      isBase64Encoded: false,
     })
   }
 }

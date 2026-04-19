@@ -30,6 +30,13 @@ export default antfu(
       'e18e/prefer-timer-args': 'off',
       'no-console': env.NODE_ENV === 'production' ? 'warn' : 'off',
       'no-debugger': env.NODE_ENV === 'production' ? 'warn' : 'off',
+      'security/detect-object-injection': 'error',
+      'security-node/detect-crlf': 'error',
+      'security-node/detect-eval-with-expression': 'error',
+      'security-node/detect-new-buffer': 'error',
+      'security-node/detect-non-literal-fs-filename': 'error',
+      'security-node/detect-non-literal-require': 'error',
+      'security-node/detect-unsafe-regex': 'error',
     },
     ignores: [
       'dist',

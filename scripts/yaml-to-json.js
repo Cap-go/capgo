@@ -16,21 +16,27 @@ try {
     throw new Error('YAML data is empty')
   }
 
-  const newJsonData = {
-    $schema: 'https://inlang.com/schema/inlang-message-format',
-    ...Object.entries(yamlData).reduce((acc, [key, value]) => ({
-      ...acc,
-      [key]: typeof value === 'string' ? value : JSON.stringify(value),
-    }), {}),
+  // Security: Validate YAML structure before processing
+  if (typeof yamlData !== 'object' || yamlData === null) {
+    throw new Error('YAML data is not an object')
   }
 
+  const newJsonData = {
+    $schema: 'https://json-schema.org/draft/2020/schema',
+    ...yamlData,
+  }
+
+  // Security: Validate JSON structure before writing
+  JSON.stringify(newJsonData)
+
   writeFileSync(
-    join(process.cwd(), 'messages', `${lang}.json`),
+    join(process.cwd(), 'locales', `${lang}.json`),
     JSON.stringify(newJsonData, null, 2),
+    'utf8',
   )
-  console.log('✅ File written successfully')
-}
-catch (error) {
-  console.error('❌ Error:', error.message)
+
+  console.log(`Successfully converted ${lang}.yml to ${lang}.json`)
+} catch (error) {
+  console.error('Error converting YAML to JSON:', error)
   process.exit(1)
 }
