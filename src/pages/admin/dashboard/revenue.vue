@@ -164,6 +164,50 @@ const mrrSeries = computed(() => {
   ]
 })
 
+const churnRateSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  const data = globalStatsTrendData.value.map((item, index) => {
+    const previousPaying = index > 0 ? globalStatsTrendData.value[index - 1]?.paying || 0 : 0
+    const churnRate = previousPaying > 0 ? (item.canceled_orgs || 0) / previousPaying * 100 : 0
+    return {
+      date: item.date,
+      value: Number(churnRate.toFixed(2)),
+    }
+  })
+
+  return [
+    {
+      label: 'Gross Churn Rate (%)',
+      data,
+      color: '#ef4444', // red
+    },
+  ]
+})
+
+const nrrSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  const data = globalStatsTrendData.value.map((item, index) => {
+    const previousMrr = index > 0 ? globalStatsTrendData.value[index - 1]?.mrr || 0 : 0
+    const nrr = previousMrr > 0 ? (item.mrr || 0) / previousMrr * 100 : 0
+    return {
+      date: item.date,
+      value: Number(nrr.toFixed(2)),
+    }
+  })
+
+  return [
+    {
+      label: 'Net Revenue Retention (%)',
+      data,
+      color: '#10b981', // green
+    },
+  ]
+})
+
 const arrSeries = computed(() => {
   if (globalStatsTrendData.value.length === 0)
     return []
@@ -539,6 +583,33 @@ displayStore.defaultBack = '/dashboard'
               <AdminMultiLineChart
                 :series="upgradeTrendSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+          </div>
+
+          <!-- Retention and Churn -->
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <ChartCard
+              title="Gross Churn Rate"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="churnRateSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="churnRateSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+                value-suffix="%"
+              />
+            </ChartCard>
+
+            <ChartCard
+              title="Net Revenue Retention"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="nrrSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="nrrSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+                value-suffix="%"
               />
             </ChartCard>
           </div>
