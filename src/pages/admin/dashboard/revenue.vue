@@ -236,6 +236,25 @@ const totalPayingOrgsSeries = computed(() => {
   ]
 })
 
+function calculateChurnRate(canceledOrgs: number, previousPaying: number): number {
+  if (previousPaying <= 0)
+    return 0
+  return Number(((canceledOrgs / previousPaying) * 100).toFixed(2))
+}
+
+function calculateEstimatedNrr(
+  currentMrr: number,
+  previousMrr: number,
+  newPayingOrgs: number,
+  previousPaying: number,
+): number {
+  if (previousMrr <= 0)
+    return 100
+  const previousArpu = previousPaying > 0 ? previousMrr / previousPaying : 0
+  const estimatedNewMrr = newPayingOrgs * previousArpu
+  return Number((((currentMrr - estimatedNewMrr) / previousMrr) * 100).toFixed(2))
+}
+
 const churnRateSeries = computed(() => {
   if (globalStatsTrendData.value.length === 0)
     return []
@@ -246,12 +265,9 @@ const churnRateSeries = computed(() => {
       data: globalStatsTrendData.value.map((item, index) => {
         const previous = index > 0 ? globalStatsTrendData.value[index - 1] : null
         const previousPaying = previous ? previous.paying || 0 : item.paying || 0
-        const churnRate = previousPaying > 0
-          ? ((item.canceled_orgs || 0) / previousPaying) * 100
-          : 0
         return {
           date: item.date,
-          value: Number(churnRate.toFixed(2)),
+          value: calculateChurnRate(item.canceled_orgs || 0, previousPaying),
         }
       }),
       color: '#ef4444', // red
@@ -272,17 +288,16 @@ const estimatedNrrSeries = computed(() => {
           return { date: item.date, value: 100 }
 
         const previousMrr = previous.mrr || 0
-        if (previousMrr <= 0)
-          return { date: item.date, value: 100 }
-
         const previousPaying = previous.paying || 0
-        const previousArpu = previousPaying > 0 ? previousMrr / previousPaying : 0
-        const estimatedNewMrr = (item.new_paying_orgs || 0) * previousArpu
-        const estimatedNrr = ((item.mrr - estimatedNewMrr) / previousMrr) * 100
 
         return {
           date: item.date,
-          value: Number(estimatedNrr.toFixed(2)),
+          value: calculateEstimatedNrr(
+            item.mrr || 0,
+            previousMrr,
+            item.new_paying_orgs || 0,
+            previousPaying,
+          ),
         }
       }),
       color: '#8b5cf6', // purple
@@ -304,10 +319,7 @@ const latestChurnRate = computed(() => {
   const latest = globalStatsTrendData.value[latestIndex]
   const previous = latestIndex > 0 ? globalStatsTrendData.value[latestIndex - 1] : null
   const previousPaying = previous ? previous.paying || 0 : latest.paying || 0
-  if (previousPaying <= 0)
-    return 0
-
-  return Number((((latest.canceled_orgs || 0) / previousPaying) * 100).toFixed(2))
+  return calculateChurnRate(latest.canceled_orgs || 0, previousPaying)
 })
 
 const latestEstimatedNrr = computed(() => {
@@ -321,13 +333,13 @@ const latestEstimatedNrr = computed(() => {
     return 100
 
   const previousMrr = previous.mrr || 0
-  if (previousMrr <= 0)
-    return 100
-
   const previousPaying = previous.paying || 0
-  const previousArpu = previousPaying > 0 ? previousMrr / previousPaying : 0
-  const estimatedNewMrr = (latest.new_paying_orgs || 0) * previousArpu
-  return Number((((latest.mrr - estimatedNewMrr) / previousMrr) * 100).toFixed(2))
+  return calculateEstimatedNrr(
+    latest.mrr || 0,
+    previousMrr,
+    latest.new_paying_orgs || 0,
+    previousPaying,
+  )
 })
 
 watch(() => adminStore.activeDateRange, () => {
