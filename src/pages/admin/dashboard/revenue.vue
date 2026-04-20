@@ -236,10 +236,98 @@ const totalPayingOrgsSeries = computed(() => {
   ]
 })
 
+const churnRateSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Churn Rate (%)',
+      data: globalStatsTrendData.value.map((item, index) => {
+        const previous = index > 0 ? globalStatsTrendData.value[index - 1] : null
+        const previousPaying = previous ? previous.paying || 0 : item.paying || 0
+        const churnRate = previousPaying > 0
+          ? ((item.canceled_orgs || 0) / previousPaying) * 100
+          : 0
+        return {
+          date: item.date,
+          value: Number(churnRate.toFixed(2)),
+        }
+      }),
+      color: '#ef4444', // red
+    },
+  ]
+})
+
+const estimatedNrrSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Estimated NRR (%)',
+      data: globalStatsTrendData.value.map((item, index) => {
+        const previous = index > 0 ? globalStatsTrendData.value[index - 1] : null
+        if (!previous)
+          return { date: item.date, value: 100 }
+
+        const previousMrr = previous.mrr || 0
+        if (previousMrr <= 0)
+          return { date: item.date, value: 100 }
+
+        const previousPaying = previous.paying || 0
+        const previousArpu = previousPaying > 0 ? previousMrr / previousPaying : 0
+        const estimatedNewMrr = (item.new_paying_orgs || 0) * previousArpu
+        const estimatedNrr = ((item.mrr - estimatedNewMrr) / previousMrr) * 100
+
+        return {
+          date: item.date,
+          value: Number(estimatedNrr.toFixed(2)),
+        }
+      }),
+      color: '#8b5cf6', // purple
+    },
+  ]
+})
+
 const latestGlobalStats = computed(() => {
   if (globalStatsTrendData.value.length === 0)
     return null
   return globalStatsTrendData.value[globalStatsTrendData.value.length - 1]
+})
+
+const latestChurnRate = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return 0
+
+  const latestIndex = globalStatsTrendData.value.length - 1
+  const latest = globalStatsTrendData.value[latestIndex]
+  const previous = latestIndex > 0 ? globalStatsTrendData.value[latestIndex - 1] : null
+  const previousPaying = previous ? previous.paying || 0 : latest.paying || 0
+  if (previousPaying <= 0)
+    return 0
+
+  return Number((((latest.canceled_orgs || 0) / previousPaying) * 100).toFixed(2))
+})
+
+const latestEstimatedNrr = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return 100
+
+  const latestIndex = globalStatsTrendData.value.length - 1
+  const latest = globalStatsTrendData.value[latestIndex]
+  const previous = latestIndex > 0 ? globalStatsTrendData.value[latestIndex - 1] : null
+  if (!previous)
+    return 100
+
+  const previousMrr = previous.mrr || 0
+  if (previousMrr <= 0)
+    return 100
+
+  const previousPaying = previous.paying || 0
+  const previousArpu = previousPaying > 0 ? previousMrr / previousPaying : 0
+  const estimatedNewMrr = (latest.new_paying_orgs || 0) * previousArpu
+  return Number((((latest.mrr - estimatedNewMrr) / previousMrr) * 100).toFixed(2))
 })
 
 watch(() => adminStore.activeDateRange, () => {
@@ -324,6 +412,49 @@ displayStore.defaultBack = '/dashboard'
                 </p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   Projected annual recurring revenue (MRR × 12)
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Retention Metrics Cards -->
+          <div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+            <!-- Churn Rate Card -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-error/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-error"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  Churn Rate
+                </p>
+                <p class="mt-2 text-3xl font-bold text-error">
+                  {{ latestChurnRate.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}%
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Canceled orgs divided by previous paying orgs
+                </p>
+              </div>
+            </div>
+
+            <!-- Estimated NRR Card -->
+            <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+              <div class="flex items-start justify-between mb-4">
+                <div class="p-3 rounded-lg bg-secondary/10">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-secondary"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                </div>
+              </div>
+              <div>
+                <p class="text-sm text-slate-600 dark:text-slate-400">
+                  Estimated NRR
+                </p>
+                <p class="mt-2 text-3xl font-bold text-secondary">
+                  {{ latestEstimatedNrr.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}%
+                </p>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  Estimated from MRR change excluding new logo revenue
                 </p>
               </div>
             </div>
@@ -538,6 +669,31 @@ displayStore.defaultBack = '/dashboard'
             >
               <AdminMultiLineChart
                 :series="upgradeTrendSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+          </div>
+
+          <!-- Retention Charts -->
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <ChartCard
+              title="Churn Rate (%)"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="churnRateSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="churnRateSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+
+            <ChartCard
+              title="Estimated NRR (%)"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="estimatedNrrSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="estimatedNrrSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
               />
             </ChartCard>
