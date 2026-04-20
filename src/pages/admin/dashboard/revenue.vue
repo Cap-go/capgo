@@ -236,12 +236,27 @@ const totalPayingOrgsSeries = computed(() => {
   ]
 })
 
+/**
+ * Churn rate is the percentage of paying organizations lost over one step:
+ * canceled_orgs / previous_paying * 100.
+ */
 function calculateChurnRate(canceledOrgs: number, previousPaying: number): number {
   if (previousPaying <= 0)
     return 0
   return Number(((canceledOrgs / previousPaying) * 100).toFixed(2))
 }
 
+function calculateArpu(mrr: number, paying: number): number {
+  if (paying <= 0)
+    return 0
+  return mrr / paying
+}
+
+/**
+ * Estimated NRR isolates retained revenue by removing estimated new-logo MRR
+ * from current MRR, then compares that retained revenue to previous MRR.
+ * Returns 100 when previous MRR is unavailable/zero to avoid division errors.
+ */
 function calculateEstimatedNrr(
   currentMrr: number,
   previousMrr: number,
@@ -250,7 +265,7 @@ function calculateEstimatedNrr(
 ): number {
   if (previousMrr <= 0)
     return 100
-  const previousArpu = previousPaying > 0 ? previousMrr / previousPaying : 0
+  const previousArpu = calculateArpu(previousMrr, previousPaying)
   const estimatedNewMrr = newPayingOrgs * previousArpu
   return Number((((currentMrr - estimatedNewMrr) / previousMrr) * 100).toFixed(2))
 }
