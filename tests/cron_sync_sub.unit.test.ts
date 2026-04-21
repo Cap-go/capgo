@@ -1,5 +1,11 @@
 import { HTTPException } from 'hono/http-exception'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const mockedModules = [
+  '../supabase/functions/_backend/utils/hono.ts',
+  '../supabase/functions/_backend/utils/pg.ts',
+  '../supabase/functions/_backend/utils/plans.ts',
+]
 
 describe('cron_sync_sub resilience', () => {
   function setupCommonMocks(syncSubscriptionAndEvents: ReturnType<typeof vi.fn>) {
@@ -24,6 +30,11 @@ describe('cron_sync_sub resilience', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    mockedModules.forEach(path => vi.doUnmock(path))
+    vi.resetModules()
   })
 
   it('retries transient cron_sync_sub failures and succeeds', async () => {
