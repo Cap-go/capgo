@@ -2,6 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareAPISecret, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
+import { retryWithBackoff } from '../utils/retry.ts'
 import { readStatsBandwidth, readStatsMau, readStatsStorage, readStatsVersion } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -17,6 +18,9 @@ interface OrgStatsRefreshTarget {
   customerId: string | null
   previousStatsUpdatedAt: string | null
 }
+
+const PLAN_REFRESH_RETRY_ATTEMPTS = 3
+const PLAN_REFRESH_RETRY_DELAY_MS = 300
 
 async function getOrgStatsRefreshTarget(
   supabase: ReturnType<typeof supabaseAdmin>,
@@ -62,8 +66,47 @@ async function queueOrgPlanRefresh(
     org_id: orgId,
     customer_id: customerId,
   }).throwOnError()
+}
 
-  cloudlog({ requestId: c.get('requestId'), message: 'plan processing queued for org', orgId, customerId })
+async function queueOrgPlanRefreshWithRetry(
+  c: Parameters<typeof supabaseAdmin>[0],
+  supabase: ReturnType<typeof supabaseAdmin>,
+  orgId: string,
+  customerId: string,
+): Promise<void> {
+  const { result, attempts } = await retryWithBackoff(async () => {
+    try {
+      await queueOrgPlanRefresh(c, supabase, orgId, customerId)
+      return { ok: true as const }
+    }
+    catch (error) {
+      return { ok: false as const, error }
+    }
+  }, {
+    attempts: PLAN_REFRESH_RETRY_ATTEMPTS,
+    baseDelayMs: PLAN_REFRESH_RETRY_DELAY_MS,
+    shouldRetry: result => !result.ok,
+  })
+
+  if (!result?.ok) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Failed to queue cron_stat_app org plan refresh',
+      orgId,
+      customerId,
+      attempts,
+      error: result?.error,
+    })
+    return
+  }
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: attempts > 1 ? 'plan processing queued for org after retries' : 'plan processing queued for org',
+    orgId,
+    customerId,
+    attempts,
+  })
 }
 
 app.use('/', useCors)
@@ -207,7 +250,7 @@ app.post('/', middlewareAPISecret, async (c) => {
   }
 
   if (orgStatsRefreshTarget?.customerId) {
-    await queueOrgPlanRefresh(c, supabase, body.orgId, orgStatsRefreshTarget.customerId)
+    await queueOrgPlanRefreshWithRetry(c, supabase, body.orgId, orgStatsRefreshTarget.customerId)
   }
 
   return c.json({ status: 'Stats saved', mau, bandwidth, storage, versionUsage })
