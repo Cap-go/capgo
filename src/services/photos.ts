@@ -40,10 +40,9 @@ export function isPhotoSelectionCancelledError(error: unknown) {
   if (!message)
     return false
 
-  return message.includes('user cancelled photos app')
-    || message.includes('user canceled photos app')
-    || message.includes('cancelled')
-    || message.includes('canceled')
+  return message.includes('user')
+    && /cancel(?:led|ed)/.test(message)
+    && /photos?|images?|camera|picker|selection|picking|app/.test(message)
 }
 
 function base64ToArrayBuffer(base64: string) {

@@ -62,7 +62,7 @@ describe('photo helpers', () => {
   })
 
   it('matches the PostHog photo cancellation errors', async () => {
-    const { isPhotoSelectionCancelledError } = await import('../src/services/photos.ts')
+    const { isPhotoSelectionCancelledError } = await import('~/services/photos.ts')
 
     expect(isPhotoSelectionCancelledError(new Error('User cancelled photos app'))).toBe(true)
     expect(isPhotoSelectionCancelledError({ message: 'User canceled image selection' })).toBe(true)
@@ -74,7 +74,7 @@ describe('photo helpers', () => {
     getPhotoMock.mockRejectedValueOnce(new Error('User cancelled photos app'))
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const isLoading = ref(false)
-    const { takePhoto } = await import('../src/services/photos.ts')
+    const { takePhoto } = await import('~/services/photos.ts')
 
     await expect(takePhoto('update-account', isLoading, 'user', 'went-wrong')).resolves.toBeUndefined()
 
@@ -86,7 +86,7 @@ describe('photo helpers', () => {
     pickImagesMock.mockRejectedValueOnce({ message: 'User canceled photos app' })
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const isLoading = ref(false)
-    const { pickPhoto } = await import('../src/services/photos.ts')
+    const { pickPhoto } = await import('~/services/photos.ts')
 
     await expect(pickPhoto('update-org', isLoading, 'org', 'went-wrong')).resolves.toBeUndefined()
 
@@ -94,11 +94,23 @@ describe('photo helpers', () => {
     expect(consoleErrorSpy).not.toHaveBeenCalled()
   })
 
+  it('still logs unexpected camera capture errors', async () => {
+    getPhotoMock.mockRejectedValueOnce(new Error('Camera permission denied'))
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const isLoading = ref(false)
+    const { takePhoto } = await import('~/services/photos.ts')
+
+    await expect(takePhoto('update-org', isLoading, 'org', 'went-wrong')).resolves.toBeUndefined()
+
+    expect(isLoading.value).toBe(false)
+    expect(consoleErrorSpy).toHaveBeenCalledOnce()
+  })
+
   it('still logs unexpected image picker errors', async () => {
     pickImagesMock.mockRejectedValueOnce(new Error('Camera permission denied'))
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const isLoading = ref(false)
-    const { pickPhoto } = await import('../src/services/photos.ts')
+    const { pickPhoto } = await import('~/services/photos.ts')
 
     await expect(pickPhoto('update-org', isLoading, 'org', 'went-wrong')).resolves.toBeUndefined()
 
