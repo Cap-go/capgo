@@ -217,10 +217,36 @@ export interface AppUsageGlobalByApp {
   byApp: AppUsageByApp[]
 }
 
+function parseDashboardRangeDate(value?: string) {
+  if (!value)
+    return null
+
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+export function normalizeDashboardDateRange(startDate?: string, endDate?: string, now: Date = new Date()) {
+  const fallbackEnd = new Date(now)
+  fallbackEnd.setHours(0, 0, 0, 0)
+  fallbackEnd.setDate(fallbackEnd.getDate() + 1)
+
+  const fallbackStart = new Date(fallbackEnd)
+  fallbackStart.setDate(fallbackStart.getDate() - 30)
+
+  const resolvedStart = parseDashboardRangeDate(startDate) ?? fallbackStart
+  const resolvedEnd = parseDashboardRangeDate(endDate) ?? fallbackEnd
+
+  return {
+    start: resolvedStart.toISOString(),
+    end: resolvedEnd.toISOString(),
+  }
+}
+
 export async function getAllDashboard(orgId: string, startDate?: string, endDate?: string): Promise<AppUsageGlobalByApp> {
   try {
     const supabase = useSupabase()
-    const dateRange = `?from=${new Date(startDate!).toISOString()}&to=${new Date(endDate!).toISOString()}&breakdown=true&noAccumulate=true`
+    const { start, end } = normalizeDashboardDateRange(startDate, endDate)
+    const dateRange = `?from=${start}&to=${end}&breakdown=true&noAccumulate=true`
 
     // 🚀 SUPER OPTIMIZED: Single API call returns both aggregated AND per-app breakdown (with daily values, not accumulated)
     const response = await supabase.functions.invoke(`statistics/org/${orgId}/${dateRange}`, {
