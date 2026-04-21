@@ -28,8 +28,14 @@ function getCanvasContext(ctx: unknown): CanvasRenderingContext2D | null {
   return null
 }
 
+function hasConnectedCanvas(chart: Pick<Chart, 'canvas' | 'ctx'>): boolean {
+  const ctx = getCanvasContext(chart.ctx)
+  const canvas = chart.canvas ?? ctx?.canvas
+  return canvas?.isConnected !== false
+}
+
 function canSafelyUpdateChart(chart: Chart): boolean {
-  return !!getCanvasContext(chart.ctx) && !!chart.canvas?.isConnected
+  return !!getCanvasContext(chart.ctx) && hasConnectedCanvas(chart)
 }
 
 function clearTooltipSelection(chart: Chart) {
@@ -507,6 +513,9 @@ function isDarkMode() {
 export const verticalLinePlugin = {
   id: 'verticalLine',
   afterDatasetsDraw(chart: Chart) {
+    if (!hasConnectedCanvas(chart))
+      return
+
     const active = chart.tooltip?.getActiveElements()
     if (chart.tooltip && active && active.length > 0) {
       const activePoint = active[0]
@@ -599,6 +608,9 @@ export const todayLinePlugin = {
   afterDatasetsDraw(chart: Chart, _args: unknown, pluginOptions?: TodayLinePluginOptions) {
     const options = pluginOptions ?? {}
     if (!options.enabled)
+      return
+
+    if (!hasConnectedCanvas(chart))
       return
 
     const xScale = resolveScale(chart, 'x')

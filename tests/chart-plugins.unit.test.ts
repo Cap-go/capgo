@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import { inlineAnnotationPlugin } from '../src/services/chartAnnotations'
 import { todayLinePlugin, verticalLinePlugin } from '../src/services/chartTooltip'
@@ -43,6 +43,65 @@ describe('chart plugins', () => {
       xIndex: 2,
       label: 'Today',
     })).not.toThrow()
+  })
+
+  it('skips drawing the vertical hover line when the canvas is disconnected', () => {
+    const ctx = {
+      save: vi.fn(),
+    }
+
+    expect(() => verticalLinePlugin.afterDatasetsDraw({
+      ctx,
+      canvas: {
+        isConnected: false,
+      },
+      tooltip: {
+        getActiveElements: () => [{ element: { x: 12 } }],
+      },
+      scales: {
+        y: {
+          top: 10,
+          bottom: 90,
+        },
+      },
+      options: {
+        plugins: {},
+      },
+    } as any)).not.toThrow()
+
+    expect(ctx.save).not.toHaveBeenCalled()
+  })
+
+  it('skips drawing the today line when the canvas is disconnected', () => {
+    const ctx = {
+      save: vi.fn(),
+    }
+
+    expect(() => todayLinePlugin.afterDatasetsDraw({
+      ctx,
+      canvas: {
+        isConnected: false,
+      },
+      chartArea: {
+        top: 10,
+        bottom: 90,
+      },
+      scales: {
+        x: {
+          getPixelForValue: () => 24,
+        },
+        y: {
+          top: 10,
+          bottom: 90,
+        },
+      },
+    } as any, undefined, {
+      enabled: true,
+      xIndex: 2,
+      label: 'Today',
+    })).not.toThrow()
+
+    expect(ctx.save).not.toHaveBeenCalled()
   })
 
   it('skips inline annotations when the chart context is gone', () => {
