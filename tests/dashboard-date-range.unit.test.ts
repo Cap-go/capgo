@@ -35,19 +35,10 @@ describe('dashboard date range normalization', () => {
     expect(normalizeDashboardDateRange(undefined, undefined, now)).toEqual(createFallbackWindow(now))
   })
 
-  it.concurrent('falls back only the invalid side of the range', () => {
+  it.concurrent('falls back to the default window when either bound is invalid', () => {
     const now = new Date('2026-04-21T15:45:00.000Z')
-    const fallback = createFallbackWindow(now)
-
-    expect(normalizeDashboardDateRange('not-a-date', '2026-04-30T00:00:00.000Z', now)).toEqual({
-      start: fallback.start,
-      end: '2026-04-30T00:00:00.000Z',
-    })
-
-    expect(normalizeDashboardDateRange('2026-04-01T00:00:00.000Z', 'still-not-a-date', now)).toEqual({
-      start: '2026-04-01T00:00:00.000Z',
-      end: fallback.end,
-    })
+    expect(normalizeDashboardDateRange('not-a-date', '2026-04-30T00:00:00.000Z', now)).toEqual(createFallbackWindow(now))
+    expect(normalizeDashboardDateRange('2026-04-01T00:00:00.000Z', 'still-not-a-date', now)).toEqual(createFallbackWindow(now))
   })
 
   it.concurrent('falls back to the default window when the resolved range is inverted', () => {
