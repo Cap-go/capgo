@@ -34,18 +34,19 @@ function createSingleBuilder<T>(result: T) {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     single: vi.fn().mockResolvedValue(result),
+    maybeSingle: vi.fn().mockResolvedValue(result),
   }
 }
 
 function createWriteBuilder(error?: Error | null) {
-  return {
+  const builder = {
+    data: null,
+    error: error ?? null,
     upsert: vi.fn().mockReturnThis(),
     update: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
-    throwOnError: error
-      ? vi.fn().mockRejectedValue(error)
-      : vi.fn().mockResolvedValue({ data: null, error: null }),
   }
+  return builder
 }
 
 function createRpcSingleBuilder<T>(result: T) {
@@ -54,11 +55,10 @@ function createRpcSingleBuilder<T>(result: T) {
   }
 }
 
-function createRpcThrowBuilder(error?: Error | null) {
+function createRpcResultBuilder(error?: Error | null) {
   return {
-    throwOnError: error
-      ? vi.fn().mockRejectedValue(error)
-      : vi.fn().mockResolvedValue({ data: null, error: null }),
+    data: null,
+    error: error ?? null,
   }
 }
 
@@ -94,7 +94,7 @@ function createSupabaseStub(options?: {
     },
     error: null,
   })
-  const queueBuilder = createRpcThrowBuilder(options?.queueError)
+  const queueBuilder = createRpcResultBuilder(options?.queueError)
 
   const orgBuilders = [orgSelectBuilder, orgUpdateBuilder]
 
@@ -194,7 +194,7 @@ describe('cron_stat_app follow-up failures', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        apisecret: 'testsecret',
+        'apisecret': 'testsecret',
       },
       body: JSON.stringify({
         appId: 'com.test.app',
@@ -205,12 +205,15 @@ describe('cron_stat_app follow-up failures', () => {
     } as any)
 
     expect(response.status).toBe(500)
-    expect(builders.dailyMauBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.dailyBandwidthBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.dailyStorageBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.dailyVersionBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.orgUpdateBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.queueBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.dailyMauBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.dailyBandwidthBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.dailyStorageBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.dailyVersionBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.orgUpdateBuilder.update).toHaveBeenCalledTimes(1)
+    expect(client.rpc).toHaveBeenCalledWith('queue_cron_stat_org_for_org', {
+      org_id: 'org-test',
+      customer_id: 'cus_test',
+    })
 
     const payload = await response.json() as { error: string }
     expect(payload.error).toBe('unknown_error')
@@ -226,7 +229,7 @@ describe('cron_stat_app follow-up failures', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        apisecret: 'testsecret',
+        'apisecret': 'testsecret',
       },
       body: JSON.stringify({
         appId: 'com.test.app',
@@ -237,12 +240,15 @@ describe('cron_stat_app follow-up failures', () => {
     } as any)
 
     expect(response.status).toBe(200)
-    expect(builders.dailyMauBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.dailyBandwidthBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.dailyStorageBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.dailyVersionBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.orgUpdateBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.queueBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.dailyMauBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.dailyBandwidthBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.dailyStorageBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.dailyVersionBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.orgUpdateBuilder.update).toHaveBeenCalledTimes(1)
+    expect(client.rpc).toHaveBeenCalledWith('queue_cron_stat_org_for_org', {
+      org_id: 'org-test',
+      customer_id: 'cus_test',
+    })
 
     const payload = await response.json() as { status: string }
     expect(payload.status).toBe('Stats saved')
@@ -258,7 +264,7 @@ describe('cron_stat_app follow-up failures', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        apisecret: 'testsecret',
+        'apisecret': 'testsecret',
       },
       body: JSON.stringify({
         appId: 'com.test.app',
@@ -269,12 +275,12 @@ describe('cron_stat_app follow-up failures', () => {
     } as any)
 
     expect(response.status).toBe(200)
-    expect(builders.dailyMauBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.dailyBandwidthBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.dailyStorageBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.dailyVersionBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.orgUpdateBuilder.throwOnError).not.toHaveBeenCalled()
-    expect(builders.queueBuilder.throwOnError).not.toHaveBeenCalled()
+    expect(builders.dailyMauBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.dailyBandwidthBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.dailyStorageBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.dailyVersionBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.orgUpdateBuilder.update).not.toHaveBeenCalled()
+    expect(client.rpc).not.toHaveBeenCalledWith('queue_cron_stat_org_for_org', expect.anything())
 
     const payload = await response.json() as { status: string }
     expect(payload.status).toBe('Stats saved')
