@@ -48,7 +48,7 @@ function getRetryablePostgrestStatus(error: unknown): number | null {
     }
 
     if ('message' in error && typeof (error as { message?: unknown }).message === 'string') {
-      const match = (error as { message: string }).message.match(/error code:\s*(\d{3})/i)
+      const match = /error code:\s*(\d{3})/i.exec((error as { message: string }).message)
       if (match) {
         return Number.parseInt(match[1], 10)
       }

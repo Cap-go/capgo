@@ -43,7 +43,7 @@ describe('[POST] /triggers/cron_stat_app - Error Cases', () => {
     expect(data.error).toBe('no_orgId')
   })
 
-  it('should skip stale jobs when the app no longer exists', async () => {
+  it.concurrent('should skip stale jobs when the app no longer exists', async () => {
     const response = await fetch(`${BASE_URL}/triggers/cron_stat_app`, {
       method: 'POST',
       headers: triggerHeaders,
