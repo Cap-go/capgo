@@ -136,6 +136,10 @@ function createSupabaseStub(options?: {
   return {
     client,
     builders: {
+      dailyMauBuilder,
+      dailyBandwidthBuilder,
+      dailyStorageBuilder,
+      dailyVersionBuilder,
       orgUpdateBuilder,
       queueBuilder,
     },
@@ -200,6 +204,10 @@ describe('cron_stat_app follow-up failures', () => {
     } as any)
 
     expect(response.status).toBe(500)
+    expect(builders.dailyMauBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.dailyBandwidthBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.dailyStorageBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.dailyVersionBuilder.throwOnError).toHaveBeenCalledTimes(1)
     expect(builders.orgUpdateBuilder.throwOnError).toHaveBeenCalledTimes(1)
     expect(builders.queueBuilder.throwOnError).toHaveBeenCalledTimes(1)
 
@@ -228,6 +236,10 @@ describe('cron_stat_app follow-up failures', () => {
     } as any)
 
     expect(response.status).toBe(200)
+    expect(builders.dailyMauBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.dailyBandwidthBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.dailyStorageBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.dailyVersionBuilder.throwOnError).toHaveBeenCalledTimes(1)
     expect(builders.orgUpdateBuilder.throwOnError).toHaveBeenCalledTimes(1)
     expect(builders.queueBuilder.throwOnError).toHaveBeenCalledTimes(1)
 
