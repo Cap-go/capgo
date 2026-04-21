@@ -97,6 +97,16 @@ function isRetryableStatsError(error: unknown) {
   return status !== null && status >= 500 && status < 600
 }
 
+function getMissingAppStatsError(errors: unknown[]) {
+  return errors.find((error) => {
+    if (!error || typeof error !== 'object')
+      return false
+
+    const appError = error as { error?: unknown, status?: unknown }
+    return appError.error === 'app_not_found' || appError.status === 404
+  })
+}
+
 async function executeStatsQueryWithRetry<T>(
   c: Context,
   label: string,
@@ -175,6 +185,7 @@ async function getStatsAppOwnerOrgOrThrow(
 
 export const statisticsTestUtils = {
   executeStatsQueryWithRetry,
+  getMissingAppStatsError,
   getRetryableStatus,
   isRetryableStatsError,
   getStatsAppOwnerOrgOrThrow,
@@ -814,6 +825,10 @@ app.get('/user', async (c) => {
 
   const errors = stats.filter(stat => stat.error).map(stat => stat.error)
   if (errors.length > 0) {
+    const missingAppError = getMissingAppStatsError(errors)
+    if (missingAppError)
+      throw quickError(404, 'app_not_found', 'App not found', { error: missingAppError })
+
     throw quickError(500, 'cannot_get_user_statistics', 'Cannot get user statistics', { error: errors })
   }
 

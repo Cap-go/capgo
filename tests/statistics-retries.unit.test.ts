@@ -41,4 +41,13 @@ describe('statistics retry helpers', () => {
 
     expect(result).toEqual({ ownerOrg: null, error: null, notFound: true })
   })
+
+  it('detects missing-app errors in aggregated statistics results', () => {
+    const result = statisticsTestUtils.getMissingAppStatsError([
+      { error: 'cannot_get_user_statistics', status: 500 },
+      { error: 'app_not_found', status: 404 },
+    ])
+
+    expect(result).toEqual({ error: 'app_not_found', status: 404 })
+  })
 })
