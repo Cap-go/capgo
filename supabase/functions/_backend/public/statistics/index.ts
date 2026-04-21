@@ -153,10 +153,31 @@ async function resolveAppOwnerOrg(
   return { ownerOrg: data.owner_org ?? null, error: null, notFound: false }
 }
 
+async function getStatsAppOwnerOrgOrThrow(
+  c: Context,
+  auth: AuthInfo,
+  appId: string,
+  supabase: ReturnType<typeof supabaseClient>,
+) {
+  const { ownerOrg, error, notFound } = await resolveAppOwnerOrg(c, appId, supabase)
+
+  if (error)
+    throw quickError(500, 'cannot_get_app_statistics', 'Cannot get app statistics', { error })
+
+  if (notFound)
+    throw quickError(404, 'app_not_found', 'App not found', { app_id: appId })
+
+  if (ownerOrg && auth.authType !== 'jwt')
+    await checkOrganizationAccess(c, ownerOrg, supabase)
+
+  return ownerOrg
+}
+
 export const statisticsTestUtils = {
   executeStatsQueryWithRetry,
   getRetryableStatus,
   isRetryableStatsError,
+  getStatsAppOwnerOrgOrThrow,
   resolveAppOwnerOrg,
 }
 
@@ -667,18 +688,7 @@ app.get('/app/:app_id', async (c) => {
   // Use authenticated client - RLS will enforce access
   const supabase = getAuthenticatedSupabase(c, auth)
 
-  // Get the organization ID for this app and check organization access
-  const { ownerOrg, error: ownerOrgError, notFound } = await resolveAppOwnerOrg(c, appId, supabase)
-
-  if (ownerOrgError)
-    throw quickError(500, 'cannot_get_app_statistics', 'Cannot get app statistics', { error: ownerOrgError })
-
-  if (notFound)
-    throw quickError(404, 'app_not_found', 'App not found', { app_id: appId })
-
-  if (ownerOrg && auth.authType !== 'jwt') {
-    await checkOrganizationAccess(c, ownerOrg, supabase)
-  }
+  const ownerOrg = await getStatsAppOwnerOrgOrThrow(c, auth, appId, supabase)
 
   const { data: finalStats, error: statsError } = await getNormalStats(c, appId, ownerOrg, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt', false, body.noAccumulate ?? false)
 
@@ -750,18 +760,7 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
   // Use authenticated client - RLS will enforce access
   const supabase = getAuthenticatedSupabase(c, auth)
 
-  // Get the organization ID for this app and check organization access
-  const { ownerOrg, error: ownerOrgError, notFound } = await resolveAppOwnerOrg(c, appId, supabase)
-
-  if (ownerOrgError)
-    throw quickError(500, 'cannot_get_app_statistics', 'Cannot get app statistics', { error: ownerOrgError })
-
-  if (notFound)
-    throw quickError(404, 'app_not_found', 'App not found', { app_id: appId })
-
-  if (ownerOrg && auth.authType !== 'jwt') {
-    await checkOrganizationAccess(c, ownerOrg, supabase)
-  }
+  await getStatsAppOwnerOrgOrThrow(c, auth, appId, supabase)
 
   const { data, error } = await getBundleUsage(appId, body.from, body.to, useDashboard, supabase)
 
