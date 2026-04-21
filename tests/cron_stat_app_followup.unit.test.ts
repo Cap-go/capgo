@@ -64,6 +64,7 @@ function createRpcThrowBuilder(error?: Error | null) {
 
 function createSupabaseStub(options?: {
   customerId?: string | null
+  orgSelectError?: Error | null
   orgUpdateError?: Error | null
   queueError?: Error | null
 }) {
@@ -79,7 +80,7 @@ function createSupabaseStub(options?: {
       customer_id: options?.customerId ?? 'cus_test',
       stats_updated_at: '2026-04-20T10:00:00.000Z',
     },
-    error: null,
+    error: options?.orgSelectError ?? null,
   })
   const orgUpdateBuilder = createWriteBuilder(options?.orgUpdateError)
   const dailyMauBuilder = createWriteBuilder()
@@ -242,6 +243,38 @@ describe('cron_stat_app follow-up failures', () => {
     expect(builders.dailyVersionBuilder.throwOnError).toHaveBeenCalledTimes(1)
     expect(builders.orgUpdateBuilder.throwOnError).toHaveBeenCalledTimes(1)
     expect(builders.queueBuilder.throwOnError).toHaveBeenCalledTimes(1)
+
+    const payload = await response.json() as { status: string }
+    expect(payload.status).toBe('Stats saved')
+  })
+
+  it('returns success when org refresh target lookup fails after stats writes', async () => {
+    const { client, builders } = createSupabaseStub({
+      orgSelectError: new Error('error code: 502'),
+    })
+    supabaseAdminMock.mockReturnValue(client)
+
+    const response = await createApp().fetch(new Request('http://localhost/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apisecret: 'testsecret',
+      },
+      body: JSON.stringify({
+        appId: 'com.test.app',
+        orgId: 'org-test',
+      }),
+    }), {}, {
+      waitUntil: () => { },
+    } as any)
+
+    expect(response.status).toBe(200)
+    expect(builders.dailyMauBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.dailyBandwidthBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.dailyStorageBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.dailyVersionBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.orgUpdateBuilder.throwOnError).not.toHaveBeenCalled()
+    expect(builders.queueBuilder.throwOnError).not.toHaveBeenCalled()
 
     const payload = await response.json() as { status: string }
     expect(payload.status).toBe('Stats saved')

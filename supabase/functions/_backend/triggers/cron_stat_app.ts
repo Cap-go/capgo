@@ -189,17 +189,25 @@ app.post('/', middlewareAPISecret, async (c) => {
   ])
 
   cloudlog({ requestId: c.get('requestId'), message: 'stats saved', mauLength: mau.length, bandwidthLength: bandwidth.length, storageLength: storage.length, versionUsageLength: versionUsage.length })
-  const { customerId, previousStatsUpdatedAt } = await getOrgStatsRefreshTarget(supabase, body.orgId)
-
+  let orgStatsRefreshTarget: OrgStatsRefreshTarget | null = null
   try {
-    await syncOrgStatsRefresh(supabase, body.orgId, previousStatsUpdatedAt)
+    orgStatsRefreshTarget = await getOrgStatsRefreshTarget(supabase, body.orgId)
   }
   catch (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to persist cron_stat_app org refresh metadata', orgId: body.orgId, error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to load cron_stat_app org refresh target', orgId: body.orgId, error })
   }
 
-  if (customerId) {
-    await queueOrgPlanRefresh(c, supabase, body.orgId, customerId)
+  if (orgStatsRefreshTarget) {
+    try {
+      await syncOrgStatsRefresh(supabase, body.orgId, orgStatsRefreshTarget.previousStatsUpdatedAt)
+    }
+    catch (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to persist cron_stat_app org refresh metadata', orgId: body.orgId, error })
+    }
+  }
+
+  if (orgStatsRefreshTarget?.customerId) {
+    await queueOrgPlanRefresh(c, supabase, body.orgId, orgStatsRefreshTarget.customerId)
   }
 
   return c.json({ status: 'Stats saved', mau, bandwidth, storage, versionUsage })
