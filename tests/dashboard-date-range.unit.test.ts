@@ -49,4 +49,10 @@ describe('dashboard date range normalization', () => {
       end: fallback.end,
     })
   })
+
+  it.concurrent('falls back to the default window when the resolved range is inverted', () => {
+    const now = new Date('2026-04-21T15:45:00.000Z')
+
+    expect(normalizeDashboardDateRange('2026-05-01T00:00:00.000Z', '2026-04-01T00:00:00.000Z', now)).toEqual(createFallbackWindow(now))
+  })
 })

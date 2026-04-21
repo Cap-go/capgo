@@ -236,6 +236,13 @@ export function normalizeDashboardDateRange(startDate?: string, endDate?: string
   const resolvedStart = parseDashboardRangeDate(startDate) ?? fallbackStart
   const resolvedEnd = parseDashboardRangeDate(endDate) ?? fallbackEnd
 
+  if (resolvedStart.getTime() > resolvedEnd.getTime()) {
+    return {
+      start: fallbackStart.toISOString(),
+      end: fallbackEnd.toISOString(),
+    }
+  }
+
   return {
     start: resolvedStart.toISOString(),
     end: resolvedEnd.toISOString(),
