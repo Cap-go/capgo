@@ -45,7 +45,7 @@ describe('chart plugins', () => {
     })).not.toThrow()
   })
 
-  it('skips drawing the vertical hover line when the canvas is disconnected', () => {
+  it.concurrent('skips drawing the vertical hover line when the canvas is disconnected', () => {
     const ctx = {
       save: vi.fn(),
     }
@@ -72,7 +72,7 @@ describe('chart plugins', () => {
     expect(ctx.save).not.toHaveBeenCalled()
   })
 
-  it('skips drawing the today line when the canvas is disconnected', () => {
+  it.concurrent('skips drawing the today line when the canvas is disconnected', () => {
     const ctx = {
       save: vi.fn(),
     }
