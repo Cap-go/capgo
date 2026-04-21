@@ -55,6 +55,7 @@ interface AppMetricRow {
 interface QueryResult<T> {
   data: T | null
   error: unknown
+  status?: number | null
 }
 
 interface AppOwnerOrgRow {
@@ -102,9 +103,17 @@ function getMissingAppStatsError(errors: unknown[]) {
     if (!error || typeof error !== 'object')
       return false
 
-    const appError = error as { error?: unknown, status?: unknown }
-    return appError.error === 'app_not_found' || appError.status === 404
+    const appError = error as { app_id?: unknown, error?: unknown, status?: unknown }
+    return appError.error === 'app_not_found'
+      || (appError.status === 404 && typeof appError.app_id === 'string')
   })
+}
+
+function isRetryableStatsResult(result: QueryResult<unknown>) {
+  if (typeof result.status === 'number')
+    return result.status >= 500 && result.status < 600
+
+  return Boolean(result.error) && isRetryableStatsError(result.error)
 }
 
 async function executeStatsQueryWithRetry<T>(
@@ -122,7 +131,7 @@ async function executeStatsQueryWithRetry<T>(
   }, {
     attempts: STATS_QUERY_RETRY_ATTEMPTS,
     baseDelayMs: STATS_QUERY_RETRY_DELAY_MS,
-    shouldRetry: current => Boolean(current.error) && isRetryableStatsError(current.error),
+    shouldRetry: current => isRetryableStatsResult(current),
   })
 
   const finalResult = result ?? { data: null, error: lastError }

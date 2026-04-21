@@ -8,21 +8,21 @@ const fakeContext = {
 describe('statistics retry helpers', () => {
   it('retries transient statistics query failures and returns the recovered result', async () => {
     const query = vi.fn()
-      .mockResolvedValueOnce({ data: null, error: { status: 502, message: 'error code: 502' } })
-      .mockResolvedValueOnce({ data: [{ app_id: 'com.demo.app' }], error: null })
+      .mockResolvedValueOnce({ data: null, error: { message: 'error code: 502' }, status: 502 })
+      .mockResolvedValueOnce({ data: [{ app_id: 'com.demo.app' }], error: null, status: 200 })
 
     const result = await statisticsTestUtils.executeStatsQueryWithRetry(fakeContext, 'test_metrics', query)
 
-    expect(result).toEqual({ data: [{ app_id: 'com.demo.app' }], error: null })
+    expect(result).toEqual({ data: [{ app_id: 'com.demo.app' }], error: null, status: 200 })
     expect(query).toHaveBeenCalledTimes(2)
   })
 
   it('does not retry non-retryable statistics query failures', async () => {
-    const query = vi.fn().mockResolvedValue({ data: null, error: { status: 400, message: 'bad request' } })
+    const query = vi.fn().mockResolvedValue({ data: null, error: { message: 'bad request' }, status: 400 })
 
     const result = await statisticsTestUtils.executeStatsQueryWithRetry(fakeContext, 'test_metrics', query)
 
-    expect(result).toEqual({ data: null, error: { status: 400, message: 'bad request' } })
+    expect(result).toEqual({ data: null, error: { message: 'bad request' }, status: 400 })
     expect(query).toHaveBeenCalledTimes(1)
   })
 
@@ -49,5 +49,13 @@ describe('statistics retry helpers', () => {
     ])
 
     expect(result).toEqual({ error: 'app_not_found', status: 404 })
+  })
+
+  it('ignores unrelated 404 errors when looking for missing apps', () => {
+    const result = statisticsTestUtils.getMissingAppStatsError([
+      { error: 'rpc_not_found', status: 404 },
+    ])
+
+    expect(result).toBeUndefined()
   })
 })
