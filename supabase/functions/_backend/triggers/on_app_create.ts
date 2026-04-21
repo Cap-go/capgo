@@ -136,6 +136,7 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'INSERT'), async (c)
     icon: isDemo ? '🎮' : isPendingOnboarding ? '🧭' : '🎉',
     sentToBento: Boolean(appCreatedBentoEvent),
     user_id: ownerOrg,
+    groups: { organization: ownerOrg },
     tags: {
       app_id: record.app_id,
       is_demo: isDemo ? 'true' : 'false',

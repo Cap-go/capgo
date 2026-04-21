@@ -79,6 +79,7 @@ app.post('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     event: 'Upload via single file',
     icon: '🏛️',
     user_id: app.owner_org,
+    groups: { organization: app.owner_org },
     notify: false,
   })
 

@@ -6,8 +6,11 @@ import { existInEnv, getEnv } from './utils.ts'
 const POSTHOG_CAPTURE_URL = 'https://eu.i.posthog.com/capture/'
 const POSTHOG_EXCEPTION_URL = 'https://eu.i.posthog.com/i/v0/e/'
 
+export type PostHogGroups = Record<string, string>
+
 interface PostHogCapturePayload extends Pick<TrackOptions, 'event'>, Pick<TrackOptions, 'channel' | 'description'> {
   distinct_id?: string
+  groups?: PostHogGroups
   ip?: string
   setPersonProperties?: boolean
   tags?: Record<string, any>
@@ -28,11 +31,14 @@ export async function trackPosthogEvent(c: Context, payload: PostHogCapturePaylo
 
   const distinctId = payload.user_id || payload.distinct_id || 'anonymous'
 
+  const hasGroups = payload.groups && Object.keys(payload.groups).length > 0
+
   const properties = {
     ...(payload.tags || {}),
     channel: payload.channel,
     description: payload.description,
     ...(payload.setPersonProperties === false ? {} : { $set: payload.tags }),
+    ...(hasGroups ? { $groups: payload.groups } : {}),
   }
 
   const body = {
@@ -225,6 +231,76 @@ export async function capturePosthogException(c: Context, payload: {
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'PostHog exception fetch failed', error: serializeError(e), event: '$exception', distinctId })
+    return false
+  }
+}
+
+export interface PostHogGroupIdentifyPayload {
+  groupType: string
+  groupKey: string
+  properties?: Record<string, unknown>
+}
+
+export async function groupIdentifyPosthog(c: Context, payload: PostHogGroupIdentifyPayload) {
+  const apiKey = getEnv(c, 'POSTHOG_API_KEY')
+  if (!apiKey || !existInEnv(c, 'POSTHOG_API_KEY')) {
+    cloudlog({ requestId: c.get('requestId'), message: 'PostHog not configured' })
+    return false
+  }
+
+  const host = getEnv(c, 'POSTHOG_API_HOST') || POSTHOG_CAPTURE_URL
+  const posthogUrl = host.endsWith('/capture/')
+    ? host
+    : new URL('capture/', host.endsWith('/') ? host : `${host}/`).toString()
+
+  const body = {
+    api_key: apiKey,
+    event: '$groupidentify',
+    distinct_id: `$${payload.groupType}_${payload.groupKey}`,
+    properties: {
+      $group_type: payload.groupType,
+      $group_key: payload.groupKey,
+      $group_set: payload.properties ?? {},
+    },
+    timestamp: new Date().toISOString(),
+  }
+
+  try {
+    const res = await fetch(posthogUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+
+    if (!res.ok) {
+      const error = await res.text()
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'PostHog $groupidentify error',
+        status: res.status,
+        error,
+        groupType: payload.groupType,
+        groupKey: payload.groupKey,
+      })
+      return false
+    }
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'PostHog $groupidentify sent',
+      groupType: payload.groupType,
+      groupKey: payload.groupKey,
+    })
+    return true
+  }
+  catch (e) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'PostHog $groupidentify fetch failed',
+      error: serializeError(e),
+      groupType: payload.groupType,
+      groupKey: payload.groupKey,
+    })
     return false
   }
 }

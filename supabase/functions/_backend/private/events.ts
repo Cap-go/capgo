@@ -146,6 +146,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     ...trackedBody,
     bento: onboardingBentoEvent,
     sentToBento: Boolean(onboardingBentoEvent),
+    groups: trackingUserId ? { organization: trackingUserId } : undefined,
   })
 
   return c.json(BRES)
