@@ -221,8 +221,24 @@ function parseDashboardRangeDate(value?: string) {
   if (!value)
     return null
 
+  const dateParts = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T)/)
+  if (!dateParts)
+    return null
+
+  const [year, month, day] = dateParts.slice(1).map(Number)
   const parsed = new Date(value)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
+  if (Number.isNaN(parsed.getTime()))
+    return null
+
+  if (
+    parsed.getUTCFullYear() !== year
+    || parsed.getUTCMonth() + 1 !== month
+    || parsed.getUTCDate() !== day
+  ) {
+    return null
+  }
+
+  return parsed
 }
 
 export function normalizeDashboardDateRange(startDate?: string, endDate?: string, now: Date = new Date()) {

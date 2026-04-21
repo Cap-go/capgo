@@ -11,6 +11,7 @@ import {
   findBestPlan,
   getAllDashboard,
   getTotalStorage,
+  normalizeDashboardDateRange,
   unspoofUser,
 } from './../services/supabase'
 
@@ -101,11 +102,12 @@ export const useMainStore = defineStore('main', () => {
 
   const updateDashboard = async (currentOrgId: string, rangeStart?: string, rangeEnd?: string) => {
     try {
-      const dashboardRes = await getAllDashboard(currentOrgId, rangeStart, rangeEnd)
+      const { start, end } = normalizeDashboardDateRange(rangeStart, rangeEnd)
+      const dashboardRes = await getAllDashboard(currentOrgId, start, end)
       dashboard.value = dashboardRes.global
       dashboardByapp.value = dashboardRes.byApp
 
-      const monthDay = calculateMonthDay(rangeStart)
+      const monthDay = calculateMonthDay(start)
 
       totalDevices.value = dashboard.value[monthDay]?.mau ?? 0
       totalDownload.value = dashboard.value[monthDay]?.get ?? 0
