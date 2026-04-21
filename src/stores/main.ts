@@ -5,15 +5,16 @@ import { acceptHMRUpdate, defineStore } from 'pinia'
 import { ref } from 'vue'
 import { getDaysBetweenDates } from '~/services/conversion'
 import { reset } from '~/services/posthog'
-import { getLocalConfig, useSupabase } from '~/services/supabase'
-import { createDeferredPromise } from '../utils/promise'
 import {
   findBestPlan,
   getAllDashboard,
+  getLocalConfig,
   getTotalStorage,
   normalizeDashboardDateRange,
   unspoofUser,
-} from './../services/supabase'
+  useSupabase,
+} from '~/services/supabase'
+import { createDeferredPromise } from '../utils/promise'
 
 interface TotalStats {
   mau: number

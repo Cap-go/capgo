@@ -10,7 +10,7 @@ vi.mock('../src/services/posthog.ts', () => ({
   reset: vi.fn(),
 }))
 
-vi.mock('../src/services/supabase.ts', () => ({
+vi.mock('~/services/supabase', () => ({
   findBestPlan: mockFindBestPlan,
   getAllDashboard: mockGetAllDashboard,
   getLocalConfig: () => ({ supaHost: 'https://supabase.capgo.test' }),
