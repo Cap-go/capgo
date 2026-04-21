@@ -1,0 +1,44 @@
+import { describe, expect, it, vi } from 'vitest'
+import { statisticsTestUtils } from '../supabase/functions/_backend/public/statistics/index.ts'
+
+const fakeContext = {
+  get: vi.fn(() => undefined),
+} as any
+
+describe('statistics retry helpers', () => {
+  it('retries transient statistics query failures and returns the recovered result', async () => {
+    const query = vi.fn()
+      .mockResolvedValueOnce({ data: null, error: { status: 502, message: 'error code: 502' } })
+      .mockResolvedValueOnce({ data: [{ app_id: 'com.demo.app' }], error: null })
+
+    const result = await statisticsTestUtils.executeStatsQueryWithRetry(fakeContext, 'test_metrics', query)
+
+    expect(result).toEqual({ data: [{ app_id: 'com.demo.app' }], error: null })
+    expect(query).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not retry non-retryable statistics query failures', async () => {
+    const query = vi.fn().mockResolvedValue({ data: null, error: { status: 400, message: 'bad request' } })
+
+    const result = await statisticsTestUtils.executeStatsQueryWithRetry(fakeContext, 'test_metrics', query)
+
+    expect(result).toEqual({ data: null, error: { status: 400, message: 'bad request' } })
+    expect(query).toHaveBeenCalledTimes(1)
+  })
+
+  it('marks missing apps as not found when the lookup returns no rows', async () => {
+    const supabase = {
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+          })),
+        })),
+      })),
+    } as any
+
+    const result = await statisticsTestUtils.resolveAppOwnerOrg(fakeContext, 'com.demo.missing', supabase)
+
+    expect(result).toEqual({ ownerOrg: null, error: null, notFound: true })
+  })
+})
