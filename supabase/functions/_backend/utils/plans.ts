@@ -320,6 +320,7 @@ async function userAbovePlan(c: Context, org: {
       event: `User need upgrade to ${bestPlanKey}`,
       icon: '⚠️',
       user_id: orgId,
+      groups: { organization: orgId },
       notify: false,
     }).catch()
   }
@@ -344,6 +345,7 @@ async function userIsAtPlanUsage(c: Context, orgId: string, customerId: string |
         event: 'User is at 90% of plan usage',
         icon: '⚠️',
         user_id: orgId,
+        groups: { organization: orgId },
         notify: false,
       }).catch()
     }
@@ -357,6 +359,7 @@ async function userIsAtPlanUsage(c: Context, orgId: string, customerId: string |
         event: 'User is at 70% of plan usage',
         icon: '⚠️',
         user_id: orgId,
+        groups: { organization: orgId },
         notify: false,
       }).catch()
     }
@@ -369,6 +372,7 @@ async function userIsAtPlanUsage(c: Context, orgId: string, customerId: string |
         event: 'User is at 50% of plan usage',
         icon: '⚠️',
         user_id: orgId,
+        groups: { organization: orgId },
         notify: false,
       }).catch()
     }
@@ -455,6 +459,7 @@ export async function handleOrgNotificationsAndEvents(c: Context, org: any, orgI
         event: 'User need onboarding',
         icon: '🥲',
         user_id: orgId,
+        groups: { organization: orgId },
         notify: false,
       }).catch()
     }
