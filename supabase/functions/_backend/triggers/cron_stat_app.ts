@@ -13,10 +13,15 @@ interface DataToGet {
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
-async function syncOrgStatsRefresh(
+interface OrgStatsRefreshTarget {
+  customerId: string | null
+  previousStatsUpdatedAt: string | null
+}
+
+async function getOrgStatsRefreshTarget(
   supabase: ReturnType<typeof supabaseAdmin>,
   orgId: string,
-): Promise<string | null> {
+): Promise<OrgStatsRefreshTarget> {
   const { data: orgData, error: orgError } = await supabase
     .from('orgs')
     .select('customer_id,stats_updated_at')
@@ -27,19 +32,24 @@ async function syncOrgStatsRefresh(
     throw orgError
   }
 
+  return {
+    customerId: orgData?.customer_id ?? null,
+    previousStatsUpdatedAt: orgData?.stats_updated_at ?? null,
+  }
+}
+
+async function syncOrgStatsRefresh(
+  supabase: ReturnType<typeof supabaseAdmin>,
+  orgId: string,
+  previousStatsUpdatedAt: string | null,
+): Promise<void> {
   await supabase.from('orgs')
     .update({
       stats_updated_at: new Date().toISOString(),
-      last_stats_updated_at: orgData?.stats_updated_at,
+      last_stats_updated_at: previousStatsUpdatedAt,
     })
     .eq('id', orgId)
     .throwOnError()
-
-  if (!orgData?.customer_id) {
-    return null
-  }
-
-  return orgData.customer_id
 }
 
 async function queueOrgPlanRefresh(
@@ -179,21 +189,17 @@ app.post('/', middlewareAPISecret, async (c) => {
   ])
 
   cloudlog({ requestId: c.get('requestId'), message: 'stats saved', mauLength: mau.length, bandwidthLength: bandwidth.length, storageLength: storage.length, versionUsageLength: versionUsage.length })
-  let customerId: string | null = null
+  const { customerId, previousStatsUpdatedAt } = await getOrgStatsRefreshTarget(supabase, body.orgId)
+
   try {
-    customerId = await syncOrgStatsRefresh(supabase, body.orgId)
+    await syncOrgStatsRefresh(supabase, body.orgId, previousStatsUpdatedAt)
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to persist cron_stat_app org refresh metadata', orgId: body.orgId, error })
   }
 
   if (customerId) {
-    try {
-      await queueOrgPlanRefresh(c, supabase, body.orgId, customerId)
-    }
-    catch (error) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to queue cron_stat_org after cron_stat_app', orgId: body.orgId, customerId, error })
-    }
+    await queueOrgPlanRefresh(c, supabase, body.orgId, customerId)
   }
 
   return c.json({ status: 'Stats saved', mau, bandwidth, storage, versionUsage })

@@ -154,6 +154,9 @@ describe('cron_stat_app follow-up failures', () => {
     vi.clearAllMocks()
     process.env.API_SECRET = 'testsecret'
     process.env.ENV_NAME = 'test'
+    ;(globalThis as typeof globalThis & { EdgeRuntime?: { waitUntil: (promise: Promise<unknown>) => void } }).EdgeRuntime = {
+      waitUntil: () => { },
+    }
     readStatsMauMock.mockResolvedValue([
       { app_id: 'com.test.app', date: '2026-04-20', mau: 2 },
     ])
@@ -176,7 +179,7 @@ describe('cron_stat_app follow-up failures', () => {
     ])
   })
 
-  it('returns success when queuing plan processing fails after stats writes', async () => {
+  it('returns 500 when queuing plan processing fails after stats writes', async () => {
     const { client, builders } = createSupabaseStub({
       queueError: new Error('error code: 502'),
     })
@@ -196,15 +199,15 @@ describe('cron_stat_app follow-up failures', () => {
       waitUntil: () => { },
     } as any)
 
-    expect(response.status).toBe(200)
+    expect(response.status).toBe(500)
     expect(builders.orgUpdateBuilder.throwOnError).toHaveBeenCalledTimes(1)
     expect(builders.queueBuilder.throwOnError).toHaveBeenCalledTimes(1)
 
-    const payload = await response.json() as { status: string }
-    expect(payload.status).toBe('Stats saved')
+    const payload = await response.json() as { error: string }
+    expect(payload.error).toBe('unknown_error')
   })
 
-  it('returns success when org timestamp refresh fails after stats writes', async () => {
+  it('returns success and still queues plan processing when org timestamp refresh fails after stats writes', async () => {
     const { client, builders } = createSupabaseStub({
       orgUpdateError: new Error('error code: 502'),
     })
@@ -226,7 +229,7 @@ describe('cron_stat_app follow-up failures', () => {
 
     expect(response.status).toBe(200)
     expect(builders.orgUpdateBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.queueBuilder.throwOnError).not.toHaveBeenCalled()
+    expect(builders.queueBuilder.throwOnError).toHaveBeenCalledTimes(1)
 
     const payload = await response.json() as { status: string }
     expect(payload.status).toBe('Stats saved')
