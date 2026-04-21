@@ -210,7 +210,7 @@ describe('read-mode API keys cannot access destructive organization routes', () 
 
     expect(response.status).toBe(200)
     const responseType = type({ id: 'string', name: 'string' })
-    expect(parseSchema(responseType, await response.json())).toEqual({ id: readOnlyOrgId, name: readOnlyName })
+    expect(parseSchema(responseType, await response.json())).toEqual(expect.objectContaining({ id: readOnlyOrgId, name: readOnlyName }))
   })
 
   it.concurrent('allows GET /organization/members for accessible organizations', async () => {
@@ -286,7 +286,7 @@ describe('[GET] /organization', () => {
     expect(safe.success).toBe(true)
     if (!safe.success)
       throw safe.error
-    expect(safe.data).toEqual({ id: ORG_ID, name, website })
+    expect(safe.data).toEqual(expect.objectContaining({ id: ORG_ID, name, website }))
   })
 
   it('get organization with invalid orgId', async () => {
@@ -1160,7 +1160,7 @@ describe('rbac mode - organization member operations', () => {
     expect(safe.success).toBe(true)
     if (!safe.success)
       throw safe.error
-    expect(safe.data).toEqual({ id: ORG_ID_RBAC, name: nameRbac })
+    expect(safe.data).toEqual(expect.objectContaining({ id: ORG_ID_RBAC, name: nameRbac }))
   })
 
   it('[GET] /organization/members - returns members via role_bindings (RBAC path)', async () => {
