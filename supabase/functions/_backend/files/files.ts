@@ -24,10 +24,93 @@ import { supabaseTusCreateHandler, supabaseTusHeadHandler, supabaseTusPatchHandl
 import { ALLOWED_HEADERS, ALLOWED_METHODS, buildFileHttpMetadata, EXPOSED_HEADERS, MAX_UPLOAD_LENGTH_BYTES, toBase64, TUS_EXTENSIONS, TUS_VERSION, withNoTransformCacheControl, X_CHECKSUM_SHA256 } from './util.ts'
 
 const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 20 minutes
+const DO_FETCH_RETRY_ATTEMPTS = 3
+const DO_FETCH_RETRY_DELAY_MS = 250
 
 const ATTACHMENT_PREFIX = 'attachments'
 
 export const app = new Hono<MiddlewareKeyVariables>()
+
+function getDurableObjectErrorMessage(error: unknown): string {
+  if (!error || typeof error !== 'object' || !('message' in error)) {
+    return ''
+  }
+
+  const { message } = error as { message?: unknown }
+  return typeof message === 'string' ? message.toLowerCase() : ''
+}
+
+function isRetryableDurableObjectFetchError(error: unknown): boolean {
+  if (error && typeof error === 'object') {
+    const candidate = error as { retryable?: boolean, durableObjectReset?: boolean }
+    if (candidate.retryable || candidate.durableObjectReset) {
+      return true
+    }
+  }
+
+  const message = getDurableObjectErrorMessage(error)
+  return message.includes('moved to a different machine')
+}
+
+async function fetchUploadHandlerWithRetry(
+  c: Context,
+  handler: DurableObjectStub,
+  request: Request,
+): Promise<Response> {
+  let lastError: unknown
+
+  for (let attempt = 1; attempt <= DO_FETCH_RETRY_ATTEMPTS; attempt++) {
+    try {
+      const requestInit: RequestInit & { duplex?: 'half' } = {
+        headers: request.headers,
+        method: request.method,
+        signal: AbortSignal.timeout(DO_CALL_TIMEOUT),
+      }
+      if (request.method !== 'HEAD') {
+        requestInit.body = request.clone().body
+        requestInit.duplex = 'half'
+      }
+
+      const response = await handler.fetch(
+        new Request(request.url, requestInit),
+      )
+
+      if (attempt > 1) {
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'upload handler - durable object retry succeeded',
+          attempt,
+          fileId: c.get('fileId'),
+        })
+      }
+
+      return response
+    }
+    catch (error) {
+      lastError = error
+      const shouldRetry = attempt < DO_FETCH_RETRY_ATTEMPTS && isRetryableDurableObjectFetchError(error)
+
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: shouldRetry
+          ? 'upload handler - durable object fetch failed, retrying'
+          : 'upload handler - durable object fetch failed',
+        error,
+        attempt,
+        fileId: c.get('fileId'),
+        retryable: shouldRetry,
+      })
+
+      if (!shouldRetry) {
+        throw error
+      }
+
+      await new Promise(resolve => setTimeout(resolve, DO_FETCH_RETRY_DELAY_MS * attempt))
+    }
+  }
+
+  throw lastError ?? new Error('Durable Object upload fetch failed')
+}
 
 function getExternalBaseUrl(c: Context): string {
   const protoHeader = c.req.header('X-Forwarded-Proto')
@@ -290,13 +373,17 @@ async function uploadHandler(c: Context) {
   headers.set('X-Request-Id', c.get('requestId') || 'unknown')
 
   const method = c.req.raw.method
-  return await handler.fetch(c.req.url, {
+  const requestInit: RequestInit & { duplex?: 'half' } = {
     // HEAD must not forward a request body and must preserve the verb (Hono/tiny maps HEAD to GET).
-    body: method === 'HEAD' ? undefined : c.req.raw.body,
     method,
     headers,
-    signal: AbortSignal.timeout(DO_CALL_TIMEOUT),
-  })
+  }
+  if (method !== 'HEAD') {
+    requestInit.body = c.req.raw.body
+    requestInit.duplex = 'half'
+  }
+  const request = new Request(c.req.url, requestInit)
+  return await fetchUploadHandlerWithRetry(c, handler, request)
 }
 
 async function setKeyFromMetadata(c: Context, next: Next) {
@@ -671,3 +758,8 @@ app.route('/config', files_config)
 app.route('/download_link', download_link)
 app.route('/upload_link', upload_link)
 app.route('/ok', ok)
+
+export const filesTestUtils = {
+  fetchUploadHandlerWithRetry,
+  isRetryableDurableObjectFetchError,
+}
