@@ -2,16 +2,7 @@ import { HTTPException } from 'hono/http-exception'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 describe('cron_sync_sub resilience', () => {
-  beforeEach(() => {
-    vi.resetModules()
-    vi.clearAllMocks()
-  })
-
-  it('retries transient cron_sync_sub failures and succeeds', async () => {
-    const syncSubscriptionAndEvents = vi.fn()
-      .mockRejectedValueOnce({ status: 502, message: 'error code: 502' })
-      .mockResolvedValueOnce(undefined)
-
+  function setupCommonMocks(syncSubscriptionAndEvents: ReturnType<typeof vi.fn>) {
     vi.doMock('../supabase/functions/_backend/utils/hono.ts', () => ({
       BRES: { status: 'ok' },
       middlewareAPISecret: async (_c: unknown, next: () => Promise<void>) => await next(),
@@ -28,6 +19,19 @@ describe('cron_sync_sub resilience', () => {
     vi.doMock('../supabase/functions/_backend/utils/plans.ts', () => ({
       syncSubscriptionAndEvents,
     }))
+  }
+
+  beforeEach(() => {
+    vi.resetModules()
+    vi.clearAllMocks()
+  })
+
+  it('retries transient cron_sync_sub failures and succeeds', async () => {
+    const syncSubscriptionAndEvents = vi.fn()
+      .mockRejectedValueOnce({ status: 502, message: 'error code: 502' })
+      .mockResolvedValueOnce(undefined)
+
+    setupCommonMocks(syncSubscriptionAndEvents)
 
     const { app: cronSyncSub } = await import('../supabase/functions/_backend/triggers/cron_sync_sub.ts')
 
@@ -47,22 +51,7 @@ describe('cron_sync_sub resilience', () => {
       new HTTPException(404, { message: 'Org not found', cause: { error: 'org_not_found' } }),
     )
 
-    vi.doMock('../supabase/functions/_backend/utils/hono.ts', () => ({
-      BRES: { status: 'ok' },
-      middlewareAPISecret: async (_c: unknown, next: () => Promise<void>) => await next(),
-      parseBody: async (c: { req: { json: () => Promise<unknown> } }) => await c.req.json(),
-      simpleError: (errorCode: string, message: string, moreInfo: Record<string, unknown> = {}) => {
-        throw new HTTPException(400, { message, cause: { error: errorCode, ...moreInfo } })
-      },
-    }))
-    vi.doMock('../supabase/functions/_backend/utils/pg.ts', () => ({
-      closeClient: vi.fn(),
-      getDrizzleClient: vi.fn(() => ({ drizzle: true })),
-      getPgClient: vi.fn(() => ({ pg: true })),
-    }))
-    vi.doMock('../supabase/functions/_backend/utils/plans.ts', () => ({
-      syncSubscriptionAndEvents,
-    }))
+    setupCommonMocks(syncSubscriptionAndEvents)
 
     const { app: cronSyncSub } = await import('../supabase/functions/_backend/triggers/cron_sync_sub.ts')
 
