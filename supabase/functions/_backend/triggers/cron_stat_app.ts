@@ -1,7 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareAPISecret, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
-import { cloudlog } from '../utils/logging.ts'
+import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { readStatsBandwidth, readStatsMau, readStatsStorage, readStatsVersion } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -12,6 +12,49 @@ interface DataToGet {
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
+
+async function syncOrgStatsRefresh(
+  supabase: ReturnType<typeof supabaseAdmin>,
+  orgId: string,
+): Promise<string | null> {
+  const { data: orgData, error: orgError } = await supabase
+    .from('orgs')
+    .select('customer_id,stats_updated_at')
+    .eq('id', orgId)
+    .single()
+
+  if (orgError) {
+    throw orgError
+  }
+
+  await supabase.from('orgs')
+    .update({
+      stats_updated_at: new Date().toISOString(),
+      last_stats_updated_at: orgData?.stats_updated_at,
+    })
+    .eq('id', orgId)
+    .throwOnError()
+
+  if (!orgData?.customer_id) {
+    return null
+  }
+
+  return orgData.customer_id
+}
+
+async function queueOrgPlanRefresh(
+  c: Parameters<typeof supabaseAdmin>[0],
+  supabase: ReturnType<typeof supabaseAdmin>,
+  orgId: string,
+  customerId: string,
+): Promise<void> {
+  await supabase.rpc('queue_cron_stat_org_for_org', {
+    org_id: orgId,
+    customer_id: customerId,
+  }).throwOnError()
+
+  cloudlog({ requestId: c.get('requestId'), message: 'plan processing queued for org', orgId, customerId })
+}
 
 app.use('/', useCors)
 
@@ -136,29 +179,21 @@ app.post('/', middlewareAPISecret, async (c) => {
   ])
 
   cloudlog({ requestId: c.get('requestId'), message: 'stats saved', mauLength: mau.length, bandwidthLength: bandwidth.length, storageLength: storage.length, versionUsageLength: versionUsage.length })
-  // Get customer_id for the organization to queue plan processing
-  const { data: orgData, error: orgError } = await supabase
-    .from('orgs')
-    .select('customer_id,stats_updated_at')
-    .eq('id', body.orgId)
-    .single()
+  let customerId: string | null = null
+  try {
+    customerId = await syncOrgStatsRefresh(supabase, body.orgId)
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to persist cron_stat_app org refresh metadata', orgId: body.orgId, error })
+  }
 
-  await supabase.from('orgs')
-    .update({
-      stats_updated_at: new Date().toISOString(),
-      last_stats_updated_at: orgData?.stats_updated_at,
-    })
-    .eq('id', body.orgId)
-    .throwOnError()
-
-  if (!orgError && orgData?.customer_id) {
-    // Queue plan processing for this organization
-    await supabase.rpc('queue_cron_stat_org_for_org', {
-      org_id: body.orgId,
-      customer_id: orgData.customer_id,
-    }).throwOnError()
-
-    cloudlog({ requestId: c.get('requestId'), message: 'plan processing queued for org', orgId: body.orgId, customerId: orgData.customer_id })
+  if (customerId) {
+    try {
+      await queueOrgPlanRefresh(c, supabase, body.orgId, customerId)
+    }
+    catch (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to queue cron_stat_org after cron_stat_app', orgId: body.orgId, customerId, error })
+    }
   }
 
   return c.json({ status: 'Stats saved', mau, bandwidth, storage, versionUsage })
