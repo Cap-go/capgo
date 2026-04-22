@@ -889,9 +889,11 @@ watch(() => ({
   canRefresh: hasRefreshableScope.value,
   forceDemo: !!props.forceDemo,
   key: currentScopeKey.value,
+  now: refreshStateClock.value,
   shouldAutoRequest: shouldAutoRequestChartRefresh(
     scopeStatsUpdatedAt.value,
     scopeStatsRefreshRequestedAt.value,
+    refreshStateClock.value,
   ),
 }), async (state) => {
   if (!state.canRefresh || state.forceDemo || !state.shouldAutoRequest)

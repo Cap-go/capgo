@@ -2,12 +2,16 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const {
   readStatsBandwidthMock,
+  closeClientMock,
+  getPgClientMock,
   readStatsMauMock,
   readStatsStorageMock,
   readStatsVersionMock,
   supabaseAdminMock,
 } = vi.hoisted(() => ({
   readStatsBandwidthMock: vi.fn(),
+  closeClientMock: vi.fn(),
+  getPgClientMock: vi.fn(),
   readStatsMauMock: vi.fn(),
   readStatsStorageMock: vi.fn(),
   readStatsVersionMock: vi.fn(),
@@ -25,6 +29,11 @@ vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
   supabaseAdmin: (...args: unknown[]) => supabaseAdminMock(...args),
 }))
 
+vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
+  closeClient: (...args: unknown[]) => closeClientMock(...args),
+  getPgClient: (...args: unknown[]) => getPgClientMock(...args),
+}))
+
 const { app: cronStatApp } = await import('../supabase/functions/_backend/triggers/cron_stat_app.ts')
 const { createAllCatch, createHono } = await import('../supabase/functions/_backend/utils/hono.ts')
 const { version } = await import('../supabase/functions/_backend/utils/version.ts')
@@ -35,13 +44,6 @@ function createSingleBuilder<T>(result: T) {
     eq: vi.fn().mockReturnThis(),
     single: vi.fn().mockResolvedValue(result),
     maybeSingle: vi.fn().mockResolvedValue(result),
-  }
-}
-
-function createListBuilder<T>(result: T) {
-  return {
-    select: vi.fn().mockReturnThis(),
-    eq: vi.fn().mockResolvedValue(result),
   }
 }
 
@@ -73,6 +75,28 @@ function createRpcResultBuilder(result?: { data: unknown, error: Error | null, s
   })
 }
 
+function hasPendingRefresh(rows: Array<{
+  stats_refresh_requested_at: string | null
+  stats_updated_at: string | null
+}>): boolean {
+  const staleCutoff = Date.now() - 5 * 60 * 1000
+
+  return rows.some((row) => {
+    if (!row.stats_refresh_requested_at)
+      return false
+
+    const requestedAt = Date.parse(row.stats_refresh_requested_at)
+    if (Number.isNaN(requestedAt) || requestedAt < staleCutoff)
+      return false
+
+    if (!row.stats_updated_at)
+      return true
+
+    const updatedAt = Date.parse(row.stats_updated_at)
+    return Number.isNaN(updatedAt) || requestedAt > updatedAt
+  })
+}
+
 function createSupabaseStub(options?: {
   customerId?: string | null
   orgSelectError?: Error | null
@@ -93,8 +117,8 @@ function createSupabaseStub(options?: {
     },
     error: null,
   })
-  const pendingAppsBuilder = createListBuilder({
-    data: options?.pendingAppRows ?? (options?.pendingAppRefreshes
+  const pendingAppRows = options?.pendingAppRows ?? (
+    options?.pendingAppRefreshes
       ? [
           {
             app_id: 'com.other.app',
@@ -102,8 +126,10 @@ function createSupabaseStub(options?: {
             stats_updated_at: null,
           },
         ]
-      : []),
-    error: null,
+      : []
+  )
+  const pendingAppsQuery = vi.fn().mockResolvedValue({
+    rows: [{ has_pending: hasPendingRefresh(pendingAppRows) }],
   })
   const orgSelectBuilder = createSingleBuilder({
     data: {
@@ -135,6 +161,9 @@ function createSupabaseStub(options?: {
     error: options?.queueError ?? null,
     status: options?.queueStatus ?? (options?.queueError ? 500 : 200),
   })
+  const pgClient = {
+    query: pendingAppsQuery,
+  }
   const orgBuilder = {
     select: vi.fn().mockReturnValue(orgSelectBuilder),
     update: vi.fn().mockReturnValue(orgUpdateBuilder),
@@ -148,7 +177,7 @@ function createSupabaseStub(options?: {
             appSelectConsumed = true
             return appSelectBuilder
           }
-          return pendingAppsBuilder
+          throw new Error('Unexpected apps read after app owner lookup')
         }
         case 'daily_mau':
           return dailyMauBuilder
@@ -177,6 +206,8 @@ function createSupabaseStub(options?: {
       }
     }),
   }
+  getPgClientMock.mockReturnValue(pgClient)
+  closeClientMock.mockResolvedValue(undefined)
 
   return {
     client,
@@ -188,7 +219,7 @@ function createSupabaseStub(options?: {
       markAppStatsRefreshedBuilder,
       orgBuilder,
       orgUpdateBuilder,
-      pendingAppsBuilder,
+      pendingAppsQuery,
       queueBuilder,
     },
   }
@@ -450,7 +481,7 @@ describe('cron_stat_app follow-up failures', () => {
     expect(builders.dailyBandwidthBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.dailyStorageBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.dailyVersionBuilder.upsert).toHaveBeenCalledTimes(1)
-    expect(builders.pendingAppsBuilder.eq).toHaveBeenCalledTimes(1)
+    expect(builders.pendingAppsQuery).toHaveBeenCalledTimes(1)
     expect(builders.orgBuilder.update).not.toHaveBeenCalled()
     expect(client.rpc).not.toHaveBeenCalledWith('queue_cron_stat_org_for_org', expect.anything())
 
@@ -485,7 +516,7 @@ describe('cron_stat_app follow-up failures', () => {
     } as any)
 
     expect(response.status).toBe(200)
-    expect(builders.pendingAppsBuilder.eq).toHaveBeenCalledTimes(1)
+    expect(builders.pendingAppsQuery).toHaveBeenCalledTimes(1)
     expect(builders.orgBuilder.update).toHaveBeenCalledTimes(1)
     expect(client.rpc).toHaveBeenCalledWith('queue_cron_stat_org_for_org', {
       org_id: 'org-test',
@@ -498,21 +529,11 @@ describe('cron_stat_app follow-up failures', () => {
 
   it('retries the pending refresh lookup before completing org refresh', async () => {
     const { client, builders } = createSupabaseStub()
-    builders.pendingAppsBuilder.eq
-      .mockResolvedValueOnce({
-        data: null,
-        error: new Error('error code: 502'),
-        status: 502,
-      })
-      .mockResolvedValueOnce({
-        data: null,
-        error: new Error('error code: 502'),
-        status: 502,
-      })
+    builders.pendingAppsQuery
+      .mockRejectedValueOnce(new Error('error code: 502'))
+      .mockRejectedValueOnce(new Error('error code: 502'))
       .mockResolvedValue({
-        data: [],
-        error: null,
-        status: 200,
+        rows: [{ has_pending: false }],
       })
     supabaseAdminMock.mockReturnValue(client)
 
@@ -531,7 +552,7 @@ describe('cron_stat_app follow-up failures', () => {
     } as any)
 
     expect(response.status).toBe(200)
-    expect(builders.pendingAppsBuilder.eq).toHaveBeenCalledTimes(3)
+    expect(builders.pendingAppsQuery).toHaveBeenCalledTimes(3)
     expect(builders.orgBuilder.update).toHaveBeenCalledTimes(1)
     expect(client.rpc).toHaveBeenCalledWith('queue_cron_stat_org_for_org', {
       org_id: 'org-test',
@@ -544,11 +565,7 @@ describe('cron_stat_app follow-up failures', () => {
 
   it('surfaces pending refresh lookup failures after retries', async () => {
     const { client, builders } = createSupabaseStub()
-    builders.pendingAppsBuilder.eq.mockResolvedValue({
-      data: null,
-      error: new Error('error code: 502'),
-      status: 502,
-    })
+    builders.pendingAppsQuery.mockRejectedValue(new Error('error code: 502'))
     supabaseAdminMock.mockReturnValue(client)
 
     const response = await createApp().fetch(new Request('http://localhost/', {
@@ -566,7 +583,7 @@ describe('cron_stat_app follow-up failures', () => {
     } as any)
 
     expect(response.status).toBe(500)
-    expect(builders.pendingAppsBuilder.eq).toHaveBeenCalledTimes(3)
+    expect(builders.pendingAppsQuery).toHaveBeenCalledTimes(3)
     expect(builders.orgBuilder.update).not.toHaveBeenCalled()
     expect(client.rpc).not.toHaveBeenCalledWith('queue_cron_stat_org_for_org', expect.anything())
   })

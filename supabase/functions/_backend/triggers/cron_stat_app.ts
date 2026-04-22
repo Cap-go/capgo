@@ -2,6 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareAPISecret, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
+import { closeClient, getPgClient } from '../utils/pg.ts'
 import { retryWithBackoff } from '../utils/retry.ts'
 import { readStatsBandwidth, readStatsMau, readStatsStorage, readStatsVersion } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -29,21 +30,6 @@ interface SupabaseRetryResult<T> {
 interface OrgStatsRefreshTarget {
   customerId: string | null
   previousStatsUpdatedAt: string | null
-}
-
-interface AppRefreshStateRow {
-  app_id: string
-  stats_refresh_requested_at: string | null
-  stats_updated_at: string | null
-}
-
-function parseRefreshTimestamp(value: string | null | undefined): number | null {
-  if (!value)
-    return null
-
-  const normalized = /(?:Z|[+-]\d{2}:\d{2})$/.test(value) ? value : `${value}Z`
-  const parsed = Date.parse(normalized)
-  return Number.isNaN(parsed) ? null : parsed
 }
 
 interface CycleInfo {
@@ -190,26 +176,45 @@ async function syncOrgStatsRefresh(
 
 async function hasPendingAppStatsRefresh(
   c: Parameters<typeof supabaseAdmin>[0],
-  supabase: ReturnType<typeof supabaseAdmin>,
   orgId: string,
 ): Promise<boolean> {
-  const { data } = await runSupabaseResultWithRetry<AppRefreshStateRow[]>(c, 'load_pending_app_stats_refreshes', async () => await supabase
-    .from('apps')
-    .select('app_id,stats_refresh_requested_at,stats_updated_at')
-    .eq('owner_org', orgId))
+  const pgClient = getPgClient(c, true)
+  const staleCutoff = new Date(Date.now() - APP_STATS_REFRESH_STALE_MS).toISOString()
 
-  const rows = data ?? []
-  const staleCutoff = Date.now() - APP_STATS_REFRESH_STALE_MS
-  return rows.some((row) => {
-    const requestedAt = parseRefreshTimestamp(row.stats_refresh_requested_at)
-    if (requestedAt === null)
-      return false
-    if (requestedAt < staleCutoff)
-      return false
+  try {
+    const { result, lastError } = await retryWithBackoff(
+      async () => await pgClient.query<{ has_pending: boolean }>(
+        `
+          SELECT EXISTS (
+            SELECT 1
+            FROM public.apps
+            WHERE owner_org = $1
+              AND stats_refresh_requested_at IS NOT NULL
+              AND stats_refresh_requested_at >= $2::timestamp without time zone
+              AND (
+                stats_updated_at IS NULL
+                OR stats_refresh_requested_at > stats_updated_at
+              )
+            LIMIT 1
+          ) AS has_pending
+        `,
+        [orgId, staleCutoff],
+      ),
+      {
+        attempts: SUPABASE_RETRY_ATTEMPTS,
+        baseDelayMs: SUPABASE_RETRY_DELAY_MS,
+      },
+    )
 
-    const updatedAt = parseRefreshTimestamp(row.stats_updated_at)
-    return updatedAt === null || requestedAt > updatedAt
-  })
+    if (lastError || !result) {
+      throw lastError ?? new Error('load_pending_app_stats_refreshes returned no result')
+    }
+
+    return result.rows[0]?.has_pending ?? false
+  }
+  finally {
+    await closeClient(c, pgClient)
+  }
 }
 
 async function queueOrgPlanRefresh(
@@ -396,7 +401,7 @@ app.post('/', middlewareAPISecret, async (c) => {
 
   let pendingAppRefreshes: boolean
   try {
-    pendingAppRefreshes = await hasPendingAppStatsRefresh(c, supabase, body.orgId)
+    pendingAppRefreshes = await hasPendingAppStatsRefresh(c, body.orgId)
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to inspect pending cron_stat_app refresh state', orgId: body.orgId, error })
