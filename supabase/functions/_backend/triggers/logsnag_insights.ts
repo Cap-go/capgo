@@ -62,6 +62,15 @@ interface PlanRevenue {
   plan_enterprise_monthly: number
   plan_enterprise_yearly: number
 }
+interface DailyRevenueChangeSummary {
+  churnMrr: number
+  contractionMrr: number
+  expansionMrr: number
+}
+interface RevenueRetentionMetrics {
+  churnRevenue: number
+  nrr: number
+}
 interface GlobalStats {
   apps: PromiseLike<number>
   updates: PromiseLike<number>
@@ -90,6 +99,7 @@ interface GlobalStats {
   demo_apps_created: PromiseLike<number>
   plugin_breakdown: PromiseLike<PluginBreakdownResult>
   build_stats: PromiseLike<BuildStats>
+  retention_metrics: PromiseLike<RevenueRetentionMetrics>
 }
 interface CustomerIdRow {
   customer_id: string
@@ -137,6 +147,28 @@ function countUniqueCustomers(...rowSets: Array<Array<CustomerIdRow | null | und
       .filter((row): row is CustomerIdRow => Boolean(row?.customer_id))
       .map(row => row.customer_id),
   ).size
+}
+
+function getPreviousDateId(dateId: string) {
+  const target = new Date(`${dateId}T00:00:00.000Z`)
+  target.setUTCDate(target.getUTCDate() - 1)
+  return getDateId(target)
+}
+
+function calculateNrr(previousMrr: number, dailyChanges: DailyRevenueChangeSummary) {
+  if (previousMrr <= 0)
+    return 100
+
+  const retainedMrr = Math.max(
+    previousMrr - dailyChanges.churnMrr - dailyChanges.contractionMrr + dailyChanges.expansionMrr,
+    0,
+  )
+
+  return Number(((retainedMrr / previousMrr) * 100).toFixed(2))
+}
+
+function calculateChurnRevenue(dailyChanges: DailyRevenueChangeSummary) {
+  return Number((dailyChanges.churnMrr + dailyChanges.contractionMrr).toFixed(2))
 }
 
 function isMissingBuildMetricColumnError(error: unknown): boolean {
@@ -441,6 +473,66 @@ async function getBuildStats(c: Context, window?: DailyWindow): Promise<BuildSta
   }
 }
 
+async function getRevenueRetentionMetrics(c: Context, dateId: string): Promise<RevenueRetentionMetrics> {
+  const pgClient = getPgClient(c, false)
+  const drizzleClient = getDrizzleClient(pgClient)
+  const previousDateId = getPreviousDateId(dateId)
+
+  try {
+    const result = await drizzleClient.execute<{
+      churn_mrr: number
+      contraction_mrr: number
+      expansion_mrr: number
+      previous_mrr: number
+    }>(sql`
+      WITH daily AS (
+        SELECT
+          COALESCE(SUM(churn_mrr), 0)::float AS churn_mrr,
+          COALESCE(SUM(contraction_mrr), 0)::float AS contraction_mrr,
+          COALESCE(SUM(expansion_mrr), 0)::float AS expansion_mrr
+        FROM public.daily_revenue_metrics
+        WHERE date_id = ${dateId}
+      ),
+      previous_snapshot AS (
+        SELECT COALESCE(mrr, 0)::float AS previous_mrr
+        FROM public.global_stats
+        WHERE date_id = ${previousDateId}
+        LIMIT 1
+      )
+      SELECT
+        daily.churn_mrr,
+        daily.contraction_mrr,
+        daily.expansion_mrr,
+        COALESCE(previous_snapshot.previous_mrr, 0)::float AS previous_mrr
+      FROM daily
+      LEFT JOIN previous_snapshot ON true
+    `)
+
+    const row = result.rows[0]
+    const dailyChanges = {
+      churnMrr: Number(row?.churn_mrr) || 0,
+      contractionMrr: Number(row?.contraction_mrr) || 0,
+      expansionMrr: Number(row?.expansion_mrr) || 0,
+    }
+    const previousMrr = Number(row?.previous_mrr) || 0
+
+    return {
+      churnRevenue: calculateChurnRevenue(dailyChanges),
+      nrr: calculateNrr(previousMrr, dailyChanges),
+    }
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getRevenueRetentionMetrics error', error })
+    return {
+      churnRevenue: 0,
+      nrr: 100,
+    }
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
+}
+
 async function aggregateDailyBuildStats(
   c: Context,
   start: Date,
@@ -723,13 +815,17 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
     demo_apps_created: countDemoSeededApps(c, last24h),
     plugin_breakdown: getPluginBreakdownCF(c),
     build_stats: getBuildStats(c, window),
+    retention_metrics: getRevenueRetentionMetrics(c, metricWindow.dayDateId),
   }
 }
 
 export const logsnagInsightsTestUtils = {
+  calculateChurnRevenue,
+  calculateNrr,
   countUniqueCustomers,
   getCompletedDayWindow,
   getCurrentDayWindow,
+  getPreviousDateId,
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -766,6 +862,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     demo_apps_created,
     plugin_breakdown,
     build_stats,
+    retention_metrics,
   ] = await Promise.all([
     res.apps,
     res.updates,
@@ -794,6 +891,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     res.demo_apps_created,
     res.plugin_breakdown,
     res.build_stats,
+    res.retention_metrics,
   ])
   const not_paying = users - customers.total - plans.Trial
   const org_conversion_rate = orgs > 0 ? Number((((paying_orgs_for_conversion * 100) / orgs)).toFixed(1)) : 0
@@ -852,6 +950,8 @@ app.post('/', middlewareAPISecret, async (c) => {
     revenue_maker: revenue.revenue_maker,
     revenue_team: revenue.revenue_team,
     revenue_enterprise: revenue.revenue_enterprise,
+    nrr: retention_metrics.nrr,
+    churn_revenue: retention_metrics.churnRevenue,
     plan_solo_monthly: revenue.plan_solo_monthly,
     plan_solo_yearly: revenue.plan_solo_yearly,
     plan_maker_monthly: revenue.plan_maker_monthly,

@@ -1136,6 +1136,39 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_revenue_metrics: {
+        Row: {
+          churn_mrr: number
+          contraction_mrr: number
+          created_at: string
+          customer_id: string
+          date_id: string
+          expansion_mrr: number
+          new_business_mrr: number
+          updated_at: string
+        }
+        Insert: {
+          churn_mrr?: number
+          contraction_mrr?: number
+          created_at?: string
+          customer_id: string
+          date_id: string
+          expansion_mrr?: number
+          new_business_mrr?: number
+          updated_at?: string
+        }
+        Update: {
+          churn_mrr?: number
+          contraction_mrr?: number
+          created_at?: string
+          customer_id?: string
+          date_id?: string
+          expansion_mrr?: number
+          new_business_mrr?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       global_stats: {
         Row: {
           apps: number
@@ -1157,6 +1190,7 @@ export type Database = {
           builds_total: number | null
           bundle_storage_gb: number
           canceled_orgs: number
+          churn_revenue: number
           created_at: string | null
           credits_bought: number
           credits_consumed: number
@@ -1168,6 +1202,7 @@ export type Database = {
           mrr: number
           need_upgrade: number | null
           new_paying_orgs: number
+          nrr: number
           not_paying: number | null
           onboarded: number | null
           org_conversion_rate: number
@@ -1224,6 +1259,7 @@ export type Database = {
           builds_total?: number | null
           bundle_storage_gb?: number
           canceled_orgs?: number
+          churn_revenue?: number
           created_at?: string | null
           credits_bought?: number
           credits_consumed?: number
@@ -1235,6 +1271,7 @@ export type Database = {
           mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
+          nrr?: number
           not_paying?: number | null
           onboarded?: number | null
           org_conversion_rate?: number
@@ -1291,6 +1328,7 @@ export type Database = {
           builds_total?: number | null
           bundle_storage_gb?: number
           canceled_orgs?: number
+          churn_revenue?: number
           created_at?: string | null
           credits_bought?: number
           credits_consumed?: number
@@ -1302,6 +1340,7 @@ export type Database = {
           mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
+          nrr?: number
           not_paying?: number | null
           onboarded?: number | null
           org_conversion_rate?: number

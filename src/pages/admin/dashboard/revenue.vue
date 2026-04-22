@@ -50,6 +50,8 @@ const globalStatsTrendData = ref<Array<{
   canceled_orgs: number
   upgraded_orgs: number
   mrr: number
+  nrr: number
+  churn_revenue: number
   total_revenue: number
   revenue_solo: number
   revenue_maker: number
@@ -164,6 +166,38 @@ const mrrSeries = computed(() => {
   ]
 })
 
+const nrrSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'NRR - Net Revenue Retention (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.nrr || 0,
+      })),
+      color: '#8b5cf6', // violet
+    },
+  ]
+})
+
+const churnRevenueSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Churn Revenue - Lost MRR ($)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.churn_revenue || 0,
+      })),
+      color: '#ef4444', // red
+    },
+  ]
+})
+
 const arrSeries = computed(() => {
   if (globalStatsTrendData.value.length === 0)
     return []
@@ -178,6 +212,25 @@ const arrSeries = computed(() => {
       color: '#10b981', // green
     },
   ]
+})
+
+const nrrAxisRange = computed(() => {
+  const values = nrrSeries.value.flatMap(series => series.data.map(point => point.value)).filter(value => Number.isFinite(value))
+  if (values.length === 0) {
+    return {
+      suggestedMin: 90,
+      suggestedMax: 110,
+    }
+  }
+
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const padding = Math.max((max - min) * 0.25, 5)
+
+  return {
+    suggestedMin: Math.max(0, Math.floor(min - padding)),
+    suggestedMax: Math.ceil(max + padding),
+  }
 })
 
 const planARRSeries = computed(() => {
@@ -488,6 +541,7 @@ displayStore.defaultBack = '/dashboard'
               <AdminMultiLineChart
                 :series="mrrSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
+                value-prefix="$"
               />
             </ChartCard>
 
@@ -500,6 +554,7 @@ displayStore.defaultBack = '/dashboard'
               <AdminMultiLineChart
                 :series="arrSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
+                value-prefix="$"
               />
             </ChartCard>
 
@@ -512,6 +567,37 @@ displayStore.defaultBack = '/dashboard'
               <AdminMultiLineChart
                 :series="planARRSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
+                value-prefix="$"
+              />
+            </ChartCard>
+          </div>
+
+          <!-- Retention Charts -->
+          <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <ChartCard
+              title="NRR - Net Revenue Retention"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="nrrSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="nrrSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+                :begin-at-zero="false"
+                :suggested-min="nrrAxisRange.suggestedMin"
+                :suggested-max="nrrAxisRange.suggestedMax"
+                value-suffix="%"
+              />
+            </ChartCard>
+
+            <ChartCard
+              title="Churn Revenue - Lost MRR"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="churnRevenueSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="churnRevenueSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+                value-prefix="$"
               />
             </ChartCard>
           </div>

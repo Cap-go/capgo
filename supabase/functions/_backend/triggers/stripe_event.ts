@@ -30,6 +30,32 @@ interface Org {
 type StripeInfoRow = Database['public']['Tables']['stripe_info']['Row']
 type StripeInfoUpdate = Database['public']['Tables']['stripe_info']['Update']
 type PlanRow = Database['public']['Tables']['plans']['Row']
+type StripeInfoRevenueState = {
+  is_good_plan?: boolean | null
+  paid_at?: string | null
+  price_id?: string | null
+  product_id?: string | null
+  status?: Database['public']['Enums']['stripe_status'] | null
+} | null | undefined
+type RevenuePlanRow = Pick<PlanRow, 'price_m' | 'price_m_id' | 'price_y' | 'price_y_id' | 'stripe_id'>
+
+interface RevenueMovement {
+  currentMrr: number
+  nextMrr: number
+  newBusinessMrr: number
+  expansionMrr: number
+  contractionMrr: number
+  churnMrr: number
+}
+
+const ZERO_REVENUE_MOVEMENT: RevenueMovement = {
+  currentMrr: 0,
+  nextMrr: 0,
+  newBusinessMrr: 0,
+  expansionMrr: 0,
+  contractionMrr: 0,
+  churnMrr: 0,
+}
 
 const checkoutSessionEventTypes = new Set([
   'checkout.session.completed',
@@ -126,6 +152,169 @@ function buildSubscriptionEventMetadata(
 
 function getPlanChangeTrackingEventName(statusName: string) {
   return statusName === 'upgraded' ? 'User Upgraded' : 'User Plan Changed'
+}
+
+function getEventDateId(eventOccurredAtIso: string) {
+  return new Date(eventOccurredAtIso).toISOString().slice(0, 10)
+}
+
+function getPlanMrr(plan: RevenuePlanRow | null | undefined, priceId: string | null | undefined) {
+  if (!plan || !priceId)
+    return 0
+
+  if (plan.price_m_id === priceId)
+    return Number(plan.price_m) || 0
+
+  if (plan.price_y_id === priceId)
+    return (Number(plan.price_y) || 0) / 12
+
+  return 0
+}
+
+function getPlanByProductId(plans: RevenuePlanRow[], productId: string | null | undefined) {
+  if (!productId)
+    return null
+
+  return plans.find(plan => plan.stripe_id === productId) ?? null
+}
+
+function getSubscriptionMrr(plans: RevenuePlanRow[], stripeInfo: StripeInfoRevenueState) {
+  if (!stripeInfo || stripeInfo.status !== 'succeeded' || stripeInfo.is_good_plan === false)
+    return 0
+
+  return getPlanMrr(getPlanByProductId(plans, stripeInfo.product_id), stripeInfo.price_id)
+}
+
+function classifyRevenueMovement(
+  currentStripeInfo: StripeInfoRevenueState,
+  nextStripeInfo: StripeInfoRevenueState,
+  plans: RevenuePlanRow[],
+): RevenueMovement {
+  const currentMrr = getSubscriptionMrr(plans, currentStripeInfo)
+  const nextMrr = getSubscriptionMrr(plans, nextStripeInfo)
+
+  if (currentMrr === 0 && nextMrr === 0)
+    return { ...ZERO_REVENUE_MOVEMENT }
+
+  if (currentMrr === 0 && nextMrr > 0) {
+    if (!currentStripeInfo?.paid_at) {
+      return {
+        ...ZERO_REVENUE_MOVEMENT,
+        currentMrr,
+        nextMrr,
+        newBusinessMrr: nextMrr,
+      }
+    }
+
+    return {
+      ...ZERO_REVENUE_MOVEMENT,
+      currentMrr,
+      nextMrr,
+      expansionMrr: nextMrr,
+    }
+  }
+
+  if (currentMrr > 0 && nextMrr === 0) {
+    return {
+      ...ZERO_REVENUE_MOVEMENT,
+      currentMrr,
+      nextMrr,
+      churnMrr: currentMrr,
+    }
+  }
+
+  if (nextMrr > currentMrr) {
+    return {
+      ...ZERO_REVENUE_MOVEMENT,
+      currentMrr,
+      nextMrr,
+      expansionMrr: nextMrr - currentMrr,
+    }
+  }
+
+  if (currentMrr > nextMrr) {
+    return {
+      ...ZERO_REVENUE_MOVEMENT,
+      currentMrr,
+      nextMrr,
+      contractionMrr: currentMrr - nextMrr,
+    }
+  }
+
+  return {
+    ...ZERO_REVENUE_MOVEMENT,
+    currentMrr,
+    nextMrr,
+  }
+}
+
+function hasRevenueMovement(movement: RevenueMovement) {
+  return movement.newBusinessMrr > 0
+    || movement.expansionMrr > 0
+    || movement.contractionMrr > 0
+    || movement.churnMrr > 0
+}
+
+async function getRevenuePlans(c: Context): Promise<RevenuePlanRow[]> {
+  const { data: plans, error } = await supabaseAdmin(c)
+    .from('plans')
+    .select('stripe_id, price_m, price_y, price_m_id, price_y_id')
+    .in('name', ['Solo', 'Maker', 'Team', 'Enterprise'])
+
+  if (error) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Failed to load revenue plans for Stripe revenue movement tracking',
+      error,
+    })
+    return []
+  }
+
+  return plans ?? []
+}
+
+async function recordRevenueMovement(
+  c: Context,
+  customerId: string,
+  eventOccurredAtIso: string,
+  movement: RevenueMovement,
+) {
+  if (!hasRevenueMovement(movement))
+    return
+
+  const pgClient = getPgClient(c, false)
+  const drizzleClient = getDrizzleClient(pgClient)
+
+  try {
+    await drizzleClient.execute(sql`
+      INSERT INTO public.daily_revenue_metrics (
+        date_id,
+        customer_id,
+        new_business_mrr,
+        expansion_mrr,
+        contraction_mrr,
+        churn_mrr
+      )
+      VALUES (
+        ${getEventDateId(eventOccurredAtIso)},
+        ${customerId},
+        ${movement.newBusinessMrr},
+        ${movement.expansionMrr},
+        ${movement.contractionMrr},
+        ${movement.churnMrr}
+      )
+      ON CONFLICT (date_id, customer_id)
+      DO UPDATE SET
+        updated_at = now(),
+        new_business_mrr = public.daily_revenue_metrics.new_business_mrr + EXCLUDED.new_business_mrr,
+        expansion_mrr = public.daily_revenue_metrics.expansion_mrr + EXCLUDED.expansion_mrr,
+        contraction_mrr = public.daily_revenue_metrics.contraction_mrr + EXCLUDED.contraction_mrr,
+        churn_mrr = public.daily_revenue_metrics.churn_mrr + EXCLUDED.churn_mrr
+    `)
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
 }
 
 async function writePaidAtAtomically(c: Context, customerId: string, eventOccurredAtIso: string) {
@@ -403,7 +592,7 @@ async function createdOrUpdated(
   c: Context,
   stripeData: StripeData,
   org: Org,
-  currentStripeInfo: Pick<StripeInfoRow, 'paid_at' | 'status'> | null | undefined,
+  currentStripeInfo: StripeInfoRow | null | undefined,
   eventOccurredAtIso: string,
   originalStatus?: Database['public']['Enums']['stripe_status'] | null,
 ) {
@@ -421,6 +610,10 @@ async function createdOrUpdated(
     const paidAt = getPaidAtUpdate(currentStripeInfo, status, eventOccurredAtIso)
     if (paidAt)
       updateData.paid_at = paidAt
+    const revenuePlans = await getRevenuePlans(c)
+    const revenueMovement = classifyRevenueMovement(currentStripeInfo, updateData, revenuePlans)
+    if (revenueMovement.currentMrr > 0 && revenueMovement.nextMrr > revenueMovement.currentMrr)
+      updateData.upgraded_at = eventOccurredAtIso
     const { error: dbError2 } = await supabaseAdmin(c)
       .from('stripe_info')
       .update(updateData)
@@ -428,6 +621,8 @@ async function createdOrUpdated(
     if (dbError2) {
       return quickError(404, 'succeeded_customer_id_not_found', `succeeded: customer_id not found`, { dbError2, stripeData })
     }
+
+    await recordRevenueMovement(c, stripeData.data.customer_id, eventOccurredAtIso, revenueMovement)
 
     let previousPlan: PlanRow | null = null
     if (trackingState.shouldSendPlanChange && stripeData.previousProductId) {
@@ -645,13 +840,17 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
     if (customer && customer.subscription_id === stripeData.data.subscription_id) {
       // This is the known subscription being cancelled
       await didCancel(c, org)
+      const eventOccurredAtIso = new Date(stripeEvent.created * 1000).toISOString()
       // Only mark as 'succeeded' if subscription is still active until period end
       // Check if subscription_anchor_end is in the future
       if (stripeData.data.subscription_anchor_end && new Date(stripeData.data.subscription_anchor_end) > new Date()) {
         stripeData.data.status = 'succeeded'
       }
+      const revenuePlans = await getRevenuePlans(c)
+      const revenueMovement = classifyRevenueMovement(customer, stripeData.data, revenuePlans)
       // Otherwise keep it as 'canceled' since the period has ended
       await updateStripeInfo(c, stripeData)
+      await recordRevenueMovement(c, stripeData.data.customer_id, eventOccurredAtIso, revenueMovement)
     }
     // If it's a different subscription (not the one in DB), ignore it
     // This prevents old subscription webhooks from overwriting newer active subscriptions
@@ -664,8 +863,11 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
 
 export const stripeEventTestUtils = {
   buildSubscriptionEventMetadata,
+  classifyRevenueMovement,
+  getEventDateId,
   getPaidAtUpdate,
   getPlanChangeTrackingEventName,
+  getSubscriptionMrr,
   getSubscriptionTrackingState,
   isCustomerProfileEvent,
 }
