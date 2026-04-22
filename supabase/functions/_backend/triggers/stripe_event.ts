@@ -425,6 +425,10 @@ async function createdOrUpdated(
       .from('stripe_info')
       .update(updateData)
       .eq('customer_id', stripeData.data.customer_id)
+    if (dbError2) {
+      return quickError(404, 'succeeded_customer_id_not_found', `succeeded: customer_id not found`, { dbError2, stripeData })
+    }
+
     let previousPlan: PlanRow | null = null
     if (trackingState.shouldSendPlanChange && stripeData.previousProductId) {
       const previousProduct = await supabaseAdmin(c)
@@ -452,10 +456,6 @@ async function createdOrUpdated(
         notify: true,
         tags: planChangeMetadata,
       })
-    }
-
-    if (dbError2) {
-      return quickError(404, 'succeeded_customer_id_not_found', `succeeded: customer_id not found`, { dbError2, stripeData })
     }
 
     if (paidAt) {
