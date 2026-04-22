@@ -184,7 +184,7 @@ describe('cron_stat_app follow-up failures', () => {
     ])
   })
 
-  it('returns 500 when queuing plan processing fails after stats writes', async () => {
+  it('returns success when queuing plan processing fails after stats writes', async () => {
     const { client, builders } = createSupabaseStub({
       queueError: new Error('error code: 502'),
     })
@@ -194,7 +194,7 @@ describe('cron_stat_app follow-up failures', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        apisecret: 'testsecret',
+        'apisecret': 'testsecret',
       },
       body: JSON.stringify({
         appId: 'com.test.app',
@@ -204,16 +204,45 @@ describe('cron_stat_app follow-up failures', () => {
       waitUntil: () => { },
     } as any)
 
-    expect(response.status).toBe(500)
+    expect(response.status).toBe(200)
     expect(builders.dailyMauBuilder.throwOnError).toHaveBeenCalledTimes(1)
     expect(builders.dailyBandwidthBuilder.throwOnError).toHaveBeenCalledTimes(1)
     expect(builders.dailyStorageBuilder.throwOnError).toHaveBeenCalledTimes(1)
     expect(builders.dailyVersionBuilder.throwOnError).toHaveBeenCalledTimes(1)
     expect(builders.orgUpdateBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.queueBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.queueBuilder.throwOnError).toHaveBeenCalledTimes(3)
 
-    const payload = await response.json() as { error: string }
-    expect(payload.error).toBe('unknown_error')
+    const payload = await response.json() as { status: string }
+    expect(payload.status).toBe('Stats saved')
+  })
+
+  it('retries queuing plan processing before succeeding', async () => {
+    const { client, builders } = createSupabaseStub()
+    builders.queueBuilder.throwOnError
+      .mockRejectedValueOnce(new Error('error code: 502'))
+      .mockRejectedValueOnce(new Error('error code: 502'))
+      .mockResolvedValue({ data: null, error: null })
+    supabaseAdminMock.mockReturnValue(client)
+
+    const response = await createApp().fetch(new Request('http://localhost/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apisecret': 'testsecret',
+      },
+      body: JSON.stringify({
+        appId: 'com.test.app',
+        orgId: 'org-test',
+      }),
+    }), {}, {
+      waitUntil: () => { },
+    } as any)
+
+    expect(response.status).toBe(200)
+    expect(builders.queueBuilder.throwOnError).toHaveBeenCalledTimes(3)
+
+    const payload = await response.json() as { status: string }
+    expect(payload.status).toBe('Stats saved')
   })
 
   it('returns success and still queues plan processing when org timestamp refresh fails after stats writes', async () => {
@@ -226,7 +255,7 @@ describe('cron_stat_app follow-up failures', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        apisecret: 'testsecret',
+        'apisecret': 'testsecret',
       },
       body: JSON.stringify({
         appId: 'com.test.app',
@@ -258,7 +287,7 @@ describe('cron_stat_app follow-up failures', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        apisecret: 'testsecret',
+        'apisecret': 'testsecret',
       },
       body: JSON.stringify({
         appId: 'com.test.app',
