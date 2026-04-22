@@ -365,7 +365,7 @@ describe('cron_stat_app follow-up failures', () => {
     } as any)
 
     expect(response.status).toBe(200)
-    expect(builders.appUpdateBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.appUpdateBuilder.update).toHaveBeenCalledTimes(1)
     expect(builders.dailyMauBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.dailyBandwidthBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.dailyStorageBuilder.upsert).toHaveBeenCalledTimes(1)
@@ -401,7 +401,7 @@ describe('cron_stat_app follow-up failures', () => {
     } as any)
 
     expect(response.status).toBe(200)
-    expect(builders.appUpdateBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.appUpdateBuilder.update).toHaveBeenCalledTimes(1)
     expect(builders.dailyMauBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.dailyBandwidthBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.dailyStorageBuilder.upsert).toHaveBeenCalledTimes(1)
@@ -434,7 +434,7 @@ describe('cron_stat_app follow-up failures', () => {
     } as any)
 
     expect(response.status).toBe(200)
-    expect(builders.appUpdateBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.appUpdateBuilder.update).toHaveBeenCalledTimes(1)
     expect(builders.dailyMauBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.dailyBandwidthBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.dailyStorageBuilder.upsert).toHaveBeenCalledTimes(1)

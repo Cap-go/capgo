@@ -127,6 +127,7 @@ const isRefreshPolling = ref(false)
 const autoRefreshScopeKey = ref<string | null>(null)
 let refreshPollTimer: ReturnType<typeof setTimeout> | null = null
 let refreshPollStartedAt = 0
+let refreshClockTimer: ReturnType<typeof setInterval> | null = null
 const effectiveOrganization = computed(() => {
   if (props.appId)
     return organizationStore.getOrgByAppId(props.appId) ?? organizationStore.currentOrganization
@@ -906,6 +907,10 @@ watch(() => ({
 }, { immediate: true })
 
 onMounted(async () => {
+  refreshClockTimer = setInterval(() => {
+    touchRefreshStateClock()
+  }, CHART_REFRESH_POLL_MS)
+
   // If forceDemo is true, load immediately with demo data
   if (props.forceDemo) {
     loadData()
@@ -925,6 +930,10 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  if (refreshClockTimer !== null) {
+    clearInterval(refreshClockTimer)
+    refreshClockTimer = null
+  }
   stopRefreshPolling()
 })
 </script>

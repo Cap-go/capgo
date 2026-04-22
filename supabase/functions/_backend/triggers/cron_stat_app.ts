@@ -157,16 +157,16 @@ async function getOrgStatsRefreshTarget(
 }
 
 async function syncAppStatsRefresh(
+  c: Parameters<typeof supabaseAdmin>[0],
   supabase: ReturnType<typeof supabaseAdmin>,
   appId: string,
   refreshCompletedAt: string,
 ): Promise<void> {
-  await supabase.from('apps')
+  await runSupabaseResultWithRetry(c, 'sync_app_stats_refresh', async () => await supabase.from('apps')
     .update({
       stats_updated_at: refreshCompletedAt,
     })
-    .eq('app_id', appId)
-    .throwOnError()
+    .eq('app_id', appId))
 }
 
 async function syncOrgStatsRefresh(
@@ -389,7 +389,7 @@ app.post('/', middlewareAPISecret, async (c) => {
 
   cloudlog({ requestId: c.get('requestId'), message: 'stats saved', mauLength: mau.length, bandwidthLength: bandwidth.length, storageLength: storage.length, versionUsageLength: versionUsage.length })
   const refreshCompletedAt = new Date().toISOString()
-  await syncAppStatsRefresh(supabase, body.appId, refreshCompletedAt)
+  await syncAppStatsRefresh(c, supabase, body.appId, refreshCompletedAt)
 
   let pendingAppRefreshes = true
   try {

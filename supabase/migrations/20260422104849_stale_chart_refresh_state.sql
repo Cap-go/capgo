@@ -350,44 +350,24 @@ SECURITY DEFINER
 SET search_path = '' AS $function$
 DECLARE
   v_org_id uuid;
-  v_lock_key integer;
   v_now_utc timestamp without time zone;
-  v_stats_updated_at timestamp without time zone;
-  v_stats_refresh_requested_at timestamp without time zone;
 BEGIN
   IF p_app_id IS NULL OR p_app_id = '' THEN
     RETURN;
   END IF;
 
-  v_lock_key := pg_catalog.hashtext(p_app_id);
-  PERFORM pg_catalog.pg_advisory_xact_lock(v_lock_key);
   v_now_utc := pg_catalog.timezone('UTC', pg_catalog.clock_timestamp());
 
-  SELECT
-    a.owner_org,
-    a.stats_updated_at,
-    a.stats_refresh_requested_at
-  INTO
-    v_org_id,
-    v_stats_updated_at,
-    v_stats_refresh_requested_at
-  FROM public.apps a
+  UPDATE public.apps AS a
+  SET stats_refresh_requested_at = v_now_utc
   WHERE a.app_id = p_app_id
-  LIMIT 1;
+    AND (p_org_id IS NULL OR a.owner_org = p_org_id)
+    AND (a.stats_updated_at IS NULL OR a.stats_updated_at < v_now_utc - INTERVAL '5 minutes')
+    AND (a.stats_refresh_requested_at IS NULL OR a.stats_refresh_requested_at < v_now_utc - INTERVAL '5 minutes')
+  RETURNING a.owner_org
+  INTO v_org_id;
 
   IF v_org_id IS NULL THEN
-    RETURN;
-  END IF;
-
-  IF p_org_id IS NOT NULL AND v_org_id IS DISTINCT FROM p_org_id THEN
-    RETURN;
-  END IF;
-
-  IF v_stats_updated_at IS NOT NULL AND v_stats_updated_at >= v_now_utc - INTERVAL '5 minutes' THEN
-    RETURN;
-  END IF;
-
-  IF v_stats_refresh_requested_at IS NOT NULL AND v_stats_refresh_requested_at >= v_now_utc - INTERVAL '5 minutes' THEN
     RETURN;
   END IF;
 
@@ -398,10 +378,6 @@ BEGIN
   ) THEN
     RETURN;
   END IF;
-
-  UPDATE public.apps
-  SET stats_refresh_requested_at = v_now_utc
-  WHERE app_id = p_app_id;
 
   PERFORM pgmq.send('cron_stat_app',
     pg_catalog.jsonb_build_object(
