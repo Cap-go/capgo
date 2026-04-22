@@ -13,6 +13,29 @@ function createTestContext() {
 }
 
 describe('backend alert resilience helpers', () => {
+  it('clears stale thrown errors after a later retry succeeds', async () => {
+    const { retryWithBackoff } = await import('../supabase/functions/_backend/utils/retry.ts')
+
+    let attempts = 0
+    const outcome = await retryWithBackoff(async () => {
+      attempts += 1
+
+      if (attempts === 1) {
+        throw new Error('temporary queue failure')
+      }
+
+      return { ok: true }
+    }, {
+      attempts: 3,
+      baseDelayMs: 1,
+    })
+
+    expect(attempts).toBe(2)
+    expect(outcome.result).toEqual({ ok: true })
+    expect(outcome.lastError).toBeUndefined()
+    expect(outcome.attempts).toBe(2)
+  })
+
   it('retries retryable durable object resets for replayable upload requests', async () => {
     const { filesTestUtils } = await import('../supabase/functions/_backend/files/files.ts')
 

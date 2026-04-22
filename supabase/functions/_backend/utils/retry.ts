@@ -20,6 +20,7 @@ export async function retryWithBackoff<T>(
   for (let attempt = 0; attempt < options.attempts; attempt++) {
     try {
       result = await operation()
+      lastError = undefined
       const needsRetry = options.shouldRetry?.(result) ?? false
       if (!needsRetry) {
         return { result, lastError, attempts: attempt + 1 }
