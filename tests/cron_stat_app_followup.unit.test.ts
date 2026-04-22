@@ -78,6 +78,11 @@ function createSupabaseStub(options?: {
   orgSelectError?: Error | null
   orgUpdateError?: Error | null
   pendingAppRefreshes?: boolean
+  pendingAppRows?: Array<{
+    app_id: string
+    stats_refresh_requested_at: string | null
+    stats_updated_at: string | null
+  }>
   queueError?: Error | null
   queueStatus?: number | null
 }) {
@@ -89,15 +94,15 @@ function createSupabaseStub(options?: {
     error: null,
   })
   const pendingAppsBuilder = createListBuilder({
-    data: options?.pendingAppRefreshes
+    data: options?.pendingAppRows ?? (options?.pendingAppRefreshes
       ? [
           {
             app_id: 'com.other.app',
-            stats_refresh_requested_at: '2026-04-20T11:00:00.000Z',
+            stats_refresh_requested_at: new Date(Date.now() - 60 * 1000).toISOString(),
             stats_updated_at: null,
           },
         ]
-      : [],
+      : []),
     error: null,
   })
   const orgSelectBuilder = createSingleBuilder({
@@ -124,7 +129,7 @@ function createSupabaseStub(options?: {
     error: null,
     status: 200,
   })
-  const appBuilders = [appSelectBuilder, pendingAppsBuilder]
+  let appSelectConsumed = false
   const queueBuilder = createRpcResultBuilder({
     data: null,
     error: options?.queueError ?? null,
@@ -139,11 +144,11 @@ function createSupabaseStub(options?: {
     from: vi.fn((table: string) => {
       switch (table) {
         case 'apps': {
-          const nextBuilder = appBuilders.shift()
-          if (!nextBuilder) {
-            throw new Error('Unexpected apps builder call')
+          if (!appSelectConsumed) {
+            appSelectConsumed = true
+            return appSelectBuilder
           }
-          return nextBuilder
+          return pendingAppsBuilder
         }
         case 'daily_mau':
           return dailyMauBuilder
@@ -451,5 +456,118 @@ describe('cron_stat_app follow-up failures', () => {
 
     const payload = await response.json() as { status: string }
     expect(payload.status).toBe('Stats saved')
+  })
+
+  it('ignores stale pending refresh markers when deciding org completion', async () => {
+    const { client, builders } = createSupabaseStub({
+      pendingAppRows: [
+        {
+          app_id: 'com.other.app',
+          stats_refresh_requested_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+          stats_updated_at: null,
+        },
+      ],
+    })
+    supabaseAdminMock.mockReturnValue(client)
+
+    const response = await createApp().fetch(new Request('http://localhost/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apisecret': 'testsecret',
+      },
+      body: JSON.stringify({
+        appId: 'com.test.app',
+        orgId: 'org-test',
+      }),
+    }), {}, {
+      waitUntil: () => { },
+    } as any)
+
+    expect(response.status).toBe(200)
+    expect(builders.pendingAppsBuilder.eq).toHaveBeenCalledTimes(1)
+    expect(builders.orgBuilder.update).toHaveBeenCalledTimes(1)
+    expect(client.rpc).toHaveBeenCalledWith('queue_cron_stat_org_for_org', {
+      org_id: 'org-test',
+      customer_id: 'cus_test',
+    })
+
+    const payload = await response.json() as { status: string }
+    expect(payload.status).toBe('Stats saved')
+  })
+
+  it('retries the pending refresh lookup before completing org refresh', async () => {
+    const { client, builders } = createSupabaseStub()
+    builders.pendingAppsBuilder.eq
+      .mockResolvedValueOnce({
+        data: null,
+        error: new Error('error code: 502'),
+        status: 502,
+      })
+      .mockResolvedValueOnce({
+        data: null,
+        error: new Error('error code: 502'),
+        status: 502,
+      })
+      .mockResolvedValue({
+        data: [],
+        error: null,
+        status: 200,
+      })
+    supabaseAdminMock.mockReturnValue(client)
+
+    const response = await createApp().fetch(new Request('http://localhost/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apisecret': 'testsecret',
+      },
+      body: JSON.stringify({
+        appId: 'com.test.app',
+        orgId: 'org-test',
+      }),
+    }), {}, {
+      waitUntil: () => { },
+    } as any)
+
+    expect(response.status).toBe(200)
+    expect(builders.pendingAppsBuilder.eq).toHaveBeenCalledTimes(3)
+    expect(builders.orgBuilder.update).toHaveBeenCalledTimes(1)
+    expect(client.rpc).toHaveBeenCalledWith('queue_cron_stat_org_for_org', {
+      org_id: 'org-test',
+      customer_id: 'cus_test',
+    })
+
+    const payload = await response.json() as { status: string }
+    expect(payload.status).toBe('Stats saved')
+  })
+
+  it('surfaces pending refresh lookup failures after retries', async () => {
+    const { client, builders } = createSupabaseStub()
+    builders.pendingAppsBuilder.eq.mockResolvedValue({
+      data: null,
+      error: new Error('error code: 502'),
+      status: 502,
+    })
+    supabaseAdminMock.mockReturnValue(client)
+
+    const response = await createApp().fetch(new Request('http://localhost/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apisecret': 'testsecret',
+      },
+      body: JSON.stringify({
+        appId: 'com.test.app',
+        orgId: 'org-test',
+      }),
+    }), {}, {
+      waitUntil: () => { },
+    } as any)
+
+    expect(response.status).toBe(500)
+    expect(builders.pendingAppsBuilder.eq).toHaveBeenCalledTimes(3)
+    expect(builders.orgBuilder.update).not.toHaveBeenCalled()
+    expect(client.rpc).not.toHaveBeenCalledWith('queue_cron_stat_org_for_org', expect.anything())
   })
 })

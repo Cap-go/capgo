@@ -18,6 +18,7 @@ const SUPABASE_RETRY_ATTEMPTS = 3
 const SUPABASE_RETRY_DELAY_MS = 300
 const PLAN_REFRESH_RETRY_ATTEMPTS = 3
 const PLAN_REFRESH_RETRY_DELAY_MS = 300
+const APP_STATS_REFRESH_STALE_MS = 5 * 60 * 1000
 
 interface SupabaseRetryResult<T> {
   data: T | null
@@ -188,22 +189,22 @@ async function syncOrgStatsRefresh(
 }
 
 async function hasPendingAppStatsRefresh(
+  c: Parameters<typeof supabaseAdmin>[0],
   supabase: ReturnType<typeof supabaseAdmin>,
   orgId: string,
 ): Promise<boolean> {
-  const { data, error } = await supabase
+  const { data } = await runSupabaseResultWithRetry<AppRefreshStateRow[]>(c, 'load_pending_app_stats_refreshes', async () => await supabase
     .from('apps')
     .select('app_id,stats_refresh_requested_at,stats_updated_at')
-    .eq('owner_org', orgId)
+    .eq('owner_org', orgId))
 
-  if (error) {
-    throw error
-  }
-
-  const rows = (data ?? []) as AppRefreshStateRow[]
+  const rows = data ?? []
+  const staleCutoff = Date.now() - APP_STATS_REFRESH_STALE_MS
   return rows.some((row) => {
     const requestedAt = parseRefreshTimestamp(row.stats_refresh_requested_at)
     if (requestedAt === null)
+      return false
+    if (requestedAt < staleCutoff)
       return false
 
     const updatedAt = parseRefreshTimestamp(row.stats_updated_at)
@@ -395,10 +396,11 @@ app.post('/', middlewareAPISecret, async (c) => {
 
   let pendingAppRefreshes = true
   try {
-    pendingAppRefreshes = await hasPendingAppStatsRefresh(supabase, body.orgId)
+    pendingAppRefreshes = await hasPendingAppStatsRefresh(c, supabase, body.orgId)
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to inspect pending cron_stat_app refresh state', orgId: body.orgId, error })
+    throw error
   }
 
   let orgStatsRefreshTarget: OrgStatsRefreshTarget | null = null

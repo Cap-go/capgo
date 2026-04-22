@@ -35,7 +35,7 @@ describe('cron_stat_app refresh completion', () => {
   })
 
   beforeEach(async () => {
-    const requestedAt = new Date(Date.now() - 10 * 60 * 1000).toISOString()
+    const requestedAt = new Date(Date.now() - 60 * 1000).toISOString()
 
     await getSupabaseClient().from('orgs').update({
       last_stats_updated_at: null,
