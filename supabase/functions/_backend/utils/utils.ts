@@ -157,13 +157,28 @@ export function backgroundTask(c: Context, p: any) {
   return p
 }
 
+function getContextEnv(c: Context): Record<string, string | undefined> {
+  const runtimeEnv = env(c)
+  if (runtimeEnv && typeof runtimeEnv === 'object') {
+    return runtimeEnv as Record<string, string | undefined>
+  }
+
+  const contextEnv = (c as Context & { env?: Record<string, string | undefined> }).env
+  if (contextEnv && typeof contextEnv === 'object') {
+    return contextEnv
+  }
+
+  return {}
+}
+
 export function existInEnv(c: Context, key: string): boolean {
-  return key in env(c)
+  return key in getContextEnv(c)
 }
 
 export function getEnv(c: Context, key: string): string {
-  if (key in env(c))
-    return env(c)[key] ?? ''
+  const contextEnv = getContextEnv(c)
+  if (key in contextEnv)
+    return contextEnv[key] ?? ''
   return ''
 }
 

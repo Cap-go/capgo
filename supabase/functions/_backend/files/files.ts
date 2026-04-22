@@ -21,9 +21,9 @@ import { app as files_config } from './files_config.ts'
 import { parseUploadMetadata } from './parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
 import { supabaseTusCreateHandler, supabaseTusHeadHandler, supabaseTusPatchHandler } from './supabaseTusProxy.ts'
-import { ALLOWED_HEADERS, ALLOWED_METHODS, buildFileHttpMetadata, EXPOSED_HEADERS, MAX_UPLOAD_LENGTH_BYTES, toBase64, TUS_EXTENSIONS, TUS_VERSION, withNoTransformCacheControl, X_CHECKSUM_SHA256 } from './util.ts'
+import { ALLOWED_HEADERS, ALLOWED_METHODS, buildFileHttpMetadata, EXPOSED_HEADERS, isRetryableDurableObjectResetError, MAX_UPLOAD_LENGTH_BYTES, toBase64, TUS_EXTENSIONS, TUS_VERSION, withNoTransformCacheControl, X_CHECKSUM_SHA256, X_UPLOAD_HANDLER_RETRYABLE } from './util.ts'
 
-const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 20 minutes
+const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 30 minutes
 const DO_FETCH_RETRY_ATTEMPTS = 3
 const DO_FETCH_RETRY_DELAY_MS = 250
 
@@ -31,29 +31,96 @@ const ATTACHMENT_PREFIX = 'attachments'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
-function getDurableObjectErrorMessage(error: unknown): string {
-  if (!error || typeof error !== 'object' || !('message' in error)) {
-    return ''
-  }
-
-  const { message } = error as { message?: unknown }
-  return typeof message === 'string' ? message.toLowerCase() : ''
+function isRetryableDurableObjectFetchError(error: unknown): boolean {
+  return isRetryableDurableObjectResetError(error)
 }
 
-function isRetryableDurableObjectFetchError(error: unknown): boolean {
-  if (error && typeof error === 'object') {
-    const candidate = error as { retryable?: boolean, durableObjectReset?: boolean }
-    if (candidate.retryable || candidate.durableObjectReset) {
-      return true
-    }
+function requestHasUploadBody(request: Request): boolean {
+  if (request.body == null) {
+    return false
   }
 
-  const message = getDurableObjectErrorMessage(error)
-  return message.includes('moved to a different machine')
+  if (request.headers.has('transfer-encoding')) {
+    return true
+  }
+
+  const contentLength = request.headers.get('content-length')
+  if (contentLength == null) {
+    return true
+  }
+
+  const parsedLength = Number.parseInt(contentLength, 10)
+  return !Number.isFinite(parsedLength) || parsedLength > 0
 }
 
 function canReplayUploadRequest(request: Request): boolean {
-  return request.method === 'HEAD' || request.body === null
+  return request.method === 'HEAD' || !requestHasUploadBody(request)
+}
+
+function buildDurableObjectRequest(request: Request): Request {
+  const requestInit: RequestInit & { duplex?: 'half' } = {
+    headers: request.headers,
+    method: request.method,
+    signal: AbortSignal.timeout(DO_CALL_TIMEOUT),
+  }
+  if (request.method !== 'HEAD' && requestHasUploadBody(request)) {
+    requestInit.body = request.body
+    requestInit.duplex = 'half'
+  }
+
+  return new Request(request.url, requestInit)
+}
+
+function isRetryableDurableObjectResponse(response: Response): boolean {
+  return response.headers.get(X_UPLOAD_HANDLER_RETRYABLE) === '1'
+}
+
+async function recoverUploadOffsetFromDurableObject(
+  c: Context,
+  handler: DurableObjectStub,
+  request: Request,
+  fallbackResponse: Response,
+): Promise<Response> {
+  if (request.method !== 'PATCH') {
+    return fallbackResponse
+  }
+
+  try {
+    const headers = new Headers(request.headers)
+    headers.delete('content-length')
+
+    const headResponse = await handler.fetch(new Request(request.url, {
+      method: 'HEAD',
+      headers,
+      signal: AbortSignal.timeout(DO_CALL_TIMEOUT),
+    }))
+
+    const uploadOffset = headResponse.headers.get('Upload-Offset')
+    if (!headResponse.ok || uploadOffset == null) {
+      return fallbackResponse
+    }
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'upload handler - recovered upload offset after durable object reset',
+      fileId: c.get('fileId'),
+      uploadOffset,
+    })
+
+    return new Response(null, {
+      status: 409,
+      headers: new Headers(headResponse.headers),
+    })
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'upload handler - failed to recover upload offset after durable object reset',
+      error,
+      fileId: c.get('fileId'),
+    })
+    return fallbackResponse
+  }
 }
 
 async function fetchUploadHandlerWithRetry(
@@ -67,19 +134,27 @@ async function fetchUploadHandlerWithRetry(
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const requestInit: RequestInit & { duplex?: 'half' } = {
-        headers: request.headers,
-        method: request.method,
-        signal: AbortSignal.timeout(DO_CALL_TIMEOUT),
-      }
-      if (request.method !== 'HEAD' && request.body !== null) {
-        requestInit.body = request.body
-        requestInit.duplex = 'half'
+      const response = await handler.fetch(buildDurableObjectRequest(request))
+
+      const shouldRetryResponse = canRetryRequest
+        && attempt < maxAttempts
+        && isRetryableDurableObjectResponse(response)
+
+      if (shouldRetryResponse) {
+        cloudlogErr({
+          requestId: c.get('requestId'),
+          message: 'upload handler - durable object returned retryable response, retrying',
+          attempt,
+          fileId: c.get('fileId'),
+          status: response.status,
+        })
+        await new Promise(resolve => setTimeout(resolve, DO_FETCH_RETRY_DELAY_MS * attempt))
+        continue
       }
 
-      const response = await handler.fetch(
-        new Request(request.url, requestInit),
-      )
+      if (!canRetryRequest && isRetryableDurableObjectResponse(response)) {
+        return await recoverUploadOffsetFromDurableObject(c, handler, request, response)
+      }
 
       if (attempt > 1) {
         cloudlog({
@@ -386,7 +461,7 @@ async function uploadHandler(c: Context) {
     method,
     headers,
   }
-  if (method !== 'HEAD') {
+  if (method !== 'HEAD' && requestHasUploadBody(c.req.raw)) {
     requestInit.body = c.req.raw.body
     requestInit.duplex = 'half'
   }

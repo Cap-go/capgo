@@ -10,6 +10,39 @@ import { supabaseAdmin } from '../utils/supabase.ts'
 
 const SIZE_RETRY_ATTEMPTS = 3
 const SIZE_RETRY_DELAY_MS = 500
+const MANIFEST_UPDATE_RETRY_ATTEMPTS = 3
+const MANIFEST_UPDATE_RETRY_DELAY_MS = 300
+
+interface ManifestUpdateResult {
+  error: unknown
+  status?: number | null
+}
+
+function getRetryablePostgrestStatus(candidate: unknown): number | null {
+  if (candidate && typeof candidate === 'object') {
+    if ('status' in candidate && typeof (candidate as { status?: unknown }).status === 'number') {
+      return (candidate as { status: number }).status
+    }
+
+    if ('message' in candidate && typeof (candidate as { message?: unknown }).message === 'string') {
+      const match = /error code:\s*(\d{3})/i.exec((candidate as { message: string }).message)
+      if (match) {
+        return Number.parseInt(match[1], 10)
+      }
+    }
+  }
+
+  return null
+}
+
+function isRetryablePostgrestResult(result: ManifestUpdateResult | null | undefined): boolean {
+  if (!result) {
+    return false
+  }
+
+  const status = typeof result.status === 'number' ? result.status : getRetryablePostgrestStatus(result.error)
+  return typeof status === 'number' && status >= 500 && status < 600
+}
 
 async function getManifestSizeWithRetry(c: Context, s3Path: string): Promise<{ size: number, lastError?: unknown }> {
   const { result, lastError } = await retryWithBackoff(
@@ -22,6 +55,45 @@ async function getManifestSizeWithRetry(c: Context, s3Path: string): Promise<{ s
   )
 
   return { size: typeof result === 'number' ? result : 0, lastError }
+}
+
+async function runManifestUpdateWithRetry(
+  c: Context,
+  operation: () => Promise<ManifestUpdateResult>,
+): Promise<void> {
+  const { result, lastError, attempts } = await retryWithBackoff(async () => {
+    try {
+      return await operation()
+    }
+    catch (error) {
+      return { error }
+    }
+  }, {
+    attempts: MANIFEST_UPDATE_RETRY_ATTEMPTS,
+    baseDelayMs: MANIFEST_UPDATE_RETRY_DELAY_MS,
+    shouldRetry: result => isRetryablePostgrestResult(result),
+  })
+
+  if (!result) {
+    throw new Error('update_manifest_file_size returned no result')
+  }
+
+  if (attempts > 1) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'on_manifest_create update retried',
+      attempts,
+      hadError: Boolean(result.error || lastError),
+    })
+  }
+
+  if (lastError || result.error) {
+    throw result.error ?? lastError
+  }
+
+  if (typeof result.status === 'number' && result.status >= 400) {
+    throw new Error(`update_manifest_file_size failed with status ${result.status}`)
+  }
 }
 
 async function updateManifestSize(c: Context, record: Database['public']['Tables']['manifest']['Row']) {
@@ -43,11 +115,13 @@ async function updateManifestSize(c: Context, record: Database['public']['Tables
     return c.json(BRES)
   }
 
-  const { error: updateError } = await supabaseAdmin(c)
-    .from('manifest')
-    .update({ file_size: size })
-    .eq('id', record.id)
-  if (updateError) {
+  try {
+    await runManifestUpdateWithRetry(c, async () => await supabaseAdmin(c)
+      .from('manifest')
+      .update({ file_size: size })
+      .eq('id', record.id))
+  }
+  catch (updateError) {
     cloudlog({ requestId: c.get('requestId'), message: 'error update manifest size', error: updateError })
     throw simpleError('manifest_update_failed', 'Failed to update manifest file_size', { record, updateError })
   }
@@ -68,3 +142,8 @@ app.post('/', middlewareAPISecret, triggerValidator('manifest', 'INSERT'), (c) =
 
   return updateManifestSize(c, record)
 })
+
+export const onManifestCreateTestUtils = {
+  isRetryablePostgrestResult,
+  runManifestUpdateWithRetry,
+}

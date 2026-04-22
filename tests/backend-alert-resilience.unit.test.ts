@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
+import { X_UPLOAD_HANDLER_RETRYABLE } from '../supabase/functions/_backend/files/util.ts'
+import { existInEnv, getEnv } from '../supabase/functions/_backend/utils/utils.ts'
 
 function createTestContext() {
   return {
@@ -68,6 +70,81 @@ describe('backend alert resilience helpers', () => {
     )
 
     expect(response.status).toBe(204)
+    expect(handler.fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('retries retryable durable object responses for empty-body upload creation requests', async () => {
+    const { filesTestUtils } = await import('../supabase/functions/_backend/files/files.ts')
+
+    const handler = {
+      fetch: vi.fn(),
+    } as any
+
+    handler.fetch
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        error: 'durable_object_temporarily_unavailable',
+      }), {
+        status: 503,
+        headers: {
+          [X_UPLOAD_HANDLER_RETRYABLE]: '1',
+        },
+      }))
+      .mockResolvedValueOnce(new Response(null, { status: 201 }))
+
+    const response = await filesTestUtils.fetchUploadHandlerWithRetry(
+      createTestContext(),
+      handler,
+      new Request('http://localhost/files/upload/attachments/test.zip', {
+        method: 'POST',
+        headers: {
+          'Content-Length': '0',
+          'Tus-Resumable': '1.0.0',
+        },
+      }),
+    )
+
+    expect(response.status).toBe(201)
+    expect(handler.fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('recovers upload offset after a retryable durable object patch response', async () => {
+    const { filesTestUtils } = await import('../supabase/functions/_backend/files/files.ts')
+
+    const handler = {
+      fetch: vi.fn()
+        .mockResolvedValueOnce(new Response(JSON.stringify({
+          error: 'durable_object_temporarily_unavailable',
+        }), {
+          status: 503,
+          headers: {
+            [X_UPLOAD_HANDLER_RETRYABLE]: '1',
+          },
+        }))
+        .mockResolvedValueOnce(new Response(null, {
+          status: 200,
+          headers: {
+            'Upload-Offset': '5242880',
+            'Tus-Resumable': '1.0.0',
+          },
+        })),
+    } as any
+
+    const response = await filesTestUtils.fetchUploadHandlerWithRetry(
+      createTestContext(),
+      handler,
+      new Request('http://localhost/files/upload/attachments/test.zip', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/offset+octet-stream',
+          'Upload-Offset': '0',
+          'Tus-Resumable': '1.0.0',
+        },
+        body: 'chunk-data',
+      }),
+    )
+
+    expect(response.status).toBe(409)
+    expect(response.headers.get('Upload-Offset')).toBe('5242880')
     expect(handler.fetch).toHaveBeenCalledTimes(2)
   })
 
@@ -162,6 +239,46 @@ describe('backend alert resilience helpers', () => {
 
     expect(attempts).toBe(2)
     expect(result.data).toEqual({ ok: true })
+  })
+
+  it('retries transient PostgREST statuses for on_manifest_create updates', async () => {
+    const { onManifestCreateTestUtils } = await import('../supabase/functions/_backend/triggers/on_manifest_create.ts')
+
+    let attempts = 0
+    await onManifestCreateTestUtils.runManifestUpdateWithRetry(
+      createTestContext(),
+      async () => {
+        attempts += 1
+
+        if (attempts === 1) {
+          return {
+            error: {
+              name: 'PostgrestError',
+              message: 'error code: 502',
+            },
+            status: 502,
+          }
+        }
+
+        return {
+          error: null,
+          status: 204,
+        }
+      },
+    )
+
+    expect(attempts).toBe(2)
+  })
+
+  it('returns empty strings when env bindings are missing from the context', () => {
+    const context = {
+      req: {
+        header: () => undefined,
+      },
+    } as any
+
+    expect(existInEnv(context, 'ENVIRONMENT')).toBe(false)
+    expect(getEnv(context, 'ENVIRONMENT')).toBe('')
   })
 
   it('skips stale cron_stat_app jobs when the app no longer exists', async () => {
