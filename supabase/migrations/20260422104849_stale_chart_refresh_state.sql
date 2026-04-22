@@ -399,6 +399,37 @@ REVOKE ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uui
 REVOKE ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid) FROM authenticated;
 GRANT ALL ON FUNCTION public.queue_cron_stat_app_for_app(character varying, uuid) TO service_role;
 
+CREATE OR REPLACE FUNCTION public.mark_app_stats_refreshed(
+  p_app_id character varying
+) RETURNS timestamp without time zone
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = '' AS $function$
+DECLARE
+  v_now_utc timestamp without time zone := pg_catalog.timezone('UTC', pg_catalog.clock_timestamp());
+BEGIN
+  IF p_app_id IS NULL OR p_app_id = '' THEN
+    RETURN NULL;
+  END IF;
+
+  UPDATE public.apps
+  SET stats_updated_at = v_now_utc
+  WHERE app_id = p_app_id;
+
+  IF NOT FOUND THEN
+    RETURN NULL;
+  END IF;
+
+  RETURN v_now_utc;
+END;
+$function$;
+
+ALTER FUNCTION public.mark_app_stats_refreshed(character varying) OWNER TO postgres;
+REVOKE ALL ON FUNCTION public.mark_app_stats_refreshed(character varying) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.mark_app_stats_refreshed(character varying) FROM anon;
+REVOKE ALL ON FUNCTION public.mark_app_stats_refreshed(character varying) FROM authenticated;
+GRANT ALL ON FUNCTION public.mark_app_stats_refreshed(character varying) TO service_role;
+
 CREATE OR REPLACE FUNCTION public.request_app_chart_refresh(app_id character varying)
 RETURNS TABLE(
   requested_at timestamp without time zone,
@@ -423,23 +454,27 @@ BEGIN
     RAISE EXCEPTION 'App ID is required';
   END IF;
 
-  SELECT a.owner_org, a.stats_refresh_requested_at
-  INTO v_org_id, v_before_requested_at
-  FROM public.apps a
-  WHERE a.app_id = request_app_chart_refresh.app_id
-  LIMIT 1;
-
-  IF v_org_id IS NULL THEN
-    RAISE EXCEPTION 'App not found';
-  END IF;
-
   SELECT COALESCE(
     NULLIF(pg_catalog.current_setting('request.jwt.claim.role', true), ''),
     NULLIF(pg_catalog.current_setting('role', true), ''),
     NULLIF(COALESCE(session_user, current_user), '')
   ) INTO caller_role;
 
+  SELECT a.owner_org, a.stats_refresh_requested_at
+  INTO v_org_id, v_before_requested_at
+  FROM public.apps a
+  WHERE a.app_id = request_app_chart_refresh.app_id
+  LIMIT 1;
+
+  IF caller_role IN ('service_role', 'postgres', 'supabase_admin') AND v_org_id IS NULL THEN
+    RAISE EXCEPTION 'App not found';
+  END IF;
+
   IF caller_role NOT IN ('service_role', 'postgres', 'supabase_admin') THEN
+    IF v_org_id IS NULL THEN
+      RAISE EXCEPTION 'App access denied';
+    END IF;
+
     SELECT public.get_identity_org_appid(
       '{read,upload,write,all}'::public.key_mode[],
       v_org_id,
@@ -507,6 +542,7 @@ DECLARE
   v_queued_app_ids character varying[] := ARRAY[]::character varying[];
   v_queued_count integer := 0;
   v_total_count integer := 0;
+  v_org_exists boolean := false;
   v_org_requested_at_before timestamp without time zone;
   v_return_requested_at timestamp without time zone;
   v_before_requested_at timestamp without time zone;
@@ -517,23 +553,29 @@ BEGIN
     RAISE EXCEPTION 'Org ID is required';
   END IF;
 
-  SELECT o.stats_refresh_requested_at
-  INTO v_org_requested_at_before
-  FROM public.orgs o
-  WHERE o.id = request_org_chart_refresh.org_id
-  LIMIT 1;
-
-  IF NOT FOUND THEN
-    RAISE EXCEPTION 'Organization not found';
-  END IF;
-
   SELECT COALESCE(
     NULLIF(pg_catalog.current_setting('request.jwt.claim.role', true), ''),
     NULLIF(pg_catalog.current_setting('role', true), ''),
     NULLIF(COALESCE(session_user, current_user), '')
   ) INTO caller_role;
 
+  SELECT o.stats_refresh_requested_at
+  INTO v_org_requested_at_before
+  FROM public.orgs o
+  WHERE o.id = request_org_chart_refresh.org_id
+  LIMIT 1;
+
+  v_org_exists := FOUND;
+
+  IF caller_role IN ('service_role', 'postgres', 'supabase_admin') AND NOT v_org_exists THEN
+    RAISE EXCEPTION 'Organization not found';
+  END IF;
+
   IF caller_role NOT IN ('service_role', 'postgres', 'supabase_admin') THEN
+    IF NOT v_org_exists THEN
+      RAISE EXCEPTION 'Organization access denied';
+    END IF;
+
     SELECT public.get_identity_org_allowed(
       '{read,upload,write,all}'::public.key_mode[],
       request_org_chart_refresh.org_id

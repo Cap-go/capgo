@@ -88,7 +88,6 @@ function createSupabaseStub(options?: {
     },
     error: null,
   })
-  const appUpdateBuilder = createWriteBuilder()
   const pendingAppsBuilder = createListBuilder({
     data: options?.pendingAppRefreshes
       ? [
@@ -120,7 +119,12 @@ function createSupabaseStub(options?: {
     },
     error: null,
   })
-  const appBuilders = [appSelectBuilder, appUpdateBuilder, pendingAppsBuilder]
+  const markAppStatsRefreshedBuilder = createRpcResultBuilder({
+    data: '2026-04-20T12:00:00.000Z',
+    error: null,
+    status: 200,
+  })
+  const appBuilders = [appSelectBuilder, pendingAppsBuilder]
   const queueBuilder = createRpcResultBuilder({
     data: null,
     error: options?.queueError ?? null,
@@ -159,6 +163,8 @@ function createSupabaseStub(options?: {
       switch (name) {
         case 'get_cycle_info_org':
           return cycleInfoBuilder
+        case 'mark_app_stats_refreshed':
+          return markAppStatsRefreshedBuilder(args)
         case 'queue_cron_stat_org_for_org':
           return queueBuilder(args)
         default:
@@ -170,11 +176,11 @@ function createSupabaseStub(options?: {
   return {
     client,
     builders: {
-      appUpdateBuilder,
       dailyMauBuilder,
       dailyBandwidthBuilder,
       dailyStorageBuilder,
       dailyVersionBuilder,
+      markAppStatsRefreshedBuilder,
       orgBuilder,
       orgUpdateBuilder,
       pendingAppsBuilder,
@@ -365,7 +371,7 @@ describe('cron_stat_app follow-up failures', () => {
     } as any)
 
     expect(response.status).toBe(200)
-    expect(builders.appUpdateBuilder.update).toHaveBeenCalledTimes(1)
+    expect(builders.markAppStatsRefreshedBuilder).toHaveBeenCalledTimes(1)
     expect(builders.dailyMauBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.dailyBandwidthBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.dailyStorageBuilder.upsert).toHaveBeenCalledTimes(1)
@@ -401,7 +407,7 @@ describe('cron_stat_app follow-up failures', () => {
     } as any)
 
     expect(response.status).toBe(200)
-    expect(builders.appUpdateBuilder.update).toHaveBeenCalledTimes(1)
+    expect(builders.markAppStatsRefreshedBuilder).toHaveBeenCalledTimes(1)
     expect(builders.dailyMauBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.dailyBandwidthBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.dailyStorageBuilder.upsert).toHaveBeenCalledTimes(1)
@@ -434,7 +440,7 @@ describe('cron_stat_app follow-up failures', () => {
     } as any)
 
     expect(response.status).toBe(200)
-    expect(builders.appUpdateBuilder.update).toHaveBeenCalledTimes(1)
+    expect(builders.markAppStatsRefreshedBuilder).toHaveBeenCalledTimes(1)
     expect(builders.dailyMauBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.dailyBandwidthBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.dailyStorageBuilder.upsert).toHaveBeenCalledTimes(1)

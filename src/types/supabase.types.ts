@@ -3800,6 +3800,10 @@ export type Database = {
         Args: { customer_id: string; org_id: string }
         Returns: undefined
       }
+      mark_app_stats_refreshed: {
+        Args: { p_app_id: string }
+        Returns: string | null
+      }
       request_app_chart_refresh: {
         Args: { app_id: string }
         Returns: {

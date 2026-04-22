@@ -160,13 +160,16 @@ async function syncAppStatsRefresh(
   c: Parameters<typeof supabaseAdmin>[0],
   supabase: ReturnType<typeof supabaseAdmin>,
   appId: string,
-  refreshCompletedAt: string,
-): Promise<void> {
-  await runSupabaseResultWithRetry(c, 'sync_app_stats_refresh', async () => await supabase.from('apps')
-    .update({
-      stats_updated_at: refreshCompletedAt,
-    })
-    .eq('app_id', appId))
+): Promise<string> {
+  const { data } = await runSupabaseResultWithRetry<string | null>(c, 'sync_app_stats_refresh', async () => await supabase.rpc('mark_app_stats_refreshed', {
+    p_app_id: appId,
+  }))
+
+  if (!data) {
+    throw new Error('sync_app_stats_refresh returned no timestamp')
+  }
+
+  return data
 }
 
 async function syncOrgStatsRefresh(
@@ -388,8 +391,7 @@ app.post('/', middlewareAPISecret, async (c) => {
   ])
 
   cloudlog({ requestId: c.get('requestId'), message: 'stats saved', mauLength: mau.length, bandwidthLength: bandwidth.length, storageLength: storage.length, versionUsageLength: versionUsage.length })
-  const refreshCompletedAt = new Date().toISOString()
-  await syncAppStatsRefresh(c, supabase, body.appId, refreshCompletedAt)
+  const refreshCompletedAt = await syncAppStatsRefresh(c, supabase, body.appId)
 
   let pendingAppRefreshes = true
   try {
