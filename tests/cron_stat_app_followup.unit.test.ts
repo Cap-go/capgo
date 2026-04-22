@@ -37,6 +37,13 @@ function createSingleBuilder<T>(result: T) {
   }
 }
 
+function createListBuilder<T>(result: T) {
+  return {
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockResolvedValue(result),
+  }
+}
+
 function createWriteBuilder(error?: Error | null) {
   return {
     upsert: vi.fn().mockReturnThis(),
@@ -66,13 +73,27 @@ function createSupabaseStub(options?: {
   customerId?: string | null
   orgSelectError?: Error | null
   orgUpdateError?: Error | null
+  pendingAppRefreshes?: boolean
   queueError?: Error | null
 }) {
-  const appBuilder = createSingleBuilder({
+  const appSelectBuilder = createSingleBuilder({
     data: {
       app_id: 'com.test.app',
       owner_org: 'org-test',
     },
+    error: null,
+  })
+  const appUpdateBuilder = createWriteBuilder()
+  const pendingAppsBuilder = createListBuilder({
+    data: options?.pendingAppRefreshes
+      ? [
+          {
+            app_id: 'com.other.app',
+            stats_refresh_requested_at: '2026-04-20T11:00:00.000Z',
+            stats_updated_at: null,
+          },
+        ]
+      : [],
     error: null,
   })
   const orgSelectBuilder = createSingleBuilder({
@@ -96,13 +117,19 @@ function createSupabaseStub(options?: {
   })
   const queueBuilder = createRpcThrowBuilder(options?.queueError)
 
+  const appBuilders = [appSelectBuilder, appUpdateBuilder, pendingAppsBuilder]
   const orgBuilders = [orgSelectBuilder, orgUpdateBuilder]
 
   const client = {
     from: vi.fn((table: string) => {
       switch (table) {
-        case 'apps':
-          return appBuilder
+        case 'apps': {
+          const nextBuilder = appBuilders.shift()
+          if (!nextBuilder) {
+            throw new Error('Unexpected apps builder call')
+          }
+          return nextBuilder
+        }
         case 'daily_mau':
           return dailyMauBuilder
         case 'daily_bandwidth':
@@ -137,11 +164,13 @@ function createSupabaseStub(options?: {
   return {
     client,
     builders: {
+      appUpdateBuilder,
       dailyMauBuilder,
       dailyBandwidthBuilder,
       dailyStorageBuilder,
       dailyVersionBuilder,
       orgUpdateBuilder,
+      pendingAppsBuilder,
       queueBuilder,
     },
   }
@@ -194,7 +223,7 @@ describe('cron_stat_app follow-up failures', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        apisecret: 'testsecret',
+        'apisecret': 'testsecret',
       },
       body: JSON.stringify({
         appId: 'com.test.app',
@@ -226,7 +255,7 @@ describe('cron_stat_app follow-up failures', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        apisecret: 'testsecret',
+        'apisecret': 'testsecret',
       },
       body: JSON.stringify({
         appId: 'com.test.app',
@@ -241,6 +270,7 @@ describe('cron_stat_app follow-up failures', () => {
     expect(builders.dailyBandwidthBuilder.throwOnError).toHaveBeenCalledTimes(1)
     expect(builders.dailyStorageBuilder.throwOnError).toHaveBeenCalledTimes(1)
     expect(builders.dailyVersionBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.appUpdateBuilder.throwOnError).toHaveBeenCalledTimes(1)
     expect(builders.orgUpdateBuilder.throwOnError).toHaveBeenCalledTimes(1)
     expect(builders.queueBuilder.throwOnError).toHaveBeenCalledTimes(1)
 
@@ -258,7 +288,7 @@ describe('cron_stat_app follow-up failures', () => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        apisecret: 'testsecret',
+        'apisecret': 'testsecret',
       },
       body: JSON.stringify({
         appId: 'com.test.app',
@@ -273,6 +303,41 @@ describe('cron_stat_app follow-up failures', () => {
     expect(builders.dailyBandwidthBuilder.throwOnError).toHaveBeenCalledTimes(1)
     expect(builders.dailyStorageBuilder.throwOnError).toHaveBeenCalledTimes(1)
     expect(builders.dailyVersionBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.appUpdateBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.orgUpdateBuilder.throwOnError).not.toHaveBeenCalled()
+    expect(builders.queueBuilder.throwOnError).not.toHaveBeenCalled()
+
+    const payload = await response.json() as { status: string }
+    expect(payload.status).toBe('Stats saved')
+  })
+
+  it('returns success without updating org freshness while another app refresh is still pending', async () => {
+    const { client, builders } = createSupabaseStub({
+      pendingAppRefreshes: true,
+    })
+    supabaseAdminMock.mockReturnValue(client)
+
+    const response = await createApp().fetch(new Request('http://localhost/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apisecret': 'testsecret',
+      },
+      body: JSON.stringify({
+        appId: 'com.test.app',
+        orgId: 'org-test',
+      }),
+    }), {}, {
+      waitUntil: () => { },
+    } as any)
+
+    expect(response.status).toBe(200)
+    expect(builders.dailyMauBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.dailyBandwidthBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.dailyStorageBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.dailyVersionBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.appUpdateBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.pendingAppsBuilder.eq).toHaveBeenCalledTimes(1)
     expect(builders.orgUpdateBuilder.throwOnError).not.toHaveBeenCalled()
     expect(builders.queueBuilder.throwOnError).not.toHaveBeenCalled()
 

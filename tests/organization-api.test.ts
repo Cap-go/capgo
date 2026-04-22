@@ -1053,6 +1053,7 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
     expect(testOrg).toBeTruthy()
     expect(testOrg).toHaveProperty('enforce_hashed_api_keys')
     expect(testOrg!.enforce_hashed_api_keys).toBe(true)
+    expect(testOrg).toHaveProperty('stats_refresh_requested_at')
     expect(testOrg).toHaveProperty('website')
     expect(testOrg!.website).toBe(rpcWebsite)
 

@@ -270,6 +270,8 @@ export type Database = {
           need_onboarding: boolean
           owner_org: string
           retention: number
+          stats_refresh_requested_at: string | null
+          stats_updated_at: string | null
           transfer_history: Json[] | null
           updated_at: string | null
           user_id: string | null
@@ -293,6 +295,8 @@ export type Database = {
           need_onboarding?: boolean
           owner_org: string
           retention?: number
+          stats_refresh_requested_at?: string | null
+          stats_updated_at?: string | null
           transfer_history?: Json[] | null
           updated_at?: string | null
           user_id?: string | null
@@ -316,6 +320,8 @@ export type Database = {
           need_onboarding?: boolean
           owner_org?: string
           retention?: number
+          stats_refresh_requested_at?: string | null
+          stats_updated_at?: string | null
           transfer_history?: Json[] | null
           updated_at?: string | null
           user_id?: string | null
@@ -1625,6 +1631,7 @@ export type Database = {
           require_apikey_expiration: boolean
           required_encryption_key: string | null
           sso_enabled: boolean
+          stats_refresh_requested_at: string | null
           stats_updated_at: string | null
           updated_at: string | null
           use_new_rbac: boolean
@@ -1649,6 +1656,7 @@ export type Database = {
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
           sso_enabled?: boolean
+          stats_refresh_requested_at?: string | null
           stats_updated_at?: string | null
           updated_at?: string | null
           use_new_rbac?: boolean
@@ -1673,6 +1681,7 @@ export type Database = {
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
           sso_enabled?: boolean
+          stats_refresh_requested_at?: string | null
           stats_updated_at?: string | null
           updated_at?: string | null
           use_new_rbac?: boolean
@@ -3401,7 +3410,8 @@ export type Database = {
               required_encryption_key: string
               role: string
               sso_enabled: boolean
-              stats_updated_at: string
+              stats_refresh_requested_at: string | null
+              stats_updated_at: string | null
               subscription_end: string
               subscription_start: string
               trial_left: number
@@ -3438,7 +3448,8 @@ export type Database = {
               required_encryption_key: string
               role: string
               sso_enabled: boolean
-              stats_updated_at: string
+              stats_refresh_requested_at: string | null
+              stats_updated_at: string | null
               subscription_end: string
               subscription_start: string
               trial_left: number
@@ -3788,6 +3799,24 @@ export type Database = {
       queue_cron_stat_org_for_org: {
         Args: { customer_id: string; org_id: string }
         Returns: undefined
+      }
+      request_app_chart_refresh: {
+        Args: { app_id: string }
+        Returns: {
+          queued_app_ids: string[]
+          queued_count: number
+          requested_at: string | null
+          skipped_count: number
+        }[]
+      }
+      request_org_chart_refresh: {
+        Args: { org_id: string }
+        Returns: {
+          queued_app_ids: string[]
+          queued_count: number
+          requested_at: string | null
+          skipped_count: number
+        }[]
       }
       rbac_check_permission: {
         Args: {

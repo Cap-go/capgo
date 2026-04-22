@@ -18,6 +18,21 @@ interface OrgStatsRefreshTarget {
   previousStatsUpdatedAt: string | null
 }
 
+interface AppRefreshStateRow {
+  app_id: string
+  stats_refresh_requested_at: string | null
+  stats_updated_at: string | null
+}
+
+function parseRefreshTimestamp(value: string | null | undefined): number | null {
+  if (!value)
+    return null
+
+  const normalized = /(?:Z|[+-]\d{2}:\d{2})$/.test(value) ? value : `${value}Z`
+  const parsed = Date.parse(normalized)
+  return Number.isNaN(parsed) ? null : parsed
+}
+
 async function getOrgStatsRefreshTarget(
   supabase: ReturnType<typeof supabaseAdmin>,
   orgId: string,
@@ -38,18 +53,56 @@ async function getOrgStatsRefreshTarget(
   }
 }
 
+async function syncAppStatsRefresh(
+  supabase: ReturnType<typeof supabaseAdmin>,
+  appId: string,
+  refreshCompletedAt: string,
+): Promise<void> {
+  await supabase.from('apps')
+    .update({
+      stats_updated_at: refreshCompletedAt,
+    })
+    .eq('app_id', appId)
+    .throwOnError()
+}
+
 async function syncOrgStatsRefresh(
   supabase: ReturnType<typeof supabaseAdmin>,
   orgId: string,
   previousStatsUpdatedAt: string | null,
+  refreshCompletedAt: string,
 ): Promise<void> {
   await supabase.from('orgs')
     .update({
-      stats_updated_at: new Date().toISOString(),
+      stats_updated_at: refreshCompletedAt,
       last_stats_updated_at: previousStatsUpdatedAt,
     })
     .eq('id', orgId)
     .throwOnError()
+}
+
+async function hasPendingAppStatsRefresh(
+  supabase: ReturnType<typeof supabaseAdmin>,
+  orgId: string,
+): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('apps')
+    .select('app_id,stats_refresh_requested_at,stats_updated_at')
+    .eq('owner_org', orgId)
+
+  if (error) {
+    throw error
+  }
+
+  const rows = (data ?? []) as AppRefreshStateRow[]
+  return rows.some((row) => {
+    const requestedAt = parseRefreshTimestamp(row.stats_refresh_requested_at)
+    if (requestedAt === null)
+      return false
+
+    const updatedAt = parseRefreshTimestamp(row.stats_updated_at)
+    return updatedAt === null || requestedAt > updatedAt
+  })
 }
 
 async function queueOrgPlanRefresh(
@@ -189,6 +242,17 @@ app.post('/', middlewareAPISecret, async (c) => {
   ])
 
   cloudlog({ requestId: c.get('requestId'), message: 'stats saved', mauLength: mau.length, bandwidthLength: bandwidth.length, storageLength: storage.length, versionUsageLength: versionUsage.length })
+  const refreshCompletedAt = new Date().toISOString()
+  await syncAppStatsRefresh(supabase, body.appId, refreshCompletedAt)
+
+  let pendingAppRefreshes = true
+  try {
+    pendingAppRefreshes = await hasPendingAppStatsRefresh(supabase, body.orgId)
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to inspect pending cron_stat_app refresh state', orgId: body.orgId, error })
+  }
+
   let orgStatsRefreshTarget: OrgStatsRefreshTarget | null = null
   try {
     orgStatsRefreshTarget = await getOrgStatsRefreshTarget(supabase, body.orgId)
@@ -197,16 +261,16 @@ app.post('/', middlewareAPISecret, async (c) => {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to load cron_stat_app org refresh target', orgId: body.orgId, error })
   }
 
-  if (orgStatsRefreshTarget) {
+  if (orgStatsRefreshTarget && !pendingAppRefreshes) {
     try {
-      await syncOrgStatsRefresh(supabase, body.orgId, orgStatsRefreshTarget.previousStatsUpdatedAt)
+      await syncOrgStatsRefresh(supabase, body.orgId, orgStatsRefreshTarget.previousStatsUpdatedAt, refreshCompletedAt)
     }
     catch (error) {
       cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to persist cron_stat_app org refresh metadata', orgId: body.orgId, error })
     }
   }
 
-  if (orgStatsRefreshTarget?.customerId) {
+  if (orgStatsRefreshTarget?.customerId && !pendingAppRefreshes) {
     await queueOrgPlanRefresh(c, supabase, body.orgId, orgStatsRefreshTarget.customerId)
   }
 
