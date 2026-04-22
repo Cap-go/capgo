@@ -1172,6 +1172,27 @@ export type Database = {
         }
         Relationships: []
       }
+      processed_stripe_events: {
+        Row: {
+          created_at: string
+          customer_id: string
+          date_id: string
+          event_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          date_id: string
+          event_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          date_id?: string
+          event_id?: string
+        }
+        Relationships: []
+      }
       global_stats: {
         Row: {
           apps: number

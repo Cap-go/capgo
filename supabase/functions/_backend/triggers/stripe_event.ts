@@ -48,7 +48,7 @@ interface RevenueMovement {
   churnMrr: number
 }
 
-type PersistRevenueMovementResult = 'applied' | 'missing' | 'stale'
+type PersistRevenueMovementResult = 'applied' | 'duplicate' | 'missing' | 'stale'
 
 const ZERO_REVENUE_MOVEMENT: RevenueMovement = {
   currentMrr: 0,
@@ -300,7 +300,7 @@ async function getRevenuePlans(c: Context): Promise<RevenuePlanRow[]> {
       message: 'Failed to load revenue plans for Stripe revenue movement tracking',
       error,
     })
-    return []
+    throw error
   }
 
   return plans ?? []
@@ -328,6 +328,7 @@ function buildStripeInfoUpdateStatement(customerId: string, updateData: StripeIn
 async function persistStripeInfoAndRevenueMovement(
   c: Context,
   customerId: string,
+  stripeEventId: string,
   updateData: StripeInfoUpdate,
   eventOccurredAtIso: string,
   movement: RevenueMovement,
@@ -359,6 +360,27 @@ async function persistStripeInfoAndRevenueMovement(
     if (isStaleStripeEvent(lockedStripeInfo, eventOccurredAtIso)) {
       await pgClient.query('ROLLBACK')
       return 'stale'
+    }
+
+    if (shouldRecordMovement) {
+      const processedEvent = await pgClient.query(`
+        INSERT INTO public.processed_stripe_events (
+          event_id,
+          customer_id,
+          date_id
+        )
+        VALUES ($1, $2, $3)
+        ON CONFLICT (event_id) DO NOTHING
+      `, [
+        stripeEventId,
+        customerId,
+        getEventDateId(eventOccurredAtIso),
+      ])
+
+      if ((processedEvent.rowCount ?? 0) === 0) {
+        await pgClient.query('ROLLBACK')
+        return 'duplicate'
+      }
     }
 
     if (updateStatement) {
@@ -694,7 +716,7 @@ async function createdOrUpdated(
   currentStripeInfo: StripeInfoRow | null | undefined,
   eventOccurredAtIso: string,
   originalStatus?: Database['public']['Enums']['stripe_status'] | null,
-) {
+): Promise<Response | void> {
   const status = originalStatus ?? stripeData.data.status
   let statusName: string = status ?? ''
   if (isStaleStripeEvent(currentStripeInfo, eventOccurredAtIso)) {
@@ -727,10 +749,22 @@ async function createdOrUpdated(
     const didPersist = await persistStripeInfoAndRevenueMovement(
       c,
       stripeData.data.customer_id,
+      c.get('stripeEvent')!.id,
       updateData,
       eventOccurredAtIso,
       revenueMovement,
     )
+    if (didPersist === 'duplicate') {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'Skipping duplicate Stripe subscription event',
+        customerId: stripeData.data.customer_id,
+        eventOccurredAtIso,
+        stripeEventId: c.get('stripeEvent')!.id,
+        subscriptionId: stripeData.data.subscription_id,
+      })
+      return
+    }
     if (didPersist === 'stale') {
       cloudlog({
         requestId: c.get('requestId'),
@@ -944,7 +978,9 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
     const originalStatus = stripeData.data.status
     const eventOccurredAtIso = new Date(stripeEvent.created * 1000).toISOString()
     stripeData.data.status = 'succeeded'
-    await createdOrUpdated(c, stripeData, org, customer, eventOccurredAtIso, originalStatus!)
+    const createdOrUpdatedResponse = await createdOrUpdated(c, stripeData, org, customer, eventOccurredAtIso, originalStatus!)
+    if (createdOrUpdatedResponse)
+      return createdOrUpdatedResponse
   }
   else if (stripeData.data.status === 'failed') {
     await trackBentoEvent(c, org.management_email, {}, 'org:failed_payment')
@@ -981,10 +1017,22 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
       const didPersist = await persistStripeInfoAndRevenueMovement(
         c,
         stripeData.data.customer_id,
+        stripeEvent.id,
         toStripeInfoUpdate(stripeData.data),
         eventOccurredAtIso,
         revenueMovement,
       )
+      if (didPersist === 'duplicate') {
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'Skipping duplicate Stripe cancellation event',
+          customerId: stripeData.data.customer_id,
+          eventOccurredAtIso,
+          stripeEventId: stripeEvent.id,
+          subscriptionId: stripeData.data.subscription_id,
+        })
+        return c.json(BRES)
+      }
       if (didPersist === 'stale') {
         cloudlog({
           requestId: c.get('requestId'),

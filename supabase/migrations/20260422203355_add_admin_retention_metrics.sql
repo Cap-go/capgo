@@ -28,6 +28,26 @@ REVOKE ALL ON TABLE public.daily_revenue_metrics FROM anon;
 REVOKE ALL ON TABLE public.daily_revenue_metrics FROM authenticated;
 GRANT ALL ON TABLE public.daily_revenue_metrics TO service_role;
 
+CREATE TABLE IF NOT EXISTS public.processed_stripe_events (
+  event_id text NOT NULL,
+  customer_id character varying NOT NULL,
+  date_id character varying NOT NULL,
+  created_at timestamp with time zone DEFAULT now() NOT NULL,
+  CONSTRAINT processed_stripe_events_pkey PRIMARY KEY (event_id)
+);
+
+ALTER TABLE public.processed_stripe_events OWNER TO postgres;
+
+COMMENT ON TABLE public.processed_stripe_events IS 'Idempotency ledger for Stripe webhook events that have already updated retention revenue metrics.';
+
+CREATE INDEX IF NOT EXISTS processed_stripe_events_customer_id_date_id_idx
+ON public.processed_stripe_events (customer_id, date_id);
+
+REVOKE ALL ON TABLE public.processed_stripe_events FROM PUBLIC;
+REVOKE ALL ON TABLE public.processed_stripe_events FROM anon;
+REVOKE ALL ON TABLE public.processed_stripe_events FROM authenticated;
+GRANT ALL ON TABLE public.processed_stripe_events TO service_role;
+
 ALTER TABLE public.global_stats
 ADD COLUMN IF NOT EXISTS nrr double precision DEFAULT 100 NOT NULL,
 ADD COLUMN IF NOT EXISTS churn_revenue double precision DEFAULT 0 NOT NULL;

@@ -899,7 +899,10 @@ app.post('/', middlewareAPISecret, async (c) => {
     res.demo_apps_created,
     res.plugin_breakdown,
     res.build_stats,
-    res.retention_metrics,
+    Promise.resolve(res.retention_metrics).catch((error: unknown) => {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'retention metrics unavailable', error })
+      return null
+    }),
   ])
   const not_paying = users - customers.total - plans.Trial
   const org_conversion_rate = orgs > 0 ? Number((((paying_orgs_for_conversion * 100) / orgs)).toFixed(1)) : 0
@@ -958,8 +961,6 @@ app.post('/', middlewareAPISecret, async (c) => {
     revenue_maker: revenue.revenue_maker,
     revenue_team: revenue.revenue_team,
     revenue_enterprise: revenue.revenue_enterprise,
-    nrr: retention_metrics.nrr,
-    churn_revenue: retention_metrics.churnRevenue,
     plan_solo_monthly: revenue.plan_solo_monthly,
     plan_solo_yearly: revenue.plan_solo_yearly,
     plan_maker_monthly: revenue.plan_maker_monthly,
@@ -990,6 +991,12 @@ app.post('/', middlewareAPISecret, async (c) => {
     builds_last_month: build_stats.last_month,
     builds_last_month_ios: build_stats.last_month_ios,
     builds_last_month_android: build_stats.last_month_android,
+    ...(retention_metrics
+      ? {
+          churn_revenue: retention_metrics.churnRevenue,
+          nrr: retention_metrics.nrr,
+        }
+      : {}),
   }
   cloudlog({ requestId: c.get('requestId'), message: 'newData', newData })
   const { error } = await supabaseAdmin(c)
