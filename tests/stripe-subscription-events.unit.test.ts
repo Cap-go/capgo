@@ -85,6 +85,7 @@ describe('stripe subscription event classification', () => {
       shouldSendPlanChange: false,
       statusName: 'upgraded',
     })
+    expect(stripeEventTestUtils.getPlanChangeTrackingEventName('upgraded')).toBe('User Upgraded')
     expect(
       stripeEventTestUtils.buildSubscriptionEventMetadata(
         stripeData,
@@ -141,6 +142,7 @@ describe('stripe subscription event classification', () => {
       shouldSendPlanChange: true,
       statusName: 'updated',
     })
+    expect(stripeEventTestUtils.getPlanChangeTrackingEventName('updated')).toBe('User Plan Changed')
     expect(
       stripeEventTestUtils.buildSubscriptionEventMetadata(
         stripeData,

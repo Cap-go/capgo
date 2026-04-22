@@ -124,6 +124,10 @@ function buildSubscriptionEventMetadata(
   })
 }
 
+function getPlanChangeTrackingEventName(statusName: string) {
+  return statusName === 'upgraded' ? 'User Upgraded' : 'User Plan Changed'
+}
+
 async function writePaidAtAtomically(c: Context, customerId: string, eventOccurredAtIso: string) {
   const pgClient = getPgClient(c, false)
   const drizzleClient = getDrizzleClient(pgClient)
@@ -430,6 +434,7 @@ async function createdOrUpdated(
         .single()
       previousPlan = previousProduct.data
       const planChangeMetadata = buildSubscriptionEventMetadata(stripeData, plan, previousPlan)
+      const planChangeEventName = getPlanChangeTrackingEventName(trackingState.statusName)
       await sendEventToTracking(c, {
         bento: {
           cron: '* * * * *',
@@ -439,7 +444,7 @@ async function createdOrUpdated(
           uniqId: 'user:plan_change',
         },
         channel: 'usage',
-        event: 'User Upgraded',
+        event: planChangeEventName,
         icon: '💰',
         sentToBento: true,
         user_id: org.id,
@@ -660,6 +665,7 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
 export const stripeEventTestUtils = {
   buildSubscriptionEventMetadata,
   getPaidAtUpdate,
+  getPlanChangeTrackingEventName,
   getSubscriptionTrackingState,
   isCustomerProfileEvent,
 }
