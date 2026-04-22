@@ -2,12 +2,13 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { z } from 'zod'
 
-import { BASE_URL, fetchWithRetry, getAuthHeaders, getSupabaseClient, headers as apiKeyHeaders, ORG_ID as SEED_ORG_ID, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, fetchWithRetry, getAuthHeaders, getSupabaseClient, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
 const name = `Test Audit Organization ${globalId}`
 const customerId = `cus_audit_${ORG_ID}`
+const APIKEY_AUDIT_APP_ID = `com.audit.logs.${globalId.replace(/-/g, '')}`
 
 // Schema for audit log response
 const auditLogSchema = z.object({
@@ -33,6 +34,8 @@ const auditLogsResponseSchema = z.object({
 type AuditLog = z.infer<typeof auditLogSchema>
 
 let authHeaders: Record<string, string>
+let apiKeyAuthHeaders: Record<string, string>
+let apiKeyId: number | null = null
 
 async function waitForAuditLog(
   url: string,
@@ -101,6 +104,36 @@ beforeAll(async () => {
   })
   if (memberError)
     throw memberError
+
+  const { error: appError } = await getSupabaseClient().from('apps').insert({
+    app_id: APIKEY_AUDIT_APP_ID,
+    name: `Audit API App ${globalId}`,
+    icon_url: 'https://example.com/icon.png',
+    owner_org: ORG_ID,
+  })
+  if (appError)
+    throw appError
+
+  const apiKeyResponse = await fetchWithRetry(`${BASE_URL}/apikey`, {
+    method: 'POST',
+    headers: authHeaders,
+    body: JSON.stringify({
+      name: `audit-api-key-${globalId}`,
+      mode: 'all',
+      limited_to_orgs: [ORG_ID],
+      limited_to_apps: [APIKEY_AUDIT_APP_ID],
+    }),
+  })
+  const apiKeyData = await apiKeyResponse.json() as { id?: number, key?: string, error?: string }
+  if (apiKeyResponse.status !== 200 || !apiKeyData.id || !apiKeyData.key) {
+    throw new Error(`Failed to create isolated audit API key: ${JSON.stringify(apiKeyData)}`)
+  }
+
+  apiKeyId = apiKeyData.id
+  apiKeyAuthHeaders = {
+    'Content-Type': 'application/json',
+    'Authorization': apiKeyData.key,
+  }
 })
 
 afterAll(async () => {
@@ -108,6 +141,10 @@ afterAll(async () => {
   await getSupabaseClient().from('audit_logs').delete().eq('org_id', ORG_ID)
 
   // Clean up test organization and stripe_info
+  if (apiKeyId !== null)
+    await getSupabaseClient().from('apikeys').delete().eq('id', apiKeyId)
+  await getSupabaseClient().from('app_versions').delete().eq('app_id', APIKEY_AUDIT_APP_ID)
+  await getSupabaseClient().from('apps').delete().eq('app_id', APIKEY_AUDIT_APP_ID)
   await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID)
   await getSupabaseClient().from('orgs').delete().eq('id', ORG_ID)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
@@ -403,9 +440,9 @@ describe('audit logs for app_versions via API key', () => {
     // Create a bundle via the API (uses API key authentication)
     const response = await fetchWithRetry(`${BASE_URL}/bundle`, {
       method: 'POST',
-      headers: apiKeyHeaders,
+      headers: apiKeyAuthHeaders,
       body: JSON.stringify({
-        app_id: 'com.demo.app',
+        app_id: APIKEY_AUDIT_APP_ID,
         version: testVersionName,
         external_url: 'https://example.com/test-audit-bundle.zip',
         checksum: 'abc123def456',
@@ -421,8 +458,8 @@ describe('audit logs for app_versions via API key', () => {
     // Wait for the trigger to execute
     await new Promise(resolve => setTimeout(resolve, 200))
 
-    // Fetch audit logs for this org - use the seed org ID since that's where the app belongs
-    const auditResponse = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${SEED_ORG_ID}&tableName=app_versions&operation=INSERT`, {
+    // Fetch audit logs for the dedicated test org
+    const auditResponse = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=app_versions&operation=INSERT`, {
       headers: authHeaders,
     })
     expect(auditResponse.status).toBe(200)
@@ -440,7 +477,7 @@ describe('audit logs for app_versions via API key', () => {
       if (versionAuditLog) {
         expect(versionAuditLog.operation).toBe('INSERT')
         expect(versionAuditLog.table_name).toBe('app_versions')
-        expect(versionAuditLog.org_id).toBe(SEED_ORG_ID)
+        expect(versionAuditLog.org_id).toBe(ORG_ID)
         // This is the key assertion: user_id should be set from the API key
         expect(versionAuditLog.user_id).toBe(USER_ID)
         expect(versionAuditLog.old_record).toBeNull()
@@ -462,9 +499,9 @@ describe('audit logs for app_versions via API key', () => {
     // Update the bundle via the API - note: endpoint requires version_id (number), not version name
     const response = await fetchWithRetry(`${BASE_URL}/bundle/metadata`, {
       method: 'POST',
-      headers: apiKeyHeaders,
+      headers: apiKeyAuthHeaders,
       body: JSON.stringify({
-        app_id: 'com.demo.app',
+        app_id: APIKEY_AUDIT_APP_ID,
         version_id: createdVersionId,
         comment: 'Updated via API key test',
       }),
@@ -473,13 +510,13 @@ describe('audit logs for app_versions via API key', () => {
     expect(response.status).toBe(200)
 
     const updateAuditLog = await waitForAuditLog(
-      `${BASE_URL}/organization/audit?orgId=${SEED_ORG_ID}&tableName=app_versions&operation=UPDATE`,
+      `${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=app_versions&operation=UPDATE`,
       log => log.record_id === createdVersionId?.toString() && log.changed_fields?.includes('comment') === true,
     )
 
     expect(updateAuditLog.operation).toBe('UPDATE')
     expect(updateAuditLog.table_name).toBe('app_versions')
-    expect(updateAuditLog.org_id).toBe(SEED_ORG_ID)
+    expect(updateAuditLog.org_id).toBe(ORG_ID)
     // user_id should be set from the API key
     expect(updateAuditLog.user_id).toBe(USER_ID)
     expect(updateAuditLog.old_record).toBeTruthy()
@@ -501,9 +538,9 @@ describe('audit logs for app_versions via API key', () => {
     // Delete the bundle via the API - note: this is a soft-delete (sets deleted=true)
     const response = await fetchWithRetry(`${BASE_URL}/bundle`, {
       method: 'DELETE',
-      headers: apiKeyHeaders,
+      headers: apiKeyAuthHeaders,
       body: JSON.stringify({
-        app_id: 'com.demo.app',
+        app_id: APIKEY_AUDIT_APP_ID,
         version: testVersionName,
       }),
     })
@@ -514,7 +551,7 @@ describe('audit logs for app_versions via API key', () => {
     await new Promise(resolve => setTimeout(resolve, 200))
 
     // Fetch audit logs for UPDATE operations (soft-delete creates UPDATE, not DELETE)
-    const auditResponse = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${SEED_ORG_ID}&tableName=app_versions&operation=UPDATE`, {
+    const auditResponse = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=app_versions&operation=UPDATE`, {
       headers: authHeaders,
     })
     expect(auditResponse.status).toBe(200)
@@ -533,7 +570,7 @@ describe('audit logs for app_versions via API key', () => {
       if (deleteAuditLog) {
         expect(deleteAuditLog.operation).toBe('UPDATE')
         expect(deleteAuditLog.table_name).toBe('app_versions')
-        expect(deleteAuditLog.org_id).toBe(SEED_ORG_ID)
+        expect(deleteAuditLog.org_id).toBe(ORG_ID)
         // user_id should be set from the API key
         expect(deleteAuditLog.user_id).toBe(USER_ID)
         // Both old and new record should exist for UPDATE
