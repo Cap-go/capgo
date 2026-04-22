@@ -188,31 +188,39 @@ BEGIN
     SELECT rbac_org_roles.org_id
     FROM rbac_org_roles
   ),
+  time_constants AS (
+    SELECT
+      NOW() AS current_time,
+      date_trunc('MONTH', NOW()) AS current_month_start,
+      '0 DAYS'::INTERVAL AS zero_day_interval
+  ),
   paying_orgs_ordered AS (
     SELECT
       o.id,
       ROW_NUMBER() OVER (ORDER BY o.id ASC) - 1 AS preceding_count
     FROM public.orgs o
     JOIN public.stripe_info si ON o.customer_id = si.customer_id
+    CROSS JOIN time_constants tc
     WHERE (
       (si.status = 'succeeded'
-        AND (si.canceled_at IS NULL OR si.canceled_at > NOW())
-        AND si.subscription_anchor_end > NOW())
-      OR si.trial_at > NOW()
+        AND (si.canceled_at IS NULL OR si.canceled_at > tc.current_time)
+        AND si.subscription_anchor_end > tc.current_time)
+      OR si.trial_at > tc.current_time
     )
   ),
   billing_cycles AS (
     SELECT
       o.id AS org_id,
       CASE
-        WHEN COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
-             > NOW() - date_trunc('MONTH', NOW())
-        THEN date_trunc('MONTH', NOW() - INTERVAL '1 MONTH')
-             + COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
-        ELSE date_trunc('MONTH', NOW())
-             + COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), '0 DAYS'::INTERVAL)
+        WHEN COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), tc.zero_day_interval)
+             > tc.current_time - tc.current_month_start
+        THEN date_trunc('MONTH', tc.current_time - INTERVAL '1 MONTH')
+             + COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), tc.zero_day_interval)
+        ELSE tc.current_month_start
+             + COALESCE(si.subscription_anchor_start - date_trunc('MONTH', si.subscription_anchor_start), tc.zero_day_interval)
       END AS cycle_start
     FROM public.orgs o
+    CROSS JOIN time_constants tc
     LEFT JOIN public.stripe_info si ON o.customer_id = si.customer_id
   ),
   two_fa_access AS (
@@ -351,6 +359,7 @@ SET search_path = '' AS $function$
 DECLARE
   v_org_id uuid;
   v_now_utc timestamp without time zone;
+  v_refresh_ttl CONSTANT interval := INTERVAL '5 minutes';
 BEGIN
   IF p_app_id IS NULL OR p_app_id = '' THEN
     RETURN;
@@ -362,8 +371,8 @@ BEGIN
   SET stats_refresh_requested_at = v_now_utc
   WHERE a.app_id = p_app_id
     AND (p_org_id IS NULL OR a.owner_org = p_org_id)
-    AND (a.stats_updated_at IS NULL OR a.stats_updated_at < v_now_utc - INTERVAL '5 minutes')
-    AND (a.stats_refresh_requested_at IS NULL OR a.stats_refresh_requested_at < v_now_utc - INTERVAL '5 minutes')
+    AND (a.stats_updated_at IS NULL OR a.stats_updated_at < v_now_utc - v_refresh_ttl)
+    AND (a.stats_refresh_requested_at IS NULL OR a.stats_refresh_requested_at < v_now_utc - v_refresh_ttl)
   RETURNING a.owner_org
   INTO v_org_id;
 
@@ -449,6 +458,9 @@ DECLARE
   v_after_requested_at timestamp without time zone;
   v_request_started_at timestamp without time zone := pg_catalog.timezone('UTC', pg_catalog.clock_timestamp());
   v_queued boolean := false;
+  v_privileged_roles CONSTANT text[] := ARRAY['service_role', 'postgres', 'supabase_admin'];
+  v_read_key_modes CONSTANT public.key_mode[] := '{read,upload,write,all}'::public.key_mode[];
+  v_read_min_right CONSTANT public.user_min_right := 'read'::public.user_min_right;
 BEGIN
   IF request_app_chart_refresh.app_id IS NULL OR request_app_chart_refresh.app_id = '' THEN
     RAISE EXCEPTION 'App ID is required';
@@ -466,24 +478,24 @@ BEGIN
   WHERE a.app_id = request_app_chart_refresh.app_id
   LIMIT 1;
 
-  IF caller_role IN ('service_role', 'postgres', 'supabase_admin') AND v_org_id IS NULL THEN
+  IF caller_role = ANY(v_privileged_roles) AND v_org_id IS NULL THEN
     RAISE EXCEPTION 'App not found';
   END IF;
 
-  IF caller_role NOT IN ('service_role', 'postgres', 'supabase_admin') THEN
+  IF caller_role <> ALL(v_privileged_roles) THEN
     IF v_org_id IS NULL THEN
       RAISE EXCEPTION 'App access denied';
     END IF;
 
     SELECT public.get_identity_org_appid(
-      '{read,upload,write,all}'::public.key_mode[],
+      v_read_key_modes,
       v_org_id,
       request_app_chart_refresh.app_id
     )
     INTO caller_id;
 
     IF caller_id IS NULL OR NOT public.check_min_rights(
-      'read'::public.user_min_right,
+      v_read_min_right,
       caller_id,
       v_org_id,
       request_app_chart_refresh.app_id,
@@ -548,6 +560,9 @@ DECLARE
   v_before_requested_at timestamp without time zone;
   v_after_requested_at timestamp without time zone;
   app_record record;
+  v_privileged_roles CONSTANT text[] := ARRAY['service_role', 'postgres', 'supabase_admin'];
+  v_read_key_modes CONSTANT public.key_mode[] := '{read,upload,write,all}'::public.key_mode[];
+  v_read_min_right CONSTANT public.user_min_right := 'read'::public.user_min_right;
 BEGIN
   IF request_org_chart_refresh.org_id IS NULL THEN
     RAISE EXCEPTION 'Org ID is required';
@@ -567,23 +582,23 @@ BEGIN
 
   v_org_exists := FOUND;
 
-  IF caller_role IN ('service_role', 'postgres', 'supabase_admin') AND NOT v_org_exists THEN
+  IF caller_role = ANY(v_privileged_roles) AND NOT v_org_exists THEN
     RAISE EXCEPTION 'Organization not found';
   END IF;
 
-  IF caller_role NOT IN ('service_role', 'postgres', 'supabase_admin') THEN
+  IF caller_role <> ALL(v_privileged_roles) THEN
     IF NOT v_org_exists THEN
       RAISE EXCEPTION 'Organization access denied';
     END IF;
 
     SELECT public.get_identity_org_allowed(
-      '{read,upload,write,all}'::public.key_mode[],
+      v_read_key_modes,
       request_org_chart_refresh.org_id
     )
     INTO caller_id;
 
     IF caller_id IS NULL OR NOT public.check_min_rights(
-      'read'::public.user_min_right,
+      v_read_min_right,
       caller_id,
       request_org_chart_refresh.org_id,
       NULL::character varying,
@@ -672,6 +687,10 @@ DECLARE
   caller_id uuid;
   app_exists boolean;
   org_stats_updated_at timestamp without time zone;
+  v_cache_ttl CONSTANT interval := INTERVAL '5 minutes';
+  v_privileged_roles CONSTANT text[] := ARRAY['service_role', 'postgres', 'supabase_admin'];
+  v_read_key_modes CONSTANT public.key_mode[] := '{read,upload,write,all}'::public.key_mode[];
+  v_read_min_right CONSTANT public.user_min_right := 'read'::public.user_min_right;
 BEGIN
   SELECT COALESCE(
     NULLIF(pg_catalog.current_setting('request.jwt.claim.role', true), ''),
@@ -679,16 +698,16 @@ BEGIN
     NULLIF(COALESCE(session_user, current_user), '')
   ) INTO caller_role;
 
-  IF caller_role NOT IN ('service_role', 'postgres', 'supabase_admin') THEN
+  IF caller_role <> ALL(v_privileged_roles) THEN
     SELECT public.get_identity_org_appid(
-      '{read,upload,write,all}'::public.key_mode[],
+      v_read_key_modes,
       get_app_metrics.p_org_id,
       get_app_metrics.p_app_id
     )
     INTO caller_id;
 
     IF caller_id IS NULL OR NOT public.check_min_rights(
-      'read'::public.user_min_right,
+      v_read_min_right,
       caller_id,
       get_app_metrics.p_org_id,
       get_app_metrics.p_app_id,
@@ -724,7 +743,7 @@ BEGIN
     OR cache_entry.start_date IS DISTINCT FROM get_app_metrics.p_start_date
     OR cache_entry.end_date IS DISTINCT FROM get_app_metrics.p_end_date
     OR cache_entry.cached_at IS NULL
-    OR cache_entry.cached_at < (pg_catalog.now() - interval '5 minutes')
+    OR cache_entry.cached_at < (pg_catalog.now() - v_cache_ttl)
     OR (
       org_stats_updated_at IS NOT NULL
       AND pg_catalog.timezone('UTC', cache_entry.cached_at) < org_stats_updated_at
@@ -804,6 +823,10 @@ DECLARE
   caller_id uuid;
   org_exists boolean;
   org_stats_updated_at timestamp without time zone;
+  v_cache_ttl CONSTANT interval := INTERVAL '5 minutes';
+  v_privileged_roles CONSTANT text[] := ARRAY['service_role', 'postgres', 'supabase_admin'];
+  v_read_key_modes CONSTANT public.key_mode[] := '{read,upload,write,all}'::public.key_mode[];
+  v_read_min_right CONSTANT public.user_min_right := 'read'::public.user_min_right;
 BEGIN
   SELECT COALESCE(
     NULLIF(pg_catalog.current_setting('request.jwt.claim.role', true), ''),
@@ -811,15 +834,15 @@ BEGIN
     NULLIF(COALESCE(session_user, current_user), '')
   ) INTO caller_role;
 
-  IF caller_role NOT IN ('service_role', 'postgres', 'supabase_admin') THEN
+  IF caller_role <> ALL(v_privileged_roles) THEN
     SELECT public.get_identity_org_allowed(
-      '{read,upload,write,all}'::public.key_mode[],
+      v_read_key_modes,
       get_app_metrics.org_id
     )
     INTO caller_id;
 
     IF caller_id IS NULL OR NOT public.check_min_rights(
-      'read'::public.user_min_right,
+      v_read_min_right,
       caller_id,
       get_app_metrics.org_id,
       NULL::character varying,
@@ -854,7 +877,7 @@ BEGIN
     OR cache_entry.start_date IS DISTINCT FROM get_app_metrics.start_date
     OR cache_entry.end_date IS DISTINCT FROM get_app_metrics.end_date
     OR cache_entry.cached_at IS NULL
-    OR cache_entry.cached_at < (pg_catalog.now() - interval '5 minutes')
+    OR cache_entry.cached_at < (pg_catalog.now() - v_cache_ttl)
     OR (
       org_stats_updated_at IS NOT NULL
       AND pg_catalog.timezone('UTC', cache_entry.cached_at) < org_stats_updated_at
