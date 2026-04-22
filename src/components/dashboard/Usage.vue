@@ -24,6 +24,7 @@ import {
   requestOrgChartRefresh,
   shouldAutoRequestChartRefresh,
 } from '~/services/dashboardRefresh'
+import { formatUtcDateTimeAsLocal } from '~/services/date'
 import { DEMO_APP_NAMES, generateDemoBandwidthData, generateDemoMauData, generateDemoStorageData } from '~/services/demoChartData'
 import { getPlans, useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
@@ -165,7 +166,7 @@ const subscriptionAnchorEnd = computed(() => {
 })
 const lastRunDisplay = computed(() => {
   const source = scopeStatsUpdatedAt.value
-  return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
+  return formatUtcDateTimeAsLocal(source) || t('unknown')
 })
 const nextRunDisplay = computed(() => {
   const source = effectiveOrganization.value?.next_stats_update_at
