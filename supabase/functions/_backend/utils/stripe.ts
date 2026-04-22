@@ -465,6 +465,7 @@ export interface CreditCheckoutDetails {
 export interface StripeData {
   data: Database['public']['Tables']['stripe_info']['Insert']
   isUpgrade: boolean
+  previousPriceId: string | undefined
   previousProductId: string | undefined
 }
 
