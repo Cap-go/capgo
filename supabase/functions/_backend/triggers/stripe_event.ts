@@ -12,9 +12,11 @@ import { middlewareStripeWebhook } from '../utils/hono_middleware_stripe.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import * as schema from '../utils/postgres_schema.ts'
+import { groupIdentifyPosthog } from '../utils/posthog.ts'
 import { ensureCustomerMetadata, getCreditCheckoutDetails, syncStripeCustomerCountry } from '../utils/stripe.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
+import { backgroundTask } from '../utils/utils.ts'
 
 export const app = new Hono<MiddlewareKeyVariablesStripe>()
 
@@ -276,6 +278,7 @@ async function customerSourceCreated(c: Context, org: Org, stripeEvent: Stripe.C
     icon: '💳',
     sentToBento: true,
     user_id: org.id,
+    groups: { organization: org.id },
     notify: false,
   })
   return c.json(BRES)
@@ -295,6 +298,7 @@ async function customerSourceExpiring(c: Context, org: Org) {
     icon: '⚠️',
     sentToBento: true,
     user_id: org.id,
+    groups: { organization: org.id },
     notify: false,
   })
   return c.json(BRES)
@@ -332,6 +336,7 @@ async function invoiceUpcoming(c: Context, org: Org, stripeEvent: Stripe.Invoice
     icon: '📄',
     sentToBento: true,
     user_id: org.id,
+    groups: { organization: org.id },
     notify: false,
   })
   return c.json(BRES)
@@ -384,6 +389,7 @@ async function createdOrUpdated(
         icon: '💰',
         sentToBento: true,
         user_id: org.id,
+        groups: { organization: org.id },
         notify: true,
         tags: {
           plan_name: plan.name,
@@ -418,11 +424,23 @@ async function createdOrUpdated(
       icon: '💰',
       sentToBento: true,
       user_id: org.id,
+      groups: { organization: org.id },
       notify: isNewSubscription,
       tags: {
         plan_name: plan.name,
       },
     })
+
+    await backgroundTask(c, groupIdentifyPosthog(c, {
+      groupType: 'organization',
+      groupKey: org.id,
+      properties: {
+        plan_name: plan.name,
+        plan_status: status,
+        plan_type: isMonthly ? 'monthly' : 'yearly',
+        subscription_status_name: statusName,
+      },
+    }))
   }
   else {
     const segment = await customerToSegmentOrg(c, org.id, stripeData.data.price_id)
@@ -458,8 +476,18 @@ async function didCancel(c: Context, org: Org) {
     icon: '⚠️',
     sentToBento: true,
     user_id: org.id,
+    groups: { organization: org.id },
     notify: true,
   })
+
+  await backgroundTask(c, groupIdentifyPosthog(c, {
+    groupType: 'organization',
+    groupKey: org.id,
+    properties: {
+      plan_status: 'canceled',
+      canceled_at: new Date().toISOString(),
+    },
+  }))
 }
 
 async function getOrg(c: Context, stripeData: StripeData) {

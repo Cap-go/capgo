@@ -217,10 +217,61 @@ export interface AppUsageGlobalByApp {
   byApp: AppUsageByApp[]
 }
 
+function parseDashboardRangeDate(value?: string) {
+  if (!value)
+    return null
+
+  const dateParts = value.match(/^(\d{4})-(\d{2})-(\d{2})(?:$|T)/)
+  if (!dateParts)
+    return null
+
+  const [year, month, day] = dateParts.slice(1).map(Number)
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime()))
+    return null
+
+  if (
+    parsed.getUTCFullYear() !== year
+    || parsed.getUTCMonth() + 1 !== month
+    || parsed.getUTCDate() !== day
+  ) {
+    return null
+  }
+
+  return parsed
+}
+
+export function normalizeDashboardDateRange(startDate?: string, endDate?: string, now: Date = new Date()) {
+  const fallbackEnd = new Date(now)
+  fallbackEnd.setHours(0, 0, 0, 0)
+  fallbackEnd.setDate(fallbackEnd.getDate() + 1)
+
+  const fallbackStart = new Date(fallbackEnd)
+  fallbackStart.setDate(fallbackStart.getDate() - 30)
+
+  const parsedStart = parseDashboardRangeDate(startDate)
+  const parsedEnd = parseDashboardRangeDate(endDate)
+  const resolvedStart = parsedStart && parsedEnd ? parsedStart : fallbackStart
+  const resolvedEnd = parsedStart && parsedEnd ? parsedEnd : fallbackEnd
+
+  if (resolvedStart.getTime() > resolvedEnd.getTime()) {
+    return {
+      start: fallbackStart.toISOString(),
+      end: fallbackEnd.toISOString(),
+    }
+  }
+
+  return {
+    start: resolvedStart.toISOString(),
+    end: resolvedEnd.toISOString(),
+  }
+}
+
 export async function getAllDashboard(orgId: string, startDate?: string, endDate?: string): Promise<AppUsageGlobalByApp> {
   try {
     const supabase = useSupabase()
-    const dateRange = `?from=${new Date(startDate!).toISOString()}&to=${new Date(endDate!).toISOString()}&breakdown=true&noAccumulate=true`
+    const { start, end } = normalizeDashboardDateRange(startDate, endDate)
+    const dateRange = `?from=${start}&to=${end}&breakdown=true&noAccumulate=true`
 
     // 🚀 SUPER OPTIMIZED: Single API call returns both aggregated AND per-app breakdown (with daily values, not accumulated)
     const response = await supabase.functions.invoke(`statistics/org/${orgId}/${dateRange}`, {
