@@ -52,22 +52,28 @@ function isRetryableDurableObjectFetchError(error: unknown): boolean {
   return message.includes('moved to a different machine')
 }
 
+function canReplayUploadRequest(request: Request): boolean {
+  return request.method === 'HEAD' || request.body === null
+}
+
 async function fetchUploadHandlerWithRetry(
   c: Context,
   handler: DurableObjectStub,
   request: Request,
 ): Promise<Response> {
+  const canRetryRequest = canReplayUploadRequest(request)
+  const maxAttempts = canRetryRequest ? DO_FETCH_RETRY_ATTEMPTS : 1
   let lastError: unknown
 
-  for (let attempt = 1; attempt <= DO_FETCH_RETRY_ATTEMPTS; attempt++) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const requestInit: RequestInit & { duplex?: 'half' } = {
         headers: request.headers,
         method: request.method,
         signal: AbortSignal.timeout(DO_CALL_TIMEOUT),
       }
-      if (request.method !== 'HEAD') {
-        requestInit.body = request.clone().body
+      if (request.method !== 'HEAD' && request.body !== null) {
+        requestInit.body = request.body
         requestInit.duplex = 'half'
       }
 
@@ -88,7 +94,9 @@ async function fetchUploadHandlerWithRetry(
     }
     catch (error) {
       lastError = error
-      const shouldRetry = attempt < DO_FETCH_RETRY_ATTEMPTS && isRetryableDurableObjectFetchError(error)
+      const shouldRetry = canRetryRequest
+        && attempt < maxAttempts
+        && isRetryableDurableObjectFetchError(error)
 
       cloudlogErr({
         requestId: c.get('requestId'),

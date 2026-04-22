@@ -13,7 +13,7 @@ function createTestContext() {
 }
 
 describe('backend alert resilience helpers', () => {
-  it('retries retryable durable object resets for file uploads', async () => {
+  it('retries retryable durable object resets for replayable upload requests', async () => {
     const { filesTestUtils } = await import('../supabase/functions/_backend/files/files.ts')
 
     const handler = {
@@ -40,13 +40,41 @@ describe('backend alert resilience helpers', () => {
       createTestContext(),
       handler,
       new Request('http://localhost/files/upload/attachments/test.zip', {
-        method: 'PATCH',
-        body: 'chunk-data',
+        method: 'HEAD',
       }),
     )
 
     expect(response.status).toBe(204)
     expect(handler.fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not retry retryable durable object resets for streaming upload bodies', async () => {
+    const { filesTestUtils } = await import('../supabase/functions/_backend/files/files.ts')
+
+    const handler = {
+      fetch: vi.fn(),
+    } as any
+
+    handler.fetch.mockImplementation(async () => {
+      throw Object.assign(
+        new Error('cannot access storage because object has moved to a different machine'),
+        {
+          retryable: true,
+          durableObjectReset: true,
+        },
+      )
+    })
+
+    await expect(filesTestUtils.fetchUploadHandlerWithRetry(
+      createTestContext(),
+      handler,
+      new Request('http://localhost/files/upload/attachments/test.zip', {
+        method: 'PATCH',
+        body: 'chunk-data',
+      }),
+    )).rejects.toThrow('cannot access storage because object has moved to a different machine')
+
+    expect(handler.fetch).toHaveBeenCalledTimes(1)
   })
 
   it('retries transient PostgREST 502 responses for cron_stat_app', async () => {
