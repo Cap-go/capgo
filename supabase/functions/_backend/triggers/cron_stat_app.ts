@@ -178,7 +178,7 @@ async function hasPendingAppStatsRefresh(
   c: Parameters<typeof supabaseAdmin>[0],
   orgId: string,
 ): Promise<boolean> {
-  const pgClient = getPgClient(c, true)
+  const pgClient = getPgClient(c)
   const staleCutoff = new Date(Date.now() - APP_STATS_REFRESH_STALE_MS).toISOString()
 
   try {
