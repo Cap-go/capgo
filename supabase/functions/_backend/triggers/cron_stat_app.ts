@@ -2,7 +2,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { middlewareAPISecret, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
-import { retryWithBackoff } from '../utils/retry.ts'
+import { getRetryablePostgrestStatus, isRetryablePostgrestError, isRetryablePostgrestResult, isRetryablePostgrestStatus, retryWithBackoff } from '../utils/retry.ts'
 import { readStatsBandwidth, readStatsMau, readStatsStorage, readStatsVersion } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -42,40 +42,6 @@ interface AppOwnerOrgRow {
 interface VersionNameRow {
   id: number
   name: string
-}
-
-function getRetryablePostgrestStatus(candidate: unknown): number | null {
-  if (candidate && typeof candidate === 'object') {
-    if ('status' in candidate && typeof (candidate as { status?: unknown }).status === 'number') {
-      return (candidate as { status: number }).status
-    }
-
-    if ('message' in candidate && typeof (candidate as { message?: unknown }).message === 'string') {
-      const match = /error code:\s*(\d{3})/i.exec((candidate as { message: string }).message)
-      if (match) {
-        return Number.parseInt(match[1], 10)
-      }
-    }
-  }
-
-  return null
-}
-
-function isRetryablePostgrestStatus(status: number | null): boolean {
-  return status !== null && status >= 500 && status < 600
-}
-
-function isRetryablePostgrestError(error: unknown): boolean {
-  const status = getRetryablePostgrestStatus(error)
-  return isRetryablePostgrestStatus(status)
-}
-
-function isRetryablePostgrestResult(result: SupabaseRetryResult<unknown> | null | undefined): boolean {
-  if (!result) {
-    return false
-  }
-
-  return isRetryablePostgrestStatus(getRetryablePostgrestStatus(result)) || isRetryablePostgrestError(result.error)
 }
 
 async function runSupabaseResultWithRetry<T>(

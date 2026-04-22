@@ -1,10 +1,11 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { RetryableResult } from '../utils/retry.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
-import { retryWithBackoff } from '../utils/retry.ts'
+import { isRetryablePostgrestResult, retryWithBackoff } from '../utils/retry.ts'
 import { s3 } from '../utils/s3.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -12,37 +13,6 @@ const SIZE_RETRY_ATTEMPTS = 3
 const SIZE_RETRY_DELAY_MS = 500
 const MANIFEST_UPDATE_RETRY_ATTEMPTS = 3
 const MANIFEST_UPDATE_RETRY_DELAY_MS = 300
-
-interface ManifestUpdateResult {
-  error: unknown
-  status?: number | null
-}
-
-function getRetryablePostgrestStatus(candidate: unknown): number | null {
-  if (candidate && typeof candidate === 'object') {
-    if ('status' in candidate && typeof (candidate as { status?: unknown }).status === 'number') {
-      return (candidate as { status: number }).status
-    }
-
-    if ('message' in candidate && typeof (candidate as { message?: unknown }).message === 'string') {
-      const match = /error code:\s*(\d{3})/i.exec((candidate as { message: string }).message)
-      if (match) {
-        return Number.parseInt(match[1], 10)
-      }
-    }
-  }
-
-  return null
-}
-
-function isRetryablePostgrestResult(result: ManifestUpdateResult | null | undefined): boolean {
-  if (!result) {
-    return false
-  }
-
-  const status = typeof result.status === 'number' ? result.status : getRetryablePostgrestStatus(result.error)
-  return typeof status === 'number' && status >= 500 && status < 600
-}
 
 async function getManifestSizeWithRetry(c: Context, s3Path: string): Promise<{ size: number, lastError?: unknown }> {
   const { result, lastError } = await retryWithBackoff(
@@ -59,7 +29,7 @@ async function getManifestSizeWithRetry(c: Context, s3Path: string): Promise<{ s
 
 async function runManifestUpdateWithRetry(
   c: Context,
-  operation: () => Promise<ManifestUpdateResult>,
+  operation: () => Promise<RetryableResult>,
 ): Promise<void> {
   const { result, lastError, attempts } = await retryWithBackoff(async () => {
     try {
