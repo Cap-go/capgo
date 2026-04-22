@@ -73,7 +73,7 @@ describe('backend alert resilience helpers', () => {
     expect(handler.fetch).toHaveBeenCalledTimes(2)
   })
 
-  it('retries retryable durable object responses for empty-body upload creation requests', async () => {
+  it.concurrent('retries retryable durable object responses for empty-body upload creation requests', async () => {
     const { filesTestUtils } = await import('../supabase/functions/_backend/files/files.ts')
 
     const handler = {
@@ -107,7 +107,7 @@ describe('backend alert resilience helpers', () => {
     expect(handler.fetch).toHaveBeenCalledTimes(2)
   })
 
-  it('recovers upload offset after a retryable durable object patch response', async () => {
+  it.concurrent('recovers upload offset after a retryable durable object patch response', async () => {
     const { filesTestUtils } = await import('../supabase/functions/_backend/files/files.ts')
 
     const handler = {
@@ -241,7 +241,7 @@ describe('backend alert resilience helpers', () => {
     expect(result.data).toEqual({ ok: true })
   })
 
-  it('retries transient PostgREST statuses for on_manifest_create updates', async () => {
+  it.concurrent('retries transient PostgREST statuses for on_manifest_create updates', async () => {
     const { onManifestCreateTestUtils } = await import('../supabase/functions/_backend/triggers/on_manifest_create.ts')
 
     let attempts = 0
@@ -270,7 +270,7 @@ describe('backend alert resilience helpers', () => {
     expect(attempts).toBe(2)
   })
 
-  it('returns empty strings when env bindings are missing from the context', () => {
+  it.concurrent('returns empty strings when env bindings are missing from the context', () => {
     const context = {
       req: {
         header: () => undefined,

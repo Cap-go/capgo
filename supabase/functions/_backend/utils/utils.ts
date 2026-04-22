@@ -172,13 +172,13 @@ function getContextEnv(c: Context): Record<string, string | undefined> {
 }
 
 export function existInEnv(c: Context, key: string): boolean {
-  return key in getContextEnv(c)
+  return getContextEnv(c)[key] !== undefined
 }
 
 export function getEnv(c: Context, key: string): string {
-  const contextEnv = getContextEnv(c)
-  if (key in contextEnv)
-    return contextEnv[key] ?? ''
+  const value = getContextEnv(c)[key]
+  if (value !== undefined)
+    return value
   return ''
 }
 
