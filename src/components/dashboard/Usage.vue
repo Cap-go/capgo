@@ -335,9 +335,9 @@ function startRefreshPolling() {
   }, CHART_REFRESH_POLL_MS)
 }
 
-async function queueScopeRefresh(auto = false) {
+async function queueScopeRefresh(auto = false): Promise<boolean> {
   if (!hasRefreshableScope.value || props.forceDemo || isRefreshPolling.value)
-    return
+    return false
 
   try {
     if (props.appId) {
@@ -347,12 +347,13 @@ async function queueScopeRefresh(auto = false) {
 
       if (result.requested_at && isChartRefreshInProgress(result.requested_at, localAppStatsUpdatedAt.value, refreshStateClock.value)) {
         startRefreshPolling()
+        return true
       }
     }
     else {
       const orgId = effectiveOrganization.value?.gid
       if (!orgId)
-        return
+        return false
 
       const result = await requestOrgChartRefresh(orgId)
       syncLocalOrgRefreshState({
@@ -362,14 +363,21 @@ async function queueScopeRefresh(auto = false) {
 
       if (result.requested_at && isChartRefreshInProgress(result.requested_at, localOrgStatsUpdatedAt.value, refreshStateClock.value)) {
         startRefreshPolling()
+        return true
       }
     }
+
+    if (!auto) {
+      await reloadChartsAfterRefresh()
+    }
+    return false
   }
   catch (error) {
     console.error('Error requesting chart refresh:', error)
     if (auto) {
       autoRefreshScopeKey.value = null
     }
+    return false
   }
 }
 
