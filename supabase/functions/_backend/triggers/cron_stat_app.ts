@@ -159,11 +159,17 @@ async function queueOrgPlanRefresh(
   supabase: ReturnType<typeof supabaseAdmin>,
   orgId: string,
   customerId: string,
-): Promise<void> {
-  await supabase.rpc('queue_cron_stat_org_for_org', {
+): Promise<SupabaseRetryResult<unknown>> {
+  const result = await supabase.rpc('queue_cron_stat_org_for_org', {
     org_id: orgId,
     customer_id: customerId,
-  }).throwOnError()
+  })
+
+  return {
+    data: result.data,
+    error: result.error,
+    status: result.status,
+  }
 }
 
 async function queueOrgPlanRefreshWithRetry(
@@ -172,34 +178,20 @@ async function queueOrgPlanRefreshWithRetry(
   orgId: string,
   customerId: string,
 ): Promise<void> {
-  const { result, attempts } = await retryWithBackoff(async () => {
-    try {
-      await queueOrgPlanRefresh(supabase, orgId, customerId)
-      return { ok: true as const }
-    }
-    catch (error) {
-      return { ok: false as const, error }
-    }
-  }, {
+  const { result, lastError, attempts } = await retryWithBackoff(async () => await queueOrgPlanRefresh(supabase, orgId, customerId), {
     attempts: PLAN_REFRESH_RETRY_ATTEMPTS,
     baseDelayMs: PLAN_REFRESH_RETRY_DELAY_MS,
-    shouldRetry: (result) => {
-      if (result.ok) {
-        return false
-      }
-
-      return isRetryablePostgrestError(result.error)
-    },
+    shouldRetry: result => isRetryablePostgrestResult(result),
   })
 
-  if (!result?.ok) {
+  if (lastError || !result || result.error || (typeof result.status === 'number' && result.status >= 400)) {
     cloudlogErr({
       requestId: c.get('requestId'),
       message: 'Failed to queue cron_stat_app org plan refresh',
       orgId,
       customerId,
       attempts,
-      error: result?.error,
+      error: lastError ?? result?.error ?? result,
     })
     return
   }

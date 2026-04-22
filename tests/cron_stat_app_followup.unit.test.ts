@@ -54,12 +54,12 @@ function createRpcSingleBuilder<T>(result: T) {
   }
 }
 
-function createRpcThrowBuilder(error?: Error | null) {
-  return {
-    throwOnError: error
-      ? vi.fn().mockRejectedValue(error)
-      : vi.fn().mockResolvedValue({ data: null, error: null }),
-  }
+function createRpcResultBuilder(result?: { data: unknown, error: Error | null, status?: number | null }) {
+  return vi.fn().mockResolvedValue(result ?? {
+    data: null,
+    error: null,
+    status: 200,
+  })
 }
 
 function createSupabaseStub(options?: {
@@ -67,6 +67,7 @@ function createSupabaseStub(options?: {
   orgSelectError?: Error | null
   orgUpdateError?: Error | null
   queueError?: Error | null
+  queueStatus?: number | null
 }) {
   const appBuilder = createSingleBuilder({
     data: {
@@ -94,7 +95,11 @@ function createSupabaseStub(options?: {
     },
     error: null,
   })
-  const queueBuilder = createRpcThrowBuilder(options?.queueError)
+  const queueBuilder = createRpcResultBuilder({
+    data: null,
+    error: options?.queueError ?? null,
+    status: options?.queueStatus ?? (options?.queueError ? 500 : 200),
+  })
   const orgBuilder = {
     select: vi.fn().mockReturnValue(orgSelectBuilder),
     update: vi.fn().mockReturnValue(orgUpdateBuilder),
@@ -119,12 +124,12 @@ function createSupabaseStub(options?: {
           throw new Error(`Unexpected table ${table}`)
       }
     }),
-    rpc: vi.fn((name: string) => {
+    rpc: vi.fn((name: string, args?: unknown) => {
       switch (name) {
         case 'get_cycle_info_org':
           return cycleInfoBuilder
         case 'queue_cron_stat_org_for_org':
-          return queueBuilder
+          return queueBuilder(args)
         default:
           throw new Error(`Unexpected rpc ${name}`)
       }
@@ -184,7 +189,8 @@ describe('cron_stat_app follow-up failures', () => {
 
   it('returns success when queuing plan processing fails after stats writes', async () => {
     const { client, builders } = createSupabaseStub({
-      queueError: new Error('error code: 502'),
+      queueError: new Error('temporary upstream failure'),
+      queueStatus: 502,
     })
     supabaseAdminMock.mockReturnValue(client)
 
@@ -208,7 +214,7 @@ describe('cron_stat_app follow-up failures', () => {
     expect(builders.dailyStorageBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.dailyVersionBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.orgBuilder.update).toHaveBeenCalledTimes(1)
-    expect(builders.queueBuilder.throwOnError).toHaveBeenCalledTimes(3)
+    expect(builders.queueBuilder).toHaveBeenCalledTimes(3)
 
     const payload = await response.json() as { status: string }
     expect(payload.status).toBe('Stats saved')
@@ -216,10 +222,18 @@ describe('cron_stat_app follow-up failures', () => {
 
   it('retries queuing plan processing before succeeding', async () => {
     const { client, builders } = createSupabaseStub()
-    builders.queueBuilder.throwOnError
-      .mockRejectedValueOnce(new Error('error code: 502'))
-      .mockRejectedValueOnce(new Error('error code: 502'))
-      .mockResolvedValue({ data: null, error: null })
+    builders.queueBuilder
+      .mockResolvedValueOnce({
+        data: null,
+        error: new Error('temporary upstream failure'),
+        status: 502,
+      })
+      .mockResolvedValueOnce({
+        data: null,
+        error: new Error('temporary upstream failure'),
+        status: 502,
+      })
+      .mockResolvedValue({ data: null, error: null, status: 200 })
     supabaseAdminMock.mockReturnValue(client)
 
     const response = await createApp().fetch(new Request('http://localhost/', {
@@ -237,7 +251,7 @@ describe('cron_stat_app follow-up failures', () => {
     } as any)
 
     expect(response.status).toBe(200)
-    expect(builders.queueBuilder.throwOnError).toHaveBeenCalledTimes(3)
+    expect(builders.queueBuilder).toHaveBeenCalledTimes(3)
 
     const payload = await response.json() as { status: string }
     expect(payload.status).toBe('Stats saved')
@@ -246,6 +260,7 @@ describe('cron_stat_app follow-up failures', () => {
   it('does not retry non-retryable queue failures', async () => {
     const { client, builders } = createSupabaseStub({
       queueError: new Error('invalid queue payload'),
+      queueStatus: 400,
     })
     supabaseAdminMock.mockReturnValue(client)
 
@@ -264,7 +279,33 @@ describe('cron_stat_app follow-up failures', () => {
     } as any)
 
     expect(response.status).toBe(200)
-    expect(builders.queueBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.queueBuilder).toHaveBeenCalledTimes(1)
+
+    const payload = await response.json() as { status: string }
+    expect(payload.status).toBe('Stats saved')
+  })
+
+  it('retries thrown queue failures before giving up', async () => {
+    const { client, builders } = createSupabaseStub()
+    builders.queueBuilder.mockRejectedValue(new Error('fetch failed'))
+    supabaseAdminMock.mockReturnValue(client)
+
+    const response = await createApp().fetch(new Request('http://localhost/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apisecret': 'testsecret',
+      },
+      body: JSON.stringify({
+        appId: 'com.test.app',
+        orgId: 'org-test',
+      }),
+    }), {}, {
+      waitUntil: () => { },
+    } as any)
+
+    expect(response.status).toBe(200)
+    expect(builders.queueBuilder).toHaveBeenCalledTimes(3)
 
     const payload = await response.json() as { status: string }
     expect(payload.status).toBe('Stats saved')
