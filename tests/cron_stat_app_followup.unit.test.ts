@@ -39,14 +39,13 @@ function createSingleBuilder<T>(result: T) {
 }
 
 function createWriteBuilder(error?: Error | null) {
-  const builder = {
+  return {
     data: null,
     error: error ?? null,
     upsert: vi.fn().mockReturnThis(),
     update: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
   }
-  return builder
 }
 
 function createRpcSingleBuilder<T>(result: T) {
@@ -55,10 +54,11 @@ function createRpcSingleBuilder<T>(result: T) {
   }
 }
 
-function createRpcResultBuilder(error?: Error | null) {
+function createRpcThrowBuilder(error?: Error | null) {
   return {
-    data: null,
-    error: error ?? null,
+    throwOnError: error
+      ? vi.fn().mockRejectedValue(error)
+      : vi.fn().mockResolvedValue({ data: null, error: null }),
   }
 }
 
@@ -94,9 +94,11 @@ function createSupabaseStub(options?: {
     },
     error: null,
   })
-  const queueBuilder = createRpcResultBuilder(options?.queueError)
-
-  const orgBuilders = [orgSelectBuilder, orgUpdateBuilder]
+  const queueBuilder = createRpcThrowBuilder(options?.queueError)
+  const orgBuilder = {
+    select: vi.fn().mockReturnValue(orgSelectBuilder),
+    update: vi.fn().mockReturnValue(orgUpdateBuilder),
+  }
 
   const client = {
     from: vi.fn((table: string) => {
@@ -111,13 +113,8 @@ function createSupabaseStub(options?: {
           return dailyStorageBuilder
         case 'daily_version':
           return dailyVersionBuilder
-        case 'orgs': {
-          const nextBuilder = orgBuilders.shift()
-          if (!nextBuilder) {
-            throw new Error('Unexpected orgs builder call')
-          }
-          return nextBuilder
-        }
+        case 'orgs':
+          return orgBuilder
         default:
           throw new Error(`Unexpected table ${table}`)
       }
@@ -141,6 +138,7 @@ function createSupabaseStub(options?: {
       dailyBandwidthBuilder,
       dailyStorageBuilder,
       dailyVersionBuilder,
+      orgBuilder,
       orgUpdateBuilder,
       queueBuilder,
     },
@@ -184,7 +182,7 @@ describe('cron_stat_app follow-up failures', () => {
     ])
   })
 
-  it('returns 500 when queuing plan processing fails after stats writes', async () => {
+  it('returns success when queuing plan processing fails after stats writes', async () => {
     const { client, builders } = createSupabaseStub({
       queueError: new Error('error code: 502'),
     })
@@ -204,19 +202,45 @@ describe('cron_stat_app follow-up failures', () => {
       waitUntil: () => { },
     } as any)
 
-    expect(response.status).toBe(500)
+    expect(response.status).toBe(200)
     expect(builders.dailyMauBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.dailyBandwidthBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.dailyStorageBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.dailyVersionBuilder.upsert).toHaveBeenCalledTimes(1)
-    expect(builders.orgUpdateBuilder.update).toHaveBeenCalledTimes(1)
-    expect(client.rpc).toHaveBeenCalledWith('queue_cron_stat_org_for_org', {
-      org_id: 'org-test',
-      customer_id: 'cus_test',
-    })
+    expect(builders.orgBuilder.update).toHaveBeenCalledTimes(1)
+    expect(builders.queueBuilder.throwOnError).toHaveBeenCalledTimes(3)
 
-    const payload = await response.json() as { error: string }
-    expect(payload.error).toBe('unknown_error')
+    const payload = await response.json() as { status: string }
+    expect(payload.status).toBe('Stats saved')
+  })
+
+  it('retries queuing plan processing before succeeding', async () => {
+    const { client, builders } = createSupabaseStub()
+    builders.queueBuilder.throwOnError
+      .mockRejectedValueOnce(new Error('error code: 502'))
+      .mockRejectedValueOnce(new Error('error code: 502'))
+      .mockResolvedValue({ data: null, error: null })
+    supabaseAdminMock.mockReturnValue(client)
+
+    const response = await createApp().fetch(new Request('http://localhost/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apisecret': 'testsecret',
+      },
+      body: JSON.stringify({
+        appId: 'com.test.app',
+        orgId: 'org-test',
+      }),
+    }), {}, {
+      waitUntil: () => { },
+    } as any)
+
+    expect(response.status).toBe(200)
+    expect(builders.queueBuilder.throwOnError).toHaveBeenCalledTimes(3)
+
+    const payload = await response.json() as { status: string }
+    expect(payload.status).toBe('Stats saved')
   })
 
   it('returns success and still queues plan processing when org timestamp refresh fails after stats writes', async () => {
@@ -244,7 +268,7 @@ describe('cron_stat_app follow-up failures', () => {
     expect(builders.dailyBandwidthBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.dailyStorageBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.dailyVersionBuilder.upsert).toHaveBeenCalledTimes(1)
-    expect(builders.orgUpdateBuilder.update).toHaveBeenCalledTimes(1)
+    expect(builders.orgBuilder.update).toHaveBeenCalledTimes(3)
     expect(client.rpc).toHaveBeenCalledWith('queue_cron_stat_org_for_org', {
       org_id: 'org-test',
       customer_id: 'cus_test',
@@ -279,7 +303,7 @@ describe('cron_stat_app follow-up failures', () => {
     expect(builders.dailyBandwidthBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.dailyStorageBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.dailyVersionBuilder.upsert).toHaveBeenCalledTimes(1)
-    expect(builders.orgUpdateBuilder.update).not.toHaveBeenCalled()
+    expect(builders.orgBuilder.update).not.toHaveBeenCalled()
     expect(client.rpc).not.toHaveBeenCalledWith('queue_cron_stat_org_for_org', expect.anything())
 
     const payload = await response.json() as { status: string }

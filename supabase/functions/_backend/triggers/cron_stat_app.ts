@@ -16,10 +16,13 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 const SUPABASE_RETRY_ATTEMPTS = 3
 const SUPABASE_RETRY_DELAY_MS = 300
+const PLAN_REFRESH_RETRY_ATTEMPTS = 3
+const PLAN_REFRESH_RETRY_DELAY_MS = 300
 
 interface SupabaseRetryResult<T> {
   data: T | null
   error: unknown
+  status?: number | null
 }
 
 interface OrgStatsRefreshTarget {
@@ -41,14 +44,14 @@ interface VersionNameRow {
   name: string
 }
 
-function getRetryablePostgrestStatus(error: unknown): number | null {
-  if (error && typeof error === 'object') {
-    if ('status' in error && typeof (error as { status?: unknown }).status === 'number') {
-      return (error as { status: number }).status
+function getRetryablePostgrestStatus(candidate: unknown): number | null {
+  if (candidate && typeof candidate === 'object') {
+    if ('status' in candidate && typeof (candidate as { status?: unknown }).status === 'number') {
+      return (candidate as { status: number }).status
     }
 
-    if ('message' in error && typeof (error as { message?: unknown }).message === 'string') {
-      const match = /error code:\s*(\d{3})/i.exec((error as { message: string }).message)
+    if ('message' in candidate && typeof (candidate as { message?: unknown }).message === 'string') {
+      const match = /error code:\s*(\d{3})/i.exec((candidate as { message: string }).message)
       if (match) {
         return Number.parseInt(match[1], 10)
       }
@@ -58,9 +61,21 @@ function getRetryablePostgrestStatus(error: unknown): number | null {
   return null
 }
 
+function isRetryablePostgrestStatus(status: number | null): boolean {
+  return status !== null && status >= 500 && status < 600
+}
+
 function isRetryablePostgrestError(error: unknown): boolean {
   const status = getRetryablePostgrestStatus(error)
-  return status !== null && status >= 500 && status < 600
+  return isRetryablePostgrestStatus(status)
+}
+
+function isRetryablePostgrestResult(result: SupabaseRetryResult<unknown> | null | undefined): boolean {
+  if (!result) {
+    return false
+  }
+
+  return isRetryablePostgrestStatus(getRetryablePostgrestStatus(result)) || isRetryablePostgrestError(result.error)
 }
 
 async function runSupabaseResultWithRetry<T>(
@@ -81,7 +96,7 @@ async function runSupabaseResultWithRetry<T>(
   }, {
     attempts: SUPABASE_RETRY_ATTEMPTS,
     baseDelayMs: SUPABASE_RETRY_DELAY_MS,
-    shouldRetry: result => isRetryablePostgrestError(result?.error),
+    shouldRetry: result => isRetryablePostgrestResult(result),
   })
 
   if (!result) {
@@ -94,12 +109,16 @@ async function runSupabaseResultWithRetry<T>(
       message: 'cron_stat_app retry finished',
       label,
       attempts,
-      hadError: Boolean(result.error),
+      hadError: Boolean(result.error || isRetryablePostgrestStatus(getRetryablePostgrestStatus(result))),
     })
   }
 
   if (result.error) {
     throw result.error
+  }
+
+  if (typeof result.status === 'number' && result.status >= 400) {
+    throw new Error(`${label} failed with status ${result.status}`)
   }
 
   return result
@@ -137,17 +156,55 @@ async function syncOrgStatsRefresh(
 }
 
 async function queueOrgPlanRefresh(
+  supabase: ReturnType<typeof supabaseAdmin>,
+  orgId: string,
+  customerId: string,
+): Promise<void> {
+  await supabase.rpc('queue_cron_stat_org_for_org', {
+    org_id: orgId,
+    customer_id: customerId,
+  }).throwOnError()
+}
+
+async function queueOrgPlanRefreshWithRetry(
   c: Parameters<typeof supabaseAdmin>[0],
   supabase: ReturnType<typeof supabaseAdmin>,
   orgId: string,
   customerId: string,
 ): Promise<void> {
-  await runSupabaseResultWithRetry(c, 'queue_cron_stat_org_for_org', async () => await supabase.rpc('queue_cron_stat_org_for_org', {
-    org_id: orgId,
-    customer_id: customerId,
-  }))
+  const { result, attempts } = await retryWithBackoff(async () => {
+    try {
+      await queueOrgPlanRefresh(supabase, orgId, customerId)
+      return { ok: true as const }
+    }
+    catch (error) {
+      return { ok: false as const, error }
+    }
+  }, {
+    attempts: PLAN_REFRESH_RETRY_ATTEMPTS,
+    baseDelayMs: PLAN_REFRESH_RETRY_DELAY_MS,
+    shouldRetry: result => !result.ok,
+  })
 
-  cloudlog({ requestId: c.get('requestId'), message: 'plan processing queued for org', orgId, customerId })
+  if (!result?.ok) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Failed to queue cron_stat_app org plan refresh',
+      orgId,
+      customerId,
+      attempts,
+      error: result?.error,
+    })
+    return
+  }
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: attempts > 1 ? 'plan processing queued for org after retries' : 'plan processing queued for org',
+    orgId,
+    customerId,
+    attempts,
+  })
 }
 
 app.use('/', useCors)
@@ -298,7 +355,7 @@ app.post('/', middlewareAPISecret, async (c) => {
   }
 
   if (orgStatsRefreshTarget?.customerId) {
-    await queueOrgPlanRefresh(c, supabase, orgId, orgStatsRefreshTarget.customerId)
+    await queueOrgPlanRefreshWithRetry(c, supabase, orgId, orgStatsRefreshTarget.customerId)
   }
 
   return c.json({ status: 'Stats saved', mau, bandwidth, storage, versionUsage })

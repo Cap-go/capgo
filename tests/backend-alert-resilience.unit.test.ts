@@ -80,6 +80,39 @@ describe('backend alert resilience helpers', () => {
     expect(result.data).toEqual({ ok: true })
   })
 
+  it('retries transient PostgREST top-level 502 statuses for cron_stat_app', async () => {
+    const { cronStatAppTestUtils } = await import('../supabase/functions/_backend/triggers/cron_stat_app.ts')
+
+    let attempts = 0
+    const result = await cronStatAppTestUtils.runSupabaseResultWithRetry(
+      createTestContext(),
+      'test_postgrest_top_level_status_retry',
+      async () => {
+        attempts += 1
+
+        if (attempts === 1) {
+          return {
+            data: null,
+            error: {
+              name: 'PostgrestError',
+              message: 'temporary upstream failure',
+            },
+            status: 502,
+          }
+        }
+
+        return {
+          data: { ok: true },
+          error: null,
+          status: 200,
+        }
+      },
+    )
+
+    expect(attempts).toBe(2)
+    expect(result.data).toEqual({ ok: true })
+  })
+
   it('skips stale cron_stat_app jobs when the app no longer exists', async () => {
     vi.resetModules()
     vi.doMock('../supabase/functions/_backend/utils/hono.ts', async (importOriginal) => {
