@@ -213,6 +213,7 @@ watchEffect(async () => {
               :app-id="id"
               :use-billing-period="usageComponent?.useBillingPeriod ?? true"
               :accumulated="(usageComponent?.useBillingPeriod ?? true) && (usageComponent?.showCumulative ?? false)"
+              :reload-trigger="usageComponent?.reloadTrigger ?? 0"
               :force-demo="appNotFound"
               class="col-span-full sm:col-span-6 xl:col-span-4"
             />
@@ -220,6 +221,7 @@ watchEffect(async () => {
               :app-id="id"
               :use-billing-period="usageComponent?.useBillingPeriod ?? true"
               :accumulated="(usageComponent?.useBillingPeriod ?? true) && (usageComponent?.showCumulative ?? false)"
+              :reload-trigger="usageComponent?.reloadTrigger ?? 0"
               :force-demo="appNotFound"
               class="col-span-full sm:col-span-6 xl:col-span-4"
             />
@@ -227,6 +229,7 @@ watchEffect(async () => {
               :app-id="id"
               :use-billing-period="usageComponent?.useBillingPeriod ?? true"
               :accumulated="(usageComponent?.useBillingPeriod ?? true) && (usageComponent?.showCumulative ?? false)"
+              :reload-trigger="usageComponent?.reloadTrigger ?? 0"
               :force-demo="appNotFound"
               class="col-span-full sm:col-span-6 xl:col-span-4"
             />

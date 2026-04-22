@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.121.6",
+  "version": "12.121.10",
   "private": true,
   "license": "GPL-3.0",
   "scripts": {
@@ -226,7 +226,7 @@
     "@types/dompurify": "3.2.0",
     "@types/pg": "^8.20.0",
     "@types/semver": "^7.7.1",
-    "@vitejs/plugin-vue": "6.0.5",
+    "@vitejs/plugin-vue": "6.0.6",
     "@vitest/coverage-v8": "^4.1.4",
     "@vitest/ui": "^4.1.4",
     "@vue/compiler-sfc": "3.5.32",

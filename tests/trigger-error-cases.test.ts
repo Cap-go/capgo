@@ -43,6 +43,21 @@ describe('[POST] /triggers/cron_stat_app - Error Cases', () => {
     expect(data.error).toBe('no_orgId')
   })
 
+  it.concurrent('should skip stale jobs when the app no longer exists', async () => {
+    const response = await fetch(`${BASE_URL}/triggers/cron_stat_app`, {
+      method: 'POST',
+      headers: triggerHeaders,
+      body: JSON.stringify({
+        appId: 'nonexistent-app-id',
+        orgId: ORG_ID,
+      }),
+    })
+    expect(response.status).toBe(200)
+    const data = await response.json() as { status: string, reason: string }
+    expect(data.status).toBe('skipped')
+    expect(data.reason).toBe('app_not_found')
+  })
+
   it('should return 400 when appId is not provided', async () => {
     const response = await fetch(`${BASE_URL}/triggers/cron_stat_app`, {
       method: 'POST',

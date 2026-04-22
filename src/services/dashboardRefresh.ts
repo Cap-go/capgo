@@ -2,7 +2,7 @@ import { useSupabase } from '~/services/supabase'
 
 export const CHART_REFRESH_STALE_MS = 5 * 60 * 1000
 export const CHART_REFRESH_POLL_MS = 10 * 1000
-export const CHART_REFRESH_TIMEOUT_MS = 2 * 60 * 1000
+export const CHART_REFRESH_TIMEOUT_MS = CHART_REFRESH_STALE_MS + CHART_REFRESH_POLL_MS
 
 export interface ChartRefreshRequestResult {
   requested_at: string | null
@@ -34,9 +34,12 @@ export function parseDashboardRefreshTimestamp(value: string | null | undefined)
 export function isChartRefreshInProgress(
   requestedAt: string | null | undefined,
   updatedAt: string | null | undefined,
+  now: number = Date.now(),
 ): boolean {
   const requestedMs = parseDashboardRefreshTimestamp(requestedAt)
   if (requestedMs === null)
+    return false
+  if (now - requestedMs >= CHART_REFRESH_TIMEOUT_MS)
     return false
 
   const updatedMs = parseDashboardRefreshTimestamp(updatedAt)
@@ -59,7 +62,7 @@ export function shouldAutoRequestChartRefresh(
   requestedAt: string | null | undefined,
   now: number = Date.now(),
 ): boolean {
-  return isChartDataStale(updatedAt, now) && !isChartRefreshInProgress(requestedAt, updatedAt)
+  return isChartDataStale(updatedAt, now) && !isChartRefreshInProgress(requestedAt, updatedAt, now)
 }
 
 export function isOrgCacheReadyForRefresh(

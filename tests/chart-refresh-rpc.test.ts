@@ -229,6 +229,48 @@ describe('chart refresh RPCs', () => {
     expect(await countCronStatAppMessages(freshAppId)).toBe(0)
   })
 
+  it('request_org_chart_refresh preserves the current org request marker when no apps are queued', async () => {
+    const inProgressRequestedAt = new Date(Date.now() - 2 * 60 * 1000).toISOString()
+
+    await getSupabaseClient().from('orgs').update({
+      stats_refresh_requested_at: inProgressRequestedAt,
+    }).eq('id', orgId).throwOnError()
+    await getSupabaseClient().from('apps').update({
+      stats_refresh_requested_at: inProgressRequestedAt,
+      stats_updated_at: new Date().toISOString(),
+    }).in('app_id', [staleAppId, freshAppId]).throwOnError()
+
+    const { data: beforeOrgState, error: beforeOrgError } = await getSupabaseClient()
+      .from('orgs')
+      .select('stats_refresh_requested_at')
+      .eq('id', orgId)
+      .single()
+
+    expect(beforeOrgError).toBeNull()
+    expect(beforeOrgState?.stats_refresh_requested_at).toBeTruthy()
+
+    const { data, error } = await authorizedClient.rpc('request_org_chart_refresh', {
+      org_id: orgId,
+    }).single()
+
+    expect(error).toBeNull()
+    expect(data?.queued_app_ids).toEqual([])
+    expect(data?.queued_count).toBe(0)
+    expect(data?.skipped_count).toBe(2)
+    expect(data?.requested_at).toBe(beforeOrgState?.stats_refresh_requested_at)
+
+    const { data: afterOrgState, error: afterOrgError } = await getSupabaseClient()
+      .from('orgs')
+      .select('stats_refresh_requested_at')
+      .eq('id', orgId)
+      .single()
+
+    expect(afterOrgError).toBeNull()
+    expect(afterOrgState?.stats_refresh_requested_at).toBe(beforeOrgState?.stats_refresh_requested_at)
+    expect(await countCronStatAppMessages(staleAppId)).toBe(0)
+    expect(await countCronStatAppMessages(freshAppId)).toBe(0)
+  })
+
   it('get_app_metrics rebuilds cache immediately when org stats_updated_at is newer than cached_at', async () => {
     const metricDate = new Date()
     metricDate.setHours(0, 0, 0, 0)

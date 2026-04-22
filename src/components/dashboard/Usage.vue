@@ -122,6 +122,7 @@ const localOrgStatsUpdatedAt = ref<string | null>(null)
 const localOrgStatsRefreshRequestedAt = ref<string | null>(null)
 const localAppStatsUpdatedAt = ref<string | null>(props.appStatsUpdatedAt ?? null)
 const localAppStatsRefreshRequestedAt = ref<string | null>(props.appStatsRefreshRequestedAt ?? null)
+const refreshStateClock = ref(Date.now())
 const isRefreshPolling = ref(false)
 const autoRefreshScopeKey = ref<string | null>(null)
 let refreshPollTimer: ReturnType<typeof setTimeout> | null = null
@@ -137,8 +138,8 @@ const currentScopeKey = computed(() => props.appId
   : `org:${effectiveOrganization.value?.gid ?? 'none'}`)
 const scopeStatsUpdatedAt = computed(() => props.appId ? localAppStatsUpdatedAt.value : localOrgStatsUpdatedAt.value)
 const scopeStatsRefreshRequestedAt = computed(() => props.appId ? localAppStatsRefreshRequestedAt.value : localOrgStatsRefreshRequestedAt.value)
-const isCurrentScopeRefreshing = computed(() => isChartRefreshInProgress(scopeStatsRefreshRequestedAt.value, scopeStatsUpdatedAt.value))
-const isCurrentScopeStale = computed(() => isChartDataStale(scopeStatsUpdatedAt.value))
+const isCurrentScopeRefreshing = computed(() => isChartRefreshInProgress(scopeStatsRefreshRequestedAt.value, scopeStatsUpdatedAt.value, refreshStateClock.value))
+const isCurrentScopeStale = computed(() => isChartDataStale(scopeStatsUpdatedAt.value, refreshStateClock.value))
 const hasRefreshableScope = computed(() => {
   if (props.forceDemo)
     return false
@@ -235,7 +236,12 @@ function clearDashboardParams() {
   router.replace({ query })
 }
 
+function touchRefreshStateClock(now: number = Date.now()) {
+  refreshStateClock.value = now
+}
+
 function syncLocalOrgRefreshState(state: { stats_refresh_requested_at: string | null, stats_updated_at: string | null }) {
+  touchRefreshStateClock()
   localOrgStatsUpdatedAt.value = state.stats_updated_at ?? null
   localOrgStatsRefreshRequestedAt.value = state.stats_refresh_requested_at ?? null
 
@@ -253,6 +259,7 @@ function clearUsageCaches() {
 }
 
 function stopRefreshPolling() {
+  touchRefreshStateClock()
   if (refreshPollTimer !== null) {
     clearTimeout(refreshPollTimer)
     refreshPollTimer = null
@@ -266,6 +273,7 @@ async function reloadChartsAfterRefresh() {
 }
 
 async function pollRefreshState() {
+  touchRefreshStateClock()
   try {
     if (props.appId) {
       const appState = await fetchAppChartRefreshState(props.appId)
@@ -317,6 +325,7 @@ async function pollRefreshState() {
 }
 
 function startRefreshPolling() {
+  touchRefreshStateClock()
   stopRefreshPolling()
   isRefreshPolling.value = true
   refreshPollStartedAt = Date.now()
@@ -333,8 +342,9 @@ async function queueScopeRefresh(auto = false) {
     if (props.appId) {
       const result = await requestAppChartRefresh(props.appId)
       localAppStatsRefreshRequestedAt.value = result.requested_at
+      touchRefreshStateClock()
 
-      if (result.requested_at && isChartRefreshInProgress(result.requested_at, localAppStatsUpdatedAt.value)) {
+      if (result.requested_at && isChartRefreshInProgress(result.requested_at, localAppStatsUpdatedAt.value, refreshStateClock.value)) {
         startRefreshPolling()
       }
     }
@@ -349,7 +359,7 @@ async function queueScopeRefresh(auto = false) {
         stats_refresh_requested_at: result.requested_at,
       })
 
-      if (result.requested_at && isChartRefreshInProgress(result.requested_at, localOrgStatsUpdatedAt.value)) {
+      if (result.requested_at && isChartRefreshInProgress(result.requested_at, localOrgStatsUpdatedAt.value, refreshStateClock.value)) {
         startRefreshPolling()
       }
     }
@@ -404,6 +414,7 @@ async function reloadAllCharts() {
 // Expose function and state for parent components
 defineExpose({
   clearDashboardParams,
+  reloadTrigger,
   useBillingPeriod,
   showCumulative,
 })
@@ -832,10 +843,12 @@ watch(() => route.query, (newQuery) => {
 }, { deep: true })
 
 watch(() => props.appStatsUpdatedAt, (value) => {
+  touchRefreshStateClock()
   localAppStatsUpdatedAt.value = value ?? null
 }, { immediate: true })
 
 watch(() => props.appStatsRefreshRequestedAt, (value) => {
+  touchRefreshStateClock()
   localAppStatsRefreshRequestedAt.value = value ?? null
 }, { immediate: true })
 

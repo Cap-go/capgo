@@ -34,6 +34,7 @@ function createSingleBuilder<T>(result: T) {
     select: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
     single: vi.fn().mockResolvedValue(result),
+    maybeSingle: vi.fn().mockResolvedValue(result),
   }
 }
 
@@ -45,14 +46,17 @@ function createListBuilder<T>(result: T) {
 }
 
 function createWriteBuilder(error?: Error | null) {
-  return {
+  const builder = {
+    data: null,
+    error: error ?? null,
+    status: error ? 500 : 200,
     upsert: vi.fn().mockReturnThis(),
     update: vi.fn().mockReturnThis(),
     eq: vi.fn().mockReturnThis(),
-    throwOnError: error
-      ? vi.fn().mockRejectedValue(error)
-      : vi.fn().mockResolvedValue({ data: null, error: null }),
+    throwOnError: vi.fn().mockImplementation(() => error ? Promise.reject(error) : Promise.resolve(builder)),
   }
+
+  return builder
 }
 
 function createRpcSingleBuilder<T>(result: T) {
@@ -61,12 +65,12 @@ function createRpcSingleBuilder<T>(result: T) {
   }
 }
 
-function createRpcThrowBuilder(error?: Error | null) {
-  return {
-    throwOnError: error
-      ? vi.fn().mockRejectedValue(error)
-      : vi.fn().mockResolvedValue({ data: null, error: null }),
-  }
+function createRpcResultBuilder(result?: { data: unknown, error: Error | null, status?: number | null }) {
+  return vi.fn().mockResolvedValue(result ?? {
+    data: null,
+    error: null,
+    status: 200,
+  })
 }
 
 function createSupabaseStub(options?: {
@@ -75,6 +79,7 @@ function createSupabaseStub(options?: {
   orgUpdateError?: Error | null
   pendingAppRefreshes?: boolean
   queueError?: Error | null
+  queueStatus?: number | null
 }) {
   const appSelectBuilder = createSingleBuilder({
     data: {
@@ -115,10 +120,16 @@ function createSupabaseStub(options?: {
     },
     error: null,
   })
-  const queueBuilder = createRpcThrowBuilder(options?.queueError)
-
   const appBuilders = [appSelectBuilder, appUpdateBuilder, pendingAppsBuilder]
-  const orgBuilders = [orgSelectBuilder, orgUpdateBuilder]
+  const queueBuilder = createRpcResultBuilder({
+    data: null,
+    error: options?.queueError ?? null,
+    status: options?.queueStatus ?? (options?.queueError ? 500 : 200),
+  })
+  const orgBuilder = {
+    select: vi.fn().mockReturnValue(orgSelectBuilder),
+    update: vi.fn().mockReturnValue(orgUpdateBuilder),
+  }
 
   const client = {
     from: vi.fn((table: string) => {
@@ -138,23 +149,18 @@ function createSupabaseStub(options?: {
           return dailyStorageBuilder
         case 'daily_version':
           return dailyVersionBuilder
-        case 'orgs': {
-          const nextBuilder = orgBuilders.shift()
-          if (!nextBuilder) {
-            throw new Error('Unexpected orgs builder call')
-          }
-          return nextBuilder
-        }
+        case 'orgs':
+          return orgBuilder
         default:
           throw new Error(`Unexpected table ${table}`)
       }
     }),
-    rpc: vi.fn((name: string) => {
+    rpc: vi.fn((name: string, args?: unknown) => {
       switch (name) {
         case 'get_cycle_info_org':
           return cycleInfoBuilder
         case 'queue_cron_stat_org_for_org':
-          return queueBuilder
+          return queueBuilder(args)
         default:
           throw new Error(`Unexpected rpc ${name}`)
       }
@@ -169,6 +175,7 @@ function createSupabaseStub(options?: {
       dailyBandwidthBuilder,
       dailyStorageBuilder,
       dailyVersionBuilder,
+      orgBuilder,
       orgUpdateBuilder,
       pendingAppsBuilder,
       queueBuilder,
@@ -213,9 +220,10 @@ describe('cron_stat_app follow-up failures', () => {
     ])
   })
 
-  it('returns 500 when queuing plan processing fails after stats writes', async () => {
+  it('returns success when queuing plan processing fails after stats writes', async () => {
     const { client, builders } = createSupabaseStub({
-      queueError: new Error('error code: 502'),
+      queueError: new Error('temporary upstream failure'),
+      queueStatus: 502,
     })
     supabaseAdminMock.mockReturnValue(client)
 
@@ -233,16 +241,107 @@ describe('cron_stat_app follow-up failures', () => {
       waitUntil: () => { },
     } as any)
 
-    expect(response.status).toBe(500)
-    expect(builders.dailyMauBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.dailyBandwidthBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.dailyStorageBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.dailyVersionBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.orgUpdateBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.queueBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(response.status).toBe(200)
+    expect(builders.dailyMauBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.dailyBandwidthBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.dailyStorageBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.dailyVersionBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.orgBuilder.update).toHaveBeenCalledTimes(1)
+    expect(builders.queueBuilder).toHaveBeenCalledTimes(3)
 
-    const payload = await response.json() as { error: string }
-    expect(payload.error).toBe('unknown_error')
+    const payload = await response.json() as { status: string }
+    expect(payload.status).toBe('Stats saved')
+  })
+
+  it('retries queuing plan processing before succeeding', async () => {
+    const { client, builders } = createSupabaseStub()
+    builders.queueBuilder
+      .mockResolvedValueOnce({
+        data: null,
+        error: new Error('temporary upstream failure'),
+        status: 502,
+      })
+      .mockResolvedValueOnce({
+        data: null,
+        error: new Error('temporary upstream failure'),
+        status: 502,
+      })
+      .mockResolvedValue({ data: null, error: null, status: 200 })
+    supabaseAdminMock.mockReturnValue(client)
+
+    const response = await createApp().fetch(new Request('http://localhost/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apisecret': 'testsecret',
+      },
+      body: JSON.stringify({
+        appId: 'com.test.app',
+        orgId: 'org-test',
+      }),
+    }), {}, {
+      waitUntil: () => { },
+    } as any)
+
+    expect(response.status).toBe(200)
+    expect(builders.queueBuilder).toHaveBeenCalledTimes(3)
+
+    const payload = await response.json() as { status: string }
+    expect(payload.status).toBe('Stats saved')
+  })
+
+  it('does not retry non-retryable queue failures', async () => {
+    const { client, builders } = createSupabaseStub({
+      queueError: new Error('invalid queue payload'),
+      queueStatus: 400,
+    })
+    supabaseAdminMock.mockReturnValue(client)
+
+    const response = await createApp().fetch(new Request('http://localhost/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apisecret': 'testsecret',
+      },
+      body: JSON.stringify({
+        appId: 'com.test.app',
+        orgId: 'org-test',
+      }),
+    }), {}, {
+      waitUntil: () => { },
+    } as any)
+
+    expect(response.status).toBe(200)
+    expect(builders.queueBuilder).toHaveBeenCalledTimes(1)
+
+    const payload = await response.json() as { status: string }
+    expect(payload.status).toBe('Stats saved')
+  })
+
+  it('retries thrown queue failures before giving up', async () => {
+    const { client, builders } = createSupabaseStub()
+    builders.queueBuilder.mockRejectedValue(new Error('fetch failed'))
+    supabaseAdminMock.mockReturnValue(client)
+
+    const response = await createApp().fetch(new Request('http://localhost/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apisecret': 'testsecret',
+      },
+      body: JSON.stringify({
+        appId: 'com.test.app',
+        orgId: 'org-test',
+      }),
+    }), {}, {
+      waitUntil: () => { },
+    } as any)
+
+    expect(response.status).toBe(200)
+    expect(builders.queueBuilder).toHaveBeenCalledTimes(3)
+
+    const payload = await response.json() as { status: string }
+    expect(payload.status).toBe('Stats saved')
   })
 
   it('returns success and still queues plan processing when org timestamp refresh fails after stats writes', async () => {
@@ -266,13 +365,16 @@ describe('cron_stat_app follow-up failures', () => {
     } as any)
 
     expect(response.status).toBe(200)
-    expect(builders.dailyMauBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.dailyBandwidthBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.dailyStorageBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.dailyVersionBuilder.throwOnError).toHaveBeenCalledTimes(1)
     expect(builders.appUpdateBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.orgUpdateBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.queueBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.dailyMauBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.dailyBandwidthBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.dailyStorageBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.dailyVersionBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.orgBuilder.update).toHaveBeenCalledTimes(3)
+    expect(client.rpc).toHaveBeenCalledWith('queue_cron_stat_org_for_org', {
+      org_id: 'org-test',
+      customer_id: 'cus_test',
+    })
 
     const payload = await response.json() as { status: string }
     expect(payload.status).toBe('Stats saved')
@@ -299,13 +401,13 @@ describe('cron_stat_app follow-up failures', () => {
     } as any)
 
     expect(response.status).toBe(200)
-    expect(builders.dailyMauBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.dailyBandwidthBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.dailyStorageBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.dailyVersionBuilder.throwOnError).toHaveBeenCalledTimes(1)
     expect(builders.appUpdateBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.orgUpdateBuilder.throwOnError).not.toHaveBeenCalled()
-    expect(builders.queueBuilder.throwOnError).not.toHaveBeenCalled()
+    expect(builders.dailyMauBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.dailyBandwidthBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.dailyStorageBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.dailyVersionBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.orgBuilder.update).not.toHaveBeenCalled()
+    expect(client.rpc).not.toHaveBeenCalledWith('queue_cron_stat_org_for_org', expect.anything())
 
     const payload = await response.json() as { status: string }
     expect(payload.status).toBe('Stats saved')
@@ -332,14 +434,14 @@ describe('cron_stat_app follow-up failures', () => {
     } as any)
 
     expect(response.status).toBe(200)
-    expect(builders.dailyMauBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.dailyBandwidthBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.dailyStorageBuilder.throwOnError).toHaveBeenCalledTimes(1)
-    expect(builders.dailyVersionBuilder.throwOnError).toHaveBeenCalledTimes(1)
     expect(builders.appUpdateBuilder.throwOnError).toHaveBeenCalledTimes(1)
+    expect(builders.dailyMauBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.dailyBandwidthBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.dailyStorageBuilder.upsert).toHaveBeenCalledTimes(1)
+    expect(builders.dailyVersionBuilder.upsert).toHaveBeenCalledTimes(1)
     expect(builders.pendingAppsBuilder.eq).toHaveBeenCalledTimes(1)
-    expect(builders.orgUpdateBuilder.throwOnError).not.toHaveBeenCalled()
-    expect(builders.queueBuilder.throwOnError).not.toHaveBeenCalled()
+    expect(builders.orgBuilder.update).not.toHaveBeenCalled()
+    expect(client.rpc).not.toHaveBeenCalledWith('queue_cron_stat_org_for_org', expect.anything())
 
     const payload = await response.json() as { status: string }
     expect(payload.status).toBe('Stats saved')

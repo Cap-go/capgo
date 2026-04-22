@@ -351,14 +351,17 @@ SET search_path = '' AS $function$
 DECLARE
   v_org_id uuid;
   v_lock_key integer;
-  v_lock_acquired boolean := false;
-  v_now_utc timestamp without time zone := pg_catalog.timezone('UTC', pg_catalog.clock_timestamp());
+  v_now_utc timestamp without time zone;
   v_stats_updated_at timestamp without time zone;
   v_stats_refresh_requested_at timestamp without time zone;
 BEGIN
   IF p_app_id IS NULL OR p_app_id = '' THEN
     RETURN;
   END IF;
+
+  v_lock_key := pg_catalog.hashtext(p_app_id);
+  PERFORM pg_catalog.pg_advisory_xact_lock(v_lock_key);
+  v_now_utc := pg_catalog.timezone('UTC', pg_catalog.clock_timestamp());
 
   SELECT
     a.owner_org,
@@ -388,51 +391,29 @@ BEGIN
     RETURN;
   END IF;
 
-  v_lock_key := pg_catalog.hashtext(p_app_id);
-  BEGIN
-    PERFORM pg_catalog.pg_advisory_lock(v_lock_key);
-    v_lock_acquired := true;
+  IF EXISTS (
+    SELECT 1
+    FROM pgmq.q_cron_stat_app AS queued_job
+    WHERE queued_job.message->'payload'->>'appId' = p_app_id
+  ) THEN
+    RETURN;
+  END IF;
 
-    IF EXISTS (
-      SELECT 1
-      FROM pgmq.q_cron_stat_app AS queued_job
-      WHERE queued_job.message->'payload'->>'appId' = p_app_id
-    ) THEN
-      PERFORM pg_catalog.pg_advisory_unlock(v_lock_key);
-      v_lock_acquired := false;
-      RETURN;
-    END IF;
+  UPDATE public.apps
+  SET stats_refresh_requested_at = v_now_utc
+  WHERE app_id = p_app_id;
 
-    UPDATE public.apps
-    SET stats_refresh_requested_at = v_now_utc
-    WHERE app_id = p_app_id;
-
-    PERFORM pgmq.send('cron_stat_app',
-      pg_catalog.jsonb_build_object(
-        'function_name', 'cron_stat_app',
-        'function_type', 'cloudflare',
-        'payload', pg_catalog.jsonb_build_object(
-          'appId', p_app_id,
-          'orgId', v_org_id,
-          'todayOnly', false
-        )
+  PERFORM pgmq.send('cron_stat_app',
+    pg_catalog.jsonb_build_object(
+      'function_name', 'cron_stat_app',
+      'function_type', 'cloudflare',
+      'payload', pg_catalog.jsonb_build_object(
+        'appId', p_app_id,
+        'orgId', v_org_id,
+        'todayOnly', false
       )
-    );
-
-    PERFORM pg_catalog.pg_advisory_unlock(v_lock_key);
-    v_lock_acquired := false;
-  EXCEPTION
-    WHEN query_canceled THEN
-      IF v_lock_acquired THEN
-        PERFORM pg_catalog.pg_advisory_unlock(v_lock_key);
-      END IF;
-      RAISE;
-    WHEN OTHERS THEN
-      IF v_lock_acquired THEN
-        PERFORM pg_catalog.pg_advisory_unlock(v_lock_key);
-      END IF;
-      RAISE;
-  END;
+    )
+  );
 END;
 $function$;
 
@@ -550,6 +531,8 @@ DECLARE
   v_queued_app_ids character varying[] := ARRAY[]::character varying[];
   v_queued_count integer := 0;
   v_total_count integer := 0;
+  v_org_requested_at_before timestamp without time zone;
+  v_return_requested_at timestamp without time zone;
   v_before_requested_at timestamp without time zone;
   v_after_requested_at timestamp without time zone;
   app_record record;
@@ -558,11 +541,13 @@ BEGIN
     RAISE EXCEPTION 'Org ID is required';
   END IF;
 
-  IF NOT EXISTS (
-    SELECT 1
-    FROM public.orgs
-    WHERE id = request_org_chart_refresh.org_id
-  ) THEN
+  SELECT o.stats_refresh_requested_at
+  INTO v_org_requested_at_before
+  FROM public.orgs o
+  WHERE o.id = request_org_chart_refresh.org_id
+  LIMIT 1;
+
+  IF NOT FOUND THEN
     RAISE EXCEPTION 'Organization not found';
   END IF;
 
@@ -590,10 +575,6 @@ BEGIN
     END IF;
   END IF;
 
-  UPDATE public.orgs
-  SET stats_refresh_requested_at = v_request_started_at
-  WHERE id = request_org_chart_refresh.org_id;
-
   FOR app_record IN
     SELECT a.app_id, a.stats_refresh_requested_at
     FROM public.apps a
@@ -619,9 +600,19 @@ BEGIN
     END IF;
   END LOOP;
 
+  IF v_queued_count > 0 THEN
+    UPDATE public.orgs
+    SET stats_refresh_requested_at = v_request_started_at
+    WHERE id = request_org_chart_refresh.org_id;
+
+    v_return_requested_at := v_request_started_at;
+  ELSE
+    v_return_requested_at := v_org_requested_at_before;
+  END IF;
+
   RETURN QUERY
   SELECT
-    v_request_started_at,
+    v_return_requested_at,
     COALESCE(v_queued_app_ids, ARRAY[]::character varying[]),
     v_queued_count,
     GREATEST(v_total_count - v_queued_count, 0);
