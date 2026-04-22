@@ -3,7 +3,7 @@ import type { Database } from '~/types/supabase.types'
 import dayjs from 'dayjs'
 import { storeToRefs } from 'pinia'
 import colors from 'tailwindcss/colors'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import ArrowPathIconSolid from '~icons/heroicons/arrow-path-solid'
@@ -12,6 +12,18 @@ import CalendarDaysIcon from '~icons/heroicons/calendar-days'
 import ChartBarIcon from '~icons/heroicons/chart-bar'
 import InformationInfo from '~icons/heroicons/information-circle'
 import { bytesToGb, getDaysBetweenDates } from '~/services/conversion'
+import {
+  CHART_REFRESH_POLL_MS,
+  CHART_REFRESH_TIMEOUT_MS,
+  fetchAppChartRefreshState,
+  fetchOrgChartRefreshState,
+  isChartDataStale,
+  isChartRefreshInProgress,
+  isOrgCacheReadyForRefresh,
+  requestAppChartRefresh,
+  requestOrgChartRefresh,
+  shouldAutoRequestChartRefresh,
+} from '~/services/dashboardRefresh'
 import { DEMO_APP_NAMES, generateDemoBandwidthData, generateDemoMauData, generateDemoStorageData } from '~/services/demoChartData'
 import { getPlans, useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
@@ -24,6 +36,8 @@ import UsageCard from './UsageCard.vue'
 
 const props = defineProps<{
   appId?: string
+  appStatsRefreshRequestedAt?: string | null
+  appStatsUpdatedAt?: string | null
   forceDemo?: boolean
 }>()
 
@@ -104,10 +118,39 @@ const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const dashboardAppsStore = useDashboardAppsStore()
 const dialogStore = useDialogV2Store()
+const localOrgStatsUpdatedAt = ref<string | null>(null)
+const localOrgStatsRefreshRequestedAt = ref<string | null>(null)
+const localAppStatsUpdatedAt = ref<string | null>(props.appStatsUpdatedAt ?? null)
+const localAppStatsRefreshRequestedAt = ref<string | null>(props.appStatsRefreshRequestedAt ?? null)
+const refreshStateClock = ref(Date.now())
+const isRefreshPolling = ref(false)
+const autoRefreshScopeKey = ref<string | null>(null)
+let refreshPollTimer: ReturnType<typeof setTimeout> | null = null
+let refreshPollStartedAt = 0
+let refreshClockTimer: ReturnType<typeof setInterval> | null = null
 const effectiveOrganization = computed(() => {
   if (props.appId)
     return organizationStore.getOrgByAppId(props.appId) ?? organizationStore.currentOrganization
   return organizationStore.currentOrganization
+})
+
+const currentScopeKey = computed(() => props.appId
+  ? `app:${props.appId}`
+  : `org:${effectiveOrganization.value?.gid ?? 'none'}`)
+const scopeStatsUpdatedAt = computed(() => props.appId ? localAppStatsUpdatedAt.value : localOrgStatsUpdatedAt.value)
+const scopeStatsRefreshRequestedAt = computed(() => props.appId ? localAppStatsRefreshRequestedAt.value : localOrgStatsRefreshRequestedAt.value)
+const isCurrentScopeRefreshing = computed(() => isChartRefreshInProgress(scopeStatsRefreshRequestedAt.value, scopeStatsUpdatedAt.value, refreshStateClock.value))
+const isCurrentScopeStale = computed(() => isChartDataStale(scopeStatsUpdatedAt.value, refreshStateClock.value))
+const hasRefreshableScope = computed(() => {
+  if (props.forceDemo)
+    return false
+  if (props.appId)
+    return !!props.appId
+  if (!effectiveOrganization.value?.gid || !dashboardAppsStore.isLoaded)
+    return false
+  if (dashboardAppsStore.appIds.length === 0)
+    return false
+  return true
 })
 
 const { dashboard } = storeToRefs(main)
@@ -121,7 +164,7 @@ const subscriptionAnchorEnd = computed(() => {
   return end ? dayjs(end).format('YYYY/MM/D') : t('unknown')
 })
 const lastRunDisplay = computed(() => {
-  const source = effectiveOrganization.value?.stats_updated_at
+  const source = scopeStatsUpdatedAt.value
   return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
 })
 const nextRunDisplay = computed(() => {
@@ -194,6 +237,162 @@ function clearDashboardParams() {
   router.replace({ query })
 }
 
+function touchRefreshStateClock(now: number = Date.now()) {
+  refreshStateClock.value = now
+}
+
+function syncLocalOrgRefreshState(state: { stats_refresh_requested_at: string | null, stats_updated_at: string | null }) {
+  touchRefreshStateClock()
+  localOrgStatsUpdatedAt.value = state.stats_updated_at ?? null
+  localOrgStatsRefreshRequestedAt.value = state.stats_refresh_requested_at ?? null
+
+  if (effectiveOrganization.value) {
+    effectiveOrganization.value.stats_updated_at = state.stats_updated_at
+    effectiveOrganization.value.stats_refresh_requested_at = state.stats_refresh_requested_at
+  }
+}
+
+function clearUsageCaches() {
+  const currentOrgId = effectiveOrganization.value?.gid ?? null
+  const cacheKey = `${currentOrgId ?? 'none'}:${props.appId ?? 'org'}`
+  cacheByOrg.delete(cacheKey)
+  cacheByOrgByApp.delete(cacheKey)
+}
+
+function stopRefreshPolling() {
+  touchRefreshStateClock()
+  if (refreshPollTimer !== null) {
+    clearTimeout(refreshPollTimer)
+    refreshPollTimer = null
+  }
+  isRefreshPolling.value = false
+}
+
+async function reloadChartsAfterRefresh() {
+  clearUsageCaches()
+  await reloadAllCharts()
+}
+
+async function pollRefreshState() {
+  touchRefreshStateClock()
+  try {
+    if (props.appId) {
+      const appState = await fetchAppChartRefreshState(props.appId)
+      localAppStatsUpdatedAt.value = appState.stats_updated_at ?? null
+      localAppStatsRefreshRequestedAt.value = appState.stats_refresh_requested_at ?? null
+
+      const orgState = await fetchOrgChartRefreshState(appState.owner_org)
+      syncLocalOrgRefreshState(orgState)
+
+      const appSettled = !isChartRefreshInProgress(appState.stats_refresh_requested_at, appState.stats_updated_at)
+      const orgCacheReady = isOrgCacheReadyForRefresh(orgState.stats_updated_at, appState.stats_refresh_requested_at)
+      if (appSettled && orgCacheReady) {
+        stopRefreshPolling()
+        await reloadChartsAfterRefresh()
+        return
+      }
+    }
+    else {
+      const orgId = effectiveOrganization.value?.gid
+      if (!orgId) {
+        stopRefreshPolling()
+        return
+      }
+
+      const orgState = await fetchOrgChartRefreshState(orgId)
+      syncLocalOrgRefreshState(orgState)
+
+      const orgSettled = !isChartRefreshInProgress(orgState.stats_refresh_requested_at, orgState.stats_updated_at)
+      const orgCacheReady = isOrgCacheReadyForRefresh(orgState.stats_updated_at, orgState.stats_refresh_requested_at)
+      if (orgSettled && orgCacheReady) {
+        stopRefreshPolling()
+        await reloadChartsAfterRefresh()
+        return
+      }
+    }
+  }
+  catch (error) {
+    console.error('Error polling chart refresh state:', error)
+  }
+
+  if (Date.now() - refreshPollStartedAt >= CHART_REFRESH_TIMEOUT_MS) {
+    stopRefreshPolling()
+    return
+  }
+
+  refreshPollTimer = setTimeout(() => {
+    void pollRefreshState()
+  }, CHART_REFRESH_POLL_MS)
+}
+
+function startRefreshPolling() {
+  touchRefreshStateClock()
+  stopRefreshPolling()
+  isRefreshPolling.value = true
+  refreshPollStartedAt = Date.now()
+  refreshPollTimer = setTimeout(() => {
+    void pollRefreshState()
+  }, CHART_REFRESH_POLL_MS)
+}
+
+async function queueScopeRefresh(auto = false): Promise<boolean> {
+  if (!hasRefreshableScope.value || props.forceDemo || isRefreshPolling.value)
+    return false
+
+  try {
+    if (props.appId) {
+      const result = await requestAppChartRefresh(props.appId)
+      localAppStatsRefreshRequestedAt.value = result.requested_at
+      touchRefreshStateClock()
+
+      if (result.requested_at && isChartRefreshInProgress(result.requested_at, localAppStatsUpdatedAt.value, refreshStateClock.value)) {
+        startRefreshPolling()
+        return true
+      }
+    }
+    else {
+      const orgId = effectiveOrganization.value?.gid
+      if (!orgId)
+        return false
+
+      const result = await requestOrgChartRefresh(orgId)
+      syncLocalOrgRefreshState({
+        stats_updated_at: localOrgStatsUpdatedAt.value,
+        stats_refresh_requested_at: result.requested_at,
+      })
+
+      if (result.requested_at && isChartRefreshInProgress(result.requested_at, localOrgStatsUpdatedAt.value, refreshStateClock.value)) {
+        startRefreshPolling()
+        return true
+      }
+    }
+
+    if (!auto) {
+      await reloadChartsAfterRefresh()
+    }
+    return false
+  }
+  catch (error) {
+    console.error('Error requesting chart refresh:', error)
+    if (auto) {
+      autoRefreshScopeKey.value = null
+    }
+    return false
+  }
+}
+
+async function handleReloadClick() {
+  if (props.forceDemo || !hasRefreshableScope.value || (!isCurrentScopeStale.value && !isCurrentScopeRefreshing.value)) {
+    await reloadChartsAfterRefresh()
+    return
+  }
+
+  if (isCurrentScopeRefreshing.value || isRefreshPolling.value)
+    return
+
+  await queueScopeRefresh()
+}
+
 // Function to reload all chart data
 async function reloadAllCharts() {
   // Force reload of main dashboard data
@@ -224,6 +423,7 @@ async function reloadAllCharts() {
 // Expose function and state for parent components
 defineExpose({
   clearDashboardParams,
+  reloadTrigger,
   useBillingPeriod,
   showCumulative,
 })
@@ -651,7 +851,76 @@ watch(() => route.query, (newQuery) => {
   }
 }, { deep: true })
 
+watch(() => props.appStatsUpdatedAt, (value) => {
+  touchRefreshStateClock()
+  localAppStatsUpdatedAt.value = value ?? null
+}, { immediate: true })
+
+watch(() => props.appStatsRefreshRequestedAt, (value) => {
+  touchRefreshStateClock()
+  localAppStatsRefreshRequestedAt.value = value ?? null
+}, { immediate: true })
+
+watch(() => [
+  effectiveOrganization.value?.gid ?? null,
+  effectiveOrganization.value?.stats_updated_at ?? null,
+  effectiveOrganization.value?.stats_refresh_requested_at ?? null,
+], ([, updatedAt, requestedAt]) => {
+  syncLocalOrgRefreshState({
+    stats_refresh_requested_at: requestedAt,
+    stats_updated_at: updatedAt,
+  })
+}, { immediate: true })
+
+watch(currentScopeKey, (_newKey, oldKey) => {
+  if (oldKey && oldKey !== _newKey) {
+    autoRefreshScopeKey.value = null
+  }
+  stopRefreshPolling()
+})
+
+watch(isCurrentScopeStale, (isStale) => {
+  if (!isStale) {
+    autoRefreshScopeKey.value = null
+  }
+})
+
+watch(() => ({
+  canRefresh: hasRefreshableScope.value,
+  forceDemo: !!props.forceDemo,
+  key: currentScopeKey.value,
+  now: refreshStateClock.value,
+  shouldAutoRequest: shouldAutoRequestChartRefresh(
+    scopeStatsUpdatedAt.value,
+    scopeStatsRefreshRequestedAt.value,
+    refreshStateClock.value,
+  ),
+}), async (state) => {
+  if (!state.canRefresh || state.forceDemo || !state.shouldAutoRequest)
+    return
+  if (autoRefreshScopeKey.value === state.key)
+    return
+
+  autoRefreshScopeKey.value = state.key
+  await queueScopeRefresh(true)
+}, { immediate: true })
+
+watch(() => ({
+  canRefresh: hasRefreshableScope.value,
+  key: currentScopeKey.value,
+  refreshing: isCurrentScopeRefreshing.value,
+}), (state) => {
+  if (!state.canRefresh || !state.refreshing || isRefreshPolling.value)
+    return
+
+  startRefreshPolling()
+}, { immediate: true })
+
 onMounted(async () => {
+  refreshClockTimer = setInterval(() => {
+    touchRefreshStateClock()
+  }, CHART_REFRESH_POLL_MS)
+
   // If forceDemo is true, load immediately with demo data
   if (props.forceDemo) {
     loadData()
@@ -668,6 +937,14 @@ onMounted(async () => {
   }
   // If dashboard not fetched yet, the watcher on 'dashboard' will handle loading
   // and will check needsForceRefresh there
+})
+
+onBeforeUnmount(() => {
+  if (refreshClockTimer !== null) {
+    clearInterval(refreshClockTimer)
+    refreshClockTimer = null
+  }
+  stopRefreshPolling()
 })
 </script>
 
@@ -726,9 +1003,11 @@ onMounted(async () => {
         type="button"
         class="flex items-center justify-center w-8 h-8 text-gray-700 transition-colors bg-white rounded-md shadow-sm cursor-pointer sm:w-9 sm:h-9 dark:text-gray-200 dark:bg-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:hover:bg-gray-600 dark:hover:text-white dark:focus:ring-blue-400"
         :aria-label="t('reload')"
-        @click="reloadAllCharts"
+        :class="{ 'opacity-60 cursor-not-allowed': isCurrentScopeRefreshing || isRefreshPolling }"
+        :disabled="isCurrentScopeRefreshing || isRefreshPolling"
+        @click="handleReloadClick"
       >
-        <ArrowPathIconSolid class="w-4 h-4" />
+        <ArrowPathIconSolid class="w-4 h-4" :class="{ 'animate-spin': isCurrentScopeRefreshing || isRefreshPolling }" />
       </button>
 
       <!-- Usage Info Tooltip -->
