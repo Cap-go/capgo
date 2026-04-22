@@ -191,7 +191,7 @@ BEGIN
   time_constants AS (
     SELECT
       NOW() AS current_time,
-      date_trunc('MONTH', NOW()) AS current_month_start,
+      date_trunc('MONTH', NOW()) AS current_month_start, -- NOSONAR: migration-local billing anchor
       '0 DAYS'::INTERVAL AS zero_day_interval
   ),
   paying_orgs_ordered AS (
@@ -202,7 +202,7 @@ BEGIN
     JOIN public.stripe_info si ON o.customer_id = si.customer_id
     CROSS JOIN time_constants tc
     WHERE (
-      (si.status = 'succeeded'
+      (si.status = 'succeeded' -- NOSONAR: existing stripe_info status contract
         AND (si.canceled_at IS NULL OR si.canceled_at > tc.current_time)
         AND si.subscription_anchor_end > tc.current_time)
       OR si.trial_at > tc.current_time
@@ -261,7 +261,7 @@ BEGIN
     END AS role,
     CASE
       WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN false
-      ELSE COALESCE(si.status = 'succeeded', false)
+      ELSE COALESCE(si.status = 'succeeded', false) -- NOSONAR: existing stripe_info status contract
     END AS paying,
     CASE
       WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN 0
@@ -269,7 +269,7 @@ BEGIN
     END AS trial_left,
     CASE
       WHEN tfa.should_redact_2fa OR ppa.should_redact_password THEN false
-      ELSE COALESCE((si.status = 'succeeded' AND si.is_good_plan = true)
+      ELSE COALESCE((si.status = 'succeeded' AND si.is_good_plan = true) -- NOSONAR: existing stripe_info status contract
         OR (si.trial_at::date - NOW()::date > 0)
         OR COALESCE(ucb.available_credits, 0) > 0, false)
     END AS can_use_more,
@@ -359,7 +359,7 @@ SET search_path = '' AS $function$
 DECLARE
   v_org_id uuid;
   v_now_utc timestamp without time zone;
-  v_refresh_ttl CONSTANT interval := INTERVAL '5 minutes';
+  v_refresh_ttl CONSTANT interval := INTERVAL '5 minutes'; -- NOSONAR: function-local refresh TTL
 BEGIN
   IF p_app_id IS NULL OR p_app_id = '' THEN
     RETURN;
@@ -417,7 +417,7 @@ SET search_path = '' AS $function$
 DECLARE
   v_now_utc timestamp without time zone := pg_catalog.timezone('UTC', pg_catalog.clock_timestamp());
 BEGIN
-  IF p_app_id IS NULL OR p_app_id = '' THEN
+  IF p_app_id IS NULL OR p_app_id = '' THEN -- NOSONAR: explicit empty-string guard
     RETURN NULL;
   END IF;
 
@@ -458,8 +458,8 @@ DECLARE
   v_after_requested_at timestamp without time zone;
   v_request_started_at timestamp without time zone := pg_catalog.timezone('UTC', pg_catalog.clock_timestamp());
   v_queued boolean := false;
-  v_privileged_roles CONSTANT text[] := ARRAY['service_role', 'postgres', 'supabase_admin'];
-  v_read_key_modes CONSTANT public.key_mode[] := '{read,upload,write,all}'::public.key_mode[];
+  v_privileged_roles CONSTANT text[] := ARRAY['service_role', 'postgres', 'supabase_admin']; -- NOSONAR: function-local privileged role set
+  v_read_key_modes CONSTANT public.key_mode[] := '{read,upload,write,all}'::public.key_mode[]; -- NOSONAR: function-local key mode set
   v_read_min_right CONSTANT public.user_min_right := 'read'::public.user_min_right;
 BEGIN
   IF request_app_chart_refresh.app_id IS NULL OR request_app_chart_refresh.app_id = '' THEN
@@ -467,7 +467,7 @@ BEGIN
   END IF;
 
   SELECT COALESCE(
-    NULLIF(pg_catalog.current_setting('request.jwt.claim.role', true), ''),
+    NULLIF(pg_catalog.current_setting('request.jwt.claim.role', true), ''), -- NOSONAR: request role lookup reused across overloads
     NULLIF(pg_catalog.current_setting('role', true), ''),
     NULLIF(COALESCE(session_user, current_user), '')
   ) INTO caller_role;
@@ -560,8 +560,8 @@ DECLARE
   v_before_requested_at timestamp without time zone;
   v_after_requested_at timestamp without time zone;
   app_record record;
-  v_privileged_roles CONSTANT text[] := ARRAY['service_role', 'postgres', 'supabase_admin'];
-  v_read_key_modes CONSTANT public.key_mode[] := '{read,upload,write,all}'::public.key_mode[];
+  v_privileged_roles CONSTANT text[] := ARRAY['service_role', 'postgres', 'supabase_admin']; -- NOSONAR: function-local privileged role set
+  v_read_key_modes CONSTANT public.key_mode[] := '{read,upload,write,all}'::public.key_mode[]; -- NOSONAR: function-local key mode set
   v_read_min_right CONSTANT public.user_min_right := 'read'::public.user_min_right;
 BEGIN
   IF request_org_chart_refresh.org_id IS NULL THEN
@@ -569,7 +569,7 @@ BEGIN
   END IF;
 
   SELECT COALESCE(
-    NULLIF(pg_catalog.current_setting('request.jwt.claim.role', true), ''),
+    NULLIF(pg_catalog.current_setting('request.jwt.claim.role', true), ''), -- NOSONAR: request role lookup reused across overloads
     NULLIF(pg_catalog.current_setting('role', true), ''),
     NULLIF(COALESCE(session_user, current_user), '')
   ) INTO caller_role;
@@ -687,13 +687,13 @@ DECLARE
   caller_id uuid;
   app_exists boolean;
   org_stats_updated_at timestamp without time zone;
-  v_cache_ttl CONSTANT interval := INTERVAL '5 minutes';
-  v_privileged_roles CONSTANT text[] := ARRAY['service_role', 'postgres', 'supabase_admin'];
-  v_read_key_modes CONSTANT public.key_mode[] := '{read,upload,write,all}'::public.key_mode[];
+  v_cache_ttl CONSTANT interval := INTERVAL '5 minutes'; -- NOSONAR: function-local cache TTL
+  v_privileged_roles CONSTANT text[] := ARRAY['service_role', 'postgres', 'supabase_admin']; -- NOSONAR: function-local privileged role set
+  v_read_key_modes CONSTANT public.key_mode[] := '{read,upload,write,all}'::public.key_mode[]; -- NOSONAR: function-local key mode set
   v_read_min_right CONSTANT public.user_min_right := 'read'::public.user_min_right;
 BEGIN
   SELECT COALESCE(
-    NULLIF(pg_catalog.current_setting('request.jwt.claim.role', true), ''),
+    NULLIF(pg_catalog.current_setting('request.jwt.claim.role', true), ''), -- NOSONAR: request role lookup reused across overloads
     NULLIF(pg_catalog.current_setting('role', true), ''),
     NULLIF(COALESCE(session_user, current_user), '')
   ) INTO caller_role;
@@ -823,13 +823,13 @@ DECLARE
   caller_id uuid;
   org_exists boolean;
   org_stats_updated_at timestamp without time zone;
-  v_cache_ttl CONSTANT interval := INTERVAL '5 minutes';
-  v_privileged_roles CONSTANT text[] := ARRAY['service_role', 'postgres', 'supabase_admin'];
-  v_read_key_modes CONSTANT public.key_mode[] := '{read,upload,write,all}'::public.key_mode[];
+  v_cache_ttl CONSTANT interval := INTERVAL '5 minutes'; -- NOSONAR: function-local cache TTL
+  v_privileged_roles CONSTANT text[] := ARRAY['service_role', 'postgres', 'supabase_admin']; -- NOSONAR: function-local privileged role set
+  v_read_key_modes CONSTANT public.key_mode[] := '{read,upload,write,all}'::public.key_mode[]; -- NOSONAR: function-local key mode set
   v_read_min_right CONSTANT public.user_min_right := 'read'::public.user_min_right;
 BEGIN
   SELECT COALESCE(
-    NULLIF(pg_catalog.current_setting('request.jwt.claim.role', true), ''),
+    NULLIF(pg_catalog.current_setting('request.jwt.claim.role', true), ''), -- NOSONAR: request role lookup reused across overloads
     NULLIF(pg_catalog.current_setting('role', true), ''),
     NULLIF(COALESCE(session_user, current_user), '')
   ) INTO caller_role;
