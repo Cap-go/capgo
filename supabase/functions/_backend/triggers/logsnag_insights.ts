@@ -480,16 +480,20 @@ async function getRevenueRetentionMetrics(c: Context, dateId: string): Promise<R
 
   try {
     const result = await drizzleClient.execute<{
-      churn_mrr: number
-      contraction_mrr: number
-      expansion_mrr: number
+      retained_churn_mrr: number
+      retained_contraction_mrr: number
+      retained_expansion_mrr: number
+      total_churn_mrr: number
+      total_contraction_mrr: number
       previous_mrr: number
     }>(sql`
       WITH daily AS (
         SELECT
-          COALESCE(SUM(churn_mrr), 0)::float AS churn_mrr,
-          COALESCE(SUM(contraction_mrr), 0)::float AS contraction_mrr,
-          COALESCE(SUM(expansion_mrr), 0)::float AS expansion_mrr
+          COALESCE(SUM(CASE WHEN opening_mrr > 0 THEN churn_mrr ELSE 0 END), 0)::float AS retained_churn_mrr,
+          COALESCE(SUM(CASE WHEN opening_mrr > 0 THEN contraction_mrr ELSE 0 END), 0)::float AS retained_contraction_mrr,
+          COALESCE(SUM(CASE WHEN opening_mrr > 0 THEN expansion_mrr ELSE 0 END), 0)::float AS retained_expansion_mrr,
+          COALESCE(SUM(churn_mrr), 0)::float AS total_churn_mrr,
+          COALESCE(SUM(contraction_mrr), 0)::float AS total_contraction_mrr
         FROM public.daily_revenue_metrics
         WHERE date_id = ${dateId}
       ),
@@ -500,25 +504,32 @@ async function getRevenueRetentionMetrics(c: Context, dateId: string): Promise<R
         LIMIT 1
       )
       SELECT
-        daily.churn_mrr,
-        daily.contraction_mrr,
-        daily.expansion_mrr,
+        daily.retained_churn_mrr,
+        daily.retained_contraction_mrr,
+        daily.retained_expansion_mrr,
+        daily.total_churn_mrr,
+        daily.total_contraction_mrr,
         COALESCE(previous_snapshot.previous_mrr, 0)::float AS previous_mrr
       FROM daily
       LEFT JOIN previous_snapshot ON true
     `)
 
     const row = result.rows[0]
-    const dailyChanges = {
-      churnMrr: Number(row?.churn_mrr) || 0,
-      contractionMrr: Number(row?.contraction_mrr) || 0,
-      expansionMrr: Number(row?.expansion_mrr) || 0,
+    const retainedChanges = {
+      churnMrr: Number(row?.retained_churn_mrr) || 0,
+      contractionMrr: Number(row?.retained_contraction_mrr) || 0,
+      expansionMrr: Number(row?.retained_expansion_mrr) || 0,
+    }
+    const totalLostRevenue = {
+      churnMrr: Number(row?.total_churn_mrr) || 0,
+      contractionMrr: Number(row?.total_contraction_mrr) || 0,
+      expansionMrr: 0,
     }
     const previousMrr = Number(row?.previous_mrr) || 0
 
     return {
-      churnRevenue: calculateChurnRevenue(dailyChanges),
-      nrr: calculateNrr(previousMrr, dailyChanges),
+      churnRevenue: calculateChurnRevenue(totalLostRevenue),
+      nrr: calculateNrr(previousMrr, retainedChanges),
     }
   }
   catch (error) {

@@ -56,6 +56,27 @@ const ZERO_REVENUE_MOVEMENT: RevenueMovement = {
   contractionMrr: 0,
   churnMrr: 0,
 }
+const STRIPE_INFO_TRANSACTION_COLUMNS = [
+  'bandwidth_exceeded',
+  'build_time_exceeded',
+  'canceled_at',
+  'customer_country',
+  'is_good_plan',
+  'mau_exceeded',
+  'paid_at',
+  'plan_calculated_at',
+  'plan_usage',
+  'price_id',
+  'product_id',
+  'status',
+  'storage_exceeded',
+  'subscription_anchor_end',
+  'subscription_anchor_start',
+  'subscription_id',
+  'trial_at',
+  'upgraded_at',
+] as const
+const STRIPE_INFO_TRANSACTION_COLUMN_SET = new Set<string>(STRIPE_INFO_TRANSACTION_COLUMNS)
 
 const checkoutSessionEventTypes = new Set([
   'checkout.session.completed',
@@ -273,44 +294,92 @@ async function getRevenuePlans(c: Context): Promise<RevenuePlanRow[]> {
   return plans ?? []
 }
 
-async function recordRevenueMovement(
+function buildStripeInfoUpdateStatement(customerId: string, updateData: StripeInfoUpdate) {
+  const entries = Object.entries(updateData)
+    .filter(([key, value]) => value !== undefined && STRIPE_INFO_TRANSACTION_COLUMN_SET.has(key))
+
+  if (entries.length === 0)
+    return null
+
+  const values: unknown[] = [customerId]
+  const assignments = entries.map(([key, value]) => {
+    values.push(value)
+    return `"${key}" = $${values.length}`
+  })
+
+  return {
+    text: `UPDATE public.stripe_info SET ${assignments.join(', ')} WHERE customer_id = $1`,
+    values,
+  }
+}
+
+async function persistStripeInfoAndRevenueMovement(
   c: Context,
   customerId: string,
+  updateData: StripeInfoUpdate,
   eventOccurredAtIso: string,
   movement: RevenueMovement,
 ) {
-  if (!hasRevenueMovement(movement))
-    return
+  const updateStatement = buildStripeInfoUpdateStatement(customerId, updateData)
+  const shouldRecordMovement = hasRevenueMovement(movement)
+
+  if (!updateStatement && !shouldRecordMovement)
+    return true
 
   const pgClient = getPgClient(c, false)
-  const drizzleClient = getDrizzleClient(pgClient)
 
   try {
-    await drizzleClient.execute(sql`
-      INSERT INTO public.daily_revenue_metrics (
-        date_id,
-        customer_id,
-        new_business_mrr,
-        expansion_mrr,
-        contraction_mrr,
-        churn_mrr
-      )
-      VALUES (
-        ${getEventDateId(eventOccurredAtIso)},
-        ${customerId},
-        ${movement.newBusinessMrr},
-        ${movement.expansionMrr},
-        ${movement.contractionMrr},
-        ${movement.churnMrr}
-      )
-      ON CONFLICT (date_id, customer_id)
-      DO UPDATE SET
-        updated_at = now(),
-        new_business_mrr = public.daily_revenue_metrics.new_business_mrr + EXCLUDED.new_business_mrr,
-        expansion_mrr = public.daily_revenue_metrics.expansion_mrr + EXCLUDED.expansion_mrr,
-        contraction_mrr = public.daily_revenue_metrics.contraction_mrr + EXCLUDED.contraction_mrr,
-        churn_mrr = public.daily_revenue_metrics.churn_mrr + EXCLUDED.churn_mrr
-    `)
+    await pgClient.query('BEGIN')
+
+    if (updateStatement) {
+      const result = await pgClient.query(updateStatement.text, updateStatement.values)
+      if ((result.rowCount ?? 0) === 0) {
+        await pgClient.query('ROLLBACK')
+        return false
+      }
+    }
+
+    if (shouldRecordMovement) {
+      await pgClient.query(`
+        INSERT INTO public.daily_revenue_metrics (
+          date_id,
+          customer_id,
+          opening_mrr,
+          new_business_mrr,
+          expansion_mrr,
+          contraction_mrr,
+          churn_mrr
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (date_id, customer_id)
+        DO UPDATE SET
+          updated_at = now(),
+          new_business_mrr = public.daily_revenue_metrics.new_business_mrr + EXCLUDED.new_business_mrr,
+          expansion_mrr = public.daily_revenue_metrics.expansion_mrr + EXCLUDED.expansion_mrr,
+          contraction_mrr = public.daily_revenue_metrics.contraction_mrr + EXCLUDED.contraction_mrr,
+          churn_mrr = public.daily_revenue_metrics.churn_mrr + EXCLUDED.churn_mrr
+      `, [
+        getEventDateId(eventOccurredAtIso),
+        customerId,
+        movement.currentMrr,
+        movement.newBusinessMrr,
+        movement.expansionMrr,
+        movement.contractionMrr,
+        movement.churnMrr,
+      ])
+    }
+
+    await pgClient.query('COMMIT')
+    return true
+  }
+  catch (error) {
+    try {
+      await pgClient.query('ROLLBACK')
+    }
+    catch {
+      // Ignore rollback failures and rethrow the original error.
+    }
+    throw error
   }
   finally {
     closeClient(c, pgClient)
@@ -614,15 +683,15 @@ async function createdOrUpdated(
     const revenueMovement = classifyRevenueMovement(currentStripeInfo, updateData, revenuePlans)
     if (revenueMovement.currentMrr > 0 && revenueMovement.nextMrr > revenueMovement.currentMrr)
       updateData.upgraded_at = eventOccurredAtIso
-    const { error: dbError2 } = await supabaseAdmin(c)
-      .from('stripe_info')
-      .update(updateData)
-      .eq('customer_id', stripeData.data.customer_id)
-    if (dbError2) {
-      return quickError(404, 'succeeded_customer_id_not_found', `succeeded: customer_id not found`, { dbError2, stripeData })
-    }
-
-    await recordRevenueMovement(c, stripeData.data.customer_id, eventOccurredAtIso, revenueMovement)
+    const didPersist = await persistStripeInfoAndRevenueMovement(
+      c,
+      stripeData.data.customer_id,
+      updateData,
+      eventOccurredAtIso,
+      revenueMovement,
+    )
+    if (!didPersist)
+      return quickError(404, 'succeeded_customer_id_not_found', `succeeded: customer_id not found`, { stripeData })
 
     let previousPlan: PlanRow | null = null
     if (trackingState.shouldSendPlanChange && stripeData.previousProductId) {
@@ -849,8 +918,15 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
       const revenuePlans = await getRevenuePlans(c)
       const revenueMovement = classifyRevenueMovement(customer, stripeData.data, revenuePlans)
       // Otherwise keep it as 'canceled' since the period has ended
-      await updateStripeInfo(c, stripeData)
-      await recordRevenueMovement(c, stripeData.data.customer_id, eventOccurredAtIso, revenueMovement)
+      const didPersist = await persistStripeInfoAndRevenueMovement(
+        c,
+        stripeData.data.customer_id,
+        toStripeInfoUpdate(stripeData.data),
+        eventOccurredAtIso,
+        revenueMovement,
+      )
+      if (!didPersist)
+        return quickError(404, 'canceled_customer_id_not_found', `canceled: customer_id not found`, { stripeData })
     }
     // If it's a different subscription (not the one in DB), ignore it
     // This prevents old subscription webhooks from overwriting newer active subscriptions

@@ -3,6 +3,7 @@ CREATE TABLE IF NOT EXISTS public.daily_revenue_metrics (
   customer_id character varying NOT NULL,
   created_at timestamp with time zone DEFAULT now() NOT NULL,
   updated_at timestamp with time zone DEFAULT now() NOT NULL,
+  opening_mrr double precision DEFAULT 0 NOT NULL,
   new_business_mrr double precision DEFAULT 0 NOT NULL,
   expansion_mrr double precision DEFAULT 0 NOT NULL,
   contraction_mrr double precision DEFAULT 0 NOT NULL,
@@ -13,6 +14,7 @@ CREATE TABLE IF NOT EXISTS public.daily_revenue_metrics (
 ALTER TABLE public.daily_revenue_metrics OWNER TO postgres;
 
 COMMENT ON TABLE public.daily_revenue_metrics IS 'Daily MRR movement rollup per customer, fed by Stripe webhook events for admin retention analytics.';
+COMMENT ON COLUMN public.daily_revenue_metrics.opening_mrr IS 'Customer monthly recurring revenue at the start of the UTC day, before any tracked movement.';
 COMMENT ON COLUMN public.daily_revenue_metrics.new_business_mrr IS 'New monthly recurring revenue created on the day.';
 COMMENT ON COLUMN public.daily_revenue_metrics.expansion_mrr IS 'Expansion monthly recurring revenue added on the day.';
 COMMENT ON COLUMN public.daily_revenue_metrics.contraction_mrr IS 'Monthly recurring revenue lost to downgrades on the day.';

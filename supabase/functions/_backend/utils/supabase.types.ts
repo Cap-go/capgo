@@ -1145,6 +1145,7 @@ export type Database = {
           date_id: string
           expansion_mrr: number
           new_business_mrr: number
+          opening_mrr: number
           updated_at: string
         }
         Insert: {
@@ -1155,6 +1156,7 @@ export type Database = {
           date_id: string
           expansion_mrr?: number
           new_business_mrr?: number
+          opening_mrr?: number
           updated_at?: string
         }
         Update: {
@@ -1165,6 +1167,7 @@ export type Database = {
           date_id?: string
           expansion_mrr?: number
           new_business_mrr?: number
+          opening_mrr?: number
           updated_at?: string
         }
         Relationships: []

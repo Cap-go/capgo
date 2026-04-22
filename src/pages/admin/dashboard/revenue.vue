@@ -175,7 +175,7 @@ const nrrSeries = computed(() => {
       label: 'NRR - Net Revenue Retention (%)',
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
-        value: item.nrr || 0,
+        value: item.nrr ?? 100,
       })),
       color: '#8b5cf6', // violet
     },
