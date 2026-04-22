@@ -394,7 +394,7 @@ app.post('/', middlewareAPISecret, async (c) => {
   cloudlog({ requestId: c.get('requestId'), message: 'stats saved', mauLength: mau.length, bandwidthLength: bandwidth.length, storageLength: storage.length, versionUsageLength: versionUsage.length })
   const refreshCompletedAt = await syncAppStatsRefresh(c, supabase, body.appId)
 
-  let pendingAppRefreshes = true
+  let pendingAppRefreshes: boolean
   try {
     pendingAppRefreshes = await hasPendingAppStatsRefresh(c, supabase, body.orgId)
   }
