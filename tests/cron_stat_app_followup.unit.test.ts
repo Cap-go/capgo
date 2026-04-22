@@ -243,6 +243,33 @@ describe('cron_stat_app follow-up failures', () => {
     expect(payload.status).toBe('Stats saved')
   })
 
+  it('does not retry non-retryable queue failures', async () => {
+    const { client, builders } = createSupabaseStub({
+      queueError: new Error('invalid queue payload'),
+    })
+    supabaseAdminMock.mockReturnValue(client)
+
+    const response = await createApp().fetch(new Request('http://localhost/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apisecret': 'testsecret',
+      },
+      body: JSON.stringify({
+        appId: 'com.test.app',
+        orgId: 'org-test',
+      }),
+    }), {}, {
+      waitUntil: () => { },
+    } as any)
+
+    expect(response.status).toBe(200)
+    expect(builders.queueBuilder.throwOnError).toHaveBeenCalledTimes(1)
+
+    const payload = await response.json() as { status: string }
+    expect(payload.status).toBe('Stats saved')
+  })
+
   it('returns success and still queues plan processing when org timestamp refresh fails after stats writes', async () => {
     const { client, builders } = createSupabaseStub({
       orgUpdateError: new Error('error code: 502'),

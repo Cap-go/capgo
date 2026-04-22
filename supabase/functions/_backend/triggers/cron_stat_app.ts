@@ -183,7 +183,13 @@ async function queueOrgPlanRefreshWithRetry(
   }, {
     attempts: PLAN_REFRESH_RETRY_ATTEMPTS,
     baseDelayMs: PLAN_REFRESH_RETRY_DELAY_MS,
-    shouldRetry: result => !result.ok,
+    shouldRetry: (result) => {
+      if (result.ok) {
+        return false
+      }
+
+      return isRetryablePostgrestError(result.error)
+    },
   })
 
   if (!result?.ok) {
