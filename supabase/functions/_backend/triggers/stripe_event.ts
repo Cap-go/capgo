@@ -29,6 +29,7 @@ interface Org {
 
 type StripeInfoRow = Database['public']['Tables']['stripe_info']['Row']
 type StripeInfoUpdate = Database['public']['Tables']['stripe_info']['Update']
+type PlanRow = Database['public']['Tables']['plans']['Row']
 
 const checkoutSessionEventTypes = new Set([
   'checkout.session.completed',
@@ -69,6 +70,62 @@ function toStripeInfoUpdate(data: StripeData['data']): StripeInfoUpdate {
   return Object.fromEntries(
     Object.entries(data).filter(([_, value]) => value !== undefined),
   ) as StripeInfoUpdate
+}
+
+function compactMetadata(metadata: Record<string, string | undefined>) {
+  return Object.fromEntries(
+    Object.entries(metadata).filter(([_, value]) => value !== undefined),
+  ) as Record<string, string>
+}
+
+function getPlanType(
+  plan: Pick<PlanRow, 'price_m_id' | 'price_y_id'>,
+  priceId: string | null | undefined,
+) {
+  if (!priceId)
+    return undefined
+  if (plan.price_m_id === priceId)
+    return 'monthly'
+  if (plan.price_y_id === priceId)
+    return 'yearly'
+  return undefined
+}
+
+function getSubscriptionTrackingState(
+  stripeData: Pick<StripeData, 'data' | 'isUpgrade' | 'previousPriceId' | 'previousProductId'>,
+  originalStatus: Database['public']['Enums']['stripe_status'] | null | undefined,
+) {
+  return {
+    shouldSendPlanChange: Boolean(
+      stripeData.previousProductId
+      && stripeData.data.product_id
+      && stripeData.previousProductId !== stripeData.data.product_id,
+    ),
+    statusName: stripeData.isUpgrade ? 'upgraded' : originalStatus ?? '',
+  }
+}
+
+function buildSubscriptionEventMetadata(
+  stripeData: Pick<StripeData, 'data' | 'previousPriceId' | 'previousProductId'>,
+  currentPlan: Pick<PlanRow, 'name' | 'price_m_id' | 'price_y_id' | 'stripe_id'>,
+  previousPlan?: Pick<PlanRow, 'name' | 'price_m_id' | 'price_y_id' | 'stripe_id'> | null,
+) {
+  const currentPlanType = getPlanType(currentPlan, stripeData.data.price_id)
+  const fallbackPreviousPlan = stripeData.previousProductId === currentPlan.stripe_id ? currentPlan : previousPlan
+  const previousPlanType = fallbackPreviousPlan
+    ? getPlanType(fallbackPreviousPlan, stripeData.previousPriceId)
+    : undefined
+
+  return compactMetadata({
+    plan_name: currentPlan.name,
+    plan_type: currentPlanType,
+    previous_plan_name: fallbackPreviousPlan?.name,
+    previous_plan_type: previousPlanType,
+  })
+}
+
+function getPlanChangeTrackingEventName(statusName: string) {
+  return statusName === 'upgraded' ? 'User Upgraded' : 'User Plan Changed'
 }
 
 async function writePaidAtAtomically(c: Context, customerId: string, eventOccurredAtIso: string) {
@@ -358,6 +415,8 @@ async function createdOrUpdated(
     .eq('stripe_id', stripeData.data.product_id)
     .single()
   if (plan) {
+    const trackingState = getSubscriptionTrackingState(stripeData, status)
+    statusName = trackingState.statusName
     const updateData = toStripeInfoUpdate(stripeData.data)
     const paidAt = getPaidAtUpdate(currentStripeInfo, status, eventOccurredAtIso)
     if (paidAt)
@@ -366,40 +425,37 @@ async function createdOrUpdated(
       .from('stripe_info')
       .update(updateData)
       .eq('customer_id', stripeData.data.customer_id)
-    if (stripeData.isUpgrade && stripeData.previousProductId) {
-      statusName = 'upgraded'
+    if (dbError2) {
+      return quickError(404, 'succeeded_customer_id_not_found', `succeeded: customer_id not found`, { dbError2, stripeData })
+    }
+
+    let previousPlan: PlanRow | null = null
+    if (trackingState.shouldSendPlanChange && stripeData.previousProductId) {
       const previousProduct = await supabaseAdmin(c)
         .from('plans')
         .select()
         .eq('stripe_id', stripeData.previousProductId)
         .single()
+      previousPlan = previousProduct.data
+      const planChangeMetadata = buildSubscriptionEventMetadata(stripeData, plan, previousPlan)
+      const planChangeEventName = getPlanChangeTrackingEventName(trackingState.statusName)
       await sendEventToTracking(c, {
         bento: {
           cron: '* * * * *',
-          data: {
-            plan_name: plan.name,
-            previous_plan_name: previousProduct.data?.name ?? '',
-          },
+          data: planChangeMetadata,
           event: 'user:plan_change',
           preferenceKey: 'credit_usage',
           uniqId: 'user:plan_change',
         },
         channel: 'usage',
-        event: 'User Upgraded',
+        event: planChangeEventName,
         icon: '💰',
         sentToBento: true,
         user_id: org.id,
         groups: { organization: org.id },
         notify: true,
-        tags: {
-          plan_name: plan.name,
-          previous_plan_name: previousProduct.data?.name ?? '',
-        },
+        tags: planChangeMetadata,
       })
-    }
-
-    if (dbError2) {
-      return quickError(404, 'succeeded_customer_id_not_found', `succeeded: customer_id not found`, { dbError2, stripeData })
     }
 
     if (paidAt) {
@@ -409,12 +465,13 @@ async function createdOrUpdated(
     const segment = await customerToSegmentOrg(c, org.id, stripeData.data.price_id, plan)
     const isMonthly = plan.price_m_id === stripeData.data.price_id
     const eventName = `user:subscribe_${statusName}:${isMonthly ? 'monthly' : 'yearly'}`
+    const subscriptionMetadata = buildSubscriptionEventMetadata(stripeData, plan, previousPlan)
     await addTagBento(c, org.management_email, segment)
     const isNewSubscription = status === 'created'
     await sendEventToTracking(c, {
       bento: {
         cron: '* * * * *',
-        data: { plan_name: plan.name },
+        data: subscriptionMetadata,
         event: eventName,
         preferenceKey: 'credit_usage',
         uniqId: `subscription:${eventName}:${plan.name}`,
@@ -426,9 +483,7 @@ async function createdOrUpdated(
       user_id: org.id,
       groups: { organization: org.id },
       notify: isNewSubscription,
-      tags: {
-        plan_name: plan.name,
-      },
+      tags: subscriptionMetadata,
     })
 
     await backgroundTask(c, groupIdentifyPosthog(c, {
@@ -608,6 +663,9 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
 })
 
 export const stripeEventTestUtils = {
+  buildSubscriptionEventMetadata,
   getPaidAtUpdate,
+  getPlanChangeTrackingEventName,
+  getSubscriptionTrackingState,
   isCustomerProfileEvent,
 }

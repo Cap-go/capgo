@@ -18,6 +18,17 @@ export function parseStripeEvent(c: Context, body: string, signature: string) {
   )
 }
 
+function getLicensedSubscriptionItem(items: Stripe.SubscriptionItem[] | undefined) {
+  return items?.find(item => item.plan.usage_type === 'licensed') ?? items?.[0]
+}
+
+function getSubscriptionInterval(item: Stripe.SubscriptionItem | undefined) {
+  const interval = item?.plan?.interval
+  if (interval === 'month' || interval === 'year')
+    return interval
+  return undefined
+}
+
 function subscriptionUpdated(c: Context, event: Stripe.CustomerSubscriptionCreatedEvent | Stripe.CustomerSubscriptionDeletedEvent | Stripe.CustomerSubscriptionUpdatedEvent, data: Database['public']['Tables']['stripe_info']['Insert']) {
   let isUpgrade = false
   const subscription = event.data.object
@@ -25,7 +36,12 @@ function subscriptionUpdated(c: Context, event: Stripe.CustomerSubscriptionCreat
 
   // Get previous items if available
   const previousItems = previousAttributes?.items?.data as Stripe.SubscriptionItem[] | undefined
-  const previousProductId = previousItems?.[0]?.plan.product as string | undefined
+  const previousLicensedItem = getLicensedSubscriptionItem(previousItems)
+  const previousPriceId = previousLicensedItem?.plan.id
+  const previousProductId = previousLicensedItem?.plan.product as string | undefined
+  const previousInterval = getSubscriptionInterval(previousLicensedItem)
+  const currentLicensedItem = getLicensedSubscriptionItem(subscription.items.data)
+  const currentInterval = getSubscriptionInterval(currentLicensedItem)
 
   const res = parsePriceIds(c, subscription.items.data)
   data.price_id = res.priceId
@@ -41,8 +57,10 @@ function subscriptionUpdated(c: Context, event: Stripe.CustomerSubscriptionCreat
   data.subscription_anchor_end = firstItem?.current_period_end
     ? new Date(firstItem.current_period_end * 1000).toISOString()
     : undefined
-  data.price_id = subscription.items.data.length ? subscription.items.data[0].plan.id : undefined
-  data.product_id = (subscription.items.data.length ? subscription.items.data[0].plan.product : undefined) as string
+  data.price_id = currentLicensedItem?.plan.id
+  data.product_id = currentLicensedItem?.plan.product
+    ? String(currentLicensedItem.plan.product)
+    : undefined as any
   if (event.type === 'customer.subscription.deleted') {
     data.status = 'deleted'
   }
@@ -56,11 +74,11 @@ function subscriptionUpdated(c: Context, event: Stripe.CustomerSubscriptionCreat
   data.subscription_id = subscription.id
   data.customer_id = String(subscription.customer)
 
-  // Check if this is an upgrade
-  if (previousProductId && data.product_id !== previousProductId) {
+  // Only treat a billing cadence change from monthly to yearly as an upgrade.
+  if (previousInterval === 'month' && currentInterval === 'year') {
     isUpgrade = true
   }
-  return { data, isUpgrade, previousProductId }
+  return { data, isUpgrade, previousPriceId, previousProductId }
 }
 
 function invoiceUpcoming(event: Stripe.InvoiceUpcomingEvent, data: Database['public']['Tables']['stripe_info']['Insert']) {
@@ -101,17 +119,19 @@ export function extractDataEvent(c: Context, event: Stripe.Event): StripeData {
     status: 'succeeded',
   }
   let isUpgrade = false
+  let previousPriceId: string | undefined
   let previousProductId: string | undefined
 
   cloudlog({ requestId: c.get('requestId'), message: 'event', event: JSON.stringify(event, null, 2) })
   if (!event?.data?.object) {
-    return { data, isUpgrade, previousProductId }
+    return { data, isUpgrade, previousPriceId, previousProductId }
   }
 
   if (event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted' || event.type === 'customer.subscription.created') {
     const res = subscriptionUpdated(c, event, data)
     data = res.data
     isUpgrade = res.isUpgrade
+    previousPriceId = res.previousPriceId
     previousProductId = res.previousProductId
   }
   else if (event.type === 'charge.failed') {
@@ -135,5 +155,5 @@ export function extractDataEvent(c: Context, event: Stripe.Event): StripeData {
   else {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Other event', event })
   }
-  return { data, isUpgrade, previousProductId }
+  return { data, isUpgrade, previousPriceId, previousProductId }
 }
