@@ -534,10 +534,7 @@ async function getRevenueRetentionMetrics(c: Context, dateId: string): Promise<R
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getRevenueRetentionMetrics error', error })
-    return {
-      churnRevenue: 0,
-      nrr: 100,
-    }
+    throw error
   }
   finally {
     closeClient(c, pgClient)

@@ -125,4 +125,22 @@ describe('stripe revenue movement classification', () => {
       contractionMrr: 0,
     })
   })
+
+  it.concurrent('treats already-persisted newer subscription state as stale', () => {
+    expect(stripeEventTestUtils.isStaleStripeEvent(
+      {
+        updated_at: '2026-04-22T12:10:00.000Z',
+      } as any,
+      '2026-04-22T12:00:00.000Z',
+    )).toBe(true)
+  })
+
+  it.concurrent('keeps newer incoming subscription events eligible for processing', () => {
+    expect(stripeEventTestUtils.isStaleStripeEvent(
+      {
+        updated_at: '2026-04-22T12:10:00.000Z',
+      } as any,
+      '2026-04-22T12:20:00.000Z',
+    )).toBe(false)
+  })
 })

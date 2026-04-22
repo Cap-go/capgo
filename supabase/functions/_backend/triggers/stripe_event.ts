@@ -276,6 +276,16 @@ function hasRevenueMovement(movement: RevenueMovement) {
     || movement.churnMrr > 0
 }
 
+function isStaleStripeEvent(
+  currentStripeInfo: Pick<StripeInfoRow, 'updated_at'> | null | undefined,
+  eventOccurredAtIso: string,
+) {
+  if (!currentStripeInfo?.updated_at)
+    return false
+
+  return new Date(currentStripeInfo.updated_at).getTime() > new Date(eventOccurredAtIso).getTime()
+}
+
 async function getRevenuePlans(c: Context): Promise<RevenuePlanRow[]> {
   const { data: plans, error } = await supabaseAdmin(c)
     .from('plans')
@@ -667,6 +677,17 @@ async function createdOrUpdated(
 ) {
   const status = originalStatus ?? stripeData.data.status
   let statusName: string = status ?? ''
+  if (isStaleStripeEvent(currentStripeInfo, eventOccurredAtIso)) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Skipping stale Stripe subscription event',
+      customerId: stripeData.data.customer_id,
+      eventOccurredAtIso,
+      currentStripeInfoUpdatedAt: currentStripeInfo?.updated_at,
+      subscriptionId: stripeData.data.subscription_id,
+    })
+    return
+  }
   const { data: plan } = await supabaseAdmin(c)
     .from('plans')
     .select()
@@ -905,11 +926,22 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
     cloudlog({ requestId: c.get('requestId'), message: 'Subscription webhook missing price_id or product_id', stripeData, subscriptionId: stripeData.data.subscription_id })
   }
   else if (['canceled', 'deleted'].includes(stripeData.data.status ?? '')) {
+    const eventOccurredAtIso = new Date(stripeEvent.created * 1000).toISOString()
+    if (isStaleStripeEvent(customer, eventOccurredAtIso)) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'Skipping stale Stripe cancellation event',
+        customerId: stripeData.data.customer_id,
+        eventOccurredAtIso,
+        currentStripeInfoUpdatedAt: customer?.updated_at,
+        subscriptionId: stripeData.data.subscription_id,
+      })
+      return c.json(BRES)
+    }
     // Check if this is the subscription currently in the database
     if (customer && customer.subscription_id === stripeData.data.subscription_id) {
       // This is the known subscription being cancelled
       await didCancel(c, org)
-      const eventOccurredAtIso = new Date(stripeEvent.created * 1000).toISOString()
       // Only mark as 'succeeded' if subscription is still active until period end
       // Check if subscription_anchor_end is in the future
       if (stripeData.data.subscription_anchor_end && new Date(stripeData.data.subscription_anchor_end) > new Date()) {
@@ -945,5 +977,6 @@ export const stripeEventTestUtils = {
   getPlanChangeTrackingEventName,
   getSubscriptionMrr,
   getSubscriptionTrackingState,
+  isStaleStripeEvent,
   isCustomerProfileEvent,
 }
