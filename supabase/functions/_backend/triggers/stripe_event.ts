@@ -64,6 +64,7 @@ const STRIPE_INFO_TRANSACTION_COLUMNS = [
   'canceled_at',
   'customer_country',
   'is_good_plan',
+  'last_stripe_event_at',
   'mau_exceeded',
   'paid_at',
   'plan_calculated_at',
@@ -279,13 +280,13 @@ function hasRevenueMovement(movement: RevenueMovement) {
 }
 
 function isStaleStripeEvent(
-  currentStripeInfo: Pick<StripeInfoRow, 'updated_at'> | null | undefined,
+  currentStripeInfo: Pick<StripeInfoRow, 'last_stripe_event_at'> | null | undefined,
   eventOccurredAtIso: string,
 ) {
-  if (!currentStripeInfo?.updated_at)
+  if (!currentStripeInfo?.last_stripe_event_at)
     return false
 
-  return new Date(currentStripeInfo.updated_at).getTime() > new Date(eventOccurredAtIso).getTime()
+  return new Date(currentStripeInfo.last_stripe_event_at).getTime() > new Date(eventOccurredAtIso).getTime()
 }
 
 async function getRevenuePlans(c: Context): Promise<RevenuePlanRow[]> {
@@ -333,7 +334,11 @@ async function persistStripeInfoAndRevenueMovement(
   eventOccurredAtIso: string,
   movement: RevenueMovement,
 ): Promise<PersistRevenueMovementResult> {
-  const updateStatement = buildStripeInfoUpdateStatement(customerId, updateData)
+  const transactionUpdateData: StripeInfoUpdate = {
+    ...updateData,
+    last_stripe_event_at: eventOccurredAtIso,
+  }
+  const updateStatement = buildStripeInfoUpdateStatement(customerId, transactionUpdateData)
   const shouldRecordMovement = hasRevenueMovement(movement)
 
   if (!updateStatement && !shouldRecordMovement)
@@ -346,8 +351,8 @@ async function persistStripeInfoAndRevenueMovement(
 
     // Lock the row so concurrent retries serialize before we classify
     // the event as missing/stale and before we append revenue movement.
-    const stripeInfoRow = await pgClient.query<Pick<StripeInfoRow, 'updated_at'>>(
-      'SELECT updated_at FROM public.stripe_info WHERE customer_id = $1 FOR UPDATE',
+    const stripeInfoRow = await pgClient.query<Pick<StripeInfoRow, 'last_stripe_event_at'>>(
+      'SELECT last_stripe_event_at FROM public.stripe_info WHERE customer_id = $1 FOR UPDATE',
       [customerId],
     )
     const lockedStripeInfo = stripeInfoRow.rows[0]
@@ -725,7 +730,7 @@ async function createdOrUpdated(
       message: 'Skipping stale Stripe subscription event',
       customerId: stripeData.data.customer_id,
       eventOccurredAtIso,
-      currentStripeInfoUpdatedAt: currentStripeInfo?.updated_at,
+      currentStripeInfoLastStripeEventAt: currentStripeInfo?.last_stripe_event_at,
       subscriptionId: stripeData.data.subscription_id,
     })
     return
@@ -999,7 +1004,7 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
         message: 'Skipping stale Stripe cancellation event',
         customerId: stripeData.data.customer_id,
         eventOccurredAtIso,
-        currentStripeInfoUpdatedAt: customer?.updated_at,
+        currentStripeInfoLastStripeEventAt: customer?.last_stripe_event_at,
         subscriptionId: stripeData.data.subscription_id,
       })
       return c.json(BRES)

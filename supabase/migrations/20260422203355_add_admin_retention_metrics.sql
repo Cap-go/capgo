@@ -52,6 +52,11 @@ ALTER TABLE public.global_stats
 ADD COLUMN IF NOT EXISTS nrr double precision DEFAULT 100 NOT NULL,
 ADD COLUMN IF NOT EXISTS churn_revenue double precision DEFAULT 0 NOT NULL;
 
+ALTER TABLE public.stripe_info
+ADD COLUMN IF NOT EXISTS last_stripe_event_at timestamp with time zone;
+
+COMMENT ON COLUMN public.stripe_info.last_stripe_event_at IS 'Timestamp of the most recent Stripe event applied to this row, used for webhook ordering checks.';
+
 UPDATE public.global_stats
 SET nrr = 100
 WHERE nrr IS NULL;
