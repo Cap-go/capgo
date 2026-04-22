@@ -48,6 +48,8 @@ interface RevenueMovement {
   churnMrr: number
 }
 
+type PersistRevenueMovementResult = 'applied' | 'missing' | 'stale'
+
 const ZERO_REVENUE_MOVEMENT: RevenueMovement = {
   currentMrr: 0,
   nextMrr: 0,
@@ -329,23 +331,41 @@ async function persistStripeInfoAndRevenueMovement(
   updateData: StripeInfoUpdate,
   eventOccurredAtIso: string,
   movement: RevenueMovement,
-) {
+): Promise<PersistRevenueMovementResult> {
   const updateStatement = buildStripeInfoUpdateStatement(customerId, updateData)
   const shouldRecordMovement = hasRevenueMovement(movement)
 
   if (!updateStatement && !shouldRecordMovement)
-    return true
+    return 'applied'
 
   const pgClient = getPgClient(c, false)
 
   try {
     await pgClient.query('BEGIN')
 
+    // Lock the row so concurrent retries serialize before we classify
+    // the event as missing/stale and before we append revenue movement.
+    const stripeInfoRow = await pgClient.query<Pick<StripeInfoRow, 'updated_at'>>(
+      'SELECT updated_at FROM public.stripe_info WHERE customer_id = $1 FOR UPDATE',
+      [customerId],
+    )
+    const lockedStripeInfo = stripeInfoRow.rows[0]
+
+    if (!lockedStripeInfo) {
+      await pgClient.query('ROLLBACK')
+      return 'missing'
+    }
+
+    if (isStaleStripeEvent(lockedStripeInfo, eventOccurredAtIso)) {
+      await pgClient.query('ROLLBACK')
+      return 'stale'
+    }
+
     if (updateStatement) {
       const result = await pgClient.query(updateStatement.text, updateStatement.values)
       if ((result.rowCount ?? 0) === 0) {
         await pgClient.query('ROLLBACK')
-        return false
+        return 'missing'
       }
     }
 
@@ -380,7 +400,7 @@ async function persistStripeInfoAndRevenueMovement(
     }
 
     await pgClient.query('COMMIT')
-    return true
+    return 'applied'
   }
   catch (error) {
     try {
@@ -711,7 +731,17 @@ async function createdOrUpdated(
       eventOccurredAtIso,
       revenueMovement,
     )
-    if (!didPersist)
+    if (didPersist === 'stale') {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'Skipping stale Stripe subscription event after row lock',
+        customerId: stripeData.data.customer_id,
+        eventOccurredAtIso,
+        subscriptionId: stripeData.data.subscription_id,
+      })
+      return
+    }
+    if (didPersist === 'missing')
       return quickError(404, 'succeeded_customer_id_not_found', `succeeded: customer_id not found`, { stripeData })
 
     let previousPlan: PlanRow | null = null
@@ -940,8 +970,6 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
     }
     // Check if this is the subscription currently in the database
     if (customer && customer.subscription_id === stripeData.data.subscription_id) {
-      // This is the known subscription being cancelled
-      await didCancel(c, org)
       // Only mark as 'succeeded' if subscription is still active until period end
       // Check if subscription_anchor_end is in the future
       if (stripeData.data.subscription_anchor_end && new Date(stripeData.data.subscription_anchor_end) > new Date()) {
@@ -957,8 +985,21 @@ app.post('/', middlewareStripeWebhook(), async (c) => {
         eventOccurredAtIso,
         revenueMovement,
       )
-      if (!didPersist)
+      if (didPersist === 'stale') {
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'Skipping stale Stripe cancellation event after row lock',
+          customerId: stripeData.data.customer_id,
+          eventOccurredAtIso,
+          subscriptionId: stripeData.data.subscription_id,
+        })
+        return c.json(BRES)
+      }
+      if (didPersist === 'missing')
         return quickError(404, 'canceled_customer_id_not_found', `canceled: customer_id not found`, { stripeData })
+
+      // This is the known subscription being cancelled.
+      await didCancel(c, org)
     }
     // If it's a different subscription (not the one in DB), ignore it
     // This prevents old subscription webhooks from overwriting newer active subscriptions
