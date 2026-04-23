@@ -104,6 +104,24 @@ describe('retention metric backfill helpers', () => {
     })
   })
 
+  it.concurrent('builds new business metrics from status-only subscription update activations', () => {
+    const result = buildRevenueMovementEvents([
+      subscriptionEvent('evt_status_update', 'customer.subscription.updated', 1774353600, 'cus_activated', 'sub_activated', 'price_solo_monthly', 'prod_solo'),
+    ], plans as any, {
+      fromDateId: '2026-03-24',
+      toDateId: '2026-03-24',
+    })
+
+    expect(result.movements).toHaveLength(1)
+    expect(result.movements[0]).toMatchObject({
+      event_id: 'evt_status_update',
+      customer_id: 'cus_activated',
+      current_mrr: 0,
+      next_mrr: 12,
+      new_business_mrr: 12,
+    })
+  })
+
   it.concurrent('builds churn metrics from deleted subscription events', () => {
     const result = buildRevenueMovementEvents([
       subscriptionEvent('evt_deleted', 'customer.subscription.deleted', 1774353600, 'cus_churned', 'sub_churned', 'price_team_yearly', 'prod_team'),

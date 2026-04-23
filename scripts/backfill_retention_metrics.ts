@@ -9,8 +9,8 @@
  *
  * Rebuild an exact date range:
  *   bun run stripe:backfill-retention-metrics --apply --reset --from=2026-04-01 --to=2026-04-23
- *   reset=true deletes existing rows before insertProcessedEvents/upsertDailyRevenueMetrics;
- *   if a reset apply fails, re-run the same command to rebuild the deleted range.
+ *   --apply uses one Postgres transaction for metric writes, global_stats refresh,
+ *   processed-event markers, and optional --reset deletes.
  *
  * Older history requires an exported Stripe events JSON file:
  *   bun run stripe:backfill-retention-metrics --events-file=./tmp/stripe-events.json --from=2026-01-01 --to=2026-04-23
@@ -22,6 +22,7 @@ import { existsSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import process from 'node:process'
 import { createClient } from '@supabase/supabase-js'
+import { Client as PgClient } from 'pg'
 import StripeClient from 'stripe'
 import { calculateChurnRevenue, calculateNrr, classifyRevenueMovement, getEventDateId, getPreviousDateId, getSubscriptionMrr, hasRevenueMovement } from '../supabase/functions/_backend/utils/revenue_metrics.ts'
 
@@ -40,7 +41,6 @@ const SUBSCRIPTION_EVENT_TYPES = [
 type SupabaseClient = ReturnType<typeof createClient<Database>>
 type DailyRevenueMetricRow = Database['public']['Tables']['daily_revenue_metrics']['Row']
 type DailyRevenueMetricInsert = Database['public']['Tables']['daily_revenue_metrics']['Insert']
-type ProcessedStripeEventInsert = Database['public']['Tables']['processed_stripe_events']['Insert']
 type StripeStatus = Database['public']['Enums']['stripe_status']
 type SubscriptionEventType = typeof SUBSCRIPTION_EVENT_TYPES[number]
 
@@ -108,6 +108,27 @@ interface RefreshRetentionMetricsResult {
   updated: number
 }
 
+interface ApplyBackfillTransactionOptions {
+  customerId?: string | null
+  databaseUrl: string
+  fromDateId: string
+  mergedMetricRows: DailyRevenueMetricInsert[]
+  movementsToApply: BackfillRevenueMovementEvent[]
+  reset: boolean
+  retentionDates: string[]
+  toDateId: string
+}
+
+interface RetentionMetricSummaryRow {
+  has_global_stats: boolean
+  lost_churn_mrr: number | string | null
+  lost_contraction_mrr: number | string | null
+  previous_mrr: number | string | null
+  retained_churn_mrr: number | string | null
+  retained_contraction_mrr: number | string | null
+  retained_expansion_mrr: number | string | null
+}
+
 function getArgValue(args: string[], prefix: string): string | null {
   const arg = args.find(value => value.startsWith(`${prefix}=`))
   if (!arg)
@@ -146,6 +167,24 @@ function getRequiredEnv(env: Record<string, string | undefined>, key: string) {
   if (!value)
     throw new Error(`Missing ${key}`)
   return value
+}
+
+function getDatabaseUrl(env: Record<string, string | undefined>) {
+  return env.DATABASE_URL?.trim()
+    || env.POSTGRES_URL?.trim()
+    || env.SUPABASE_DB_URL?.trim()
+    || env.SUPABASE_DB_DIRECT_URL?.trim()
+    || env.DIRECT_URL?.trim()
+    || null
+}
+
+function createPgClient(databaseUrl: string) {
+  const host = new URL(databaseUrl).hostname
+  const usesLocalDatabase = host === 'localhost' || host === '127.0.0.1' || host === '::1'
+  return new PgClient({
+    connectionString: databaseUrl,
+    ssl: usesLocalDatabase ? false : { rejectUnauthorized: false },
+  })
 }
 
 function createStripeClient(secretKey: string, apiBaseUrl?: string) {
@@ -446,14 +485,15 @@ export function buildRevenueMovementEvents(
 
     const trackedState = customerStates.get(customerId)
     const previousItem = getLicensedSubscriptionItem(getPreviousSubscriptionItems(event))
-    const previousPriceId = getItemPriceId(previousItem) ?? trackedState?.price_id ?? currentPriceId
-    const previousProductId = getItemProductId(previousItem) ?? trackedState?.product_id ?? currentProductId
+    const previousPriceId = getItemPriceId(previousItem) ?? trackedState?.price_id ?? null
+    const previousProductId = getItemProductId(previousItem) ?? trackedState?.product_id ?? null
+    const previousStatus = trackedState?.status ?? (previousItem ? 'succeeded' : null)
     const previousMrr = getSubscriptionMrr(plans, {
       is_good_plan: true,
       paid_at: trackedState?.paid_at ?? eventOccurredAtIso,
       price_id: previousPriceId,
       product_id: previousProductId,
-      status: 'succeeded',
+      status: previousStatus,
     })
     const knownPaidAt = getKnownPaidAtBefore(customerId, eventOccurredAtIso, trackedState?.paid_at, options.initialPaidAtByCustomerId)
     const activePaidAt = trackedState?.paid_at ?? knownPaidAt ?? (previousMrr > 0 ? eventOccurredAtIso : null)
@@ -646,50 +686,6 @@ async function fetchExistingProcessedEventIds(supabase: SupabaseClient, eventIds
   return existing
 }
 
-async function resetBackfillRange(supabase: SupabaseClient, fromDateId: string, toDateId: string, customerId?: string | null) {
-  let processedDelete = supabase
-    .from('processed_stripe_events')
-    .delete()
-    .gte('date_id', fromDateId)
-    .lte('date_id', toDateId)
-  let metricsDelete = supabase
-    .from('daily_revenue_metrics')
-    .delete()
-    .gte('date_id', fromDateId)
-    .lte('date_id', toDateId)
-
-  if (customerId) {
-    processedDelete = processedDelete.eq('customer_id', customerId)
-    metricsDelete = metricsDelete.eq('customer_id', customerId)
-  }
-
-  const [processedResult, metricsResult] = await Promise.all([processedDelete, metricsDelete])
-  if (processedResult.error)
-    throw processedResult.error
-  if (metricsResult.error)
-    throw metricsResult.error
-}
-
-async function insertProcessedEvents(supabase: SupabaseClient, movements: BackfillRevenueMovementEvent[]) {
-  const rows: ProcessedStripeEventInsert[] = movements.map(movement => ({
-    event_id: movement.event_id,
-    customer_id: movement.customer_id,
-    date_id: movement.date_id,
-  }))
-
-  for (const chunk of chunkArray(rows, DB_CHUNK_SIZE)) {
-    if (chunk.length === 0)
-      continue
-
-    const { error } = await supabase
-      .from('processed_stripe_events')
-      .upsert(chunk, { ignoreDuplicates: true, onConflict: 'event_id' })
-
-    if (error)
-      throw error
-  }
-}
-
 async function fetchExistingDailyRevenueMetrics(
   supabase: SupabaseClient,
   fromDateId: string,
@@ -732,97 +728,171 @@ export function mergeMetricRows(existingRows: DailyRevenueMetricRow[], rowsToAdd
   })
 }
 
-async function upsertDailyRevenueMetrics(supabase: SupabaseClient, rows: DailyRevenueMetricInsert[]) {
+async function withPgTransaction<T>(databaseUrl: string, action: (client: PgClient) => Promise<T>) {
+  const client = createPgClient(databaseUrl)
+  await client.connect()
+
+  try {
+    await client.query('BEGIN')
+    const result = await action(client)
+    await client.query('COMMIT')
+    return result
+  }
+  catch (error) {
+    await client.query('ROLLBACK')
+    throw error
+  }
+  finally {
+    await client.end()
+  }
+}
+
+async function resetBackfillRangePg(client: PgClient, fromDateId: string, toDateId: string, customerId?: string | null) {
+  const values = [fromDateId, toDateId]
+  const predicates = ['date_id >= $1', 'date_id <= $2']
+  if (customerId) {
+    values.push(customerId)
+    predicates.push(`customer_id = $${values.length}`)
+  }
+
+  await client.query(`DELETE FROM public.processed_stripe_events WHERE ${predicates.join(' AND ')}`, values)
+  await client.query(`DELETE FROM public.daily_revenue_metrics WHERE ${predicates.join(' AND ')}`, values)
+}
+
+async function upsertDailyRevenueMetricsPg(client: PgClient, rows: DailyRevenueMetricInsert[]) {
   for (const chunk of chunkArray(rows, DB_CHUNK_SIZE)) {
     if (chunk.length === 0)
       continue
 
-    const { error } = await supabase
-      .from('daily_revenue_metrics')
-      .upsert(chunk, { onConflict: 'date_id,customer_id' })
+    const values: Array<number | string> = []
+    const placeholders = chunk.map((row, index) => {
+      const offset = index * 7
+      values.push(
+        row.date_id,
+        row.customer_id,
+        Number(row.opening_mrr) || 0,
+        Number(row.new_business_mrr) || 0,
+        Number(row.expansion_mrr) || 0,
+        Number(row.contraction_mrr) || 0,
+        Number(row.churn_mrr) || 0,
+      )
+      return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7})`
+    })
 
-    if (error)
-      throw error
+    await client.query(`
+      INSERT INTO public.daily_revenue_metrics (
+        date_id,
+        customer_id,
+        opening_mrr,
+        new_business_mrr,
+        expansion_mrr,
+        contraction_mrr,
+        churn_mrr
+      )
+      VALUES ${placeholders.join(', ')}
+      ON CONFLICT (date_id, customer_id) DO UPDATE
+      SET
+        updated_at = now(),
+        opening_mrr = EXCLUDED.opening_mrr,
+        new_business_mrr = EXCLUDED.new_business_mrr,
+        expansion_mrr = EXCLUDED.expansion_mrr,
+        contraction_mrr = EXCLUDED.contraction_mrr,
+        churn_mrr = EXCLUDED.churn_mrr
+    `, values)
   }
 }
 
-async function fetchDailyRevenueMetricsForDate(supabase: SupabaseClient, dateId: string) {
-  const { data, error } = await supabase
-    .from('daily_revenue_metrics')
-    .select('opening_mrr, churn_mrr, contraction_mrr, expansion_mrr')
-    .eq('date_id', dateId)
+async function insertProcessedEventsPg(client: PgClient, movements: BackfillRevenueMovementEvent[]) {
+  for (const chunk of chunkArray(movements, DB_CHUNK_SIZE)) {
+    if (chunk.length === 0)
+      continue
 
-  if (error)
-    throw error
+    const values: string[] = []
+    const placeholders = chunk.map((movement, index) => {
+      const offset = index * 3
+      values.push(movement.event_id, movement.customer_id, movement.date_id)
+      return `($${offset + 1}, $${offset + 2}, $${offset + 3})`
+    })
 
-  return data ?? []
+    await client.query(`
+      INSERT INTO public.processed_stripe_events (
+        event_id,
+        customer_id,
+        date_id
+      )
+      VALUES ${placeholders.join(', ')}
+      ON CONFLICT (event_id) DO NOTHING
+    `, values)
+  }
 }
 
-async function fetchPreviousMrr(supabase: SupabaseClient, dateId: string) {
-  const { data, error } = await supabase
-    .from('global_stats')
-    .select('mrr')
-    .eq('date_id', getPreviousDateId(dateId))
-    .maybeSingle()
-
-  if (error)
-    throw error
-
-  return Number(data?.mrr) || 0
-}
-
-async function refreshGlobalRetentionMetrics(supabase: SupabaseClient, dateIds: string[]): Promise<RefreshRetentionMetricsResult> {
+async function refreshGlobalRetentionMetricsPg(client: PgClient, dateIds: string[]): Promise<RefreshRetentionMetricsResult> {
   const skippedMissingGlobalStats: string[] = []
   let updated = 0
 
   for (const dateId of dateIds) {
-    const [rows, previousMrr] = await Promise.all([
-      fetchDailyRevenueMetricsForDate(supabase, dateId),
-      fetchPreviousMrr(supabase, dateId),
-    ])
-    const retainedChanges = rows.reduce((summary, row) => {
-      if ((Number(row.opening_mrr) || 0) <= 0)
-        return summary
+    const { rows } = await client.query<RetentionMetricSummaryRow>(`
+      SELECT
+        EXISTS (
+          SELECT 1
+          FROM public.global_stats
+          WHERE date_id = $1
+        ) AS has_global_stats,
+        COALESCE((
+          SELECT mrr
+          FROM public.global_stats
+          WHERE date_id = $2
+        ), 0) AS previous_mrr,
+        COALESCE(SUM(CASE WHEN opening_mrr > 0 THEN churn_mrr ELSE 0 END), 0) AS retained_churn_mrr,
+        COALESCE(SUM(CASE WHEN opening_mrr > 0 THEN contraction_mrr ELSE 0 END), 0) AS retained_contraction_mrr,
+        COALESCE(SUM(CASE WHEN opening_mrr > 0 THEN expansion_mrr ELSE 0 END), 0) AS retained_expansion_mrr,
+        COALESCE(SUM(churn_mrr), 0) AS lost_churn_mrr,
+        COALESCE(SUM(contraction_mrr), 0) AS lost_contraction_mrr
+      FROM public.daily_revenue_metrics
+      WHERE date_id = $1
+    `, [dateId, getPreviousDateId(dateId)])
+    const row = rows[0]
 
-      summary.churnMrr += Number(row.churn_mrr) || 0
-      summary.contractionMrr += Number(row.contraction_mrr) || 0
-      summary.expansionMrr += Number(row.expansion_mrr) || 0
-      return summary
-    }, { churnMrr: 0, contractionMrr: 0, expansionMrr: 0 })
-    const totalLostRevenue = rows.reduce((summary, row) => {
-      summary.churnMrr += Number(row.churn_mrr) || 0
-      summary.contractionMrr += Number(row.contraction_mrr) || 0
-      return summary
-    }, { churnMrr: 0, contractionMrr: 0, expansionMrr: 0 })
-
-    const { data: globalStats, error: globalStatsError } = await supabase
-      .from('global_stats')
-      .select('date_id')
-      .eq('date_id', dateId)
-      .maybeSingle()
-
-    if (globalStatsError)
-      throw globalStatsError
-    if (!globalStats) {
+    if (!row?.has_global_stats) {
       skippedMissingGlobalStats.push(dateId)
       continue
     }
 
-    const { error } = await supabase
-      .from('global_stats')
-      .update({
-        churn_revenue: calculateChurnRevenue(totalLostRevenue),
-        nrr: calculateNrr(previousMrr, retainedChanges),
-      })
-      .eq('date_id', dateId)
-
-    if (error)
-      throw error
-
+    await client.query(`
+      UPDATE public.global_stats
+      SET
+        churn_revenue = $2,
+        nrr = $3
+      WHERE date_id = $1
+    `, [
+      dateId,
+      calculateChurnRevenue({
+        churnMrr: Number(row.lost_churn_mrr) || 0,
+        contractionMrr: Number(row.lost_contraction_mrr) || 0,
+        expansionMrr: 0,
+      }),
+      calculateNrr(Number(row.previous_mrr) || 0, {
+        churnMrr: Number(row.retained_churn_mrr) || 0,
+        contractionMrr: Number(row.retained_contraction_mrr) || 0,
+        expansionMrr: Number(row.retained_expansion_mrr) || 0,
+      }),
+    ])
     updated++
   }
 
   return { skippedMissingGlobalStats, updated }
+}
+
+async function applyBackfillTransaction(options: ApplyBackfillTransactionOptions) {
+  return withPgTransaction(options.databaseUrl, async (client) => {
+    if (options.reset)
+      await resetBackfillRangePg(client, options.fromDateId, options.toDateId, options.customerId)
+
+    await upsertDailyRevenueMetricsPg(client, options.mergedMetricRows)
+    const refreshResult = await refreshGlobalRetentionMetricsPg(client, options.retentionDates)
+    await insertProcessedEventsPg(client, options.movementsToApply)
+    return refreshResult
+  })
 }
 
 async function writeFailures(failures: unknown[]) {
@@ -876,7 +946,11 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
   if (!apply)
     console.log('Dry run only. Pass --apply to write rows.')
   if (reset)
-    console.warn('reset=true: existing processed_stripe_events and daily_revenue_metrics rows are deleted before insertProcessedEvents/upsertDailyRevenueMetrics. Re-run this command if apply fails.')
+    console.warn('reset=true: existing processed_stripe_events and daily_revenue_metrics rows are deleted inside the apply transaction before rebuilding the range.')
+
+  const databaseUrl = apply ? getDatabaseUrl(env) : null
+  if (apply && !databaseUrl)
+    throw new Error('--apply requires DATABASE_URL, POSTGRES_URL, SUPABASE_DB_URL, SUPABASE_DB_DIRECT_URL, or DIRECT_URL so metric writes and processed-event markers are committed atomically')
 
   let events: Stripe.Event[]
   if (eventsFile) {
@@ -933,8 +1007,9 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
     return
   }
 
-  if (reset)
-    await resetBackfillRange(supabase, fromDateId, toDateId, customerId)
+  const applyDatabaseUrl = databaseUrl
+  if (!applyDatabaseUrl)
+    throw new Error('Missing direct database URL for apply')
 
   const existingMetrics = reset
     ? []
@@ -942,15 +1017,22 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
   const mergedMetricRows = reset
     ? metricRowsToApply
     : mergeMetricRows(existingMetrics, metricRowsToApply)
+  const retentionDates = reset
+    ? getDateIdsBetween(fromDateId, toDateId)
+    : [...new Set(metricRowsToApply.map(row => row.date_id))].sort()
 
   const failures: unknown[] = []
   try {
-    await insertProcessedEvents(supabase, movementsToApply)
-    await upsertDailyRevenueMetrics(supabase, mergedMetricRows)
-    const retentionDates = reset
-      ? getDateIdsBetween(fromDateId, toDateId)
-      : [...new Set(metricRowsToApply.map(row => row.date_id))].sort()
-    const refreshResult = await refreshGlobalRetentionMetrics(supabase, retentionDates)
+    const refreshResult = await applyBackfillTransaction({
+      customerId,
+      databaseUrl: applyDatabaseUrl,
+      fromDateId,
+      mergedMetricRows,
+      movementsToApply,
+      reset,
+      retentionDates,
+      toDateId,
+    })
     console.log(`Updated global_stats retention metrics for ${refreshResult.updated} dates`)
     if (refreshResult.skippedMissingGlobalStats.length > 0)
       console.log(`Skipped missing global_stats rows: ${refreshResult.skippedMissingGlobalStats.join(', ')}`)
