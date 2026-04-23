@@ -72,7 +72,7 @@ function getPlanByProductId(plans: RevenuePlanRow[], productId: string | null | 
 }
 
 export function getSubscriptionMrr(plans: RevenuePlanRow[], stripeInfo: StripeInfoRevenueState) {
-  if (!stripeInfo || stripeInfo.status !== 'succeeded' || stripeInfo.is_good_plan === false)
+  if (stripeInfo?.status !== 'succeeded' || stripeInfo?.is_good_plan === false)
     return 0
 
   return getPlanMrr(getPlanByProductId(plans, stripeInfo.product_id), stripeInfo.price_id)

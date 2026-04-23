@@ -9,6 +9,8 @@
  *
  * Rebuild an exact date range:
  *   bun run stripe:backfill-retention-metrics --apply --reset --from=2026-04-01 --to=2026-04-23
+ *   reset=true deletes existing rows before insertProcessedEvents/upsertDailyRevenueMetrics;
+ *   if a reset apply fails, re-run the same command to rebuild the deleted range.
  *
  * Older history requires an exported Stripe events JSON file:
  *   bun run stripe:backfill-retention-metrics --events-file=./tmp/stripe-events.json --from=2026-01-01 --to=2026-04-23
@@ -229,6 +231,24 @@ function sortStripeEvents(events: Stripe.Event[]) {
   })
 }
 
+function parseStripeEventCreatedSeconds(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value))
+    return value
+
+  if (typeof value !== 'string')
+    return null
+
+  const numericValue = Number(value)
+  if (Number.isFinite(numericValue))
+    return numericValue
+
+  const parsedDate = Date.parse(value)
+  if (Number.isNaN(parsedDate))
+    return null
+
+  return Math.floor(parsedDate / 1000)
+}
+
 function chunkArray<T>(items: T[], size: number) {
   const chunks: T[][] = []
   for (let index = 0; index < items.length; index += size) {
@@ -245,6 +265,38 @@ function toStripeId(value: unknown) {
   if (typeof value === 'object' && 'id' in value && typeof value.id === 'string')
     return value.id
   return null
+}
+
+function normalizeStripeEventFromFile(event: unknown, index: number): Stripe.Event {
+  if (typeof event !== 'object' || event === null)
+    throw new Error(`--events-file contains malformed Stripe event at index ${index}: event must be an object`)
+
+  const candidate = event as {
+    created?: unknown
+    data?: { object?: unknown }
+    id?: unknown
+    type?: unknown
+  }
+  if (typeof candidate.id !== 'string')
+    throw new Error(`--events-file contains malformed Stripe event at index ${index}: missing string id`)
+  if (typeof candidate.type !== 'string')
+    throw new Error(`--events-file contains malformed Stripe event at index ${index}: missing string type`)
+
+  const created = parseStripeEventCreatedSeconds(candidate.created)
+  if (created === null)
+    throw new Error(`--events-file contains malformed Stripe event at index ${index}: missing numeric or parseable created value`)
+
+  const dataObject = candidate.data?.object
+  if (typeof dataObject !== 'object' || dataObject === null)
+    throw new Error(`--events-file contains malformed Stripe event at index ${index}: missing data.object`)
+
+  if (!toStripeId((dataObject as { customer?: unknown }).customer))
+    throw new Error(`--events-file contains malformed Stripe event at index ${index}: missing data.object.customer`)
+
+  return {
+    ...(event as Stripe.Event),
+    created,
+  }
 }
 
 function getLicensedSubscriptionItem(items: Stripe.SubscriptionItem[] | undefined) {
@@ -507,7 +559,7 @@ async function loadEventsFile(filePath: string): Promise<Stripe.Event[]> {
   if (!events)
     throw new Error('--events-file must contain a JSON array, or an object with data/events array')
 
-  return sortStripeEvents(events as Stripe.Event[])
+  return sortStripeEvents(events.map(normalizeStripeEventFromFile))
 }
 
 async function fetchStripeEvents(stripe: StripeClient, fromDateId: string, toDateId: string, limit: number | null) {
@@ -631,7 +683,7 @@ async function insertProcessedEvents(supabase: SupabaseClient, movements: Backfi
 
     const { error } = await supabase
       .from('processed_stripe_events')
-      .insert(chunk)
+      .upsert(chunk, { ignoreDuplicates: true, onConflict: 'event_id' })
 
     if (error)
       throw error
@@ -824,7 +876,7 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
   if (!apply)
     console.log('Dry run only. Pass --apply to write rows.')
   if (reset)
-    console.log('Reset enabled. Existing processed_stripe_events and daily_revenue_metrics rows in range will be rebuilt.')
+    console.warn('reset=true: existing processed_stripe_events and daily_revenue_metrics rows are deleted before insertProcessedEvents/upsertDailyRevenueMetrics. Re-run this command if apply fails.')
 
   let events: Stripe.Event[]
   if (eventsFile) {
