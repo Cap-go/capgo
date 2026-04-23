@@ -32,6 +32,7 @@ interface Props {
   filters?: { [key: string]: boolean }
   searchPlaceholder?: string
   showAdd?: boolean
+  addButtonTestId?: string
   search?: string
   total: number
   currentPage: number
@@ -453,6 +454,7 @@ const isAdding = computed(() => props.isLoading || pendingAdd.value)
         </button>
         <div v-if="showAdd" class="p-px mr-2 rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
           <button
+            :data-test="addButtonTestId"
             class="inline-flex items-center py-1.5 px-3 text-sm font-medium text-gray-500 bg-white rounded-md cursor-pointer dark:text-white dark:bg-gray-800 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
             type="button" @click="handleAddClick"
           >
@@ -582,6 +584,7 @@ const isAdding = computed(() => props.isLoading || pendingAdd.value)
                       <button
                         v-for="(action, actionIndex) in col.actions"
                         v-show="!action.visible || action.visible(elem)" :key="actionIndex"
+                        :data-test="typeof action.testId === 'function' ? action.testId(elem) : action.testId"
                         :disabled="action.disabled && action.disabled(elem)"
                         :title="typeof action.title === 'function' ? action.title(elem) : action.title"
                         class="p-2 text-gray-500 rounded-md cursor-pointer dark:text-gray-400 hover:text-gray-600 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed dark:hover:bg-gray-700 dark:hover:text-gray-300 dark:disabled:hover:text-gray-400 disabled:hover:bg-transparent disabled:hover:text-gray-500"

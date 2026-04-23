@@ -1,5 +1,4 @@
 import type { PlaywrightTestConfig } from '@playwright/test'
-import * as os from 'node:os'
 import { env } from 'node:process'
 import { defineConfig, devices } from '@playwright/test'
 import { getPlaywrightStripeApiBaseUrl, getStripeEmulatorPort } from './scripts/playwright-stripe'
@@ -14,6 +13,9 @@ const headless = true
 const isCi = !!env.CI
 const reuseExistingServer = !isCi
 const webServerTimeout = isCi ? 360_000 : 300_000
+// The local Supabase edge runtime becomes unstable under parallel Chromium workers.
+// Keep Playwright serial by default and allow an explicit override for debugging.
+const configuredWorkers = Number(env.PLAYWRIGHT_WORKERS || '1')
 
 const webServer: PlaywrightTestConfig['webServer'] = []
 const { ports: supabasePorts } = getSupabaseWorktreeConfig()
@@ -61,14 +63,13 @@ webServer.push({
  */
 export default defineConfig({
   testDir: './playwright/e2e',
-  /* Run tests in files in parallel */
-  fullyParallel: !isCi,
+  /* Keep browser runs serial to avoid edge runtime CPU cancellations. */
+  fullyParallel: false,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!env.CI,
   /* Never retry, the entire thing is stateful and retries will never succeed because of the modifications to supabase in the previous attempt */
   retries: 0,
-  /* Opt out of parallel tests on CI. */
-  workers: isCi ? 1 : os.cpus().length,
+  workers: configuredWorkers,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
     ['list', { printSteps: true }],
@@ -82,8 +83,8 @@ export default defineConfig({
     screenshot: 'on',
     baseURL: 'http://localhost:5173/',
     viewport: { width: 1280, height: 720 },
-    actionTimeout: 15000,
-    navigationTimeout: 15000,
+    actionTimeout: 30_000,
+    navigationTimeout: 30_000,
     // storageState: 'playwright/.auth/user1.json',
   },
   expect: {

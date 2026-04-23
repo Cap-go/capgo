@@ -159,8 +159,10 @@ stopExistingPlaywrightBackend()
 await ensureSupabaseStarted()
 
 // Playwright E2E expects the seeded schema helpers and deterministic fixture data.
-if (!env.SKIP_SUPABASE_DB_RESET)
+if (!env.SKIP_SUPABASE_DB_RESET) {
   resetSupabaseDb()
+  await ensureSupabaseStarted()
+}
 
 const child = spawn('bun', ['scripts/supabase-worktree.ts', 'functions', 'serve', '--env-file', generatedEnvPath], {
   cwd: repoRoot,

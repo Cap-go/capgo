@@ -27,6 +27,7 @@ declare module 'vue' {
     AuditLogTable: typeof import('./components/tables/AuditLogTable.vue')['default']
     Banner: typeof import('./components/Banner.vue')['default']
     BlurBg: typeof import('./components/BlurBg.vue')['default']
+    BuildSetupInvite: typeof import('./components/dashboard/BuildSetupInvite.vue')['default']
     BuildTable: typeof import('./components/tables/BuildTable.vue')['default']
     BundleCompareSelect: typeof import('./components/bundle/BundleCompareSelect.vue')['default']
     BundlePreviewFrame: typeof import('./components/BundlePreviewFrame.vue')['default']
