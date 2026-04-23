@@ -11,7 +11,7 @@ import { backgroundTask, getEnv } from '../utils/utils.ts'
 
 // Define constants
 const DEFAULT_BATCH_SIZE = 950 // Default batch size for queue reads limit of CF is 1000 fetches so we take a safe margin
-const MAX_QUEUE_READS = 5
+export const MAX_QUEUE_READS = 5
 const DISCORD_IGNORED_ERROR_CODES = new Set(['version_not_found', 'no_channel'])
 
 // Zod schema for a message object
@@ -72,6 +72,15 @@ function truncateDiscordField(value: string, maxLength = 1024): string {
   if (value.length <= maxLength)
     return value
   return `${value.slice(0, maxLength - 15)}... (truncated)`
+}
+
+function sanitizeDiscordResponseBody(value: string): string {
+  return value
+    .replace(/[\w.%+-]+@[\w.-]+\.[A-Z]{2,}/gi, '[REDACTED_EMAIL]')
+    .replace(/\b(Bearer\s+)[\w.~+/-]+=*/gi, '$1[REDACTED_TOKEN]')
+    .replace(/((?:api[-_]?key|token|authorization|password|secret|access[-_]?token|refresh[-_]?token)["']?\s*[:=]\s*["']?)([^"',\s}]+)/gi, '$1[REDACTED]')
+    .replace(/\b[\dA-F]{32,}\b/gi, '[REDACTED_TOKEN]')
+    .replace(/\b[\w+/=-]{40,}\b/g, '[REDACTED_TOKEN]')
 }
 
 // Helper function to generate UUID v4
@@ -224,9 +233,9 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
                 inline: true,
               },
               {
-                name: '🧾 Response Body',
+                name: '🧾 Sanitized Response Body',
                 value: truncateDiscordField(actionableFailures
-                  .map(detail => detail.response_body ? `**${detail.function_name}:** ${detail.response_body}` : `**${detail.function_name}:** (empty)`)
+                  .map(detail => detail.response_body ? `**${detail.function_name}:** ${sanitizeDiscordResponseBody(detail.response_body)}` : `**${detail.function_name}:** (empty)`)
                   .join('\n')),
                 inline: false,
               },
@@ -545,4 +554,5 @@ export const __queueConsumerTestUtils__ = {
   extractErrorDetails,
   extractMessageBody,
   getActionableQueueFailures,
+  sanitizeDiscordResponseBody,
 }
