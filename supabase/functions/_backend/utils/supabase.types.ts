@@ -1142,6 +1142,63 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_revenue_metrics: {
+        Row: {
+          churn_mrr: number
+          contraction_mrr: number
+          created_at: string
+          customer_id: string
+          date_id: string
+          expansion_mrr: number
+          new_business_mrr: number
+          opening_mrr: number
+          updated_at: string
+        }
+        Insert: {
+          churn_mrr?: number
+          contraction_mrr?: number
+          created_at?: string
+          customer_id: string
+          date_id: string
+          expansion_mrr?: number
+          new_business_mrr?: number
+          opening_mrr?: number
+          updated_at?: string
+        }
+        Update: {
+          churn_mrr?: number
+          contraction_mrr?: number
+          created_at?: string
+          customer_id?: string
+          date_id?: string
+          expansion_mrr?: number
+          new_business_mrr?: number
+          opening_mrr?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      processed_stripe_events: {
+        Row: {
+          created_at: string
+          customer_id: string
+          date_id: string
+          event_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          date_id: string
+          event_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          date_id?: string
+          event_id?: string
+        }
+        Relationships: []
+      }
       global_stats: {
         Row: {
           apps: number
@@ -1163,6 +1220,7 @@ export type Database = {
           builds_total: number | null
           bundle_storage_gb: number
           canceled_orgs: number
+          churn_revenue: number
           created_at: string | null
           credits_bought: number
           credits_consumed: number
@@ -1174,6 +1232,7 @@ export type Database = {
           mrr: number
           need_upgrade: number | null
           new_paying_orgs: number
+          nrr: number
           not_paying: number | null
           onboarded: number | null
           org_conversion_rate: number
@@ -1230,6 +1289,7 @@ export type Database = {
           builds_total?: number | null
           bundle_storage_gb?: number
           canceled_orgs?: number
+          churn_revenue?: number
           created_at?: string | null
           credits_bought?: number
           credits_consumed?: number
@@ -1241,6 +1301,7 @@ export type Database = {
           mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
+          nrr?: number
           not_paying?: number | null
           onboarded?: number | null
           org_conversion_rate?: number
@@ -1297,6 +1358,7 @@ export type Database = {
           builds_total?: number | null
           bundle_storage_gb?: number
           canceled_orgs?: number
+          churn_revenue?: number
           created_at?: string | null
           credits_bought?: number
           credits_consumed?: number
@@ -1308,6 +1370,7 @@ export type Database = {
           mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
+          nrr?: number
           not_paying?: number | null
           onboarded?: number | null
           org_conversion_rate?: number
@@ -2090,6 +2153,7 @@ export type Database = {
           customer_id: string
           id: number
           is_good_plan: boolean | null
+          last_stripe_event_at: string | null
           mau_exceeded: boolean | null
           paid_at: string | null
           plan_calculated_at: string | null
@@ -2114,6 +2178,7 @@ export type Database = {
           customer_id: string
           id?: number
           is_good_plan?: boolean | null
+          last_stripe_event_at?: string | null
           mau_exceeded?: boolean | null
           paid_at?: string | null
           plan_calculated_at?: string | null
@@ -2138,6 +2203,7 @@ export type Database = {
           customer_id?: string
           id?: number
           is_good_plan?: boolean | null
+          last_stripe_event_at?: string | null
           mau_exceeded?: boolean | null
           paid_at?: string | null
           plan_calculated_at?: string | null

@@ -997,6 +997,8 @@ export interface AdminGlobalStatsTrend {
   canceled_orgs: number
   upgraded_orgs: number
   mrr: number
+  nrr: number
+  churn_revenue: number
   total_revenue: number
   revenue_solo: number
   revenue_maker: number
@@ -1073,6 +1075,8 @@ export async function getAdminGlobalStatsTrend(
         canceled_orgs::int,
         COALESCE(upgraded_orgs, 0)::int AS upgraded_orgs,
         mrr::float,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'nrr', '')::float, 100)::float AS nrr,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue', '')::float, 0)::float AS churn_revenue,
         total_revenue::float,
         revenue_solo::float,
         revenue_maker::float,
@@ -1165,6 +1169,8 @@ export async function getAdminGlobalStatsTrend(
       canceled_orgs: Number(row.canceled_orgs) || 0,
       upgraded_orgs: Number(row.upgraded_orgs) || 0,
       mrr: Number(row.mrr) || 0,
+      nrr: Number(row.nrr) || 0,
+      churn_revenue: Number(row.churn_revenue) || 0,
       total_revenue: Number(row.total_revenue) || 0,
       revenue_solo: Number(row.revenue_solo) || 0,
       revenue_maker: Number(row.revenue_maker) || 0,

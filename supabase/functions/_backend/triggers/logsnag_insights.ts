@@ -62,6 +62,15 @@ interface PlanRevenue {
   plan_enterprise_monthly: number
   plan_enterprise_yearly: number
 }
+interface DailyRevenueChangeSummary {
+  churnMrr: number
+  contractionMrr: number
+  expansionMrr: number
+}
+interface RevenueRetentionMetrics {
+  churnRevenue: number
+  nrr: number
+}
 interface GlobalStats {
   apps: PromiseLike<number>
   updates: PromiseLike<number>
@@ -90,6 +99,7 @@ interface GlobalStats {
   demo_apps_created: PromiseLike<number>
   plugin_breakdown: PromiseLike<PluginBreakdownResult>
   build_stats: PromiseLike<BuildStats>
+  retention_metrics: PromiseLike<RevenueRetentionMetrics>
 }
 interface CustomerIdRow {
   customer_id: string
@@ -137,6 +147,28 @@ function countUniqueCustomers(...rowSets: Array<Array<CustomerIdRow | null | und
       .filter((row): row is CustomerIdRow => Boolean(row?.customer_id))
       .map(row => row.customer_id),
   ).size
+}
+
+function getPreviousDateId(dateId: string) {
+  const target = new Date(`${dateId}T00:00:00.000Z`)
+  target.setUTCDate(target.getUTCDate() - 1)
+  return getDateId(target)
+}
+
+function calculateNrr(previousMrr: number, dailyChanges: DailyRevenueChangeSummary) {
+  if (previousMrr <= 0)
+    return 100
+
+  const retainedMrr = Math.max(
+    previousMrr - dailyChanges.churnMrr - dailyChanges.contractionMrr + dailyChanges.expansionMrr,
+    0,
+  )
+
+  return Number(((retainedMrr / previousMrr) * 100).toFixed(2))
+}
+
+function calculateChurnRevenue(dailyChanges: DailyRevenueChangeSummary) {
+  return Number((dailyChanges.churnMrr + dailyChanges.contractionMrr).toFixed(2))
 }
 
 function isMissingBuildMetricColumnError(error: unknown): boolean {
@@ -441,6 +473,74 @@ async function getBuildStats(c: Context, window?: DailyWindow): Promise<BuildSta
   }
 }
 
+async function getRevenueRetentionMetrics(c: Context, dateId: string): Promise<RevenueRetentionMetrics> {
+  const pgClient = getPgClient(c, false)
+  const drizzleClient = getDrizzleClient(pgClient)
+  const previousDateId = getPreviousDateId(dateId)
+
+  try {
+    const result = await drizzleClient.execute<{
+      retained_churn_mrr: number
+      retained_contraction_mrr: number
+      retained_expansion_mrr: number
+      total_churn_mrr: number
+      total_contraction_mrr: number
+      previous_mrr: number
+    }>(sql`
+      WITH daily AS (
+        SELECT
+          COALESCE(SUM(CASE WHEN opening_mrr > 0 THEN churn_mrr ELSE 0 END), 0)::float AS retained_churn_mrr,
+          COALESCE(SUM(CASE WHEN opening_mrr > 0 THEN contraction_mrr ELSE 0 END), 0)::float AS retained_contraction_mrr,
+          COALESCE(SUM(CASE WHEN opening_mrr > 0 THEN expansion_mrr ELSE 0 END), 0)::float AS retained_expansion_mrr,
+          COALESCE(SUM(churn_mrr), 0)::float AS total_churn_mrr,
+          COALESCE(SUM(contraction_mrr), 0)::float AS total_contraction_mrr
+        FROM public.daily_revenue_metrics
+        WHERE date_id = ${dateId}
+      ),
+      previous_snapshot AS (
+        SELECT COALESCE(mrr, 0)::float AS previous_mrr
+        FROM public.global_stats
+        WHERE date_id = ${previousDateId}
+        LIMIT 1
+      )
+      SELECT
+        daily.retained_churn_mrr,
+        daily.retained_contraction_mrr,
+        daily.retained_expansion_mrr,
+        daily.total_churn_mrr,
+        daily.total_contraction_mrr,
+        COALESCE(previous_snapshot.previous_mrr, 0)::float AS previous_mrr
+      FROM daily
+      LEFT JOIN previous_snapshot ON true
+    `)
+
+    const row = result.rows[0]
+    const retainedChanges = {
+      churnMrr: Number(row?.retained_churn_mrr) || 0,
+      contractionMrr: Number(row?.retained_contraction_mrr) || 0,
+      expansionMrr: Number(row?.retained_expansion_mrr) || 0,
+    }
+    const totalLostRevenue = {
+      churnMrr: Number(row?.total_churn_mrr) || 0,
+      contractionMrr: Number(row?.total_contraction_mrr) || 0,
+      expansionMrr: 0,
+    }
+    const previousMrr = Number(row?.previous_mrr) || 0
+
+    return {
+      churnRevenue: calculateChurnRevenue(totalLostRevenue),
+      nrr: calculateNrr(previousMrr, retainedChanges),
+    }
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getRevenueRetentionMetrics error', error })
+    throw error
+  }
+  finally {
+    closeClient(c, pgClient)
+  }
+}
+
 async function aggregateDailyBuildStats(
   c: Context,
   start: Date,
@@ -723,13 +823,17 @@ function getStats(c: Context, window?: DailyWindow): GlobalStats {
     demo_apps_created: countDemoSeededApps(c, last24h),
     plugin_breakdown: getPluginBreakdownCF(c),
     build_stats: getBuildStats(c, window),
+    retention_metrics: getRevenueRetentionMetrics(c, metricWindow.dayDateId),
   }
 }
 
 export const logsnagInsightsTestUtils = {
+  calculateChurnRevenue,
+  calculateNrr,
   countUniqueCustomers,
   getCompletedDayWindow,
   getCurrentDayWindow,
+  getPreviousDateId,
 }
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -766,6 +870,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     demo_apps_created,
     plugin_breakdown,
     build_stats,
+    retention_metrics,
   ] = await Promise.all([
     res.apps,
     res.updates,
@@ -794,6 +899,10 @@ app.post('/', middlewareAPISecret, async (c) => {
     res.demo_apps_created,
     res.plugin_breakdown,
     res.build_stats,
+    Promise.resolve(res.retention_metrics).catch((error: unknown) => {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'retention metrics unavailable', error })
+      return null
+    }),
   ])
   const not_paying = users - customers.total - plans.Trial
   const org_conversion_rate = orgs > 0 ? Number((((paying_orgs_for_conversion * 100) / orgs)).toFixed(1)) : 0
@@ -882,6 +991,12 @@ app.post('/', middlewareAPISecret, async (c) => {
     builds_last_month: build_stats.last_month,
     builds_last_month_ios: build_stats.last_month_ios,
     builds_last_month_android: build_stats.last_month_android,
+    ...(retention_metrics
+      ? {
+          churn_revenue: retention_metrics.churnRevenue,
+          nrr: retention_metrics.nrr,
+        }
+      : {}),
   }
   cloudlog({ requestId: c.get('requestId'), message: 'newData', newData })
   const { error } = await supabaseAdmin(c)
