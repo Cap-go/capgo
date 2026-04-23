@@ -215,6 +215,32 @@ describe('retention metric backfill helpers', () => {
     })
   })
 
+  it.concurrent('preserves input order for same-timestamp events', () => {
+    const result = buildRevenueMovementEvents([
+      subscriptionEvent('evt_z_create', 'customer.subscription.created', 1774353600, 'cus_same_second', 'sub_same_second', 'price_solo_monthly', 'prod_solo'),
+      subscriptionEvent('evt_a_delete', 'customer.subscription.deleted', 1774353600, 'cus_same_second', 'sub_same_second', 'price_solo_monthly', 'prod_solo'),
+    ], plans as any, {
+      fromDateId: '2026-03-24',
+      toDateId: '2026-03-24',
+    })
+
+    expect(result.movements).toHaveLength(2)
+    expect(result.movements.map(movement => movement.event_id)).toEqual([
+      'evt_z_create',
+      'evt_a_delete',
+    ])
+    expect(result.movements[0]).toMatchObject({
+      new_business_mrr: 12,
+      expansion_mrr: 0,
+      churn_mrr: 0,
+    })
+    expect(result.movements[1]).toMatchObject({
+      new_business_mrr: 0,
+      expansion_mrr: 0,
+      churn_mrr: 12,
+    })
+  })
+
   it.concurrent('keeps an existing zero opening MRR when incrementally merging same-day rows', () => {
     const merged = mergeMetricRows([
       {

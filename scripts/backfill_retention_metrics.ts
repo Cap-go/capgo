@@ -310,11 +310,14 @@ function getEventCreatedIso(event: Stripe.Event) {
 }
 
 function sortStripeEvents(events: Stripe.Event[]) {
-  return [...events].sort((left, right) => {
-    if (left.created !== right.created)
-      return left.created - right.created
-    return left.id.localeCompare(right.id)
-  })
+  return events
+    .map((event, index) => ({ event, index }))
+    .sort((left, right) => {
+      if (left.event.created !== right.event.created)
+        return left.event.created - right.event.created
+      return left.index - right.index
+    })
+    .map(item => item.event)
 }
 
 function parseStripeEventCreatedSeconds(value: unknown) {
