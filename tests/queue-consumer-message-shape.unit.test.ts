@@ -120,4 +120,22 @@ describe('queue_consumer legacy message compatibility', () => {
     expect(sanitized).not.toContain('super-secret-token-value')
     expect(sanitized).toContain('builder unavailable')
   })
+
+  it.concurrent('keeps message-only JSON error details actionable', async () => {
+    const response = new Response(JSON.stringify({
+      message: 'builder unavailable',
+    }), {
+      headers: {
+        'content-type': 'application/json',
+      },
+      status: 503,
+      statusText: 'Service Unavailable',
+    })
+
+    await expect(__queueConsumerTestUtils__.extractErrorDetails(response)).resolves.toEqual({
+      bodyPreview: '{"message":"builder unavailable"}',
+      errorCode: null,
+      errorMessage: 'builder unavailable',
+    })
+  })
 })

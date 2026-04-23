@@ -380,12 +380,10 @@ async function extractErrorDetails(response: Response): Promise<{
   if (payload && typeof payload === 'object') {
     const errorCode = payload.error ?? payload.errorCode
     const errorMessage = payload.message ?? payload.errorMessage
-    if (typeof errorCode === 'string') {
-      return {
-        bodyPreview,
-        errorCode,
-        errorMessage: typeof errorMessage === 'string' ? errorMessage : null,
-      }
+    return {
+      bodyPreview,
+      errorCode: typeof errorCode === 'string' ? errorCode : null,
+      errorMessage: typeof errorMessage === 'string' ? errorMessage : null,
     }
   }
   return {
