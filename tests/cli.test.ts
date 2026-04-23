@@ -182,7 +182,7 @@ describe('tests CLI upload options in parallel', () => {
     }))
   })
 
-  it('test code check (missing notifyAppReady)', async () => {
+  it.concurrent('test code check (missing notifyAppReady)', async () => {
     const app = fileTestApps.get('code-check')
     if (!app)
       throw new Error('No file test app available for code-check test')
@@ -230,7 +230,7 @@ describe('tests CLI upload options in parallel', () => {
     expect(result.error).toContain('Invalid API key')
   }, 60000)
 
-  it('should test upload with org-limited API key', async () => {
+  it.concurrent('should test upload with org-limited API key', async () => {
     const app = apiTestApps.get('org-limited')
     if (!app)
       throw new Error('No API test app available for org-limited test')
@@ -257,7 +257,7 @@ describe('tests CLI upload options in parallel', () => {
     }
   }, 60000)
 
-  it('should fail upload with wrong org-limited API key', async () => {
+  it.concurrent('should fail upload with wrong org-limited API key', async () => {
     const app = apiTestApps.get('wrong-org')
     if (!app)
       throw new Error('No API test app available for wrong-org test')
