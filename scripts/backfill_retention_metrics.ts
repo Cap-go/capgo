@@ -42,9 +42,10 @@ type ProcessedStripeEventInsert = Database['public']['Tables']['processed_stripe
 type StripeStatus = Database['public']['Enums']['stripe_status']
 type SubscriptionEventType = typeof SUBSCRIPTION_EVENT_TYPES[number]
 
-interface CustomerPaidAtRow {
+interface CustomerRevenueBaselineRow {
   customer_id: string
   paid_at: string | null
+  subscription_id: string | null
 }
 
 interface TrackedSubscriptionState {
@@ -84,6 +85,7 @@ interface BuildRevenueMovementEventsOptions {
   customerId?: string | null
   fromDateId: string
   initialPaidAtByCustomerId?: Map<string, string | null>
+  initialSubscriptionIdByCustomerId?: Map<string, string | null>
   toDateId: string
 }
 
@@ -416,7 +418,8 @@ export function buildRevenueMovementEvents(
       nextState = buildTrackedState(customerId, subscriptionId, 'succeeded', currentPriceId, currentProductId, activePaidAt ?? eventOccurredAtIso)
     }
     else {
-      if (trackedState?.subscription_id && trackedState.subscription_id !== subscriptionId) {
+      const baselineSubscriptionId = trackedState?.subscription_id ?? options.initialSubscriptionIdByCustomerId?.get(customerId) ?? null
+      if (baselineSubscriptionId && baselineSubscriptionId !== subscriptionId) {
         skipped.subscriptionMismatch++
         continue
       }
@@ -554,21 +557,24 @@ async function fetchRevenuePlans(supabase: SupabaseClient): Promise<RevenuePlanR
   return data ?? []
 }
 
-async function fetchInitialPaidAtByCustomerId(supabase: SupabaseClient, customerIds: string[]) {
+async function fetchInitialCustomerRevenueBaseline(supabase: SupabaseClient, customerIds: string[]) {
   const paidAtByCustomerId = new Map<string, string | null>()
+  const subscriptionIdByCustomerId = new Map<string, string | null>()
   for (const chunk of chunkArray(customerIds, DB_CHUNK_SIZE)) {
     const { data, error } = await supabase
       .from('stripe_info')
-      .select('customer_id, paid_at')
+      .select('customer_id, paid_at, subscription_id')
       .in('customer_id', chunk)
 
     if (error)
       throw error
 
-    for (const row of (data ?? []) as CustomerPaidAtRow[])
+    for (const row of (data ?? []) as CustomerRevenueBaselineRow[]) {
       paidAtByCustomerId.set(row.customer_id, row.paid_at)
+      subscriptionIdByCustomerId.set(row.customer_id, row.subscription_id)
+    }
   }
-  return paidAtByCustomerId
+  return { paidAtByCustomerId, subscriptionIdByCustomerId }
 }
 
 async function fetchExistingProcessedEventIds(supabase: SupabaseClient, eventIds: string[]) {
@@ -654,7 +660,7 @@ async function fetchExistingDailyRevenueMetrics(
   return data ?? []
 }
 
-function mergeMetricRows(existingRows: DailyRevenueMetricRow[], rowsToAdd: DailyRevenueMetricInsert[]) {
+export function mergeMetricRows(existingRows: DailyRevenueMetricRow[], rowsToAdd: DailyRevenueMetricInsert[]) {
   const existingByKey = new Map(existingRows.map(row => [`${row.date_id}:${row.customer_id}`, row]))
 
   return rowsToAdd.map((row) => {
@@ -665,7 +671,7 @@ function mergeMetricRows(existingRows: DailyRevenueMetricRow[], rowsToAdd: Daily
     return {
       date_id: row.date_id,
       customer_id: row.customer_id,
-      opening_mrr: Number(existing.opening_mrr) || Number(row.opening_mrr) || 0,
+      opening_mrr: existing.opening_mrr ?? row.opening_mrr ?? 0,
       new_business_mrr: (Number(existing.new_business_mrr) || 0) + (Number(row.new_business_mrr) || 0),
       expansion_mrr: (Number(existing.expansion_mrr) || 0) + (Number(row.expansion_mrr) || 0),
       contraction_mrr: (Number(existing.contraction_mrr) || 0) + (Number(row.contraction_mrr) || 0),
@@ -837,14 +843,15 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
   }
 
   const customerIds = getCustomerIdsFromEvents(events, customerId)
-  const [plans, initialPaidAtByCustomerId] = await Promise.all([
+  const [plans, initialCustomerRevenueBaseline] = await Promise.all([
     fetchRevenuePlans(supabase),
-    fetchInitialPaidAtByCustomerId(supabase, customerIds),
+    fetchInitialCustomerRevenueBaseline(supabase, customerIds),
   ])
   const { movements, skipped } = buildRevenueMovementEvents(events, plans, {
     customerId,
     fromDateId,
-    initialPaidAtByCustomerId,
+    initialPaidAtByCustomerId: initialCustomerRevenueBaseline.paidAtByCustomerId,
+    initialSubscriptionIdByCustomerId: initialCustomerRevenueBaseline.subscriptionIdByCustomerId,
     toDateId,
   })
   const movementSummary = summarizeDailyRevenueMetrics(movements.map(movement => ({

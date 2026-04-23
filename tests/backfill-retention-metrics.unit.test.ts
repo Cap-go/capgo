@@ -1,6 +1,6 @@
 import type Stripe from 'stripe'
 import { describe, expect, it } from 'vitest'
-import { aggregateRevenueMovementEvents, buildRevenueMovementEvents, summarizeDailyRevenueMetrics } from '../scripts/backfill_retention_metrics.ts'
+import { aggregateRevenueMovementEvents, buildRevenueMovementEvents, mergeMetricRows, summarizeDailyRevenueMetrics } from '../scripts/backfill_retention_metrics.ts'
 
 const plans = [
   {
@@ -148,5 +148,48 @@ describe('retention metric backfill helpers', () => {
       expansion_mrr: 37,
       churn_mrr: 49,
     })
+  })
+
+  it.concurrent('keeps an existing zero opening MRR when incrementally merging same-day rows', () => {
+    const merged = mergeMetricRows([
+      {
+        date_id: '2026-03-24',
+        customer_id: 'cus_sequence',
+        opening_mrr: 0,
+        new_business_mrr: 12,
+        expansion_mrr: 0,
+        contraction_mrr: 0,
+        churn_mrr: 0,
+      } as any,
+    ], [
+      {
+        date_id: '2026-03-24',
+        customer_id: 'cus_sequence',
+        opening_mrr: 49,
+        new_business_mrr: 0,
+        expansion_mrr: 0,
+        contraction_mrr: 0,
+        churn_mrr: 49,
+      },
+    ])
+
+    expect(merged[0]).toMatchObject({
+      opening_mrr: 0,
+      new_business_mrr: 12,
+      churn_mrr: 49,
+    })
+  })
+
+  it.concurrent('skips first-in-range deleted events when the stored subscription id differs', () => {
+    const result = buildRevenueMovementEvents([
+      subscriptionEvent('evt_old_deleted', 'customer.subscription.deleted', 1774353600, 'cus_active', 'sub_old', 'price_team_monthly', 'prod_team'),
+    ], plans as any, {
+      fromDateId: '2026-03-24',
+      initialSubscriptionIdByCustomerId: new Map([['cus_active', 'sub_new']]),
+      toDateId: '2026-03-24',
+    })
+
+    expect(result.movements).toHaveLength(0)
+    expect(result.skipped.subscriptionMismatch).toBe(1)
   })
 })
