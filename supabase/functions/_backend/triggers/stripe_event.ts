@@ -1,7 +1,6 @@
 import type { Context } from 'hono'
 import type Stripe from 'stripe'
 import type { MiddlewareKeyVariablesStripe } from '../utils/hono_middleware_stripe.ts'
-import type { RevenueMovement, RevenuePlanRow } from '../utils/revenue_metrics.ts'
 import type { StripeData } from '../utils/stripe.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { eq, sql } from 'drizzle-orm'
@@ -14,7 +13,6 @@ import { cloudlog } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import * as schema from '../utils/postgres_schema.ts'
 import { groupIdentifyPosthog } from '../utils/posthog.ts'
-import { classifyRevenueMovement, getEventDateId, getSubscriptionMrr, hasRevenueMovement, isStaleStripeEvent } from '../utils/revenue_metrics.ts'
 import { ensureCustomerMetadata, getCreditCheckoutDetails, syncStripeCustomerCountry } from '../utils/stripe.ts'
 import { customerToSegmentOrg, supabaseAdmin } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
@@ -32,9 +30,34 @@ interface Org {
 type StripeInfoRow = Database['public']['Tables']['stripe_info']['Row']
 type StripeInfoUpdate = Database['public']['Tables']['stripe_info']['Update']
 type PlanRow = Database['public']['Tables']['plans']['Row']
+type StripeInfoRevenueState = {
+  is_good_plan?: boolean | null
+  paid_at?: string | null
+  price_id?: string | null
+  product_id?: string | null
+  status?: Database['public']['Enums']['stripe_status'] | null
+} | null | undefined
+type RevenuePlanRow = Pick<PlanRow, 'price_m' | 'price_m_id' | 'price_y' | 'price_y_id' | 'stripe_id'>
+
+interface RevenueMovement {
+  currentMrr: number
+  nextMrr: number
+  newBusinessMrr: number
+  expansionMrr: number
+  contractionMrr: number
+  churnMrr: number
+}
 
 type PersistRevenueMovementResult = 'applied' | 'duplicate' | 'missing' | 'stale'
 
+const ZERO_REVENUE_MOVEMENT: RevenueMovement = {
+  currentMrr: 0,
+  nextMrr: 0,
+  newBusinessMrr: 0,
+  expansionMrr: 0,
+  contractionMrr: 0,
+  churnMrr: 0,
+}
 const STRIPE_INFO_TRANSACTION_COLUMNS = [
   'bandwidth_exceeded',
   'build_time_exceeded',
@@ -153,6 +176,117 @@ function buildSubscriptionEventMetadata(
 
 function getPlanChangeTrackingEventName(statusName: string) {
   return statusName === 'upgraded' ? 'User Upgraded' : 'User Plan Changed'
+}
+
+function getEventDateId(eventOccurredAtIso: string) {
+  return new Date(eventOccurredAtIso).toISOString().slice(0, 10)
+}
+
+function getPlanMrr(plan: RevenuePlanRow | null | undefined, priceId: string | null | undefined) {
+  if (!plan || !priceId)
+    return 0
+
+  if (plan.price_m_id === priceId)
+    return Number(plan.price_m) || 0
+
+  if (plan.price_y_id === priceId)
+    return (Number(plan.price_y) || 0) / 12
+
+  return 0
+}
+
+function getPlanByProductId(plans: RevenuePlanRow[], productId: string | null | undefined) {
+  if (!productId)
+    return null
+
+  return plans.find(plan => plan.stripe_id === productId) ?? null
+}
+
+function getSubscriptionMrr(plans: RevenuePlanRow[], stripeInfo: StripeInfoRevenueState) {
+  if (!stripeInfo || stripeInfo.status !== 'succeeded' || stripeInfo.is_good_plan === false)
+    return 0
+
+  return getPlanMrr(getPlanByProductId(plans, stripeInfo.product_id), stripeInfo.price_id)
+}
+
+function classifyRevenueMovement(
+  currentStripeInfo: StripeInfoRevenueState,
+  nextStripeInfo: StripeInfoRevenueState,
+  plans: RevenuePlanRow[],
+): RevenueMovement {
+  const currentMrr = getSubscriptionMrr(plans, currentStripeInfo)
+  const nextMrr = getSubscriptionMrr(plans, nextStripeInfo)
+
+  if (currentMrr === 0 && nextMrr === 0)
+    return { ...ZERO_REVENUE_MOVEMENT }
+
+  if (currentMrr === 0 && nextMrr > 0) {
+    if (!currentStripeInfo?.paid_at) {
+      return {
+        ...ZERO_REVENUE_MOVEMENT,
+        currentMrr,
+        nextMrr,
+        newBusinessMrr: nextMrr,
+      }
+    }
+
+    return {
+      ...ZERO_REVENUE_MOVEMENT,
+      currentMrr,
+      nextMrr,
+      expansionMrr: nextMrr,
+    }
+  }
+
+  if (currentMrr > 0 && nextMrr === 0) {
+    return {
+      ...ZERO_REVENUE_MOVEMENT,
+      currentMrr,
+      nextMrr,
+      churnMrr: currentMrr,
+    }
+  }
+
+  if (nextMrr > currentMrr) {
+    return {
+      ...ZERO_REVENUE_MOVEMENT,
+      currentMrr,
+      nextMrr,
+      expansionMrr: nextMrr - currentMrr,
+    }
+  }
+
+  if (currentMrr > nextMrr) {
+    return {
+      ...ZERO_REVENUE_MOVEMENT,
+      currentMrr,
+      nextMrr,
+      contractionMrr: currentMrr - nextMrr,
+    }
+  }
+
+  return {
+    ...ZERO_REVENUE_MOVEMENT,
+    currentMrr,
+    nextMrr,
+  }
+}
+
+function hasRevenueMovement(movement: RevenueMovement) {
+  return movement.newBusinessMrr > 0
+    || movement.expansionMrr > 0
+    || movement.contractionMrr > 0
+    || movement.churnMrr > 0
+}
+
+function isStaleStripeEvent(
+  currentStripeInfo: Pick<StripeInfoRow, 'last_stripe_event_at'> | null | undefined,
+  eventOccurredAtIso: string,
+) {
+  if (!currentStripeInfo?.last_stripe_event_at)
+    return false
+
+  return new Date(currentStripeInfo.last_stripe_event_at).getTime() > new Date(eventOccurredAtIso).getTime()
 }
 
 async function getRevenuePlans(c: Context): Promise<RevenuePlanRow[]> {
