@@ -129,6 +129,10 @@ interface ApplyBackfillTransactionResult extends RefreshRetentionMetricsResult {
   movementsApplied: number
 }
 
+interface ProcessedEventIdRow {
+  event_id: string
+}
+
 interface RetentionMetricSummaryRow {
   has_global_stats: boolean
   lost_churn_mrr: number | string | null
@@ -812,6 +816,24 @@ function dedupeRevenueMovementEvents(movements: BackfillRevenueMovementEvent[]) 
   return deduped
 }
 
+export function findMissingResetSnapshotEventIds(
+  movements: BackfillRevenueMovementEvent[],
+  processedEventIds: string[],
+  sampleSize = 10,
+) {
+  const snapshotEventIds = new Set(movements.map(movement => movement.event_id))
+  const missingEventIds: string[] = []
+
+  for (const eventId of processedEventIds) {
+    if (!snapshotEventIds.has(eventId))
+      missingEventIds.push(eventId)
+    if (missingEventIds.length >= sampleSize)
+      break
+  }
+
+  return missingEventIds
+}
+
 export function summarizeDailyRevenueMetrics(rows: Pick<DailyRevenueMetricInsert, 'churn_mrr' | 'contraction_mrr' | 'expansion_mrr' | 'new_business_mrr' | 'opening_mrr'>[]): BackfillSummary {
   return rows.reduce<BackfillSummary>((summary, row) => {
     summary.rows++
@@ -1067,6 +1089,46 @@ async function claimProcessedEventsPg(client: PgClient, movements: BackfillReven
   return uniqueMovements.filter(movement => claimedEventIds.has(movement.event_id))
 }
 
+async function lockResetRetentionTablesPg(client: PgClient) {
+  // Block concurrent webhook writes while reset deletes and exact metric upserts run.
+  await client.query(`
+    LOCK TABLE
+      public.processed_stripe_events,
+      public.daily_revenue_metrics
+    IN SHARE ROW EXCLUSIVE MODE
+  `)
+}
+
+async function assertResetSnapshotIsCurrentPg(
+  client: PgClient,
+  movements: BackfillRevenueMovementEvent[],
+  fromDateId: string,
+  toDateId: string,
+  customerId?: string | null,
+) {
+  const values = [fromDateId, toDateId]
+  const predicates = [
+    `date_id >= $1`,
+    `date_id <= $2`,
+  ]
+
+  if (customerId) {
+    values.push(customerId)
+    predicates.push(`customer_id = $3`)
+  }
+
+  const { rows } = await client.query<ProcessedEventIdRow>(`
+    SELECT event_id
+    FROM public.processed_stripe_events
+    WHERE ${predicates.join(' AND ')}
+  `, values)
+
+  const missingEventIds = findMissingResetSnapshotEventIds(movements, rows.map(row => row.event_id))
+  if (missingEventIds.length > 0) {
+    throw new Error(`--apply --reset snapshot is stale for ${fromDateId}..${toDateId}; fetch events again before retrying. Missing processed event ids: ${missingEventIds.join(', ')}`)
+  }
+}
+
 async function refreshGlobalRetentionMetricsPg(client: PgClient, dateIds: string[]): Promise<RefreshRetentionMetricsResult> {
   const skippedMissingGlobalStats: string[] = []
   let updated = 0
@@ -1126,8 +1188,11 @@ async function refreshGlobalRetentionMetricsPg(client: PgClient, dateIds: string
 
 async function applyBackfillTransaction(options: ApplyBackfillTransactionOptions): Promise<ApplyBackfillTransactionResult> {
   return withPgTransaction(options.databaseUrl, options.env, async (client) => {
-    if (options.reset)
+    if (options.reset) {
+      await lockResetRetentionTablesPg(client)
+      await assertResetSnapshotIsCurrentPg(client, options.movements, options.fromDateId, options.toDateId, options.customerId)
       await resetBackfillRangePg(client, options.fromDateId, options.toDateId, options.customerId)
+    }
 
     const movementsToApply = await claimProcessedEventsPg(client, options.movements)
     const metricRowsToApply = aggregateRevenueMovementEvents(movementsToApply)

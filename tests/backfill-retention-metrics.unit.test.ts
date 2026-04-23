@@ -1,6 +1,6 @@
 import type Stripe from 'stripe'
 import { describe, expect, it } from 'vitest'
-import { aggregateRevenueMovementEvents, buildRevenueMovementEvents, mergeMetricRows, summarizeDailyRevenueMetrics } from '../scripts/backfill_retention_metrics.ts'
+import { aggregateRevenueMovementEvents, buildRevenueMovementEvents, findMissingResetSnapshotEventIds, mergeMetricRows, summarizeDailyRevenueMetrics } from '../scripts/backfill_retention_metrics.ts'
 
 const plans = [
   {
@@ -269,6 +269,26 @@ describe('retention metric backfill helpers', () => {
       new_business_mrr: 12,
       churn_mrr: 49,
     })
+  })
+
+  it.concurrent('detects reset snapshots that miss already processed event ids', () => {
+    const missing = findMissingResetSnapshotEventIds([
+      {
+        event_id: 'evt_known',
+        event_type: 'customer.subscription.created',
+        date_id: '2026-03-24',
+        customer_id: 'cus_reset',
+        opening_mrr: 0,
+        current_mrr: 0,
+        next_mrr: 12,
+        new_business_mrr: 12,
+        expansion_mrr: 0,
+        contraction_mrr: 0,
+        churn_mrr: 0,
+      },
+    ], ['evt_known', 'evt_missing'])
+
+    expect(missing).toEqual(['evt_missing'])
   })
 
   it.concurrent('skips deleted events when pre-range state tracks a different subscription id', () => {
