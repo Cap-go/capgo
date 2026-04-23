@@ -1,6 +1,6 @@
 import type Stripe from 'stripe'
 import { describe, expect, it } from 'vitest'
-import { aggregateRevenueMovementEvents, buildRevenueMovementEvents, findMissingResetSnapshotEventIds, mergeMetricRows, summarizeDailyRevenueMetrics } from '../scripts/backfill_retention_metrics.ts'
+import { aggregateRevenueMovementEvents, buildRevenueMovementEvents, fetchStripeEvents, findMissingResetSnapshotEventIds, mergeMetricRows, summarizeDailyRevenueMetrics } from '../scripts/backfill_retention_metrics.ts'
 
 const plans = [
   {
@@ -289,6 +289,57 @@ describe('retention metric backfill helpers', () => {
     ], ['evt_known', 'evt_missing'])
 
     expect(missing).toEqual(['evt_missing'])
+  })
+
+  it.concurrent('keeps Stripe API source order for same-second events across event types', async () => {
+    const seenParams: Stripe.EventListParams[] = []
+    const stripe = {
+      events: {
+        list(params: Stripe.EventListParams) {
+          seenParams.push(params)
+          return (async function* () {
+            yield subscriptionEvent('evt_deleted_same_second', 'customer.subscription.deleted', 1774353600, 'cus_api', 'sub_api', 'price_solo_monthly', 'prod_solo')
+            yield subscriptionEvent('evt_created_same_second', 'customer.subscription.created', 1774353600, 'cus_api', 'sub_api', 'price_solo_monthly', 'prod_solo')
+          })()
+        },
+      },
+    } as any
+
+    const result = await fetchStripeEvents(stripe, '2026-03-24', '2026-03-24', null)
+
+    expect(seenParams).toHaveLength(1)
+    expect(seenParams[0]?.types).toEqual([
+      'customer.subscription.created',
+      'customer.subscription.updated',
+      'customer.subscription.deleted',
+    ])
+    expect(result.reachedLimit).toBe(false)
+    expect(result.events.map(event => event.id)).toEqual([
+      'evt_deleted_same_second',
+      'evt_created_same_second',
+    ])
+  })
+
+  it.concurrent('flags truncated Stripe event fetches when the limit is reached', async () => {
+    const stripe = {
+      events: {
+        list() {
+          return (async function* () {
+            yield subscriptionEvent('evt_first', 'customer.subscription.created', 1774353600, 'cus_limit', 'sub_limit', 'price_solo_monthly', 'prod_solo')
+            yield subscriptionEvent('evt_second', 'customer.subscription.updated', 1774357200, 'cus_limit', 'sub_limit', 'price_team_monthly', 'prod_team', {
+              priceId: 'price_solo_monthly',
+              productId: 'prod_solo',
+            })
+          })()
+        },
+      },
+    } as any
+
+    const result = await fetchStripeEvents(stripe, '2026-03-24', '2026-03-24', 1)
+
+    expect(result.reachedLimit).toBe(true)
+    expect(result.events).toHaveLength(1)
+    expect(result.events[0]?.id).toBe('evt_first')
   })
 
   it.concurrent('skips deleted events when pre-range state tracks a different subscription id', () => {

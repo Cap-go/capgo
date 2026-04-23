@@ -108,6 +108,11 @@ interface BuildRevenueMovementEventsResult {
   }
 }
 
+interface StripeEventFetchResult {
+  events: Stripe.Event[]
+  reachedLimit: boolean
+}
+
 interface RefreshRetentionMetricsResult {
   skippedMissingGlobalStats: string[]
   updated: number
@@ -869,26 +874,32 @@ async function loadEventsFile(filePath: string): Promise<Stripe.Event[]> {
   return sortStripeEvents(events.map(normalizeStripeEventFromFile))
 }
 
-async function fetchStripeEvents(stripe: StripeClient, fromDateId: string, toDateId: string, limit: number | null) {
+export async function fetchStripeEvents(stripe: Pick<StripeClient, 'events'>, fromDateId: string, toDateId: string, limit: number | null): Promise<StripeEventFetchResult> {
   const events: Stripe.Event[] = []
-  for (const type of SUBSCRIPTION_EVENT_TYPES) {
-    const params = {
-      created: {
-        gte: dateIdToStartSeconds(fromDateId),
-        lte: dateIdToEndSeconds(toDateId),
-      },
-      limit: EVENT_FETCH_PAGE_SIZE,
-      type,
-    } as Stripe.EventListParams
 
-    for await (const event of stripe.events.list(params)) {
-      events.push(event)
-      if (limit && events.length >= limit)
-        return sortStripeEvents(events)
+  const params = {
+    created: {
+      gte: dateIdToStartSeconds(fromDateId),
+      lte: dateIdToEndSeconds(toDateId),
+    },
+    limit: EVENT_FETCH_PAGE_SIZE,
+    types: [...SUBSCRIPTION_EVENT_TYPES],
+  } as Stripe.EventListParams
+
+  for await (const event of stripe.events.list(params)) {
+    events.push(event)
+    if (limit && events.length >= limit) {
+      return {
+        events: sortStripeEvents(events),
+        reachedLimit: true,
+      }
     }
   }
 
-  return sortStripeEvents(events)
+  return {
+    events: sortStripeEvents(events),
+    reachedLimit: false,
+  }
 }
 
 function getCustomerIdsFromEvents(events: Stripe.Event[], customerId?: string | null) {
@@ -1265,6 +1276,7 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
   const databaseUrl = apply ? getRequiredDatabaseUrl(env) : ''
 
   let events: Stripe.Event[]
+  let reachedEventFetchLimit = false
   if (eventsFile) {
     events = await loadEventsFile(eventsFile)
     console.log(`Loaded ${events.length} events from ${eventsFile}`)
@@ -1282,10 +1294,18 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
     const fetchFromDateId = !limit && compareDateIds(fromDateId, oldestEventApiDateId) > 0
       ? oldestEventApiDateId
       : fromDateId
-    events = await fetchStripeEvents(stripe, fetchFromDateId, toDateId, limit)
+    const fetchedEvents = await fetchStripeEvents(stripe, fetchFromDateId, toDateId, limit)
+    events = fetchedEvents.events
+    reachedEventFetchLimit = fetchedEvents.reachedLimit
     if (fetchFromDateId !== fromDateId)
       console.log(`Fetched recent Stripe events from ${fetchFromDateId} to seed subscription state before ${fromDateId}`)
     console.log(`Fetched ${events.length} subscription events from Stripe`)
+    if (reachedEventFetchLimit)
+      console.warn(`Stripe event fetch stopped at --limit=${limit}`)
+  }
+
+  if (apply && reset && reachedEventFetchLimit) {
+    throw new Error('--apply --reset cannot use a truncated Stripe event snapshot. Increase or remove --limit, or provide --events-file.')
   }
 
   const customerIds = getCustomerIdsFromEvents(events, customerId)
