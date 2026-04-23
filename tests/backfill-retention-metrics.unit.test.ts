@@ -37,8 +37,17 @@ function subscriptionEvent(
   subscriptionId: string,
   priceId: string,
   productId: string,
-  previous?: { priceId: string, productId: string },
+  previous?: { priceId?: string, productId?: string, status?: string },
 ) {
+  const previousAttributes: Partial<Stripe.Subscription> = {}
+  if (previous?.priceId && previous.productId) {
+    previousAttributes.items = {
+      data: [subscriptionItem(previous.priceId, previous.productId)],
+    } as any
+  }
+  if (previous && 'status' in previous)
+    previousAttributes.status = previous.status as any
+
   return {
     id,
     type,
@@ -53,11 +62,7 @@ function subscriptionEvent(
         },
       },
       previous_attributes: previous
-        ? {
-            items: {
-              data: [subscriptionItem(previous.priceId, previous.productId)],
-            },
-          }
+        ? previousAttributes
         : undefined,
     },
   } as Stripe.Event
@@ -104,9 +109,11 @@ describe('retention metric backfill helpers', () => {
     })
   })
 
-  it.concurrent('builds new business metrics from status-only subscription update activations', () => {
+  it.concurrent('builds new business metrics from status-only subscription update activations with previous status', () => {
     const result = buildRevenueMovementEvents([
-      subscriptionEvent('evt_status_update', 'customer.subscription.updated', 1774353600, 'cus_activated', 'sub_activated', 'price_solo_monthly', 'prod_solo'),
+      subscriptionEvent('evt_status_update', 'customer.subscription.updated', 1774353600, 'cus_activated', 'sub_activated', 'price_solo_monthly', 'prod_solo', {
+        status: 'incomplete',
+      }),
     ], plans as any, {
       fromDateId: '2026-03-24',
       toDateId: '2026-03-24',
@@ -120,6 +127,18 @@ describe('retention metric backfill helpers', () => {
       next_mrr: 12,
       new_business_mrr: 12,
     })
+  })
+
+  it.concurrent('skips first subscription update when previous revenue state is unknown', () => {
+    const result = buildRevenueMovementEvents([
+      subscriptionEvent('evt_metadata_update', 'customer.subscription.updated', 1774353600, 'cus_existing_unknown', 'sub_existing_unknown', 'price_solo_monthly', 'prod_solo'),
+    ], plans as any, {
+      fromDateId: '2026-03-24',
+      toDateId: '2026-03-24',
+    })
+
+    expect(result.movements).toHaveLength(0)
+    expect(result.skipped.noMovement).toBe(1)
   })
 
   it.concurrent('builds churn metrics from deleted subscription events', () => {
@@ -198,16 +217,31 @@ describe('retention metric backfill helpers', () => {
     })
   })
 
-  it.concurrent('skips first-in-range deleted events when the stored subscription id differs', () => {
+  it.concurrent('skips deleted events when pre-range state tracks a different subscription id', () => {
     const result = buildRevenueMovementEvents([
+      subscriptionEvent('evt_pre_range_create', 'customer.subscription.created', 1774267200, 'cus_active', 'sub_new', 'price_team_monthly', 'prod_team'),
       subscriptionEvent('evt_old_deleted', 'customer.subscription.deleted', 1774353600, 'cus_active', 'sub_old', 'price_team_monthly', 'prod_team'),
     ], plans as any, {
       fromDateId: '2026-03-24',
-      initialSubscriptionIdByCustomerId: new Map([['cus_active', 'sub_new']]),
       toDateId: '2026-03-24',
     })
 
     expect(result.movements).toHaveLength(0)
     expect(result.skipped.subscriptionMismatch).toBe(1)
+  })
+
+  it.concurrent('does not use current subscription id as a historical deletion baseline', () => {
+    const result = buildRevenueMovementEvents([
+      subscriptionEvent('evt_deleted', 'customer.subscription.deleted', 1774353600, 'cus_historical_churn', 'sub_old', 'price_team_monthly', 'prod_team'),
+    ], plans as any, {
+      fromDateId: '2026-03-24',
+      toDateId: '2026-03-24',
+    })
+
+    expect(result.movements).toHaveLength(1)
+    expect(result.movements[0]).toMatchObject({
+      event_id: 'evt_deleted',
+      churn_mrr: 49,
+    })
   })
 })

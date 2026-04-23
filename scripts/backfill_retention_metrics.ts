@@ -47,7 +47,6 @@ type SubscriptionEventType = typeof SUBSCRIPTION_EVENT_TYPES[number]
 interface CustomerRevenueBaselineRow {
   customer_id: string
   paid_at: string | null
-  subscription_id: string | null
 }
 
 interface TrackedSubscriptionState {
@@ -87,7 +86,6 @@ interface BuildRevenueMovementEventsOptions {
   customerId?: string | null
   fromDateId: string
   initialPaidAtByCustomerId?: Map<string, string | null>
-  initialSubscriptionIdByCustomerId?: Map<string, string | null>
   toDateId: string
 }
 
@@ -166,6 +164,13 @@ function getRequiredEnv(env: Record<string, string | undefined>, key: string) {
   const value = env[key]?.trim()
   if (!value)
     throw new Error(`Missing ${key}`)
+  return value
+}
+
+function getRequiredDatabaseUrl(env: Record<string, string | undefined>) {
+  const value = getDatabaseUrl(env)
+  if (!value)
+    throw new Error('--apply requires DATABASE_URL, POSTGRES_URL, SUPABASE_DB_URL, SUPABASE_DB_DIRECT_URL, or DIRECT_URL so metric writes and processed-event markers are committed atomically')
   return value
 }
 
@@ -339,7 +344,14 @@ function normalizeStripeEventFromFile(event: unknown, index: number): Stripe.Eve
 }
 
 function getLicensedSubscriptionItem(items: Stripe.SubscriptionItem[] | undefined) {
-  return items?.find(item => item.plan?.usage_type === 'licensed') ?? items?.[0] ?? null
+  const licensedItem = items?.find(item => item.plan?.usage_type === 'licensed') ?? null
+  if (licensedItem)
+    return licensedItem
+
+  if (items?.length)
+    console.warn(`No licensed subscription item found; ignoring ${items.length} subscription item(s). First item usage_type=${items[0]?.plan?.usage_type ?? 'unknown'}`)
+
+  return null
 }
 
 function getItemPriceId(item: Stripe.SubscriptionItem | null | undefined) {
@@ -363,6 +375,25 @@ function getSubscriptionItems(subscription: Stripe.Subscription) {
 function getPreviousSubscriptionItems(event: Stripe.Event) {
   const previousAttributes = event.data.previous_attributes as Partial<Stripe.Subscription> | undefined
   return previousAttributes?.items?.data as Stripe.SubscriptionItem[] | undefined
+}
+
+function toBackfillStripeStatus(status: unknown): StripeStatus | null {
+  if (status === 'active' || status === 'trialing' || status === 'succeeded')
+    return 'succeeded'
+  if (status === 'created' || status === 'updated' || status === 'failed' || status === 'deleted' || status === 'canceled')
+    return status
+  return null
+}
+
+function getPreviousSubscriptionStatus(event: Stripe.Event) {
+  const previousAttributes = event.data.previous_attributes as Partial<Stripe.Subscription> | undefined
+  if (!previousAttributes || !Object.hasOwn(previousAttributes, 'status'))
+    return { hasStatus: false, status: null as StripeStatus | null }
+
+  return {
+    hasStatus: true,
+    status: toBackfillStripeStatus(previousAttributes.status),
+  }
 }
 
 function toRevenueState(state: TrackedSubscriptionState | StripeInfoRevenueState): StripeInfoRevenueState {
@@ -458,7 +489,8 @@ export function buildRevenueMovementEvents(
 
     const eventOccurredAtIso = getEventCreatedIso(event)
     const dateId = getEventDateId(eventOccurredAtIso)
-    if (compareDateIds(dateId, options.fromDateId) < 0 || compareDateIds(dateId, options.toDateId) > 0) {
+    const isBeforeRange = compareDateIds(dateId, options.fromDateId) < 0
+    if (compareDateIds(dateId, options.toDateId) > 0) {
       skipped.outOfRange++
       continue
     }
@@ -485,9 +517,11 @@ export function buildRevenueMovementEvents(
 
     const trackedState = customerStates.get(customerId)
     const previousItem = getLicensedSubscriptionItem(getPreviousSubscriptionItems(event))
-    const previousPriceId = getItemPriceId(previousItem) ?? trackedState?.price_id ?? null
-    const previousProductId = getItemProductId(previousItem) ?? trackedState?.product_id ?? null
-    const previousStatus = trackedState?.status ?? (previousItem ? 'succeeded' : null)
+    const previousStatusChange = getPreviousSubscriptionStatus(event)
+    const shouldReuseCurrentPlanForPreviousState = !trackedState && !previousItem && previousStatusChange.status === 'succeeded'
+    const previousPriceId = getItemPriceId(previousItem) ?? trackedState?.price_id ?? (shouldReuseCurrentPlanForPreviousState ? currentPriceId : null)
+    const previousProductId = getItemProductId(previousItem) ?? trackedState?.product_id ?? (shouldReuseCurrentPlanForPreviousState ? currentProductId : null)
+    const previousStatus = trackedState?.status ?? (previousItem ? 'succeeded' : previousStatusChange.status)
     const previousMrr = getSubscriptionMrr(plans, {
       is_good_plan: true,
       paid_at: trackedState?.paid_at ?? eventOccurredAtIso,
@@ -506,11 +540,20 @@ export function buildRevenueMovementEvents(
       nextState = buildTrackedState(customerId, subscriptionId, 'succeeded', currentPriceId, currentProductId, knownPaidAt ?? eventOccurredAtIso)
     }
     else if (event.type === 'customer.subscription.updated') {
+      const hasPreviousRevenueState = Boolean(trackedState || previousItem || previousStatusChange.hasStatus)
       currentState = buildTrackedState(customerId, subscriptionId, previousMrr > 0 ? 'succeeded' : 'updated', previousPriceId, previousProductId, activePaidAt)
       nextState = buildTrackedState(customerId, subscriptionId, 'succeeded', currentPriceId, currentProductId, activePaidAt ?? eventOccurredAtIso)
+      if (!hasPreviousRevenueState) {
+        customerStates.set(customerId, nextState)
+        if (isBeforeRange)
+          skipped.outOfRange++
+        else
+          skipped.noMovement++
+        continue
+      }
     }
     else {
-      const baselineSubscriptionId = trackedState?.subscription_id ?? options.initialSubscriptionIdByCustomerId?.get(customerId) ?? null
+      const baselineSubscriptionId = trackedState?.subscription_id ?? null
       if (baselineSubscriptionId && baselineSubscriptionId !== subscriptionId) {
         skipped.subscriptionMismatch++
         continue
@@ -522,6 +565,11 @@ export function buildRevenueMovementEvents(
 
     const movement = classifyRevenueMovement(toRevenueState(currentState), toRevenueState(nextState), plans)
     customerStates.set(customerId, nextState)
+
+    if (isBeforeRange) {
+      skipped.outOfRange++
+      continue
+    }
 
     if (!hasRevenueMovement(movement)) {
       skipped.noMovement++
@@ -651,11 +699,10 @@ async function fetchRevenuePlans(supabase: SupabaseClient): Promise<RevenuePlanR
 
 async function fetchInitialCustomerRevenueBaseline(supabase: SupabaseClient, customerIds: string[]) {
   const paidAtByCustomerId = new Map<string, string | null>()
-  const subscriptionIdByCustomerId = new Map<string, string | null>()
   for (const chunk of chunkArray(customerIds, DB_CHUNK_SIZE)) {
     const { data, error } = await supabase
       .from('stripe_info')
-      .select('customer_id, paid_at, subscription_id')
+      .select('customer_id, paid_at')
       .in('customer_id', chunk)
 
     if (error)
@@ -663,10 +710,9 @@ async function fetchInitialCustomerRevenueBaseline(supabase: SupabaseClient, cus
 
     for (const row of (data ?? []) as CustomerRevenueBaselineRow[]) {
       paidAtByCustomerId.set(row.customer_id, row.paid_at)
-      subscriptionIdByCustomerId.set(row.customer_id, row.subscription_id)
     }
   }
-  return { paidAtByCustomerId, subscriptionIdByCustomerId }
+  return { paidAtByCustomerId }
 }
 
 async function fetchExistingProcessedEventIds(supabase: SupabaseClient, eventIds: string[]) {
@@ -948,9 +994,7 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
   if (reset)
     console.warn('reset=true: existing processed_stripe_events and daily_revenue_metrics rows are deleted inside the apply transaction before rebuilding the range.')
 
-  const databaseUrl = apply ? getDatabaseUrl(env) : null
-  if (apply && !databaseUrl)
-    throw new Error('--apply requires DATABASE_URL, POSTGRES_URL, SUPABASE_DB_URL, SUPABASE_DB_DIRECT_URL, or DIRECT_URL so metric writes and processed-event markers are committed atomically')
+  const databaseUrl = apply ? getRequiredDatabaseUrl(env) : ''
 
   let events: Stripe.Event[]
   if (eventsFile) {
@@ -959,12 +1003,20 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
   }
   else {
     const oldestEventApiDateId = dateIdDaysAgo(DEFAULT_LOOKBACK_DAYS)
-    if (compareDateIds(fromDateId, oldestEventApiDateId) < 0)
+    if (compareDateIds(fromDateId, oldestEventApiDateId) < 0) {
+      if (apply && reset)
+        throw new Error('Cannot use --apply --reset with Stripe Events API for a range older than recent event history. Provide --events-file for archived events.')
       console.warn('Stripe Events API only exposes recent events. Use --events-file for older archived Stripe events.')
+    }
 
     const stripeSecretKey = getRequiredEnv(env, 'STRIPE_SECRET_KEY')
     const stripe = createStripeClient(stripeSecretKey, env.STRIPE_API_BASE_URL?.trim())
-    events = await fetchStripeEvents(stripe, fromDateId, toDateId, limit)
+    const fetchFromDateId = !limit && compareDateIds(fromDateId, oldestEventApiDateId) > 0
+      ? oldestEventApiDateId
+      : fromDateId
+    events = await fetchStripeEvents(stripe, fetchFromDateId, toDateId, limit)
+    if (fetchFromDateId !== fromDateId)
+      console.log(`Fetched recent Stripe events from ${fetchFromDateId} to seed subscription state before ${fromDateId}`)
     console.log(`Fetched ${events.length} subscription events from Stripe`)
   }
 
@@ -977,7 +1029,6 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
     customerId,
     fromDateId,
     initialPaidAtByCustomerId: initialCustomerRevenueBaseline.paidAtByCustomerId,
-    initialSubscriptionIdByCustomerId: initialCustomerRevenueBaseline.subscriptionIdByCustomerId,
     toDateId,
   })
   const movementSummary = summarizeDailyRevenueMetrics(movements.map(movement => ({
@@ -1007,10 +1058,6 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
     return
   }
 
-  const applyDatabaseUrl = databaseUrl
-  if (!applyDatabaseUrl)
-    throw new Error('Missing direct database URL for apply')
-
   const existingMetrics = reset
     ? []
     : await fetchExistingDailyRevenueMetrics(supabase, fromDateId, toDateId, customerId)
@@ -1025,7 +1072,7 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
   try {
     const refreshResult = await applyBackfillTransaction({
       customerId,
-      databaseUrl: applyDatabaseUrl,
+      databaseUrl,
       fromDateId,
       mergedMetricRows,
       movementsToApply,
