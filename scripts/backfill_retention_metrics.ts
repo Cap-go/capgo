@@ -30,7 +30,6 @@ const DEFAULT_ENV_FILE = './internal/cloudflare/.env.prod'
 const DEFAULT_LOOKBACK_DAYS = 30
 const EVENT_FETCH_PAGE_SIZE = 100
 const DB_CHUNK_SIZE = 500
-const DB_PAGE_SIZE = 1000
 const FAILURE_OUTPUT = './tmp/retention_metric_backfill_failures.json'
 const DATE_ID_REGEX = /^\d{4}-\d{2}-\d{2}$/
 const SUBSCRIPTION_EVENT_TYPES = [
@@ -112,11 +111,15 @@ interface ApplyBackfillTransactionOptions {
   databaseUrl: string
   env: Record<string, string | undefined>
   fromDateId: string
-  mergedMetricRows: DailyRevenueMetricInsert[]
-  movementsToApply: BackfillRevenueMovementEvent[]
+  movements: BackfillRevenueMovementEvent[]
   reset: boolean
   retentionDates: string[]
   toDateId: string
+}
+
+interface ApplyBackfillTransactionResult extends RefreshRetentionMetricsResult {
+  metricRowsApplied: number
+  movementsApplied: number
 }
 
 interface RetentionMetricSummaryRow {
@@ -739,41 +742,6 @@ async function fetchExistingProcessedEventIds(supabase: SupabaseClient, eventIds
   return existing
 }
 
-async function fetchExistingDailyRevenueMetrics(
-  supabase: SupabaseClient,
-  fromDateId: string,
-  toDateId: string,
-  customerId?: string | null,
-) {
-  const rows: DailyRevenueMetricRow[] = []
-  let offset = 0
-
-  while (true) {
-    let query = supabase
-      .from('daily_revenue_metrics')
-      .select('*')
-      .gte('date_id', fromDateId)
-      .lte('date_id', toDateId)
-      .order('date_id', { ascending: true })
-      .order('customer_id', { ascending: true })
-      .range(offset, offset + DB_PAGE_SIZE - 1)
-
-    if (customerId)
-      query = query.eq('customer_id', customerId)
-
-    const { data, error } = await query
-    if (error)
-      throw error
-
-    rows.push(...(data ?? []))
-    if (!data || data.length < DB_PAGE_SIZE)
-      break
-    offset += DB_PAGE_SIZE
-  }
-
-  return rows
-}
-
 export function mergeMetricRows(existingRows: DailyRevenueMetricRow[], rowsToAdd: DailyRevenueMetricInsert[]) {
   const existingByKey = new Map(existingRows.map(row => [`${row.date_id}:${row.customer_id}`, row]))
 
@@ -825,7 +793,7 @@ async function resetBackfillRangePg(client: PgClient, fromDateId: string, toDate
   await client.query(`DELETE FROM public.daily_revenue_metrics WHERE ${predicates.join(' AND ')}`, values)
 }
 
-async function upsertDailyRevenueMetricsPg(client: PgClient, rows: DailyRevenueMetricInsert[]) {
+async function upsertDailyRevenueMetricsPg(client: PgClient, rows: DailyRevenueMetricInsert[], mode: 'additive' | 'exact') {
   for (const chunk of chunkArray(rows, DB_CHUNK_SIZE)) {
     if (chunk.length === 0)
       continue
@@ -845,6 +813,21 @@ async function upsertDailyRevenueMetricsPg(client: PgClient, rows: DailyRevenueM
       return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7})`
     })
 
+    const updateClause = mode === 'exact'
+      ? `
+        opening_mrr = EXCLUDED.opening_mrr,
+        new_business_mrr = EXCLUDED.new_business_mrr,
+        expansion_mrr = EXCLUDED.expansion_mrr,
+        contraction_mrr = EXCLUDED.contraction_mrr,
+        churn_mrr = EXCLUDED.churn_mrr
+      `
+      : `
+        new_business_mrr = public.daily_revenue_metrics.new_business_mrr + EXCLUDED.new_business_mrr,
+        expansion_mrr = public.daily_revenue_metrics.expansion_mrr + EXCLUDED.expansion_mrr,
+        contraction_mrr = public.daily_revenue_metrics.contraction_mrr + EXCLUDED.contraction_mrr,
+        churn_mrr = public.daily_revenue_metrics.churn_mrr + EXCLUDED.churn_mrr
+      `
+
     await client.query(`
       INSERT INTO public.daily_revenue_metrics (
         date_id,
@@ -859,16 +842,14 @@ async function upsertDailyRevenueMetricsPg(client: PgClient, rows: DailyRevenueM
       ON CONFLICT (date_id, customer_id) DO UPDATE
       SET
         updated_at = now(),
-        opening_mrr = EXCLUDED.opening_mrr,
-        new_business_mrr = EXCLUDED.new_business_mrr,
-        expansion_mrr = EXCLUDED.expansion_mrr,
-        contraction_mrr = EXCLUDED.contraction_mrr,
-        churn_mrr = EXCLUDED.churn_mrr
+        ${updateClause}
     `, values)
   }
 }
 
-async function insertProcessedEventsPg(client: PgClient, movements: BackfillRevenueMovementEvent[]) {
+async function claimProcessedEventsPg(client: PgClient, movements: BackfillRevenueMovementEvent[]) {
+  const claimedEventIds = new Set<string>()
+
   for (const chunk of chunkArray(movements, DB_CHUNK_SIZE)) {
     if (chunk.length === 0)
       continue
@@ -880,7 +861,7 @@ async function insertProcessedEventsPg(client: PgClient, movements: BackfillReve
       return `($${offset + 1}, $${offset + 2}, $${offset + 3})`
     })
 
-    await client.query(`
+    const { rows } = await client.query<{ event_id: string }>(`
       INSERT INTO public.processed_stripe_events (
         event_id,
         customer_id,
@@ -888,8 +869,14 @@ async function insertProcessedEventsPg(client: PgClient, movements: BackfillReve
       )
       VALUES ${placeholders.join(', ')}
       ON CONFLICT (event_id) DO NOTHING
+      RETURNING event_id
     `, values)
+
+    for (const row of rows)
+      claimedEventIds.add(row.event_id)
   }
+
+  return movements.filter(movement => claimedEventIds.has(movement.event_id))
 }
 
 async function refreshGlobalRetentionMetricsPg(client: PgClient, dateIds: string[]): Promise<RefreshRetentionMetricsResult> {
@@ -949,15 +936,23 @@ async function refreshGlobalRetentionMetricsPg(client: PgClient, dateIds: string
   return { skippedMissingGlobalStats, updated }
 }
 
-async function applyBackfillTransaction(options: ApplyBackfillTransactionOptions) {
+async function applyBackfillTransaction(options: ApplyBackfillTransactionOptions): Promise<ApplyBackfillTransactionResult> {
   return withPgTransaction(options.databaseUrl, options.env, async (client) => {
     if (options.reset)
       await resetBackfillRangePg(client, options.fromDateId, options.toDateId, options.customerId)
 
-    await upsertDailyRevenueMetricsPg(client, options.mergedMetricRows)
-    const refreshResult = await refreshGlobalRetentionMetricsPg(client, options.retentionDates)
-    await insertProcessedEventsPg(client, options.movementsToApply)
-    return refreshResult
+    const movementsToApply = await claimProcessedEventsPg(client, options.movements)
+    const metricRowsToApply = aggregateRevenueMovementEvents(movementsToApply)
+    await upsertDailyRevenueMetricsPg(client, metricRowsToApply, options.reset ? 'exact' : 'additive')
+    const retentionDates = options.reset
+      ? options.retentionDates
+      : [...new Set(metricRowsToApply.map(row => row.date_id))].sort()
+    const refreshResult = await refreshGlobalRetentionMetricsPg(client, retentionDates)
+    return {
+      ...refreshResult,
+      metricRowsApplied: metricRowsToApply.length,
+      movementsApplied: movementsToApply.length,
+    }
   })
 }
 
@@ -1061,46 +1056,43 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
   printSummary('Detected revenue movements', movementSummary)
   console.log(`Skipped: ${JSON.stringify(skipped)}`)
 
-  let movementsToApply = movements
+  let previewMovementsToApply = movements
   if (!reset) {
     const existingEventIds = await fetchExistingProcessedEventIds(supabase, movements.map(movement => movement.event_id))
-    movementsToApply = movements.filter(movement => !existingEventIds.has(movement.event_id))
-    console.log(`Existing processed events skipped: ${movements.length - movementsToApply.length}`)
+    previewMovementsToApply = movements.filter(movement => !existingEventIds.has(movement.event_id))
+    console.log(`Existing processed events skipped: ${movements.length - previewMovementsToApply.length}`)
   }
 
-  const metricRowsToApply = aggregateRevenueMovementEvents(movementsToApply)
-  printSummary('Daily metrics to apply', summarizeDailyRevenueMetrics(metricRowsToApply))
+  const previewMetricRowsToApply = aggregateRevenueMovementEvents(previewMovementsToApply)
+  printSummary(apply ? 'Candidate daily metrics to apply' : 'Daily metrics to apply', summarizeDailyRevenueMetrics(previewMetricRowsToApply))
 
   if (!apply) {
     console.log('Sample metric rows:')
-    for (const row of metricRowsToApply.slice(0, 10))
+    for (const row of previewMetricRowsToApply.slice(0, 10))
       console.log(row)
     return
   }
 
-  const existingMetrics = reset
-    ? []
-    : await fetchExistingDailyRevenueMetrics(supabase, fromDateId, toDateId, customerId)
-  const mergedMetricRows = reset
-    ? metricRowsToApply
-    : mergeMetricRows(existingMetrics, metricRowsToApply)
   const retentionDates = reset
     ? getDateIdsBetween(fromDateId, toDateId)
-    : [...new Set(metricRowsToApply.map(row => row.date_id))].sort()
+    : []
 
   const failures: unknown[] = []
+  let appliedMovements = 0
+  let appliedMetricRows = 0
   try {
     const refreshResult = await applyBackfillTransaction({
       customerId,
       databaseUrl,
       env,
       fromDateId,
-      mergedMetricRows,
-      movementsToApply,
+      movements,
       reset,
       retentionDates,
       toDateId,
     })
+    appliedMovements = refreshResult.movementsApplied
+    appliedMetricRows = refreshResult.metricRowsApplied
     console.log(`Updated global_stats retention metrics for ${refreshResult.updated} dates`)
     if (refreshResult.skippedMissingGlobalStats.length > 0)
       console.log(`Skipped missing global_stats rows: ${refreshResult.skippedMissingGlobalStats.join(', ')}`)
@@ -1119,7 +1111,7 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
   if (failures.length > 0)
     throw new Error(`Retention metric backfill failed. Details written to ${FAILURE_OUTPUT}`)
 
-  console.log(`Done. Processed movements: ${movementsToApply.length}. Daily metric rows: ${mergedMetricRows.length}.`)
+  console.log(`Done. Processed movements: ${appliedMovements}. Daily metric rows: ${appliedMetricRows}.`)
 }
 
 if (import.meta.main)
