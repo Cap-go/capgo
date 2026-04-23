@@ -30,6 +30,7 @@ const DEFAULT_ENV_FILE = './internal/cloudflare/.env.prod'
 const DEFAULT_LOOKBACK_DAYS = 30
 const EVENT_FETCH_PAGE_SIZE = 100
 const DB_CHUNK_SIZE = 500
+const DB_PAGE_SIZE = 1000
 const FAILURE_OUTPUT = './tmp/retention_metric_backfill_failures.json'
 const DATE_ID_REGEX = /^\d{4}-\d{2}-\d{2}$/
 const SUBSCRIPTION_EVENT_TYPES = [
@@ -385,8 +386,10 @@ function getPreviousSubscriptionItems(event: Stripe.Event) {
 }
 
 function toBackfillStripeStatus(status: unknown): StripeStatus | null {
-  if (status === 'active' || status === 'trialing' || status === 'succeeded')
+  if (status === 'active' || status === 'trialing' || status === 'past_due' || status === 'unpaid' || status === 'succeeded')
     return 'succeeded'
+  if (status === 'incomplete' || status === 'incomplete_expired' || status === 'paused')
+    return 'created'
   if (status === 'created' || status === 'updated' || status === 'failed' || status === 'deleted' || status === 'canceled')
     return status
   return null
@@ -544,7 +547,7 @@ export function buildRevenueMovementEvents(
       nextState = buildTrackedState(customerId, subscriptionId, 'succeeded', currentPriceId, currentProductId, knownPaidAt ?? eventOccurredAtIso)
     }
     else if (event.type === 'customer.subscription.updated') {
-      const hasPreviousRevenueState = Boolean(trackedState || previousItem || previousStatusChange.hasStatus)
+      const hasPreviousRevenueState = Boolean(trackedState || previousItem || previousStatusChange.status)
       currentState = buildTrackedState(customerId, subscriptionId, previousMrr > 0 ? 'succeeded' : 'updated', previousPriceId, previousProductId, activePaidAt)
       nextState = buildTrackedState(customerId, subscriptionId, 'succeeded', currentPriceId, currentProductId, activePaidAt ?? eventOccurredAtIso)
       if (!hasPreviousRevenueState) {
@@ -742,20 +745,33 @@ async function fetchExistingDailyRevenueMetrics(
   toDateId: string,
   customerId?: string | null,
 ) {
-  let query = supabase
-    .from('daily_revenue_metrics')
-    .select('*')
-    .gte('date_id', fromDateId)
-    .lte('date_id', toDateId)
+  const rows: DailyRevenueMetricRow[] = []
+  let offset = 0
 
-  if (customerId)
-    query = query.eq('customer_id', customerId)
+  while (true) {
+    let query = supabase
+      .from('daily_revenue_metrics')
+      .select('*')
+      .gte('date_id', fromDateId)
+      .lte('date_id', toDateId)
+      .order('date_id', { ascending: true })
+      .order('customer_id', { ascending: true })
+      .range(offset, offset + DB_PAGE_SIZE - 1)
 
-  const { data, error } = await query
-  if (error)
-    throw error
+    if (customerId)
+      query = query.eq('customer_id', customerId)
 
-  return data ?? []
+    const { data, error } = await query
+    if (error)
+      throw error
+
+    rows.push(...(data ?? []))
+    if (!data || data.length < DB_PAGE_SIZE)
+      break
+    offset += DB_PAGE_SIZE
+  }
+
+  return rows
 }
 
 export function mergeMetricRows(existingRows: DailyRevenueMetricRow[], rowsToAdd: DailyRevenueMetricInsert[]) {

@@ -141,6 +141,20 @@ describe('retention metric backfill helpers', () => {
     expect(result.skipped.noMovement).toBe(1)
   })
 
+  it.concurrent('does not invent movement for first past due subscription updates', () => {
+    const result = buildRevenueMovementEvents([
+      subscriptionEvent('evt_past_due_update', 'customer.subscription.updated', 1774353600, 'cus_past_due', 'sub_past_due', 'price_solo_monthly', 'prod_solo', {
+        status: 'past_due',
+      }),
+    ], plans as any, {
+      fromDateId: '2026-03-24',
+      toDateId: '2026-03-24',
+    })
+
+    expect(result.movements).toHaveLength(0)
+    expect(result.skipped.noMovement).toBe(1)
+  })
+
   it.concurrent('builds churn metrics from deleted subscription events', () => {
     const result = buildRevenueMovementEvents([
       subscriptionEvent('evt_deleted', 'customer.subscription.deleted', 1774353600, 'cus_churned', 'sub_churned', 'price_team_yearly', 'prod_team'),
