@@ -11,11 +11,14 @@ import { getSupabaseWorktreeConfig } from './scripts/supabase-worktree-config'
  */
 // Keep local and CI Playwright runs headless so they do not steal window focus.
 const headless = true
+const isCi = !!env.CI
+const reuseExistingServer = !isCi
+const webServerTimeout = isCi ? 360_000 : 300_000
 
 const webServer: PlaywrightTestConfig['webServer'] = []
 const { ports: supabasePorts } = getSupabaseWorktreeConfig()
-const localSupabaseUrl = `http://localhost:${supabasePorts.api}`
-const localApiDomain = `localhost:${supabasePorts.api}/functions/v1`
+const localSupabaseUrl = `http://127.0.0.1:${supabasePorts.api}`
+const localApiDomain = `127.0.0.1:${supabasePorts.api}/functions/v1`
 const localSupabaseAnonKey = env.SUPABASE_ANON_KEY || 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH'
 const localStripeEmulatorPort = getStripeEmulatorPort(env)
 const localStripeApiBaseUrl = getPlaywrightStripeApiBaseUrl(env)
@@ -25,7 +28,7 @@ if (!env.SKIP_STRIPE_EMULATOR_START) {
     command: `STRIPE_EMULATOR_PORT=${localStripeEmulatorPort} bun run stripe:emulator`,
     port: localStripeEmulatorPort,
     timeout: 60_000,
-    reuseExistingServer: true,
+    reuseExistingServer,
     stdout: 'pipe',
   })
 }
@@ -37,8 +40,8 @@ if (!env.SKIP_BACKEND_START) {
   webServer.push({
     command: `ENV=local STRIPE_SECRET_KEY=sk_test_emulator STRIPE_API_BASE_URL=${localStripeApiBaseUrl} STRIPE_WEBHOOK_SECRET=testsecret WEBAPP_URL=http://localhost:5173 bun run backend:playwright`,
     url: `${localSupabaseUrl}/functions/v1/ok`,
-    timeout: 60_000,
-    reuseExistingServer: true,
+    timeout: webServerTimeout,
+    reuseExistingServer,
   })
 }
 else {
@@ -48,8 +51,8 @@ else {
 webServer.push({
   command: `ENV=local SUPA_URL=${localSupabaseUrl} SUPA_ANON=${localSupabaseAnonKey} API_DOMAIN=${localApiDomain} CAPTCHA_KEY='' bun run serve:local`,
   port: 5173,
-  timeout: 60_000,
-  reuseExistingServer: true,
+  timeout: webServerTimeout,
+  reuseExistingServer,
   stdout: 'pipe',
 })
 
@@ -59,13 +62,13 @@ webServer.push({
 export default defineConfig({
   testDir: './playwright/e2e',
   /* Run tests in files in parallel */
-  fullyParallel: true,
+  fullyParallel: !isCi,
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!env.CI,
   /* Never retry, the entire thing is stateful and retries will never succeed because of the modifications to supabase in the previous attempt */
   retries: 0,
   /* Opt out of parallel tests on CI. */
-  workers: os.cpus().length,
+  workers: isCi ? 1 : os.cpus().length,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
     ['list', { printSteps: true }],
