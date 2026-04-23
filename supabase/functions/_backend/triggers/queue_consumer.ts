@@ -74,12 +74,28 @@ function truncateDiscordField(value: string, maxLength = 1024): string {
   return `${value.slice(0, maxLength - 15)}... (truncated)`
 }
 
+function isAsciiLetterOrDigit(char: string): boolean {
+  if (!char)
+    return false
+  const code = char.charCodeAt(0)
+  return (code >= 48 && code <= 57)
+    || (code >= 65 && code <= 90)
+    || (code >= 97 && code <= 122)
+}
+
 function isEmailLocalChar(char: string): boolean {
-  return /[A-Za-z0-9._%+-]/.test(char)
+  return isAsciiLetterOrDigit(char)
+    || char === '.'
+    || char === '_'
+    || char === '%'
+    || char === '+'
+    || char === '-'
 }
 
 function isEmailDomainChar(char: string): boolean {
-  return /[A-Za-z0-9.-]/.test(char)
+  return isAsciiLetterOrDigit(char)
+    || char === '.'
+    || char === '-'
 }
 
 function isLikelyEmail(value: string): boolean {
