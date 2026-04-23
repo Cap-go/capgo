@@ -11,6 +11,7 @@ import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { logsnagInsights } from '../utils/logsnag.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
+import { calculateChurnRevenue, calculateNrr, getPreviousDateId } from '../utils/revenue_metrics.ts'
 import { countAllApps, countAllUpdates, countAllUpdatesExternal, getUpdateStats } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
@@ -61,11 +62,6 @@ interface PlanRevenue {
   plan_team_yearly: number
   plan_enterprise_monthly: number
   plan_enterprise_yearly: number
-}
-interface DailyRevenueChangeSummary {
-  churnMrr: number
-  contractionMrr: number
-  expansionMrr: number
 }
 interface RevenueRetentionMetrics {
   churnRevenue: number
@@ -147,28 +143,6 @@ function countUniqueCustomers(...rowSets: Array<Array<CustomerIdRow | null | und
       .filter((row): row is CustomerIdRow => Boolean(row?.customer_id))
       .map(row => row.customer_id),
   ).size
-}
-
-function getPreviousDateId(dateId: string) {
-  const target = new Date(`${dateId}T00:00:00.000Z`)
-  target.setUTCDate(target.getUTCDate() - 1)
-  return getDateId(target)
-}
-
-function calculateNrr(previousMrr: number, dailyChanges: DailyRevenueChangeSummary) {
-  if (previousMrr <= 0)
-    return 100
-
-  const retainedMrr = Math.max(
-    previousMrr - dailyChanges.churnMrr - dailyChanges.contractionMrr + dailyChanges.expansionMrr,
-    0,
-  )
-
-  return Number(((retainedMrr / previousMrr) * 100).toFixed(2))
-}
-
-function calculateChurnRevenue(dailyChanges: DailyRevenueChangeSummary) {
-  return Number((dailyChanges.churnMrr + dailyChanges.contractionMrr).toFixed(2))
 }
 
 function isMissingBuildMetricColumnError(error: unknown): boolean {
