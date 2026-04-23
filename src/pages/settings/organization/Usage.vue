@@ -10,6 +10,7 @@ import { toast } from 'vue-sonner'
 import CreditsCta from '~/components/CreditsCta.vue'
 import Spinner from '~/components/Spinner.vue'
 import { bytesToGb } from '~/services/conversion'
+import { formatUtcDateTimeAsLocal } from '~/services/date'
 import { calculateCreditCost, getCurrentPlanNameOrg, getPlans, getPlanUsagePercent, getTotalStorage, getUsageCreditDeductions } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -324,7 +325,7 @@ function lastRunDate() {
   if (!source)
     return `${t('last-run')}: ${t('unknown')}`
 
-  const lastRun = dayjs(source).format('MMMM D, YYYY HH:mm')
+  const lastRun = formatUtcDateTimeAsLocal(source) || t('unknown')
   return `${t('last-run')}: ${lastRun}`
 }
 function nextRunDate() {

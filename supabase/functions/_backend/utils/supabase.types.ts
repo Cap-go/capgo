@@ -270,6 +270,8 @@ export type Database = {
           need_onboarding: boolean
           owner_org: string
           retention: number
+          stats_refresh_requested_at: string | null
+          stats_updated_at: string | null
           transfer_history: Json[] | null
           updated_at: string | null
           user_id: string | null
@@ -293,6 +295,8 @@ export type Database = {
           need_onboarding?: boolean
           owner_org: string
           retention?: number
+          stats_refresh_requested_at?: string | null
+          stats_updated_at?: string | null
           transfer_history?: Json[] | null
           updated_at?: string | null
           user_id?: string | null
@@ -316,6 +320,8 @@ export type Database = {
           need_onboarding?: boolean
           owner_org?: string
           retention?: number
+          stats_refresh_requested_at?: string | null
+          stats_updated_at?: string | null
           transfer_history?: Json[] | null
           updated_at?: string | null
           user_id?: string | null
@@ -1136,6 +1142,63 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_revenue_metrics: {
+        Row: {
+          churn_mrr: number
+          contraction_mrr: number
+          created_at: string
+          customer_id: string
+          date_id: string
+          expansion_mrr: number
+          new_business_mrr: number
+          opening_mrr: number
+          updated_at: string
+        }
+        Insert: {
+          churn_mrr?: number
+          contraction_mrr?: number
+          created_at?: string
+          customer_id: string
+          date_id: string
+          expansion_mrr?: number
+          new_business_mrr?: number
+          opening_mrr?: number
+          updated_at?: string
+        }
+        Update: {
+          churn_mrr?: number
+          contraction_mrr?: number
+          created_at?: string
+          customer_id?: string
+          date_id?: string
+          expansion_mrr?: number
+          new_business_mrr?: number
+          opening_mrr?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      processed_stripe_events: {
+        Row: {
+          created_at: string
+          customer_id: string
+          date_id: string
+          event_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          date_id: string
+          event_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          date_id?: string
+          event_id?: string
+        }
+        Relationships: []
+      }
       global_stats: {
         Row: {
           apps: number
@@ -1157,6 +1220,7 @@ export type Database = {
           builds_total: number | null
           bundle_storage_gb: number
           canceled_orgs: number
+          churn_revenue: number
           created_at: string | null
           credits_bought: number
           credits_consumed: number
@@ -1168,6 +1232,7 @@ export type Database = {
           mrr: number
           need_upgrade: number | null
           new_paying_orgs: number
+          nrr: number
           not_paying: number | null
           onboarded: number | null
           org_conversion_rate: number
@@ -1224,6 +1289,7 @@ export type Database = {
           builds_total?: number | null
           bundle_storage_gb?: number
           canceled_orgs?: number
+          churn_revenue?: number
           created_at?: string | null
           credits_bought?: number
           credits_consumed?: number
@@ -1235,6 +1301,7 @@ export type Database = {
           mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
+          nrr?: number
           not_paying?: number | null
           onboarded?: number | null
           org_conversion_rate?: number
@@ -1291,6 +1358,7 @@ export type Database = {
           builds_total?: number | null
           bundle_storage_gb?: number
           canceled_orgs?: number
+          churn_revenue?: number
           created_at?: string | null
           credits_bought?: number
           credits_consumed?: number
@@ -1302,6 +1370,7 @@ export type Database = {
           mrr?: number
           need_upgrade?: number | null
           new_paying_orgs?: number
+          nrr?: number
           not_paying?: number | null
           onboarded?: number | null
           org_conversion_rate?: number
@@ -1625,6 +1694,7 @@ export type Database = {
           require_apikey_expiration: boolean
           required_encryption_key: string | null
           sso_enabled: boolean
+          stats_refresh_requested_at: string | null
           stats_updated_at: string | null
           updated_at: string | null
           use_new_rbac: boolean
@@ -1649,6 +1719,7 @@ export type Database = {
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
           sso_enabled?: boolean
+          stats_refresh_requested_at?: string | null
           stats_updated_at?: string | null
           updated_at?: string | null
           use_new_rbac?: boolean
@@ -1673,6 +1744,7 @@ export type Database = {
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
           sso_enabled?: boolean
+          stats_refresh_requested_at?: string | null
           stats_updated_at?: string | null
           updated_at?: string | null
           use_new_rbac?: boolean
@@ -2081,6 +2153,7 @@ export type Database = {
           customer_id: string
           id: number
           is_good_plan: boolean | null
+          last_stripe_event_at: string | null
           mau_exceeded: boolean | null
           paid_at: string | null
           plan_calculated_at: string | null
@@ -2105,6 +2178,7 @@ export type Database = {
           customer_id: string
           id?: number
           is_good_plan?: boolean | null
+          last_stripe_event_at?: string | null
           mau_exceeded?: boolean | null
           paid_at?: string | null
           plan_calculated_at?: string | null
@@ -2129,6 +2203,7 @@ export type Database = {
           customer_id?: string
           id?: number
           is_good_plan?: boolean | null
+          last_stripe_event_at?: string | null
           mau_exceeded?: boolean | null
           paid_at?: string | null
           plan_calculated_at?: string | null
@@ -3401,7 +3476,8 @@ export type Database = {
               required_encryption_key: string
               role: string
               sso_enabled: boolean
-              stats_updated_at: string
+              stats_refresh_requested_at: string | null
+              stats_updated_at: string | null
               subscription_end: string
               subscription_start: string
               trial_left: number
@@ -3438,7 +3514,8 @@ export type Database = {
               required_encryption_key: string
               role: string
               sso_enabled: boolean
-              stats_updated_at: string
+              stats_refresh_requested_at: string | null
+              stats_updated_at: string | null
               subscription_end: string
               subscription_start: string
               trial_left: number
@@ -3788,6 +3865,28 @@ export type Database = {
       queue_cron_stat_org_for_org: {
         Args: { customer_id: string; org_id: string }
         Returns: undefined
+      }
+      mark_app_stats_refreshed: {
+        Args: { p_app_id: string }
+        Returns: string | null
+      }
+      request_app_chart_refresh: {
+        Args: { app_id: string }
+        Returns: {
+          queued_app_ids: string[]
+          queued_count: number
+          requested_at: string | null
+          skipped_count: number
+        }[]
+      }
+      request_org_chart_refresh: {
+        Args: { org_id: string }
+        Returns: {
+          queued_app_ids: string[]
+          queued_count: number
+          requested_at: string | null
+          skipped_count: number
+        }[]
       }
       rbac_check_permission: {
         Args: {
