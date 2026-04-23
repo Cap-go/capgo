@@ -56,4 +56,51 @@ describe('queue_consumer legacy message compatibility', () => {
 
     expect(__queueConsumerTestUtils__.extractMessageBody(message!)).toEqual({})
   })
+
+  it.concurrent('does not alert Discord while failed messages still have retries left', () => {
+    expect(__queueConsumerTestUtils__.getActionableQueueFailures([
+      {
+        cf_id: 'cf-1',
+        function_name: 'on_version_update',
+        function_type: 'supabase',
+        msg_id: 1,
+        payload_size: 10,
+        read_count: 1,
+        status: 502,
+        status_text: 'Bad Gateway',
+      },
+    ])).toEqual([])
+  })
+
+  it.concurrent('alerts Discord after retry budget is exhausted', () => {
+    const failure = {
+      cf_id: 'cf-1',
+      error_code: 'internal_error',
+      function_name: 'on_version_update',
+      function_type: 'supabase',
+      msg_id: 1,
+      payload_size: 10,
+      read_count: 5,
+      status: 500,
+      status_text: 'Internal Server Error',
+    }
+
+    expect(__queueConsumerTestUtils__.getActionableQueueFailures([failure])).toEqual([failure])
+  })
+
+  it.concurrent('keeps ignored queue errors out of Discord after retries are exhausted', () => {
+    expect(__queueConsumerTestUtils__.getActionableQueueFailures([
+      {
+        cf_id: 'cf-1',
+        error_code: 'version_not_found',
+        function_name: 'on_version_update',
+        function_type: 'supabase',
+        msg_id: 1,
+        payload_size: 10,
+        read_count: 5,
+        status: 400,
+        status_text: 'Bad Request',
+      },
+    ])).toEqual([])
+  })
 })

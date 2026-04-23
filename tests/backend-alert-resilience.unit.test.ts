@@ -71,7 +71,7 @@ describe('backend alert resilience helpers', () => {
     expect(handler.fetch).toHaveBeenCalledTimes(2)
   })
 
-  it('does not retry retryable durable object resets for streaming upload bodies', async () => {
+  it('returns retryable response for streaming upload bodies when a durable object moves', async () => {
     const { filesTestUtils } = await import('../supabase/functions/_backend/files/files.ts')
 
     const handler = {
@@ -88,15 +88,22 @@ describe('backend alert resilience helpers', () => {
       )
     })
 
-    await expect(filesTestUtils.fetchUploadHandlerWithRetry(
+    const response = await filesTestUtils.fetchUploadHandlerWithRetry(
       createTestContext(),
       handler,
       new Request('http://localhost/files/upload/attachments/test.zip', {
         method: 'PATCH',
         body: 'chunk-data',
       }),
-    )).rejects.toThrow('cannot access storage because object has moved to a different machine')
+    )
 
+    expect(response.status).toBe(503)
+    expect(response.headers.get('Retry-After')).toBe('1')
+    expect(response.headers.get('Tus-Resumable')).toBe('1.0.0')
+    await expect(response.json()).resolves.toEqual({
+      error: 'upload_retryable',
+      message: 'Upload worker moved during this request. Retry the upload request.',
+    })
     expect(handler.fetch).toHaveBeenCalledTimes(1)
   })
 

@@ -101,6 +101,9 @@ export function onError(functionName: string) {
         moreInfo: res.moreInfo,
         stack: serializeError(e)?.stack ?? 'N/A',
       })
+      const suppressDiscordAlert = e.cause
+        && typeof e.cause === 'object'
+        && (e.cause as { suppressDiscordAlert?: unknown }).suppressDiscordAlert === true
       if (e.status === 429) {
         const rateLimitResetAt = typeof res.moreInfo?.rateLimitResetAt === 'number' ? res.moreInfo.rateLimitResetAt : undefined
         let retryAfterSeconds = typeof res.moreInfo?.retryAfterSeconds === 'number' ? res.moreInfo.retryAfterSeconds : undefined
@@ -115,7 +118,7 @@ export function onError(functionName: string) {
         }
         return c.json({ error: 'too_many_requests', message: 'You are being rate limited' }, e.status)
       }
-      if (e.status >= 500) {
+      if (e.status >= 500 && !suppressDiscordAlert) {
         await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
         void backgroundTask(c, capturePosthogException(c, {
           error: e,
