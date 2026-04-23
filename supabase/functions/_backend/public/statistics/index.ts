@@ -7,7 +7,7 @@ import { honoFactory, quickError, simpleError, useCors } from '../../utils/hono.
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
 import { cloudlog } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
-import { retryWithBackoff } from '../../utils/retry.ts'
+import { getRetryablePostgrestStatus, isRetryablePostgrestError, isRetryablePostgrestResult, retryWithBackoff } from '../../utils/retry.ts'
 import { supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
 import { isStripeConfigured } from '../../utils/utils.ts'
 import { buildDailyReportedCountsByName, convertCountsToPercentagesByName, fillMissingDailyCounts } from '../../utils/version_stats_helpers.ts'
@@ -78,24 +78,8 @@ function getAuthenticatedSupabase(c: Context, auth: AuthInfo) {
   return supabaseClient(c, authorization)
 }
 
-function getRetryableStatus(error: unknown): number | null {
-  if (error && typeof error === 'object') {
-    if ('status' in error && typeof (error as { status?: unknown }).status === 'number')
-      return (error as { status: number }).status
-
-    if ('message' in error && typeof (error as { message?: unknown }).message === 'string') {
-      const match = /error code:\s*(\d{3})/i.exec((error as { message: string }).message)
-      if (match)
-        return Number.parseInt(match[1], 10)
-    }
-  }
-
-  return null
-}
-
 function isRetryableStatsError(error: unknown) {
-  const status = getRetryableStatus(error)
-  return status !== null && status >= 500 && status < 600
+  return isRetryablePostgrestError(error)
 }
 
 function getMissingAppStatsError(errors: unknown[]) {
@@ -110,10 +94,7 @@ function getMissingAppStatsError(errors: unknown[]) {
 }
 
 function isRetryableStatsResult(result: QueryResult<unknown>) {
-  if (typeof result.status === 'number')
-    return result.status >= 500 && result.status < 600
-
-  return Boolean(result.error) && isRetryableStatsError(result.error)
+  return isRetryablePostgrestResult(result)
 }
 
 async function executeStatsQueryWithRetry<T>(
@@ -195,7 +176,7 @@ async function getStatsAppOwnerOrgOrThrow(
 export const statisticsTestUtils = {
   executeStatsQueryWithRetry,
   getMissingAppStatsError,
-  getRetryableStatus,
+  getRetryableStatus: getRetryablePostgrestStatus,
   isRetryableStatsError,
   getStatsAppOwnerOrgOrThrow,
   resolveAppOwnerOrg,

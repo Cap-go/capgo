@@ -5,7 +5,7 @@ import { BRES, middlewareAPISecret, parseBody, simpleError } from '../utils/hono
 import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { syncSubscriptionAndEvents } from '../utils/plans.ts'
-import { retryWithBackoff } from '../utils/retry.ts'
+import { getRetryablePostgrestStatus, isRetryablePostgrestError, retryWithBackoff } from '../utils/retry.ts'
 
 interface OrgToGet {
   orgId?: string
@@ -19,18 +19,7 @@ function getRetryableStatus(error: unknown): number | null {
   if (error instanceof HTTPException)
     return error.status
 
-  if (error && typeof error === 'object') {
-    if ('status' in error && typeof (error as { status?: unknown }).status === 'number')
-      return (error as { status: number }).status
-
-    if ('message' in error && typeof (error as { message?: unknown }).message === 'string') {
-      const match = /error code:\s*(\d{3})/i.exec((error as { message: string }).message)
-      if (match)
-        return Number.parseInt(match[1], 10)
-    }
-  }
-
-  return null
+  return getRetryablePostgrestStatus(error)
 }
 
 function getErrorCode(error: unknown): string | null {
@@ -45,8 +34,7 @@ function getErrorCode(error: unknown): string | null {
 }
 
 function isRetryableCronSyncError(error: unknown): boolean {
-  const status = getRetryableStatus(error)
-  return status !== null && status >= 500 && status < 600
+  return isRetryablePostgrestError(error)
 }
 
 function isMissingOrgError(error: unknown): boolean {
