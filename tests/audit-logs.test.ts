@@ -114,19 +114,16 @@ beforeAll(async () => {
   if (appError)
     throw appError
 
-  const apiKeyResponse = await fetchWithRetry(`${BASE_URL}/apikey`, {
-    method: 'POST',
-    headers: authHeaders,
-    body: JSON.stringify({
-      name: `audit-api-key-${globalId}`,
-      mode: 'all',
-      limited_to_orgs: [ORG_ID],
-      limited_to_apps: [APIKEY_AUDIT_APP_ID],
-    }),
+  const { data: apiKeyData, error: apiKeyError } = await getSupabaseClient().rpc('create_hashed_apikey_for_user', {
+    p_user_id: USER_ID,
+    p_mode: 'all',
+    p_name: `audit-api-key-${globalId}`,
+    p_limited_to_orgs: [ORG_ID],
+    p_limited_to_apps: [APIKEY_AUDIT_APP_ID],
+    p_expires_at: null as unknown as string,
   })
-  const apiKeyData = await apiKeyResponse.json() as { id?: number, key?: string, error?: string }
-  if (apiKeyResponse.status !== 200 || !apiKeyData.id || !apiKeyData.key) {
-    throw new Error(`Failed to create isolated audit API key: ${JSON.stringify(apiKeyData)}`)
+  if (apiKeyError || !apiKeyData?.id || !apiKeyData.key) {
+    throw new Error(`Failed to create isolated audit API key: ${apiKeyError?.message ?? 'missing key data'}`)
   }
 
   apiKeyId = apiKeyData.id
