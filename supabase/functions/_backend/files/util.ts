@@ -42,6 +42,7 @@ export const MAX_CHUNK_SIZE_BYTES = 1024 * 1024 * 99 // 99MB
 export const ALERT_UPLOAD_SIZE_BYTES = 1024 * 1024 * 20 // 20MB
 
 export const X_CHECKSUM_SHA256 = 'X-Checksum-Sha256'
+export const X_UPLOAD_HANDLER_RETRYABLE = 'X-Capgo-DO-Retryable'
 export const NO_TRANSFORM_CACHE_CONTROL = 'no-transform'
 
 // how long an unfinished upload lives in ms
@@ -101,6 +102,31 @@ export function toBase64(v: Uint8Array | ArrayBuffer): string {
   else {
     return Buffer.from(v).toString('base64')
   }
+}
+
+function getErrorMessage(error: unknown): string {
+  if (!error || typeof error !== 'object' || !('message' in error)) {
+    return ''
+  }
+
+  const { message } = error as { message?: unknown }
+  return typeof message === 'string' ? message.toLowerCase() : ''
+}
+
+export function isRetryableDurableObjectResetError(error: unknown): boolean {
+  if (error && typeof error === 'object') {
+    const candidate = error as { retryable?: boolean, durableObjectReset?: boolean, overloaded?: boolean }
+    if (candidate.retryable || candidate.durableObjectReset || candidate.overloaded) {
+      return true
+    }
+  }
+
+  const message = getErrorMessage(error)
+  return [
+    'moved to a different machine',
+    'storage operation exceeded timeout',
+    'caused object to be reset',
+  ].some(fragment => message.includes(fragment))
 }
 
 // Parse binary data from a base64 string
