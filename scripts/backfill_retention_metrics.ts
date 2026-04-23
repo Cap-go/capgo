@@ -402,10 +402,11 @@ function getLicensedSubscriptionItem(items: Stripe.SubscriptionItem[] | undefine
   if (licensedItem)
     return licensedItem
 
-  if (items?.length)
-    console.warn(`No licensed subscription item found; ignoring ${items.length} subscription item(s). First item usage_type=${items[0]?.plan?.usage_type ?? 'unknown'}`)
+  const fallbackItem = items?.[0] ?? null
+  if (fallbackItem)
+    console.warn(`No licensed subscription item found; falling back to the first subscription item (usage_type=${fallbackItem.plan?.usage_type ?? 'unknown'})`)
 
-  return null
+  return fallbackItem
 }
 
 function getItemPriceId(item: Stripe.SubscriptionItem | null | undefined) {

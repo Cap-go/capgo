@@ -19,13 +19,13 @@ const plans = [
   },
 ] as const
 
-function subscriptionItem(priceId: string, productId: string, currentPeriodEnd?: number) {
+function subscriptionItem(priceId: string, productId: string, currentPeriodEnd?: number, usageType = 'licensed') {
   return {
     current_period_end: currentPeriodEnd,
     plan: {
       id: priceId,
       product: productId,
-      usage_type: 'licensed',
+      usage_type: usageType,
     },
   } as Stripe.SubscriptionItem
 }
@@ -155,6 +155,36 @@ describe('retention metric backfill helpers', () => {
 
     expect(result.movements).toHaveLength(0)
     expect(result.skipped.noMovement).toBe(1)
+  })
+
+  it.concurrent('falls back to the first subscription item when no licensed item is present', () => {
+    const result = buildRevenueMovementEvents([
+      {
+        id: 'evt_metered_fallback',
+        type: 'customer.subscription.created',
+        created: 1774353600,
+        data: {
+          object: {
+            id: 'sub_metered',
+            object: 'subscription',
+            customer: 'cus_metered',
+            items: {
+              data: [subscriptionItem('price_solo_monthly', 'prod_solo', undefined, 'metered')],
+            },
+          },
+        },
+      } as Stripe.Event,
+    ], plans as any, {
+      fromDateId: '2026-03-24',
+      toDateId: '2026-03-24',
+    })
+
+    expect(result.movements).toHaveLength(1)
+    expect(result.movements[0]).toMatchObject({
+      event_id: 'evt_metered_fallback',
+      new_business_mrr: 12,
+    })
+    expect(result.skipped.missingPlan).toBe(0)
   })
 
   it.concurrent('builds churn metrics from deleted subscription events', () => {
