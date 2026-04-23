@@ -74,9 +74,66 @@ function truncateDiscordField(value: string, maxLength = 1024): string {
   return `${value.slice(0, maxLength - 15)}... (truncated)`
 }
 
+function isEmailLocalChar(char: string): boolean {
+  return /[A-Za-z0-9._%+-]/.test(char)
+}
+
+function isEmailDomainChar(char: string): boolean {
+  return /[A-Za-z0-9.-]/.test(char)
+}
+
+function isLikelyEmail(value: string): boolean {
+  const atIndex = value.indexOf('@')
+  if (atIndex <= 0 || atIndex !== value.lastIndexOf('@') || atIndex === value.length - 1)
+    return false
+
+  const domainPart = value.slice(atIndex + 1)
+  const lastDotIndex = domainPart.lastIndexOf('.')
+  if (lastDotIndex <= 0 || lastDotIndex === domainPart.length - 1)
+    return false
+
+  const tld = domainPart.slice(lastDotIndex + 1)
+  return tld.length >= 2
+}
+
+function redactEmailLikeSubstrings(value: string): string {
+  let result = ''
+  let cursor = 0
+  let searchIndex = 0
+
+  while (searchIndex < value.length) {
+    const atIndex = value.indexOf('@', searchIndex)
+    if (atIndex === -1)
+      break
+
+    let start = atIndex
+    while (start > cursor && isEmailLocalChar(value[start - 1]))
+      start--
+
+    let end = atIndex + 1
+    while (end < value.length && isEmailDomainChar(value[end]))
+      end++
+
+    const candidate = value.slice(start, end)
+    if (isLikelyEmail(candidate)) {
+      result += value.slice(cursor, start)
+      result += '[REDACTED_EMAIL]'
+      cursor = end
+      searchIndex = end
+      continue
+    }
+
+    searchIndex = atIndex + 1
+  }
+
+  if (cursor === 0)
+    return value
+
+  return `${result}${value.slice(cursor)}`
+}
+
 function sanitizeDiscordResponseBody(value: string): string {
-  return value
-    .replace(/[\w.%+-]+@[\w.-]+\.[A-Z]{2,}/gi, '[REDACTED_EMAIL]')
+  return redactEmailLikeSubstrings(value)
     .replace(/\b(Bearer\s+)[\w.~+/-]+=*/gi, '$1[REDACTED_TOKEN]')
     .replace(/((?:api[-_]?key|token|authorization|password|secret|access[-_]?token|refresh[-_]?token)["']?\s*[:=]\s*["']?)([^"',\s}]+)/gi, '$1[REDACTED]')
     .replace(/\b[\dA-F]{32,}\b/gi, '[REDACTED_TOKEN]')
