@@ -155,6 +155,20 @@ async function recoverUploadOffsetFromDurableObject(
   }
 }
 
+function retryableUploadUnavailableResponse(): Response {
+  return new Response(JSON.stringify({
+    error: 'upload_retryable',
+    message: 'Upload worker moved during this request. Retry the upload request.',
+  }), {
+    status: 503,
+    headers: {
+      'Content-Type': 'application/json',
+      'Retry-After': '1',
+      'Tus-Resumable': TUS_VERSION,
+    },
+  })
+}
+
 async function fetchUploadHandlerWithRetry(
   c: Context,
   handler: DurableObjectStub,
@@ -201,9 +215,10 @@ async function fetchUploadHandlerWithRetry(
     }
     catch (error) {
       lastError = error
+      const isRetryableDurableObjectError = isRetryableDurableObjectFetchError(error)
       const shouldRetry = canRetryRequest
         && attempt < maxAttempts
-        && isRetryableDurableObjectFetchError(error)
+        && isRetryableDurableObjectError
 
       cloudlogErr({
         requestId: c.get('requestId'),
@@ -217,6 +232,15 @@ async function fetchUploadHandlerWithRetry(
       })
 
       if (!shouldRetry) {
+        if (!canRetryRequest && isRetryableDurableObjectError) {
+          cloudlog({
+            requestId: c.get('requestId'),
+            message: 'upload handler - durable object fetch failed for streaming request, returning retryable response',
+            attempt,
+            fileId: c.get('fileId'),
+          })
+          return retryableUploadUnavailableResponse()
+        }
         throw error
       }
 
@@ -378,7 +402,7 @@ async function getHandler(c: Context): Promise<Response> {
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getHandler files get failed', fileId, error })
-    throw quickError(503, 'upstream_unavailable', 'File storage temporarily unavailable', { fileId })
+    throw quickError(503, 'upstream_unavailable', 'File storage temporarily unavailable', { fileId }, error, { alert: false })
   }
   if (object == null) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files object is null' })
@@ -878,4 +902,5 @@ app.route('/ok', ok)
 export const filesTestUtils = {
   fetchUploadHandlerWithRetry,
   isRetryableDurableObjectFetchError,
+  retryableUploadUnavailableResponse,
 }

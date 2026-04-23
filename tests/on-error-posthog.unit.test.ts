@@ -95,6 +95,33 @@ describe('onError PostHog capture', () => {
     })
   })
 
+  it('skips crash reporting for expected operational HTTP exceptions', async () => {
+    const { onError } = await import('../supabase/functions/_backend/utils/on_error.ts')
+
+    const error = new HTTPException(503, {
+      cause: {
+        error: 'service_unavailable',
+        message: 'Build service unavailable',
+        moreInfo: {},
+        suppressDiscordAlert: true,
+      },
+    })
+
+    const response = await onError('api')(error, createContext())
+
+    expect(backgroundTaskMock).not.toHaveBeenCalled()
+    expect(sendDiscordAlert500Mock).not.toHaveBeenCalled()
+    expect(capturePosthogExceptionMock).not.toHaveBeenCalled()
+    expect(response).toEqual({
+      body: {
+        error: 'service_unavailable',
+        message: 'Build service unavailable',
+        moreInfo: {},
+      },
+      status: 503,
+    })
+  })
+
   it('skips PostHog capture for client HTTP exceptions', async () => {
     const { onError } = await import('../supabase/functions/_backend/utils/on_error.ts')
 

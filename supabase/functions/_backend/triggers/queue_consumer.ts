@@ -11,6 +11,7 @@ import { backgroundTask, getEnv } from '../utils/utils.ts'
 
 // Define constants
 const DEFAULT_BATCH_SIZE = 950 // Default batch size for queue reads limit of CF is 1000 fetches so we take a safe margin
+export const MAX_QUEUE_READS = 5
 const DISCORD_IGNORED_ERROR_CODES = new Set(['version_not_found', 'no_channel'])
 
 // Zod schema for a message object
@@ -37,12 +38,122 @@ interface Message {
 
 export const messagesArraySchema = z.array(messageSchema)
 
+interface FailureDetail {
+  function_name: string
+  function_type: string
+  msg_id: number
+  read_count: number
+  status: number
+  status_text: string
+  error_code?: string
+  error_message?: string
+  response_body?: string
+  payload_size: number
+  cf_id: string
+}
+
 function extractMessageBody(message: Message): Record<string, unknown> {
   if (message.message?.payload !== undefined)
     return (message.message.payload ?? {}) as Record<string, unknown>
 
   const { function_name: _functionName, function_type: _functionType, ...legacyBody } = message.message ?? {}
   return legacyBody
+}
+
+function getActionableQueueFailures(failureDetails: FailureDetail[]): FailureDetail[] {
+  return failureDetails.filter((detail) => {
+    if (detail.read_count < MAX_QUEUE_READS)
+      return false
+    return !detail.error_code || !DISCORD_IGNORED_ERROR_CODES.has(detail.error_code)
+  })
+}
+
+function truncateDiscordField(value: string, maxLength = 1024): string {
+  if (value.length <= maxLength)
+    return value
+  return `${value.slice(0, maxLength - 15)}... (truncated)`
+}
+
+function isAsciiLetterOrDigit(char: string): boolean {
+  if (!char)
+    return false
+  const code = char.charCodeAt(0)
+  return (code >= 48 && code <= 57)
+    || (code >= 65 && code <= 90)
+    || (code >= 97 && code <= 122)
+}
+
+function isEmailLocalChar(char: string): boolean {
+  return isAsciiLetterOrDigit(char)
+    || char === '.'
+    || char === '_'
+    || char === '%'
+    || char === '+'
+    || char === '-'
+}
+
+function isEmailDomainChar(char: string): boolean {
+  return isAsciiLetterOrDigit(char)
+    || char === '.'
+    || char === '-'
+}
+
+function isLikelyEmail(value: string): boolean {
+  const atIndex = value.indexOf('@')
+  if (atIndex <= 0 || atIndex !== value.lastIndexOf('@') || atIndex === value.length - 1)
+    return false
+
+  const domainPart = value.slice(atIndex + 1)
+  const lastDotIndex = domainPart.lastIndexOf('.')
+  if (lastDotIndex <= 0 || lastDotIndex === domainPart.length - 1)
+    return false
+
+  const tld = domainPart.slice(lastDotIndex + 1)
+  return tld.length >= 2
+}
+
+function redactEmailLikeSubstrings(value: string): string {
+  let result = ''
+  let cursor = 0
+  let searchIndex = 0
+
+  while (searchIndex < value.length) {
+    const atIndex = value.indexOf('@', searchIndex)
+    if (atIndex === -1)
+      break
+
+    let start = atIndex
+    while (start > cursor && isEmailLocalChar(value[start - 1]))
+      start--
+
+    let end = atIndex + 1
+    while (end < value.length && isEmailDomainChar(value[end]))
+      end++
+
+    const candidate = value.slice(start, end)
+    if (isLikelyEmail(candidate)) {
+      result += value.slice(cursor, start)
+      result += '[REDACTED_EMAIL]'
+      cursor = end
+      searchIndex = end
+      continue
+    }
+
+    searchIndex = atIndex + 1
+  }
+
+  if (cursor === 0)
+    return value
+
+  return `${result}${value.slice(cursor)}`
+}
+
+function sanitizeDiscordResponseBody(value: string): string {
+  return redactEmailLikeSubstrings(value)
+    .replace(/\b(Bearer\s+)[\w.~+/-]+=*/gi, '$1[REDACTED_TOKEN]')
+    .replace(/((?:api[-_]?key|token|authorization|password|secret|access[-_]?token|refresh[-_]?token)["']?\s*[:=]\s*["']?)([^"',\s}]+)/gi, '$1[REDACTED]')
+    .replace(/\b[\dA-F]{32,}\b/gi, '[REDACTED_TOKEN]')
+    .replace(/\b[\w+/=-]{40,}\b/g, '[REDACTED_TOKEN]')
 }
 
 // Helper function to generate UUID v4
@@ -85,12 +196,13 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
     }
     const cfId = generateUUID()
     const httpResponse = await http_post_helper(c, function_name, function_type, body, cfId)
-    const errorCode = await extractErrorCode(httpResponse)
+    const errorDetails = await extractErrorDetails(httpResponse)
 
     return {
       httpResponse,
-      errorCode,
+      errorDetails,
       cfId,
+      payloadSize: JSON.stringify(body).length,
       ...message,
     }
   }))
@@ -128,12 +240,14 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
       read_count: msg.read_ct,
       status: msg.httpResponse.status,
       status_text: msg.httpResponse.statusText,
-      error_code: msg.errorCode ?? undefined,
-      payload_size: msg.message?.payload ? JSON.stringify(msg.message.payload).length : 0,
+      error_code: msg.errorDetails.errorCode ?? undefined,
+      error_message: msg.errorDetails.errorMessage ?? undefined,
+      response_body: msg.errorDetails.bodyPreview ?? undefined,
+      payload_size: msg.payloadSize,
       cf_id: msg.cfId,
     }))
 
-    const actionableFailures = failureDetails.filter(detail => !detail.error_code || !DISCORD_IGNORED_ERROR_CODES.has(detail.error_code))
+    const actionableFailures = getActionableQueueFailures(failureDetails)
 
     const groupedByFunction = actionableFailures.reduce((acc, detail) => {
       const key = detail.function_name
@@ -163,10 +277,12 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
               },
               {
                 name: '🔍 Detailed Failures',
-                value: actionableFailures.slice(0, 10).map((detail) => {
+                value: truncateDiscordField(actionableFailures.slice(0, 10).map((detail) => {
                   const cfLogUrl = `https://dash.cloudflare.com/${getEnv(c, 'CF_ACCOUNT_ANALYTICS_ID')}/workers/services/view/capgo_api-prod/production/observability/logs?workers-observability-view=%22invocations%22&filters=%5B%7B%22key%22%3A%22%24workers.event.request.headers.x-capgo-cf-id%22%2C%22type%22%3A%22string%22%2C%22value%22%3A%22${detail.cf_id}%22%2C%22operation%22%3A%22eq%22%7D%5D`
-                  return `**${detail.function_name}** | Status: ${detail.status} | Read: ${detail.read_count}/5 | [CF Logs](${cfLogUrl})`
-                }).join('\n'),
+                  const errorInfo = detail.error_code ? ` | Error: ${detail.error_code}` : ''
+                  const messageInfo = detail.error_message ? ` | ${truncateDiscordField(detail.error_message.replace(/\s+/g, ' ').trim(), 180)}` : ''
+                  return `**${detail.function_name}** | Status: ${detail.status} | Read: ${detail.read_count}/${MAX_QUEUE_READS}${errorInfo}${messageInfo} | [CF Logs](${cfLogUrl})`
+                }).join('\n')),
                 inline: false,
               },
               {
@@ -181,13 +297,20 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
               },
               {
                 name: '⚠️ Retry Analysis',
-                value: `**Will Retry:** ${actionableFailures.filter(d => d.read_count < 5).length}\n**Will Archive:** ${actionableFailures.filter(d => d.read_count >= 5).length}`,
+                value: `**Retry Budget Exhausted:** ${actionableFailures.length}\n**Will Archive:** ${actionableFailures.length}`,
                 inline: true,
               },
               {
                 name: '📦 Payload Info',
                 value: `**Avg Size:** ${Math.round(actionableFailures.reduce((sum, d) => sum + d.payload_size, 0) / actionableFailures.length)} bytes\n**Max Size:** ${Math.max(...actionableFailures.map(d => d.payload_size))} bytes`,
                 inline: true,
+              },
+              {
+                name: '🧾 Sanitized Response Body',
+                value: truncateDiscordField(actionableFailures
+                  .map(detail => detail.response_body ? `**${detail.function_name}:** ${sanitizeDiscordResponseBody(detail.response_body)}` : `**${detail.function_name}:** (empty)`)
+                  .join('\n')),
+                inline: false,
               },
             ],
             footer: {
@@ -198,7 +321,12 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
       })
     }
     else {
-      cloudlog({ requestId: c.get('requestId'), message: `[${queueName}] Suppressed Discord alert for ignored error codes.`, ignoredErrors: Array.from(DISCORD_IGNORED_ERROR_CODES) })
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: `[${queueName}] Suppressed Discord alert for retryable or ignored queue failures.`,
+        retryingFailures: failureDetails.filter(detail => detail.read_count < MAX_QUEUE_READS).length,
+        ignoredErrors: Array.from(DISCORD_IGNORED_ERROR_CODES),
+      })
     }
     // set visibility timeout to random number to prevent Auto DDOS
   }
@@ -211,19 +339,31 @@ async function processQueue(c: Context, db: ReturnType<typeof getPgClient>, queu
   }
 }
 
-async function extractErrorCode(response: Response): Promise<string | null> {
+async function extractErrorDetails(response: Response): Promise<{
+  errorCode: string | null
+  errorMessage: string | null
+  bodyPreview: string | null
+}> {
   if (response.status < 400) {
-    return null
+    return {
+      bodyPreview: null,
+      errorCode: null,
+      errorMessage: null,
+    }
   }
   const cloned = response.clone()
   const contentType = cloned.headers.get('content-type') ?? ''
   let payload: any = null
+  let bodyPreview: string | null = null
   try {
     if (contentType.includes('application/json')) {
-      payload = await cloned.json()
+      const text = await cloned.text()
+      bodyPreview = text.slice(0, 500)
+      payload = text ? JSON.parse(text) : null
     }
     else {
       const text = await cloned.text()
+      bodyPreview = text ? text.slice(0, 500) : null
       if (text) {
         try {
           payload = JSON.parse(text)
@@ -239,11 +379,18 @@ async function extractErrorCode(response: Response): Promise<string | null> {
   }
   if (payload && typeof payload === 'object') {
     const errorCode = payload.error ?? payload.errorCode
-    if (typeof errorCode === 'string') {
-      return errorCode
+    const errorMessage = payload.message ?? payload.errorMessage
+    return {
+      bodyPreview,
+      errorCode: typeof errorCode === 'string' ? errorCode : null,
+      errorMessage: typeof errorMessage === 'string' ? errorMessage : null,
     }
   }
-  return null
+  return {
+    bodyPreview,
+    errorCode: null,
+    errorMessage: null,
+  }
 }
 
 // Reads messages from the queue and logs them
@@ -475,5 +622,8 @@ app.post('/sync', async (c) => {
 })
 
 export const __queueConsumerTestUtils__ = {
+  extractErrorDetails,
   extractMessageBody,
+  getActionableQueueFailures,
+  sanitizeDiscordResponseBody,
 }
