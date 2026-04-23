@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { getEndpointUrl, getSupabaseClient, headers, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { getEndpointUrl, getSupabaseClient, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const globalId = randomUUID()
 const numericGlobalId = Number.parseInt(globalId.replaceAll('-', '').slice(0, 12), 16)
@@ -11,6 +11,8 @@ const WEBHOOKS_TEST_URL = getEndpointUrl('/webhooks/test')
 const WEBHOOKS_RETRY_URL = getEndpointUrl('/webhooks/deliveries/retry')
 const legacyApiKeySeedId = numericGlobalId * 2
 const expiringSubkeySeedId = legacyApiKeySeedId + 1
+const seededWebhookId = randomUUID()
+const seededDeliveryId = randomUUID()
 
 let legacyApiKeyId: number | null = null
 let legacyApiKeyValue: string | null = null
@@ -68,31 +70,40 @@ beforeAll(async () => {
   legacyApiKeyId = legacyKeyData.id
   legacyApiKeyValue = legacyKeyData.key
 
-  const webhookResponse = await fetch(WEBHOOKS_URL, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      orgId: policyOrgId,
-      name: `policy-webhook-${globalId}`,
-      url: 'https://example.com/webhook-policy',
-      events: ['orgs'],
-    }),
+  // Seed preconditions directly so policy tests do not depend on webhook delivery side effects.
+  const { error: webhookError } = await (supabase as any).from('webhooks').insert({
+    id: seededWebhookId,
+    org_id: policyOrgId,
+    name: `policy-webhook-${globalId}`,
+    url: 'https://example.com/webhook-policy',
+    events: ['orgs'],
+    enabled: true,
+    created_by: USER_ID,
   })
-  expect(webhookResponse.status).toBe(201)
-  const webhookData = await webhookResponse.json() as { webhook: { id: string } }
-  createdWebhookId = webhookData.webhook.id
+  if (webhookError)
+    throw webhookError
+  createdWebhookId = seededWebhookId
 
-  const testWebhookResponse = await fetch(WEBHOOKS_TEST_URL, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      orgId: policyOrgId,
-      webhookId: createdWebhookId,
-    }),
+  const { error: deliveryError } = await (supabase as any).from('webhook_deliveries').insert({
+    id: seededDeliveryId,
+    webhook_id: seededWebhookId,
+    org_id: policyOrgId,
+    event_type: 'orgs.TEST',
+    status: 'failed',
+    request_payload: {
+      event_id: seededDeliveryId,
+      event_type: 'orgs.TEST',
+      org_id: policyOrgId,
+      data: { test: true },
+    },
+    response_status: 500,
+    response_body: 'seeded test delivery',
+    attempt_count: 1,
+    max_attempts: 3,
   })
-  expect(testWebhookResponse.status).toBe(200)
-  const testWebhookData = await testWebhookResponse.json() as { delivery_id: string }
-  createdDeliveryId = testWebhookData.delivery_id
+  if (deliveryError)
+    throw deliveryError
+  createdDeliveryId = seededDeliveryId
 
   const { error: policyError } = await supabase.from('orgs').update({
     require_apikey_expiration: true,
