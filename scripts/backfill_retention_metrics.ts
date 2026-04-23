@@ -109,6 +109,7 @@ interface RefreshRetentionMetricsResult {
 interface ApplyBackfillTransactionOptions {
   customerId?: string | null
   databaseUrl: string
+  env: Record<string, string | undefined>
   fromDateId: string
   mergedMetricRows: DailyRevenueMetricInsert[]
   movementsToApply: BackfillRevenueMovementEvent[]
@@ -183,12 +184,18 @@ function getDatabaseUrl(env: Record<string, string | undefined>) {
     || null
 }
 
-function createPgClient(databaseUrl: string) {
+function shouldAllowSelfSignedPgCertificate(env: Record<string, string | undefined>) {
+  return env.PG_ALLOW_SELF_SIGNED_CERT?.trim() === 'true' || env.PG_SSL_REJECT_UNAUTHORIZED?.trim() === '0'
+}
+
+function createPgClient(databaseUrl: string, env: Record<string, string | undefined>) {
   const host = new URL(databaseUrl).hostname
   const usesLocalDatabase = host === 'localhost' || host === '127.0.0.1' || host === '::1'
   return new PgClient({
     connectionString: databaseUrl,
-    ssl: usesLocalDatabase ? false : { rejectUnauthorized: false },
+    // Keep certificate validation on by default; disable it only for managed
+    // poolers that require self-signed certs and are explicitly opted in.
+    ssl: usesLocalDatabase ? false : { rejectUnauthorized: !shouldAllowSelfSignedPgCertificate(env) },
   })
 }
 
@@ -396,10 +403,7 @@ function getPreviousSubscriptionStatus(event: Stripe.Event) {
   }
 }
 
-function toRevenueState(state: TrackedSubscriptionState | StripeInfoRevenueState): StripeInfoRevenueState {
-  if (!state)
-    return state
-
+function toRevenueState(state: TrackedSubscriptionState): NonNullable<StripeInfoRevenueState> {
   return {
     is_good_plan: state.is_good_plan,
     paid_at: state.paid_at,
@@ -774,8 +778,8 @@ export function mergeMetricRows(existingRows: DailyRevenueMetricRow[], rowsToAdd
   })
 }
 
-async function withPgTransaction<T>(databaseUrl: string, action: (client: PgClient) => Promise<T>) {
-  const client = createPgClient(databaseUrl)
+async function withPgTransaction<T>(databaseUrl: string, env: Record<string, string | undefined>, action: (client: PgClient) => Promise<T>) {
+  const client = createPgClient(databaseUrl, env)
   await client.connect()
 
   try {
@@ -930,7 +934,7 @@ async function refreshGlobalRetentionMetricsPg(client: PgClient, dateIds: string
 }
 
 async function applyBackfillTransaction(options: ApplyBackfillTransactionOptions) {
-  return withPgTransaction(options.databaseUrl, async (client) => {
+  return withPgTransaction(options.databaseUrl, options.env, async (client) => {
     if (options.reset)
       await resetBackfillRangePg(client, options.fromDateId, options.toDateId, options.customerId)
 
@@ -1073,6 +1077,7 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
     const refreshResult = await applyBackfillTransaction({
       customerId,
       databaseUrl,
+      env,
       fromDateId,
       mergedMetricRows,
       movementsToApply,
