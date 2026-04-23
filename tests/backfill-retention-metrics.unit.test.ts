@@ -19,8 +19,9 @@ const plans = [
   },
 ] as const
 
-function subscriptionItem(priceId: string, productId: string) {
+function subscriptionItem(priceId: string, productId: string, currentPeriodEnd?: number) {
   return {
+    current_period_end: currentPeriodEnd,
     plan: {
       id: priceId,
       product: productId,
@@ -38,6 +39,7 @@ function subscriptionEvent(
   priceId: string,
   productId: string,
   previous?: { priceId?: string, productId?: string, status?: string },
+  currentPeriodEnd?: number,
 ) {
   const previousAttributes: Partial<Stripe.Subscription> = {}
   if (previous?.priceId && previous.productId) {
@@ -58,7 +60,7 @@ function subscriptionEvent(
         object: 'subscription',
         customer: customerId,
         items: {
-          data: [subscriptionItem(priceId, productId)],
+          data: [subscriptionItem(priceId, productId, currentPeriodEnd)],
         },
       },
       previous_attributes: previous
@@ -169,6 +171,18 @@ describe('retention metric backfill helpers', () => {
       next_mrr: 0,
       churn_mrr: 39,
     })
+  })
+
+  it.concurrent('does not churn deleted subscriptions that are active until period end', () => {
+    const result = buildRevenueMovementEvents([
+      subscriptionEvent('evt_deleted_period_end', 'customer.subscription.deleted', 1774353600, 'cus_canceling', 'sub_canceling', 'price_team_monthly', 'prod_team', undefined, 1774440000),
+    ], plans as any, {
+      fromDateId: '2026-03-24',
+      toDateId: '2026-03-24',
+    })
+
+    expect(result.movements).toHaveLength(0)
+    expect(result.skipped.noMovement).toBe(1)
   })
 
   it.concurrent('aggregates multiple movements for one customer-day with the first opening MRR', () => {

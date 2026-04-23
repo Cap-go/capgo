@@ -379,6 +379,18 @@ function getItemProductId(item: Stripe.SubscriptionItem | null | undefined) {
   return toStripeId(item.plan?.product) ?? toStripeId(item.price?.product) ?? null
 }
 
+function getItemPeriodEndIso(item: Stripe.SubscriptionItem | null | undefined) {
+  if (!item?.current_period_end)
+    return null
+
+  return new Date(item.current_period_end * 1000).toISOString()
+}
+
+function isActiveUntilPeriodEnd(item: Stripe.SubscriptionItem | null | undefined, eventOccurredAtIso: string) {
+  const periodEndIso = getItemPeriodEndIso(item)
+  return Boolean(periodEndIso && new Date(periodEndIso).getTime() > new Date(eventOccurredAtIso).getTime())
+}
+
 function getSubscriptionItems(subscription: Stripe.Subscription) {
   return subscription.items?.data as Stripe.SubscriptionItem[] | undefined
 }
@@ -570,7 +582,7 @@ export function buildRevenueMovementEvents(
       }
 
       currentState = buildTrackedState(customerId, subscriptionId, 'succeeded', trackedState?.price_id ?? currentPriceId, trackedState?.product_id ?? currentProductId, activePaidAt ?? eventOccurredAtIso)
-      nextState = buildTrackedState(customerId, subscriptionId, 'deleted', currentPriceId, currentProductId, activePaidAt ?? eventOccurredAtIso)
+      nextState = buildTrackedState(customerId, subscriptionId, isActiveUntilPeriodEnd(currentItem, eventOccurredAtIso) ? 'succeeded' : 'deleted', currentPriceId, currentProductId, activePaidAt ?? eventOccurredAtIso)
     }
 
     const movement = classifyRevenueMovement(toRevenueState(currentState), toRevenueState(nextState), plans)
@@ -623,6 +635,20 @@ export function aggregateRevenueMovementEvents(movements: BackfillRevenueMovemen
       return dateCompare
     return left.customer_id.localeCompare(right.customer_id)
   })
+}
+
+function dedupeRevenueMovementEvents(movements: BackfillRevenueMovementEvent[]) {
+  const deduped: BackfillRevenueMovementEvent[] = []
+  const seenEventIds = new Set<string>()
+
+  for (const movement of movements) {
+    if (seenEventIds.has(movement.event_id))
+      continue
+    seenEventIds.add(movement.event_id)
+    deduped.push(movement)
+  }
+
+  return deduped
 }
 
 export function summarizeDailyRevenueMetrics(rows: Pick<DailyRevenueMetricInsert, 'churn_mrr' | 'contraction_mrr' | 'expansion_mrr' | 'new_business_mrr' | 'opening_mrr'>[]): BackfillSummary {
@@ -848,9 +874,10 @@ async function upsertDailyRevenueMetricsPg(client: PgClient, rows: DailyRevenueM
 }
 
 async function claimProcessedEventsPg(client: PgClient, movements: BackfillRevenueMovementEvent[]) {
+  const uniqueMovements = dedupeRevenueMovementEvents(movements)
   const claimedEventIds = new Set<string>()
 
-  for (const chunk of chunkArray(movements, DB_CHUNK_SIZE)) {
+  for (const chunk of chunkArray(uniqueMovements, DB_CHUNK_SIZE)) {
     if (chunk.length === 0)
       continue
 
@@ -876,7 +903,7 @@ async function claimProcessedEventsPg(client: PgClient, movements: BackfillReven
       claimedEventIds.add(row.event_id)
   }
 
-  return movements.filter(movement => claimedEventIds.has(movement.event_id))
+  return uniqueMovements.filter(movement => claimedEventIds.has(movement.event_id))
 }
 
 async function refreshGlobalRetentionMetricsPg(client: PgClient, dateIds: string[]): Promise<RefreshRetentionMetricsResult> {
@@ -1040,12 +1067,16 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
     fetchRevenuePlans(supabase),
     fetchInitialCustomerRevenueBaseline(supabase, customerIds),
   ])
-  const { movements, skipped } = buildRevenueMovementEvents(events, plans, {
+  const builtMovements = buildRevenueMovementEvents(events, plans, {
     customerId,
     fromDateId,
     initialPaidAtByCustomerId: initialCustomerRevenueBaseline.paidAtByCustomerId,
     toDateId,
   })
+  const movements = dedupeRevenueMovementEvents(builtMovements.movements)
+  const skipped = builtMovements.skipped
+  if (movements.length !== builtMovements.movements.length)
+    console.warn(`Duplicate Stripe event ids skipped: ${builtMovements.movements.length - movements.length}`)
   const movementSummary = summarizeDailyRevenueMetrics(movements.map(movement => ({
     opening_mrr: movement.opening_mrr,
     new_business_mrr: movement.new_business_mrr,
