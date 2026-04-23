@@ -48,7 +48,7 @@ function readIntHeader(request: Request, headerName: string): number | null {
 
 function isZeroLengthTusUploadBody(request: Request): boolean {
   return request.method !== 'HEAD'
-    && request.headers.get('content-type') === TUS_UPLOAD_CONTENT_TYPE
+    && request.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase() === TUS_UPLOAD_CONTENT_TYPE
     && readIntHeader(request, 'content-length') === 0
 }
 

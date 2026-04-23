@@ -188,7 +188,7 @@ describe('backend alert resilience helpers', () => {
         method: 'PATCH',
         headers: {
           'Content-Length': '0',
-          'Content-Type': 'application/offset+octet-stream',
+          'Content-Type': 'Application/Offset+Octet-Stream',
           'Tus-Resumable': '1.0.0',
           'Upload-Offset': '0',
         },

@@ -63,6 +63,12 @@ interface StoredUploadInfo {
   contentType?: string
 }
 
+const TUS_UPLOAD_CONTENT_TYPE = 'application/offset+octet-stream'
+
+function normalizeContentType(contentType: string | null | undefined): string | null {
+  return contentType?.split(';', 1)[0]?.trim().toLowerCase() || null
+}
+
 function optionsHandler(c: Context) {
   cloudlog({ requestId: c.get('requestId'), message: 'in DO optionsHandler' })
   return c.newResponse(null, 204, {
@@ -221,12 +227,12 @@ export class UploadHandler extends DurableObject {
       contentType,
     })
 
-    if (contentType != null && contentType !== 'application/offset+octet-stream') {
+    if (contentType != null && normalizeContentType(contentType) !== TUS_UPLOAD_CONTENT_TYPE) {
       cloudlog({
         requestId: c.get('requestId'),
         message: 'TUS initCreate - invalid content type',
         contentType,
-        expected: 'application/offset+octet-stream',
+        expected: TUS_UPLOAD_CONTENT_TYPE,
       })
       throw new HTTPException(415, {
         res: c.json({
