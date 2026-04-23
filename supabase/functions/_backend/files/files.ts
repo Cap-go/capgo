@@ -28,6 +28,7 @@ const DO_FETCH_RETRY_ATTEMPTS = 3
 const DO_FETCH_RETRY_DELAY_MS = 250
 
 const ATTACHMENT_PREFIX = 'attachments'
+const TUS_UPLOAD_CONTENT_TYPE = 'application/offset+octet-stream'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
@@ -35,7 +36,24 @@ function isRetryableDurableObjectFetchError(error: unknown): boolean {
   return isRetryableDurableObjectResetError(error)
 }
 
-function requestHasUploadBody(request: Request): boolean {
+function readIntHeader(request: Request, headerName: string): number | null {
+  const rawValue = request.headers.get(headerName)
+  if (rawValue == null) {
+    return null
+  }
+
+  const parsedValue = Number.parseInt(rawValue, 10)
+  return Number.isFinite(parsedValue) ? parsedValue : Number.NaN
+}
+
+function isZeroByteTusCreationWithUpload(request: Request): boolean {
+  return request.method === 'POST'
+    && request.headers.get('content-type') === TUS_UPLOAD_CONTENT_TYPE
+    && readIntHeader(request, 'upload-length') === 0
+    && readIntHeader(request, 'content-length') === 0
+}
+
+function requestHasNonEmptyUploadBody(request: Request): boolean {
   if (request.body == null) {
     return false
   }
@@ -44,17 +62,30 @@ function requestHasUploadBody(request: Request): boolean {
     return true
   }
 
-  const contentLength = request.headers.get('content-length')
+  const contentLength = readIntHeader(request, 'content-length')
   if (contentLength == null) {
     return true
   }
 
-  const parsedLength = Number.parseInt(contentLength, 10)
-  return !Number.isFinite(parsedLength) || parsedLength > 0
+  return Number.isNaN(contentLength) || contentLength > 0
+}
+
+function getForwardedUploadBody(request: Request): ReadableStream<Uint8Array> | ArrayBuffer | null {
+  if (request.method === 'HEAD') {
+    return null
+  }
+
+  if (isZeroByteTusCreationWithUpload(request)) {
+    return new ArrayBuffer(0)
+  }
+
+  return requestHasNonEmptyUploadBody(request)
+    ? request.body as ReadableStream<Uint8Array>
+    : null
 }
 
 function canReplayUploadRequest(request: Request): boolean {
-  return request.method === 'HEAD' || !requestHasUploadBody(request)
+  return request.method === 'HEAD' || !requestHasNonEmptyUploadBody(request)
 }
 
 function buildDurableObjectRequest(request: Request): Request {
@@ -63,8 +94,10 @@ function buildDurableObjectRequest(request: Request): Request {
     method: request.method,
     signal: AbortSignal.timeout(DO_CALL_TIMEOUT),
   }
-  if (request.method !== 'HEAD' && requestHasUploadBody(request)) {
-    requestInit.body = request.body
+
+  const uploadBody = getForwardedUploadBody(request)
+  if (uploadBody != null) {
+    requestInit.body = uploadBody
     requestInit.duplex = 'half'
   }
 
@@ -461,8 +494,9 @@ async function uploadHandler(c: Context) {
     method,
     headers,
   }
-  if (method !== 'HEAD' && requestHasUploadBody(c.req.raw)) {
-    requestInit.body = c.req.raw.body
+  const uploadBody = getForwardedUploadBody(c.req.raw)
+  if (uploadBody != null) {
+    requestInit.body = uploadBody
     requestInit.duplex = 'half'
   }
   const request = new Request(c.req.url, requestInit)
