@@ -46,10 +46,9 @@ function readIntHeader(request: Request, headerName: string): number | null {
   return Number.isFinite(parsedValue) ? parsedValue : Number.NaN
 }
 
-function isZeroByteTusCreationWithUpload(request: Request): boolean {
-  return request.method === 'POST'
+function isZeroLengthTusUploadBody(request: Request): boolean {
+  return request.method !== 'HEAD'
     && request.headers.get('content-type') === TUS_UPLOAD_CONTENT_TYPE
-    && readIntHeader(request, 'upload-length') === 0
     && readIntHeader(request, 'content-length') === 0
 }
 
@@ -75,7 +74,7 @@ function getForwardedUploadBody(request: Request): ReadableStream<Uint8Array> | 
     return null
   }
 
-  if (isZeroByteTusCreationWithUpload(request)) {
+  if (isZeroLengthTusUploadBody(request)) {
     return new ArrayBuffer(0)
   }
 

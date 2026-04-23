@@ -148,11 +148,55 @@ describe('backend alert resilience helpers', () => {
           'Tus-Resumable': '1.0.0',
           'Upload-Length': '0',
         },
-        body: new Uint8Array(0),
+        body: new ArrayBuffer(0),
       }),
     )
 
     expect(response.status).toBe(201)
+    expect(handler.fetch).toHaveBeenCalledTimes(2)
+    expect(forwardedBodyLengths).toEqual([0, 0])
+  })
+
+  it.concurrent('forwards a replayable zero-byte TUS patch body', async () => {
+    const { filesTestUtils } = await import('../supabase/functions/_backend/files/files.ts')
+
+    const forwardedBodyLengths: number[] = []
+    const handler = {
+      fetch: vi.fn(async (request: Request) => {
+        expect(request.body).not.toBeNull()
+        forwardedBodyLengths.push((await request.arrayBuffer()).byteLength)
+
+        if (forwardedBodyLengths.length === 1) {
+          return new Response(JSON.stringify({
+            error: 'durable_object_temporarily_unavailable',
+          }), {
+            status: 503,
+            headers: {
+              [X_UPLOAD_HANDLER_RETRYABLE]: '1',
+            },
+          })
+        }
+
+        return new Response(null, { status: 204 })
+      }),
+    } as any
+
+    const response = await filesTestUtils.fetchUploadHandlerWithRetry(
+      createTestContext(),
+      handler,
+      new Request('http://localhost/files/upload/attachments/test.zip', {
+        method: 'PATCH',
+        headers: {
+          'Content-Length': '0',
+          'Content-Type': 'application/offset+octet-stream',
+          'Tus-Resumable': '1.0.0',
+          'Upload-Offset': '0',
+        },
+        body: new ArrayBuffer(0),
+      }),
+    )
+
+    expect(response.status).toBe(204)
     expect(handler.fetch).toHaveBeenCalledTimes(2)
     expect(forwardedBodyLengths).toEqual([0, 0])
   })
