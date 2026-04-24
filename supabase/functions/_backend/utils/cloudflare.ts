@@ -606,16 +606,34 @@ interface DeviceInfoCF {
   updated_at: string
 }
 
-/**
- * Read device metadata from the Analytics Engine, respecting search, version, custom ID, and cursor filters.
- */
-export async function readDevicesCF(c: Context, params: ReadDevicesParams, customIdMode: boolean): Promise<DeviceRes[]> {
-  // Use Analytics Engine DEVICE_INFO for reading devices
-  // Schema: blob1=device_id, blob2=version_name, blob3=plugin_version, blob4=os_version,
-  //         blob5=custom_id, blob6=version_build, blob7=default_channel, blob8=key_id
-  //         double1=platform (0=android, 1=ios), double2=is_prod, double3=is_emulator
-  //         index1=app_id, timestamp=updated_at
+interface DevicesOrderCF {
+  ascending: boolean
+}
 
+function getReadDevicesCFOrder(params: ReadDevicesParams): DevicesOrderCF | null {
+  const activeOrder = params.order?.find(
+    col => col.key === 'updated_at' && typeof col.sortable === 'string',
+  )
+
+  return activeOrder ? { ascending: activeOrder.sortable === 'asc' } : null
+}
+
+function buildReadDevicesCFCursorFilter(cursor: string | undefined, devicesOrder: DevicesOrderCF | null) {
+  if (!(cursor && devicesOrder))
+    return ''
+
+  const [cursorTime, cursorDeviceId] = cursor.split('|')
+  if (!(cursorTime && cursorDeviceId))
+    return ''
+
+  const safeCursorTime = escapeSqlString(cursorTime)
+  const safeCursorDeviceId = escapeSqlString(cursorDeviceId)
+  const comparison = devicesOrder.ascending ? '>' : '<'
+
+  return `WHERE (updated_at ${comparison} toDateTime('${safeCursorTime}') OR (updated_at = toDateTime('${safeCursorTime}') AND device_id > '${safeCursorDeviceId}'))`
+}
+
+export function buildReadDevicesCFQuery(params: ReadDevicesParams, customIdMode: boolean) {
   const limit = normalizeAnalyticsLimit(params.limit)
   const conditions: string[] = [`index1 = '${escapeSqlString(params.app_id)}'`]
 
@@ -624,7 +642,6 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
   }
 
   if (params.deviceIds?.length) {
-    cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds: params.deviceIds })
     if (params.deviceIds.length === 1) {
       conditions.push(`blob1 = '${escapeSqlString(params.deviceIds[0])}'`)
     }
@@ -635,13 +652,11 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
   }
 
   if (params.search) {
-    cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
     const searchLower = params.search.toLowerCase()
     if (params.deviceIds?.length) {
       conditions.push(`position('${escapeSqlString(searchLower)}' IN toLower(blob5)) > 0`)
     }
     else {
-      // Search in device_id, custom_id, or version_name
       conditions.push(`(position('${escapeSqlString(searchLower)}' IN toLower(blob1)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob5)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob2)) > 0)`)
     }
   }
@@ -650,42 +665,55 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
     conditions.push(`blob2 = '${escapeSqlString(params.version_name)}'`)
   }
 
-  const activeOrder = params.order?.find(
-    col => col.key === 'updated_at' && typeof col.sortable === 'string',
-  )
-  const devicesOrder = activeOrder ? { ascending: activeOrder.sortable === 'asc' } : null
+  const devicesOrder = getReadDevicesCFOrder(params)
+  const cursorFilter = buildReadDevicesCFCursorFilter(params.cursor, devicesOrder)
+  const orderBy = devicesOrder ? `updated_at ${devicesOrder.ascending ? 'ASC' : 'DESC'}, device_id ASC` : 'device_id ASC'
 
-  // Cursor-based pagination using timestamp
-  let cursorFilter = ''
-  if (params.cursor && devicesOrder) {
-    // Cursor format: "timestamp|device_id"
-    const [cursorTime, cursorDeviceId] = params.cursor.split('|')
-    if (cursorTime && cursorDeviceId) {
-      cursorFilter = devicesOrder.ascending
-        ? `AND (timestamp > toDateTime('${escapeSqlString(cursorTime)}') OR (timestamp = toDateTime('${escapeSqlString(cursorTime)}') AND blob1 > '${escapeSqlString(cursorDeviceId)}'))`
-        : `AND (timestamp < toDateTime('${escapeSqlString(cursorTime)}') OR (timestamp = toDateTime('${escapeSqlString(cursorTime)}') AND blob1 > '${escapeSqlString(cursorDeviceId)}'))`
-    }
+  return [
+    'SELECT *',
+    'FROM (',
+    '  SELECT',
+    '    argMax(blob1, timestamp) AS device_id,',
+    '    argMax(blob2, timestamp) AS version_name,',
+    '    argMax(blob3, timestamp) AS plugin_version,',
+    '    argMax(blob4, timestamp) AS os_version,',
+    '    argMax(blob5, timestamp) AS custom_id,',
+    '    argMax(blob6, timestamp) AS version_build,',
+    '    argMax(blob7, timestamp) AS default_channel,',
+    '    argMax(blob8, timestamp) AS key_id,',
+    '    argMax(double1, timestamp) AS platform,',
+    '    argMax(double2, timestamp) AS is_prod,',
+    '    argMax(double3, timestamp) AS is_emulator,',
+    '    max(timestamp) AS updated_at',
+    '  FROM device_info',
+    `  WHERE ${conditions.join(' AND ')}`,
+    '  GROUP BY blob1',
+    ')',
+    cursorFilter,
+    `ORDER BY ${orderBy}`,
+    `LIMIT ${limit + 1}`,
+  ].filter(Boolean).join('\n')
+}
+
+/**
+ * Read device metadata from the Analytics Engine, respecting search, version, custom ID, and cursor filters.
+ */
+export async function readDevicesCF(c: Context, params: ReadDevicesParams, customIdMode: boolean): Promise<DeviceRes[]> {
+  // Use Analytics Engine DEVICE_INFO for reading devices
+  // Schema: blob1=device_id, blob2=version_name, blob3=plugin_version, blob4=os_version,
+  //         blob5=custom_id, blob6=version_build, blob7=default_channel, blob8=key_id
+  //         double1=platform (0=android, 1=ios), double2=is_prod, double3=is_emulator
+  //         index1=app_id, timestamp=updated_at
+
+  if (params.deviceIds?.length) {
+    cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds: params.deviceIds })
   }
 
-  // Query to get latest record per device_id using argMax
-  const query = `SELECT
-  argMax(blob1, timestamp) AS device_id,
-  argMax(blob2, timestamp) AS version_name,
-  argMax(blob3, timestamp) AS plugin_version,
-  argMax(blob4, timestamp) AS os_version,
-  argMax(blob5, timestamp) AS custom_id,
-  argMax(blob6, timestamp) AS version_build,
-  argMax(blob7, timestamp) AS default_channel,
-  argMax(blob8, timestamp) AS key_id,
-  argMax(double1, timestamp) AS platform,
-  argMax(double2, timestamp) AS is_prod,
-  argMax(double3, timestamp) AS is_emulator,
-  max(timestamp) AS updated_at
-FROM device_info
-WHERE ${conditions.join(' AND ')} ${cursorFilter}
-GROUP BY blob1
-ORDER BY ${devicesOrder ? `updated_at ${devicesOrder.ascending ? 'ASC' : 'DESC'}, device_id ASC` : 'device_id ASC'}
-LIMIT ${limit + 1}`
+  if (params.search) {
+    cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
+  }
+
+  const query = buildReadDevicesCFQuery(params, customIdMode)
 
   cloudlog({ requestId: c.get('requestId'), message: 'readDevicesCF query', query })
   try {
