@@ -224,6 +224,14 @@ export function getRequiredDatabaseUrl(env: Record<string, string | undefined>) 
   const value = getDatabaseUrl(env)
   if (!value)
     throw new Error(`--apply requires ${DATABASE_URL_ENV_KEYS.join(', ')} so metric writes and processed-event markers are committed atomically`)
+
+  try {
+    new URL(value)
+  }
+  catch {
+    throw new Error(`--apply requires a valid Postgres URL from ${DATABASE_URL_ENV_KEYS.join(', ')}`)
+  }
+
   return value
 }
 
@@ -245,10 +253,10 @@ function isSupabasePoolerHost(databaseUrl: string) {
 }
 
 export function shouldAllowSelfSignedPgCertificate(env: Record<string, string | undefined>, databaseUrl?: string) {
-  const allowSelfSigned = env.PG_ALLOW_SELF_SIGNED_CERT?.trim()
-  if (allowSelfSigned === 'true')
+  const allowSelfSigned = env.PG_ALLOW_SELF_SIGNED_CERT?.trim().toLowerCase()
+  if (allowSelfSigned === 'true' || allowSelfSigned === '1')
     return true
-  if (allowSelfSigned === 'false')
+  if (allowSelfSigned === 'false' || allowSelfSigned === '0')
     return false
 
   const rejectUnauthorized = env.PG_SSL_REJECT_UNAUTHORIZED?.trim()

@@ -385,6 +385,12 @@ describe('retention metric backfill helpers', () => {
     })).toBe('postgres://main-writer')
   })
 
+  it.concurrent('rejects malformed database urls early', () => {
+    expect(() => getRequiredDatabaseUrl({
+      DATABASE_URL: 'not-a-valid-postgres-url',
+    })).toThrow('--apply requires a valid Postgres URL from MAIN_SUPABASE_DB_URL, DATABASE_URL, POSTGRES_URL, SUPABASE_DB_URL, SUPABASE_DB_DIRECT_URL, DIRECT_URL')
+  })
+
   it.concurrent('falls back to DATABASE_URL before direct-url env names', () => {
     expect(getDatabaseUrl({
       DATABASE_URL: 'postgres://database-url',
@@ -409,6 +415,20 @@ describe('retention metric backfill helpers', () => {
   it.concurrent('keeps strict verification when PG_SSL_REJECT_UNAUTHORIZED forces it', () => {
     expect(shouldAllowSelfSignedPgCertificate(
       { PG_SSL_REJECT_UNAUTHORIZED: '1' },
+      'postgresql://postgres:secret@db.project-ref.supabase.co:6543/postgres',
+    )).toBe(false)
+  })
+
+  it.concurrent('honors PG_ALLOW_SELF_SIGNED_CERT=1 as the highest-priority override', () => {
+    expect(shouldAllowSelfSignedPgCertificate(
+      { PG_ALLOW_SELF_SIGNED_CERT: '1', PG_SSL_REJECT_UNAUTHORIZED: '1' },
+      'postgresql://postgres:secret@db.project-ref.supabase.co:6543/postgres',
+    )).toBe(true)
+  })
+
+  it.concurrent('honors PG_ALLOW_SELF_SIGNED_CERT=0 as the highest-priority override', () => {
+    expect(shouldAllowSelfSignedPgCertificate(
+      { PG_ALLOW_SELF_SIGNED_CERT: '0', PG_SSL_REJECT_UNAUTHORIZED: '0' },
       'postgresql://postgres:secret@db.project-ref.supabase.co:6543/postgres',
     )).toBe(false)
   })
