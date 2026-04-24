@@ -25,6 +25,7 @@ BEGIN
           FROM public.org_users AS org_user
           WHERE org_user.org_id = org.id
             AND org_user.user_id = apikey_row.user_id
+            AND org_user.user_right::text NOT LIKE 'invite_%'
         )
       )
   )

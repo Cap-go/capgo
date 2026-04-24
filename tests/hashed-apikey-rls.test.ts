@@ -18,6 +18,7 @@ import {
   ORG_ID_2FA_TEST,
   ORG_ID_RLS,
   POSTGRES_URL,
+  USER_ID_2,
   USER_ID_RLS,
 } from './test-utils.ts'
 
@@ -199,6 +200,38 @@ async function setOrgHashedApiKeyEnforcement(orgId: string, enforce: boolean): P
       'UPDATE orgs SET enforce_hashed_api_keys = $1 WHERE id = $2',
       [enforce, orgId],
     )
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function createPendingInviteOrgForUser(userId: string): Promise<string> {
+  const client = await pool.connect()
+  const orgId = randomUUID()
+  try {
+    await client.query(
+      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys)
+       VALUES ($1, $2, $3, $4, true)`,
+      [orgId, USER_ID_2, `pending-invite-org-${orgId}`, `pending-invite-${orgId}@capgo.test`],
+    )
+    await client.query(
+      `INSERT INTO public.org_users (org_id, user_id, user_right)
+       VALUES ($1, $2, 'invite_read')`,
+      [orgId, userId],
+    )
+    return orgId
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function deletePendingInviteOrgForUser(orgId: string, userId: string): Promise<void> {
+  const client = await pool.connect()
+  try {
+    await client.query('DELETE FROM public.org_users WHERE org_id = $1 AND user_id = $2', [orgId, userId])
+    await client.query('DELETE FROM public.orgs WHERE id = $1', [orgId])
   }
   finally {
     client.release()
@@ -390,6 +423,24 @@ describe('enforce_hashed_api_keys blocks plaintext capgkey auth on the RLS plane
       hashedKey.key,
     )
     expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
+  })
+
+  it('does not reject a plain API key for users with only a pending invite to an enforced org', async () => {
+    const pendingInviteOrgId = await createPendingInviteOrgForUser(RLS_TEST_USER_ID)
+
+    try {
+      await setOrgHashedApiKeyEnforcement(ORG_ID_RLS, false)
+
+      const rows = await execWithCapgkey(
+        `SELECT get_identity('{all,write,read,upload}'::key_mode[]) AS user_id`,
+        plainKey.key,
+      )
+      expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
+    }
+    finally {
+      await setOrgHashedApiKeyEnforcement(ORG_ID_RLS, true)
+      await deletePendingInviteOrgForUser(pendingInviteOrgId, RLS_TEST_USER_ID)
+    }
   })
 
   it('blocks direct anon RLS reads from the apikeys table for plain API keys', async () => {
