@@ -78,6 +78,34 @@ function validateScope(scopeType: RoleBindingBody['scope_type'], appId?: string,
   return { ok: true, data: null }
 }
 
+async function validateScopedAppOwnership(
+  drizzle: ReturnType<typeof getDrizzleClient>,
+  scopeType: RoleBindingBody['scope_type'],
+  orgId: string,
+  appId?: string,
+): Promise<ValidationResult<null>> {
+  if (scopeType !== 'app' && scopeType !== 'channel') {
+    return { ok: true, data: null }
+  }
+
+  const [app] = await drizzle
+    .select({ id: schema.apps.id })
+    .from(schema.apps)
+    .where(
+      and(
+        eq(schema.apps.id, appId!),
+        eq(schema.apps.owner_org, orgId),
+      ),
+    )
+    .limit(1)
+
+  if (!app) {
+    return { ok: false, status: 404, error: 'App not found in this org' }
+  }
+
+  return { ok: true, data: null }
+}
+
 async function validatePrincipalAccess(
   drizzle: ReturnType<typeof getDrizzleClient>,
   principalType: RoleBindingBody['principal_type'],
@@ -299,6 +327,11 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     const scopeValidation = validateScope(scope_type, app_id, channel_id)
     if (!scopeValidation.ok) {
       return c.json({ error: scopeValidation.error }, scopeValidation.status as any)
+    }
+
+    const scopedAppValidation = await validateScopedAppOwnership(drizzle, scope_type, org_id, app_id)
+    if (!scopedAppValidation.ok) {
+      return c.json({ error: scopedAppValidation.error }, scopedAppValidation.status as any)
     }
 
     const principalValidation = await validatePrincipalAccess(drizzle, principal_type, principal_id, org_id)

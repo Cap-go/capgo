@@ -5,9 +5,10 @@ import type { PoolClient } from 'pg'
  * Tests the checkPermission function with both legacy and RBAC modes
  * to ensure feature flag routing works correctly.
  */
+import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { APIKEY_TEST_ALL, ORG_ID, POSTGRES_URL, USER_ID } from './test-utils'
+import { APIKEY_TEST_ALL, ORG_ID, POSTGRES_URL, USER_ID, USER_ID_2 } from './test-utils'
 
 // Test constants
 const TEST_APP_ID = 'com.demo.app'
@@ -200,6 +201,96 @@ describe('rbac permission system', () => {
         `, [APIKEY_TEST_ALL, TEST_APP_ID])
 
         expect(result.rows[0].perm).toBe('perm_owner')
+      })
+
+      it('should ignore forged app-scoped bindings whose org_id does not match the target app owner', async () => {
+        const victimOrgId = randomUUID()
+        const victimAppUuid = randomUUID()
+        const victimAppId = `com.rbac.forged.${randomUUID()}`
+
+        await query(`
+          INSERT INTO public.orgs (
+            id,
+            created_by,
+            name,
+            management_email,
+            use_new_rbac
+          ) VALUES ($1::uuid, $2::uuid, $3, $4, true)
+        `, [
+          victimOrgId,
+          USER_ID_2,
+          `RBAC Victim Org ${victimOrgId}`,
+          `rbac-victim-${victimOrgId}@capgo.app`,
+        ])
+
+        await query(`
+          INSERT INTO public.apps (
+            id,
+            app_id,
+            icon_url,
+            owner_org,
+            name
+          ) VALUES ($1::uuid, $2, $3, $4::uuid, $5)
+        `, [
+          victimAppUuid,
+          victimAppId,
+          'rbac-forged-binding-icon',
+          victimOrgId,
+          `RBAC Victim App ${victimAppId}`,
+        ])
+
+        const roleResult = await query(`
+          SELECT id
+          FROM public.roles
+          WHERE name = 'app_admin'
+          LIMIT 1
+        `)
+        const roleId = roleResult.rows[0]?.id
+        expect(roleId).toBeTruthy()
+
+        await query(`
+          INSERT INTO public.role_bindings (
+            principal_type,
+            principal_id,
+            role_id,
+            scope_type,
+            org_id,
+            app_id,
+            granted_by,
+            is_direct
+          ) VALUES (
+            public.rbac_principal_user(),
+            $1::uuid,
+            $2::uuid,
+            public.rbac_scope_app(),
+            $3::uuid,
+            $4::uuid,
+            $1::uuid,
+            true
+          )
+        `, [
+          USER_ID,
+          roleId,
+          ORG_ID,
+          victimAppUuid,
+        ])
+
+        const result = await query(`
+          SELECT public.rbac_has_permission(
+            public.rbac_principal_user(),
+            $1::uuid,
+            'app.update_settings',
+            $2::uuid,
+            $3,
+            NULL::bigint
+          ) AS allowed
+        `, [
+          USER_ID,
+          ORG_ID,
+          victimAppId,
+        ])
+
+        expect(result.rows[0].allowed).toBe(false)
       })
     })
 
