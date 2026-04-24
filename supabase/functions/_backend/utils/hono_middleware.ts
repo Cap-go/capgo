@@ -330,6 +330,7 @@ function setApiKeyAuthContext(c: Context, apikey: Database['public']['Tables']['
     jwt: null,
   })
   c.set('apikey', apikey)
+  c.set('parentApikey', apikey)
   c.set('capgkey', keyString)
 }
 
@@ -347,7 +348,13 @@ function setSubkeyAuthContext(c: Context, userId: string, subkey: Database['publ
     apikey: subkey,
     jwt: null,
   })
+  c.set('apikey', subkey)
   c.set('subkey', subkey)
+
+  // Prefer the subkey's own secret for downstream RLS/policy checks when it exists.
+  if (subkey.key) {
+    c.set('capgkey', subkey.key)
+  }
 }
 
 /**
