@@ -11,6 +11,8 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 const UPDATE_RETRY_ATTEMPTS = 3
 const UPDATE_RETRY_DELAY_MS = 300
+type ChannelRow = Database['public']['Tables']['channels']['Row']
+type ChannelPlatformScope = 'ios' | 'android'
 
 async function updateChannelsWithRetry(
   c: Context<MiddlewareKeyVariables>,
@@ -32,6 +34,65 @@ async function updateChannelsWithRetry(
   }
 }
 
+async function getCurrentChannel(
+  c: Context<MiddlewareKeyVariables>,
+  channelId: number,
+): Promise<Pick<ChannelRow, 'id' | 'app_id' | 'public' | 'ios' | 'android' | 'updated_at' | 'created_at'> | null> {
+  const { data, error } = await supabaseAdmin(c)
+    .from('channels')
+    .select('id, app_id, public, ios, android, updated_at, created_at')
+    .eq('id', channelId)
+    .maybeSingle()
+
+  if (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Failed to reload current channel state',
+      error,
+      channelId,
+    })
+    return null
+  }
+
+  return data
+}
+
+async function isCurrentPublicWinner(
+  c: Context<MiddlewareKeyVariables>,
+  record: Pick<ChannelRow, 'id' | 'app_id'>,
+  scope: ChannelPlatformScope,
+) {
+  const currentRecord = await getCurrentChannel(c, record.id)
+  if (!currentRecord?.public || !currentRecord[scope])
+    return false
+
+  const { data: winner, error } = await supabaseAdmin(c)
+    .from('channels')
+    .select('id')
+    .eq('app_id', currentRecord.app_id)
+    .eq('public', true)
+    .eq(scope, true)
+    .order('updated_at', { ascending: false })
+    .order('created_at', { ascending: false })
+    .order('id', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Failed to resolve current public channel winner',
+      error,
+      app_id: currentRecord.app_id,
+      channelId: currentRecord.id,
+      scope,
+    })
+    return false
+  }
+
+  return winner?.id === currentRecord.id
+}
+
 app.post('/', middlewareAPISecret, triggerValidator('channels', 'UPDATE'), async (c) => {
   const record = c.get('webhookBody') as Database['public']['Tables']['channels']['Row']
   cloudlog({ requestId: c.get('requestId'), message: 'record', record })
@@ -46,29 +107,33 @@ app.post('/', middlewareAPISecret, triggerValidator('channels', 'UPDATE'), async
   }
 
   if (record.public && record.ios) {
-    await updateChannelsWithRetry(
-      c,
-      async () => await supabaseAdmin(c)
-        .from('channels')
-        .update({ public: false })
-        .eq('app_id', record.app_id)
-        .eq('ios', true)
-        .neq('id', record.id),
-      { app_id: record.app_id, record_id: record.id, scope: 'ios' },
-    )
+    if (await isCurrentPublicWinner(c, record, 'ios')) {
+      await updateChannelsWithRetry(
+        c,
+        async () => await supabaseAdmin(c)
+          .from('channels')
+          .update({ public: false })
+          .eq('app_id', record.app_id)
+          .eq('ios', true)
+          .neq('id', record.id),
+        { app_id: record.app_id, record_id: record.id, scope: 'ios' },
+      )
+    }
   }
 
   if (record.public && record.android) {
-    await updateChannelsWithRetry(
-      c,
-      async () => await supabaseAdmin(c)
-        .from('channels')
-        .update({ public: false })
-        .eq('app_id', record.app_id)
-        .eq('android', true)
-        .neq('id', record.id),
-      { app_id: record.app_id, record_id: record.id, scope: 'android' },
-    )
+    if (await isCurrentPublicWinner(c, record, 'android')) {
+      await updateChannelsWithRetry(
+        c,
+        async () => await supabaseAdmin(c)
+          .from('channels')
+          .update({ public: false })
+          .eq('app_id', record.app_id)
+          .eq('android', true)
+          .neq('id', record.id),
+        { app_id: record.app_id, record_id: record.id, scope: 'android' },
+      )
+    }
   }
 
   return c.json(BRES)
