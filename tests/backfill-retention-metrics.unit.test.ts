@@ -385,6 +385,20 @@ describe('retention metric backfill helpers', () => {
     })).toBe('postgres://main-writer')
   })
 
+  it.concurrent('falls back to DATABASE_URL before direct-url env names', () => {
+    expect(getDatabaseUrl({
+      DATABASE_URL: 'postgres://database-url',
+      SUPABASE_DB_DIRECT_URL: 'postgres://direct',
+      DIRECT_URL: 'postgres://direct-legacy',
+    })).toBe('postgres://database-url')
+
+    expect(getRequiredDatabaseUrl({
+      DATABASE_URL: 'postgres://database-url',
+      SUPABASE_DB_DIRECT_URL: 'postgres://direct',
+      DIRECT_URL: 'postgres://direct-legacy',
+    })).toBe('postgres://database-url')
+  })
+
   it.concurrent('skips deleted events when pre-range state tracks a different subscription id', () => {
     const result = buildRevenueMovementEvents([
       subscriptionEvent('evt_pre_range_create', 'customer.subscription.created', 1774267200, 'cus_active', 'sub_new', 'price_team_monthly', 'prod_team'),
