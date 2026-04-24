@@ -201,6 +201,62 @@ describe('rbac permission system', () => {
 
         expect(result.rows[0].perm).toBe('perm_owner')
       })
+
+      it('should ignore role bindings whose role scope does not match the binding scope', async () => {
+        const fakeUserId = '11111111-1111-4111-8111-111111111111'
+
+        await query(`SET LOCAL session_replication_role = replica`)
+        await query(`
+          INSERT INTO public.role_bindings (
+            principal_type,
+            principal_id,
+            role_id,
+            scope_type,
+            org_id,
+            app_id,
+            granted_by,
+            granted_at,
+            reason,
+            is_direct
+          )
+          SELECT
+            public.rbac_principal_user(),
+            $1::uuid,
+            r.id,
+            public.rbac_scope_app(),
+            $2::uuid,
+            a.id,
+            $1::uuid,
+            now(),
+            'scope-mismatch-regression-test',
+            true
+          FROM public.roles r
+          JOIN public.apps a ON a.app_id = $3
+          WHERE r.name = public.rbac_role_org_super_admin()
+        `, [fakeUserId, ORG_ID, TEST_APP_ID])
+
+        const result = await query(`
+          SELECT
+            public.rbac_has_permission(
+              public.rbac_principal_user(),
+              $1::uuid,
+              'app.update_settings',
+              $2::uuid,
+              $3,
+              NULL::bigint
+            ) AS app_permission_allowed,
+            public.check_min_rights(
+              'write'::public.user_min_right,
+              $1::uuid,
+              $2::uuid,
+              $3,
+              NULL::bigint
+            ) AS write_allowed
+        `, [fakeUserId, ORG_ID, TEST_APP_ID])
+
+        expect(result.rows[0].app_permission_allowed).toBe(false)
+        expect(result.rows[0].write_allowed).toBe(false)
+      })
     })
 
     describe('feature flag routing', () => {
