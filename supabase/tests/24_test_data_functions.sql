@@ -386,6 +386,17 @@ SELECT
     );
 
 -- Test transfer_app
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM public.channels
+        WHERE id = 9876501001
+    ) THEN
+        RAISE EXCEPTION 'transfer_app test fixture channel id already exists';
+    END IF;
+END $$;
+
 INSERT INTO public.org_users (org_id, user_id, user_right)
 VALUES (
     '34a8c55d-2d0f-4652-a43f-684c7a9403ac',
@@ -396,13 +407,16 @@ ON CONFLICT DO NOTHING;
 
 WITH seeded_channel AS (
     INSERT INTO public.channels (
+        id,
         name,
         app_id,
         version,
         owner_org,
         created_by
     )
+    OVERRIDING SYSTEM VALUE
     VALUES (
+        9876501001,
         'transfer-history-test',
         'com.demoadmin.app',
         10,
@@ -448,13 +462,13 @@ SELECT
 SELECT
     is(
         (
-            SELECT count(*)::bigint
+            SELECT owner_org::text
             FROM public.deploy_history
             WHERE
-                app_id = 'com.demoadmin.app'
-                AND owner_org = '34a8c55d-2d0f-4652-a43f-684c7a9403ac'
+                channel_id = 9876501001
+                AND app_id = 'com.demoadmin.app'
         ),
-        1::bigint,
+        '34a8c55d-2d0f-4652-a43f-684c7a9403ac',
         'transfer_app test - deploy history ownership moves to destination org'
     );
 
