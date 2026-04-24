@@ -159,12 +159,14 @@ export async function streamBuildLogs(
     job_id: jobId,
   })
 
-  // Listen for client disconnect to cancel the build
   const requestId = c.get('requestId')
-  c.req.raw.signal.addEventListener('abort', () => {
-    // Fire and forget - cancel the build when client disconnects
-    cancelBuildOnDisconnect(builderUrl, builderApiKey, jobId, buildRequest.app_id, requestId)
-  })
+  // Security: align disconnect-triggered cancellation with the explicit cancel endpoint.
+  if (await checkPermission(c, 'app.build_native', { appId: buildRequest.app_id })) {
+    c.req.raw.signal.addEventListener('abort', () => {
+      // Fire and forget - cancel the build when an authorized client disconnects.
+      cancelBuildOnDisconnect(builderUrl, builderApiKey, jobId, buildRequest.app_id, requestId)
+    })
+  }
 
   // Directly return the builder's response body as an SSE stream
   // The builder already returns proper SSE format with Content-Type: text/event-stream

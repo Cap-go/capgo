@@ -1,0 +1,202 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { streamBuildLogs } from '../supabase/functions/_backend/public/build/logs.ts'
+
+const { mockSupabaseApikey, mockCheckPermission, mockGetEnv } = vi.hoisted(() => ({
+  mockSupabaseApikey: vi.fn(),
+  mockCheckPermission: vi.fn(),
+  mockGetEnv: vi.fn(),
+}))
+
+vi.mock('../supabase/functions/_backend/utils/supabase.ts', () => ({
+  supabaseApikey: mockSupabaseApikey,
+}))
+
+vi.mock('../supabase/functions/_backend/utils/rbac.ts', () => ({
+  checkPermission: mockCheckPermission,
+}))
+
+vi.mock('../supabase/functions/_backend/utils/utils.ts', () => ({
+  getEnv: mockGetEnv,
+}))
+
+describe('build log disconnect authorization', () => {
+  const requestId = 'req-build-logs-disconnect-auth'
+  const jobId = 'job-build-logs-123'
+  const appId = 'com.test.build.logs.disconnect'
+  const builderUrl = 'https://builder.capgo.test'
+  const builderApiKey = 'builder-api-key'
+
+  function createContext() {
+    const controller = new AbortController()
+    const request = new Request(`http://localhost/build/logs/${jobId}?app_id=${appId}`, {
+      method: 'GET',
+      signal: controller.signal,
+    })
+
+    return {
+      controller,
+      context: {
+        req: {
+          raw: request,
+        },
+        get: vi.fn().mockImplementation((key: string) => {
+          if (key === 'requestId')
+            return requestId
+          return undefined
+        }),
+      },
+    }
+  }
+
+  beforeEach(() => {
+    mockSupabaseApikey.mockReset()
+    mockCheckPermission.mockReset()
+    mockGetEnv.mockReset()
+
+    const selectBuilder = {
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({
+        data: { app_id: appId },
+        error: null,
+      }),
+    }
+
+    mockSupabaseApikey.mockReturnValue({
+      from: vi.fn().mockImplementation((table: string) => {
+        expect(table).toBe('build_requests')
+        return {
+          select: vi.fn().mockReturnValue(selectBuilder),
+        }
+      }),
+    })
+
+    mockGetEnv.mockImplementation((_, key: string) => {
+      if (key === 'BUILDER_URL')
+        return builderUrl
+      if (key === 'BUILDER_API_KEY')
+        return builderApiKey
+      return ''
+    })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('does not cancel the build when a read-only caller disconnects', async () => {
+    mockCheckPermission
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
+
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url === `${builderUrl}/jobs/${jobId}/logs`) {
+        return new Response('data: log line\n\n', {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/event-stream',
+          },
+        })
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`)
+    })
+
+    try {
+      const { context, controller } = createContext()
+      const response = await streamBuildLogs(
+        context as any,
+        jobId,
+        appId,
+        {
+          key: 'read-key',
+          user_id: 'user-read-only',
+        } as any,
+      )
+
+      expect(response.status).toBe(200)
+      expect(response.headers.get('Content-Type')).toBe('text/event-stream')
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+
+      controller.abort()
+      await new Promise(resolve => setTimeout(resolve, 0))
+
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+      expect(mockCheckPermission).toHaveBeenNthCalledWith(1, context, 'app.read_logs', { appId })
+      expect(mockCheckPermission).toHaveBeenNthCalledWith(2, context, 'app.build_native', { appId })
+    }
+    finally {
+      fetchMock.mockRestore()
+    }
+  })
+
+  it('cancels the build on disconnect when the caller can build natively', async () => {
+    mockCheckPermission
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(true)
+
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url === `${builderUrl}/jobs/${jobId}/logs`) {
+        return new Response('data: log line\n\n', {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/event-stream',
+          },
+        })
+      }
+
+      if (url === `${builderUrl}/jobs/${jobId}/cancel`) {
+        expect(init).toMatchObject({
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': builderApiKey,
+          },
+          body: JSON.stringify({ app_id: appId }),
+        })
+
+        return new Response(JSON.stringify({ status: 'cancelled' }), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`)
+    })
+
+    try {
+      const { context, controller } = createContext()
+      const response = await streamBuildLogs(
+        context as any,
+        jobId,
+        appId,
+        {
+          key: 'all-key',
+          user_id: 'user-build-native',
+        } as any,
+      )
+
+      expect(response.status).toBe(200)
+      expect(fetchMock).toHaveBeenCalledTimes(1)
+
+      controller.abort()
+      await new Promise(resolve => setTimeout(resolve, 0))
+
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(fetchMock).toHaveBeenNthCalledWith(2, `${builderUrl}/jobs/${jobId}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': builderApiKey,
+        },
+        body: JSON.stringify({ app_id: appId }),
+      })
+    }
+    finally {
+      fetchMock.mockRestore()
+    }
+  })
+})
