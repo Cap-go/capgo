@@ -7,7 +7,7 @@ describe('preview subdomain encoding', () => {
     const versionId = 123456
     const subdomain = buildPreviewSubdomain(appId, versionId)
 
-    expect(subdomain).not.toMatch(/[_.A-Z]/)
+    expect(subdomain).not.toMatch(/[.A-Z]/)
     expect(parsePreviewHostname(`${subdomain}.preview.capgo.app`)).toEqual({ appId, versionId })
   })
 
@@ -35,6 +35,19 @@ describe('preview subdomain encoding', () => {
     })
   })
 
+  it.concurrent('returns null for malformed hostnames', () => {
+    expect(parsePreviewHostname('invalid.domain.com')).toBeNull()
+    expect(parsePreviewHostname('')).toBeNull()
+  })
+
+  it.concurrent('supports version zero in the new reversible format', () => {
+    const appId = 'com.example'
+    const versionId = 0
+    const subdomain = buildPreviewSubdomain(appId, versionId)
+
+    expect(parsePreviewHostname(`${subdomain}.preview.capgo.app`)).toEqual({ appId, versionId })
+  })
+
   it.concurrent('does not mistake legacy double-hyphen app IDs for the new separator', () => {
     expect(parsePreviewHostname('com--example__app-42.preview.capgo.app')).toEqual({
       appId: 'com--example.app',
@@ -42,7 +55,16 @@ describe('preview subdomain encoding', () => {
     })
   })
 
+  it.concurrent('keeps long lowercase preview labels within the DNS label limit', () => {
+    const appId = 'com.organizationname.myapplicationproductionreleasex'
+    const versionId = 12345678
+    const subdomain = buildPreviewSubdomain(appId, versionId)
+
+    expect(subdomain.length).toBeLessThanOrEqual(63)
+    expect(parsePreviewHostname(`${subdomain}.preview.capgo.app`)).toEqual({ appId, versionId })
+  })
+
   it.concurrent('escapes underscores instead of collapsing them into dots', () => {
-    expect(encodePreviewAppId('com.example_app')).toContain('-5f')
+    expect(encodePreviewAppId('com.example_app')).toContain('_')
   })
 })

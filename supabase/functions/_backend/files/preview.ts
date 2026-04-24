@@ -133,7 +133,7 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
 
   if (!parsed) {
     cloudlog({ requestId: c.get('requestId'), message: 'invalid preview subdomain', hostname })
-    throw simpleError('invalid_subdomain', 'Invalid preview subdomain format. Expected: {preview_app_id}--{version_id}.preview.capgo.app')
+    throw simpleError('invalid_subdomain', 'Invalid preview subdomain format. Expected: {version_id}-{preview_app_id}.preview.capgo.app')
   }
 
   const { appId, versionId } = parsed
