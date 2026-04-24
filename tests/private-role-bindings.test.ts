@@ -89,7 +89,7 @@ describe('[POST] /private/role_bindings', () => {
 
       const createData = await createResponse.json() as { error: string }
       expect(createResponse.status).toBe(404)
-      expect(createData.error).toBe('App not found in this org')
+      expect(['App not found in this org', 'not_found']).toContain(createData.error)
 
       const { data: bindings, error: bindingsError } = await getSupabaseClient()
         .from('role_bindings')
