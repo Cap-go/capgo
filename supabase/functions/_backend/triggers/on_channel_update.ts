@@ -12,7 +12,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 const UPDATE_RETRY_ATTEMPTS = 3
 const UPDATE_RETRY_DELAY_MS = 300
 type ChannelRow = Database['public']['Tables']['channels']['Row']
-type ChannelPlatformScope = 'ios' | 'android'
+type ChannelPlatformScope = 'ios' | 'android' | 'electron'
 
 async function updateChannelsWithRetry(
   c: Context<MiddlewareKeyVariables>,
@@ -37,10 +37,10 @@ async function updateChannelsWithRetry(
 async function getCurrentChannel(
   c: Context<MiddlewareKeyVariables>,
   channelId: number,
-): Promise<Pick<ChannelRow, 'id' | 'app_id' | 'public' | 'ios' | 'android' | 'updated_at' | 'created_at'> | null> {
+): Promise<Pick<ChannelRow, 'id' | 'app_id' | 'public' | 'ios' | 'android' | 'electron' | 'updated_at' | 'created_at'> | null> {
   const { data, error } = await supabaseAdmin(c)
     .from('channels')
-    .select('id, app_id, public, ios, android, updated_at, created_at')
+    .select('id, app_id, public, ios, android, electron, updated_at, created_at')
     .eq('id', channelId)
     .maybeSingle()
 
@@ -132,6 +132,21 @@ app.post('/', middlewareAPISecret, triggerValidator('channels', 'UPDATE'), async
           .eq('android', true)
           .neq('id', record.id),
         { app_id: record.app_id, record_id: record.id, scope: 'android' },
+      )
+    }
+  }
+
+  if (record.public && record.electron) {
+    if (await isCurrentPublicWinner(c, record, 'electron')) {
+      await updateChannelsWithRetry(
+        c,
+        async () => await supabaseAdmin(c)
+          .from('channels')
+          .update({ public: false })
+          .eq('app_id', record.app_id)
+          .eq('electron', true)
+          .neq('id', record.id),
+        { app_id: record.app_id, record_id: record.id, scope: 'electron' },
       )
     }
   }

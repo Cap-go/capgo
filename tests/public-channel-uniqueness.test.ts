@@ -1,8 +1,6 @@
-import type { Context } from 'hono'
 import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
-import { getDrizzleClient, requestInfosChannelPostgres } from '../supabase/functions/_backend/utils/pg.ts'
-import { cleanupPostgresClient, executeSQL, getPostgresClient, ORG_ID, USER_ID } from './test-utils.ts'
+import { cleanupPostgresClient, executeSQL, ORG_ID, USER_ID } from './test-utils.ts'
 
 interface ChannelStateRow {
   name: string
@@ -142,110 +140,46 @@ afterAll(async () => {
 })
 
 describe('public channel uniqueness', () => {
-  it('uses the most recently updated public electron channel as the deterministic winner', async () => {
-    const appId = `com.public.channel.electron.${randomUUID()}`
-    const oldVersion = await createAppFixture(appId)
-    const newVersionName = `1.0.${Math.floor(Math.random() * 100000) + 1000}`
-    const [newVersion] = await executeSQL(
-      `INSERT INTO public.app_versions (
-        created_at,
-        app_id,
-        name,
-        r2_path,
-        updated_at,
-        deleted,
-        external_url,
-        checksum,
-        storage_provider,
-        owner_org,
-        comment,
-        link,
-        user_id
-      ) VALUES (
-        NOW(),
-        $1,
-        $2,
-        $3,
-        NOW(),
-        false,
-        NULL,
-        '',
-        'r2',
-        $4,
-        NULL,
-        NULL,
-        $5
-      )
-      RETURNING id`,
-      [appId, newVersionName, `orgs/${ORG_ID}/apps/${appId}/${newVersionName}.zip`, ORG_ID, USER_ID],
-    )
-    const oldChannel = `electron-public-${randomUUID().slice(0, 8)}`
-    const newChannel = `electron-public-${randomUUID().slice(0, 8)}`
-
-    await insertChannel(appId, oldVersion, oldChannel, {
-      public: true,
-      ios: false,
-      android: false,
-      electron: true,
-    })
-    await insertChannel(appId, Number(newVersion.id), newChannel, {
-      public: true,
-      ios: false,
-      android: false,
-      electron: true,
-    })
-    await executeSQL(
-      `UPDATE public.channels
-       SET updated_at = NOW() + INTERVAL '1 minute'
-       WHERE app_id = $1
-         AND name = $2`,
-      [appId, oldChannel],
-    )
-
-    const drizzleClient = getDrizzleClient(await getPostgresClient())
-    const context = {
-      get(key: string) {
-        return key === 'requestId' ? 'public-channel-uniqueness-test' : undefined
-      },
-    } as Context
-
-    const channel = await requestInfosChannelPostgres(context, 'electron', appId, '', drizzleClient, false)
-
-    expect(channel?.channels.name).toBe(oldChannel)
-    expect(channel?.version.name).toBe('1.0.0')
-  })
-
-  it('allows one public iOS channel and one public Android channel when both keep electron enabled', async () => {
-    const appId = `com.public.channel.mobile-defaults.${randomUUID()}`
+  it('allows one public channel per platform', async () => {
+    const appId = `com.public.channel.platform-defaults.${randomUUID()}`
     const versionId = await createAppFixture(appId)
     const iosPublic = `ios-public-${randomUUID().slice(0, 8)}`
     const androidPublic = `android-public-${randomUUID().slice(0, 8)}`
+    const electronPublic = `electron-public-${randomUUID().slice(0, 8)}`
 
     await insertChannel(appId, versionId, iosPublic, {
       public: true,
       ios: true,
       android: false,
-      electron: true,
+      electron: false,
     })
     await insertChannel(appId, versionId, androidPublic, {
       public: true,
       ios: false,
       android: true,
+      electron: false,
+    })
+    await insertChannel(appId, versionId, electronPublic, {
+      public: true,
+      ios: false,
+      android: false,
       electron: true,
     })
 
-    const states = await getChannelStates(appId, [iosPublic, androidPublic])
+    const states = await getChannelStates(appId, [iosPublic, androidPublic, electronPublic])
 
     expect(states.get(iosPublic)).toBe(true)
     expect(states.get(androidPublic)).toBe(true)
+    expect(states.get(electronPublic)).toBe(true)
   })
 
-  it('demotes overlapping public channels on insert while preserving other platforms', async () => {
+  it('demotes overlapping public electron channels on insert while preserving other platforms', async () => {
     const appId = `com.public.channel.insert.${randomUUID()}`
     const versionId = await createAppFixture(appId)
     const iosPublic = `ios-public-${randomUUID().slice(0, 8)}`
     const androidPublic = `android-public-${randomUUID().slice(0, 8)}`
-    const nextIosPublic = `ios-next-${randomUUID().slice(0, 8)}`
+    const electronPublic = `electron-public-${randomUUID().slice(0, 8)}`
+    const nextElectronPublic = `electron-next-${randomUUID().slice(0, 8)}`
 
     await insertChannel(appId, versionId, iosPublic, {
       public: true,
@@ -259,26 +193,34 @@ describe('public channel uniqueness', () => {
       android: true,
       electron: false,
     })
-    await insertChannel(appId, versionId, nextIosPublic, {
+    await insertChannel(appId, versionId, electronPublic, {
       public: true,
-      ios: true,
+      ios: false,
       android: false,
-      electron: false,
+      electron: true,
+    })
+    await insertChannel(appId, versionId, nextElectronPublic, {
+      public: true,
+      ios: false,
+      android: false,
+      electron: true,
     })
 
-    const states = await getChannelStates(appId, [iosPublic, androidPublic, nextIosPublic])
+    const states = await getChannelStates(appId, [iosPublic, androidPublic, electronPublic, nextElectronPublic])
 
-    expect(states.get(iosPublic)).toBe(false)
+    expect(states.get(iosPublic)).toBe(true)
     expect(states.get(androidPublic)).toBe(true)
-    expect(states.get(nextIosPublic)).toBe(true)
+    expect(states.get(electronPublic)).toBe(false)
+    expect(states.get(nextElectronPublic)).toBe(true)
   })
 
-  it('demotes overlapping public channels on update while preserving other platforms', async () => {
+  it('demotes overlapping public electron channels on update while preserving other platforms', async () => {
     const appId = `com.public.channel.update.${randomUUID()}`
     const versionId = await createAppFixture(appId)
     const iosPublic = `ios-public-${randomUUID().slice(0, 8)}`
     const androidPublic = `android-public-${randomUUID().slice(0, 8)}`
-    const privateCandidate = `ios-private-${randomUUID().slice(0, 8)}`
+    const electronPublic = `electron-public-${randomUUID().slice(0, 8)}`
+    const privateCandidate = `electron-private-${randomUUID().slice(0, 8)}`
 
     await insertChannel(appId, versionId, iosPublic, {
       public: true,
@@ -292,11 +234,17 @@ describe('public channel uniqueness', () => {
       android: true,
       electron: false,
     })
+    await insertChannel(appId, versionId, electronPublic, {
+      public: true,
+      ios: false,
+      android: false,
+      electron: true,
+    })
     await insertChannel(appId, versionId, privateCandidate, {
       public: false,
-      ios: true,
+      ios: false,
       android: false,
-      electron: false,
+      electron: true,
     })
 
     await executeSQL(
@@ -307,10 +255,11 @@ describe('public channel uniqueness', () => {
       [appId, privateCandidate],
     )
 
-    const states = await getChannelStates(appId, [iosPublic, androidPublic, privateCandidate])
+    const states = await getChannelStates(appId, [iosPublic, androidPublic, electronPublic, privateCandidate])
 
-    expect(states.get(iosPublic)).toBe(false)
+    expect(states.get(iosPublic)).toBe(true)
     expect(states.get(androidPublic)).toBe(true)
+    expect(states.get(electronPublic)).toBe(false)
     expect(states.get(privateCandidate)).toBe(true)
   })
 })
