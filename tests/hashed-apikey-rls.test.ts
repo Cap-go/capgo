@@ -86,6 +86,41 @@ async function execWithAuthAndCapgkey(
   }
 }
 
+async function execAsRoleWithCapgkey(
+  sql: string,
+  role: 'anon' | 'authenticated',
+  capgkey: string,
+  params: unknown[] = [],
+): Promise<{ rows: any[], rowCount: number }> {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    try {
+      await client.query(`SET LOCAL ROLE ${role}`)
+      await client.query(
+        'SELECT set_config(\'request.headers\', $1, true)',
+        [JSON.stringify({ capgkey })],
+      )
+
+      const result = await client.query(sql, params)
+      await client.query('COMMIT')
+      return { rows: result.rows, rowCount: result.rowCount ?? 0 }
+    }
+    catch (error) {
+      try {
+        await client.query('ROLLBACK')
+      }
+      catch {
+        // Ignore rollback failures for clearer root error handling.
+      }
+      throw error
+    }
+  }
+  finally {
+    client.release()
+  }
+}
+
 // Helper to create a hashed API key via the API
 async function createHashedApiKey(
   name: string,
@@ -150,6 +185,19 @@ async function setApiKeyExpiration(id: number, expiresAt: Date | null): Promise<
     await client.query(
       'UPDATE apikeys SET expires_at = $1 WHERE id = $2',
       [expiresAt?.toISOString() ?? null, id],
+    )
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function setOrgHashedApiKeyEnforcement(orgId: string, enforce: boolean): Promise<void> {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      'UPDATE orgs SET enforce_hashed_api_keys = $1 WHERE id = $2',
+      [enforce, orgId],
     )
   }
   finally {
@@ -278,6 +326,88 @@ describe('get_identity() with hashed API keys', () => {
     expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
 
     await deleteApiKey(futureKey.id)
+  })
+})
+
+describe('enforce_hashed_api_keys blocks plaintext capgkey auth on the RLS plane', () => {
+  let hashedKey: { id: number, key: string, key_hash: string }
+  let plainKey: { id: number, key: string }
+  let originalEnforceHashedApiKeys: boolean | null = null
+
+  beforeAll(async () => {
+    hashedKey = await createHashedApiKey('test-hashed-enforced-rls')
+    plainKey = await createPlainApiKey('test-plain-enforced-rls')
+
+    const client = await pool.connect()
+    try {
+      const { rows } = await client.query(
+        'SELECT enforce_hashed_api_keys FROM orgs WHERE id = $1',
+        [ORG_ID_RLS],
+      )
+      originalEnforceHashedApiKeys = rows[0]?.enforce_hashed_api_keys ?? null
+    }
+    finally {
+      client.release()
+    }
+
+    await setOrgHashedApiKeyEnforcement(ORG_ID_RLS, true)
+  }, 60000)
+
+  afterAll(async () => {
+    await deleteApiKey(hashedKey.id)
+    await deleteApiKey(plainKey.id)
+
+    if (originalEnforceHashedApiKeys !== null) {
+      await setOrgHashedApiKeyEnforcement(ORG_ID_RLS, originalEnforceHashedApiKeys)
+    }
+  })
+
+  it('find_apikey_by_value returns empty for a plain API key after hashed enforcement is enabled', async () => {
+    const client = await pool.connect()
+    try {
+      const result = await client.query(
+        'SELECT id FROM find_apikey_by_value($1)',
+        [plainKey.key],
+      )
+      expect(result.rows).toEqual([])
+    }
+    finally {
+      client.release()
+    }
+  })
+
+  it('get_identity rejects a plain API key after hashed enforcement is enabled', async () => {
+    const rows = await execWithCapgkey(
+      `SELECT get_identity('{all,write,read,upload}'::key_mode[]) AS user_id`,
+      plainKey.key,
+    )
+    expect(rows[0].user_id).toBeNull()
+  })
+
+  it('get_identity still accepts a hashed API key after hashed enforcement is enabled', async () => {
+    const rows = await execWithCapgkey(
+      `SELECT get_identity('{all,write,read,upload}'::key_mode[]) AS user_id`,
+      hashedKey.key,
+    )
+    expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
+  })
+
+  it('blocks direct anon RLS reads from the apikeys table for plain API keys', async () => {
+    const { rows } = await execAsRoleWithCapgkey(
+      'SELECT id, name FROM public.apikeys ORDER BY id DESC LIMIT 1',
+      'anon',
+      plainKey.key,
+    )
+
+    expect(rows).toEqual([])
+  })
+
+  it('rejects get_orgs_v7 over the anon RPC path for plain API keys', async () => {
+    await expect(execAsRoleWithCapgkey(
+      'SELECT * FROM public.get_orgs_v7()',
+      'anon',
+      plainKey.key,
+    )).rejects.toThrow('Invalid API key provided')
   })
 })
 
