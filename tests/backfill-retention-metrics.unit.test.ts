@@ -1,6 +1,6 @@
 import type Stripe from 'stripe'
 import { describe, expect, it } from 'vitest'
-import { aggregateRevenueMovementEvents, buildRevenueMovementEvents, fetchStripeEvents, findMissingResetSnapshotEventIds, getDatabaseUrl, getRequiredDatabaseUrl, mergeMetricRows, summarizeDailyRevenueMetrics } from '../scripts/backfill_retention_metrics.ts'
+import { aggregateRevenueMovementEvents, buildRevenueMovementEvents, fetchStripeEvents, findMissingResetSnapshotEventIds, getDatabaseUrl, getRequiredDatabaseUrl, mergeMetricRows, shouldAllowSelfSignedPgCertificate, summarizeDailyRevenueMetrics } from '../scripts/backfill_retention_metrics.ts'
 
 const plans = [
   {
@@ -397,6 +397,20 @@ describe('retention metric backfill helpers', () => {
       SUPABASE_DB_DIRECT_URL: 'postgres://direct',
       DIRECT_URL: 'postgres://direct-legacy',
     })).toBe('postgres://database-url')
+  })
+
+  it.concurrent('allows the Supabase writer pooler TLS chain by default', () => {
+    expect(shouldAllowSelfSignedPgCertificate(
+      {},
+      'postgresql://postgres:secret@db.project-ref.supabase.co:6543/postgres',
+    )).toBe(true)
+  })
+
+  it.concurrent('keeps strict verification when PG_SSL_REJECT_UNAUTHORIZED forces it', () => {
+    expect(shouldAllowSelfSignedPgCertificate(
+      { PG_SSL_REJECT_UNAUTHORIZED: '1' },
+      'postgresql://postgres:secret@db.project-ref.supabase.co:6543/postgres',
+    )).toBe(false)
   })
 
   it.concurrent('skips deleted events when pre-range state tracks a different subscription id', () => {
