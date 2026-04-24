@@ -4,7 +4,7 @@
 
 DROP POLICY IF EXISTS "Allow update for auth, api keys (write, all) (write+)" ON public.channels;
 
-CREATE POLICY "Allow update for auth (write+)" ON public.channels
+CREATE POLICY "Allow update for auth, api keys (write, all) (write+)" ON public.channels
 FOR UPDATE
 TO authenticated
 USING (
