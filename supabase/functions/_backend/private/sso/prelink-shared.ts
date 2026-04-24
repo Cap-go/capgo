@@ -50,9 +50,9 @@ const PUBLIC_EMAIL_DOMAINS = new Set([
  * of the local part and the domain. Example: "j***@example.com"
  */
 function maskEmail(email: string | undefined | null): string | undefined {
-  if (!email || !email.includes('@'))
+  if (!email?.includes('@'))
     return undefined
-  const [localPart, domainPart] = email.split('@')
+  const [localPart, domainPart] = email.split('@', 2)
   if (!localPart || !domainPart)
     return undefined
   const maskedLocal = `${localPart.charAt(0)}***`
@@ -199,7 +199,7 @@ export async function runPrelinkUsers(
 
   if (PUBLIC_EMAIL_DOMAINS.has(normalizedDomain)) {
     cloudlogErr({ requestId, message: 'BLOCKED: prelink attempted on public email domain', domain: normalizedDomain, providerId: provider_id })
-    return quickError(400, 'public_domain_blocked', 'Cannot prelink users on public email domains')
+    quickError(400, 'public_domain_blocked', 'Cannot prelink users on public email domains')
   }
 
   const admin = supabaseAdmin(c)
@@ -212,22 +212,22 @@ export async function runPrelinkUsers(
 
   if (providerCheckError || !providerCheck) {
     cloudlogErr({ requestId, message: 'Provider not found for prelink', providerId: provider_id, error: providerCheckError })
-    return quickError(404, 'provider_not_found', 'SSO provider not found')
+    quickError(404, 'provider_not_found', 'SSO provider not found')
   }
 
   if (providerCheck.org_id !== org_id) {
     cloudlogErr({ requestId, message: 'Org mismatch: provider does not belong to requested org', providerId: provider_id, requestOrgId: org_id, providerOrgId: providerCheck.org_id })
-    return quickError(403, 'org_mismatch', 'SSO provider does not belong to the specified organization')
+    quickError(403, 'org_mismatch', 'SSO provider does not belong to the specified organization')
   }
 
   if (providerCheck.status !== 'active') {
     cloudlog({ requestId, message: 'Provider not active, cannot prelink', providerId: provider_id, status: providerCheck.status })
-    return quickError(400, 'provider_not_active', 'SSO provider must be active before prelinking users')
+    quickError(400, 'provider_not_active', 'SSO provider must be active before prelinking users')
   }
 
   if (providerCheck.domain?.toLowerCase().trim() !== normalizedDomain) {
     cloudlogErr({ requestId, message: 'Domain mismatch between request and provider', requestDomain: normalizedDomain, providerDomain: providerCheck.domain })
-    return quickError(400, 'domain_mismatch', 'Requested domain does not match provider domain')
+    quickError(400, 'domain_mismatch', 'Requested domain does not match provider domain')
   }
 
   let errorCount = 0
