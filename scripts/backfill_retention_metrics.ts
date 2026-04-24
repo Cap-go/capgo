@@ -212,15 +212,16 @@ function getRequiredEnv(env: Record<string, string | undefined>, key: string) {
   return value
 }
 
-function getRequiredDatabaseUrl(env: Record<string, string | undefined>) {
+export function getRequiredDatabaseUrl(env: Record<string, string | undefined>) {
   const value = getDatabaseUrl(env)
   if (!value)
-    throw new Error('--apply requires DATABASE_URL, POSTGRES_URL, SUPABASE_DB_URL, SUPABASE_DB_DIRECT_URL, or DIRECT_URL so metric writes and processed-event markers are committed atomically')
+    throw new Error('--apply requires MAIN_SUPABASE_DB_URL, DATABASE_URL, POSTGRES_URL, SUPABASE_DB_URL, SUPABASE_DB_DIRECT_URL, or DIRECT_URL so metric writes and processed-event markers are committed atomically')
   return value
 }
 
-function getDatabaseUrl(env: Record<string, string | undefined>) {
-  return env.DATABASE_URL?.trim()
+export function getDatabaseUrl(env: Record<string, string | undefined>) {
+  return env.MAIN_SUPABASE_DB_URL?.trim()
+    || env.DATABASE_URL?.trim()
     || env.POSTGRES_URL?.trim()
     || env.SUPABASE_DB_URL?.trim()
     || env.SUPABASE_DB_DIRECT_URL?.trim()

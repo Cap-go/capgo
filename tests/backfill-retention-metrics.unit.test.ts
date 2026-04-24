@@ -1,6 +1,6 @@
 import type Stripe from 'stripe'
 import { describe, expect, it } from 'vitest'
-import { aggregateRevenueMovementEvents, buildRevenueMovementEvents, fetchStripeEvents, findMissingResetSnapshotEventIds, mergeMetricRows, summarizeDailyRevenueMetrics } from '../scripts/backfill_retention_metrics.ts'
+import { aggregateRevenueMovementEvents, buildRevenueMovementEvents, fetchStripeEvents, findMissingResetSnapshotEventIds, getDatabaseUrl, getRequiredDatabaseUrl, mergeMetricRows, summarizeDailyRevenueMetrics } from '../scripts/backfill_retention_metrics.ts'
 
 const plans = [
   {
@@ -370,6 +370,19 @@ describe('retention metric backfill helpers', () => {
     expect(result.reachedLimit).toBe(true)
     expect(result.events).toHaveLength(1)
     expect(result.events[0]?.id).toBe('evt_first')
+  })
+
+  it.concurrent('prefers MAIN_SUPABASE_DB_URL for apply writes', () => {
+    expect(getDatabaseUrl({
+      MAIN_SUPABASE_DB_URL: 'postgres://main-writer',
+      SUPABASE_DB_URL: 'postgres://fallback-direct',
+    })).toBe('postgres://main-writer')
+  })
+
+  it.concurrent('accepts MAIN_SUPABASE_DB_URL as the required apply database url', () => {
+    expect(getRequiredDatabaseUrl({
+      MAIN_SUPABASE_DB_URL: 'postgres://main-writer',
+    })).toBe('postgres://main-writer')
   })
 
   it.concurrent('skips deleted events when pre-range state tracks a different subscription id', () => {
