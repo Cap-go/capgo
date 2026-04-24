@@ -199,4 +199,84 @@ describe('build log disconnect authorization', () => {
       fetchMock.mockRestore()
     }
   })
+
+  it('cancels immediately when an authorized request already aborted before listener registration', async () => {
+    let resolveBuildPermission: (value: boolean) => void = () => {
+      throw new Error('Build permission resolver not initialized')
+    }
+    const buildPermissionPromise = new Promise<boolean>((resolve) => {
+      resolveBuildPermission = resolve
+    })
+
+    mockCheckPermission
+      .mockResolvedValueOnce(true)
+      .mockImplementationOnce(() => buildPermissionPromise)
+
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url === `${builderUrl}/jobs/${jobId}/logs`) {
+        return new Response('data: log line\n\n', {
+          status: 200,
+          headers: {
+            'Content-Type': 'text/event-stream',
+          },
+        })
+      }
+
+      if (url === `${builderUrl}/jobs/${jobId}/cancel`) {
+        expect(init).toMatchObject({
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': builderApiKey,
+          },
+          body: JSON.stringify({ app_id: appId }),
+        })
+
+        return new Response(JSON.stringify({ status: 'cancelled' }), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+      }
+
+      throw new Error(`Unexpected fetch: ${url}`)
+    })
+
+    try {
+      const { context, controller } = createContext()
+      const responsePromise = streamBuildLogs(
+        context as any,
+        jobId,
+        appId,
+        {
+          key: 'all-key',
+          user_id: 'user-build-native',
+        } as any,
+      )
+
+      await Promise.resolve()
+      controller.abort()
+      resolveBuildPermission(true)
+
+      const response = await responsePromise
+      expect(response.status).toBe(200)
+
+      await new Promise(resolve => setTimeout(resolve, 0))
+
+      expect(fetchMock).toHaveBeenCalledTimes(2)
+      expect(fetchMock).toHaveBeenNthCalledWith(2, `${builderUrl}/jobs/${jobId}/cancel`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': builderApiKey,
+        },
+        body: JSON.stringify({ app_id: appId }),
+      })
+    }
+    finally {
+      fetchMock.mockRestore()
+    }
+  })
 })
