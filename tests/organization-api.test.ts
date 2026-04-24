@@ -5,6 +5,7 @@ import { z } from 'zod'
 
 import {
   BASE_URL,
+  getAuthHeaders,
   getSupabaseClient,
   headers,
   normalizeLocalhostUrl,
@@ -1021,9 +1022,10 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
   it('update organization enforce_hashed_api_keys to false', async () => {
     // First, set it to true
     await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: true }).eq('id', ORG_ID)
+    const authHeaders = await getAuthHeaders()
 
     const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
+      headers: authHeaders,
       method: 'PUT',
       body: JSON.stringify({
         orgId: ORG_ID,
