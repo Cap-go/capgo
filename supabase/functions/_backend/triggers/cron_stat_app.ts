@@ -1,8 +1,9 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
-import { middlewareAPISecret, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { middlewareAPISecret, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
-import { retryWithBackoff } from '../utils/retry.ts'
+import { closeClient, getPgClient } from '../utils/pg.ts'
+import { getRetryablePostgrestStatus, isRetryablePostgrestError, isRetryablePostgrestResult, isRetryablePostgrestStatus, retryWithBackoff } from '../utils/retry.ts'
 import { readStatsBandwidth, readStatsMau, readStatsStorage, readStatsVersion } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
@@ -14,27 +15,93 @@ interface DataToGet {
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
+const SUPABASE_RETRY_ATTEMPTS = 3
+const SUPABASE_RETRY_DELAY_MS = 300
+const PLAN_REFRESH_RETRY_ATTEMPTS = 3
+const PLAN_REFRESH_RETRY_DELAY_MS = 300
+const APP_STATS_REFRESH_STALE_MS = 5 * 60 * 1000
+
+interface SupabaseRetryResult<T> {
+  data: T | null
+  error: unknown
+  status?: number | null
+}
+
 interface OrgStatsRefreshTarget {
   customerId: string | null
   previousStatsUpdatedAt: string | null
 }
 
-const PLAN_REFRESH_RETRY_ATTEMPTS = 3
-const PLAN_REFRESH_RETRY_DELAY_MS = 300
+interface CycleInfo {
+  subscription_anchor_start: string | null
+  subscription_anchor_end: string | null
+}
+
+interface AppOwnerOrgRow {
+  owner_org: string
+}
+
+interface VersionNameRow {
+  id: number
+  name: string
+}
+
+async function runSupabaseResultWithRetry<T>(
+  c: Parameters<typeof supabaseAdmin>[0],
+  label: string,
+  operation: () => Promise<SupabaseRetryResult<T>>,
+): Promise<SupabaseRetryResult<T>> {
+  const { result, attempts } = await retryWithBackoff(async () => {
+    try {
+      return await operation()
+    }
+    catch (error) {
+      return {
+        data: null,
+        error,
+      }
+    }
+  }, {
+    attempts: SUPABASE_RETRY_ATTEMPTS,
+    baseDelayMs: SUPABASE_RETRY_DELAY_MS,
+    shouldRetry: result => isRetryablePostgrestResult(result),
+  })
+
+  if (!result) {
+    throw new Error(`${label} returned no result`)
+  }
+
+  if (attempts > 1) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'cron_stat_app retry finished',
+      label,
+      attempts,
+      hadError: Boolean(result.error || isRetryablePostgrestStatus(getRetryablePostgrestStatus(result))),
+    })
+  }
+
+  if (result.error) {
+    throw result.error
+  }
+
+  if (typeof result.status === 'number' && result.status >= 400) {
+    throw new Error(`${label} failed with status ${result.status}`)
+  }
+
+  return result
+}
 
 async function getOrgStatsRefreshTarget(
+  c: Parameters<typeof supabaseAdmin>[0],
   supabase: ReturnType<typeof supabaseAdmin>,
   orgId: string,
 ): Promise<OrgStatsRefreshTarget> {
-  const { data: orgData, error: orgError } = await supabase
+  const { data: orgData } = await runSupabaseResultWithRetry<{ customer_id: string | null, stats_updated_at: string | null }>(c, 'load_org_stats_refresh_target', async () => await supabase
     .from('orgs')
     .select('customer_id,stats_updated_at')
     .eq('id', orgId)
-    .single()
-
-  if (orgError) {
-    throw orgError
-  }
+    .single())
 
   return {
     customerId: orgData?.customer_id ?? null,
@@ -42,30 +109,95 @@ async function getOrgStatsRefreshTarget(
   }
 }
 
-async function syncOrgStatsRefresh(
+async function syncAppStatsRefresh(
+  c: Parameters<typeof supabaseAdmin>[0],
   supabase: ReturnType<typeof supabaseAdmin>,
-  orgId: string,
-  previousStatsUpdatedAt: string | null,
-): Promise<void> {
-  await supabase.from('orgs')
-    .update({
-      stats_updated_at: new Date().toISOString(),
-      last_stats_updated_at: previousStatsUpdatedAt,
-    })
-    .eq('id', orgId)
-    .throwOnError()
+  appId: string,
+): Promise<string> {
+  const { data } = await runSupabaseResultWithRetry<string | null>(c, 'sync_app_stats_refresh', async () => await supabase.rpc('mark_app_stats_refreshed', {
+    p_app_id: appId,
+  }))
+
+  if (!data) {
+    throw new Error('sync_app_stats_refresh returned no timestamp')
+  }
+
+  return data
 }
 
-async function queueOrgPlanRefresh(
+async function syncOrgStatsRefresh(
   c: Parameters<typeof supabaseAdmin>[0],
   supabase: ReturnType<typeof supabaseAdmin>,
   orgId: string,
-  customerId: string,
+  previousStatsUpdatedAt: string | null,
+  refreshCompletedAt: string,
 ): Promise<void> {
-  await supabase.rpc('queue_cron_stat_org_for_org', {
+  await runSupabaseResultWithRetry(c, 'sync_org_stats_refresh', async () => await supabase.from('orgs')
+    .update({
+      stats_updated_at: refreshCompletedAt,
+      last_stats_updated_at: previousStatsUpdatedAt,
+    })
+    .eq('id', orgId))
+}
+
+async function hasPendingAppStatsRefresh(
+  c: Parameters<typeof supabaseAdmin>[0],
+  orgId: string,
+): Promise<boolean> {
+  const pgClient = getPgClient(c)
+  const staleCutoff = new Date(Date.now() - APP_STATS_REFRESH_STALE_MS).toISOString()
+
+  try {
+    const { result, lastError } = await retryWithBackoff(
+      async () => await pgClient.query<{ has_pending: boolean }>(
+        `
+          SELECT EXISTS (
+            SELECT 1
+            FROM public.apps
+            WHERE owner_org = $1
+              AND stats_refresh_requested_at IS NOT NULL
+              AND stats_refresh_requested_at >= $2::timestamp without time zone
+              AND (
+                stats_updated_at IS NULL
+                OR stats_refresh_requested_at > stats_updated_at
+              )
+            LIMIT 1
+          ) AS has_pending
+        `,
+        [orgId, staleCutoff],
+      ),
+      {
+        attempts: SUPABASE_RETRY_ATTEMPTS,
+        baseDelayMs: SUPABASE_RETRY_DELAY_MS,
+      },
+    )
+
+    if (lastError || !result) {
+      throw lastError ?? new Error('load_pending_app_stats_refreshes returned no result')
+    }
+
+    return result.rows[0]?.has_pending ?? false
+  }
+  finally {
+    await closeClient(c, pgClient)
+  }
+}
+
+async function queueOrgPlanRefresh(
+  supabase: ReturnType<typeof supabaseAdmin>,
+  orgId: string,
+  customerId: string,
+): Promise<SupabaseRetryResult<unknown>> {
+  const result = await supabase.rpc('queue_cron_stat_org_for_org', {
     org_id: orgId,
     customer_id: customerId,
-  }).throwOnError()
+  })
+
+  return {
+    data: result.data,
+    error: result.error,
+    status: result.status,
+  }
 }
 
 async function queueOrgPlanRefreshWithRetry(
@@ -74,28 +206,20 @@ async function queueOrgPlanRefreshWithRetry(
   orgId: string,
   customerId: string,
 ): Promise<void> {
-  const { result, attempts } = await retryWithBackoff(async () => {
-    try {
-      await queueOrgPlanRefresh(c, supabase, orgId, customerId)
-      return { ok: true as const }
-    }
-    catch (error) {
-      return { ok: false as const, error }
-    }
-  }, {
+  const { result, lastError, attempts } = await retryWithBackoff(async () => await queueOrgPlanRefresh(supabase, orgId, customerId), {
     attempts: PLAN_REFRESH_RETRY_ATTEMPTS,
     baseDelayMs: PLAN_REFRESH_RETRY_DELAY_MS,
-    shouldRetry: result => !result.ok,
+    shouldRetry: result => isRetryablePostgrestResult(result),
   })
 
-  if (!result?.ok) {
+  if (lastError || !result || result.error || (typeof result.status === 'number' && result.status >= 400)) {
     cloudlogErr({
       requestId: c.get('requestId'),
       message: 'Failed to queue cron_stat_app org plan refresh',
       orgId,
       customerId,
       attempts,
-      error: result?.error,
+      error: lastError ?? result?.error ?? result,
     })
     return
   }
@@ -118,23 +242,34 @@ app.post('/', middlewareAPISecret, async (c) => {
     throw simpleError('no_appId', 'No appId', { body })
   if (!body.orgId)
     throw simpleError('no_orgId', 'No orgId', { body })
+  const appId = body.appId
+  const orgId = body.orgId
 
   const supabase = supabaseAdmin(c)
 
-  const app = await supabase.from('apps')
-    .select('*')
-    .eq('app_id', body.appId)
-    .single()
-  if (!app.data)
-    return quickError(404, 'app_not_found', 'App not found', { body })
-  if (app.data.owner_org !== body.orgId)
-    return quickError(401, 'app_not_found', 'This app is not owned by the organization', { body })
+  const appResult = await runSupabaseResultWithRetry<AppOwnerOrgRow>(c, 'load_app', async () => await supabase.from('apps')
+    .select('owner_org')
+    .eq('app_id', appId)
+    .maybeSingle())
+  if (!appResult.data) {
+    cloudlog({ requestId: c.get('requestId'), message: 'cron_stat_app skipping missing app', body })
+    return c.json({ status: 'skipped', reason: 'app_not_found' })
+  }
+  if (appResult.data.owner_org !== orgId) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'cron_stat_app skipping owner mismatch',
+      body,
+      app_owner_org: appResult.data.owner_org,
+    })
+    return c.json({ status: 'skipped', reason: 'owner_org_mismatch' })
+  }
 
   // get the period of the billing of the organization
-  const cycleInfoData = await supabase.rpc('get_cycle_info_org', { orgid: body.orgId }).single()
-  const cycleInfo = cycleInfoData.data
+  const cycleInfoResult = await runSupabaseResultWithRetry<CycleInfo>(c, 'get_cycle_info_org', async () => await supabase.rpc('get_cycle_info_org', { orgid: orgId }).single())
+  const cycleInfo = cycleInfoResult.data
   if (!cycleInfo?.subscription_anchor_start || !cycleInfo?.subscription_anchor_end)
-    throw simpleError('cannot_get_cycle_info', 'Cannot get cycle info', { cycleInfoData })
+    throw simpleError('cannot_get_cycle_info', 'Cannot get cycle info', { cycleInfoResult })
 
   cloudlog({ requestId: c.get('requestId'), message: 'cycleInfo', cycleInfo })
   const startDate = cycleInfo.subscription_anchor_start
@@ -164,10 +299,10 @@ app.post('/', middlewareAPISecret, async (c) => {
 
   let versionIdToNameMap: Record<number, string> = {}
   if (versionNamesToResolve.length > 0) {
-    const { data: versions } = await supabase
+    const { data: versions } = await runSupabaseResultWithRetry<VersionNameRow[]>(c, 'resolve_version_names', async () => await supabase
       .from('app_versions')
       .select('id, name')
-      .in('id', versionNamesToResolve)
+      .in('id', versionNamesToResolve))
     if (versions) {
       versionIdToNameMap = Object.fromEntries(versions.map(v => [v.id, v.name]))
     }
@@ -213,45 +348,57 @@ app.post('/', middlewareAPISecret, async (c) => {
   // Note: daily_version upsert uses type cast because auto-generated types are stale
   // (migration adds version_name column but types haven't been regenerated)
   await Promise.all([
-    supabase.from('daily_mau')
+    runSupabaseResultWithRetry(c, 'upsert_daily_mau', async () => await supabase.from('daily_mau')
       .upsert(mau, { onConflict: 'app_id,date' })
-      .eq('app_id', body.appId)
-      .throwOnError(),
-    supabase.from('daily_bandwidth')
+      .eq('app_id', appId)),
+    runSupabaseResultWithRetry(c, 'upsert_daily_bandwidth', async () => await supabase.from('daily_bandwidth')
       .upsert(bandwidth, { onConflict: 'app_id,date' })
-      .eq('app_id', body.appId)
-      .throwOnError(),
-    supabase.from('daily_storage')
+      .eq('app_id', appId)),
+    runSupabaseResultWithRetry(c, 'upsert_daily_storage', async () => await supabase.from('daily_storage')
       .upsert(storage, { onConflict: 'app_id,date' })
-      .eq('app_id', body.appId)
-      .throwOnError(),
-    supabase.from('daily_version')
+      .eq('app_id', appId)),
+    runSupabaseResultWithRetry(c, 'upsert_daily_version', async () => await supabase.from('daily_version')
       .upsert(resolvedVersionUsage, { onConflict: 'app_id,date,version_name' })
-      .eq('app_id', body.appId)
-      .throwOnError(),
+      .eq('app_id', appId)),
   ])
 
   cloudlog({ requestId: c.get('requestId'), message: 'stats saved', mauLength: mau.length, bandwidthLength: bandwidth.length, storageLength: storage.length, versionUsageLength: versionUsage.length })
-  let orgStatsRefreshTarget: OrgStatsRefreshTarget | null = null
+  const refreshCompletedAt = await syncAppStatsRefresh(c, supabase, body.appId)
+
+  let pendingAppRefreshes: boolean
   try {
-    orgStatsRefreshTarget = await getOrgStatsRefreshTarget(supabase, body.orgId)
+    pendingAppRefreshes = await hasPendingAppStatsRefresh(c, body.orgId)
   }
   catch (error) {
-    cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to load cron_stat_app org refresh target', orgId: body.orgId, error })
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to inspect pending cron_stat_app refresh state', orgId: body.orgId, error })
+    throw error
   }
 
-  if (orgStatsRefreshTarget) {
+  let orgStatsRefreshTarget: OrgStatsRefreshTarget | null = null
+  try {
+    orgStatsRefreshTarget = await getOrgStatsRefreshTarget(c, supabase, orgId)
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to load cron_stat_app org refresh target', orgId, error })
+  }
+
+  if (orgStatsRefreshTarget && !pendingAppRefreshes) {
     try {
-      await syncOrgStatsRefresh(supabase, body.orgId, orgStatsRefreshTarget.previousStatsUpdatedAt)
+      await syncOrgStatsRefresh(c, supabase, orgId, orgStatsRefreshTarget.previousStatsUpdatedAt, refreshCompletedAt)
     }
     catch (error) {
-      cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to persist cron_stat_app org refresh metadata', orgId: body.orgId, error })
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to persist cron_stat_app org refresh metadata', orgId, error })
     }
   }
 
-  if (orgStatsRefreshTarget?.customerId) {
-    await queueOrgPlanRefreshWithRetry(c, supabase, body.orgId, orgStatsRefreshTarget.customerId)
+  if (orgStatsRefreshTarget?.customerId && !pendingAppRefreshes) {
+    await queueOrgPlanRefreshWithRetry(c, supabase, orgId, orgStatsRefreshTarget.customerId)
   }
 
   return c.json({ status: 'Stats saved', mau, bandwidth, storage, versionUsage })
 })
+
+export const cronStatAppTestUtils = {
+  isRetryablePostgrestError,
+  runSupabaseResultWithRetry,
+}

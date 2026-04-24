@@ -92,8 +92,11 @@ export async function checkWebhookPermissionV2(
     }
   }
 
-  // Check org admin access
-  if (!(await hasOrgRight(c, orgId, auth.userId, 'admin'))) {
+  const hasWebhookAdminRight = auth.authType === 'apikey'
+    ? await hasOrgRightApikey(c, orgId, auth.userId, 'admin', c.get('capgkey') as string)
+    : await hasOrgRight(c, orgId, auth.userId, 'admin')
+
+  if (!hasWebhookAdminRight) {
     throw simpleError('no_permission', 'You need admin access to manage webhooks', { org_id: orgId })
   }
 

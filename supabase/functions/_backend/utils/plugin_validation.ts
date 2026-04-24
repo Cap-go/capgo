@@ -126,24 +126,24 @@ function validateRequiredDeviceId(input: UnknownRecord, issues: ValidationIssue[
   return value
 }
 
-function validateRequiredVersionName(input: UnknownRecord, issues: ValidationIssue[]): string | undefined {
+function validateRequiredVersionName(input: UnknownRecord, issues: ValidationIssue[], allowEmpty = false): string | undefined {
   const value = validateRequiredString(input, 'version_name', issues, MISSING_STRING_VERSION_NAME, NON_STRING_VERSION_NAME)
   if (value === undefined) {
     return undefined
   }
-  if (value.length === 0) {
+  if (!allowEmpty && value.length === 0) {
     issues.push(fieldIssue('version_name', MISSING_STRING_VERSION_NAME))
     return undefined
   }
   return value
 }
 
-function validateRequiredVersionBuild(input: UnknownRecord, issues: ValidationIssue[]): string | undefined {
+function validateRequiredVersionBuild(input: UnknownRecord, issues: ValidationIssue[], allowEmpty = false): string | undefined {
   const value = validateRequiredString(input, 'version_build', issues, MISSING_STRING_VERSION_BUILD, NON_STRING_VERSION_BUILD)
   if (value === undefined) {
     return undefined
   }
-  if (value.length === 0) {
+  if (!allowEmpty && value.length === 0) {
     issues.push(fieldIssue('version_build', MISSING_STRING_VERSION_BUILD))
     return undefined
   }
@@ -252,7 +252,7 @@ export const statsRequestSchema = createPluginSchema<AppStats>((input, issues) =
   validateRequiredAppId(input, issues)
   validateRequiredDeviceId(input, issues)
   validateRequiredPlatformString(input, issues)
-  validateRequiredVersionName(input, issues)
+  validateRequiredVersionName(input, issues, true)
   validateRequiredVersionOs(input, issues)
   validateBasePluginBooleans(input, issues)
   validateOptionalCommonStrings(input, issues)
@@ -263,8 +263,8 @@ export const statsRequestSchema = createPluginSchema<AppStats>((input, issues) =
 export const channelSelfRequestSchema = createPluginSchema<AppInfos>((input, issues) => {
   validateRequiredAppId(input, issues)
   validateRequiredDeviceId(input, issues)
-  validateRequiredVersionName(input, issues)
-  validateRequiredVersionBuild(input, issues)
+  validateRequiredVersionName(input, issues, true)
+  validateRequiredVersionBuild(input, issues, true)
   validateBasePluginBooleans(input, issues)
   validateRequiredDevicePlatform(input, issues)
   validateOptionalString(input, 'defaultChannel', issues)

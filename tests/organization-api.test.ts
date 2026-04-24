@@ -6,7 +6,6 @@ import { parseSchema, safeParseSchema } from '../supabase/functions/_backend/uti
 
 import {
   BASE_URL,
-  getAuthHeaders,
   getSupabaseClient,
   headers,
   normalizeLocalhostUrl,
@@ -76,14 +75,11 @@ describe('read-mode API keys cannot access destructive organization routes', () 
   const readOnlyCustomerId = `cus_test_${readOnlyOrgId}`
   let readOnlyKey = ''
   let readOnlyKeyId = 0
-  let authHeaders: Record<string, string>
   const readOnlyHeaders = {
     'Content-Type': 'application/json',
   }
 
   beforeAll(async () => {
-    authHeaders = await getAuthHeaders()
-
     const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
       customer_id: readOnlyCustomerId,
       status: 'succeeded',
@@ -112,29 +108,35 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     })
     expect(orgUserError).toBeNull()
 
-    const createResponse = await fetch(`${BASE_URL}/apikey`, {
-      method: 'POST',
-      headers: authHeaders,
-      body: JSON.stringify({
-        name: `Organization read-only regression ${randomUUID()}`,
+    // Seed the key directly so this suite stays focused on organization-route auth.
+    // API key creation behavior is covered in apikey-specific tests and can run in parallel.
+    const { data: createdKey, error: createError } = await getSupabaseClient()
+      .from('apikeys')
+      .insert({
+        user_id: USER_ID,
+        key: randomUUID(),
+        key_hash: null,
         mode: 'read',
-        hashed: false,
+        name: `Organization read-only regression ${randomUUID()}`,
         limited_to_orgs: [readOnlyOrgId],
-      }),
-    })
-    const createdKey = await createResponse.json<{ id?: number, key?: string, error?: string, message?: string }>()
-    expect(createResponse.status, JSON.stringify(createdKey)).toBe(200)
-    const parsedKey = parseSchema(type({ id: 'number', key: 'string' }), createdKey)
-    readOnlyKey = parsedKey.key
-    readOnlyKeyId = parsedKey.id
+      })
+      .select('id, key')
+      .single()
+
+    expect(createError).toBeNull()
+    expect(createdKey?.id).toBeTypeOf('number')
+    expect(createdKey?.key).toBeTypeOf('string')
+    if (!createdKey?.key || typeof createdKey.id !== 'number') {
+      throw new Error('Failed to seed read-only API key')
+    }
+
+    readOnlyKey = createdKey.key
+    readOnlyKeyId = createdKey.id
   })
 
   afterAll(async () => {
     if (readOnlyKeyId) {
-      await fetch(`${BASE_URL}/apikey/${readOnlyKeyId}`, {
-        method: 'DELETE',
-        headers: authHeaders,
-      })
+      await getSupabaseClient().from('apikeys').delete().eq('id', readOnlyKeyId)
     }
     await getSupabaseClient().from('org_users').delete().eq('org_id', readOnlyOrgId)
     await getSupabaseClient().from('orgs').delete().eq('id', readOnlyOrgId)
@@ -1067,6 +1069,8 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
     expect(testOrg).toBeTruthy()
     expect(testOrg).toHaveProperty('enforce_hashed_api_keys')
     expect(testOrg!.enforce_hashed_api_keys).toBe(true)
+    expect(testOrg).toHaveProperty('stats_updated_at')
+    expect(testOrg).toHaveProperty('stats_refresh_requested_at')
     expect(testOrg).toHaveProperty('website')
     expect(testOrg!.website).toBe(rpcWebsite)
 

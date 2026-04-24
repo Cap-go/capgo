@@ -293,13 +293,18 @@ export function simpleErrorWithStatus(c: Context, status: ContentfulStatusCode, 
   return c.json(res, status)
 }
 
-export function quickError(status: number, errorCode: string, message: string, moreInfo: any = {}, cause?: any): never {
+export interface QuickErrorOptions {
+  alert?: boolean
+}
+
+export function quickError(status: number, errorCode: string, message: string, moreInfo: any = {}, cause?: any, options: QuickErrorOptions = {}): never {
   // Store error details in cause so onError can extract them
   const errorDetails = {
     error: errorCode,
     message,
     moreInfo,
     originalCause: cause,
+    suppressDiscordAlert: options.alert === false,
   }
   // Throw a simple HTTPException - onError will create the response with X-Request-Id header
   throw new HTTPException(status as any, {

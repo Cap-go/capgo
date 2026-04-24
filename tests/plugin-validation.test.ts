@@ -1,7 +1,7 @@
 import type { StandardSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
 import { describe, expect, it } from 'vitest'
 import { safeParseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
-import { statsRequestSchema, updateRequestSchema } from '../supabase/functions/_backend/utils/plugin_validation.ts'
+import { channelSelfRequestSchema, statsRequestSchema, updateRequestSchema } from '../supabase/functions/_backend/utils/plugin_validation.ts'
 import { INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS } from '../supabase/functions/_backend/utils/utils.ts'
 
 const NO_ERROR = { error: '' }
@@ -209,13 +209,6 @@ describe('test schemas', () => {
       expectError(response, NON_STRING_VERSION_NAME)
     })
 
-    it(`version_name invalid #3 ${suffix}`, () => {
-      const body = getJSON()
-      body.version_name = ''
-      const response = parseJSON(body, schema)
-      expectError(response, MISSING_STRING_VERSION_NAME)
-    })
-
     it(`app_id and device_id missing ${suffix}`, () => {
       const body = getJSON()
       delete body.app_id
@@ -233,6 +226,29 @@ describe('test schemas', () => {
       expectError(response, INVALID_STRING_APP_ID)
       expectError(response, INVALID_STRING_DEVICE_ID, 1)
     })
+  })
+})
+
+describe('test version_name compatibility', () => {
+  it('rejects empty version_name for /updates', () => {
+    const body = getJSON()
+    body.version_name = ''
+    const response = parseJSON(body, updateRequestSchema)
+    expectError(response, MISSING_STRING_VERSION_NAME)
+  })
+
+  it('accepts empty version_name for /stats', () => {
+    const body = getJSON()
+    body.version_name = ''
+    const response = parseJSON(body, statsRequestSchema)
+    expect(response).toEqual(NO_ERROR)
+  })
+
+  it('accepts empty version_name for /channel_self', () => {
+    const body = getJSON()
+    body.version_name = ''
+    const response = parseJSON(body, channelSelfRequestSchema)
+    expect(response).toEqual(NO_ERROR)
   })
 })
 
@@ -263,6 +279,13 @@ describe('test version_build - /updates', () => {
     body.version_build = ''
     const response = parseJSON(body, updateRequestSchema)
     expectError(response, MISSING_STRING_VERSION_BUILD)
+  })
+
+  it('accepts empty version_build for /channel_self', () => {
+    const body = getJSON()
+    body.version_build = ''
+    const response = parseJSON(body, channelSelfRequestSchema)
+    expect(response).toEqual(NO_ERROR)
   })
 })
 

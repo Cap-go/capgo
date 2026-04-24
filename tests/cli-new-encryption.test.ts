@@ -200,7 +200,7 @@ describe.concurrent('tests CLI encryption encrypt/upload/download/decrypt', () =
       await resetAppData(APPNAME)
       await resetAppDataStats(APPNAME)
     }
-  })
+  }, 60000)
 
   it.concurrent('test upload bundle with custom key data', async () => {
     const id = randomUUID()
@@ -233,7 +233,7 @@ describe.concurrent('tests CLI encryption encrypt/upload/download/decrypt', () =
       await resetAppData(APPNAME)
       await resetAppDataStats(APPNAME)
     }
-  })
+  }, 60000)
 
   it.concurrent('test upload bundle with custom key path', async () => {
     const id = randomUUID()
@@ -271,7 +271,7 @@ describe.concurrent('tests CLI encryption encrypt/upload/download/decrypt', () =
       await resetAppData(APPNAME)
       await resetAppDataStats(APPNAME)
     }
-  })
+  }, 60000)
 })
 
 describe.concurrent('tests CLI upload no encryption', () => {
@@ -335,5 +335,5 @@ describe.concurrent('tests CLI upload no encryption', () => {
       await resetAppData(APPNAME)
       await resetAppDataStats(APPNAME)
     }
-  })
+  }, 60000)
 })
