@@ -12,12 +12,30 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
+function formatChildExit(name: string, child: ReturnType<typeof spawn>) {
+  if (child.exitCode !== null)
+    return `${name} exited before readiness with code ${child.exitCode}`
+
+  if (child.signalCode !== null)
+    return `${name} exited before readiness from signal ${child.signalCode}`
+
+  return null
+}
+
+function stopChildProcess(child: ReturnType<typeof spawn> | null, signal: NodeJS.Signals) {
+  if (!child || child.exitCode !== null || child.signalCode !== null)
+    return
+
+  child.kill(signal)
+}
+
 async function waitForBackend(timeoutMs: number, backend: ReturnType<typeof spawn>) {
   const startedAt = Date.now()
 
   while (Date.now() - startedAt < timeoutMs) {
-    if (backend.exitCode !== null)
-      throw new Error(`Playwright backend exited before readiness with code ${backend.exitCode}`)
+    const exitMessage = formatChildExit('Playwright backend', backend)
+    if (exitMessage)
+      throw new Error(exitMessage)
 
     if (existsSync(backendReadyFile))
       return
@@ -49,10 +67,24 @@ const backend = spawn('bun', ['scripts/serve-backend-playwright.ts'], {
 })
 
 const signalHandlers = new Map<NodeJS.Signals, () => void>()
+let playwright: ReturnType<typeof spawn> | null = null
+let relayingSignal = false
+
+function removeSignalHandlers() {
+  for (const [signal, handler] of signalHandlers)
+    process.off(signal, handler)
+}
 
 function forwardSignal(signal: NodeJS.Signals) {
   const handler = () => {
-    backend.kill(signal)
+    if (relayingSignal)
+      return
+
+    relayingSignal = true
+    stopChildProcess(playwright, signal)
+    stopChildProcess(backend, signal)
+    removeSignalHandlers()
+    process.kill(process.pid, signal)
   }
   signalHandlers.set(signal, handler)
   process.on(signal, handler)
@@ -64,7 +96,7 @@ forwardSignal('SIGTERM')
 try {
   await waitForBackend(backendReadyTimeoutMs, backend)
 
-  const playwright = spawn('bunx', ['playwright', 'test', ...playwrightArgs], {
+  playwright = spawn('bunx', ['playwright', 'test', ...playwrightArgs], {
     cwd: repoRoot,
     stdio: 'inherit',
     env: {
@@ -76,8 +108,9 @@ try {
   const exitCode = await new Promise<number>((resolve) => {
     playwright.on('exit', (code, signal) => {
       if (signal) {
-        backend.kill(signal)
-        resolve(1)
+        stopChildProcess(backend, signal)
+        removeSignalHandlers()
+        process.kill(process.pid, signal)
         return
       }
 
@@ -85,14 +118,14 @@ try {
     })
   })
 
-  backend.kill('SIGTERM')
+  stopChildProcess(backend, 'SIGTERM')
   process.exit(exitCode)
 }
 catch (error) {
-  backend.kill('SIGTERM')
+  stopChildProcess(playwright, 'SIGTERM')
+  stopChildProcess(backend, 'SIGTERM')
   throw error
 }
 finally {
-  for (const [signal, handler] of signalHandlers)
-    process.off(signal, handler)
+  removeSignalHandlers()
 }
