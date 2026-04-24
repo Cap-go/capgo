@@ -140,6 +140,31 @@ afterAll(async () => {
 })
 
 describe('public channel uniqueness', () => {
+  it('allows one public iOS channel and one public Android channel when both keep electron enabled', async () => {
+    const appId = `com.public.channel.mobile-defaults.${randomUUID()}`
+    const versionId = await createAppFixture(appId)
+    const iosPublic = `ios-public-${randomUUID().slice(0, 8)}`
+    const androidPublic = `android-public-${randomUUID().slice(0, 8)}`
+
+    await insertChannel(appId, versionId, iosPublic, {
+      public: true,
+      ios: true,
+      android: false,
+      electron: true,
+    })
+    await insertChannel(appId, versionId, androidPublic, {
+      public: true,
+      ios: false,
+      android: true,
+      electron: true,
+    })
+
+    const states = await getChannelStates(appId, [iosPublic, androidPublic])
+
+    expect(states.get(iosPublic)).toBe(true)
+    expect(states.get(androidPublic)).toBe(true)
+  })
+
   it('demotes overlapping public channels on insert while preserving other platforms', async () => {
     const appId = `com.public.channel.insert.${randomUUID()}`
     const versionId = await createAppFixture(appId)

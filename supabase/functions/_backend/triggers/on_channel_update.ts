@@ -71,18 +71,5 @@ app.post('/', middlewareAPISecret, triggerValidator('channels', 'UPDATE'), async
     )
   }
 
-  if (record.public && record.electron) {
-    await updateChannelsWithRetry(
-      c,
-      async () => await supabaseAdmin(c)
-        .from('channels')
-        .update({ public: false })
-        .eq('app_id', record.app_id)
-        .eq('electron', true)
-        .neq('id', record.id),
-      { app_id: record.app_id, record_id: record.id, scope: 'electron' },
-    )
-  }
-
   return c.json(BRES)
 })

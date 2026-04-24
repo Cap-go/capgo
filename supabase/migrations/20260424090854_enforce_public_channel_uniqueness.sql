@@ -1,4 +1,4 @@
--- Enforce one public channel winner per app/platform at write time.
+-- Enforce one public channel winner per mobile platform at write time.
 -- This closes the race where overlapping public channels can coexist briefly
 -- and unnamed /updates requests silently pick an implicit winner.
 
@@ -26,7 +26,6 @@ BEGIN
     AND (
       (NEW.ios = true AND existing.ios = true)
       OR (NEW.android = true AND existing.android = true)
-      OR (NEW.electron = true AND existing.electron = true)
     );
 
   RETURN NEW;
@@ -38,7 +37,7 @@ REVOKE ALL ON FUNCTION public.normalize_public_channel_overlap() FROM PUBLIC;
 
 DROP TRIGGER IF EXISTS normalize_public_channel_overlap_before_upsert ON public.channels;
 CREATE TRIGGER normalize_public_channel_overlap_before_upsert
-BEFORE INSERT OR UPDATE OF public, ios, android, electron, app_id
+BEFORE INSERT OR UPDATE OF public, ios, android, app_id
 ON public.channels
 FOR EACH ROW
 EXECUTE FUNCTION public.normalize_public_channel_overlap();
@@ -58,7 +57,6 @@ WHERE older.public = true
       AND (
         (older.ios = true AND newer.ios = true)
         OR (older.android = true AND newer.android = true)
-        OR (older.electron = true AND newer.electron = true)
       )
       AND (
         newer.updated_at > older.updated_at
@@ -74,7 +72,3 @@ WHERE public = true AND ios = true;
 CREATE UNIQUE INDEX IF NOT EXISTS channels_one_public_android_per_app_key
 ON public.channels (app_id)
 WHERE public = true AND android = true;
-
-CREATE UNIQUE INDEX IF NOT EXISTS channels_one_public_electron_per_app_key
-ON public.channels (app_id)
-WHERE public = true AND electron = true;
