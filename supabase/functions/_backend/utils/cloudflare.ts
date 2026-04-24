@@ -667,7 +667,11 @@ export function buildReadDevicesCFQuery(params: ReadDevicesParams, customIdMode:
 
   const devicesOrder = getReadDevicesCFOrder(params)
   const cursorFilter = buildReadDevicesCFCursorFilter(params.cursor, devicesOrder)
-  const orderBy = devicesOrder ? `updated_at ${devicesOrder.ascending ? 'ASC' : 'DESC'}, device_id ASC` : 'device_id ASC'
+  let orderBy = 'device_id ASC'
+  if (devicesOrder) {
+    const updatedAtDirection = devicesOrder.ascending ? 'ASC' : 'DESC'
+    orderBy = `updated_at ${updatedAtDirection}, device_id ASC`
+  }
 
   return [
     'SELECT *',
