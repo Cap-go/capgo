@@ -14,8 +14,6 @@ const queueName = `queue_load_${randomUUID().replace(/-/g, '').slice(0, 12)}`
 
 beforeAll(async () => {
   await pool.query('SELECT pgmq.create($1)', [queueName])
-  await pool.query(`DELETE FROM pgmq.q_${queueName}`)
-  await pool.query(`DELETE FROM pgmq.a_${queueName}`)
 })
 
 beforeEach(async () => {
@@ -63,7 +61,7 @@ describe('queue Load Test', () => {
     // Close postgres connection
     await pool.end()
   })
-  it('should handle queue consumer health check', async () => {
+  it.concurrent('should handle queue consumer health check', async () => {
     const healthResponse = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/health`, {
       headers: headersInternal,
     })
@@ -76,7 +74,7 @@ describe('queue Load Test', () => {
     await fetchQueueSync(queueName)
   })
 
-  it('should reject invalid queue sync requests', async () => {
+  it.concurrent('should reject invalid queue sync requests', async () => {
     // Test missing queue_name
     const invalidResponse1 = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
       method: 'POST',
