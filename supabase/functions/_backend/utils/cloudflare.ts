@@ -706,11 +706,11 @@ export async function readDevicesCF(c: Context, params: ReadDevicesParams, custo
   //         index1=app_id, timestamp=updated_at
 
   if (params.deviceIds?.length) {
-    cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIds: params.deviceIds })
+    cloudlog({ requestId: c.get('requestId'), message: 'deviceIds', deviceIdsCount: params.deviceIds.length })
   }
 
   if (params.search) {
-    cloudlog({ requestId: c.get('requestId'), message: 'search', search: params.search })
+    cloudlog({ requestId: c.get('requestId'), message: 'search', searchLength: params.search.length })
   }
 
   const query = buildReadDevicesCFQuery(params, customIdMode)
