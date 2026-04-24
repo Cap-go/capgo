@@ -12,6 +12,7 @@ const supabaseConfig = getSupabaseWorktreeConfig(repoRoot)
 
 const stripeApiBaseUrl = getPlaywrightStripeApiBaseUrl(env)
 const webAppUrl = env.WEBAPP_URL || 'http://localhost:5173'
+const functionsReadyTimeoutMs = Number(env.PLAYWRIGHT_BACKEND_TIMEOUT_MS || '360000')
 
 interface SupabaseStatus {
   API_URL?: string
@@ -154,6 +155,25 @@ async function waitForFunctionsReady(timeoutMs: number) {
   throw new Error(`Timed out waiting for Supabase functions at ${targetUrl}`)
 }
 
+async function stopChildProcess(child: ReturnType<typeof spawn>, signal: NodeJS.Signals = 'SIGTERM') {
+  if (child.exitCode !== null)
+    return
+
+  const exitPromise = new Promise<void>((resolve) => {
+    child.once('exit', () => resolve())
+  })
+
+  child.kill(signal)
+  await Promise.race([
+    exitPromise,
+    sleep(5000).then(() => {
+      if (child.exitCode === null)
+        child.kill('SIGKILL')
+      return exitPromise
+    }),
+  ])
+}
+
 let envFileContent = baseEnv
 for (const [key, value] of overriddenEnv)
   envFileContent = upsertEnvValue(envFileContent, key, value)
@@ -176,7 +196,16 @@ const child = spawn('bun', ['scripts/supabase-worktree.ts', 'functions', 'serve'
   env: process.env,
 })
 
-await waitForFunctionsReady(60_000)
+let childStarted = false
+
+try {
+  await waitForFunctionsReady(functionsReadyTimeoutMs)
+  childStarted = true
+}
+finally {
+  if (!childStarted)
+    await stopChildProcess(child)
+}
 
 if (env.PLAYWRIGHT_READY_FILE) {
   mkdirSync(dirname(env.PLAYWRIGHT_READY_FILE), { recursive: true })

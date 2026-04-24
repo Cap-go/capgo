@@ -5,6 +5,7 @@ import process from 'node:process'
 
 const repoRoot = process.cwd()
 const backendReadyFile = resolve(repoRoot, '.context/playwright/backend.ready')
+const backendReadyTimeoutMs = Number(process.env.PLAYWRIGHT_BACKEND_TIMEOUT_MS || '360000')
 const playwrightArgs = process.argv.slice(2)
 
 function sleep(ms: number): Promise<void> {
@@ -61,7 +62,7 @@ forwardSignal('SIGINT')
 forwardSignal('SIGTERM')
 
 try {
-  await waitForBackend(360_000, backend)
+  await waitForBackend(backendReadyTimeoutMs, backend)
 
   const playwright = spawn('bunx', ['playwright', 'test', ...playwrightArgs], {
     cwd: repoRoot,
