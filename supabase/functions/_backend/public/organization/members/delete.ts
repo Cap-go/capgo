@@ -55,6 +55,8 @@ export async function deleteMember(c: Context<MiddlewareKeyVariables>, bodyRaw: 
     throw quickError(404, 'organization_member_not_found', 'User is not a member of this organization', { orgId: body.orgId, email: body.email })
   }
 
+  // The org_users delete trigger should resync role_bindings, but keep this
+  // explicit cleanup as a safety net for the advisory regression path.
   const { error: rbacError } = await supabaseAdmin(c)
     .from('role_bindings')
     .delete()

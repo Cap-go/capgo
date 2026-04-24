@@ -249,6 +249,11 @@ BEGIN
 END;
 $$;
 
+ALTER FUNCTION "public"."rbac_check_permission_direct"("text", "uuid", "uuid", character varying, bigint, "text") OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."rbac_check_permission_direct"("text", "uuid", "uuid", character varying, bigint, "text") FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."rbac_check_permission_direct"("text", "uuid", "uuid", character varying, bigint, "text") TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."rbac_check_permission_direct"("text", "uuid", "uuid", character varying, bigint, "text") TO "service_role";
+
 
 CREATE OR REPLACE FUNCTION "public"."rbac_check_permission_direct_no_password_policy"("p_permission_key" "text", "p_user_id" "uuid", "p_org_id" "uuid", "p_app_id" character varying, "p_channel_id" bigint, "p_apikey" "text" DEFAULT NULL::"text") RETURNS boolean
     LANGUAGE "plpgsql" SECURITY DEFINER
@@ -424,3 +429,8 @@ BEGIN
   END IF;
 END;
 $$;
+
+ALTER FUNCTION "public"."rbac_check_permission_direct_no_password_policy"("text", "uuid", "uuid", character varying, bigint, "text") OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."rbac_check_permission_direct_no_password_policy"("text", "uuid", "uuid", character varying, bigint, "text") FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION "public"."rbac_check_permission_direct_no_password_policy"("text", "uuid", "uuid", character varying, bigint, "text") TO "authenticated";
+GRANT EXECUTE ON FUNCTION "public"."rbac_check_permission_direct_no_password_policy"("text", "uuid", "uuid", character varying, bigint, "text") TO "service_role";

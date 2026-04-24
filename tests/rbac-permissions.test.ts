@@ -270,6 +270,29 @@ describe('rbac permission system', () => {
           VALUES ($1::uuid, $2, NULL, 'write', $3, ARRAY[$4::uuid], ARRAY[]::text[])
         `, [USER_ID, scopedKey, `RBAC scoped ${allowedOrgId}`, allowedOrgId])
 
+        const apiKeyResult = await query(`
+          SELECT rbac_id
+          FROM public.apikeys
+          WHERE key = $1
+          LIMIT 1
+        `, [scopedKey])
+        const apiKeyRbacId = apiKeyResult.rows[0]?.rbac_id
+        expect(apiKeyRbacId).toBeTruthy()
+
+        await query(`
+          INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, granted_by)
+          SELECT
+            'apikey',
+            $1::uuid,
+            r.id,
+            'org',
+            $2::uuid,
+            $3::uuid
+          FROM public.roles r
+          WHERE r.name = 'org_super_admin'
+          LIMIT 1
+        `, [apiKeyRbacId, allowedOrgId, USER_ID])
+
         const deniedResult = await query(`
           SELECT public.rbac_check_permission_direct(
             'org.delete',
