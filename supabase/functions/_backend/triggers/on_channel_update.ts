@@ -56,16 +56,6 @@ app.post('/', middlewareAPISecret, triggerValidator('channels', 'UPDATE'), async
         .neq('id', record.id),
       { app_id: record.app_id, record_id: record.id, scope: 'ios' },
     )
-    await updateChannelsWithRetry(
-      c,
-      async () => await supabaseAdmin(c)
-        .from('channels')
-        .update({ public: false })
-        .eq('app_id', record.app_id)
-        .eq('android', false)
-        .eq('ios', false),
-      { app_id: record.app_id, record_id: record.id, scope: 'hidden_ios' },
-    )
   }
 
   if (record.public && record.android) {
@@ -79,28 +69,18 @@ app.post('/', middlewareAPISecret, triggerValidator('channels', 'UPDATE'), async
         .neq('id', record.id),
       { app_id: record.app_id, record_id: record.id, scope: 'android' },
     )
-    await updateChannelsWithRetry(
-      c,
-      async () => await supabaseAdmin(c)
-        .from('channels')
-        .update({ public: false })
-        .eq('app_id', record.app_id)
-        .eq('android', false)
-        .eq('ios', false),
-      { app_id: record.app_id, record_id: record.id, scope: 'hidden_android' },
-    )
   }
 
-  if (record.public && (record.ios === record.android)) {
+  if (record.public && record.electron) {
     await updateChannelsWithRetry(
       c,
       async () => await supabaseAdmin(c)
         .from('channels')
         .update({ public: false })
         .eq('app_id', record.app_id)
-        .eq('public', true)
+        .eq('electron', true)
         .neq('id', record.id),
-      { app_id: record.app_id, record_id: record.id, scope: 'public' },
+      { app_id: record.app_id, record_id: record.id, scope: 'electron' },
     )
   }
 
