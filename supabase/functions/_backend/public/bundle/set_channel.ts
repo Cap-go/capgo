@@ -3,7 +3,7 @@ import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
-import { supabaseApikey } from '../../utils/supabase.ts'
+import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 import { isValidAppId } from '../../utils/utils.ts'
 
 interface SetChannelBody {
@@ -65,13 +65,18 @@ export async function setChannel(c: Context<MiddlewareKeyVariables>, body: SetCh
   }
 
   // Update the channel to set the new version
-  const { error: updateError } = await supabaseApikey(c, apikey.key)
+  // Keep the supported write-scoped /bundle flow working after explicit RBAC
+  // and ownership checks while direct PostgREST channel updates stay locked down.
+  const { data: updatedChannel, error: updateError } = await supabaseAdmin(c)
     .from('channels')
     .update({ version: body.version_id })
     .eq('id', body.channel_id)
     .eq('app_id', body.app_id)
+    .eq('owner_org', org.owner_org)
+    .select('id')
+    .single()
 
-  if (updateError) {
+  if (updateError || !updatedChannel) {
     throw simpleError('cannot_set_bundle_to_channel', 'Cannot set bundle to channel', { supabaseError: updateError })
   }
 
