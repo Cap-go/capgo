@@ -116,11 +116,16 @@ export async function validatePrincipalAccess(
     const targetRbacAccess = await drizzle
       .select({ id: schema.role_bindings.id })
       .from(schema.role_bindings)
+      .innerJoin(schema.roles, and(
+        eq(schema.role_bindings.role_id, schema.roles.id),
+        eq(schema.role_bindings.scope_type, schema.roles.scope_type),
+      ))
       .where(
         and(
           eq(schema.role_bindings.principal_type, 'user'),
           eq(schema.role_bindings.principal_id, principalId),
           eq(schema.role_bindings.org_id, orgId),
+          sql`(${schema.role_bindings.expires_at} IS NULL OR ${schema.role_bindings.expires_at} > now())`,
         ),
       )
       .limit(1)

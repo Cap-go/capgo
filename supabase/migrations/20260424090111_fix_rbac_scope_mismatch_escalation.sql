@@ -91,12 +91,20 @@ BEGIN
     LIMIT 1;
 
     IF v_channel_uuid IS NOT NULL THEN
-      IF v_app_uuid IS NULL THEN
-        SELECT id INTO v_app_uuid FROM public.apps WHERE app_id = v_channel_app_id LIMIT 1;
+      IF p_app_id IS NOT NULL AND p_app_id IS DISTINCT FROM v_channel_app_id THEN
+        RETURN false;
       END IF;
-      IF v_org_id IS NULL THEN
-        v_org_id := v_channel_org_id;
+
+      IF p_org_id IS NOT NULL AND p_org_id IS DISTINCT FROM v_channel_org_id THEN
+        RETURN false;
       END IF;
+
+      SELECT id INTO v_app_uuid
+      FROM public.apps
+      WHERE app_id = v_channel_app_id
+      LIMIT 1;
+
+      v_org_id := v_channel_org_id;
     END IF;
   END IF;
 
@@ -163,3 +171,11 @@ BEGIN
   RETURN v_has;
 END;
 $function$;
+
+ALTER FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) OWNER TO "postgres";
+
+REVOKE ALL ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) FROM anon;
+REVOKE ALL ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) FROM authenticated;
+GRANT EXECUTE ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) TO service_role;

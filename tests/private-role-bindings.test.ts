@@ -78,6 +78,94 @@ describe('private role bindings helpers', () => {
     })
   })
 
+  it('accepts active scope-valid RBAC bindings as membership proof', async () => {
+    const id = randomUUID()
+    const orgId = randomUUID()
+    const drizzle = getDrizzleClient(client as any)
+
+    await query(`
+      INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
+      VALUES ($1::uuid, $2, $3, $4::uuid, true)
+    `, [orgId, `Role Binding Membership Org ${id}`, `role-binding-membership-${id}@capgo.app`, USER_ID])
+
+    await query(`
+      INSERT INTO public.role_bindings (
+        principal_type,
+        principal_id,
+        role_id,
+        scope_type,
+        org_id,
+        granted_by,
+        granted_at,
+        reason,
+        is_direct
+      )
+      SELECT
+        public.rbac_principal_user(),
+        $1::uuid,
+        r.id,
+        public.rbac_scope_org(),
+        $2::uuid,
+        $3::uuid,
+        now(),
+        'membership-proof-test',
+        true
+      FROM public.roles r
+      WHERE r.name = public.rbac_role_org_member()
+    `, [USER_ID_2, orgId, USER_ID])
+
+    const result = await validatePrincipalAccess(drizzle, 'user', USER_ID_2, orgId)
+
+    expect(result).toEqual({ ok: true, data: null })
+  })
+
+  it('ignores expired RBAC bindings as membership proof', async () => {
+    const id = randomUUID()
+    const orgId = randomUUID()
+    const drizzle = getDrizzleClient(client as any)
+
+    await query(`
+      INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
+      VALUES ($1::uuid, $2, $3, $4::uuid, true)
+    `, [orgId, `Expired Role Binding Org ${id}`, `expired-role-binding-${id}@capgo.app`, USER_ID])
+
+    await query(`
+      INSERT INTO public.role_bindings (
+        principal_type,
+        principal_id,
+        role_id,
+        scope_type,
+        org_id,
+        granted_by,
+        granted_at,
+        expires_at,
+        reason,
+        is_direct
+      )
+      SELECT
+        public.rbac_principal_user(),
+        $1::uuid,
+        r.id,
+        public.rbac_scope_org(),
+        $2::uuid,
+        $3::uuid,
+        now(),
+        now() - interval '1 hour',
+        'expired-membership-proof-test',
+        true
+      FROM public.roles r
+      WHERE r.name = public.rbac_role_org_member()
+    `, [USER_ID_2, orgId, USER_ID])
+
+    const result = await validatePrincipalAccess(drizzle, 'user', USER_ID_2, orgId)
+
+    expect(result).toEqual({
+      ok: false,
+      status: 400,
+      error: 'User is not a member of this org',
+    })
+  })
+
   it('requires the role family to match the requested binding scope', () => {
     expect(validateRoleScope('app', 'app')).toEqual({ ok: true, data: null })
     expect(validateRoleScope('org', 'app')).toEqual({

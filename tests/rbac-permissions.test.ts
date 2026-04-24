@@ -5,9 +5,10 @@ import type { PoolClient } from 'pg'
  * Tests the checkPermission function with both legacy and RBAC modes
  * to ensure feature flag routing works correctly.
  */
+import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { APIKEY_TEST_ALL, ORG_ID, POSTGRES_URL, USER_ID } from './test-utils'
+import { APIKEY_TEST_ALL, ORG_ID, POSTGRES_URL, USER_ID, USER_ID_2 } from './test-utils'
 
 // Test constants
 const TEST_APP_ID = 'com.demo.app'
@@ -256,6 +257,47 @@ describe('rbac permission system', () => {
 
         expect(result.rows[0].app_permission_allowed).toBe(false)
         expect(result.rows[0].write_allowed).toBe(false)
+      })
+
+      it('should reject caller-supplied app and org scope when channel scope belongs elsewhere', async () => {
+        const id = randomUUID()
+        const foreignOrgId = randomUUID()
+        const foreignAppId = `com.channel.scope.${id}`
+
+        await query(`
+          INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
+          VALUES ($1::uuid, $2, $3, $4::uuid, true)
+        `, [foreignOrgId, `Channel Scope Org ${id}`, `channel-scope-${id}@capgo.app`, USER_ID_2])
+
+        await query(`
+          INSERT INTO public.apps (app_id, name, icon_url, owner_org)
+          VALUES ($1, $2, $3, $4::uuid)
+        `, [foreignAppId, `Channel Scope App ${id}`, 'https://example.com/icon.png', foreignOrgId])
+
+        const versionResult = await query(`
+          INSERT INTO public.app_versions (app_id, name, owner_org, user_id, storage_provider)
+          VALUES ($1, '1.0.0', $2::uuid, $3::uuid, 'r2-direct')
+          RETURNING id
+        `, [foreignAppId, foreignOrgId, USER_ID_2])
+
+        const channelResult = await query(`
+          INSERT INTO public.channels (name, app_id, version, created_by, owner_org)
+          VALUES ('production', $1, $2::bigint, $3::uuid, $4::uuid)
+          RETURNING id
+        `, [foreignAppId, versionResult.rows[0].id, USER_ID_2, foreignOrgId])
+
+        const result = await query(`
+          SELECT public.rbac_has_permission(
+            public.rbac_principal_user(),
+            $1::uuid,
+            'app.update_settings',
+            $2::uuid,
+            $3,
+            $4::bigint
+          ) AS allowed
+        `, [USER_ID, ORG_ID, TEST_APP_ID, channelResult.rows[0].id])
+
+        expect(result.rows[0].allowed).toBe(false)
       })
     })
 
