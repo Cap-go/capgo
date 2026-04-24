@@ -607,6 +607,7 @@ describe('rls policies with hashed api keys (via supabase sdk)', () => {
 })
 
 describe('channels rls blocks direct api-key updates', () => {
+  let allKey: { id: number, key: string, key_hash: string } | null = null
   let writeKey: { id: number, key: string, key_hash: string } | null = null
   let versionId: number | null = null
   let channelId: number | null = null
@@ -614,6 +615,7 @@ describe('channels rls blocks direct api-key updates', () => {
   const channelName = `rls-direct-channel-${randomUUID().slice(0, 8)}`
 
   beforeAll(async () => {
+    allKey = await createHashedApiKey('test-channel-direct-all-key', 'all', [ORG_ID_RLS], [APP_NAME_RLS])
     writeKey = await createHashedApiKey('test-channel-direct-write-key', 'write', [ORG_ID_RLS], [APP_NAME_RLS])
 
     const versionResult = await pool.query(
@@ -656,6 +658,9 @@ describe('channels rls blocks direct api-key updates', () => {
       await pool.query('DELETE FROM public.app_versions WHERE id = $1', [versionId])
     }
 
+    if (allKey)
+      await deleteApiKey(allKey.id)
+
     if (writeKey)
       await deleteApiKey(writeKey.id)
   })
@@ -678,6 +683,25 @@ describe('channels rls blocks direct api-key updates', () => {
     )
 
     expect(rows[0].allow_emulator).toBe(false)
+  })
+
+  it('still lets an all-scoped API key mutate supported channel fields via anon role access', async () => {
+    if (!allKey || !channelId)
+      throw new Error('RLS channel test setup did not complete')
+
+    const result = await execWithAnonCapgkey(
+      'UPDATE public.channels SET allow_emulator = true WHERE id = $1 RETURNING id, allow_emulator',
+      allKey.key,
+      [channelId],
+    )
+
+    expect(result.rowCount).toBe(1)
+    expect(result.rows[0].allow_emulator).toBe(true)
+
+    await pool.query(
+      'UPDATE public.channels SET allow_emulator = false WHERE id = $1',
+      [channelId],
+    )
   })
 })
 
