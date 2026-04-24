@@ -334,6 +334,7 @@ columns.value = [
       {
         icon: IconTrash,
         onClick: (key: Database['public']['Tables']['apikeys']['Row']) => deleteKey(key),
+        testId: (key: Database['public']['Tables']['apikeys']['Row']) => `delete-key-${key.id}`,
       },
     ],
   },
@@ -778,6 +779,7 @@ getKeys()
           <div class="flex flex-col overflow-hidden overflow-y-auto bg-white md:mt-5 md:rounded-lg md:border md:shadow-lg border-slate-300 dark:border-slate-900 dark:bg-slate-800">
             <DataTable
               v-model:current-page="currentPage"
+              add-button-test-id="create-key"
               show-add
               :auto-reload="false"
               :columns="columns"

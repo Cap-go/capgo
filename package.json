@@ -55,7 +55,7 @@
     "files:prod": "wrangler dev -c cloudflare_workers/files/wrangler.jsonc --env=prod --env-file=internal/cloudflare/.env.prod",
     "stripe:emulator": "bun scripts/serve-stripe-emulator.ts",
     "init:playwright": "bunx playwright install",
-    "test:front": "playwright test",
+    "test:front": "bun scripts/run-playwright-tests.ts",
     "test:local": "bun run supabase:with-env -- LOCAL_CLI_PATH=true bunx vitest run",
     "test:coverage:all": "bun run supabase:with-env -- bunx vitest run --coverage.enabled=true tests/*",
     "test:all": "bun run supabase:with-env -- bunx vitest run tests/*",
