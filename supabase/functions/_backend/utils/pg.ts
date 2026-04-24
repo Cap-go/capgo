@@ -1,5 +1,5 @@
 import type { Context } from 'hono'
-import { and, eq, or, sql } from 'drizzle-orm'
+import { and, desc, eq, or, sql } from 'drizzle-orm'
 import { drizzle } from 'drizzle-orm/node-postgres'
 import { alias } from 'drizzle-orm/pg-core'
 import { getRuntimeKey } from 'hono/adapter'
@@ -481,7 +481,7 @@ export function requestInfosChannelPostgres(
     .from(channelAlias)
     .innerJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
 
-  const channelQuery = (includeManifest
+  const baseChannelQuery = (includeManifest
     ? baseQuery.leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
     : baseQuery)
     .where(
@@ -497,7 +497,9 @@ export function requestInfosChannelPostgres(
           ),
     )
     .groupBy(channelAlias.id, versionAlias.id)
-    .limit(1)
+  const channelQuery = !defaultChannel
+    ? baseChannelQuery.orderBy(desc(channelAlias.id)).limit(1)
+    : baseChannelQuery.limit(1)
   cloudlog({ requestId: c.get('requestId'), message: 'channel Query:', channelQuery: channelQuery.toSQL() })
   const channel = channelQuery.then(data => data.at(0))
 

@@ -1,6 +1,8 @@
+import type { Context } from 'hono'
 import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
-import { cleanupPostgresClient, executeSQL, ORG_ID, USER_ID } from './test-utils.ts'
+import { getDrizzleClient, requestInfosChannelPostgres } from '../supabase/functions/_backend/utils/pg.ts'
+import { cleanupPostgresClient, executeSQL, getPostgresClient, ORG_ID, USER_ID } from './test-utils.ts'
 
 interface ChannelStateRow {
   name: string
@@ -140,6 +142,72 @@ afterAll(async () => {
 })
 
 describe('public channel uniqueness', () => {
+  it('uses a deterministic winner when multiple public electron channels exist', async () => {
+    const appId = `com.public.channel.electron.${randomUUID()}`
+    const oldVersion = await createAppFixture(appId)
+    const newVersionName = `1.0.${Math.floor(Math.random() * 100000) + 1000}`
+    const [newVersion] = await executeSQL(
+      `INSERT INTO public.app_versions (
+        created_at,
+        app_id,
+        name,
+        r2_path,
+        updated_at,
+        deleted,
+        external_url,
+        checksum,
+        storage_provider,
+        owner_org,
+        comment,
+        link,
+        user_id
+      ) VALUES (
+        NOW(),
+        $1,
+        $2,
+        $3,
+        NOW(),
+        false,
+        NULL,
+        '',
+        'r2',
+        $4,
+        NULL,
+        NULL,
+        $5
+      )
+      RETURNING id`,
+      [appId, newVersionName, `orgs/${ORG_ID}/apps/${appId}/${newVersionName}.zip`, ORG_ID, USER_ID],
+    )
+    const oldChannel = `electron-public-${randomUUID().slice(0, 8)}`
+    const newChannel = `electron-public-${randomUUID().slice(0, 8)}`
+
+    await insertChannel(appId, oldVersion, oldChannel, {
+      public: true,
+      ios: false,
+      android: false,
+      electron: true,
+    })
+    await insertChannel(appId, Number(newVersion.id), newChannel, {
+      public: true,
+      ios: false,
+      android: false,
+      electron: true,
+    })
+
+    const drizzleClient = getDrizzleClient(await getPostgresClient())
+    const context = {
+      get(key: string) {
+        return key === 'requestId' ? 'public-channel-uniqueness-test' : undefined
+      },
+    } as Context
+
+    const channel = await requestInfosChannelPostgres(context, 'electron', appId, '', drizzleClient, false)
+
+    expect(channel?.channels.name).toBe(newChannel)
+    expect(channel?.version.name).toBe(newVersionName)
+  })
+
   it('allows one public iOS channel and one public Android channel when both keep electron enabled', async () => {
     const appId = `com.public.channel.mobile-defaults.${randomUUID()}`
     const versionId = await createAppFixture(appId)
