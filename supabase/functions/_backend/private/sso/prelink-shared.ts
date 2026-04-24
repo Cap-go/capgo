@@ -114,23 +114,25 @@ async function fallbackDeleteEmailIdentity(
     // Local/self-hosted Supabase builds can lack the GoTrue admin identity-delete
     // route. Mirror the intended effect by removing the email identity and clearing
     // the password hash so password auth no longer works.
-    await pgClient.query(
+    const result = await pgClient.query<{ deleted_identity_id: string }>(
       `
-        update auth.users
-        set encrypted_password = null,
-            updated_at = now()
-        where id = $1
-      `,
-      [userId],
-    )
-
-    const result = await pgClient.query(
-      `
-        delete from auth.identities
-        where id = $1
-          and user_id = $2
-          and provider = 'email'
-        returning id
+        with deleted_identity as (
+          delete from auth.identities
+          where id = $1
+            and user_id = $2
+            and provider = 'email'
+          returning user_id, id as deleted_identity_id
+        ),
+        updated_user as (
+          update auth.users
+          set encrypted_password = null,
+              updated_at = now()
+          where id in (select user_id from deleted_identity)
+          returning id
+        )
+        select deleted_identity_id
+        from deleted_identity
+        where exists (select 1 from updated_user)
       `,
       [identityId, userId],
     )
