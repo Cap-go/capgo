@@ -86,6 +86,47 @@ async function execWithAuthAndCapgkey(
   }
 }
 
+async function execWithAnonCapgkey(
+  sql: string,
+  capgkey: string,
+  params: unknown[] = [],
+): Promise<{ rows: any[], rowCount: number }> {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    try {
+      await client.query('SET LOCAL ROLE anon')
+      await client.query(
+        'SELECT set_config(\'request.jwt.claims\', $1, true)',
+        [JSON.stringify({
+          role: 'anon',
+          aud: 'anon',
+        })],
+      )
+      await client.query(
+        'SELECT set_config(\'request.headers\', $1, true)',
+        [JSON.stringify({ capgkey })],
+      )
+
+      const result = await client.query(sql, params)
+      await client.query('COMMIT')
+      return { rows: result.rows, rowCount: result.rowCount ?? 0 }
+    }
+    catch (error) {
+      try {
+        await client.query('ROLLBACK')
+      }
+      catch {
+        // Ignore rollback failures for clearer root error handling.
+      }
+      throw error
+    }
+  }
+  finally {
+    client.release()
+  }
+}
+
 // Helper to create a hashed API key via the API
 async function createHashedApiKey(
   name: string,
@@ -562,6 +603,81 @@ describe('rls policies with hashed api keys (via supabase sdk)', () => {
     // Should return empty array (RLS blocks access)
     expect(error).toBeNull()
     expect(data).toEqual([])
+  })
+})
+
+describe('channels rls blocks direct api-key updates', () => {
+  let writeKey: { id: number, key: string, key_hash: string } | null = null
+  let versionId: number | null = null
+  let channelId: number | null = null
+  const versionName = `rls-direct-version-${randomUUID().slice(0, 8)}`
+  const channelName = `rls-direct-channel-${randomUUID().slice(0, 8)}`
+
+  beforeAll(async () => {
+    writeKey = await createHashedApiKey('test-channel-direct-write-key', 'write', [ORG_ID_RLS], [APP_NAME_RLS])
+
+    const versionResult = await pool.query(
+      `INSERT INTO public.app_versions (app_id, name, owner_org, user_id, checksum, storage_provider, r2_path, deleted)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, false)
+       RETURNING id`,
+      [
+        APP_NAME_RLS,
+        versionName,
+        ORG_ID_RLS,
+        USER_ID_RLS,
+        `checksum-${versionName}`,
+        'r2',
+        `orgs/${ORG_ID_RLS}/apps/${APP_NAME_RLS}/${versionName}.zip`,
+      ],
+    )
+    versionId = Number(versionResult.rows[0].id)
+
+    const channelResult = await pool.query(
+      `INSERT INTO public.channels (app_id, name, version, owner_org, created_by, public, allow_emulator)
+       VALUES ($1, $2, $3, $4, $5, false, false)
+       RETURNING id`,
+      [
+        APP_NAME_RLS,
+        channelName,
+        versionId,
+        ORG_ID_RLS,
+        USER_ID_RLS,
+      ],
+    )
+    channelId = Number(channelResult.rows[0].id)
+  }, 60000)
+
+  afterAll(async () => {
+    if (channelId) {
+      await pool.query('DELETE FROM public.channels WHERE id = $1', [channelId])
+    }
+
+    if (versionId) {
+      await pool.query('DELETE FROM public.app_versions WHERE id = $1', [versionId])
+    }
+
+    if (writeKey)
+      await deleteApiKey(writeKey.id)
+  })
+
+  it('does not let a write-scoped API key mutate protected channel fields via anon role access', async () => {
+    if (!writeKey || !channelId)
+      throw new Error('RLS channel test setup did not complete')
+
+    const result = await execWithAnonCapgkey(
+      'UPDATE public.channels SET allow_emulator = true WHERE id = $1 RETURNING id, allow_emulator',
+      writeKey.key,
+      [channelId],
+    )
+
+    expect(result.rowCount).toBe(0)
+
+    const { rows } = await pool.query(
+      'SELECT allow_emulator FROM public.channels WHERE id = $1',
+      [channelId],
+    )
+
+    expect(rows[0].allow_emulator).toBe(false)
   })
 })
 
