@@ -119,7 +119,6 @@ describe('build log disconnect authorization', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1)
 
       controller.abort()
-      await new Promise(resolve => setTimeout(resolve, 0))
 
       expect(fetchMock).toHaveBeenCalledTimes(1)
       expect(mockCheckPermission).toHaveBeenNthCalledWith(1, context, 'app.read_logs', { appId })
@@ -131,6 +130,13 @@ describe('build log disconnect authorization', () => {
   })
 
   it('cancels the build on disconnect when the caller can build natively', async () => {
+    let resolveCancelObserved: () => void = () => {
+      throw new Error('Cancel observer not initialized')
+    }
+    const cancelObserved = new Promise<void>((resolve) => {
+      resolveCancelObserved = resolve
+    })
+
     mockCheckPermission
       .mockResolvedValueOnce(true)
       .mockResolvedValueOnce(true)
@@ -147,6 +153,7 @@ describe('build log disconnect authorization', () => {
       }
 
       if (url === `${builderUrl}/jobs/${jobId}/cancel`) {
+        resolveCancelObserved()
         expect(init).toMatchObject({
           method: 'POST',
           headers: {
@@ -183,7 +190,7 @@ describe('build log disconnect authorization', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1)
 
       controller.abort()
-      await new Promise(resolve => setTimeout(resolve, 0))
+      await cancelObserved
 
       expect(fetchMock).toHaveBeenCalledTimes(2)
       expect(fetchMock).toHaveBeenNthCalledWith(2, `${builderUrl}/jobs/${jobId}/cancel`, {
@@ -204,8 +211,14 @@ describe('build log disconnect authorization', () => {
     let resolveBuildPermission: (value: boolean) => void = () => {
       throw new Error('Build permission resolver not initialized')
     }
+    let resolveCancelObserved: () => void = () => {
+      throw new Error('Cancel observer not initialized')
+    }
     const buildPermissionPromise = new Promise<boolean>((resolve) => {
       resolveBuildPermission = resolve
+    })
+    const cancelObserved = new Promise<void>((resolve) => {
+      resolveCancelObserved = resolve
     })
 
     mockCheckPermission
@@ -224,6 +237,7 @@ describe('build log disconnect authorization', () => {
       }
 
       if (url === `${builderUrl}/jobs/${jobId}/cancel`) {
+        resolveCancelObserved()
         expect(init).toMatchObject({
           method: 'POST',
           headers: {
@@ -263,7 +277,7 @@ describe('build log disconnect authorization', () => {
       const response = await responsePromise
       expect(response.status).toBe(200)
 
-      await new Promise(resolve => setTimeout(resolve, 0))
+      await cancelObserved
 
       expect(fetchMock).toHaveBeenCalledTimes(2)
       expect(fetchMock).toHaveBeenNthCalledWith(2, `${builderUrl}/jobs/${jobId}/cancel`, {

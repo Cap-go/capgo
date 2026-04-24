@@ -161,7 +161,21 @@ export async function streamBuildLogs(
 
   const requestId = c.get('requestId')
   // Security: align disconnect-triggered cancellation with the explicit cancel endpoint.
-  if (await checkPermission(c, 'app.build_native', { appId: buildRequest.app_id })) {
+  let canCancelOnDisconnect = false
+  try {
+    canCancelOnDisconnect = await checkPermission(c, 'app.build_native', { appId: buildRequest.app_id })
+  }
+  catch (err) {
+    cloudlogErr({
+      requestId,
+      message: 'Failed to verify cancel permission for build logs disconnect',
+      job_id: jobId,
+      app_id: buildRequest.app_id,
+      error: err instanceof Error ? err.message : String(err),
+    })
+  }
+
+  if (canCancelOnDisconnect) {
     const cancelOnAbort = () => {
       // Fire and forget - cancel the build when an authorized client disconnects.
       cancelBuildOnDisconnect(builderUrl, builderApiKey, jobId, buildRequest.app_id, requestId)
