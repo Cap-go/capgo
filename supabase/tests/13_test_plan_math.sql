@@ -42,7 +42,14 @@ BEGIN
   -- Let's now add a second app to this org. 
   ALTER TABLE app_versions DISABLE TRIGGER force_valid_owner_org_app_versions;
 
-  UPDATE apps set owner_org='046a36ac-e03c-4590-9257-bd6c9dba9ee8' where app_id='com.demoadmin.app';
+  UPDATE public.org_users
+  SET user_right = 'super_admin'::public.user_min_right
+  WHERE org_id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'
+    AND user_id = 'c591b04e-cf29-4945-b9a0-776d0672061a';
+
+  PERFORM tests.authenticate_as('test_admin');
+  PERFORM public.transfer_app('com.demoadmin.app', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid);
+  PERFORM tests.authenticate_as_service_role();
 
   UPDATE app_versions set app_id='com.demoadmin.app', r2_path='orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demoadmin.app/1.359.0.zip' where id=7;
   INSERT INTO "public"."daily_mau" ("app_id", "mau", "date") VALUES 
