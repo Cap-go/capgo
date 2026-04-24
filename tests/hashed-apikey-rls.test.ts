@@ -42,29 +42,37 @@ async function execWithCapgkey(sql: string, capgkey: string): Promise<any> {
   }
 }
 
-async function execWithAuthAndCapgkey(
+type RequestRole = 'anon' | 'authenticated'
+
+async function execWithRoleClaims(
   sql: string,
-  userId: string,
-  capgkey: string,
-  params: unknown[] = [],
+  {
+    role,
+    claims,
+    headers,
+    params = [],
+  }: {
+    role: RequestRole
+    claims: Record<string, string>
+    headers: Record<string, string>
+    params?: unknown[]
+  },
 ): Promise<{ rows: any[], rowCount: number }> {
   const client = await pool.connect()
   try {
     await client.query('BEGIN')
     try {
-      await client.query('SET LOCAL ROLE authenticated')
-      await client.query('SELECT set_config(\'request.jwt.claim.sub\', $1, true)', [userId])
+      await client.query(`SET LOCAL ROLE ${role}`)
+      if (claims.sub) {
+        await client.query('SELECT set_config(\'request.jwt.claim.sub\', $1, true)', [claims.sub])
+      }
       await client.query(
         'SELECT set_config(\'request.jwt.claims\', $1, true)',
-        [JSON.stringify({
-          sub: userId,
-          role: 'authenticated',
-          aud: 'authenticated',
-        })],
+        [JSON.stringify(claims)],
       )
       await client.query(
         'SELECT set_config(\'request.headers\', $1, true)',
-        [JSON.stringify({ capgkey })],
+        [JSON.stringify(headers)],
       )
 
       const result = await client.query(sql, params)
@@ -565,6 +573,119 @@ describe('rls policies with hashed api keys (via supabase sdk)', () => {
   })
 })
 
+describe('channels rls blocks direct api-key updates', () => {
+  let allKey: { id: number, key: string, key_hash: string } | null = null
+  let writeKey: { id: number, key: string, key_hash: string } | null = null
+  let versionId: number | null = null
+  let channelId: number | null = null
+  const versionName = `rls-direct-version-${randomUUID().slice(0, 8)}`
+  const channelName = `rls-direct-channel-${randomUUID().slice(0, 8)}`
+
+  beforeAll(async () => {
+    allKey = await createHashedApiKey('test-channel-direct-all-key', 'all', [ORG_ID_RLS], [APP_NAME_RLS])
+    writeKey = await createHashedApiKey('test-channel-direct-write-key', 'write', [ORG_ID_RLS], [APP_NAME_RLS])
+
+    const versionResult = await pool.query(
+      `INSERT INTO public.app_versions (app_id, name, owner_org, user_id, checksum, storage_provider, r2_path, deleted)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, false)
+       RETURNING id`,
+      [
+        APP_NAME_RLS,
+        versionName,
+        ORG_ID_RLS,
+        USER_ID_RLS,
+        `checksum-${versionName}`,
+        'r2',
+        `orgs/${ORG_ID_RLS}/apps/${APP_NAME_RLS}/${versionName}.zip`,
+      ],
+    )
+    versionId = Number(versionResult.rows[0].id)
+
+    const channelResult = await pool.query(
+      `INSERT INTO public.channels (app_id, name, version, owner_org, created_by, public, allow_emulator)
+       VALUES ($1, $2, $3, $4, $5, false, false)
+       RETURNING id`,
+      [
+        APP_NAME_RLS,
+        channelName,
+        versionId,
+        ORG_ID_RLS,
+        USER_ID_RLS,
+      ],
+    )
+    channelId = Number(channelResult.rows[0].id)
+  }, 60000)
+
+  afterAll(async () => {
+    if (channelId) {
+      await pool.query('DELETE FROM public.channels WHERE id = $1', [channelId])
+    }
+
+    if (versionId) {
+      await pool.query('DELETE FROM public.app_versions WHERE id = $1', [versionId])
+    }
+
+    if (allKey)
+      await deleteApiKey(allKey.id)
+
+    if (writeKey)
+      await deleteApiKey(writeKey.id)
+  })
+
+  it('does not let a write-scoped API key mutate protected channel fields via anon role access', async () => {
+    if (!writeKey || !channelId)
+      throw new Error('RLS channel test setup did not complete')
+
+    const result = await execWithRoleClaims(
+      'UPDATE public.channels SET allow_emulator = true WHERE id = $1 RETURNING id, allow_emulator',
+      {
+        role: 'anon',
+        claims: {
+          role: 'anon',
+          aud: 'anon',
+        },
+        headers: { capgkey: writeKey.key },
+        params: [channelId],
+      },
+    )
+
+    expect(result.rowCount).toBe(0)
+
+    const { rows } = await pool.query(
+      'SELECT allow_emulator FROM public.channels WHERE id = $1',
+      [channelId],
+    )
+
+    expect(rows[0].allow_emulator).toBe(false)
+  })
+
+  it('still lets an all-scoped API key mutate supported channel fields via anon role access', async () => {
+    if (!allKey || !channelId)
+      throw new Error('RLS channel test setup did not complete')
+
+    const result = await execWithRoleClaims(
+      'UPDATE public.channels SET allow_emulator = true WHERE id = $1 RETURNING id, allow_emulator',
+      {
+        role: 'anon',
+        claims: {
+          role: 'anon',
+          aud: 'anon',
+        },
+        headers: { capgkey: allKey.key },
+        params: [channelId],
+      },
+    )
+
+    expect(result.rowCount).toBe(1)
+    expect(result.rows[0].allow_emulator).toBe(true)
+
+    await pool.query(
+      'UPDATE public.channels SET allow_emulator = false WHERE id = $1',
+      [channelId],
+    )
+  })
+})
+
 describe('webhook and webhook_delivery rls with api-key org scope precedence', () => {
   let limitedKey: { id: number, key: string, key_hash: string }
   let scopedKey: { id: number, key: string, key_hash: string }
@@ -621,18 +742,32 @@ describe('webhook and webhook_delivery rls with api-key org scope precedence', (
   })
 
   it('uses API key org scope when auth context is also present for webhook reads', async () => {
-    const webhookRows = await execWithAuthAndCapgkey(
+    const webhookRows = await execWithRoleClaims(
       'SELECT id FROM public.webhooks WHERE id = $1',
-      USER_ID_RLS,
-      limitedKey.key,
-      [webhookId],
+      {
+        role: 'authenticated',
+        claims: {
+          sub: USER_ID_RLS,
+          role: 'authenticated',
+          aud: 'authenticated',
+        },
+        headers: { capgkey: limitedKey.key },
+        params: [webhookId],
+      },
     ).then(result => result.rows)
 
-    const deliveryRows = await execWithAuthAndCapgkey(
+    const deliveryRows = await execWithRoleClaims(
       'SELECT id FROM public.webhook_deliveries WHERE id = $1',
-      USER_ID_RLS,
-      limitedKey.key,
-      [deliveryId],
+      {
+        role: 'authenticated',
+        claims: {
+          sub: USER_ID_RLS,
+          role: 'authenticated',
+          aud: 'authenticated',
+        },
+        headers: { capgkey: limitedKey.key },
+        params: [deliveryId],
+      },
     ).then(result => result.rows)
 
     expect(webhookRows).toEqual([])
@@ -641,11 +776,18 @@ describe('webhook and webhook_delivery rls with api-key org scope precedence', (
 
   it('prevents webhook_delivery org_id changes when update payload org_id is unauthorized', async () => {
     await expect(
-      execWithAuthAndCapgkey(
+      execWithRoleClaims(
         'UPDATE public.webhook_deliveries SET org_id = $1 WHERE id = $2',
-        USER_ID_RLS,
-        scopedKey.key,
-        [ORG_ID_2, deliveryId],
+        {
+          role: 'authenticated',
+          claims: {
+            sub: USER_ID_RLS,
+            role: 'authenticated',
+            aud: 'authenticated',
+          },
+          headers: { capgkey: scopedKey.key },
+          params: [ORG_ID_2, deliveryId],
+        },
       ),
     ).rejects.toMatchObject({ code: '42501' })
 
