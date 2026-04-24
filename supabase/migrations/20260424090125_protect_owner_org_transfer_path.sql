@@ -57,6 +57,11 @@ DECLARE
     v_user_id uuid;
     v_last_transfer jsonb;
     v_last_transfer_date timestamp;
+    v_transfer_error constant text := 'Unable to process transfer request.';
+    v_app_id_key constant text := 'app_id';
+    v_old_org_id_key constant text := 'old_org_id';
+    v_new_org_id_key constant text := 'new_org_id';
+    v_uid_key constant text := 'uid';
 BEGIN
   SELECT owner_org, transfer_history[array_length(transfer_history, 1)]
   INTO v_old_org_id, v_last_transfer
@@ -64,7 +69,7 @@ BEGIN
   WHERE app_id = p_app_id;
 
   IF v_old_org_id IS NULL THEN
-    RAISE EXCEPTION 'Unable to process transfer request.';
+    RAISE EXCEPTION '%', v_transfer_error;
   END IF;
 
   v_user_id := (SELECT auth.uid());
@@ -72,9 +77,9 @@ BEGIN
   IF v_user_id IS NULL THEN
     PERFORM public.pg_log(
       'deny: TRANSFER_NO_AUTH',
-      jsonb_build_object('app_id', p_app_id, 'new_org_id', p_new_org_id)
+      jsonb_build_object(v_app_id_key, p_app_id, v_new_org_id_key, p_new_org_id)
     );
-    RAISE EXCEPTION 'Unable to process transfer request.';
+    RAISE EXCEPTION '%', v_transfer_error;
   END IF;
 
   IF NOT public.rbac_check_permission(
@@ -86,13 +91,13 @@ BEGIN
     PERFORM public.pg_log(
       'deny: TRANSFER_OLD_ORG_RIGHTS',
       jsonb_build_object(
-        'app_id', p_app_id,
-        'old_org_id', v_old_org_id,
-        'new_org_id', p_new_org_id,
-        'uid', v_user_id
+        v_app_id_key, p_app_id,
+        v_old_org_id_key, v_old_org_id,
+        v_new_org_id_key, p_new_org_id,
+        v_uid_key, v_user_id
       )
     );
-    RAISE EXCEPTION 'Unable to process transfer request.';
+    RAISE EXCEPTION '%', v_transfer_error;
   END IF;
 
   IF NOT public.rbac_check_permission(
@@ -104,13 +109,13 @@ BEGIN
     PERFORM public.pg_log(
       'deny: TRANSFER_NEW_ORG_RIGHTS',
       jsonb_build_object(
-        'app_id', p_app_id,
-        'old_org_id', v_old_org_id,
-        'new_org_id', p_new_org_id,
-        'uid', v_user_id
+        v_app_id_key, p_app_id,
+        v_old_org_id_key, v_old_org_id,
+        v_new_org_id_key, p_new_org_id,
+        v_uid_key, v_user_id
       )
     );
-    RAISE EXCEPTION 'Unable to process transfer request.';
+    RAISE EXCEPTION '%', v_transfer_error;
   END IF;
 
   IF v_last_transfer IS NOT NULL THEN
