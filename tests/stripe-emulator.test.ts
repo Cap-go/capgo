@@ -1,8 +1,8 @@
 import type Stripe from 'stripe'
 import { randomUUID } from 'node:crypto'
 import { createServer } from 'node:net'
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createEmulator } from 'emulate'
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { createCheckout, createOneTimeCheckout, getCreditCheckoutDetails, getStripe } from '../supabase/functions/_backend/utils/stripe.ts'
 
 const { mockedSupabaseAdmin } = vi.hoisted(() => ({
@@ -74,17 +74,47 @@ async function getFreePort(): Promise<number> {
   })
 }
 
+async function startStripeEmulatorWithRetry(maxAttempts = 5) {
+  let lastError: Error | null = null
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const port = await getFreePort()
+
+    try {
+      const instance = await createEmulator({
+        service: 'stripe' as any,
+        port,
+      })
+
+      return {
+        baseUrl: `http://127.0.0.1:${port}`,
+        instance,
+      }
+    }
+    catch (error) {
+      const emulatorError = error instanceof Error ? error : new Error(String(error))
+      const errorCode = typeof error === 'object' && error !== null && 'code' in error
+        ? (error as NodeJS.ErrnoException).code
+        : undefined
+
+      lastError = emulatorError
+
+      if (errorCode !== 'EADDRINUSE')
+        throw emulatorError
+    }
+  }
+
+  throw lastError ?? new Error('Failed to start Stripe emulator')
+}
+
 describe('stripe emulator integration', () => {
-  let emulator: Awaited<ReturnType<typeof createEmulator>>
+  let emulator: Awaited<ReturnType<typeof createEmulator>> | undefined
   let stripeApiBaseUrl = ''
 
   beforeAll(async () => {
-    const port = await getFreePort()
-    stripeApiBaseUrl = `http://127.0.0.1:${port}`
-    emulator = await createEmulator({
-      service: 'stripe' as any,
-      port,
-    })
+    const started = await startStripeEmulatorWithRetry()
+    stripeApiBaseUrl = started.baseUrl
+    emulator = started.instance
   })
 
   afterEach(() => {
@@ -93,7 +123,8 @@ describe('stripe emulator integration', () => {
   })
 
   afterAll(async () => {
-    await emulator.close()
+    if (emulator)
+      await emulator.close()
   })
 
   it('creates subscription checkout sessions through emulate using stored plan prices', async () => {

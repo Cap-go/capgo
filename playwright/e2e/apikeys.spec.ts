@@ -33,7 +33,7 @@ test.describe('API Key Management', () => {
     const keyRow = page.locator('tr', { hasText: keyName })
     await expect(keyRow).toHaveCount(1)
 
-    await keyRow.locator('[data-test="delete-key"]').click()
+    await keyRow.locator('[data-test^="delete-key-"]').click()
     await page.getByRole('button', { name: 'Delete' }).click()
 
     const toast = page.locator('[data-test="toast"]')

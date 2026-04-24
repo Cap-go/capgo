@@ -16,7 +16,9 @@ const webAppUrl = env.WEBAPP_URL || 'http://localhost:5173'
 interface SupabaseStatus {
   API_URL?: string
   ANON_KEY?: string
+  PUBLISHABLE_KEY?: string
   SERVICE_ROLE_KEY?: string
+  SECRET_KEY?: string
 }
 
 function upsertEnvValue(content: string, key: string, value: string): string {
@@ -72,7 +74,11 @@ function getSupabaseStatus(): SupabaseStatus | null {
 }
 
 function hasHealthySupabaseApi(status: SupabaseStatus | null) {
-  return Boolean(status?.API_URL && status?.ANON_KEY && status?.SERVICE_ROLE_KEY)
+  return Boolean(
+    status?.API_URL
+    && (status?.ANON_KEY || status?.PUBLISHABLE_KEY)
+    && (status?.SERVICE_ROLE_KEY || status?.SECRET_KEY),
+  )
 }
 
 function stopSupabase() {

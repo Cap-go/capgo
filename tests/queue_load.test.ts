@@ -24,21 +24,33 @@ beforeEach(async () => {
 })
 
 async function fetchQueueSync(queueName: string, maxRetries = 4) {
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    const response = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
-      method: 'POST',
-      headers: headersInternal,
-      body: JSON.stringify({ queue_name: queueName }),
-    })
+  let lastError: Error | null = null
 
-    if (response.status === 202) {
-      expect(await response.json()).toEqual({ status: 'ok' })
-      return response
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch(`${BASE_URL_TRIGGER}/queue_consumer/sync`, {
+        method: 'POST',
+        headers: headersInternal,
+        body: JSON.stringify({ queue_name: queueName }),
+      })
+
+      if (response.status === 202) {
+        expect(await response.json()).toEqual({ status: 'ok' })
+        return response
+      }
+
+      lastError = new Error(`queue_consumer/sync returned HTTP ${response.status} for ${queueName}`)
+    }
+    catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error))
     }
 
     if (attempt < maxRetries - 1)
       await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)))
   }
+
+  if (lastError)
+    throw new Error(`queue_consumer/sync failed for ${queueName}: ${lastError.message}`)
 
   throw new Error(`queue_consumer/sync failed for ${queueName}`)
 }

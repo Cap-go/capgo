@@ -1,9 +1,10 @@
+import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, rmSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { spawn, spawnSync } from 'node:child_process'
 import process from 'node:process'
 
-const backendReadyFile = resolve(process.cwd(), '.context/playwright/backend.ready')
+const repoRoot = process.cwd()
+const backendReadyFile = resolve(repoRoot, '.context/playwright/backend.ready')
 const playwrightArgs = process.argv.slice(2)
 
 function sleep(ms: number): Promise<void> {
@@ -28,6 +29,7 @@ async function waitForBackend(timeoutMs: number, backend: ReturnType<typeof spaw
 
 function stopExistingPlaywrightBackend() {
   spawnSync('pkill', ['-f', 'supabase-functions.playwright.env'], {
+    cwd: repoRoot,
     stdio: 'ignore',
     env: process.env,
   })
@@ -37,6 +39,7 @@ stopExistingPlaywrightBackend()
 rmSync(backendReadyFile, { force: true })
 
 const backend = spawn('bun', ['scripts/serve-backend-playwright.ts'], {
+  cwd: repoRoot,
   stdio: 'inherit',
   env: {
     ...process.env,
@@ -61,6 +64,7 @@ try {
   await waitForBackend(360_000, backend)
 
   const playwright = spawn('bunx', ['playwright', 'test', ...playwrightArgs], {
+    cwd: repoRoot,
     stdio: 'inherit',
     env: {
       ...process.env,

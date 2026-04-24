@@ -334,7 +334,7 @@ columns.value = [
       {
         icon: IconTrash,
         onClick: (key: Database['public']['Tables']['apikeys']['Row']) => deleteKey(key),
-        testId: 'delete-key',
+        testId: (key: Database['public']['Tables']['apikeys']['Row']) => `delete-key-${key.id}`,
       },
     ],
   },

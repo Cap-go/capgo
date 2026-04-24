@@ -231,3 +231,13 @@ jobs:
         run: ln -sfn supabase/templates templates
       - name: Run Playwright tests
         run: bun run test:front
+      - name: Upload Playwright artifacts
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: playwright-artifacts
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

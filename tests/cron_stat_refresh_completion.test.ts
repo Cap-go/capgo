@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
-  BASE_URL,
   executeSQL,
+  getEndpointUrl,
   getSupabaseClient,
   resetAndSeedAppData,
   resetAndSeedAppDataStats,
@@ -61,7 +61,7 @@ describe('cron_stat_app refresh completion', () => {
   }, 60000)
 
   it('updates app freshness immediately and only marks the org fresh after the last pending app completes', { timeout: 30000 }, async () => {
-    const firstResponse = await fetch(`${BASE_URL}/triggers/cron_stat_app`, {
+    const firstResponse = await fetch(getEndpointUrl('/triggers/cron_stat_app'), {
       body: JSON.stringify({
         appId: firstAppId,
         orgId,
@@ -96,7 +96,7 @@ describe('cron_stat_app refresh completion', () => {
     expect(orgBeforeError).toBeNull()
     expect(orgBeforeCompletion?.stats_updated_at).toBeNull()
 
-    const secondResponse = await fetch(`${BASE_URL}/triggers/cron_stat_app`, {
+    const secondResponse = await fetch(getEndpointUrl('/triggers/cron_stat_app'), {
       body: JSON.stringify({
         appId: secondAppId,
         orgId,
