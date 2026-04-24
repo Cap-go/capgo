@@ -142,7 +142,7 @@ afterAll(async () => {
 })
 
 describe('public channel uniqueness', () => {
-  it('uses a deterministic winner when multiple public electron channels exist', async () => {
+  it('uses the most recently updated public electron channel as the deterministic winner', async () => {
     const appId = `com.public.channel.electron.${randomUUID()}`
     const oldVersion = await createAppFixture(appId)
     const newVersionName = `1.0.${Math.floor(Math.random() * 100000) + 1000}`
@@ -194,6 +194,13 @@ describe('public channel uniqueness', () => {
       android: false,
       electron: true,
     })
+    await executeSQL(
+      `UPDATE public.channels
+       SET updated_at = NOW() + INTERVAL '1 minute'
+       WHERE app_id = $1
+         AND name = $2`,
+      [appId, oldChannel],
+    )
 
     const drizzleClient = getDrizzleClient(await getPostgresClient())
     const context = {
@@ -204,8 +211,8 @@ describe('public channel uniqueness', () => {
 
     const channel = await requestInfosChannelPostgres(context, 'electron', appId, '', drizzleClient, false)
 
-    expect(channel?.channels.name).toBe(newChannel)
-    expect(channel?.version.name).toBe(newVersionName)
+    expect(channel?.channels.name).toBe(oldChannel)
+    expect(channel?.version.name).toBe('1.0.0')
   })
 
   it('allows one public iOS channel and one public Android channel when both keep electron enabled', async () => {

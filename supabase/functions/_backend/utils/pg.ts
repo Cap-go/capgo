@@ -498,7 +498,7 @@ export function requestInfosChannelPostgres(
     )
     .groupBy(channelAlias.id, versionAlias.id)
   const channelQuery = !defaultChannel
-    ? baseChannelQuery.orderBy(desc(channelAlias.id)).limit(1)
+    ? baseChannelQuery.orderBy(desc(channelAlias.updated_at), desc(channelAlias.id)).limit(1)
     : baseChannelQuery.limit(1)
   cloudlog({ requestId: c.get('requestId'), message: 'channel Query:', channelQuery: channelQuery.toSQL() })
   const channel = channelQuery.then(data => data.at(0))
