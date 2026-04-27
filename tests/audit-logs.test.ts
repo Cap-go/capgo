@@ -116,7 +116,9 @@ beforeAll(async () => {
 
   const { data: apiKeyData, error: apiKeyError } = await getSupabaseClient().rpc('create_hashed_apikey_for_user', {
     p_user_id: USER_ID,
-    p_mode: 'write',
+    // This suite exercises bundle create, metadata update, delete, and channel promotion flows.
+    // Use an all-mode key so the audit assertions track the current permission model instead of failing on RBAC gating.
+    p_mode: 'all',
     p_name: `audit-api-key-${globalId}`,
     p_limited_to_orgs: [ORG_ID],
     p_limited_to_apps: [APIKEY_AUDIT_APP_ID],
