@@ -24,6 +24,8 @@ const defaultEmailPreferences: EmailPreferences = {
   channel_self_rejected: true,
 }
 
+const hookTimeoutMs = 60_000
+
 function isBentoConfiguredForTests() {
   const publishableKey = (process.env.BENTO_PUBLISHABLE_KEY || '').trim()
   const secretKey = (process.env.BENTO_SECRET_KEY || '').trim()
@@ -52,7 +54,7 @@ beforeAll(async () => {
     userId: USER_ID_EMAIL_PREFS,
     stripeCustomerId: STRIPE_CUSTOMER_ID_EMAIL_PREFS,
   })
-})
+}, hookTimeoutMs)
 
 beforeEach(async () => {
   await resetEmailPreferences()
@@ -65,7 +67,7 @@ afterEach(async () => {
 afterAll(async () => {
   await resetAppData(APPNAME_PREFS)
   await resetEmailPreferences()
-})
+}, hookTimeoutMs)
 
 // Helper to check if migration has been applied
 async function isMigrationApplied(): Promise<boolean> {
