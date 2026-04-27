@@ -26,7 +26,6 @@ const globalId = randomUUID()
 const name = `Test Organization ${globalId}`
 const customerId = `cus_test_${ORG_ID}`
 const website = 'https://test-organization.example/'
-let user2AuthHeaders: Record<string, string> | null = null
 
 beforeAll(async () => {
   // Create stripe_info for this test org
@@ -45,7 +44,7 @@ beforeAll(async () => {
     id: ORG_ID,
     name,
     management_email: TEST_EMAIL,
-    created_by: USER_ID_2,
+    created_by: USER_ID,
     customer_id: customerId,
     website,
     use_new_rbac: false, // Explicitly legacy — this suite tests the legacy permission path
@@ -56,13 +55,11 @@ beforeAll(async () => {
   // Add the test user as super_admin to the org so they can access it via API
   const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
     org_id: ORG_ID,
-    user_id: USER_ID_2,
+    user_id: USER_ID,
     user_right: 'super_admin',
   })
   if (orgUserError)
     throw orgUserError
-
-  user2AuthHeaders = await getAuthHeadersForCredentials('test2@capgo.app', USER_PASSWORD)
 })
 
 afterAll(async () => {
@@ -998,32 +995,76 @@ describe('[DELETE] /organization', () => {
 })
 
 describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
+  const enforceOrgId = randomUUID()
+  const enforceGlobalId = randomUUID()
+  const enforceCustomerId = `cus_test_${enforceOrgId}`
+  const enforceWebsite = 'https://hashed-enforcement.example/'
+  let user2AuthHeaders: Record<string, string> | null = null
+
+  beforeAll(async () => {
+    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
+      customer_id: enforceCustomerId,
+      status: 'succeeded',
+      product_id: 'prod_LQIregjtNduh4q',
+      subscription_id: `sub_${enforceGlobalId}`,
+      trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+      is_good_plan: true,
+    })
+    expect(stripeError).toBeNull()
+
+    const { error: orgError } = await getSupabaseClient().from('orgs').insert({
+      id: enforceOrgId,
+      name: `Hashed Enforcement Organization ${enforceGlobalId}`,
+      management_email: TEST_EMAIL,
+      created_by: USER_ID_2,
+      customer_id: enforceCustomerId,
+      website: enforceWebsite,
+      use_new_rbac: false,
+    })
+    expect(orgError).toBeNull()
+
+    const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+      org_id: enforceOrgId,
+      user_id: USER_ID_2,
+      user_right: 'super_admin',
+    })
+    expect(orgUserError).toBeNull()
+
+    user2AuthHeaders = await getAuthHeadersForCredentials('test2@capgo.app', USER_PASSWORD)
+  })
+
+  afterAll(async () => {
+    await getSupabaseClient().from('org_users').delete().eq('org_id', enforceOrgId)
+    await getSupabaseClient().from('orgs').delete().eq('id', enforceOrgId)
+    await getSupabaseClient().from('stripe_info').delete().eq('customer_id', enforceCustomerId)
+  })
+
   it('update organization enforce_hashed_api_keys to true', async () => {
     if (!user2AuthHeaders)
       throw new Error('Missing auth headers for test2@capgo.app')
 
     // First, ensure it's false
-    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false }).eq('id', ORG_ID)
+    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false }).eq('id', enforceOrgId)
 
     const response = await fetch(`${BASE_URL}/organization`, {
       headers: user2AuthHeaders,
       method: 'PUT',
       body: JSON.stringify({
-        orgId: ORG_ID,
+        orgId: enforceOrgId,
         enforce_hashed_api_keys: true,
       }),
     })
     expect(response.status).toBe(200)
     const responseData = await response.json() as { id: string, data: any }
-    expect(responseData.id).toBe(ORG_ID)
+    expect(responseData.id).toBe(enforceOrgId)
 
     // Verify the setting was updated
-    const { data, error } = await getSupabaseClient().from('orgs').select('enforce_hashed_api_keys').eq('id', ORG_ID).single()
+    const { data, error } = await getSupabaseClient().from('orgs').select('enforce_hashed_api_keys').eq('id', enforceOrgId).single()
     expect(error).toBeNull()
     expect(data?.enforce_hashed_api_keys).toBe(true)
 
     // Reset to false
-    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false }).eq('id', ORG_ID)
+    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false }).eq('id', enforceOrgId)
   })
 
   it('update organization enforce_hashed_api_keys to false', async () => {
@@ -1031,31 +1072,31 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
       throw new Error('Missing auth headers for test2@capgo.app')
 
     // First, set it to true
-    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: true }).eq('id', ORG_ID)
+    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: true }).eq('id', enforceOrgId)
 
     const response = await fetch(`${BASE_URL}/organization`, {
       headers: user2AuthHeaders,
       method: 'PUT',
       body: JSON.stringify({
-        orgId: ORG_ID,
+        orgId: enforceOrgId,
         enforce_hashed_api_keys: false,
       }),
     })
     expect(response.status).toBe(200)
     const responseData = await response.json() as { id: string, data: any }
-    expect(responseData.id).toBe(ORG_ID)
+    expect(responseData.id).toBe(enforceOrgId)
 
     // Verify the setting was updated
-    const { data, error } = await getSupabaseClient().from('orgs').select('enforce_hashed_api_keys').eq('id', ORG_ID).single()
+    const { data, error } = await getSupabaseClient().from('orgs').select('enforce_hashed_api_keys').eq('id', enforceOrgId).single()
     expect(error).toBeNull()
     expect(data?.enforce_hashed_api_keys).toBe(false)
   })
 
   it('get_orgs_v7 returns enforce_hashed_api_keys field', async () => {
     // Set a known value
-    const rpcWebsite = website
-    const previousWebsite = website
-    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: true, website: rpcWebsite }).eq('id', ORG_ID)
+    const rpcWebsite = enforceWebsite
+    const previousWebsite = enforceWebsite
+    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: true, website: rpcWebsite }).eq('id', enforceOrgId)
 
     // Call get_orgs_v7 via RPC
     const { data, error } = await getSupabaseClient().rpc('get_orgs_v7', { userid: USER_ID_2 })
@@ -1063,7 +1104,7 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
     expect(Array.isArray(data)).toBe(true)
 
     // Find our test org
-    const testOrg = data?.find((org: { gid: string }) => org.gid === ORG_ID)
+    const testOrg = data?.find((org: { gid: string }) => org.gid === enforceOrgId)
     expect(testOrg).toBeTruthy()
     expect(testOrg).toHaveProperty('enforce_hashed_api_keys')
     expect(testOrg!.enforce_hashed_api_keys).toBe(true)
@@ -1073,7 +1114,7 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
     expect(testOrg!.website).toBe(rpcWebsite)
 
     // Reset
-    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false, website: previousWebsite }).eq('id', ORG_ID)
+    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false, website: previousWebsite }).eq('id', enforceOrgId)
   })
 
   it.concurrent('rejects public RPC access to get_orgs_v7(userid)', async () => {
