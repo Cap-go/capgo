@@ -24,12 +24,12 @@ resolve_target_branch() {
     if [[ "${GITHUB_REF_NAME}" == gh-readonly-queue/* ]]; then
       local queued_ref
       queued_ref="${GITHUB_REF_NAME#gh-readonly-queue/}"
-      echo "${queued_ref%%/pr-*}"
+      echo "${queued_ref%/pr-*}"
       return
     fi
 
     if [[ "${GITHUB_REF_NAME}" == */pr-* ]]; then
-      echo "${GITHUB_REF_NAME%%/pr-*}"
+      echo "${GITHUB_REF_NAME%/pr-*}"
       return
     fi
   fi
