@@ -1,46 +1,64 @@
--- Harden role bindings against cross-org scope forgery.
--- Security fix for GHSA-5r52-m8r9-7f8x.
+CREATE OR REPLACE FUNCTION public.enforce_role_binding_role_scope()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path = ''
+AS $$
+DECLARE
+  v_role_scope_type text;
+BEGIN
+  SELECT r.scope_type
+  INTO v_role_scope_type
+  FROM public.roles r
+  WHERE r.id = NEW.role_id
+  LIMIT 1;
 
-DELETE FROM public.role_bindings AS rb
-WHERE rb.scope_type = public.rbac_scope_app()
-  AND rb.org_id IS NOT NULL
-  AND rb.app_id IS NOT NULL
-  AND NOT EXISTS (
-    SELECT 1
-    FROM public.apps AS a
-    WHERE a.id = rb.app_id
-      AND a.owner_org = rb.org_id
-  );
+  IF v_role_scope_type IS NULL THEN
+    RETURN NEW;
+  END IF;
 
-DELETE FROM public.role_bindings AS rb
-WHERE rb.scope_type = public.rbac_scope_channel()
-  AND rb.org_id IS NOT NULL
-  AND rb.app_id IS NOT NULL
-  AND rb.channel_id IS NOT NULL
-  AND NOT EXISTS (
-    SELECT 1
-    FROM public.channels AS ch
-    JOIN public.apps AS a
-      ON a.app_id = ch.app_id
-    WHERE ch.rbac_id = rb.channel_id
-      AND a.id = rb.app_id
-      AND ch.owner_org = rb.org_id
-      AND a.owner_org = rb.org_id
-  );
+  IF v_role_scope_type <> NEW.scope_type THEN
+    RAISE EXCEPTION USING
+      ERRCODE = '23514',
+      MESSAGE = 'ROLE_SCOPE_MISMATCH';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+ALTER FUNCTION public.enforce_role_binding_role_scope() OWNER TO "postgres";
+
+COMMENT ON FUNCTION public.enforce_role_binding_role_scope() IS
+  'Rejects role_bindings writes where the bound role family does not match the binding scope_type.';
+
+DROP TRIGGER IF EXISTS enforce_role_binding_role_scope ON public.role_bindings;
+
+CREATE TRIGGER enforce_role_binding_role_scope
+BEFORE INSERT OR UPDATE OF role_id, scope_type
+ON public.role_bindings
+FOR EACH ROW
+EXECUTE FUNCTION public.enforce_role_binding_role_scope();
+
+COMMENT ON TRIGGER enforce_role_binding_role_scope ON public.role_bindings IS
+  'Prevents mixed-scope RBAC bindings such as org roles attached to app scope rows.';
+
+DELETE FROM public.role_bindings rb
+USING public.roles r
+WHERE rb.role_id = r.id
+  AND rb.scope_type <> r.scope_type;
 
 CREATE OR REPLACE FUNCTION public.rbac_has_permission(
-  p_principal_type text,
-  p_principal_id uuid,
-  p_permission_key text,
-  p_org_id uuid,
-  p_app_id character varying,
-  p_channel_id bigint
-)
-RETURNS boolean
+    p_principal_type text,
+    p_principal_id uuid,
+    p_permission_key text,
+    p_org_id uuid,
+    p_app_id character varying,
+    p_channel_id bigint
+) RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = ''
-AS $$
+AS $function$
 DECLARE
   v_org_id uuid := p_org_id;
   v_app_uuid uuid;
@@ -103,8 +121,8 @@ BEGIN
     JOIN public.role_bindings rb ON rb.scope_type = s.scope_type
       AND (
         (rb.scope_type = public.rbac_scope_org() AND rb.org_id = s.org_id) OR
-        (rb.scope_type = public.rbac_scope_app() AND rb.org_id = s.org_id AND rb.app_id = s.app_id) OR
-        (rb.scope_type = public.rbac_scope_channel() AND rb.org_id = s.org_id AND rb.app_id = s.app_id AND rb.channel_id = s.channel_id)
+        (rb.scope_type = public.rbac_scope_app() AND rb.app_id = s.app_id) OR
+        (rb.scope_type = public.rbac_scope_channel() AND rb.channel_id = s.channel_id)
       )
     JOIN public.roles r ON r.id = rb.role_id
       AND r.scope_type = rb.scope_type
@@ -124,8 +142,8 @@ BEGIN
       AND rb.scope_type = s.scope_type
       AND (
         (rb.scope_type = public.rbac_scope_org() AND rb.org_id = s.org_id) OR
-        (rb.scope_type = public.rbac_scope_app() AND rb.org_id = s.org_id AND rb.app_id = s.app_id) OR
-        (rb.scope_type = public.rbac_scope_channel() AND rb.org_id = s.org_id AND rb.app_id = s.app_id AND rb.channel_id = s.channel_id)
+        (rb.scope_type = public.rbac_scope_app() AND rb.app_id = s.app_id) OR
+        (rb.scope_type = public.rbac_scope_channel() AND rb.channel_id = s.channel_id)
       )
       AND (v_org_id IS NULL OR g.org_id = v_org_id)
       AND (rb.expires_at IS NULL OR rb.expires_at > now())
@@ -154,14 +172,11 @@ BEGIN
 
   RETURN v_has;
 END;
-$$;
+$function$;
 
 ALTER FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) OWNER TO "postgres";
+
 REVOKE ALL ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) FROM anon;
 REVOKE ALL ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) FROM authenticated;
-REVOKE ALL ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) FROM service_role;
 GRANT EXECUTE ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) TO service_role;
-
-COMMENT ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) IS
-  'Checks whether a principal has a permission at org/app/channel scope. App and channel bindings must match the resolved owning org so forged cross-org scope rows are ignored.';
