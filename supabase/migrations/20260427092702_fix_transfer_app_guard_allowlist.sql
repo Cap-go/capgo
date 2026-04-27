@@ -159,6 +159,10 @@ BEGIN
   SET owner_org = p_new_org_id
   WHERE app_id = p_app_id;
 
+  UPDATE public.deploy_history
+  SET owner_org = p_new_org_id
+  WHERE app_id = p_app_id;
+
 END;
 $$;
 
