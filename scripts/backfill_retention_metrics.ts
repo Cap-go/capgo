@@ -224,6 +224,14 @@ export function getRequiredDatabaseUrl(env: Record<string, string | undefined>) 
   const value = getDatabaseUrl(env)
   if (!value)
     throw new Error(`--apply requires ${DATABASE_URL_ENV_KEYS.join(', ')} so metric writes and processed-event markers are committed atomically`)
+
+  try {
+    new URL(value)
+  }
+  catch {
+    throw new Error(`--apply requires a valid Postgres URL from ${DATABASE_URL_ENV_KEYS.join(', ')}`)
+  }
+
   return value
 }
 
@@ -237,8 +245,33 @@ export function getDatabaseUrl(env: Record<string, string | undefined>) {
   return null
 }
 
-function shouldAllowSelfSignedPgCertificate(env: Record<string, string | undefined>) {
-  return env.PG_ALLOW_SELF_SIGNED_CERT?.trim() === 'true' || env.PG_SSL_REJECT_UNAUTHORIZED?.trim() === '0'
+function isSupabasePoolerHost(databaseUrl: string) {
+  const parsed = new URL(databaseUrl)
+  const hostname = parsed.hostname.toLowerCase()
+  const port = parsed.port || '5432'
+  return port === '6543' && (hostname.endsWith('.supabase.co') || hostname.endsWith('.supabase.com'))
+}
+
+export function shouldAllowSelfSignedPgCertificate(env: Record<string, string | undefined>, databaseUrl?: string) {
+  const allowSelfSigned = env.PG_ALLOW_SELF_SIGNED_CERT?.trim().toLowerCase()
+  if (allowSelfSigned === 'true' || allowSelfSigned === '1')
+    return true
+  if (allowSelfSigned === 'false' || allowSelfSigned === '0')
+    return false
+
+  const rejectUnauthorized = env.PG_SSL_REJECT_UNAUTHORIZED?.trim()
+  if (rejectUnauthorized === '0')
+    return true
+  if (rejectUnauthorized === '1')
+    return false
+
+  if (!databaseUrl)
+    return false
+
+  // Supabase's managed writer pooler uses a TLS chain that `pg` cannot
+  // validate reliably in local Node/Bun environments, so match the existing
+  // repo tooling behavior and keep encryption while skipping cert validation.
+  return isSupabasePoolerHost(databaseUrl)
 }
 
 function createPgClient(databaseUrl: string, env: Record<string, string | undefined>) {
@@ -248,7 +281,7 @@ function createPgClient(databaseUrl: string, env: Record<string, string | undefi
     connectionString: databaseUrl,
     // Keep certificate validation on by default; disable it only for managed
     // poolers that require self-signed certs and are explicitly opted in.
-    ssl: usesLocalDatabase ? false : { rejectUnauthorized: !shouldAllowSelfSignedPgCertificate(env) },
+    ssl: usesLocalDatabase ? false : { rejectUnauthorized: !shouldAllowSelfSignedPgCertificate(env, databaseUrl) },
   })
 }
 
