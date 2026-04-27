@@ -123,7 +123,6 @@ async function guard(
   const sessionUser = sessionData?.session?.user ?? null
   const hasAuth = !!claimsData?.claims?.sub && !!sessionUser
   const hadAuth = !!main.auth
-  const needsVerifiedEmail = to.path.startsWith('/settings') || to.path === '/delete_account'
   const inviteOrgId = typeof to.query.invite_org === 'string' && to.query.invite_org.length > 0
     ? to.query.invite_org
     : null
@@ -181,16 +180,6 @@ async function guard(
   }
 
   if (hasAuth && sessionUser && !hadAuth) {
-    if (!sessionUser.email_confirmed_at && needsVerifiedEmail) {
-      return next({
-        path: '/resend_email',
-        query: {
-          reason: 'email_not_verified',
-          return_to: to.fullPath,
-        },
-      })
-    }
-
     // Check if account is disabled (marked for deletion)
     try {
       const { data: isDisabled, error: disabledError } = await supabase
@@ -280,16 +269,6 @@ async function guard(
     // User is already authenticated, but check if account got disabled
     // (only if not already on account disabled page)
     if (to.path !== '/accountDisabled') {
-      if (!sessionUser?.email_confirmed_at && needsVerifiedEmail) {
-        return next({
-          path: '/resend_email',
-          query: {
-            reason: 'email_not_verified',
-            return_to: to.fullPath,
-          },
-        })
-      }
-
       try {
         const { data: isDisabled, error: disabledError } = await supabase
           .rpc('is_account_disabled', { user_id: main.auth.id })
