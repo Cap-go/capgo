@@ -18,6 +18,7 @@ import {
   ORG_ID_2FA_TEST,
   ORG_ID_RLS,
   POSTGRES_URL,
+  USER_ID_2,
   USER_ID_RLS,
 } from './test-utils.ts'
 
@@ -73,6 +74,41 @@ async function execWithRoleClaims(
       await client.query(
         'SELECT set_config(\'request.headers\', $1, true)',
         [JSON.stringify(headers)],
+      )
+
+      const result = await client.query(sql, params)
+      await client.query('COMMIT')
+      return { rows: result.rows, rowCount: result.rowCount ?? 0 }
+    }
+    catch (error) {
+      try {
+        await client.query('ROLLBACK')
+      }
+      catch {
+        // Ignore rollback failures for clearer root error handling.
+      }
+      throw error
+    }
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function execAsRoleWithCapgkey(
+  sql: string,
+  role: 'anon' | 'authenticated',
+  capgkey: string,
+  params: unknown[] = [],
+): Promise<{ rows: any[], rowCount: number }> {
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    try {
+      await client.query(`SET LOCAL ROLE ${role}`)
+      await client.query(
+        'SELECT set_config(\'request.headers\', $1, true)',
+        [JSON.stringify({ capgkey })],
       )
 
       const result = await client.query(sql, params)
@@ -158,6 +194,278 @@ async function setApiKeyExpiration(id: number, expiresAt: Date | null): Promise<
     await client.query(
       'UPDATE apikeys SET expires_at = $1 WHERE id = $2',
       [expiresAt?.toISOString() ?? null, id],
+    )
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function setOrgHashedApiKeyEnforcement(orgId: string, enforce: boolean): Promise<void> {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      'UPDATE orgs SET enforce_hashed_api_keys = $1 WHERE id = $2',
+      [enforce, orgId],
+    )
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function createEnforcedMemberOrgForUser(userId: string, enforceHashedApiKeys = true): Promise<string> {
+  const client = await pool.connect()
+  const orgId = randomUUID()
+  try {
+    await client.query(
+      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [orgId, USER_ID_2, `hashed-enforcement-org-${orgId}`, `hashed-enforcement-${orgId}@capgo.test`, enforceHashedApiKeys],
+    )
+    await client.query(
+      `INSERT INTO public.org_users (org_id, user_id, user_right)
+       VALUES ($1, $2, 'super_admin')`,
+      [orgId, userId],
+    )
+    return orgId
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function deleteEnforcedMemberOrgForUser(orgId: string, userId: string): Promise<void> {
+  const client = await pool.connect()
+  try {
+    await client.query('DELETE FROM public.org_users WHERE org_id = $1 AND user_id = $2', [orgId, userId])
+    await client.query('DELETE FROM public.orgs WHERE id = $1', [orgId])
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function createPendingInviteOrgForUser(userId: string): Promise<string> {
+  const client = await pool.connect()
+  const orgId = randomUUID()
+  try {
+    await client.query(
+      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys)
+       VALUES ($1, $2, $3, $4, true)`,
+      [orgId, USER_ID_2, `pending-invite-org-${orgId}`, `pending-invite-${orgId}@capgo.test`],
+    )
+    await client.query(
+      `INSERT INTO public.org_users (org_id, user_id, user_right)
+       VALUES ($1, $2, 'invite_read')`,
+      [orgId, userId],
+    )
+    return orgId
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function deletePendingInviteOrgForUser(orgId: string, userId: string): Promise<void> {
+  const client = await pool.connect()
+  try {
+    await client.query('DELETE FROM public.org_users WHERE org_id = $1 AND user_id = $2', [orgId, userId])
+    await client.query('DELETE FROM public.orgs WHERE id = $1', [orgId])
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function createEnforcedRbacOnlyOrgForUser(userId: string): Promise<string> {
+  const client = await pool.connect()
+  const orgId = randomUUID()
+  try {
+    await client.query(
+      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys, use_new_rbac)
+       VALUES ($1, $2, $3, $4, true, true)`,
+      [orgId, USER_ID_2, `rbac-only-org-${orgId}`, `rbac-only-${orgId}@capgo.test`],
+    )
+    await client.query(
+      `INSERT INTO public.role_bindings (
+        principal_type, principal_id, role_id, scope_type, org_id, granted_by, reason, is_direct
+      ) VALUES (
+        public.rbac_principal_user(),
+        $1,
+        (SELECT id FROM public.roles WHERE name = public.rbac_role_org_member()),
+        public.rbac_scope_org(),
+        $2,
+        $3,
+        'hashed-apikey-rls test',
+        true
+      )`,
+      [userId, orgId, USER_ID_2],
+    )
+    return orgId
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function deleteEnforcedRbacOnlyOrgForUser(orgId: string, userId: string): Promise<void> {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      `DELETE FROM public.role_bindings
+       WHERE principal_type = public.rbac_principal_user()
+         AND principal_id = $1
+         AND org_id = $2`,
+      [userId, orgId],
+    )
+    await client.query('DELETE FROM public.orgs WHERE id = $1', [orgId])
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function createEnforcedApikeyPrincipalOrgForKey(apikeyId: number): Promise<string> {
+  const client = await pool.connect()
+  const orgId = randomUUID()
+  try {
+    await client.query(
+      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys, use_new_rbac)
+       VALUES ($1, $2, $3, $4, true, true)`,
+      [orgId, USER_ID_2, `apikey-rbac-org-${orgId}`, `apikey-rbac-${orgId}@capgo.test`],
+    )
+    await client.query(
+      `INSERT INTO public.role_bindings (
+        principal_type, principal_id, role_id, scope_type, org_id, granted_by, reason, is_direct
+      ) VALUES (
+        public.rbac_principal_apikey(),
+        (SELECT rbac_id FROM public.apikeys WHERE id = $1),
+        (SELECT id FROM public.roles WHERE name = public.rbac_role_org_member()),
+        public.rbac_scope_org(),
+        $2,
+        $3,
+        'hashed-apikey-rls test',
+        true
+      )`,
+      [apikeyId, orgId, USER_ID_2],
+    )
+    return orgId
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function deleteEnforcedApikeyPrincipalOrgForKey(orgId: string, apikeyId: number): Promise<void> {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      `DELETE FROM public.role_bindings
+       WHERE principal_type = public.rbac_principal_apikey()
+         AND principal_id = (SELECT rbac_id FROM public.apikeys WHERE id = $1)
+         AND org_id = $2`,
+      [apikeyId, orgId],
+    )
+    await client.query('DELETE FROM public.orgs WHERE id = $1', [orgId])
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function createStandaloneOrg(enforceHashedApiKeys = true): Promise<string> {
+  const client = await pool.connect()
+  const orgId = randomUUID()
+  try {
+    await client.query(
+      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys, use_new_rbac)
+       VALUES ($1, $2, $3, $4, $5, true)`,
+      [orgId, USER_ID_2, `standalone-org-${orgId}`, `standalone-${orgId}@capgo.test`, enforceHashedApiKeys],
+    )
+    return orgId
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function deleteStandaloneOrg(orgId: string): Promise<void> {
+  const client = await pool.connect()
+  try {
+    await client.query('DELETE FROM public.orgs WHERE id = $1', [orgId])
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function createStaleAppScopedBindingForUser(userId: string, staleOrgId: string): Promise<void> {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      `INSERT INTO public.role_bindings (
+        principal_type, principal_id, role_id, scope_type, org_id, app_id, granted_by, reason, is_direct
+      ) VALUES (
+        public.rbac_principal_user(),
+        $1,
+        (SELECT id FROM public.roles WHERE name = public.rbac_role_app_reader()),
+        public.rbac_scope_app(),
+        $2,
+        (SELECT id FROM public.apps WHERE app_id = $3),
+        $4,
+        'hashed-apikey-rls stale app scope test',
+        true
+      )`,
+      [userId, staleOrgId, APP_NAME_RLS, USER_ID_2],
+    )
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function deleteStaleAppScopedBindingForUser(userId: string, staleOrgId: string): Promise<void> {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      `DELETE FROM public.role_bindings
+       WHERE principal_type = public.rbac_principal_user()
+         AND principal_id = $1
+         AND scope_type = public.rbac_scope_app()
+         AND org_id = $2
+         AND app_id = (SELECT id FROM public.apps WHERE app_id = $3)`,
+      [userId, staleOrgId, APP_NAME_RLS],
+    )
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function createStaleAppScopedOrgUserForUser(userId: string, staleOrgId: string): Promise<void> {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      `INSERT INTO public.org_users (org_id, user_id, user_right, app_id)
+       VALUES ($1, $2, 'read', $3)`,
+      [staleOrgId, userId, APP_NAME_RLS],
+    )
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function deleteStaleAppScopedOrgUserForUser(userId: string, staleOrgId: string): Promise<void> {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      `DELETE FROM public.org_users
+       WHERE org_id = $1
+         AND user_id = $2
+         AND app_id = $3`,
+      [staleOrgId, userId, APP_NAME_RLS],
     )
   }
   finally {
@@ -286,6 +594,166 @@ describe('get_identity() with hashed API keys', () => {
     expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
 
     await deleteApiKey(futureKey.id)
+  })
+})
+
+describe('enforce_hashed_api_keys blocks plaintext capgkey auth on the RLS plane', () => {
+  let hashedKey: { id: number, key: string, key_hash: string }
+  let plainKey: { id: number, key: string }
+  let suiteOrgId: string
+
+  beforeAll(async () => {
+    suiteOrgId = await createEnforcedMemberOrgForUser(RLS_TEST_USER_ID, true)
+    hashedKey = await createHashedApiKey('test-hashed-enforced-rls')
+    plainKey = await createPlainApiKey('test-plain-enforced-rls')
+  }, 60000)
+
+  afterAll(async () => {
+    await deleteApiKey(hashedKey.id)
+    await deleteApiKey(plainKey.id)
+    await deleteEnforcedMemberOrgForUser(suiteOrgId, RLS_TEST_USER_ID)
+  })
+
+  it('find_apikey_by_value returns empty for a plain API key after hashed enforcement is enabled', async () => {
+    const client = await pool.connect()
+    try {
+      const result = await client.query(
+        'SELECT id FROM find_apikey_by_value($1)',
+        [plainKey.key],
+      )
+      expect(result.rows).toEqual([])
+    }
+    finally {
+      client.release()
+    }
+  })
+
+  it('get_identity rejects a plain API key after hashed enforcement is enabled', async () => {
+    const rows = await execWithCapgkey(
+      `SELECT get_identity('{all,write,read,upload}'::key_mode[]) AS user_id`,
+      plainKey.key,
+    )
+    expect(rows[0].user_id).toBeNull()
+  })
+
+  it('get_identity still accepts a hashed API key after hashed enforcement is enabled', async () => {
+    const rows = await execWithCapgkey(
+      `SELECT get_identity('{all,write,read,upload}'::key_mode[]) AS user_id`,
+      hashedKey.key,
+    )
+    expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
+  })
+
+  it('does not reject a plain API key for users with only a pending invite to an enforced org', async () => {
+    const pendingInviteOrgId = await createPendingInviteOrgForUser(RLS_TEST_USER_ID)
+
+    try {
+      await setOrgHashedApiKeyEnforcement(suiteOrgId, false)
+
+      const rows = await execWithCapgkey(
+        `SELECT get_identity('{all,write,read,upload}'::key_mode[]) AS user_id`,
+        plainKey.key,
+      )
+      expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
+    }
+    finally {
+      await setOrgHashedApiKeyEnforcement(suiteOrgId, true)
+      await deletePendingInviteOrgForUser(pendingInviteOrgId, RLS_TEST_USER_ID)
+    }
+  })
+
+  it('rejects a plain API key when hashed enforcement is reached through RBAC-only org membership', async () => {
+    const rbacOnlyOrgId = await createEnforcedRbacOnlyOrgForUser(RLS_TEST_USER_ID)
+
+    try {
+      await setOrgHashedApiKeyEnforcement(suiteOrgId, false)
+
+      const rows = await execWithCapgkey(
+        `SELECT get_identity('{all,write,read,upload}'::key_mode[]) AS user_id`,
+        plainKey.key,
+      )
+      expect(rows[0].user_id).toBeNull()
+    }
+    finally {
+      await setOrgHashedApiKeyEnforcement(suiteOrgId, true)
+      await deleteEnforcedRbacOnlyOrgForUser(rbacOnlyOrgId, RLS_TEST_USER_ID)
+    }
+  })
+
+  it('rejects a plain API key when hashed enforcement is reached through RBAC API-key bindings', async () => {
+    const apikeyPrincipalOrgId = await createEnforcedApikeyPrincipalOrgForKey(plainKey.id)
+
+    try {
+      await setOrgHashedApiKeyEnforcement(suiteOrgId, false)
+
+      const rows = await execWithCapgkey(
+        `SELECT get_identity('{all,write,read,upload}'::key_mode[]) AS user_id`,
+        plainKey.key,
+      )
+      expect(rows[0].user_id).toBeNull()
+    }
+    finally {
+      await setOrgHashedApiKeyEnforcement(suiteOrgId, true)
+      await deleteEnforcedApikeyPrincipalOrgForKey(apikeyPrincipalOrgId, plainKey.id)
+    }
+  })
+
+  it('ignores stale org_id values on app-scoped RBAC bindings when deriving org enforcement', async () => {
+    const staleEnforcedOrgId = await createStandaloneOrg(true)
+
+    try {
+      await setOrgHashedApiKeyEnforcement(suiteOrgId, false)
+      await createStaleAppScopedBindingForUser(RLS_TEST_USER_ID, staleEnforcedOrgId)
+
+      const rows = await execWithCapgkey(
+        `SELECT get_identity('{all,write,read,upload}'::key_mode[]) AS user_id`,
+        plainKey.key,
+      )
+      expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
+    }
+    finally {
+      await deleteStaleAppScopedBindingForUser(RLS_TEST_USER_ID, staleEnforcedOrgId)
+      await setOrgHashedApiKeyEnforcement(suiteOrgId, true)
+      await deleteStandaloneOrg(staleEnforcedOrgId)
+    }
+  })
+
+  it('ignores stale org_id values on app-scoped legacy org_users rows when deriving org enforcement', async () => {
+    const staleEnforcedOrgId = await createStandaloneOrg(true)
+
+    try {
+      await setOrgHashedApiKeyEnforcement(suiteOrgId, false)
+      await createStaleAppScopedOrgUserForUser(RLS_TEST_USER_ID, staleEnforcedOrgId)
+
+      const rows = await execWithCapgkey(
+        `SELECT get_identity('{all,write,read,upload}'::key_mode[]) AS user_id`,
+        plainKey.key,
+      )
+      expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
+    }
+    finally {
+      await deleteStaleAppScopedOrgUserForUser(RLS_TEST_USER_ID, staleEnforcedOrgId)
+      await setOrgHashedApiKeyEnforcement(suiteOrgId, true)
+      await deleteStandaloneOrg(staleEnforcedOrgId)
+    }
+  })
+
+  it('blocks direct anon RLS reads from the apikeys table for plain API keys', async () => {
+    const { rows } = await execAsRoleWithCapgkey(
+      'SELECT id, name FROM public.apikeys ORDER BY id DESC LIMIT 1',
+      'anon',
+      plainKey.key,
+    )
+
+    expect(rows).toEqual([])
+  })
+
+  it('rejects get_orgs_v7 over the anon RPC path for plain API keys', async () => {
+    await expect(execAsRoleWithCapgkey(
+      'SELECT * FROM public.get_orgs_v7()',
+      'anon',
+      plainKey.key,
+    )).rejects.toThrow('Invalid API key provided')
   })
 })
 
