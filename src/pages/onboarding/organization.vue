@@ -802,7 +802,7 @@ onUnmounted(() => {
                   type="button"
                   class="d-btn"
                   :class="hasSavedLogo ? 'd-btn-secondary' : 'd-btn-ghost'"
-                  data-test="onboarding-skip-logo"
+                  data-test="onboarding-logo-action"
                   :disabled="isUploadingLogo"
                   @click="skipLogo"
                 >
