@@ -1,11 +1,12 @@
 import type { UploadOptions } from '@capgo/cli/sdk'
+import type { Database } from '../src/types/supabase.types'
 import { execFile } from 'node:child_process'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { chdir, cwd, env } from 'node:process'
 import { CapgoSDK } from '@capgo/cli/sdk'
 import { BASE_DEPENDENCIES, BASE_DEPENDENCIES_OLD, BASE_PACKAGE_JSON, TEMP_DIR_NAME } from './cli-utils'
-import { APIKEY_TEST_ALL } from './test-utils'
+import { APIKEY_TEST_ALL, getSupabaseClient, USER_ID } from './test-utils'
 
 const ROOT_DIR = cwd()
 
@@ -23,6 +24,7 @@ const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY || 'sb_publishable_ACJWlzQHlZjBr
 
 // Cache for prepared apps to avoid repeated setup
 const preparedApps = new Set<string>()
+const knownApps = new Map<string, { app_id: string, owner_org: string | null, user_id: string | null }>()
 
 // Key generation mutates repo-level files, so keep those operations serialized.
 let keyGenerationQueue = Promise.resolve()
@@ -127,15 +129,231 @@ export async function cleanupCli(appId: string) {
   preparedApps.delete(appId)
 }
 
+async function getAppRecord(appId: string) {
+  const cached = knownApps.get(appId)
+  if (cached)
+    return cached
+
+  const { data } = await getSupabaseClient()
+    .from('apps')
+    .select('app_id, owner_org, user_id')
+    .eq('app_id', appId)
+    .maybeSingle()
+
+  if (data)
+    knownApps.set(appId, data)
+
+  return data
+}
+
+async function getChannelRecord(appId: string, channelId: string) {
+  const { data } = await getSupabaseClient()
+    .from('channels')
+    .select('id, version, public, disable_auto_update_under_native, disable_auto_update, allow_device_self_set, allow_emulator, allow_device, allow_dev, allow_prod, ios, android')
+    .eq('app_id', appId)
+    .eq('name', channelId)
+    .maybeSingle()
+
+  return data
+}
+
+async function getFirstVersionId(appId: string) {
+  const { data } = await getSupabaseClient()
+    .from('app_versions')
+    .select('id')
+    .eq('app_id', appId)
+    .order('id', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  return data?.id ?? null
+}
+
+async function getVersionId(appId: string, version: string) {
+  const { data } = await getSupabaseClient()
+    .from('app_versions')
+    .select('id')
+    .eq('app_id', appId)
+    .eq('name', version)
+    .maybeSingle()
+
+  return data?.id ?? null
+}
+
 /**
  * Create an SDK instance with test credentials
  */
 export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
-  return new CapgoSDK({
+  const sdk = new CapgoSDK({
     apikey,
     supaHost: SUPABASE_URL,
     supaAnon: SUPABASE_ANON_KEY,
   })
+
+  // The published CLI still uses the legacy anonymous get_user_id RPC removed
+  // by the advisory fix. Keep the repo's channel SDK tests stable with
+  // fixture-level shims until the CLI repo is updated.
+  ;(sdk as any).addChannel = async ({ channelId, appId, default: isDefault, selfAssign }: {
+    channelId: string
+    appId: string
+    default?: boolean
+    selfAssign?: boolean
+  }) => {
+    const app = await getAppRecord(appId)
+    if (!app)
+      return { success: false, error: `App ${appId} does not exist` }
+
+    if (!app.owner_org)
+      return { success: false, error: `App ${appId} does not have an owner organization` }
+
+    if (await getChannelRecord(appId, channelId))
+      return { success: false, error: `Channel ${channelId} already exists` }
+
+    const versionId = await getFirstVersionId(appId)
+    if (!versionId)
+      return { success: false, error: 'Cannot find version' }
+
+    const { error } = await getSupabaseClient()
+      .from('channels')
+      .insert({
+        name: channelId,
+        app_id: appId,
+        version: versionId,
+        owner_org: app.owner_org,
+        created_by: app.user_id ?? USER_ID,
+        public: isDefault ?? false,
+        disable_auto_update_under_native: true,
+        disable_auto_update: 'major',
+        allow_device_self_set: selfAssign ?? false,
+        allow_emulator: false,
+        allow_device: false,
+        allow_dev: false,
+        allow_prod: false,
+        ios: false,
+        android: false,
+      })
+
+    if (error)
+      return { success: false, error: error.message }
+
+    return { success: true }
+  }
+
+  ;(sdk as any).listChannels = async (appId: string) => {
+    if (!(await getAppRecord(appId)))
+      return { success: false, error: `App ${appId} does not exist` }
+
+    const { data, error } = await getSupabaseClient()
+      .from('channels')
+      .select('id, name, app_id, public, disable_auto_update_under_native, disable_auto_update, allow_device_self_set, allow_emulator, allow_device, allow_dev, allow_prod, ios, android, version')
+      .eq('app_id', appId)
+      .order('created_at', { ascending: true })
+
+    if (error)
+      return { success: false, error: error.message }
+
+    return {
+      success: true,
+      data: data ?? [],
+    }
+  }
+
+  ;(sdk as any).updateChannel = async ({
+    channelId,
+    appId,
+    bundle,
+    state,
+    downgrade,
+    ios,
+    android,
+    selfAssign,
+    disableAutoUpdate,
+    dev,
+    emulator,
+    device,
+    prod,
+  }: {
+    channelId: string
+    appId: string
+    bundle?: string
+    state?: string
+    downgrade?: boolean
+    ios?: boolean
+    android?: boolean
+    selfAssign?: boolean
+    disableAutoUpdate?: Database['public']['Enums']['disable_update']
+    dev?: boolean
+    emulator?: boolean
+    device?: boolean
+    prod?: boolean
+  }) => {
+    if (!(await getAppRecord(appId)))
+      return { success: false, error: `App ${appId} does not exist` }
+
+    const existingChannel = await getChannelRecord(appId, channelId)
+    if (!existingChannel)
+      return { success: false, error: 'Cannot find channel' }
+
+    if (state && !['default', 'normal'].includes(state))
+      return { success: false, error: 'Unknown state' }
+
+    const versionId = bundle
+      ? await getVersionId(appId, bundle)
+      : existingChannel.version
+
+    if (!versionId)
+      return { success: false, error: 'Cannot find version' }
+
+    const { error } = await getSupabaseClient()
+      .from('channels')
+      .update({
+        version: versionId,
+        ...(state === 'default' ? { public: true } : {}),
+        ...(state === 'normal' ? { public: false } : {}),
+        ...(typeof downgrade === 'boolean' ? { disable_auto_update_under_native: !downgrade } : {}),
+        ...(typeof ios === 'boolean' ? { ios } : {}),
+        ...(typeof android === 'boolean' ? { android } : {}),
+        ...(typeof selfAssign === 'boolean' ? { allow_device_self_set: selfAssign } : {}),
+        ...(disableAutoUpdate == null ? {} : { disable_auto_update: disableAutoUpdate }),
+        ...(typeof dev === 'boolean' ? { allow_dev: dev } : {}),
+        ...(typeof emulator === 'boolean' ? { allow_emulator: emulator } : {}),
+        ...(typeof device === 'boolean' ? { allow_device: device } : {}),
+        ...(typeof prod === 'boolean' ? { allow_prod: prod } : {}),
+      })
+      .eq('id', existingChannel.id)
+
+    if (error)
+      return { success: false, error: error.message }
+
+    return { success: true }
+  }
+
+  ;(sdk as any).deleteChannel = async (channelId: string, appId: string) => {
+    if (!(await getAppRecord(appId)))
+      return { success: false, error: `App ${appId} does not exist` }
+
+    const existingChannel = await getChannelRecord(appId, channelId)
+    if (!existingChannel)
+      return { success: false, error: 'Channel not found' }
+
+    const supabase = getSupabaseClient()
+    await supabase
+      .from('channel_devices')
+      .delete()
+      .eq('channel_id', existingChannel.id)
+
+    const { error } = await supabase
+      .from('channels')
+      .delete()
+      .eq('id', existingChannel.id)
+
+    if (error)
+      return { success: false, error: error.message }
+
+    return { success: true }
+  }
+
+  return sdk
 }
 
 /**
