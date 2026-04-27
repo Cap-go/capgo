@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(11);
+SELECT plan(14);
 
 SELECT
     is(
@@ -103,6 +103,77 @@ SELECT
         'service_role keeps execute privilege on'
         || ' get_org_perm_for_apikey(text, text)'
     );
+
+INSERT INTO storage.objects (bucket_id, name)
+VALUES (
+    'apps',
+    '6aa76066-55ef-4238-ade6-0b32334a4097/com.demo.app/rpc-permission-test.txt'
+)
+ON CONFLICT (bucket_id, name) DO NOTHING;
+
+SET LOCAL ROLE anon;
+
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM storage.objects
+            WHERE
+                bucket_id = 'apps'
+                AND name
+                = '6aa76066-55ef-4238-ade6-0b32334a4097/'
+                || 'com.demo.app/rpc-permission-test.txt'
+        ),
+        0::bigint,
+        'anon without capgkey cannot read app-scoped storage objects'
+    );
+
+DO $$
+BEGIN
+    PERFORM set_config('request.headers', '{"capgkey": "ae6e7458-c46d-4c00-aa3b-153b0b8520ea"}', true);
+END $$;
+
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM storage.objects
+            WHERE
+                bucket_id = 'apps'
+                AND name
+                = '6aa76066-55ef-4238-ade6-0b32334a4097/'
+                || 'com.demo.app/rpc-permission-test.txt'
+        ),
+        1::bigint,
+        'anon API-key storage access still works through header-based identity'
+    );
+
+DO $$
+BEGIN
+    PERFORM set_config('request.headers', '{"capgkey": "invalid-key"}', true);
+END $$;
+
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM storage.objects
+            WHERE
+                bucket_id = 'apps'
+                AND name
+                = '6aa76066-55ef-4238-ade6-0b32334a4097/'
+                || 'com.demo.app/rpc-permission-test.txt'
+        ),
+        0::bigint,
+        'anon with invalid capgkey still cannot read app-scoped storage objects'
+    );
+
+RESET ROLE;
+
+DO $$
+BEGIN
+    PERFORM set_config('request.headers', '{}', true);
+END $$;
 
 SET LOCAL ROLE authenticated;
 
