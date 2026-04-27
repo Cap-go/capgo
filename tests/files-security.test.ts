@@ -7,6 +7,7 @@ import {
   getEndpointUrl,
   getSupabaseClient,
   headers,
+  USER_ID,
 } from './test-utils.ts'
 
 const TUS_VERSION = '1.0.0'
@@ -20,20 +21,26 @@ function buildAttachmentPath(orgId: string, appId: string, filename: string) {
 }
 
 async function createUploadScopedKey(appId: string, name: string): Promise<{ id: number, key: string }> {
-  const response = await fetchWithRetry(`${BASE_URL}/apikey`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      name,
+  // Seed the scoped key directly so this suite only validates files behavior.
+  // API key creation behavior is covered in the dedicated apikey suites and can
+  // otherwise introduce unrelated worker-auth flakiness here.
+  const { data: created, error } = await getSupabaseClient()
+    .from('apikeys')
+    .insert({
+      user_id: USER_ID,
+      key: null,
+      key_hash: null,
       mode: 'upload',
+      name,
       limited_to_apps: [appId],
-    }),
-  }, 5, 750)
-  if (response.status !== 200) {
-    throw new Error(`Failed to create upload-scoped key (${response.status}): ${await response.text()}`)
+    })
+    .select('id, key')
+    .single()
+
+  if (error || !created) {
+    throw new Error(`Failed to seed upload-scoped key: ${error?.message ?? 'missing key row'}`)
   }
 
-  const created = await response.json() as { id: number, key: string | null }
   let key = created.key
 
   if (!key) {
