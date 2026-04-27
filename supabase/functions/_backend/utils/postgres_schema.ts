@@ -265,6 +265,7 @@ export const schema = {
   apps,
   app_versions,
   manifest,
+  app_version_manifest_cache,
   channels,
   channel_devices,
   orgs,

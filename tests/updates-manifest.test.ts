@@ -27,8 +27,8 @@ interface UpdateRes {
 async function insertManifestEntries(appVersionId: number) {
   const supabase = getSupabaseClient()
   // First, delete any existing manifest entries for this version
-  await supabase.from('manifest').delete().eq('app_version_id', appVersionId)
-  await supabase.from('app_version_manifest_cache').delete().eq('app_version_id', appVersionId)
+  await supabase.from('manifest').delete().eq('app_version_id', appVersionId).throwOnError()
+  await supabase.from('app_version_manifest_cache').delete().eq('app_version_id', appVersionId).throwOnError()
   // Insert the manifest entry
   const { error } = await supabase.from('manifest').insert({
     app_version_id: appVersionId,
@@ -62,8 +62,8 @@ async function insertManifestEntries(appVersionId: number) {
 // Helper to remove manifest entries
 async function removeManifestEntries(appVersionId: number) {
   const supabase = getSupabaseClient()
-  await supabase.from('manifest').delete().eq('app_version_id', appVersionId)
-  await supabase.from('app_version_manifest_cache').delete().eq('app_version_id', appVersionId)
+  await supabase.from('manifest').delete().eq('app_version_id', appVersionId).throwOnError()
+  await supabase.from('app_version_manifest_cache').delete().eq('app_version_id', appVersionId).throwOnError()
   await supabase.from('app_versions').update({ manifest_count: 0 }).eq('id', appVersionId)
 }
 
@@ -92,8 +92,8 @@ afterEach(async () => {
 
   if (versionId) {
     // Remove any manifest entries added during the test
-    await supabase.from('manifest').delete().eq('app_version_id', versionId)
-    await supabase.from('app_version_manifest_cache').delete().eq('app_version_id', versionId)
+    await supabase.from('manifest').delete().eq('app_version_id', versionId).throwOnError()
+    await supabase.from('app_version_manifest_cache').delete().eq('app_version_id', versionId).throwOnError()
 
     // Reset app_versions fields to initial state
     await supabase

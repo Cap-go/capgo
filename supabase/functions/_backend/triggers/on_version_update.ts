@@ -1,22 +1,18 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { ManifestCacheEntry } from '../utils/manifestCache.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { eq } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { buildManifestCacheEntries, compactManifestCacheEntries } from '../utils/manifestCache.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { manifest } from '../utils/postgres_schema.ts'
 import { getPath, s3 } from '../utils/s3.ts'
 import { createStatsMeta } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
-
-interface ManifestCacheEntry {
-  file_name: string
-  file_hash: string
-  s3_path: string
-}
 
 /**
  * Resolves `owner_org` for an app version row.
@@ -85,20 +81,12 @@ async function v2PathSize(c: Context, record: Database['public']['Tables']['app_
   return true
 }
 
-function buildManifestCacheEntries(entries: ManifestCacheEntry[]): Database['public']['Tables']['app_version_manifest_cache']['Insert']['entries'] {
-  return entries.map(entry => ({
-    file_name: entry.file_name,
-    file_hash: entry.file_hash,
-    s3_path: entry.s3_path,
-  })) as unknown as Database['public']['Tables']['app_version_manifest_cache']['Insert']['entries']
-}
-
 async function upsertManifestCache(c: Context, appVersionId: number, entries: ManifestCacheEntry[]) {
   const { error: cacheError } = await supabaseAdmin(c)
     .from('app_version_manifest_cache')
     .upsert({
       app_version_id: appVersionId,
-      entries: buildManifestCacheEntries(entries),
+      entries: buildManifestCacheEntries(entries) as unknown as Database['public']['Tables']['app_version_manifest_cache']['Insert']['entries'],
     }, {
       onConflict: 'app_version_id',
     })
@@ -122,22 +110,25 @@ async function deleteManifestCache(c: Context, appVersionId: number) {
  */
 async function handleManifest(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
   cloudlog({ requestId: c.get('requestId'), message: 'manifest', manifest: record.manifest })
-  const manifestEntries = record.manifest as Database['public']['CompositeTypes']['manifest_entry'][]
+  const manifestEntries = Array.isArray(record.manifest)
+    ? record.manifest as Database['public']['CompositeTypes']['manifest_entry'][]
+    : []
 
   // Check if entries exist
-  const { data: existingEntries } = await supabaseAdmin(c)
+  const { data: existingEntries, error: existingEntriesError } = await supabaseAdmin(c)
     .from('manifest')
-    .select('id')
+    .select('file_name, file_hash, s3_path')
     .eq('app_version_id', record.id)
-    .limit(1)
+  if (existingEntriesError)
+    cloudlog({ requestId: c.get('requestId'), message: 'error get manifest entries', error: existingEntriesError, appVersionId: record.id })
 
-  const validEntries = manifestEntries
-    .filter(entry => entry.file_name && entry.file_hash && entry.s3_path)
+  const compactEntries = compactManifestCacheEntries(manifestEntries)
+  const validEntries = compactEntries
     .map(entry => ({
       app_version_id: record.id,
-      file_name: entry.file_name!,
-      file_hash: entry.file_hash!,
-      s3_path: entry.s3_path!,
+      file_name: entry.file_name,
+      file_hash: entry.file_hash,
+      s3_path: entry.s3_path,
       file_size: 0,
     }))
 
@@ -180,21 +171,22 @@ async function handleManifest(c: Context, record: Database['public']['Tables']['
     }
   }
 
-  if (hasManifestRows && validEntries.length > 0) {
-    await upsertManifestCache(c, record.id, validEntries.map(entry => ({
-      file_name: entry.file_name,
-      file_hash: entry.file_hash,
-      s3_path: entry.s3_path,
-    })))
-  }
+  const cacheEntries = compactEntries.length > 0
+    ? compactEntries
+    : compactManifestCacheEntries(existingEntries ?? [])
 
-  // delete manifest in app_versions
-  const { error: deleteError } = await supabaseAdmin(c)
-    .from('app_versions')
-    .update({ manifest: null })
-    .eq('id', record.id)
-  if (deleteError)
-    cloudlog({ requestId: c.get('requestId'), message: 'error delete manifest in app_versions', error: deleteError })
+  if (hasManifestRows && cacheEntries.length > 0)
+    await upsertManifestCache(c, record.id, cacheEntries)
+
+  if (record.manifest !== null) {
+    // Clear the staging payload once rows and cache are materialized.
+    const { error: deleteError } = await supabaseAdmin(c)
+      .from('app_versions')
+      .update({ manifest: null })
+      .eq('id', record.id)
+    if (deleteError)
+      cloudlog({ requestId: c.get('requestId'), message: 'error delete manifest in app_versions', error: deleteError })
+  }
 }
 
 /**
@@ -232,7 +224,7 @@ async function updateIt(c: Context, record: Database['public']['Tables']['app_ve
   }
 
   // Handle manifest entries
-  if (record.manifest) {
+  if (record.manifest || record.manifest_count) {
     await handleManifest(c, record)
   }
 
@@ -389,7 +381,7 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'UPDATE'), (
     cloudlog({ requestId: c.get('requestId'), message: 'no app_id', record })
     return c.json(BRES)
   }
-  if (!record.r2_path && !record.manifest) {
+  if (!record.r2_path && !record.manifest && !record.manifest_count) {
     cloudlog({ requestId: c.get('requestId'), message: 'no r2_path and no manifest, skipping update', record })
     return c.json(BRES)
   }

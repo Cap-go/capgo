@@ -1,9 +1,13 @@
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
+import { eq, sql } from 'drizzle-orm'
 import { lockOnboardingApp, unlockOnboardingApp } from '../../utils/demo.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
+import { buildManifestCacheEntries } from '../../utils/manifestCache.ts'
+import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
+import { app_version_manifest_cache, apps, manifest as manifestTable } from '../../utils/postgres_schema.ts'
 import { hasOrgRight, supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
 
 /** Request body for creating a demo app */
@@ -364,7 +368,7 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       { name: '1.2.0', daysAgo: 1, comment: 'New dashboard features', link: 'https://github.com/example/demo-app/pull/123' },
     ]
 
-    // Create all versions with manifest and native_packages for real versions
+    // Create all versions with precomputed manifest counts and native_packages.
     const versionInserts = demoVersions.map((v) => {
       const isSystemVersion = v.name === 'unknown' || v.name === 'builtin'
       const manifest = isSystemVersion ? null : getDemoManifest(v.name, appId)
@@ -379,8 +383,8 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
         comment: v.comment,
         link: v.link,
         user_id: auth.userId,
-        // Add manifest and native_packages for non-system versions
-        manifest: manifest as any,
+        // Demo seeding writes manifest rows and cache directly below.
+        manifest: null,
         manifest_count: manifest?.length ?? 0,
         native_packages: nativePackages as any,
       }
@@ -414,8 +418,8 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
 
     // Insert manifest entries into the manifest table for each version
     // This is required for the bundle file list to show in the UI
-    const manifestInserts: Database['public']['Tables']['manifest']['Insert'][] = []
-    const manifestCacheInserts: Database['public']['Tables']['app_version_manifest_cache']['Insert'][] = []
+    const manifestInserts: (typeof manifestTable.$inferInsert)[] = []
+    const manifestCacheInserts: (typeof app_version_manifest_cache.$inferInsert)[] = []
 
     for (const version of demoVersions) {
       if (version.name === 'unknown' || version.name === 'builtin')
@@ -428,11 +432,7 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       const manifestEntries = getDemoManifest(version.name, appId)
       manifestCacheInserts.push({
         app_version_id: versionId,
-        entries: manifestEntries.map(entry => ({
-          file_name: entry.file_name,
-          file_hash: entry.file_hash,
-          s3_path: entry.s3_path,
-        })) as unknown as Database['public']['Tables']['app_version_manifest_cache']['Insert']['entries'],
+        entries: buildManifestCacheEntries(manifestEntries),
       })
       for (const entry of manifestEntries) {
         manifestInserts.push({
@@ -445,26 +445,46 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       }
     }
 
-    if (manifestInserts.length > 0) {
-      const { error: manifestError } = await supabase
-        .from('manifest')
-        .insert(manifestInserts)
+    if (manifestInserts.length > 0 || manifestCacheInserts.length > 0) {
+      const pgClient = getPgClient(c, false)
+      const drizzle = getDrizzleClient(pgClient)
+      try {
+        await drizzle.transaction(async (tx) => {
+          if (manifestInserts.length > 0)
+            await tx.insert(manifestTable).values(manifestInserts)
 
-      if (manifestError) {
-        cloudlog({ requestId, message: 'Error creating manifest entries', error: manifestError })
+          if (manifestCacheInserts.length > 0) {
+            await tx
+              .insert(app_version_manifest_cache)
+              .values(manifestCacheInserts)
+              .onConflictDoUpdate({
+                target: app_version_manifest_cache.app_version_id,
+                set: {
+                  entries: sql`excluded.entries`,
+                  updated_at: sql`now()`,
+                },
+              })
+
+            await tx
+              .update(apps)
+              .set({ manifest_bundle_count: manifestCacheInserts.length })
+              .where(eq(apps.app_id, appId))
+          }
+        })
+        cloudlog({
+          requestId,
+          message: 'Manifest entries and cache created',
+          manifestCount: manifestInserts.length,
+          manifestBundleCount: manifestCacheInserts.length,
+        })
       }
-      else {
-        cloudlog({ requestId, message: 'Manifest entries created', count: manifestInserts.length })
+      catch (error) {
+        cloudlog({ requestId, message: 'Error creating manifest data', error })
+        throw simpleError('cannot_seed_manifest', 'Cannot seed manifest data', { error })
       }
-    }
-
-    if (manifestCacheInserts.length > 0) {
-      const { error: manifestCacheError } = await supabase
-        .from('app_version_manifest_cache')
-        .upsert(manifestCacheInserts, { onConflict: 'app_version_id' })
-
-      if (manifestCacheError)
-        cloudlog({ requestId, message: 'Error creating manifest cache rows', error: manifestCacheError })
+      finally {
+        await closeClient(c, pgClient)
+      }
     }
 
     // Demo channels configuration

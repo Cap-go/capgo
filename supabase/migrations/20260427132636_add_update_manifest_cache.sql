@@ -47,6 +47,34 @@ BEGIN
 END;
 $$;
 
+INSERT INTO public.manifest (
+    app_version_id,
+    file_name,
+    s3_path,
+    file_hash,
+    file_size
+)
+SELECT
+    av.id,
+    manifest_entry.file_name,
+    manifest_entry.s3_path,
+    manifest_entry.file_hash,
+    0 AS file_size
+FROM public.app_versions AS av
+CROSS JOIN
+    LATERAL unnest(av.manifest) WITH ORDINALITY
+        AS manifest_entry (file_name, s3_path, file_hash, ordinality)
+WHERE
+    av.manifest IS NOT NULL
+    AND manifest_entry.file_name IS NOT NULL
+    AND manifest_entry.s3_path IS NOT NULL
+    AND manifest_entry.file_hash IS NOT NULL
+    AND NOT EXISTS (
+        SELECT 1
+        FROM public.manifest AS manifest_row
+        WHERE manifest_row.app_version_id = av.id
+    );
+
 INSERT INTO public.app_version_manifest_cache (app_version_id, entries)
 SELECT
     m.app_version_id,
@@ -65,33 +93,18 @@ ON CONFLICT (app_version_id) DO UPDATE
         entries = excluded.entries,
         updated_at = now();
 
-INSERT INTO public.app_version_manifest_cache (app_version_id, entries)
-SELECT
-    av.id,
-    jsonb_agg(
-        jsonb_build_object(
-            'file_name', manifest_entry.file_name,
-            'file_hash', manifest_entry.file_hash,
-            's3_path', manifest_entry.s3_path
-        )
-        ORDER BY manifest_entry.ordinality
-    ) AS entries
-FROM public.app_versions AS av
-CROSS JOIN
-    LATERAL unnest(av.manifest) WITH ORDINALITY
-        AS manifest_entry (file_name, s3_path, file_hash, ordinality)
+UPDATE public.app_versions AS av
+SET manifest = NULL
 WHERE
     av.manifest IS NOT NULL
-    AND NOT EXISTS (
-        SELECT 1
-        FROM public.app_version_manifest_cache AS manifest_cache
-        WHERE manifest_cache.app_version_id = av.id
-    )
-GROUP BY av.id
-ON CONFLICT (app_version_id) DO UPDATE
-    SET
-        entries = excluded.entries,
-        updated_at = now();
+    AND (
+        EXISTS (
+            SELECT 1
+            FROM public.app_version_manifest_cache AS manifest_cache
+            WHERE manifest_cache.app_version_id = av.id
+        )
+        OR coalesce(array_length(av.manifest, 1), 0) = 0
+    );
 
 UPDATE public.app_versions AS av
 SET manifest_count = coalesce(manifest_cache.manifest_count, 0)

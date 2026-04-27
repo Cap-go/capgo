@@ -418,7 +418,7 @@ describe('manifest bundle count gating', () => {
       await supabase.from('manifest').delete().in('id', insertedManifestIds)
       insertedManifestIds.length = 0
     }
-    await supabase.from('app_version_manifest_cache').delete().eq('app_version_id', baseVersionId)
+    await supabase.from('app_version_manifest_cache').delete().eq('app_version_id', baseVersionId).throwOnError()
     await supabase.from('app_versions').update({ manifest_count: 0 }).eq('id', baseVersionId)
     await supabase.from('apps').update({ manifest_bundle_count: 0 }).eq('app_id', APP_NAME_UPDATE)
   })
@@ -483,6 +483,20 @@ describe('manifest bundle count gating', () => {
     expect(response.status).toBe(200)
     const json = await response.json<UpdateRes>()
     expect(json.manifest).toBeDefined()
+    expect(json.manifest?.some(entry => entry?.file_name === fileName)).toBe(true)
+  })
+
+  it('falls back to manifest rows when the cache row is missing', async () => {
+    const fileName = await seedManifestEntry()
+    await supabase.from('app_version_manifest_cache').delete().eq('app_version_id', baseVersionId).throwOnError()
+
+    const { error } = await supabase.from('apps').update({ manifest_bundle_count: 1 }).eq('app_id', APP_NAME_UPDATE)
+    if (error)
+      throw error
+
+    const response = await postUpdate(makeUpdatePayload())
+    expect(response.status).toBe(200)
+    const json = await response.json<UpdateRes>()
     expect(json.manifest?.some(entry => entry?.file_name === fileName)).toBe(true)
   })
 
