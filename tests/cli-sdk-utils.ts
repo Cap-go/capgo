@@ -207,25 +207,20 @@ interface CompatibilityEntry {
   remoteVersion: string | undefined
 }
 
-function hashApiKey(value: string) {
-  return createHash('sha256').update(value).digest('hex')
-}
-
 function isApiKeyExpired(expiresAt: string | null) {
   return expiresAt != null && new Date(expiresAt).getTime() <= Date.now()
 }
 
 async function getApiKeyRecord(apikey: string) {
-  const { data } = await getSupabaseClient()
-    .from('apikeys')
-    .select('expires_at, id, key, key_hash, limited_to_apps, limited_to_orgs, mode, user_id')
-    .or(`key.eq.${apikey},key_hash.eq.${hashApiKey(apikey)}`)
-    .maybeSingle()
+  const { data } = await getSupabaseClient().rpc('find_apikey_by_value' as any, {
+    key_value: apikey,
+  })
+  const row = data?.[0] as ApiKeyRow | undefined
 
-  if (!data || isApiKeyExpired(data.expires_at))
+  if (!row || isApiKeyExpired(row.expires_at))
     return null
 
-  return data as ApiKeyRow
+  return row
 }
 
 function hasModeAccess(mode: Database['public']['Enums']['key_mode'], allowedModes: Database['public']['Enums']['key_mode'][]) {
