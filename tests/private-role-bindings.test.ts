@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto'
+import { env } from 'node:process'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { getAuthHeaders, getEndpointUrl, getSupabaseClient, USER_ID, USER_ID_2 } from './test-utils.ts'
 
 let authHeaders: Record<string, string>
+const USE_CLOUDFLARE = env.USE_CLOUDFLARE_WORKERS === 'true'
 
 interface RoleBindingFixture {
   attackerOrgId: string
@@ -119,7 +121,8 @@ beforeAll(async () => {
   authHeaders = await getAuthHeaders()
 })
 
-describe('[POST] /private/role_bindings', () => {
+// /private/role_bindings is currently served by the Supabase private functions stack, not the Cloudflare API worker.
+describe.skipIf(USE_CLOUDFLARE)('[POST] /private/role_bindings', () => {
   it('accepts channel-scoped bindings when channel_id is the channel RBAC uuid', async () => {
     const fixture = await createRoleBindingFixture()
 
