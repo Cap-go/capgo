@@ -368,11 +368,101 @@ describe('rbac permission system', () => {
               $2::uuid,
               $3,
               NULL::bigint
-            ) AS app_read_allowed
+          ) AS app_read_allowed
         `, [fakeUserId, ORG_ID, TEST_APP_ID])
 
         expect(result.rows[0].org_permission_allowed).toBe(false)
         expect(result.rows[0].app_read_allowed).toBe(true)
+      })
+
+      it('should ignore forged app-scoped bindings whose org_id does not match the target app owner', async () => {
+        const victimOrgId = randomUUID()
+        const victimAppUuid = randomUUID()
+        const victimAppId = `com.rbac.forged.${randomUUID()}`
+
+        await query(`
+          INSERT INTO public.orgs (
+            id,
+            created_by,
+            name,
+            management_email,
+            use_new_rbac
+          ) VALUES ($1::uuid, $2::uuid, $3, $4, true)
+        `, [
+          victimOrgId,
+          USER_ID_2,
+          `RBAC Victim Org ${victimOrgId}`,
+          `rbac-victim-${victimOrgId}@capgo.app`,
+        ])
+
+        await query(`
+          INSERT INTO public.apps (
+            id,
+            app_id,
+            icon_url,
+            owner_org,
+            name
+          ) VALUES ($1::uuid, $2, $3, $4::uuid, $5)
+        `, [
+          victimAppUuid,
+          victimAppId,
+          'rbac-forged-binding-icon',
+          victimOrgId,
+          `RBAC Victim App ${victimAppId}`,
+        ])
+
+        const roleResult = await query(`
+          SELECT id
+          FROM public.roles
+          WHERE name = 'app_admin'
+          LIMIT 1
+        `)
+        const roleId = roleResult.rows[0]?.id
+        expect(roleId).toBeTruthy()
+
+        await query(`
+          INSERT INTO public.role_bindings (
+            principal_type,
+            principal_id,
+            role_id,
+            scope_type,
+            org_id,
+            app_id,
+            granted_by,
+            is_direct
+          ) VALUES (
+            public.rbac_principal_user(),
+            $1::uuid,
+            $2::uuid,
+            public.rbac_scope_app(),
+            $3::uuid,
+            $4::uuid,
+            $1::uuid,
+            true
+          )
+        `, [
+          USER_ID,
+          roleId,
+          ORG_ID,
+          victimAppUuid,
+        ])
+
+        const result = await query(`
+          SELECT public.rbac_has_permission(
+            public.rbac_principal_user(),
+            $1::uuid,
+            'app.update_settings',
+            $2::uuid,
+            $3,
+            NULL::bigint
+          ) AS allowed
+        `, [
+          USER_ID,
+          ORG_ID,
+          victimAppId,
+        ])
+
+        expect(result.rows[0].allowed).toBe(false)
       })
 
       it('should reject caller-supplied app and org scope when channel scope belongs elsewhere', async () => {
@@ -412,6 +502,174 @@ describe('rbac permission system', () => {
             $4::bigint
           ) AS allowed
         `, [USER_ID, ORG_ID, TEST_APP_ID, channelResult.rows[0].id])
+
+        expect(result.rows[0].allowed).toBe(false)
+      })
+
+      it('should ignore forged channel-scoped bindings whose org_id and app_id do not match the target channel owner', async () => {
+        const victimOrgId = randomUUID()
+        const victimAppUuid = randomUUID()
+        const victimAppId = `com.rbac.channel.${randomUUID()}`
+        const victimVersionName = `rbac-channel-version-${randomUUID().slice(0, 8)}`
+        const victimChannelName = `rbac-channel-${randomUUID().slice(0, 8)}`
+
+        const attackerAppResult = await query(`
+          SELECT id
+          FROM public.apps
+          WHERE app_id = $1
+          LIMIT 1
+        `, [TEST_APP_ID])
+        const attackerAppUuid = attackerAppResult.rows[0]?.id
+        expect(attackerAppUuid).toBeTruthy()
+
+        await query(`
+          INSERT INTO public.orgs (
+            id,
+            created_by,
+            name,
+            management_email,
+            use_new_rbac
+          ) VALUES ($1::uuid, $2::uuid, $3, $4, true)
+        `, [
+          victimOrgId,
+          USER_ID_2,
+          `RBAC Channel Victim Org ${victimOrgId}`,
+          `rbac-channel-victim-${victimOrgId}@capgo.app`,
+        ])
+
+        await query(`
+          INSERT INTO public.apps (
+            id,
+            app_id,
+            icon_url,
+            owner_org,
+            name
+          ) VALUES ($1::uuid, $2, $3, $4::uuid, $5)
+        `, [
+          victimAppUuid,
+          victimAppId,
+          'rbac-forged-channel-icon',
+          victimOrgId,
+          `RBAC Channel Victim App ${victimAppId}`,
+        ])
+
+        const versionResult = await query(`
+          INSERT INTO public.app_versions (
+            app_id,
+            name,
+            owner_org,
+            user_id,
+            checksum,
+            storage_provider,
+            r2_path,
+            deleted
+          ) VALUES (
+            $1,
+            $2,
+            $3::uuid,
+            $4::uuid,
+            $5,
+            'r2',
+            $6,
+            false
+          )
+          RETURNING id
+        `, [
+          victimAppId,
+          victimVersionName,
+          victimOrgId,
+          USER_ID_2,
+          `checksum-${victimVersionName}`,
+          `orgs/${victimOrgId}/apps/${victimAppId}/${victimVersionName}.zip`,
+        ])
+        const victimVersionId = versionResult.rows[0]?.id
+        expect(victimVersionId).toBeTruthy()
+
+        const channelResult = await query(`
+          INSERT INTO public.channels (
+            app_id,
+            name,
+            version,
+            owner_org,
+            created_by,
+            public,
+            allow_emulator
+          ) VALUES (
+            $1,
+            $2,
+            $3::bigint,
+            $4::uuid,
+            $5::uuid,
+            false,
+            false
+          )
+          RETURNING id, rbac_id
+        `, [
+          victimAppId,
+          victimChannelName,
+          victimVersionId,
+          victimOrgId,
+          USER_ID_2,
+        ])
+        const victimChannelId = channelResult.rows[0]?.id
+        const victimChannelRbacId = channelResult.rows[0]?.rbac_id
+        expect(victimChannelId).toBeTruthy()
+        expect(victimChannelRbacId).toBeTruthy()
+
+        const roleResult = await query(`
+          SELECT id
+          FROM public.roles
+          WHERE name = public.rbac_role_channel_admin()
+          LIMIT 1
+        `)
+        const roleId = roleResult.rows[0]?.id
+        expect(roleId).toBeTruthy()
+
+        await query(`
+          INSERT INTO public.role_bindings (
+            principal_type,
+            principal_id,
+            role_id,
+            scope_type,
+            org_id,
+            app_id,
+            channel_id,
+            granted_by,
+            is_direct
+          ) VALUES (
+            public.rbac_principal_user(),
+            $1::uuid,
+            $2::uuid,
+            public.rbac_scope_channel(),
+            $3::uuid,
+            $4::uuid,
+            $5::uuid,
+            $1::uuid,
+            true
+          )
+        `, [
+          USER_ID,
+          roleId,
+          ORG_ID,
+          attackerAppUuid,
+          victimChannelRbacId,
+        ])
+
+        const result = await query(`
+          SELECT public.rbac_has_permission(
+            public.rbac_principal_user(),
+            $1::uuid,
+            public.rbac_perm_channel_update_settings(),
+            $2::uuid,
+            $3,
+            $4::bigint
+          ) AS allowed
+        `, [
+          USER_ID,
+          ORG_ID,
+          TEST_APP_ID,
+          victimChannelId,
+        ])
 
         expect(result.rows[0].allowed).toBe(false)
       })
