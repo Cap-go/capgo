@@ -8,7 +8,7 @@ import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { buildManifestCacheEntries, compactManifestCacheEntries } from '../utils/manifestCache.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
-import { apps, manifest } from '../utils/postgres_schema.ts'
+import { app_version_manifest_cache, apps, manifest } from '../utils/postgres_schema.ts'
 import { getPath, s3 } from '../utils/s3.ts'
 import { createStatsMeta } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -93,6 +93,8 @@ async function upsertManifestCache(c: Context, appVersionId: number, entries: Ma
 
   if (cacheError)
     cloudlog({ requestId: c.get('requestId'), message: 'error upsert manifest cache', error: cacheError, appVersionId })
+
+  return !cacheError
 }
 
 async function deleteManifestCache(c: Context, appVersionId: number) {
@@ -119,8 +121,10 @@ async function handleManifest(c: Context, record: Database['public']['Tables']['
     .from('manifest')
     .select('file_name, file_hash, s3_path')
     .eq('app_version_id', record.id)
-  if (existingEntriesError)
+  if (existingEntriesError) {
     cloudlog({ requestId: c.get('requestId'), message: 'error get manifest entries', error: existingEntriesError, appVersionId: record.id })
+    return
+  }
 
   const compactEntries = compactManifestCacheEntries(manifestEntries)
   const validEntries: (typeof manifest.$inferInsert)[] = compactEntries
@@ -134,6 +138,7 @@ async function handleManifest(c: Context, record: Database['public']['Tables']['
 
   // Only create entries if none exist
   let hasManifestRows = Boolean(existingEntries?.length)
+  let cachePersisted = false
   if (!existingEntries?.length && validEntries.length > 0) {
     const pgClient = getPgClient(c, false)
     const drizzleClient = getDrizzleClient(pgClient)
@@ -148,8 +153,22 @@ async function handleManifest(c: Context, record: Database['public']['Tables']['
             updated_at: sql`now()`,
           })
           .where(eq(apps.app_id, record.app_id))
+        await tx
+          .insert(app_version_manifest_cache)
+          .values({
+            app_version_id: record.id,
+            entries: buildManifestCacheEntries(compactEntries),
+          })
+          .onConflictDoUpdate({
+            target: app_version_manifest_cache.app_version_id,
+            set: {
+              entries: sql`excluded.entries`,
+              updated_at: sql`now()`,
+            },
+          })
       })
       hasManifestRows = true
+      cachePersisted = true
     }
     catch (error) {
       cloudlog({ requestId: c.get('requestId'), message: 'error insert manifest transaction', error, appVersionId: record.id, appId: record.app_id })
@@ -163,10 +182,10 @@ async function handleManifest(c: Context, record: Database['public']['Tables']['
     ? compactEntries
     : compactManifestCacheEntries(existingEntries ?? [])
 
-  if (hasManifestRows && cacheEntries.length > 0)
-    await upsertManifestCache(c, record.id, cacheEntries)
+  if (hasManifestRows && cacheEntries.length > 0 && !cachePersisted)
+    cachePersisted = await upsertManifestCache(c, record.id, cacheEntries)
 
-  if (record.manifest !== null) {
+  if (record.manifest !== null && (cachePersisted || cacheEntries.length === 0)) {
     // Clear the staging payload once rows and cache are materialized.
     const { error: deleteError } = await supabaseAdmin(c)
       .from('app_versions')
