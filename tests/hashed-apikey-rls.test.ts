@@ -238,6 +238,54 @@ async function deletePendingInviteOrgForUser(orgId: string, userId: string): Pro
   }
 }
 
+async function createEnforcedRbacOnlyOrgForUser(userId: string): Promise<string> {
+  const client = await pool.connect()
+  const orgId = randomUUID()
+  try {
+    await client.query(
+      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys, use_new_rbac)
+       VALUES ($1, $2, $3, $4, true, true)`,
+      [orgId, USER_ID_2, `rbac-only-org-${orgId}`, `rbac-only-${orgId}@capgo.test`],
+    )
+    await client.query(
+      `INSERT INTO public.role_bindings (
+        principal_type, principal_id, role_id, scope_type, org_id, granted_by, reason, is_direct
+      ) VALUES (
+        public.rbac_principal_user(),
+        $1,
+        (SELECT id FROM public.roles WHERE name = public.rbac_role_org_member()),
+        public.rbac_scope_org(),
+        $2,
+        $3,
+        'hashed-apikey-rls test',
+        true
+      )`,
+      [userId, orgId, USER_ID_2],
+    )
+    return orgId
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function deleteEnforcedRbacOnlyOrgForUser(orgId: string, userId: string): Promise<void> {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      `DELETE FROM public.role_bindings
+       WHERE principal_type = public.rbac_principal_user()
+         AND principal_id = $1
+         AND org_id = $2`,
+      [userId, orgId],
+    )
+    await client.query('DELETE FROM public.orgs WHERE id = $1', [orgId])
+  }
+  finally {
+    client.release()
+  }
+}
+
 beforeAll(async () => {
   pool = new Pool({ connectionString: POSTGRES_URL })
   const client = await pool.connect()
@@ -440,6 +488,24 @@ describe('enforce_hashed_api_keys blocks plaintext capgkey auth on the RLS plane
     finally {
       await setOrgHashedApiKeyEnforcement(ORG_ID_RLS, true)
       await deletePendingInviteOrgForUser(pendingInviteOrgId, RLS_TEST_USER_ID)
+    }
+  })
+
+  it('rejects a plain API key when hashed enforcement is reached through RBAC-only org membership', async () => {
+    const rbacOnlyOrgId = await createEnforcedRbacOnlyOrgForUser(RLS_TEST_USER_ID)
+
+    try {
+      await setOrgHashedApiKeyEnforcement(ORG_ID_RLS, false)
+
+      const rows = await execWithCapgkey(
+        `SELECT get_identity('{all,write,read,upload}'::key_mode[]) AS user_id`,
+        plainKey.key,
+      )
+      expect(rows[0].user_id).toBeNull()
+    }
+    finally {
+      await setOrgHashedApiKeyEnforcement(ORG_ID_RLS, true)
+      await deleteEnforcedRbacOnlyOrgForUser(rbacOnlyOrgId, RLS_TEST_USER_ID)
     }
   })
 
