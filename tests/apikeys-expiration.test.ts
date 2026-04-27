@@ -400,6 +400,21 @@ describe('organization API key expiration policy', () => {
     expect(data.error).toBe('expiration_exceeds_max')
   })
 
+  it('fail to create app-scoped api key for unknown app ids', async () => {
+    const response = await apiFetch('/apikey', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        name: 'key-policy-app-scope-missing-app',
+        limited_to_apps: [`com.app.expiration.missing.${id}`],
+      }),
+    })
+    const data = await response.json() as { error: string }
+
+    expect(response.status).toBe(400)
+    expect(data.error).toBe('failed_to_resolve_apikey_policy_scope')
+  })
+
   it('fail to update api key scope to app owner org without expiration (scope-change regression)', async () => {
     const createResponse = await apiFetch('/apikey', {
       method: 'POST',
@@ -472,7 +487,7 @@ describe('organization API key expiration policy', () => {
       .insert({
         user_id: USER_ID,
         key: null,
-        key_hash: null,
+        key_hash: '0'.repeat(64),
         mode: 'all',
         name: 'direct-insert-policy-bypass',
         limited_to_apps: [POLICY_APPNAME],
