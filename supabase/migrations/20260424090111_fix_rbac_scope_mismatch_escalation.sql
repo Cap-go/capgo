@@ -116,7 +116,7 @@ BEGIN
     SELECT public.rbac_scope_channel(), v_org_id, v_app_uuid, v_channel_uuid WHERE v_channel_uuid IS NOT NULL
   ),
   direct_roles AS (
-    SELECT rb.role_id
+    SELECT rb.role_id, rb.scope_type
     FROM scope_catalog s
     JOIN public.role_bindings rb ON rb.scope_type = s.scope_type
       AND (
@@ -131,7 +131,7 @@ BEGIN
       AND (rb.expires_at IS NULL OR rb.expires_at > now())
   ),
   group_roles AS (
-    SELECT rb.role_id
+    SELECT rb.role_id, rb.scope_type
     FROM scope_catalog s
     JOIN public.group_members gm ON gm.user_id = p_principal_id
     JOIN public.groups g ON g.id = gm.group_id
@@ -149,16 +149,18 @@ BEGIN
       AND (rb.expires_at IS NULL OR rb.expires_at > now())
   ),
   combined_roles AS (
-    SELECT role_id FROM direct_roles
+    SELECT role_id, scope_type FROM direct_roles
     UNION
-    SELECT role_id FROM group_roles
+    SELECT role_id, scope_type FROM group_roles
   ),
   role_closure AS (
-    SELECT role_id FROM combined_roles
+    SELECT role_id, scope_type FROM combined_roles
     UNION
-    SELECT rh.child_role_id
+    SELECT rh.child_role_id, rc.scope_type
     FROM public.role_hierarchy rh
     JOIN role_closure rc ON rc.role_id = rh.parent_role_id
+    JOIN public.roles child_role ON child_role.id = rh.child_role_id
+      AND child_role.scope_type = rc.scope_type
   ),
   perm_set AS (
     SELECT DISTINCT p.key
@@ -177,5 +179,4 @@ ALTER FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character vary
 REVOKE ALL ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) FROM anon;
 REVOKE ALL ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) FROM authenticated;
-GRANT EXECUTE ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) TO service_role;

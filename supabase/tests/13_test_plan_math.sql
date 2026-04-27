@@ -40,9 +40,11 @@ BEGIN
   RETURN NEXT IS(usage.bandwidth_percent, (SELECT CAST ('1.0' AS DOUBLE PRECISION)), 'Bandwidth usage = 1% for "Solo" plan');
 
   -- Let's now add a second app to this org. 
+  ALTER TABLE apps DISABLE TRIGGER USER;
   ALTER TABLE app_versions DISABLE TRIGGER force_valid_owner_org_app_versions;
 
   UPDATE apps set owner_org='046a36ac-e03c-4590-9257-bd6c9dba9ee8' where app_id='com.demoadmin.app';
+  ALTER TABLE apps ENABLE TRIGGER USER;
 
   UPDATE app_versions set app_id='com.demoadmin.app', r2_path='orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demoadmin.app/1.359.0.zip' where id=7;
   INSERT INTO "public"."daily_mau" ("app_id", "mau", "date") VALUES 

@@ -309,6 +309,72 @@ describe('rbac permission system', () => {
         expect(result.rows[0].write_allowed).toBe(false)
       })
 
+      it('should ignore cross-scope hierarchy descendants during permission expansion', async () => {
+        const fakeUserId = '22222222-2222-4222-8222-222222222222'
+
+        await query(`
+          INSERT INTO public.role_bindings (
+            principal_type,
+            principal_id,
+            role_id,
+            scope_type,
+            org_id,
+            app_id,
+            granted_by,
+            granted_at,
+            reason,
+            is_direct
+          )
+          SELECT
+            public.rbac_principal_user(),
+            $1::uuid,
+            app_role.id,
+            public.rbac_scope_app(),
+            $2::uuid,
+            a.id,
+            $3::uuid,
+            now(),
+            'cross-scope-hierarchy-test',
+            true
+          FROM public.roles app_role
+          JOIN public.apps a ON a.app_id = $4
+          WHERE app_role.name = public.rbac_role_app_reader()
+        `, [fakeUserId, ORG_ID, USER_ID, TEST_APP_ID])
+
+        await query(`
+          INSERT INTO public.role_hierarchy (parent_role_id, child_role_id)
+          SELECT
+            parent_role.id,
+            child_role.id
+          FROM public.roles parent_role
+          JOIN public.roles child_role ON child_role.name = public.rbac_role_org_super_admin()
+          WHERE parent_role.name = public.rbac_role_app_reader()
+        `)
+
+        const result = await query(`
+          SELECT
+            public.rbac_has_permission(
+              public.rbac_principal_user(),
+              $1::uuid,
+              'org.update_user_roles',
+              $2::uuid,
+              $3,
+              NULL::bigint
+            ) AS org_permission_allowed,
+            public.rbac_has_permission(
+              public.rbac_principal_user(),
+              $1::uuid,
+              'app.read',
+              $2::uuid,
+              $3,
+              NULL::bigint
+            ) AS app_read_allowed
+        `, [fakeUserId, ORG_ID, TEST_APP_ID])
+
+        expect(result.rows[0].org_permission_allowed).toBe(false)
+        expect(result.rows[0].app_read_allowed).toBe(true)
+      })
+
       it('should reject caller-supplied app and org scope when channel scope belongs elsewhere', async () => {
         const id = randomUUID()
         const foreignOrgId = randomUUID()
