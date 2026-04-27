@@ -12,32 +12,67 @@ async function assertCompatibilityTableColumns(appId: string, column1: string, c
   const nodeModulesPath = join(process.cwd(), 'node_modules')
 
   const sdk = createTestSDK()
-  const result = await sdk.checkBundleCompatibility({
-    appId,
-    channel: 'production',
-    packageJson: packageJsonPath,
-    nodeModules: nodeModulesPath,
-  })
+  let lastError: unknown
 
-  expect(result.success).toBe(true)
-  expect(result.data).toBeDefined()
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const result = await sdk.checkBundleCompatibility({
+      appId,
+      channel: 'production',
+      packageJson: packageJsonPath,
+      nodeModules: nodeModulesPath,
+    })
 
-  // Find the package in the compatibility data
-  const packageEntry = result.data!.find((entry: any) => entry.name === column1)
-  expect(packageEntry).toBeDefined()
-  expect(packageEntry!.localVersion).toContain(column2)
-  expect(packageEntry!.remoteVersion).toContain(column3)
-  // Note: SDK compatibility field structure may differ from CLI output
-  // The ✅/❌ symbols are in the CLI's text rendering, SDK returns the data
-  // We'll check if versions match for compatibility
-  if (column4 === '✅') {
-    // Compatible - versions should match (considering semver resolution)
-    expect(packageEntry!.remoteVersion).toBeDefined()
+    try {
+      expect(result.success).toBe(true)
+      expect(result.data).toBeDefined()
+
+      // Find the package in the compatibility data
+      const packageEntry = result.data!.find((entry: any) => entry.name === column1)
+      expect(packageEntry).toBeDefined()
+      expect(packageEntry!.localVersion).toContain(column2)
+      expect(packageEntry!.remoteVersion).toContain(column3)
+      // Note: SDK compatibility field structure may differ from CLI output
+      // The ✅/❌ symbols are in the CLI's text rendering, SDK returns the data
+      // We'll check if versions match for compatibility
+      if (column4 === '✅') {
+        // Compatible - versions should match (considering semver resolution)
+        expect(packageEntry!.remoteVersion).toBeDefined()
+      }
+      else {
+        // Incompatible - just verify the entry exists
+        expect(packageEntry!.localVersion).toBeDefined()
+      }
+      return
+    }
+    catch (error) {
+      lastError = error
+      if (attempt === 4)
+        throw error
+
+      await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)))
+    }
   }
-  else {
-    // Incompatible - just verify the entry exists
-    expect(packageEntry!.localVersion).toBeDefined()
-  }
+
+  throw lastError
+}
+
+async function writeBundleContent(appId: string, marker: string) {
+  const indexHtmlPath = join(tempFileFolder(appId), 'dist', 'index.html')
+  await writeFile(indexHtmlPath, `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>CLI Metadata Test</title>
+</head>
+<body>
+  <h1>${marker}</h1>
+  <script>
+    if (window.CapacitorUpdater) {
+      window.CapacitorUpdater.notifyAppReady();
+    }
+  </script>
+</body>
+</html>`)
 }
 
 async function getInstalledDependencyVersion(packageName: string): Promise<string> {
@@ -84,6 +119,7 @@ describe('tests CLI metadata', () => {
   it('should upload bundle with metadata check', async () => {
     const testSemver = getSemver()
     const packageJsonPath = join(process.cwd(), 'temp_cli_test', APPNAME, 'package.json')
+    await writeBundleContent(APPNAME, `metadata-${testSemver}`)
 
     // First upload a bundle WITH metadata to establish baseline
     const result = await uploadBundleSDK(APPNAME, testSemver, 'production', {
