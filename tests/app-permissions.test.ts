@@ -149,8 +149,9 @@ describe('app creation permission tests', () => {
         }),
       })
 
-      // We expect this to fail with 400 (missing required field - app_id validation passes but owner_org logic may vary)
       expect(response.status).toBe(400)
+      const data = await response.json() as { error: string }
+      expect(data.error).toBe('missing_owner_org')
     })
   })
 })

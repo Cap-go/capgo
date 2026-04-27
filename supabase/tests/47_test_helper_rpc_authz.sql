@@ -115,18 +115,24 @@ SELECT
     );
 
 SELECT
-    throws_ok(
-        'SELECT get_user_main_org_id(''' || tests.get_supabase_uid('test_admin') || ''')',
-        '42501',
-        'permission denied for function get_user_main_org_id',
+    is(
+        has_function_privilege(
+            'anon'::name,
+            'public.get_user_main_org_id(uuid)'::regprocedure,
+            'EXECUTE'
+        ),
+        false,
         'get_user_main_org_id - anonymous execute is blocked'
     );
 
 SELECT
-    throws_ok(
-        'SELECT is_account_disabled(''' || tests.get_supabase_uid('test_admin') || ''')',
-        '42501',
-        'permission denied for function is_account_disabled',
+    is(
+        has_function_privilege(
+            'anon'::name,
+            'public.is_account_disabled(uuid)'::regprocedure,
+            'EXECUTE'
+        ),
+        false,
         'is_account_disabled - anonymous execute is blocked'
     );
 

@@ -151,6 +151,8 @@ jobs:
         run: ln -sfn supabase/templates templates
       - name: Run Supabase Start
         run: supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,studio,logflare,vector,realtime
+      - name: Reset Supabase DB
+        run: supabase db reset
       - name: Run Supabase Test DB
         run: supabase test db
       - name: Lint SQL

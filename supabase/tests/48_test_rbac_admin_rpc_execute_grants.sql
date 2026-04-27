@@ -38,40 +38,35 @@ END $$;
 SELECT tests.authenticate_as('test_rbac_admin_rpc_user');
 
 SELECT
-    throws_ok(
-        $sql$
-        SELECT public.rbac_migrate_org_users_to_bindings(
-            current_setting('test.rbac_admin_rpc_org')::uuid,
-            tests.get_supabase_uid('test_rbac_admin_rpc_user')
-        )
-        $sql$,
-        '42501',
-        'permission denied for function rbac_migrate_org_users_to_bindings',
+    is(
+        has_function_privilege(
+            'authenticated'::name,
+            'public.rbac_migrate_org_users_to_bindings(uuid, uuid)'::regprocedure,
+            'EXECUTE'
+        ),
+        false,
         'rbac_migrate_org_users_to_bindings blocks authenticated callers'
     );
 
 SELECT
-    throws_ok(
-        $sql$
-        SELECT public.rbac_enable_for_org(
-            current_setting('test.rbac_admin_rpc_org')::uuid,
-            tests.get_supabase_uid('test_rbac_admin_rpc_user')
-        )
-        $sql$,
-        '42501',
-        'permission denied for function rbac_enable_for_org',
+    is(
+        has_function_privilege(
+            'authenticated'::name,
+            'public.rbac_enable_for_org(uuid, uuid)'::regprocedure,
+            'EXECUTE'
+        ),
+        false,
         'rbac_enable_for_org blocks authenticated callers'
     );
 
 SELECT
-    throws_ok(
-        $sql$
-        SELECT public.rbac_rollback_org(
-            current_setting('test.rbac_admin_rpc_org')::uuid
-        )
-        $sql$,
-        '42501',
-        'permission denied for function rbac_rollback_org',
+    is(
+        has_function_privilege(
+            'authenticated'::name,
+            'public.rbac_rollback_org(uuid)'::regprocedure,
+            'EXECUTE'
+        ),
+        false,
         'rbac_rollback_org blocks authenticated callers'
     );
 

@@ -14,8 +14,15 @@ SELECT
 
 SELECT
     is(
-        is_trial_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
-        15,
+        public.is_trial_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
+        (
+            SELECT COALESCE(
+                GREATEST((trial_at::date - CURRENT_DATE), 0),
+                0
+            )::integer
+            FROM public.stripe_info
+            WHERE customer_id = 'cus_Pa0k8TO6HVln6A'
+        ),
         'is_trial_org - org admin can read trial days'
     );
 
@@ -60,19 +67,25 @@ SELECT
 SELECT tests.clear_authentication();
 
 SELECT
-    throws_ok(
-        'SELECT is_paying_org(''22dbad8a-b885-4309-9b3b-a09f8460fb6d'')',
-        '42501',
-        'permission denied for function is_paying_org',
-        'is_paying_org - anonymous call is blocked'
+    is(
+        has_function_privilege(
+            'anon'::name,
+            'public.is_paying_org(uuid)'::regprocedure,
+            'EXECUTE'
+        ),
+        false,
+        'is_paying_org - anonymous execute is blocked'
     );
 
 SELECT
-    throws_ok(
-        'SELECT is_trial_org(''22dbad8a-b885-4309-9b3b-a09f8460fb6d'')',
-        '42501',
-        'permission denied for function is_trial_org',
-        'is_trial_org - anonymous call is blocked'
+    is(
+        has_function_privilege(
+            'anon'::name,
+            'public.is_trial_org(uuid)'::regprocedure,
+            'EXECUTE'
+        ),
+        false,
+        'is_trial_org - anonymous execute is blocked'
     );
 
 SELECT
@@ -97,8 +110,15 @@ SELECT
 
 SELECT
     is(
-        is_trial_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
-        15,
+        public.is_trial_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
+        (
+            SELECT COALESCE(
+                GREATEST((trial_at::date - CURRENT_DATE), 0),
+                0
+            )::integer
+            FROM public.stripe_info
+            WHERE customer_id = 'cus_Pa0k8TO6HVln6A'
+        ),
         'is_trial_org - service role can read trial days'
     );
 

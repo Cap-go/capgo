@@ -99,7 +99,7 @@ declare module 'vue-router/auto-routes' {
     >,
     '/ApiKeys': RouteRecordInfo<
       '/ApiKeys',
-      '/ApiKeys',
+      '/apikeys',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -403,6 +403,20 @@ declare module 'vue-router/auto-routes' {
       '/settings/organization',
       Record<never, never>,
       Record<never, never>,
+      | never
+    >,
+    '/settings/organization/ApiKeys': RouteRecordInfo<
+      '/settings/organization/ApiKeys',
+      '/settings/organization/api-keys',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/settings/organization/ApiKeys.[id]': RouteRecordInfo<
+      '/settings/organization/ApiKeys.[id]',
+      '/settings/organization/api-keys/:id',
+      { id: ParamValue<true> },
+      { id: ParamValue<false> },
       | never
     >,
     '/settings/organization/Security': RouteRecordInfo<
@@ -830,6 +844,18 @@ declare module 'vue-router/auto-routes' {
     'src/pages/settings/organization/index.vue': {
       routes:
         | '/settings/organization/'
+      views:
+        | never
+    }
+    'src/pages/settings/organization/ApiKeys.vue': {
+      routes:
+        | '/settings/organization/ApiKeys'
+      views:
+        | never
+    }
+    'src/pages/settings/organization/ApiKeys.[id].vue': {
+      routes:
+        | '/settings/organization/ApiKeys.[id]'
       views:
         | never
     }
