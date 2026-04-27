@@ -83,13 +83,17 @@ async function validateScopedAppOwnership(
   scopeType: RoleBindingBody['scope_type'],
   orgId: string,
   appId?: string,
+  channelId?: number,
 ): Promise<ValidationResult<null>> {
   if (scopeType !== 'app' && scopeType !== 'channel') {
     return { ok: true, data: null }
   }
 
   const [app] = await drizzle
-    .select({ id: schema.apps.id })
+    .select({
+      id: schema.apps.id,
+      publicAppId: schema.apps.app_id,
+    })
     .from(schema.apps)
     .where(
       and(
@@ -101,6 +105,24 @@ async function validateScopedAppOwnership(
 
   if (!app) {
     return { ok: false, status: 404, error: 'App not found in this org' }
+  }
+
+  if (scopeType === 'channel') {
+    const [channel] = await drizzle
+      .select({ id: schema.channels.id })
+      .from(schema.channels)
+      .where(
+        and(
+          eq(schema.channels.id, channelId!),
+          eq(schema.channels.app_id, app.publicAppId),
+          eq(schema.channels.owner_org, orgId),
+        ),
+      )
+      .limit(1)
+
+    if (!channel) {
+      return { ok: false, status: 404, error: 'Channel not found in this app/org' }
+    }
   }
 
   return { ok: true, data: null }
@@ -329,7 +351,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       return c.json({ error: scopeValidation.error }, scopeValidation.status as any)
     }
 
-    const scopedAppValidation = await validateScopedAppOwnership(drizzle, scope_type, org_id, app_id)
+    const scopedAppValidation = await validateScopedAppOwnership(drizzle, scope_type, org_id, app_id, channel_id)
     if (!scopedAppValidation.ok) {
       return c.json({ error: scopedAppValidation.error }, scopedAppValidation.status as any)
     }

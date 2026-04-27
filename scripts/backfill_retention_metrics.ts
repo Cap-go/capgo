@@ -30,6 +30,14 @@ const EVENT_FETCH_PAGE_SIZE = 100
 const DB_CHUNK_SIZE = 500
 const FAILURE_OUTPUT = './tmp/retention_metric_backfill_failures.json'
 const DATE_ID_REGEX = /^\d{4}-\d{2}-\d{2}$/
+const DATABASE_URL_ENV_KEYS = [
+  'MAIN_SUPABASE_DB_URL',
+  'DATABASE_URL',
+  'POSTGRES_URL',
+  'SUPABASE_DB_URL',
+  'SUPABASE_DB_DIRECT_URL',
+  'DIRECT_URL',
+] as const
 const SUBSCRIPTION_EVENT_TYPES = [
   'customer.subscription.created',
   'customer.subscription.updated',
@@ -212,20 +220,21 @@ function getRequiredEnv(env: Record<string, string | undefined>, key: string) {
   return value
 }
 
-function getRequiredDatabaseUrl(env: Record<string, string | undefined>) {
+export function getRequiredDatabaseUrl(env: Record<string, string | undefined>) {
   const value = getDatabaseUrl(env)
   if (!value)
-    throw new Error('--apply requires DATABASE_URL, POSTGRES_URL, SUPABASE_DB_URL, SUPABASE_DB_DIRECT_URL, or DIRECT_URL so metric writes and processed-event markers are committed atomically')
+    throw new Error(`--apply requires ${DATABASE_URL_ENV_KEYS.join(', ')} so metric writes and processed-event markers are committed atomically`)
   return value
 }
 
-function getDatabaseUrl(env: Record<string, string | undefined>) {
-  return env.DATABASE_URL?.trim()
-    || env.POSTGRES_URL?.trim()
-    || env.SUPABASE_DB_URL?.trim()
-    || env.SUPABASE_DB_DIRECT_URL?.trim()
-    || env.DIRECT_URL?.trim()
-    || null
+export function getDatabaseUrl(env: Record<string, string | undefined>) {
+  for (const key of DATABASE_URL_ENV_KEYS) {
+    const value = env[key]?.trim()
+    if (value)
+      return value
+  }
+
+  return null
 }
 
 function shouldAllowSelfSignedPgCertificate(env: Record<string, string | undefined>) {

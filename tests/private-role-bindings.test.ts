@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getAuthHeaders, getSupabaseClient, USER_ID, USER_ID_2 } from './test-utils.ts'
+import { getAuthHeaders, getEndpointUrl, getSupabaseClient, USER_ID, USER_ID_2 } from './test-utils.ts'
 
 let authHeaders: Record<string, string>
 
@@ -73,7 +73,7 @@ describe('[POST] /private/role_bindings', () => {
     const fixture = await createRoleBindingFixture()
 
     try {
-      const createResponse = await fetch(`${BASE_URL}/private/role_bindings`, {
+      const createResponse = await fetch(getEndpointUrl('/private/role_bindings'), {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({

@@ -83,6 +83,8 @@ BEGIN
   END IF;
 
   WITH RECURSIVE scope_catalog AS (
+    SELECT public.rbac_scope_platform()::text AS scope_type, NULL::uuid AS org_id, NULL::uuid AS app_id, NULL::uuid AS channel_id
+    UNION ALL
     SELECT public.rbac_scope_org()::text AS scope_type, v_org_id AS org_id, NULL::uuid AS app_id, NULL::uuid AS channel_id WHERE v_org_id IS NOT NULL
     UNION ALL
     SELECT public.rbac_scope_app(), v_org_id, v_app_uuid, NULL::uuid WHERE v_app_uuid IS NOT NULL
@@ -94,6 +96,7 @@ BEGIN
     FROM scope_catalog s
     JOIN public.role_bindings rb ON rb.scope_type = s.scope_type
       AND (
+        (rb.scope_type = public.rbac_scope_platform()) OR
         (rb.scope_type = public.rbac_scope_org() AND rb.org_id = s.org_id) OR
         (rb.scope_type = public.rbac_scope_app() AND rb.org_id = s.org_id AND rb.app_id = s.app_id) OR
         (rb.scope_type = public.rbac_scope_channel() AND rb.org_id = s.org_id AND rb.app_id = s.app_id AND rb.channel_id = s.channel_id)
@@ -144,6 +147,12 @@ END;
 $$;
 
 ALTER FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) OWNER TO "postgres";
+REVOKE ALL ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) FROM anon;
+REVOKE ALL ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) FROM authenticated;
+REVOKE ALL ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) FROM service_role;
+GRANT EXECUTE ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) TO service_role;
 
 COMMENT ON FUNCTION public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint) IS
   'Checks whether a principal has a permission at org/app/channel scope. App and channel bindings must match the resolved owning org so forged cross-org scope rows are ignored.';
