@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import VueTurnstile from 'vue-turnstile'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
+import { getRecentEmailOtpVerification } from '~/services/emailOtp'
 import { hideLoader } from '~/services/loader'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -27,9 +28,6 @@ const router = useRouter()
 
 const version = import.meta.env.VITE_APP_VERSION
 const registerUrl = window.location.host === 'console.capgo.app' ? 'https://capgo.app/register/' : `/register/`
-const isLoadingSession = ref(true)
-const isEmailVerified = ref(true)
-const isDeleteBlocked = computed(() => !isEmailVerified.value)
 
 async function redirectToEmailVerification() {
   await router.push({
@@ -41,16 +39,20 @@ async function redirectToEmailVerification() {
   })
 }
 
-async function checkEmailVerification() {
-  isLoadingSession.value = true
-  const { data: sessionResult, error: sessionError } = await supabase.auth.getSession()
-  if (sessionError) {
-    isEmailVerified.value = false
-    isLoadingSession.value = false
-    return
+async function ensureRecentEmailVerification(userId: string) {
+  try {
+    const { isVerified } = await getRecentEmailOtpVerification(supabase, userId)
+    if (isVerified)
+      return true
   }
-  isEmailVerified.value = !!sessionResult?.session?.user?.email_confirmed_at
-  isLoadingSession.value = false
+  catch (error) {
+    console.error('Cannot load email OTP verification state', error)
+    toast.error(t('something-went-wrong-try-again-later'))
+    return false
+  }
+
+  await redirectToEmailVerification()
+  return false
 }
 
 async function deleteAccount() {
@@ -106,6 +108,11 @@ async function deleteAccount() {
             if (!user) {
               isLoading.value = false
               return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
+            }
+
+            if (!await ensureRecentEmailVerification(userId)) {
+              isLoading.value = false
+              return false
             }
 
             // Delete user using RPC function
@@ -165,9 +172,6 @@ async function deleteAccount() {
 }
 
 async function submit(form: { email: string, password: string }) {
-  if (isDeleteBlocked.value) {
-    return setErrors('delete-account', [t('email-not-verified')], {})
-  }
   isLoading.value = true
   if (captchaKey.value && !turnstileToken.value) {
     isLoading.value = false
@@ -191,6 +195,18 @@ async function submit(form: { email: string, password: string }) {
     toast.error(t('invalid-auth'))
   }
   else {
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims()
+    const userId = claimsData?.claims?.sub
+    if (claimsError || !userId) {
+      isLoading.value = false
+      return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
+    }
+
+    if (!await ensureRecentEmailVerification(userId)) {
+      isLoading.value = false
+      return
+    }
+
     pendingEmail.value = form.email
     pendingPassword.value = form.password
     turnstileToken.value = ''
@@ -201,7 +217,6 @@ async function submit(form: { email: string, password: string }) {
 }
 
 onMounted (() => {
-  checkEmailVerification()
   hideLoader()
 })
 </script>
@@ -223,24 +238,7 @@ onMounted (() => {
       </div>
 
       <div class="relative mx-auto mt-8 max-w-md md:mt-4">
-        <div v-if="isLoadingSession" class="flex justify-center">
-          <Spinner size="w-8 h-8" class="my-auto" />
-        </div>
-        <div v-else-if="isDeleteBlocked" class="rounded-md border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-800 dark:border-amber-700 dark:bg-amber-900/30 dark:text-amber-100">
-          <p class="mb-1">
-            {{ t('email-not-verified') }}
-          </p>
-          <p class="mb-3 text-xs">
-            {{ t('delete-account-verify-hint') }}
-          </p>
-          <router-link
-            :to="{ path: '/resend_email', query: { reason: 'email_not_verified', return_to: '/delete_account' } }"
-            class="inline-flex justify-center items-center px-4 py-2 rounded-md text-sm font-semibold text-white bg-muted-blue-700 hover:bg-blue-700 focus:bg-blue-700"
-          >
-            {{ t('validate-email') }}
-          </router-link>
-        </div>
-        <div v-else class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
+        <div class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
           <div class="py-6 px-4 sm:py-7 sm:px-8">
             <FormKit id="delete-account" type="form" :actions="false" @submit="submit">
               <div class="space-y-5">
