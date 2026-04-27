@@ -28,6 +28,7 @@ const SERVICE_ONLY_PROCS = [
   'public.delete_old_deleted_versions()',
   'public.generate_org_user_stripe_info_on_org_create()',
   'public.get_apikey()',
+  'public.is_paying_and_good_plan_org_action(uuid, public.action_type[])',
   'public.noupdate()',
   'public.prevent_last_super_admin_binding_delete()',
   'public.resync_org_user_role_bindings(uuid, uuid)',
@@ -41,6 +42,8 @@ const SERVICE_ONLY_PROCS = [
 ] as const
 
 const ANON_ALLOWED_PROCS = [
+  'public.get_app_metrics(uuid, character varying, date, date)',
+  'public.get_app_metrics(uuid, date, date)',
   'public.get_org_members(uuid, uuid)',
   'public.get_total_app_storage_size_orgs(uuid, character varying)',
   'public.get_total_storage_size_org(uuid)',
@@ -57,7 +60,6 @@ const ANON_ALLOWED_PROCS = [
   'public.is_onboarding_needed_org(uuid)',
   'public.is_org_yearly(uuid)',
   'public.is_paying_and_good_plan_org(uuid)',
-  'public.is_paying_and_good_plan_org_action(uuid, public.action_type[])',
   'public.reject_access_due_to_2fa_for_app(character varying)',
   'public.reject_access_due_to_2fa_for_org(uuid)',
   'public.verify_mfa()',
@@ -74,8 +76,6 @@ const AUTHENTICATED_ONLY_PROCS = [
   'public.delete_user()',
   'public.get_account_removal_date()',
   'public.get_app_access_rbac(uuid)',
-  'public.get_app_metrics(uuid, character varying, date, date)',
-  'public.get_app_metrics(uuid, date, date)',
   'public.get_app_metrics(uuid)',
   'public.get_org_members(uuid)',
   'public.get_org_members_rbac(uuid)',

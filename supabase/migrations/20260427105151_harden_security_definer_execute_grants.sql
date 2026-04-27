@@ -266,9 +266,9 @@ GRANT EXECUTE ON FUNCTION public.get_app_access_rbac(uuid) TO SERVICE_ROLE;
 REVOKE ALL
 ON FUNCTION public.get_app_metrics(uuid, character varying, date, date)
 FROM PUBLIC;
-REVOKE ALL
+GRANT EXECUTE
 ON FUNCTION public.get_app_metrics(uuid, character varying, date, date)
-FROM ANON;
+TO ANON;
 GRANT EXECUTE
 ON FUNCTION public.get_app_metrics(uuid, character varying, date, date)
 TO AUTHENTICATED;
@@ -277,7 +277,7 @@ ON FUNCTION public.get_app_metrics(uuid, character varying, date, date)
 TO SERVICE_ROLE;
 
 REVOKE ALL ON FUNCTION public.get_app_metrics(uuid, date, date) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.get_app_metrics(uuid, date, date) FROM ANON;
+GRANT EXECUTE ON FUNCTION public.get_app_metrics(uuid, date, date) TO ANON;
 GRANT EXECUTE
 ON FUNCTION public.get_app_metrics(uuid, date, date)
 TO AUTHENTICATED;
@@ -455,16 +455,16 @@ ON FUNCTION public.is_paying_and_good_plan_org_action(
     uuid, public.action_type []
 )
 FROM PUBLIC;
-GRANT EXECUTE
+REVOKE ALL
 ON FUNCTION public.is_paying_and_good_plan_org_action(
     uuid, public.action_type []
 )
-TO ANON;
-GRANT EXECUTE
+FROM ANON;
+REVOKE ALL
 ON FUNCTION public.is_paying_and_good_plan_org_action(
     uuid, public.action_type []
 )
-TO AUTHENTICATED;
+FROM AUTHENTICATED;
 GRANT EXECUTE
 ON FUNCTION public.is_paying_and_good_plan_org_action(
     uuid, public.action_type []
