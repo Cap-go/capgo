@@ -116,7 +116,7 @@ beforeAll(async () => {
 
   const { data: apiKeyData, error: apiKeyError } = await getSupabaseClient().rpc('create_hashed_apikey_for_user', {
     p_user_id: USER_ID,
-    p_mode: 'all',
+    p_mode: 'write',
     p_name: `audit-api-key-${globalId}`,
     p_limited_to_orgs: [ORG_ID],
     p_limited_to_apps: [APIKEY_AUDIT_APP_ID],
@@ -580,6 +580,114 @@ describe('audit logs for app_versions via API key', () => {
           expect((deleteAuditLog.new_record as Record<string, unknown>).deleted).toBe(true)
         }
       }
+    }
+  })
+})
+
+describe('audit logs for channel promotions via API key bundle flow', () => {
+  const sourceVersionName = `99.0.0-audit-channel-source-${randomUUID()}`
+  const targetVersionName = `99.0.0-audit-channel-target-${randomUUID()}`
+  const channelName = `audit-channel-${randomUUID()}`
+  let sourceVersionId: number | null = null
+  let targetVersionId: number | null = null
+  let channelId: number | null = null
+
+  beforeAll(async () => {
+    const supabase = getSupabaseClient()
+
+    const { data: insertedVersions, error: versionError } = await supabase
+      .from('app_versions')
+      .insert([
+        {
+          app_id: APIKEY_AUDIT_APP_ID,
+          name: sourceVersionName,
+          owner_org: ORG_ID,
+        },
+        {
+          app_id: APIKEY_AUDIT_APP_ID,
+          name: targetVersionName,
+          owner_org: ORG_ID,
+        },
+      ])
+      .select('id,name')
+
+    if (versionError || !insertedVersions || insertedVersions.length !== 2) {
+      throw new Error(`Failed to create audit channel versions: ${versionError?.message ?? 'missing versions'}`)
+    }
+
+    sourceVersionId = insertedVersions.find(version => version.name === sourceVersionName)?.id ?? null
+    targetVersionId = insertedVersions.find(version => version.name === targetVersionName)?.id ?? null
+    if (sourceVersionId === null || targetVersionId === null) {
+      throw new Error('Failed to resolve audit channel version IDs')
+    }
+
+    const { data: insertedChannel, error: channelError } = await supabase
+      .from('channels')
+      .insert({
+        name: channelName,
+        app_id: APIKEY_AUDIT_APP_ID,
+        version: sourceVersionId,
+        created_by: USER_ID,
+        owner_org: ORG_ID,
+      })
+      .select('id')
+      .single()
+
+    if (channelError || !insertedChannel) {
+      throw new Error(`Failed to create audit channel: ${channelError?.message ?? 'missing channel'}`)
+    }
+
+    channelId = insertedChannel.id
+  })
+
+  afterAll(async () => {
+    const supabase = getSupabaseClient()
+
+    if (channelId !== null) {
+      await supabase.from('channels').delete().eq('id', channelId)
+      await supabase.from('audit_logs').delete().eq('record_id', channelId.toString()).eq('table_name', 'channels')
+    }
+
+    if (sourceVersionId !== null) {
+      await supabase.from('app_versions').delete().eq('id', sourceVersionId)
+    }
+
+    if (targetVersionId !== null) {
+      await supabase.from('app_versions').delete().eq('id', targetVersionId)
+    }
+  })
+
+  it('channel UPDATE via API key bundle promotion keeps audit user_id attribution', async () => {
+    if (!channelId || !targetVersionId) {
+      throw new Error('Audit channel promotion test setup did not complete')
+    }
+    const promotionChannelId = channelId
+
+    const response = await fetchWithRetry(`${BASE_URL}/bundle`, {
+      method: 'PUT',
+      headers: apiKeyAuthHeaders,
+      body: JSON.stringify({
+        app_id: APIKEY_AUDIT_APP_ID,
+        version_id: targetVersionId,
+        channel_id: promotionChannelId,
+      }),
+    })
+
+    expect(response.status).toBe(200)
+
+    const promotionAuditLog = await waitForAuditLog(
+      `${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=channels&operation=UPDATE`,
+      log => log.record_id === promotionChannelId.toString() && log.changed_fields?.includes('version') === true,
+    )
+
+    expect(promotionAuditLog.operation).toBe('UPDATE')
+    expect(promotionAuditLog.table_name).toBe('channels')
+    expect(promotionAuditLog.org_id).toBe(ORG_ID)
+    expect(promotionAuditLog.user_id).toBe(USER_ID)
+    expect(promotionAuditLog.changed_fields).toContain('version')
+
+    if (promotionAuditLog.new_record && typeof promotionAuditLog.new_record === 'object') {
+      expect((promotionAuditLog.new_record as Record<string, unknown>).version).toBe(targetVersionId)
     }
   })
 })

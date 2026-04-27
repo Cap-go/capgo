@@ -85,6 +85,7 @@ export interface MiddlewareKeyVariables {
   Bindings: Bindings
   Variables: {
     apikey?: Database['public']['Tables']['apikeys']['Row']
+    parentApikey?: Database['public']['Tables']['apikeys']['Row']
     capgkey?: string
     requestId: string
     fileId?: string

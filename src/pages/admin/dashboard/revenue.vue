@@ -132,7 +132,7 @@ const upgradeTrendSeries = computed(() => {
 
   return [
     {
-      label: 'Organizations Needing Upgrade',
+      label: t('need-upgrade-trend'),
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
         value: item.need_upgrade,
@@ -140,7 +140,7 @@ const upgradeTrendSeries = computed(() => {
       color: '#ef4444', // red
     },
     {
-      label: 'Upgraded Organizations (24h)',
+      label: t('upgraded-organizations'),
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
         value: item.upgraded_orgs || 0,
@@ -488,7 +488,7 @@ displayStore.defaultBack = '/dashboard'
               </div>
               <div>
                 <p class="text-sm text-slate-600 dark:text-slate-400">
-                  Orgs Upgraded (24h)
+                  {{ t('upgraded-organizations') }}
                 </p>
                 <p v-if="latestGlobalStats" class="mt-2 text-3xl font-bold text-success">
                   {{ (latestGlobalStats.upgraded_orgs || 0).toLocaleString() }}
@@ -497,7 +497,7 @@ displayStore.defaultBack = '/dashboard'
                   0
                 </p>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                  Plan upgrades in the last 24 hours
+                  {{ t('upgraded-organizations-latest-day') }}
                 </p>
               </div>
             </div>

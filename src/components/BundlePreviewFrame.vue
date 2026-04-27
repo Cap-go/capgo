@@ -4,6 +4,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconExternalLink from '~icons/lucide/external-link'
 import IconSmartphone from '~icons/lucide/smartphone'
+import { buildPreviewSubdomain } from '../../shared/preview-subdomain.ts'
 
 const props = defineProps<{
   appId: string
@@ -49,11 +50,9 @@ function checkMobile() {
 
 const currentDevice = computed(() => devices[selectedDevice.value])
 
-// Build the preview URL using subdomain format (no auth - relies on obscure subdomain)
+// Build the preview URL using a reversible preview subdomain format.
 const previewUrl = computed(() => {
-  // Encode app_id: lowercase for DNS, replace . with __ (underscores work in practice)
-  const encodedAppId = props.appId.toLowerCase().replace(/\./g, '__')
-  const subdomain = `${encodedAppId}-${props.versionId}`
+  const subdomain = buildPreviewSubdomain(props.appId, props.versionId)
   // Extract base domain from current host, default to capgo.app for localhost
   // Preserve environment segments (e.g., 'dev' in console.dev.capgo.app)
   const hostname = window.location.hostname

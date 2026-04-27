@@ -5,6 +5,7 @@ import { fetchWithRetry, getAuthHeaders, getAuthHeadersForCredentials, getEndpoi
 
 const SSO_TEST_ORG_ID = randomUUID()
 const SSO_TEST_CUSTOMER_ID = `cus_sso_test_${randomUUID()}`
+const ENTERPRISE_PRODUCT_ID = 'prod_MH5Jh6ajC9e7ZH'
 
 let authHeaders: Record<string, string>
 
@@ -249,6 +250,209 @@ describe('[GET] /private/sso/sp-metadata', () => {
       sp_metadata_url: `${expectedBaseUrl}/auth/v1/sso/saml/metadata`,
       nameid_format: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
     })
+  })
+})
+
+describe('[POST] /private/sso/prelink-users', () => {
+  it.concurrent('only unlinks password identities for members of the provider org', async () => {
+    const prelinkOrgId = randomUUID()
+    const prelinkCustomerId = `cus_sso_prelink_${randomUUID()}`
+    const foreignOrgId = randomUUID()
+    const foreignCustomerId = `cus_sso_prelink_foreign_${randomUUID()}`
+    const providerId = randomUUID()
+    const domain = `${randomUUID()}.sso.test`
+    const memberEmail = `member-${randomUUID()}@${domain}`
+    const outsiderEmail = `outsider-${randomUUID()}@${domain}`
+    const pool = new Pool({ connectionString: POSTGRES_URL })
+
+    let memberUserId: string | null = null
+    let outsiderUserId: string | null = null
+
+    try {
+      const { error: prelinkStripeError } = await getSupabaseClient().from('stripe_info').insert({
+        customer_id: prelinkCustomerId,
+        status: 'succeeded',
+        product_id: ENTERPRISE_PRODUCT_ID,
+        subscription_id: `sub_sso_prelink_${randomUUID()}`,
+        trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+        is_good_plan: true,
+      })
+      if (prelinkStripeError)
+        throw prelinkStripeError
+
+      const { error: prelinkOrgError } = await getSupabaseClient().from('orgs').insert({
+        id: prelinkOrgId,
+        name: `SSO Prelink Org ${prelinkOrgId}`,
+        management_email: `sso-prelink-${prelinkOrgId}@capgo.app`,
+        created_by: USER_ID,
+        customer_id: prelinkCustomerId,
+        sso_enabled: true,
+      })
+      if (prelinkOrgError)
+        throw prelinkOrgError
+
+      const { error: prelinkAdminError } = await getSupabaseClient().from('org_users').insert({
+        org_id: prelinkOrgId,
+        user_id: USER_ID,
+        user_right: 'super_admin' as const,
+      })
+      if (prelinkAdminError)
+        throw prelinkAdminError
+
+      const { error: foreignStripeError } = await getSupabaseClient().from('stripe_info').insert({
+        customer_id: foreignCustomerId,
+        status: 'succeeded',
+        product_id: ENTERPRISE_PRODUCT_ID,
+        subscription_id: `sub_sso_prelink_foreign_${randomUUID()}`,
+        trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+        is_good_plan: true,
+      })
+      if (foreignStripeError)
+        throw foreignStripeError
+
+      const { error: foreignOrgError } = await getSupabaseClient().from('orgs').insert({
+        id: foreignOrgId,
+        name: `SSO Foreign Org ${foreignOrgId}`,
+        management_email: `sso-foreign-${foreignOrgId}@capgo.app`,
+        created_by: USER_ID,
+        customer_id: foreignCustomerId,
+        sso_enabled: true,
+      })
+      if (foreignOrgError)
+        throw foreignOrgError
+
+      const { error: providerError } = await (getSupabaseClient().from as any)('sso_providers').insert({
+        id: providerId,
+        org_id: prelinkOrgId,
+        domain,
+        provider_id: randomUUID(),
+        status: 'active',
+        enforce_sso: false,
+        dns_verification_token: `dns-${randomUUID()}`,
+      })
+      if (providerError)
+        throw providerError
+
+      const { data: memberUserData, error: memberUserError } = await getSupabaseClient().auth.admin.createUser({
+        email: memberEmail,
+        password: 'testtest',
+        email_confirm: true,
+      })
+      if (memberUserError || !memberUserData.user) {
+        throw memberUserError ?? new Error('Failed to create prelink org member user')
+      }
+      memberUserId = memberUserData.user.id
+
+      const { data: outsiderUserData, error: outsiderUserError } = await getSupabaseClient().auth.admin.createUser({
+        email: outsiderEmail,
+        password: 'testtest',
+        email_confirm: true,
+      })
+      if (outsiderUserError || !outsiderUserData.user) {
+        throw outsiderUserError ?? new Error('Failed to create foreign org user for prelink test')
+      }
+      outsiderUserId = outsiderUserData.user.id
+
+      const { error: publicUsersError } = await getSupabaseClient().from('users').insert([
+        {
+          id: memberUserId,
+          email: memberEmail,
+          first_name: 'Prelink',
+          last_name: 'Member',
+          country: null,
+          enable_notifications: true,
+          opt_for_newsletters: true,
+        },
+        {
+          id: outsiderUserId,
+          email: outsiderEmail,
+          first_name: 'Prelink',
+          last_name: 'Outsider',
+          country: null,
+          enable_notifications: true,
+          opt_for_newsletters: true,
+        },
+      ])
+      if (publicUsersError)
+        throw publicUsersError
+
+      const { error: orgUsersError } = await getSupabaseClient().from('org_users').insert([
+        {
+          org_id: prelinkOrgId,
+          user_id: memberUserId,
+          user_right: 'read' as const,
+        },
+        {
+          org_id: foreignOrgId,
+          user_id: outsiderUserId,
+          user_right: 'read' as const,
+        },
+      ])
+      if (orgUsersError)
+        throw orgUsersError
+
+      const beforeMemberIdentities = await pool.query<{ provider: string }>(
+        'select provider from auth.identities where user_id = $1 order by provider',
+        [memberUserId],
+      )
+      const beforeOutsiderIdentities = await pool.query<{ provider: string }>(
+        'select provider from auth.identities where user_id = $1 order by provider',
+        [outsiderUserId],
+      )
+
+      expect(beforeMemberIdentities.rows.some(row => row.provider === 'email')).toBe(true)
+      expect(beforeOutsiderIdentities.rows.some(row => row.provider === 'email')).toBe(true)
+
+      const response = await fetchWithRetry(getEndpointUrl('/private/sso/prelink-users'), {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ provider_id: providerId }),
+      })
+
+      expect(response.status).toBe(200)
+      const responseBody = await response.json() as {
+        processed: number
+        linked: number
+        error_count: number
+      }
+      expect(responseBody).toEqual({
+        processed: 1,
+        linked: 1,
+        error_count: 0,
+      })
+
+      const memberIdentities = await pool.query<{ provider: string }>(
+        'select provider from auth.identities where user_id = $1 order by provider',
+        [memberUserId],
+      )
+      const outsiderIdentities = await pool.query<{ provider: string }>(
+        'select provider from auth.identities where user_id = $1 order by provider',
+        [outsiderUserId],
+      )
+
+      expect(memberIdentities.rows.some(row => row.provider === 'email')).toBe(false)
+      expect(outsiderIdentities.rows.some(row => row.provider === 'email')).toBe(true)
+    }
+    finally {
+      await pool.end()
+
+      await Promise.allSettled([
+        (getSupabaseClient().from as any)('sso_providers').delete().eq('id', providerId),
+        getSupabaseClient().from('org_users').delete().eq('org_id', prelinkOrgId),
+        getSupabaseClient().from('org_users').delete().eq('org_id', foreignOrgId),
+        memberUserId ? getSupabaseClient().from('users').delete().eq('id', memberUserId) : Promise.resolve(null),
+        outsiderUserId ? getSupabaseClient().from('users').delete().eq('id', outsiderUserId) : Promise.resolve(null),
+      ])
+
+      await Promise.allSettled([
+        getSupabaseClient().from('orgs').delete().eq('id', prelinkOrgId),
+        getSupabaseClient().from('orgs').delete().eq('id', foreignOrgId),
+        getSupabaseClient().from('stripe_info').delete().eq('customer_id', prelinkCustomerId),
+        getSupabaseClient().from('stripe_info').delete().eq('customer_id', foreignCustomerId),
+        memberUserId ? getSupabaseClient().auth.admin.deleteUser(memberUserId) : Promise.resolve(null),
+        outsiderUserId ? getSupabaseClient().auth.admin.deleteUser(outsiderUserId) : Promise.resolve(null),
+      ])
+    }
   })
 })
 

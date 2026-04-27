@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, getSupabaseClient, headers, NON_ACCESS_APP_NAME, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
+import { BASE_URL, getAuthHeaders, getSupabaseClient, NON_ACCESS_APP_NAME, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.app.error.${id}`
@@ -8,8 +8,11 @@ const testOrgId = randomUUID()
 const testStripeCustomerId = `cus_app_error_${id.replace(/-/g, '').slice(0, 18)}`
 let testApiKeyId: number | null = null
 let testHeaders: Record<string, string>
+let authHeaders: Record<string, string>
 
 beforeAll(async () => {
+  authHeaders = await getAuthHeaders()
+
   await resetAndSeedAppData(APPNAME, {
     orgId: testOrgId,
     userId: USER_ID,
@@ -18,7 +21,7 @@ beforeAll(async () => {
 
   const createResponse = await fetch(`${BASE_URL}/apikey`, {
     method: 'POST',
-    headers,
+    headers: authHeaders,
     body: JSON.stringify({
       name: `app-error-cases-${id}`,
       mode: 'all',
@@ -48,7 +51,7 @@ afterAll(async () => {
   if (testApiKeyId !== null) {
     await fetch(`${BASE_URL}/apikey/${testApiKeyId}`, {
       method: 'DELETE',
-      headers,
+      headers: authHeaders,
     })
   }
   await getSupabaseClient().from('org_users').delete().eq('org_id', testOrgId)
