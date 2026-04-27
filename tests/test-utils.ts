@@ -229,6 +229,7 @@ export const PRODUCT_ID = 'prod_LQIregjtNduh4q'
 export const USER_ADMIN_EMAIL = 'admin@capgo.app'
 export const APP_NAME = 'com.demo'
 export const NON_ACCESS_APP_NAME = 'com.demoadmin.app'
+export const NON_OWNER_READONLY_APP_NAME = 'com.nonowner.readonly.app'
 export const headers = {
   'Content-Type': 'application/json',
   'Authorization': APIKEY_TEST_ALL,

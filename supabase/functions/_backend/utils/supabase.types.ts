@@ -250,6 +250,35 @@ export type Database = {
           },
         ]
       }
+      app_version_manifest_cache: {
+        Row: {
+          app_version_id: number
+          created_at: string
+          entries: Json
+          updated_at: string
+        }
+        Insert: {
+          app_version_id: number
+          created_at?: string
+          entries?: Json
+          updated_at?: string
+        }
+        Update: {
+          app_version_id?: number
+          created_at?: string
+          entries?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_version_manifest_cache_app_version_id_fkey"
+            columns: ["app_version_id"]
+            isOneToOne: true
+            referencedRelation: "app_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       apps: {
         Row: {
           allow_device_custom_id: boolean

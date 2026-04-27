@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APIKEY_STATS, getEndpointUrl, getSupabaseClient, headers, NON_OWNER_ORG_ID, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
+import { APIKEY_STATS, getEndpointUrl, getSupabaseClient, headers, NON_OWNER_ORG_ID, NON_OWNER_READONLY_APP_NAME, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.private.error.${id}`
@@ -113,7 +113,8 @@ describe('[POST] /private/create_device - Error Cases', () => {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        app_id: 'com.demoadmin.app', // Use the admin app that test user doesn't have access to
+        // Use an app owned by NON_OWNER_ORG_ID where the test user only has read access.
+        app_id: NON_OWNER_READONLY_APP_NAME,
         org_id: NON_OWNER_ORG_ID,
         device_id: randomUUID(),
         platform: 'android',

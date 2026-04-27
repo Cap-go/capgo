@@ -415,10 +415,12 @@ describe('manifest bundle count gating', () => {
 
   afterEach(async () => {
     if (insertedManifestIds.length > 0) {
-      await supabase.from('manifest').delete().in('id', insertedManifestIds)
+      await supabase.from('manifest').delete().in('id', insertedManifestIds).throwOnError()
       insertedManifestIds.length = 0
     }
-    await supabase.from('apps').update({ manifest_bundle_count: 0 }).eq('app_id', APP_NAME_UPDATE)
+    await supabase.from('app_version_manifest_cache').delete().eq('app_version_id', baseVersionId).throwOnError()
+    await supabase.from('app_versions').update({ manifest_count: 0 }).eq('id', baseVersionId).throwOnError()
+    await supabase.from('apps').update({ manifest_bundle_count: 0 }).eq('app_id', APP_NAME_UPDATE).throwOnError()
   })
 
   async function seedManifestEntry() {
@@ -437,6 +439,29 @@ describe('manifest bundle count gating', () => {
     if (error || !data)
       throw error ?? new Error('Failed to seed manifest entry')
     insertedManifestIds.push(data.id)
+
+    const { error: cacheError } = await supabase
+      .from('app_version_manifest_cache')
+      .upsert({
+        app_version_id: baseVersionId,
+        entries: [{
+          file_name: fileName,
+          file_hash: `hash-${suffix}`,
+          s3_path: `tests/${fileName}`,
+        }],
+      }, {
+        onConflict: 'app_version_id',
+      })
+    if (cacheError)
+      throw cacheError
+
+    const { error: manifestCountError } = await supabase
+      .from('app_versions')
+      .update({ manifest_count: 1 })
+      .eq('id', baseVersionId)
+    if (manifestCountError)
+      throw manifestCountError
+
     return fileName
   }
 
@@ -459,6 +484,20 @@ describe('manifest bundle count gating', () => {
     const json = await response.json<UpdateRes>()
     expect(json.manifest).toBeDefined()
     expect(json.manifest?.some(entry => entry?.file_name === fileName)).toBe(true)
+  })
+
+  it('does not rebuild manifest rows when the cache row is missing', async () => {
+    await seedManifestEntry()
+    await supabase.from('app_version_manifest_cache').delete().eq('app_version_id', baseVersionId).throwOnError()
+
+    const { error } = await supabase.from('apps').update({ manifest_bundle_count: 1 }).eq('app_id', APP_NAME_UPDATE)
+    if (error)
+      throw error
+
+    const response = await postUpdate(makeUpdatePayload())
+    expect(response.status).toBe(200)
+    const json = await response.json<UpdateRes>()
+    expect(json.manifest).toBeUndefined()
   })
 
   it('skips manifest query when manifest bundle count is zero', async () => {

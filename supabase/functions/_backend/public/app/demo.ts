@@ -34,6 +34,14 @@ interface DemoManifestEntry {
   file_size: number
 }
 
+function toManifestPayload(entries: DemoManifestEntry[]): Database['public']['CompositeTypes']['manifest_entry'][] {
+  return entries.map(({ file_name, s3_path, file_hash }) => ({
+    file_name,
+    s3_path,
+    file_hash,
+  }))
+}
+
 /**
  * Generate demo native packages (Capacitor plugins)
  * @param versionName - Version name to base the package versions on
@@ -347,7 +355,7 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
 
     // RLS bypass needed: Demo app creation inserts into multiple tables (apps, app_versions,
     // channels, devices, daily_mau, daily_bandwidth, daily_storage, daily_version, build_requests,
-    // manifest, deploy_history) where RLS policies may not grant direct user insert access.
+    // deploy_history) where RLS policies may not grant direct user insert access.
     // Authorization is enforced at endpoint level via hasOrgRight check above.
 
     // Create the demo app
@@ -364,10 +372,11 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       { name: '1.2.0', daysAgo: 1, comment: 'New dashboard features', link: 'https://github.com/example/demo-app/pull/123' },
     ]
 
-    // Create all versions with manifest and native_packages for real versions
+    // Create all versions with precomputed manifest counts and native_packages.
     const versionInserts = demoVersions.map((v) => {
       const isSystemVersion = v.name === 'unknown' || v.name === 'builtin'
       const manifest = isSystemVersion ? null : getDemoManifest(v.name, appId)
+      const manifestPayload = manifest ? toManifestPayload(manifest) : null
       const nativePackages = isSystemVersion ? null : getDemoNativePackages(v.name)
 
       return {
@@ -379,9 +388,7 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
         comment: v.comment,
         link: v.link,
         user_id: auth.userId,
-        // Add manifest and native_packages for non-system versions
-        manifest: manifest as any,
-        manifest_count: manifest?.length ?? 0,
+        manifest: manifestPayload,
         native_packages: nativePackages as any,
       }
     })
@@ -411,43 +418,6 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
     }
 
     const versionMap = new Map(allVersions.map(v => [v.name, v.id]))
-
-    // Insert manifest entries into the manifest table for each version
-    // This is required for the bundle file list to show in the UI
-    const manifestInserts: Database['public']['Tables']['manifest']['Insert'][] = []
-
-    for (const version of demoVersions) {
-      if (version.name === 'unknown' || version.name === 'builtin')
-        continue
-
-      const versionId = versionMap.get(version.name)
-      if (!versionId)
-        continue
-
-      const manifestEntries = getDemoManifest(version.name, appId)
-      for (const entry of manifestEntries) {
-        manifestInserts.push({
-          app_version_id: versionId,
-          file_name: entry.file_name,
-          file_hash: entry.file_hash,
-          s3_path: entry.s3_path,
-          file_size: entry.file_size,
-        })
-      }
-    }
-
-    if (manifestInserts.length > 0) {
-      const { error: manifestError } = await supabase
-        .from('manifest')
-        .insert(manifestInserts)
-
-      if (manifestError) {
-        cloudlog({ requestId, message: 'Error creating manifest entries', error: manifestError })
-      }
-      else {
-        cloudlog({ requestId, message: 'Manifest entries created', count: manifestInserts.length })
-      }
-    }
 
     // Demo channels configuration
     const demoChannels: DemoChannel[] = [

@@ -1,3 +1,4 @@
+import type { ManifestCacheEntry } from './manifestCache.ts'
 import { bigint, boolean, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
 
 // do_not_change
@@ -64,6 +65,13 @@ export const manifest = pgTable('manifest', {
   s3_path: varchar('s3_path').notNull(),
   file_hash: varchar('file_hash').notNull(),
   file_size: bigint('file_size', { mode: 'number' }).default(0),
+})
+
+export const app_version_manifest_cache = pgTable('app_version_manifest_cache', {
+  app_version_id: bigint('app_version_id', { mode: 'number' }).primaryKey().notNull().references(() => app_versions.id, { onDelete: 'cascade' }),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+  updated_at: timestamp('updated_at').notNull().defaultNow(),
+  entries: jsonb('entries').$type<ManifestCacheEntry[]>().notNull(),
 })
 
 export const channels = pgTable('channels', {
@@ -253,6 +261,7 @@ export const schema = {
   apps,
   app_versions,
   manifest,
+  app_version_manifest_cache,
   channels,
   channel_devices,
   orgs,
