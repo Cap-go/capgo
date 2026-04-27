@@ -131,7 +131,7 @@ if [[ -n "$added_files" ]]; then
       printf '%s\t%s\n' "$ts" "$file" >> "${added_timestamps_file}"
     fi
 
-    if [[ "$ts" < "$latest_base_timestamp" ]]; then
+    if (( 10#$ts < 10#$latest_base_timestamp )); then
       echo '❌ Migration timestamp regression detected'
       echo "  Latest timestamp on ${base_ref}: ${latest_base_timestamp}"
       echo "  New file: $file"
