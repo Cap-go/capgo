@@ -78,6 +78,33 @@ describe('private role bindings helpers', () => {
     })
   })
 
+  it('accepts users with an active membership beyond invite-only legacy rows', async () => {
+    const id = randomUUID()
+    const orgId = randomUUID()
+    const drizzle = getDrizzleClient(client as any)
+
+    await query(`
+      INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
+      VALUES ($1::uuid, $2, $3, $4::uuid, true)
+    `, [orgId, `Role Binding Invite Overflow Org ${id}`, `role-binding-invite-overflow-${id}@capgo.app`, USER_ID])
+
+    for (let index = 0; index < 10; index += 1) {
+      await query(`
+        INSERT INTO public.org_users (org_id, user_id, user_right)
+        VALUES ($1::uuid, $2::uuid, 'invite_read'::public.user_min_right)
+      `, [orgId, USER_ID_2])
+    }
+
+    await query(`
+      INSERT INTO public.org_users (org_id, user_id, user_right)
+      VALUES ($1::uuid, $2::uuid, 'admin'::public.user_min_right)
+    `, [orgId, USER_ID_2])
+
+    const result = await validatePrincipalAccess(drizzle, 'user', USER_ID_2, orgId)
+
+    expect(result).toEqual({ ok: true, data: null })
+  })
+
   it('accepts active scope-valid RBAC bindings as membership proof', async () => {
     const id = randomUUID()
     const orgId = randomUUID()

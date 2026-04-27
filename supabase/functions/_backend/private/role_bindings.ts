@@ -92,24 +92,35 @@ export async function validatePrincipalAccess(
   orgId: string,
 ): Promise<ValidationResult<null>> {
   if (principalType === 'user') {
-    const targetMemberships = await drizzle
+    const activeMembership = await drizzle
       .select({ user_right: schema.org_users.user_right })
       .from(schema.org_users)
       .where(
         and(
           eq(schema.org_users.user_id, principalId),
           eq(schema.org_users.org_id, orgId),
+          sql`(${schema.org_users.user_right} IS NULL OR ${schema.org_users.user_right}::text NOT LIKE 'invite_%')`,
         ),
       )
-      .limit(10)
+      .limit(1)
 
-    const hasActiveMembership = targetMemberships.some(({ user_right }) => typeof user_right !== 'string' || !user_right.startsWith('invite_'))
-    if (hasActiveMembership) {
+    if (activeMembership.length) {
       return { ok: true, data: null }
     }
 
-    const hasPendingInvite = targetMemberships.some(({ user_right }) => typeof user_right === 'string' && user_right.startsWith('invite_'))
-    if (hasPendingInvite) {
+    const pendingInvite = await drizzle
+      .select({ user_right: schema.org_users.user_right })
+      .from(schema.org_users)
+      .where(
+        and(
+          eq(schema.org_users.user_id, principalId),
+          eq(schema.org_users.org_id, orgId),
+          sql`${schema.org_users.user_right}::text LIKE 'invite_%'`,
+        ),
+      )
+      .limit(1)
+
+    if (pendingInvite.length) {
       return { ok: false, status: 400, error: 'User has not accepted the org invitation yet' }
     }
 
