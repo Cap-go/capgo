@@ -401,27 +401,7 @@ function getSchemaUpdatesAlias(includeMetadata = false) {
     allow_device_self_set: channelAlias.allow_device_self_set,
     public: channelAlias.public,
   }
-  const manifestFallbackSelect = sql<{ file_name: string, file_hash: string, s3_path: string }[]>`(
-    SELECT COALESCE(
-      jsonb_agg(
-        jsonb_build_object(
-          'file_name', ${schema.manifest.file_name},
-          'file_hash', ${schema.manifest.file_hash},
-          's3_path', ${schema.manifest.s3_path}
-        )
-        ORDER BY ${schema.manifest.id}
-      ),
-      '[]'::jsonb
-    )
-    FROM ${schema.manifest}
-    WHERE ${schema.manifest.app_version_id} = ${versionAlias.id}
-  )`
-  const manifestSelect = sql<{ file_name: string, file_hash: string, s3_path: string }[]>`CASE
-    WHEN ${schema.app_version_manifest_cache.entries} IS NOT NULL
-      AND jsonb_array_length(${schema.app_version_manifest_cache.entries}) > 0
-    THEN ${schema.app_version_manifest_cache.entries}
-    ELSE ${manifestFallbackSelect}
-  END`
+  const manifestSelect = sql<{ file_name: string, file_hash: string, s3_path: string }[] | null>`${schema.app_version_manifest_cache.entries}`
   return { versionSelect, channelDevicesAlias, channelAlias, channelSelect, manifestSelect, versionAlias }
 }
 
