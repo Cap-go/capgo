@@ -3,6 +3,7 @@ import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { s3 } from '../utils/s3.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -47,6 +48,14 @@ app.post('/', middlewareAPISecret, triggerValidator('apps', 'DELETE'), async (c)
     }
     catch (error) {
       cloudlog({ requestId: c.get('requestId'), message: 'error deleting app images', error, app_id: record.app_id })
+    }
+
+    try {
+      const deletedObjectCount = await s3.deleteObjectsWithPrefix(c, `orgs/${record.owner_org}/apps/${record.app_id}/`)
+      cloudlog({ requestId: c.get('requestId'), message: 'deleted app storage objects', count: deletedObjectCount, app_id: record.app_id })
+    }
+    catch (error) {
+      cloudlog({ requestId: c.get('requestId'), message: 'error deleting app storage objects', error, app_id: record.app_id })
     }
   }
 

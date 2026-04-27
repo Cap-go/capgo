@@ -11,7 +11,7 @@ import { sendDiscordAlert } from '../utils/discord.ts'
 import { quickError, simpleError } from '../utils/hono.ts'
 import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
-import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
+import { closeClient, getAppByIdPg, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { getAppByAppIdPg, getUserIdFromApikey } from '../utils/pg_files.ts'
 import { checkPermissionPg } from '../utils/rbac.ts'
 import { createStatsBandwidth } from '../utils/stats.ts'
@@ -28,6 +28,7 @@ const DO_FETCH_RETRY_ATTEMPTS = 3
 const DO_FETCH_RETRY_DELAY_MS = 250
 
 const ATTACHMENT_PREFIX = 'attachments'
+const ATTACHMENT_PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth', 'storage']
 const TUS_UPLOAD_CONTENT_TYPE = 'application/offset+octet-stream'
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -311,8 +312,48 @@ async function saveBandwidthUsage(c: Context, fileSize: number | null | undefine
   }
 }
 
+function parseAppScopedAttachmentPath(fileId: unknown): { app_id: string, owner_org: string } | null {
+  if (typeof fileId !== 'string') {
+    return null
+  }
+
+  const parts = fileId.split('/')
+  const [orgs, owner_org, apps, app_id] = parts
+  if (orgs !== 'orgs' || apps !== 'apps' || parts.length < 5 || !owner_org || !app_id) {
+    return null
+  }
+
+  return { app_id, owner_org }
+}
+
+async function assertReadableAppScopedAttachment(c: Context, fileId: unknown): Promise<void> {
+  const scopedPath = parseAppScopedAttachmentPath(fileId)
+  if (!scopedPath) {
+    return
+  }
+
+  const pgClient = getPgClient(c, true)
+  const drizzleClient = getDrizzleClient(pgClient)
+
+  try {
+    const app = await getAppByAppIdPg(c, scopedPath.app_id, drizzleClient)
+    if (!app || app.owner_org !== scopedPath.owner_org) {
+      throw new HTTPException(404, {
+        res: c.json({
+          error: 'not_found',
+          message: 'Not found',
+        }, 404),
+      })
+    }
+  }
+  finally {
+    await closeClient(c, pgClient)
+  }
+}
+
 async function getHandler(c: Context): Promise<Response> {
   const fileId = c.get('fileId')
+  await assertReadableAppScopedAttachment(c, fileId)
   cloudlog({ requestId: c.get('requestId'), message: 'getHandler files', fileId })
   if (getRuntimeKey() !== 'workerd') {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files using supabase storage' })
@@ -677,43 +718,25 @@ async function checkWriteAppAccess(c: Context, next: Next) {
     fileId: requestId,
   })
 
-  const parts = requestId.split('/')
-  const [orgs, owner_org, apps, app_id] = parts
+  const scopedPath = parseAppScopedAttachmentPath(requestId)
 
-  if (orgs !== 'orgs' || apps !== 'apps') {
+  if (!scopedPath) {
     cloudlog({
       requestId: c.get('requestId'),
       message: 'checkWriteAppAccess - invalid path structure',
       fileId: requestId,
-      orgs,
-      apps,
-      expected: 'orgs/*/apps/*',
+      expected: 'orgs/*/apps/*/*',
     })
     throw new HTTPException(400, {
       res: c.json({
         error: 'invalid_file_path',
         message: 'Invalid file path structure. Expected: orgs/{owner_org}/apps/{app_id}/...',
-        moreInfo: { fileId: requestId, orgs, apps, requestId: c.get('requestId') },
+        moreInfo: { fileId: requestId, requestId: c.get('requestId') },
       }),
     })
   }
 
-  if (parts.length < 5) {
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'checkWriteAppAccess - path too short',
-      fileId: requestId,
-      pathLength: parts.length,
-      minRequired: 5,
-    })
-    throw new HTTPException(400, {
-      res: c.json({
-        error: 'invalid_file_path',
-        message: 'Invalid file path. Path must have at least 5 segments: orgs/{owner_org}/apps/{app_id}/{filename}',
-        moreInfo: { fileId: requestId, pathLength: parts.length, requestId: c.get('requestId') },
-      }),
-    })
-  }
+  const { owner_org, app_id } = scopedPath
 
   cloudlog({
     requestId: c.get('requestId'),
@@ -774,7 +797,7 @@ async function checkWriteAppAccess(c: Context, next: Next) {
     })
 
     // Use the new RBAC permission check
-    const hasPermission = await checkPermissionPg(c, 'app.read_bundles', { appId: app_id }, drizzleClient, userId, capgkey)
+    const hasPermission = await checkPermissionPg(c, 'app.upload_bundle', { appId: app_id }, drizzleClient, userId, capgkey)
 
     cloudlog({
       requestId: c.get('requestId'),
@@ -836,6 +859,18 @@ async function checkWriteAppAccess(c: Context, next: Next) {
           },
         }),
       })
+    }
+
+    const appPlan = await getAppByIdPg(c, app_id, drizzleClient, ATTACHMENT_PLAN_LIMIT)
+    if (!appPlan) {
+      throw quickError(503, 'upstream_unavailable', 'App plan state temporarily unavailable', { app_id })
+    }
+
+    if (!appPlan.plan_valid) {
+      return c.json({
+        error: 'on_premise_app',
+        message: 'On-premise app detected',
+      }, 429)
     }
 
     cloudlog({
