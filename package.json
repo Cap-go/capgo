@@ -245,7 +245,7 @@
     "simple-git-hooks": "^2.13.1",
     "supabase": "^2.88.1",
     "tailwindcss": "^4.2.2",
-    "typescript": "6.0.2",
+    "typescript": "6.0.3",
     "unplugin-auto-import": "^21.0.0",
     "unplugin-formkit": "^0.3.0",
     "unplugin-icons": "23.0.1",
