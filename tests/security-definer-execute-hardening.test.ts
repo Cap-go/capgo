@@ -28,7 +28,6 @@ const SERVICE_ONLY_PROCS = [
   'public.delete_old_deleted_versions()',
   'public.generate_org_user_stripe_info_on_org_create()',
   'public.get_apikey()',
-  'public.is_paying_and_good_plan_org_action(uuid, public.action_type[])',
   'public.noupdate()',
   'public.prevent_last_super_admin_binding_delete()',
   'public.resync_org_user_role_bindings(uuid, uuid)',
