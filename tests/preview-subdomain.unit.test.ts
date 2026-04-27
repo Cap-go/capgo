@@ -67,4 +67,10 @@ describe('preview subdomain encoding', () => {
   it.concurrent('escapes underscores instead of collapsing them into dots', () => {
     expect(encodePreviewAppId('com.example_app')).toContain('_')
   })
+
+  it.concurrent('rejects preview labels longer than the DNS label limit', () => {
+    expect(() => buildPreviewSubdomain('ABCDEFGHIJKLMNOPQRSTUVWXYZABCDE', 1)).toThrow(
+      'Preview subdomain exceeds DNS label limit: "1--a-b-c-d-e-f-g-h-i-j-k-l-m-n-o-p-q-r-s-t-u-v-w-x-y-z-a-b-c-d-e" (64 characters)',
+    )
+  })
 })

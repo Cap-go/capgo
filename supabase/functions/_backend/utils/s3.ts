@@ -126,8 +126,19 @@ async function deleteObjectsWithPrefix(c: Context, prefix: string): Promise<numb
   let deletedCount = 0
 
   for await (const object of client.listObjects({ prefix })) {
-    await client.deleteObject(object.key)
-    deletedCount += 1
+    try {
+      await client.deleteObject(object.key)
+      deletedCount += 1
+    }
+    catch (error) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'deleteObjectsWithPrefix item failed',
+        prefix,
+        key: object.key,
+        error,
+      })
+    }
   }
 
   return deletedCount

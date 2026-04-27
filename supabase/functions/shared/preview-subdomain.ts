@@ -1,5 +1,6 @@
 const PREVIEW_HOSTNAME_REGEX = /^([^.]+)\.preview(?:\.[^.]+)?\.(?:capgo\.app|usecapgo\.com)$/
 const PREVIEW_VERSION_SEPARATOR = '-'
+const DNS_LABEL_MAX_LENGTH = 63
 
 /**
  * Parsed preview hostname information after the preview subdomain is decoded.
@@ -50,7 +51,10 @@ export function encodePreviewAppId(appId: string): string {
  * Builds the preview subdomain label used before `.preview.capgo.app`.
  */
 export function buildPreviewSubdomain(appId: string, versionId: number): string {
-  return `${versionId}${PREVIEW_VERSION_SEPARATOR}${encodePreviewAppId(appId)}`
+  const label = `${versionId}${PREVIEW_VERSION_SEPARATOR}${encodePreviewAppId(appId)}`
+  if (label.length > DNS_LABEL_MAX_LENGTH)
+    throw new Error(`Preview subdomain exceeds DNS label limit: "${label}" (${label.length} characters)`)
+  return label
 }
 
 /**
