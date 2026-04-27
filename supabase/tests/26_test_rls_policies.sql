@@ -233,8 +233,8 @@ SELECT
     policies_are(
         'public',
         'daily_revenue_metrics',
-        ARRAY['Allow service_role full access'],
-        'daily_revenue_metrics should stay service_role-only'
+        ARRAY['Deny all access'],
+        'daily_revenue_metrics should deny all user-context access'
     );
 
 -- Test processed_stripe_events policies
@@ -242,8 +242,8 @@ SELECT
     policies_are(
         'public',
         'processed_stripe_events',
-        ARRAY['Allow service_role full access'],
-        'processed_stripe_events should stay service_role-only'
+        ARRAY['Deny all access'],
+        'processed_stripe_events should deny all user-context access'
     );
 
 SELECT
