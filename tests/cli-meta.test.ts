@@ -15,14 +15,14 @@ async function assertCompatibilityTableColumns(appId: string, column1: string, c
   let lastError: unknown
 
   for (let attempt = 0; attempt < 5; attempt++) {
-    const result = await sdk.checkBundleCompatibility({
-      appId,
-      channel: 'production',
-      packageJson: packageJsonPath,
-      nodeModules: nodeModulesPath,
-    })
-
     try {
+      const result = await sdk.checkBundleCompatibility({
+        appId,
+        channel: 'production',
+        packageJson: packageJsonPath,
+        nodeModules: nodeModulesPath,
+      })
+
       expect(result.success).toBe(true)
       expect(result.data).toBeDefined()
 
@@ -53,7 +53,7 @@ async function assertCompatibilityTableColumns(appId: string, column1: string, c
     }
   }
 
-  throw lastError
+  throw lastError ?? new Error('Compatibility check failed without a captured error')
 }
 
 async function writeBundleContent(appId: string, marker: string) {

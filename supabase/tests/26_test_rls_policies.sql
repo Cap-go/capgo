@@ -3,7 +3,7 @@
 BEGIN;
 
 -- Plan the number of tests
-SELECT plan(41);
+SELECT plan(43);
 
 -- Test app_versions policies
 SELECT
@@ -244,6 +244,30 @@ SELECT
         'processed_stripe_events',
         ARRAY['Allow service_role full access'],
         'processed_stripe_events should stay service_role-only'
+    );
+
+SELECT
+    ok(
+        (
+            SELECT c.relrowsecurity
+            FROM pg_class AS c
+            JOIN pg_namespace AS n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public'
+              AND c.relname = 'daily_revenue_metrics'
+        ),
+        'daily_revenue_metrics should have RLS enabled'
+    );
+
+SELECT
+    ok(
+        (
+            SELECT c.relrowsecurity
+            FROM pg_class AS c
+            JOIN pg_namespace AS n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public'
+              AND c.relname = 'processed_stripe_events'
+        ),
+        'processed_stripe_events should have RLS enabled'
     );
 
 -- Test manifest policies
