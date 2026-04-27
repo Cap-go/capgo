@@ -3,7 +3,7 @@
 BEGIN;
 
 -- Plan the number of tests
-SELECT plan(39);
+SELECT plan(41);
 
 -- Test app_versions policies
 SELECT
@@ -226,6 +226,24 @@ SELECT
         'stripe_info',
         ARRAY['Allow org member to select stripe_info'],
         'stripe_info should have correct policies'
+    );
+
+-- Test daily_revenue_metrics policies
+SELECT
+    policies_are(
+        'public',
+        'daily_revenue_metrics',
+        ARRAY['Allow service_role full access'],
+        'daily_revenue_metrics should stay service_role-only'
+    );
+
+-- Test processed_stripe_events policies
+SELECT
+    policies_are(
+        'public',
+        'processed_stripe_events',
+        ARRAY['Allow service_role full access'],
+        'processed_stripe_events should stay service_role-only'
     );
 
 -- Test manifest policies
