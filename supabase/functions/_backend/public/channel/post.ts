@@ -55,7 +55,7 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
   if (error || !org) {
     throw simpleError('invalid_app_id', 'You can\'t access this app', { app_id: body.app_id })
   }
-  const inferredElectron = body.electron ?? (body.public && (body.ios === true || body.android === true) ? false : undefined)
+  const inferredElectron = body.electron ?? (body.public && body.ios !== body.android ? false : undefined)
   const channel: Database['public']['Tables']['channels']['Insert'] = {
     created_by: apikey.user_id,
     app_id: body.app_id,

@@ -124,4 +124,28 @@ describe('public channel post', () => {
       }),
     )
   })
+
+  it('keeps legacy all-platform public writes electron-compatible when both mobile flags are true', async () => {
+    const { post } = await import('../supabase/functions/_backend/public/channel/post.ts')
+
+    await post(
+      { json: vi.fn() } as any,
+      {
+        app_id: 'com.test.legacy-all-platforms',
+        channel: 'production',
+        version: '1.0.0',
+        public: true,
+        ios: true,
+        android: true,
+      },
+      { user_id: 'user-test', key: 'capg-key' } as any,
+    )
+
+    expect(updateOrCreateChannel).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.not.objectContaining({
+        electron: false,
+      }),
+    )
+  })
 })
