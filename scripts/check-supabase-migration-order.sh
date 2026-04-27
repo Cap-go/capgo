@@ -87,6 +87,17 @@ if [[ -n "$modified_files" ]]; then
   status=1
 fi
 
+deleted_files="$(git diff --name-only --diff-filter=D "${base_ref}...HEAD" -- 'supabase/migrations/*.sql')"
+if [[ -n "$deleted_files" ]]; then
+  echo '❌ Existing Supabase migrations were deleted in this change.'
+  echo '  Supabase migrations must remain append-only.'
+  while IFS= read -r file; do
+    [[ -z "$file" ]] && continue
+    echo "  - $file"
+  done <<< "$deleted_files"
+  status=1
+fi
+
 added_files="$(git diff --name-only --diff-filter=A "${base_ref}...HEAD" -- 'supabase/migrations/*.sql')"
 if [[ -n "$added_files" ]]; then
   : > "${added_timestamps_file}"
