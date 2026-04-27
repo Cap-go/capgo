@@ -1,13 +1,9 @@
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
-import { eq, sql } from 'drizzle-orm'
 import { lockOnboardingApp, unlockOnboardingApp } from '../../utils/demo.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
-import { buildManifestCacheEntries } from '../../utils/manifestCache.ts'
-import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
-import { app_version_manifest_cache, apps, manifest as manifestTable } from '../../utils/postgres_schema.ts'
 import { hasOrgRight, supabaseAdmin, updateOrCreateChannel } from '../../utils/supabase.ts'
 
 /** Request body for creating a demo app */
@@ -36,6 +32,14 @@ interface DemoManifestEntry {
   s3_path: string
   file_hash: string
   file_size: number
+}
+
+function toManifestPayload(entries: DemoManifestEntry[]): Database['public']['CompositeTypes']['manifest_entry'][] {
+  return entries.map(({ file_name, s3_path, file_hash }) => ({
+    file_name,
+    s3_path,
+    file_hash,
+  }))
 }
 
 /**
@@ -351,7 +355,7 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
 
     // RLS bypass needed: Demo app creation inserts into multiple tables (apps, app_versions,
     // channels, devices, daily_mau, daily_bandwidth, daily_storage, daily_version, build_requests,
-    // manifest, deploy_history) where RLS policies may not grant direct user insert access.
+    // deploy_history) where RLS policies may not grant direct user insert access.
     // Authorization is enforced at endpoint level via hasOrgRight check above.
 
     // Create the demo app
@@ -372,6 +376,7 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
     const versionInserts = demoVersions.map((v) => {
       const isSystemVersion = v.name === 'unknown' || v.name === 'builtin'
       const manifest = isSystemVersion ? null : getDemoManifest(v.name, appId)
+      const manifestPayload = manifest ? toManifestPayload(manifest) : null
       const nativePackages = isSystemVersion ? null : getDemoNativePackages(v.name)
 
       return {
@@ -383,9 +388,7 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
         comment: v.comment,
         link: v.link,
         user_id: auth.userId,
-        // Demo seeding writes manifest rows and cache directly below.
-        manifest: null,
-        manifest_count: manifest?.length ?? 0,
+        manifest: manifestPayload,
         native_packages: nativePackages as any,
       }
     })
@@ -415,77 +418,6 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
     }
 
     const versionMap = new Map(allVersions.map(v => [v.name, v.id]))
-
-    // Insert manifest entries into the manifest table for each version
-    // This is required for the bundle file list to show in the UI
-    const manifestInserts: (typeof manifestTable.$inferInsert)[] = []
-    const manifestCacheInserts: (typeof app_version_manifest_cache.$inferInsert)[] = []
-
-    for (const version of demoVersions) {
-      if (version.name === 'unknown' || version.name === 'builtin')
-        continue
-
-      const versionId = versionMap.get(version.name)
-      if (!versionId)
-        continue
-
-      const manifestEntries = getDemoManifest(version.name, appId)
-      manifestCacheInserts.push({
-        app_version_id: versionId,
-        entries: buildManifestCacheEntries(manifestEntries),
-      })
-      for (const entry of manifestEntries) {
-        manifestInserts.push({
-          app_version_id: versionId,
-          file_name: entry.file_name,
-          file_hash: entry.file_hash,
-          s3_path: entry.s3_path,
-          file_size: entry.file_size,
-        })
-      }
-    }
-
-    if (manifestInserts.length > 0 || manifestCacheInserts.length > 0) {
-      const pgClient = getPgClient(c, false)
-      const drizzle = getDrizzleClient(pgClient)
-      try {
-        await drizzle.transaction(async (tx) => {
-          if (manifestInserts.length > 0)
-            await tx.insert(manifestTable).values(manifestInserts)
-
-          if (manifestCacheInserts.length > 0) {
-            await tx
-              .insert(app_version_manifest_cache)
-              .values(manifestCacheInserts)
-              .onConflictDoUpdate({
-                target: app_version_manifest_cache.app_version_id,
-                set: {
-                  entries: sql`excluded.entries`,
-                  updated_at: sql`now()`,
-                },
-              })
-
-            await tx
-              .update(apps)
-              .set({ manifest_bundle_count: manifestCacheInserts.length })
-              .where(eq(apps.app_id, appId))
-          }
-        })
-        cloudlog({
-          requestId,
-          message: 'Manifest entries and cache created',
-          manifestCount: manifestInserts.length,
-          manifestBundleCount: manifestCacheInserts.length,
-        })
-      }
-      catch (error) {
-        cloudlog({ requestId, message: 'Error creating manifest data', error })
-        throw simpleError('cannot_seed_manifest', 'Cannot seed manifest data', { error })
-      }
-      finally {
-        await closeClient(c, pgClient)
-      }
-    }
 
     // Demo channels configuration
     const demoChannels: DemoChannel[] = [
