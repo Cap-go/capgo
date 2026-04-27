@@ -3,7 +3,7 @@ import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
-import { resolveApikeyPolicyOrgIds, supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
+import { resolveApikeyPolicyOrgIds, supabaseAdmin, supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
 import { Constants } from '../../utils/supabase.types.ts'
 
 const app = honoFactory.createApp()
@@ -103,6 +103,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
 
   // Use supabaseWithAuth which handles both JWT and API key authentication
   const supabase = supabaseWithAuth(c, auth)
+  const policyLookupSupabase = supabaseAdmin(c)
 
   // Check if the apikey to update exists (RLS handles ownership)
   const baseQuery = supabase
@@ -137,6 +138,7 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
     const orgsToValidate = await resolveApikeyPolicyOrgIds(supabase, {
       limitedToApps: nextLimitedToApps,
       limitedToOrgs: nextLimitedToOrgs,
+      policyLookupSupabase,
     })
     await validateExpirationAgainstOrgPolicies(orgsToValidate, expirationToValidate, supabase)
   }

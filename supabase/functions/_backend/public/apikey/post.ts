@@ -2,7 +2,7 @@ import type { AuthInfo } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
-import { resolveApikeyPolicyOrgIds, supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
+import { resolveApikeyPolicyOrgIds, supabaseAdmin, supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
 import { Constants } from '../../utils/supabase.types.ts'
 
 const app = honoFactory.createApp()
@@ -60,6 +60,7 @@ app.post('/', middlewareV2(['all']), async (c) => {
 
   // Use supabaseWithAuth which handles both JWT and API key authentication
   const supabase = supabaseWithAuth(c, auth)
+  const policyLookupSupabase = supabaseAdmin(c)
 
   if (orgId) {
     const { data: org, error } = await supabase.from('orgs').select('*').eq('id', orgId).single()
@@ -80,6 +81,7 @@ app.post('/', middlewareV2(['all']), async (c) => {
   const allOrgIds = await resolveApikeyPolicyOrgIds(supabase, {
     limitedToApps,
     limitedToOrgs,
+    policyLookupSupabase,
   })
   await validateExpirationAgainstOrgPolicies(allOrgIds, expiresAt, supabase)
 
