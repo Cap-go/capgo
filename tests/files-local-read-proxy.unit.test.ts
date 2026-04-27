@@ -67,6 +67,7 @@ describe('files local read proxy', () => {
       return new Response('proxied local bytes', {
         headers: {
           'cache-control': 'public, max-age=60',
+          'content-disposition': 'inline; filename="stored.txt"',
           'content-type': 'text/plain',
         },
       })
@@ -108,6 +109,7 @@ describe('files local read proxy', () => {
       return new Response(null, {
         headers: {
           'cache-control': 'public, max-age=60',
+          'content-disposition': 'inline; filename="stored.txt"',
           'content-type': 'text/plain',
         },
       })

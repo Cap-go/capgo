@@ -274,9 +274,7 @@ function ensureNoTransformResponse(response: Response): Response {
 function withAttachmentResponseHeaders(response: Response, fileId: string): Response {
   const headers = new Headers(response.headers)
   headers.set('cache-control', withNoTransformCacheControl(headers.get('cache-control')))
-  if (!headers.has('content-disposition')) {
-    headers.set('content-disposition', `attachment; filename="${fileId}"`)
-  }
+  headers.set('content-disposition', `attachment; filename="${fileId}"`)
 
   return new Response(response.body, {
     headers,
