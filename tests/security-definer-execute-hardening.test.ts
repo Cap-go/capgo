@@ -1,0 +1,182 @@
+import type { Pool } from 'pg'
+import { Pool as PgPool } from 'pg'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { POSTGRES_URL } from './test-utils.ts'
+
+interface ProcState {
+  anon_exec: boolean
+  auth_exec: boolean
+  proc: string
+  prosecdef: boolean
+}
+
+const INVOKER_PROCS = [
+  'public.get_apikey_header()',
+  'public.is_apikey_expired(timestamp with time zone)',
+  'public.strip_html(text)',
+  'public.transform_role_to_invite(public.user_min_right)',
+  'public.transform_role_to_non_invite(public.user_min_right)',
+  'public.verify_api_key_hash(text, text)',
+] as const
+
+const SERVICE_ONLY_PROCS = [
+  'public.apikeys_force_server_key()',
+  'public.apikeys_strip_plain_key_for_hashed()',
+  'public.check_encrypted_bundle_on_insert()',
+  'public.check_org_hashed_key_enforcement(uuid, public.apikeys)',
+  'public.cleanup_onboarding_app_data_on_complete()',
+  'public.delete_old_deleted_versions()',
+  'public.generate_org_user_stripe_info_on_org_create()',
+  'public.get_apikey()',
+  'public.get_user_main_org_id_by_app_id(text)',
+  'public.noupdate()',
+  'public.prevent_last_super_admin_binding_delete()',
+  'public.reject_access_due_to_2fa_for_app(character varying)',
+  'public.reject_access_due_to_2fa_for_org(uuid)',
+  'public.resync_org_user_role_bindings(uuid, uuid)',
+  'public.sanitize_apps_text_fields()',
+  'public.sanitize_orgs_text_fields()',
+  'public.sanitize_tmp_users_text_fields()',
+  'public.sanitize_users_text_fields()',
+  'public.sync_org_has_usage_credits_from_grants()',
+  'public.sync_org_user_role_binding_on_update()',
+  'public.sync_org_user_to_role_binding()',
+] as const
+
+const AUTHENTICATED_ONLY_PROCS = [
+  'public.accept_invitation_to_org(uuid)',
+  'public.check_org_members_2fa_enabled(uuid)',
+  'public.check_org_members_password_policy(uuid)',
+  'public.count_non_compliant_bundles(uuid, text)',
+  'public.delete_group_with_bindings(uuid)',
+  'public.delete_non_compliant_bundles(uuid, text)',
+  'public.delete_org_member_role(uuid, uuid)',
+  'public.delete_user()',
+  'public.get_account_removal_date()',
+  'public.get_app_access_rbac(uuid)',
+  'public.get_app_metrics(uuid, character varying, date, date)',
+  'public.get_app_metrics(uuid, date, date)',
+  'public.get_app_metrics(uuid)',
+  'public.get_org_members(uuid, uuid)',
+  'public.get_org_members(uuid)',
+  'public.get_org_members_rbac(uuid)',
+  'public.get_org_user_access_rbac(uuid, uuid)',
+  'public.get_total_app_storage_size_orgs(uuid, character varying)',
+  'public.get_total_storage_size_org(uuid)',
+  'public.get_user_org_ids()',
+  'public.has_2fa_enabled()',
+  'public.invite_user_to_org(character varying, uuid, public.user_min_right)',
+  'public.invite_user_to_org_rbac(character varying, uuid, text)',
+  'public.is_allowed_action_org(uuid)',
+  'public.is_allowed_action_org_action(uuid, public.action_type[])',
+  'public.is_canceled_org(uuid)',
+  'public.is_good_plan_v5_org(uuid)',
+  'public.is_onboarded_org(uuid)',
+  'public.is_onboarding_needed_org(uuid)',
+  'public.is_org_yearly(uuid)',
+  'public.is_paying_and_good_plan_org(uuid)',
+  'public.is_paying_and_good_plan_org_action(uuid, public.action_type[])',
+  'public.modify_permissions_tmp(text, uuid, public.user_min_right)',
+  'public.rbac_check_permission(text, uuid, character varying, bigint)',
+  'public.rbac_check_permission_no_password_policy(text, uuid, character varying, bigint)',
+  'public.update_org_invite_role_rbac(uuid, uuid, text)',
+  'public.update_org_member_role(uuid, uuid, text)',
+  'public.update_tmp_invite_role_rbac(uuid, text, text)',
+  'public.verify_mfa()',
+] as const
+
+describe('security definer execute hardening', () => {
+  let pool: Pool
+
+  beforeAll(() => {
+    pool = new PgPool({ connectionString: POSTGRES_URL })
+  })
+
+  afterAll(async () => {
+    await pool.end()
+  })
+
+  async function getProcStates(procs: readonly string[]): Promise<Map<string, ProcState>> {
+    const result = await pool.query<ProcState>(`
+      WITH requested AS (
+        SELECT
+          proc,
+          to_regprocedure(proc) AS proc_oid
+        FROM unnest($1::text[]) AS proc
+      )
+      SELECT
+        requested.proc,
+        p.prosecdef,
+        has_function_privilege('anon', p.oid, 'EXECUTE') AS anon_exec,
+        has_function_privilege('authenticated', p.oid, 'EXECUTE') AS auth_exec
+      FROM requested
+      LEFT JOIN pg_proc AS p
+        ON p.oid = requested.proc_oid
+      ORDER BY 1
+    `, [procs])
+
+    return new Map(result.rows.map(row => [row.proc, row]))
+  }
+
+  it.concurrent('runs pure helpers as security invoker', async () => {
+    const states = await getProcStates(INVOKER_PROCS)
+
+    expect(states.size).toBe(INVOKER_PROCS.length)
+
+    for (const proc of INVOKER_PROCS) {
+      expect(states.get(proc)?.prosecdef, proc).toBe(false)
+    }
+  })
+
+  it.concurrent('keeps helper behavior intact', async () => {
+    const result = await pool.query<{
+      expired_null: boolean
+      invite_role: string
+      non_invite_role: string
+      stripped: string
+      verified: boolean
+    }>(`
+      SELECT
+        public.is_apikey_expired(NULL) AS expired_null,
+        public.strip_html('<b>capgo</b>') AS stripped,
+        public.transform_role_to_invite('write'::public.user_min_right)::text AS invite_role,
+        public.transform_role_to_non_invite('invite_admin'::public.user_min_right)::text AS non_invite_role,
+        public.verify_api_key_hash(
+          'capgo',
+          encode(extensions.digest('capgo', 'sha256'), 'hex')
+        ) AS verified
+    `)
+
+    expect(result.rows[0]).toEqual({
+      expired_null: false,
+      invite_role: 'invite_write',
+      non_invite_role: 'admin',
+      stripped: 'capgo',
+      verified: true,
+    })
+  })
+
+  it.concurrent('blocks direct execution of service-only helpers', async () => {
+    const states = await getProcStates(SERVICE_ONLY_PROCS)
+
+    expect(states.size).toBe(SERVICE_ONLY_PROCS.length)
+
+    for (const proc of SERVICE_ONLY_PROCS) {
+      const state = states.get(proc)
+      expect(state?.anon_exec, proc).toBe(false)
+      expect(state?.auth_exec, proc).toBe(false)
+    }
+  })
+
+  it.concurrent('keeps signed-in RPCs inaccessible to anonymous callers', async () => {
+    const states = await getProcStates(AUTHENTICATED_ONLY_PROCS)
+
+    expect(states.size).toBe(AUTHENTICATED_ONLY_PROCS.length)
+
+    for (const proc of AUTHENTICATED_ONLY_PROCS) {
+      const state = states.get(proc)
+      expect(state?.anon_exec, proc).toBe(false)
+      expect(state?.auth_exec, proc).toBe(true)
+    }
+  })
+})
