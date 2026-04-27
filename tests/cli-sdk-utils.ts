@@ -2,7 +2,7 @@ import type { UploadOptions } from '@capgo/cli/sdk'
 import type { Database } from '../src/types/supabase.types'
 import { Buffer } from 'node:buffer'
 import { execFile } from 'node:child_process'
-import { constants, createCipheriv, createHash, privateEncrypt, randomBytes } from 'node:crypto'
+import { constants, createCipheriv, createHash, createPublicKey, privateEncrypt, randomBytes } from 'node:crypto'
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { chdir, cwd, env } from 'node:process'
@@ -322,6 +322,23 @@ function checksumHex(buffer: Buffer) {
   return createHash('sha256').update(buffer).digest('hex')
 }
 
+function getPublicKeyFingerprint(publicKey: string) {
+  return publicKey
+    .replace(/-----BEGIN (RSA )?PUBLIC KEY-----/g, '')
+    .replace(/-----END (RSA )?PUBLIC KEY-----/g, '')
+    .replace(/\s+/g, '')
+    .substring(0, 20)
+}
+
+function getKeyIdFromPrivateKey(privateKey: string) {
+  const publicKey = createPublicKey(privateKey).export({ type: 'pkcs1', format: 'pem' })
+  return getPublicKeyFingerprint(publicKey.toString())
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error)
+}
+
 async function resolveInstalledVersion(packageName: string, nodeModulesPaths: string[]) {
   const parts = packageName.split('/')
 
@@ -415,6 +432,16 @@ async function uploadBufferToStorage(filePath: string, zipBuffer: Buffer) {
     throw new Error(`Upload failed with status ${uploadResponse.status}`)
 }
 
+async function deleteBundleRecord(versionId: number) {
+  const { error } = await getSupabaseClient()
+    .from('app_versions')
+    .delete()
+    .eq('id', versionId)
+
+  if (error)
+    throw new Error(error.message)
+}
+
 async function createBundleRecord(
   appId: string,
   version: string,
@@ -423,7 +450,7 @@ async function createBundleRecord(
   fields: {
     checksum: string
     comment?: string
-    key_id?: string
+    key_id?: string | null
     min_update_version?: string | null
     native_packages?: NativePackage[] | null
     r2_path: string
@@ -495,6 +522,7 @@ async function buildUploadPayload(appId: string, options: UploadOptions) {
       return { error: 'Missing encryption key' as const }
 
     const privateKey = await readFile(options.encryptionKey, 'utf8')
+    const keyId = getKeyIdFromPrivateKey(privateKey)
     const iv = randomBytes(16)
     const aesKey = randomBytes(16)
     const cipher = createCipheriv('aes-128-cbc', aesKey, iv)
@@ -503,6 +531,7 @@ async function buildUploadPayload(appId: string, options: UploadOptions) {
 
     return {
       checksum: checksumHex(encryptedZipBuffer),
+      keyId,
       nativePackages,
       sessionKey: `${iv.toString('base64')}:${encryptedSessionKey}`,
       zipBuffer: encryptedZipBuffer,
@@ -511,6 +540,7 @@ async function buildUploadPayload(appId: string, options: UploadOptions) {
 
   return {
     checksum: checksumHex(plainZipBuffer),
+    keyId: null,
     nativePackages,
     sessionKey: null,
     zipBuffer: plainZipBuffer,
@@ -796,13 +826,26 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
       const versionId = await createBundleRecord(options.appId, bundleVersion, app, apiKey, {
         checksum: uploadPayload.checksum,
         comment: options.comment,
+        key_id: uploadPayload.keyId,
         min_update_version: minUpdateVersion.minUpdateVersion,
         native_packages: uploadPayload.nativePackages,
         r2_path: r2Path,
         session_key: uploadPayload.sessionKey,
       })
 
-      await uploadBufferToStorage(r2Path, uploadPayload.zipBuffer)
+      try {
+        await uploadBufferToStorage(r2Path, uploadPayload.zipBuffer)
+      }
+      catch (uploadError) {
+        try {
+          await deleteBundleRecord(versionId)
+        }
+        catch (cleanupError) {
+          throw new Error(`Upload failed and cleanup failed: ${getErrorMessage(uploadError)}; cleanup error: ${getErrorMessage(cleanupError)}`)
+        }
+
+        throw uploadError
+      }
 
       if (options.channel) {
         const channelRecord = await getChannelRecord(options.appId, options.channel)
@@ -826,7 +869,7 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
       }
     }
     catch (error) {
-      return { success: false, error: error instanceof Error ? error.message : String(error) }
+      return { success: false, error: getErrorMessage(error) }
     }
   }
 
