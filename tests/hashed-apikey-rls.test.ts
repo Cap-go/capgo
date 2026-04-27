@@ -366,6 +366,75 @@ async function deleteEnforcedApikeyPrincipalOrgForKey(orgId: string, apikeyId: n
   }
 }
 
+async function createStandaloneOrg(enforceHashedApiKeys = true): Promise<string> {
+  const client = await pool.connect()
+  const orgId = randomUUID()
+  try {
+    await client.query(
+      `INSERT INTO public.orgs (id, created_by, name, management_email, enforce_hashed_api_keys, use_new_rbac)
+       VALUES ($1, $2, $3, $4, $5, true)`,
+      [orgId, USER_ID_2, `standalone-org-${orgId}`, `standalone-${orgId}@capgo.test`, enforceHashedApiKeys],
+    )
+    return orgId
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function deleteStandaloneOrg(orgId: string): Promise<void> {
+  const client = await pool.connect()
+  try {
+    await client.query('DELETE FROM public.orgs WHERE id = $1', [orgId])
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function createStaleAppScopedBindingForUser(userId: string, staleOrgId: string): Promise<void> {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      `INSERT INTO public.role_bindings (
+        principal_type, principal_id, role_id, scope_type, org_id, app_id, granted_by, reason, is_direct
+      ) VALUES (
+        public.rbac_principal_user(),
+        $1,
+        (SELECT id FROM public.roles WHERE name = public.rbac_role_app_reader()),
+        public.rbac_scope_app(),
+        $2,
+        (SELECT id FROM public.apps WHERE app_id = $3),
+        $4,
+        'hashed-apikey-rls stale app scope test',
+        true
+      )`,
+      [userId, staleOrgId, APP_NAME_RLS, USER_ID_2],
+    )
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function deleteStaleAppScopedBindingForUser(userId: string, staleOrgId: string): Promise<void> {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      `DELETE FROM public.role_bindings
+       WHERE principal_type = public.rbac_principal_user()
+         AND principal_id = $1
+         AND scope_type = public.rbac_scope_app()
+         AND org_id = $2
+         AND app_id = (SELECT id FROM public.apps WHERE app_id = $3)`,
+      [userId, staleOrgId, APP_NAME_RLS],
+    )
+  }
+  finally {
+    client.release()
+  }
+}
+
 beforeAll(async () => {
   pool = new Pool({ connectionString: POSTGRES_URL })
   const client = await pool.connect()
@@ -588,6 +657,26 @@ describe('enforce_hashed_api_keys blocks plaintext capgkey auth on the RLS plane
     finally {
       await setOrgHashedApiKeyEnforcement(suiteOrgId, true)
       await deleteEnforcedApikeyPrincipalOrgForKey(apikeyPrincipalOrgId, plainKey.id)
+    }
+  })
+
+  it('ignores stale org_id values on app-scoped RBAC bindings when deriving org enforcement', async () => {
+    const staleEnforcedOrgId = await createStandaloneOrg(true)
+
+    try {
+      await setOrgHashedApiKeyEnforcement(suiteOrgId, false)
+      await createStaleAppScopedBindingForUser(RLS_TEST_USER_ID, staleEnforcedOrgId)
+
+      const rows = await execWithCapgkey(
+        `SELECT get_identity('{all,write,read,upload}'::key_mode[]) AS user_id`,
+        plainKey.key,
+      )
+      expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
+    }
+    finally {
+      await deleteStaleAppScopedBindingForUser(RLS_TEST_USER_ID, staleEnforcedOrgId)
+      await setOrgHashedApiKeyEnforcement(suiteOrgId, true)
+      await deleteStandaloneOrg(staleEnforcedOrgId)
     }
   })
 

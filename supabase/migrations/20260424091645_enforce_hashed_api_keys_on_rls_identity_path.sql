@@ -38,6 +38,7 @@ BEGIN
           FROM public.role_bindings AS rb
           WHERE rb.principal_type = public.rbac_principal_user()
             AND rb.principal_id = apikey_row.user_id
+            AND rb.scope_type = public.rbac_scope_org()
             AND rb.org_id IS NOT NULL
             AND (rb.expires_at IS NULL OR rb.expires_at > now())
             AND NOT EXISTS (
@@ -55,6 +56,7 @@ BEGIN
           JOIN public.group_members AS gm ON gm.group_id = rb.principal_id
           WHERE rb.principal_type = public.rbac_principal_group()
             AND gm.user_id = apikey_row.user_id
+            AND rb.scope_type = public.rbac_scope_org()
             AND rb.org_id IS NOT NULL
             AND (rb.expires_at IS NULL OR rb.expires_at > now())
 
@@ -65,6 +67,7 @@ BEGIN
           WHERE apikey_row.rbac_id IS NOT NULL
             AND rb.principal_type = public.rbac_principal_apikey()
             AND rb.principal_id = apikey_row.rbac_id
+            AND rb.scope_type = public.rbac_scope_org()
             AND rb.org_id IS NOT NULL
             AND (rb.expires_at IS NULL OR rb.expires_at > now())
 
@@ -75,6 +78,7 @@ BEGIN
           JOIN public.apps ON apps.id = rb.app_id
           WHERE rb.principal_type = public.rbac_principal_user()
             AND rb.principal_id = apikey_row.user_id
+            AND rb.scope_type = public.rbac_scope_app()
             AND rb.app_id IS NOT NULL
             AND (rb.expires_at IS NULL OR rb.expires_at > now())
             AND NOT EXISTS (
@@ -93,6 +97,7 @@ BEGIN
           JOIN public.group_members AS gm ON gm.group_id = rb.principal_id
           WHERE rb.principal_type = public.rbac_principal_group()
             AND gm.user_id = apikey_row.user_id
+            AND rb.scope_type = public.rbac_scope_app()
             AND rb.app_id IS NOT NULL
             AND (rb.expires_at IS NULL OR rb.expires_at > now())
 
@@ -104,6 +109,7 @@ BEGIN
           WHERE apikey_row.rbac_id IS NOT NULL
             AND rb.principal_type = public.rbac_principal_apikey()
             AND rb.principal_id = apikey_row.rbac_id
+            AND rb.scope_type = public.rbac_scope_app()
             AND rb.app_id IS NOT NULL
             AND (rb.expires_at IS NULL OR rb.expires_at > now())
 
@@ -115,6 +121,7 @@ BEGIN
           JOIN public.apps ON apps.app_id = ch.app_id
           WHERE rb.principal_type = public.rbac_principal_user()
             AND rb.principal_id = apikey_row.user_id
+            AND rb.scope_type = public.rbac_scope_channel()
             AND rb.channel_id IS NOT NULL
             AND (rb.expires_at IS NULL OR rb.expires_at > now())
             AND NOT EXISTS (
@@ -134,6 +141,7 @@ BEGIN
           JOIN public.group_members AS gm ON gm.group_id = rb.principal_id
           WHERE rb.principal_type = public.rbac_principal_group()
             AND gm.user_id = apikey_row.user_id
+            AND rb.scope_type = public.rbac_scope_channel()
             AND rb.channel_id IS NOT NULL
             AND (rb.expires_at IS NULL OR rb.expires_at > now())
 
@@ -146,6 +154,7 @@ BEGIN
           WHERE apikey_row.rbac_id IS NOT NULL
             AND rb.principal_type = public.rbac_principal_apikey()
             AND rb.principal_id = apikey_row.rbac_id
+            AND rb.scope_type = public.rbac_scope_channel()
             AND rb.channel_id IS NOT NULL
             AND (rb.expires_at IS NULL OR rb.expires_at > now())
         ) AS accessible_orgs

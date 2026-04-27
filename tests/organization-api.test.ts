@@ -5,7 +5,7 @@ import { z } from 'zod'
 
 import {
   BASE_URL,
-  getAuthHeaders,
+  getAuthHeadersForCredentials,
   getSupabaseClient,
   headers,
   normalizeLocalhostUrl,
@@ -15,6 +15,7 @@ import {
   USER_ADMIN_EMAIL,
   USER_EMAIL,
   USER_ID,
+  USER_ID_2,
   USER_PASSWORD,
 } from './test-utils.ts'
 
@@ -25,6 +26,7 @@ const globalId = randomUUID()
 const name = `Test Organization ${globalId}`
 const customerId = `cus_test_${ORG_ID}`
 const website = 'https://test-organization.example/'
+let user2AuthHeaders: Record<string, string> | null = null
 
 beforeAll(async () => {
   // Create stripe_info for this test org
@@ -43,7 +45,7 @@ beforeAll(async () => {
     id: ORG_ID,
     name,
     management_email: TEST_EMAIL,
-    created_by: USER_ID,
+    created_by: USER_ID_2,
     customer_id: customerId,
     website,
     use_new_rbac: false, // Explicitly legacy — this suite tests the legacy permission path
@@ -54,11 +56,13 @@ beforeAll(async () => {
   // Add the test user as super_admin to the org so they can access it via API
   const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
     org_id: ORG_ID,
-    user_id: USER_ID,
+    user_id: USER_ID_2,
     user_right: 'super_admin',
   })
   if (orgUserError)
     throw orgUserError
+
+  user2AuthHeaders = await getAuthHeadersForCredentials('test2@capgo.app', USER_PASSWORD)
 })
 
 afterAll(async () => {
@@ -995,11 +999,14 @@ describe('[DELETE] /organization', () => {
 
 describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
   it('update organization enforce_hashed_api_keys to true', async () => {
+    if (!user2AuthHeaders)
+      throw new Error('Missing auth headers for test2@capgo.app')
+
     // First, ensure it's false
     await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false }).eq('id', ORG_ID)
 
     const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
+      headers: user2AuthHeaders,
       method: 'PUT',
       body: JSON.stringify({
         orgId: ORG_ID,
@@ -1020,12 +1027,14 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
   })
 
   it('update organization enforce_hashed_api_keys to false', async () => {
+    if (!user2AuthHeaders)
+      throw new Error('Missing auth headers for test2@capgo.app')
+
     // First, set it to true
     await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: true }).eq('id', ORG_ID)
-    const authHeaders = await getAuthHeaders()
 
     const response = await fetch(`${BASE_URL}/organization`, {
-      headers: authHeaders,
+      headers: user2AuthHeaders,
       method: 'PUT',
       body: JSON.stringify({
         orgId: ORG_ID,
@@ -1049,7 +1058,7 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
     await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: true, website: rpcWebsite }).eq('id', ORG_ID)
 
     // Call get_orgs_v7 via RPC
-    const { data, error } = await getSupabaseClient().rpc('get_orgs_v7', { userid: USER_ID })
+    const { data, error } = await getSupabaseClient().rpc('get_orgs_v7', { userid: USER_ID_2 })
     expect(error).toBeNull()
     expect(Array.isArray(data)).toBe(true)
 
