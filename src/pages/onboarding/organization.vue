@@ -70,6 +70,7 @@ const activeOrgName = computed(() => {
     return currentOrganization.value.name
   return orgNameInput.value.trim() || websitePreview.value?.name || ''
 })
+const hasSavedLogo = computed(() => currentOrganization.value?.gid === activeOrgId.value && !!currentOrganization.value.logo)
 
 const websiteHostname = computed(() => {
   const value = websiteInput.value.trim()
@@ -797,10 +798,20 @@ onUnmounted(() => {
                 >
                   {{ t('organization-onboarding-use-imported-logo') }}
                 </button>
-                <button type="button" class="d-btn d-btn-ghost" data-test="onboarding-skip-logo" :disabled="isUploadingLogo" @click="skipLogo">
-                  {{ t('skip') }}
+                <button
+                  type="button"
+                  class="d-btn"
+                  :class="hasSavedLogo ? 'd-btn-secondary' : 'd-btn-ghost'"
+                  data-test="onboarding-skip-logo"
+                  :disabled="isUploadingLogo"
+                  @click="skipLogo"
+                >
+                  {{ hasSavedLogo ? t('button-next') : t('skip') }}
                 </button>
               </div>
+              <p v-if="hasSavedLogo" class="text-sm font-medium text-emerald-600">
+                {{ t('organization-onboarding-logo-saved') }}
+              </p>
             </div>
 
             <div class="rounded-[28px] border border-slate-200 bg-slate-950 p-5 text-white">
