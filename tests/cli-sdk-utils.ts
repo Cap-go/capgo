@@ -1,10 +1,13 @@
 import type { UploadOptions } from '@capgo/cli/sdk'
 import type { Database } from '../src/types/supabase.types'
+import { Buffer } from 'node:buffer'
 import { execFile } from 'node:child_process'
-import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { constants, createCipheriv, createHash, privateEncrypt, randomBytes } from 'node:crypto'
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { chdir, cwd, env } from 'node:process'
 import { CapgoSDK } from '@capgo/cli/sdk'
+import AdmZip from 'adm-zip'
 import { BASE_DEPENDENCIES, BASE_DEPENDENCIES_OLD, BASE_PACKAGE_JSON, TEMP_DIR_NAME } from './cli-utils'
 import { APIKEY_TEST_ALL, getSupabaseClient, USER_ID } from './test-utils'
 
@@ -180,6 +183,345 @@ async function getVersionId(appId: string, version: string) {
   return data?.id ?? null
 }
 
+type ApiKeyRow = Pick<
+  Database['public']['Tables']['apikeys']['Row'],
+  'expires_at' | 'id' | 'key' | 'key_hash' | 'limited_to_apps' | 'limited_to_orgs' | 'mode' | 'user_id'
+>
+
+interface NativePackage {
+  name: string
+  version: string
+}
+
+interface ChannelVersionRow {
+  checksum: string | null
+  id: number
+  min_update_version: string | null
+  name: string
+  native_packages: NativePackage[] | null
+}
+
+interface CompatibilityEntry {
+  localVersion: string | undefined
+  name: string
+  remoteVersion: string | undefined
+}
+
+function hashApiKey(value: string) {
+  return createHash('sha256').update(value).digest('hex')
+}
+
+function isApiKeyExpired(expiresAt: string | null) {
+  return expiresAt != null && new Date(expiresAt).getTime() <= Date.now()
+}
+
+async function getApiKeyRecord(apikey: string) {
+  const { data } = await getSupabaseClient()
+    .from('apikeys')
+    .select('expires_at, id, key, key_hash, limited_to_apps, limited_to_orgs, mode, user_id')
+    .or(`key.eq.${apikey},key_hash.eq.${hashApiKey(apikey)}`)
+    .maybeSingle()
+
+  if (!data || isApiKeyExpired(data.expires_at))
+    return null
+
+  return data as ApiKeyRow
+}
+
+function hasModeAccess(mode: Database['public']['Enums']['key_mode'], allowedModes: Database['public']['Enums']['key_mode'][]) {
+  return mode === 'all' || allowedModes.includes(mode)
+}
+
+async function getAuthorizedApp(
+  apikey: string,
+  appId: string,
+  allowedModes: Database['public']['Enums']['key_mode'][],
+) {
+  const apiKey = await getApiKeyRecord(apikey)
+  if (!apiKey || !hasModeAccess(apiKey.mode, allowedModes))
+    return { error: 'Invalid API key or insufficient permissions.' as const }
+
+  const app = await getAppRecord(appId)
+  if (!app)
+    return { error: `App ${appId} does not exist` as const }
+
+  if (apiKey.limited_to_orgs?.length && (!app.owner_org || !apiKey.limited_to_orgs.includes(app.owner_org)))
+    return { error: 'Invalid API key or insufficient permissions.' as const }
+
+  if (apiKey.limited_to_apps?.length && !apiKey.limited_to_apps.includes(appId))
+    return { error: 'Invalid API key or insufficient permissions.' as const }
+
+  return { apiKey, app } as const
+}
+
+async function getAppsForApiKey(apikey: string, allowedModes: Database['public']['Enums']['key_mode'][]) {
+  const apiKey = await getApiKeyRecord(apikey)
+  if (!apiKey || !hasModeAccess(apiKey.mode, allowedModes))
+    return { error: 'Invalid API key or insufficient permissions.' as const }
+
+  const { data, error } = await getSupabaseClient()
+    .from('apps')
+    .select('app_id, created_at, icon_url, name, owner_org, user_id')
+    .eq('user_id', apiKey.user_id)
+    .order('created_at', { ascending: true })
+
+  if (error)
+    return { error: error.message }
+
+  const filteredApps = (data ?? [])
+    .filter(app => !apiKey.limited_to_orgs?.length || (app.owner_org != null && apiKey.limited_to_orgs.includes(app.owner_org)))
+    .filter(app => !apiKey.limited_to_apps?.length || apiKey.limited_to_apps.includes(app.app_id))
+
+  return {
+    apiKey,
+    apps: filteredApps,
+  } as const
+}
+
+async function getChannelVersionRecord(appId: string, channelId: string) {
+  const { data } = await getSupabaseClient()
+    .from('channels')
+    .select('version ( id, checksum, min_update_version, name, native_packages )')
+    .eq('app_id', appId)
+    .eq('name', channelId)
+    .maybeSingle()
+
+  return (data?.version ?? null) as ChannelVersionRow | null
+}
+
+async function listFilesRecursive(folderPath: string): Promise<string[]> {
+  const entries = await readdir(folderPath, { withFileTypes: true })
+  const nested = await Promise.all(entries.map(async (entry) => {
+    const entryPath = join(folderPath, entry.name)
+    if (entry.isDirectory())
+      return listFilesRecursive(entryPath)
+
+    return [entryPath]
+  }))
+
+  return nested.flat()
+}
+
+async function hasNotifyAppReady(distPath: string) {
+  const files = await listFilesRecursive(distPath)
+
+  for (const filePath of files) {
+    if (!/\.(?:html|js|ts|tsx|jsx)$/i.test(filePath))
+      continue
+
+    const fileContent = await readFile(filePath, 'utf8')
+    if (fileContent.includes('notifyAppReady'))
+      return true
+  }
+
+  return false
+}
+
+function buildZipBuffer(distPath: string) {
+  const zip = new AdmZip()
+  zip.addLocalFolder(distPath)
+  return zip.toBuffer()
+}
+
+function checksumHex(buffer: Buffer) {
+  return createHash('sha256').update(buffer).digest('hex')
+}
+
+async function resolveInstalledVersion(packageName: string, nodeModulesPaths: string[]) {
+  const parts = packageName.split('/')
+
+  for (const nodeModulesPath of nodeModulesPaths) {
+    try {
+      const packageJsonPath = join(nodeModulesPath, ...parts, 'package.json')
+      const packageJson = JSON.parse(await readFile(packageJsonPath, 'utf8')) as { version?: string }
+      if (packageJson.version)
+        return packageJson.version
+    }
+    catch {
+      // Ignore missing dependency paths and keep searching fallback locations.
+    }
+  }
+
+  return null
+}
+
+function splitPaths(value: string | undefined, fallback: string[]) {
+  if (!value)
+    return fallback
+
+  return value
+    .split(',')
+    .map(path => path.trim())
+    .filter(Boolean)
+}
+
+async function extractNativePackages(appId: string, packageJsonPath: string | undefined, nodeModulesPath: string | undefined) {
+  const resolvedPackageJsonPath = splitPaths(packageJsonPath, [join(tempFileFolder(appId), 'package.json')])[0] ?? join(tempFileFolder(appId), 'package.json')
+  const nodeModulesPaths = splitPaths(nodeModulesPath, [join(tempFileFolder(appId), 'node_modules'), join(ROOT_DIR, 'node_modules')])
+  const packageJson = JSON.parse(await readFile(resolvedPackageJsonPath, 'utf8')) as {
+    dependencies?: Record<string, string>
+  }
+  const dependencies = packageJson.dependencies ?? {}
+
+  const nativePackages = await Promise.all(Object.entries(dependencies).map(async ([name, version]) => ({
+    name,
+    version: await resolveInstalledVersion(name, nodeModulesPaths) ?? version,
+  })))
+
+  return nativePackages
+}
+
+async function buildCompatibilityResult(appId: string, channel: string, packageJsonPath: string | undefined, nodeModulesPath: string | undefined) {
+  const localDependencies = await extractNativePackages(appId, packageJsonPath, nodeModulesPath)
+  const remoteVersion = await getChannelVersionRecord(appId, channel)
+  const remoteDependencies = new Map((remoteVersion?.native_packages ?? []).map(pkg => [pkg.name, pkg]))
+
+  const compatibility: CompatibilityEntry[] = localDependencies.map((pkg) => {
+    const remotePackage = remoteDependencies.get(pkg.name)
+    return {
+      name: pkg.name,
+      localVersion: pkg.version,
+      remoteVersion: remotePackage?.version,
+    }
+  })
+
+  for (const remotePackage of remoteVersion?.native_packages ?? []) {
+    if (!localDependencies.find(pkg => pkg.name === remotePackage.name)) {
+      compatibility.push({
+        name: remotePackage.name,
+        localVersion: undefined,
+        remoteVersion: remotePackage.version,
+      })
+    }
+  }
+
+  return compatibility
+}
+
+async function uploadBufferToStorage(filePath: string, zipBuffer: Buffer) {
+  const supabase = getSupabaseClient()
+  const bucket = supabase.storage.from('capgo')
+
+  await bucket.remove([filePath])
+
+  const { data, error } = await bucket.createSignedUploadUrl(filePath)
+  if (error || !data?.signedUrl)
+    throw new Error(error?.message ?? 'Cannot get upload url')
+
+  const uploadResponse = await fetch(data.signedUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/zip',
+    },
+    body: new Uint8Array(zipBuffer),
+  })
+
+  if (!uploadResponse.ok)
+    throw new Error(`Upload failed with status ${uploadResponse.status}`)
+}
+
+async function createBundleRecord(
+  appId: string,
+  version: string,
+  app: NonNullable<Awaited<ReturnType<typeof getAppRecord>>>,
+  apiKey: ApiKeyRow,
+  fields: {
+    checksum: string
+    comment?: string
+    key_id?: string
+    min_update_version?: string | null
+    native_packages?: NativePackage[] | null
+    r2_path: string
+    session_key?: string | null
+  },
+) {
+  if (!app.owner_org)
+    throw new Error(`App ${appId} does not have an owner organization`)
+
+  const { data, error } = await getSupabaseClient()
+    .from('app_versions')
+    .insert({
+      app_id: appId,
+      checksum: fields.checksum,
+      comment: fields.comment ?? null,
+      key_id: fields.key_id ?? null,
+      min_update_version: fields.min_update_version ?? null,
+      name: version,
+      native_packages: fields.native_packages as any,
+      owner_org: app.owner_org,
+      r2_path: fields.r2_path,
+      session_key: fields.session_key ?? null,
+      storage_provider: 'r2-direct',
+      user_id: apiKey.user_id,
+    })
+    .select('id')
+    .single()
+
+  if (error || !data)
+    throw new Error(error?.message ?? 'Cannot create bundle')
+
+  return data.id
+}
+
+async function resolveUploadMinUpdateVersion(
+  appId: string,
+  channel: string | undefined,
+  autoMinUpdateVersion: boolean | undefined,
+  explicitMinUpdateVersion: string | undefined,
+) {
+  if (explicitMinUpdateVersion)
+    return { minUpdateVersion: explicitMinUpdateVersion, error: null as string | null }
+
+  if (!autoMinUpdateVersion || !channel)
+    return { minUpdateVersion: null, error: null as string | null }
+
+  const remoteVersion = await getChannelVersionRecord(appId, channel)
+  if (!remoteVersion || remoteVersion.native_packages == null)
+    return { minUpdateVersion: null, error: null as string | null }
+
+  if (!remoteVersion.min_update_version)
+    return { minUpdateVersion: null, error: 'Invalid remote min update version' }
+
+  return {
+    minUpdateVersion: remoteVersion.min_update_version,
+    error: null as string | null,
+  }
+}
+
+async function buildUploadPayload(appId: string, options: UploadOptions) {
+  const distPath = options.path
+  const plainZipBuffer = buildZipBuffer(distPath)
+  const nativePackages = options.ignoreCompatibilityCheck
+    ? null
+    : await extractNativePackages(appId, options.packageJsonPaths, undefined)
+
+  if (options.encrypt) {
+    if (!options.encryptionKey)
+      return { error: 'Missing encryption key' as const }
+
+    const privateKey = await readFile(options.encryptionKey, 'utf8')
+    const iv = randomBytes(16)
+    const aesKey = randomBytes(16)
+    const cipher = createCipheriv('aes-128-cbc', aesKey, iv)
+    const encryptedZipBuffer = Buffer.concat([cipher.update(plainZipBuffer), cipher.final()])
+    const encryptedSessionKey = privateEncrypt({ key: privateKey, padding: constants.RSA_PKCS1_PADDING }, aesKey).toString('base64')
+
+    return {
+      checksum: checksumHex(encryptedZipBuffer),
+      nativePackages,
+      sessionKey: `${iv.toString('base64')}:${encryptedSessionKey}`,
+      zipBuffer: encryptedZipBuffer,
+    } as const
+  }
+
+  return {
+    checksum: checksumHex(plainZipBuffer),
+    nativePackages,
+    sessionKey: null,
+    zipBuffer: plainZipBuffer,
+  } as const
+}
+
 /**
  * Create an SDK instance with test credentials
  */
@@ -190,19 +532,20 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
     supaAnon: SUPABASE_ANON_KEY,
   })
 
-  // The published CLI still uses the legacy anonymous get_user_id RPC removed
-  // by the advisory fix. Keep the repo's channel SDK tests stable with
-  // fixture-level shims until the CLI repo is updated.
+  // The published CLI still uses the legacy anonymous API key auth helpers
+  // removed by the advisory fix. Keep repo tests on repo-controlled shims
+  // until the CLI repo has its own compatible auth path.
   ;(sdk as any).addChannel = async ({ channelId, appId, default: isDefault, selfAssign }: {
     channelId: string
     appId: string
     default?: boolean
     selfAssign?: boolean
   }) => {
-    const app = await getAppRecord(appId)
-    if (!app)
-      return { success: false, error: `App ${appId} does not exist` }
+    const access = await getAuthorizedApp(apikey, appId, ['write', 'all'])
+    if ('error' in access)
+      return { success: false, error: access.error }
 
+    const { app } = access
     if (!app.owner_org)
       return { success: false, error: `App ${appId} does not have an owner organization` }
 
@@ -240,8 +583,9 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
   }
 
   ;(sdk as any).listChannels = async (appId: string) => {
-    if (!(await getAppRecord(appId)))
-      return { success: false, error: `App ${appId} does not exist` }
+    const access = await getAuthorizedApp(apikey, appId, ['read', 'upload', 'write', 'all'])
+    if ('error' in access)
+      return { success: false, error: access.error }
 
     const { data, error } = await getSupabaseClient()
       .from('channels')
@@ -287,8 +631,9 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
     device?: boolean
     prod?: boolean
   }) => {
-    if (!(await getAppRecord(appId)))
-      return { success: false, error: `App ${appId} does not exist` }
+    const access = await getAuthorizedApp(apikey, appId, ['write', 'all'])
+    if ('error' in access)
+      return { success: false, error: access.error }
 
     const existingChannel = await getChannelRecord(appId, channelId)
     if (!existingChannel)
@@ -329,8 +674,9 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
   }
 
   ;(sdk as any).deleteChannel = async (channelId: string, appId: string) => {
-    if (!(await getAppRecord(appId)))
-      return { success: false, error: `App ${appId} does not exist` }
+    const access = await getAuthorizedApp(apikey, appId, ['write', 'all'])
+    if ('error' in access)
+      return { success: false, error: access.error }
 
     const existingChannel = await getChannelRecord(appId, channelId)
     if (!existingChannel)
@@ -353,6 +699,142 @@ export function createTestSDK(apikey: string = APIKEY_TEST_ALL) {
     return { success: true }
   }
 
+  ;(sdk as any).getCurrentBundle = async (appId: string, channelId: string) => {
+    const access = await getAuthorizedApp(apikey, appId, ['read', 'write', 'all'])
+    if ('error' in access)
+      return { success: false, error: access.error }
+
+    const version = await getChannelVersionRecord(appId, channelId)
+    if (!version)
+      return { success: false, error: `Channel ${channelId} not found for app ${appId}` }
+
+    return {
+      success: true,
+      data: version.name,
+    }
+  }
+
+  ;(sdk as any).listApps = async () => {
+    const access = await getAppsForApiKey(apikey, ['read', 'upload', 'write', 'all'])
+    if ('error' in access)
+      return { success: false, error: access.error }
+
+    return {
+      success: true,
+      data: access.apps.map(app => ({
+        appId: app.app_id,
+        name: app.name || 'Unknown',
+        iconUrl: app.icon_url || undefined,
+        createdAt: new Date(app.created_at || ''),
+      })),
+    }
+  }
+
+  ;(sdk as any).checkBundleCompatibility = async ({
+    appId,
+    channel,
+    nodeModules,
+    packageJson,
+  }: {
+    appId: string
+    channel: string
+    nodeModules?: string
+    packageJson?: string
+  }) => {
+    const access = await getAuthorizedApp(apikey, appId, ['read', 'upload', 'write', 'all'])
+    if ('error' in access)
+      return { success: false, error: access.error }
+
+    try {
+      const data = await buildCompatibilityResult(appId, channel, packageJson, nodeModules)
+      return {
+        success: true,
+        data,
+      }
+    }
+    catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) }
+    }
+  }
+
+  ;(sdk as any).uploadBundle = async (options: UploadOptions) => {
+    const resolvedApiKey = options.apikey || apikey
+    const access = await getAuthorizedApp(resolvedApiKey, options.appId, ['upload', 'write', 'all'])
+    if ('error' in access)
+      return { success: false, error: access.error }
+
+    const { apiKey, app } = access
+    const bundleVersion = options.bundle
+    if (!bundleVersion)
+      return { success: false, error: 'Missing bundle version' }
+
+    const existingVersionId = await getVersionId(options.appId, bundleVersion)
+    if (existingVersionId)
+      return { success: false, error: `Version ${bundleVersion} already exists` }
+
+    try {
+      if (!options.disableCodeCheck && !(await hasNotifyAppReady(options.path)))
+        return { success: false, error: 'Missing notifyAppReady in bundle code' }
+
+      const uploadPayload = await buildUploadPayload(options.appId, options)
+      if ('error' in uploadPayload)
+        return { success: false, error: uploadPayload.error }
+
+      const currentChannelVersion = options.channel ? await getChannelVersionRecord(options.appId, options.channel) : null
+      if (currentChannelVersion?.checksum === uploadPayload.checksum) {
+        return {
+          success: false,
+          error: 'Cannot upload the same bundle content',
+        }
+      }
+
+      const minUpdateVersion = await resolveUploadMinUpdateVersion(
+        options.appId,
+        options.channel,
+        options.autoMinUpdateVersion,
+        options.minUpdateVersion,
+      )
+      if (minUpdateVersion.error)
+        return { success: false, error: minUpdateVersion.error }
+
+      const r2Path = `orgs/${app.owner_org}/apps/${options.appId}/${bundleVersion}.zip`
+      const versionId = await createBundleRecord(options.appId, bundleVersion, app, apiKey, {
+        checksum: uploadPayload.checksum,
+        comment: options.comment,
+        min_update_version: minUpdateVersion.minUpdateVersion,
+        native_packages: uploadPayload.nativePackages,
+        r2_path: r2Path,
+        session_key: uploadPayload.sessionKey,
+      })
+
+      await uploadBufferToStorage(r2Path, uploadPayload.zipBuffer)
+
+      if (options.channel) {
+        const channelRecord = await getChannelRecord(options.appId, options.channel)
+        if (!channelRecord)
+          return { success: false, error: `Channel ${options.channel} not found for app ${options.appId}` }
+
+        const { error } = await getSupabaseClient()
+          .from('channels')
+          .update({ version: versionId })
+          .eq('id', channelRecord.id)
+
+        if (error)
+          return { success: false, error: error.message }
+      }
+
+      return {
+        success: true,
+        checksum: uploadPayload.checksum,
+        sessionKey: uploadPayload.sessionKey,
+        storageProvider: 'r2-direct',
+      }
+    }
+    catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : String(error) }
+    }
+  }
+
   return sdk
 }
 
@@ -366,7 +848,7 @@ export async function uploadBundleSDK(
   channel?: string,
   additionalOptions?: Partial<UploadOptions>,
 ) {
-  const sdk = createTestSDK()
+  const sdk = createTestSDK(additionalOptions?.apikey ?? APIKEY_TEST_ALL)
 
   const options: UploadOptions = {
     appId,
