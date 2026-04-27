@@ -20,7 +20,7 @@ function buildAttachmentPath(orgId: string, appId: string, filename: string) {
 }
 
 async function createUploadScopedKey(appId: string, name: string): Promise<{ id: number, key: string }> {
-  const response = await fetch(`${BASE_URL}/apikey`, {
+  const response = await fetchWithRetry(`${BASE_URL}/apikey`, {
     method: 'POST',
     headers,
     body: JSON.stringify({
@@ -28,8 +28,10 @@ async function createUploadScopedKey(appId: string, name: string): Promise<{ id:
       mode: 'upload',
       limited_to_apps: [appId],
     }),
-  })
-  expect(response.status).toBe(200)
+  }, 5, 750)
+  if (response.status !== 200) {
+    throw new Error(`Failed to create upload-scoped key (${response.status}): ${await response.text()}`)
+  }
 
   const created = await response.json() as { id: number, key: string | null }
   let key = created.key

@@ -12,25 +12,16 @@
 import type { UploadOptions } from '@capgo/cli/sdk'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
-import { env } from 'node:process'
-import { CapgoSDK } from '@capgo/cli/sdk'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { createTestSDK } from './cli-sdk-utils'
 import { cleanupCli, getSemver, prepareCli, tempFileFolder } from './cli-utils'
 import { CLI_HASHED_APIKEY, CLI_HASHED_ORG_ID, CLI_HASHED_STRIPE_CUSTOMER_ID, CLI_HASHED_USER_ID, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils'
-
-// Supabase base URL (not including /functions/v1)
-const SUPABASE_URL = env.SUPABASE_URL || 'http://localhost:54321'
-const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY || 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH'
 
 /**
  * Create an SDK instance with the CLI hashed API key (isolated test data)
  */
 function createHashedKeySDK() {
-  return new CapgoSDK({
-    apikey: CLI_HASHED_APIKEY,
-    supaHost: SUPABASE_URL,
-    supaAnon: SUPABASE_ANON_KEY,
-  })
+  return createTestSDK(CLI_HASHED_APIKEY)
 }
 
 /**
@@ -73,7 +64,7 @@ async function retryUpload<T extends { success: boolean, error?: string }>(
   return lastResult!
 }
 
-describe('CLI operations with hashed API key', () => {
+describe('cli operations with hashed API key', () => {
   const id = randomUUID()
   const APPNAME = `com.cli_hashed_${id}`
 
