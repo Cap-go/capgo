@@ -415,6 +415,7 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
     // Insert manifest entries into the manifest table for each version
     // This is required for the bundle file list to show in the UI
     const manifestInserts: Database['public']['Tables']['manifest']['Insert'][] = []
+    const manifestCacheInserts: Database['public']['Tables']['app_version_manifest_cache']['Insert'][] = []
 
     for (const version of demoVersions) {
       if (version.name === 'unknown' || version.name === 'builtin')
@@ -425,6 +426,14 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
         continue
 
       const manifestEntries = getDemoManifest(version.name, appId)
+      manifestCacheInserts.push({
+        app_version_id: versionId,
+        entries: manifestEntries.map(entry => ({
+          file_name: entry.file_name,
+          file_hash: entry.file_hash,
+          s3_path: entry.s3_path,
+        })) as unknown as Database['public']['Tables']['app_version_manifest_cache']['Insert']['entries'],
+      })
       for (const entry of manifestEntries) {
         manifestInserts.push({
           app_version_id: versionId,
@@ -447,6 +456,15 @@ export async function createDemoApp(c: Context<MiddlewareKeyVariables>, body: Cr
       else {
         cloudlog({ requestId, message: 'Manifest entries created', count: manifestInserts.length })
       }
+    }
+
+    if (manifestCacheInserts.length > 0) {
+      const { error: manifestCacheError } = await supabase
+        .from('app_version_manifest_cache')
+        .upsert(manifestCacheInserts, { onConflict: 'app_version_id' })
+
+      if (manifestCacheError)
+        cloudlog({ requestId, message: 'Error creating manifest cache rows', error: manifestCacheError })
     }
 
     // Demo channels configuration

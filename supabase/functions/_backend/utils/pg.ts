@@ -401,13 +401,7 @@ function getSchemaUpdatesAlias(includeMetadata = false) {
     allow_device_self_set: channelAlias.allow_device_self_set,
     public: channelAlias.public,
   }
-  const manifestSelect = sql<{ file_name: string, file_hash: string, s3_path: string }[]>`COALESCE(json_agg(
-        json_build_object(
-          'file_name', ${schema.manifest.file_name},
-          'file_hash', ${schema.manifest.file_hash},
-          's3_path', ${schema.manifest.s3_path}
-        )
-      ) FILTER (WHERE ${schema.manifest.file_name} IS NOT NULL), '[]'::json)`
+  const manifestSelect = sql<{ file_name: string, file_hash: string, s3_path: string }[]>`COALESCE(${schema.app_version_manifest_cache.entries}, '[]'::jsonb)`
   return { versionSelect, channelDevicesAlias, channelAlias, channelSelect, manifestSelect, versionAlias }
 }
 
@@ -449,10 +443,9 @@ export function requestInfosChannelDevicePostgres(
     .innerJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
 
   const channelDevice = (includeManifest
-    ? baseQuery.leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
+    ? baseQuery.leftJoin(schema.app_version_manifest_cache, eq(schema.app_version_manifest_cache.app_version_id, versionAlias.id))
     : baseQuery)
     .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
-    .groupBy(channelDevicesAlias.device_id, channelDevicesAlias.app_id, channelAlias.id, versionAlias.id)
     .limit(1)
   cloudlog({ requestId: c.get('requestId'), message: 'channelDevice Query:', channelDeviceQuery: channelDevice.toSQL() })
 
@@ -482,7 +475,7 @@ export function requestInfosChannelPostgres(
     .innerJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
 
   const channelQuery = (includeManifest
-    ? baseQuery.leftJoin(schema.manifest, eq(schema.manifest.app_version_id, versionAlias.id))
+    ? baseQuery.leftJoin(schema.app_version_manifest_cache, eq(schema.app_version_manifest_cache.app_version_id, versionAlias.id))
     : baseQuery)
     .where(
       !defaultChannel
@@ -496,7 +489,6 @@ export function requestInfosChannelPostgres(
             eq(channelAlias.name, defaultChannel),
           ),
     )
-    .groupBy(channelAlias.id, versionAlias.id)
     .limit(1)
   cloudlog({ requestId: c.get('requestId'), message: 'channel Query:', channelQuery: channelQuery.toSQL() })
   const channel = channelQuery.then(data => data.at(0))

@@ -12,6 +12,12 @@ import { createStatsMeta } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 import { backgroundTask } from '../utils/utils.ts'
 
+interface ManifestCacheEntry {
+  file_name: string
+  file_hash: string
+  s3_path: string
+}
+
 /**
  * Resolves `owner_org` for an app version row.
  *
@@ -79,6 +85,38 @@ async function v2PathSize(c: Context, record: Database['public']['Tables']['app_
   return true
 }
 
+function buildManifestCacheEntries(entries: ManifestCacheEntry[]): Database['public']['Tables']['app_version_manifest_cache']['Insert']['entries'] {
+  return entries.map(entry => ({
+    file_name: entry.file_name,
+    file_hash: entry.file_hash,
+    s3_path: entry.s3_path,
+  })) as unknown as Database['public']['Tables']['app_version_manifest_cache']['Insert']['entries']
+}
+
+async function upsertManifestCache(c: Context, appVersionId: number, entries: ManifestCacheEntry[]) {
+  const { error: cacheError } = await supabaseAdmin(c)
+    .from('app_version_manifest_cache')
+    .upsert({
+      app_version_id: appVersionId,
+      entries: buildManifestCacheEntries(entries),
+    }, {
+      onConflict: 'app_version_id',
+    })
+
+  if (cacheError)
+    cloudlog({ requestId: c.get('requestId'), message: 'error upsert manifest cache', error: cacheError, appVersionId })
+}
+
+async function deleteManifestCache(c: Context, appVersionId: number) {
+  const { error: cacheDeleteError } = await supabaseAdmin(c)
+    .from('app_version_manifest_cache')
+    .delete()
+    .eq('app_version_id', appVersionId)
+
+  if (cacheDeleteError)
+    cloudlog({ requestId: c.get('requestId'), message: 'error delete manifest cache', error: cacheDeleteError, appVersionId })
+}
+
 /**
  * Persists manifest rows and updates aggregate counters when a version includes a manifest payload.
  */
@@ -93,54 +131,63 @@ async function handleManifest(c: Context, record: Database['public']['Tables']['
     .eq('app_version_id', record.id)
     .limit(1)
 
+  const validEntries = manifestEntries
+    .filter(entry => entry.file_name && entry.file_hash && entry.s3_path)
+    .map(entry => ({
+      app_version_id: record.id,
+      file_name: entry.file_name!,
+      file_hash: entry.file_hash!,
+      s3_path: entry.s3_path!,
+      file_size: 0,
+    }))
+
   // Only create entries if none exist
-  if (!existingEntries?.length && manifestEntries.length > 0) {
-    const validEntries = manifestEntries
-      .filter(entry => entry.file_name && entry.file_hash && entry.s3_path)
-      .map(entry => ({
-        app_version_id: record.id,
-        file_name: entry.file_name!,
-        file_hash: entry.file_hash!,
-        s3_path: entry.s3_path!,
-        file_size: 0,
-      }))
+  let hasManifestRows = Boolean(existingEntries?.length)
+  if (!existingEntries?.length && validEntries.length > 0) {
+    const { error: insertError } = await supabaseAdmin(c)
+      .from('manifest')
+      .insert(validEntries)
+    if (insertError) {
+      cloudlog({ requestId: c.get('requestId'), message: 'error insert manifest', error: insertError })
+    }
+    else {
+      hasManifestRows = true
+      // Update manifest_count on the version
+      const { error: countError } = await supabaseAdmin(c)
+        .from('app_versions')
+        .update({ manifest_count: validEntries.length })
+        .eq('id', record.id)
+      if (countError)
+        cloudlog({ requestId: c.get('requestId'), message: 'error update manifest_count', error: countError })
 
-    if (validEntries.length > 0) {
-      const { error: insertError } = await supabaseAdmin(c)
-        .from('manifest')
-        .insert(validEntries)
-      if (insertError) {
-        cloudlog({ requestId: c.get('requestId'), message: 'error insert manifest', error: insertError })
+      // Increment manifest_bundle_count on the app using raw SQL
+      const pgClient = getPgClient(c, false)
+      try {
+        await pgClient.query(
+          `UPDATE apps
+           SET manifest_bundle_count = manifest_bundle_count + 1,
+               updated_at = now()
+           WHERE app_id = $1`,
+          [record.app_id],
+        )
       }
-      else {
-        // Update manifest_count on the version
-        const { error: countError } = await supabaseAdmin(c)
-          .from('app_versions')
-          .update({ manifest_count: validEntries.length })
-          .eq('id', record.id)
-        if (countError)
-          cloudlog({ requestId: c.get('requestId'), message: 'error update manifest_count', error: countError })
-
-        // Increment manifest_bundle_count on the app using raw SQL
-        const pgClient = getPgClient(c, false)
-        try {
-          await pgClient.query(
-            `UPDATE apps
-             SET manifest_bundle_count = manifest_bundle_count + 1,
-                 updated_at = now()
-             WHERE app_id = $1`,
-            [record.app_id],
-          )
-        }
-        catch (error) {
-          cloudlog({ requestId: c.get('requestId'), message: 'error update manifest_bundle_count', error })
-        }
-        finally {
-          await closeClient(c, pgClient)
-        }
+      catch (error) {
+        cloudlog({ requestId: c.get('requestId'), message: 'error update manifest_bundle_count', error })
+      }
+      finally {
+        await closeClient(c, pgClient)
       }
     }
   }
+
+  if (hasManifestRows && validEntries.length > 0) {
+    await upsertManifestCache(c, record.id, validEntries.map(entry => ({
+      file_name: entry.file_name,
+      file_hash: entry.file_hash,
+      s3_path: entry.s3_path,
+    })))
+  }
+
   // delete manifest in app_versions
   const { error: deleteError } = await supabaseAdmin(c)
     .from('app_versions')
@@ -206,9 +253,9 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
       .from(manifest)
       .where(eq(manifest.app_version_id, record.id))
 
-    if (manifestEntries && manifestEntries.length > 0) {
-      const manifestCount = manifestEntries.length
+    const manifestCount = Math.max(record.manifest_count ?? 0, manifestEntries?.length ?? 0)
 
+    if (manifestEntries && manifestEntries.length > 0) {
       // Delete each file from S3
       const promisesDeleteS3 = []
       for (const entry of manifestEntries) {
@@ -252,7 +299,9 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
         }
       }
       await backgroundTask(c, Promise.all(promisesDeleteS3))
+    }
 
+    if (manifestCount > 0) {
       // After deleting manifest entries, update manifest_count and decrement manifest_bundle_count
       const updatePgClient = getPgClient(c, false)
       try {
@@ -261,16 +310,13 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
           [record.id],
         )
 
-        // Only decrement if this version had manifests
-        if (manifestCount > 0) {
-          await updatePgClient.query(
-            `UPDATE apps
-             SET manifest_bundle_count = GREATEST(manifest_bundle_count - 1, 0),
-                 updated_at = now()
-             WHERE app_id = $1`,
-            [record.app_id],
-          )
-        }
+        await updatePgClient.query(
+          `UPDATE apps
+           SET manifest_bundle_count = GREATEST(manifest_bundle_count - 1, 0),
+               updated_at = now()
+           WHERE app_id = $1`,
+          [record.app_id],
+        )
       }
       catch (error) {
         cloudlog({ requestId: c.get('requestId'), message: 'error update counters on delete', error })
@@ -286,6 +332,8 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
   finally {
     await closeClient(c, pgClient)
   }
+
+  await deleteManifestCache(c, record.id)
 }
 
 export async function deleteIt(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {

@@ -2,6 +2,12 @@ import { bigint, boolean, integer, jsonb, pgEnum, pgTable, primaryKey, serial, t
 
 // do_not_change
 
+interface ManifestCacheEntry {
+  file_name: string
+  file_hash: string
+  s3_path: string
+}
+
 export const disableUpdatePgEnum = pgEnum('disable_update', ['major', 'minor', 'patch', 'version_number', 'none'])
 export const keyModePgEnum = pgEnum('key_mode', ['read', 'write', 'all', 'upload'])
 export const userMinRightPgEnum = pgEnum('user_min_right', [
@@ -64,6 +70,13 @@ export const manifest = pgTable('manifest', {
   s3_path: varchar('s3_path').notNull(),
   file_hash: varchar('file_hash').notNull(),
   file_size: bigint('file_size', { mode: 'number' }).default(0),
+})
+
+export const app_version_manifest_cache = pgTable('app_version_manifest_cache', {
+  app_version_id: bigint('app_version_id', { mode: 'number' }).primaryKey().notNull().references(() => app_versions.id, { onDelete: 'cascade' }),
+  created_at: timestamp('created_at').notNull().defaultNow(),
+  updated_at: timestamp('updated_at').notNull().defaultNow(),
+  entries: jsonb('entries').$type<ManifestCacheEntry[]>().notNull(),
 })
 
 export const channels = pgTable('channels', {

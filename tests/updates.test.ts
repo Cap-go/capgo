@@ -418,6 +418,8 @@ describe('manifest bundle count gating', () => {
       await supabase.from('manifest').delete().in('id', insertedManifestIds)
       insertedManifestIds.length = 0
     }
+    await supabase.from('app_version_manifest_cache').delete().eq('app_version_id', baseVersionId)
+    await supabase.from('app_versions').update({ manifest_count: 0 }).eq('id', baseVersionId)
     await supabase.from('apps').update({ manifest_bundle_count: 0 }).eq('app_id', APP_NAME_UPDATE)
   })
 
@@ -437,6 +439,29 @@ describe('manifest bundle count gating', () => {
     if (error || !data)
       throw error ?? new Error('Failed to seed manifest entry')
     insertedManifestIds.push(data.id)
+
+    const { error: cacheError } = await supabase
+      .from('app_version_manifest_cache')
+      .upsert({
+        app_version_id: baseVersionId,
+        entries: [{
+          file_name: fileName,
+          file_hash: `hash-${suffix}`,
+          s3_path: `tests/${fileName}`,
+        }],
+      }, {
+        onConflict: 'app_version_id',
+      })
+    if (cacheError)
+      throw cacheError
+
+    const { error: manifestCountError } = await supabase
+      .from('app_versions')
+      .update({ manifest_count: 1 })
+      .eq('id', baseVersionId)
+    if (manifestCountError)
+      throw manifestCountError
+
     return fileName
   }
 
