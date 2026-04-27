@@ -1,18 +1,44 @@
+import type { Database } from '../src/types/supabase.types'
 import { randomUUID } from 'node:crypto'
+import { env } from 'node:process'
+import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, fetchWithRetry, getAuthHeaders, getSupabaseClient, ORG_ID, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, fetchWithRetry, getAuthHeaders, getSupabaseClient, normalizeLocalhostUrl, ORG_ID, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.app.expiration.${id}`
+const POLICY_APPNAME = `com.app.expiration.policy.${id}`
 
 // Org for testing expiration policies
 const POLICY_ORG_ID = randomUUID()
 const POLICY_ORG_CUSTOMER_ID = `cus_test_policy_${id}`
 const POLICY_ORG_NAME = `Test Policy Org ${id}`
 let authHeaders: Record<string, string>
+let policyAppUuid: string
 
 function apiFetch(path: string, init?: RequestInit) {
   return fetchWithRetry(`${BASE_URL}${path}`, init)
+}
+
+function createAuthenticatedSupabaseClient(headers: Record<string, string>) {
+  const supabaseUrl = normalizeLocalhostUrl(env.SUPABASE_URL)
+  const supabaseAnonKey = env.SUPABASE_ANON_KEY
+  const authorization = headers.Authorization ?? headers.authorization
+
+  if (!supabaseUrl || !supabaseAnonKey || !authorization) {
+    throw new Error('Missing Supabase auth environment for authenticated client')
+  }
+
+  return createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    global: {
+      headers: {
+        Authorization: authorization,
+      },
+    },
+    auth: {
+      persistSession: false,
+    },
+  })
 }
 
 beforeAll(async () => {
@@ -42,10 +68,28 @@ beforeAll(async () => {
   })
   if (orgError)
     throw orgError
+
+  await resetAndSeedAppData(POLICY_APPNAME, {
+    orgId: POLICY_ORG_ID,
+    stripeCustomerId: POLICY_ORG_CUSTOMER_ID,
+    userId: USER_ID,
+  })
+
+  const { data: policyApp, error: policyAppError } = await getSupabaseClient()
+    .from('apps')
+    .select('id')
+    .eq('app_id', POLICY_APPNAME)
+    .single()
+
+  if (policyAppError || !policyApp?.id)
+    throw policyAppError ?? new Error('Missing policy app')
+
+  policyAppUuid = policyApp.id
 })
 
 afterAll(async () => {
   await resetAppData(APPNAME)
+  await resetAppData(POLICY_APPNAME)
   // Clean up policy org
   await getSupabaseClient().from('orgs').delete().eq('id', POLICY_ORG_ID)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', POLICY_ORG_CUSTOMER_ID)
@@ -324,6 +368,72 @@ describe('organization API key expiration policy', () => {
     expect(response.status).toBe(200)
     expect(data).toHaveProperty('key')
     // Should succeed even without expiration since org doesn't require it
+  })
+
+  it('fail to create app-scoped api key without expiration for org requiring expiration', async () => {
+    const response = await apiFetch('/apikey', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        name: 'key-policy-app-scope',
+        app_id: policyAppUuid,
+      }),
+    })
+    const data = await response.json() as { error: string }
+    expect(response.status).toBe(400)
+    expect(data.error).toBe('expiration_required')
+  })
+
+  it('fail to create app-scoped api key with expiration exceeding org max days', async () => {
+    const tooFarDate = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString()
+    const response = await apiFetch('/apikey', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        name: 'key-policy-app-scope-too-far',
+        limited_to_apps: [POLICY_APPNAME],
+        expires_at: tooFarDate,
+      }),
+    })
+    const data = await response.json() as { error: string }
+    expect(response.status).toBe(400)
+    expect(data.error).toBe('expiration_exceeds_max')
+  })
+
+  it('reject direct apikey inserts that bypass app-scoped expiration policy', async () => {
+    const supabase = createAuthenticatedSupabaseClient(authHeaders)
+    const { data, error } = await supabase
+      .from('apikeys')
+      .insert({
+        user_id: USER_ID,
+        key: null,
+        key_hash: null,
+        mode: 'all',
+        name: 'direct-insert-policy-bypass',
+        limited_to_apps: [POLICY_APPNAME],
+        limited_to_orgs: [],
+        expires_at: null,
+      })
+      .select()
+      .single()
+
+    expect(data).toBeNull()
+    expect(error?.message).toBe('expiration_required')
+  })
+
+  it('reject hashed apikey RPC creation that exceeds app owner org max expiration', async () => {
+    const supabase = createAuthenticatedSupabaseClient(authHeaders)
+    const tooFarDate = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString()
+    const { data, error } = await supabase.rpc('create_hashed_apikey', {
+      p_mode: 'all',
+      p_name: 'direct-rpc-policy-bypass',
+      p_limited_to_orgs: [],
+      p_limited_to_apps: [POLICY_APPNAME],
+      p_expires_at: tooFarDate,
+    })
+
+    expect(data).toBeNull()
+    expect(error?.message).toBe('expiration_exceeds_max')
   })
 })
 

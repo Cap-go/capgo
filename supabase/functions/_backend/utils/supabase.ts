@@ -1542,6 +1542,38 @@ export function validateExpirationDate(expiresAt: string | null | undefined): vo
 }
 
 /**
+ * Resolve all organization IDs affected by API key scopes.
+ * App-scoped keys inherit expiration policy from the app owner organization.
+ */
+export async function resolveApikeyPolicyOrgIds(
+  supabase: SupabaseClient<Database>,
+  options: {
+    limitedToApps?: string[] | null
+    limitedToOrgs?: string[] | null
+  },
+): Promise<string[]> {
+  const orgIds = new Set((options.limitedToOrgs ?? []).filter(Boolean))
+  const limitedToApps = [...new Set((options.limitedToApps ?? []).filter(Boolean))]
+
+  if (limitedToApps.length === 0) {
+    return [...orgIds]
+  }
+
+  const { data: apps } = await supabase
+    .from('apps')
+    .select('owner_org')
+    .in('app_id', limitedToApps)
+
+  for (const app of apps ?? []) {
+    if (app.owner_org) {
+      orgIds.add(app.owner_org)
+    }
+  }
+
+  return [...orgIds]
+}
+
+/**
  * Validate API key expiration against org policies for multiple orgs.
  * Throws simpleError if any org policy is violated.
  * @param orgIds - Array of org IDs to validate against
