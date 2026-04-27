@@ -73,9 +73,11 @@ BEGIN
     LIMIT 1;
 
     IF v_channel_uuid IS NOT NULL THEN
-      IF v_app_uuid IS NULL THEN
-        SELECT id INTO v_app_uuid FROM public.apps WHERE app_id = v_channel_app_id LIMIT 1;
-      END IF;
+      SELECT id, owner_org INTO v_app_uuid, v_org_id
+      FROM public.apps
+      WHERE app_id = v_channel_app_id
+      LIMIT 1;
+
       IF v_org_id IS NULL THEN
         v_org_id := v_channel_org_id;
       END IF;
