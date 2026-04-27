@@ -72,6 +72,57 @@ describe('stripe revenue movement classification', () => {
     })
   })
 
+  it.concurrent('tracks monthly to yearly cadence upgrades for admin metrics even when MRR stays flat', () => {
+    const movement = stripeEventTestUtils.classifyRevenueMovement(
+      {
+        is_good_plan: true,
+        paid_at: '2026-04-01T00:00:00.000Z',
+        price_id: 'price_solo_monthly',
+        product_id: 'prod_solo',
+        status: 'succeeded',
+      },
+      {
+        is_good_plan: true,
+        paid_at: '2026-04-01T00:00:00.000Z',
+        price_id: 'price_solo_yearly',
+        product_id: 'prod_solo',
+        status: 'succeeded',
+      },
+      plans as any,
+    )
+
+    expect(movement).toMatchObject({
+      currentMrr: 12,
+      nextMrr: 10,
+      newBusinessMrr: 0,
+      expansionMrr: 0,
+      contractionMrr: 2,
+      churnMrr: 0,
+    })
+    expect(stripeEventTestUtils.shouldTrackOrganizationUpgrade(true, movement)).toBe(true)
+  })
+
+  it.concurrent('does not track first-time subscriptions as organization upgrades for admin metrics', () => {
+    const movement = stripeEventTestUtils.classifyRevenueMovement(
+      {
+        paid_at: null,
+        price_id: null,
+        product_id: null,
+        status: 'created',
+      },
+      {
+        is_good_plan: true,
+        paid_at: '2026-04-22T12:00:00.000Z',
+        price_id: 'price_solo_monthly',
+        product_id: 'prod_solo',
+        status: 'succeeded',
+      },
+      plans as any,
+    )
+
+    expect(stripeEventTestUtils.shouldTrackOrganizationUpgrade(false, movement)).toBe(false)
+  })
+
   it.concurrent('records downgrades as contraction MRR', () => {
     expect(stripeEventTestUtils.classifyRevenueMovement(
       {
