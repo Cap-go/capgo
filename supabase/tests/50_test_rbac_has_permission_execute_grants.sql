@@ -8,11 +8,14 @@ SELECT
             SELECT 1
             FROM pg_proc p
             CROSS JOIN LATERAL aclexplode(COALESCE(p.proacl, acldefault('f', p.proowner))) AS acl
-            JOIN pg_roles grantee_role
+            LEFT JOIN pg_roles grantee_role
               ON grantee_role.oid = acl.grantee
             WHERE p.oid = 'public.rbac_has_permission(text, uuid, text, uuid, character varying, bigint)'::regprocedure
-              AND grantee_role.rolname = 'authenticated'
               AND acl.privilege_type = 'EXECUTE'
+              AND (
+                  grantee_role.rolname = 'authenticated'
+                  OR acl.grantee = 0
+              )
         ),
         false,
         'authenticated does not have EXECUTE on public.rbac_has_permission'
