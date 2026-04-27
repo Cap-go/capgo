@@ -1,4 +1,5 @@
 import type { PoolClient } from 'pg'
+import { randomUUID } from 'node:crypto'
 /**
  * RBAC Permission System Tests
  *
@@ -126,6 +127,56 @@ describe('rbac permission system', () => {
 
         expect(result.rows[0].allowed).toBe(false)
       })
+
+      it('should deny org permissions outside limited_to_orgs for scoped api keys', async () => {
+        const allowedOrgId = randomUUID()
+        const targetOrgId = randomUUID()
+        const scopedKey = `legacy-scope-${randomUUID()}`
+
+        await query(`
+          INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
+          VALUES
+            ($1::uuid, $3, $5, $6::uuid, false),
+            ($2::uuid, $4, $5, $6::uuid, false)
+        `, [allowedOrgId, targetOrgId, `Legacy Allowed ${allowedOrgId}`, `Legacy Target ${targetOrgId}`, `legacy-scope-${randomUUID()}@capgo.app`, USER_ID])
+
+        await query(`
+          INSERT INTO public.org_users (org_id, user_id, user_right)
+          VALUES
+            ($1::uuid, $3::uuid, 'super_admin'),
+            ($2::uuid, $3::uuid, 'super_admin')
+        `, [allowedOrgId, targetOrgId, USER_ID])
+
+        await query(`
+          INSERT INTO public.apikeys (user_id, key, key_hash, mode, name, limited_to_orgs, limited_to_apps)
+          VALUES ($1::uuid, $2, NULL, 'write', $3, ARRAY[$4::uuid], ARRAY[]::text[])
+        `, [USER_ID, scopedKey, `Legacy scoped ${allowedOrgId}`, allowedOrgId])
+
+        const deniedResult = await query(`
+          SELECT public.rbac_check_permission_direct(
+            'org.delete',
+            $1::uuid,
+            $2::uuid,
+            NULL::text,
+            NULL::bigint,
+            $3
+          ) AS allowed
+        `, [USER_ID, targetOrgId, scopedKey])
+
+        const allowedResult = await query(`
+          SELECT public.rbac_check_permission_direct(
+            'org.delete',
+            $1::uuid,
+            $2::uuid,
+            NULL::text,
+            NULL::bigint,
+            $3
+          ) AS allowed
+        `, [USER_ID, allowedOrgId, scopedKey])
+
+        expect(deniedResult.rows[0].allowed).toBe(false)
+        expect(allowedResult.rows[0].allowed).toBe(true)
+      })
     })
 
     describe('rbac mode (use_new_rbac = true)', () => {
@@ -200,6 +251,72 @@ describe('rbac permission system', () => {
         `, [APIKEY_TEST_ALL, TEST_APP_ID])
 
         expect(result.rows[0].perm).toBe('perm_owner')
+      })
+
+      it('should deny org permissions outside limited_to_orgs for scoped api keys', async () => {
+        const allowedOrgId = randomUUID()
+        const targetOrgId = randomUUID()
+        const scopedKey = `rbac-scope-${randomUUID()}`
+
+        await query(`
+          INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
+          VALUES
+            ($1::uuid, $3, $5, $6::uuid, true),
+            ($2::uuid, $4, $5, $6::uuid, true)
+        `, [allowedOrgId, targetOrgId, `RBAC Allowed ${allowedOrgId}`, `RBAC Target ${targetOrgId}`, `rbac-scope-${randomUUID()}@capgo.app`, USER_ID])
+
+        await query(`
+          INSERT INTO public.apikeys (user_id, key, key_hash, mode, name, limited_to_orgs, limited_to_apps)
+          VALUES ($1::uuid, $2, NULL, 'write', $3, ARRAY[$4::uuid], ARRAY[]::text[])
+        `, [USER_ID, scopedKey, `RBAC scoped ${allowedOrgId}`, allowedOrgId])
+
+        const apiKeyResult = await query(`
+          SELECT rbac_id
+          FROM public.apikeys
+          WHERE key = $1
+          LIMIT 1
+        `, [scopedKey])
+        const apiKeyRbacId = apiKeyResult.rows[0]?.rbac_id
+        expect(apiKeyRbacId).toBeTruthy()
+
+        await query(`
+          INSERT INTO public.role_bindings (principal_type, principal_id, role_id, scope_type, org_id, granted_by)
+          SELECT
+            'apikey',
+            $1::uuid,
+            r.id,
+            'org',
+            $2::uuid,
+            $3::uuid
+          FROM public.roles r
+          WHERE r.name = 'org_super_admin'
+          LIMIT 1
+        `, [apiKeyRbacId, allowedOrgId, USER_ID])
+
+        const deniedResult = await query(`
+          SELECT public.rbac_check_permission_direct(
+            'org.delete',
+            $1::uuid,
+            $2::uuid,
+            NULL::text,
+            NULL::bigint,
+            $3
+          ) AS allowed
+        `, [USER_ID, targetOrgId, scopedKey])
+
+        const allowedResult = await query(`
+          SELECT public.rbac_check_permission_direct(
+            'org.delete',
+            $1::uuid,
+            $2::uuid,
+            NULL::text,
+            NULL::bigint,
+            $3
+          ) AS allowed
+        `, [USER_ID, allowedOrgId, scopedKey])
+
+        expect(deniedResult.rows[0].allowed).toBe(false)
+        expect(allowedResult.rows[0].allowed).toBe(true)
       })
     })
 
