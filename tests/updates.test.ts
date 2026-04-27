@@ -415,12 +415,12 @@ describe('manifest bundle count gating', () => {
 
   afterEach(async () => {
     if (insertedManifestIds.length > 0) {
-      await supabase.from('manifest').delete().in('id', insertedManifestIds)
+      await supabase.from('manifest').delete().in('id', insertedManifestIds).throwOnError()
       insertedManifestIds.length = 0
     }
     await supabase.from('app_version_manifest_cache').delete().eq('app_version_id', baseVersionId).throwOnError()
-    await supabase.from('app_versions').update({ manifest_count: 0 }).eq('id', baseVersionId)
-    await supabase.from('apps').update({ manifest_bundle_count: 0 }).eq('app_id', APP_NAME_UPDATE)
+    await supabase.from('app_versions').update({ manifest_count: 0 }).eq('id', baseVersionId).throwOnError()
+    await supabase.from('apps').update({ manifest_bundle_count: 0 }).eq('app_id', APP_NAME_UPDATE).throwOnError()
   })
 
   async function seedManifestEntry() {
