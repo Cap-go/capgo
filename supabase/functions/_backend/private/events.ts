@@ -15,17 +15,26 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('/', useCors)
 
+interface ResolvedTrackingId {
+  trackingUserId: string
+  // Only set when we've verified the id refers to an organization the caller
+  // can access. Events for a bare authenticated user (no requestedUserId, or
+  // requestedUserId === authUserId) leave this undefined so we don't pollute
+  // the PostHog `organization` group with user UUIDs.
+  orgId?: string
+}
+
 async function resolveTrackingUserId(
   c: Context<MiddlewareKeyVariables>,
   requestedUserId: string | undefined,
   appId: string | undefined,
   notifyConsole = false,
-) {
+): Promise<ResolvedTrackingId> {
   const forbiddenError = notifyConsole ? 'Forbidden' : 'no_permission'
   const authUserId = c.get('auth')?.userId ?? ''
 
   if (!requestedUserId || requestedUserId === authUserId) {
-    return authUserId
+    return { trackingUserId: authUserId }
   }
 
   if (appId) {
@@ -44,11 +53,11 @@ async function resolveTrackingUserId(
       throw quickError(403, forbiddenError, 'You cannot send events for this organization')
     }
 
-    return requestedUserId
+    return { trackingUserId: requestedUserId, orgId: requestedUserId }
   }
 
   if (await checkPermission(c, 'org.read', { orgId: requestedUserId })) {
-    return requestedUserId
+    return { trackingUserId: requestedUserId, orgId: requestedUserId }
   }
 
   throw quickError(403, forbiddenError, 'You cannot send events for this organization')
@@ -83,7 +92,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     : typeof body.tags?.app_id === 'string'
       ? body.tags.app_id
       : undefined
-  const trackingUserId = await resolveTrackingUserId(c, requestedUserId, appId, Boolean(body.notifyConsole))
+  const { trackingUserId, orgId: verifiedOrgId } = await resolveTrackingUserId(c, requestedUserId, appId, Boolean(body.notifyConsole))
   const trackedBody = requestedUserId ? { ...trackOptions, user_id: trackingUserId } : trackOptions
 
   // notifyConsole: broadcast to Supabase Realtime only, skip all tracking
@@ -99,7 +108,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
         description: trackedBody.description,
         icon: trackedBody.icon,
         app_id: appId,
-        org_id: trackingUserId,
+        org_id: requestedOrgId,
         channel_name: typeof trackedBody.tags?.channel === 'string' ? trackedBody.tags.channel : undefined,
         bundle_name: typeof trackedBody.tags?.bundle === 'string' ? trackedBody.tags.bundle : undefined,
         timestamp: new Date().toISOString(),
@@ -146,6 +155,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
     ...trackedBody,
     bento: onboardingBentoEvent,
     sentToBento: Boolean(onboardingBentoEvent),
+    groups: verifiedOrgId ? { organization: verifiedOrgId } : undefined,
   })
 
   return c.json(BRES)

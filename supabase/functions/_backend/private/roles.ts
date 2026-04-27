@@ -7,6 +7,13 @@ import { getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { schema } from '../utils/postgres_schema.ts'
 import { version } from '../utils/version.ts'
 
+const ROLE_SCOPE_TYPES = ['org', 'app', 'channel'] as const
+type RoleScopeType = (typeof ROLE_SCOPE_TYPES)[number]
+
+function isRoleScopeType(value: string | undefined): value is RoleScopeType {
+  return value != null && ROLE_SCOPE_TYPES.includes(value as RoleScopeType)
+}
+
 export const app = createHono('', version)
 
 app.use('*', useCors)
@@ -60,7 +67,7 @@ app.get('/:scope_type', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json({ error: 'Unauthorized' }, 401)
   }
 
-  if (!['org', 'app', 'channel'].includes(scopeType)) {
+  if (!isRoleScopeType(scopeType)) {
     return c.json({ error: 'Invalid scope_type' }, 400)
   }
 

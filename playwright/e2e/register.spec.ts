@@ -1,4 +1,18 @@
+import type { Page } from '@playwright/test'
 import { expect, test } from '../support/commands'
+
+async function expectProtectedRouteRedirect(page: Page, targetPath: string, expectedUrl: RegExp, expectedSelector: string) {
+  const redirectedPage = await page.context().newPage()
+
+  try {
+    await redirectedPage.goto(targetPath, { waitUntil: 'commit' })
+    await redirectedPage.waitForURL(expectedUrl)
+    await expect(redirectedPage.locator(expectedSelector)).toBeVisible()
+  }
+  finally {
+    await redirectedPage.close()
+  }
+}
 
 test.describe('Registration', () => {
   test.beforeEach(async ({ page }) => {
@@ -17,8 +31,8 @@ test.describe('Registration', () => {
     await page.click('[data-test="submit"]')
 
     await page.waitForURL(/\/onboarding\/organization/)
-    await page.goto('/apps')
-    await page.waitForURL(/\/onboarding\/organization/)
+    await expect(page.locator('[data-test="onboarding-mode-name"]')).toBeVisible()
+    await expectProtectedRouteRedirect(page, '/apps', /\/onboarding\/organization/, '[data-test="onboarding-mode-name"]')
 
     await page.click('[data-test="onboarding-mode-name"]')
     await page.fill('[data-test="onboarding-org-name"]', `No Org E2E ${uniqueSuffix}`)
@@ -29,7 +43,25 @@ test.describe('Registration', () => {
 
     await page.waitForURL(/step=invite/)
     await page.click('[data-test="onboarding-finish"]')
-    await page.waitForURL('/apps')
+    await page.waitForURL('/app/new')
+  })
+
+  test('should allow new users to log out from org onboarding', async ({ page }) => {
+    const uniqueSuffix = Date.now()
+    const email = `no-org-logout-e2e-${uniqueSuffix}@example.com`
+
+    await page.fill('[data-test="email"]', email)
+    await page.fill('[data-test="first_name"]', 'Wrong')
+    await page.fill('[data-test="last_name"]', 'Account')
+    await page.fill('[data-test="password"]', 'Password123!')
+    await page.fill('[data-test="confirm-password"]', 'Password123!')
+    await page.click('[data-test="submit"]')
+
+    await page.waitForURL(/\/onboarding\/organization/)
+    await page.click('[data-test="onboarding-logout"]')
+
+    await page.waitForURL(/\/login\/?$/)
+    await expectProtectedRouteRedirect(page, '/apps', /\/login/, '[data-test="continue"]')
   })
 
   test('should show error for existing email', async ({ page }) => {

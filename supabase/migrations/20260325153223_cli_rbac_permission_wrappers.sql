@@ -46,13 +46,13 @@ REVOKE ALL ON FUNCTION "public"."cli_check_permission"(
   "app_id" "text",
   "channel_id" bigint
 ) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION "public"."cli_check_permission"(
+GRANT EXECUTE ON FUNCTION "public"."cli_check_permission"(
   "apikey" "text",
   "permission_key" "text",
   "org_id" "uuid",
   "app_id" "text",
   "channel_id" bigint
-) FROM "anon";
+) TO "anon";
 GRANT EXECUTE ON FUNCTION "public"."cli_check_permission"(
   "apikey" "text",
   "permission_key" "text",
@@ -112,9 +112,9 @@ ALTER FUNCTION "public"."get_accessible_apps_for_apikey_v2"(
 REVOKE ALL ON FUNCTION "public"."get_accessible_apps_for_apikey_v2"(
   "apikey" "text"
 ) FROM PUBLIC;
-REVOKE EXECUTE ON FUNCTION "public"."get_accessible_apps_for_apikey_v2"(
+GRANT EXECUTE ON FUNCTION "public"."get_accessible_apps_for_apikey_v2"(
   "apikey" "text"
-) FROM "anon";
+) TO "anon";
 GRANT EXECUTE ON FUNCTION "public"."get_accessible_apps_for_apikey_v2"(
   "apikey" "text"
 ) TO "authenticated";

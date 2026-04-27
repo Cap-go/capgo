@@ -18,7 +18,7 @@ interface RoleBindingBody {
   scope_type: (typeof SCOPE_TYPES)[number]
   org_id: string
   app_id?: string
-  channel_id?: number
+  channel_id?: string | number | null
   reason?: string
 }
 
@@ -71,12 +71,101 @@ function parseRoleBindingBody(body: any): ValidationResult<RoleBindingBody> {
   }
 }
 
-function validateScope(scopeType: RoleBindingBody['scope_type'], appId?: string, channelId?: number): ValidationResult<null> {
+function isSupportedChannelId(channelId: RoleBindingBody['channel_id']): channelId is string | number {
+  if (typeof channelId === 'number') {
+    return Number.isSafeInteger(channelId) && channelId > 0
+  }
+
+  return typeof channelId === 'string' && channelId.trim().length > 0
+}
+
+function getLegacyChannelRowId(channelId: string | number): number | null {
+  if (typeof channelId === 'number') {
+    return channelId
+  }
+
+  const trimmedChannelId = channelId.trim()
+  if (!/^\d+$/.test(trimmedChannelId)) {
+    return null
+  }
+
+  const parsedChannelId = Number(trimmedChannelId)
+  return Number.isSafeInteger(parsedChannelId) && parsedChannelId > 0 ? parsedChannelId : null
+}
+
+function validateScope(scopeType: RoleBindingBody['scope_type'], appId?: string, channelId?: RoleBindingBody['channel_id']): ValidationResult<null> {
   if (scopeType === 'app' && !appId) {
     return { ok: false, status: 400, error: 'app_id required for app scope' }
   }
-  if (scopeType === 'channel' && (!appId || !channelId)) {
+  if (scopeType === 'channel' && (!appId || !isSupportedChannelId(channelId))) {
     return { ok: false, status: 400, error: 'app_id and channel_id required for channel scope' }
+  }
+  return { ok: true, data: null }
+}
+
+async function validateScopedAppOwnership(
+  drizzle: ReturnType<typeof getDrizzleClient>,
+  scopeType: RoleBindingBody['scope_type'],
+  orgId: string,
+  appId?: string,
+  channelId?: RoleBindingBody['channel_id'],
+): Promise<ValidationResult<{ channelRbacId: string | null }>> {
+  if (scopeType !== 'app' && scopeType !== 'channel') {
+    return { ok: true, data: { channelRbacId: null } }
+  }
+
+  const [app] = await drizzle
+    .select({
+      id: schema.apps.id,
+      publicAppId: schema.apps.app_id,
+    })
+    .from(schema.apps)
+    .where(
+      and(
+        eq(schema.apps.id, appId!),
+        eq(schema.apps.owner_org, orgId),
+      ),
+    )
+    .limit(1)
+
+  if (!app) {
+    return { ok: false, status: 404, error: 'App not found in this org' }
+  }
+
+  if (scopeType === 'channel') {
+    if (!isSupportedChannelId(channelId)) {
+      return { ok: false, status: 400, error: 'app_id and channel_id required for channel scope' }
+    }
+
+    const legacyChannelRowId = getLegacyChannelRowId(channelId)
+    const normalizedChannelId = typeof channelId === 'string' ? channelId.trim() : `${channelId}`
+    const [channel] = await drizzle
+      .select({ rbacId: schema.channels.rbac_id })
+      .from(schema.channels)
+      .where(
+        and(
+          legacyChannelRowId !== null
+            ? eq(schema.channels.id, legacyChannelRowId)
+            : eq(schema.channels.rbac_id, normalizedChannelId),
+          eq(schema.channels.app_id, app.publicAppId),
+          eq(schema.channels.owner_org, orgId),
+        ),
+      )
+      .limit(1)
+
+    if (!channel) {
+      return { ok: false, status: 404, error: 'Channel not found in this app/org' }
+    }
+
+    return { ok: true, data: { channelRbacId: channel.rbacId } }
+  }
+
+  return { ok: true, data: { channelRbacId: null } }
+}
+
+export function validateRoleScope(roleScopeType: string, bindingScopeType: string): ValidationResult<null> {
+  if (roleScopeType !== bindingScopeType) {
+    return { ok: false, status: 400, error: 'Role scope_type does not match binding scope' }
   }
   return { ok: true, data: null }
 }
@@ -86,34 +175,56 @@ async function validateUserPrincipalAccess(
   principalId: string,
   orgId: string,
 ): Promise<ValidationResult<null>> {
-  const targetRbacAccess = await drizzle
-    .select({ id: schema.role_bindings.id })
-    .from(schema.role_bindings)
-    .where(
-      and(
-        eq(schema.role_bindings.principal_type, 'user'),
-        eq(schema.role_bindings.principal_id, principalId),
-        eq(schema.role_bindings.org_id, orgId),
-      ),
-    )
-    .limit(1)
-
-  if (targetRbacAccess.length) {
-    return { ok: true, data: null }
-  }
-
-  const targetLegacyAccess = await drizzle
-    .select({ id: schema.org_users.id })
+  const activeMembership = await drizzle
+    .select({ user_right: schema.org_users.user_right })
     .from(schema.org_users)
     .where(
       and(
         eq(schema.org_users.user_id, principalId),
         eq(schema.org_users.org_id, orgId),
+        sql`(${schema.org_users.user_right} IS NULL OR ${schema.org_users.user_right}::text NOT LIKE 'invite_%')`,
       ),
     )
     .limit(1)
 
-  if (!targetLegacyAccess.length) {
+  if (activeMembership.length) {
+    return { ok: true, data: null }
+  }
+
+  const pendingInvite = await drizzle
+    .select({ user_right: schema.org_users.user_right })
+    .from(schema.org_users)
+    .where(
+      and(
+        eq(schema.org_users.user_id, principalId),
+        eq(schema.org_users.org_id, orgId),
+        sql`${schema.org_users.user_right}::text LIKE 'invite_%'`,
+      ),
+    )
+    .limit(1)
+
+  if (pendingInvite.length) {
+    return { ok: false, status: 400, error: 'User has not accepted the org invitation yet' }
+  }
+
+  const targetRbacAccess = await drizzle
+    .select({ id: schema.role_bindings.id })
+    .from(schema.role_bindings)
+    .innerJoin(schema.roles, and(
+      eq(schema.role_bindings.role_id, schema.roles.id),
+      eq(schema.role_bindings.scope_type, schema.roles.scope_type),
+    ))
+    .where(
+      and(
+        eq(schema.role_bindings.principal_type, 'user'),
+        eq(schema.role_bindings.principal_id, principalId),
+        eq(schema.role_bindings.org_id, orgId),
+        sql`(${schema.role_bindings.expires_at} IS NULL OR ${schema.role_bindings.expires_at} > now())`,
+      ),
+    )
+    .limit(1)
+
+  if (!targetRbacAccess.length) {
     return { ok: false, status: 400, error: 'User is not a member of this org' }
   }
 
@@ -223,7 +334,7 @@ async function validateApiKeyPrincipalAccess(
   return { ok: true, data: null }
 }
 
-async function validatePrincipalAccess(
+export async function validatePrincipalAccess(
   drizzle: ReturnType<typeof getDrizzleClient>,
   principalType: RoleBindingBody['principal_type'],
   principalId: string,
@@ -276,7 +387,10 @@ async function getCallerMaxPriorityRank(
   const result = await drizzle
     .select({ max_rank: sql<number>`MAX(${schema.roles.priority_rank})` })
     .from(schema.role_bindings)
-    .innerJoin(schema.roles, eq(schema.role_bindings.role_id, schema.roles.id))
+    .innerJoin(schema.roles, and(
+      eq(schema.role_bindings.role_id, schema.roles.id),
+      eq(schema.role_bindings.scope_type, schema.roles.scope_type),
+    ))
     .where(
       and(
         eq(schema.role_bindings.principal_type, principalType),
@@ -296,6 +410,9 @@ app.get('/:org_id', async (c: Context<MiddlewareKeyVariables>) => {
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
+  }
+  if (!orgId) {
+    return c.json({ error: 'org_id is required' }, 400)
   }
 
   let pgClient
@@ -413,6 +530,11 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       return c.json({ error: 'Role is not assignable' }, 403)
     }
 
+    const roleScopeValidation = validateRoleScope(role.scope_type, scope_type)
+    if (!roleScopeValidation.ok) {
+      return c.json({ error: roleScopeValidation.error }, roleScopeValidation.status as any)
+    }
+
     // Prevent privilege escalation: caller cannot assign a role with higher priority than their own
     const callerPrincipalId = auth.authType === 'apikey' ? auth.apikey!.rbac_id : auth.userId
     const callerMaxRank = await getCallerMaxPriorityRank(drizzle, auth.authType, callerPrincipalId, org_id)
@@ -424,6 +546,12 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     if (!scopeValidation.ok) {
       return c.json({ error: scopeValidation.error }, scopeValidation.status as any)
     }
+
+    const scopedAppValidation = await validateScopedAppOwnership(drizzle, scope_type, org_id, app_id, channel_id)
+    if (!scopedAppValidation.ok) {
+      return c.json({ error: scopedAppValidation.error }, scopedAppValidation.status as any)
+    }
+    const normalizedChannelId = scopedAppValidation.data.channelRbacId
 
     const principalValidation = await validatePrincipalAccess(drizzle, principal_type, principal_id, org_id)
     if (!principalValidation.ok) {
@@ -440,7 +568,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
         scope_type,
         org_id,
         app_id: app_id || null,
-        channel_id: channel_id || null,
+        channel_id: normalizedChannelId,
         granted_by: userId,
         reason: reason || null,
         is_direct: true,
@@ -457,7 +585,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       role_id: role.id,
       scope_type,
       app_id,
-      channel_id,
+      channel_id: normalizedChannelId,
       granted_by: userId,
     })
 
@@ -508,6 +636,9 @@ app.patch('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
   }
+  if (!bindingId) {
+    return c.json({ error: 'binding_id is required' }, 400)
+  }
 
   let body
   try {
@@ -517,8 +648,8 @@ app.patch('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
     return c.json({ error: 'Invalid JSON' }, 400)
   }
 
-  const { role_name } = body ?? {}
-  if (!role_name) {
+  const roleName = typeof body?.role_name === 'string' ? body.role_name : undefined
+  if (!roleName) {
     return c.json({ error: 'role_name is required' }, 400)
   }
 
@@ -534,7 +665,7 @@ app.patch('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
     const [role] = await drizzle
       .select()
       .from(schema.roles)
-      .where(eq(schema.roles.name, role_name))
+      .where(eq(schema.roles.name, roleName))
       .limit(1)
 
     if (!role) {
@@ -545,8 +676,16 @@ app.patch('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
       return c.json({ error: 'Role is not assignable' }, 403)
     }
 
-    if (role.scope_type !== binding.scope_type) {
-      return c.json({ error: 'Role scope_type does not match the existing binding scope' }, 400)
+    const principalValidation = binding.org_id
+      ? await validatePrincipalAccess(drizzle, binding.principal_type as RoleBindingBody['principal_type'], binding.principal_id, binding.org_id)
+      : { ok: true as const, data: null }
+    if (!principalValidation.ok) {
+      return c.json({ error: principalValidation.error }, principalValidation.status as any)
+    }
+
+    const roleScopeValidation = validateRoleScope(role.scope_type, binding.scope_type)
+    if (!roleScopeValidation.ok) {
+      return c.json({ error: roleScopeValidation.error }, roleScopeValidation.status as any)
     }
 
     // Prevent privilege escalation: caller cannot assign a role with higher priority than their own
@@ -601,6 +740,9 @@ app.delete('/:binding_id', async (c: Context<MiddlewareKeyVariables>) => {
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
+  }
+  if (!bindingId) {
+    return c.json({ error: 'binding_id is required' }, 400)
   }
 
   let pgClient

@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import QRCode from 'qrcode'
+import { toSvg } from 'better-qr'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconExternalLink from '~icons/lucide/external-link'
 import IconSmartphone from '~icons/lucide/smartphone'
+import { buildPreviewSubdomain } from '../../shared/preview-subdomain.ts'
 
 const props = defineProps<{
   appId: string
@@ -49,11 +50,9 @@ function checkMobile() {
 
 const currentDevice = computed(() => devices[selectedDevice.value])
 
-// Build the preview URL using subdomain format (no auth - relies on obscure subdomain)
+// Build the preview URL using a reversible preview subdomain format.
 const previewUrl = computed(() => {
-  // Encode app_id: lowercase for DNS, replace . with __ (underscores work in practice)
-  const encodedAppId = props.appId.toLowerCase().replace(/\./g, '__')
-  const subdomain = `${encodedAppId}-${props.versionId}`
+  const subdomain = buildPreviewSubdomain(props.appId, props.versionId)
   // Extract base domain from current host, default to capgo.app for localhost
   // Preserve environment segments (e.g., 'dev' in console.dev.capgo.app)
   const hostname = window.location.hostname
@@ -68,17 +67,19 @@ const previewUrl = computed(() => {
   return `https://${subdomain}.preview.${baseDomain}/`
 })
 
+function svgToDataUrl(svg: string): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+}
+
 // Generate QR code linking to the preview URL
-async function generateQRCode() {
+function generateQRCode() {
   try {
-    qrCodeDataUrl.value = await QRCode.toDataURL(previewUrl.value, {
-      width: 150,
+    qrCodeDataUrl.value = svgToDataUrl(toSvg(previewUrl.value, {
       margin: 2,
-      color: {
-        dark: '#000000',
-        light: '#ffffff',
-      },
-    })
+      moduleSize: 4,
+      foreground: '#000000',
+      background: '#ffffff',
+    }))
   }
   catch (error) {
     console.error('Failed to generate QR code:', error)

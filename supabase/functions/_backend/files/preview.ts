@@ -3,11 +3,12 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Buffer } from 'node:buffer'
 import { brotliDecompressSync } from 'node:zlib'
 import { getRuntimeKey } from 'hono/adapter'
+import { buildPreviewSubdomain, parsePreviewHostname } from '../../../../shared/preview-subdomain.ts'
 import { CacheHelper } from '../utils/cache.ts'
 import { simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
-import { backgroundTask } from '../utils/utils.ts'
+import { backgroundTask, isValidAppId } from '../utils/utils.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
 // Cache settings
 const PREVIEW_AUTH_CACHE_PATH = '/.preview-auth'
@@ -35,7 +36,7 @@ function buildPreviewAuthRequest(c: Context, appId: string) {
     return null
   return {
     helper,
-    request: helper.buildRequest(PREVIEW_AUTH_CACHE_PATH, { app_id: appId.toLowerCase() }),
+    request: helper.buildRequest(PREVIEW_AUTH_CACHE_PATH, { app_id: appId }),
   }
 }
 
@@ -116,32 +117,12 @@ function getContentType(filePath: string): string {
   return MIME_TYPES[ext] || 'application/octet-stream'
 }
 
-// Parse subdomain format: {app_id_with_dots_as_underscores}-{version_id}.preview[.env].capgo.app
-// Example: ee__forgr__capacitor_go-222063.preview.capgo.app
 function parsePreviewSubdomain(hostname: string): { appId: string, versionId: number } | null {
-  // Match pattern: {something}.preview[.optional-env].capgo.app or usecapgo.com
-  const match = hostname.match(/^([^.]+)\.preview(?:\.[^.]+)?\.(?:capgo\.app|usecapgo\.com)$/)
-  if (!match)
+  const parsed = parsePreviewHostname(hostname)
+  if (!parsed || !isValidAppId(parsed.appId))
     return null
 
-  const subdomain = match[1]
-  // Split by last hyphen to get app_id and version_id
-  // app_id has dots replaced with double underscores
-  const lastHyphen = subdomain.lastIndexOf('-')
-  if (lastHyphen === -1)
-    return null
-
-  const appIdEncoded = subdomain.substring(0, lastHyphen)
-  const versionIdStr = subdomain.substring(lastHyphen + 1)
-
-  // Decode app_id: replace __ with . (frontend lowercases and encodes . as __)
-  const appId = appIdEncoded.replace(/__/g, '.')
-  const versionId = Number.parseInt(versionIdStr, 10)
-
-  if (!appId || Number.isNaN(versionId))
-    return null
-
-  return { appId, versionId }
+  return parsed
 }
 
 // Export the handler directly for use in the main app
@@ -152,7 +133,7 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
 
   if (!parsed) {
     cloudlog({ requestId: c.get('requestId'), message: 'invalid preview subdomain', hostname })
-    throw simpleError('invalid_subdomain', 'Invalid preview subdomain format. Expected: {app_id}-{version_id}.preview.capgo.app')
+    throw simpleError('invalid_subdomain', 'Invalid preview subdomain format. Expected: {version_id}-{preview_app_id}.preview.capgo.app')
   }
 
   const { appId, versionId } = parsed
@@ -349,10 +330,6 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
 
 // Export helper for generating preview URLs
 export function generatePreviewUrl(appId: string, versionId: number, env: 'prod' | 'preprod' | 'dev' = 'prod'): string {
-  // Encode app_id: replace . with __
-  const encodedAppId = appId.replace(/\./g, '__')
-  const subdomain = `${encodedAppId}-${versionId}`
-
   const envPrefix = env === 'prod' ? '' : `.${env}`
-  return `https://${subdomain}.preview${envPrefix}.capgo.app`
+  return `https://${buildPreviewSubdomain(appId, versionId)}.preview${envPrefix}.capgo.app`
 }

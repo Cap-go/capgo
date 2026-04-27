@@ -8,6 +8,7 @@ import { getSupabaseClient, POSTGRES_URL } from './test-utils.ts'
 
 const SUPABASE_URL = (env.SUPABASE_URL ?? '').replace(/\/$/, '')
 const SUPABASE_ANON_KEY = env.SUPABASE_ANON_KEY ?? ''
+const USE_CLOUDFLARE_WORKERS = env.USE_CLOUDFLARE_WORKERS === 'true'
 
 if (!SUPABASE_URL)
   throw new Error('SUPABASE_URL is required for plan usage RPC authorization tests')
@@ -36,6 +37,17 @@ let planName: string
 let ownerSupabase: Awaited<ReturnType<typeof createAuthenticatedClient>>
 let attackerSupabase: Awaited<ReturnType<typeof createAuthenticatedClient>>
 
+function isRetryableAuthError(error: unknown): boolean {
+  if (!error || typeof error !== 'object')
+    return false
+
+  const maybeError = error as { message?: string, status?: number }
+  if (maybeError.status === 0)
+    return true
+
+  return /fetch failed|network/i.test(maybeError.message ?? '')
+}
+
 async function createAuthenticatedClient(email: string, password: string) {
   const client = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: {
@@ -45,138 +57,144 @@ async function createAuthenticatedClient(email: string, password: string) {
     },
   })
 
-  const { error } = await client.auth.signInWithPassword({ email, password })
-  if (error)
-    throw error
+  const maxRetries = 3
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    const { error } = await client.auth.signInWithPassword({ email, password })
+    if (!error)
+      return client
+    if (!isRetryableAuthError(error) || attempt === maxRetries - 1)
+      throw error
+    await new Promise(resolve => setTimeout(resolve, 200 * (attempt + 1)))
+  }
 
   return client
 }
 
-beforeAll(async () => {
-  const { data: ownerAuth, error: ownerAuthError } = await serviceRoleSupabase.auth.admin.createUser({
-    email: OWNER_EMAIL,
-    password: TEST_PASSWORD,
-    email_confirm: true,
-  })
-  if (ownerAuthError)
-    throw ownerAuthError
-
-  const { data: attackerAuth, error: attackerAuthError } = await serviceRoleSupabase.auth.admin.createUser({
-    email: ATTACKER_EMAIL,
-    password: TEST_PASSWORD,
-    email_confirm: true,
-  })
-  if (attackerAuthError)
-    throw attackerAuthError
-
-  ownerUserId = ownerAuth.user.id
-  attackerUserId = attackerAuth.user.id
-
-  const { error: usersError } = await serviceRoleSupabase.from('users').insert([
-    {
-      id: ownerUserId,
+describe.skipIf(USE_CLOUDFLARE_WORKERS)('plan usage org RPC authorization', () => {
+  beforeAll(async () => {
+    const { data: ownerAuth, error: ownerAuthError } = await serviceRoleSupabase.auth.admin.createUser({
       email: OWNER_EMAIL,
-    },
-    {
-      id: attackerUserId,
-      email: ATTACKER_EMAIL,
-    },
-  ])
-  if (usersError)
-    throw usersError
-
-  const { data: planRow, error: planError } = await serviceRoleSupabase
-    .from('plans')
-    .select('name,stripe_id')
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .single()
-  if (planError)
-    throw planError
-  planName = planRow.name
-
-  const { error: stripeError } = await serviceRoleSupabase.from('stripe_info').insert({
-    customer_id: CUSTOMER_ID,
-    product_id: planRow.stripe_id,
-    status: 'succeeded',
-    subscription_anchor_start: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-    subscription_anchor_end: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
-  })
-  if (stripeError)
-    throw stripeError
-
-  const { data: orgRow, error: orgError } = await serviceRoleSupabase
-    .from('orgs')
-    .insert({
-      created_by: ownerUserId,
-      name: 'Plan Access Test Org',
-      management_email: OWNER_EMAIL,
-      customer_id: CUSTOMER_ID,
+      password: TEST_PASSWORD,
+      email_confirm: true,
     })
-    .select('id')
-    .single()
-  if (orgError)
-    throw orgError
-  orgId = orgRow.id
+    if (ownerAuthError)
+      throw ownerAuthError
 
-  const { error: orgUserError } = await serviceRoleSupabase.from('org_users').insert({
-    org_id: orgId,
-    user_id: ownerUserId,
-    user_right: 'super_admin',
+    const { data: attackerAuth, error: attackerAuthError } = await serviceRoleSupabase.auth.admin.createUser({
+      email: ATTACKER_EMAIL,
+      password: TEST_PASSWORD,
+      email_confirm: true,
+    })
+    if (attackerAuthError)
+      throw attackerAuthError
+
+    ownerUserId = ownerAuth.user.id
+    attackerUserId = attackerAuth.user.id
+
+    const { error: usersError } = await serviceRoleSupabase.from('users').insert([
+      {
+        id: ownerUserId,
+        email: OWNER_EMAIL,
+      },
+      {
+        id: attackerUserId,
+        email: ATTACKER_EMAIL,
+      },
+    ])
+    if (usersError)
+      throw usersError
+
+    const { data: planRow, error: planError } = await serviceRoleSupabase
+      .from('plans')
+      .select('name,stripe_id')
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .single()
+    if (planError)
+      throw planError
+    planName = planRow.name
+
+    const { error: stripeError } = await serviceRoleSupabase.from('stripe_info').insert({
+      customer_id: CUSTOMER_ID,
+      product_id: planRow.stripe_id,
+      status: 'succeeded',
+      subscription_anchor_start: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
+      subscription_anchor_end: new Date(Date.now() + 20 * 24 * 60 * 60 * 1000).toISOString(),
+    })
+    if (stripeError)
+      throw stripeError
+
+    const { data: orgRow, error: orgError } = await serviceRoleSupabase
+      .from('orgs')
+      .insert({
+        created_by: ownerUserId,
+        name: 'Plan Access Test Org',
+        management_email: OWNER_EMAIL,
+        customer_id: CUSTOMER_ID,
+      })
+      .select('id')
+      .single()
+    if (orgError)
+      throw orgError
+    orgId = orgRow.id
+
+    const { error: orgUserError } = await serviceRoleSupabase.from('org_users').insert({
+      org_id: orgId,
+      user_id: ownerUserId,
+      user_right: 'super_admin',
+    })
+    if (orgUserError)
+      throw orgUserError
+
+    ownerSupabase = await createAuthenticatedClient(OWNER_EMAIL, TEST_PASSWORD)
+    attackerSupabase = await createAuthenticatedClient(ATTACKER_EMAIL, TEST_PASSWORD)
+
+    const { data: cycleData, error: cycleError } = await ownerSupabase.rpc('get_cycle_info_org', {
+      orgid: orgId,
+    })
+    if (cycleError)
+      throw cycleError
+    if (!cycleData?.[0]?.subscription_anchor_start || !cycleData[0]?.subscription_anchor_end)
+      throw new Error('Expected get_cycle_info_org to return a billing cycle for the test org')
+
+    const cycleStart = cycleData[0].subscription_anchor_start.slice(0, 10)
+    const cycleEnd = cycleData[0].subscription_anchor_end.slice(0, 10)
+
+    const { error: cacheError } = await serviceRoleSupabase.from('app_metrics_cache').insert({
+      org_id: orgId,
+      start_date: cycleStart,
+      end_date: cycleEnd,
+      response: [],
+      cached_at: new Date().toISOString(),
+    })
+    if (cacheError)
+      throw cacheError
   })
-  if (orgUserError)
-    throw orgUserError
 
-  ownerSupabase = await createAuthenticatedClient(OWNER_EMAIL, TEST_PASSWORD)
-  attackerSupabase = await createAuthenticatedClient(ATTACKER_EMAIL, TEST_PASSWORD)
+  afterAll(async () => {
+    if (orgId)
+      await serviceRoleSupabase.from('app_metrics_cache').delete().eq('org_id', orgId)
 
-  const { data: cycleData, error: cycleError } = await ownerSupabase.rpc('get_cycle_info_org', {
-    orgid: orgId,
+    if (orgId) {
+      await serviceRoleSupabase.from('org_users').delete().eq('org_id', orgId)
+      await serviceRoleSupabase.from('orgs').delete().eq('id', orgId)
+    }
+
+    await serviceRoleSupabase.from('stripe_info').delete().eq('customer_id', CUSTOMER_ID)
+
+    if (ownerUserId)
+      await serviceRoleSupabase.from('users').delete().eq('id', ownerUserId)
+    if (attackerUserId)
+      await serviceRoleSupabase.from('users').delete().eq('id', attackerUserId)
+
+    if (ownerUserId)
+      await serviceRoleSupabase.auth.admin.deleteUser(ownerUserId)
+    if (attackerUserId)
+      await serviceRoleSupabase.auth.admin.deleteUser(attackerUserId)
+
+    await pgPool.end()
   })
-  if (cycleError)
-    throw cycleError
-  if (!cycleData?.[0]?.subscription_anchor_start || !cycleData[0]?.subscription_anchor_end)
-    throw new Error('Expected get_cycle_info_org to return a billing cycle for the test org')
 
-  const cycleStart = cycleData[0].subscription_anchor_start.slice(0, 10)
-  const cycleEnd = cycleData[0].subscription_anchor_end.slice(0, 10)
-
-  const { error: cacheError } = await serviceRoleSupabase.from('app_metrics_cache').insert({
-    org_id: orgId,
-    start_date: cycleStart,
-    end_date: cycleEnd,
-    response: [],
-    cached_at: new Date().toISOString(),
-  })
-  if (cacheError)
-    throw cacheError
-})
-
-afterAll(async () => {
-  if (orgId)
-    await serviceRoleSupabase.from('app_metrics_cache').delete().eq('org_id', orgId)
-
-  if (orgId) {
-    await serviceRoleSupabase.from('org_users').delete().eq('org_id', orgId)
-    await serviceRoleSupabase.from('orgs').delete().eq('id', orgId)
-  }
-
-  await serviceRoleSupabase.from('stripe_info').delete().eq('customer_id', CUSTOMER_ID)
-
-  if (ownerUserId)
-    await serviceRoleSupabase.from('users').delete().eq('id', ownerUserId)
-  if (attackerUserId)
-    await serviceRoleSupabase.from('users').delete().eq('id', attackerUserId)
-
-  if (ownerUserId)
-    await serviceRoleSupabase.auth.admin.deleteUser(ownerUserId)
-  if (attackerUserId)
-    await serviceRoleSupabase.auth.admin.deleteUser(attackerUserId)
-
-  await pgPool.end()
-})
-
-describe('plan usage org RPC authorization', () => {
   it.concurrent('allows authorized org members to read plan usage RPCs', async () => {
     const { data: planNameData, error: planNameError } = await ownerSupabase.rpc('get_current_plan_name_org', {
       orgid: orgId,

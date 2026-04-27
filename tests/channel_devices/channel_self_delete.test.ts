@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { getSupabaseClient, ORG_ID, PLUGIN_BASE_URL, resetAndSeedAppData, resetAppData, USER_ID } from 'tests/test-utils'
+import { getSupabaseClient, ORG_ID, PLUGIN_BASE_URL, resetAndSeedAppData, resetAppData, USER_ID } from '../test-utils.ts'
 
 const testAppId = `com.test.channel.delete.${Date.now()}`
 

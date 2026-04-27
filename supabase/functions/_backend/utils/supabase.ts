@@ -109,6 +109,7 @@ export function emptySupabase(c: Context) {
 
 // WARNING: The service role key has admin privileges and should only be used in secure server environments!
 export function supabaseAdmin(c: Context) {
+  const serviceRoleKey = getEnv(c, 'SUPABASE_SERVICE_ROLE_KEY')
   const options = {
     auth: {
       autoRefreshToken: false,
@@ -116,7 +117,7 @@ export function supabaseAdmin(c: Context) {
       detectSessionInUrl: false,
     },
   }
-  return createClient<Database>(getEnv(c, 'SUPABASE_URL'), getEnv(c, 'SUPABASE_SERVICE_ROLE_KEY'), options)
+  return createClient<Database>(getEnv(c, 'SUPABASE_URL'), serviceRoleKey, options)
 }
 
 export function supabaseApikey(c: Context, apikey: string | null | undefined) {
@@ -1592,14 +1593,20 @@ export async function checkApikeyMeetsOrgPolicy(
   orgId: string,
   supabase: SupabaseClient<Database>,
 ): Promise<{ valid: boolean, error?: string }> {
-  const { data: org } = await supabase
+  const { data: org, error } = await supabase
     .from('orgs')
     .select('require_apikey_expiration')
     .eq('id', orgId)
     .single()
 
-  if (!org) {
-    return { valid: true }
+  if (error || !org) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'checkApikeyMeetsOrgPolicy: unable to load org policy',
+      error,
+      orgId,
+    })
+    return { valid: false, error: 'org_policy_lookup_failed' }
   }
 
   if (org.require_apikey_expiration && !key.expires_at) {

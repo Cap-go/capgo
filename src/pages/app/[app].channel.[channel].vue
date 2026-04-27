@@ -27,6 +27,18 @@ interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
 }
 
+type ChannelUpdate = Database['public']['Tables']['channels']['Update']
+type EditableChannelKey = 'allow_dev'
+  | 'allow_device'
+  | 'allow_device_self_set'
+  | 'allow_emulator'
+  | 'allow_prod'
+  | 'android'
+  | 'disable_auto_update_under_native'
+  | 'electron'
+  | 'ios'
+  | 'version'
+
 // Bundle link dialog state
 const bundleLinkVersions = ref<Database['public']['Tables']['app_versions']['Row'][]>([])
 const bundleLinkSearchVal = ref('')
@@ -137,7 +149,7 @@ async function getChannel(force = false) {
   }
 }
 
-async function saveChannelChange(key: string, val: any) {
+async function saveChannelChange<K extends EditableChannelKey>(key: K, val: ChannelUpdate[K]) {
   if (!canUpdateChannelSettings.value) {
     toast.error(t('no-permission'))
     return
@@ -156,7 +168,7 @@ async function saveChannelChange(key: string, val: any) {
   try {
     const update = {
       [key]: val,
-    }
+    } as ChannelUpdate
     const { error } = await supabase
       .from('channels')
       .update(update)

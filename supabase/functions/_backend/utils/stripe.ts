@@ -6,6 +6,9 @@ import { cloudlog, cloudlogErr } from './logging.ts'
 import { supabaseAdmin } from './supabase.ts'
 import { getEnv, isStripeConfigured } from './utils.ts'
 
+const ISO_COUNTRY_CODE_REGEX = /^[A-Z]{2}$/
+const TRAILING_SLASHES_REGEX = /\/+$/
+
 // Checks if SUPABASE_URL points to a local instance
 function isLocalSupabase(c: Context): boolean {
   const supabaseUrl = getEnv(c, 'SUPABASE_URL')
@@ -58,10 +61,52 @@ export function resolveStripeEnvironment(c: Context): StripeEnvironment {
   return 'test'
 }
 
-export function getStripe(c: Context) {
+function getStripeApiBaseUrl(c: Context): URL | null {
+  const rawBaseUrl = getEnv(c, 'STRIPE_API_BASE_URL').trim()
+  if (!rawBaseUrl)
+    return null
+
+  let parsedBaseUrl: URL
+  try {
+    parsedBaseUrl = new URL(rawBaseUrl)
+  }
+  catch {
+    throw new Error('Invalid STRIPE_API_BASE_URL')
+  }
+
+  if (!['http:', 'https:'].includes(parsedBaseUrl.protocol)) {
+    throw new Error('STRIPE_API_BASE_URL must use http or https')
+  }
+
+  if (parsedBaseUrl.pathname !== '/' && parsedBaseUrl.pathname !== '') {
+    throw new Error('STRIPE_API_BASE_URL must not include a path')
+  }
+
+  return parsedBaseUrl
+}
+
+export function isStripeEmulatorEnabled(c: Context): boolean {
+  return getStripeApiBaseUrl(c) !== null
+}
+
+export function getStripe(c: Context): Stripe {
+  const apiBaseUrl = getStripeApiBaseUrl(c)
+  const apiPort = apiBaseUrl
+    ? Number.parseInt(apiBaseUrl.port || (apiBaseUrl.protocol === 'https:' ? '443' : '80'), 10)
+    : undefined
+  type StripeApiVersion = NonNullable<ConstructorParameters<typeof Stripe>[1]>['apiVersion']
+
   return new Stripe(getEnv(c, 'STRIPE_SECRET_KEY'), {
-    apiVersion: '2025-10-29.clover',
+    // Keep the pinned runtime API version even when the installed SDK types lag behind it.
+    apiVersion: '2026-03-25.dahlia' as StripeApiVersion,
     httpClient: Stripe.createFetchHttpClient(),
+    ...(apiBaseUrl
+      ? {
+          host: apiBaseUrl.hostname,
+          port: apiPort,
+          protocol: apiBaseUrl.protocol.replace(':', '') as 'http' | 'https',
+        }
+      : {}),
   })
 }
 
@@ -260,8 +305,88 @@ export async function createPortal(c: Context, customerId: string, callbackUrl: 
 export function updateCustomerEmail(c: Context, customerId: string, newEmail: string) {
   if (!isStripeConfigured(c))
     return Promise.resolve()
-  return getStripe(c).customers.update(customerId, { email: newEmail, name: newEmail, metadata: { email: newEmail } },
+  return getStripe(c).customers.update(customerId, { email: newEmail, metadata: { email: newEmail } },
   )
+}
+
+export function updateCustomerOrganizationName(c: Context, customerId: string, newName: string) {
+  if (!isStripeConfigured(c))
+    return Promise.resolve()
+  return getStripe(c).customers.update(customerId, { name: newName })
+}
+
+export async function getStripeCustomerName(c: Context, customerId: string | null | undefined): Promise<string | null | undefined> {
+  if (!customerId || !isStripeConfigured(c))
+    return undefined
+
+  try {
+    const customer = await getStripe(c).customers.retrieve(customerId)
+    if (customer.deleted)
+      return null
+    return customer.name ?? null
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getStripeCustomerName', customerId, error })
+    return undefined
+  }
+}
+
+export function isDeterministicStripeCustomerUpdateError(error: unknown) {
+  return error instanceof Stripe.errors.StripeAuthenticationError
+    || error instanceof Stripe.errors.StripeInvalidRequestError
+    || error instanceof Stripe.errors.StripePermissionError
+    || error instanceof Stripe.errors.StripeRateLimitError
+}
+
+export function normalizeStripeCountryCode(country: string | null | undefined): string | null {
+  if (!country)
+    return null
+
+  const normalized = country.trim().toUpperCase()
+  if (!normalized || !ISO_COUNTRY_CODE_REGEX.test(normalized))
+    return null
+
+  return normalized
+}
+
+export async function getStripeCustomerCountry(c: Context, customerId: string | null | undefined): Promise<string | null | undefined> {
+  if (!customerId || !isStripeConfigured(c))
+    return undefined
+
+  try {
+    const customer = await getStripe(c).customers.retrieve(customerId)
+    if (customer.deleted)
+      return null
+    return normalizeStripeCountryCode(customer.address?.country ?? null)
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getStripeCustomerCountry', customerId, error })
+    return undefined
+  }
+}
+
+export async function syncStripeCustomerCountry(c: Context, customerId: string | null | undefined): Promise<string | null | undefined> {
+  if (!customerId || !isStripeConfigured(c))
+    return undefined
+
+  const customerCountry = await getStripeCustomerCountry(c, customerId)
+  if (customerCountry === undefined)
+    return undefined
+
+  const { data, error } = await supabaseAdmin(c)
+    .from('stripe_info')
+    .update({ customer_country: customerCountry })
+    .eq('customer_id', customerId)
+    .select('customer_id')
+
+  if (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'syncStripeCustomerCountry', customerId, error })
+  }
+  else if (!data?.length) {
+    cloudlog({ requestId: c.get('requestId'), message: 'syncStripeCustomerCountry no stripe_info row matched', customerId, customerCountry })
+  }
+
+  return customerCountry
 }
 
 export async function cancelSubscription(c: Context, customerId: string) {
@@ -277,14 +402,33 @@ export async function cancelSubscription(c: Context, customerId: string) {
   })
 }
 
+async function getStoredPlanPriceId(c: Context, planId: string, recurrence: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabaseAdmin(c)
+      .from('plans')
+      .select('price_m_id, price_y_id')
+      .eq('stripe_id', planId)
+      .single()
+
+    if (error) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'getStoredPlanPriceId', planId, recurrence, error })
+      return null
+    }
+
+    return recurrence === 'year' ? data.price_y_id : data.price_m_id
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getStoredPlanPriceId', planId, recurrence, error })
+    return null
+  }
+}
+
 async function getPriceIds(c: Context, planId: string, recurrence: string): Promise<{ priceId: string | null }> {
   let priceId = null
   if (!isStripeConfigured(c))
     return { priceId }
   try {
-    const prices = await getStripe(c).prices.search({
-      query: `product:"${planId}"`,
-    })
+    const prices = await listPricesByProduct(c, planId)
     cloudlog({ requestId: c.get('requestId'), message: 'prices stripe', prices })
     prices.data.forEach((price) => {
       if (price.recurring && price.recurring.interval === recurrence && price.active && price.recurring.usage_type === 'licensed')
@@ -294,6 +438,10 @@ async function getPriceIds(c: Context, planId: string, recurrence: string): Prom
   catch (err) {
     cloudlog({ requestId: c.get('requestId'), message: 'search err', error: err })
   }
+  if (!priceId) {
+    priceId = await getStoredPlanPriceId(c, planId, recurrence)
+    cloudlog({ requestId: c.get('requestId'), message: 'prices fallback', planId, recurrence, priceId })
+  }
   return { priceId }
 }
 
@@ -301,9 +449,23 @@ export interface MeteredData {
   [key: string]: string
 }
 
+export interface CreditCheckoutItemSummary {
+  [key: string]: string | number | null
+  id: string | null
+  quantity: number | null
+  priceId: string | null
+  productId: string | null
+}
+
+export interface CreditCheckoutDetails {
+  creditQuantity: number
+  itemsSummary: CreditCheckoutItemSummary[]
+}
+
 export interface StripeData {
   data: Database['public']['Tables']['stripe_info']['Insert']
   isUpgrade: boolean
+  previousPriceId: string | undefined
   previousProductId: string | undefined
 }
 
@@ -361,13 +523,19 @@ export async function createCheckout(c: Context, customerId: string, recurrence:
   return { url: session.url }
 }
 
+async function listPricesByProduct(c: Context, productId: string, active?: boolean) {
+  return await getStripe(c).prices.list({
+    product: productId,
+    ...(active === undefined ? {} : { active }),
+    limit: 100,
+  })
+}
+
 async function getOneTimePriceId(c: Context, productId: string): Promise<string | null> {
   if (!isStripeConfigured(c))
     return null
   try {
-    const prices = await getStripe(c).prices.search({
-      query: `product:"${productId}" AND active:'true'`,
-    })
+    const prices = await listPricesByProduct(c, productId, true)
 
     for (const price of prices.data) {
       if (price.type === 'one_time' && price.active)
@@ -418,19 +586,92 @@ export async function createOneTimeCheckout(
       {
         price: priceId,
         quantity,
-        adjustable_quantity: {
-          enabled: true,
-          minimum: 1,
-          maximum: 100000,
-        },
+        ...(isStripeEmulatorEnabled(c)
+          ? {}
+          : {
+              adjustable_quantity: {
+                enabled: true,
+                minimum: 1,
+                maximum: 100000,
+              },
+            }),
       },
     ],
     metadata: {
       productId,
+      orgId: clientReferenceId ?? '',
       intendedQuantity: String(quantity),
     },
   })
   return { url: session.url }
+}
+
+export async function getCreditCheckoutDetails(c: Context, session: Stripe.Checkout.Session, expectedProductId: string): Promise<CreditCheckoutDetails> {
+  try {
+    const lineItems = await getStripe(c).checkout.sessions.listLineItems(session.id, {
+      expand: ['data.price.product'],
+      limit: 100,
+    })
+
+    let creditQuantity = 0
+    const itemsSummary = lineItems.data.map((item) => {
+      const priceProduct = typeof item.price?.product === 'string'
+        ? item.price.product
+        : (item.price?.product as { id?: string } | null)?.id ?? null
+
+      if (priceProduct === expectedProductId)
+        creditQuantity += item.quantity ?? 0
+
+      return {
+        id: item.id ?? null,
+        quantity: item.quantity ?? null,
+        priceId: item.price?.id ?? null,
+        productId: priceProduct,
+      }
+    })
+
+    return {
+      creditQuantity,
+      itemsSummary,
+    }
+  }
+  catch (error) {
+    if (!isStripeEmulatorEnabled(c))
+      throw error
+
+    const metadataProductId = typeof session.metadata?.productId === 'string'
+      ? session.metadata.productId
+      : null
+    const intendedQuantity = Number.parseInt(session.metadata?.intendedQuantity ?? '', 10)
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Falling back to Stripe checkout metadata for credit checkout details',
+      sessionId: session.id,
+      expectedProductId,
+      metadataProductId,
+      error: error instanceof Error ? error.message : String(error),
+    })
+
+    if (metadataProductId === expectedProductId && Number.isFinite(intendedQuantity) && intendedQuantity > 0) {
+      return {
+        creditQuantity: intendedQuantity,
+        itemsSummary: [
+          {
+            id: null,
+            quantity: intendedQuantity,
+            priceId: null,
+            productId: metadataProductId,
+          },
+        ],
+      }
+    }
+
+    return {
+      creditQuantity: 0,
+      itemsSummary: [],
+    }
+  }
 }
 
 function getAllowedRedirectUrl(c: Context, value: string, field: 'return_url' | 'success_url' | 'cancel_url') {
@@ -468,7 +709,7 @@ export interface StripeCustomer {
 
 export async function createCustomer(c: Context, email: string, userId: string, orgId: string, name: string) {
   cloudlog({ requestId: c.get('requestId'), message: 'createCustomer', email, userId, orgId, name })
-  const baseConsoleUrl = (getEnv(c, 'WEBAPP_URL') || '').replace(/\/+$/, '')
+  const baseConsoleUrl = (getEnv(c, 'WEBAPP_URL') || '').replace(TRAILING_SLASHES_REGEX, '')
   const metadata: Record<string, string> = {
     user_id: userId,
     org_id: orgId,
@@ -502,7 +743,7 @@ export async function ensureCustomerMetadata(c: Context, customerId: string, org
   if (!isStripeConfigured(c))
     return
 
-  const baseConsoleUrl = (getEnv(c, 'WEBAPP_URL') || '').replace(/\/+$/, '')
+  const baseConsoleUrl = (getEnv(c, 'WEBAPP_URL') || '').replace(TRAILING_SLASHES_REGEX, '')
   const metadata: Record<string, string> = {
     org_id: orgId,
   }

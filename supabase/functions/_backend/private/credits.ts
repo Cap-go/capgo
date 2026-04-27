@@ -1,11 +1,12 @@
 import type { Context } from 'hono'
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type Stripe from 'stripe'
+import type { AuthInfo, MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
 import { getFallbackCreditProductId } from '../utils/credits.ts'
-import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
+import { getClaimsFromJWT, middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { checkPermission } from '../utils/rbac.ts'
-import { createOneTimeCheckout, getStripe } from '../utils/stripe.ts'
+import { createOneTimeCheckout, getCreditCheckoutDetails, getStripe, isStripeEmulatorEnabled } from '../utils/stripe.ts'
 import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
@@ -25,6 +26,8 @@ interface CostCalculationRequest {
   mau: number
   bandwidth: number // in bytes
   storage: number // in bytes
+  build_time?: number // in seconds
+  org_id?: string
 }
 
 interface TierUsage {
@@ -32,7 +35,7 @@ interface TierUsage {
   step_min: number
   step_max: number
   unit_factor: number
-  units_used: number // billing units (GB for bandwidth/storage, count for MAU)
+  units_used: number // billing units (GiB/minutes/count)
   price_per_unit: number // Price per billing unit
   cost: number
 }
@@ -48,11 +51,13 @@ interface CostCalculationResponse {
     mau: MetricBreakdown
     bandwidth: MetricBreakdown
     storage: MetricBreakdown
+    build_time: MetricBreakdown
   }
   usage: {
     mau: number
     bandwidth: number
     storage: number
+    build_time: number
   }
 }
 
@@ -63,13 +68,157 @@ interface StartTopUpRequest {
 
 interface CompleteTopUpRequest {
   orgId: string
-  sessionId: string
+  sessionId?: string
 }
 
 const DEFAULT_TOP_UP_QUANTITY = 100
 const MAX_TOP_UP_QUANTITY = 100000
 
 type AppContext = Context<MiddlewareKeyVariables, any, any>
+
+function sortCreditSteps(steps: CreditStep[]): CreditStep[] {
+  return [...steps].sort((a, b) => {
+    if (a.type !== b.type)
+      return a.type.localeCompare(b.type)
+
+    if (a.step_min !== b.step_min)
+      return a.step_min - b.step_min
+
+    return a.step_max - b.step_max
+  })
+}
+
+function subtractScopedRange(baseStep: CreditStep, scopedStep: CreditStep): CreditStep[] {
+  const overlapStart = Math.max(baseStep.step_min, scopedStep.step_min)
+  const overlapEnd = Math.min(baseStep.step_max, scopedStep.step_max)
+
+  if (overlapStart >= overlapEnd)
+    return [baseStep]
+
+  const remainingSteps: CreditStep[] = []
+
+  if (baseStep.step_min < overlapStart) {
+    remainingSteps.push({
+      ...baseStep,
+      step_min: baseStep.step_min,
+      step_max: overlapStart,
+    })
+  }
+
+  if (overlapEnd < baseStep.step_max) {
+    remainingSteps.push({
+      ...baseStep,
+      step_min: overlapEnd,
+      step_max: baseStep.step_max,
+    })
+  }
+
+  return remainingSteps
+}
+
+function preferScopedCreditSteps(steps: CreditStep[], orgId?: string): CreditStep[] {
+  if (!orgId)
+    return sortCreditSteps(steps)
+
+  const stepGroups = new Map<string, { global: CreditStep[], scoped: CreditStep[] }>()
+
+  for (const step of steps) {
+    const currentGroup = stepGroups.get(step.type) ?? { global: [], scoped: [] }
+
+    if (step.org_id === orgId)
+      currentGroup.scoped.push(step)
+    else
+      currentGroup.global.push(step)
+
+    stepGroups.set(step.type, currentGroup)
+  }
+
+  const normalizedSteps: CreditStep[] = []
+
+  for (const [, group] of stepGroups.entries()) {
+    const scopedSteps = sortCreditSteps(group.scoped)
+    if (scopedSteps.length === 0) {
+      normalizedSteps.push(...sortCreditSteps(group.global))
+      continue
+    }
+
+    let remainingGlobalSteps = sortCreditSteps(group.global)
+    for (const scopedStep of scopedSteps)
+      remainingGlobalSteps = remainingGlobalSteps.flatMap(globalStep => subtractScopedRange(globalStep, scopedStep))
+
+    normalizedSteps.push(...sortCreditSteps([...remainingGlobalSteps, ...scopedSteps]))
+  }
+
+  return sortCreditSteps(normalizedSteps)
+}
+
+async function requireOrgScopedPricingAccess(c: AppContext, orgId: string, authorization: string) {
+  c.set('authorization', authorization)
+
+  const claims = await getClaimsFromJWT(c, authorization)
+  if (!claims?.sub) {
+    throw simpleError('not_authorized', 'Not authorized')
+  }
+
+  c.set('auth', {
+    userId: claims.sub,
+    authType: 'jwt',
+    apikey: null,
+    jwt: authorization,
+  } satisfies AuthInfo)
+
+  if (!await checkPermission(c, 'org.read', { orgId })) {
+    throw simpleError('not_authorized', 'Not authorized')
+  }
+}
+
+async function getScopedCreditSteps(c: AppContext, orgId?: string): Promise<CreditStep[]> {
+  const authorization = c.req.header('authorization')
+    ?? c.req.header('Authorization')
+    ?? c.get('authorization')
+
+  let pricingClient: ReturnType<typeof supabaseAdmin> | ReturnType<typeof supabaseClient> | undefined
+  if (orgId) {
+    if (!authorization) {
+      throw simpleError('not_authorized', 'Not authorized')
+    }
+
+    await requireOrgScopedPricingAccess(c, orgId, authorization)
+    pricingClient = supabaseClient(c, authorization)
+  }
+  else {
+    pricingClient = supabaseAdmin(c)
+  }
+
+  if (!pricingClient)
+    throw simpleError('not_authorized', 'Not authorized')
+
+  const scopedPricingClient = pricingClient
+
+  const [globalCreditsResult, orgCreditsResult] = await Promise.all([
+    scopedPricingClient
+      .from('capgo_credits_steps')
+      .select()
+      .is('org_id', null),
+    orgId
+      ? scopedPricingClient
+          .from('capgo_credits_steps')
+          .select()
+          .eq('org_id', orgId)
+      : Promise.resolve({ data: [] as CreditStep[], error: null }),
+  ])
+
+  const { data: globalCredits, error: globalCreditsError } = globalCreditsResult
+  const { data: orgCredits, error: orgCreditsError } = orgCreditsResult
+
+  if (globalCreditsError || orgCreditsError)
+    throw simpleError('failed_to_fetch_pricing_data', 'Failed to fetch pricing data')
+
+  return preferScopedCreditSteps([
+    ...((globalCredits ?? []) as CreditStep[]),
+    ...((orgCredits ?? []) as CreditStep[]),
+  ], orgId)
+}
 
 async function getCreditTopUpProductId(c: AppContext, customerId: string, token: string): Promise<{ productId: string }> {
   const supabase = supabaseClient(c, token)
@@ -157,44 +306,135 @@ async function resolveOrgStripeContext(c: AppContext, orgId: string) {
   return { customerId: org.customer_id, token: rawAuthHeader }
 }
 
+async function hasProcessedCreditTopUp(
+  supabase: ReturnType<typeof supabaseClient>,
+  orgId: string,
+  sessionId: string,
+  paymentIntentId?: string | null,
+) {
+  const sourceMatchFilters = [`source_ref->>sessionId.eq.${sessionId}`]
+  if (paymentIntentId)
+    sourceMatchFilters.push(`source_ref->>paymentIntentId.eq.${paymentIntentId}`)
+
+  const { data, error } = await supabase
+    .from('usage_credit_transactions')
+    .select('id')
+    .eq('org_id', orgId)
+    .eq('transaction_type', 'purchase')
+    .or(sourceMatchFilters.join(','))
+    .limit(1)
+
+  if (error) {
+    cloudlogErr({
+      message: 'credit_top_up_candidate_check_failed',
+      orgId,
+      sessionId,
+      error,
+    })
+    throw simpleError('idempotency_check_failed', 'Failed to verify top-up status', { error })
+  }
+
+  return Boolean(data?.length)
+}
+
+function getCheckoutSessionPaymentIntentId(session: Stripe.Checkout.Session): string | null {
+  return typeof session.payment_intent === 'string'
+    ? session.payment_intent
+    : session.payment_intent?.id ?? null
+}
+
+async function resolveCheckoutSession(
+  c: AppContext,
+  stripe: ReturnType<typeof getStripe>,
+  supabase: ReturnType<typeof supabaseClient>,
+  orgId: string,
+  customerId: string,
+  sessionId?: string,
+) {
+  if (sessionId) {
+    const isValidStripeSessionId = /^cs_(?:test|live)_[a-zA-Z0-9]+$/.test(sessionId)
+    const isValidEmulatorSessionId = isStripeEmulatorEnabled(c) && /^cs_[\w-]+$/.test(sessionId)
+
+    if (!isValidStripeSessionId && !isValidEmulatorSessionId)
+      throw simpleError('invalid_session_id', 'Invalid session ID format')
+
+    return await stripe.checkout.sessions.retrieve(sessionId)
+  }
+
+  const candidateSessions: Stripe.Checkout.Session[] = []
+  let startingAfter: string | undefined
+
+  while (true) {
+    const sessions = await stripe.checkout.sessions.list({
+      customer: customerId,
+      limit: 100,
+      ...(startingAfter ? { starting_after: startingAfter } : {}),
+    })
+
+    candidateSessions.push(...sessions.data.filter(session =>
+      session.customer === customerId
+      && session.mode === 'payment'
+      && session.payment_status === 'paid'
+      && session.status === 'complete'
+      && (
+        session.client_reference_id === orgId
+        || session.metadata?.orgId === orgId
+      ),
+    ))
+
+    if (!sessions.has_more || sessions.data.length === 0)
+      break
+
+    startingAfter = sessions.data[sessions.data.length - 1]?.id
+    if (!startingAfter)
+      break
+  }
+
+  candidateSessions
+    .sort((a, b) => (b.created ?? 0) - (a.created ?? 0))
+
+  let unresolvedSession: Stripe.Checkout.Session | null = null
+  for (const candidateSession of candidateSessions) {
+    const paymentIntentId = getCheckoutSessionPaymentIntentId(candidateSession)
+    if (await hasProcessedCreditTopUp(supabase, orgId, candidateSession.id, paymentIntentId))
+      continue
+
+    if (unresolvedSession) {
+      throw simpleError('multiple_unprocessed_sessions', 'Multiple completed checkout sessions require an explicit sessionId')
+    }
+
+    unresolvedSession = candidateSession
+  }
+
+  if (!unresolvedSession)
+    throw simpleError('session_not_found', 'No completed checkout session found')
+
+  return unresolvedSession
+}
+
 export const app = new Hono<MiddlewareKeyVariables>()
 
 app.use('*', useCors)
 
 app.get('/', async (c) => {
-  try {
-    const { data: credits } = await supabaseAdmin(c)
-      .from('capgo_credits_steps')
-      .select()
-      .order('price_per_unit')
-    return c.json(credits ?? [])
-  }
-  catch (e) {
-    throw simpleError('failed_to_fetch_pricing_data', 'Failed to fetch pricing data', {}, e)
-  }
+  const orgId = c.req.query('org_id') ?? undefined
+  const credits = await getScopedCreditSteps(c as AppContext, orgId)
+  return c.json(credits)
 })
 
 app.post('/', async (c) => {
   const body = await parseBody<CostCalculationRequest>(c)
-  const { mau, bandwidth, storage } = body
+  const buildTime = Number(body.build_time ?? 0)
+  const { mau, bandwidth, org_id: orgId, storage } = body
 
   // Validate inputs
   if (mau === undefined || bandwidth === undefined || storage === undefined) {
     throw simpleError('missing_required_fields', 'Missing required fields: mau, bandwidth, storage')
   }
+  if (!Number.isFinite(buildTime) || buildTime < 0)
+    throw simpleError('invalid_build_time', 'build_time must be a non-negative number')
 
-  // Get pricing steps from database
-  const { data: credits, error } = await supabaseAdmin(c)
-    .from('capgo_credits_steps')
-    .select()
-    .order('type, step_min')
-
-  if (error || !credits) {
-    throw simpleError('failed_to_fetch_pricing_data', 'Failed to fetch pricing data')
-  }
-
-  // Type assertion for credits
-  const typedCredits = credits as CreditStep[]
+  const typedCredits = await getScopedCreditSteps(c as AppContext, orgId)
 
   // Calculate cost for each metric type with tier breakdown
   const calculateMetricCost = (value: number, type: string): MetricBreakdown => {
@@ -269,8 +509,9 @@ app.post('/', async (c) => {
   const mauResult = calculateMetricCost(mau, 'mau')
   const bandwidthResult = calculateMetricCost(bandwidth, 'bandwidth')
   const storageResult = calculateMetricCost(storage, 'storage')
+  const buildTimeResult = calculateMetricCost(buildTime, 'build_time')
 
-  const totalCost = mauResult.cost + bandwidthResult.cost + storageResult.cost
+  const totalCost = mauResult.cost + bandwidthResult.cost + storageResult.cost + buildTimeResult.cost
 
   const response: CostCalculationResponse = {
     total_cost: totalCost,
@@ -278,11 +519,13 @@ app.post('/', async (c) => {
       mau: mauResult,
       bandwidth: bandwidthResult,
       storage: storageResult,
+      build_time: buildTimeResult,
     },
     usage: {
       mau,
       bandwidth,
       storage,
+      build_time: buildTime,
     },
   }
 
@@ -329,13 +572,15 @@ app.post('/start-top-up', middlewareAuth, async (c) => {
 
 app.post('/complete-top-up', middlewareAuth, async (c) => {
   const body = await parseBody<CompleteTopUpRequest>(c)
-  if (!body.orgId || !body.sessionId)
-    throw simpleError('missing_parameters', 'orgId and sessionId are required')
+  if (!body.orgId)
+    throw simpleError('missing_parameters', 'orgId is required')
 
   const { customerId, token } = await resolveOrgStripeContext(c, body.orgId)
+  const supabase = supabaseClient(c, token)
 
   const stripe = getStripe(c)
-  const session = await stripe.checkout.sessions.retrieve(body.sessionId)
+  const session = await resolveCheckoutSession(c, stripe, supabase, body.orgId, customerId, body.sessionId)
+  const resolvedSessionId = session.id
 
   if (!session || session.customer !== customerId)
     throw simpleError('invalid_session_customer', 'Checkout session does not belong to this organization')
@@ -347,43 +592,17 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
     throw simpleError('session_not_paid', 'Checkout session is not paid')
 
   const { productId } = await getCreditTopUpProductId(c, customerId, token)
-  const paymentIntentId = typeof session.payment_intent === 'string'
-    ? session.payment_intent
-    : session.payment_intent?.id ?? null
+  const paymentIntentId = getCheckoutSessionPaymentIntentId(session)
 
-  const lineItems = await stripe.checkout.sessions.listLineItems(body.sessionId, {
-    expand: ['data.price.product'],
-    limit: 100,
-  })
-
-  let creditQuantity = 0
-  const itemsSummary = lineItems.data.map((item) => {
-    const priceProduct = typeof item.price?.product === 'string'
-      ? item.price?.product
-      : (item.price?.product as { id?: string } | null)?.id ?? null
-    if (priceProduct === productId)
-      creditQuantity += item.quantity ?? 0
-
-    return {
-      id: item.id,
-      quantity: item.quantity,
-      priceId: item.price?.id ?? null,
-      productId: priceProduct,
-    }
-  })
+  const { creditQuantity, itemsSummary } = await getCreditCheckoutDetails(c, session, productId)
 
   if (creditQuantity <= 0)
     throw simpleError('credit_product_not_found', 'Checkout session does not include the credit product')
 
-  // Validate sessionId format to prevent injection (Stripe session IDs: cs_test_* or cs_live_*)
-  if (!/^cs_(?:test|live)_[a-zA-Z0-9]+$/.test(body.sessionId))
-    throw simpleError('invalid_session_id', 'Invalid session ID format')
-
-  const sourceMatchFilters = [`source_ref->>sessionId.eq.${body.sessionId}`]
+  const sourceMatchFilters = [`source_ref->>sessionId.eq.${resolvedSessionId}`]
   if (paymentIntentId)
     sourceMatchFilters.push(`source_ref->>paymentIntentId.eq.${paymentIntentId}`)
 
-  const supabase = supabaseClient(c, token)
   const { data: existingTx, error: existingTxError } = await supabase
     .from('usage_credit_transactions')
     .select('id, grant_id, balance_after')
@@ -398,7 +617,7 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
       message: 'credit_top_up_idempotency_check_failed',
       error: existingTxError,
       orgId: body.orgId,
-      sessionId: body.sessionId,
+      sessionId: resolvedSessionId,
     })
 
     throw simpleError('idempotency_check_failed', 'Failed to verify top-up status', { error: existingTxError })
@@ -417,7 +636,7 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
       requestId: c.get('requestId'),
       message: 'Skipping credit top-up RPC due to existing transaction',
       orgId: body.orgId,
-      sessionId: body.sessionId,
+      sessionId: resolvedSessionId,
       transactionId: matchedTx.id,
     })
 
@@ -436,13 +655,13 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
     requestId: c.get('requestId'),
     message: 'Completing credit top-up',
     orgId: body.orgId,
-    sessionId: body.sessionId,
+    sessionId: resolvedSessionId,
     creditQuantity,
     itemsSummary,
   })
 
   const sourceRef = {
-    sessionId: body.sessionId,
+    sessionId: resolvedSessionId,
     paymentIntentId,
     itemsSummary,
   }
@@ -471,7 +690,7 @@ app.post('/complete-top-up', middlewareAuth, async (c) => {
       requestId: c.get('requestId'),
       message: 'credit_top_up_rpc_failed',
       orgId: body.orgId,
-      sessionId: body.sessionId,
+      sessionId: resolvedSessionId,
       rpcError: rpcErrorInfo,
     })
 

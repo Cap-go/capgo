@@ -49,6 +49,7 @@ testing against Cloudflare Workers.
 ### Database and Backend
 
 - `bun run supabase:start` - Start local Supabase instance (worktree-isolated)
+- `bun run supabase:cleanup` - Stop local Supabase and delete this worktree's Supabase volumes
 - `bun run supabase:db:reset` - Reset and seed local database
 - `bun backend` - Start Supabase functions locally
 - `bun reset` - Reset Supabase database
@@ -99,6 +100,13 @@ testing against Cloudflare Workers.
   service-role writes. Example:
   - `const loginAdmin = supabaseAdmin(c)` → use for `signInWithPassword`
   - `const adminClient = supabaseAdmin(c)` → use for admin writes
+- **Backend DB access style:** prefer `getPgClient()` / `getDrizzleClient()` for
+  multi-step SQL, transactions, joins, schema-backed writes, or code that
+  benefits from explicit pool lifecycle handling. Do **not** force every simple
+  one-statement internal helper write into Drizzle just for consistency. A
+  small service-role helper that is already a single clear `supabaseAdmin(c)`
+  call may stay on `supabaseAdmin` when that keeps the code smaller and equally
+  correct.
 
 ### HTTP Response Conventions
 
@@ -155,6 +163,16 @@ Capgo relies on two layered caches for plugin endpoints (`/updates`, `/stats`, `
    - When explicitly discussing the Capgo CLI command itself, always use `@latest`.
    - Use the public shape like `npx @capgo/cli@latest ...` for customer-facing command examples.
    - Use internal execution equivalents (for example, `bunx @capgo/cli@latest ...`) only in internal tooling context.
+
+### Email Templates
+
+- `supabase/templates/invite_new_user_to_org.html` and `supabase/templates/invite_existing_user_to_org.html` are Bento templates.
+- Every other file in `supabase/templates/` is a Supabase auth or notification template.
+- Supabase templates use Supabase template syntax.
+- Bento templates use Bento template syntax.
+- Updating templates in the repository does not upload them anywhere automatically.
+- Supabase email templates must be uploaded manually to Supabase.
+- Bento email templates must be uploaded manually to Bento.
 
 ### Environment Setup
 

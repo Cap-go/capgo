@@ -5,21 +5,24 @@ meta:
 
 <script setup lang="ts">
 import type { TableColumn } from '~/components/comp_def'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, h, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import AdminBarChart from '~/components/admin/AdminBarChart.vue'
 import AdminFilterBar from '~/components/admin/AdminFilterBar.vue'
 import AdminFunnelChart from '~/components/admin/AdminFunnelChart.vue'
 import AdminMultiLineChart from '~/components/admin/AdminMultiLineChart.vue'
+import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
 import Spinner from '~/components/Spinner.vue'
-import { formatLocalDate } from '~/services/date'
+import { formatLocalDate, formatLocalDateTime } from '~/services/date'
+import { getEmoji } from '~/services/i18n'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
 import { useAdminDashboardStore } from '~/stores/adminDashboard'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 
-const { t } = useI18n()
+const { locale, t } = useI18n()
 const displayStore = useDisplayStore()
 const mainStore = useMainStore()
 const adminStore = useAdminDashboardStore()
@@ -32,20 +35,52 @@ interface OnboardingFunnelData {
   orgs_with_app: number
   orgs_with_channel: number
   orgs_with_bundle: number
+  orgs_subscribed: number
   app_conversion_rate: number
   channel_conversion_rate: number
   bundle_conversion_rate: number
+  subscription_conversion_rate: number
   trend: Array<{
     date: string
     new_orgs: number
     orgs_created_app: number
     orgs_created_channel: number
     orgs_created_bundle: number
+    orgs_subscribed: number
+  }>
+}
+
+interface EmailTypeBreakdown {
+  totals: {
+    professional: number
+    personal: number
+    disposable: number
+    total: number
+  }
+  trend: Array<{
+    date: string
+    professional: number
+    personal: number
+    disposable: number
+    total: number
+  }>
+}
+
+interface CustomerCountryBreakdown {
+  total_organizations: number
+  countries: Array<{
+    country_code: string
+    organizations: number
+    percentage: number
   }>
 }
 
 const onboardingFunnelData = ref<OnboardingFunnelData | null>(null)
 const isLoadingOnboardingFunnel = ref(false)
+const emailTypeBreakdown = ref<EmailTypeBreakdown | null>(null)
+const isLoadingEmailTypeBreakdown = ref(false)
+const customerCountryBreakdown = ref<CustomerCountryBreakdown | null>(null)
+const isLoadingCustomerCountryBreakdown = ref(false)
 
 // Global stats trend data
 const globalStatsTrendData = ref<Array<{
@@ -79,7 +114,9 @@ interface TrialOrganization {
   management_email: string
   trial_end_date: string
   days_remaining: number
+  trial_extension_count: number
   created_at: string
+  last_bundle_upload_at: string | null
 }
 
 interface TrialOrganizationsResponse {
@@ -95,6 +132,9 @@ interface CancelledOrganization {
   org_name: string
   management_email: string
   canceled_at: string
+  plan_name: string | null
+  billing_type: 'monthly' | 'yearly' | null
+  subscription_or_signup_date: string
   cancellation_reason: string | null
 }
 
@@ -118,8 +158,26 @@ const cancelledOrganizationsCurrentPage = ref(1)
 const isLoadingCancelledOrganizations = ref(false)
 const CANCELLED_PAGE_SIZE = 20
 
+function getTrialExtensionBadgeLabel(extensionCount: number) {
+  return t('trial-extended-badge', { count: extensionCount })
+}
+
 const trialOrganizationsColumns = ref<TableColumn[]>([
-  { label: t('org-name'), key: 'org_name', mobile: true, head: true, sortable: false },
+  {
+    label: t('org-name'),
+    key: 'org_name',
+    mobile: true,
+    head: true,
+    sortable: false,
+    renderFunction: (item: TrialOrganization) => h('div', { class: 'flex flex-wrap items-center gap-2 text-slate-800 dark:text-white' }, [
+      h('span', { class: 'font-medium' }, item.org_name),
+      item.trial_extension_count > 0
+        ? h('span', {
+            class: 'inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-200',
+          }, getTrialExtensionBadgeLabel(item.trial_extension_count))
+        : null,
+    ]),
+  },
   { label: t('email'), key: 'management_email', mobile: false, sortable: false },
   {
     label: t('days-remaining'),
@@ -143,7 +201,24 @@ const trialOrganizationsColumns = ref<TableColumn[]>([
       return formatLocalDate(item.trial_end_date)
     },
   },
+  {
+    label: t('last-upload'),
+    key: 'last_bundle_upload_at',
+    mobile: false,
+    sortable: false,
+    displayFunction: (item: TrialOrganization) => {
+      return formatLocalDateTime(item.last_bundle_upload_at) || t('never')
+    },
+  },
 ])
+
+function formatBillingTypeLabel(billingType: CancelledOrganization['billing_type']) {
+  if (billingType === 'yearly')
+    return t('yearly')
+  if (billingType === 'monthly')
+    return t('monthly')
+  return t('unknown')
+}
 
 const cancelledOrganizationsColumns = ref<TableColumn[]>([
   { label: t('org-name'), key: 'org_name', mobile: true, head: true, sortable: false },
@@ -158,6 +233,27 @@ const cancelledOrganizationsColumns = ref<TableColumn[]>([
         return t('unknown')
       return formatLocalDate(item.canceled_at)
     },
+  },
+  {
+    label: t('plan'),
+    key: 'plan_name',
+    mobile: false,
+    sortable: false,
+    displayFunction: (item: CancelledOrganization) => item.plan_name || t('unknown'),
+  },
+  {
+    label: t('billing-cycle'),
+    key: 'billing_type',
+    mobile: false,
+    sortable: false,
+    displayFunction: (item: CancelledOrganization) => formatBillingTypeLabel(item.billing_type),
+  },
+  {
+    label: t('subscription-or-signup-date'),
+    key: 'subscription_or_signup_date',
+    mobile: false,
+    sortable: false,
+    displayFunction: (item: CancelledOrganization) => formatLocalDate(item.subscription_or_signup_date) || t('unknown'),
   },
   {
     label: t('cancellation-reason'),
@@ -297,6 +393,63 @@ async function loadOnboardingFunnel() {
   }
 }
 
+async function loadEmailTypeBreakdown() {
+  isLoadingEmailTypeBreakdown.value = true
+  try {
+    const data = await adminStore.fetchStats('email_type_breakdown')
+    emailTypeBreakdown.value = data as EmailTypeBreakdown
+  }
+  catch (error) {
+    console.error('[Admin Dashboard Users] Error loading email type breakdown:', error)
+    emailTypeBreakdown.value = null
+  }
+  finally {
+    isLoadingEmailTypeBreakdown.value = false
+  }
+}
+
+async function loadCustomerCountryBreakdown() {
+  isLoadingCustomerCountryBreakdown.value = true
+  try {
+    const data = await adminStore.fetchStats('customer_country_breakdown')
+    customerCountryBreakdown.value = data as CustomerCountryBreakdown
+  }
+  catch (error) {
+    console.error('[Admin Dashboard Users] Error loading customer country breakdown:', error)
+    customerCountryBreakdown.value = null
+  }
+  finally {
+    isLoadingCustomerCountryBreakdown.value = false
+  }
+}
+
+const countryDisplayNames = computed(() => {
+  try {
+    return new Intl.DisplayNames([locale.value || 'en'], { type: 'region' })
+  }
+  catch {
+    return new Intl.DisplayNames(['en'], { type: 'region' })
+  }
+})
+
+function normalizeCountryCode(countryCode: string) {
+  return countryCode.trim().toUpperCase()
+}
+
+function getCountryLabel(countryCode: string) {
+  const normalizedCountryCode = normalizeCountryCode(countryCode)
+  return countryDisplayNames.value.of(normalizedCountryCode) ?? normalizedCountryCode
+}
+
+function getCountryFlag(countryCode: string) {
+  try {
+    return getEmoji(normalizeCountryCode(countryCode))
+  }
+  catch {
+    return '🌐'
+  }
+}
+
 // Computed properties for multi-line charts
 const usersTrendSeries = computed(() => {
   if (globalStatsTrendData.value.length === 0)
@@ -321,6 +474,66 @@ const usersTrendSeries = computed(() => {
     },
   ]
 })
+
+const emailTypeTotals = computed(() => emailTypeBreakdown.value?.totals ?? {
+  professional: 0,
+  personal: 0,
+  disposable: 0,
+  total: 0,
+})
+
+const emailTypeTrendSeries = computed(() => {
+  const trend = emailTypeBreakdown.value?.trend ?? []
+  if (trend.length === 0)
+    return []
+
+  return [
+    {
+      label: t('admin-users-email-type-professional'),
+      data: trend.map(item => ({
+        date: item.date,
+        value: item.professional,
+      })),
+      color: '#119eff',
+    },
+    {
+      label: t('admin-users-email-type-personal'),
+      data: trend.map(item => ({
+        date: item.date,
+        value: item.personal,
+      })),
+      color: '#10b981',
+    },
+    {
+      label: t('admin-users-email-type-disposable'),
+      data: trend.map(item => ({
+        date: item.date,
+        value: item.disposable,
+      })),
+      color: '#ef4444',
+    },
+  ]
+})
+
+const customerCountryEntries = computed(() => customerCountryBreakdown.value?.countries ?? [])
+const topCustomerCountryEntries = computed(() => customerCountryEntries.value.slice(0, 10))
+
+const customerCountryTotalOrganizations = computed(() => customerCountryBreakdown.value?.total_organizations ?? 0)
+const customerCountryUniqueCountries = computed(() => customerCountryEntries.value.length)
+const leadingCustomerCountry = computed(() => topCustomerCountryEntries.value[0] ?? null)
+const leadingCustomerCountrySubtitle = computed(() => {
+  if (!leadingCustomerCountry.value)
+    return t('admin-users-country-top-country-empty')
+
+  return t('admin-users-country-top-country-description', {
+    country: getCountryLabel(leadingCustomerCountry.value.country_code),
+    count: leadingCustomerCountry.value.organizations.toLocaleString(),
+    share: leadingCustomerCountry.value.percentage.toFixed(1),
+  })
+})
+
+const customerCountryChartLabels = computed(() => topCustomerCountryEntries.value.map(country => `${getCountryFlag(country.country_code)} ${getCountryLabel(country.country_code)}`))
+const customerCountryChartValues = computed(() => topCustomerCountryEntries.value.map(country => country.organizations))
 
 const registrationsTrendSeries = computed(() => {
   if (globalStatsTrendData.value.length === 0)
@@ -421,6 +634,7 @@ const onboardingFunnelRates = computed(() => {
       app: 0,
       channel: 0,
       bundle: 0,
+      subscribed: 0,
     }
   }
 
@@ -428,11 +642,13 @@ const onboardingFunnelRates = computed(() => {
   const orgsWithApp = Number(onboardingFunnelData.value.orgs_with_app) || 0
   const orgsWithChannel = Number(onboardingFunnelData.value.orgs_with_channel) || 0
   const orgsWithBundle = Number(onboardingFunnelData.value.orgs_with_bundle) || 0
+  const orgsSubscribed = Number(onboardingFunnelData.value.orgs_subscribed) || 0
 
   return {
     app: totalOrgs > 0 ? (orgsWithApp / totalOrgs) * 100 : 0,
     channel: orgsWithApp > 0 ? (orgsWithChannel / orgsWithApp) * 100 : 0,
     bundle: orgsWithChannel > 0 ? (orgsWithBundle / orgsWithChannel) * 100 : 0,
+    subscribed: orgsWithBundle > 0 ? (orgsSubscribed / orgsWithBundle) * 100 : 0,
   }
 })
 
@@ -451,22 +667,28 @@ const onboardingFunnelStages = computed(() => {
       color: '#3b82f6', // blue
     },
     {
-      label: 'Created an App',
+      label: t('created-an-app'),
       value: Number(data.orgs_with_app) || 0,
       percentage: rates.app,
       color: '#8b5cf6', // purple
     },
     {
-      label: 'Created a Channel',
+      label: t('created-a-channel'),
       value: Number(data.orgs_with_channel) || 0,
       percentage: rates.channel,
       color: '#f59e0b', // amber
     },
     {
-      label: 'Uploaded a Bundle',
+      label: t('uploaded-a-bundle'),
       value: Number(data.orgs_with_bundle) || 0,
       percentage: rates.bundle,
       color: '#10b981', // green
+    },
+    {
+      label: t('subscribed'),
+      value: Number(data.orgs_subscribed) || 0,
+      percentage: rates.subscribed,
+      color: '#ef4444', // red
     },
   ]
 })
@@ -478,25 +700,34 @@ const onboardingFunnelTrendSeries = computed(() => {
 
   const trend = onboardingFunnelData.value.trend
   const demoAppsCreatedByDate = new Map(globalStatsTrendData.value.map(item => [item.date, item.demo_apps_created]))
+  const userRegistrationsByDate = new Map(globalStatsTrendData.value.map(item => [item.date, item.registers_today]))
   return [
     {
-      label: 'New Organizations',
+      label: t('user-registrations'),
       data: trend.map(item => ({
         date: item.date,
-        value: item.new_orgs,
+        value: userRegistrationsByDate.get(item.date) ?? 0,
       })),
       color: '#3b82f6', // blue
     },
     {
-      label: 'Created App (within 7 days)',
+      label: t('new-organizations'),
       data: trend.map(item => ({
         date: item.date,
-        value: item.orgs_created_app,
+        value: item.new_orgs,
       })),
       color: '#8b5cf6', // purple
     },
     {
-      label: 'Created Channel (within 7 days)',
+      label: t('created-app-within-7-days'),
+      data: trend.map(item => ({
+        date: item.date,
+        value: item.orgs_created_app,
+      })),
+      color: '#2563eb', // blue
+    },
+    {
+      label: t('created-channel-within-7-days'),
       data: trend.map(item => ({
         date: item.date,
         value: item.orgs_created_channel,
@@ -504,7 +735,7 @@ const onboardingFunnelTrendSeries = computed(() => {
       color: '#f59e0b', // amber
     },
     {
-      label: 'Uploaded Bundle (within 7 days)',
+      label: t('uploaded-bundle-within-7-days'),
       data: trend.map(item => ({
         date: item.date,
         value: item.orgs_created_bundle,
@@ -512,12 +743,20 @@ const onboardingFunnelTrendSeries = computed(() => {
       color: '#10b981', // green
     },
     {
-      label: 'Demo Apps Created',
+      label: t('demo-apps-created'),
       data: trend.map(item => ({
         date: item.date,
         value: demoAppsCreatedByDate.get(item.date) ?? 0,
       })),
       color: '#ef4444', // red
+    },
+    {
+      label: t('subscribed-within-7-days'),
+      data: trend.map(item => ({
+        date: item.date,
+        value: item.orgs_subscribed,
+      })),
+      color: '#14b8a6', // teal
     },
   ]
 })
@@ -525,6 +764,8 @@ const onboardingFunnelTrendSeries = computed(() => {
 watch(() => adminStore.activeDateRange, () => {
   loadGlobalStatsTrend()
   loadOnboardingFunnel()
+  loadEmailTypeBreakdown()
+  loadCustomerCountryBreakdown()
   loadCancelledOrganizations()
 }, { deep: true })
 
@@ -532,6 +773,8 @@ watch(() => adminStore.activeDateRange, () => {
 watch(() => adminStore.refreshTrigger, () => {
   loadGlobalStatsTrend()
   loadOnboardingFunnel()
+  loadEmailTypeBreakdown()
+  loadCustomerCountryBreakdown()
   loadTrialOrganizations()
   loadCancelledOrganizations()
 })
@@ -544,7 +787,7 @@ onMounted(async () => {
   }
 
   isLoading.value = true
-  await Promise.all([loadGlobalStatsTrend(), loadOnboardingFunnel(), loadTrialOrganizations(), loadCancelledOrganizations()])
+  await Promise.all([loadGlobalStatsTrend(), loadOnboardingFunnel(), loadEmailTypeBreakdown(), loadCustomerCountryBreakdown(), loadTrialOrganizations(), loadCancelledOrganizations()])
   isLoading.value = false
 
   displayStore.NavTitle = t('users-and-revenue')
@@ -582,7 +825,7 @@ displayStore.defaultBack = '/dashboard'
               </div>
 
               <!-- Conversion summary -->
-              <div class="grid grid-cols-3 gap-4 pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
+              <div class="grid grid-cols-2 gap-4 pt-4 mt-4 border-t border-gray-200 sm:grid-cols-4 dark:border-gray-700">
                 <div class="text-center">
                   <p class="text-2xl font-bold text-purple-500">
                     {{ onboardingFunnelRates.app.toFixed(1) }}%
@@ -596,7 +839,7 @@ displayStore.defaultBack = '/dashboard'
                     {{ onboardingFunnelRates.channel.toFixed(1) }}%
                   </p>
                   <p class="text-xs text-gray-500 dark:text-gray-400">
-                    App → Channel
+                    {{ t('app-to-channel') }}
                   </p>
                 </div>
                 <div class="text-center">
@@ -604,7 +847,15 @@ displayStore.defaultBack = '/dashboard'
                     {{ onboardingFunnelRates.bundle.toFixed(1) }}%
                   </p>
                   <p class="text-xs text-gray-500 dark:text-gray-400">
-                    Channel → Bundle
+                    {{ t('channel-to-bundle') }}
+                  </p>
+                </div>
+                <div class="text-center">
+                  <p class="text-2xl font-bold text-rose-500">
+                    {{ onboardingFunnelRates.subscribed.toFixed(1) }}%
+                  </p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ t('bundle-to-subscribed') }}
                   </p>
                 </div>
               </div>
@@ -671,6 +922,191 @@ displayStore.defaultBack = '/dashboard'
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
                   Organizations in trial period
                 </p>
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-6">
+            <div class="flex flex-col gap-1">
+              <h3 class="text-lg font-semibold">
+                {{ t('admin-users-email-type-breakdown') }}
+              </h3>
+              <p class="text-sm text-slate-600 dark:text-slate-400">
+                {{ t('admin-users-email-type-breakdown-description') }}
+              </p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+              <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+                <div class="flex items-start justify-between mb-4">
+                  <div class="p-3 rounded-lg bg-primary/10">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-primary"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M5 7l1.5 12h11L19 7M9 11h6M10 15h4" /></svg>
+                  </div>
+                </div>
+                <div>
+                  <p class="text-sm text-slate-600 dark:text-slate-400">
+                    {{ t('admin-users-email-type-professional') }}
+                  </p>
+                  <p class="mt-2 text-3xl font-bold text-primary">
+                    {{ emailTypeTotals.professional.toLocaleString() }}
+                  </p>
+                  <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    {{ t('admin-users-email-type-professional-description') }}
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+                <div class="flex items-start justify-between mb-4">
+                  <div class="p-3 rounded-lg bg-success/10">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-success"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  </div>
+                </div>
+                <div>
+                  <p class="text-sm text-slate-600 dark:text-slate-400">
+                    {{ t('admin-users-email-type-personal') }}
+                  </p>
+                  <p class="mt-2 text-3xl font-bold text-success">
+                    {{ emailTypeTotals.personal.toLocaleString() }}
+                  </p>
+                  <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    {{ t('admin-users-email-type-personal-description') }}
+                  </p>
+                </div>
+              </div>
+
+              <div class="flex flex-col justify-between p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+                <div class="flex items-start justify-between mb-4">
+                  <div class="p-3 rounded-lg bg-error/10">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" class="w-6 h-6 stroke-current text-error"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636l-1.414 1.414M7.05 16.95l-1.414 1.414M5.636 5.636l1.414 1.414M16.95 16.95l1.414 1.414M9 12h6M12 9v6m0 6a9 9 0 100-18 9 9 0 000 18z" /></svg>
+                  </div>
+                </div>
+                <div>
+                  <p class="text-sm text-slate-600 dark:text-slate-400">
+                    {{ t('admin-users-email-type-disposable') }}
+                  </p>
+                  <p class="mt-2 text-3xl font-bold text-error">
+                    {{ emailTypeTotals.disposable.toLocaleString() }}
+                  </p>
+                  <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    {{ t('admin-users-email-type-disposable-description') }}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <ChartCard
+              :title="t('admin-users-email-type-trend')"
+              :is-loading="isLoadingEmailTypeBreakdown"
+              :has-data="emailTypeTrendSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="emailTypeTrendSeries"
+                :is-loading="isLoadingEmailTypeBreakdown"
+              />
+            </ChartCard>
+          </div>
+
+          <div class="space-y-6">
+            <div class="flex flex-col gap-1">
+              <h3 class="text-lg font-semibold">
+                {{ t('admin-users-country-breakdown') }}
+              </h3>
+              <p class="text-sm text-slate-600 dark:text-slate-400">
+                {{ t('admin-users-country-breakdown-description') }}
+              </p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+              <AdminStatsCard
+                :title="t('admin-users-country-covered-organizations')"
+                :value="customerCountryTotalOrganizations"
+                color-class="text-[#119eff]"
+                :is-loading="isLoadingCustomerCountryBreakdown"
+                :subtitle="t('admin-users-country-covered-organizations-description')"
+              />
+              <AdminStatsCard
+                :title="t('admin-users-country-unique-countries')"
+                :value="customerCountryUniqueCountries"
+                color-class="text-emerald-500"
+                :is-loading="isLoadingCustomerCountryBreakdown"
+                :subtitle="t('admin-users-country-unique-countries-description')"
+              />
+              <AdminStatsCard
+                :title="t('admin-users-country-top-country')"
+                :value="leadingCustomerCountry ? `${getCountryFlag(leadingCustomerCountry.country_code)} ${getCountryLabel(leadingCustomerCountry.country_code)}` : '-'"
+                color-class="text-amber-500"
+                :is-loading="isLoadingCustomerCountryBreakdown"
+                :subtitle="leadingCustomerCountrySubtitle"
+              />
+            </div>
+
+            <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">
+              <ChartCard
+                :title="t('admin-users-country-chart')"
+                :is-loading="isLoadingCustomerCountryBreakdown"
+                :has-data="topCustomerCountryEntries.length > 0"
+              >
+                <AdminBarChart
+                  :labels="customerCountryChartLabels"
+                  :values="customerCountryChartValues"
+                  :label="t('organizations')"
+                  value-mode="count"
+                  :is-loading="isLoadingCustomerCountryBreakdown"
+                />
+              </ChartCard>
+
+              <div class="p-6 bg-white border rounded-lg shadow-lg border-slate-300 dark:bg-gray-800 dark:border-slate-900">
+                <div class="flex flex-col gap-1">
+                  <h3 class="text-lg font-semibold">
+                    {{ t('admin-users-country-top-list') }}
+                  </h3>
+                  <p class="text-sm text-slate-600 dark:text-slate-400">
+                    {{ t('admin-users-country-top-list-description') }}
+                  </p>
+                </div>
+
+                <div v-if="isLoadingCustomerCountryBreakdown" class="flex items-center justify-center h-72">
+                  <span class="loading loading-spinner loading-lg" />
+                </div>
+
+                <div v-else-if="topCustomerCountryEntries.length > 0" class="mt-6 space-y-3">
+                  <div
+                    v-for="(country, index) in topCustomerCountryEntries"
+                    :key="country.country_code"
+                    class="flex items-center justify-between gap-4 p-4 border rounded-lg border-slate-200 dark:border-slate-700"
+                  >
+                    <div class="flex items-center gap-3 min-w-0">
+                      <div class="flex items-center justify-center w-9 h-9 text-sm font-semibold rounded-full bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-200 shrink-0">
+                        {{ index + 1 }}
+                      </div>
+                      <div class="text-2xl leading-none shrink-0">
+                        {{ getCountryFlag(country.country_code) }}
+                      </div>
+                      <div class="min-w-0">
+                        <p class="font-medium truncate">
+                          {{ getCountryLabel(country.country_code) }}
+                        </p>
+                        <p class="text-xs uppercase text-slate-500 dark:text-slate-400">
+                          {{ country.country_code }}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div class="text-right shrink-0">
+                      <p class="font-semibold">
+                        {{ country.organizations.toLocaleString() }}
+                      </p>
+                      <p class="text-xs text-slate-500 dark:text-slate-400">
+                        {{ country.percentage.toFixed(1) }}%
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-else class="flex items-center justify-center h-72 text-slate-400">
+                  {{ t('no-data-available') }}
+                </div>
               </div>
             </div>
           </div>

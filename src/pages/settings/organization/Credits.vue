@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { CreditMetricType, CreditPricingStep } from '~/services/creditPricing'
 import type { Database } from '~/types/supabase.types'
 import { FormKit } from '@formkit/vue'
 import dayjs from 'dayjs'
@@ -14,8 +15,9 @@ import CloudIcon from '~icons/heroicons/cloud'
 import ScaleIcon from '~icons/heroicons/scale'
 import UserGroupIcon from '~icons/heroicons/user-group'
 import AdminOnlyModal from '~/components/AdminOnlyModal.vue'
+import { creditPricingMetricOrder, formatCreditPricingPrice, formatCreditPricingTierLabel } from '~/services/creditPricing'
 import { completeCreditTopUp, startCreditTopUp } from '~/services/stripe'
-import { useSupabase } from '~/services/supabase'
+import { getCreditPricingSteps, useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -53,12 +55,6 @@ interface DailyLedgerRow {
   deductionsByMetric: Partial<Record<Database['public']['Enums']['credit_metric_type'], { total: number, count: number }>>
 }
 
-interface PricingStep {
-  type: string
-  price_per_unit: number
-  unit_factor: number
-}
-
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
@@ -77,7 +73,7 @@ const isSuperAdmin = computed(() => {
 const showAdminModal = ref(false)
 
 const transactions = ref<UsageCreditLedgerRow[]>([])
-const pricingSteps = ref<PricingStep[]>([])
+const pricingSteps = ref<CreditPricingStep[]>([])
 const isLoadingTransactions = ref(false)
 const loadError = ref<string | null>(null)
 const creditUsdRate = ref(1)
@@ -116,172 +112,59 @@ const hasCreditSummary = computed(() => creditTotal.value > 0 || creditAvailable
 const creditUsedUsd = computed(() => creditUsed.value * creditUsdRate.value)
 const creditsAvailableUsd = computed(() => creditAvailable.value * creditUsdRate.value)
 
-const creditPricingSectionsConfig = [
-  {
+const creditPricingSectionsMeta: Record<CreditMetricType, {
+  icon: typeof UserGroupIcon
+  titleKey: string
+  subtitleKey: string
+  accentClass: string
+}> = {
+  mau: {
     icon: UserGroupIcon,
     titleKey: 'credits-pricing-mau-title',
     subtitleKey: 'credits-pricing-mau-subtitle',
     accentClass: 'bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300',
-    tiers: [
-      {
-        labelKey: 'credits-pricing-mau-tier-first',
-        priceKey: 'credits-pricing-mau-tier-first-price',
-      },
-      {
-        labelKey: 'credits-pricing-mau-tier-next-2m',
-        priceKey: 'credits-pricing-mau-tier-next-2m-price',
-      },
-      {
-        labelKey: 'credits-pricing-mau-tier-next-7m',
-        priceKey: 'credits-pricing-mau-tier-next-7m-price',
-      },
-      {
-        labelKey: 'credits-pricing-mau-tier-next-5m',
-        priceKey: 'credits-pricing-mau-tier-next-5m-price',
-      },
-      {
-        labelKey: 'credits-pricing-mau-tier-next-10m',
-        priceKey: 'credits-pricing-mau-tier-next-10m-price',
-      },
-      {
-        labelKey: 'credits-pricing-mau-tier-next-15m',
-        priceKey: 'credits-pricing-mau-tier-next-15m-price',
-      },
-      {
-        labelKey: 'credits-pricing-mau-tier-next-60m',
-        priceKey: 'credits-pricing-mau-tier-next-60m-price',
-      },
-      {
-        labelKey: 'credits-pricing-mau-tier-over-100m',
-        priceKey: 'credits-pricing-mau-tier-over-100m-price',
-      },
-    ],
   },
-  {
+  bandwidth: {
     icon: CloudIcon,
     titleKey: 'credits-pricing-bandwidth-title',
     subtitleKey: 'credits-pricing-bandwidth-subtitle',
     accentClass: 'bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-300',
-    tiers: [
-      {
-        labelKey: 'credits-pricing-bandwidth-tier-first',
-        priceKey: 'credits-pricing-bandwidth-tier-first-price',
-      },
-      {
-        labelKey: 'credits-pricing-bandwidth-tier-next-1tb',
-        priceKey: 'credits-pricing-bandwidth-tier-next-1tb-price',
-      },
-      {
-        labelKey: 'credits-pricing-bandwidth-tier-next-4tb',
-        priceKey: 'credits-pricing-bandwidth-tier-next-4tb-price',
-      },
-      {
-        labelKey: 'credits-pricing-bandwidth-tier-next-6tb',
-        priceKey: 'credits-pricing-bandwidth-tier-next-6tb-price',
-      },
-      {
-        labelKey: 'credits-pricing-bandwidth-tier-next-13tb',
-        priceKey: 'credits-pricing-bandwidth-tier-next-13tb-price',
-      },
-      {
-        labelKey: 'credits-pricing-bandwidth-tier-next-38tb',
-        priceKey: 'credits-pricing-bandwidth-tier-next-38tb-price',
-      },
-      {
-        labelKey: 'credits-pricing-bandwidth-tier-next-64tb',
-        priceKey: 'credits-pricing-bandwidth-tier-next-64tb-price',
-      },
-      {
-        labelKey: 'credits-pricing-bandwidth-tier-over-128tb',
-        priceKey: 'credits-pricing-bandwidth-tier-over-128tb-price',
-      },
-    ],
   },
-  {
+  storage: {
     icon: ArchiveBoxIcon,
     titleKey: 'credits-pricing-storage-title',
     subtitleKey: 'credits-pricing-storage-subtitle',
     accentClass: 'bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300',
-    tiers: [
-      {
-        labelKey: 'credits-pricing-storage-tier-first',
-        priceKey: 'credits-pricing-storage-tier-first-price',
-      },
-      {
-        labelKey: 'credits-pricing-storage-tier-next-5gib',
-        priceKey: 'credits-pricing-storage-tier-next-5gib-price',
-      },
-      {
-        labelKey: 'credits-pricing-storage-tier-next-19gib',
-        priceKey: 'credits-pricing-storage-tier-next-19gib-price',
-      },
-      {
-        labelKey: 'credits-pricing-storage-tier-next-38gib',
-        priceKey: 'credits-pricing-storage-tier-next-38gib-price',
-      },
-      {
-        labelKey: 'credits-pricing-storage-tier-next-187gib',
-        priceKey: 'credits-pricing-storage-tier-next-187gib-price',
-      },
-      {
-        labelKey: 'credits-pricing-storage-tier-next-390gib',
-        priceKey: 'credits-pricing-storage-tier-next-390gib-price',
-      },
-      {
-        labelKey: 'credits-pricing-storage-tier-next-640gib',
-        priceKey: 'credits-pricing-storage-tier-next-640gib-price',
-      },
-      {
-        labelKey: 'credits-pricing-storage-tier-over-1tb',
-        priceKey: 'credits-pricing-storage-tier-over-1tb-price',
-      },
-    ],
   },
-  {
+  build_time: {
     icon: ScaleIcon,
     titleKey: 'credits-pricing-build-title',
     subtitleKey: 'credits-pricing-build-subtitle',
     accentClass: 'bg-sky-100 text-sky-600 dark:bg-sky-900/40 dark:text-sky-300',
-    tiers: [
-      {
-        labelKey: 'credits-pricing-build-tier-first-100',
-        priceKey: 'credits-pricing-build-tier-first-100-price',
-      },
-      {
-        labelKey: 'credits-pricing-build-tier-next-400',
-        priceKey: 'credits-pricing-build-tier-next-400-price',
-      },
-      {
-        labelKey: 'credits-pricing-build-tier-next-500',
-        priceKey: 'credits-pricing-build-tier-next-500-price',
-      },
-      {
-        labelKey: 'credits-pricing-build-tier-next-4000',
-        priceKey: 'credits-pricing-build-tier-next-4000-price',
-      },
-      {
-        labelKey: 'credits-pricing-build-tier-next-5000',
-        priceKey: 'credits-pricing-build-tier-next-5000-price',
-      },
-      {
-        labelKey: 'credits-pricing-build-tier-over-10000',
-        priceKey: 'credits-pricing-build-tier-over-10000-price',
-      },
-    ],
   },
-] as const
+}
 
 const creditPricingSections = computed(() =>
-  creditPricingSectionsConfig.map(section => ({
-    icon: section.icon,
-    accentClass: section.accentClass,
-    title: t(section.titleKey),
-    subtitle: t(section.subtitleKey),
-    tiers: section.tiers.map(tier => ({
-      label: t(tier.labelKey),
-      price: t(tier.priceKey),
-    })),
-  })),
+  creditPricingMetricOrder.flatMap((metric) => {
+    const meta = creditPricingSectionsMeta[metric]
+    const tiers = pricingSteps.value
+      .filter(step => step.type === metric)
+      .map(step => ({
+        label: formatCreditPricingTierLabel(step, t),
+        price: formatCreditPricingPrice(metric, step.price_per_unit, t),
+      }))
+
+    if (!tiers.length)
+      return []
+
+    return [{
+      icon: meta.icon,
+      accentClass: meta.accentClass,
+      title: t(meta.titleKey),
+      subtitle: t(meta.subtitleKey),
+      tiers,
+    }]
+  }),
 )
 
 const creditPricingFootnote = computed(() => t('credits-pricing-footnote'))
@@ -440,8 +323,6 @@ const paginatedDailyTransactions = computed(() => {
   return dailyTransactions.value.slice(start, end)
 })
 
-const deductionMetricsOrder: Database['public']['Enums']['credit_metric_type'][] = ['mau', 'bandwidth', 'storage', 'build_time']
-
 // Compute estimated usage from credits consumed using first-tier pricing
 // This is an approximation since actual pricing is tiered, but gives a reasonable estimate
 function computeUsageFromCredits(metric: Database['public']['Enums']['credit_metric_type'], credits: number): number {
@@ -465,8 +346,8 @@ function metricsWithData(day: DailyLedgerRow) {
 
   // Keep preferred order, then fall back to original
   return entries.sort((a, b) => {
-    const aIdx = deductionMetricsOrder.indexOf(a.metric)
-    const bIdx = deductionMetricsOrder.indexOf(b.metric)
+    const aIdx = creditPricingMetricOrder.indexOf(a.metric)
+    const bIdx = creditPricingMetricOrder.indexOf(b.metric)
     if (aIdx === -1 && bIdx === -1)
       return a.metric.localeCompare(b.metric)
     if (aIdx === -1)
@@ -507,25 +388,7 @@ async function loadTransactions() {
 }
 
 async function loadPricingSteps() {
-  const { data, error } = await supabase
-    .from('capgo_credits_steps')
-    .select('type, price_per_unit, unit_factor')
-    .is('org_id', null) // Only global pricing, not org-specific overrides
-    .order('step_min', { ascending: true })
-
-  if (error) {
-    console.error('Failed to load pricing steps', error)
-    return
-  }
-
-  // Keep only first tier per metric type (lowest step_min)
-  const seen = new Set<string>()
-  pricingSteps.value = (data ?? []).filter((step) => {
-    if (seen.has(step.type))
-      return false
-    seen.add(step.type)
-    return true
-  })
+  pricingSteps.value = await getCreditPricingSteps(currentOrganization.value?.gid)
 }
 
 async function handleBuyCredits() {
@@ -572,14 +435,8 @@ async function handleCreditCheckoutReturn() {
   const sessionIdParam = Array.isArray(sessionIdRaw) ? sessionIdRaw[0] : sessionIdRaw
   // Stripe may append unexpected query fragments after the session id; keep only the valid prefix.
   const sessionId = typeof sessionIdParam === 'string'
-    ? (sessionIdParam.match(/^cs_\w+/)?.[0] ?? '')
-    : ''
-  if (!sessionId) {
-    delete newQuery.creditCheckout
-    delete newQuery.session_id
-    await router.replace({ query: newQuery })
-    return
-  }
+    ? (sessionIdParam.match(/^cs_[\w-]+/)?.[0] ?? null)
+    : null
   if (!currentOrganization.value?.gid)
     return
 
@@ -614,7 +471,7 @@ onMounted(async () => {
 watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined, oldOrgId: string | undefined) => {
   if (!newOrgId || newOrgId === oldOrgId)
     return
-  await Promise.allSettled([loadTransactions()])
+  await Promise.allSettled([loadTransactions(), loadPricingSteps()])
   await handleCreditCheckoutReturn()
 })
 </script>
@@ -704,6 +561,7 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
                   v-model="topUpQuantityInput"
                   type="number"
                   name="creditsTopUpQuantity"
+                  data-test="credits-top-up-quantity"
                   inputmode="numeric"
                   min="1"
                   step="1"
@@ -738,6 +596,7 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
             </div>
             <button
               type="submit"
+              data-test="credits-top-up-submit"
               :disabled="isProcessingCheckout || !isTopUpQuantityValid"
               :class="{ 'opacity-75 pointer-events-none': isProcessingCheckout || !isTopUpQuantityValid }"
               class="inline-flex w-full justify-center items-center py-2 px-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-semibold rounded-lg transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 disabled:opacity-60 disabled:cursor-not-allowed sm:w-auto"

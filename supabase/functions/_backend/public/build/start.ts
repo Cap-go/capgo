@@ -1,7 +1,6 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
 import { HTTPException } from 'hono/http-exception'
-import { SignJWT } from 'jose'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
@@ -14,6 +13,46 @@ interface BuilderStartResponse {
   logs_token?: string
 }
 
+function encodeBase64Url(input: Uint8Array): string {
+  let binary = ''
+  for (const byte of input) {
+    binary += String.fromCharCode(byte)
+  }
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '')
+}
+
+async function signHs256Jwt(payload: Record<string, unknown>, secret: string): Promise<string> {
+  const encoder = new TextEncoder()
+  const header = {
+    alg: 'HS256',
+    typ: 'JWT',
+  }
+
+  const encodedHeader = encodeBase64Url(encoder.encode(JSON.stringify(header)))
+  const encodedPayload = encodeBase64Url(encoder.encode(JSON.stringify(payload)))
+  const signingInput = `${encodedHeader}.${encodedPayload}`
+
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secret),
+    {
+      name: 'HMAC',
+      hash: 'SHA-256',
+    },
+    false,
+    ['sign'],
+  )
+
+  const signature = new Uint8Array(
+    await crypto.subtle.sign('HMAC', key, encoder.encode(signingInput)),
+  )
+
+  return `${signingInput}.${encodeBase64Url(signature)}`
+}
+
 /**
  * Generate a JWT token for direct log stream access
  * Uses HMAC-SHA256 for signing
@@ -24,19 +63,16 @@ async function generateLogStreamToken(
   appId: string,
   jwtSecret: string,
 ): Promise<string> {
-  const secret = new TextEncoder().encode(jwtSecret)
-
-  return await new SignJWT({
+  const nowInSeconds = Math.floor(Date.now() / 1000)
+  return signHs256Jwt({
     job_id: jobId,
     app_id: appId,
-  })
-    .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
-    .setIssuer('capgo')
-    .setAudience('build-logs')
-    .setSubject(userId)
-    .setIssuedAt()
-    .setExpirationTime('4h')
-    .sign(secret)
+    iss: 'capgo',
+    aud: 'build-logs',
+    sub: userId,
+    iat: nowInSeconds,
+    exp: nowInSeconds + (4 * 60 * 60),
+  }, jwtSecret)
 }
 
 async function markBuildAsFailed(

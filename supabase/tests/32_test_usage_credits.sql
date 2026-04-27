@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(19);
+SELECT plan(23);
 
 DO $$
 BEGIN
@@ -39,6 +39,38 @@ SELECT
         )
         > 0,
         'top_up_usage_credits qualifies source_ref lookups to avoid ambiguity'
+    );
+
+SELECT
+    results_eq(
+        $$SELECT price_per_unit
+          FROM public.capgo_credits_steps
+         WHERE type = 'build_time'
+           AND org_id IS NULL
+           AND step_min = 0
+         ORDER BY step_max ASC
+         LIMIT 1$$,
+        $$VALUES (0.16::double precision)$$,
+        'build_time credit pricing starts at $0.16 per minute'
+    );
+
+SELECT
+    results_eq(
+        $$SELECT price_per_unit
+          FROM public.capgo_credits_steps
+         WHERE type = 'build_time'
+           AND org_id IS NULL
+         ORDER BY step_max DESC, step_min DESC
+         LIMIT 1$$,
+        $$VALUES (0.08::double precision)$$,
+        'build_time credit pricing floors at $0.08 per minute'
+    );
+
+SELECT
+    results_eq(
+        $$SELECT credits_required FROM public.calculate_credit_cost('build_time', 6000)$$,
+        $$VALUES (16.0::numeric)$$,
+        'calculate_credit_cost prices build_time through the shared credit ladder'
     );
 
 CREATE TEMP TABLE test_credit_context (
@@ -151,6 +183,76 @@ SELECT
 FROM
     grant_insert,
     step_insert;
+
+CREATE TEMP TABLE test_repricing_context (
+    credit_step_id bigint,
+    overage_event_id uuid
+) ON COMMIT DROP;
+
+WITH repricing_step AS (
+    INSERT INTO public.capgo_credits_steps (
+        type,
+        step_min,
+        step_max,
+        price_per_unit,
+        unit_factor,
+        org_id
+    )
+    VALUES (
+        'build_time',
+        900000000,
+        900006000,
+        0.5,
+        60,
+        NULL
+    )
+    RETURNING id
+),
+repricing_overage AS (
+    INSERT INTO public.usage_overage_events (
+        org_id,
+        metric,
+        overage_amount,
+        credits_estimated,
+        credits_debited,
+        credit_step_id,
+        billing_cycle_start,
+        billing_cycle_end,
+        details
+    )
+    SELECT
+        (SELECT org_id FROM test_credit_context),
+        'build_time'::public.credit_metric_type,
+        6000,
+        50,
+        0,
+        repricing_step.id,
+        current_date,
+        current_date,
+        '{}'::jsonb
+    FROM repricing_step
+    RETURNING id, credit_step_id
+)
+INSERT INTO test_repricing_context (credit_step_id, overage_event_id)
+SELECT credit_step_id, id
+FROM repricing_overage;
+
+UPDATE public.capgo_credits_steps
+SET
+    price_per_unit = 0.16,
+    unit_factor = 60
+WHERE id = (SELECT credit_step_id FROM test_repricing_context);
+
+SELECT
+    is(
+        (
+            SELECT credit_step_id
+            FROM public.usage_overage_events
+            WHERE id = (SELECT overage_event_id FROM test_repricing_context)
+        ),
+        (SELECT credit_step_id FROM test_repricing_context),
+        'repricing build_time tiers in place preserves usage_overage_events credit_step_id links'
+    );
 
 SELECT
     throws_ok(

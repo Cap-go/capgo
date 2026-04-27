@@ -32,6 +32,7 @@ interface Props {
   filters?: { [key: string]: boolean }
   searchPlaceholder?: string
   showAdd?: boolean
+  addButtonTestId?: string
   search?: string
   total: number
   currentPage: number
@@ -473,6 +474,7 @@ const paginationClass = computed(() => props.mobileFixedPagination
         </button>
         <div v-if="showAdd" class="p-px mr-2 rounded-lg from-cyan-500 to-purple-500 bg-linear-to-r">
           <button
+            :data-test="addButtonTestId"
             class="inline-flex items-center py-1.5 px-3 text-sm font-medium text-gray-500 bg-white rounded-md cursor-pointer dark:text-white dark:bg-gray-800 hover:bg-gray-100 focus:ring-4 focus:ring-gray-200 dark:hover:bg-gray-700 dark:focus:ring-gray-700 focus:outline-hidden"
             type="button" @click="handleAddClick"
           >
@@ -602,6 +604,7 @@ const paginationClass = computed(() => props.mobileFixedPagination
                       <div
                         v-for="(action, actionIndex) in col.actions"
                         v-show="!action.visible || action.visible(elem)" :key="actionIndex"
+                      >
                       >
                         <div
                           class="relative inline-flex group"

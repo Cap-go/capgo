@@ -217,12 +217,12 @@ BEGIN
         1073741824,
         NULL
       ), -- 1280+ GiB
-      ('build_time', 0, 6000, 0.5, 60, NULL), -- 0-100 minutes (in seconds, displayed as minutes)
-      ('build_time', 6000, 30000, 0.45, 60, NULL), -- 100-500 minutes (in seconds, displayed as minutes)
-      ('build_time', 30000, 60000, 0.40, 60, NULL), -- 500-1000 minutes (in seconds, displayed as minutes)
-      ('build_time', 60000, 300000, 0.35, 60, NULL), -- 1000-5000 minutes (in seconds, displayed as minutes)
-      ('build_time', 300000, 600000, 0.30, 60, NULL), -- 5000-10000 minutes (in seconds, displayed as minutes)
-      ('build_time', 600000, 9223372036854775807, 0.25, 60, NULL); -- 10000+ minutes (in seconds, displayed as minutes)
+      ('build_time', 0, 6000, 0.16, 60, NULL), -- 0-100 minutes (in seconds, displayed as minutes)
+      ('build_time', 6000, 30000, 0.14, 60, NULL), -- 100-500 minutes (in seconds, displayed as minutes)
+      ('build_time', 30000, 60000, 0.12, 60, NULL), -- 500-1000 minutes (in seconds, displayed as minutes)
+      ('build_time', 60000, 300000, 0.10, 60, NULL), -- 1000-5000 minutes (in seconds, displayed as minutes)
+      ('build_time', 300000, 600000, 0.09, 60, NULL), -- 5000-10000 minutes (in seconds, displayed as minutes)
+      ('build_time', 600000, 9223372036854775807, 0.08, 60, NULL); -- 10000+ minutes (in seconds, displayed as minutes)
 
     INSERT INTO "storage"."buckets" ("id", "name", "owner", "created_at", "updated_at", "public") VALUES
     ('capgo', 'capgo', NULL, NOW(), NOW(), 't'),
@@ -614,7 +614,7 @@ BEGIN
 
     -- Drop replicated orgs but keet the the seed ones
     DELETE from "public"."orgs" where POSITION('organization' in orgs.name)=1;
-    PERFORM setval('public.apikeys_id_seq', 111, false);
+    PERFORM setval('public.apikeys_id_seq', 111, true);
     PERFORM setval('public.app_versions_id_seq', 16, true);
     PERFORM setval('public.channel_id_seq', 6, false);
     PERFORM setval('public.deploy_history_id_seq', 5, false);

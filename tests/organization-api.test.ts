@@ -5,6 +5,7 @@ import { z } from 'zod'
 
 import {
   BASE_URL,
+  getAuthHeadersForCredentials,
   getSupabaseClient,
   headers,
   normalizeLocalhostUrl,
@@ -14,6 +15,7 @@ import {
   USER_ADMIN_EMAIL,
   USER_EMAIL,
   USER_ID,
+  USER_ID_2,
   USER_PASSWORD,
 } from './test-utils.ts'
 
@@ -107,28 +109,35 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     })
     expect(orgUserError).toBeNull()
 
-    const createResponse = await fetch(`${BASE_URL}/apikey`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        name: `Organization read-only regression ${randomUUID()}`,
+    // Seed the key directly so this suite stays focused on organization-route auth.
+    // API key creation behavior is covered in apikey-specific tests and can run in parallel.
+    const { data: createdKey, error: createError } = await getSupabaseClient()
+      .from('apikeys')
+      .insert({
+        user_id: USER_ID,
+        key: randomUUID(),
+        key_hash: null,
         mode: 'read',
-        hashed: false,
+        name: `Organization read-only regression ${randomUUID()}`,
         limited_to_orgs: [readOnlyOrgId],
-      }),
-    })
-    expect(createResponse.status).toBe(200)
-    const createdKey = await createResponse.json<{ id: number, key: string }>()
+      })
+      .select('id, key')
+      .single()
+
+    expect(createError).toBeNull()
+    expect(createdKey?.id).toBeTypeOf('number')
+    expect(createdKey?.key).toBeTypeOf('string')
+    if (!createdKey?.key || typeof createdKey.id !== 'number') {
+      throw new Error('Failed to seed read-only API key')
+    }
+
     readOnlyKey = createdKey.key
     readOnlyKeyId = createdKey.id
   })
 
   afterAll(async () => {
     if (readOnlyKeyId) {
-      await fetch(`${BASE_URL}/apikey/${readOnlyKeyId}`, {
-        method: 'DELETE',
-        headers,
-      })
+      await getSupabaseClient().from('apikeys').delete().eq('id', readOnlyKeyId)
     }
     await getSupabaseClient().from('org_users').delete().eq('org_id', readOnlyOrgId)
     await getSupabaseClient().from('orgs').delete().eq('id', readOnlyOrgId)
@@ -171,21 +180,21 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     expect(response.status).toBe(401)
   })
 
-	  it.concurrent('rejects POST /organization', async () => {
-	    const response = await fetch(`${BASE_URL}/organization`, {
-	      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
-	      method: 'POST',
-	      body: JSON.stringify({
-	        orgId: readOnlyOrgId,
-	        name: `Blocked create ${randomUUID()}`,
-	      }),
-	    })
+  it.concurrent('rejects POST /organization', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'POST',
+      body: JSON.stringify({
+        orgId: readOnlyOrgId,
+        name: `Blocked create ${randomUUID()}`,
+      }),
+    })
 
-	    expect(response.status).toBe(401)
-	    // Ensure this is blocked by API-key auth (key mode allowlist), not by RLS deeper in the handler.
-	    const payload = await response.json() as { error?: string }
-	    expect(payload.error).toBe('invalid_apikey')
-	  })
+    expect(response.status).toBe(401)
+    // Ensure this is blocked by API-key auth (key mode allowlist), not by RLS deeper in the handler.
+    const payload = await response.json() as { error?: string }
+    expect(payload.error).toBe('invalid_apikey')
+  })
 
   it.concurrent('rejects DELETE /organization', async () => {
     const response = await fetch(`${BASE_URL}/organization?orgId=${readOnlyOrgId}`, {
@@ -222,6 +231,32 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     expect(members.parse(await response.json()).some(member => member.uid === USER_ID)).toBe(true)
   })
 
+  it.concurrent('allows GET /organization/members for same user without org scope limits', async () => {
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID}`, {
+      headers,
+      method: 'GET',
+    })
+
+    expect(response.status).toBe(200)
+    const members = z.array(z.object({
+      uid: z.string(),
+      email: z.string(),
+      role: z.string(),
+    }))
+    expect(members.parse(await response.json()).some(member => member.uid === USER_ID)).toBe(true)
+  })
+
+  it.concurrent('rejects GET /organization/members outside limited_to_orgs scope', async () => {
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${ORG_ID}`, {
+      headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
+      method: 'GET',
+    })
+
+    expect(response.status).toBe(400)
+    const payload = await response.json() as { error: string }
+    expect(payload.error).toBe('cannot_access_organization')
+  })
+
   it.concurrent('allows GET /organization/audit for accessible organizations', async () => {
     const response = await fetch(`${BASE_URL}/organization/audit?orgId=${readOnlyOrgId}`, {
       headers: { ...readOnlyHeaders, capgkey: readOnlyKey },
@@ -231,6 +266,334 @@ describe('read-mode API keys cannot access destructive organization routes', () 
     expect(response.status).toBe(200)
     // The audit endpoint is allowed for read-mode keys; payload may be empty for a new org.
     expect(await response.json()).toBeDefined()
+  })
+})
+
+describe('scoped write API keys cannot cross organization boundaries', () => {
+  const allowedOrgId = randomUUID()
+  const targetOrgId = randomUUID()
+  const targetOrgName = `Scoped target ${randomUUID()}`
+  const targetCustomerId = `cus_scope_target_${randomUUID()}`
+  const scopedKeyName = `Scoped org write ${randomUUID()}`
+  const imagePath = `org/${targetOrgId}/scope-bypass-${randomUUID()}.txt`
+  let scopedKey = ''
+  let scopedKeyId = 0
+
+  beforeAll(async () => {
+    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
+      customer_id: targetCustomerId,
+      status: 'succeeded',
+      product_id: 'prod_LQIregjtNduh4q',
+      subscription_id: `sub_${randomUUID()}`,
+      trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+      is_good_plan: true,
+    })
+    expect(stripeError).toBeNull()
+
+    const { error: allowedOrgError } = await getSupabaseClient().from('orgs').insert({
+      id: allowedOrgId,
+      name: `Scoped allowed ${randomUUID()}`,
+      management_email: TEST_EMAIL,
+      created_by: USER_ID,
+      use_new_rbac: true,
+    })
+    expect(allowedOrgError).toBeNull()
+
+    const { error: targetOrgError } = await getSupabaseClient().from('orgs').insert({
+      id: targetOrgId,
+      name: targetOrgName,
+      management_email: TEST_EMAIL,
+      created_by: USER_ID,
+      customer_id: targetCustomerId,
+      use_new_rbac: true,
+    })
+    expect(targetOrgError).toBeNull()
+
+    const { data: createdKey, error: createKeyError } = await getSupabaseClient()
+      .from('apikeys')
+      .insert({
+        user_id: USER_ID,
+        key: randomUUID(),
+        key_hash: null,
+        mode: 'write',
+        name: scopedKeyName,
+        limited_to_orgs: [allowedOrgId],
+      })
+      .select('id, key')
+      .single()
+
+    expect(createKeyError).toBeNull()
+    expect(createdKey?.key).toBeTruthy()
+    expect(createdKey?.id).toBeTypeOf('number')
+
+    if (!createdKey?.key || typeof createdKey.id !== 'number') {
+      throw new Error('Failed to create scoped write API key')
+    }
+
+    scopedKey = createdKey.key
+    scopedKeyId = createdKey.id
+
+    const imageContent = new Blob(['scope bypass regression'], { type: 'text/plain' })
+    const { error: uploadError } = await getSupabaseClient()
+      .storage
+      .from('images')
+      .upload(imagePath, imageContent, {
+        contentType: 'text/plain',
+        upsert: true,
+      })
+
+    expect(uploadError).toBeNull()
+  })
+
+  afterAll(async () => {
+    if (scopedKeyId) {
+      await getSupabaseClient().from('apikeys').delete().eq('id', scopedKeyId)
+    }
+
+    await getSupabaseClient().storage.from('images').remove([imagePath])
+    await getSupabaseClient().from('role_bindings').delete().eq('org_id', allowedOrgId)
+    await getSupabaseClient().from('role_bindings').delete().eq('org_id', targetOrgId)
+    await getSupabaseClient().from('org_users').delete().eq('org_id', allowedOrgId)
+    await getSupabaseClient().from('org_users').delete().eq('org_id', targetOrgId)
+    await getSupabaseClient().from('orgs').delete().eq('id', allowedOrgId)
+    await getSupabaseClient().from('orgs').delete().eq('id', targetOrgId)
+    await getSupabaseClient().from('stripe_info').delete().eq('customer_id', targetCustomerId)
+  })
+
+  it.concurrent('rejects DELETE /organization outside limited_to_orgs scope without deleting images', async () => {
+    const response = await fetch(`${BASE_URL}/organization?orgId=${targetOrgId}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'capgkey': scopedKey,
+      },
+      method: 'DELETE',
+    })
+
+    expect(response.status).toBe(403)
+    const payload = await response.json() as { error: string }
+    expect(payload.error).toBe('invalid_org_id')
+
+    const { data: targetOrg, error: targetOrgError } = await getSupabaseClient()
+      .from('orgs')
+      .select('id')
+      .eq('id', targetOrgId)
+      .maybeSingle()
+
+    expect(targetOrgError).toBeNull()
+    expect(targetOrg?.id).toBe(targetOrgId)
+
+    const { data: imageList, error: imageError } = await getSupabaseClient()
+      .storage
+      .from('images')
+      .list(`org/${targetOrgId}`)
+
+    expect(imageError).toBeNull()
+    expect(imageList?.some(file => file.name === imagePath.split('/').at(-1))).toBe(true)
+  })
+
+  it.concurrent('rejects DELETE /organization/members outside limited_to_orgs scope without deleting role bindings', async () => {
+    const addMemberResponse = await fetch(`${BASE_URL}/organization/members`, {
+      headers,
+      method: 'POST',
+      body: JSON.stringify({
+        orgId: targetOrgId,
+        email: USER_ADMIN_EMAIL,
+        invite_type: 'read',
+      }),
+    })
+    expect(addMemberResponse.status).toBe(200)
+
+    const { data: userData, error: userError } = await getSupabaseClient().from('users').select('id').eq('email', USER_ADMIN_EMAIL).single()
+    expect(userError).toBeNull()
+    expect(userData?.id).toBeTruthy()
+
+    const { data: bindingsBefore, error: bindingsBeforeError } = await getSupabaseClient()
+      .from('role_bindings')
+      .select('id')
+      .eq('principal_type', 'user')
+      .eq('principal_id', userData!.id)
+      .eq('org_id', targetOrgId)
+
+    expect(bindingsBeforeError).toBeNull()
+    expect(bindingsBefore!.length).toBeGreaterThan(0)
+
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${targetOrgId}&email=${USER_ADMIN_EMAIL}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'capgkey': scopedKey,
+      },
+      method: 'DELETE',
+    })
+
+    expect(response.status).toBe(400)
+    const payload = await response.json() as { error: string }
+    expect(payload.error).toBe('cannot_access_organization')
+
+    const { data: membershipAfter, error: membershipAfterError } = await getSupabaseClient()
+      .from('org_users')
+      .select('org_id, user_id')
+      .eq('org_id', targetOrgId)
+      .eq('user_id', userData!.id)
+      .maybeSingle()
+
+    expect(membershipAfterError).toBeNull()
+    expect(membershipAfter?.org_id).toBe(targetOrgId)
+
+    const { data: bindingsAfter, error: bindingsAfterError } = await getSupabaseClient()
+      .from('role_bindings')
+      .select('id')
+      .eq('principal_type', 'user')
+      .eq('principal_id', userData!.id)
+      .eq('org_id', targetOrgId)
+
+    expect(bindingsAfterError).toBeNull()
+    expect(bindingsAfter!.length).toBeGreaterThan(0)
+
+    await getSupabaseClient().from('org_users').delete().eq('org_id', targetOrgId).eq('user_id', userData!.id)
+  })
+})
+
+describe('x-limited-key-id subkeys enforce organization scope on middlewareKey routes', () => {
+  const scopedOrgId = randomUUID()
+  const blockedOrgId = randomUUID()
+  const scopedCustomerId = `cus_scoped_${scopedOrgId}`
+  const blockedCustomerId = `cus_blocked_${blockedOrgId}`
+  let parentKey = ''
+  let parentKeyId = 0
+  let scopedSubkeyId = 0
+
+  beforeAll(async () => {
+    const supabase = getSupabaseClient()
+
+    const { error: scopedStripeError } = await supabase.from('stripe_info').insert({
+      customer_id: scopedCustomerId,
+      status: 'succeeded',
+      product_id: 'prod_LQIregjtNduh4q',
+      subscription_id: `sub_${randomUUID()}`,
+      trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+      is_good_plan: true,
+    })
+    expect(scopedStripeError).toBeNull()
+
+    const { error: blockedStripeError } = await supabase.from('stripe_info').insert({
+      customer_id: blockedCustomerId,
+      status: 'succeeded',
+      product_id: 'prod_LQIregjtNduh4q',
+      subscription_id: `sub_${randomUUID()}`,
+      trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+      is_good_plan: true,
+    })
+    expect(blockedStripeError).toBeNull()
+
+    const { error: orgError } = await supabase.from('orgs').insert([
+      {
+        id: scopedOrgId,
+        name: `Scoped org ${randomUUID()}`,
+        management_email: TEST_EMAIL,
+        created_by: USER_ID,
+        customer_id: scopedCustomerId,
+        use_new_rbac: false,
+      },
+      {
+        id: blockedOrgId,
+        name: `Blocked org ${randomUUID()}`,
+        management_email: TEST_EMAIL,
+        created_by: USER_ID,
+        customer_id: blockedCustomerId,
+        use_new_rbac: false,
+      },
+    ])
+    expect(orgError).toBeNull()
+
+    const { error: orgUsersError } = await supabase.from('org_users').insert([
+      { org_id: scopedOrgId, user_id: USER_ID, user_right: 'super_admin' },
+      { org_id: blockedOrgId, user_id: USER_ID, user_right: 'super_admin' },
+    ])
+    expect(orgUsersError).toBeNull()
+
+    const { data: parentKeyData, error: parentKeyError } = await supabase
+      .from('apikeys')
+      .insert({
+        user_id: USER_ID,
+        key: randomUUID(),
+        key_hash: null,
+        mode: 'all',
+        name: `Parent key ${randomUUID()}`,
+        limited_to_orgs: [],
+        limited_to_apps: [],
+      })
+      .select('id, key')
+      .single()
+    expect(parentKeyError).toBeNull()
+    if (!parentKeyData?.key || typeof parentKeyData.id !== 'number') {
+      throw new TypeError('Failed to seed parent API key')
+    }
+    parentKey = parentKeyData.key
+    parentKeyId = parentKeyData.id
+
+    const { data: subkeyData, error: subkeyError } = await supabase
+      .from('apikeys')
+      .insert({
+        user_id: USER_ID,
+        key: randomUUID(),
+        key_hash: null,
+        mode: 'read',
+        name: `Scoped subkey ${randomUUID()}`,
+        limited_to_orgs: [scopedOrgId],
+        limited_to_apps: [],
+      })
+      .select('id')
+      .single()
+    expect(subkeyError).toBeNull()
+    if (typeof subkeyData?.id !== 'number') {
+      throw new TypeError('Failed to seed scoped subkey')
+    }
+    scopedSubkeyId = subkeyData.id
+  })
+
+  afterAll(async () => {
+    const supabase = getSupabaseClient()
+
+    if (scopedSubkeyId) {
+      await supabase.from('apikeys').delete().eq('id', scopedSubkeyId)
+    }
+    if (parentKeyId) {
+      await supabase.from('apikeys').delete().eq('id', parentKeyId)
+    }
+
+    await supabase.from('org_users').delete().in('org_id', [scopedOrgId, blockedOrgId])
+    await supabase.from('orgs').delete().in('id', [scopedOrgId, blockedOrgId])
+    await supabase.from('stripe_info').delete().in('customer_id', [scopedCustomerId, blockedCustomerId])
+  })
+
+  it.concurrent('limits GET /organization to the subkey org', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'authorization': parentKey,
+        'x-limited-key-id': String(scopedSubkeyId),
+      },
+      method: 'GET',
+    })
+
+    expect(response.status).toBe(200)
+    const payload = z.array(z.object({ id: z.string(), name: z.string() })).parse(await response.json())
+    expect(payload.map(org => org.id)).toEqual([scopedOrgId])
+  })
+
+  it.concurrent('rejects GET /organization/members outside the subkey org scope', async () => {
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${blockedOrgId}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'authorization': parentKey,
+        'x-limited-key-id': String(scopedSubkeyId),
+      },
+      method: 'GET',
+    })
+
+    expect(response.status).toBe(400)
+    const payload = await response.json() as { error: string }
+    expect(payload.error).toBe('cannot_access_organization')
   })
 })
 
@@ -673,26 +1036,11 @@ describe('[PUT] /organization', () => {
     const originalName = `Update Base Organization ${new Date().toISOString()}`
     const name = `Updated Organization ${new Date().toISOString()}`
     const website = 'https://www.capgo.app/docs'
-    const customerId = `cus_test_${orgId}`
-    const subscriptionId = `sub_${orgId}`
-    const trialAt = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
-    const stripeInfo = {
-      customer_id: customerId,
-      status: 'succeeded' as const,
-      product_id: 'prod_LQIregjtNduh4q',
-      subscription_id: subscriptionId,
-      trial_at: trialAt,
-      is_good_plan: true,
-    }
-    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert(stripeInfo)
-    if (stripeError)
-      throw stripeError
     const { error: createError } = await getSupabaseClient().from('orgs').insert({
       id: orgId,
       name: originalName,
       management_email: TEST_EMAIL,
       created_by: USER_ID,
-      customer_id: customerId,
       website: 'https://base.example/',
       use_new_rbac: false,
     })
@@ -730,7 +1078,6 @@ describe('[PUT] /organization', () => {
     finally {
       await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
       await getSupabaseClient().from('orgs').delete().eq('id', orgId)
-      await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
     }
   })
 
@@ -803,6 +1150,8 @@ describe('[DELETE] /organization', () => {
   it('delete organization successfully', async () => {
     const id = randomUUID()
     const customerId = `cus_test_${id}`
+    const startDate = '2026-01-01'
+    const endDate = '2026-01-31'
 
     // Create stripe_info for this test org
     const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
@@ -828,6 +1177,21 @@ describe('[DELETE] /organization', () => {
     expect(errorOrg).toBeNull()
     expect(dataOrg).toBeTruthy()
 
+    const { error: metricsCacheError } = await getSupabaseClient().from('org_metrics_cache').insert({
+      org_id: id,
+      start_date: startDate,
+      end_date: endDate,
+      mau: 1,
+      storage: 2,
+      bandwidth: 3,
+      build_time_unit: 4,
+      get: 5,
+      fail: 6,
+      install: 7,
+      uninstall: 8,
+    })
+    expect(metricsCacheError).toBeNull()
+
     const response = await fetch(`${BASE_URL}/organization?orgId=${id}`, {
       headers,
       method: 'DELETE',
@@ -839,6 +1203,14 @@ describe('[DELETE] /organization', () => {
     const { data: dataOrg2, error: errorOrg2 } = await getSupabaseClient().from('orgs').select().eq('id', id).single()
     expect(errorOrg2).toBeTruthy()
     expect(dataOrg2).toBeNull()
+
+    const { data: cachedMetrics, error: cachedMetricsError } = await getSupabaseClient()
+      .from('org_metrics_cache')
+      .select('org_id')
+      .eq('org_id', id)
+      .maybeSingle()
+    expect(cachedMetricsError).toBeNull()
+    expect(cachedMetrics).toBeNull()
 
     await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
   })
@@ -951,74 +1323,126 @@ describe('[DELETE] /organization', () => {
 })
 
 describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
+  const enforceOrgId = randomUUID()
+  const enforceGlobalId = randomUUID()
+  const enforceCustomerId = `cus_test_${enforceOrgId}`
+  const enforceWebsite = 'https://hashed-enforcement.example/'
+  let user2AuthHeaders: Record<string, string> | null = null
+
+  beforeAll(async () => {
+    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
+      customer_id: enforceCustomerId,
+      status: 'succeeded',
+      product_id: 'prod_LQIregjtNduh4q',
+      subscription_id: `sub_${enforceGlobalId}`,
+      trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+      is_good_plan: true,
+    })
+    expect(stripeError).toBeNull()
+
+    const { error: orgError } = await getSupabaseClient().from('orgs').insert({
+      id: enforceOrgId,
+      name: `Hashed Enforcement Organization ${enforceGlobalId}`,
+      management_email: TEST_EMAIL,
+      created_by: USER_ID_2,
+      customer_id: enforceCustomerId,
+      website: enforceWebsite,
+      use_new_rbac: false,
+    })
+    expect(orgError).toBeNull()
+
+    const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+      org_id: enforceOrgId,
+      user_id: USER_ID_2,
+      user_right: 'super_admin',
+    })
+    expect(orgUserError).toBeNull()
+
+    user2AuthHeaders = await getAuthHeadersForCredentials('test2@capgo.app', USER_PASSWORD)
+  })
+
+  afterAll(async () => {
+    await getSupabaseClient().from('org_users').delete().eq('org_id', enforceOrgId)
+    await getSupabaseClient().from('orgs').delete().eq('id', enforceOrgId)
+    await getSupabaseClient().from('stripe_info').delete().eq('customer_id', enforceCustomerId)
+  })
+
   it('update organization enforce_hashed_api_keys to true', async () => {
+    if (!user2AuthHeaders)
+      throw new Error('Missing auth headers for test2@capgo.app')
+
     // First, ensure it's false
-    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false }).eq('id', ORG_ID)
+    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false }).eq('id', enforceOrgId)
 
     const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
+      headers: user2AuthHeaders,
       method: 'PUT',
       body: JSON.stringify({
-        orgId: ORG_ID,
+        orgId: enforceOrgId,
         enforce_hashed_api_keys: true,
       }),
     })
     expect(response.status).toBe(200)
     const responseData = await response.json() as { id: string, data: any }
-    expect(responseData.id).toBe(ORG_ID)
+    expect(responseData.id).toBe(enforceOrgId)
 
     // Verify the setting was updated
-    const { data, error } = await getSupabaseClient().from('orgs').select('enforce_hashed_api_keys').eq('id', ORG_ID).single()
+    const { data, error } = await getSupabaseClient().from('orgs').select('enforce_hashed_api_keys').eq('id', enforceOrgId).single()
     expect(error).toBeNull()
     expect(data?.enforce_hashed_api_keys).toBe(true)
 
     // Reset to false
-    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false }).eq('id', ORG_ID)
+    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false }).eq('id', enforceOrgId)
   })
 
   it('update organization enforce_hashed_api_keys to false', async () => {
+    if (!user2AuthHeaders)
+      throw new Error('Missing auth headers for test2@capgo.app')
+
     // First, set it to true
-    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: true }).eq('id', ORG_ID)
+    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: true }).eq('id', enforceOrgId)
 
     const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
+      headers: user2AuthHeaders,
       method: 'PUT',
       body: JSON.stringify({
-        orgId: ORG_ID,
+        orgId: enforceOrgId,
         enforce_hashed_api_keys: false,
       }),
     })
     expect(response.status).toBe(200)
     const responseData = await response.json() as { id: string, data: any }
-    expect(responseData.id).toBe(ORG_ID)
+    expect(responseData.id).toBe(enforceOrgId)
 
     // Verify the setting was updated
-    const { data, error } = await getSupabaseClient().from('orgs').select('enforce_hashed_api_keys').eq('id', ORG_ID).single()
+    const { data, error } = await getSupabaseClient().from('orgs').select('enforce_hashed_api_keys').eq('id', enforceOrgId).single()
     expect(error).toBeNull()
     expect(data?.enforce_hashed_api_keys).toBe(false)
   })
 
   it('get_orgs_v7 returns enforce_hashed_api_keys field', async () => {
     // Set a known value
-    const rpcWebsite = website
-    const previousWebsite = website
-    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: true, website: rpcWebsite }).eq('id', ORG_ID)
+    const rpcWebsite = enforceWebsite
+    const previousWebsite = enforceWebsite
+    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: true, website: rpcWebsite }).eq('id', enforceOrgId)
 
     // Call get_orgs_v7 via RPC
-    const { data, error } = await getSupabaseClient().rpc('get_orgs_v7', { userid: USER_ID })
+    const { data, error } = await getSupabaseClient().rpc('get_orgs_v7', { userid: USER_ID_2 })
     expect(error).toBeNull()
     expect(Array.isArray(data)).toBe(true)
 
     // Find our test org
-    const testOrg = data?.find((org: { gid: string }) => org.gid === ORG_ID)
+    const testOrg = data?.find((org: { gid: string }) => org.gid === enforceOrgId)
     expect(testOrg).toBeTruthy()
     expect(testOrg).toHaveProperty('enforce_hashed_api_keys')
     expect(testOrg!.enforce_hashed_api_keys).toBe(true)
+    expect(testOrg).toHaveProperty('stats_updated_at')
+    expect(testOrg).toHaveProperty('stats_refresh_requested_at')
     expect(testOrg).toHaveProperty('website')
     expect(testOrg!.website).toBe(rpcWebsite)
 
     // Reset
-    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false, website: previousWebsite }).eq('id', ORG_ID)
+    await getSupabaseClient().from('orgs').update({ enforce_hashed_api_keys: false, website: previousWebsite }).eq('id', enforceOrgId)
   })
 
   it.concurrent('rejects public RPC access to get_orgs_v7(userid)', async () => {
@@ -1074,27 +1498,14 @@ describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
 const ORG_ID_RBAC = randomUUID()
 const globalIdRbac = randomUUID()
 const nameRbac = `RBAC Test Organization ${globalIdRbac}`
-const customerIdRbac = `cus_test_rbac_${ORG_ID_RBAC}`
 
 describe('rbac mode - organization member operations', () => {
   beforeAll(async () => {
-    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
-      customer_id: customerIdRbac,
-      status: 'succeeded',
-      product_id: 'prod_LQIregjtNduh4q',
-      subscription_id: `sub_${globalIdRbac}`,
-      trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
-      is_good_plan: true,
-    })
-    if (stripeError)
-      throw stripeError
-
     const { error } = await getSupabaseClient().from('orgs').insert({
       id: ORG_ID_RBAC,
       name: nameRbac,
       management_email: TEST_EMAIL,
       created_by: USER_ID,
-      customer_id: customerIdRbac,
       use_new_rbac: true, // Explicitly RBAC — tests the RBAC permission path
     })
     if (error)
@@ -1108,7 +1519,6 @@ describe('rbac mode - organization member operations', () => {
     await getSupabaseClient().from('role_bindings').delete().eq('org_id', ORG_ID_RBAC)
     await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID_RBAC)
     await getSupabaseClient().from('orgs').delete().eq('id', ORG_ID_RBAC)
-    await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerIdRbac)
   })
 
   it('[GET] /organization - get RBAC org by id', async () => {

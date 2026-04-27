@@ -1,10 +1,12 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
+import { HTTPException } from 'hono/http-exception'
 import { z } from 'zod/mini'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { createSignedImageUrl, normalizeImagePath } from '../../utils/storage.ts'
+import { getStripeCustomerName, isDeterministicStripeCustomerUpdateError, updateCustomerOrganizationName } from '../../utils/stripe.ts'
 import { apikeyHasOrgRightWithPolicy, supabaseAdmin, supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
 import { normalizeWebsiteUrl } from './website.ts'
 
@@ -19,6 +21,9 @@ const bodySchema = z.object({
   enforce_hashed_api_keys: z.optional(z.boolean()),
   enforcing_2fa: z.optional(z.boolean()),
 })
+
+type OrgRow = Database['public']['Tables']['orgs']['Row']
+type OrgUpdateFields = Partial<Database['public']['Tables']['orgs']['Update']>
 
 function parseBody(bodyRaw: unknown) {
   const bodyParsed = bodySchema.safeParse(bodyRaw)
@@ -61,10 +66,10 @@ function validateMaxExpirationDays(maxDays?: number | null) {
   }
 }
 
-function buildUpdateFields(body: z.infer<typeof bodySchema>) {
-  const updateFields: Partial<Database['public']['Tables']['orgs']['Update']> = {}
+function buildUpdateFields(body: z.infer<typeof bodySchema>, sanitizedName?: string) {
+  const updateFields: OrgUpdateFields = {}
   if (body.name !== undefined)
-    updateFields.name = body.name
+    updateFields.name = sanitizedName ?? body.name
   if (body.website !== undefined)
     updateFields.website = normalizeWebsiteUrl(body.website)
   if (body.logo !== undefined)
@@ -82,6 +87,28 @@ function buildUpdateFields(body: z.infer<typeof bodySchema>) {
   return updateFields
 }
 
+async function sanitizeOrgNameForSync(
+  supabase: ReturnType<typeof supabaseApikey>,
+  name: string,
+) {
+  const { data, error } = await supabase.rpc('strip_html', { input: name })
+
+  if (error || data === null) {
+    throw simpleError('cannot_update_org', 'Cannot update org', {
+      error: error?.message ?? 'cannot_sanitize_org_name',
+    })
+  }
+
+  const sanitizedName = data.trim()
+  if (!sanitizedName) {
+    throw simpleError('invalid_body', 'Invalid body', {
+      error: 'sanitized_name_empty',
+    })
+  }
+
+  return sanitizedName
+}
+
 async function enforceSelf2faRequirement(authUserId: string, c: Context<MiddlewareKeyVariables>) {
   const { data: has2faEnabled, error } = await supabaseAdmin(c)
     .rpc('has_2fa_enabled', { user_id: authUserId })
@@ -97,20 +124,97 @@ async function enforceSelf2faRequirement(authUserId: string, c: Context<Middlewa
 async function updateOrg(
   supabase: ReturnType<typeof supabaseApikey>,
   orgId: string,
-  updateFields: Partial<Database['public']['Tables']['orgs']['Update']>,
+  updateFields: OrgUpdateFields,
+  options?: { expectedCurrentName?: string, expectedCurrentFields?: OrgUpdateFields },
 ) {
-  const { error, data } = await supabase
+  let query = supabase
     .from('orgs')
     .update(updateFields)
     .eq('id', orgId)
+  if (options?.expectedCurrentName !== undefined)
+    query = query.eq('name', options.expectedCurrentName)
+  if (options?.expectedCurrentFields) {
+    for (const key of Object.keys(options.expectedCurrentFields) as Array<keyof OrgUpdateFields>) {
+      const fieldValue = options.expectedCurrentFields[key]
+      if (fieldValue === undefined)
+        continue
+      query = fieldValue === null
+        ? query.is(key, null)
+        : query.eq(key, fieldValue)
+    }
+  }
+
+  const { error, data } = await query
     .select()
-    .single()
+    .maybeSingle()
 
   if (error) {
     throw simpleError('cannot_update_org', 'Cannot update org', { error: error.message })
   }
+  if (!data) {
+    throw simpleError('cannot_update_org', 'Cannot update org', {
+      error: 'org_name_changed',
+      orgId,
+    })
+  }
 
   return data
+}
+
+function buildRollbackFields(
+  currentOrg: OrgRow,
+  updateFields: OrgUpdateFields,
+) {
+  const rollbackFields: OrgUpdateFields = {}
+
+  for (const key of Object.keys(updateFields) as Array<keyof OrgUpdateFields>) {
+    rollbackFields[key] = currentOrg[key as keyof OrgRow] as never
+  }
+
+  return rollbackFields
+}
+
+function buildExpectedCurrentFields(
+  currentOrg: OrgRow,
+  updateFields: OrgUpdateFields,
+) {
+  const expectedCurrentFields: OrgUpdateFields = {}
+
+  for (const key of Object.keys(updateFields) as Array<keyof OrgUpdateFields>) {
+    expectedCurrentFields[key] = currentOrg[key as keyof OrgRow] as never
+  }
+
+  return expectedCurrentFields
+}
+
+async function getOrgForNameSync(
+  supabase: ReturnType<typeof supabaseApikey>,
+  orgId: string,
+): Promise<OrgRow> {
+  const { error, data } = await supabase
+    .from('orgs')
+    .select('*')
+    .eq('id', orgId)
+    .single()
+
+  if (error) {
+    throw simpleError('cannot_get_org', 'Cannot get org', { error: error.message })
+  }
+
+  return data
+}
+
+function getErrorDetail(error: unknown) {
+  if (error instanceof HTTPException) {
+    const httpErrorDetail = (error.cause as { moreInfo?: { error?: unknown } } | undefined)?.moreInfo?.error
+    if (httpErrorDetail !== undefined)
+      return httpErrorDetail
+  }
+
+  if (error instanceof Error)
+    return error.message
+
+  return error
 }
 
 export async function put(
@@ -137,8 +241,60 @@ export async function put(
   }
 
   validateMaxExpirationDays(body.max_apikey_expiration_days)
-  const updateFields = buildUpdateFields(body)
-  const dataOrg = await updateOrg(supabase, body.orgId, updateFields)
+  const sanitizedOrgName = body.name !== undefined
+    ? await sanitizeOrgNameForSync(supabase, body.name)
+    : undefined
+  const updateFields = buildUpdateFields(body, sanitizedOrgName)
+  const shouldSyncStripeName = body.name !== undefined
+  const currentOrg = shouldSyncStripeName
+    ? await getOrgForNameSync(supabase, body.orgId)
+    : null
+
+  const dataOrg: Database['public']['Tables']['orgs']['Row'] = await updateOrg(supabase, body.orgId, updateFields, {
+    expectedCurrentName: shouldSyncStripeName ? currentOrg?.name : undefined,
+  })
+
+  const committedCustomerId = dataOrg.customer_id
+
+  if (shouldSyncStripeName && currentOrg && committedCustomerId && !committedCustomerId.startsWith('pending_')) {
+    try {
+      await updateCustomerOrganizationName(c, committedCustomerId, dataOrg.name)
+    }
+    catch (stripeError) {
+      const stripeCustomerName = await getStripeCustomerName(c, committedCustomerId)
+
+      if (stripeCustomerName === dataOrg.name) {
+        // Stripe can time out after persisting the update; don't roll back the DB in that case.
+      }
+      else if (stripeCustomerName !== undefined || isDeterministicStripeCustomerUpdateError(stripeError)) {
+        const rollbackFields = buildRollbackFields(currentOrg, updateFields)
+
+        try {
+          await updateOrg(supabase, body.orgId, rollbackFields, {
+            expectedCurrentName: dataOrg.name,
+            expectedCurrentFields: buildExpectedCurrentFields(dataOrg, updateFields),
+          })
+        }
+        catch (rollbackError) {
+          throw simpleError('cannot_update_org', 'Cannot update org', {
+            error: getErrorDetail(stripeError),
+            rollbackError: getErrorDetail(rollbackError),
+          })
+        }
+
+        throw simpleError('cannot_update_org', 'Cannot update org', {
+          error: getErrorDetail(stripeError),
+        })
+      }
+      else {
+        throw simpleError('cannot_update_org', 'Cannot update org', {
+          error: getErrorDetail(stripeError),
+          stripeSyncState: 'unknown',
+        })
+      }
+    }
+  }
+
   if (dataOrg.logo) {
     const signedLogo = await createSignedImageUrl(c, dataOrg.logo)
     dataOrg.logo = signedLogo ?? null

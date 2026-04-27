@@ -3,6 +3,8 @@ BEGIN;
 
 SELECT plan(3);
 
+SELECT tests.authenticate_as_service_role();
+
 -- Test is_org_yearly
 SELECT
     is(

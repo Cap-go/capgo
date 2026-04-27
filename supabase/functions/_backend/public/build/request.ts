@@ -33,6 +33,10 @@ interface BuilderJobResponse {
   status: string
 }
 
+function throwBuilderUnavailable(message: string, moreInfo: Record<string, unknown> = {}, cause?: unknown): never {
+  throw quickError(503, 'service_unavailable', message, moreInfo, cause, { alert: false })
+}
+
 /**
  * Construct the JSON body forwarded to the builder's POST /jobs endpoint.
  * Extracted for testability — the handler calls this, and unit tests assert the shape.
@@ -171,7 +175,7 @@ export async function requestBuild(
       builder_url_configured: !!builderUrl,
       builder_api_key_configured: !!builderApiKey,
     })
-    throw quickError(503, 'service_unavailable', 'Build service unavailable (builder not configured)')
+    throwBuilderUnavailable('Build service unavailable (builder not configured)')
   }
 
   try {
@@ -227,10 +231,16 @@ export async function requestBuild(
         app_id,
         platform,
       })
-      throw quickError(503, 'service_unavailable', 'Build service unavailable (builder error)')
+      throwBuilderUnavailable('Build service unavailable (builder error)', {
+        status: builderResponse.status,
+        statusText: builderResponse.statusText,
+      })
     }
   }
   catch (error) {
+    if (error && typeof error === 'object' && 'status' in error && (error as { status?: unknown }).status === 503) {
+      throw error
+    }
     cloudlogErr({
       requestId: c.get('requestId'),
       message: 'Builder API fetch failed',
@@ -242,7 +252,7 @@ export async function requestBuild(
       app_id,
       platform,
     })
-    throw quickError(503, 'service_unavailable', 'Build service unavailable (builder call failed)')
+    throwBuilderUnavailable('Build service unavailable (builder call failed)', {}, error)
   }
 
   const upload_expires_at = new Date(Date.now() + 60 * 60 * 1000)
@@ -255,7 +265,7 @@ export async function requestBuild(
       builder_url: builderUrl,
       builder_api_key_present: !!builderApiKey,
     })
-    throw quickError(503, 'service_unavailable', 'Build service unavailable (upload URL missing)')
+    throwBuilderUnavailable('Build service unavailable (upload URL missing)')
   }
 
   const upload_url = `${getEnv(c, 'PUBLIC_URL') || 'https://api.capgo.app'}/build/upload/${builderJob.jobId}`

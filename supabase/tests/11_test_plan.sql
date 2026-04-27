@@ -167,6 +167,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+SELECT tests.authenticate_as_service_role();
+
 SELECT my_tests();
 
 SELECT *
