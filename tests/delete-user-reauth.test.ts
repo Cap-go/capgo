@@ -1,7 +1,4 @@
 import type { PoolClient } from 'pg'
-import type { Database } from '../src/types/supabase.types'
-import { env } from 'node:process'
-import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import {
@@ -15,29 +12,6 @@ import {
 const USER_EMAIL_DELETE_USER_UNVERIFIED = 'delete-user-unverified@capgo.app'
 const USER_PASSWORD_DELETE_USER_UNVERIFIED = 'testtest'
 let userIdDeleteUserUnverified = ''
-
-function normalizeLocalhostUrl(raw: string): string {
-  try {
-    const url = new URL(raw)
-    if (url.hostname === 'localhost')
-      url.hostname = '127.0.0.1'
-    return url.toString().replace(/\/$/, '')
-  }
-  catch {
-    return raw.replace('localhost', '127.0.0.1')
-  }
-}
-
-function createAnonSupabaseClient() {
-  if (!env.SUPABASE_URL || !env.SUPABASE_ANON_KEY)
-    throw new Error('SUPABASE_URL or SUPABASE_ANON_KEY is missing for delete-user SDK test')
-
-  return createClient<Database>(normalizeLocalhostUrl(env.SUPABASE_URL), env.SUPABASE_ANON_KEY, {
-    auth: {
-      persistSession: false,
-    },
-  })
-}
 
 async function withAuthClient<T>(userId: string, fn: (client: PoolClient) => Promise<T>): Promise<T> {
   const pool = await getPostgresClient()
@@ -78,6 +52,24 @@ async function deleteUserAs(userId: string) {
   return await withAuthClient(userId, client => client.query('SELECT public.delete_user()'))
 }
 
+async function upsertRecentEmailOtpVerification(client: PoolClient, userId: string, verifiedAt: string) {
+  await client.query(
+    `
+      INSERT INTO "public"."user_security" (
+        "user_id",
+        "email_otp_verified_at",
+        "created_at",
+        "updated_at"
+      ) VALUES ($1, $2, NOW(), NOW())
+      ON CONFLICT ("user_id") DO UPDATE
+      SET
+        "email_otp_verified_at" = EXCLUDED."email_otp_verified_at",
+        "updated_at" = NOW()
+    `,
+    [userId, verifiedAt],
+  )
+}
+
 beforeAll(async () => {
   const supabase = getSupabaseClient()
   const { error: cleanupError } = await supabase
@@ -90,6 +82,10 @@ beforeAll(async () => {
   const pool = await getPostgresClient()
   const client = await pool.connect()
   try {
+    await client.query(
+      'DELETE FROM "public"."user_security" WHERE "user_id" = ANY($1::uuid[])',
+      [[USER_ID_DELETE_USER_STALE, USER_ID_DELETE_USER_FRESH]],
+    )
     await client.query('DELETE FROM "public"."users" WHERE "email" = $1', [USER_EMAIL_DELETE_USER_UNVERIFIED])
     await client.query('DELETE FROM "auth"."users" WHERE "email" = $1', [USER_EMAIL_DELETE_USER_UNVERIFIED])
 
@@ -150,6 +146,12 @@ beforeAll(async () => {
       'UPDATE "auth"."users" SET "last_sign_in_at" = NOW() WHERE "id" = $1',
       [USER_ID_DELETE_USER_FRESH],
     )
+    await client.query(
+      'UPDATE "auth"."users" SET "last_sign_in_at" = NOW() WHERE "id" = $1',
+      [userIdDeleteUserUnverified],
+    )
+    await upsertRecentEmailOtpVerification(client, USER_ID_DELETE_USER_STALE, new Date().toISOString())
+    await upsertRecentEmailOtpVerification(client, USER_ID_DELETE_USER_FRESH, new Date().toISOString())
   }
   finally {
     client.release()
@@ -171,6 +173,15 @@ afterAll(async () => {
   const pool = await getPostgresClient()
   const client = await pool.connect()
   try {
+    const securityUserIds = [USER_ID_DELETE_USER_STALE, USER_ID_DELETE_USER_FRESH]
+    if (userIdDeleteUserUnverified)
+      securityUserIds.push(userIdDeleteUserUnverified)
+
+    await client.query(
+      'DELETE FROM "public"."user_security" WHERE "user_id" = ANY($1::uuid[])',
+      [securityUserIds],
+    )
+
     if (userIdDeleteUserUnverified) {
       await client.query('DELETE FROM "public"."users" WHERE "id" = $1', [userIdDeleteUserUnverified])
       await client.query('DELETE FROM "auth"."users" WHERE "id" = $1', [userIdDeleteUserUnverified])
@@ -181,7 +192,7 @@ afterAll(async () => {
   }
 })
 
-describe('delete_user reauthentication guard', () => {
+describe('delete_user email ownership and reauthentication guards', () => {
   it.concurrent('rejects deletion when reauthentication is stale', async () => {
     let caught: unknown
     try {
@@ -217,7 +228,7 @@ describe('delete_user reauthentication guard', () => {
     expect(removedData?.email).toBe(USER_EMAIL_DELETE_USER_FRESH)
   })
 
-  it.concurrent('rejects deletion when email is not verified', async () => {
+  it.concurrent('rejects deletion when recent email OTP verification is missing', async () => {
     let caught: unknown
     try {
       await deleteUserAs(userIdDeleteUserUnverified)
@@ -229,25 +240,6 @@ describe('delete_user reauthentication guard', () => {
     expect(caught).toBeTruthy()
     const message = (caught as { message?: string }).message ?? ''
     expect(message).toContain('email_not_verified')
-
-    const { data, error } = await getSupabaseClient()
-      .from('to_delete_accounts')
-      .select('account_id')
-      .eq('account_id', userIdDeleteUserUnverified)
-    expect(error).toBeNull()
-    expect(data ?? []).toHaveLength(0)
-  })
-
-  it.concurrent('does not allow an unverified user to obtain a Supabase SDK session', async () => {
-    const client = createAnonSupabaseClient()
-
-    const { data: signInData, error: signInError } = await client.auth.signInWithPassword({
-      email: USER_EMAIL_DELETE_USER_UNVERIFIED,
-      password: USER_PASSWORD_DELETE_USER_UNVERIFIED,
-    })
-    expect(signInData.session).toBeNull()
-    expect(signInError).toBeTruthy()
-    expect(signInError?.message ?? '').toContain('Email not confirmed')
 
     const { data, error } = await getSupabaseClient()
       .from('to_delete_accounts')

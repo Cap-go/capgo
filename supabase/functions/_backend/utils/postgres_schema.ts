@@ -86,6 +86,7 @@ export const channels = pgTable('channels', {
   allow_device: boolean('allow_device').notNull().default(true),
   allow_dev: boolean('allow_dev').notNull().default(true),
   allow_prod: boolean('allow_prod').notNull().default(true),
+  rbac_id: uuid('rbac_id').notNull(),
 })
 
 export const channel_devices = pgTable('channel_devices', {
@@ -239,7 +240,7 @@ export const role_bindings = pgTable('role_bindings', {
   org_id: uuid('org_id'),
   app_id: uuid('app_id'),
   bundle_id: bigint('bundle_id', { mode: 'number' }),
-  channel_id: bigint('channel_id', { mode: 'number' }),
+  channel_id: uuid('channel_id'),
   granted_by: uuid('granted_by').notNull(),
   granted_at: timestamp('granted_at').notNull().defaultNow(),
   expires_at: timestamp('expires_at'),

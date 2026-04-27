@@ -3,7 +3,7 @@
 BEGIN;
 
 -- Plan the number of tests
-SELECT plan(39);
+SELECT plan(43);
 
 -- Test app_versions policies
 SELECT
@@ -228,15 +228,57 @@ SELECT
         'stripe_info should have correct policies'
     );
 
+-- Test daily_revenue_metrics policies
+SELECT
+    policies_are(
+        'public',
+        'daily_revenue_metrics',
+        ARRAY['Deny all access'],
+        'daily_revenue_metrics should deny all user-context access'
+    );
+
+-- Test processed_stripe_events policies
+SELECT
+    policies_are(
+        'public',
+        'processed_stripe_events',
+        ARRAY['Deny all access'],
+        'processed_stripe_events should deny all user-context access'
+    );
+
+SELECT
+    ok(
+        (
+            SELECT c.relrowsecurity
+            FROM pg_class AS c
+            JOIN pg_namespace AS n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public'
+              AND c.relname = 'daily_revenue_metrics'
+        ),
+        'daily_revenue_metrics should have RLS enabled'
+    );
+
+SELECT
+    ok(
+        (
+            SELECT c.relrowsecurity
+            FROM pg_class AS c
+            JOIN pg_namespace AS n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public'
+              AND c.relname = 'processed_stripe_events'
+        ),
+        'processed_stripe_events should have RLS enabled'
+    );
+
 -- Test manifest policies
 SELECT
     policies_are(
         'public',
         'manifest',
         ARRAY[
-            'Allow users to delete manifest entries',
-            'Allow users to insert manifest entries',
             'Allow select for auth, api keys (read+)',
+            'Prevent users from deleting manifest entries',
+            'Prevent users from inserting manifest entries',
             'Prevent users from updating manifest entries'
         ],
         'manifest should have correct policies'

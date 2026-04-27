@@ -91,6 +91,9 @@ BEGIN
     END IF;
   END IF;
 
+  -- Allow the guarded owner_org cascade only inside the approved transfer path.
+  PERFORM pg_catalog.set_config('capgo.allow_owner_org_transfer', 'true', true);
+
   UPDATE public.apps
   SET
       owner_org = p_new_org_id,
@@ -127,6 +130,8 @@ BEGIN
   UPDATE public.deploy_history
   SET owner_org = p_new_org_id
   WHERE app_id = p_app_id;
+
+  PERFORM pg_catalog.set_config('capgo.allow_owner_org_transfer', 'false', true);
 
 END;
 $$;

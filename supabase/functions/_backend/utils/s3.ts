@@ -121,6 +121,29 @@ async function deleteObject(c: Context, fileId: string) {
   return response.status >= 200 && response.status < 300
 }
 
+async function deleteObjectsWithPrefix(c: Context, prefix: string): Promise<number> {
+  const client = initS3(c)
+  let deletedCount = 0
+
+  for await (const object of client.listObjects({ prefix })) {
+    try {
+      await client.deleteObject(object.key)
+      deletedCount += 1
+    }
+    catch (error) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'deleteObjectsWithPrefix item failed',
+        prefix,
+        key: object.key,
+        error,
+      })
+    }
+  }
+
+  return deletedCount
+}
+
 async function checkIfExist(c: Context, fileId: string | null) {
   if (!fileId) {
     return false
@@ -247,6 +270,7 @@ async function getObject(c: Context, fileId: string): Promise<Response | null> {
 export const s3 = {
   getSize,
   deleteObject,
+  deleteObjectsWithPrefix,
   checkIfExist,
   getSignedUrl,
   getUploadUrl,
