@@ -16,6 +16,7 @@ interface ChannelSet {
   disableAutoUpdate?: Database['public']['Enums']['disable_update']
   ios?: boolean
   android?: boolean
+  electron?: boolean
   allow_device_self_set?: boolean
   allow_emulator?: boolean
   allow_device?: boolean
@@ -54,6 +55,7 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
   if (error || !org) {
     throw simpleError('invalid_app_id', 'You can\'t access this app', { app_id: body.app_id })
   }
+  const inferredElectron = body.electron ?? (body.public && body.ios !== body.android ? false : undefined)
   const channel: Database['public']['Tables']['channels']['Insert'] = {
     created_by: apikey.user_id,
     app_id: body.app_id,
@@ -68,6 +70,7 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: ChannelSet,
     ...(body.allow_prod == null ? {} : { allow_prod: body.allow_prod }),
     ...(body.ios == null ? {} : { ios: body.ios }),
     ...(body.android == null ? {} : { android: body.android }),
+    ...(inferredElectron == null ? {} : { electron: inferredElectron }),
     version: -1,
     owner_org: org.owner_org,
   }

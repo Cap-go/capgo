@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   APIKEY_TEST2_ALL,
   APIKEY_TEST_ALL,
+  fetchWithRetry,
   getAuthHeaders,
   getAuthHeadersForCredentials,
   getSupabaseClient,
@@ -47,7 +48,7 @@ async function fetchManifestRows(headers: Record<string, string>, appVersionId: 
   if (!anonKey)
     throw new Error('SUPABASE_ANON_KEY is missing')
 
-  const response = await fetch(getRestManifestUrl(appVersionId), {
+  const response = await fetchWithRetry(getRestManifestUrl(appVersionId), {
     method: 'GET',
     headers: {
       ...headers,
