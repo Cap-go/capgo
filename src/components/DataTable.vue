@@ -605,7 +605,6 @@ const paginationClass = computed(() => props.mobileFixedPagination
                         v-for="(action, actionIndex) in col.actions"
                         v-show="!action.visible || action.visible(elem)" :key="actionIndex"
                       >
-                      >
                         <div
                           class="relative inline-flex group"
                         >
