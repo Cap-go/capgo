@@ -329,7 +329,12 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
 }
 
 // Export helper for generating preview URLs
-export function generatePreviewUrl(appId: string, versionId: number, env: 'prod' | 'preprod' | 'dev' = 'prod'): string {
+export function generatePreviewUrl(appId: string, versionId: number, env: 'prod' | 'preprod' | 'dev' = 'prod'): string | null {
   const envPrefix = env === 'prod' ? '' : `.${env}`
-  return `https://${buildPreviewSubdomain(appId, versionId)}.preview${envPrefix}.capgo.app`
+  try {
+    return `https://${buildPreviewSubdomain(appId, versionId)}.preview${envPrefix}.capgo.app`
+  }
+  catch {
+    return null
+  }
 }

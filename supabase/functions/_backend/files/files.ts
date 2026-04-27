@@ -382,13 +382,18 @@ async function getSupabaseStorageResponse(c: Context, fileId: string): Promise<R
 
   const requestHeaders = new Headers()
   const rangeHeader = c.req.header('range')
-  if (rangeHeader) {
+  const method = c.req.raw.method === 'HEAD' ? 'HEAD' : 'GET'
+  if (method === 'GET' && rangeHeader) {
     requestHeaders.set('range', rangeHeader)
   }
 
   let response: Response
   try {
-    response = await fetch(signedUrlData.signedUrl, rangeHeader ? { headers: requestHeaders } : undefined)
+    const fetchInit: RequestInit = { method }
+    if (rangeHeader) {
+      fetchInit.headers = requestHeaders
+    }
+    response = await fetch(signedUrlData.signedUrl, fetchInit)
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getHandler files signed URL fetch failed', fileId, error })
@@ -410,7 +415,9 @@ async function getSupabaseStorageResponse(c: Context, fileId: string): Promise<R
     throw quickError(503, 'upstream_unavailable', 'File storage temporarily unavailable', { fileId, status: response.status }, responseBody, { alert: false })
   }
 
-  await saveBandwidthUsage(c, getTransferredBytesFromResponse(response))
+  if (method !== 'HEAD') {
+    await saveBandwidthUsage(c, getTransferredBytesFromResponse(response))
+  }
   return withAttachmentResponseHeaders(response, fileId)
 }
 
@@ -809,7 +816,7 @@ async function checkWriteAppAccess(c: Context, next: Next) {
   })
 
   // Use Postgres instead of Supabase SDK
-  const pgClient = getPgClient(c, true) // read-only query
+  const pgClient = getPgClient(c, false) // authz + plan gating must read primary
   const drizzleClient = getDrizzleClient(pgClient)
 
   try {

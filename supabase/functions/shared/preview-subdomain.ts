@@ -40,6 +40,11 @@ function encodeEscapedByte(char: string) {
   throw new Error(`Unsupported preview app id character: ${char}`)
 }
 
+function assertValidPreviewVersionId(versionId: number): void {
+  if (!Number.isSafeInteger(versionId) || versionId < 0)
+    throw new Error(`Invalid preview version id: ${versionId}`)
+}
+
 /**
  * Encodes an app ID into a reversible DNS-safe preview subdomain label.
  */
@@ -51,6 +56,7 @@ export function encodePreviewAppId(appId: string): string {
  * Builds the preview subdomain label used before `.preview.capgo.app`.
  */
 export function buildPreviewSubdomain(appId: string, versionId: number): string {
+  assertValidPreviewVersionId(versionId)
   const label = `${versionId}${PREVIEW_VERSION_SEPARATOR}${encodePreviewAppId(appId)}`
   if (label.length > DNS_LABEL_MAX_LENGTH)
     throw new Error(`Preview subdomain exceeds DNS label limit: "${label}" (${label.length} characters)`)
@@ -108,7 +114,7 @@ function parseVersionId(value: string): number | null {
     return null
 
   const versionId = Number.parseInt(value, 10)
-  return Number.isNaN(versionId) ? null : versionId
+  return Number.isSafeInteger(versionId) ? versionId : null
 }
 
 /**
