@@ -31,6 +31,26 @@ BEGIN
           FROM public.org_users AS org_user
           WHERE org_user.user_id = apikey_row.user_id
             AND org_user.user_right::text NOT LIKE 'invite_%'
+            AND org_user.app_id IS NULL
+            AND org_user.channel_id IS NULL
+
+          UNION
+
+          SELECT apps.owner_org AS org_uuid
+          FROM public.org_users AS org_user
+          JOIN public.apps ON apps.app_id = org_user.app_id
+          WHERE org_user.user_id = apikey_row.user_id
+            AND org_user.user_right::text NOT LIKE 'invite_%'
+            AND org_user.app_id IS NOT NULL
+
+          UNION
+
+          SELECT ch.owner_org AS org_uuid
+          FROM public.org_users AS org_user
+          JOIN public.channels AS ch ON ch.id = org_user.channel_id
+          WHERE org_user.user_id = apikey_row.user_id
+            AND org_user.user_right::text NOT LIKE 'invite_%'
+            AND org_user.channel_id IS NOT NULL
 
           UNION
 

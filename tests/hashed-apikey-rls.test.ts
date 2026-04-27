@@ -435,6 +435,36 @@ async function deleteStaleAppScopedBindingForUser(userId: string, staleOrgId: st
   }
 }
 
+async function createStaleAppScopedOrgUserForUser(userId: string, staleOrgId: string): Promise<void> {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      `INSERT INTO public.org_users (org_id, user_id, user_right, app_id)
+       VALUES ($1, $2, 'read', $3)`,
+      [staleOrgId, userId, APP_NAME_RLS],
+    )
+  }
+  finally {
+    client.release()
+  }
+}
+
+async function deleteStaleAppScopedOrgUserForUser(userId: string, staleOrgId: string): Promise<void> {
+  const client = await pool.connect()
+  try {
+    await client.query(
+      `DELETE FROM public.org_users
+       WHERE org_id = $1
+         AND user_id = $2
+         AND app_id = $3`,
+      [staleOrgId, userId, APP_NAME_RLS],
+    )
+  }
+  finally {
+    client.release()
+  }
+}
+
 beforeAll(async () => {
   pool = new Pool({ connectionString: POSTGRES_URL })
   const client = await pool.connect()
@@ -675,6 +705,26 @@ describe('enforce_hashed_api_keys blocks plaintext capgkey auth on the RLS plane
     }
     finally {
       await deleteStaleAppScopedBindingForUser(RLS_TEST_USER_ID, staleEnforcedOrgId)
+      await setOrgHashedApiKeyEnforcement(suiteOrgId, true)
+      await deleteStandaloneOrg(staleEnforcedOrgId)
+    }
+  })
+
+  it('ignores stale org_id values on app-scoped legacy org_users rows when deriving org enforcement', async () => {
+    const staleEnforcedOrgId = await createStandaloneOrg(true)
+
+    try {
+      await setOrgHashedApiKeyEnforcement(suiteOrgId, false)
+      await createStaleAppScopedOrgUserForUser(RLS_TEST_USER_ID, staleEnforcedOrgId)
+
+      const rows = await execWithCapgkey(
+        `SELECT get_identity('{all,write,read,upload}'::key_mode[]) AS user_id`,
+        plainKey.key,
+      )
+      expect(rows[0].user_id).toBe(RLS_TEST_USER_ID)
+    }
+    finally {
+      await deleteStaleAppScopedOrgUserForUser(RLS_TEST_USER_ID, staleEnforcedOrgId)
       await setOrgHashedApiKeyEnforcement(suiteOrgId, true)
       await deleteStandaloneOrg(staleEnforcedOrgId)
     }
