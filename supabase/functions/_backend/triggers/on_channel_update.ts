@@ -57,14 +57,14 @@ async function getCurrentChannel(
   return data
 }
 
-async function isCurrentPublicWinner(
+async function getCurrentPublicWinner(
   c: Context<MiddlewareKeyVariables>,
   record: Pick<ChannelRow, 'id' | 'app_id'>,
   scope: ChannelPlatformScope,
 ) {
   const currentRecord = await getCurrentChannel(c, record.id)
   if (!currentRecord?.public || !currentRecord[scope])
-    return false
+    return null
 
   const { data: winner, error } = await supabaseAdmin(c)
     .from('channels')
@@ -87,10 +87,10 @@ async function isCurrentPublicWinner(
       channelId: currentRecord.id,
       scope,
     })
-    return false
+    return null
   }
 
-  return winner?.id === currentRecord.id
+  return winner?.id === currentRecord.id ? currentRecord : null
 }
 
 app.post('/', middlewareAPISecret, triggerValidator('channels', 'UPDATE'), async (c) => {
@@ -107,46 +107,49 @@ app.post('/', middlewareAPISecret, triggerValidator('channels', 'UPDATE'), async
   }
 
   if (record.public && record.ios) {
-    if (await isCurrentPublicWinner(c, record, 'ios')) {
+    const currentWinner = await getCurrentPublicWinner(c, record, 'ios')
+    if (currentWinner) {
       await updateChannelsWithRetry(
         c,
         async () => await supabaseAdmin(c)
           .from('channels')
           .update({ public: false })
-          .eq('app_id', record.app_id)
+          .eq('app_id', currentWinner.app_id)
           .eq('ios', true)
           .neq('id', record.id),
-        { app_id: record.app_id, record_id: record.id, scope: 'ios' },
+        { app_id: currentWinner.app_id, record_id: record.id, scope: 'ios' },
       )
     }
   }
 
   if (record.public && record.android) {
-    if (await isCurrentPublicWinner(c, record, 'android')) {
+    const currentWinner = await getCurrentPublicWinner(c, record, 'android')
+    if (currentWinner) {
       await updateChannelsWithRetry(
         c,
         async () => await supabaseAdmin(c)
           .from('channels')
           .update({ public: false })
-          .eq('app_id', record.app_id)
+          .eq('app_id', currentWinner.app_id)
           .eq('android', true)
           .neq('id', record.id),
-        { app_id: record.app_id, record_id: record.id, scope: 'android' },
+        { app_id: currentWinner.app_id, record_id: record.id, scope: 'android' },
       )
     }
   }
 
   if (record.public && record.electron) {
-    if (await isCurrentPublicWinner(c, record, 'electron')) {
+    const currentWinner = await getCurrentPublicWinner(c, record, 'electron')
+    if (currentWinner) {
       await updateChannelsWithRetry(
         c,
         async () => await supabaseAdmin(c)
           .from('channels')
           .update({ public: false })
-          .eq('app_id', record.app_id)
+          .eq('app_id', currentWinner.app_id)
           .eq('electron', true)
           .neq('id', record.id),
-        { app_id: record.app_id, record_id: record.id, scope: 'electron' },
+        { app_id: currentWinner.app_id, record_id: record.id, scope: 'electron' },
       )
     }
   }
