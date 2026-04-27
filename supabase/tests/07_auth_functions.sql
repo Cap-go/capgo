@@ -174,6 +174,8 @@ SELECT
 -- Test get_user_id with hashed API keys
 -- ============================================================================
 
+SELECT tests.authenticate_as('test_user');
+
 SELECT
     is(
         get_user_id('test-hashed-apikey-for-auth-test'),
@@ -194,6 +196,8 @@ SELECT
         null,
         'get_user_id test - expired plain key returns null'
     );
+
+SELECT tests.clear_authentication();
 
 SELECT *
 FROM

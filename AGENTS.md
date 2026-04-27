@@ -451,6 +451,43 @@ CREATE POLICY "Allow select on my_table" ON public.my_table
 FOR SELECT USING (condition_1 OR condition_2);
 ```
 
+**Rule 1.5: Never rely on implicit deny for table operations.**
+
+If an operation is intentionally forbidden, add an explicit deny policy for that
+operation instead of relying on the absence of a policy.
+
+- Do not use "no INSERT policy means INSERT is blocked" as the final design.
+- Do not use "no DELETE policy means DELETE is blocked" as the final design.
+- The expected repository style is explicit allow or explicit deny for each
+  operation you intentionally care about.
+- This is especially important for security-sensitive tables and system-managed
+  tables such as `manifest`.
+
+When an operation must be impossible for user-facing roles, prefer an explicit
+deny policy with a clear name, for example:
+
+```sql
+-- Example: system-managed table, users must never insert rows directly
+CREATE POLICY "Deny insert on my_table"
+ON public.my_table
+AS RESTRICTIVE
+FOR INSERT
+TO authenticated
+WITH CHECK (false);
+
+-- Example: users must never delete rows directly
+CREATE POLICY "Deny delete on my_table"
+ON public.my_table
+AS RESTRICTIVE
+FOR DELETE
+TO authenticated
+USING (false);
+```
+
+If API key traffic must also be denied through user-context RLS, make that
+intent explicit in the policy design and naming. Do not leave the operation
+blocked only because no policy happened to exist.
+
 **Rule 2: Call `auth.uid()` only once using a subquery.**
 
 The `auth.uid()` function should never be called multiple times in a policy. Use a `SELECT *` subquery pattern to call it once and reference the result:

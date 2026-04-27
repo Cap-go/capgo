@@ -1542,6 +1542,65 @@ export function validateExpirationDate(expiresAt: string | null | undefined): vo
 }
 
 /**
+ * Resolve all organization IDs affected by API key scopes.
+ * App-scoped keys inherit expiration policy from the app owner organization.
+ */
+export async function resolveApikeyPolicyOrgIds(
+  supabase: SupabaseClient<Database>,
+  options: {
+    limitedToApps?: string[] | null
+    limitedToOrgs?: string[] | null
+    policyLookupSupabase?: SupabaseClient<Database>
+  },
+): Promise<string[]> {
+  const orgIds = new Set((options.limitedToOrgs ?? []).filter(Boolean))
+  const limitedToApps = [...new Set((options.limitedToApps ?? []).filter(Boolean))]
+
+  if (limitedToApps.length === 0) {
+    return [...orgIds]
+  }
+
+  const resolvedAppIds = new Set<string>()
+
+  async function addResolvedApps(client: SupabaseClient<Database>, appIds: string[]) {
+    if (appIds.length === 0) {
+      return
+    }
+
+    const { data: apps, error } = await client
+      .from('apps')
+      .select('app_id, owner_org')
+      .in('app_id', appIds)
+
+    if (error) {
+      throw simpleError('failed_to_resolve_apikey_policy_scope', 'Failed to resolve API key policy scope', { supabaseError: error })
+    }
+
+    for (const app of apps ?? []) {
+      if (!app.app_id || !app.owner_org)
+        continue
+      resolvedAppIds.add(app.app_id)
+      orgIds.add(app.owner_org)
+    }
+  }
+
+  await addResolvedApps(supabase, limitedToApps)
+
+  let unresolvedAppIds = limitedToApps.filter(appId => !resolvedAppIds.has(appId))
+  if (unresolvedAppIds.length > 0 && options.policyLookupSupabase) {
+    // Hidden apps still need owner-org policy enforcement even when caller RLS cannot see them.
+    await addResolvedApps(options.policyLookupSupabase, unresolvedAppIds)
+    unresolvedAppIds = unresolvedAppIds.filter(appId => !resolvedAppIds.has(appId))
+  }
+
+  if (unresolvedAppIds.length > 0) {
+    throw simpleError('failed_to_resolve_apikey_policy_scope', 'Failed to resolve API key policy scope', { unresolvedAppIds })
+  }
+
+  return [...orgIds]
+}
+
+/**
  * Validate API key expiration against org policies for multiple orgs.
  * Throws simpleError if any org policy is violated.
  * @param orgIds - Array of org IDs to validate against

@@ -276,9 +276,9 @@ SELECT
         'public',
         'manifest',
         ARRAY[
-            'Allow users to delete manifest entries',
-            'Allow users to insert manifest entries',
             'Allow select for auth, api keys (read+)',
+            'Prevent users from deleting manifest entries',
+            'Prevent users from inserting manifest entries',
             'Prevent users from updating manifest entries'
         ],
         'manifest should have correct policies'

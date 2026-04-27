@@ -103,11 +103,11 @@ async function postUpdateAfterChannelMutation(data: Partial<ReturnType<typeof ge
 
 beforeAll(async () => {
   await resetAndSeedAppData(APP_NAME_UPDATE)
-})
+}, 60_000)
 afterAll(async () => {
   await resetAppData(APP_NAME_UPDATE)
   await resetAppDataStats(APP_NAME_UPDATE)
-})
+}, 60_000)
 
 describe('[POST] /updates', () => {
   it('no new version available', async () => {

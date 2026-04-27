@@ -51,20 +51,26 @@ function checkMobile() {
 const currentDevice = computed(() => devices[selectedDevice.value])
 
 // Build the preview URL using a reversible preview subdomain format.
-const previewUrl = computed(() => {
-  const subdomain = buildPreviewSubdomain(props.appId, props.versionId)
-  // Extract base domain from current host, default to capgo.app for localhost
-  // Preserve environment segments (e.g., 'dev' in console.dev.capgo.app)
-  const hostname = window.location.hostname
-  let baseDomain = 'capgo.app'
-  if (hostname.includes('.') && hostname !== '127.0.0.1') {
-    const hostParts = hostname.split('.')
-    // Check if hostname contains an env segment (dev, preprod, staging, etc.)
-    const envSegments = ['dev', 'preprod', 'staging']
-    const hasEnvSegment = hostParts.length > 2 && envSegments.some(env => hostParts.includes(env))
-    baseDomain = hasEnvSegment ? hostParts.slice(-3).join('.') : hostParts.slice(-2).join('.')
+const previewUrl = computed<string | null>(() => {
+  try {
+    const subdomain = buildPreviewSubdomain(props.appId, props.versionId)
+    // Extract base domain from current host, default to capgo.app for localhost
+    // Preserve environment segments (e.g., 'dev' in console.dev.capgo.app)
+    const hostname = window.location.hostname
+    let baseDomain = 'capgo.app'
+    if (hostname.includes('.') && hostname !== '127.0.0.1') {
+      const hostParts = hostname.split('.')
+      // Check if hostname contains an env segment (dev, preprod, staging, etc.)
+      const envSegments = ['dev', 'preprod', 'staging']
+      const hasEnvSegment = hostParts.length > 2 && envSegments.some(env => hostParts.includes(env))
+      baseDomain = hasEnvSegment ? hostParts.slice(-3).join('.') : hostParts.slice(-2).join('.')
+    }
+    return `https://${subdomain}.preview.${baseDomain}/`
   }
-  return `https://${subdomain}.preview.${baseDomain}/`
+  catch (error) {
+    console.error('Failed to build preview URL:', error)
+    return null
+  }
 })
 
 function svgToDataUrl(svg: string): string {
@@ -73,6 +79,11 @@ function svgToDataUrl(svg: string): string {
 
 // Generate QR code linking to the preview URL
 function generateQRCode() {
+  if (!previewUrl.value) {
+    qrCodeDataUrl.value = ''
+    return
+  }
+
   try {
     qrCodeDataUrl.value = svgToDataUrl(toSvg(previewUrl.value, {
       margin: 2,
@@ -90,6 +101,8 @@ function generateQRCode() {
 watch(previewUrl, generateQRCode)
 
 function openExternal() {
+  if (!previewUrl.value)
+    return
   window.open(previewUrl.value, '_blank')
 }
 </script>
@@ -100,6 +113,7 @@ function openExternal() {
     <button
       class="absolute z-10 p-2 transition-colors bg-white rounded-lg shadow-lg top-4 right-4 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700"
       :title="t('open-in-external')"
+      :disabled="!previewUrl"
       @click="openExternal"
     >
       <IconExternalLink class="w-5 h-5" />
@@ -155,7 +169,7 @@ function openExternal() {
           >
             <iframe
               title="Preview App"
-              :src="previewUrl"
+              :src="previewUrl || 'about:blank'"
               class="w-full h-full border-0"
               :style="{
                 width: `${currentDevice.width}px`,

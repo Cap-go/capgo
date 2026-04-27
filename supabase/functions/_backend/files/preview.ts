@@ -3,7 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Buffer } from 'node:buffer'
 import { brotliDecompressSync } from 'node:zlib'
 import { getRuntimeKey } from 'hono/adapter'
-import { buildPreviewSubdomain, parsePreviewHostname } from '../../../../shared/preview-subdomain.ts'
+import { buildPreviewSubdomain, parsePreviewHostname } from '../../shared/preview-subdomain.ts'
 import { CacheHelper } from '../utils/cache.ts'
 import { simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
@@ -329,7 +329,12 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
 }
 
 // Export helper for generating preview URLs
-export function generatePreviewUrl(appId: string, versionId: number, env: 'prod' | 'preprod' | 'dev' = 'prod'): string {
+export function generatePreviewUrl(appId: string, versionId: number, env: 'prod' | 'preprod' | 'dev' = 'prod'): string | null {
   const envPrefix = env === 'prod' ? '' : `.${env}`
-  return `https://${buildPreviewSubdomain(appId, versionId)}.preview${envPrefix}.capgo.app`
+  try {
+    return `https://${buildPreviewSubdomain(appId, versionId)}.preview${envPrefix}.capgo.app`
+  }
+  catch {
+    return null
+  }
 }
