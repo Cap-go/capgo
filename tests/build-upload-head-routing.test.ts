@@ -45,6 +45,18 @@ describe('build upload HEAD routing', () => {
     expect([400, 401]).toContain(response.status)
   })
 
+  it.concurrent('treats GET /build/upload/:jobId with Tus-Resumable as a TUS HEAD fallback', async () => {
+    const response = await createMountedBuildApp().request(new Request('http://localhost/build/upload/test-job', {
+      method: 'GET',
+      headers: {
+        'Tus-Resumable': '1.0.0',
+      },
+    }))
+
+    expect(response.status).not.toBe(404)
+    expect([400, 401]).toContain(response.status)
+  })
+
   it.concurrent('keeps GET /build/upload/:jobId/* as not found', async () => {
     const response = await createMountedBuildApp().request(new Request('http://localhost/build/upload/test-job/file.zip', {
       method: 'GET',
