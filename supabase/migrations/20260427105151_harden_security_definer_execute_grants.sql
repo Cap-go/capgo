@@ -75,6 +75,12 @@ FROM PUBLIC;
 REVOKE ALL
 ON FUNCTION public.sync_org_user_role_binding_on_delete()
 FROM PUBLIC;
+REVOKE ALL
+ON FUNCTION public.sync_org_user_role_binding_on_delete()
+FROM ANON;
+REVOKE ALL
+ON FUNCTION public.sync_org_user_role_binding_on_delete()
+FROM AUTHENTICATED;
 
 REVOKE ALL
 ON FUNCTION public.sync_org_user_role_binding_on_update()

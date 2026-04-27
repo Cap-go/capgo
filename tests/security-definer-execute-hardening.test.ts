@@ -36,6 +36,7 @@ const SERVICE_ONLY_PROCS = [
   'public.sanitize_tmp_users_text_fields()',
   'public.sanitize_users_text_fields()',
   'public.sync_org_has_usage_credits_from_grants()',
+  'public.sync_org_user_role_binding_on_delete()',
   'public.sync_org_user_role_binding_on_update()',
   'public.sync_org_user_to_role_binding()',
 ] as const
@@ -120,12 +121,17 @@ describe('security definer execute hardening', () => {
     return new Map(result.rows.map(row => [row.proc, row]))
   }
 
+  function assertProcExists(states: Map<string, ProcState>, proc: string) {
+    expect(states.get(proc)?.prosecdef, `${proc} does not exist or signature mismatch`).not.toBeNull()
+  }
+
   it.concurrent('runs pure helpers as security invoker', async () => {
     const states = await getProcStates(INVOKER_PROCS)
 
     expect(states.size).toBe(INVOKER_PROCS.length)
 
     for (const proc of INVOKER_PROCS) {
+      assertProcExists(states, proc)
       expect(states.get(proc)?.prosecdef, proc).toBe(false)
     }
   })
@@ -164,6 +170,7 @@ describe('security definer execute hardening', () => {
     expect(states.size).toBe(SERVICE_ONLY_PROCS.length)
 
     for (const proc of SERVICE_ONLY_PROCS) {
+      assertProcExists(states, proc)
       const state = states.get(proc)
       expect(state?.anon_exec, proc).toBe(false)
       expect(state?.auth_exec, proc).toBe(false)
@@ -176,6 +183,7 @@ describe('security definer execute hardening', () => {
     expect(states.size).toBe(ANON_ALLOWED_PROCS.length)
 
     for (const proc of ANON_ALLOWED_PROCS) {
+      assertProcExists(states, proc)
       const state = states.get(proc)
       expect(state?.anon_exec, proc).toBe(true)
       expect(state?.auth_exec, proc).toBe(true)
@@ -188,6 +196,7 @@ describe('security definer execute hardening', () => {
     expect(states.size).toBe(AUTHENTICATED_ONLY_PROCS.length)
 
     for (const proc of AUTHENTICATED_ONLY_PROCS) {
+      assertProcExists(states, proc)
       const state = states.get(proc)
       expect(state?.anon_exec, proc).toBe(false)
       expect(state?.auth_exec, proc).toBe(true)
