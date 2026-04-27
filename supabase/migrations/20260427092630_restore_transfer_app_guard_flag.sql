@@ -138,3 +138,35 @@ ALTER FUNCTION public.transfer_app(
     p_app_id character varying,
     p_new_org_id uuid
 ) OWNER TO postgres;
+
+REVOKE ALL ON FUNCTION public.transfer_app(
+    p_app_id character varying,
+    p_new_org_id uuid
+) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.transfer_app(
+    p_app_id character varying,
+    p_new_org_id uuid
+) FROM anon;
+REVOKE ALL ON FUNCTION public.transfer_app(
+    p_app_id character varying,
+    p_new_org_id uuid
+) FROM authenticated;
+REVOKE ALL ON FUNCTION public.transfer_app(
+    p_app_id character varying,
+    p_new_org_id uuid
+) FROM service_role;
+GRANT EXECUTE ON FUNCTION public.transfer_app(
+    p_app_id character varying,
+    p_new_org_id uuid
+) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.transfer_app(
+    p_app_id character varying,
+    p_new_org_id uuid
+) TO service_role;
+
+COMMENT ON FUNCTION public.transfer_app(
+    p_app_id character varying,
+    p_new_org_id uuid
+) IS 'Transfers an app and all its related data to a new '
+'organization. Requires app.transfer permission on both '
+'source and destination organizations.';
