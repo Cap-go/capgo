@@ -60,6 +60,16 @@ BEGIN
 
           UNION
 
+          SELECT rb.org_id AS org_uuid
+          FROM public.role_bindings AS rb
+          WHERE apikey_row.rbac_id IS NOT NULL
+            AND rb.principal_type = public.rbac_principal_apikey()
+            AND rb.principal_id = apikey_row.rbac_id
+            AND rb.org_id IS NOT NULL
+            AND (rb.expires_at IS NULL OR rb.expires_at > now())
+
+          UNION
+
           SELECT apps.owner_org AS org_uuid
           FROM public.role_bindings AS rb
           JOIN public.apps ON apps.id = rb.app_id
@@ -83,6 +93,17 @@ BEGIN
           JOIN public.group_members AS gm ON gm.group_id = rb.principal_id
           WHERE rb.principal_type = public.rbac_principal_group()
             AND gm.user_id = apikey_row.user_id
+            AND rb.app_id IS NOT NULL
+            AND (rb.expires_at IS NULL OR rb.expires_at > now())
+
+          UNION
+
+          SELECT apps.owner_org AS org_uuid
+          FROM public.role_bindings AS rb
+          JOIN public.apps ON apps.id = rb.app_id
+          WHERE apikey_row.rbac_id IS NOT NULL
+            AND rb.principal_type = public.rbac_principal_apikey()
+            AND rb.principal_id = apikey_row.rbac_id
             AND rb.app_id IS NOT NULL
             AND (rb.expires_at IS NULL OR rb.expires_at > now())
 
@@ -113,6 +134,18 @@ BEGIN
           JOIN public.group_members AS gm ON gm.group_id = rb.principal_id
           WHERE rb.principal_type = public.rbac_principal_group()
             AND gm.user_id = apikey_row.user_id
+            AND rb.channel_id IS NOT NULL
+            AND (rb.expires_at IS NULL OR rb.expires_at > now())
+
+          UNION
+
+          SELECT apps.owner_org AS org_uuid
+          FROM public.role_bindings AS rb
+          JOIN public.channels AS ch ON ch.rbac_id = rb.channel_id
+          JOIN public.apps ON apps.app_id = ch.app_id
+          WHERE apikey_row.rbac_id IS NOT NULL
+            AND rb.principal_type = public.rbac_principal_apikey()
+            AND rb.principal_id = apikey_row.rbac_id
             AND rb.channel_id IS NOT NULL
             AND (rb.expires_at IS NULL OR rb.expires_at > now())
         ) AS accessible_orgs
@@ -153,3 +186,5 @@ AS $$
 $$;
 
 ALTER FUNCTION "public"."find_apikey_by_value"("key_value" "text") OWNER TO "postgres";
+REVOKE ALL ON FUNCTION "public"."find_apikey_by_value"("key_value" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."find_apikey_by_value"("key_value" "text") TO "service_role";

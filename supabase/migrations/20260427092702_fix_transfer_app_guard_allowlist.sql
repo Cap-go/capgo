@@ -128,40 +128,48 @@ BEGIN
     END IF;
   END IF;
 
-  -- Allow the guarded owner_org cascade only inside the approved transfer path.
-  PERFORM set_config('capgo.allow_owner_org_transfer', 'true', true);
+  BEGIN
+    -- Allow the guarded owner_org cascade only inside the approved transfer path.
+    PERFORM set_config('capgo.allow_owner_org_transfer', 'true', true);
 
-  UPDATE public.apps
-  SET
-      owner_org = p_new_org_id,
-      updated_at = now(),
-      transfer_history = COALESCE(transfer_history, '{}') || jsonb_build_object(
-          'transferred_at', now(),
-          'transferred_from', v_old_org_id,
-          'transferred_to', p_new_org_id,
-          'initiated_by', v_user_id
-      )::jsonb
-  WHERE app_id = p_app_id;
+    UPDATE public.apps
+    SET
+        owner_org = p_new_org_id,
+        updated_at = now(),
+        transfer_history = COALESCE(transfer_history, '{}') || jsonb_build_object(
+            'transferred_at', now(),
+            'transferred_from', v_old_org_id,
+            'transferred_to', p_new_org_id,
+            'initiated_by', v_user_id
+        )::jsonb
+    WHERE app_id = p_app_id;
 
-  UPDATE public.app_versions
-  SET owner_org = p_new_org_id
-  WHERE app_id = p_app_id;
+    UPDATE public.app_versions
+    SET owner_org = p_new_org_id
+    WHERE app_id = p_app_id;
 
-  UPDATE public.app_versions_meta
-  SET owner_org = p_new_org_id
-  WHERE app_id = p_app_id;
+    UPDATE public.app_versions_meta
+    SET owner_org = p_new_org_id
+    WHERE app_id = p_app_id;
 
-  UPDATE public.channel_devices
-  SET owner_org = p_new_org_id
-  WHERE app_id = p_app_id;
+    UPDATE public.channel_devices
+    SET owner_org = p_new_org_id
+    WHERE app_id = p_app_id;
 
-  UPDATE public.channels
-  SET owner_org = p_new_org_id
-  WHERE app_id = p_app_id;
+    UPDATE public.channels
+    SET owner_org = p_new_org_id
+    WHERE app_id = p_app_id;
 
-  UPDATE public.deploy_history
-  SET owner_org = p_new_org_id
-  WHERE app_id = p_app_id;
+    UPDATE public.deploy_history
+    SET owner_org = p_new_org_id
+    WHERE app_id = p_app_id;
+
+    PERFORM set_config('capgo.allow_owner_org_transfer', 'false', true);
+  EXCEPTION
+    WHEN OTHERS THEN
+      PERFORM set_config('capgo.allow_owner_org_transfer', 'false', true);
+      RAISE;
+  END;
 
 END;
 $$;
