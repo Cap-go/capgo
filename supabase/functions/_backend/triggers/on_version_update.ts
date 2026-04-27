@@ -2,13 +2,13 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { ManifestCacheEntry } from '../utils/manifestCache.ts'
 import type { Database } from '../utils/supabase.types.ts'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { buildManifestCacheEntries, compactManifestCacheEntries } from '../utils/manifestCache.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
-import { manifest } from '../utils/postgres_schema.ts'
+import { apps, manifest } from '../utils/postgres_schema.ts'
 import { getPath, s3 } from '../utils/s3.ts'
 import { createStatsMeta } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
@@ -123,7 +123,7 @@ async function handleManifest(c: Context, record: Database['public']['Tables']['
     cloudlog({ requestId: c.get('requestId'), message: 'error get manifest entries', error: existingEntriesError, appVersionId: record.id })
 
   const compactEntries = compactManifestCacheEntries(manifestEntries)
-  const validEntries = compactEntries
+  const validEntries: (typeof manifest.$inferInsert)[] = compactEntries
     .map(entry => ({
       app_version_id: record.id,
       file_name: entry.file_name,
@@ -135,39 +135,27 @@ async function handleManifest(c: Context, record: Database['public']['Tables']['
   // Only create entries if none exist
   let hasManifestRows = Boolean(existingEntries?.length)
   if (!existingEntries?.length && validEntries.length > 0) {
-    const { error: insertError } = await supabaseAdmin(c)
-      .from('manifest')
-      .insert(validEntries)
-    if (insertError) {
-      cloudlog({ requestId: c.get('requestId'), message: 'error insert manifest', error: insertError })
-    }
-    else {
+    const pgClient = getPgClient(c, false)
+    const drizzleClient = getDrizzleClient(pgClient)
+    try {
+      await drizzleClient.transaction(async (tx) => {
+        await tx.insert(manifest).values(validEntries)
+        await tx.execute(sql`UPDATE app_versions SET manifest_count = ${validEntries.length} WHERE id = ${record.id}`)
+        await tx
+          .update(apps)
+          .set({
+            manifest_bundle_count: sql`${apps.manifest_bundle_count} + 1`,
+            updated_at: sql`now()`,
+          })
+          .where(eq(apps.app_id, record.app_id))
+      })
       hasManifestRows = true
-      // Update manifest_count on the version
-      const { error: countError } = await supabaseAdmin(c)
-        .from('app_versions')
-        .update({ manifest_count: validEntries.length })
-        .eq('id', record.id)
-      if (countError)
-        cloudlog({ requestId: c.get('requestId'), message: 'error update manifest_count', error: countError })
-
-      // Increment manifest_bundle_count on the app using raw SQL
-      const pgClient = getPgClient(c, false)
-      try {
-        await pgClient.query(
-          `UPDATE apps
-           SET manifest_bundle_count = manifest_bundle_count + 1,
-               updated_at = now()
-           WHERE app_id = $1`,
-          [record.app_id],
-        )
-      }
-      catch (error) {
-        cloudlog({ requestId: c.get('requestId'), message: 'error update manifest_bundle_count', error })
-      }
-      finally {
-        await closeClient(c, pgClient)
-      }
+    }
+    catch (error) {
+      cloudlog({ requestId: c.get('requestId'), message: 'error insert manifest transaction', error, appVersionId: record.id, appId: record.app_id })
+    }
+    finally {
+      await closeClient(c, pgClient)
     }
   }
 

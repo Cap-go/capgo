@@ -1,12 +1,7 @@
+import type { ManifestCacheEntry } from './manifestCache.ts'
 import { bigint, boolean, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
 
 // do_not_change
-
-interface ManifestCacheEntry {
-  file_name: string
-  file_hash: string
-  s3_path: string
-}
 
 export const disableUpdatePgEnum = pgEnum('disable_update', ['major', 'minor', 'patch', 'version_number', 'none'])
 export const keyModePgEnum = pgEnum('key_mode', ['read', 'write', 'all', 'upload'])

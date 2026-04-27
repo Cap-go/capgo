@@ -23,6 +23,8 @@ export function compactManifestCacheEntries(entries: readonly ManifestCacheEntry
   })
 }
 
+// Semantic wrapper: callers use `compact` when they need normalized entries
+// in memory and `build` when they are constructing the persisted cache payload.
 export function buildManifestCacheEntries(entries: readonly ManifestCacheEntryLike[]): ManifestCacheEntry[] {
   return compactManifestCacheEntries(entries)
 }
