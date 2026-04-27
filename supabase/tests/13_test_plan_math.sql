@@ -39,12 +39,18 @@ BEGIN
   RETURN NEXT IS(usage.mau_percent, (SELECT CAST ('1.0' AS DOUBLE PRECISION)), 'Mau usage = 2% for "Solo" plan');
   RETURN NEXT IS(usage.bandwidth_percent, (SELECT CAST ('1.0' AS DOUBLE PRECISION)), 'Bandwidth usage = 1% for "Solo" plan');
 
-  -- Let's now add a second app to this org. 
-  ALTER TABLE public.apps DISABLE TRIGGER USER;
+  -- Let's now add a second app to this org.
   ALTER TABLE public.app_versions DISABLE TRIGGER force_valid_owner_org_app_versions;
 
-  UPDATE public.apps set owner_org='046a36ac-e03c-4590-9257-bd6c9dba9ee8' where app_id='com.demoadmin.app';
-  ALTER TABLE public.apps ENABLE TRIGGER USER;
+  UPDATE public.org_users
+  SET user_right = 'super_admin'::public.user_min_right
+  WHERE org_id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'
+    AND user_id = 'c591b04e-cf29-4945-b9a0-776d0672061a';
+
+  PERFORM tests.authenticate_as('test_admin');
+  PERFORM public.transfer_app('com.demoadmin.app', '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid);
+  PERFORM set_config('role', 'postgres', true);
+  PERFORM set_config('request.jwt.claims', null, true);
 
   UPDATE public.app_versions set app_id='com.demoadmin.app', r2_path='orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demoadmin.app/1.359.0.zip' where id=7;
   ALTER TABLE public.app_versions ENABLE TRIGGER force_valid_owner_org_app_versions;

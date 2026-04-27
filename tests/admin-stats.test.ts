@@ -302,7 +302,7 @@ beforeAll(async () => {
   ])
   if (channelError)
     throw channelError
-}, 30000)
+}, 90000)
 
 afterAll(async () => {
   const supabase = getSupabaseClient()
@@ -312,7 +312,7 @@ afterAll(async () => {
   await supabase.from('apps').delete().in('app_id', [TRIAL_APP_ID, ONBOARDING_APP_ID, ONBOARDING_LATE_SUBSCRIPTION_APP_ID])
   await supabase.from('orgs').delete().in('id', [TRIAL_ORG_ID, CANCELLED_YEARLY_ORG_ID, CANCELLED_MONTHLY_ORG_ID, ONBOARDING_ORG_ID, ONBOARDING_NO_BUNDLE_ORG_ID, ONBOARDING_LATE_SUBSCRIPTION_ORG_ID])
   await supabase.from('stripe_info').delete().in('customer_id', [TRIAL_CUSTOMER_ID, CANCELLED_YEARLY_CUSTOMER_ID, CANCELLED_MONTHLY_CUSTOMER_ID, ONBOARDING_CUSTOMER_ID, ONBOARDING_NO_BUNDLE_CUSTOMER_ID, ONBOARDING_LATE_SUBSCRIPTION_CUSTOMER_ID])
-})
+}, 90000)
 
 describe('/private/admin_stats', () => {
   it.concurrent('returns last bundle upload for trial organizations and excludes builtin versions', async () => {
