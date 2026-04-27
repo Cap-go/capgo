@@ -119,12 +119,10 @@ GRANT EXECUTE ON FUNCTION public.get_apikey() TO SERVICE_ROLE;
 REVOKE ALL
 ON FUNCTION public.get_user_main_org_id_by_app_id(text)
 FROM PUBLIC;
-REVOKE ALL
+GRANT EXECUTE ON FUNCTION public.get_user_main_org_id_by_app_id(text) TO ANON;
+GRANT EXECUTE
 ON FUNCTION public.get_user_main_org_id_by_app_id(text)
-FROM ANON;
-REVOKE ALL
-ON FUNCTION public.get_user_main_org_id_by_app_id(text)
-FROM AUTHENTICATED;
+TO AUTHENTICATED;
 GRANT EXECUTE
 ON FUNCTION public.get_user_main_org_id_by_app_id(text)
 TO SERVICE_ROLE;
@@ -132,12 +130,12 @@ TO SERVICE_ROLE;
 REVOKE ALL
 ON FUNCTION public.reject_access_due_to_2fa_for_app(character varying)
 FROM PUBLIC;
-REVOKE ALL
+GRANT EXECUTE
 ON FUNCTION public.reject_access_due_to_2fa_for_app(character varying)
-FROM ANON;
-REVOKE ALL
+TO ANON;
+GRANT EXECUTE
 ON FUNCTION public.reject_access_due_to_2fa_for_app(character varying)
-FROM AUTHENTICATED;
+TO AUTHENTICATED;
 GRANT EXECUTE
 ON FUNCTION public.reject_access_due_to_2fa_for_app(character varying)
 TO SERVICE_ROLE;
@@ -145,10 +143,10 @@ TO SERVICE_ROLE;
 REVOKE ALL ON FUNCTION public.reject_access_due_to_2fa_for_org(
     uuid
 ) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.reject_access_due_to_2fa_for_org(uuid) FROM ANON;
-REVOKE ALL
+GRANT EXECUTE ON FUNCTION public.reject_access_due_to_2fa_for_org(uuid) TO ANON;
+GRANT EXECUTE
 ON FUNCTION public.reject_access_due_to_2fa_for_org(uuid)
-FROM AUTHENTICATED;
+TO AUTHENTICATED;
 GRANT EXECUTE
 ON FUNCTION public.reject_access_due_to_2fa_for_org(uuid)
 TO SERVICE_ROLE;
@@ -293,7 +291,7 @@ GRANT EXECUTE ON FUNCTION public.get_app_metrics(uuid) TO AUTHENTICATED;
 GRANT EXECUTE ON FUNCTION public.get_app_metrics(uuid) TO SERVICE_ROLE;
 
 REVOKE ALL ON FUNCTION public.get_org_members(uuid, uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.get_org_members(uuid, uuid) FROM ANON;
+GRANT EXECUTE ON FUNCTION public.get_org_members(uuid, uuid) TO ANON;
 GRANT EXECUTE
 ON FUNCTION public.get_org_members(uuid, uuid)
 TO AUTHENTICATED;
@@ -327,9 +325,9 @@ TO SERVICE_ROLE;
 REVOKE ALL
 ON FUNCTION public.get_total_app_storage_size_orgs(uuid, character varying)
 FROM PUBLIC;
-REVOKE ALL
+GRANT EXECUTE
 ON FUNCTION public.get_total_app_storage_size_orgs(uuid, character varying)
-FROM ANON;
+TO ANON;
 GRANT EXECUTE
 ON FUNCTION public.get_total_app_storage_size_orgs(uuid, character varying)
 TO AUTHENTICATED;
@@ -338,7 +336,7 @@ ON FUNCTION public.get_total_app_storage_size_orgs(uuid, character varying)
 TO SERVICE_ROLE;
 
 REVOKE ALL ON FUNCTION public.get_total_storage_size_org(uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.get_total_storage_size_org(uuid) FROM ANON;
+GRANT EXECUTE ON FUNCTION public.get_total_storage_size_org(uuid) TO ANON;
 GRANT EXECUTE
 ON FUNCTION public.get_total_storage_size_org(uuid)
 TO AUTHENTICATED;
@@ -352,7 +350,7 @@ GRANT EXECUTE ON FUNCTION public.get_user_org_ids() TO AUTHENTICATED;
 GRANT EXECUTE ON FUNCTION public.get_user_org_ids() TO SERVICE_ROLE;
 
 REVOKE ALL ON FUNCTION public.has_2fa_enabled() FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.has_2fa_enabled() FROM ANON;
+GRANT EXECUTE ON FUNCTION public.has_2fa_enabled() TO ANON;
 GRANT EXECUTE ON FUNCTION public.has_2fa_enabled() TO AUTHENTICATED;
 GRANT EXECUTE ON FUNCTION public.has_2fa_enabled() TO SERVICE_ROLE;
 
@@ -391,7 +389,7 @@ ON FUNCTION public.invite_user_to_org_rbac(character varying, uuid, text)
 TO SERVICE_ROLE;
 
 REVOKE ALL ON FUNCTION public.is_allowed_action_org(uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.is_allowed_action_org(uuid) FROM ANON;
+GRANT EXECUTE ON FUNCTION public.is_allowed_action_org(uuid) TO ANON;
 GRANT EXECUTE
 ON FUNCTION public.is_allowed_action_org(uuid)
 TO AUTHENTICATED;
@@ -400,9 +398,9 @@ GRANT EXECUTE ON FUNCTION public.is_allowed_action_org(uuid) TO SERVICE_ROLE;
 REVOKE ALL
 ON FUNCTION public.is_allowed_action_org_action(uuid, public.action_type [])
 FROM PUBLIC;
-REVOKE ALL
+GRANT EXECUTE
 ON FUNCTION public.is_allowed_action_org_action(uuid, public.action_type [])
-FROM ANON;
+TO ANON;
 GRANT EXECUTE
 ON FUNCTION public.is_allowed_action_org_action(uuid, public.action_type [])
 TO AUTHENTICATED;
@@ -411,24 +409,24 @@ ON FUNCTION public.is_allowed_action_org_action(uuid, public.action_type [])
 TO SERVICE_ROLE;
 
 REVOKE ALL ON FUNCTION public.is_canceled_org(uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.is_canceled_org(uuid) FROM ANON;
+GRANT EXECUTE ON FUNCTION public.is_canceled_org(uuid) TO ANON;
 GRANT EXECUTE ON FUNCTION public.is_canceled_org(uuid) TO AUTHENTICATED;
 GRANT EXECUTE ON FUNCTION public.is_canceled_org(uuid) TO SERVICE_ROLE;
 
 REVOKE ALL ON FUNCTION public.is_good_plan_v5_org(uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.is_good_plan_v5_org(uuid) FROM ANON;
+GRANT EXECUTE ON FUNCTION public.is_good_plan_v5_org(uuid) TO ANON;
 GRANT EXECUTE
 ON FUNCTION public.is_good_plan_v5_org(uuid)
 TO AUTHENTICATED;
 GRANT EXECUTE ON FUNCTION public.is_good_plan_v5_org(uuid) TO SERVICE_ROLE;
 
 REVOKE ALL ON FUNCTION public.is_onboarded_org(uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.is_onboarded_org(uuid) FROM ANON;
+GRANT EXECUTE ON FUNCTION public.is_onboarded_org(uuid) TO ANON;
 GRANT EXECUTE ON FUNCTION public.is_onboarded_org(uuid) TO AUTHENTICATED;
 GRANT EXECUTE ON FUNCTION public.is_onboarded_org(uuid) TO SERVICE_ROLE;
 
 REVOKE ALL ON FUNCTION public.is_onboarding_needed_org(uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.is_onboarding_needed_org(uuid) FROM ANON;
+GRANT EXECUTE ON FUNCTION public.is_onboarding_needed_org(uuid) TO ANON;
 GRANT EXECUTE
 ON FUNCTION public.is_onboarding_needed_org(uuid)
 TO AUTHENTICATED;
@@ -437,14 +435,14 @@ ON FUNCTION public.is_onboarding_needed_org(uuid)
 TO SERVICE_ROLE;
 
 REVOKE ALL ON FUNCTION public.is_org_yearly(uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.is_org_yearly(uuid) FROM ANON;
+GRANT EXECUTE ON FUNCTION public.is_org_yearly(uuid) TO ANON;
 GRANT EXECUTE ON FUNCTION public.is_org_yearly(uuid) TO AUTHENTICATED;
 GRANT EXECUTE ON FUNCTION public.is_org_yearly(uuid) TO SERVICE_ROLE;
 
 REVOKE ALL
 ON FUNCTION public.is_paying_and_good_plan_org(uuid)
 FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.is_paying_and_good_plan_org(uuid) FROM ANON;
+GRANT EXECUTE ON FUNCTION public.is_paying_and_good_plan_org(uuid) TO ANON;
 GRANT EXECUTE
 ON FUNCTION public.is_paying_and_good_plan_org(uuid)
 TO AUTHENTICATED;
@@ -457,11 +455,11 @@ ON FUNCTION public.is_paying_and_good_plan_org_action(
     uuid, public.action_type []
 )
 FROM PUBLIC;
-REVOKE ALL
+GRANT EXECUTE
 ON FUNCTION public.is_paying_and_good_plan_org_action(
     uuid, public.action_type []
 )
-FROM ANON;
+TO ANON;
 GRANT EXECUTE
 ON FUNCTION public.is_paying_and_good_plan_org_action(
     uuid, public.action_type []
@@ -560,6 +558,6 @@ ON FUNCTION public.update_tmp_invite_role_rbac(uuid, text, text)
 TO SERVICE_ROLE;
 
 REVOKE ALL ON FUNCTION public.verify_mfa() FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.verify_mfa() FROM ANON;
+GRANT EXECUTE ON FUNCTION public.verify_mfa() TO ANON;
 GRANT EXECUTE ON FUNCTION public.verify_mfa() TO AUTHENTICATED;
 GRANT EXECUTE ON FUNCTION public.verify_mfa() TO SERVICE_ROLE;

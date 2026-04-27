@@ -28,11 +28,8 @@ const SERVICE_ONLY_PROCS = [
   'public.delete_old_deleted_versions()',
   'public.generate_org_user_stripe_info_on_org_create()',
   'public.get_apikey()',
-  'public.get_user_main_org_id_by_app_id(text)',
   'public.noupdate()',
   'public.prevent_last_super_admin_binding_delete()',
-  'public.reject_access_due_to_2fa_for_app(character varying)',
-  'public.reject_access_due_to_2fa_for_org(uuid)',
   'public.resync_org_user_role_bindings(uuid, uuid)',
   'public.sanitize_apps_text_fields()',
   'public.sanitize_orgs_text_fields()',
@@ -41,6 +38,26 @@ const SERVICE_ONLY_PROCS = [
   'public.sync_org_has_usage_credits_from_grants()',
   'public.sync_org_user_role_binding_on_update()',
   'public.sync_org_user_to_role_binding()',
+] as const
+
+const ANON_ALLOWED_PROCS = [
+  'public.get_org_members(uuid, uuid)',
+  'public.get_total_app_storage_size_orgs(uuid, character varying)',
+  'public.get_total_storage_size_org(uuid)',
+  'public.get_user_main_org_id_by_app_id(text)',
+  'public.has_2fa_enabled()',
+  'public.is_allowed_action_org(uuid)',
+  'public.is_allowed_action_org_action(uuid, public.action_type[])',
+  'public.is_canceled_org(uuid)',
+  'public.is_good_plan_v5_org(uuid)',
+  'public.is_onboarded_org(uuid)',
+  'public.is_onboarding_needed_org(uuid)',
+  'public.is_org_yearly(uuid)',
+  'public.is_paying_and_good_plan_org(uuid)',
+  'public.is_paying_and_good_plan_org_action(uuid, public.action_type[])',
+  'public.reject_access_due_to_2fa_for_app(character varying)',
+  'public.reject_access_due_to_2fa_for_org(uuid)',
+  'public.verify_mfa()',
 ] as const
 
 const AUTHENTICATED_ONLY_PROCS = [
@@ -57,32 +74,18 @@ const AUTHENTICATED_ONLY_PROCS = [
   'public.get_app_metrics(uuid, character varying, date, date)',
   'public.get_app_metrics(uuid, date, date)',
   'public.get_app_metrics(uuid)',
-  'public.get_org_members(uuid, uuid)',
   'public.get_org_members(uuid)',
   'public.get_org_members_rbac(uuid)',
   'public.get_org_user_access_rbac(uuid, uuid)',
-  'public.get_total_app_storage_size_orgs(uuid, character varying)',
-  'public.get_total_storage_size_org(uuid)',
   'public.get_user_org_ids()',
-  'public.has_2fa_enabled()',
   'public.invite_user_to_org(character varying, uuid, public.user_min_right)',
   'public.invite_user_to_org_rbac(character varying, uuid, text)',
-  'public.is_allowed_action_org(uuid)',
-  'public.is_allowed_action_org_action(uuid, public.action_type[])',
-  'public.is_canceled_org(uuid)',
-  'public.is_good_plan_v5_org(uuid)',
-  'public.is_onboarded_org(uuid)',
-  'public.is_onboarding_needed_org(uuid)',
-  'public.is_org_yearly(uuid)',
-  'public.is_paying_and_good_plan_org(uuid)',
-  'public.is_paying_and_good_plan_org_action(uuid, public.action_type[])',
   'public.modify_permissions_tmp(text, uuid, public.user_min_right)',
   'public.rbac_check_permission(text, uuid, character varying, bigint)',
   'public.rbac_check_permission_no_password_policy(text, uuid, character varying, bigint)',
   'public.update_org_invite_role_rbac(uuid, uuid, text)',
   'public.update_org_member_role(uuid, uuid, text)',
   'public.update_tmp_invite_role_rbac(uuid, text, text)',
-  'public.verify_mfa()',
 ] as const
 
 describe('security definer execute hardening', () => {
@@ -165,6 +168,18 @@ describe('security definer execute hardening', () => {
       const state = states.get(proc)
       expect(state?.anon_exec, proc).toBe(false)
       expect(state?.auth_exec, proc).toBe(false)
+    }
+  })
+
+  it.concurrent('keeps anon-safe helpers callable for anonymous callers', async () => {
+    const states = await getProcStates(ANON_ALLOWED_PROCS)
+
+    expect(states.size).toBe(ANON_ALLOWED_PROCS.length)
+
+    for (const proc of ANON_ALLOWED_PROCS) {
+      const state = states.get(proc)
+      expect(state?.anon_exec, proc).toBe(true)
+      expect(state?.auth_exec, proc).toBe(true)
     }
   })
 
