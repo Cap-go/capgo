@@ -345,7 +345,7 @@ ON FUNCTION public.get_total_storage_size_org(uuid)
 TO SERVICE_ROLE;
 
 REVOKE ALL ON FUNCTION public.get_user_org_ids() FROM PUBLIC;
-REVOKE ALL ON FUNCTION public.get_user_org_ids() FROM ANON;
+GRANT EXECUTE ON FUNCTION public.get_user_org_ids() TO ANON;
 GRANT EXECUTE ON FUNCTION public.get_user_org_ids() TO AUTHENTICATED;
 GRANT EXECUTE ON FUNCTION public.get_user_org_ids() TO SERVICE_ROLE;
 
@@ -359,11 +359,11 @@ ON FUNCTION public.invite_user_to_org(
     character varying, uuid, public.user_min_right
 )
 FROM PUBLIC;
-REVOKE ALL
+GRANT EXECUTE
 ON FUNCTION public.invite_user_to_org(
     character varying, uuid, public.user_min_right
 )
-FROM ANON;
+TO ANON;
 GRANT EXECUTE
 ON FUNCTION public.invite_user_to_org(
     character varying, uuid, public.user_min_right
@@ -378,9 +378,9 @@ TO SERVICE_ROLE;
 REVOKE ALL
 ON FUNCTION public.invite_user_to_org_rbac(character varying, uuid, text)
 FROM PUBLIC;
-REVOKE ALL
+GRANT EXECUTE
 ON FUNCTION public.invite_user_to_org_rbac(character varying, uuid, text)
-FROM ANON;
+TO ANON;
 GRANT EXECUTE
 ON FUNCTION public.invite_user_to_org_rbac(character varying, uuid, text)
 TO AUTHENTICATED;
