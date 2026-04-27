@@ -11,7 +11,8 @@ AS $$
 BEGIN
   -- Serialize public-channel changes per app so concurrent writers cannot
   -- reintroduce overlapping public state between the normalization update and
-  -- the row write itself.
+  -- the row write itself. Taking this lock before the cross-row UPDATE also
+  -- makes same-app writers wait here instead of deadlocking on channel rows.
   PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(NEW.app_id));
 
   IF NEW.public IS DISTINCT FROM true THEN
