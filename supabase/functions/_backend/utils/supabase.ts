@@ -1559,10 +1559,14 @@ export async function resolveApikeyPolicyOrgIds(
     return [...orgIds]
   }
 
-  const { data: apps } = await supabase
+  const { data: apps, error } = await supabase
     .from('apps')
     .select('owner_org')
     .in('app_id', limitedToApps)
+
+  if (error) {
+    throw simpleError('failed_to_resolve_apikey_policy_scope', 'Failed to resolve API key policy scope', { supabaseError: error })
+  }
 
   for (const app of apps ?? []) {
     if (app.owner_org) {

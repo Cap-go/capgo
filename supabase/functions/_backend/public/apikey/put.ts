@@ -31,9 +31,11 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
   const auth = c.get('auth') as AuthInfo
   const authApikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
 
-  // Only check limited_to_orgs constraint for API key auth (not JWT)
-  if (auth.authType === 'apikey' && authApikey?.limited_to_orgs?.length) {
-    throw quickError(401, 'cannot_update_apikey', 'You cannot do that as a limited API key', { requestId, apikeyId: authApikey.id })
+  // Block any constrained API key from mutating other keys owned by the same user.
+  const callerHasLimitedScope = (authApikey?.limited_to_orgs?.length ?? 0) > 0
+    || (authApikey?.limited_to_apps?.length ?? 0) > 0
+  if (auth.authType === 'apikey' && callerHasLimitedScope) {
+    throw quickError(401, 'cannot_update_apikey', 'You cannot do that as a limited API key', { requestId, apikeyId: authApikey?.id })
   }
 
   const body = await parseBody<ApiKeyPut>(c)

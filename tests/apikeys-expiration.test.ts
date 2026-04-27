@@ -400,6 +400,71 @@ describe('organization API key expiration policy', () => {
     expect(data.error).toBe('expiration_exceeds_max')
   })
 
+  it('fail to update api key scope to app owner org without expiration (scope-change regression)', async () => {
+    const createResponse = await apiFetch('/apikey', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        name: 'key-policy-app-scope-update',
+      }),
+    })
+    expect(createResponse.status).toBe(200)
+    const createdKey = await createResponse.json<{ id: number }>()
+
+    const updateResponse = await apiFetch(`/apikey/${createdKey.id}`, {
+      method: 'PUT',
+      headers: authHeaders,
+      body: JSON.stringify({
+        limited_to_apps: [POLICY_APPNAME],
+      }),
+    })
+    const data = await updateResponse.json() as { error: string }
+
+    expect(updateResponse.status).toBe(400)
+    expect(data.error).toBe('expiration_required')
+  })
+
+  it('reject limited app-scoped api keys from updating sibling keys', async () => {
+    const validDate = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
+    const limitedKeyResponse = await apiFetch('/apikey', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        name: 'key-policy-limited-updater',
+        limited_to_apps: [POLICY_APPNAME],
+        expires_at: validDate,
+      }),
+    })
+    expect(limitedKeyResponse.status).toBe(200)
+    const limitedKey = await limitedKeyResponse.json<{ key: string }>()
+
+    const siblingKeyResponse = await apiFetch('/apikey', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        name: 'key-policy-sibling-target',
+      }),
+    })
+    expect(siblingKeyResponse.status).toBe(200)
+    const siblingKey = await siblingKeyResponse.json<{ id: number }>()
+
+    const limitedAuthHeaders = {
+      'Content-Type': 'application/json',
+      'Authorization': limitedKey.key,
+    }
+    const updateResponse = await apiFetch(`/apikey/${siblingKey.id}`, {
+      method: 'PUT',
+      headers: limitedAuthHeaders,
+      body: JSON.stringify({
+        name: 'key-policy-escalation-attempt',
+      }),
+    })
+    const data = await updateResponse.json() as { error: string }
+
+    expect(updateResponse.status).toBe(401)
+    expect(data.error).toBe('cannot_update_apikey')
+  })
+
   it('reject direct apikey inserts that bypass app-scoped expiration policy', async () => {
     const supabase = createAuthenticatedSupabaseClient(authHeaders)
     const { data, error } = await supabase
