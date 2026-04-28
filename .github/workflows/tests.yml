@@ -15,7 +15,7 @@ permissions: {}
 
 env:
   DENO_DIR: my_cache_directory
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   test_all:
@@ -86,49 +86,65 @@ jobs:
         run: supabase test db
       - name: Lint SQL
         run: supabase db lint -s public --fail-on warning
-      - uses: JarvusInnovations/background-action@v1
+      - id: bootstrap_edge_server
         name: Bootstrap Edge server
-        with:
-          run: supabase functions serve &
-          wait-on: |
+        env:
+          BACKGROUND_SERVICE_NAME: Bootstrap Edge server
+          BACKGROUND_RUN_COMMAND: supabase functions serve
+          BACKGROUND_WAIT_ON: |
             http-get://127.0.0.1:54321/functions/v1/ok
-          # IMPORTANT: to use environment variables in wait-on, you must use this form: ${{ env.VAR }}
-          # See wait-on section below for all resource types and prefixes
-
-          tail: stderr,stdout # true = stderr,stdout
-          # This will allow you to monitor the progress live
-
-          log-output-resume: stderr,stdout
-          # Eliminates previously output stderr log entries from post-run output
-
-          wait-for: 1m
-
-          log-output: stderr,stdout # same as true
-
-          log-output-if: true
-          # failure = exit-early or timeout
-
-          working-directory: .
+          BACKGROUND_LOG_PATH: ${{ runner.temp }}/bootstrap-edge-server.log
+          BACKGROUND_WAIT_TIMEOUT_MS: 60000
+        run: bash .github/scripts/start-background-service.sh
       - name: Run all backend and CLI tests
         run: bun run test:all
-      - uses: JarvusInnovations/background-action@v1
+      - name: Show Edge server logs after backend test failure
+        if: failure() && steps.bootstrap_edge_server.outputs.log_path != ''
+        run: |
+          echo "::group::Bootstrap Edge server log"
+          tail -n 200 "${{ steps.bootstrap_edge_server.outputs.log_path }}" || true
+          echo "::endgroup::"
+      - id: start_cloudflare_workers
         name: Start Cloudflare Workers for testing
-        with:
-          run: |
+        env:
+          BACKGROUND_SERVICE_NAME: Cloudflare Workers
+          BACKGROUND_RUN_COMMAND: |
             chmod +x scripts/start-cloudflare-workers.sh
             ./scripts/start-cloudflare-workers.sh
-          wait-on: |
+          BACKGROUND_WAIT_ON: |
             http-get://127.0.0.1:8787/ok
             http-get://127.0.0.1:8788/ok
             http-get://127.0.0.1:8789/ok
-          tail: stderr,stdout
-          log-output-resume: stderr,stdout
-          wait-for: 2m
-          log-output: stderr,stdout
-          log-output-if: true
-          working-directory: .
+          BACKGROUND_LOG_PATH: ${{ runner.temp }}/cloudflare-workers.log
+          BACKGROUND_WAIT_TIMEOUT_MS: 120000
+          BACKGROUND_TAIL_LINES: 400
+        run: bash .github/scripts/start-background-service.sh
       - name: Run Cloudflare Workers backend tests
         run: bun run test:cloudflare:backend
+      - name: Show Cloudflare Worker logs after Cloudflare test failure
+        if: failure() && steps.start_cloudflare_workers.outputs.log_path != ''
+        run: |
+          echo "::group::Cloudflare Worker log"
+          tail -n 400 "${{ steps.start_cloudflare_workers.outputs.log_path }}" || true
+          echo "::endgroup::"
+      - name: Upload background service logs
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: test-all-background-service-logs
+          path: |
+            ${{ steps.bootstrap_edge_server.outputs.log_path }}
+            ${{ steps.start_cloudflare_workers.outputs.log_path }}
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Stop background services
+        if: always()
+        run: |
+          for pid in "${{ steps.bootstrap_edge_server.outputs.pid }}" "${{ steps.start_cloudflare_workers.outputs.pid }}"; do
+            if [ -n "${pid}" ] && kill -0 "${pid}" 2>/dev/null; then
+              kill "${pid}" 2>/dev/null || true
+            fi
+          done
 
   test_playwright:
     runs-on: ubuntu-latest
@@ -160,8 +176,76 @@ jobs:
           version: 2.84.2
       - name: Link Supabase templates
         run: ln -sfn supabase/templates templates
+      - id: start_playwright_stripe_emulator
+        name: Start Stripe emulator for Playwright
+        env:
+          BACKGROUND_SERVICE_NAME: Stripe emulator
+          BACKGROUND_RUN_COMMAND: STRIPE_EMULATOR_PORT=4510 bun run stripe:emulator
+          BACKGROUND_WAIT_ON: |
+            tcp:127.0.0.1:4510
+          BACKGROUND_LOG_PATH: ${{ runner.temp }}/playwright-stripe-emulator.log
+          BACKGROUND_WAIT_TIMEOUT_MS: 60000
+          BACKGROUND_TAIL_LINES: 300
+        run: bash .github/scripts/start-background-service.sh
+      - id: start_playwright_backend
+        name: Start Playwright backend
+        env:
+          BACKGROUND_SERVICE_NAME: Playwright backend
+          BACKGROUND_RUN_COMMAND: |
+            rm -f .context/playwright/gha-backend.ready
+            PLAYWRIGHT_READY_FILE=.context/playwright/gha-backend.ready \
+            ENV=local \
+            STRIPE_SECRET_KEY=sk_test_emulator \
+            STRIPE_API_BASE_URL=http://host.docker.internal:4510 \
+            STRIPE_WEBHOOK_SECRET=testsecret \
+            WEBAPP_URL=http://localhost:5173 \
+            bun run backend:playwright
+          BACKGROUND_WAIT_ON: |
+            file:${{ github.workspace }}/.context/playwright/gha-backend.ready
+          BACKGROUND_LOG_PATH: ${{ runner.temp }}/playwright-backend.log
+          BACKGROUND_WAIT_TIMEOUT_MS: 360000
+          BACKGROUND_TAIL_LINES: 400
+        run: bash .github/scripts/start-background-service.sh
+      - id: start_playwright_frontend
+        name: Start Playwright frontend
+        env:
+          BACKGROUND_SERVICE_NAME: Playwright frontend
+          BACKGROUND_RUN_COMMAND: CAPTCHA_KEY='' bun run serve:worktree
+          BACKGROUND_WAIT_ON: |
+            http-get://localhost:5173
+          BACKGROUND_LOG_PATH: ${{ runner.temp }}/playwright-frontend.log
+          BACKGROUND_WAIT_TIMEOUT_MS: 360000
+          BACKGROUND_TAIL_LINES: 300
+        run: bash .github/scripts/start-background-service.sh
       - name: Run Playwright tests
-        run: bun run test:front
+        env:
+          SKIP_STRIPE_EMULATOR_START: "true"
+          SKIP_BACKEND_START: "true"
+          SKIP_FRONTEND_START: "true"
+        run: bunx playwright test
+      - name: Show Playwright service logs after failure
+        if: failure()
+        run: |
+          echo "::group::Stripe emulator log"
+          tail -n 200 "${{ steps.start_playwright_stripe_emulator.outputs.log_path }}" || true
+          echo "::endgroup::"
+          echo "::group::Playwright backend log"
+          tail -n 300 "${{ steps.start_playwright_backend.outputs.log_path }}" || true
+          echo "::endgroup::"
+          echo "::group::Playwright frontend log"
+          tail -n 200 "${{ steps.start_playwright_frontend.outputs.log_path }}" || true
+          echo "::endgroup::"
+      - name: Upload Playwright background service logs
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-background-service-logs
+          path: |
+            ${{ steps.start_playwright_stripe_emulator.outputs.log_path }}
+            ${{ steps.start_playwright_backend.outputs.log_path }}
+            ${{ steps.start_playwright_frontend.outputs.log_path }}
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Upload Playwright artifacts
         if: failure()
         uses: actions/upload-artifact@v6
@@ -172,3 +256,11 @@ jobs:
             test-results/
           if-no-files-found: ignore
           retention-days: 7
+      - name: Stop Playwright background services
+        if: always()
+        run: |
+          for pid in "${{ steps.start_playwright_frontend.outputs.pid }}" "${{ steps.start_playwright_backend.outputs.pid }}" "${{ steps.start_playwright_stripe_emulator.outputs.pid }}"; do
+            if [ -n "${pid}" ] && kill -0 "${pid}" 2>/dev/null; then
+              kill "${pid}" 2>/dev/null || true
+            fi
+          done

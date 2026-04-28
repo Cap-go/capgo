@@ -1,7 +1,10 @@
 import type { PlaywrightTestConfig } from '@playwright/test'
 import { env } from 'node:process'
 import { defineConfig, devices } from '@playwright/test'
-import { getPlaywrightStripeApiBaseUrl, getStripeEmulatorPort } from './scripts/playwright-stripe'
+import {
+  getPlaywrightStripeApiBaseUrl,
+  getStripeEmulatorPort,
+} from './scripts/playwright-stripe'
 import { getSupabaseWorktreeConfig } from './scripts/supabase-worktree-config'
 
 /**
@@ -21,7 +24,8 @@ const webServer: PlaywrightTestConfig['webServer'] = []
 const { ports: supabasePorts } = getSupabaseWorktreeConfig()
 const localSupabaseUrl = `http://127.0.0.1:${supabasePorts.api}`
 const localApiDomain = `127.0.0.1:${supabasePorts.api}/functions/v1`
-const localSupabaseAnonKey = env.SUPABASE_ANON_KEY || 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH'
+const localSupabaseAnonKey
+  = env.SUPABASE_ANON_KEY || 'sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH'
 const localStripeEmulatorPort = getStripeEmulatorPort(env)
 const localStripeApiBaseUrl = getPlaywrightStripeApiBaseUrl(env)
 
@@ -50,13 +54,18 @@ else {
   console.log('Skipping backend server')
 }
 
-webServer.push({
-  command: `ENV=local SUPA_URL=${localSupabaseUrl} SUPA_ANON=${localSupabaseAnonKey} API_DOMAIN=${localApiDomain} CAPTCHA_KEY='' bun run serve:local`,
-  port: 5173,
-  timeout: webServerTimeout,
-  reuseExistingServer,
-  stdout: 'pipe',
-})
+if (env.SKIP_FRONTEND_START) {
+  console.log('Skipping frontend server')
+}
+else {
+  webServer.push({
+    command: `ENV=local SUPA_URL=${localSupabaseUrl} SUPA_ANON=${localSupabaseAnonKey} API_DOMAIN=${localApiDomain} CAPTCHA_KEY='' bun run serve:local`,
+    port: 5173,
+    timeout: webServerTimeout,
+    reuseExistingServer,
+    stdout: 'pipe',
+  })
+}
 
 /**
  * See https://playwright.dev/docs/test-configuration.
