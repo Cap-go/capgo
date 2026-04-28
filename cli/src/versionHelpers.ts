@@ -58,7 +58,7 @@ export async function interactiveVersionBump(
     validate: (value) => {
       if (!value)
         return 'Version is required'
-      if (!value.match(/^\d+\.\d+\.\d+/))
+      if (!/^\d+\.\d+\.\d+/.test(value))
         return 'Please enter a valid version (x.y.z)'
     },
   })

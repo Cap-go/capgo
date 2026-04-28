@@ -1,4 +1,5 @@
 import type { OrganizationSetOptions, PasswordPolicyConfig } from '../schemas/organization'
+import type { Database } from '../types/supabase.types'
 import { confirm as confirmC, intro, isCancel, log, outro, text } from '@clack/prompts'
 import { checkAlerts } from '../api/update'
 import {
@@ -306,7 +307,7 @@ export async function setOrganizationInternal(
       }
     }
 
-    const updateFields: Record<string, unknown> = {}
+    const updateFields: Database['public']['Tables']['orgs']['Update'] = {}
     if (requireApikeyExpiration !== undefined)
       updateFields.require_apikey_expiration = requireApikeyExpiration
     if (maxApikeyExpirationDays !== undefined)

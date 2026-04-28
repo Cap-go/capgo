@@ -72,7 +72,7 @@ function resolveBundleId(content: string, configListId: string): string {
   const configIdsSection = configListMatch[0].match(/buildConfigurations\s*=\s*\(([^)]*)\)/)
   if (!configIdsSection)
     return ''
-  const configIds = [...configIdsSection[1].matchAll(/(\w+)/g)].map(m => m[1])
+  const configIds = Array.from(configIdsSection[1].matchAll(/(\w+)/g), m => m[1])
   if (configIds.length === 0)
     return ''
 

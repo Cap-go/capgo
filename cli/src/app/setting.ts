@@ -37,7 +37,7 @@ export async function setSettingInternal(setting: string, options: AppSettingOpt
     }
 
     for (const path of pathElements.slice(0, -1)) {
-      if (!Object.prototype.hasOwnProperty.call(baseObj, path))
+      if (!Object.hasOwn(baseObj, path))
         baseObj[path] = {}
       baseObj = baseObj[path]
     }

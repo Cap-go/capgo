@@ -1864,7 +1864,7 @@ export async function getLocalDependencies(packageJsonPath: string | undefined, 
       }
     })).catch(() => [])
 
-  if (anyInvalid || dependenciesObject.find(a => a.native === undefined)) {
+  if (anyInvalid || dependenciesObject.some(a => a.native === undefined)) {
     log.error('Missing dependencies or invalid dependencies')
     log.error('If you use monorepo, workspace or any special package manager you can use the --package-json [path,] and --node-modules [path,] options to make the command work properly')
     throw new Error('Missing dependencies or invalid dependencies')
@@ -2097,7 +2097,7 @@ export async function checkCompatibilityCloud(supabase: SupabaseClient<Database>
   // Only include remote packages that are not in local for informational purposes
   // These won't affect compatibility
   const removeNotInLocal = [...mappedRemoteNativePackages]
-    .filter(([remoteName]) => dependenciesObject.find(a => a.name === remoteName) === undefined)
+    .filter(([remoteName]) => !dependenciesObject.some(a => a.name === remoteName))
     .map(([name, pkg]) => ({
       name,
       localVersion: undefined,
@@ -2144,7 +2144,7 @@ export async function checkCompatibilityNativePackages(supabase: SupabaseClient<
   // Only include remote packages that are not in local for informational purposes
   // These won't affect compatibility
   const removeNotInLocal = [...mappedRemoteNativePackages]
-    .filter(([remoteName]) => nativePackages.find(a => a.name === remoteName) === undefined)
+    .filter(([remoteName]) => !nativePackages.some(a => a.name === remoteName))
     .map(([name, pkg]) => ({
       name,
       localVersion: undefined,
@@ -2233,7 +2233,7 @@ export function validateIosUpdaterSync(
     ...(packageJson?.devDependencies as Record<string, unknown> | undefined),
     ...(packageJson?.optionalDependencies as Record<string, unknown> | undefined),
   }
-  const updaterDeclaredInPackageJson = Object.prototype.hasOwnProperty.call(dependencies, '@capgo/capacitor-updater')
+  const updaterDeclaredInPackageJson = Object.hasOwn(dependencies, '@capgo/capacitor-updater')
   const updaterPresentInNodeModules = [projectRoot, rootDir]
     .some(baseDir => existsSync(join(baseDir, 'node_modules', '@capgo', 'capacitor-updater')))
 

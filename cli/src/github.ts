@@ -365,7 +365,7 @@ async function processInParallel<T>(
   }
 
   const workerCount = Math.min(maxConcurrency, items.length)
-  await Promise.all(Array.from({ length: workerCount }, () => worker()))
+  await Promise.all(Array.from({ length: workerCount }, worker))
 }
 
 function createStartRateLimiter(minDelayMs: number, maxDelayMs: number, signal?: AbortSignal) {

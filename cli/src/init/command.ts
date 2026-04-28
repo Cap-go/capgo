@@ -2895,7 +2895,7 @@ function formatGithubRepositoryList(repositories: string[]) {
   if (repositories.length === 2)
     return `${repositories[0]} and ${repositories[1]}`
 
-  return `${repositories.slice(0, -1).join(', ')}, and ${repositories[repositories.length - 1]}`
+  return `${repositories.slice(0, -1).join(', ')}, and ${repositories.at(-1)}`
 }
 
 async function maybeInstallCapgoSkills() {

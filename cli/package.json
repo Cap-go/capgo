@@ -5,13 +5,14 @@
   "description": "A CLI to upload to capgo servers",
   "author": "Martin martin@capgo.app",
   "license": "Apache 2.0",
-  "homepage": "https://github.com/Cap-go/CLI#readme",
+  "homepage": "https://github.com/Cap-go/capgo/tree/main/cli#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Cap-go/CLI.git"
+    "url": "git+https://github.com/Cap-go/capgo.git",
+    "directory": "cli"
   },
   "bugs": {
-    "url": "https://github.com/Cap-go/CLI/issues"
+    "url": "https://github.com/Cap-go/capgo/issues"
   },
   "keywords": [
     "appflow alternative",
@@ -56,9 +57,10 @@
     "no-debug": "node dist/index.js",
     "dev-build": "SUPA_DB=development ncc build",
     "pack": "pkg",
-    "types": "npx --yes supabase gen types typescript --project-id=xvwzpoazmxkqosrdewyv > src/types/supabase.types.ts",
+    "types": "bunx --bun supabase gen types typescript --project-id=xvwzpoazmxkqosrdewyv > src/types/supabase.types.ts",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint \"src/**/*.ts\" --fix",
+    "lint": "eslint \"src/**/*.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" --fix",
     "check-posix-paths": "node test/check-posix-paths.js",
     "generate-docs": "node dist/index.js generate-docs README.md",
     "test:bundle": "bun test/test-bundle.mjs",

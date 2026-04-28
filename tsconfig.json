@@ -49,6 +49,7 @@
     "scripts",
     "supabase/functions/_script",
     "cypress",
+    "cli",
     "vite.config.mts",
     "temp_cli_test",
     "tests/device_comparison.test.ts"
