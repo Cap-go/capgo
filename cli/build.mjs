@@ -1,7 +1,5 @@
 import { copyFileSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
 import { env, exit } from 'node:process'
-import { fileURLToPath } from 'node:url'
 
 // Shared plugin definitions - Bun's plugin API is compatible with esbuild's
 const stubSemver = {

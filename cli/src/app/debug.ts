@@ -197,7 +197,6 @@ async function toTableRow(data: LogData, channel: string, orgId: string, apikey:
 }
 
 export async function waitLog(channel: string, apikey: string, appId: string, orgId: string, deviceId?: string) {
-  let loop = true
   const config = await getLocalConfig()
   const baseAppUrl = `${config.hostWeb}/app/${appId}`
   await markSnag(channel, orgId, apikey, 'Use waitlog', appId)
@@ -216,7 +215,7 @@ export async function waitLog(channel: string, apikey: string, appId: string, or
   const s = spinner()
   const docsUrl = `${config.host}/docs/plugins/updater/debugging/#sent-from-the-backend`
   s.start(`Waiting for logs (Expect delay of 30 sec) more info: ${docsUrl}`)
-  while (loop) {
+  while (true) {
     await wait(5000)
     const data = await getStats(apikey, query, after)
     if (data.length > 0) {
@@ -255,7 +254,6 @@ export async function waitLog(channel: string, apikey: string, appId: string, or
         s.start(`Waiting for logs (Expect delay of 30 sec) more info: ${docsUrl}`)
       }
       if (shouldStop) {
-        loop = false
         break
       }
     }

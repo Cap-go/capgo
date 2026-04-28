@@ -115,7 +115,7 @@ export async function addAppInternal(
   let iconBuff: Buffer | null = null
   let iconType: string | null = null
 
-  if (icon && existsSync(icon)) {
+  if (existsSync(icon)) {
     iconBuff = readFileSync(icon)
     const contentType = getContentType(icon)
     iconType = contentType || 'image/png'

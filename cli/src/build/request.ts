@@ -1526,14 +1526,15 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
                 log.error(`[TUS] Response body: ${body}`)
               }
 
-              let errorMsg = 'Unknown error'
-              try {
-                const jsonBody = JSON.parse(body || '{"error": "unknown error"}')
-                errorMsg = jsonBody.status || jsonBody.error || jsonBody.message || 'unknown error'
-              }
-              catch {
-                errorMsg = body || error.message
-              }
+              const errorMsg = (() => {
+                try {
+                  const jsonBody = JSON.parse(body || '{"error": "unknown error"}')
+                  return jsonBody.status || jsonBody.error || jsonBody.message || 'unknown error'
+                }
+                catch {
+                  return body || error.message
+                }
+              })()
               reject(new Error(`TUS upload failed: ${errorMsg}`))
             }
             else {
