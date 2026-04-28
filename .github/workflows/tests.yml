@@ -52,6 +52,7 @@ jobs:
           filters: |
             shared:
               - '.github/workflows/**'
+              - '.npmrc'
               - 'package.json'
               - 'bun.lock'
               - 'bunfig.toml'

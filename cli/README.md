@@ -72,7 +72,13 @@ Follow the documentation here: https://capacitorjs.com/docs/getting-started/
   - [Init](#build-init)
   - [Request](#build-request)
   - [Credentials](#build-credentials)
+    - [Save](#build-credentials-save)
+    - [List](#build-credentials-list)
+    - [Clear](#build-credentials-clear)
+    - [Update](#build-credentials-update)
+    - [Migrate](#build-credentials-migrate)
 - 🔹 [Probe](#probe)
+- 🔹 [Generate-docs](#generate-docs)
 - 🔹 [Mcp](#mcp)
 
 ## <a id="init"></a> 🚀 **Init**
@@ -1192,10 +1198,6 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 
 ### <a id="build-credentials"></a> 🔹 **Credentials**
 
-```bash
-npx @capgo/cli@latest build credentials
-```
-
 Manage build credentials stored locally on your machine.
 🔒 SECURITY:
    - Credentials saved to ~/.capgo-credentials/credentials.json (global) or .capgo-credentials.json (local)
@@ -1205,6 +1207,181 @@ Manage build credentials stored locally on your machine.
 📚 DOCUMENTATION:
    iOS setup: https://capgo.app/docs/cli/cloud-build/ios/
    Android setup: https://capgo.app/docs/cli/cloud-build/android/
+
+#### <a id="build-credentials-save"></a> 🔹 **Save**
+
+```bash
+npx @capgo/cli@latest build credentials save
+```
+
+Save build credentials locally for iOS or Android.
+Credentials are stored in:
+  - ~/.capgo-credentials/credentials.json (default, global)
+  - .capgo-credentials.json in project root (with --local flag)
+⚠️  REQUIRED BEFORE BUILDING: You must save credentials before requesting a build.
+🔒 These credentials are NEVER stored on Capgo servers permanently.
+   They are deleted immediately after the build completes.
+📚 Setup guides:
+   iOS: https://capgo.app/docs/cli/cloud-build/ios/
+   Android: https://capgo.app/docs/cli/cloud-build/android/
+  npx @capgo/cli build credentials save --platform ios \
+    --certificate ./cert.p12 --p12-password "password" \
+    --ios-provisioning-profile ./profile.mobileprovision \
+    --apple-key ./AuthKey.p8 --apple-key-id "KEY123" \
+    --apple-issuer-id "issuer-uuid" --apple-team-id "team-id"
+Multi-target Example (app + widget extension):
+  npx @capgo/cli build credentials save --platform ios \
+    --ios-provisioning-profile ./App.mobileprovision \
+    --ios-provisioning-profile com.example.widget=./Widget.mobileprovision \
+    ...
+  npx @capgo/cli build credentials save --platform android \
+    --keystore ./release.keystore --keystore-alias "my-key" \
+    --keystore-key-password "key-pass" \
+    --play-config ./service-account.json
+Local storage (per-project):
+  npx @capgo/cli build credentials save --local --platform ios ...
+
+**Example:**
+
+```bash
+iOS Example:
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **--appId** | <code>string</code> | App ID (e.g., com.example.app) (required) |
+| **--platform** | <code>string</code> | Platform: ios or android (required) |
+| **--certificate** | <code>string</code> | iOS: Path to .p12 certificate file |
+| **--ios-provisioning-profile** | <code>string</code> | iOS: Provisioning profile path or bundleId=path (repeatable) |
+| **--p12-password** | <code>string</code> | iOS: Certificate password (optional if cert has no password) |
+| **--apple-key** | <code>string</code> | iOS: Path to .p8 App Store Connect API key |
+| **--apple-key-id** | <code>string</code> | iOS: App Store Connect API Key ID |
+| **--apple-issuer-id** | <code>string</code> | iOS: App Store Connect Issuer ID |
+| **--apple-team-id** | <code>string</code> | iOS: App Store Connect Team ID |
+| **--ios-distribution** | <code>string</code> | iOS: Distribution mode |
+| **--apple-id** | <code>string</code> | iOS: Apple ID email (optional) |
+| **--apple-app-password** | <code>string</code> | iOS: App-specific password (optional) |
+| **--keystore** | <code>string</code> | Android: Path to keystore file (.keystore or .jks) |
+| **--keystore-alias** | <code>string</code> | Android: Keystore key alias |
+| **--keystore-key-password** | <code>string</code> | Android: Keystore key password |
+| **--keystore-store-password** | <code>string</code> | Android: Keystore store password |
+| **--play-config** | <code>string</code> | Android: Path to Play Store service account JSON |
+| **--android-flavor** | <code>string</code> | Android: Product flavor to build (e.g. production). Required if your project has multiple flavors. |
+| **--local** | <code>boolean</code> | Save to .capgo-credentials.json in project root instead of global ~/.capgo-credentials/ |
+| **--output-upload** | <code>boolean</code> | Upload build outputs (IPA/APK/AAB) to Capgo storage and print download links |
+| **--no-output-upload** | <code>boolean</code> | Do not upload build outputs (IPA/APK/AAB) to Capgo storage |
+| **--output-retention** | <code>string</code> | Output link TTL: 1h to 7d (default: 1h). Examples: 1h, 6h, 2d |
+| **--skip-build-number-bump** | <code>boolean</code> | Skip automatic build number/version code incrementing on future builds |
+| **--no-skip-build-number-bump** | <code>boolean</code> | Re-enable automatic build number incrementing (default behavior) |
+
+#### <a id="build-credentials-list"></a> 📋 **List**
+
+```bash
+npx @capgo/cli@latest build credentials list
+```
+
+List saved build credentials (passwords masked).
+Shows what credentials are currently saved (both global and local).
+Examples:
+  npx @capgo/cli build credentials list  # List all apps
+  npx @capgo/cli build credentials list --appId com.example.app  # List specific app
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **--appId** | <code>string</code> | App ID to list (optional, lists all if omitted) |
+| **--local** | <code>boolean</code> | List credentials from local .capgo-credentials.json only |
+
+#### <a id="build-credentials-clear"></a> 🔹 **Clear**
+
+```bash
+npx @capgo/cli@latest build credentials clear
+```
+
+Clear saved build credentials.
+Remove credentials from storage.
+Use --appId and --platform to target specific credentials.
+Examples:
+  npx @capgo/cli build credentials clear  # Clear all apps (global)
+  npx @capgo/cli build credentials clear --local  # Clear local credentials
+  npx @capgo/cli build credentials clear --appId com.example.app --platform ios
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **--appId** | <code>string</code> | App ID to clear (optional, clears all apps if omitted) |
+| **--platform** | <code>string</code> | Platform to clear: ios or android (optional, clears all platforms if omitted) |
+| **--local** | <code>boolean</code> | Clear from local .capgo-credentials.json instead of global |
+
+#### <a id="build-credentials-update"></a> 🔹 **Update**
+
+```bash
+npx @capgo/cli@latest build credentials update
+```
+
+Update specific credentials without providing all of them again.
+Update existing credentials by providing only the fields you want to change.
+Platform is auto-detected from the options you provide.
+Examples:
+  npx @capgo/cli build credentials update --ios-provisioning-profile ./new-profile.mobileprovision
+  npx @capgo/cli build credentials update --local --keystore ./new-keystore.jks
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **--appId** | <code>string</code> | App ID (auto-detected from capacitor.config if omitted) |
+| **--platform** | <code>string</code> | Platform: ios or android (auto-detected from options) |
+| **--local** | <code>boolean</code> | Update local .capgo-credentials.json instead of global |
+| **--certificate** | <code>string</code> | Path to P12 certificate file |
+| **--ios-provisioning-profile** | <code>string</code> | Provisioning profile path or bundleId=path (repeatable, additive by default) |
+| **--overwrite-ios-provisioning-map** | <code>boolean</code> | Replace the entire provisioning map instead of merging (default: merge) |
+| **--p12-password** | <code>string</code> | P12 certificate password |
+| **--apple-key** | <code>string</code> | Path to App Store Connect API key (.p8 file) |
+| **--apple-key-id** | <code>string</code> | App Store Connect API Key ID |
+| **--apple-issuer-id** | <code>string</code> | App Store Connect Issuer ID |
+| **--apple-team-id** | <code>string</code> | App Store Connect Team ID |
+| **--ios-distribution** | <code>string</code> | iOS: Distribution mode |
+| **--keystore** | <code>string</code> | Path to keystore file (.keystore or .jks) |
+| **--keystore-alias** | <code>string</code> | Keystore key alias |
+| **--keystore-key-password** | <code>string</code> | Keystore key password |
+| **--keystore-store-password** | <code>string</code> | Keystore store password |
+| **--play-config** | <code>string</code> | Path to Google Play service account JSON |
+| **--android-flavor** | <code>string</code> | Android: Product flavor to build (e.g. production). Required if your project has multiple flavors. |
+| **--output-upload** | <code>boolean</code> | Upload build outputs (IPA/APK/AAB) to Capgo storage and print download links |
+| **--no-output-upload** | <code>boolean</code> | Do not upload build outputs (IPA/APK/AAB) to Capgo storage |
+| **--output-retention** | <code>string</code> | Output link TTL: 1h to 7d. Examples: 1h, 6h, 2d |
+| **--skip-build-number-bump** | <code>boolean</code> | Skip automatic build number/version code incrementing on future builds |
+| **--no-skip-build-number-bump** | <code>boolean</code> | Re-enable automatic build number incrementing (default behavior) |
+
+#### <a id="build-credentials-migrate"></a> 🔹 **Migrate**
+
+```bash
+npx @capgo/cli@latest build credentials migrate
+```
+
+Migrate legacy provisioning profile to the new multi-target format.
+Converts BUILD_PROVISION_PROFILE_BASE64 to CAPGO_IOS_PROVISIONING_MAP.
+Discovers the main bundle ID from your Xcode project automatically.
+  npx @capgo/cli build credentials migrate --platform ios
+
+**Example:**
+
+```bash
+Example:
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **--appId** | <code>string</code> | App ID (auto-detected from capacitor.config if omitted) |
+| **--platform** | <code>string</code> | Platform (only ios is supported) |
+| **--local** | <code>boolean</code> | Migrate from local .capgo-credentials.json instead of global |
 
 
 ## <a id="probe"></a> 🔹 **Probe**

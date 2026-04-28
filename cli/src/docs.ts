@@ -27,10 +27,8 @@ interface MappedCommand {
   isCommandGroup: boolean // Property to identify command groups
 }
 
-function getOptionsAnchor(cmdName: string, parentCmd?: string) {
-  if (!parentCmd || parentCmd === cmdName)
-    return `options-${cmdName}`
-  return `options-${parentCmd}-${cmdName}`
+function getOptionsAnchor(commandPath: string[]) {
+  return `options-${commandPath.join('-')}`
 }
 
 function formatFrontmatterString(value: string): string {
@@ -85,69 +83,47 @@ function getCommandEmoji(cmdName: string): string {
   return emoji
 }
 
-export function generateDocs(filePath: string = './README.md', folderPath?: string) {
-  const commands = program.commands.map((cmd: Command): MappedCommand => {
-    // Cast to access internal properties
-    const cmdWithInternals = cmd as CommandWithInternals
-    // Check if command has an action handler
-    const hasAction = cmdWithInternals._actionHandler !== null && cmdWithInternals._actionHandler !== undefined
-    // Check if it has subcommands
-    const hasSubcommands = cmd.commands && cmd.commands.length > 0
-    // A command group has subcommands but no action handler
-    const isCommandGroup = hasSubcommands && !hasAction
+function capitalizeCommandName(cmdName: string) {
+  return cmdName.charAt(0).toUpperCase() + cmdName.slice(1)
+}
 
-    return {
-      name: cmd.name(),
-      alias: cmd.alias() || '',
-      description: cmd.description(),
-      options: cmd.options.map((opt: Option): CommandOption => ({
-        flags: opt.flags,
-        description: opt.description || '',
-        displayName: opt.short || opt.long || opt.flags.split(' ')[0].replace(/,$/, '').trim(),
-        type: opt.required || opt.optional ? 'string' : 'boolean',
-      })),
-      subcommands: cmd.commands
-        ? cmd.commands.map((subCmd: Command): MappedCommand => {
-            const subCmdWithInternals = subCmd as CommandWithInternals
-            const subCmdHasAction = subCmdWithInternals._actionHandler !== null && subCmdWithInternals._actionHandler !== undefined
-            return {
-              name: subCmd.name(),
-              alias: subCmd.alias() || '',
-              description: subCmd.description(),
-              options: subCmd.options.map((opt: Option): CommandOption => ({
-                flags: opt.flags,
-                description: opt.description || '',
-                displayName: opt.short || opt.long || opt.flags.split(' ')[0].replace(/,$/, '').trim(),
-                type: opt.required || opt.optional ? 'string' : 'boolean',
-              })),
-              subcommands: [], // Subcommands don't have their own subcommands in this implementation
-              hasAction: subCmdHasAction,
-              isCommandGroup: false, // Subcommands are never command groups
-            }
-          })
-        : [],
-      hasAction,
-      isCommandGroup,
-    }
-  })
+function mapOption(opt: Option): CommandOption {
+  return {
+    flags: opt.flags,
+    description: opt.description || '',
+    displayName: opt.short || opt.long || opt.flags.split(' ')[0].replace(/,$/, '').trim(),
+    type: opt.required || opt.optional ? 'string' : 'boolean',
+  }
+}
+
+function mapCommand(cmd: Command): MappedCommand {
+  const cmdWithInternals = cmd as CommandWithInternals
+  const hasAction = cmdWithInternals._actionHandler !== null && cmdWithInternals._actionHandler !== undefined
+  const subcommands = cmd.commands?.map(mapCommand) ?? []
+  const hasSubcommands = subcommands.length > 0
+
+  return {
+    name: cmd.name(),
+    alias: cmd.alias() || '',
+    description: cmd.description(),
+    options: cmd.options.map(mapOption),
+    subcommands,
+    hasAction,
+    isCommandGroup: hasSubcommands && !hasAction,
+  }
+}
+
+export function generateDocs(filePath: string = './README.md', folderPath?: string) {
+  const commands = program.commands.map(mapCommand)
 
   // Function to format command documentation
-  const formatCommand = (cmd: MappedCommand, isSubcommand = false, parentCmd?: string, skipMainHeading = false) => {
+  const formatCommand = (cmd: MappedCommand, commandPath: string[] = [], skipMainHeading = false) => {
     const cmdName = cmd.name
-    const cmdNameCapitalized = cmdName.charAt(0).toUpperCase() + cmdName.slice(1)
-
-    // Create anchor for TOC linking - use different IDs for README vs individual files
-    let anchor
-    if (isSubcommand) {
-      // For subcommands, in README we use parent-child format, in individual files just child
-      anchor = parentCmd ? `${parentCmd}-${cmdName}` : cmdName
-    }
-    else {
-      // For main commands, use the command name as the primary section anchor
-      anchor = cmdName
-    }
-
-    const heading = isSubcommand ? `###` : `##`
+    const cmdNameCapitalized = capitalizeCommandName(cmdName)
+    const isSubcommand = commandPath.length > 0
+    const fullPath = [...commandPath, cmdName]
+    const anchor = fullPath.join('-')
+    const heading = '#'.repeat(Math.min(2 + commandPath.length, 6))
 
     let section = ''
 
@@ -166,12 +142,7 @@ export function generateDocs(filePath: string = './README.md', folderPath?: stri
     // For regular commands, show usage example
     if (!cmd.isCommandGroup) {
       section += `\`\`\`bash\n`
-      if (isSubcommand) {
-        section += `npx @capgo/cli@latest ${parentCmd} ${cmdName}\n`
-      }
-      else {
-        section += `npx @capgo/cli@latest ${cmdName}\n`
-      }
+      section += `npx @capgo/cli@latest ${fullPath.join(' ')}\n`
       section += `\`\`\`\n\n`
     }
 
@@ -207,7 +178,7 @@ export function generateDocs(filePath: string = './README.md', folderPath?: stri
     // Options table - for all commands (even command groups may have global options)
     if (cmd.options.length > 0) {
       if (!isSubcommand) {
-        section += `## <a id="${getOptionsAnchor(cmdName, parentCmd)}"></a> Options (${cmdNameCapitalized})\n\n`
+        section += `## <a id="${getOptionsAnchor(fullPath)}"></a> Options (${cmdNameCapitalized})\n\n`
       }
       else {
         section += `**Options:**\n\n`
@@ -221,6 +192,28 @@ export function generateDocs(filePath: string = './README.md', folderPath?: stri
     }
 
     return section
+  }
+
+  const renderCommandTree = (cmd: MappedCommand, commandPath: string[] = [], skipMainHeading = false) => {
+    let section = formatCommand(cmd, commandPath, skipMainHeading)
+    for (const subCmd of cmd.subcommands)
+      section += renderCommandTree(subCmd, [...commandPath, cmd.name])
+    return section
+  }
+
+  const addTocEntries = (cmd: MappedCommand, lines: string[], depth = 0, commandPath: string[] = []) => {
+    const fullPath = [...commandPath, cmd.name]
+    const label = capitalizeCommandName(cmd.name)
+    const prefix = `${'  '.repeat(depth)}- `
+    if (depth === 0) {
+      lines.push(`${prefix}${getCommandEmoji(cmd.name)} [${label}](#${fullPath.join('-')})`)
+    }
+    else {
+      lines.push(`${prefix}[${label}](#${fullPath.join('-')})`)
+    }
+
+    for (const subCmd of cmd.subcommands)
+      addTocEntries(subCmd, lines, depth + 1, fullPath)
   }
 
   // If folderPath is provided, generate individual files for each command
@@ -253,16 +246,7 @@ sidebar:
       cmdFile += `${description}\n\n`
 
       let cmdMarkdown = ''
-      if (cmd.subcommands.length === 0) {
-        // Add command documentation
-        cmdMarkdown = formatCommand(cmd, false, cmd.name, true) // Last param to skip the main heading
-      }
-      else {
-        cmdMarkdown += formatCommand(cmd, false, cmd.name, true)
-        for (const subCmd of cmd.subcommands) {
-          cmdMarkdown += formatCommand(subCmd, true, cmd.name)
-        }
-      }
+      cmdMarkdown = renderCommandTree(cmd, [], true)
 
       cmdFile += cmdMarkdown
 
@@ -283,20 +267,10 @@ sidebar:
 
     // Generate Table of Contents
     markdown += '## 📋 Table of Contents\n\n'
-    for (const cmd of commands) {
-      if (cmd.name === 'generate-docs')
-        continue // Skip documenting this command
-
-      // Get emoji for this command
-      const emoji = getCommandEmoji(cmd.name)
-      markdown += `- ${emoji} [${cmd.name.charAt(0).toUpperCase() + cmd.name.slice(1)}](#${cmd.name})\n`
-
-      if (cmd.subcommands.length > 0) {
-        for (const subCmd of cmd.subcommands) {
-          markdown += `  - [${subCmd.name.charAt(0).toUpperCase() + subCmd.name.slice(1)}](#${cmd.name}-${subCmd.name})\n`
-        }
-      }
-    }
+    const tocLines: string[] = []
+    for (const cmd of commands)
+      addTocEntries(cmd, tocLines)
+    markdown += `${tocLines.join('\n')}\n`
     markdown += '\n'
 
     // Generate documentation for each command
@@ -304,20 +278,7 @@ sidebar:
       if (cmd.name === 'generate-docs')
         continue // Skip documenting this command
 
-      // Use the formatCommand function with the flag set to skip usage for command groups
-      markdown += formatCommand(cmd, false, undefined, false)
-
-      if (cmd.subcommands.length > 0) {
-        // For command groups, don't add a subcommands heading since that's implied
-        if (!cmd.isCommandGroup) {
-          markdown += `#### ${cmd.name.toUpperCase()} Subcommands:\n\n`
-        }
-
-        for (const subCmd of cmd.subcommands) {
-          markdown += formatCommand(subCmd, true, cmd.name)
-        }
-      }
-
+      markdown += renderCommandTree(cmd)
       markdown += '\n'
     }
 

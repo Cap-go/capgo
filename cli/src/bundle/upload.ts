@@ -606,8 +606,14 @@ async function uploadBundleToCapgoCloud(apikey: string, supabase: SupabaseType, 
     log.info(`[Verbose] Performance event sent successfully`)
 }
 
-// It is really important that his function never terminates the program, it should always return, even if it fails
-async function deleteLinkedBundleOnUpload(supabase: SupabaseType, appid: string, channel: string) {
+type LinkedChannelVersion = {
+  deleted: boolean
+  id: number
+  name: string
+} | null
+
+// It is really important that this function never terminates the program, it should always return.
+async function getLinkedBundleOnChannel(supabase: SupabaseType, appid: string, channel: string): Promise<LinkedChannelVersion> {
   const { data, error } = await supabase
     .from('channels')
     .select('version ( id, name, deleted )')
@@ -616,19 +622,31 @@ async function deleteLinkedBundleOnUpload(supabase: SupabaseType, appid: string,
 
   if (error) {
     log.error(`Cannot delete linked bundle on upload ${formatError(error)}`)
-    return
+    return null
   }
 
   if (data.length === 0) {
     log.warn('No linked bundle found in the channel you are trying to upload to')
-    return
+    return null
   }
 
   const version = data[0].version
+  if (!version) {
+    log.warn('No linked bundle found in the channel you are trying to upload to')
+    return null
+  }
   if (version.deleted) {
     log.warn('The linked bundle is already deleted')
-    return
+    return null
   }
+
+  return version
+}
+
+// It is really important that this function never terminates the program, it should always return.
+async function deleteLinkedBundleOnUpload(supabase: SupabaseType, version: LinkedChannelVersion) {
+  if (!version)
+    return
 
   const { error: deleteError } = await supabase
     .from('app_versions')
@@ -640,7 +658,7 @@ async function deleteLinkedBundleOnUpload(supabase: SupabaseType, appid: string,
     return
   }
 
-  log.info('Linked bundle deleted')
+  log.info(`Linked bundle ${version.name} deleted`)
 }
 
 async function setVersionInChannel(
@@ -698,9 +716,7 @@ export async function getDefaultUploadChannel(appId: string, supabase: SupabaseT
     .single()
 
   if (error) {
-    log.warn('Cannot find default upload channel')
-    log.info(`You can set it here:  ${hostWeb}/app/${appId}/info`)
-    return null
+    throw new Error(`Cannot find default upload channel: ${formatError(error)}. You can set it here: ${hostWeb}/app/${appId}/info`)
   }
 
   return data.default_upload_channel
@@ -819,7 +835,8 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   if (options.verbose)
     log.info(`[Verbose] User verified successfully, user_id: ${userId}`)
 
-  const channel = options.channel || await getDefaultUploadChannel(appid, supabase, localConfig.hostWeb) || 'production'
+  const defaultUploadChannel = options.channel ? null : await getDefaultUploadChannel(appid, supabase, localConfig.hostWeb)
+  const channel = options.channel || defaultUploadChannel || 'production'
   if (options.verbose)
     log.info(`[Verbose] Target channel: ${channel}`)
 
@@ -1213,12 +1230,11 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     log.info(`  - Admin: ${hasOrganizationPerm(permissions, OrganizationPerm.admin) ? 'yes' : 'no'}`)
   }
 
-  if (options.deleteLinkedBundleOnUpload && hasOrganizationPerm(permissions, OrganizationPerm.write)) {
-    if (options.verbose)
-      log.info(`[Verbose] Deleting linked bundle in channel ${channel}...`)
-    await deleteLinkedBundleOnUpload(supabase, appid, channel)
-  }
-  else if (options.deleteLinkedBundleOnUpload) {
+  const shouldDeleteLinkedBundle = options.deleteLinkedBundleOnUpload && hasOrganizationPerm(permissions, OrganizationPerm.write)
+  const linkedBundleToDelete = shouldDeleteLinkedBundle
+    ? await getLinkedBundleOnChannel(supabase, appid, channel)
+    : null
+  if (options.deleteLinkedBundleOnUpload && !shouldDeleteLinkedBundle) {
     log.warn('Cannot delete linked bundle on upload as a upload organization member')
   }
 
@@ -1228,6 +1244,12 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     await setVersionInChannel(supabase, apikey, !!options.bundleUrl, bundle, channel, userId, orgId, appid, localConfig, options.selfAssign)
     if (options.verbose)
       log.info(`[Verbose] Channel updated successfully`)
+
+    if (shouldDeleteLinkedBundle) {
+      if (options.verbose)
+        log.info(`[Verbose] Deleting previously linked bundle in channel ${channel}...`)
+      await deleteLinkedBundleOnUpload(supabase, linkedBundleToDelete)
+    }
   }
   else {
     log.warn('Cannot set channel as a upload organization member')
