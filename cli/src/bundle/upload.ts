@@ -290,7 +290,7 @@ async function checkVersionExists(supabase: SupabaseType, appid: string, bundle:
       return newVersion // Return the new version to retry with
     }
 
-    uploadFail(`Version ${bundle} already exists ${formatError(appVersionError)}`)
+    uploadFail(`Version ${bundle} already exists`)
   }
 
   return false

@@ -8,6 +8,8 @@ import { formatError } from './utils'
 interface CommandOption {
   flags: string
   description: string
+  displayName: string
+  type: 'boolean' | 'string'
 }
 
 // Extend Command type to include internal properties
@@ -101,6 +103,8 @@ export function generateDocs(filePath: string = './README.md', folderPath?: stri
       options: cmd.options.map((opt: Option): CommandOption => ({
         flags: opt.flags,
         description: opt.description || '',
+        displayName: opt.short || opt.long || opt.flags.split(' ')[0].replace(/,$/, '').trim(),
+        type: opt.required || opt.optional ? 'string' : 'boolean',
       })),
       subcommands: cmd.commands
         ? cmd.commands.map((subCmd: Command): MappedCommand => {
@@ -113,6 +117,8 @@ export function generateDocs(filePath: string = './README.md', folderPath?: stri
               options: subCmd.options.map((opt: Option): CommandOption => ({
                 flags: opt.flags,
                 description: opt.description || '',
+                displayName: opt.short || opt.long || opt.flags.split(' ')[0].replace(/,$/, '').trim(),
+                type: opt.required || opt.optional ? 'string' : 'boolean',
               })),
               subcommands: [], // Subcommands don't have their own subcommands in this implementation
               hasAction: subCmdHasAction,
@@ -209,9 +215,7 @@ export function generateDocs(filePath: string = './README.md', folderPath?: stri
       section += `| Param          | Type          | Description          |\n`
       section += `| -------------- | ------------- | -------------------- |\n`
       for (const opt of cmd.options) {
-        const param = opt.flags.split(' ')[0]
-        const type = opt.flags.split(' ').length > 1 ? 'string' : 'boolean'
-        section += `| **${param}** | <code>${type}</code> | ${opt.description} |\n`
+        section += `| **${opt.displayName}** | <code>${opt.type}</code> | ${opt.description} |\n`
       }
       section += '\n'
     }
@@ -229,7 +233,7 @@ export function generateDocs(filePath: string = './README.md', folderPath?: stri
     // Process each command
     for (const cmd of commands) {
       if (cmd.name === 'generate-docs')
-        return // Skip documenting this command
+        continue
 
       // Determine emoji for this command
       const emoji = getCommandEmoji(cmd.name)
@@ -254,6 +258,7 @@ sidebar:
         cmdMarkdown = formatCommand(cmd, false, cmd.name, true) // Last param to skip the main heading
       }
       else {
+        cmdMarkdown += formatCommand(cmd, false, cmd.name, true)
         for (const subCmd of cmd.subcommands) {
           cmdMarkdown += formatCommand(subCmd, true, cmd.name)
         }
@@ -330,6 +335,11 @@ sidebar:
     const startIndex = fileContent.indexOf(startTag)
     const endIndex = fileContent.indexOf(endTag, startIndex)
 
+    if ((startIndex === -1) !== (endIndex === -1)) {
+      log.error(`Both ${startTag} and ${endTag} must be present in ${filePath}`)
+      return
+    }
+
     if (startIndex !== -1 && endIndex !== -1) {
       const before = fileContent.substring(0, startIndex + startTag.length)
       const after = fileContent.substring(endIndex)
@@ -337,9 +347,12 @@ sidebar:
       writeFileSync(filePath, newContent, 'utf8')
       log.success(`Documentation updated in ${filePath}`)
     }
-    else {
+    else if (!fileContent.trim()) {
       writeFileSync(filePath, markdown, 'utf8')
       log.success(`Documentation written to ${filePath}`)
+    }
+    else {
+      log.error(`Refusing to overwrite unmanaged content in ${filePath}`)
     }
   }
 }

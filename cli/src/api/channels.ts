@@ -134,18 +134,16 @@ export async function findUnknownVersion(
       .single()
 
     if (createError) {
-      // Both find and create failed - now we log
       if (!silent)
-        log.error(`Cannot find or create unknown version for ${appId}. Find error: ${formatError(findError)}, Create error: ${formatError(createError)}`)
+        log.error(`Cannot create unknown version for ${appId}: ${formatError(createError)}`)
       throw new Error(`Cannot find or create unknown version for app ${appId}: ${formatError(createError)}`)
     }
 
     return newVersion
   }
   catch (createErr) {
-    // Both find and create failed - now we log
     if (!silent)
-      log.error(`Cannot find or create unknown version for ${appId}. Find error: ${formatError(findError)}, Create error: ${formatError(createErr)}`)
+      log.error(`Cannot create unknown version for ${appId}: ${formatError(createErr)}`)
     throw new Error(`Cannot retrieve or create unknown version for app ${appId}: ${formatError(createErr)}`)
   }
 }

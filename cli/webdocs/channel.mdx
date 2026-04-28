@@ -8,6 +8,7 @@ sidebar:
 
 📢 Manage distribution channels for app updates in Capgo Cloud, controlling how updates are delivered to devices.
 
+
 ### <a id="channel-add"></a> ➕ **Add**
 
 **Alias:** `a`
@@ -28,9 +29,9 @@ npx @capgo/cli@latest channel add production com.example.app --default
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
-| **-d,** | <code>string</code> | Set the channel as default |
+| **-d** | <code>boolean</code> | Set the channel as default |
 | **--self-assign** | <code>boolean</code> | Allow device to self-assign to this channel |
-| **-a,** | <code>string</code> | API key to link to your account |
+| **-a** | <code>string</code> | API key to link to your account |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 
@@ -54,7 +55,7 @@ npx @capgo/cli@latest channel delete production com.example.app
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
-| **-a,** | <code>string</code> | API key to link to your account |
+| **-a** | <code>string</code> | API key to link to your account |
 | **--delete-bundle** | <code>boolean</code> | Delete the bundle associated with the channel |
 | **--success-if-not-found** | <code>boolean</code> | Success if the channel is not found |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
@@ -80,7 +81,7 @@ npx @capgo/cli@latest channel list com.example.app
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
-| **-a,** | <code>string</code> | API key to link to your account |
+| **-a** | <code>string</code> | API key to link to your account |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 
@@ -102,8 +103,8 @@ npx @capgo/cli@latest channel currentBundle production com.example.app
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
-| **-c,** | <code>string</code> | Channel to get the current bundle from |
-| **-a,** | <code>string</code> | API key to link to your account |
+| **-c** | <code>string</code> | Channel to get the current bundle from |
+| **-a** | <code>string</code> | API key to link to your account |
 | **--quiet** | <code>boolean</code> | Only print the bundle version |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
@@ -129,9 +130,9 @@ npx @capgo/cli@latest channel set production com.example.app --bundle 1.0.0 --st
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
-| **-a,** | <code>string</code> | API key to link to your account |
-| **-b,** | <code>string</code> | Bundle version number of the file to set |
-| **-s,** | <code>string</code> | Set the state of the channel, default or normal |
+| **-a** | <code>string</code> | API key to link to your account |
+| **-b** | <code>string</code> | Bundle version number of the file to set |
+| **-s** | <code>string</code> | Set the state of the channel, default or normal |
 | **--latest-remote** | <code>boolean</code> | Get the latest bundle uploaded in capgo cloud and set it to the channel |
 | **--latest** | <code>boolean</code> | Get the latest version key in the package.json to set it to the channel |
 | **--downgrade** | <code>boolean</code> | Allow to downgrade to version under native one |

@@ -8,6 +8,7 @@ sidebar:
 
 📱 Manage your Capgo app settings and configurations in Capgo Cloud.
 
+
 ### <a id="app-add"></a> ➕ **Add**
 
 **Alias:** `a`
@@ -29,9 +30,9 @@ npx @capgo/cli@latest app add com.example.app --name "My App" --icon ./icon.png
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
-| **-n,** | <code>string</code> | App name for display in Capgo Cloud |
-| **-i,** | <code>string</code> | App icon path for display in Capgo Cloud |
-| **-a,** | <code>string</code> | API key to link to your account |
+| **-n** | <code>string</code> | App name for display in Capgo Cloud |
+| **-i** | <code>string</code> | App icon path for display in Capgo Cloud |
+| **-a** | <code>string</code> | API key to link to your account |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 
@@ -53,7 +54,7 @@ npx @capgo/cli@latest app delete com.example.app
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
-| **-a,** | <code>string</code> | API key to link to your account |
+| **-a** | <code>string</code> | API key to link to your account |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 
@@ -77,7 +78,7 @@ npx @capgo/cli@latest app list
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
-| **-a,** | <code>string</code> | API key to link to your account |
+| **-a** | <code>string</code> | API key to link to your account |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 
@@ -100,8 +101,8 @@ npx @capgo/cli@latest app debug com.example.app --device DEVICE_ID
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
-| **-a,** | <code>string</code> | API key to link to your account |
-| **-d,** | <code>string</code> | The specific device ID to debug |
+| **-a** | <code>string</code> | API key to link to your account |
+| **-d** | <code>string</code> | The specific device ID to debug |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 
@@ -148,10 +149,10 @@ npx @capgo/cli@latest app set com.example.app --name "Updated App" --retention 3
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
-| **-n,** | <code>string</code> | App name for display in Capgo Cloud |
-| **-i,** | <code>string</code> | App icon path for display in Capgo Cloud |
-| **-a,** | <code>string</code> | API key to link to your account |
-| **-r,** | <code>string</code> | Days to keep old bundles (0 = infinite, default: 0) |
+| **-n** | <code>string</code> | App name for display in Capgo Cloud |
+| **-i** | <code>string</code> | App icon path for display in Capgo Cloud |
+| **-a** | <code>string</code> | API key to link to your account |
+| **-r** | <code>string</code> | Days to keep old bundles (0 = infinite, default: 0) |
 | **--expose-metadata** | <code>string</code> | Expose bundle metadata (link and comment) to the plugin (true/false, default: false) |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |

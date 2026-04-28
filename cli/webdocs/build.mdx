@@ -8,6 +8,16 @@ sidebar:
 
 🏗️  Manage native iOS/Android builds through Capgo Cloud.
 
+⚠️ This feature is currently in PUBLIC BETA and cannot be used by anyone at this time.
+ 🔒 SECURITY GUARANTEE:
+    Build credentials are NEVER stored on Capgo servers.
+    They are used only during the build and auto-deleted after.
+    Build outputs may optionally be uploaded for time-limited download links.
+📋 BEFORE BUILDING:
+   Save your credentials first:
+   npx @capgo/cli build credentials save --appId <your-app-id> --platform ios
+   npx @capgo/cli build credentials save --appId <your-app-id> --platform android
+
 ### <a id="build-init"></a> 🚀 **Init**
 
 **Alias:** `onboarding`
@@ -22,7 +32,7 @@ Set up iOS build credentials interactively (creates certificates and profiles au
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
-| **-a,** | <code>string</code> | API key to link to your account |
+| **-a** | <code>string</code> | API key to link to your account |
 
 ### <a id="build-request"></a> 🔹 **Request**
 
@@ -75,7 +85,7 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | **--output-retention** | <code>string</code> | Override output link TTL for this build only (1h to 7d). Examples: 1h, 6h, 2d. Precedence: CLI > env > saved credentials |
 | **--skip-build-number-bump** | <code>boolean</code> | Skip automatic build number/version code incrementing. Uses whatever version is already in the project files. |
 | **--no-skip-build-number-bump** | <code>boolean</code> | Override saved credentials to re-enable automatic build number incrementing for this build only. |
-| **-a,** | <code>string</code> | API key to link to your account |
+| **-a** | <code>string</code> | API key to link to your account |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 | **--verbose** | <code>boolean</code> | Enable verbose output with detailed logging |

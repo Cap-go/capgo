@@ -8,6 +8,7 @@ sidebar:
 
 🔐 Manage encryption keys for secure bundle distribution in Capgo Cloud, supporting end-to-end encryption with RSA and AES combination.
 
+
 ### <a id="key-save"></a> 🔹 **Save**
 
 ```bash
@@ -27,7 +28,7 @@ npx @capgo/cli@latest key save --key ./path/to/key.pub
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
-| **-f,** | <code>string</code> | Force generate a new one |
+| **-f** | <code>boolean</code> | Force generate a new one |
 | **--key** | <code>string</code> | Key path to save in Capacitor config |
 | **--key-data** | <code>string</code> | Key data to save in Capacitor config |
 
@@ -52,7 +53,7 @@ npx @capgo/cli@latest key create
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
-| **-f,** | <code>string</code> | Force generate a new one |
+| **-f** | <code>boolean</code> | Force generate a new one |
 
 ### <a id="key-delete_old"></a> 🗑️ **Delete_old**
 

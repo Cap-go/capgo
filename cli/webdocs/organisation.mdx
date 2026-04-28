@@ -8,6 +8,7 @@ sidebar:
 
 [DEPRECATED] Use "organization" instead. This command will be removed in a future version.
 
+
 ### <a id="organisation-list"></a> 📋 **List**
 
 **Alias:** `l`
@@ -22,7 +23,7 @@ npx @capgo/cli@latest organisation list
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
-| **-a,** | <code>string</code> | API key to link to your account |
+| **-a** | <code>string</code> | API key to link to your account |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 
@@ -40,9 +41,9 @@ npx @capgo/cli@latest organisation add
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
-| **-n,** | <code>string</code> | Organization name |
-| **-e,** | <code>string</code> | Management email for the organization |
-| **-a,** | <code>string</code> | API key to link to your account |
+| **-n** | <code>string</code> | Organization name |
+| **-e** | <code>string</code> | Management email for the organization |
+| **-a** | <code>string</code> | API key to link to your account |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 
@@ -60,8 +61,8 @@ npx @capgo/cli@latest organisation set
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
-| **-n,** | <code>string</code> | Organization name |
-| **-e,** | <code>string</code> | Management email for the organization |
+| **-n** | <code>string</code> | Organization name |
+| **-e** | <code>string</code> | Management email for the organization |
 | **--enforce-2fa** | <code>boolean</code> | Enable 2FA enforcement for all organization members |
 | **--no-enforce-2fa** | <code>boolean</code> | Disable 2FA enforcement for organization |
 | **--password-policy** | <code>boolean</code> | Enable password policy enforcement for organization |
@@ -78,7 +79,7 @@ npx @capgo/cli@latest organisation set
 | **--max-apikey-expiration-days** | <code>string</code> | Maximum days before API key expiration (1-365, null for no limit) |
 | **--enforce-hashed-api-keys** | <code>boolean</code> | Enforce hashed/secure API keys (key value stored as hash, shown only once) |
 | **--no-enforce-hashed-api-keys** | <code>boolean</code> | Allow plain-text API keys |
-| **-a,** | <code>string</code> | API key to link to your account |
+| **-a** | <code>string</code> | API key to link to your account |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 
@@ -96,7 +97,7 @@ npx @capgo/cli@latest organisation delete
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
-| **-a,** | <code>string</code> | API key to link to your account |
+| **-a** | <code>string</code> | API key to link to your account |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
 
