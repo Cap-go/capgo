@@ -1,0 +1,156 @@
+---
+title: 🔹 organization
+description: "🏢 Manage your organizations in Capgo Cloud for team collaboration and app management."
+sidebar_label: organization
+sidebar:
+  order: 11
+---
+
+🏢 Manage your organizations in Capgo Cloud for team collaboration and app management.
+
+### <a id="organization-list"></a> 📋 **List**
+
+**Alias:** `l`
+
+```bash
+npx @capgo/cli@latest organization list
+```
+
+📋 List all organizations you have access to in Capgo Cloud.
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest organization list
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-a,** | <code>string</code> | API key to link to your account |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+
+### <a id="organization-add"></a> ➕ **Add**
+
+**Alias:** `a`
+
+```bash
+npx @capgo/cli@latest organization add
+```
+
+➕ Create a new organization in Capgo Cloud for team collaboration.
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest organization add --name "My Company" --email admin@mycompany.com
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-n,** | <code>string</code> | Organization name |
+| **-e,** | <code>string</code> | Management email for the organization |
+| **-a,** | <code>string</code> | API key to link to your account |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+
+### <a id="organization-members"></a> 🔹 **Members**
+
+**Alias:** `m`
+
+```bash
+npx @capgo/cli@latest organization members
+```
+
+👥 List organization members and their 2FA status.
+Shows all members of an organization with their roles and whether they have 2FA enabled.
+Useful before enabling 2FA enforcement to see which members will be affected.
+> ℹ️ Viewing 2FA status requires super_admin rights in the organization.
+
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest organization members ORG_ID
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-a,** | <code>string</code> | API key to link to your account |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+
+### <a id="organization-set"></a> ⚙️ **Set**
+
+**Alias:** `s`
+
+```bash
+npx @capgo/cli@latest organization set
+```
+
+⚙️ Update organization settings including name, email, security policies, and enforcement options.
+Security settings require super_admin role.
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest organization set ORG_ID --name "New Name"
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-n,** | <code>string</code> | Organization name |
+| **-e,** | <code>string</code> | Management email for the organization |
+| **--enforce-2fa** | <code>boolean</code> | Enable 2FA enforcement for all organization members |
+| **--no-enforce-2fa** | <code>boolean</code> | Disable 2FA enforcement for organization |
+| **--password-policy** | <code>boolean</code> | Enable password policy enforcement for organization |
+| **--no-password-policy** | <code>boolean</code> | Disable password policy enforcement |
+| **--min-length** | <code>string</code> | Minimum password length (6-128, default: 10) |
+| **--require-uppercase** | <code>boolean</code> | Require uppercase letter in password |
+| **--no-require-uppercase** | <code>boolean</code> | Do not require uppercase letter |
+| **--require-number** | <code>boolean</code> | Require number in password |
+| **--no-require-number** | <code>boolean</code> | Do not require number |
+| **--require-special** | <code>boolean</code> | Require special character in password |
+| **--no-require-special** | <code>boolean</code> | Do not require special character |
+| **--require-apikey-expiration** | <code>boolean</code> | Require all API keys to have an expiration date |
+| **--no-require-apikey-expiration** | <code>boolean</code> | Do not require API key expiration |
+| **--max-apikey-expiration-days** | <code>string</code> | Maximum days before API key expiration (1-365, null for no limit) |
+| **--enforce-hashed-api-keys** | <code>boolean</code> | Enforce hashed/secure API keys (key value stored as hash, shown only once) |
+| **--no-enforce-hashed-api-keys** | <code>boolean</code> | Allow plain-text API keys |
+| **-a,** | <code>string</code> | API key to link to your account |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+
+### <a id="organization-delete"></a> 🗑️ **Delete**
+
+**Alias:** `d`
+
+```bash
+npx @capgo/cli@latest organization delete
+```
+
+🗑️ Delete an organization from Capgo Cloud. This action cannot be undone.
+Only organization owners can delete organizations.
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest organization delete ORG_ID
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-a,** | <code>string</code> | API key to link to your account |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+

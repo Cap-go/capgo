@@ -1,0 +1,131 @@
+{
+  "name": "@capgo/cli",
+  "type": "module",
+  "version": "7.93.1",
+  "description": "A CLI to upload to capgo servers",
+  "author": "Martin martin@capgo.app",
+  "license": "Apache 2.0",
+  "homepage": "https://github.com/Cap-go/CLI#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Cap-go/CLI.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Cap-go/CLI/issues"
+  },
+  "keywords": [
+    "appflow alternative",
+    "ionic",
+    "capacitor",
+    "auto update",
+    "live update",
+    "capgo",
+    "cli",
+    "upload",
+    "capgo-cli",
+    "sdk",
+    "tanstack-intent"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./sdk": {
+      "types": "./dist/src/sdk.d.ts",
+      "import": "./dist/src/sdk.js"
+    }
+  },
+  "main": "dist/index.js",
+  "types": "dist/src/index.d.ts",
+  "bin": {
+    "capgo": "dist/index.js"
+  },
+  "files": [
+    "!skills/_artifacts",
+    "dist",
+    "skills"
+  ],
+  "engines": {
+    "npm": ">=8.0.0",
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsc && bun build.mjs",
+    "dev": "NODE_ENV=development ncc build",
+    "no-debug": "node dist/index.js",
+    "dev-build": "SUPA_DB=development ncc build",
+    "pack": "pkg",
+    "types": "npx --yes supabase gen types typescript --project-id=xvwzpoazmxkqosrdewyv > src/types/supabase.types.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint \"src/**/*.ts\" --fix",
+    "check-posix-paths": "node test/check-posix-paths.js",
+    "generate-docs": "node dist/index.js generate-docs README.md",
+    "test:bundle": "bun test/test-bundle.mjs",
+    "test:functional": "bun test/test-functional.mjs",
+    "test:semver": "bun test/test-semver-validation.mjs",
+    "test:version-edge-cases": "bun test/test-version-validation.mjs",
+    "test:regex": "bun test/test-regex-validation.mjs",
+    "test:upload": "bun test/test-upload-validation.mjs",
+    "test:credentials": "bun test/test-credentials.mjs",
+    "test:credentials-validation": "bun test/test-credentials-validation.mjs",
+    "test:build-zip-filter": "bun test/test-build-zip-filter.mjs",
+    "test:checksum": "bun test/test-checksum-algorithm.mjs",
+    "test:ci-prompts": "bun test/test-ci-prompts.mjs",
+    "test:onboarding-recovery": "bun test/test-onboarding-recovery.mjs",
+    "test:prompt-preferences": "bun test/test-prompt-preferences.mjs",
+    "test:esm-sdk": "node test/test-sdk-esm.mjs",
+    "test:mcp": "node test/test-mcp.mjs",
+    "test:version-detection": "node test/test-get-installed-version.mjs",
+    "test:version-detection:setup": "./test/fixtures/setup-test-projects.sh",
+    "test:platform-paths": "bun test/test-platform-paths.mjs",
+    "test:payload-split": "bun test/test-payload-split.mjs",
+    "test": "bun run test:bundle && bun run test:functional && bun run test:semver && bun run test:version-edge-cases && bun run test:regex && bun run test:upload && bun run test:credentials && bun run test:credentials-validation && bun run test:build-zip-filter && bun run test:checksum && bun run test:ci-prompts && bun run test:onboarding-recovery && bun run test:prompt-preferences && bun run test:esm-sdk && bun run test:mcp && bun run test:version-detection && bun run test:platform-paths && bun run test:payload-split"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "^7.0.0",
+    "@bradenmacdonald/s3-lite-client": "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.5",
+    "@capacitor/cli": "^8.0.0",
+    "@capgo/find-package-manager": "^0.0.18",
+    "@clack/prompts": "^1.0.0",
+    "@modelcontextprotocol/sdk": "^1.25.3",
+    "@sauber/table": "npm:@jsr/sauber__table",
+    "@std/semver": "npm:@jsr/std__semver@1.0.8",
+    "@supabase/supabase-js": "^2.79.0",
+    "@tanstack/intent": "^0.0.23",
+    "@types/adm-zip": "^0.5.7",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^25.0.0",
+    "@types/node-forge": "^1.3.14",
+    "@types/prettyjson": "^0.0.33",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^18.3.28",
+    "@types/tmp": "^0.2.6",
+    "@vercel/ncc": "^0.38.4",
+    "adm-zip": "^0.5.16",
+    "ci-info": "^4.3.1",
+    "commander": "^14.0.2",
+    "eslint": "^9.38.0",
+    "git-format-staged": "4.0.1",
+    "husky": "^9.1.7",
+    "is-wsl": "^3.1.0",
+    "micromatch": "^4.0.8",
+    "open": "^11.0.0",
+    "partysocket": "^1.1.11",
+    "prettyjson": "^1.2.5",
+    "tmp": "^0.2.5",
+    "tus-js-client": "^4.3.1",
+    "typescript": "^5.9.3",
+    "ws": "^8.18.3",
+    "zod": "^4.3.6"
+  },
+  "dependencies": {
+    "@inkjs/ui": "^2.0.0",
+    "ink": "^5.2.1",
+    "ink-spinner": "^5.0.0",
+    "jsonwebtoken": "^9.0.3",
+    "node-forge": "^1.3.3",
+    "qrcode": "^1.5.4",
+    "react": "^18.3.1"
+  }
+}

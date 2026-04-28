@@ -1,0 +1,34 @@
+---
+title: 🚀 init
+description: "🚀 Initialize a new app in Capgo Cloud with step-by-step guidance."
+sidebar_label: init
+sidebar:
+  order: 1
+---
+
+🚀 Initialize a new app in Capgo Cloud with step-by-step guidance.
+
+**Alias:** `i`
+
+```bash
+npx @capgo/cli@latest init
+```
+
+This includes adding code for updates, building, uploading your app, and verifying update functionality.
+Capgo bundles are web assets and can be fetched by anyone who knows the URL. Use encryption for banking, regulated, or other high-security apps.
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest init YOUR_API_KEY com.example.app
+```
+
+## <a id="options"></a> Options
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-n,** | <code>string</code> | App name for display in Capgo Cloud |
+| **-i,** | <code>string</code> | App icon path for display in Capgo Cloud |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+
