@@ -13,7 +13,7 @@ tail_lines="${BACKGROUND_TAIL_LINES:-200}"
 wait_on_version="${BACKGROUND_WAIT_ON_VERSION:-8.0.1}"
 
 if [ -z "${service_name}" ] || [ -z "${run_command}" ] || [ -z "${wait_on_resources_raw}" ] || [ -z "${log_path}" ]; then
-  echo "::error::BACKGROUND_SERVICE_NAME, BACKGROUND_RUN_COMMAND, BACKGROUND_WAIT_ON, and BACKGROUND_LOG_PATH are required."
+  printf '%s\n' "::error::BACKGROUND_SERVICE_NAME, BACKGROUND_RUN_COMMAND, BACKGROUND_WAIT_ON, and BACKGROUND_LOG_PATH are required." >&2
   exit 1
 fi
 
@@ -28,7 +28,7 @@ while IFS= read -r resource; do
 done < <(printf '%s\n' "${wait_on_resources_raw}" | sed '/^[[:space:]]*$/d')
 
 if [ "${#wait_on_resources[@]}" -eq 0 ]; then
-  echo "::error::${service_name} is missing wait-on resources."
+  printf '%s\n' "::error::${service_name} is missing wait-on resources." >&2
   exit 1
 fi
 
@@ -65,13 +65,13 @@ fi
 
 sleep 1
 if ! kill -0 "${pid}" 2>/dev/null; then
-  echo "::error::${service_name} exited before it became ready."
+  printf '%s\n' "::error::${service_name} exited before it became ready." >&2
   dump_log_tail
   exit 1
 fi
 
 if ! bunx "wait-on@${wait_on_version}" "${wait_on_resources[@]}" --timeout "${wait_timeout_ms}" --interval "${wait_interval_ms}" --log --verbose; then
-  echo "::error::${service_name} failed to become ready."
+  printf '%s\n' "::error::${service_name} failed to become ready." >&2
   dump_log_tail
   exit 1
 fi
