@@ -7,6 +7,8 @@ import { formatError, getOrganizationId } from '../utils'
 interface CheckVersionOptions {
   silent?: boolean
   autoUnlink?: boolean
+  channelName?: string
+  requireMatch?: boolean
 }
 
 export async function checkVersionNotUsedInChannel(
@@ -15,12 +17,17 @@ export async function checkVersionNotUsedInChannel(
   versionData: Database['public']['Tables']['app_versions']['Row'],
   options: CheckVersionOptions = {},
 ) {
-  const { silent = false, autoUnlink = false } = options
-  const { data: channelFound, error: errorChannel } = await supabase
+  const { silent = false, autoUnlink = false, channelName, requireMatch = false } = options
+  let query = supabase
     .from('channels')
     .select()
     .eq('app_id', appid)
     .eq('version', versionData.id)
+
+  if (channelName)
+    query = query.eq('name', channelName)
+
+  const { data: channelFound, error: errorChannel } = await query
 
   if (errorChannel) {
     if (!silent)
@@ -28,8 +35,15 @@ export async function checkVersionNotUsedInChannel(
     throw new Error(`Cannot check version ${appid}@${versionData.name}: ${formatError(errorChannel)}`)
   }
 
-  if (!channelFound?.length)
+  if (!channelFound?.length) {
+    if (channelName && requireMatch) {
+      const message = `Version ${appid}@${versionData.name} is not linked to channel ${channelName}`
+      if (!silent)
+        log.error(message)
+      throw new Error(message)
+    }
     return
+  }
 
   if (silent)
     throw new Error(`Version ${appid}@${versionData.name} is used in ${channelFound.length} channel(s)`) // No interactivity allowed

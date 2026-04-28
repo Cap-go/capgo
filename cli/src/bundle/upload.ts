@@ -36,6 +36,16 @@ function uploadFail(message: string): never {
   throw new Error(message)
 }
 
+async function persistVersionData(
+  supabase: SupabaseType,
+  versionData: Database['public']['Tables']['app_versions']['Insert'],
+  action: 'add' | 'update',
+) {
+  const { error } = await updateOrCreateVersion(supabase, versionData)
+  if (error)
+    uploadFail(`Cannot ${action} bundle ${formatError(error)}`)
+}
+
 /**
  * Display a compatibility table for the given packages
  */
@@ -1035,12 +1045,28 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
   if (options.verbose)
     log.info(`[Verbose] Creating version record in database...`)
 
-  const { error: dbError } = await updateOrCreateVersion(supabase, versionData)
-  if (dbError)
-    uploadFail(`Cannot add bundle ${formatError(dbError)}`)
+  await persistVersionData(supabase, versionData, 'add')
 
   if (options.verbose)
     log.info(`[Verbose] Version record created successfully`)
+
+  if (options.dryUpload) {
+    if (options.verbose)
+      log.info(`[Verbose] Dry upload mode: skipping bundle publishing and channel assignment`)
+    if (!silent)
+      outro('Dry upload saved bundle metadata without uploading files or updating channels')
+    return {
+      success: true,
+      bundle,
+      checksum: versionData.checksum ?? null,
+      encryptionMethod,
+      sessionKey: sessionKey ? sessionKey.toString('base64') : undefined,
+      ivSessionKey: typeof versionData.session_key === 'string' ? versionData.session_key : undefined,
+      storageProvider: versionData.storage_provider,
+      skipped: true,
+      reason: 'DRY_UPLOAD',
+    }
+  }
   if (options.tusChunkSize && options.tusChunkSize > fileConfig.maxChunkSize) {
     log.error(`Chunk size ${options.tusChunkSize} is greater than the maximum chunk size ${fileConfig.maxChunkSize}, using the maximum chunk size`)
     options.tusChunkSize = fileConfig.maxChunkSize
@@ -1085,6 +1111,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     await s3Client.putObject(fileName, Uint8Array.from(zipped))
     versionData.external_url = `${endPoint}/${encodeFileName}`
     versionData.storage_provider = 'external'
+    await persistVersionData(supabase, versionData, 'update')
 
     if (options.verbose)
       log.info(`[Verbose] S3 upload complete, external URL: ${versionData.external_url}`)
@@ -1155,9 +1182,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     if (options.verbose)
       log.info(`[Verbose] Updating version record with storage provider and manifest...`)
 
-    const { error: dbError2 } = await updateOrCreateVersion(supabase, versionData)
-    if (dbError2)
-      uploadFail(`Cannot update bundle ${formatError(dbError2)}`)
+    await persistVersionData(supabase, versionData, 'update')
 
     if (options.verbose)
       log.info(`[Verbose] Version record updated successfully`)

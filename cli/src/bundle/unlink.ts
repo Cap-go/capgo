@@ -85,7 +85,12 @@ export async function unlinkDeviceInternal(
     await checkPlanValid(supabase, orgId, enrichedOptions.apikey, resolvedAppId)
 
     const versionData = await getVersionData(supabase, resolvedAppId, bundle, { silent })
-    await checkVersionNotUsedInChannel(supabase, resolvedAppId, versionData, { silent })
+    await checkVersionNotUsedInChannel(supabase, resolvedAppId, versionData, {
+      silent,
+      autoUnlink: true,
+      channelName: channel,
+      requireMatch: true,
+    })
 
     await sendEvent(enrichedOptions.apikey, {
       channel: 'bundle',
