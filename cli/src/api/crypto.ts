@@ -35,7 +35,8 @@ export function generateSessionKey(key: string): { sessionKey: Buffer, ivSession
 export function encryptSource(source: Buffer, sessionKey: Buffer, ivSessionKey: string): Buffer {
   const [ivB64] = ivSessionKey.split(':')
   const initVector = Buffer.from(ivB64, formatB64)
-  const cipher = createCipheriv(algorithm, sessionKey, initVector)
+  // AES-128-CBC remains required for updater backward compatibility; signed checksums provide integrity verification.
+  const cipher = createCipheriv(algorithm, sessionKey, initVector) // NOSONAR
   cipher.setAutoPadding(true)
   const encryptedData = Buffer.concat([cipher.update(source), cipher.final()])
   return encryptedData
@@ -55,7 +56,8 @@ export function decryptSource(source: Buffer, ivSessionKey: string, key: string)
   const initVector = Buffer.from(ivB64, formatB64)
   // console.log('\nSessionB64', sessionB64)
 
-  const decipher = createDecipheriv(algorithm, sessionKey, initVector)
+  // Keep decrypt behavior aligned with legacy bundles encrypted with AES-128-CBC.
+  const decipher = createDecipheriv(algorithm, sessionKey, initVector) // NOSONAR
   decipher.setAutoPadding(true)
   const decryptedData = Buffer.concat([decipher.update(source), decipher.final()])
 

@@ -411,7 +411,8 @@ export function normalizeGithubRepo(repository?: string): string {
   if (/^https?:\/\//.test(sanitized)) {
     try {
       const url = new URL(sanitized)
-      if (url.hostname.endsWith('github.com')) {
+      const hostname = url.hostname.toLowerCase()
+      if (hostname === 'github.com' || hostname === 'www.github.com') {
         const [owner, name] = url.pathname
           .split('/')
           .filter(part => part.length > 0)

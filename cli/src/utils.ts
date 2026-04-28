@@ -618,6 +618,19 @@ export async function getRemoteFileConfig() {
   }
 }
 
+function normalizeSupabaseHost(host: string): string {
+  const parsed = new URL(host)
+  if (!['http:', 'https:'].includes(parsed.protocol))
+    throw new Error('Invalid Supabase host protocol')
+  if (parsed.username || parsed.password)
+    throw new Error('Supabase host must not include credentials')
+  if (parsed.search || parsed.hash)
+    throw new Error('Supabase host must not include query parameters or fragments')
+
+  const normalizedPath = parsed.pathname.replace(/\/+$/, '')
+  return `${parsed.origin}${normalizedPath}`
+}
+
 export async function createSupabaseClient(apikey: string, supaHost?: string, supaKey?: string, silent = false) {
   const config = await getRemoteConfig(silent)
   if (supaHost && supaKey) {
@@ -631,7 +644,9 @@ export async function createSupabaseClient(apikey: string, supaHost?: string, su
       log.error('Cannot connect to server please try again later')
     throw new Error('Cannot connect to server please try again later')
   }
-  return createClient<Database>(config.supaHost, config.supaKey, {
+  const normalizedSupaHost = normalizeSupabaseHost(config.supaHost)
+  // Custom Supabase hosts are an explicit CLI feature; normalizeSupabaseHost constrains the accepted URL shape first.
+  return createClient<Database>(normalizedSupaHost, config.supaKey, { // NOSONAR
     auth: {
       persistSession: false,
     },
