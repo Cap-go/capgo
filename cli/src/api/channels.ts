@@ -45,7 +45,7 @@ export async function checkVersionNotUsedInChannel(
     return
   }
 
-  if (silent)
+  if (silent && !autoUnlink)
     throw new Error(`Version ${appid}@${versionData.name} is used in ${channelFound.length} channel(s)`) // No interactivity allowed
 
   intro(`❌ Version ${appid}@${versionData.name} is used in ${channelFound.length} channel${channelFound.length > 1 ? 's' : ''}`)
@@ -62,12 +62,12 @@ export async function checkVersionNotUsedInChannel(
   }
 
   for (const channel of channelFound) {
-    const s = spinner()
-    s.start(`Unlinking channel ${channel.name}`)
+    const s = silent ? null : spinner()
+    s?.start(`Unlinking channel ${channel.name}`)
 
     const unknownVersion = await findUnknownVersion(supabase, appid, { silent })
     if (!unknownVersion) {
-      s.stop(`Cannot find unknown version for ${appid}`)
+      s?.stop(`Cannot find unknown version for ${appid}`)
       throw new Error(`Cannot find unknown version for ${appid}`)
     }
     const { error: errorChannelUpdate } = await supabase
@@ -76,14 +76,15 @@ export async function checkVersionNotUsedInChannel(
       .eq('id', channel.id)
 
     if (errorChannelUpdate) {
-      s.stop(`Cannot update channel ${channel.name} ${formatError(errorChannelUpdate)}`)
+      s?.stop(`Cannot update channel ${channel.name} ${formatError(errorChannelUpdate)}`)
       throw new Error(`Cannot update channel ${channel.name}: ${formatError(errorChannelUpdate)}`)
     }
 
-    s.stop(`✅ Channel ${channel.name} unlinked`)
+    s?.stop(`✅ Channel ${channel.name} unlinked`)
   }
 
-  outro(`Version unlinked from ${channelFound.length} channel${channelFound.length > 1 ? 's' : ''}`)
+  if (!silent)
+    outro(`Version unlinked from ${channelFound.length} channel${channelFound.length > 1 ? 's' : ''}`)
 }
 
 interface FindUnknownOptions {
@@ -103,9 +104,15 @@ export async function findUnknownVersion(
     .select('id')
     .eq('app_id', appId)
     .eq('name', 'unknown')
-    .single()
+    .maybeSingle()
 
-  if (!findError) {
+  if (findError) {
+    if (!silent)
+      log.error(`Cannot find unknown version for ${appId}: ${formatError(findError)}`)
+    throw new Error(`Cannot find unknown version for app ${appId}: ${formatError(findError)}`)
+  }
+
+  if (data) {
     return data
   }
 
@@ -208,7 +215,7 @@ export function displayChannels(data: Channel[], silent = false) {
 
   const t = new Table()
   t.theme = Table.roundTheme
-  t.headers = ['Name', 'Version', 'Public', 'iOS', 'Android', 'Auto Update', 'Native Auto Update', 'Device Self Set', 'Progressive Deploy', 'Secondary Version', 'Secondary Version Percentage', 'AB Testing', 'AB Testing Version', 'AB Testing Percentage', 'Emulator', 'Device', 'Dev', 'Prod']
+  t.headers = ['Name', 'Version', 'Public', 'iOS', 'Android', 'Auto Update', 'Native Auto Update', 'Device Self Set', 'Emulator', 'Device', 'Dev', 'Prod']
   t.rows = []
 
   for (const row of data.toReversed()) {

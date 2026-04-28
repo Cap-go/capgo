@@ -7,7 +7,7 @@
 
 A CLI to upload and download files from the Capgo Cloud.
 
-You can find the most up to date version of this doc in our web doc:
+You can find the most up-to-date version of this doc in our web doc:
 https://capgo.app/docs/cli/overview/
 
 ## Usage
@@ -63,7 +63,7 @@ Follow the documentation here: https://capacitorjs.com/docs/getting-started/
   - [Members](#organization-members)
   - [Set](#organization-set)
   - [Delete](#organization-delete)
-- 🔹 [Organisation](#organisation)
+- 🔹 [Organization Alias (deprecated)](#organisation)
   - [List](#organisation-list)
   - [Add](#organisation-add)
   - [Set](#organisation-set)

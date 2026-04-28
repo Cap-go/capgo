@@ -32,10 +32,13 @@ export async function unlinkDeviceInternal(
       apikey: options.apikey || findSavedKey(),
     }
 
-    const extConfig = await getConfig()
-    const resolvedAppId = getAppId(appId, extConfig?.config)
     const packVersion = getBundleVersion('', options.packageJson)
-    const bundle = enrichedOptions.bundle || packVersion
+    const needsProjectConfig = !appId || (!enrichedOptions.bundle && !packVersion)
+    const extConfig = needsProjectConfig ? await getConfig(silent) : undefined
+    const resolvedAppId = getAppId(appId, extConfig?.config)
+    const bundle = enrichedOptions.bundle
+      || extConfig?.config?.plugins?.CapacitorUpdater?.version
+      || packVersion
 
     if (!enrichedOptions.apikey) {
       if (!silent)

@@ -1108,10 +1108,16 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     if (options.verbose)
       log.info(`[Verbose] Uploading to S3 as: ${fileName}`)
 
-    await s3Client.putObject(fileName, Uint8Array.from(zipped))
-    versionData.external_url = `${endPoint}/${encodeFileName}`
-    versionData.storage_provider = 'external'
-    await persistVersionData(supabase, versionData, 'update')
+    try {
+      await s3Client.putObject(fileName, Uint8Array.from(zipped))
+      versionData.external_url = `${endPoint}/${encodeFileName}`
+      versionData.storage_provider = 'external'
+      await persistVersionData(supabase, versionData, 'update')
+    }
+    catch (error) {
+      await deletedFailedVersion(supabase, appid, bundle)
+      uploadFail(`Cannot upload bundle to S3 ${formatError(error)}`)
+    }
 
     if (options.verbose)
       log.info(`[Verbose] S3 upload complete, external URL: ${versionData.external_url}`)
