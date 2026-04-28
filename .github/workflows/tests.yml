@@ -212,7 +212,7 @@ jobs:
           BACKGROUND_SERVICE_NAME: Playwright frontend
           BACKGROUND_RUN_COMMAND: CAPTCHA_KEY='' bun run serve:worktree
           BACKGROUND_WAIT_ON: |
-            http-get://127.0.0.1:5173
+            http-get://localhost:5173
           BACKGROUND_LOG_PATH: ${{ runner.temp }}/playwright-frontend.log
           BACKGROUND_WAIT_TIMEOUT_MS: 360000
           BACKGROUND_TAIL_LINES: 300
