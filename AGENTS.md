@@ -679,10 +679,10 @@ When backend code uses the plugin read-path (`/updates`, `/stats`, `/channel_sel
 - Logical replication replicates **table data**, not derived objects like **views** and **SQL functions**.
 - Treat the read replica (what you see in PlanetScale) as the source of truth for what is queryable from plugin endpoints.
 - Do **not** query credits ledger tables/views from the replica (e.g. `usage_credit_*` / `usage_credit_balances`). If plugin logic needs a “has credits” signal, **materialize it into a replicated column/table** (example: an org-level boolean flag that is refreshed by primary-side jobs).
-- `/updates`, `/stats`, and `/channel_self` are extremely hot paths and can be called hundreds of times per second.
-- Those endpoints must not call the primary Supabase/Postgres database in-request or through `backgroundTask()` side effects unless there is no other practical option.
-- Background work is not an exception: do not enqueue primary-DB RPCs, writes, or lookups from these plugin endpoints just because the response is returned first.
-- If an unavoidable primary write remains for one of these endpoints, keep it minimal, document the reason inline, and treat it as an exception that requires extra review.
+`/updates`, `/stats`, and `/channel_self` are extremely hot paths and can be called hundreds of times per second, so they must never add direct primary-DB work, service-role RPCs, queue writes, or any other Postgres side effect from the live request path.
+Those endpoints must not call the primary Supabase/Postgres database in-request or through `backgroundTask()` side effects unless there is no other practical option.
+Background work is not an exception: do not enqueue primary-DB RPCs, writes, or lookups from these plugin endpoints just because the response is returned first.
+If a feature seems to require direct DB work from these endpoints, stop and design an alternative that keeps the request path replica-safe and off the primary DB; treat such request-path side effects as forbidden unless explicitly approved, and document any unavoidable primary writes inline as an exception that needs extra review.
 
 ## Pull Request Guidelines
 

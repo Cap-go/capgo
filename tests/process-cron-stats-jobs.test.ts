@@ -66,4 +66,40 @@ describe('cron_stat_app queue resilience', () => {
     expect(queuedMessages[0]?.message?.payload?.orgId).toBe(ORG_ID_CRON_QUEUE)
     expect(queuedMessages[0]?.message?.payload?.todayOnly).toBe(false)
   })
+
+  it.concurrent('live /stats traffic does not enqueue cron_stat_app directly', async () => {
+    await clearCronStatAppMessages(liveQueueAppId)
+
+    const versionName = '1.0.0'
+    await createAppVersions(versionName, liveQueueAppId)
+
+    const baseData = getBaseData(liveQueueAppId)
+    const payload = {
+      ...baseData,
+      action: 'set',
+      device_id: randomUUID().toLowerCase(),
+      version_build: versionName,
+      version_name: versionName,
+    }
+
+    const firstResponse = await fetch(getEndpointUrl('/stats'), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+    })
+    expect(firstResponse.status).toBe(200)
+
+    const secondResponse = await fetch(getEndpointUrl('/stats'), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        ...payload,
+        device_id: randomUUID().toLowerCase(),
+      }),
+    })
+    expect(secondResponse.status).toBe(200)
+
+    const queuedMessages = await getCronStatAppMessages(liveQueueAppId)
+    expect(queuedMessages).toHaveLength(0)
+  })
 })
