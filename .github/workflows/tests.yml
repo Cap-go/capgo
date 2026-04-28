@@ -381,7 +381,8 @@ jobs:
       - name: Check file size of Linux build
         run: ls -lh build-linux.zip
       - name: Verify ZIP file integrity for Linux build with zipinfo
-        run: zipinfo ./build-linux.zip || (echo "ZIP file is corrupted: build-linux.zip" && exit 1)
+        run: |
+          zipinfo ./build-linux.zip || (echo "ZIP file is corrupted: build-linux.zip" && exit 1)
       - name: Verify POSIX paths for Linux build
         run: |
           unzip build-linux.zip -d extracted-linux
@@ -413,9 +414,11 @@ jobs:
           ls -lh build-windows-2025.zip
           ls -lh build-windows-2022.zip
       - name: Verify ZIP file integrity for Windows 2025 build with zipinfo
-        run: zipinfo ./build-windows-2025.zip || (echo "ZIP file is corrupted: build-windows-2025.zip" && exit 1)
+        run: |
+          zipinfo ./build-windows-2025.zip || (echo "ZIP file is corrupted: build-windows-2025.zip" && exit 1)
       - name: Verify ZIP file integrity for Windows 2022 build with zipinfo
-        run: zipinfo ./build-windows-2022.zip || (echo "ZIP file is corrupted: build-windows-2022.zip" && exit 1)
+        run: |
+          zipinfo ./build-windows-2022.zip || (echo "ZIP file is corrupted: build-windows-2022.zip" && exit 1)
       - name: Verify POSIX paths for Windows 2025 build
         run: |
           unzip build-windows-2025.zip -d extracted-2025
