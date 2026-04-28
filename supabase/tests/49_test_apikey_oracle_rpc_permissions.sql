@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(14);
+SELECT plan(20);
 
 SELECT
     is(
@@ -34,6 +34,59 @@ SELECT
         false,
         'anon role has no execute privilege on'
         || ' get_org_perm_for_apikey(text, text)'
+    );
+
+-- Published CLI v7.x still reads `public.apps` through anon PostgREST RLS.
+-- That path calls `get_identity_org_appid()` directly from the apps SELECT
+-- policy, which depends on `get_apikey_header()` and `is_apikey_expired()`,
+-- then calls `check_min_rights()`, which re-checks API-key RBAC scope on RBAC
+-- orgs. Keep those anon grants covered until the CLI switches to the
+-- RBAC-aware wrappers.
+SELECT
+    is(
+        has_function_privilege(
+            'anon'::name,
+            'public.get_apikey_header()'::regprocedure,
+            'EXECUTE'
+        ),
+        true,
+        'anon role keeps execute privilege on get_apikey_header()'
+    );
+
+SELECT
+    is(
+        has_function_privilege(
+            'anon'::name,
+            'public.is_apikey_expired(timestamp with time zone)'::regprocedure,
+            'EXECUTE'
+        ),
+        true,
+        'anon role keeps execute privilege on'
+        || ' is_apikey_expired(timestamp with time zone)'
+    );
+
+SELECT
+    is(
+        has_function_privilege(
+            'anon'::name,
+            'public.get_identity_org_appid(public.key_mode[], uuid, character varying)'::regprocedure,
+            'EXECUTE'
+        ),
+        true,
+        'anon role keeps execute privilege on'
+        || ' get_identity_org_appid(public.key_mode[], uuid, character varying)'
+    );
+
+SELECT
+    is(
+        has_function_privilege(
+            'anon'::name,
+            'public.check_min_rights(public.user_min_right, uuid, uuid, character varying, bigint)'::regprocedure,
+            'EXECUTE'
+        ),
+        true,
+        'anon role keeps execute privilege on'
+        || ' check_min_rights(public.user_min_right, uuid, uuid, character varying, bigint)'
     );
 
 SELECT
@@ -148,10 +201,32 @@ SELECT
         'anon API-key storage access still works through header-based identity'
     );
 
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM public.apps
+            WHERE app_id = 'com.demo.app'
+        ),
+        1::bigint,
+        'anon API-key apps query still works through RLS helper identity'
+    );
+
 DO $$
 BEGIN
     PERFORM set_config('request.headers', '{"capgkey": "invalid-key"}', true);
 END $$;
+
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM public.apps
+            WHERE app_id = 'com.demo.app'
+        ),
+        0::bigint,
+        'anon with invalid capgkey cannot read apps through helper identity'
+    );
 
 SELECT
     is(
