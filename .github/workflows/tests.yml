@@ -310,7 +310,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
       - name: Check spelling with typos
-        uses: crate-ci/typos@v1.45.1
+        run: cd cli && bunx typos .
 
   cli_create_valid_zip_linux:
     needs: changes
