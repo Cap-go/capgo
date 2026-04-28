@@ -309,12 +309,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-      - name: Setup bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
       - name: Check spelling with typos
-        run: cd cli && bunx typos .
+        uses: crate-ci/typos@v1.45.1
+        with:
+          files: ./cli
+          config: ./.typos.toml
 
   cli_create_valid_zip_linux:
     needs: changes
