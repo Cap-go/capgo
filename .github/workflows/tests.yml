@@ -38,6 +38,12 @@ jobs:
       run_capgo: ${{ steps.set.outputs.capgo }}
       run_cli: ${{ steps.set.outputs.cli }}
     steps:
+      - name: Checkout repository
+        if: github.event_name != 'workflow_call'
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
       - name: Detect changed paths
         if: github.event_name != 'workflow_call'
         id: filter
