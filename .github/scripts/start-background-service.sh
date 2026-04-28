@@ -12,7 +12,7 @@ wait_interval_ms="${BACKGROUND_WAIT_INTERVAL_MS:-500}"
 tail_lines="${BACKGROUND_TAIL_LINES:-200}"
 wait_on_version="${BACKGROUND_WAIT_ON_VERSION:-8.0.1}"
 
-if [ -z "${service_name}" ] || [ -z "${run_command}" ] || [ -z "${wait_on_resources_raw}" ] || [ -z "${log_path}" ]; then
+if [[ -z "${service_name}" || -z "${run_command}" || -z "${wait_on_resources_raw}" || -z "${log_path}" ]]; then
   printf '%s\n' "::error::BACKGROUND_SERVICE_NAME, BACKGROUND_RUN_COMMAND, BACKGROUND_WAIT_ON, and BACKGROUND_LOG_PATH are required." >&2
   exit 1
 fi
@@ -22,18 +22,18 @@ mkdir -p "$(dirname "${log_path}")"
 
 wait_on_resources=()
 while IFS= read -r resource; do
-  if [ -n "${resource}" ]; then
+  if [[ -n "${resource}" ]]; then
     wait_on_resources+=("${resource}")
   fi
 done < <(printf '%s\n' "${wait_on_resources_raw}" | sed '/^[[:space:]]*$/d')
 
-if [ "${#wait_on_resources[@]}" -eq 0 ]; then
+if [[ "${#wait_on_resources[@]}" -eq 0 ]]; then
   printf '%s\n' "::error::${service_name} is missing wait-on resources." >&2
   exit 1
 fi
 
 dump_log_tail() {
-  if [ ! -f "${log_path}" ]; then
+  if [[ ! -f "${log_path}" ]]; then
     echo "No log file found at ${log_path}"
     return
   fi
@@ -56,7 +56,7 @@ pid=$!
 disown "${pid}" 2>/dev/null || true
 popd >/dev/null
 
-if [ -n "${GITHUB_OUTPUT:-}" ]; then
+if [[ -n "${GITHUB_OUTPUT:-}" ]]; then
   {
     echo "pid=${pid}"
     echo "log_path=${log_path}"

@@ -54,7 +54,10 @@ else {
   console.log('Skipping backend server')
 }
 
-if (!env.SKIP_FRONTEND_START) {
+if (env.SKIP_FRONTEND_START) {
+  console.log('Skipping frontend server')
+}
+else {
   webServer.push({
     command: `ENV=local SUPA_URL=${localSupabaseUrl} SUPA_ANON=${localSupabaseAnonKey} API_DOMAIN=${localApiDomain} CAPTCHA_KEY='' bun run serve:local`,
     port: 5173,
@@ -62,9 +65,6 @@ if (!env.SKIP_FRONTEND_START) {
     reuseExistingServer,
     stdout: 'pipe',
   })
-}
-else {
-  console.log('Skipping frontend server')
 }
 
 /**
