@@ -39,7 +39,7 @@ test.describe('Registration', () => {
     await page.click('[data-test="onboarding-create-org"]')
 
     await page.waitForURL(/step=logo/)
-    await page.click('[data-test="onboarding-skip-logo"]')
+    await page.click('[data-test="onboarding-logo-action"]')
 
     await page.waitForURL(/step=invite/)
     await page.click('[data-test="onboarding-finish"]')
