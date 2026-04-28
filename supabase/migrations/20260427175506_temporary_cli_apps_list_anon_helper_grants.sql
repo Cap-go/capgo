@@ -1,4 +1,9 @@
 -- Temporary compatibility fix for the published CLI `app list` flow.
+-- Sunset: remove these grants in cleanup migration
+-- `remove_temporary_cli_apps_anon_helper_grants` once the published CLI
+-- switches `app list` to the RBAC-aware wrappers from
+-- `20260427144323_cli_rbac_permission_wrappers.sql`
+-- (`get_accessible_apps_for_apikey_v2()` / `cli_check_permission()`).
 --
 -- The currently published CLI still does legacy anonymous PostgREST auth checks
 -- before issuing a direct `GET /rest/v1/apps` request with the `capgkey`

@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(19);
+SELECT plan(20);
 
 SELECT
     is(
@@ -216,6 +216,17 @@ DO $$
 BEGIN
     PERFORM set_config('request.headers', '{"capgkey": "invalid-key"}', true);
 END $$;
+
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM public.apps
+            WHERE app_id = 'com.demo.app'
+        ),
+        0::bigint,
+        'anon with invalid capgkey cannot read apps through helper identity'
+    );
 
 SELECT
     is(
