@@ -209,6 +209,8 @@ jobs:
           working-directory: .
       - name: Run all backend and CLI tests
         run: bun run test:all
+      - name: Reset Supabase DB before Cloudflare Workers tests
+        run: supabase db reset
       - uses: JarvusInnovations/background-action@2428e7b970a846423095c79d43f759abf979a635 # v1.0.7
         name: Start Cloudflare Workers for testing
         with:
