@@ -6,6 +6,10 @@ concurrency:
 
 on:
   pull_request:
+  push:
+    branches-ignore:
+      - main
+      - development
   merge_group:
     types:
       - checks_requested
