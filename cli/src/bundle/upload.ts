@@ -140,7 +140,10 @@ async function verifyCompatibility(supabase: SupabaseType, pm: pmType, options: 
     .select('disable_auto_update, version ( min_update_version, native_packages )')
     .eq('name', channel)
     .eq('app_id', appid)
-    .single()
+    .maybeSingle()
+
+  if (channelError)
+    uploadFail(`Cannot load channel ${channel} for compatibility checks ${formatError(channelError)}`)
 
   const updateMetadataRequired = !!channelData && channelData.disable_auto_update === 'version_number'
 
@@ -234,7 +237,10 @@ async function checkVersionExists(supabase: SupabaseType, appid: string, bundle:
     .rpc('exist_app_versions', { appid, name_version: bundle })
     .single()
 
-  if (appVersion || appVersionError) {
+  if (appVersionError)
+    uploadFail(`Cannot check if version ${bundle} already exists ${formatError(appVersionError)}`)
+
+  if (appVersion) {
     if (versionExistsOk) {
       log.warn(`Version ${bundle} already exists - exiting gracefully due to --silent-fail option`)
       outro('Bundle version already exists - exiting gracefully 🎉')
@@ -478,7 +484,7 @@ async function uploadBundleToCapgoCloud(apikey: string, supabase: SupabaseType, 
         log.error(`Cannot finish TUS upload ${formatError(changeError)}`)
         if (options.verbose)
           log.info(`[Verbose] Database update failed: ${formatError(changeError)}`)
-        return Promise.reject(new Error('Cannot finish TUS upload'))
+        throw new Error('Cannot finish TUS upload')
       }
 
       if (options.verbose)
@@ -493,7 +499,7 @@ async function uploadBundleToCapgoCloud(apikey: string, supabase: SupabaseType, 
         log.error(`Cannot get upload url`)
         if (options.verbose)
           log.info(`[Verbose] Failed to retrieve presigned upload URL from database`)
-        return Promise.reject(new Error('Cannot get upload url'))
+        throw new Error('Cannot get upload url')
       }
 
       if (options.verbose) {
@@ -1092,7 +1098,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
       log.info(`  - SSL: ${s3SSL ? 'enabled' : 'disabled'}`)
     }
 
-    const endPoint = s3SSL ? `https://${s3Endpoint}` : `http://${s3Endpoint}`
+    const endPoint = `${s3SSL ? 'https' : 'http'}://${s3Endpoint}${s3Port ? `:${s3Port}` : ''}`
     const s3Client = new S3Client({
       endPoint: s3Endpoint,
       region: s3Region,
@@ -1293,7 +1299,7 @@ export async function uploadBundleInternal(preAppid: string, options: OptionsUpl
     }
   }
 
-  if (silent && !result.skipped)
+  if (!silent && !result.skipped)
     outro('Time to share your update to the world 🌍')
 
   return result

@@ -48,7 +48,8 @@ export async function checkVersionNotUsedInChannel(
   if (silent && !autoUnlink)
     throw new Error(`Version ${appid}@${versionData.name} is used in ${channelFound.length} channel(s)`) // No interactivity allowed
 
-  intro(`❌ Version ${appid}@${versionData.name} is used in ${channelFound.length} channel${channelFound.length > 1 ? 's' : ''}`)
+  if (!silent)
+    intro(`❌ Version ${appid}@${versionData.name} is used in ${channelFound.length} channel${channelFound.length > 1 ? 's' : ''}`)
 
   let shouldUnlink = autoUnlink
   if (!autoUnlink) {
@@ -116,18 +117,20 @@ export async function findUnknownVersion(
     return data
   }
 
-  // Not found - try to create it silently
+  // Not found - create or reuse the synthetic placeholder version safely.
   try {
     const orgId = await getOrganizationId(supabase, appId)
     const { data: newVersion, error: createError } = await supabase
       .from('app_versions')
-      .insert({
+      .upsert({
         owner_org: orgId,
         deleted: true,
         name: 'unknown',
         app_id: appId,
       })
       .select('id')
+      .eq('app_id', appId)
+      .eq('name', 'unknown')
       .single()
 
     if (createError) {

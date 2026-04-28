@@ -63,7 +63,7 @@ Follow the documentation here: https://capacitorjs.com/docs/getting-started/
   - [Members](#organization-members)
   - [Set](#organization-set)
   - [Delete](#organization-delete)
-- 🔹 [Organization Alias (deprecated)](#organisation)
+- 🔹 [Organisation](#organisation)
   - [List](#organisation-list)
   - [Add](#organisation-add)
   - [Set](#organisation-set)
@@ -93,7 +93,7 @@ Capgo bundles are web assets and can be fetched by anyone who knows the URL. Use
 npx @capgo/cli@latest init YOUR_API_KEY com.example.app
 ```
 
-## <a id="options"></a> Options
+## <a id="options-init"></a> Options (Init)
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
@@ -122,7 +122,7 @@ npx @capgo/cli@latest star-all
 ⭐ Star all Capgo GitHub repositories with a small random delay between each request.
 If you do not pass repositories, this defaults to all Cap-go repositories whose name starts with `capacitor-`.
 
-## <a id="options"></a> Options
+## <a id="options-star-all"></a> Options (Star-all)
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
@@ -146,7 +146,7 @@ This command helps diagnose issues with your setup.
 npx @capgo/cli@latest doctor
 ```
 
-## <a id="options"></a> Options
+## <a id="options-doctor"></a> Options (Doctor)
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
@@ -170,7 +170,7 @@ Use --apikey=******** in any command to override it.
 npx @capgo/cli@latest login YOUR_API_KEY
 ```
 
-## <a id="options"></a> Options
+## <a id="options-login"></a> Options (Login)
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
@@ -1223,7 +1223,7 @@ and reports whether an update would be delivered, or explains why not.
 npx @capgo/cli@latest probe --platform ios
 ```
 
-## <a id="options"></a> Options
+## <a id="options-probe"></a> Options (Probe)
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |

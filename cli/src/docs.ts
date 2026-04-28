@@ -25,6 +25,12 @@ interface MappedCommand {
   isCommandGroup: boolean // Property to identify command groups
 }
 
+function getOptionsAnchor(cmdName: string, parentCmd?: string) {
+  if (!parentCmd || parentCmd === cmdName)
+    return `options-${cmdName}`
+  return `options-${parentCmd}-${cmdName}`
+}
+
 function formatFrontmatterString(value: string): string {
   return JSON.stringify(value)
 }
@@ -131,8 +137,8 @@ export function generateDocs(filePath: string = './README.md', folderPath?: stri
       anchor = parentCmd ? `${parentCmd}-${cmdName}` : cmdName
     }
     else {
-      // For main commands, in README we use command name, in individual files we use 'options'
-      anchor = skipMainHeading ? 'options' : cmdName
+      // For main commands, use the command name as the primary section anchor
+      anchor = cmdName
     }
 
     const heading = isSubcommand ? `###` : `##`
@@ -195,8 +201,7 @@ export function generateDocs(filePath: string = './README.md', folderPath?: stri
     // Options table - for all commands (even command groups may have global options)
     if (cmd.options.length > 0) {
       if (!isSubcommand) {
-        // Only add the Options title for the main command
-        section += `## <a id="options"></a> Options\n\n`
+        section += `## <a id="${getOptionsAnchor(cmdName, parentCmd)}"></a> Options (${cmdNameCapitalized})\n\n`
       }
       else {
         section += `**Options:**\n\n`
