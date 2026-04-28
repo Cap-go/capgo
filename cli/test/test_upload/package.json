@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@capgo/capacitor-updater": "7.2.6"
+  }
+}

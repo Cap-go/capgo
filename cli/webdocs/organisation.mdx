@@ -1,0 +1,102 @@
+---
+title: 🔹 organisation
+description: "[DEPRECATED] Use \"organization\" instead. This command will be removed in a future version."
+sidebar_label: organisation
+sidebar:
+  order: 12
+---
+
+[DEPRECATED] Use "organization" instead. This command will be removed in a future version.
+
+### <a id="organisation-list"></a> 📋 **List**
+
+**Alias:** `l`
+
+```bash
+npx @capgo/cli@latest organisation list
+```
+
+[DEPRECATED] Use "organization list" instead.
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-a,** | <code>string</code> | API key to link to your account |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+
+### <a id="organisation-add"></a> ➕ **Add**
+
+**Alias:** `a`
+
+```bash
+npx @capgo/cli@latest organisation add
+```
+
+[DEPRECATED] Use "organization add" instead.
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-n,** | <code>string</code> | Organization name |
+| **-e,** | <code>string</code> | Management email for the organization |
+| **-a,** | <code>string</code> | API key to link to your account |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+
+### <a id="organisation-set"></a> ⚙️ **Set**
+
+**Alias:** `s`
+
+```bash
+npx @capgo/cli@latest organisation set
+```
+
+[DEPRECATED] Use "organization set" instead.
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-n,** | <code>string</code> | Organization name |
+| **-e,** | <code>string</code> | Management email for the organization |
+| **--enforce-2fa** | <code>boolean</code> | Enable 2FA enforcement for all organization members |
+| **--no-enforce-2fa** | <code>boolean</code> | Disable 2FA enforcement for organization |
+| **--password-policy** | <code>boolean</code> | Enable password policy enforcement for organization |
+| **--no-password-policy** | <code>boolean</code> | Disable password policy enforcement |
+| **--min-length** | <code>string</code> | Minimum password length (6-128, default: 10) |
+| **--require-uppercase** | <code>boolean</code> | Require uppercase letter in password |
+| **--no-require-uppercase** | <code>boolean</code> | Do not require uppercase letter |
+| **--require-number** | <code>boolean</code> | Require number in password |
+| **--no-require-number** | <code>boolean</code> | Do not require number |
+| **--require-special** | <code>boolean</code> | Require special character in password |
+| **--no-require-special** | <code>boolean</code> | Do not require special character |
+| **--require-apikey-expiration** | <code>boolean</code> | Require all API keys to have an expiration date |
+| **--no-require-apikey-expiration** | <code>boolean</code> | Do not require API key expiration |
+| **--max-apikey-expiration-days** | <code>string</code> | Maximum days before API key expiration (1-365, null for no limit) |
+| **--enforce-hashed-api-keys** | <code>boolean</code> | Enforce hashed/secure API keys (key value stored as hash, shown only once) |
+| **--no-enforce-hashed-api-keys** | <code>boolean</code> | Allow plain-text API keys |
+| **-a,** | <code>string</code> | API key to link to your account |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+
+### <a id="organisation-delete"></a> 🗑️ **Delete**
+
+**Alias:** `d`
+
+```bash
+npx @capgo/cli@latest organisation delete
+```
+
+[DEPRECATED] Use "organization delete" instead.
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-a,** | <code>string</code> | API key to link to your account |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+

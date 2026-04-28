@@ -1,0 +1,98 @@
+---
+title: 🔹 build
+description: "🏗️  Manage native iOS/Android builds through Capgo Cloud."
+sidebar_label: build
+sidebar:
+  order: 13
+---
+
+🏗️  Manage native iOS/Android builds through Capgo Cloud.
+
+### <a id="build-init"></a> 🚀 **Init**
+
+**Alias:** `onboarding`
+
+```bash
+npx @capgo/cli@latest build init
+```
+
+Set up iOS build credentials interactively (creates certificates and profiles automatically)
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **-a,** | <code>string</code> | API key to link to your account |
+
+### <a id="build-request"></a> 🔹 **Request**
+
+```bash
+npx @capgo/cli@latest build request
+```
+
+Request a native build from Capgo Cloud.
+This command will zip your project directory and upload it to Capgo for building.
+The build will be processed and sent directly to app stores.
+ 🔒 SECURITY: Credentials are never stored on Capgo servers. They are auto-deleted
+    after build completion. Build outputs may optionally be uploaded for time-limited download links.
+📋 PREREQUISITE: Save credentials first with:
+   `npx @capgo/cli build credentials save --appId <app-id> --platform <ios|android>`
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest build request com.example.app --platform ios --path .
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **--path** | <code>string</code> | Path to the project directory to build (default: current directory) |
+| **--platform** | <code>string</code> | Target platform: ios or android (required) |
+| **--build-mode** | <code>string</code> | Build mode: debug or release (default: release) |
+| **--build-certificate-base64** | <code>string</code> | iOS: Base64-encoded .p12 certificate |
+| **--p12-password** | <code>string</code> | iOS: Certificate password (optional if cert has no password) |
+| **--apple-id** | <code>string</code> | iOS: Apple ID email |
+| **--apple-app-specific-password** | <code>string</code> | iOS: App-specific password |
+| **--apple-key-id** | <code>string</code> | iOS: App Store Connect API Key ID |
+| **--apple-issuer-id** | <code>string</code> | iOS: App Store Connect Issuer ID |
+| **--apple-key-content** | <code>string</code> | iOS: Base64-encoded App Store Connect API key (.p8) |
+| **--app-store-connect-team-id** | <code>string</code> | iOS: App Store Connect Team ID |
+| **--ios-scheme** | <code>string</code> | iOS: Xcode scheme to build (default: App) |
+| **--ios-target** | <code>string</code> | iOS: Xcode target for reading build settings (default: same as scheme) |
+| **--ios-distribution** | <code>string</code> | iOS: Distribution mode |
+| **--ios-provisioning-profile** | <code>string</code> | iOS: Provisioning profile path or bundleId=path mapping (repeatable) |
+| **--android-keystore-file** | <code>string</code> | Android: Base64-encoded keystore file |
+| **--keystore-key-alias** | <code>string</code> | Android: Keystore key alias |
+| **--keystore-key-password** | <code>string</code> | Android: Keystore key password |
+| **--keystore-store-password** | <code>string</code> | Android: Keystore store password |
+| **--play-config-json** | <code>string</code> | Android: Base64-encoded Google Play service account JSON |
+| **--android-flavor** | <code>string</code> | Android: Product flavor to build (e.g. production). Required if your project has multiple flavors. |
+| **--no-playstore-upload** | <code>boolean</code> | Skip Play Store upload for this build (nulls out saved play config). Requires --output-upload. |
+| **--output-upload** | <code>boolean</code> | Override output upload behavior for this build only (enable). Precedence: CLI > env > saved credentials |
+| **--no-output-upload** | <code>boolean</code> | Override output upload behavior for this build only (disable). Precedence: CLI > env > saved credentials |
+| **--output-retention** | <code>string</code> | Override output link TTL for this build only (1h to 7d). Examples: 1h, 6h, 2d. Precedence: CLI > env > saved credentials |
+| **--skip-build-number-bump** | <code>boolean</code> | Skip automatic build number/version code incrementing. Uses whatever version is already in the project files. |
+| **--no-skip-build-number-bump** | <code>boolean</code> | Override saved credentials to re-enable automatic build number incrementing for this build only. |
+| **-a,** | <code>string</code> | API key to link to your account |
+| **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
+| **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+| **--verbose** | <code>boolean</code> | Enable verbose output with detailed logging |
+
+### <a id="build-credentials"></a> 🔹 **Credentials**
+
+```bash
+npx @capgo/cli@latest build credentials
+```
+
+Manage build credentials stored locally on your machine.
+🔒 SECURITY:
+   - Credentials saved to ~/.capgo-credentials/credentials.json (global) or .capgo-credentials.json (local)
+   - When building, sent to Capgo but NEVER stored permanently
+   - Deleted from Capgo immediately after build
+   - Build outputs may optionally be uploaded for time-limited download links
+📚 DOCUMENTATION:
+   iOS setup: https://capgo.app/docs/cli/cloud-build/ios/
+   Android setup: https://capgo.app/docs/cli/cloud-build/android/
+
