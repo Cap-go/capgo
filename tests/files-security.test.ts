@@ -24,11 +24,12 @@ async function createUploadScopedKey(appId: string, name: string): Promise<{ id:
   // Seed the scoped key directly so this suite only validates files behavior.
   // API key creation behavior is covered in the dedicated apikey suites and can
   // otherwise introduce unrelated worker-auth flakiness here.
+  const plainKey = randomUUID()
   const { data: created, error } = await getSupabaseClient()
     .from('apikeys')
     .insert({
       user_id: USER_ID,
-      key: null,
+      key: plainKey,
       key_hash: null,
       mode: 'upload',
       name,
@@ -41,18 +42,7 @@ async function createUploadScopedKey(appId: string, name: string): Promise<{ id:
     throw new Error(`Failed to seed upload-scoped key: ${error?.message ?? 'missing key row'}`)
   }
 
-  let key = created.key
-
-  if (!key) {
-    const { data, error } = await getSupabaseClient()
-      .from('apikeys')
-      .select('key')
-      .eq('id', created.id)
-      .single()
-
-    expect(error).toBeNull()
-    key = data?.key ?? null
-  }
+  const key = created.key
 
   expect(key).toBeTruthy()
   return {
