@@ -36,9 +36,12 @@ SELECT
         || ' get_org_perm_for_apikey(text, text)'
     );
 
--- Published CLI v7.x still performs anonymous PostgREST helper calls before a
--- direct `GET /rest/v1/apps` query with the `capgkey` header. Keep these anon
--- grants covered until the CLI switches to the RBAC-aware wrappers.
+-- Published CLI v7.x still reads `public.apps` through anon PostgREST RLS.
+-- That path calls `get_identity_org_appid()` directly from the apps SELECT
+-- policy, which depends on `get_apikey_header()` and `is_apikey_expired()`,
+-- then calls `check_min_rights()`, which re-checks API-key RBAC scope on RBAC
+-- orgs. Keep those anon grants covered until the CLI switches to the
+-- RBAC-aware wrappers.
 SELECT
     is(
         has_function_privilege(
