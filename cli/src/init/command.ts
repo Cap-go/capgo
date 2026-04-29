@@ -52,6 +52,23 @@ const capacitorConfigFiles = ['capacitor.config.ts', 'capacitor.config.js', 'cap
 const capacitorGettingStartedUrl = 'https://capacitorjs.com/docs/getting-started'
 const nextWebDirPattern = /["']?webDir["']?\s*:\s*["']out["']/
 const nuxtWebDirPattern = /["']?webDir["']?\s*:\s*["']\.output\/public["']/
+const initNativeBundleVersion = '0.0.0'
+const htmlAutoTestInjection = `  <div id="capgo-test-banner" style="background: linear-gradient(90deg, #4CAF50, #2196F3); color: white; padding: 15px; text-align: center; font-weight: bold; position: fixed; top: env(safe-area-inset-top, 0); left: env(safe-area-inset-left, 0); right: env(safe-area-inset-right, 0); z-index: 9999; box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding-top: calc(15px + env(safe-area-inset-top, 0));">
+    🚀 Capgo Update Test - This banner shows the update worked!
+  </div>
+  <style>
+    body { padding-top: calc(60px + env(safe-area-inset-top, 0)) !important; }
+  </style>`
+const vueAutoTestInjection = `  <div class="capgo-test-vue" style="background: linear-gradient(90deg, #4CAF50, #2196F3); color: white; padding: 15px; text-align: center; font-weight: bold; margin-bottom: 20px; padding-top: calc(15px + env(safe-area-inset-top, 0)); padding-left: calc(15px + env(safe-area-inset-left, 0)); padding-right: calc(15px + env(safe-area-inset-right, 0));">
+    🚀 Capgo Update Test - Vue component updated!
+  </div>`
+const cssAutoTestInjection = `/* Capgo test modification - background change */
+body {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  /* capgo-test-background */
+}
+
+`
 const frameworkSetupGuides = {
   nextjs: 'https://capgo.app/blog/nextjs-mobile-app-capacitor-from-scratch/',
   nuxtjs: 'https://capgo.app/blog/nuxt-mobile-app-capacitor-from-scratch/',
@@ -59,6 +76,21 @@ const frameworkSetupGuides = {
 } as const
 type CapacitorConfigSnapshot = Awaited<ReturnType<typeof getConfig>>['config']
 type CancelablePromptValue = boolean | string | symbol
+type InitAutoTestChangeKind = 'html-banner' | 'vue-banner' | 'css-background'
+
+interface GitRepoStatus {
+  inRepo: boolean
+  clean: boolean
+  repoRoot?: string
+  entries: string[]
+  error?: string
+}
+
+interface InitAutoTestChange {
+  filePath: string
+  displayPath: string
+  kind: InitAutoTestChangeKind
+}
 
 let tmpObject: tmp.FileResult['name'] | undefined
 let globalPathToPackageJson: string | undefined
@@ -70,6 +102,7 @@ let globalAppId: string | undefined
 let globalCodeDiff: InitCodeDiff | undefined
 let globalEncryptionSummary: InitEncryptionSummary | undefined
 let globalCurrentStepNumber = 0
+let globalAutoTestChange: InitAutoTestChange | undefined
 
 const CODE_DIFF_CONTEXT_LINES = 5
 
@@ -94,6 +127,182 @@ function getInitRecoveryCommands() {
     capAddAndroid: formatRunnerCommand(pm.runner, ['cap', 'add', 'android']),
     capSyncIos: formatRunnerCommand(pm.runner, ['cap', 'sync', 'ios']),
     capSyncAndroid: formatRunnerCommand(pm.runner, ['cap', 'sync', 'android']),
+  }
+}
+
+export function getGitRepoStatus(startDir = cwd()): GitRepoStatus {
+  const repoResult = spawnSync('git', ['rev-parse', '--show-toplevel'], {
+    cwd: startDir,
+    stdio: 'pipe',
+    encoding: 'utf8',
+  })
+
+  if (repoResult.error) {
+    return {
+      inRepo: false,
+      clean: true,
+      entries: [],
+      error: formatError(repoResult.error),
+    }
+  }
+
+  if (repoResult.status !== 0) {
+    return {
+      inRepo: false,
+      clean: true,
+      entries: [],
+    }
+  }
+
+  const repoRoot = repoResult.stdout?.toString().trim()
+  if (!repoRoot) {
+    return {
+      inRepo: false,
+      clean: true,
+      entries: [],
+    }
+  }
+
+  const statusResult = spawnSync('git', ['status', '--porcelain', '--untracked-files=all'], {
+    cwd: repoRoot,
+    stdio: 'pipe',
+    encoding: 'utf8',
+  })
+
+  if (statusResult.error) {
+    return {
+      inRepo: true,
+      clean: false,
+      repoRoot,
+      entries: [],
+      error: formatError(statusResult.error),
+    }
+  }
+
+  if (statusResult.status !== 0) {
+    return {
+      inRepo: true,
+      clean: false,
+      repoRoot,
+      entries: [],
+      error: statusResult.stderr?.toString().trim() || statusResult.stdout?.toString().trim() || `git status exited with code ${statusResult.status}`,
+    }
+  }
+
+  const entries = statusResult.stdout
+    ?.toString()
+    .split('\n')
+    .map(line => line.trimEnd())
+    .filter(Boolean) ?? []
+
+  return {
+    inRepo: true,
+    clean: entries.length === 0,
+    repoRoot,
+    entries,
+  }
+}
+
+export function getInitUpdaterPluginConfig(appId: string, directInstall: boolean) {
+  return {
+    version: initNativeBundleVersion,
+    appId,
+    autoUpdate: true,
+    ...(directInstall
+      ? {
+          directUpdate: 'always',
+          autoSplashscreen: true,
+        }
+      : {}),
+  }
+}
+
+export function applyInitAutoTestChange(filePath: string, content: string): { kind: InitAutoTestChangeKind, content: string } | undefined {
+  if (filePath.endsWith('.html')) {
+    if (content.includes('<body>') && !content.includes('capgo-test-banner')) {
+      return {
+        kind: 'html-banner',
+        content: content.replace('<body>', `<body>\n${htmlAutoTestInjection}`),
+      }
+    }
+    return undefined
+  }
+
+  if (filePath.endsWith('.vue')) {
+    if (content.includes('<template>') && !content.includes('capgo-test-vue')) {
+      return {
+        kind: 'vue-banner',
+        content: content.replace('<template>', `<template>\n${vueAutoTestInjection}`),
+      }
+    }
+    return undefined
+  }
+
+  if (filePath.endsWith('.css')) {
+    if (!content.includes('capgo-test-background')) {
+      return {
+        kind: 'css-background',
+        content: `${cssAutoTestInjection}${content}`,
+      }
+    }
+  }
+
+  return undefined
+}
+
+export function revertInitAutoTestChangeContent(kind: InitAutoTestChangeKind, content: string): string | undefined {
+  if (kind === 'html-banner') {
+    const reverted = content.replace(`<body>\n${htmlAutoTestInjection}`, '<body>')
+    return reverted !== content ? reverted : undefined
+  }
+
+  if (kind === 'vue-banner') {
+    const reverted = content.replace(`<template>\n${vueAutoTestInjection}`, '<template>')
+    return reverted !== content ? reverted : undefined
+  }
+
+  const reverted = content.replace(cssAutoTestInjection, '')
+  return reverted !== content ? reverted : undefined
+}
+
+async function ensureGitRepoCleanBeforeInit() {
+  let warned = false
+
+  while (true) {
+    const status = getGitRepoStatus()
+    if (status.error) {
+      pLog.warn(`Could not verify git status, skipping clean-repo check: ${status.error}`)
+      return
+    }
+
+    if (!status.inRepo)
+      return
+
+    if (status.clean) {
+      if (warned)
+        pLog.success('Git repository is clean ✅')
+      return
+    }
+
+    warned = true
+    pLog.warn(`Git repository is not clean: ${status.repoRoot}`)
+    for (const entry of status.entries.slice(0, 10)) {
+      pLog.warn(`  ${entry}`)
+    }
+    if (status.entries.length > 10) {
+      pLog.warn(`  ...and ${status.entries.length - 10} more`)
+    }
+    pLog.info('Clean, commit, or stash those changes before init continues.')
+
+    const confirmed = await pConfirm({
+      message: 'Have you cleaned the repository? I will check again.',
+      initialValue: false,
+    })
+    cancelBeforeAuthenticatedOnboarding(confirmed)
+
+    if (!confirmed) {
+      pLog.warn('Init is paused until the repository is clean.')
+    }
   }
 }
 
@@ -603,6 +812,7 @@ function markStepDone(step: number, pathToPackageJson?: string, channelName?: st
       currentVersion: globalCurrentVersion,
       codeDiff: globalCodeDiff,
       encryptionSummary: globalEncryptionSummary,
+      autoTestChange: globalAutoTestChange,
     }))
     if (pathToPackageJson) {
       globalPathToPackageJson = pathToPackageJson
@@ -630,7 +840,7 @@ async function tryResumeOnboarding(apikey: string): Promise<ResumeResult | undef
     if (!rawData || rawData.length === 0)
       return undefined
 
-    const { step_done, orgId, orgName, appId: savedAppId, pathToPackageJson, channelName, platform, delta, currentVersion, codeDiff, encryptionSummary } = JSON.parse(rawData)
+    const { step_done, orgId, orgName, appId: savedAppId, pathToPackageJson, channelName, platform, delta, currentVersion, codeDiff, encryptionSummary, autoTestChange } = JSON.parse(rawData)
     if (!orgId || !step_done) {
       pLog.warn('⚠️  Found previous onboarding progress, but it was saved in an older format.')
       pLog.info('   Starting fresh. Your previous progress cannot be resumed.')
@@ -667,6 +877,19 @@ async function tryResumeOnboarding(apikey: string): Promise<ResumeResult | undef
       }
       if (savedAppId) {
         globalAppId = savedAppId
+      }
+      if (
+        autoTestChange
+        && typeof autoTestChange === 'object'
+        && typeof autoTestChange.filePath === 'string'
+        && typeof autoTestChange.displayPath === 'string'
+        && ['html-banner', 'vue-banner', 'css-background'].includes(autoTestChange.kind)
+      ) {
+        globalAutoTestChange = {
+          filePath: autoTestChange.filePath,
+          displayPath: autoTestChange.displayPath,
+          kind: autoTestChange.kind as InitAutoTestChangeKind,
+        }
       }
       // Only carry the diff forward if the user is about to land on step 5 (where it's displayed).
       if (step_done === 4 && codeDiff && typeof codeDiff === 'object' && typeof codeDiff.filePath === 'string' && Array.isArray(codeDiff.lines)) {
@@ -729,6 +952,7 @@ async function tryResumeOnboarding(apikey: string): Promise<ResumeResult | undef
     setInitCodeDiff(undefined)
     globalEncryptionSummary = undefined
     setInitEncryptionSummary(undefined)
+    globalAutoTestChange = undefined
     return undefined
   }
   catch (err) {
@@ -738,11 +962,13 @@ async function tryResumeOnboarding(apikey: string): Promise<ResumeResult | undef
     setInitCodeDiff(undefined)
     globalEncryptionSummary = undefined
     setInitEncryptionSummary(undefined)
+    globalAutoTestChange = undefined
     return undefined
   }
 }
 
 function cleanupStepsDone() {
+  globalAutoTestChange = undefined
   if (!tmpObject) {
     return
   }
@@ -1985,16 +2211,10 @@ async function addUpdaterStep(orgId: string, apikey: string, appId: string) {
     const s = pSpinner()
     s.start(`Updating config file`)
     delta = !!doDirectInstall
-    const directInstall = doDirectInstall
-      ? {
-          directUpdate: 'always',
-          autoSplashscreen: true,
-        }
-      : {}
     if (doDirectInstall) {
       await updateConfigbyKey('SplashScreen', { launchAutoHide: false })
     }
-    await updateConfigUpdater({ version: pkgVersion, appId, autoUpdate: true, ...directInstall })
+    await updateConfigUpdater(getInitUpdaterPluginConfig(appId, delta))
     s.stop(`Config file updated ✅`)
     break
   }
@@ -3334,6 +3554,7 @@ async function runDeviceStep(orgId: string, apikey: string, appId: string, platf
 
 async function addCodeChangeStep(orgId: string, apikey: string, appId: string, pkgVersion: string, platform: 'ios' | 'android') {
   pLog.info(`🎯 Now let's test Capgo by making a visible change and deploying an update!`)
+  globalAutoTestChange = undefined
 
   const modificationType = await pSelect({
     message: 'How would you like to test the update?',
@@ -3371,52 +3592,16 @@ async function addCodeChangeStep(orgId: string, apikey: string, appId: string, p
       if (existsSync(filePath) && !changed) {
         try {
           const content = readFileSync(filePath, 'utf8')
-          let newContent = content
-
-          if (filePath.endsWith('.html')) {
-            // Add a visible banner to HTML files
-            if (content.includes('<body>') && !content.includes('capgo-test-banner')) {
-              newContent = content.replace(
-                '<body>',
-                `<body>
-  <div id="capgo-test-banner" style="background: linear-gradient(90deg, #4CAF50, #2196F3); color: white; padding: 15px; text-align: center; font-weight: bold; position: fixed; top: env(safe-area-inset-top, 0); left: env(safe-area-inset-left, 0); right: env(safe-area-inset-right, 0); z-index: 9999; box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding-top: calc(15px + env(safe-area-inset-top, 0));">
-    🚀 Capgo Update Test - This banner shows the update worked!
-  </div>
-  <style>
-    body { padding-top: calc(60px + env(safe-area-inset-top, 0)) !important; }
-  </style>`,
-              )
-            }
-          }
-          else if (filePath.endsWith('.vue')) {
-            // Add a test banner to Vue components
-            if (content.includes('<template>') && !content.includes('capgo-test-vue')) {
-              newContent = content.replace(
-                '<template>',
-                `<template>
-  <div class="capgo-test-vue" style="background: linear-gradient(90deg, #4CAF50, #2196F3); color: white; padding: 15px; text-align: center; font-weight: bold; margin-bottom: 20px; padding-top: calc(15px + env(safe-area-inset-top, 0)); padding-left: calc(15px + env(safe-area-inset-left, 0)); padding-right: calc(15px + env(safe-area-inset-right, 0));">
-    🚀 Capgo Update Test - Vue component updated!
-  </div>`,
-              )
-            }
-          }
-          else if (filePath.endsWith('.css')) {
-            // Add body background change as fallback
-            if (!content.includes('capgo-test-background')) {
-              newContent = `/* Capgo test modification - background change */
-body {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  /* capgo-test-background */
-}
-
-${content}`
-            }
-          }
-
-          if (newContent !== content) {
-            writeFileSync(filePath, newContent, 'utf8')
+          const appliedChange = applyInitAutoTestChange(filePath, content)
+          if (appliedChange) {
+            writeFileSync(filePath, appliedChange.content, 'utf8')
             s.stop(`✅ Made test changes to ${filePath}`)
             pLog.info(`📝 Added visible test modification to verify the update works`)
+            globalAutoTestChange = {
+              filePath,
+              displayPath: formatInitFilePath(filePath),
+              kind: appliedChange.kind,
+            }
             changed = true
             break
           }
@@ -3570,6 +3755,74 @@ ${content}`
 
   await markStep(orgId, apikey, 'add-code-change', appId)
   return newVersion
+}
+
+function getSuggestedCleanupBundleVersion(currentVersion: string) {
+  try {
+    return format(increment(parse(currentVersion), 'patch'))
+  }
+  catch {
+    return '1.0.2'
+  }
+}
+
+async function maybeOfferAutoTestCleanup(orgId: string, apikey: string, appId: string, currentVersion: string, platform: 'ios' | 'android', delta: boolean) {
+  const autoTestChange = globalAutoTestChange
+  if (!autoTestChange)
+    return
+
+  pLog.info(`Capgo CLI added a temporary onboarding test change in ${autoTestChange.displayPath}.`)
+
+  const shouldRevert = await pConfirm({
+    message: 'Do you want me to revert that temporary test change now?',
+    initialValue: true,
+  })
+  await cancelCommand(shouldRevert, orgId, apikey)
+
+  let reverted = false
+  if (shouldRevert) {
+    try {
+      const currentContent = readFileSync(autoTestChange.filePath, 'utf8')
+      const revertedContent = revertInitAutoTestChangeContent(autoTestChange.kind, currentContent)
+      if (!revertedContent) {
+        pLog.warn(`Could not automatically revert ${autoTestChange.displayPath}. Please revert it manually.`)
+      }
+      else {
+        writeFileSync(autoTestChange.filePath, revertedContent, 'utf8')
+        pLog.success(`Reverted ${autoTestChange.displayPath} ✅`)
+        reverted = true
+        globalAutoTestChange = undefined
+      }
+    }
+    catch (error) {
+      pLog.warn(`Could not automatically revert ${autoTestChange.displayPath}: ${formatError(error)}`)
+    }
+  }
+
+  let buildCommand = 'build'
+  try {
+    const projectType = await findProjectType()
+    buildCommand = await findBuildCommandForProjectType(projectType)
+  }
+  catch {
+  }
+
+  const pm = getPMAndCommand()
+  const cleanupVersion = getSuggestedCleanupBundleVersion(currentVersion)
+  const cleanupUploadCommand = [
+    `${pm.runner} @capgo/cli@latest bundle upload ${appId}`,
+    `--bundle ${cleanupVersion}`,
+    `--channel ${globalChannelName}`,
+    delta ? '--delta-only' : '',
+    globalPathToPackageJson ? `--package-json ${globalPathToPackageJson}` : '',
+  ].filter(Boolean).join(' ')
+
+  pLog.info(reverted
+    ? 'Build and upload one more cleanup bundle so the onboarding test change disappears from the installed app.'
+    : 'After you revert that onboarding test change, build and upload one more cleanup bundle so it disappears from the installed app.')
+  pLog.info(`Suggested cleanup build: ${pm.pm} run ${buildCommand}`)
+  pLog.info(`Suggested cleanup upload: ${cleanupUploadCommand}`)
+  pLog.warn(`Do not run "${pm.runner} cap sync ${platform}" before this cleanup upload.`)
 }
 
 async function uploadStep(orgId: string, apikey: string, appId: string, newVersion: string, delta: boolean) {
@@ -3827,6 +4080,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   const pm = getPMAndCommand()
   pIntro('Capgo onboarding')
   renderInitOnboardingWelcome(initOnboardingSteps.length)
+  await ensureGitRepoCleanBeforeInit()
   appId = await ensureWorkspaceReadyForInit(appId) ?? appId
   const versionStatus = await checkVersionStatus()
   if (versionStatus.isOutdated) {
@@ -3976,6 +4230,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
     setInitCodeDiff(undefined)
     globalEncryptionSummary = undefined
     setInitEncryptionSummary(undefined)
+    globalAutoTestChange = undefined
     cleanupStepsDone()
   }
 
@@ -4158,6 +4413,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
 
     if (stepToSkip < 12) {
       renderCurrentStep(12)
+      await maybeOfferAutoTestCleanup(orgId, options.apikey, appId, currentVersion, platform, delta)
       markStepDone(12)
     }
 
