@@ -3360,7 +3360,7 @@ async function addCodeChangeStep(orgId: string, apikey: string, appId: string, p
                 '<body>',
                 `<body>
   <div id="capgo-test-banner" style="background: linear-gradient(90deg, #4CAF50, #2196F3); color: white; padding: 15px; text-align: center; font-weight: bold; position: fixed; top: env(safe-area-inset-top, 0); left: env(safe-area-inset-left, 0); right: env(safe-area-inset-right, 0); z-index: 9999; box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding-top: calc(15px + env(safe-area-inset-top, 0));">
-    🚀 Capgo Update Test - This banner shows the update worked!
+    🚀 Capgo Update Test - Temporary test banner, remove it after validating the update worked.
   </div>
   <style>
     body { padding-top: calc(60px + env(safe-area-inset-top, 0)) !important; }
@@ -3375,7 +3375,7 @@ async function addCodeChangeStep(orgId: string, apikey: string, appId: string, p
                 '<template>',
                 `<template>
   <div class="capgo-test-vue" style="background: linear-gradient(90deg, #4CAF50, #2196F3); color: white; padding: 15px; text-align: center; font-weight: bold; margin-bottom: 20px; padding-top: calc(15px + env(safe-area-inset-top, 0)); padding-left: calc(15px + env(safe-area-inset-left, 0)); padding-right: calc(15px + env(safe-area-inset-right, 0));">
-    🚀 Capgo Update Test - Vue component updated!
+    🚀 Capgo Update Test - Temporary test banner, remove it after validating the update worked.
   </div>`,
               )
             }
