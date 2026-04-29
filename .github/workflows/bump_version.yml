@@ -22,6 +22,7 @@ jobs:
       capgo_release_as: ${{ steps.capgo.outputs.release_as }}
       run_cli: ${{ steps.cli.outputs.should_release }}
       cli_release_as: ${{ steps.cli.outputs.release_as }}
+      has_migration_changes: ${{ steps.migration_scope.outputs.has_migration_changes }}
       run_any: ${{ steps.capgo.outputs.should_release == 'true' || steps.cli.outputs.should_release == 'true' }}
     steps:
       - name: Checkout
@@ -36,6 +37,14 @@ jobs:
       - name: Resolve CLI release scope
         id: cli
         run: bun scripts/release-scope.ts cli "${{ github.event.before }}" "${{ github.sha }}" >> "$GITHUB_OUTPUT"
+      - name: Resolve migration scope
+        id: migration_scope
+        run: |
+          if git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | grep -q '^supabase/migrations/'; then
+            echo "has_migration_changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_migration_changes=false" >> "$GITHUB_OUTPUT"
+          fi
 
   # Run only the relevant test scope before creating tags
   test:
@@ -132,7 +141,7 @@ jobs:
 
   sync_schema_types:
     needs: [changes, bump-version]
-    if: ${{ github.ref == 'refs/heads/main' && needs.changes.outputs.run_capgo == 'true' && !startsWith(github.event.head_commit.message, 'chore(release):') && !startsWith(github.event.head_commit.message, 'chore(auto-sync):') }}
+    if: ${{ github.ref == 'refs/heads/main' && needs.changes.outputs.has_migration_changes == 'true' && !startsWith(github.event.head_commit.message, 'chore(release):') && !startsWith(github.event.head_commit.message, 'chore(auto-sync):') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -152,16 +161,6 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
         run: |
-          if ! git rev-parse -q --verify HEAD^ >/dev/null 2>&1; then
-            echo "No parent commit for HEAD, skipping schema/types sync."
-            exit 0
-          fi
-
-          if ! git diff --name-only HEAD^ HEAD | grep -q '^supabase/migrations/'; then
-            echo "No migration changes in latest commit, skipping schema/types sync."
-            exit 0
-          fi
-
           if [ -z "${{ secrets.SUPABASE_PROJECT_ID_PROD }}" ]; then
             echo "SUPABASE_PROJECT_ID_PROD is required for schema/types sync" >&2
             exit 1
