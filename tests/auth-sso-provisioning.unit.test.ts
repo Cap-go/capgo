@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 interface MockFetchResponse {
   ok: boolean
-  json(): Promise<Record<string, unknown>>
+  json: () => Promise<Record<string, unknown>>
 }
 
 function createUsersQuery(userRecord: Record<string, unknown>) {
