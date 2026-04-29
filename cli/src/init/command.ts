@@ -4132,6 +4132,22 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   const pm = getPMAndCommand()
   pIntro('Capgo onboarding')
   renderInitOnboardingWelcome(initOnboardingSteps.length)
+
+  options.apikey = apikeyCommand
+  if (!options.apikey) {
+    try {
+      options.apikey ??= findSavedKey(true)
+    }
+    catch {
+    }
+  }
+
+  const resumed = await tryResumeOnboarding(options.apikey)
+  let stepToSkip = resumed?.stepDone ?? 0
+
+  if (stepToSkip === 0)
+    await ensureGitRepoCleanBeforeInit()
+
   appId = await ensureWorkspaceReadyForInit(appId) ?? appId
   const versionStatus = await checkVersionStatus()
   if (versionStatus.isOutdated) {
@@ -4238,14 +4254,6 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
 
   const localConfig = await getLocalConfig()
   appId = getAppId(appId, extConfig?.config)
-  options.apikey = apikeyCommand
-  if (!options.apikey) {
-    try {
-      options.apikey ??= findSavedKey(true)
-    }
-    catch {
-    }
-  }
 
   appId ??= await askForAppId('Enter your appId:')
 
@@ -4264,10 +4272,6 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
 
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
   await verifyUser(supabase, options.apikey, ['upload', 'all', 'read', 'write'])
-
-  // Try to resume from saved state before asking for org selection
-  const resumed = await tryResumeOnboarding(options.apikey)
-  let stepToSkip = resumed?.stepDone ?? 0
 
   // Whenever a resume is aborted (org no longer available, role lost, 2FA
   // required, lookup failed) we restart from step 0. Drop any diff that
@@ -4330,9 +4334,6 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   const orgId = organization.gid
   globalOrgId = orgId
   globalOrgName = organization.name
-
-  if (stepToSkip === 0)
-    await ensureGitRepoCleanBeforeInit()
 
   if (resumed?.appId) {
     appId = resumed.appId
