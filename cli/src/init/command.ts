@@ -261,8 +261,12 @@ export function revertInitAutoTestChangeContent(kind: InitAutoTestChangeKind, co
     return reverted !== content ? reverted : undefined
   }
 
-  const reverted = content.replace(cssAutoTestInjection, '')
-  return reverted !== content ? reverted : undefined
+  if (kind === 'css-background') {
+    const reverted = content.replace(cssAutoTestInjection, '')
+    return reverted !== content ? reverted : undefined
+  }
+
+  return undefined
 }
 
 async function waitForGitRepoCleanRetry() {
