@@ -3970,6 +3970,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
 
   let organization: Organization
   if (resumed) {
+    const resumedSnapshot = resumed
     // Fetch orgs to validate the saved one still exists and is accessible
     const { error: orgError, data: allOrganizations } = await supabase.rpc('get_orgs_v7')
     if (orgError || !allOrganizations) {
@@ -3979,14 +3980,14 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
       discardResumedState()
     }
     else {
-      const savedOrg = allOrganizations.find(org => org.gid === resumed.orgId)
+      const savedOrg = allOrganizations.find(org => org.gid === resumedSnapshot.orgId)
       const blocked2fa = savedOrg?.enforcing_2fa && !savedOrg['2fa_has_access']
       const hasCreateAppPermission = savedOrg
         ? await hasCliPermission(supabase, options.apikey, 'org.create_app', { orgId: savedOrg.gid })
         : false
 
       if (!savedOrg) {
-        pLog.warn(`Previously used organization "${resumed.orgName}" is no longer available. Please select a new one.`)
+        pLog.warn(`Previously used organization "${resumedSnapshot.orgName}" is no longer available. Please select a new one.`)
         organization = await selectOrganizationForInit(supabase, options.apikey)
         discardResumedState()
       }
