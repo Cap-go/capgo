@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { intro, isCancel, log, outro, password } from '@clack/prompts'
 import { checkAlerts } from './api/update'
-import { createSupabaseClient, sendEvent, verifyUser } from './utils'
+import { createSupabaseClient, resolveUserIdFromApiKey, sendEvent } from './utils'
 import { appendToSafeFile, writeFileAtomic } from './utils/safeWrites'
 
 interface Options {
@@ -51,7 +51,7 @@ export async function loginInternal(apikey: string, options: Options, silent = f
   }
 
   const supabase = await createSupabaseClient(apikey, options.supaHost, options.supaAnon)
-  const userId = await verifyUser(supabase, apikey, ['write', 'all', 'upload'])
+  const userId = await resolveUserIdFromApiKey(supabase, apikey)
 
   if (local) {
     await writeFileAtomic('.capgo', `${apikey}\n`, { mode: 0o600 })

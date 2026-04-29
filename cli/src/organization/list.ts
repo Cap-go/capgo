@@ -7,7 +7,7 @@ import {
   createSupabaseClient,
   findSavedKey,
   formatError,
-  verifyUser,
+  resolveUserIdFromApiKey,
 } from '../utils'
 
 function displayOrganizations(data: Organization[], silent: boolean) {
@@ -73,7 +73,7 @@ export async function listOrganizationsInternal(options: OptionsBase, silent = f
     enrichedOptions.supaHost,
     enrichedOptions.supaAnon,
   )
-  await verifyUser(supabase, enrichedOptions.apikey, ['read', 'write', 'all'])
+  await resolveUserIdFromApiKey(supabase, enrichedOptions.apikey)
 
   if (!silent)
     log.info('Getting organizations from Capgo')

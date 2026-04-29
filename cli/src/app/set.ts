@@ -10,10 +10,9 @@ import {
   getAppId,
   getConfig,
   getContentType,
-  getOrganization,
+  getOrganizationId,
   OrganizationPerm,
   sendEvent,
-  verifyUser,
 } from '../utils'
 
 export async function setAppInternal(appId: string, options: Options, silent = false) {
@@ -37,12 +36,8 @@ export async function setAppInternal(appId: string, options: Options, silent = f
   }
 
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
-  const organization = await getOrganization(supabase, ['admin', 'super_admin'])
-  const organizationUid = organization.gid
-
-  const userId = await verifyUser(supabase, options.apikey, ['write', 'all'])
-
   await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.admin, silent)
+  const organizationUid = await getOrganizationId(supabase, appId)
 
   const { name, icon, retention, exposeMetadata } = options
 
@@ -111,7 +106,6 @@ export async function setAppInternal(appId: string, options: Options, silent = f
       expose_metadata: exposeMetadata,
     })
     .eq('app_id', appId)
-    .eq('user_id', userId)
 
   if (dbError) {
     if (!silent)
