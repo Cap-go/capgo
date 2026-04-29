@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict'
 import { execSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import {
@@ -11,6 +11,7 @@ import {
   getInitOtaVersionBase,
   getInitSuggestedOtaVersion,
   getInitUpdaterPluginConfig,
+  isOnlyAllowedInitAutoTestChange,
   revertInitAutoTestChangeContent,
 } from '../src/init/command.ts'
 
@@ -136,6 +137,41 @@ t('auto css onboarding changes preserve leading css header rules', () => {
   assert.equal(applied.kind, 'css-background')
   assert.ok(applied.content.startsWith('@charset "UTF-8";\n@import url("./base.css");\n/* Capgo test modification - background change */'))
   assert.equal(revertInitAutoTestChangeContent(applied.kind, applied.content), original)
+})
+
+t('resume allowlist only accepts the exact cli-managed test diff', () => {
+  withTempDir((root) => {
+    execSync('git init', { cwd: root, stdio: 'ignore' })
+    execSync('git config user.email "test@example.com"', { cwd: root, stdio: 'ignore' })
+    execSync('git config user.name "Test User"', { cwd: root, stdio: 'ignore' })
+
+    mkdirSync(join(root, 'src'), { recursive: true })
+    const filePath = join(root, 'src', 'main.css')
+    const original = 'body { color: red; }\n'
+    writeFileSync(filePath, original, 'utf8')
+    execSync('git add src/main.css', { cwd: root, stdio: 'ignore' })
+    execSync('git commit -m "init"', { cwd: root, stdio: 'ignore' })
+
+    const applied = applyInitAutoTestChange(filePath, original)
+    assert.ok(applied)
+    writeFileSync(filePath, applied.content, 'utf8')
+
+    const allowedStatus = getGitRepoStatus(root)
+    assert.equal(isOnlyAllowedInitAutoTestChange(allowedStatus, {
+      filePath,
+      displayPath: 'src/main.css',
+      kind: applied.kind,
+    }), true)
+
+    writeFileSync(filePath, `${applied.content}/* extra edit */\n`, 'utf8')
+
+    const extraEditStatus = getGitRepoStatus(root)
+    assert.equal(isOnlyAllowedInitAutoTestChange(extraEditStatus, {
+      filePath,
+      displayPath: 'src/main.css',
+      kind: applied.kind,
+    }), false)
+  })
 })
 
 if (failures > 0) {

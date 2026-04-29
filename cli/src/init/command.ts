@@ -4,7 +4,7 @@ import type { ExistingOrganizationApp, Options, PendingOnboardingApp } from '../
 import type { Organization } from '../utils'
 import type { InitCodeDiff, InitEncryptionPhase, InitEncryptionSummary } from './runtime'
 import { execSync, spawn, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path, { dirname, join } from 'node:path'
 import { chdir, cwd, env, exit, platform, stdin, stdout } from 'node:process'
 import { canParse, format, increment, lessThan, parse } from '@std/semver'
@@ -336,23 +336,36 @@ function getGitStatusEntryPath(entry: string) {
   return rawPath.slice(rawPath.lastIndexOf(renameSeparator) + renameSeparator.length)
 }
 
-function isOnlyAllowedInitAutoTestChange(status: GitRepoStatus, allowedChange?: InitAutoTestChange) {
+export function isOnlyAllowedInitAutoTestChange(status: GitRepoStatus, allowedChange?: InitAutoTestChange) {
   if (!allowedChange || !status.inRepo || !status.repoRoot || status.error || status.clean || status.entries.length === 0)
     return false
 
-  const repoRoot = status.repoRoot
-  const allowedFilePath = path.resolve(allowedChange.filePath)
-  const dirtyPaths = status.entries
-    .map(getGitStatusEntryPath)
-    .filter(Boolean)
-    .map(entryPath => path.resolve(repoRoot, entryPath))
-
-  if (dirtyPaths.length === 0 || !dirtyPaths.every(dirtyPath => dirtyPath === allowedFilePath))
-    return false
-
   try {
+    const repoRoot = realpathSync.native(status.repoRoot)
+    const allowedFilePath = realpathSync.native(path.resolve(allowedChange.filePath))
+    const dirtyPaths = status.entries
+      .map(getGitStatusEntryPath)
+      .filter(Boolean)
+      .map(entryPath => realpathSync.native(path.resolve(repoRoot, entryPath)))
+
+    if (dirtyPaths.length === 0 || !dirtyPaths.every(dirtyPath => dirtyPath === allowedFilePath))
+      return false
+
     const currentContent = readFileSync(allowedFilePath, 'utf8')
-    return Boolean(revertInitAutoTestChangeContent(allowedChange.kind, currentContent))
+    const revertedContent = revertInitAutoTestChangeContent(allowedChange.kind, currentContent)
+    if (!revertedContent)
+      return false
+
+    const gitRelativePath = path.relative(repoRoot, allowedFilePath).split(path.sep).join('/')
+    const indexedFile = spawnSync('git', ['show', `:${gitRelativePath}`], {
+      cwd: repoRoot,
+      stdio: 'pipe',
+      encoding: 'utf8',
+    })
+    if (indexedFile.error || indexedFile.status !== 0)
+      return false
+
+    return indexedFile.stdout.toString() === revertedContent
   }
   catch {
     return false
