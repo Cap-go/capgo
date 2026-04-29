@@ -223,19 +223,21 @@ describe('[GET] /statistics operations with and without subkey', () => {
     const subkeyData = await createSubkey.json() as { id: number }
     const nonAccessibleOrgSubkeyId = subkeyData.id
 
-    const subkeyHeaders = { 'x-limited-key-id': String(nonAccessibleOrgSubkeyId) }
-    const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-    const toDate = new Date().toISOString().split('T')[0]
-    const getOrgStats = await fetch(`${BASE_URL}/statistics/org/22dbad8a-b885-4309-9b3b-a09f8460fb6d?from=${fromDate}&to=${toDate}`, {
-      method: 'GET',
-      headers: { ...headersStats, ...subkeyHeaders },
-    })
-    expect(getOrgStats.status).toBe(401)
-    const orgStatsData = await getOrgStats.json<{ error: string }>()
-    expect(orgStatsData.error).toBe('no_access_to_organization')
-
-    // Clean up
-    await deleteApikeyById(nonAccessibleOrgSubkeyId)
+    try {
+      const subkeyHeaders = { 'x-limited-key-id': String(nonAccessibleOrgSubkeyId) }
+      const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      const toDate = new Date().toISOString().split('T')[0]
+      const getOrgStats = await fetch(`${BASE_URL}/statistics/org/22dbad8a-b885-4309-9b3b-a09f8460fb6d?from=${fromDate}&to=${toDate}`, {
+        method: 'GET',
+        headers: { ...headersStats, ...subkeyHeaders },
+      })
+      expect(getOrgStats.status).toBe(401)
+      const orgStatsData = await getOrgStats.json<{ error: string }>()
+      expect(orgStatsData.error).toBe('no_access_to_organization')
+    }
+    finally {
+      await deleteApikeyById(nonAccessibleOrgSubkeyId)
+    }
   })
 
   it('should create subkey with non-accessible app and fail to get app statistics', async () => {
@@ -253,18 +255,20 @@ describe('[GET] /statistics operations with and without subkey', () => {
     const subkeyData = await createSubkey.json() as { id: number }
     const nonAccessibleAppSubkeyId = subkeyData.id
 
-    const subkeyHeaders = { 'x-limited-key-id': String(nonAccessibleAppSubkeyId) }
-    const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-    const toDate = new Date().toISOString().split('T')[0]
-    const getStats = await fetch(`${BASE_URL}/statistics/app/com.demoadmin.app?from=${fromDate}&to=${toDate}`, {
-      method: 'GET',
-      headers: { ...headersStats, ...subkeyHeaders },
-    })
-    expect(getStats.status).toBe(401)
-    const statsData = await getStats.json<{ error: string }>()
-    expect(statsData.error).toBe('no_access_to_app')
-
-    // Clean up
-    await deleteApikeyById(nonAccessibleAppSubkeyId)
+    try {
+      const subkeyHeaders = { 'x-limited-key-id': String(nonAccessibleAppSubkeyId) }
+      const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      const toDate = new Date().toISOString().split('T')[0]
+      const getStats = await fetch(`${BASE_URL}/statistics/app/com.demoadmin.app?from=${fromDate}&to=${toDate}`, {
+        method: 'GET',
+        headers: { ...headersStats, ...subkeyHeaders },
+      })
+      expect(getStats.status).toBe(401)
+      const statsData = await getStats.json<{ error: string }>()
+      expect(statsData.error).toBe('no_access_to_app')
+    }
+    finally {
+      await deleteApikeyById(nonAccessibleAppSubkeyId)
+    }
   })
 })

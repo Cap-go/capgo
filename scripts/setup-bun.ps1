@@ -8,16 +8,31 @@ $TempDir = Join-Path $env:RUNNER_TEMP "bun-$BunVersion"
 $ArchivePath = Join-Path $TempDir $AssetName
 $ExtractPath = Join-Path $TempDir 'extract'
 $InstallDir = Join-Path $env:USERPROFILE '.bun\bin'
+$MaxDownloadAttempts = 3
 
 Remove-Item -Path $TempDir -Recurse -Force -ErrorAction SilentlyContinue
 New-Item -Path $TempDir -ItemType Directory -Force | Out-Null
 
 $AssetUrl = "https://github.com/oven-sh/bun/releases/download/bun-v$BunVersion/$AssetName"
-Invoke-WebRequest -Uri $AssetUrl -OutFile $ArchivePath
+for ($Attempt = 1; $Attempt -le $MaxDownloadAttempts; $Attempt++) {
+  try {
+    Invoke-WebRequest -Uri $AssetUrl -OutFile $ArchivePath
 
-$ActualSha256 = (Get-FileHash -Path $ArchivePath -Algorithm SHA256).Hash.ToLowerInvariant()
-if ($ActualSha256 -ne $AssetSha256) {
-  throw "Checksum mismatch for $AssetName. Expected $AssetSha256, got $ActualSha256."
+    $ActualSha256 = (Get-FileHash -Path $ArchivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($ActualSha256 -eq $AssetSha256) {
+      break
+    }
+
+    throw "Checksum mismatch for $AssetName. Expected $AssetSha256, got $ActualSha256."
+  }
+  catch {
+    if ($Attempt -eq $MaxDownloadAttempts) {
+      throw
+    }
+
+    Remove-Item -Path $ArchivePath -Force -ErrorAction SilentlyContinue
+    Start-Sleep -Seconds (2 * $Attempt)
+  }
 }
 
 Expand-Archive -Path $ArchivePath -DestinationPath $ExtractPath -Force
