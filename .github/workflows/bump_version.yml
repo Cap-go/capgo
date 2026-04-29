@@ -125,9 +125,7 @@ jobs:
 
           CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
           remote_repo="https://${GITHUB_ACTOR}:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git"
-          if ! git pull --rebase $remote_repo $CURRENT_BRANCH; then
-            git pull --rebase=false $remote_repo $CURRENT_BRANCH
-          fi
+          git pull --rebase=false $remote_repo $CURRENT_BRANCH
           git push $remote_repo HEAD:$CURRENT_BRANCH --follow-tags --tags
 
   sync_schema_types:

@@ -37,6 +37,7 @@ const componentMatchers: Record<Component, RegExp[]> = {
   cli: [
     /^bun\.lock$/,
     /^cli\/src\//,
+    /^cli\/skills\/[^/]+\/SKILL\.md$/,
     /^cli\/skills\/(?!.*\.(md|mdx)$)/,
     /^cli\/package\.json$/,
     /^cli\/build\.mjs$/,
