@@ -1,9 +1,9 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { describe, expect, it, vi } from 'vitest'
 
-type MockFetchResponse = {
+interface MockFetchResponse {
   ok: boolean
-  json: () => Promise<Record<string, unknown>>
+  json(): Promise<Record<string, unknown>>
 }
 
 function createUsersQuery(userRecord: Record<string, unknown>) {

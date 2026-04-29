@@ -180,7 +180,7 @@ describe('organization store refreshOrganizationLogos', () => {
 
   it.concurrent('fetches organizations with the auth session when the public profile is unavailable', async () => {
     mainStore.user = undefined
-    mockCreateSignedImageUrl.mockResolvedValue('')
+    mockCreateSignedImageUrl.mockResolvedValueOnce('')
     mockRpc.mockResolvedValueOnce({
       data: [{
         gid: 'org-auth-fallback',
