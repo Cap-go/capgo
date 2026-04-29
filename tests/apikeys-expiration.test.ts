@@ -3,13 +3,15 @@ import { randomUUID } from 'node:crypto'
 import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, fetchWithRetry, getAuthHeaders, getSupabaseClient, normalizeLocalhostUrl, ORG_ID, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, fetchWithRetry, getAuthHeadersForCredentials, getSupabaseClient, normalizeLocalhostUrl, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_EMAIL_APIKEY_EXPIRATION, USER_ID_APIKEY_EXPIRATION, USER_PASSWORD } from './test-utils.ts'
 
 const id = randomUUID()
-const APPNAME = `com.app.expiration.${id}`
+const BASE_ORG_ID = randomUUID()
+const BASE_ORG_CUSTOMER_ID = `cus_test_expiration_base_${id}`
 const POLICY_APPNAME = `com.app.expiration.policy.${id}`
 
-// Org for testing expiration policies
+// Orgs for testing expiration policies
+const BASE_ORG_NAME = `Test Expiration Base Org ${id}`
 const POLICY_ORG_ID = randomUUID()
 const POLICY_ORG_CUSTOMER_ID = `cus_test_policy_${id}`
 const POLICY_ORG_NAME = `Test Policy Org ${id}`
@@ -42,8 +44,36 @@ function createAuthenticatedSupabaseClient(headers: Record<string, string>) {
 }
 
 beforeAll(async () => {
-  authHeaders = await getAuthHeaders()
-  await resetAndSeedAppData(APPNAME)
+  authHeaders = await getAuthHeadersForCredentials(USER_EMAIL_APIKEY_EXPIRATION, USER_PASSWORD)
+
+  const { error: baseStripeError } = await getSupabaseClient().from('stripe_info').insert({
+    customer_id: BASE_ORG_CUSTOMER_ID,
+    status: 'succeeded',
+    product_id: 'prod_LQIregjtNduh4q',
+    subscription_id: `sub_base_${id}`,
+    trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+    is_good_plan: true,
+  })
+  if (baseStripeError)
+    throw baseStripeError
+
+  const { error: baseOrgError } = await getSupabaseClient().from('orgs').insert({
+    id: BASE_ORG_ID,
+    name: BASE_ORG_NAME,
+    management_email: TEST_EMAIL,
+    created_by: USER_ID_APIKEY_EXPIRATION,
+    customer_id: BASE_ORG_CUSTOMER_ID,
+  })
+  if (baseOrgError)
+    throw baseOrgError
+
+  const { error: baseMemberError } = await getSupabaseClient().from('org_users').insert({
+    org_id: BASE_ORG_ID,
+    user_id: USER_ID_APIKEY_EXPIRATION,
+    user_right: 'super_admin',
+  })
+  if (baseMemberError)
+    throw baseMemberError
 
   // Create a test org with specific expiration policies
   const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
@@ -61,7 +91,7 @@ beforeAll(async () => {
     id: POLICY_ORG_ID,
     name: POLICY_ORG_NAME,
     management_email: TEST_EMAIL,
-    created_by: USER_ID,
+    created_by: USER_ID_APIKEY_EXPIRATION,
     customer_id: POLICY_ORG_CUSTOMER_ID,
     require_apikey_expiration: true,
     max_apikey_expiration_days: 30,
@@ -69,10 +99,18 @@ beforeAll(async () => {
   if (orgError)
     throw orgError
 
+  const { error: policyMemberError } = await getSupabaseClient().from('org_users').insert({
+    org_id: POLICY_ORG_ID,
+    user_id: USER_ID_APIKEY_EXPIRATION,
+    user_right: 'super_admin',
+  })
+  if (policyMemberError)
+    throw policyMemberError
+
   await resetAndSeedAppData(POLICY_APPNAME, {
     orgId: POLICY_ORG_ID,
     stripeCustomerId: POLICY_ORG_CUSTOMER_ID,
-    userId: USER_ID,
+    userId: USER_ID_APIKEY_EXPIRATION,
   })
 
   const { data: policyApp, error: policyAppError } = await getSupabaseClient()
@@ -88,11 +126,13 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  await resetAppData(APPNAME)
   await resetAppData(POLICY_APPNAME)
-  // Clean up policy org
+  await getSupabaseClient().from('org_users').delete().eq('org_id', POLICY_ORG_ID)
   await getSupabaseClient().from('orgs').delete().eq('id', POLICY_ORG_ID)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', POLICY_ORG_CUSTOMER_ID)
+  await getSupabaseClient().from('org_users').delete().eq('org_id', BASE_ORG_ID)
+  await getSupabaseClient().from('orgs').delete().eq('id', BASE_ORG_ID)
+  await getSupabaseClient().from('stripe_info').delete().eq('customer_id', BASE_ORG_CUSTOMER_ID)
 })
 
 describe('[POST] /apikey with expiration', () => {
@@ -355,13 +395,13 @@ describe('organization API key expiration policy', () => {
   })
 
   it('create api key without expiration for org without policy', async () => {
-    // Use the default org which doesn't have expiration policy
+    // Use this suite's dedicated org which does not enforce expiration policy
     const response = await apiFetch('/apikey', {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
         name: 'key-no-policy-org',
-        limited_to_orgs: [ORG_ID],
+        limited_to_orgs: [BASE_ORG_ID],
       }),
     })
     const data = await response.json<{ key: string, id: number, expires_at: string | null }>()
@@ -485,7 +525,7 @@ describe('organization API key expiration policy', () => {
     const { data, error } = await supabase
       .from('apikeys')
       .insert({
-        user_id: USER_ID,
+        user_id: USER_ID_APIKEY_EXPIRATION,
         key: null,
         key_hash: '0'.repeat(64),
         mode: 'all',
@@ -538,7 +578,7 @@ describe('[PUT] /organization with API key policy', () => {
       id: updateOrgId,
       name: `Test Update Org ${id}`,
       management_email: TEST_EMAIL,
-      created_by: USER_ID,
+      created_by: USER_ID_APIKEY_EXPIRATION,
       customer_id: updateOrgCustomerId,
     })
     if (orgError)
@@ -547,7 +587,7 @@ describe('[PUT] /organization with API key policy', () => {
     // Add user as super_admin to be able to update the org
     const { error: memberError } = await getSupabaseClient().from('org_users').insert({
       org_id: updateOrgId,
-      user_id: USER_ID,
+      user_id: USER_ID_APIKEY_EXPIRATION,
       user_right: 'super_admin',
     })
     if (memberError)

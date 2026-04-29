@@ -110,6 +110,43 @@ async function maybeProvisionSsoMembership(
   return 'continue'
 }
 
+async function isDisabledAccount(supabase: SupabaseClient, userId: string | null | undefined) {
+  if (!userId)
+    return false
+
+  try {
+    const { data: isDisabled, error } = await supabase
+      .rpc('is_account_disabled', { user_id: userId })
+
+    if (error) {
+      console.error('Error checking account status:', error)
+      return true
+    }
+
+    return !!isDisabled
+  }
+  catch (error) {
+    console.error('Error checking if account is disabled:', error)
+    return true
+  }
+}
+
+function getAccountDisabledRedirect(to: RouteLocationNormalized) {
+  return {
+    path: '/accountDisabled',
+    query: to.fullPath && to.path !== '/accountDisabled'
+      ? { to: to.fullPath }
+      : {},
+  }
+}
+
+function getPostRestorePath(to: RouteLocationNormalized) {
+  const target = typeof to.query.to === 'string' ? to.query.to : ''
+  if (target.startsWith('/') && target !== '/accountDisabled')
+    return target
+  return '/dashboard'
+}
+
 async function guard(
   next: NavigationGuardNext,
   to: RouteLocationNormalized,
@@ -180,22 +217,11 @@ async function guard(
   }
 
   if (hasAuth && sessionUser && !hadAuth) {
-    // Check if account is disabled (marked for deletion)
-    try {
-      const { data: isDisabled, error: disabledError } = await supabase
-        .rpc('is_account_disabled', { user_id: sessionUser.id })
-
-      if (disabledError) {
-        console.error('Error checking account status:', disabledError)
-      }
-      else if (isDisabled) {
-        // Account is disabled, redirect to account disabled page
-        return next('/accountDisabled')
-      }
-    }
-    catch (error) {
-      console.error('Error checking if account is disabled:', error)
-    }
+    const isDisabled = await isDisabledAccount(supabase, sessionUser.id)
+    if (to.path === '/accountDisabled')
+      return isDisabled ? next() : next(getPostRestorePath(to))
+    if (isDisabled)
+      return next(getAccountDisabledRedirect(to))
 
     const provisioningResult = await maybeProvisionSsoMembership(supabase, sessionData?.session ?? null)
     if (provisioningResult === 'redirect_login') {
@@ -266,25 +292,11 @@ async function guard(
     })
   }
   else if (hasAuth && main.auth) {
-    // User is already authenticated, but check if account got disabled
-    // (only if not already on account disabled page)
-    if (to.path !== '/accountDisabled') {
-      try {
-        const { data: isDisabled, error: disabledError } = await supabase
-          .rpc('is_account_disabled', { user_id: main.auth.id })
-
-        if (disabledError) {
-          console.error('Error checking account status:', disabledError)
-        }
-        else if (isDisabled) {
-          // Account is disabled, redirect to account disabled page
-          return next('/accountDisabled')
-        }
-      }
-      catch (error) {
-        console.error('Error checking if account is disabled:', error)
-      }
-    }
+    const isDisabled = await isDisabledAccount(supabase, sessionUser?.id ?? main.auth.id)
+    if (isDisabled && to.path !== '/accountDisabled')
+      return next(getAccountDisabledRedirect(to))
+    if (!isDisabled && to.path === '/accountDisabled')
+      return next(getPostRestorePath(to))
 
     let organizationsLoaded = await tryLoadOrganizations(() => organizationStore.dedupFetchOrganizations())
     if (organizationsLoaded && !organizationStore.hasOrganizations && isSsoUser(sessionUser)) {

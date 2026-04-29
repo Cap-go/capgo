@@ -3731,6 +3731,7 @@ export type Database = {
         Returns: string
       }
       is_account_disabled: { Args: { user_id: string }; Returns: boolean }
+      restore_deleted_account: { Args: never; Returns: undefined }
       is_allowed_action: {
         Args: { apikey: string; appid: string }
         Returns: boolean
