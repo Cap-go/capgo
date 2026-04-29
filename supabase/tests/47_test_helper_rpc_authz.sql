@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(15);
+SELECT plan(18);
 
 SELECT tests.authenticate_as('test_admin');
 
@@ -72,6 +72,21 @@ SELECT
         'is_account_disabled - authenticated user can read own disabled status'
     );
 
+SELECT
+    ok(
+        get_account_removal_date() > now(),
+        'get_account_removal_date - authenticated disabled user can read own removal date'
+    );
+
+SELECT restore_deleted_account();
+
+SELECT
+    is(
+        is_account_disabled(tests.get_supabase_uid('test_admin')),
+        false,
+        'restore_deleted_account - authenticated user can restore own pending deletion'
+    );
+
 SELECT tests.authenticate_as('test_user');
 
 SELECT
@@ -134,6 +149,17 @@ SELECT
         ),
         false,
         'is_account_disabled - anonymous execute is blocked'
+    );
+
+SELECT
+    is(
+        has_function_privilege(
+            'anon'::name,
+            'public.restore_deleted_account()'::regprocedure,
+            'EXECUTE'
+        ),
+        false,
+        'restore_deleted_account - anonymous execute is blocked'
     );
 
 SELECT * FROM finish();

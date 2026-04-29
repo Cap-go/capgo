@@ -47,10 +47,14 @@
   "account": "Account",
   "account-deleted-successfully": "Account deleted successfully",
   "account-deletion-requested": "You have requested your account to be deleted",
-  "account-deletion-restore": "Please contact {link} if you would like to restore it",
+  "account-deletion-restore": "You can restore your account below while the recovery window is still open.",
+  "account-deletion-support": "If that fails, contact {link}.",
   "account-deletion-timer": "Your account will cease to exist",
   "account-deletion-timer-in": "Your account will cease to exist in",
   "account-deletion-very-soon": "Very soon",
+  "account-restored-successfully": "Your account has been restored",
+  "account-restore-failed": "We could not restore your account right now",
+  "account-restore-reauth-required": "Please sign in again before restoring your account",
   "account-error": "Error while updating your account",
   "account-id": "Account id",
   "account-password-error": "Error happened, please try again",
@@ -1844,5 +1848,7 @@
   "latest-day-in-selected-period-help": "{count} devices were on {version} on {date}.",
   "selected-period": "Selected period",
   "start-of-selected-period": "Start of selected period",
-  "start-of-selected-period-help": "{count} devices were on {version} on {date}."
+  "start-of-selected-period-help": "{count} devices were on {version} on {date}.",
+  "restore-account": "Restore account",
+  "restoring-account": "Restoring account..."
 }

@@ -354,7 +354,7 @@ export const useOrganizationStore = defineStore('organization', () => {
   const fetchOrganizations = async () => {
     const main = useMainStore()
 
-    const userId = main.user?.id
+    const userId = main.user?.id ?? main.auth?.id
     if (!userId)
       return
 

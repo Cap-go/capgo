@@ -226,6 +226,35 @@ describe('auth guard SSO provisioning', () => {
     })
   })
 
+  it('redirects accounts pending deletion to the recovery page instead of org onboarding', async () => {
+    mockRpc.mockResolvedValueOnce({
+      data: true,
+      error: null,
+    })
+
+    organizationStore.fetchOrganizations = vi.fn(async () => {
+      organizationStore.organizations = []
+      organizationStore.hasOrganizations = false
+    })
+
+    const guard = await getGuard()
+    const next = vi.fn()
+
+    await guard(
+      { path: '/dashboard', fullPath: '/dashboard', meta: { middleware: 'auth' }, query: {} },
+      { path: '/login', fullPath: '/login', meta: {}, query: {} },
+      next,
+    )
+
+    expect(organizationStore.fetchOrganizations).not.toHaveBeenCalled()
+    expect(next).toHaveBeenCalledWith({
+      path: '/accountDisabled',
+      query: {
+        to: '/dashboard',
+      },
+    })
+  })
+
   it('aborts navigation for managed SSO users when provisioning fails instead of redirecting to org onboarding', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: false,

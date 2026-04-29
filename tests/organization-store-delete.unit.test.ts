@@ -24,6 +24,11 @@ const mockResolveImagePath = vi.fn((raw?: string | null) => ({
   shouldSign: Boolean(raw?.trim()),
 }))
 const mockUpdateDashboard = vi.fn()
+const mainStore = {
+  auth: { id: 'auth-user-123' } as { id: string } | undefined,
+  user: { id: 'user-123' } as { id: string } | undefined,
+  updateDashboard: mockUpdateDashboard,
+}
 
 vi.mock('~/services/supabase', () => ({
   stripeEnabled: ref(true),
@@ -48,10 +53,7 @@ vi.mock('~/services/storage', () => ({
 }))
 
 vi.mock('../src/stores/main.ts', () => ({
-  useMainStore: () => ({
-    user: { id: 'user-123' },
-    updateDashboard: mockUpdateDashboard,
-  }),
+  useMainStore: () => mainStore,
 }))
 
 vi.mock('../src/stores/display.ts', () => ({
@@ -71,6 +73,8 @@ describe('organization store deleteOrganization', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     setActivePinia(createPinia())
+    mainStore.auth = { id: 'auth-user-123' }
+    mainStore.user = { id: 'user-123' }
     mockEq.mockResolvedValue({ data: null, error: null })
     mockIn.mockResolvedValue({ data: [], error: null })
     vi.stubGlobal('localStorage', {
@@ -172,5 +176,37 @@ describe('organization store refreshOrganizationLogos', () => {
     expect(store.currentOrganization?.logo).toBe('https://signed.example.com/org-logo.png')
     expect(store.currentOrganization?.logo_storage_path).toBe('org/org-refresh/logo/current.png')
     expect(mockUpdateDashboard).not.toHaveBeenCalled()
+  })
+
+  it('fetches organizations with the auth session when the public profile is unavailable', async () => {
+    mainStore.user = undefined
+    mockCreateSignedImageUrl.mockResolvedValue('')
+    mockRpc.mockResolvedValueOnce({
+      data: [{
+        gid: 'org-auth-fallback',
+        role: 'org_super_admin',
+        app_count: 0,
+        created_by: 'owner-123',
+        name: 'Auth Fallback Org',
+        logo: null,
+        password_policy_config: null,
+        enforcing_2fa: false,
+        '2fa_has_access': true,
+        password_has_access: true,
+        paying: true,
+        trial_left: 0,
+        can_use_more: true,
+      }],
+      error: null,
+    })
+
+    const { useOrganizationStore } = await import('../src/stores/organization.ts')
+    const store = useOrganizationStore()
+
+    await store.fetchOrganizations()
+
+    expect(mockRpc).toHaveBeenCalledWith('get_orgs_v7')
+    expect(store.organizations).toHaveLength(1)
+    expect(store.currentOrganization?.gid).toBe('org-auth-fallback')
   })
 })
