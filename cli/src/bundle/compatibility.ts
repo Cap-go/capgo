@@ -13,7 +13,6 @@ import {
   getConfig,
   isCompatible,
   OrganizationPerm,
-  resolveUserIdFromApiKey,
 } from '../utils'
 
 interface CompatibilityResult {
@@ -64,7 +63,6 @@ export async function checkCompatibilityInternal(
     enrichedOptions.supaAnon,
   )
   await check2FAComplianceForApp(supabase, resolvedAppId, silent)
-  await resolveUserIdFromApiKey(supabase, enrichedOptions.apikey)
   await checkAppExistsAndHasPermissionOrgErr(
     supabase,
     enrichedOptions.apikey,
