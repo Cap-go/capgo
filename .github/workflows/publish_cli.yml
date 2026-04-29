@@ -7,12 +7,12 @@ concurrency:
 on:
   push:
     tags:
-      - 'cli-*'
+      - "cli-*"
 
 permissions: {}
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   publish_cli:
@@ -66,5 +66,5 @@ jobs:
 
             🔗 **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.changelog.outputs.from_tag }}...${{ steps.changelog.outputs.to_tag }}
           make_latest: false
-          token: '${{ secrets.PERSONAL_ACCESS_TOKEN }}'
+          token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
           prerelease: ${{ contains(github.ref, '-alpha.') }}

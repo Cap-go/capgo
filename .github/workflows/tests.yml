@@ -28,8 +28,8 @@ permissions: {}
 
 env:
   DENO_DIR: my_cache_directory
-  CLICOLOR: '1'
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  CLICOLOR: "1"
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   changes:
@@ -388,7 +388,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ['20', '21', '22', '23', '24', '25']
+        node-version: ["20", "21", "22", "23", "24", "25"]
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -520,7 +520,7 @@ jobs:
         uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654 # v5
         with:
           distribution: zulu
-          java-version: '17'
+          java-version: "17"
       - name: Compile VerifyZip.java
         run: javac ./cli/test/VerifyZip.java
       - name: Verify ZIP file integrity for Linux build with Java

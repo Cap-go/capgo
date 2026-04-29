@@ -7,12 +7,12 @@ concurrency:
 on:
   push:
     tags:
-      - 'capgo-*'
+      - "capgo-*"
 
 permissions: {}
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 jobs:
   # Tests already passed before tag was created, so just build and deploy
@@ -133,7 +133,7 @@ jobs:
 
             🔗 **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.changelog.outputs.from_tag }}...${{ steps.changelog.outputs.to_tag }}
           make_latest: true
-          token: '${{ secrets.PERSONAL_ACCESS_TOKEN }}'
+          token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
           prerelease: ${{ contains(github.ref, '-alpha.') }}
 
   deploy_api:
