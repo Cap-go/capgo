@@ -24,12 +24,12 @@ jobs:
       id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
           filter: blob:none
       - name: Setup bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
         with:
           bun-version: latest
       - name: Install dependencies
@@ -38,7 +38,7 @@ jobs:
         run: bun run cli:build
       - name: Generate AI changelog
         id: changelog
-        uses: mistricky/ccc@v0.2.6
+        uses: mistricky/ccc@d9358b3eca472c0f41a6c1732bf073c0c54b837e # v0.2.6
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
@@ -55,7 +55,7 @@ jobs:
         run: bun publish --cwd cli --tag next --access public
       - name: Create GitHub release
         id: create_release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           body: |
             ## 🆕 Changelog
