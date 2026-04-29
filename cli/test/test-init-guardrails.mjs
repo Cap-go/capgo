@@ -8,6 +8,8 @@ import { join } from 'node:path'
 import {
   applyInitAutoTestChange,
   getGitRepoStatus,
+  getInitOtaVersionBase,
+  getInitSuggestedOtaVersion,
   getInitUpdaterPluginConfig,
   revertInitAutoTestChangeContent,
 } from '../src/init/command.ts'
@@ -77,6 +79,14 @@ t('init updater config always starts from native version 0.0.0', () => {
     directUpdate: 'always',
     autoSplashscreen: true,
   })
+})
+
+t('guided ota version suggestions stay on major zero when native baseline is pinned', () => {
+  assert.equal(getInitOtaVersionBase('1.0.0'), '0.0.0')
+  assert.equal(getInitSuggestedOtaVersion('1.0.0'), '0.0.1')
+
+  assert.equal(getInitOtaVersionBase('0.2.3'), '0.2.3')
+  assert.equal(getInitSuggestedOtaVersion('0.2.3'), '0.2.4')
 })
 
 t('auto html onboarding changes can be applied and reverted', () => {

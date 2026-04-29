@@ -217,6 +217,27 @@ export function getInitUpdaterPluginConfig(appId: string, directInstall: boolean
   }
 }
 
+export function getInitOtaVersionBase(pkgVersion: string) {
+  try {
+    const parsed = parse(pkgVersion)
+    if (parsed.major === 0)
+      return format(parsed)
+  }
+  catch {
+  }
+
+  return initNativeBundleVersion
+}
+
+export function getInitSuggestedOtaVersion(pkgVersion: string) {
+  try {
+    return format(increment(parse(getInitOtaVersionBase(pkgVersion)), 'patch'))
+  }
+  catch {
+    return '0.0.1'
+  }
+}
+
 export function applyInitAutoTestChange(filePath: string, content: string): { kind: InitAutoTestChangeKind, content: string } | undefined {
   if (filePath.endsWith('.html')) {
     if (content.includes('<body>') && !content.includes('capgo-test-banner')) {
@@ -3649,20 +3670,20 @@ async function addCodeChangeStep(orgId: string, apikey: string, appId: string, p
   }
 
   // Version bump
-  let nextVersion = '1.0.1'
-  try {
-    const parsed = parse(pkgVersion)
-    nextVersion = format(increment(parsed, 'patch'))
-  }
-  catch {
-    nextVersion = '1.0.1'
-  }
+  const otaVersionBase = getInitOtaVersionBase(pkgVersion)
+  const nextVersion = getInitSuggestedOtaVersion(pkgVersion)
   pLog.info(`🔢 OTA update versioning:`)
-  pLog.info(`   Each upload must use a new version (for example ${pkgVersion} → ${nextVersion})`)
+  if (otaVersionBase === initNativeBundleVersion && pkgVersion !== initNativeBundleVersion) {
+    pLog.info(`   Init pinned CapacitorUpdater.version to ${initNativeBundleVersion} for this guided test.`)
+    pLog.info(`   Keep the first OTA upload on major 0 (for example ${otaVersionBase} → ${nextVersion}) to avoid channel major-gate blocks.`)
+  }
+  else {
+    pLog.info(`   Each upload must use a new version (for example ${otaVersionBase} → ${nextVersion})`)
+  }
   const versionChoice = await pSelect({
     message: 'How do you want to handle the version for this update?',
     options: [
-      { value: 'auto', label: `Auto: Bump patch version (${pkgVersion} → ${nextVersion})` },
+      { value: 'auto', label: `Auto: Bump patch version (${otaVersionBase} → ${nextVersion})` },
       { value: 'manual', label: 'Manual: I\'ll provide the version number' },
     ],
   })
@@ -3672,23 +3693,16 @@ async function addCodeChangeStep(orgId: string, apikey: string, appId: string, p
     exit()
   }
 
-  let newVersion = pkgVersion
+  let newVersion = otaVersionBase
   if (versionChoice === 'auto') {
-    // Auto bump patch version using semver
-    try {
-      const parsed = parse(pkgVersion)
-      const incrementedVersion = format(increment(parsed, 'patch'))
-      newVersion = incrementedVersion
-      pLog.info(`🔢 Auto-bumped version from ${pkgVersion} to ${newVersion}`)
-    }
-    catch {
-      newVersion = '1.0.1' // fallback
-      pLog.warn(`Could not parse version ${pkgVersion}, using fallback ${newVersion}`)
-    }
+    newVersion = nextVersion
+    pLog.info(`🔢 Auto-bumped version from ${otaVersionBase} to ${newVersion}`)
   }
   else {
     const userVersion = await pText({
-      message: `Current version is ${pkgVersion}. Enter new version:`,
+      message: otaVersionBase === pkgVersion
+        ? `Current version is ${otaVersionBase}. Enter new version:`
+        : `Guided OTA baseline is ${otaVersionBase}. Enter a new 0.x.x version:`,
       validate: (value) => {
         if (!value?.match(/^\d+\.\d+\.\d+/))
           return 'Please enter a valid version (x.y.z)'
