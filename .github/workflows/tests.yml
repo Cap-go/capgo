@@ -56,6 +56,8 @@ jobs:
             shared:
               - '.github/workflows/**'
               - '.github/scripts/**'
+              - 'scripts/setup-bun.sh'
+              - 'scripts/setup-bun.ps1'
               - '.npmrc'
               - '.typos.toml'
               - 'package.json'

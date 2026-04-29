@@ -39,7 +39,7 @@ jobs:
         uses: mistricky/ccc@d9358b3eca472c0f41a6c1732bf073c0c54b837e # v0.2.6
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          github_token: ${{ github.token }}
           model: claude-sonnet-4-5-20250929
       - name: Publish CLI to npm
         if: ${{ !contains(github.ref, '-alpha.') }}
@@ -64,5 +64,5 @@ jobs:
 
             🔗 **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.changelog.outputs.from_tag }}...${{ steps.changelog.outputs.to_tag }}
           make_latest: false
-          token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
+          token: ${{ github.token }}
           prerelease: ${{ contains(github.ref, '-alpha.') }}

@@ -37,7 +37,7 @@ const componentMatchers: Record<Component, RegExp[]> = {
   cli: [
     /^bun\.lock$/,
     /^cli\/src\//,
-    /^cli\/skills\//,
+    /^cli\/skills\/(?!.*\.(md|mdx)$)/,
     /^cli\/package\.json$/,
     /^cli\/build\.mjs$/,
     /^cli\/tsconfig\.json$/,
@@ -117,7 +117,7 @@ const before = process.argv[3] ?? ''
 const after = process.argv[4] ?? 'HEAD'
 
 if (componentArg !== 'capgo' && componentArg !== 'cli') {
-  console.error('Usage: bun scripts/release-scope.ts <capgo|cli> <before> <after>')
+  console.error('Usage: bun scripts/release-scope.ts <capgo|cli> [before] [after]')
   process.exit(1)
 }
 
