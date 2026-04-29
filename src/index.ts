@@ -35,6 +35,7 @@ import { login } from './login'
 import { startMcpServer } from './mcp/server'
 import { addOrganization, deleteOrganization, listMembers, listOrganizations, setOrganization } from './organization'
 import { probe } from './probe'
+import { testRunDeviceCommand } from './run/device'
 import { getUserId } from './user/account'
 import { formatError } from './utils'
 
@@ -65,6 +66,7 @@ program
 
 This includes adding code for updates, building, uploading your app, and verifying update functionality.
 Capgo bundles are web assets and can be fetched by anyone who knows the URL. Use encryption for banking, regulated, or other high-security apps.
+During the iOS run-on-device step, choose a physical iPhone/iPad or simulator. If you choose a physical device, the CLI lets you connect, unlock, and check again before it launches the app.
 
 Example: npx @capgo/cli@latest init YOUR_API_KEY com.example.app`)
   .action(initApp)
@@ -72,6 +74,23 @@ Example: npx @capgo/cli@latest init YOUR_API_KEY com.example.app`)
   .option('-i, --icon <icon>', `App icon path for display in Capgo Cloud`)
   .option('--supa-host <supaHost>', optionDescriptions.supaHost)
   .option('--supa-anon <supaAnon>', optionDescriptions.supaAnon)
+
+const run = program
+  .command('run')
+  .description(`📱 Run Capacitor apps on devices from the CLI.`)
+
+run
+  .command('device [platform]')
+  .description(`📱 Run your Capacitor app on a connected device or simulator.
+
+If you omit the platform in an interactive terminal, the command asks whether to start on iOS or Android.
+The command lists available devices and simulators, lets you reload the list, and runs with your selection.
+For iOS, this asks whether to use a physical iPhone/iPad or simulator before showing devices.
+Use --no-launch to print the resolved command without starting the app.
+
+Example: npx @capgo/cli@latest run device ios --no-launch`)
+  .action(testRunDeviceCommand)
+  .option('--no-launch', `Resolve and print the run command without starting the app`)
 
 program
   .command('star [repository]')

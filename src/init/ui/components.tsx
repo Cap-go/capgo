@@ -18,7 +18,7 @@ function colorForTone(tone: InitScreenTone | InitLogTone): 'cyan' | 'blue' | 'gr
   return 'cyan'
 }
 
-export function InitHeader() {
+export function InitHeader({ title = '🚀  Capgo OTA Onboarding' }: Readonly<{ title?: string }>) {
   return (
     <Box
       borderStyle="double"
@@ -28,7 +28,7 @@ export function InitHeader() {
       alignSelf="center"
     >
       <Text bold color="cyan">
-        🚀  Capgo OTA Onboarding
+        {title}
       </Text>
     </Box>
   )

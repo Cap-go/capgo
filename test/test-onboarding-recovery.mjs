@@ -1,12 +1,40 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import process from 'node:process'
 import { getBuildOnboardingRecoveryAdvice } from '../src/build/onboarding/recovery.ts'
+import { CAPGO_UPDATER_PACKAGE, getUpdaterInstallState } from '../src/init/updater.ts'
 import { renderOnboardingSupportBundle, writeOnboardingSupportBundle } from '../src/onboarding-support.ts'
 import { splitRunnerCommand } from '../src/runner-command.ts'
 
 let failures = 0
+
+function writeFile(filePath, content) {
+  mkdirSync(dirname(filePath), { recursive: true })
+  writeFileSync(filePath, content, 'utf8')
+}
+
+function withTempProject(fn) {
+  const root = mkdtempSync(join(tmpdir(), 'capgo-updater-state-'))
+  try {
+    fn(root)
+  }
+  finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+}
+
+function writeProjectPackage(root, dependencies) {
+  writeFile(join(root, 'package.json'), JSON.stringify({ dependencies }))
+}
+
+function writeUpdaterInstall(root, version = '7.0.1') {
+  writeFile(join(root, 'node_modules', '@capgo', 'capacitor-updater', 'package.json'), JSON.stringify({ version }))
+}
+
+function readUpdaterState(root) {
+  return getUpdaterInstallState(join(root, 'package.json'))
+}
 
 function t(name, fn) {
   try {
@@ -47,6 +75,52 @@ t('runner command helper rejects unexpected executors', () => {
 
   if (!threw)
     throw new Error('Expected unsupported runner to throw')
+})
+
+t('updater install state requires package.json declaration', () => {
+  withTempProject((root) => {
+    writeProjectPackage(root, { '@capacitor/core': '^7.0.0' })
+    writeUpdaterInstall(root)
+
+    const state = readUpdaterState(root)
+    if (state.ready)
+      throw new Error('Expected updater state to fail without declaration')
+    if (!state.details.some(detail => detail.includes(`Missing ${CAPGO_UPDATER_PACKAGE}`)))
+      throw new Error('Expected missing declaration detail')
+  })
+})
+
+t('updater install state requires node_modules install', () => {
+  withTempProject((root) => {
+    writeProjectPackage(root, {
+      '@capacitor/core': '^7.0.0',
+      [CAPGO_UPDATER_PACKAGE]: '^7.0.0',
+    })
+
+    const state = readUpdaterState(root)
+    if (state.ready)
+      throw new Error('Expected updater state to fail without node_modules install')
+    if (!state.details.some(detail => detail.includes(`Cannot resolve ${CAPGO_UPDATER_PACKAGE}`)))
+      throw new Error('Expected missing install detail')
+  })
+})
+
+t('updater install state passes with declaration and install', () => {
+  withTempProject((root) => {
+    writeProjectPackage(root, {
+      '@capacitor/core': '^7.0.0',
+      [CAPGO_UPDATER_PACKAGE]: '^7.0.0',
+    })
+    writeUpdaterInstall(root)
+
+    const state = readUpdaterState(root)
+    if (!state.ready)
+      throw new Error(`Expected updater state to pass: ${state.details.join(', ')}`)
+    if (state.declaredVersion !== '^7.0.0')
+      throw new Error('Expected declared updater version')
+    if (state.installedVersion !== '7.0.1')
+      throw new Error('Expected installed updater version')
+  })
 })
 
 t('support bundle renderer includes commands and docs', () => {

@@ -24,6 +24,8 @@ Follow the documentation here: https://capacitorjs.com/docs/getting-started/
 ## 📋 Table of Contents
 
 - 🚀 [Init](#init)
+- 📱 [Run](#run)
+  - [Device](#run-device)
 - 🔹 [Star](#star)
 - 🔹 [Star-all](#star-all)
 - 👨‍⚕️ [Doctor](#doctor)
@@ -86,6 +88,7 @@ npx @capgo/cli@latest init
 🚀 Initialize a new app in Capgo Cloud with step-by-step guidance.
 This includes adding code for updates, building, uploading your app, and verifying update functionality.
 Capgo bundles are web assets and can be fetched by anyone who knows the URL. Use encryption for banking, regulated, or other high-security apps.
+During the iOS run-on-device step, choose a physical iPhone/iPad or simulator. If you choose a physical device, the CLI lets you connect, unlock, and check again before it launches the app.
 
 **Example:**
 
@@ -93,7 +96,7 @@ Capgo bundles are web assets and can be fetched by anyone who knows the URL. Use
 npx @capgo/cli@latest init YOUR_API_KEY com.example.app
 ```
 
-## <a id="options"></a> Options
+### <a id="init-options"></a> Options
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
@@ -101,6 +104,35 @@ npx @capgo/cli@latest init YOUR_API_KEY com.example.app
 | **-i,** | <code>string</code> | App icon path for display in Capgo Cloud |
 | **--supa-host** | <code>string</code> | Custom Supabase host URL (for self-hosting or Capgo development) |
 | **--supa-anon** | <code>string</code> | Custom Supabase anon key (for self-hosting) |
+
+
+## <a id="run"></a> 📱 **Run**
+
+📱 Run Capacitor apps on devices from the CLI.
+
+### <a id="run-device"></a> 🔹 **Device**
+
+```bash
+npx @capgo/cli@latest run device
+```
+
+📱 Run your Capacitor app on a connected device or simulator.
+If you omit the platform in an interactive terminal, the command asks whether to start on iOS or Android.
+The command lists available devices and simulators, lets you reload the list, and runs with your selection.
+For iOS, this asks whether to use a physical iPhone/iPad or simulator before showing devices.
+Use --no-launch to print the resolved command without starting the app.
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest run device ios --no-launch
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **--no-launch** | <code>boolean</code> | Resolve and print the run command without starting the app |
 
 
 ## <a id="star"></a> 🔹 **Star**
@@ -122,7 +154,7 @@ npx @capgo/cli@latest star-all
 ⭐ Star all Capgo GitHub repositories with a small random delay between each request.
 If you do not pass repositories, this defaults to all Cap-go repositories whose name starts with `capacitor-`.
 
-## <a id="options"></a> Options
+### <a id="star-all-options"></a> Options
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
@@ -146,7 +178,7 @@ This command helps diagnose issues with your setup.
 npx @capgo/cli@latest doctor
 ```
 
-## <a id="options"></a> Options
+### <a id="doctor-options"></a> Options
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
@@ -170,7 +202,7 @@ Use --apikey=******** in any command to override it.
 npx @capgo/cli@latest login YOUR_API_KEY
 ```
 
-## <a id="options"></a> Options
+### <a id="login-options"></a> Options
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
@@ -1223,7 +1255,7 @@ and reports whether an update would be delivered, or explains why not.
 npx @capgo/cli@latest probe --platform ios
 ```
 
-## <a id="options"></a> Options
+### <a id="probe-options"></a> Options
 
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
