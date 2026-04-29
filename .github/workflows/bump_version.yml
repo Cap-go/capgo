@@ -84,7 +84,9 @@ jobs:
           bun run --cwd cli generate-docs
           bun run --cwd cli generate-docs --folder webdocs
           git add cli/README.md cli/webdocs
-          git commit -m "docs(cli): update generated docs" || true
+          if ! git diff --cached --quiet; then
+            git commit -m "docs(cli): update generated docs"
+          fi
       - name: Create version bumps
         env:
           RUN_CAPGO: ${{ needs.changes.outputs.run_capgo }}

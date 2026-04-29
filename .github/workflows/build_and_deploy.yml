@@ -7,7 +7,7 @@ concurrency:
 on:
   push:
     tags:
-      - "capgo-*"
+      - "capgo-[0-9]*"
 
 permissions: {}
 
