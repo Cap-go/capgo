@@ -3817,21 +3817,36 @@ async function maybeOfferAutoTestCleanup(orgId: string, apikey: string, appId: s
 
   let reverted = false
   if (shouldRevert) {
-    try {
-      const currentContent = readFileSync(autoTestChange.filePath, 'utf8')
-      const revertedContent = revertInitAutoTestChangeContent(autoTestChange.kind, currentContent)
-      if (!revertedContent) {
-        pLog.warn(`Could not automatically revert ${autoTestChange.displayPath}. Please revert it manually.`)
-      }
-      else {
-        writeFileSync(autoTestChange.filePath, revertedContent, 'utf8')
-        pLog.success(`Reverted ${autoTestChange.displayPath} ✅`)
-        reverted = true
-        globalAutoTestChange = undefined
-      }
+    if (!existsSync(autoTestChange.filePath)) {
+      pLog.warn(`${autoTestChange.displayPath} no longer exists, so there is nothing left to revert automatically.`)
+      reverted = true
+      globalAutoTestChange = undefined
     }
-    catch (error) {
-      pLog.warn(`Could not automatically revert ${autoTestChange.displayPath}: ${formatError(error)}`)
+    else {
+      try {
+        const currentContent = readFileSync(autoTestChange.filePath, 'utf8')
+        const revertedContent = revertInitAutoTestChangeContent(autoTestChange.kind, currentContent)
+        if (!revertedContent) {
+          pLog.warn(`Could not automatically revert ${autoTestChange.displayPath}. Please revert it manually.`)
+        }
+        else {
+          writeFileSync(autoTestChange.filePath, revertedContent, 'utf8')
+          pLog.success(`Reverted ${autoTestChange.displayPath} ✅`)
+          reverted = true
+          globalAutoTestChange = undefined
+        }
+      }
+      catch (error) {
+        const fileError = error as NodeJS.ErrnoException
+        if (fileError.code === 'ENOENT') {
+          pLog.warn(`${autoTestChange.displayPath} was removed before cleanup, so there is nothing left to revert automatically.`)
+          reverted = true
+          globalAutoTestChange = undefined
+        }
+        else {
+          pLog.warn(`Could not automatically revert ${autoTestChange.displayPath}: ${formatError(error)}`)
+        }
+      }
     }
   }
 
