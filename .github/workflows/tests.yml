@@ -55,6 +55,7 @@ jobs:
           filters: |
             shared:
               - '.github/workflows/**'
+              - '.github/scripts/**'
               - '.npmrc'
               - '.typos.toml'
               - 'package.json'
