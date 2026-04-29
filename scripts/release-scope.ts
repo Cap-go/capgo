@@ -6,6 +6,7 @@ type ReleaseAs = 'patch' | 'minor' | 'major'
 const componentMatchers: Record<Component, RegExp[]> = {
   capgo: [
     /^package\.json$/,
+    /^bun\.lock$/,
     /^aliproxy\//,
     /^android\//,
     /^assets\//,
@@ -34,6 +35,7 @@ const componentMatchers: Record<Component, RegExp[]> = {
     /^wrangler\.jsonc$/,
   ],
   cli: [
+    /^bun\.lock$/,
     /^cli\/src\//,
     /^cli\/skills\//,
     /^cli\/package\.json$/,
