@@ -21,6 +21,21 @@ beforeEach(async () => {
   await pool.query(`DELETE FROM pgmq.a_${queueName}`)
 })
 
+async function waitForQueueCount(queueName: string, expectedCount: number, timeoutMs = 10000) {
+  const start = Date.now()
+
+  while (Date.now() - start < timeoutMs) {
+    const { rows } = await pool.query(`SELECT count(*) as count FROM pgmq.q_${queueName}`)
+    if (Number(rows[0]?.count ?? -1) === expectedCount)
+      return
+
+    await new Promise(resolve => setTimeout(resolve, 250))
+  }
+
+  const { rows } = await pool.query(`SELECT count(*) as count FROM pgmq.q_${queueName}`)
+  throw new Error(`Timed out waiting for queue ${queueName} to reach ${expectedCount} messages (last count: ${rows[0]?.count ?? 'unknown'})`)
+}
+
 async function fetchQueueSync(queueName: string, maxRetries = 4) {
   let lastError: Error | null = null
 
@@ -131,13 +146,7 @@ describe('queue Load Test', () => {
 
     // Process the queue
     await fetchQueueSync(queueName)
-
-    // Wait for processing to complete
-    await new Promise(resolve => setTimeout(resolve, 2000))
-
-    // Verify queue is empty after processing
-    const { rows: finalRows } = await pool.query(`SELECT count(*) as count FROM pgmq.q_${queueName}`)
-    expect(finalRows[0].count).toBe('0')
+    await waitForQueueCount(queueName, 0)
   })
 
   it('should handle stress test with rapid queue processing', { timeout: 30000 }, async () => {
