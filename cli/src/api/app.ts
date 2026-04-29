@@ -15,6 +15,11 @@ export type PendingOnboardingApp = Pick<
   'app_id' | 'name' | 'icon_url' | 'need_onboarding' | 'existing_app' | 'ios_store_url' | 'android_store_url'
 >
 
+export type ExistingOrganizationApp = Pick<
+  Database['public']['Tables']['apps']['Row'],
+  'app_id' | 'name' | 'owner_org' | 'need_onboarding'
+>
+
 function isMissingOnboardingSchemaError(error: { message?: string, details?: string, hint?: string, code?: string | null } | null) {
   if (!error)
     return false
@@ -56,6 +61,40 @@ export async function listPendingOnboardingApps(
   }
 
   return data ?? []
+}
+
+export async function findAppInOrganization(
+  supabase: SupabaseClient<Database>,
+  orgId: string,
+  appId: string,
+): Promise<ExistingOrganizationApp | null> {
+  const { data, error } = await supabase
+    .from('apps')
+    .select('app_id, name, owner_org, need_onboarding')
+    .eq('owner_org', orgId)
+    .eq('app_id', appId)
+    .maybeSingle()
+
+  if (error) {
+    if (isMissingOnboardingSchemaError(error)) {
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('apps')
+        .select('app_id, name, owner_org')
+        .eq('owner_org', orgId)
+        .eq('app_id', appId)
+        .maybeSingle()
+
+      if (fallbackError) {
+        throw new Error(`Could not check existing app ${appId} in org ${orgId}: ${fallbackError.message}`)
+      }
+
+      return fallbackData ? { ...fallbackData, need_onboarding: false } : null
+    }
+
+    throw new Error(`Could not check existing app ${appId} in org ${orgId}: ${error.message}`)
+  }
+
+  return data ?? null
 }
 
 export async function completePendingOnboardingApp(
