@@ -22,6 +22,7 @@ jobs:
       capgo_release_as: ${{ steps.capgo.outputs.release_as }}
       run_cli: ${{ steps.cli.outputs.should_release }}
       cli_release_as: ${{ steps.cli.outputs.release_as }}
+      run_any: ${{ steps.capgo.outputs.should_release == 'true' || steps.cli.outputs.should_release == 'true' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -41,7 +42,7 @@ jobs:
   # Run only the relevant test scope before creating tags
   test:
     needs: changes
-    if: ${{ needs.changes.outputs.run_capgo == 'true' || needs.changes.outputs.run_cli == 'true' }}
+    if: ${{ needs.changes.outputs.run_any == 'true' }}
     uses: ./.github/workflows/tests.yml
     with:
       run_capgo: ${{ needs.changes.outputs.run_capgo == 'true' }}
@@ -55,7 +56,7 @@ jobs:
   # Only bump the changed release scopes and create matching tags after tests pass
   bump-version:
     needs: [changes, test]
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') && !startsWith(github.event.head_commit.message, 'chore(auto-sync):') && (needs.changes.outputs.run_capgo == 'true' || needs.changes.outputs.run_cli == 'true') && needs.test.result == 'success' }}
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') && !startsWith(github.event.head_commit.message, 'chore(auto-sync):') && needs.changes.outputs.run_any == 'true' && needs.test.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     name: Bump versions and create tags
@@ -93,6 +94,8 @@ jobs:
           RUN_CLI: ${{ needs.changes.outputs.run_cli }}
           CLI_RELEASE_AS: ${{ needs.changes.outputs.cli_release_as }}
         run: |
+          set -e
+
           if [ "$RUN_CAPGO" = "true" ]; then
             if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
               bunx standard-version --skip.changelog --release-as "$CAPGO_RELEASE_AS"
@@ -120,9 +123,13 @@ jobs:
           fi
       - name: Push to origin
         run: |
+          set -e
+
           CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
           remote_repo="https://${GITHUB_ACTOR}:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git"
-          git pull --rebase $remote_repo $CURRENT_BRANCH
+          if ! git pull --rebase $remote_repo $CURRENT_BRANCH; then
+            git pull --rebase=false $remote_repo $CURRENT_BRANCH
+          fi
           git push $remote_repo HEAD:$CURRENT_BRANCH --follow-tags --tags
 
   sync_schema_types:

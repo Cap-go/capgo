@@ -35,6 +35,7 @@ const componentMatchers: Record<Component, RegExp[]> = {
   ],
   cli: [
     /^cli\/src\//,
+    /^cli\/skills\//,
     /^cli\/package\.json$/,
     /^cli\/build\.mjs$/,
     /^cli\/tsconfig\.json$/,
