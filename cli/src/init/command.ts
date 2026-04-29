@@ -3594,7 +3594,8 @@ async function runDeviceStep(orgId: string, apikey: string, appId: string, platf
 
 async function addCodeChangeStep(orgId: string, apikey: string, appId: string, pkgVersion: string, platform: 'ios' | 'android') {
   pLog.info(`🎯 Now let's test Capgo by making a visible change and deploying an update!`)
-  globalAutoTestChange = undefined
+  // Keep any restored auto-test change metadata on resume so step 12 can
+  // still offer cleanup after an interrupted step-9 flow.
 
   const modificationType = await pSelect({
     message: 'How would you like to test the update?',
@@ -3693,7 +3694,7 @@ async function addCodeChangeStep(orgId: string, apikey: string, appId: string, p
     exit()
   }
 
-  let newVersion = otaVersionBase
+  let newVersion: string
   if (versionChoice === 'auto') {
     newVersion = nextVersion
     pLog.info(`🔢 Auto-bumped version from ${otaVersionBase} to ${newVersion}`)
