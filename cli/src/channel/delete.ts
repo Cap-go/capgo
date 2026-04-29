@@ -11,8 +11,8 @@ import {
   getConfig,
   getOrganizationId,
   OrganizationPerm,
+  resolveUserIdFromApiKey,
   sendEvent,
-  verifyUser,
 } from '../utils'
 
 export async function deleteChannelInternal(channelId: string, appId: string, options: ChannelDeleteOptions, silent = false) {
@@ -37,7 +37,7 @@ export async function deleteChannelInternal(channelId: string, appId: string, op
 
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
   await check2FAComplianceForApp(supabase, appId, silent)
-  const userId = await verifyUser(supabase, options.apikey, ['all'])
+  const userId = await resolveUserIdFromApiKey(supabase, options.apikey)
 
   await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.admin, silent, true)
 

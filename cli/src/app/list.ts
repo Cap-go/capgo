@@ -4,7 +4,7 @@ import type { Database } from '../types/supabase.types'
 import { intro, log, outro } from '@clack/prompts'
 import { Table } from '@sauber/table'
 import { checkAlerts } from '../api/update'
-import { createSupabaseClient, findSavedKey, getHumanDate, verifyUser } from '../utils'
+import { createSupabaseClient, findSavedKey, getHumanDate, resolveUserIdFromApiKey } from '../utils'
 
 function displayApps(data: Database['public']['Tables']['apps']['Row'][]) {
   const table = new Table()
@@ -18,16 +18,13 @@ function displayApps(data: Database['public']['Tables']['apps']['Row'][]) {
   log.success(table.toString())
 }
 
-async function getActiveApps(
-  supabase: SupabaseClient<Database>,
-  silent: boolean,
-) {
-  const { data, error: vError } = await supabase
+async function getActiveApps(supabase: SupabaseClient<Database>, silent: boolean) {
+  const { data, error } = await supabase
     .from('apps')
     .select()
     .order('created_at', { ascending: false })
 
-  if (vError) {
+  if (error) {
     if (!silent)
       log.error('Apps not found')
     throw new Error('Apps not found')
@@ -46,7 +43,7 @@ export async function listAppInternal(options: OptionsBase, silent = false) {
 
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
 
-  await verifyUser(supabase, options.apikey, ['write', 'all', 'read', 'upload'])
+  await resolveUserIdFromApiKey(supabase, options.apikey)
 
   if (!silent)
     log.info('Getting active bundle in Capgo')

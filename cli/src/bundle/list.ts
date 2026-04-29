@@ -3,7 +3,7 @@ import { intro, log, outro } from '@clack/prompts'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
 import { checkAlerts } from '../api/update'
 import { displayBundles, getActiveAppVersions } from '../api/versions'
-import { createSupabaseClient, findSavedKey, getAppId, getConfig, OrganizationPerm, verifyUser } from '../utils'
+import { createSupabaseClient, findSavedKey, getAppId, getConfig, OrganizationPerm, resolveUserIdFromApiKey } from '../utils'
 
 export async function listBundle(appId: string, options: OptionsBase, silent = false) {
   if (!silent)
@@ -28,7 +28,7 @@ export async function listBundle(appId: string, options: OptionsBase, silent = f
 
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
   await check2FAComplianceForApp(supabase, appId, silent)
-  await verifyUser(supabase, options.apikey, ['write', 'all', 'read', 'upload'])
+  await resolveUserIdFromApiKey(supabase, options.apikey)
   await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.read, silent, true)
 
   if (!silent)
