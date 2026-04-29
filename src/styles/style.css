@@ -25,7 +25,7 @@ layer(base);
   content: none;
 }
 
-@plugin "daisyui" {
+@plugin "daisyui/index.js" {
   themes: capgolight --default, capgodark --prefersdark;
   logs: true;
   prefix: "d-";
