@@ -1,0 +1,70 @@
+name: Build and publish CLI
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    tags:
+      - 'cli-v*'
+
+permissions: {}
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  publish_cli:
+    runs-on: ubuntu-latest
+    name: Build and publish CLI to npm
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          filter: blob:none
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Build CLI
+        run: bun run cli:build
+      - name: Generate AI changelog
+        id: changelog
+        uses: mistricky/ccc@v0.2.6
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          github_token: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          model: claude-sonnet-4-5-20250929
+      - name: Publish CLI to npm
+        if: ${{ !contains(github.ref, '-alpha.') }}
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: bun publish --cwd cli --access public
+      - name: Publish CLI to npm with next tag
+        if: ${{ contains(github.ref, '-alpha.') }}
+        env:
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: bun publish --cwd cli --tag next --access public
+      - name: Create GitHub release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          body: |
+            ## 🆕 Changelog
+
+            ${{ steps.changelog.outputs.result }}
+
+            ---
+
+            🔗 **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.changelog.outputs.from_tag }}...${{ steps.changelog.outputs.to_tag }}
+          make_latest: false
+          token: '${{ secrets.PERSONAL_ACCESS_TOKEN }}'
+          prerelease: ${{ contains(github.ref, '-alpha.') }}
