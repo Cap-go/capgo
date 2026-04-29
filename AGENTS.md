@@ -12,6 +12,9 @@ when working with code in this repository.
 - `bun build` - Build production version of the web app
 - `bun mobile` - Build for mobile and copy to Capacitor platforms
 - `bun dev-build` - Build with development branch configuration
+- `bun run cli:build` - Build the CLI workspace in `cli/`
+- `bun run cli:test` - Run the CLI workspace test suite
+- `bun run cli:check` - Lint, typecheck, build, and test the CLI workspace
 
 ### Testing
 
@@ -20,10 +23,10 @@ when working with code in this repository.
 - `bun test:all` - Run all backend tests
 - `bun test:backend` - Run backend tests excluding CLI tests
 - `bun test:cli` - Run CLI-specific tests
-- `bun test:local` - Run tests with local CLI path
+- `bun test:local` - Legacy alias for the default monorepo backend test run
 - `bun test:front` - Run Playwright frontend tests
-- `LOCAL_CLI_PATH=true bun test:all:local` - Run all tests with local CLI
-  configuration
+- `bun test:all:local` - Legacy alias for `bun test:all`
+- `bun test:cli:local` - Legacy alias for `bun test:cli`
 
 #### Cloudflare Workers Testing
 
@@ -194,7 +197,7 @@ Capgo relies on two layered caches for plugin endpoints (`/updates`, `/stats`, `
 - Use Vitest test runner with custom configuration
 - Require running Supabase instance
 - Tests modify local database state
-- CLI tests require `LOCAL_CLI_PATH=true` environment variable
+- Capgo CLI tests resolve the local `cli/` workspace by default in this monorepo
 
 ### Test Categories
 

@@ -98,15 +98,27 @@ function stopExistingPlaywrightBackend() {
   })
 }
 
-function resetSupabaseDb() {
-  const resetResult = spawnSync('bun', ['run', 'supabase:db:reset'], {
-    cwd: repoRoot,
-    stdio: 'inherit',
-    env: process.env,
-  })
+async function resetSupabaseDb() {
+  const maxAttempts = 3
 
-  if ((resetResult.status ?? 1) !== 0)
-    process.exit(resetResult.status ?? 1)
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const resetResult = spawnSync('bun', ['run', 'supabase:db:reset'], {
+      cwd: repoRoot,
+      stdio: 'inherit',
+      env: process.env,
+    })
+
+    if ((resetResult.status ?? 1) === 0)
+      return
+
+    stopSupabase()
+
+    if (attempt === maxAttempts)
+      process.exit(resetResult.status ?? 1)
+
+    await sleep(attempt * 2000)
+    await ensureSupabaseStarted()
+  }
 }
 
 async function ensureSupabaseStarted() {
@@ -186,7 +198,7 @@ await ensureSupabaseStarted()
 
 // Playwright E2E expects the seeded schema helpers and deterministic fixture data.
 if (!env.SKIP_SUPABASE_DB_RESET) {
-  resetSupabaseDb()
+  await resetSupabaseDb()
   await ensureSupabaseStarted()
 }
 
