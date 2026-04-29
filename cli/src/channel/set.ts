@@ -16,9 +16,9 @@ import {
   getOrganizationId,
   isCompatible,
   OrganizationPerm,
+  resolveUserIdFromApiKey,
   sendEvent,
   updateOrCreateChannel,
-  verifyUser,
 } from '../utils'
 
 /**
@@ -78,7 +78,7 @@ export async function setChannelInternal(channel: string, appId: string, options
 
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
   await check2FAComplianceForApp(supabase, appId, silent)
-  const userId = await verifyUser(supabase, options.apikey, ['write', 'all'])
+  const userId = await resolveUserIdFromApiKey(supabase, options.apikey)
 
   await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.admin, silent, true)
   const orgId = await getOrganizationId(supabase, appId)

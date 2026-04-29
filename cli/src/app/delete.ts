@@ -9,8 +9,8 @@ import {
   getConfig,
   getOrganizationId,
   OrganizationPerm,
+  resolveUserIdFromApiKey,
   sendEvent,
-  verifyUser,
 } from '../utils'
 
 export async function deleteAppInternal(
@@ -39,7 +39,7 @@ export async function deleteAppInternal(
   }
 
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
-  const userId = await verifyUser(supabase, options.apikey, ['write', 'all'])
+  const userId = await resolveUserIdFromApiKey(supabase, options.apikey)
 
   await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.super_admin, silent)
 

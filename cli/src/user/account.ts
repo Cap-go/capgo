@@ -1,6 +1,6 @@
 import type { Options } from '../api/app'
 import { intro, log, outro } from '@clack/prompts'
-import { createSupabaseClient, findSavedKey, formatError, verifyUser } from '../utils'
+import { createSupabaseClient, findSavedKey, formatError, resolveUserIdFromApiKey } from '../utils'
 
 export async function getUserIdInternal(options: Options, silent = false) {
   if (!silent)
@@ -23,7 +23,7 @@ export async function getUserIdInternal(options: Options, silent = false) {
       enrichedOptions.supaHost,
       enrichedOptions.supaAnon,
     )
-    const userId = await verifyUser(supabase, enrichedOptions.apikey, ['read', 'all', 'write'])
+    const userId = await resolveUserIdFromApiKey(supabase, enrichedOptions.apikey)
 
     if (!silent)
       outro(`Done ✅: ${userId}`)
