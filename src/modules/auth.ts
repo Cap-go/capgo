@@ -120,14 +120,14 @@ async function isDisabledAccount(supabase: SupabaseClient, userId: string | null
 
     if (error) {
       console.error('Error checking account status:', error)
-      return false
+      return true
     }
 
     return !!isDisabled
   }
   catch (error) {
     console.error('Error checking if account is disabled:', error)
-    return false
+    return true
   }
 }
 
@@ -218,10 +218,10 @@ async function guard(
 
   if (hasAuth && sessionUser && !hadAuth) {
     const isDisabled = await isDisabledAccount(supabase, sessionUser.id)
+    if (to.path === '/accountDisabled')
+      return isDisabled ? next() : next(getPostRestorePath(to))
     if (isDisabled)
       return next(getAccountDisabledRedirect(to))
-    if (to.path === '/accountDisabled')
-      return next(getPostRestorePath(to))
 
     const provisioningResult = await maybeProvisionSsoMembership(supabase, sessionData?.session ?? null)
     if (provisioningResult === 'redirect_login') {

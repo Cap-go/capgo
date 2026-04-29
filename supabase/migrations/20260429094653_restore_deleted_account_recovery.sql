@@ -7,6 +7,7 @@ DECLARE
   auth_email text;
   last_sign_in_at_ts timestamptz;
   hashed_email text;
+  restored_account_id uuid;
 BEGIN
   SELECT "auth"."uid"() INTO auth_uid;
   IF auth_uid IS NULL THEN
@@ -23,7 +24,14 @@ BEGIN
   END IF;
 
   DELETE FROM "public"."to_delete_accounts"
-  WHERE "account_id" = auth_uid;
+  WHERE "account_id" = auth_uid
+    AND "removal_date" > NOW()
+    AND "removal_date" <= NOW() + INTERVAL '30 days'
+  RETURNING "account_id" INTO restored_account_id;
+
+  IF restored_account_id IS NULL THEN
+    RAISE EXCEPTION 'restore_window_expired' USING ERRCODE = 'P0001';
+  END IF;
 
   IF auth_email IS NOT NULL AND auth_email <> '' THEN
     hashed_email := "encode"("extensions"."digest"(auth_email::text, 'sha256'::text), 'hex'::text);

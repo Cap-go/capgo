@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(18);
+SELECT plan(20);
 
 SELECT tests.authenticate_as('test_admin');
 
@@ -85,6 +85,31 @@ SELECT
         is_account_disabled(tests.get_supabase_uid('test_admin')),
         false,
         'restore_deleted_account - authenticated user can restore own pending deletion'
+    );
+
+SELECT tests.authenticate_as_service_role();
+
+INSERT INTO public.to_delete_accounts (account_id, removal_date, removed_data)
+VALUES (
+    tests.get_supabase_uid('test_admin'),
+    now() - interval '1 minute',
+    '{}'::jsonb
+);
+
+SELECT tests.authenticate_as('test_admin');
+
+SELECT
+    throws_like(
+        'SELECT restore_deleted_account()',
+        '%restore_window_expired%',
+        'restore_deleted_account - expired deletion windows cannot be restored'
+    );
+
+SELECT
+    is(
+        is_account_disabled(tests.get_supabase_uid('test_admin')),
+        true,
+        'restore_deleted_account - expired deletion windows stay disabled until cleanup'
     );
 
 SELECT tests.authenticate_as('test_user');

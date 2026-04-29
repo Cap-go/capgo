@@ -178,7 +178,7 @@ describe('organization store refreshOrganizationLogos', () => {
     expect(mockUpdateDashboard).not.toHaveBeenCalled()
   })
 
-  it('fetches organizations with the auth session when the public profile is unavailable', async () => {
+  it.concurrent('fetches organizations with the auth session when the public profile is unavailable', async () => {
     mainStore.user = undefined
     mockCreateSignedImageUrl.mockResolvedValue('')
     mockRpc.mockResolvedValueOnce({
@@ -201,7 +201,7 @@ describe('organization store refreshOrganizationLogos', () => {
     })
 
     const { useOrganizationStore } = await import('../src/stores/organization.ts')
-    const store = useOrganizationStore()
+    const store = useOrganizationStore(createPinia())
 
     await store.fetchOrganizations()
 
