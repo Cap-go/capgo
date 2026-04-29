@@ -29,7 +29,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Setup bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
       - name: Resolve Capgo release scope
@@ -98,9 +98,9 @@ jobs:
 
           if [ "$RUN_CAPGO" = "true" ]; then
             if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
-              bunx standard-version --skip.changelog --release-as "$CAPGO_RELEASE_AS"
+              bunx standard-version --skip.changelog --release-as "$CAPGO_RELEASE_AS" --tag-prefix capgo-
             else
-              bunx standard-version --skip.changelog --release-as "$CAPGO_RELEASE_AS" --prerelease alpha
+              bunx standard-version --skip.changelog --release-as "$CAPGO_RELEASE_AS" --prerelease alpha --tag-prefix capgo-
             fi
 
             git add supabase/functions/_backend/utils/version.ts
@@ -116,9 +116,9 @@ jobs:
 
           if [ "$RUN_CLI" = "true" ]; then
             if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
-              bunx standard-version --skip.changelog --release-as "$CLI_RELEASE_AS" --tag-prefix cli-v --packageFiles cli/package.json --bumpFiles cli/package.json
+              bunx standard-version --skip.changelog --release-as "$CLI_RELEASE_AS" --tag-prefix cli- --packageFiles cli/package.json --bumpFiles cli/package.json
             else
-              bunx standard-version --skip.changelog --release-as "$CLI_RELEASE_AS" --prerelease alpha --tag-prefix cli-v --packageFiles cli/package.json --bumpFiles cli/package.json
+              bunx standard-version --skip.changelog --release-as "$CLI_RELEASE_AS" --prerelease alpha --tag-prefix cli- --packageFiles cli/package.json --bumpFiles cli/package.json
             fi
           fi
       - name: Push to origin

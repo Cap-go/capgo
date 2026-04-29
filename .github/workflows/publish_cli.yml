@@ -7,7 +7,7 @@ concurrency:
 on:
   push:
     tags:
-      - 'cli-v*'
+      - 'cli-*'
 
 permissions: {}
 
@@ -29,7 +29,7 @@ jobs:
           fetch-depth: 0
           filter: blob:none
       - name: Setup bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
       - name: Install dependencies
