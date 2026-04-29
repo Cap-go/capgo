@@ -154,9 +154,7 @@ jobs:
         with:
           fetch-depth: 2
       - name: Setup bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
+        run: bash scripts/setup-bun.sh
       - name: Validate migration timestamps
         if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         run: bash scripts/check-supabase-migration-order.sh
@@ -277,9 +275,7 @@ jobs:
         with:
           fetch-depth: 2
       - name: Setup bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
+        run: bash scripts/setup-bun.sh
       - name: Install dependencies
         run: bun install
       - name: Install Playwright browser
@@ -393,9 +389,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - name: Setup bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
+        run: bash scripts/setup-bun.sh
       - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
@@ -436,9 +430,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - name: Setup bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
+        run: bash scripts/setup-bun.sh
       - name: Install dependencies
         run: bun install
       - name: Install test_upload dependencies
@@ -470,9 +462,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - name: Setup bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
+        if: runner.os != 'Windows'
+        run: bash scripts/setup-bun.sh
+      - name: Setup bun on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/setup-bun.ps1
       - name: Install dependencies
         run: bun install
       - name: Install test_upload dependencies
@@ -621,9 +616,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - name: Setup bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
+        run: bash scripts/setup-bun.sh
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
@@ -669,9 +662,7 @@ jobs:
         with:
           fetch-depth: 2
       - name: Setup bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
+        run: bash scripts/setup-bun.sh
       - name: Install dependencies
         run: bun install
       - name: Install Supabase CLI

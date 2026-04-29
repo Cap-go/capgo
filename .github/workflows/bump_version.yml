@@ -29,9 +29,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Setup bun
-        uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
+        run: bash scripts/setup-bun.sh
       - name: Resolve Capgo release scope
         id: capgo
         run: bun scripts/release-scope.ts capgo "${{ github.event.before }}" "${{ github.sha }}" >> "$GITHUB_OUTPUT"
