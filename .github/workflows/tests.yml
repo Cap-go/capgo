@@ -56,6 +56,7 @@ jobs:
             shared:
               - '.github/workflows/**'
               - '.github/scripts/**'
+              - 'scripts/release-scope.ts'
               - 'scripts/setup-bun.sh'
               - 'scripts/setup-bun.ps1'
               - '.npmrc'
