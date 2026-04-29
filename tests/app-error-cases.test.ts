@@ -2,10 +2,13 @@ import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { BASE_URL, getAuthHeaders, getSupabaseClient, NON_ACCESS_APP_NAME, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
 
-const id = randomUUID()
+const id = randomUUID().replace(/-/g, '').slice(0, 12)
 const APPNAME = `com.app.error.${id}`
+const DELETE_APP_ID = `${APPNAME}.delete`
+const NOT_FOUND_APP_ID = `${APPNAME}.notfound`
+const PUT_APP_ID = `${APPNAME}.put`
 const testOrgId = randomUUID()
-const testStripeCustomerId = `cus_app_error_${id.replace(/-/g, '').slice(0, 18)}`
+const testStripeCustomerId = `cus_app_error_${id}`
 let testApiKeyId: number | null = null
 let testHeaders: Record<string, string>
 let authHeaders: Record<string, string>
@@ -45,9 +48,9 @@ beforeAll(async () => {
 afterAll(async () => {
   await resetAppData(APPNAME)
   // Clean up any test apps created during tests
-  await getSupabaseClient().from('apps').delete().eq('app_id', `${APPNAME}.delete`)
-  await getSupabaseClient().from('apps').delete().eq('app_id', `${APPNAME}.put`)
-  await getSupabaseClient().from('apps').delete().eq('app_id', `${APPNAME}.notfound`)
+  await getSupabaseClient().from('apps').delete().eq('app_id', DELETE_APP_ID)
+  await getSupabaseClient().from('apps').delete().eq('app_id', PUT_APP_ID)
+  await getSupabaseClient().from('apps').delete().eq('app_id', NOT_FOUND_APP_ID)
   if (testApiKeyId !== null) {
     await fetch(`${BASE_URL}/apikey/${testApiKeyId}`, {
       method: 'DELETE',
@@ -135,17 +138,17 @@ describe('[GET] /app - Error Cases', () => {
       headers: testHeaders,
       body: JSON.stringify({
         name: `App ${APPNAME}.notfound`,
-        app_id: `${APPNAME}.notfound`,
+        app_id: NOT_FOUND_APP_ID,
         owner_org: testOrgId,
       }),
     })
     expect(createResponse.status).toBe(200)
 
     // Delete the app from database directly
-    await getSupabaseClient().from('apps').delete().eq('app_id', `${APPNAME}.notfound`)
+    await getSupabaseClient().from('apps').delete().eq('app_id', NOT_FOUND_APP_ID)
 
     // Try to get the deleted app
-    const response = await fetch(`${BASE_URL}/app/${APPNAME}.notfound`, {
+    const response = await fetch(`${BASE_URL}/app/${NOT_FOUND_APP_ID}`, {
       method: 'GET',
       headers: testHeaders,
     })
@@ -175,7 +178,7 @@ describe('[PUT] /app - Error Cases', () => {
       headers: testHeaders,
       body: JSON.stringify({
         name: `App ${APPNAME}.put`,
-        app_id: `${APPNAME}.put`,
+        app_id: PUT_APP_ID,
         owner_org: testOrgId,
       }),
     })
@@ -197,7 +200,7 @@ describe('[PUT] /app - Error Cases', () => {
 
   it('should return 400 when update fails', async () => {
     // Try to update with invalid data that would cause a database error
-    const response = await fetch(`${BASE_URL}/app/${APPNAME}.put`, {
+    const response = await fetch(`${BASE_URL}/app/${PUT_APP_ID}`, {
       method: 'PUT',
       headers: testHeaders,
       body: JSON.stringify({
@@ -211,7 +214,7 @@ describe('[PUT] /app - Error Cases', () => {
   })
 
   it('should handle invalid JSON body', async () => {
-    const response = await fetch(`${BASE_URL}/app/${APPNAME}.put`, {
+    const response = await fetch(`${BASE_URL}/app/${PUT_APP_ID}`, {
       method: 'PUT',
       headers: testHeaders,
       body: 'invalid json',
@@ -238,14 +241,14 @@ describe('[DELETE] /app - Error Cases', () => {
       headers: testHeaders,
       body: JSON.stringify({
         name: `App ${APPNAME}.delete`,
-        app_id: `${APPNAME}.delete`,
+        app_id: DELETE_APP_ID,
         owner_org: testOrgId,
       }),
     })
     expect(createResponse.status).toBe(200)
 
     // Try to delete the app (this should work)
-    const response = await fetch(`${BASE_URL}/app/${APPNAME}.delete`, {
+    const response = await fetch(`${BASE_URL}/app/${DELETE_APP_ID}`, {
       method: 'DELETE',
       headers: testHeaders,
     })
@@ -254,7 +257,7 @@ describe('[DELETE] /app - Error Cases', () => {
     expect(response.status).toBe(200)
 
     // Try to delete the same app again (should fail)
-    const response2 = await fetch(`${BASE_URL}/app/${APPNAME}.delete`, {
+    const response2 = await fetch(`${BASE_URL}/app/${DELETE_APP_ID}`, {
       method: 'DELETE',
       headers: testHeaders,
     })
