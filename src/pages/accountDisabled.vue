@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
 import { useSupabase } from '~/services/supabase'
 import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
+const route = useRoute()
 const router = useRouter()
 const main = useMainStore()
 const supabase = useSupabase()
@@ -19,7 +21,46 @@ const deletionDate = ref<Date | null>(null)
 const currentTime = ref(new Date())
 const loading = ref(true)
 const error = ref<string | null>(null)
+const isRestoring = ref(false)
 let intervalId: NodeJS.Timeout | null = null
+
+const restoreTarget = computed(() => {
+  const target = typeof route.query.to === 'string' ? route.query.to : ''
+  if (target.startsWith('/') && target !== '/accountDisabled')
+    return target
+  return '/dashboard'
+})
+
+async function handleRestore() {
+  if (isRestoring.value)
+    return
+
+  isRestoring.value = true
+
+  try {
+    const { error: restoreError } = await supabase.rpc('restore_deleted_account')
+    if (restoreError) {
+      console.error('Error restoring deleted account:', restoreError)
+      if (restoreError.message?.includes('reauth_required')) {
+        toast.error(t('account-restore-reauth-required'))
+      }
+      else {
+        toast.error(t('account-restore-failed'))
+      }
+      return
+    }
+
+    toast.success(t('account-restored-successfully'))
+    await router.replace(restoreTarget.value)
+  }
+  catch (restoreError) {
+    console.error('Error restoring deleted account:', restoreError)
+    toast.error(t('account-restore-failed'))
+  }
+  finally {
+    isRestoring.value = false
+  }
+}
 
 // Use i18n component interpolation in the template; no HTML parsing here
 
@@ -112,7 +153,10 @@ const timeRemaining = computed(() => {
         <h1 class="mb-6 text-4xl font-bold text-gray-900 dark:text-white">
           {{ t('account-deletion-requested') }}
         </h1>
-        <i18n-t keypath="account-deletion-restore" tag="p" class="mb-4 text-lg text-gray-600 dark:text-gray-300">
+        <p class="mb-4 text-lg text-gray-600 dark:text-gray-300">
+          {{ t('account-deletion-restore') }}
+        </p>
+        <i18n-t keypath="account-deletion-support" tag="p" class="text-base text-gray-500 dark:text-gray-400">
           <template #link>
             <a
               href="https://support.capgo.app/"
@@ -134,7 +178,14 @@ const timeRemaining = computed(() => {
     </div>
 
     <!-- Logout button positioned 4vh below the content -->
-    <div class="flex justify-center pt-[35vh]">
+    <div class="flex flex-col gap-4 justify-center items-center pt-[35vh]">
+      <button
+        class="py-3 px-6 font-medium text-white bg-blue-600 rounded-lg transition-colors duration-200 hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-70"
+        :disabled="isRestoring"
+        @click="handleRestore"
+      >
+        {{ isRestoring ? t('restoring-account') : t('restore-account') }}
+      </button>
       <button
         class="py-3 px-6 font-medium text-white bg-gray-600 rounded-lg transition-colors duration-200 dark:bg-gray-700 hover:bg-gray-700 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:outline-none dark:hover:bg-gray-600"
         @click="handleLogout"

@@ -5,7 +5,7 @@ Legend: R = reads user records only (no direct auth/public users writes detected
 | Test file | Users | User ops (R/W) | Parallel compatibility |
 | --- | --- | --- | --- |
 | tests/admin-credits.test.ts | USER_ID | R | Shared |
-| tests/apikeys-expiration.test.ts | USER_ID | R | Shared |
+| tests/apikeys-expiration.test.ts | USER_ID_APIKEY_EXPIRATION | R | Isolated |
 | tests/app-id-validation.test.ts | USER_ID | R | Shared |
 | tests/app-permissions.test.ts | USER_ID, USER_ID_2 | R | Shared |
 | tests/app.test.ts | USER_ID | R | Shared |
