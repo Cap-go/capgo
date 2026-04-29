@@ -265,6 +265,20 @@ export function revertInitAutoTestChangeContent(kind: InitAutoTestChangeKind, co
   return reverted !== content ? reverted : undefined
 }
 
+async function waitForGitRepoCleanRetry() {
+  const ready = await pText({
+    message: 'Type "ready" once the repository is clean and you want me to check again.',
+    placeholder: 'ready',
+    validate: (value) => {
+      if (!value?.trim())
+        return 'Type "ready" when the repository is clean.'
+      if (value.trim().toLowerCase() !== 'ready')
+        return 'Type "ready" when the repository is clean.'
+    },
+  })
+  cancelBeforeAuthenticatedOnboarding(ready)
+}
+
 async function ensureGitRepoCleanBeforeInit() {
   let warned = false
 
@@ -302,6 +316,7 @@ async function ensureGitRepoCleanBeforeInit() {
 
     if (!confirmed) {
       pLog.warn('Init is paused until the repository is clean.')
+      await waitForGitRepoCleanRetry()
     }
   }
 }
@@ -3602,6 +3617,9 @@ async function addCodeChangeStep(orgId: string, apikey: string, appId: string, p
               displayPath: formatInitFilePath(filePath),
               kind: appliedChange.kind,
             }
+            // Persist the step-8 checkpoint immediately so resume can still
+            // offer cleanup if the user exits later in this step.
+            markStepDone(8)
             changed = true
             break
           }
@@ -4080,7 +4098,6 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   const pm = getPMAndCommand()
   pIntro('Capgo onboarding')
   renderInitOnboardingWelcome(initOnboardingSteps.length)
-  await ensureGitRepoCleanBeforeInit()
   appId = await ensureWorkspaceReadyForInit(appId) ?? appId
   const versionStatus = await checkVersionStatus()
   if (versionStatus.isOutdated) {
@@ -4279,6 +4296,9 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   const orgId = organization.gid
   globalOrgId = orgId
   globalOrgName = organization.name
+
+  if (stepToSkip === 0)
+    await ensureGitRepoCleanBeforeInit()
 
   if (resumed?.appId) {
     appId = resumed.appId
