@@ -20,7 +20,7 @@ import {
   getConfig,
   getHumanDate,
   OrganizationPerm,
-  verifyUser,
+  resolveUserIdFromApiKey,
 } from '../utils'
 
 async function removeVersions(
@@ -80,7 +80,7 @@ export async function cleanupBundleInternal(appId: string, options: BundleCleanu
 
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
   await check2FAComplianceForApp(supabase, appId, silent)
-  await verifyUser(supabase, options.apikey, ['write', 'all'])
+  await resolveUserIdFromApiKey(supabase, options.apikey)
   await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.write, silent, true)
 
   if (!silent)

@@ -39,7 +39,7 @@ import { WebSocket as PartySocket } from 'partysocket'
 import * as tus from 'tus-js-client'
 import WS from 'ws' // TODO: remove when min version nodejs 22 is bump, should do it in july 2026 as it become deprecated
 import pack from '../../package.json'
-import { createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent, verifyUser } from '../utils'
+import { assertCliPermission, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, resolveUserIdFromApiKey, sendEvent } from '../utils'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
 import { getPlatformDirFromCapacitorConfig } from './platform-paths'
@@ -237,9 +237,63 @@ export type { BuildCredentials, BuildRequestOptions, BuildRequestResponse, Build
  * Returns the final status if detected from the stream, or null if stream ended without status.
  */
 type StatusCheckFn = () => Promise<string | null>
+interface WsEntry {
+  id?: number
+  message?: string
+  type?: string
+  status?: string
+  kind?: string
+  data?: Record<string, unknown>
+}
 
 const TERMINAL_STATUSES = ['succeeded', 'failed', 'expired', 'released', 'cancelled'] as const
 const TERMINAL_STATUS_SET = new Set<string>(TERMINAL_STATUSES)
+
+function decodeEventData(event: MessageEvent): string {
+  if (typeof event.data === 'string')
+    return event.data
+  if (event.data instanceof ArrayBuffer)
+    return new TextDecoder().decode(event.data)
+  if (ArrayBuffer.isView(event.data)) {
+    const view = event.data as ArrayBufferView
+    return new TextDecoder().decode(new Uint8Array(view.buffer, view.byteOffset, view.byteLength))
+  }
+  if (event.data && typeof (event.data as { toString?: () => string }).toString === 'function')
+    return (event.data as { toString: () => string }).toString()
+  return ''
+}
+
+function warnOrLog(message: string, logger: BuildLogger | undefined, silent: boolean): void {
+  if (logger)
+    logger.warn(message)
+  else if (!silent)
+    clackLog.warn(message)
+}
+
+async function dispatchCustomMsg(
+  kind: string,
+  data: Record<string, unknown>,
+  logger: BuildLogger | undefined,
+  silent: boolean,
+): Promise<void> {
+  try {
+    if (logger) {
+      await logger.customMsg(kind, data)
+    }
+    else if (!silent) {
+      await handleCustomMsg(
+        kind,
+        data,
+        // eslint-disable-next-line no-console
+        (line: string) => console.log(line),
+        (line: string) => clackLog.warn(line),
+      )
+    }
+  }
+  catch (error) {
+    warnOrLog(`Custom message handler encountered an error, continuing... ${String(error)}`, logger, silent)
+  }
+}
 
 async function streamBuildLogs(
   silent: boolean,
@@ -408,6 +462,41 @@ async function streamBuildLogs(
         }, HEARTBEAT_INTERVAL_MS)
       }
 
+      const handleEntry = async (entry: WsEntry) => {
+        if (entry.type === 'custom_msg' && typeof entry.kind === 'string' && entry.data) {
+          lastMessageAt = Date.now()
+          await dispatchCustomMsg(entry.kind, entry.data, logger, silent)
+          return
+        }
+        if (entry.type === 'status' && typeof entry.status === 'string') {
+          const status = entry.status.toLowerCase()
+          lastMessageAt = Date.now()
+          if (terminalStatuses.has(status))
+            finalStatus = status
+          return
+        }
+        if (entry.type === 'log' && typeof entry.message === 'string') {
+          lastMessageAt = Date.now()
+          processLogMessage(entry.message)
+          return
+        }
+        if (typeof entry.message === 'string') {
+          lastMessageAt = Date.now()
+          processLogMessage(entry.message)
+        }
+      }
+
+      const sendConfirmation = (id: number) => {
+        if (ws.readyState !== PartySocket.OPEN)
+          return
+        try {
+          ws.send(JSON.stringify({ type: 'confirmed_received', lastId: id }))
+        }
+        catch (error) {
+          warnOrLog(`Failed to send log confirmation, continuing... ${String(error)}`, logger, silent)
+        }
+      }
+
       startHeartbeat()
 
       if (abortSignal) {
@@ -423,30 +512,9 @@ async function streamBuildLogs(
       }
 
       ws.addEventListener('message', async (event: MessageEvent) => {
-        let raw = ''
-        if (typeof event.data === 'string') {
-          raw = event.data
-        }
-        else if (event.data instanceof ArrayBuffer) {
-          raw = new TextDecoder().decode(event.data)
-        }
-        else if (ArrayBuffer.isView(event.data)) {
-          const view = event.data as ArrayBufferView
-          raw = new TextDecoder().decode(new Uint8Array(view.buffer, view.byteOffset, view.byteLength))
-        }
-        else if (event.data && typeof (event.data as { toString?: () => string }).toString === 'function') {
-          raw = (event.data as { toString: () => string }).toString()
-        }
+        const raw = decodeEventData(event)
 
-        let parsed: {
-          id?: number
-          message?: string
-          type?: string
-          status?: string
-          kind?: string
-          data?: Record<string, unknown>
-          messages?: Array<{ id?: number, message?: string, type?: string, status?: string, kind?: string, data?: Record<string, unknown> }>
-        } | null = null
+        let parsed: (WsEntry & { messages?: WsEntry[] }) | null = null
         try {
           parsed = JSON.parse(raw)
         }
@@ -454,45 +522,8 @@ async function streamBuildLogs(
           parsed = null
         }
 
-        const handleEntry = async (entry: { id?: number, message?: string, type?: string, status?: string, kind?: string, data?: Record<string, unknown> }) => {
-          if (entry.type === 'custom_msg' && typeof entry.kind === 'string' && entry.data) {
-            lastMessageAt = Date.now()
-            if (logger) {
-              await logger.customMsg(entry.kind, entry.data)
-            }
-            else if (!silent) {
-              await handleCustomMsg(
-                entry.kind,
-                entry.data,
-                // eslint-disable-next-line no-console
-                (line: string) => console.log(line),
-                (line: string) => clackLog.warn(line),
-              )
-            }
-            return
-          }
-          if (entry.type === 'status' && typeof entry.status === 'string') {
-            const status = entry.status.toLowerCase()
-            lastMessageAt = Date.now()
-            if (terminalStatuses.has(status)) {
-              finalStatus = status
-            }
-            return
-          }
-          if (entry.type === 'log' && typeof entry.message === 'string') {
-            lastMessageAt = Date.now()
-            processLogMessage(entry.message)
-            return
-          }
-          if (typeof entry.message === 'string') {
-            lastMessageAt = Date.now()
-            processLogMessage(entry.message)
-          }
-        }
-
-        if (parsed?.type === 'heartbeat_response') {
+        if (parsed?.type === 'heartbeat_response')
           return
-        }
 
         if (parsed?.type === 'batch_messages' && Array.isArray(parsed.messages)) {
           let maxId = lastConfirmedId
@@ -503,17 +534,7 @@ async function streamBuildLogs(
           }
           if (maxId > lastConfirmedId) {
             lastConfirmedId = maxId
-            if (ws.readyState === PartySocket.OPEN) {
-              try {
-                ws.send(JSON.stringify({ type: 'confirmed_received', lastId: maxId }))
-              }
-              catch (error) {
-                if (logger)
-                  logger.warn(`Failed to send log confirmation, continuing... ${String(error)}`)
-                else if (!silent)
-                  clackLog.warn(`Failed to send log confirmation, continuing... ${String(error)}`)
-              }
-            }
+            sendConfirmation(maxId)
           }
         }
         else {
@@ -525,25 +546,14 @@ async function streamBuildLogs(
             processLogMessage(raw)
           }
 
-          if (parsed && typeof parsed.id === 'number') {
+          if (parsed && typeof parsed.id === 'number' && parsed.id > lastConfirmedId) {
             lastConfirmedId = parsed.id
-            if (ws.readyState === PartySocket.OPEN) {
-              try {
-                ws.send(JSON.stringify({ type: 'confirmed_received', lastId: parsed.id }))
-              }
-              catch (error) {
-                if (logger)
-                  logger.warn(`Failed to send log confirmation, continuing... ${String(error)}`)
-                else if (!silent)
-                  clackLog.warn(`Failed to send log confirmation, continuing... ${String(error)}`)
-              }
-            }
+            sendConfirmation(parsed.id)
           }
         }
 
-        if (finalStatus) {
+        if (finalStatus)
           finish(finalStatus)
-        }
       })
 
       ws.addEventListener('error', () => {
@@ -1117,7 +1127,11 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     const host = options.supaHost || 'https://api.capgo.app'
 
     const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
-    await verifyUser(supabase, options.apikey, ['write', 'all'])
+    await resolveUserIdFromApiKey(supabase, options.apikey, silent)
+    await assertCliPermission(supabase, options.apikey, 'app.build_native', { appId }, {
+      message: `Insufficient permissions to request a native build for app ${appId}`,
+      silent,
+    })
 
     // Get organization ID for analytics
     const orgId = await getOrganizationId(supabase, appId)

@@ -8,15 +8,16 @@ import { intro, log, outro } from '@clack/prompts'
 import { checkAppExists, defaultAppIconPath, getAppIconStoragePath, newIconPath } from '../api/app'
 import { checkAlerts } from '../api/update'
 import {
+  assertCliPermission,
   createSupabaseClient,
   findSavedKey,
   formatError,
   getAppId,
   getConfig,
   getContentType,
-  getOrganization,
+  getOrganizationWithPermission,
+  resolveUserIdFromApiKey,
   sendEvent,
-  verifyUser,
 } from '../utils'
 
 export const reverseDomainRegex = /^[a-z0-9]+(\.[\w-]+)+$/i
@@ -90,14 +91,19 @@ export async function addAppInternal(
   ensureOptions(appId, options, silent)
 
   const supabase = await createSupabaseClient(options.apikey!, options.supaHost, options.supaAnon)
-  const userId = await verifyUser(supabase, options.apikey!, ['write', 'all'])
+  const userId = await resolveUserIdFromApiKey(supabase, options.apikey)
 
   await ensureAppDoesNotExist(supabase, appId, silent)
 
   if (!organization)
-    organization = await getOrganization(supabase, ['admin', 'super_admin'])
+    organization = await getOrganizationWithPermission(supabase, options.apikey, 'org.create_app')
 
   const organizationUid = organization.gid
+
+  await assertCliPermission(supabase, options.apikey, 'org.create_app', { orgId: organizationUid }, {
+    message: `Insufficient permissions to create an app in organization ${organizationUid}`,
+    silent,
+  })
 
   let { name, icon } = options
   name = name || extConfig.config?.appName || 'Unknown'

@@ -5,8 +5,8 @@ import {
   createSupabaseClient,
   findSavedKey,
   formatError,
+  resolveUserIdFromApiKey,
   sendEvent,
-  verifyUser,
 } from '../utils'
 
 export async function addOrganizationInternal(options: OrganizationAddOptions, silent = false) {
@@ -31,7 +31,7 @@ export async function addOrganizationInternal(options: OrganizationAddOptions, s
     enrichedOptions.supaHost,
     enrichedOptions.supaAnon,
   )
-  const userId = await verifyUser(supabase, enrichedOptions.apikey, ['write', 'all'])
+  const userId = await resolveUserIdFromApiKey(supabase, enrichedOptions.apikey)
 
   let { name, email } = enrichedOptions
 

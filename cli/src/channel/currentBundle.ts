@@ -7,7 +7,7 @@ import {
   getAppId,
   getConfig,
   OrganizationPerm,
-  verifyUser,
+  resolveUserIdFromApiKey,
 } from '../utils'
 
 interface Channel {
@@ -40,7 +40,7 @@ export async function currentBundleInternal(channel: string, appId: string, opti
 
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
   await check2FAComplianceForApp(supabase, appId, silent)
-  await verifyUser(supabase, options.apikey, ['write', 'all', 'read'])
+  await resolveUserIdFromApiKey(supabase, options.apikey)
   await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.read, silent, true)
 
   if (!channel) {

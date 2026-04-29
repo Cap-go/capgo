@@ -13,8 +13,8 @@ import {
   getConfig,
   getOrganizationId,
   OrganizationPerm,
+  resolveUserIdFromApiKey,
   sendEvent,
-  verifyUser,
 } from '../utils'
 
 export async function unlinkDeviceInternal(
@@ -72,7 +72,7 @@ export async function unlinkDeviceInternal(
     await check2FAComplianceForApp(supabase, resolvedAppId, silent)
 
     const [userId, orgId] = await Promise.all([
-      verifyUser(supabase, enrichedOptions.apikey, ['all', 'write']),
+      resolveUserIdFromApiKey(supabase, enrichedOptions.apikey),
       getOrganizationId(supabase, resolvedAppId),
     ])
 

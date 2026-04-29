@@ -2,7 +2,7 @@ import type { OptionsBase } from '../schemas/base'
 import { intro, log, outro } from '@clack/prompts'
 import { check2FAComplianceForApp, checkAppExistsAndHasPermissionOrgErr } from '../api/app'
 import { displayChannels, getActiveChannels } from '../api/channels'
-import { createSupabaseClient, findSavedKey, getAppId, getConfig, OrganizationPerm, sendEvent, verifyUser } from '../utils'
+import { createSupabaseClient, findSavedKey, getAppId, getConfig, OrganizationPerm, resolveUserIdFromApiKey, sendEvent } from '../utils'
 
 export async function listChannelsInternal(appId: string, options: OptionsBase, silent = false) {
   if (!silent)
@@ -26,7 +26,7 @@ export async function listChannelsInternal(appId: string, options: OptionsBase, 
 
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon)
   await check2FAComplianceForApp(supabase, appId, silent)
-  const userId = await verifyUser(supabase, options.apikey, ['write', 'all', 'read', 'upload'])
+  const userId = await resolveUserIdFromApiKey(supabase, options.apikey)
 
   await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.read, silent, true)
 

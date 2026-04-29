@@ -10,8 +10,8 @@ import {
   getConfig,
   getOrganizationId,
   OrganizationPerm,
+  resolveUserIdFromApiKey,
   sendEvent,
-  verifyUser,
 } from '../utils'
 
 export async function addChannelInternal(channelId: string, appId: string, options: ChannelAddOptions, silent = false) {
@@ -36,7 +36,7 @@ export async function addChannelInternal(channelId: string, appId: string, optio
 
   const supabase = await createSupabaseClient(options.apikey, options.supaHost, options.supaAnon, silent)
   await check2FAComplianceForApp(supabase, appId, silent)
-  await verifyUser(supabase, options.apikey, ['write', 'all'])
+  await resolveUserIdFromApiKey(supabase, options.apikey)
   await checkAppExistsAndHasPermissionOrgErr(supabase, options.apikey, appId, OrganizationPerm.admin, silent, true)
 
   if (!silent)
@@ -50,7 +50,7 @@ export async function addChannelInternal(channelId: string, appId: string, optio
   }
 
   const orgId = await getOrganizationId(supabase, appId)
-  const userId = await verifyUser(supabase, options.apikey, ['write', 'all'])
+  const userId = await resolveUserIdFromApiKey(supabase, options.apikey)
 
   const res = await createChannel(supabase, {
     name: channelId,
