@@ -94,6 +94,7 @@ interface InitAutoTestChange {
 
 let tmpObject: tmp.FileResult['name'] | undefined
 let globalPathToPackageJson: string | undefined
+let globalNodeModulesPath: string | undefined
 let globalChannelName = defaultChannel
 let globalPlatform: 'ios' | 'android' = 'ios'
 let globalDelta = false
@@ -261,9 +262,10 @@ export function applyInitAutoTestChange(filePath: string, content: string): { ki
 
   if (filePath.endsWith('.css')) {
     if (!content.includes('capgo-test-background')) {
+      const insertionIndex = getCssAutoTestInsertionIndex(content)
       return {
         kind: 'css-background',
-        content: `${cssAutoTestInjection}${content}`,
+        content: `${content.slice(0, insertionIndex)}${cssAutoTestInjection}${content.slice(insertionIndex)}`,
       }
     }
   }
@@ -290,6 +292,73 @@ export function revertInitAutoTestChangeContent(kind: InitAutoTestChangeKind, co
   return undefined
 }
 
+function isCssWhitespace(char?: string) {
+  return char === ' ' || char === '\n' || char === '\r' || char === '\t' || char === '\f'
+}
+
+function skipCssWhitespace(content: string, startIndex: number) {
+  let index = startIndex
+  while (index < content.length && isCssWhitespace(content[index]))
+    index += 1
+  return index
+}
+
+function readCssHeaderRule(content: string, startIndex: number, rule: '@charset' | '@import') {
+  const ruleStart = skipCssWhitespace(content, startIndex)
+  if (content.slice(ruleStart, ruleStart + rule.length).toLowerCase() !== rule)
+    return startIndex
+
+  const semicolonIndex = content.indexOf(';', ruleStart + rule.length)
+  if (semicolonIndex === -1)
+    return startIndex
+
+  return skipCssWhitespace(content, semicolonIndex + 1)
+}
+
+function getCssAutoTestInsertionIndex(content: string) {
+  let index = content.startsWith('\uFEFF') ? 1 : 0
+  index = readCssHeaderRule(content, index, '@charset')
+
+  while (true) {
+    const nextIndex = readCssHeaderRule(content, index, '@import')
+    if (nextIndex === index)
+      return index
+    index = nextIndex
+  }
+}
+
+function getGitStatusEntryPath(entry: string) {
+  const rawPath = entry.slice(3).trim()
+  const renameSeparator = ' -> '
+  if (!rawPath.includes(renameSeparator))
+    return rawPath
+
+  return rawPath.slice(rawPath.lastIndexOf(renameSeparator) + renameSeparator.length)
+}
+
+function isOnlyAllowedInitAutoTestChange(status: GitRepoStatus, allowedChange?: InitAutoTestChange) {
+  if (!allowedChange || !status.inRepo || !status.repoRoot || status.error || status.clean || status.entries.length === 0)
+    return false
+
+  const repoRoot = status.repoRoot
+  const allowedFilePath = path.resolve(allowedChange.filePath)
+  const dirtyPaths = status.entries
+    .map(getGitStatusEntryPath)
+    .filter(Boolean)
+    .map(entryPath => path.resolve(repoRoot, entryPath))
+
+  if (dirtyPaths.length === 0 || !dirtyPaths.every(dirtyPath => dirtyPath === allowedFilePath))
+    return false
+
+  try {
+    const currentContent = readFileSync(allowedFilePath, 'utf8')
+    return Boolean(revertInitAutoTestChangeContent(allowedChange.kind, currentContent))
+  }
+  catch {
+    return false
+  }
+}
+
 async function waitForGitRepoCleanRetry() {
   const ready = await pText({
     message: 'Type "ready" once the repository is clean and you want me to check again.',
@@ -304,12 +373,12 @@ async function waitForGitRepoCleanRetry() {
   cancelBeforeAuthenticatedOnboarding(ready)
 }
 
-async function ensureGitRepoCleanBeforeInit() {
+async function ensureGitRepoCleanBeforeInit(allowedAutoTestChange?: InitAutoTestChange) {
   let warned = false
 
   while (true) {
     const status = getGitRepoStatus()
-    if (status.error) {
+    if (status.error && !status.inRepo) {
       pLog.warn(`Could not verify git status, skipping clean-repo check: ${status.error}`)
       return
     }
@@ -317,11 +386,22 @@ async function ensureGitRepoCleanBeforeInit() {
     if (!status.inRepo)
       return
 
+    if (status.error) {
+      warned = true
+      pLog.error(`Could not verify git status for ${status.repoRoot}: ${status.error}`)
+      pLog.info('Fix the git error first, then retry onboarding.')
+      await waitForGitRepoCleanRetry()
+      continue
+    }
+
     if (status.clean) {
       if (warned)
         pLog.success('Git repository is clean ✅')
       return
     }
+
+    if (isOnlyAllowedInitAutoTestChange(status, allowedAutoTestChange))
+      return
 
     warned = true
     pLog.warn(`Git repository is not clean: ${status.repoRoot}`)
@@ -853,6 +933,7 @@ function markStepDone(step: number, pathToPackageJson?: string, channelName?: st
       codeDiff: globalCodeDiff,
       encryptionSummary: globalEncryptionSummary,
       autoTestChange: globalAutoTestChange,
+      nodeModulesPath: globalNodeModulesPath,
     }))
     if (pathToPackageJson) {
       globalPathToPackageJson = pathToPackageJson
@@ -880,7 +961,7 @@ async function tryResumeOnboarding(apikey: string): Promise<ResumeResult | undef
     if (!rawData || rawData.length === 0)
       return undefined
 
-    const { step_done, orgId, orgName, appId: savedAppId, pathToPackageJson, channelName, platform, delta, currentVersion, codeDiff, encryptionSummary, autoTestChange } = JSON.parse(rawData)
+    const { step_done, orgId, orgName, appId: savedAppId, pathToPackageJson, nodeModulesPath, channelName, platform, delta, currentVersion, codeDiff, encryptionSummary, autoTestChange } = JSON.parse(rawData)
     if (!orgId || !step_done) {
       pLog.warn('⚠️  Found previous onboarding progress, but it was saved in an older format.')
       pLog.info('   Starting fresh. Your previous progress cannot be resumed.')
@@ -902,6 +983,9 @@ async function tryResumeOnboarding(apikey: string): Promise<ResumeResult | undef
     if (resumeChoice === 'yes') {
       if (pathToPackageJson) {
         globalPathToPackageJson = pathToPackageJson
+      }
+      if (typeof nodeModulesPath === 'string' && nodeModulesPath.length > 0) {
+        globalNodeModulesPath = nodeModulesPath
       }
       if (channelName) {
         globalChannelName = channelName
@@ -993,6 +1077,7 @@ async function tryResumeOnboarding(apikey: string): Promise<ResumeResult | undef
     globalEncryptionSummary = undefined
     setInitEncryptionSummary(undefined)
     globalAutoTestChange = undefined
+    globalNodeModulesPath = undefined
     return undefined
   }
   catch (err) {
@@ -1003,12 +1088,14 @@ async function tryResumeOnboarding(apikey: string): Promise<ResumeResult | undef
     globalEncryptionSummary = undefined
     setInitEncryptionSummary(undefined)
     globalAutoTestChange = undefined
+    globalNodeModulesPath = undefined
     return undefined
   }
 }
 
 function cleanupStepsDone() {
   globalAutoTestChange = undefined
+  globalNodeModulesPath = undefined
   if (!tmpObject) {
     return
   }
@@ -3847,6 +3934,7 @@ async function maybeOfferAutoTestCleanup(orgId: string, apikey: string, appId: s
     `--channel ${globalChannelName}`,
     delta ? '--delta-only' : '',
     globalPathToPackageJson ? `--package-json ${globalPathToPackageJson}` : '',
+    globalNodeModulesPath ? `--node-modules ${globalNodeModulesPath}` : '',
   ].filter(Boolean).join(' ')
 
   pLog.info(reverted
@@ -3879,6 +3967,8 @@ async function uploadStep(orgId: string, apikey: string, appId: string, newVersi
           continue
         }
       }
+
+      globalNodeModulesPath = isMonorepo ? nodeModulesPath : undefined
 
       let uploadRes: Awaited<ReturnType<typeof uploadBundleInternal>> | undefined
       try {
@@ -4125,8 +4215,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   let resumed = await tryResumeOnboarding(options.apikey)
   let stepToSkip = resumed?.stepDone ?? 0
 
-  if (stepToSkip === 0)
-    await ensureGitRepoCleanBeforeInit()
+  await ensureGitRepoCleanBeforeInit(stepToSkip > 0 ? globalAutoTestChange : undefined)
 
   appId = await ensureWorkspaceReadyForInit(appId) ?? appId
   const versionStatus = await checkVersionStatus()
@@ -4263,6 +4352,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
     stepToSkip = 0
     resumed = undefined
     globalPathToPackageJson = undefined
+    globalNodeModulesPath = undefined
     globalChannelName = defaultChannel
     globalPlatform = 'ios'
     globalDelta = false

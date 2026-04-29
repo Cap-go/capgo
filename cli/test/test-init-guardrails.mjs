@@ -65,6 +65,19 @@ t('git status helper detects clean and dirty repos', () => {
   })
 })
 
+t('git status helper reports git status failures inside a repo', () => {
+  withTempDir((root) => {
+    execSync('git init', { cwd: root, stdio: 'ignore' })
+    writeFileSync(join(root, '.git', 'index'), 'not-a-real-index', 'utf8')
+
+    const status = getGitRepoStatus(root)
+    assert.equal(status.inRepo, true)
+    assert.equal(status.clean, false)
+    assert.equal(status.entries.length, 0)
+    assert.ok(status.error)
+  })
+})
+
 t('init updater config always starts from native version 0.0.0', () => {
   assert.deepEqual(getInitUpdaterPluginConfig('com.example.app', false), {
     version: '0.0.0',
@@ -113,6 +126,15 @@ t('auto css onboarding changes can be applied and reverted', () => {
   assert.ok(applied)
   assert.equal(applied.kind, 'css-background')
   assert.ok(applied.content.includes('capgo-test-background'))
+  assert.equal(revertInitAutoTestChangeContent(applied.kind, applied.content), original)
+})
+
+t('auto css onboarding changes preserve leading css header rules', () => {
+  const original = '@charset "UTF-8";\n@import url("./base.css");\nbody { color: red; }\n'
+  const applied = applyInitAutoTestChange('src/main.css', original)
+  assert.ok(applied)
+  assert.equal(applied.kind, 'css-background')
+  assert.ok(applied.content.startsWith('@charset "UTF-8";\n@import url("./base.css");\n/* Capgo test modification - background change */'))
   assert.equal(revertInitAutoTestChangeContent(applied.kind, applied.content), original)
 })
 
