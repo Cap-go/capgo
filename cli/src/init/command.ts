@@ -3941,7 +3941,7 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   await resolveUserIdFromApiKey(supabase, options.apikey)
 
   // Try to resume from saved state before asking for org selection
-  const resumed = await tryResumeOnboarding(options.apikey)
+  let resumed = await tryResumeOnboarding(options.apikey)
   let stepToSkip = resumed?.stepDone ?? 0
 
   // Whenever a resume is aborted (org no longer available, role lost, 2FA
@@ -3952,6 +3952,15 @@ export async function initApp(apikeyCommand: string, appId: string, options: Sup
   // before `markStepDone()` has had a chance to overwrite it.
   const discardResumedState = () => {
     stepToSkip = 0
+    resumed = undefined
+    globalPathToPackageJson = undefined
+    globalChannelName = defaultChannel
+    globalPlatform = 'ios'
+    globalDelta = false
+    globalCurrentVersion = undefined
+    globalAppId = undefined
+    globalOrgId = undefined
+    globalOrgName = undefined
     globalCodeDiff = undefined
     setInitCodeDiff(undefined)
     globalEncryptionSummary = undefined
