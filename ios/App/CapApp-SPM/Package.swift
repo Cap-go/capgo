@@ -11,7 +11,7 @@ let package = Package(
             targets: ["CapApp-SPM"])
     ],
     dependencies: [
-        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.0.2"),
+        .package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.3.0"),
         .package(name: "CapacitorActionSheet", path: "../../../node_modules/@capacitor/action-sheet"),
         .package(name: "CapacitorApp", path: "../../../node_modules/@capacitor/app"),
         .package(name: "CapacitorAppLauncher", path: "../../../node_modules/@capacitor/app-launcher"),
@@ -47,7 +47,8 @@ let package = Package(
         .package(name: "CapgoInappbrowser", path: "../../../node_modules/@capgo/inappbrowser"),
         .package(name: "CapgoKeepAwake", path: "../../../node_modules/@capgo/keep-awake"),
         .package(name: "CapgoNativeAudio", path: "../../../node_modules/@capgo/native-audio"),
-        .package(name: "CapgoNativeMarket", path: "../../../node_modules/@capgo/native-market")
+        .package(name: "CapgoNativeMarket", path: "../../../node_modules/@capgo/native-market"),
+        .package(name: "RevenuecatPurchasesCapacitor", path: "../../../node_modules/@revenuecat/purchases-capacitor")
     ],
     targets: [
         .target(
@@ -90,7 +91,8 @@ let package = Package(
                 .product(name: "CapgoInappbrowser", package: "CapgoInappbrowser"),
                 .product(name: "CapgoKeepAwake", package: "CapgoKeepAwake"),
                 .product(name: "CapgoNativeAudio", package: "CapgoNativeAudio"),
-                .product(name: "CapgoNativeMarket", package: "CapgoNativeMarket")
+                .product(name: "CapgoNativeMarket", package: "CapgoNativeMarket"),
+                .product(name: "RevenuecatPurchasesCapacitor", package: "RevenuecatPurchasesCapacitor")
             ]
         )
     ]
