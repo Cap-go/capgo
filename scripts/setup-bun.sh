@@ -53,6 +53,7 @@ if [ -z "$bun_binary_path" ]; then
 fi
 
 install -m 755 "$bun_binary_path" "$HOME/.bun/bin/bun"
+ln -sf "$HOME/.bun/bin/bun" "$HOME/.bun/bin/bunx"
 echo "$HOME/.bun/bin" >> "$GITHUB_PATH"
 export PATH="$HOME/.bun/bin:$PATH"
 

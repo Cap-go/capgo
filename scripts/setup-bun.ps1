@@ -29,6 +29,7 @@ if (-not $BunExecutable) {
 
 New-Item -Path $InstallDir -ItemType Directory -Force | Out-Null
 Copy-Item -Path $BunExecutable.FullName -Destination (Join-Path $InstallDir 'bun.exe') -Force
+Copy-Item -Path $BunExecutable.FullName -Destination (Join-Path $InstallDir 'bunx.exe') -Force
 
 "$env:USERPROFILE\.bun\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 $env:PATH = "$env:USERPROFILE\.bun\bin;$env:PATH"
