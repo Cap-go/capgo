@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from 'vitest'
-import { APP_NAME_STATS, BASE_URL, getAuthHeadersForCredentials, headersStats, ORG_ID_STATS } from './test-utils.ts'
+import { APP_NAME_STATS, BASE_URL, getAuthHeadersForCredentials, getSupabaseClient, headersStats, ORG_ID_STATS } from './test-utils.ts'
 
 function hasSeededStats(statsData: unknown) {
   if (!Array.isArray(statsData))
@@ -13,18 +13,21 @@ function hasSeededStats(statsData: unknown) {
   )
 }
 
+async function deleteApikeyById(id: number) {
+  await getSupabaseClient()
+    .from('apikeys')
+    .delete()
+    .eq('id', id)
+    .throwOnError()
+}
+
 describe('[GET] /statistics operations with and without subkey', () => {
   const APPNAME = APP_NAME_STATS // Use the seeded stats app
   let subkeyId = 0
 
   afterAll(async () => {
-    if (subkeyId) {
-      const deleteApikey = await fetch(`${BASE_URL}/apikey/${subkeyId}`, {
-        method: 'DELETE',
-        headers: headersStats,
-      })
-      expect(deleteApikey.status).toBe(200)
-    }
+    if (subkeyId)
+      await deleteApikeyById(subkeyId)
   })
 
   it('should get app statistics without subkey', async () => {
@@ -232,11 +235,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
     expect(orgStatsData.error).toBe('no_access_to_organization')
 
     // Clean up
-    const deleteApikey = await fetch(`${BASE_URL}/apikey/${nonAccessibleOrgSubkeyId}`, {
-      method: 'DELETE',
-      headers: headersStats,
-    })
-    expect(deleteApikey.status).toBe(200)
+    await deleteApikeyById(nonAccessibleOrgSubkeyId)
   })
 
   it('should create subkey with non-accessible app and fail to get app statistics', async () => {
@@ -266,10 +265,6 @@ describe('[GET] /statistics operations with and without subkey', () => {
     expect(statsData.error).toBe('no_access_to_app')
 
     // Clean up
-    const deleteApikey = await fetch(`${BASE_URL}/apikey/${nonAccessibleAppSubkeyId}`, {
-      method: 'DELETE',
-      headers: headersStats,
-    })
-    expect(deleteApikey.status).toBe(200)
+    await deleteApikeyById(nonAccessibleAppSubkeyId)
   })
 })
