@@ -4,11 +4,12 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconExternalLink from '~icons/lucide/external-link'
 import IconSmartphone from '~icons/lucide/smartphone'
-import { buildPreviewSubdomain } from '../../shared/preview-subdomain.ts'
+import { buildChannelPreviewSubdomain, buildPreviewSubdomain } from '../../shared/preview-subdomain.ts'
 
 const props = defineProps<{
   appId: string
-  versionId: number
+  versionId?: number
+  channelId?: number
 }>()
 
 const { t } = useI18n()
@@ -53,7 +54,17 @@ const currentDevice = computed(() => devices[selectedDevice.value])
 // Build the preview URL using a reversible preview subdomain format.
 const previewUrl = computed<string | null>(() => {
   try {
-    const subdomain = buildPreviewSubdomain(props.appId, props.versionId)
+    const hasVersionId = typeof props.versionId === 'number'
+    const hasChannelId = typeof props.channelId === 'number'
+
+    if (hasVersionId === hasChannelId) {
+      console.error('BundlePreviewFrame requires exactly one preview target')
+      return null
+    }
+
+    const subdomain = hasChannelId
+      ? buildChannelPreviewSubdomain(props.appId, props.channelId as number)
+      : buildPreviewSubdomain(props.appId, props.versionId as number)
     // Extract base domain from current host, default to capgo.app for localhost
     // Preserve environment segments (e.g., 'dev' in console.dev.capgo.app)
     const hostname = window.location.hostname

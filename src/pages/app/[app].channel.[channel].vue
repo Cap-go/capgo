@@ -10,6 +10,7 @@ import { toast } from 'vue-sonner'
 import IconCopy from '~icons/heroicons/clipboard-document-check'
 import IconCode from '~icons/heroicons/code-bracket'
 import Settings from '~icons/heroicons/cog-8-tooth'
+import IconEye from '~icons/heroicons/eye'
 import IconInformation from '~icons/heroicons/information-circle'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
@@ -81,6 +82,12 @@ function openBundle() {
   if (channel.value.version.name === 'unknown')
     return
   router.push(`/app/${route.params.app}/bundle/${channel.value.version.id}`)
+}
+
+function openPreview() {
+  if (!channel.value)
+    return
+  router.push(`/app/${route.params.app}/channel/${id.value}/preview`)
 }
 
 async function getChannel(force = false) {
@@ -669,6 +676,14 @@ async function copyCurlCommand() {
             <InfoRow :label="t('bundle-number')" :is-link="channel && !isInternalVersionName((channel.version.name))">
               <div class="flex items-center gap-2">
                 <span class="cursor-pointer" @click="openBundle()">{{ channel.version.name }}</span>
+                <button
+                  v-if="channel"
+                  class="p-1 transition-colors border border-gray-200 rounded-md dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800"
+                  :title="t('preview')"
+                  @click="openPreview()"
+                >
+                  <IconEye class="w-4 h-4 text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400" />
+                </button>
                 <button
                   v-if="channel"
                   class="p-1 transition-colors border border-gray-200 rounded-md dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-gray-200 dark:disabled:hover:border-gray-700"
