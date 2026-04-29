@@ -19,6 +19,8 @@ jobs:
     permissions:
       contents: read
       actions: write
+      # The reusable tests workflow declares PR read access for its path filter job.
+      pull-requests: read
 
   # Only bump version and create tag if all tests pass
   bump-version:
