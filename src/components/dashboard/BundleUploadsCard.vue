@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { Database } from '~/types/supabase.types'
 import colors from 'tailwindcss/colors'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -15,6 +16,11 @@ import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useOrganizationStore } from '~/stores/organization'
 import BundleUploadsChart from './BundleUploadsChart.vue'
 import ChartCard from './ChartCard.vue'
+
+type BundleUploadRow = Pick<
+  Database['public']['Tables']['app_versions']['Row'],
+  'app_id' | 'created_at' | 'deleted' | 'external_url' | 'r2_path' | 'user_id'
+>
 
 const props = defineProps({
   useBillingPeriod: {
@@ -125,6 +131,13 @@ const effectiveLastDayEvolution = computed(() => isDemoMode.value ? calculateDem
 
 const hasData = computed(() => effectiveTotal.value > 0 || isDemoMode.value)
 
+function isSyntheticDefaultVersion(bundle: BundleUploadRow) {
+  return bundle.deleted
+    && !bundle.r2_path
+    && !bundle.external_url
+    && !bundle.user_id
+}
+
 async function calculateStats(forceRefetch = false) {
   const startTime = Date.now()
   try {
@@ -206,7 +219,7 @@ async function calculateStats(forceRefetch = false) {
       // Fetch last 30 days of data
       const query = useSupabase()
         .from('app_versions')
-        .select('created_at, app_id')
+        .select('created_at, app_id, deleted, r2_path, external_url, user_id')
         .gte('created_at', last30DaysStart.toISOString())
         .lte('created_at', last30DaysEnd.toISOString())
         .in('app_id', targetAppIds)
@@ -234,7 +247,7 @@ async function calculateStats(forceRefetch = false) {
 
       // Map each bundle to the correct day and app (30 days)
       data
-        .filter((b: any) => b.created_at !== null && b.app_id !== null)
+        .filter((bundle: BundleUploadRow) => bundle.created_at !== null && bundle.app_id !== null && !isSyntheticDefaultVersion(bundle))
         .forEach((bundle: any) => {
           if (bundle.created_at && bundle.app_id) {
             const bundleDate = new Date(bundle.created_at)

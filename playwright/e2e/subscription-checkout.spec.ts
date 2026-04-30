@@ -212,7 +212,7 @@ test.describe('Subscription Checkout', () => {
 
     await page.goto(checkoutUrl)
     await expect(page).toHaveURL(new RegExp(`${escapedStripeOrigin}/checkout/`))
-    await page.getByRole('button', { name: 'Pay and Complete' }).click()
+    await page.getByRole('button', { name: /^Pay / }).click()
 
     await page.waitForURL(/\/settings\/organization\/plans\?success=1/)
     await expect(page.getByRole('heading', { name: 'Thank You for subscribing to Capgo' })).toBeVisible()

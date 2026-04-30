@@ -1,14 +1,22 @@
 const PREVIEW_HOSTNAME_REGEX = /^([^.]+)\.preview(?:\.[^.]+)?\.(?:capgo\.app|usecapgo\.com)$/
 const PREVIEW_VERSION_SEPARATOR = '-'
+const PREVIEW_CHANNEL_PREFIX = 'c'
 const DNS_LABEL_MAX_LENGTH = 63
 
 /**
  * Parsed preview hostname information after the preview subdomain is decoded.
  */
-export interface ParsedPreviewSubdomain {
+export interface ParsedBundlePreviewSubdomain {
   appId: string
   versionId: number
 }
+
+export interface ParsedChannelPreviewSubdomain {
+  appId: string
+  channelId: number
+}
+
+export type ParsedPreviewSubdomain = ParsedBundlePreviewSubdomain | ParsedChannelPreviewSubdomain
 
 /**
  * Returns whether a character can be emitted directly inside the DNS-safe label.
@@ -45,6 +53,11 @@ function assertValidPreviewVersionId(versionId: number): void {
     throw new Error(`Invalid preview version id: ${versionId}`)
 }
 
+function assertValidPreviewChannelId(channelId: number): void {
+  if (!Number.isSafeInteger(channelId) || channelId <= 0)
+    throw new Error(`Invalid preview channel id: ${channelId}`)
+}
+
 /**
  * Encodes an app ID into a reversible DNS-safe preview subdomain label.
  */
@@ -52,15 +65,27 @@ export function encodePreviewAppId(appId: string): string {
   return Array.from(appId).map(char => isDirectPreviewCharacter(char) ? char : encodeEscapedByte(char)).join('')
 }
 
+function buildEncodedPreviewSubdomain(target: string, appId: string): string {
+  const label = `${target}${PREVIEW_VERSION_SEPARATOR}${encodePreviewAppId(appId)}`
+  if (label.length > DNS_LABEL_MAX_LENGTH)
+    throw new Error(`Preview subdomain exceeds DNS label limit: "${label}" (${label.length} characters)`)
+  return label
+}
+
 /**
  * Builds the preview subdomain label used before `.preview.capgo.app`.
  */
 export function buildPreviewSubdomain(appId: string, versionId: number): string {
   assertValidPreviewVersionId(versionId)
-  const label = `${versionId}${PREVIEW_VERSION_SEPARATOR}${encodePreviewAppId(appId)}`
-  if (label.length > DNS_LABEL_MAX_LENGTH)
-    throw new Error(`Preview subdomain exceeds DNS label limit: "${label}" (${label.length} characters)`)
-  return label
+  return buildEncodedPreviewSubdomain(String(versionId), appId)
+}
+
+/**
+ * Builds the preview subdomain label for stable channel previews.
+ */
+export function buildChannelPreviewSubdomain(appId: string, channelId: number): string {
+  assertValidPreviewChannelId(channelId)
+  return buildEncodedPreviewSubdomain(`${PREVIEW_CHANNEL_PREFIX}${channelId}`, appId)
 }
 
 /**
@@ -117,6 +142,13 @@ function parseVersionId(value: string): number | null {
   return Number.isSafeInteger(versionId) ? versionId : null
 }
 
+function parseChannelId(value: string): number | null {
+  const channelId = parseVersionId(value)
+  if (channelId === null || channelId <= 0)
+    return null
+  return channelId
+}
+
 /**
  * Parses the new reversible preview subdomain format.
  */
@@ -125,13 +157,22 @@ function parseEncodedPreviewSubdomain(subdomain: string): ParsedPreviewSubdomain
   if (separatorIndex <= 0)
     return null
 
-  const versionId = parseVersionId(subdomain.slice(0, separatorIndex))
-  if (versionId === null)
-    return null
-
+  const target = subdomain.slice(0, separatorIndex)
   const encodedAppId = subdomain.slice(separatorIndex + PREVIEW_VERSION_SEPARATOR.length)
   const appId = decodePreviewAppId(encodedAppId)
   if (!appId)
+    return null
+
+  if (target.startsWith(PREVIEW_CHANNEL_PREFIX)) {
+    const channelId = parseChannelId(target.slice(PREVIEW_CHANNEL_PREFIX.length))
+    if (channelId === null)
+      return null
+
+    return { appId, channelId }
+  }
+
+  const versionId = parseVersionId(target)
+  if (versionId === null)
     return null
 
   return { appId, versionId }

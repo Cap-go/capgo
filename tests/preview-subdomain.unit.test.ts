@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildPreviewSubdomain, encodePreviewAppId, parsePreviewHostname } from '../shared/preview-subdomain.ts'
+import { buildChannelPreviewSubdomain, buildPreviewSubdomain, encodePreviewAppId, parsePreviewHostname } from '../shared/preview-subdomain.ts'
 
 describe('preview subdomain encoding', () => {
   it.concurrent('round-trips app IDs with reserved hostname characters', () => {
@@ -33,6 +33,15 @@ describe('preview subdomain encoding', () => {
       appId: 'com.example.app',
       versionId: 42,
     })
+  })
+
+  it.concurrent('round-trips stable channel preview hostnames', () => {
+    const appId = 'Com.Example_app-name'
+    const channelId = 123456
+    const subdomain = buildChannelPreviewSubdomain(appId, channelId)
+
+    expect(subdomain).not.toMatch(/[.A-Z]/)
+    expect(parsePreviewHostname(`${subdomain}.preview.capgo.app`)).toEqual({ appId, channelId })
   })
 
   it.concurrent('returns null for malformed hostnames', () => {
@@ -82,7 +91,20 @@ describe('preview subdomain encoding', () => {
     )
   })
 
+  it.concurrent('rejects invalid preview channel ids before building labels', () => {
+    expect(() => buildChannelPreviewSubdomain('com.example', 0)).toThrow('Invalid preview channel id: 0')
+    expect(() => buildChannelPreviewSubdomain('com.example', 1.5)).toThrow('Invalid preview channel id: 1.5')
+    expect(() => buildChannelPreviewSubdomain('com.example', Number.MAX_SAFE_INTEGER + 1)).toThrow(
+      `Invalid preview channel id: ${Number.MAX_SAFE_INTEGER + 1}`,
+    )
+  })
+
   it.concurrent('rejects preview hostnames whose version id exceeds the safe integer range', () => {
     expect(parsePreviewHostname('9007199254740992-com-0example.preview.capgo.app')).toBeNull()
+  })
+
+  it.concurrent('rejects preview hostnames whose channel id is not a positive safe integer', () => {
+    expect(parsePreviewHostname('c0-com-0example.preview.capgo.app')).toBeNull()
+    expect(parsePreviewHostname('c9007199254740992-com-0example.preview.capgo.app')).toBeNull()
   })
 })

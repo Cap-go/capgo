@@ -1,9 +1,10 @@
 import type { Context } from 'hono'
+import type { ParsedPreviewSubdomain } from '../../shared/preview-subdomain.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Buffer } from 'node:buffer'
 import { brotliDecompressSync } from 'node:zlib'
 import { getRuntimeKey } from 'hono/adapter'
-import { buildPreviewSubdomain, parsePreviewHostname } from '../../shared/preview-subdomain.ts'
+import { buildChannelPreviewSubdomain, buildPreviewSubdomain, parsePreviewHostname } from '../../shared/preview-subdomain.ts'
 import { CacheHelper } from '../utils/cache.ts'
 import { simpleError } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
@@ -112,17 +113,58 @@ const MIME_TYPES: Record<string, string> = {
   wasm: 'application/wasm',
 }
 
+const BUNDLE_PREVIEW_CACHE_CONTROL = 'public, max-age=31536000, immutable'
+const CHANNEL_PREVIEW_CACHE_CONTROL = 'no-store, no-cache, must-revalidate, max-age=0'
+
 function getContentType(filePath: string): string {
   const ext = filePath.split('.').pop()?.toLowerCase() || ''
   return MIME_TYPES[ext] || 'application/octet-stream'
 }
 
-function parsePreviewSubdomain(hostname: string): { appId: string, versionId: number } | null {
+export function buildPreviewResponseHeaders(contentType: string, options: { disableCache?: boolean, httpEtag?: string } = {}): Headers {
+  const headers = new Headers()
+  headers.set('Content-Type', contentType)
+  headers.set('X-Content-Type-Options', 'nosniff')
+
+  if (options.disableCache) {
+    headers.set('Cache-Control', CHANNEL_PREVIEW_CACHE_CONTROL)
+    headers.set('Pragma', 'no-cache')
+    headers.set('Expires', '0')
+    return headers
+  }
+
+  if (options.httpEtag)
+    headers.set('etag', options.httpEtag)
+  headers.set('Cache-Control', BUNDLE_PREVIEW_CACHE_CONTROL)
+  return headers
+}
+
+function parsePreviewSubdomain(hostname: string): ParsedPreviewSubdomain | null {
   const parsed = parsePreviewHostname(hostname)
   if (!parsed || !isValidAppId(parsed.appId))
     return null
 
   return parsed
+}
+
+async function getChannelPreviewVersionId(c: Context<MiddlewareKeyVariables>, appId: string, channelId: number): Promise<number> {
+  const supabase = supabaseAdmin(c)
+  const { data: channel, error } = await supabase
+    .from('channels')
+    .select('version')
+    .eq('app_id', appId)
+    .eq('id', channelId)
+    .single()
+
+  if (error || !channel) {
+    throw simpleError('channel_not_found', 'Channel not found', { channelId })
+  }
+
+  if (!Number.isSafeInteger(channel.version) || channel.version <= 0) {
+    throw simpleError('bundle_not_found', 'Bundle not found', { channelId })
+  }
+
+  return channel.version
 }
 
 // Export the handler directly for use in the main app
@@ -133,10 +175,11 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
 
   if (!parsed) {
     cloudlog({ requestId: c.get('requestId'), message: 'invalid preview subdomain', hostname })
-    throw simpleError('invalid_subdomain', 'Invalid preview subdomain format. Expected: {version_id}-{preview_app_id}.preview.capgo.app')
+    throw simpleError('invalid_subdomain', 'Invalid preview subdomain format. Expected: {version_id}-{preview_app_id}.preview.capgo.app or c{channel_id}-{preview_app_id}.preview.capgo.app')
   }
 
-  const { appId, versionId } = parsed
+  const { appId } = parsed
+  const isChannelPreview = 'channelId' in parsed
 
   // Get the file path from the request path - default to index.html
   let filePath = c.req.path.slice(1) || 'index.html' // Remove leading slash
@@ -145,7 +188,15 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
   if (filePath.includes('?'))
     filePath = filePath.split('?')[0]
 
-  cloudlog({ requestId: c.get('requestId'), message: 'preview subdomain request', hostname, appId, versionId, filePath })
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'preview subdomain request',
+    hostname,
+    appId,
+    channelId: isChannelPreview ? parsed.channelId : undefined,
+    versionId: 'versionId' in parsed ? parsed.versionId : undefined,
+    filePath,
+  })
 
   // Check cache for app preview authorization first
   let actualAppId: string
@@ -208,8 +259,12 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
     actualAppId = appData.app_id
   }
 
+  const previewVersionId = isChannelPreview
+    ? await getChannelPreviewVersionId(c, actualAppId, parsed.channelId)
+    : parsed.versionId
+
   // Check cache for bundle info
-  let bundleInfo = await getBundleInfo(c, versionId)
+  let bundleInfo = await getBundleInfo(c, previewVersionId)
 
   if (!bundleInfo) {
     const supabase = supabaseAdmin(c)
@@ -219,11 +274,11 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
       .from('app_versions')
       .select('id, session_key, manifest_count')
       .eq('app_id', actualAppId)
-      .eq('id', versionId)
+      .eq('id', previewVersionId)
       .single()
 
     if (bundleError || !bundle) {
-      throw simpleError('bundle_not_found', 'Bundle not found', { versionId })
+      throw simpleError('bundle_not_found', 'Bundle not found', { versionId: previewVersionId })
     }
 
     bundleInfo = {
@@ -232,7 +287,7 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
     }
 
     // Cache the bundle info
-    setBundleInfo(c, versionId, bundleInfo)
+    setBundleInfo(c, previewVersionId, bundleInfo)
   }
 
   // Check if bundle is encrypted
@@ -276,12 +331,12 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
   const { data: manifestEntries, error: manifestError } = await supabase
     .from('manifest')
     .select('s3_path, file_name')
-    .eq('app_version_id', versionId)
+    .eq('app_version_id', previewVersionId)
     .in('file_name', possiblePaths)
     .limit(1)
 
   if (manifestError || !manifestEntries || manifestEntries.length === 0) {
-    cloudlog({ requestId: c.get('requestId'), message: 'file not found in manifest', filePath, versionId, possiblePaths })
+    cloudlog({ requestId: c.get('requestId'), message: 'file not found in manifest', filePath, versionId: previewVersionId, possiblePaths })
     throw simpleError('file_not_found', 'File not found in bundle', { filePath })
   }
 
@@ -303,13 +358,19 @@ export async function handlePreviewRequest(c: Context<MiddlewareKeyVariables>): 
 
     // Use our own MIME type detection - R2 rewrites text/html to text/plain without custom domains
     const contentType = getContentType(actualFileName)
-    const headers = new Headers()
-    headers.set('Content-Type', contentType)
-    headers.set('etag', object.httpEtag)
-    headers.set('Cache-Control', 'public, max-age=31536000, immutable') // Assets are immutable, cache forever
-    headers.set('X-Content-Type-Options', 'nosniff')
+    const headers = buildPreviewResponseHeaders(contentType, {
+      disableCache: isChannelPreview,
+      httpEtag: object.httpEtag,
+    })
 
-    cloudlog({ requestId: c.get('requestId'), message: 'serving preview file from R2 (subdomain)', filePath: manifestEntry.file_name, contentType, isBrotli })
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'serving preview file from R2 (subdomain)',
+      filePath: manifestEntry.file_name,
+      contentType,
+      isBrotli,
+      cacheMode: isChannelPreview ? 'no-store' : 'immutable',
+    })
 
     // If the file is brotli compressed, decompress it before serving
     // CLI compresses with node:zlib createBrotliCompress(), we decompress with brotliDecompressSync
@@ -333,6 +394,16 @@ export function generatePreviewUrl(appId: string, versionId: number, env: 'prod'
   const envPrefix = env === 'prod' ? '' : `.${env}`
   try {
     return `https://${buildPreviewSubdomain(appId, versionId)}.preview${envPrefix}.capgo.app`
+  }
+  catch {
+    return null
+  }
+}
+
+export function generateChannelPreviewUrl(appId: string, channelId: number, env: 'prod' | 'preprod' | 'dev' = 'prod'): string | null {
+  const envPrefix = env === 'prod' ? '' : `.${env}`
+  try {
+    return `https://${buildChannelPreviewSubdomain(appId, channelId)}.preview${envPrefix}.capgo.app`
   }
   catch {
     return null
