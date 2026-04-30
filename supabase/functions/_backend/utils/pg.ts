@@ -560,6 +560,7 @@ function isReplicaMetadataGapError(error: unknown): boolean {
 }
 
 function normalizeAppOwnerPostgresResult(c: Context, appId: string, appOwner: AppOwnerPostgresRow): AppOwnerPostgresResult {
+  const orgMetadataMissing = !appOwner.orgs?.id
   const orgs = appOwner.orgs?.id
     ? {
         created_by: appOwner.orgs.created_by,
@@ -572,10 +573,10 @@ function normalizeAppOwnerPostgresResult(c: Context, appId: string, appOwner: Ap
         management_email: appOwner.orgs?.management_email ?? null,
       }
 
-  if (!appOwner.orgs?.id) {
+  if (orgMetadataMissing) {
     cloudlog({
       requestId: c.get('requestId'),
-      message: 'App owner org metadata missing on replica, preserving cloud app classification',
+      message: 'App owner org metadata missing on replica, preserving app ownership',
       app_id: appId,
       owner_org: appOwner.owner_org,
     })
@@ -583,6 +584,9 @@ function normalizeAppOwnerPostgresResult(c: Context, appId: string, appOwner: Ap
 
   return {
     ...appOwner,
+    // Keep app ownership visible, but do not mark the plan valid when org
+    // metadata is missing and the plan cannot be verified.
+    plan_valid: orgMetadataMissing ? false : appOwner.plan_valid,
     orgs,
   }
 }
@@ -617,11 +621,11 @@ async function getAppOwnerPostgresAppOnlyFallback(
     })
 
     // Plugin endpoints can only use the replica here. If auxiliary org/plan
-    // metadata is unavailable, keep an existing app in the cloud path instead
-    // of poisoning the on-prem caches.
+    // metadata is unavailable, keep app ownership visible but fail plan checks
+    // closed until metadata is queryable again.
     return normalizeAppOwnerPostgresResult(c, appId, {
       ...app,
-      plan_valid: true,
+      plan_valid: false,
       orgs: null,
     })
   }

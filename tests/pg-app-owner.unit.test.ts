@@ -62,7 +62,7 @@ describe('getAppOwnerPostgres', () => {
     expect(chains[0].innerJoin).not.toHaveBeenCalled()
     expect(appOwner).toMatchObject({
       owner_org: '623c5839-8c68-4ace-803e-c695d9d28a2b',
-      plan_valid: true,
+      plan_valid: false,
       orgs: {
         created_by: null,
         id: '623c5839-8c68-4ace-803e-c695d9d28a2b',
@@ -102,7 +102,7 @@ describe('getAppOwnerPostgres', () => {
     expect(chains[1].leftJoin).not.toHaveBeenCalled()
     expect(appOwner).toMatchObject({
       owner_org: '623c5839-8c68-4ace-803e-c695d9d28a2b',
-      plan_valid: true,
+      plan_valid: false,
       channel_device_count: 2,
       manifest_bundle_count: 3,
       expose_metadata: true,
