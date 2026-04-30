@@ -535,12 +535,102 @@ export function requestInfosPostgres(
     })
 }
 
+interface AppOwnerPostgresResult {
+  owner_org: string
+  orgs: {
+    created_by: string | null
+    id: string
+    management_email: string | null
+  }
+  plan_valid: boolean
+  channel_device_count: number
+  manifest_bundle_count: number
+  expose_metadata: boolean
+  allow_device_custom_id: boolean
+}
+
+type AppOwnerPostgresRow = Omit<AppOwnerPostgresResult, 'orgs'> & {
+  orgs: AppOwnerPostgresResult['orgs'] | null
+}
+
+function normalizeAppOwnerPostgresResult(c: Context, appId: string, appOwner: AppOwnerPostgresRow): AppOwnerPostgresResult {
+  const orgs = appOwner.orgs?.id
+    ? {
+        created_by: appOwner.orgs.created_by,
+        id: appOwner.orgs.id,
+        management_email: appOwner.orgs.management_email,
+      }
+    : {
+        created_by: appOwner.orgs?.created_by ?? null,
+        id: appOwner.owner_org,
+        management_email: appOwner.orgs?.management_email ?? null,
+      }
+
+  if (!appOwner.orgs?.id) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'App owner org metadata missing on replica, preserving cloud app classification',
+      app_id: appId,
+      owner_org: appOwner.owner_org,
+    })
+  }
+
+  return {
+    ...appOwner,
+    orgs,
+  }
+}
+
+async function getAppOwnerPostgresAppOnlyFallback(
+  c: Context,
+  appId: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+): Promise<AppOwnerPostgresResult | null> {
+  try {
+    const app = await drizzleClient
+      .select({
+        owner_org: schema.apps.owner_org,
+        channel_device_count: schema.apps.channel_device_count,
+        manifest_bundle_count: schema.apps.manifest_bundle_count,
+        expose_metadata: schema.apps.expose_metadata,
+        allow_device_custom_id: schema.apps.allow_device_custom_id,
+      })
+      .from(schema.apps)
+      .where(eq(schema.apps.app_id, appId))
+      .limit(1)
+      .then(data => data[0])
+
+    if (!app)
+      return null
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'App owner resolved from app row after metadata lookup failed',
+      app_id: appId,
+      owner_org: app.owner_org,
+    })
+
+    // Plugin endpoints can only use the replica here. If auxiliary org/plan
+    // metadata is unavailable, keep an existing app in the cloud path instead
+    // of poisoning the on-prem caches.
+    return normalizeAppOwnerPostgresResult(c, appId, {
+      ...app,
+      plan_valid: true,
+      orgs: null,
+    })
+  }
+  catch (fallbackError: unknown) {
+    logPgError(c, 'getAppOwnerPostgres fallback', fallbackError)
+    return null
+  }
+}
+
 export async function getAppOwnerPostgres(
   c: Context,
   appId: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
-): Promise<{ owner_org: string, orgs: { created_by: string, id: string, management_email: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number, expose_metadata: boolean, allow_device_custom_id: boolean } | null> {
+): Promise<AppOwnerPostgresResult | null> {
   try {
     if (actions.length === 0)
       return null
@@ -563,15 +653,18 @@ export async function getAppOwnerPostgres(
       })
       .from(schema.apps)
       .where(eq(schema.apps.app_id, appId))
-      .innerJoin(orgAlias, eq(schema.apps.owner_org, orgAlias.id))
+      .leftJoin(orgAlias, eq(schema.apps.owner_org, orgAlias.id))
       .limit(1)
       .then(data => data[0])
 
-    return appOwner
+    if (!appOwner)
+      return null
+
+    return normalizeAppOwnerPostgresResult(c, appId, appOwner)
   }
   catch (e: unknown) {
     logPgError(c, 'getAppOwnerPostgres', e)
-    return null
+    return getAppOwnerPostgresAppOnlyFallback(c, appId, drizzleClient)
   }
 }
 

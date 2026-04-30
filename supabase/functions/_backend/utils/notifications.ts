@@ -170,9 +170,14 @@ export async function sendNotifOrg(
   orgId: string,
   uniqId: string,
   cron: string,
-  managementEmail: string,
+  managementEmail: string | null | undefined,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
 ) {
+  if (!managementEmail) {
+    cloudlog({ requestId: c.get('requestId'), message: 'notif skipped missing management email', event: eventName, orgId })
+    return false
+  }
+
   // Check if notification has already been sent (read from replica)
   const notif = await getNotification(c, drizzleClient, orgId, eventName, uniqId)
   if (notif === undefined) {
@@ -334,7 +339,7 @@ export async function sendNotifOrgCached(
   orgId: string,
   uniqId: string,
   cron: string,
-  managementEmail: string,
+  managementEmail: string | null | undefined,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
 ): Promise<boolean> {
   // Check cache first - if we recently checked and it wasn't sendable, skip DB query
