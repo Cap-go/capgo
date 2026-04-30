@@ -96,7 +96,11 @@ async function loadAppInfo() {
         .select('*', { count: 'exact', head: true })
         .eq('app_id', id.value)
         .eq('deleted', false))
-        .then(({ count: bundlesCount }) => {
+        .then(({ count: bundlesCount, error: bundlesCountError }) => {
+          if (bundlesCountError) {
+            console.error(bundlesCountError)
+            return
+          }
           bundlesNb.value = bundlesCount ?? 0
         }),
     )
