@@ -99,6 +99,7 @@ async function loadAppInfo() {
         .then(({ count: bundlesCount, error: bundlesCountError }) => {
           if (bundlesCountError) {
             console.error(bundlesCountError)
+            bundlesNb.value = 0
             return
           }
           bundlesNb.value = bundlesCount ?? 0
