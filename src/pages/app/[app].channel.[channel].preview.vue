@@ -13,7 +13,7 @@ interface ChannelPreview {
   version: Pick<Database['public']['Tables']['app_versions']['Row'], 'id' | 'manifest_count' | 'name' | 'session_key'> | null
 }
 
-const route = useRoute()
+const route = useRoute('/app/[app].channel.[channel].preview')
 const router = useRouter()
 const displayStore = useDisplayStore()
 const { t } = useI18n()
@@ -24,7 +24,7 @@ const loading = ref(true)
 const channel = ref<Database['public']['Tables']['channels']['Row'] & ChannelPreview>()
 const app = ref<Database['public']['Tables']['apps']['Row']>()
 
-type PreviewState = 'loading' | 'no-manifest' | 'preview-disabled' | 'encrypted' | 'ready'
+type PreviewState = 'loading' | 'no-app' | 'no-manifest' | 'preview-disabled' | 'encrypted' | 'ready'
 const previewState = ref<PreviewState>('loading')
 
 async function getChannel() {
@@ -51,6 +51,8 @@ async function getChannel() {
 
     if (error) {
       console.error('no channel', error)
+      channel.value = undefined
+      displayStore.NavTitle = t('channel')
       return
     }
 
@@ -61,6 +63,8 @@ async function getChannel() {
     displayStore.NavTitle = channel.value?.name ?? t('channel')
   }
   catch (error) {
+    channel.value = undefined
+    displayStore.NavTitle = t('channel')
     console.error(error)
   }
 }
@@ -75,19 +79,26 @@ async function getApp() {
 
     if (error) {
       console.error('no app', error)
+      app.value = undefined
       return
     }
 
     app.value = data
   }
   catch (error) {
+    app.value = undefined
     console.error(error)
   }
 }
 
 function determinePreviewState() {
-  if (!channel.value || !app.value) {
+  if (!channel.value) {
     previewState.value = 'loading'
+    return
+  }
+
+  if (!app.value) {
+    previewState.value = 'no-app'
     return
   }
 
@@ -114,17 +125,17 @@ function goToAppSettings() {
 }
 
 watchEffect(async () => {
-  const match = route.path.match(/^\/app\/([^/]+)\/channel\/([^/]+)\/preview$/)
-  if (match) {
-    loading.value = true
-    previewState.value = 'loading'
-    packageId.value = decodeURIComponent(match[1] ?? '')
-    id.value = Number(decodeURIComponent(match[2] ?? '0'))
-    await Promise.all([getChannel(), getApp()])
-    determinePreviewState()
-    loading.value = false
-    displayStore.defaultBack = `/app/${packageId.value}/channel/${id.value}`
-  }
+  loading.value = true
+  previewState.value = 'loading'
+  channel.value = undefined
+  app.value = undefined
+  displayStore.NavTitle = t('channel')
+  packageId.value = route.params.app as string
+  id.value = Number(route.params.channel as string)
+  await Promise.all([getChannel(), getApp()])
+  determinePreviewState()
+  loading.value = false
+  displayStore.defaultBack = `/app/${packageId.value}/channel/${id.value}`
 })
 </script>
 
@@ -144,6 +155,19 @@ watchEffect(async () => {
       </p>
       <button class="mt-4 text-white d-btn d-btn-primary" @click="router.push(`/app/${packageId}/channels`)">
         {{ t('back-to-channels') }}
+      </button>
+    </div>
+
+    <div v-else-if="previewState === 'no-app'" class="flex flex-col justify-center items-center min-h-[50vh]">
+      <IconAlertCircle class="w-16 h-16 mb-4 text-destructive" />
+      <h2 class="text-xl font-semibold text-foreground">
+        {{ t('app-not-found') }}
+      </h2>
+      <p class="mt-2 text-center text-muted-foreground max-w-md">
+        {{ t('app-not-found-description') }}
+      </p>
+      <button class="mt-4 text-white d-btn d-btn-primary" @click="router.push('/apps')">
+        {{ t('back-to-apps') }}
       </button>
     </div>
 
