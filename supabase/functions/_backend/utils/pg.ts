@@ -535,12 +535,22 @@ export function requestInfosPostgres(
     })
 }
 
+export interface AppOwnerPostgresResult {
+  owner_org: string
+  orgs: { created_by: string, id: string, management_email: string }
+  plan_valid: boolean
+  channel_device_count: number
+  manifest_bundle_count: number
+  expose_metadata: boolean
+  allow_device_custom_id: boolean
+}
+
 export async function getAppOwnerPostgres(
   c: Context,
   appId: string,
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   actions: ('mau' | 'storage' | 'bandwidth')[] = [],
-): Promise<{ owner_org: string, orgs: { created_by: string, id: string, management_email: string }, plan_valid: boolean, channel_device_count: number, manifest_bundle_count: number, expose_metadata: boolean, allow_device_custom_id: boolean } | null> {
+): Promise<AppOwnerPostgresResult | null> {
   try {
     if (actions.length === 0)
       return null
@@ -563,11 +573,31 @@ export async function getAppOwnerPostgres(
       })
       .from(schema.apps)
       .where(eq(schema.apps.app_id, appId))
-      .innerJoin(orgAlias, eq(schema.apps.owner_org, orgAlias.id))
+      .leftJoin(orgAlias, eq(schema.apps.owner_org, orgAlias.id))
       .limit(1)
       .then(data => data[0])
 
-    return appOwner
+    if (!appOwner)
+      return null
+
+    if (!appOwner.orgs?.id || !appOwner.orgs.created_by || !appOwner.orgs.management_email) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'App owner org missing on read replica; preserving cloud app classification from apps row',
+        appId,
+        ownerOrg: appOwner.owner_org,
+      })
+      return {
+        ...appOwner,
+        orgs: {
+          created_by: appOwner.orgs?.created_by ?? '',
+          id: appOwner.owner_org,
+          management_email: appOwner.orgs?.management_email ?? '',
+        },
+      }
+    }
+
+    return appOwner as AppOwnerPostgresResult
   }
   catch (e: unknown) {
     logPgError(c, 'getAppOwnerPostgres', e)
