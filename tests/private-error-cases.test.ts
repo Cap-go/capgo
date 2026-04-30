@@ -100,13 +100,13 @@ describe('[POST] /private/create_device - Error Cases', () => {
     expect(device).toBeNull()
   })
 
-  it.concurrent('should allow device creation when org_id owns the app', async () => {
+  it.concurrent('should allow device creation when normalized org_id owns the app', async () => {
     const response = await fetch(getEndpointUrl('/private/create_device'), {
       method: 'POST',
       headers,
       body: JSON.stringify({
         app_id: APPNAME,
-        org_id: ORG_ID,
+        org_id: ORG_ID.toUpperCase(),
         device_id: randomUUID(),
         platform: 'android',
         version_name: '1.0.0',
