@@ -572,6 +572,7 @@ describe('[POST] /updates parallel tests', () => {
       .throwOnError()
 
     const baseData = getBaseData(APP_NAME_UPDATE)
+    baseData.platform = 'android'
     baseData.defaultChannel = channelName
     baseData.version_build = '0.0.1'
     baseData.version_name = '0.0.1'
@@ -584,6 +585,55 @@ describe('[POST] /updates parallel tests', () => {
     expect(json.version).toBeUndefined()
     expect(json.old).toBeUndefined()
     expect(json.major).toBeUndefined()
+  })
+
+  it('allows private self-settable platform-compatible defaultChannel', async () => {
+    const supabase = getSupabaseClient()
+    const versionName = `9.7.${Math.floor(Math.random() * 100000) + 1000}`
+    const channelName = `private-selfset-${randomUUID().slice(0, 8)}`
+
+    const version = await createAppVersions(versionName, APP_NAME_UPDATE)
+    await supabase
+      .from('app_versions')
+      .update({ external_url: `https://example.com/${channelName}.zip` })
+      .eq('id', version.id)
+      .throwOnError()
+
+    await supabase
+      .from('channels')
+      .insert({
+        name: channelName,
+        app_id: APP_NAME_UPDATE,
+        version: version.id,
+        owner_org: ORG_ID,
+        created_by: USER_ID,
+        public: false,
+        disable_auto_update_under_native: false,
+        disable_auto_update: 'none',
+        allow_device_self_set: true,
+        allow_emulator: true,
+        allow_device: true,
+        allow_dev: true,
+        allow_prod: true,
+        ios: false,
+        android: true,
+        electron: false,
+      })
+      .throwOnError()
+
+    const baseData = getBaseData(APP_NAME_UPDATE)
+    baseData.platform = 'android'
+    baseData.defaultChannel = channelName
+    baseData.version_build = '0.0.1'
+    baseData.version_name = '0.0.1'
+
+    const response = await postUpdate(baseData)
+    expect(response.status).toBe(200)
+
+    const json = await response.json<UpdateRes>()
+    expect(() => updateNewScheme.parse(json)).not.toThrow()
+    expect(json.version).toBe(versionName)
+    expect(json.error).toBeUndefined()
   })
 
   it('hides platform-incompatible private defaultChannel before platform checks', async () => {
@@ -621,6 +671,7 @@ describe('[POST] /updates parallel tests', () => {
       .throwOnError()
 
     const baseData = getBaseData(APP_NAME_UPDATE)
+    baseData.platform = 'android'
     baseData.defaultChannel = channelName
     baseData.version_build = '0.0.1'
     baseData.version_name = '0.0.1'
