@@ -16,9 +16,10 @@ export function isInternalVersionName(version: string) {
 }
 
 export function excludeInternalVersions<T extends { neq: (column: string, value: string) => T }>(query: T): T {
-  return query
-    .neq('name', 'builtin')
-    .neq('name', 'unknown')
+  return INTERNAL_VERSION_NAMES.reduce(
+    (acc, versionName) => acc.neq('name', versionName),
+    query,
+  )
 }
 
 export async function openVersion(app: Database['public']['Tables']['app_versions']['Row']) {

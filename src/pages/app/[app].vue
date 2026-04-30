@@ -97,8 +97,7 @@ async function loadAppInfo() {
         .eq('app_id', id.value)
         .eq('deleted', false))
         .then(({ count: bundlesCount }) => {
-          if (bundlesCount)
-            bundlesNb.value = bundlesCount
+          bundlesNb.value = bundlesCount ?? 0
         }),
     )
 
