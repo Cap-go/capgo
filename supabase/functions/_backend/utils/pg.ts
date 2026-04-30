@@ -553,6 +553,12 @@ type AppOwnerPostgresRow = Omit<AppOwnerPostgresResult, 'orgs'> & {
   orgs: AppOwnerPostgresResult['orgs'] | null
 }
 
+function isReplicaMetadataGapError(error: unknown): boolean {
+  const pgError = error as { code?: string }
+  return pgError.code === '42703' // undefined_column
+    || pgError.code === '42P01' // undefined_table
+}
+
 function normalizeAppOwnerPostgresResult(c: Context, appId: string, appOwner: AppOwnerPostgresRow): AppOwnerPostgresResult {
   const orgs = appOwner.orgs?.id
     ? {
@@ -664,7 +670,9 @@ export async function getAppOwnerPostgres(
   }
   catch (e: unknown) {
     logPgError(c, 'getAppOwnerPostgres', e)
-    return getAppOwnerPostgresAppOnlyFallback(c, appId, drizzleClient)
+    if (isReplicaMetadataGapError(e))
+      return getAppOwnerPostgresAppOnlyFallback(c, appId, drizzleClient)
+    return null
   }
 }
 

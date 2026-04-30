@@ -34,7 +34,7 @@ function createDrizzleClient(results: Array<any[] | Error>) {
 }
 
 describe('getAppOwnerPostgres', () => {
-  it('keeps cloud app ownership when org metadata is missing from the replica', async () => {
+  it.concurrent('keeps cloud app ownership when org metadata is missing from the replica', async () => {
     const { drizzleClient, chains } = createDrizzleClient([
       [
         {
@@ -71,9 +71,12 @@ describe('getAppOwnerPostgres', () => {
     })
   })
 
-  it('falls back to the app row when replica metadata lookup errors', async () => {
+  it.concurrent('falls back to the app row when replica metadata lookup errors', async () => {
+    const replicaMetadataError = Object.assign(new Error('missing replicated org metadata'), {
+      code: '42P01',
+    })
     const { drizzleClient, chains } = createDrizzleClient([
-      new Error('missing replicated org metadata'),
+      replicaMetadataError,
       [
         {
           owner_org: '623c5839-8c68-4ace-803e-c695d9d28a2b',
@@ -109,5 +112,32 @@ describe('getAppOwnerPostgres', () => {
         management_email: null,
       },
     })
+  })
+
+  it.concurrent('does not use the app row fallback for generic query errors', async () => {
+    const { drizzleClient } = createDrizzleClient([
+      new Error('connection timeout'),
+      [
+        {
+          owner_org: '623c5839-8c68-4ace-803e-c695d9d28a2b',
+          channel_device_count: 2,
+          manifest_bundle_count: 3,
+          expose_metadata: true,
+          allow_device_custom_id: false,
+        },
+      ],
+    ])
+
+    const { getAppOwnerPostgres } = await import('../supabase/functions/_backend/utils/pg.ts')
+
+    const appOwner = await getAppOwnerPostgres(
+      createContext(),
+      'com.test.generic-error',
+      drizzleClient as any,
+      ['mau', 'bandwidth'],
+    )
+
+    expect(drizzleClient.select).toHaveBeenCalledTimes(1)
+    expect(appOwner).toBeNull()
   })
 })
