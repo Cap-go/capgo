@@ -59,7 +59,7 @@ afterAll(async () => {
 })
 
 describe('[POST] /private/create_device - Error Cases', () => {
-  it('should reject app/org scope mismatch in permission checks', async () => {
+  it.concurrent('should reject app/org scope mismatch in permission checks', async () => {
     const { data, error } = await getSupabaseClient().rpc('check_min_rights', {
       min_right: 'write',
       org_id: testOrgId,
@@ -72,7 +72,7 @@ describe('[POST] /private/create_device - Error Cases', () => {
     expect(data).toBe(false)
   })
 
-  it('should return 401 when org_id does not own the app', async () => {
+  it.concurrent('should return 401 when org_id does not own the app', async () => {
     const deviceId = randomUUID()
     const response = await fetch(getEndpointUrl('/private/create_device'), {
       method: 'POST',
@@ -90,7 +90,8 @@ describe('[POST] /private/create_device - Error Cases', () => {
     const data = await response.json() as { error: string }
     expect(data.error).toBe('not_authorized')
 
-    const { data: device, error: deviceError } = await getSupabaseClient().from('devices')
+    const { data: device, error: deviceError } = await getSupabaseClient()
+      .from('devices')
       .select('device_id')
       .eq('app_id', APPNAME)
       .eq('device_id', deviceId)
@@ -99,7 +100,7 @@ describe('[POST] /private/create_device - Error Cases', () => {
     expect(device).toBeNull()
   })
 
-  it('should allow device creation when org_id owns the app', async () => {
+  it.concurrent('should allow device creation when org_id owns the app', async () => {
     const response = await fetch(getEndpointUrl('/private/create_device'), {
       method: 'POST',
       headers,
