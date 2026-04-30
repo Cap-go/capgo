@@ -3355,6 +3355,7 @@ async function addCodeChangeStep(orgId: string, apikey: string, appId: string, p
 
           if (filePath.endsWith('.html')) {
             // Add a visible banner to HTML files
+            // This banner is test-only and must be removed by the app team after update verification.
             if (content.includes('<body>') && !content.includes('capgo-test-banner')) {
               newContent = content.replace(
                 '<body>',
