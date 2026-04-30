@@ -34,11 +34,7 @@ app.post('/', middlewareV2(['all']), async (c) => {
   // Limit API key creation for constrained caller keys (not JWT).
   const callerHasLimitedScope = (apikey?.limited_to_orgs?.length ?? 0) > 0 || (apikey?.limited_to_apps?.length ?? 0) > 0
   if (auth.authType === 'apikey' && callerHasLimitedScope) {
-    // A limited key cannot create an unlimited key (privilege escalation)
-    const newKeyIsUnlimited = (limitedToOrgs.length === 0 && limitedToApps.length === 0)
-    if (newKeyIsUnlimited) {
-      throw simpleError('cannot_create_apikey', 'You cannot create an unlimited API key with a limited API key', { keyId: apikey?.id })
-    }
+    throw simpleError('cannot_create_apikey', 'You cannot create API keys with a limited API key', { keyId: apikey?.id })
   }
   const expiresAt = body.expires_at ?? null
   const isHashed = body.hashed === true
