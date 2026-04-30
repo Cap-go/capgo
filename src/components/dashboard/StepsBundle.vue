@@ -184,6 +184,7 @@ async function getVersionsCount(): Promise<number> {
     .select('id', { count: 'exact', head: true })
     .eq('owner_org', orgId)
     .eq('app_id', props.appId)
+    .eq('deleted', false)
 
   if (error)
     return 0
@@ -199,6 +200,7 @@ async function getLatestVersionId(): Promise<string | undefined> {
     .select('id, created_at')
     .eq('owner_org', orgId)
     .eq('app_id', props.appId)
+    .eq('deleted', false)
     .order('created_at', { ascending: false })
     .limit(1)
 
