@@ -14,6 +14,7 @@ import { formatBytes } from '~/services/conversion'
 import { formatDate } from '~/services/date'
 import { checkPermissions } from '~/services/permissions'
 import { useSupabase } from '~/services/supabase'
+import { excludeInternalVersions } from '~/services/versions'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
 const props = defineProps<{
@@ -205,12 +206,12 @@ async function getData() {
       }
     }
 
-    let req = supabase
+    let req = excludeInternalVersions(supabase
       .from('app_versions')
       .select('*', { count: 'exact' })
       .eq('app_id', props.appId)
       .neq('storage_provider', 'revert_to_builtin')
-      .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1)
+      .range(currentVersionsNumber.value, currentVersionsNumber.value + offset - 1))
 
     if (search.value) {
       if (channelsToSearch && channelsToSearch.length > 0) {
@@ -564,12 +565,12 @@ async function openOne(one: Element) {
 
 async function updateOverallBundlesCount() {
   try {
-    const { count } = await supabase
+    const { count } = await excludeInternalVersions(supabase
       .from('app_versions')
       .select('id', { count: 'exact', head: true })
       .eq('app_id', props.appId)
       .eq('deleted', false)
-      .neq('storage_provider', 'revert_to_builtin')
+      .neq('storage_provider', 'revert_to_builtin'))
     totalAllBundles.value = count ?? 0
   }
   catch (error) {

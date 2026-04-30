@@ -9,6 +9,7 @@ import { createDefaultApiKey } from '~/services/apikeys'
 import { pushEvent } from '~/services/posthog'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
+import { excludeInternalVersions } from '~/services/versions'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
@@ -179,11 +180,11 @@ async function getVersionsCount(): Promise<number> {
   const orgId = organizationStore.currentOrganization?.gid
   if (!orgId || !props.appId)
     return 0
-  const { count, error } = await supabase
+  const { count, error } = await excludeInternalVersions(supabase
     .from('app_versions')
     .select('id', { count: 'exact', head: true })
     .eq('owner_org', orgId)
-    .eq('app_id', props.appId)
+    .eq('app_id', props.appId))
 
   if (error)
     return 0
@@ -194,13 +195,13 @@ async function getLatestVersionId(): Promise<string | undefined> {
   const orgId = organizationStore.currentOrganization?.gid
   if (!orgId || !props.appId)
     return undefined
-  const { data, error } = await supabase
+  const { data, error } = await excludeInternalVersions(supabase
     .from('app_versions')
     .select('id, created_at')
     .eq('owner_org', orgId)
     .eq('app_id', props.appId)
     .order('created_at', { ascending: false })
-    .limit(1)
+    .limit(1))
 
   if (error || !data || data.length === 0)
     return undefined

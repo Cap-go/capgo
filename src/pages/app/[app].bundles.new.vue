@@ -4,6 +4,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import StepsBundle from '~/components/dashboard/StepsBundle.vue'
 import { useSupabase } from '~/services/supabase'
+import { excludeInternalVersions } from '~/services/versions'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
 
@@ -33,13 +34,13 @@ async function fetchBundlesCount() {
     bundlesCount.value = 0
     return
   }
-  const { count } = await supabase
+  const { count } = await excludeInternalVersions(supabase
     .from('app_versions')
     .select('id', { count: 'exact', head: true })
     .eq('owner_org', orgId)
     .eq('app_id', appId.value)
     .eq('deleted', false)
-    .neq('storage_provider', 'revert_to_builtin')
+    .neq('storage_provider', 'revert_to_builtin'))
 
   bundlesCount.value = count ?? 0
 }

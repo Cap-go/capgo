@@ -10,6 +10,7 @@ import DeploymentStatsCard from '~/components/dashboard/DeploymentStatsCard.vue'
 import ReleaseBanner from '~/components/dashboard/ReleaseBanner.vue'
 import UpdateStatsCard from '~/components/dashboard/UpdateStatsCard.vue'
 import { getCapgoVersion, useSupabase } from '~/services/supabase'
+import { excludeInternalVersions } from '~/services/versions'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
@@ -90,11 +91,11 @@ async function loadAppInfo() {
     devicesNb.value = await main.getTotalMauByApp(id.value, appOrganization.value?.subscription_start)
 
     promises.push(
-      supabase
+      excludeInternalVersions(supabase
         .from('app_versions')
         .select('*', { count: 'exact', head: true })
         .eq('app_id', id.value)
-        .eq('deleted', false)
+        .eq('deleted', false))
         .then(({ count: bundlesCount }) => {
           if (bundlesCount)
             bundlesNb.value = bundlesCount

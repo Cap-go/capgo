@@ -7,6 +7,7 @@ import IconTrendingUp from '~icons/lucide/trending-up'
 import ChartCard from '~/components/dashboard/ChartCard.vue'
 import { formatDistanceToNow } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
+import { excludeInternalVersions } from '~/services/versions'
 import { useOrganizationStore } from '~/stores/organization'
 
 const props = defineProps({
@@ -92,13 +93,13 @@ async function calculateStats() {
     }
 
     // Fetch latest version for this app
-    const { data: versionsData, error: versionsError } = await supabase
+    const { data: versionsData, error: versionsError } = await excludeInternalVersions(supabase
       .from('app_versions')
       .select('name, created_at')
       .eq('app_id', props.appId)
       .eq('deleted', false)
       .order('created_at', { ascending: false })
-      .limit(1)
+      .limit(1))
 
     if (versionsError) {
       console.error('Error fetching versions:', versionsError)

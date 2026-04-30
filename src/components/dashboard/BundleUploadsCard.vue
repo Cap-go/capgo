@@ -11,6 +11,7 @@ import {
   getDemoDayCount,
 } from '~/services/demoChartData'
 import { useSupabase } from '~/services/supabase'
+import { excludeInternalVersions } from '~/services/versions'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
 import { useOrganizationStore } from '~/stores/organization'
 import BundleUploadsChart from './BundleUploadsChart.vue'
@@ -204,12 +205,12 @@ async function calculateStats(forceRefetch = false) {
     }
     else {
       // Fetch last 30 days of data
-      const query = useSupabase()
+      const query = excludeInternalVersions(useSupabase()
         .from('app_versions')
         .select('created_at, app_id')
         .gte('created_at', last30DaysStart.toISOString())
         .lte('created_at', last30DaysEnd.toISOString())
-        .in('app_id', targetAppIds)
+        .in('app_id', targetAppIds))
 
       const result = await query
       data = result.data

@@ -7,10 +7,18 @@ import { i18n } from '~/modules/i18n'
 import { hideLoader, showLoader } from './loader'
 import { downloadUrl } from './supabase'
 
+export const INTERNAL_VERSION_NAMES = ['builtin', 'unknown'] as const
+
 export function isInternalVersionName(version: string) {
   if (!version)
     return false
-  return version === 'builtin' || version === 'unknown'
+  return INTERNAL_VERSION_NAMES.includes(version as typeof INTERNAL_VERSION_NAMES[number])
+}
+
+export function excludeInternalVersions<T extends { neq: (column: string, value: string) => T }>(query: T): T {
+  return query
+    .neq('name', 'builtin')
+    .neq('name', 'unknown')
 }
 
 export async function openVersion(app: Database['public']['Tables']['app_versions']['Row']) {

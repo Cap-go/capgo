@@ -18,7 +18,7 @@ import IconDown from '~icons/material-symbols/keyboard-arrow-down-rounded'
 import { formatDate, formatLocalDate } from '~/services/date'
 import { checkPermissions } from '~/services/permissions'
 import { checkCompatibilityNativePackages, defaultApiHost, isCompatible, useSupabase } from '~/services/supabase'
-import { isInternalVersionName } from '~/services/versions'
+import { excludeInternalVersions, isInternalVersionName } from '~/services/versions'
 import { useAppDetailStore } from '~/stores/appDetail'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useDisplayStore } from '~/stores/display'
@@ -364,13 +364,13 @@ async function openSelectVersion() {
     return
 
   // Fetch versions when dialog opens
-  const { data, error } = await supabase.from('app_versions')
+  const { data, error } = await excludeInternalVersions(supabase.from('app_versions')
     .select('*')
     .eq('app_id', channel.value.app_id)
     .eq('deleted', false)
     .neq('id', channel.value.version.id)
     .order('created_at', { ascending: false })
-    .limit(5)
+    .limit(5))
 
   if (error) {
     console.error(error)
@@ -402,14 +402,14 @@ async function refreshFilteredVersions() {
     return
 
   if (bundleLinkSearchVal.value && bundleLinkSearchVal.value.trim()) {
-    const { data, error } = await supabase.from('app_versions')
+    const { data, error } = await excludeInternalVersions(supabase.from('app_versions')
       .select('*')
       .eq('app_id', channel.value.app_id)
       .eq('deleted', false)
       .neq('id', channel.value.version.id)
       .order('created_at', { ascending: false })
       .like('name', `%${bundleLinkSearchVal.value.trim()}%`)
-      .limit(5)
+      .limit(5))
     if (error) {
       console.error(error)
       toast.error(t('error-fetching-versions'))
@@ -417,13 +417,13 @@ async function refreshFilteredVersions() {
     bundleLinkVersions.value = data ?? []
   }
   else {
-    const { data, error } = await supabase.from('app_versions')
+    const { data, error } = await excludeInternalVersions(supabase.from('app_versions')
       .select('*')
       .eq('app_id', channel.value.app_id)
       .eq('deleted', false)
       .neq('id', channel.value.version.id)
       .order('created_at', { ascending: false })
-      .limit(5)
+      .limit(5))
     if (error) {
       console.error(error)
       toast.error(t('error-fetching-versions'))
