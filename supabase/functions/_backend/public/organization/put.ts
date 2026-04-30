@@ -19,6 +19,8 @@ const bodySchema = z.object({
   require_apikey_expiration: z.optional(z.boolean()),
   max_apikey_expiration_days: z.optional(z.nullable(z.number())),
   enforce_hashed_api_keys: z.optional(z.boolean()),
+  enforce_encrypted_bundles: z.optional(z.boolean()),
+  required_encryption_key: z.optional(z.nullable(z.string())),
   enforcing_2fa: z.optional(z.boolean()),
 })
 
@@ -61,8 +63,17 @@ function validateMaxExpirationDays(maxDays?: number | null) {
   if (maxDays === undefined || maxDays === null) {
     return
   }
-  if (maxDays < 1 || maxDays > 365) {
+  if (!Number.isInteger(maxDays) || maxDays < 1 || maxDays > 365) {
     throw simpleError('invalid_max_expiration_days', 'Maximum expiration days must be between 1 and 365')
+  }
+}
+
+function validateRequiredEncryptionKey(requiredKey?: string | null) {
+  if (requiredKey === undefined || requiredKey === null) {
+    return
+  }
+  if (requiredKey.length !== 20 && requiredKey.length !== 21) {
+    throw simpleError('invalid_required_encryption_key', 'Encryption key fingerprint must be 20 or 21 characters')
   }
 }
 
@@ -82,6 +93,10 @@ function buildUpdateFields(body: z.infer<typeof bodySchema>, sanitizedName?: str
     updateFields.max_apikey_expiration_days = body.max_apikey_expiration_days
   if (body.enforce_hashed_api_keys !== undefined)
     updateFields.enforce_hashed_api_keys = body.enforce_hashed_api_keys
+  if (body.enforce_encrypted_bundles !== undefined)
+    updateFields.enforce_encrypted_bundles = body.enforce_encrypted_bundles
+  if (body.required_encryption_key !== undefined)
+    updateFields.required_encryption_key = body.required_encryption_key
   if (body.enforcing_2fa !== undefined)
     updateFields.enforcing_2fa = body.enforcing_2fa
   return updateFields
@@ -241,6 +256,7 @@ export async function put(
   }
 
   validateMaxExpirationDays(body.max_apikey_expiration_days)
+  validateRequiredEncryptionKey(body.required_encryption_key)
   const sanitizedOrgName = body.name !== undefined
     ? await sanitizeOrgNameForSync(supabase, body.name)
     : undefined
