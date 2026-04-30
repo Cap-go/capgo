@@ -1039,6 +1039,8 @@ describe('update scenarios', () => {
       const json = await response.json<UpdateRes>()
       expect(json.error).toBe('no_channel')
       expect(json.version).toBeUndefined()
+      expect(json.old).toBeUndefined()
+      expect(json.major).toBeUndefined()
     }
     finally {
       await updateChannel('production', {
