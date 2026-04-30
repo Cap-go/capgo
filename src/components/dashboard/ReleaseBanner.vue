@@ -6,7 +6,6 @@ import IconCheckCircle from '~icons/lucide/check-circle'
 import IconTrendingUp from '~icons/lucide/trending-up'
 import { formatDistanceToNow } from '~/services/date'
 import { useSupabase } from '~/services/supabase'
-import { excludeInternalVersions } from '~/services/versions'
 import { useOrganizationStore } from '~/stores/organization'
 
 const props = defineProps<{
@@ -57,13 +56,13 @@ async function fetchReleaseInfo() {
       return
     }
 
-    const { data: versionsData } = await excludeInternalVersions(supabase
+    const { data: versionsData } = await supabase
       .from('app_versions')
       .select('name, created_at')
       .eq('app_id', props.appId)
       .eq('deleted', false)
       .order('created_at', { ascending: false })
-      .limit(1))
+      .limit(1)
 
     const { data: channelsData } = await supabase
       .from('channels')
