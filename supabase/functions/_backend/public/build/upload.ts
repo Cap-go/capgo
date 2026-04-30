@@ -15,12 +15,14 @@ export async function tusProxy(
   c: Context,
   jobId: string,
   apikey: Database['public']['Tables']['apikeys']['Row'],
+  forwardMethod = c.req.method,
 ): Promise<Response> {
   cloudlog({
     requestId: c.get('requestId'),
     message: 'TUS proxy request',
     job_id: jobId,
     method: c.req.method,
+    forward_method: forwardMethod,
   })
 
   // Get builder config
@@ -182,6 +184,7 @@ export async function tusProxy(
     message: 'Proxying TUS request to builder',
     job_id: jobId,
     method: c.req.method,
+    forward_method: forwardMethod,
     original_path: originalPath,
     upload_prefix: uploadPrefix,
     tus_path: safeTusPath,
@@ -196,7 +199,7 @@ export async function tusProxy(
   // For POST requests, rewrite Upload-Metadata to use the correct artifact key
   // Use the upload_path from the build request which contains the full orgs/apps path structure
   // Example: orgs/${org_id}/apps/${app_id}/native-builds/${upload_session_key}.zip
-  if (c.req.method === 'POST') {
+  if (forwardMethod === 'POST') {
     const artifactKey = buildRequest.upload_path
 
     // Parse existing Upload-Metadata header to preserve other fields like filetype
@@ -242,7 +245,7 @@ export async function tusProxy(
 
   // Forward the request
   const builderResponse = await fetch(builderTusUrl, {
-    method: c.req.method,
+    method: forwardMethod,
     headers,
     body: c.req.raw.body,
     // @ts-expect-error - duplex is valid for streaming

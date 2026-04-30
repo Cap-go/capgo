@@ -123,7 +123,7 @@ test.describe('Credit Top-Up', () => {
     const escapedStripeOrigin = STRIPE_EMULATOR_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     await page.click('[data-test="credits-top-up-submit"]')
     await expect(page).toHaveURL(new RegExp(`${escapedStripeOrigin}/checkout/`))
-    await page.getByRole('button', { name: 'Pay and Complete' }).click()
+    await page.getByRole('button', { name: /^Pay / }).click()
 
     await page.waitForURL(/\/settings\/organization\/credits/)
     await expect(page.locator('[data-test="toast"]')).toContainText('Credits purchased successfully.')

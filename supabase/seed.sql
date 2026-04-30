@@ -73,6 +73,7 @@ BEGIN
     ('00000000-0000-0000-0000-000000000000', 'e5f6a7b8-c9d0-4e1f-8a2b-3c4d5e6f7a81', 'authenticated', 'authenticated', 'cli_hashed@capgo.app', '$2a$10$0CErXxryZPucjJWq3O7qXeTJgN.tnNU5XCZy9pXKDWRi/aS9W7UFi', NOW(), NOW(), 'oljikwwipqrkwilfsytc', NOW(), '', NULL, '', '', NULL, NOW(), '{"provider": "email", "providers": ["email"]}', '{"test_identifier": "test_cli_hashed"}', 'f', NOW(), NOW(), NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL),
     ('00000000-0000-0000-0000-000000000000', 'f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f708193', 'authenticated', 'authenticated', 'encrypted@capgo.app', '$2a$10$0CErXxryZPucjJWq3O7qXeTJgN.tnNU5XCZy9pXKDWRi/aS9W7UFi', NOW(), NOW(), 'oljikwwipqrkwilfsyte', NOW(), '', NULL, '', '', NULL, NOW(), '{"provider": "email", "providers": ["email"]}', '{"test_identifier": "test_encrypted"}', 'f', NOW(), NOW(), NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL),
     ('00000000-0000-0000-0000-000000000000', '9f1a2b3c-4d5e-4f60-8a7b-1c2d3e4f5061', 'authenticated', 'authenticated', 'emailprefs@capgo.app', '$2a$10$0CErXxryZPucjJWq3O7qXeTJgN.tnNU5XCZy9pXKDWRi/aS9W7UFi', NOW(), NOW(), 'oljikwwipqrkwilfsytp', NOW(), '', NULL, '', '', NULL, NOW(), '{"provider": "email", "providers": ["email"]}', '{"test_identifier": "test_email_prefs"}', 'f', NOW(), NOW(), NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL),
+    ('00000000-0000-0000-0000-000000000000', 'af1a2b3c-4d5e-4f60-8a7b-1c2d3e4f5062', 'authenticated', 'authenticated', 'apikey-expiration@capgo.app', '$2a$10$0CErXxryZPucjJWq3O7qXeTJgN.tnNU5XCZy9pXKDWRi/aS9W7UFi', NOW(), NOW(), 'oljikwwipqrkwilfsytq', NOW(), '', NULL, '', '', NULL, NOW(), '{"provider": "email", "providers": ["email"]}', '{"test_identifier": "test_apikey_expiration"}', 'f', NOW(), NOW(), NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL),
     ('00000000-0000-0000-0000-000000000000', 'b7a1d9f4-7b8f-4e3c-8f2b-1a2b3c4d5e6f', 'authenticated', 'authenticated', 'delete-user-stale@capgo.app', '$2a$10$0CErXxryZPucjJWq3O7qXeTJgN.tnNU5XCZy9pXKDWRi/aS9W7UFi', NOW(), NOW(), 'oljikwwipqrkwilfsyu1', NOW(), '', NULL, '', '', NULL, NOW() - interval '10 minutes', '{"provider": "email", "providers": ["email"]}', '{"test_identifier": "test_delete_user_stale"}', 'f', NOW(), NOW(), NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL),
     ('00000000-0000-0000-0000-000000000000', 'c8b2e0f5-8c90-4f4d-9f3c-2b3c4d5e6f70', 'authenticated', 'authenticated', 'delete-user-fresh@capgo.app', '$2a$10$0CErXxryZPucjJWq3O7qXeTJgN.tnNU5XCZy9pXKDWRi/aS9W7UFi', NOW(), NOW(), 'oljikwwipqrkwilfsyu2', NOW(), '', NULL, '', '', NULL, NOW(), '{"provider": "email", "providers": ["email"]}', '{"test_identifier": "test_delete_user_fresh"}', 'f', NOW(), NOW(), NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL);
 
@@ -272,6 +273,7 @@ BEGIN
     ('2022-06-03 05:54:15+00', '', 'cli_hashed', 'Capgo', NULL, 'cli_hashed@capgo.app', 'e5f6a7b8-c9d0-4e1f-8a2b-3c4d5e6f7a81', NOW(), 't', 't'),
     ('2022-06-03 05:54:15+00', '', 'encrypted', 'Capgo', NULL, 'encrypted@capgo.app', 'f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f708193', NOW(), 't', 't'),
     ('2022-06-03 05:54:15+00', '', 'emailprefs', 'Capgo', NULL, 'emailprefs@capgo.app', '9f1a2b3c-4d5e-4f60-8a7b-1c2d3e4f5061', NOW(), 't', 't'),
+    ('2022-06-03 05:54:15+00', '', 'apikey', 'expiration', NULL, 'apikey-expiration@capgo.app', 'af1a2b3c-4d5e-4f60-8a7b-1c2d3e4f5062', NOW(), 't', 't'),
     ('2022-06-03 05:54:15+00', '', 'delete', 'stale', NULL, 'delete-user-stale@capgo.app', 'b7a1d9f4-7b8f-4e3c-8f2b-1a2b3c4d5e6f', NOW(), 't', 't'),
     ('2022-06-03 05:54:15+00', '', 'delete', 'fresh', NULL, 'delete-user-fresh@capgo.app', 'c8b2e0f5-8c90-4f4d-9f3c-2b3c4d5e6f70', NOW(), 't', 't');
 
@@ -593,7 +595,7 @@ BEGIN
     INSERT INTO "public"."channels" ("id", "created_at", "name", "app_id", "version", "updated_at", "public", "disable_auto_update_under_native", "disable_auto_update", "ios", "android", "electron", "allow_device_self_set", "allow_emulator", "allow_device", "allow_dev", "allow_prod", "created_by") VALUES
     (1, NOW(), 'production', 'com.demo.app', 3, NOW(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
     (2, NOW(), 'no_access', 'com.demo.app', 5, NOW(), 'f', 't', 'major'::"public"."disable_update", 't', 't', 'f', 't', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
-    (3, NOW(), 'two_default', 'com.demo.app', 3, NOW(), 't', 't', 'major'::"public"."disable_update", 't', 'f', 't', 't', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
+    (3, NOW(), 'two_default', 'com.demo.app', 3, NOW(), 't', 't', 'major'::"public"."disable_update", 't', 'f', 'f', 't', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid),
     (4, NOW(), 'production', 'com.stats.app', 13, NOW(), 't', 't', 'major'::"public"."disable_update", 'f', 't', 't', 't', 't', 't', 't', 't', '7a1b2c3d-4e5f-4a6b-7c8d-9e0f1a2b3c4d'::uuid),
     (5, NOW(), 'electron_only', 'com.demo.app', 3, NOW(), 'f', 't', 'major'::"public"."disable_update", 'f', 'f', 't', 't', 't', 't', 't', 't', '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid);
 
@@ -1072,6 +1074,7 @@ BEGIN
     INSERT INTO public.permissions (key, scope_type, description)
     VALUES
       (public.rbac_perm_org_read(), public.rbac_scope_org(), 'Read org level settings and metadata'),
+      (public.rbac_perm_org_create_app(), public.rbac_scope_org(), 'Create a new app within an organization'),
       (public.rbac_perm_org_update_settings(), public.rbac_scope_org(), 'Update org configuration/settings'),
       (public.rbac_perm_org_delete(), public.rbac_scope_org(), 'Delete an organization'),
       (public.rbac_perm_org_read_members(), public.rbac_scope_org(), 'Read org membership list'),
@@ -1113,7 +1116,7 @@ BEGIN
     INSERT INTO public.role_permissions (role_id, permission_id)
     SELECT r.id, p.id FROM public.roles r
     JOIN public.permissions p ON p.key IN (
-      public.rbac_perm_org_read(), public.rbac_perm_org_update_settings(), public.rbac_perm_org_delete(), public.rbac_perm_org_read_members(), public.rbac_perm_org_invite_user(), public.rbac_perm_org_update_user_roles(),
+      public.rbac_perm_org_read(), public.rbac_perm_org_create_app(), public.rbac_perm_org_update_settings(), public.rbac_perm_org_delete(), public.rbac_perm_org_read_members(), public.rbac_perm_org_invite_user(), public.rbac_perm_org_update_user_roles(),
       public.rbac_perm_org_read_billing(), public.rbac_perm_org_update_billing(), public.rbac_perm_org_read_invoices(), public.rbac_perm_org_read_audit(), public.rbac_perm_org_read_billing_audit(),
       public.rbac_perm_app_read(), public.rbac_perm_app_update_settings(), public.rbac_perm_app_delete(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(),
       public.rbac_perm_app_create_channel(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_manage_devices(), public.rbac_perm_app_read_devices(),
@@ -1128,7 +1131,7 @@ BEGIN
     INSERT INTO public.role_permissions (role_id, permission_id)
     SELECT r.id, p.id FROM public.roles r
     JOIN public.permissions p ON p.key IN (
-      public.rbac_perm_org_read(), public.rbac_perm_org_update_settings(), public.rbac_perm_org_read_members(), public.rbac_perm_org_invite_user(), public.rbac_perm_org_update_user_roles(),
+      public.rbac_perm_org_read(), public.rbac_perm_org_create_app(), public.rbac_perm_org_update_settings(), public.rbac_perm_org_read_members(), public.rbac_perm_org_invite_user(), public.rbac_perm_org_update_user_roles(),
       public.rbac_perm_org_read_billing(), public.rbac_perm_org_read_invoices(), public.rbac_perm_org_read_audit(), public.rbac_perm_org_read_billing_audit(),
       public.rbac_perm_app_read(), public.rbac_perm_app_update_settings(), public.rbac_perm_app_read_bundles(), public.rbac_perm_app_upload_bundle(),
       public.rbac_perm_app_create_channel(), public.rbac_perm_app_read_channels(), public.rbac_perm_app_read_logs(), public.rbac_perm_app_manage_devices(), public.rbac_perm_app_read_devices(),
@@ -1143,7 +1146,7 @@ BEGIN
     INSERT INTO public.role_permissions (role_id, permission_id)
     SELECT r.id, p.id FROM public.roles r
     JOIN public.permissions p ON p.key IN (
-      public.rbac_perm_org_read(), public.rbac_perm_org_read_billing(), public.rbac_perm_org_update_billing(), public.rbac_perm_org_read_invoices(), public.rbac_perm_org_read_billing_audit()
+      public.rbac_perm_org_read(), public.rbac_perm_org_create_app(), public.rbac_perm_org_read_billing(), public.rbac_perm_org_update_billing(), public.rbac_perm_org_read_invoices(), public.rbac_perm_org_read_billing_audit()
     )
     WHERE r.name = public.rbac_role_org_billing_admin()
     ON CONFLICT DO NOTHING;
@@ -1152,7 +1155,7 @@ BEGIN
     INSERT INTO public.role_permissions (role_id, permission_id)
     SELECT r.id, p.id FROM public.roles r
     JOIN public.permissions p ON p.key IN (
-      public.rbac_perm_org_read(), public.rbac_perm_org_read_members()
+      public.rbac_perm_org_read(), public.rbac_perm_org_create_app(), public.rbac_perm_org_read_members()
     )
     WHERE r.name = public.rbac_role_org_member()
     ON CONFLICT DO NOTHING;

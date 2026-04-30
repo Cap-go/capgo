@@ -53,12 +53,13 @@ function createWriteClient(options?: { deleteError?: Error }) {
   }
 }
 
-describe('sendNotifOrgOnce', () => {
+describe.sequential('sendNotifOrgOnce', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    vi.resetAllMocks()
+    vi.resetModules()
   })
 
-  it.concurrent('deletes the recipient claim when Bento throws', async () => {
+  it('deletes the recipient claim when Bento throws', async () => {
     trackBentoEventMock.mockRejectedValue(new Error('bento exploded'))
     const { client, deleteMock, whereMock } = createWriteClient()
 
@@ -85,7 +86,7 @@ describe('sendNotifOrgOnce', () => {
     )
   })
 
-  it.concurrent('surfaces cleanup failure when the recipient claim cannot be deleted', async () => {
+  it('surfaces cleanup failure when the recipient claim cannot be deleted', async () => {
     trackBentoEventMock.mockResolvedValue(false)
     const { client } = createWriteClient({ deleteError: new Error('delete exploded') })
 

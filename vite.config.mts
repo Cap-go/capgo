@@ -167,10 +167,31 @@ export default defineConfig({
   },
 
   optimizeDeps: {
+    // Pre-scan the entire app so Playwright does not trigger late dep re-optimization
+    // while navigating across lazily loaded routes in the local Vite server.
+    entries: [
+      'index.html',
+      'src/**/*.{vue,ts,js,mts}',
+    ],
     include: [
       'vue',
       'vue-router',
       '@vueuse/core',
+      '@formkit/core',
+      '@formkit/i18n',
+      '@formkit/icons',
+      '@formkit/vue',
+      '@vuepic/vue-datepicker',
+      '@capacitor/camera',
+      '@capacitor/filesystem',
+      'chart.js',
+      'country-code-to-flag-emoji',
+      'dayjs',
+      'dompurify',
+      'mime',
+      'tailwindcss/colors',
+      'vue-chartjs',
+      'vue-turnstile',
     ],
     exclude: [
       'vue-demi',

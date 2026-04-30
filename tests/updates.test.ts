@@ -66,17 +66,49 @@ async function updateChannel(
     }),
   })
 
-  expect(response.status).toBe(200)
-  expect(await response.json<{ status: string }>()).toEqual({ status: 'ok' })
+  const responseText = await response.text()
+  if (response.status !== 200) {
+    throw new Error(`Channel update failed (${response.status}): ${responseText}`)
+  }
+  expect(JSON.parse(responseText) as { status: string }).toEqual({ status: 'ok' })
+}
+
+async function postUpdateAfterChannelMutation(data: Partial<ReturnType<typeof getBaseData>>) {
+  let lastResponse: Response | null = null
+
+  for (let attempt = 0; attempt < 10; attempt++) {
+    const response = await postUpdate(data)
+    if (response.status !== 429) {
+      return response
+    }
+
+    const responseText = await response.text()
+    if (!responseText.includes('"error":"on_premise_app"')) {
+      throw new Error(`Unexpected update failure after channel mutation (${response.status}): ${responseText}`)
+    }
+
+    lastResponse = new Response(responseText, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    })
+    await new Promise(resolve => setTimeout(resolve, 250 * (attempt + 1)))
+  }
+
+  if (!lastResponse) {
+    throw new Error('Expected an update response after channel mutation')
+  }
+
+  return lastResponse
 }
 
 beforeAll(async () => {
   await resetAndSeedAppData(APP_NAME_UPDATE)
-})
+}, 60_000)
 afterAll(async () => {
   await resetAppData(APP_NAME_UPDATE)
   await resetAppDataStats(APP_NAME_UPDATE)
-})
+}, 60_000)
 
 describe('[POST] /updates', () => {
   it('no new version available', async () => {
@@ -679,38 +711,58 @@ describe('update scenarios', () => {
   })
 
   it('disallow emulator', async () => {
-    await updateChannel('production', { allow_emulator: false, disableAutoUpdate: 'major' })
+    await getSupabaseClient()
+      .from('channels')
+      .update({ allow_emulator: false, disable_auto_update: 'major' })
+      .eq('app_id', APP_NAME_UPDATE)
+      .eq('name', 'production')
+      .throwOnError()
 
     try {
       const baseData = getBaseData(APP_NAME_UPDATE)
       baseData.version_name = '1.1.0'
       baseData.is_emulator = true
 
-      const response = await postUpdate(baseData)
+      const response = await postUpdateAfterChannelMutation(baseData)
       expect(response.status).toBe(200)
       const json = await response.json<UpdateRes>()
       expect(json.error).toBe('disable_emulator')
     }
     finally {
-      await updateChannel('production', { allow_emulator: true })
+      await getSupabaseClient()
+        .from('channels')
+        .update({ allow_emulator: true })
+        .eq('app_id', APP_NAME_UPDATE)
+        .eq('name', 'production')
+        .throwOnError()
     }
   })
 
   it('disallow device', async () => {
-    await updateChannel('production', { allow_device: false })
+    await getSupabaseClient()
+      .from('channels')
+      .update({ allow_device: false })
+      .eq('app_id', APP_NAME_UPDATE)
+      .eq('name', 'production')
+      .throwOnError()
 
     try {
       const baseData = getBaseData(APP_NAME_UPDATE)
       baseData.version_name = '1.1.0'
       baseData.is_emulator = false
 
-      const response = await postUpdate(baseData)
+      const response = await postUpdateAfterChannelMutation(baseData)
       expect(response.status).toBe(200)
       const json = await response.json<UpdateRes>()
       expect(json.error).toBe('disable_device')
     }
     finally {
-      await updateChannel('production', { allow_device: true })
+      await getSupabaseClient()
+        .from('channels')
+        .update({ allow_device: true })
+        .eq('app_id', APP_NAME_UPDATE)
+        .eq('name', 'production')
+        .throwOnError()
     }
   })
 

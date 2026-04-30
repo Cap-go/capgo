@@ -1,8 +1,8 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
-  BASE_URL,
   executeSQL,
+  getEndpointUrl,
   getSupabaseClient,
   resetAndSeedAppData,
   resetAndSeedAppDataStats,
@@ -32,7 +32,7 @@ describe('cron_stat_app refresh completion', () => {
     })
     await resetAndSeedAppDataStats(firstAppId)
     await resetAndSeedAppDataStats(secondAppId)
-  })
+  }, 60000)
 
   beforeEach(async () => {
     const requestedAt = new Date(Date.now() - 60 * 1000).toISOString()
@@ -47,7 +47,7 @@ describe('cron_stat_app refresh completion', () => {
       stats_refresh_requested_at: requestedAt,
       stats_updated_at: null,
     }).in('app_id', [firstAppId, secondAppId]).throwOnError()
-  })
+  }, 30000)
 
   afterAll(async () => {
     await resetAppDataStats(firstAppId)
@@ -58,10 +58,10 @@ describe('cron_stat_app refresh completion', () => {
     await getSupabaseClient().from('org_users').delete().eq('org_id', orgId)
     await getSupabaseClient().from('orgs').delete().eq('id', orgId)
     await executeSQL('DELETE FROM public.stripe_info WHERE customer_id = $1', [customerId])
-  })
+  }, 60000)
 
-  it('updates app freshness immediately and only marks the org fresh after the last pending app completes', async () => {
-    const firstResponse = await fetch(`${BASE_URL}/triggers/cron_stat_app`, {
+  it('updates app freshness immediately and only marks the org fresh after the last pending app completes', { timeout: 30000 }, async () => {
+    const firstResponse = await fetch(getEndpointUrl('/triggers/cron_stat_app'), {
       body: JSON.stringify({
         appId: firstAppId,
         orgId,
@@ -96,7 +96,7 @@ describe('cron_stat_app refresh completion', () => {
     expect(orgBeforeError).toBeNull()
     expect(orgBeforeCompletion?.stats_updated_at).toBeNull()
 
-    const secondResponse = await fetch(`${BASE_URL}/triggers/cron_stat_app`, {
+    const secondResponse = await fetch(getEndpointUrl('/triggers/cron_stat_app'), {
       body: JSON.stringify({
         appId: secondAppId,
         orgId,

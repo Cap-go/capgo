@@ -17,24 +17,21 @@ permissions:
   contents: read
   id-token: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
-
 jobs:
   benchmarks:
     name: Run benchmarks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@v6
         with:
           node-version: 22
 
       - name: Setup bun
-        uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3 # v2
+        uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
@@ -42,7 +39,7 @@ jobs:
         run: bun install
 
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@1c8ae4843586d3ba879736b7f6b7b0c990757fab # v4
+        uses: CodSpeedHQ/action@v4
         with:
           mode: simulation
           run: npx vitest bench --config vitest.config.bench.ts --run

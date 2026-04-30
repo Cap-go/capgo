@@ -204,6 +204,20 @@ describe('rBAC validation hooks', () => {
     expect(error).toBe('Invalid principal_type')
   })
 
+  it.concurrent('accepts string channel RBAC ids for role bindings', async () => {
+    const issues = await getIssues(createRoleBindingBodySchema, {
+      principal_type: 'user',
+      principal_id: '550e8400-e29b-41d4-a716-446655440001',
+      role_name: 'org_admin',
+      scope_type: 'channel',
+      org_id: '550e8400-e29b-41d4-a716-446655440000',
+      app_id: '550e8400-e29b-41d4-a716-446655440002',
+      channel_id: '550e8400-e29b-41d4-a716-446655440003',
+    })
+
+    expect(issues).toHaveLength(0)
+  })
+
   it.concurrent('keeps the role-binding update missing role name error', async () => {
     const issues = await getIssues(updateRoleBindingBodySchema, {})
     const error = await getErrorMessage(updateRoleBindingBodyHook, issues)

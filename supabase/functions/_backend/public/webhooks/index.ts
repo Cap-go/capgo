@@ -79,7 +79,7 @@ export async function checkWebhookPermissionV2(
   orgId: string,
   auth: AuthInfo,
 ): Promise<void> {
-  const parentApikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
+  const parentApikey = c.get('parentApikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
   const policyApikey = parentApikey ?? auth.apikey
 
   if (auth.authType === 'apikey' && policyApikey) {

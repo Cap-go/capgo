@@ -40,17 +40,24 @@ export async function deleteMember(c: Context<MiddlewareKeyVariables>, bodyRaw: 
   const supabase = supabaseApikey(c, c.get('capgkey') as string)
   cloudlog({ requestId: c.get('requestId'), message: 'userData.id', data: userData.id })
   cloudlog({ requestId: c.get('requestId'), message: 'body.orgId', data: body.orgId })
-  const { error } = await supabase
+  const { data: deletedMembership, error } = await supabase
     .from('org_users')
     .delete()
+    .select('org_id, user_id')
     .eq('user_id', userData.id)
     .eq('org_id', body.orgId)
+    .maybeSingle()
 
   if (error) {
     throw simpleError('error_deleting_user_from_organization', 'Error deleting user from organization', { error })
   }
 
-  // Clean up RBAC role bindings for the removed user in this org (all scopes)
+  if (!deletedMembership) {
+    throw quickError(404, 'organization_member_not_found', 'User is not a member of this organization', { orgId: body.orgId, email: body.email })
+  }
+
+  // The org_users delete trigger should resync role_bindings, but keep this
+  // explicit cleanup as a safety net for the advisory regression path.
   const { error: rbacError } = await supabaseAdmin(c)
     .from('role_bindings')
     .delete()

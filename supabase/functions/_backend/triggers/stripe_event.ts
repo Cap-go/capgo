@@ -279,6 +279,13 @@ function hasRevenueMovement(movement: RevenueMovement) {
     || movement.churnMrr > 0
 }
 
+function shouldTrackOrganizationUpgrade(isUpgrade: boolean, movement: RevenueMovement) {
+  if (isUpgrade)
+    return true
+
+  return movement.currentMrr > 0 && movement.nextMrr > movement.currentMrr
+}
+
 function isStaleStripeEvent(
   currentStripeInfo: Pick<StripeInfoRow, 'last_stripe_event_at'> | null | undefined,
   eventOccurredAtIso: string,
@@ -749,7 +756,7 @@ async function createdOrUpdated(
       updateData.paid_at = paidAt
     const revenuePlans = await getRevenuePlans(c)
     const revenueMovement = classifyRevenueMovement(currentStripeInfo, updateData, revenuePlans)
-    if (revenueMovement.currentMrr > 0 && revenueMovement.nextMrr > revenueMovement.currentMrr)
+    if (shouldTrackOrganizationUpgrade(stripeData.isUpgrade, revenueMovement))
       updateData.upgraded_at = eventOccurredAtIso
     const didPersist = await persistStripeInfoAndRevenueMovement(
       c,
@@ -1073,4 +1080,5 @@ export const stripeEventTestUtils = {
   getSubscriptionTrackingState,
   isStaleStripeEvent,
   isCustomerProfileEvent,
+  shouldTrackOrganizationUpgrade,
 }

@@ -34,6 +34,7 @@ import { closeClient, getDrizzleClient, getPgClient, logPgError } from './pg.ts'
  */
 export type Permission
   = | 'org.read'
+    | 'org.create_app'
     | 'org.update_settings'
     | 'org.delete'
     | 'org.read_members'
@@ -106,6 +107,7 @@ export interface RbacContextVariables {
 const PERMISSION_TO_LEGACY_RIGHT: Record<Permission, Database['public']['Enums']['user_min_right']> = {
   // Org permissions
   'org.read': 'read',
+  'org.create_app': 'admin',
   'org.update_settings': 'admin',
   'org.delete': 'super_admin',
   'org.read_members': 'read',

@@ -156,19 +156,16 @@ export const updateGroupBodySchema = createUpdateSchema(schema.groups).pick('nam
 
 export const addGroupMemberBodySchema = createInsertSchema(schema.group_members).pick('user_id')
 
-export const createRoleBindingBodySchema = createInsertSchema(schema.role_bindings, {
-  principal_type: PRINCIPAL_TYPE_SCHEMA,
-  principal_id: type('string.uuid'),
-  scope_type: ROLE_SCOPE_TYPE_SCHEMA,
-  org_id: type('string.uuid'),
-  app_id: type('string.uuid | null | undefined'),
-  channel_id: type('number | null | undefined'),
-  reason: type('string | null | undefined'),
+export const createRoleBindingBodySchema = type({
+  'principal_type': PRINCIPAL_TYPE_SCHEMA,
+  'principal_id': 'string.uuid',
+  'scope_type': ROLE_SCOPE_TYPE_SCHEMA,
+  'org_id': 'string.uuid',
+  'app_id?': 'string.uuid | null',
+  'channel_id?': 'string.uuid | number | null',
+  'reason?': 'string | null',
+  'role_name': NON_EMPTY_STRING_SCHEMA,
 })
-  .pick('principal_type', 'principal_id', 'scope_type', 'org_id', 'app_id', 'channel_id', 'reason')
-  .and(type({
-    role_name: NON_EMPTY_STRING_SCHEMA,
-  }))
 
 export const updateRoleBindingBodySchema = type({
   role_name: NON_EMPTY_STRING_SCHEMA,

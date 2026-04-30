@@ -8,71 +8,137 @@ on:
 
 permissions: {}
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
-
 jobs:
-  # Run all tests first before creating any tags
-  test:
+  changes:
     if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') && !startsWith(github.event.head_commit.message, 'chore(auto-sync):') }}
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    outputs:
+      run_capgo: ${{ steps.capgo.outputs.should_release }}
+      capgo_release_as: ${{ steps.capgo.outputs.release_as }}
+      run_cli: ${{ steps.cli.outputs.should_release }}
+      cli_release_as: ${{ steps.cli.outputs.release_as }}
+      has_migration_changes: ${{ steps.migration_scope.outputs.has_migration_changes }}
+      run_any: ${{ steps.capgo.outputs.should_release == 'true' || steps.cli.outputs.should_release == 'true' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Setup bun
+        run: bash scripts/setup-bun.sh
+      - name: Resolve Capgo release scope
+        id: capgo
+        run: bun scripts/release-scope.ts capgo "${{ github.event.before }}" "${{ github.sha }}" >> "$GITHUB_OUTPUT"
+      - name: Resolve CLI release scope
+        id: cli
+        run: bun scripts/release-scope.ts cli "${{ github.event.before }}" "${{ github.sha }}" >> "$GITHUB_OUTPUT"
+      - name: Resolve migration scope
+        id: migration_scope
+        run: |
+          if git diff --name-only "${{ github.event.before }}" "${{ github.sha }}" | grep -q '^supabase/migrations/'; then
+            echo "has_migration_changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_migration_changes=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # Run only the relevant test scope before creating tags
+  test:
+    needs: changes
+    if: ${{ needs.changes.outputs.run_any == 'true' }}
     uses: ./.github/workflows/tests.yml
+    with:
+      run_capgo: ${{ needs.changes.outputs.run_capgo == 'true' }}
+      run_cli: ${{ needs.changes.outputs.run_cli == 'true' }}
     permissions:
       contents: read
       actions: write
+      # The reusable tests workflow declares PR read access for its path filter job.
+      pull-requests: read
 
-  # Only bump version and create tag if all tests pass
+  # Only bump the changed release scopes and create matching tags after tests pass
   bump-version:
-    needs: [test]
-    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') && !startsWith(github.event.head_commit.message, 'chore(auto-sync):') }}
+    needs: [changes, test]
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') && !startsWith(github.event.head_commit.message, 'chore(auto-sync):') && needs.changes.outputs.run_any == 'true' && needs.test.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    name: Bump version and create tag
+    name: Bump versions and create tags
     permissions:
       contents: write
     steps:
       - name: Check out
         uses: actions/checkout@v6
         with:
+          fetch-depth: 0
           token: "${{ secrets.PERSONAL_ACCESS_TOKEN }}"
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+      - name: Install dependencies
+        if: ${{ needs.changes.outputs.run_cli == 'true' }}
+        run: bun install --frozen-lockfile
       - name: Git config
         run: |
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
-      - name: Create version bump main
-        if: github.ref == 'refs/heads/main'
-        run: bun x standard-version --skip.changelog
-      - name: Create version bump development
-        if: github.ref != 'refs/heads/main'
-        run: bun x standard-version --prerelease alpha --skip.changelog
-      - name: Add release artifacts to commit
+      - name: Generate CLI docs
+        if: ${{ needs.changes.outputs.run_cli == 'true' }}
         run: |
-          git add supabase/functions/_backend/utils/version.ts
+          bun run cli:build
+          bun run --cwd cli generate-docs
+          bun run --cwd cli generate-docs --folder webdocs
+          git add cli/README.md cli/webdocs
           if ! git diff --cached --quiet; then
-            # Get the current tag before amending (if it exists)
-            CURRENT_TAG=$(git describe --tags --exact-match 2>/dev/null || echo "")
+            git commit -m "docs(cli): update generated docs"
+          fi
+      - name: Create version bumps
+        env:
+          RUN_CAPGO: ${{ needs.changes.outputs.run_capgo }}
+          CAPGO_RELEASE_AS: ${{ needs.changes.outputs.capgo_release_as }}
+          RUN_CLI: ${{ needs.changes.outputs.run_cli }}
+          CLI_RELEASE_AS: ${{ needs.changes.outputs.cli_release_as }}
+        run: |
+          set -e
 
-            # Amend the commit
-            git commit --amend --no-edit
+          if [ "$RUN_CAPGO" = "true" ]; then
+            if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
+              bunx standard-version --skip.changelog --release-as "$CAPGO_RELEASE_AS" --tag-prefix capgo-
+            else
+              bunx standard-version --skip.changelog --release-as "$CAPGO_RELEASE_AS" --prerelease alpha --tag-prefix capgo-
+            fi
 
-            # Move the tag to the amended commit
-            if [ -n "$CURRENT_TAG" ]; then
-              git tag -f "$CURRENT_TAG"
+            git add supabase/functions/_backend/utils/version.ts
+            if ! git diff --cached --quiet; then
+              CURRENT_TAG=$(git describe --tags --exact-match 2>/dev/null || echo "")
+              git commit --amend --no-edit
+
+              if [ -n "$CURRENT_TAG" ]; then
+                git tag -f "$CURRENT_TAG"
+              fi
+            fi
+          fi
+
+          if [ "$RUN_CLI" = "true" ]; then
+            if [ "${GITHUB_REF}" = "refs/heads/main" ]; then
+              bunx standard-version --skip.changelog --release-as "$CLI_RELEASE_AS" --tag-prefix cli- --packageFiles cli/package.json --bumpFiles cli/package.json
+            else
+              bunx standard-version --skip.changelog --release-as "$CLI_RELEASE_AS" --prerelease alpha --tag-prefix cli- --packageFiles cli/package.json --bumpFiles cli/package.json
             fi
           fi
       - name: Push to origin
         run: |
+          set -e
+
           CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
           remote_repo="https://${GITHUB_ACTOR}:${{ secrets.PERSONAL_ACCESS_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git"
-          git pull $remote_repo $CURRENT_BRANCH
+          git pull --rebase=false $remote_repo $CURRENT_BRANCH
           git push $remote_repo HEAD:$CURRENT_BRANCH --follow-tags --tags
 
   sync_schema_types:
-    needs: bump-version
-    if: ${{ github.ref == 'refs/heads/main' && !startsWith(github.event.head_commit.message, 'chore(release):') && !startsWith(github.event.head_commit.message, 'chore(auto-sync):') }}
+    needs: [changes, bump-version]
+    if: ${{ github.ref == 'refs/heads/main' && needs.changes.outputs.has_migration_changes == 'true' && !startsWith(github.event.head_commit.message, 'chore(release):') && !startsWith(github.event.head_commit.message, 'chore(auto-sync):') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -92,16 +158,6 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
         run: |
-          if ! git rev-parse -q --verify HEAD^ >/dev/null 2>&1; then
-            echo "No parent commit for HEAD, skipping schema/types sync."
-            exit 0
-          fi
-
-          if ! git diff --name-only HEAD^ HEAD | grep -q '^supabase/migrations/'; then
-            echo "No migration changes in latest commit, skipping schema/types sync."
-            exit 0
-          fi
-
           if [ -z "${{ secrets.SUPABASE_PROJECT_ID_PROD }}" ]; then
             echo "SUPABASE_PROJECT_ID_PROD is required for schema/types sync" >&2
             exit 1

@@ -70,7 +70,12 @@ VALUES
     CURRENT_DATE - 7,
     CURRENT_DATE,
     '{"apps":[]}'::jsonb
-  );
+  )
+ON CONFLICT (org_id) DO UPDATE
+SET
+  start_date = EXCLUDED.start_date,
+  end_date = EXCLUDED.end_date,
+  response = EXCLUDED.response;
 
 SELECT ok(
   public.has_seeded_demo_data('com.test.demo.expired.seeded'),

@@ -61,27 +61,27 @@ async function fetchQueueSync(queueName: string, maxRetries = 4) {
   throw new Error(`queue_consumer/sync failed for ${queueName}`)
 }
 
-async function waitForDeliveryRecord(webhookId: string, timeoutMs = 10000) {
+async function waitForDeliveryRecord(webhookId: string, recordId: string, timeoutMs = 10000) {
   const start = Date.now()
 
   while (Date.now() - start < timeoutMs) {
-    const { data, error } = await (getSupabaseClient() as any)
-      .from('webhook_deliveries')
-      .select('*')
-      .eq('webhook_id', webhookId)
-      .order('created_at', { ascending: false })
-      .limit(1)
+    const { rows } = await pool.query(
+      `SELECT *
+       FROM public.webhook_deliveries
+       WHERE webhook_id = $1
+         AND request_payload->'data'->>'record_id' = $2
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [webhookId, recordId],
+    )
 
-    if (error)
-      throw error
-
-    if (data?.[0])
-      return data[0]
+    if (rows[0])
+      return rows[0]
 
     await new Promise(resolve => setTimeout(resolve, 250))
   }
 
-  throw new Error(`Timed out waiting for delivery record for webhook ${webhookId}`)
+  throw new Error(`Timed out waiting for delivery record for webhook ${webhookId} and record ${recordId}`)
 }
 
 async function waitForWebhookDeliveryQueueMessage(deliveryId: string, timeoutMs = 10000) {
@@ -186,6 +186,7 @@ describe('webhook queue processing', () => {
     if (!createdWebhookId)
       throw new Error('Webhook was not created in setup')
 
+    const recordId = `app_${randomUUID()}`
     const queueMessage = {
       function_name: 'webhook_dispatcher',
       function_type: 'cloudflare',
@@ -194,7 +195,7 @@ describe('webhook queue processing', () => {
         table_name: 'apps',
         operation: 'UPDATE',
         org_id: WEBHOOK_QUEUE_TEST_ORG_ID,
-        record_id: `app_${randomUUID()}`,
+        record_id: recordId,
         old_record: { name: 'Before' },
         new_record: { name: 'After' },
         changed_fields: ['name'],
@@ -206,12 +207,11 @@ describe('webhook queue processing', () => {
     await pool.query('SELECT pgmq.send($1, $2::jsonb)', ['webhook_dispatcher', JSON.stringify(queueMessage)])
 
     await fetchQueueSync('webhook_dispatcher')
-    const createdDelivery = await waitForDeliveryRecord(createdWebhookId)
+    const createdDelivery = await waitForDeliveryRecord(createdWebhookId, recordId)
+    await waitForWebhookDeliveryQueueMessage(createdDelivery.id)
 
     expect(createdDelivery.event_type).toBe('apps.UPDATE')
     expect(createdDelivery.status).toBe('pending')
-
-    await waitForWebhookDeliveryQueueMessage(createdDelivery.id)
     await fetchQueueSync('webhook_delivery')
     const completedDelivery = await waitForDeliveryCompletion(createdDelivery.id)
 

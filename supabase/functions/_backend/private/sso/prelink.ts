@@ -3,11 +3,10 @@ import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import { type } from 'arktype'
 import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { createHono, middlewareAuth, parseBody, quickError, simpleError, useCors } from '../../utils/hono.ts'
-import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseClient } from '../../utils/supabase.ts'
-import { getEnv } from '../../utils/utils.ts'
 import { version } from '../../utils/version.ts'
+import { runPrelinkUsers } from './prelink-shared.ts'
 
 const bodySchema = type({
   provider_id: 'string.uuid',
@@ -54,56 +53,9 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     return quickError(403, 'not_authorized', 'Not authorized to manage SSO for this organization')
   }
 
-  // Call internal endpoint for admin operations
-  const requestId = c.get('requestId')
-  const apiSecret = getEnv(c, 'API_SECRET')
-  const supabaseUrl = getEnv(c, 'SUPABASE_URL')
-
-  try {
-    const internalUrl = `${supabaseUrl}/functions/v1/private/sso/prelink-internal`
-    const response = await fetch(internalUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiSecret}`,
-      },
-      body: JSON.stringify({
-        provider_id,
-        org_id: provider.org_id,
-        domain: provider.domain,
-      }),
-    })
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-      cloudlogErr({
-        requestId,
-        message: 'SSO prelink internal endpoint failed',
-        status: response.status,
-        error: errorData,
-      })
-      return quickError(500, 'prelink_failed', 'Failed to prelink users')
-    }
-
-    const result = await response.json() as { processed: number, linked: number, errors: string[] }
-    cloudlog({
-      requestId,
-      message: 'SSO pre-linking complete via internal endpoint',
-      providerId: provider_id,
-      domain: provider.domain,
-      processed: result.processed,
-      linked: result.linked,
-      errorCount: result.errors?.length ?? 0,
-    })
-
-    return c.json(result)
-  }
-  catch (fetchError) {
-    cloudlogErr({
-      requestId,
-      message: 'Failed to call SSO prelink internal endpoint',
-      error: fetchError,
-    })
-    return quickError(500, 'prelink_failed', 'Failed to prelink users')
-  }
+  return c.json(await runPrelinkUsers(c, {
+    provider_id,
+    org_id: provider.org_id,
+    domain: provider.domain,
+  }))
 })

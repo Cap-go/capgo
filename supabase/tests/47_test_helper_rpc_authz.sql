@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(15);
+SELECT plan(20);
 
 SELECT tests.authenticate_as('test_admin');
 
@@ -72,6 +72,46 @@ SELECT
         'is_account_disabled - authenticated user can read own disabled status'
     );
 
+SELECT
+    ok(
+        get_account_removal_date() > now(),
+        'get_account_removal_date - authenticated disabled user can read own removal date'
+    );
+
+SELECT restore_deleted_account();
+
+SELECT
+    is(
+        is_account_disabled(tests.get_supabase_uid('test_admin')),
+        false,
+        'restore_deleted_account - authenticated user can restore own pending deletion'
+    );
+
+SELECT tests.authenticate_as_service_role();
+
+INSERT INTO public.to_delete_accounts (account_id, removal_date, removed_data)
+VALUES (
+    tests.get_supabase_uid('test_admin'),
+    now() - interval '1 minute',
+    '{}'::jsonb
+);
+
+SELECT tests.authenticate_as('test_admin');
+
+SELECT
+    throws_like(
+        'SELECT restore_deleted_account()',
+        '%restore_window_expired%',
+        'restore_deleted_account - expired deletion windows cannot be restored'
+    );
+
+SELECT
+    is(
+        is_account_disabled(tests.get_supabase_uid('test_admin')),
+        true,
+        'restore_deleted_account - expired deletion windows stay disabled until cleanup'
+    );
+
 SELECT tests.authenticate_as('test_user');
 
 SELECT
@@ -115,19 +155,36 @@ SELECT
     );
 
 SELECT
-    throws_ok(
-        'SELECT get_user_main_org_id(''' || tests.get_supabase_uid('test_admin') || ''')',
-        '42501',
-        'permission denied for function get_user_main_org_id',
+    is(
+        has_function_privilege(
+            'anon'::name,
+            'public.get_user_main_org_id(uuid)'::regprocedure,
+            'EXECUTE'
+        ),
+        false,
         'get_user_main_org_id - anonymous execute is blocked'
     );
 
 SELECT
-    throws_ok(
-        'SELECT is_account_disabled(''' || tests.get_supabase_uid('test_admin') || ''')',
-        '42501',
-        'permission denied for function is_account_disabled',
+    is(
+        has_function_privilege(
+            'anon'::name,
+            'public.is_account_disabled(uuid)'::regprocedure,
+            'EXECUTE'
+        ),
+        false,
         'is_account_disabled - anonymous execute is blocked'
+    );
+
+SELECT
+    is(
+        has_function_privilege(
+            'anon'::name,
+            'public.restore_deleted_account()'::regprocedure,
+            'EXECUTE'
+        ),
+        false,
+        'restore_deleted_account - anonymous execute is blocked'
     );
 
 SELECT * FROM finish();

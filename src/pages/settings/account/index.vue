@@ -13,6 +13,7 @@ import IconVersion from '~icons/heroicons/arrow-path'
 import iconEmail from '~icons/heroicons/envelope?raw'
 import iconFlag from '~icons/heroicons/flag?raw'
 import iconName from '~icons/heroicons/user?raw'
+import { getRecentEmailOtpVerification } from '~/services/emailOtp'
 import { pickPhoto, takePhoto } from '~/services/photos'
 import { getCurrentPlanNameOrg, isPayingOrg, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -38,7 +39,6 @@ const deleteAccountCaptchaRef = ref<InstanceType<typeof VueTurnstile> | null>(nu
 const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 const organizationsToDelete = ref<string[]>([])
 const paidOrganizationsToDelete = ref<Array<{ name: string, planName: string }>>([])
-const isEmailVerified = computed(() => !!main.auth?.email_confirmed_at)
 displayStore.NavTitle = t('account')
 
 async function redirectToEmailVerification() {
@@ -49,6 +49,25 @@ async function redirectToEmailVerification() {
       return_to: '/settings/account',
     },
   })
+}
+
+async function ensureRecentEmailVerification() {
+  if (!main.auth?.id)
+    return false
+
+  try {
+    const { isVerified } = await getRecentEmailOtpVerification(supabase, main.auth.id)
+    if (isVerified)
+      return true
+  }
+  catch (error) {
+    console.error('Cannot load email OTP verification state', error)
+    toast.error(t('something-went-wrong-try-again-later'))
+    return false
+  }
+
+  await redirectToEmailVerification()
+  return false
 }
 
 async function checkOrganizationImpact() {
@@ -134,8 +153,7 @@ async function checkOrganizationImpact() {
 }
 
 async function deleteAccount() {
-  if (!isEmailVerified.value) {
-    await redirectToEmailVerification()
+  if (!await ensureRecentEmailVerification()) {
     return
   }
 
@@ -252,11 +270,6 @@ async function performAccountDeletion(password: string) {
   if (!main.auth || main.auth?.email == null)
     return false
   const supabaseClient = useSupabase()
-
-  if (!isEmailVerified.value) {
-    await redirectToEmailVerification()
-    return false
-  }
 
   if (!password) {
     toast.error(t('password-placeholder'))
