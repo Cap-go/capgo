@@ -202,7 +202,7 @@
     "cron-schedule": "^6.0.0",
     "dayjs": "1.11.20",
     "dompurify": "^3.4.1",
-    "drizzle-orm": "1.0.0-beta.22",
+    "drizzle-orm": "1.0.0-rc.1",
     "hono": "4.12.15",
     "mime": "^4.1.0",
     "pg": "^8.20.0",
