@@ -680,6 +680,7 @@ export class CapgoSDK {
         supaHost: options.supaHost || this.supaHost,
         supaAnon: options.supaAnon || this.supaAnon,
         path: options.path,
+        nodeModules: options.nodeModules,
         platform: options.platform,
         userId: options.userId,
         // Flatten BuildCredentials to individual fields

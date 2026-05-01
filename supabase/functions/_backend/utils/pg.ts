@@ -297,7 +297,7 @@ export function getPgClient(c: Context, readOnly = false) {
 }
 
 export function getDrizzleClient(db: ReturnType<typeof getPgClient>) {
-  return drizzle(db, { schema, logger: true })
+  return drizzle({ client: db, logger: true })
 }
 
 // Helper to extract detailed error information from pg errors

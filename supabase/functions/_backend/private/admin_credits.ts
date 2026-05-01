@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import { z } from 'zod/mini'
+import { type } from 'arktype'
+import { safeParseSchema } from '../utils/ark_validation.ts'
 import { createHono, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
@@ -9,11 +10,11 @@ import { version } from '../utils/version.ts'
 
 type AppContext = Context<MiddlewareKeyVariables, any, any>
 
-const grantSchema = z.object({
-  org_id: z.string().check(z.minLength(1)),
-  amount: z.number().check(z.minimum(1)),
-  notes: z.optional(z.string().check(z.minLength(1))),
-  expires_at: z.optional(z.string()),
+const grantSchema = type({
+  'org_id': 'string > 0',
+  'amount': 'number >= 1',
+  'notes?': 'string > 0',
+  'expires_at?': 'string',
 })
 
 interface GrantRequest {
@@ -62,7 +63,7 @@ app.post('/grant', middlewareV2(['all']), async (c) => {
   }
 
   const body = await parseBody<GrantRequest>(c)
-  const parsedBodyResult = grantSchema.safeParse(body)
+  const parsedBodyResult = safeParseSchema(grantSchema, body)
 
   if (!parsedBodyResult.success) {
     throw simpleError('invalid_json_body', 'Invalid request body', { body, parsedBodyResult })

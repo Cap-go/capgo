@@ -1,14 +1,15 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
-import { z } from 'zod/mini'
+import { type } from 'arktype'
+import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { createHono, middlewareAuth, parseBody, quickError, simpleError, useCors } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseClient } from '../../utils/supabase.ts'
 import { version } from '../../utils/version.ts'
 import { runPrelinkUsers } from './prelink-shared.ts'
 
-const bodySchema = z.object({
-  provider_id: z.string().check(z.uuid()),
+const bodySchema = type({
+  provider_id: 'string.uuid',
 })
 
 export const app = createHono('', version)
@@ -23,9 +24,9 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
   }
 
   const rawBody = await parseBody<{ provider_id?: string }>(c)
-  const validation = bodySchema.safeParse(rawBody)
+  const validation = safeParseSchema(bodySchema, rawBody)
   if (!validation.success) {
-    throw simpleError('invalid_body', 'Invalid request body', { errors: z.prettifyError(validation.error) })
+    throw simpleError('invalid_body', 'Invalid request body', { errors: validation.error.message })
   }
 
   const { provider_id } = validation.data
