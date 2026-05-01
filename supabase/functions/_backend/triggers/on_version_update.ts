@@ -3,7 +3,7 @@ import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { eq } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
-import { BRES, middlewareAPISecret, triggerValidator } from '../utils/hono.ts'
+import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { manifest } from '../utils/postgres_schema.ts'
@@ -291,18 +291,22 @@ async function deleteManifest(c: Context, record: Database['public']['Tables']['
 export async function deleteIt(c: Context, record: Database['public']['Tables']['app_versions']['Row']) {
   cloudlog({ requestId: c.get('requestId'), message: 'Delete', r2_path: record.r2_path })
 
-  const v2Path = await getPath(c, record)
-  if (!v2Path) {
-    cloudlog({ requestId: c.get('requestId'), message: 'No r2 path' })
-    return c.json(BRES)
-  }
+  if (record.r2_path) {
+    let deleted = false
+    try {
+      deleted = await s3.deleteObject(c, record.r2_path)
+    }
+    catch (error) {
+      cloudlog({ requestId: c.get('requestId'), message: 'Cannot delete s3 (v2)', error })
+      throw simpleError('cannot_delete_s3', 'Cannot delete S3 object for deleted version', { id: record.id, r2_path: record.r2_path }, error)
+    }
 
-  try {
-    await s3.deleteObject(c, v2Path)
+    if (!deleted) {
+      throw simpleError('cannot_delete_s3', 'Cannot delete S3 object for deleted version', { id: record.id, r2_path: record.r2_path })
+    }
   }
-  catch (error) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Cannot delete s3 (v2)', error })
-    return c.json(BRES)
+  else {
+    cloudlog({ requestId: c.get('requestId'), message: 'No r2 path for deleted version', id: record.id })
   }
 
   const { data, error: dbError } = await supabaseAdmin(c)
@@ -322,8 +326,10 @@ export async function deleteIt(c: Context, record: Database['public']['Tables'][
     .from('app_versions_meta')
     .update({ size: 0 })
     .eq('id', record.id)
-  if (errorUpdate)
+  if (errorUpdate) {
     cloudlog({ requestId: c.get('requestId'), message: 'error', error: errorUpdate })
+    throw simpleError('cannot_update_version_meta', 'Cannot update version metadata for deleted version', { id: record.id }, errorUpdate)
+  }
 
   await deleteManifest(c, record)
 
@@ -341,13 +347,14 @@ app.post('/', middlewareAPISecret, triggerValidator('app_versions', 'UPDATE'), (
     cloudlog({ requestId: c.get('requestId'), message: 'no app_id', record })
     return c.json(BRES)
   }
+  // check if version was soft-deleted (deleted_at was set)
+  if (record.deleted_at && record.deleted_at !== oldRecord.deleted_at)
+    return deleteIt(c, record)
+
   if (!record.r2_path && !record.manifest) {
     cloudlog({ requestId: c.get('requestId'), message: 'no r2_path and no manifest, skipping update', record })
     return c.json(BRES)
   }
-  // check if version was soft-deleted (deleted_at was set)
-  if (record.deleted_at && record.deleted_at !== oldRecord.deleted_at)
-    return deleteIt(c, record)
 
   cloudlog({ requestId: c.get('requestId'), message: 'Update but not deleted' })
   return updateIt(c, record)
