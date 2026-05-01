@@ -8,8 +8,11 @@ ALTER TABLE "public"."apikeys"
 COMMENT ON COLUMN "public"."apikeys"."mode" IS
   'Legacy permission mode. NULL means permissions are managed via RBAC role_bindings.';
 
--- Drop and recreate create_hashed_apikey to accept nullable mode
-DROP FUNCTION IF EXISTS "public"."create_hashed_apikey"("p_mode" "public"."key_mode", "p_name" "text", "p_limited_to_orgs" "uuid"[], "p_limited_to_apps" "text"[], "p_expires_at" timestamp with time zone);
+-- Use CREATE OR REPLACE (not DROP + CREATE) to preserve existing grants.
+-- The original migration (20260206120000) set SECURITY INVOKER and relied on the
+-- default PUBLIC execute grant for create_hashed_apikey_for_user. Dropping and
+-- recreating would reset that grant and break the call chain from
+-- create_hashed_apikey (authenticated) → create_hashed_apikey_for_user.
 
 CREATE OR REPLACE FUNCTION "public"."create_hashed_apikey"(
   "p_mode" "public"."key_mode" DEFAULT NULL,
@@ -19,6 +22,7 @@ CREATE OR REPLACE FUNCTION "public"."create_hashed_apikey"(
   "p_expires_at" timestamp with time zone DEFAULT NULL
 ) RETURNS "public"."apikeys"
     LANGUAGE "plpgsql"
+    SECURITY INVOKER
     SET "search_path" TO ''
     AS $$
 DECLARE
@@ -40,16 +44,6 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION "public"."create_hashed_apikey"("p_mode" "public"."key_mode", "p_name" "text", "p_limited_to_orgs" "uuid"[], "p_limited_to_apps" "text"[], "p_expires_at" timestamp with time zone) OWNER TO "postgres";
-
-REVOKE ALL ON FUNCTION "public"."create_hashed_apikey"("p_mode" "public"."key_mode", "p_name" "text", "p_limited_to_orgs" "uuid"[], "p_limited_to_apps" "text"[], "p_expires_at" timestamp with time zone) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."create_hashed_apikey"("p_mode" "public"."key_mode", "p_name" "text", "p_limited_to_orgs" "uuid"[], "p_limited_to_apps" "text"[], "p_expires_at" timestamp with time zone) TO "service_role";
-GRANT ALL ON FUNCTION "public"."create_hashed_apikey"("p_mode" "public"."key_mode", "p_name" "text", "p_limited_to_orgs" "uuid"[], "p_limited_to_apps" "text"[], "p_expires_at" timestamp with time zone) TO "anon";
-GRANT ALL ON FUNCTION "public"."create_hashed_apikey"("p_mode" "public"."key_mode", "p_name" "text", "p_limited_to_orgs" "uuid"[], "p_limited_to_apps" "text"[], "p_expires_at" timestamp with time zone) TO "authenticated";
-
--- Drop and recreate create_hashed_apikey_for_user to accept nullable mode
-DROP FUNCTION IF EXISTS "public"."create_hashed_apikey_for_user"("p_user_id" "uuid", "p_mode" "public"."key_mode", "p_name" "text", "p_limited_to_orgs" "uuid"[], "p_limited_to_apps" "text"[], "p_expires_at" timestamp with time zone);
-
 CREATE OR REPLACE FUNCTION "public"."create_hashed_apikey_for_user"(
   "p_user_id" "uuid",
   "p_mode" "public"."key_mode" DEFAULT NULL,
@@ -59,6 +53,7 @@ CREATE OR REPLACE FUNCTION "public"."create_hashed_apikey_for_user"(
   "p_expires_at" timestamp with time zone DEFAULT NULL
 ) RETURNS "public"."apikeys"
     LANGUAGE "plpgsql"
+    SECURITY INVOKER
     SET "search_path" TO ''
     AS $$
 DECLARE
@@ -96,8 +91,3 @@ BEGIN
   RETURN v_apikey;
 END;
 $$;
-
-ALTER FUNCTION "public"."create_hashed_apikey_for_user"("p_user_id" "uuid", "p_mode" "public"."key_mode", "p_name" "text", "p_limited_to_orgs" "uuid"[], "p_limited_to_apps" "text"[], "p_expires_at" timestamp with time zone) OWNER TO "postgres";
-
-REVOKE ALL ON FUNCTION "public"."create_hashed_apikey_for_user"("p_user_id" "uuid", "p_mode" "public"."key_mode", "p_name" "text", "p_limited_to_orgs" "uuid"[], "p_limited_to_apps" "text"[], "p_expires_at" timestamp with time zone) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."create_hashed_apikey_for_user"("p_user_id" "uuid", "p_mode" "public"."key_mode", "p_name" "text", "p_limited_to_orgs" "uuid"[], "p_limited_to_apps" "text"[], "p_expires_at" timestamp with time zone) TO "service_role";

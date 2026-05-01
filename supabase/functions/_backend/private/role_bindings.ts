@@ -1,8 +1,10 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { Database } from '../utils/supabase.types.ts'
 import { sValidator } from '@hono/standard-validator'
 import { and, eq, sql } from 'drizzle-orm'
-import { createHono, middlewareAuth, useCors } from '../utils/hono.ts'
+import { createHono, useCors } from '../utils/hono.ts'
+import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { schema } from '../utils/postgres_schema.ts'
@@ -42,11 +44,21 @@ const INVALID_APIKEY_ACCESS_ERROR = 'Invalid API key or access'
 export const app = createHono('', version)
 
 app.use('*', useCors)
-app.use('*', middlewareAuth)
+app.use('*', middlewareV2(['all']))
 
-async function requireUserAuth(c: Context<MiddlewareKeyVariables>, next: () => Promise<void>) {
-  if (!c.get('auth')?.userId) {
+async function requireAuthAndGuardLimitedKeys(c: Context<MiddlewareKeyVariables>, next: () => Promise<void>) {
+  const auth = c.get('auth')
+  if (!auth?.userId) {
     return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  // Prevent limited-scope API keys from managing role bindings
+  if (auth.authType === 'apikey') {
+    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
+    const hasLimitedScope = (apikey?.limited_to_orgs?.length ?? 0) > 0 || (apikey?.limited_to_apps?.length ?? 0) > 0
+    if (hasLimitedScope) {
+      return c.json({ error: 'Limited-scope API keys cannot manage role bindings' }, 403)
+    }
   }
 
   await next()
@@ -490,7 +502,7 @@ export async function createRoleBindingForPrincipal(
 }
 
 // GET /private/role_bindings/:org_id - List role bindings for an org
-app.get('/:org_id', requireUserAuth, sValidator('param', orgIdParamSchema, invalidOrgIdHook), async (c) => {
+app.get('/:org_id', requireAuthAndGuardLimitedKeys, sValidator('param', orgIdParamSchema, invalidOrgIdHook), async (c) => {
   const { org_id: orgId } = c.req.valid('param')
 
   let pgClient
@@ -552,7 +564,7 @@ app.get('/:org_id', requireUserAuth, sValidator('param', orgIdParamSchema, inval
 })
 
 // POST /private/role_bindings - Assign a role
-app.post('/', requireUserAuth, async (c) => {
+app.post('/', requireAuthAndGuardLimitedKeys, async (c) => {
   const auth = c.get('auth')!
   const userId = auth.userId
 
@@ -696,7 +708,7 @@ app.post('/', requireUserAuth, async (c) => {
 // PATCH /private/role_bindings/:binding_id - Update a role binding
 app.patch(
   '/:binding_id',
-  requireUserAuth,
+  requireAuthAndGuardLimitedKeys,
   sValidator('param', bindingIdParamSchema, invalidBindingIdHook),
   async (c) => {
     const { binding_id: bindingId } = c.req.valid('param')
@@ -791,7 +803,7 @@ app.patch(
 )
 
 // DELETE /private/role_bindings/:binding_id - Remove a role
-app.delete('/:binding_id', requireUserAuth, sValidator('param', bindingIdParamSchema, invalidBindingIdHook), async (c) => {
+app.delete('/:binding_id', requireAuthAndGuardLimitedKeys, sValidator('param', bindingIdParamSchema, invalidBindingIdHook), async (c) => {
   const { binding_id: bindingId } = c.req.valid('param')
 
   let pgClient

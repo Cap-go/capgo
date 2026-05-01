@@ -1468,8 +1468,8 @@ export async function checkKey(c: Context, authorization: string | undefined, su
       return null
     }
 
-    // Check if mode is allowed
-    if (!allowed.includes(data.mode)) {
+    // Check if mode is allowed (NULL mode = RBAC-managed, always passes mode check)
+    if (data.mode !== null && !allowed.includes(data.mode)) {
       cloudlog({ requestId: c.get('requestId'), message: 'Invalid apikey mode', authorizationPrefix: authorization?.substring(0, 8), allowed, mode: data.mode })
       return null
     }
@@ -1507,7 +1507,7 @@ export async function checkKeyById(
       .from('apikeys')
       .select('*')
       .eq('id', id)
-      .in('mode', allowed)
+      .or(`mode.is.null,mode.in.(${allowed.join(',')})`)
       .or('expires_at.is.null,expires_at.gt.now()')
     if (userId) {
       query = query.eq('user_id', userId)
