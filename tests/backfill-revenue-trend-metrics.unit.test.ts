@@ -163,6 +163,41 @@ describe('revenue trend backfill metrics', () => {
     })
   })
 
+  it.concurrent('does not count reactivated customers as new paying orgs again', () => {
+    const rows = buildRevenueTrendBackfillRows([
+      globalStatsRow('2026-04-01'),
+      globalStatsRow('2026-04-02'),
+      globalStatsRow('2026-04-03'),
+    ], {
+      events: [
+        subscriptionEvent('evt_create_first', 'customer.subscription.created', DAY_1 + 3600, 'cus_reactivated', 'sub_reactivated_first', 'price_solo_monthly'),
+        subscriptionEvent('evt_delete_first', 'customer.subscription.deleted', DAY_2 + 3600, 'cus_reactivated', 'sub_reactivated_first', 'price_solo_monthly'),
+        subscriptionEvent('evt_create_again', 'customer.subscription.created', DAY_3_NOON, 'cus_reactivated', 'sub_reactivated_second', 'price_solo_monthly'),
+      ],
+      fromDateId: '2026-04-01',
+      plans,
+      toDateId: '2026-04-03',
+    })
+
+    expect(rows[0]).toMatchObject({
+      mrr: 12,
+      new_paying_orgs: 1,
+      plan_solo: 1,
+    })
+    expect(rows[1]).toMatchObject({
+      canceled_orgs: 1,
+      churn_revenue: 12,
+      mrr: 0,
+      new_paying_orgs: 0,
+      plan_solo: 0,
+    })
+    expect(rows[2]).toMatchObject({
+      mrr: 12,
+      new_paying_orgs: 0,
+      plan_solo: 1,
+    })
+  })
+
   it.concurrent('counts yearly and monthly baseline subscriptions by plan', () => {
     const rows = buildRevenueTrendBackfillRows([
       globalStatsRow('2026-04-01'),

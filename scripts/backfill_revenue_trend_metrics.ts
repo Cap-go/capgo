@@ -478,12 +478,10 @@ function createDailyCounters() {
 
 function recordTransition(
   daily: DailyCounters | null,
+  seenPaidCustomerIds: Set<string>,
   currentState: RevenueSubscriptionState | null,
   nextState: RevenueSubscriptionState | null,
 ) {
-  if (!daily)
-    return
-
   const currentMrr = currentState?.mrr ?? 0
   const nextMrr = nextState?.mrr ?? 0
   const customerId = nextState?.customerId ?? currentState?.customerId
@@ -491,9 +489,15 @@ function recordTransition(
     return
 
   if (currentMrr <= 0 && nextMrr > 0) {
-    daily.newCustomerIds.add(customerId)
+    if (!seenPaidCustomerIds.has(customerId)) {
+      daily?.newCustomerIds.add(customerId)
+      seenPaidCustomerIds.add(customerId)
+    }
     return
   }
+
+  if (!daily)
+    return
 
   if (currentMrr > 0 && nextMrr <= 0) {
     daily.canceledCustomerIds.add(customerId)
@@ -507,6 +511,7 @@ function recordTransition(
 
 function applySubscriptionEventToStates(
   states: Map<string, RevenueSubscriptionState>,
+  seenPaidCustomerIds: Set<string>,
   event: Stripe.Event,
   priceLookup: Map<string, PriceLookupEntry>,
   daily: DailyCounters | null,
@@ -523,7 +528,7 @@ function applySubscriptionEventToStates(
   const previousState = existingState ?? buildPreviousStateFromEvent(event, priceLookup)
   const nextState = buildNextStateFromEvent(event, priceLookup)
 
-  recordTransition(daily, previousState, nextState)
+  recordTransition(daily, seenPaidCustomerIds, previousState, nextState)
 
   if (nextState)
     states.set(getStateKey(nextState), nextState)
@@ -533,6 +538,7 @@ function applySubscriptionEventToStates(
 
 function seedBaselineStatesFromSubscriptions(
   states: Map<string, RevenueSubscriptionState>,
+  seenPaidCustomerIds: Set<string>,
   subscriptions: Stripe.Subscription[],
   priceLookup: Map<string, PriceLookupEntry>,
   fromDateId: string,
@@ -551,11 +557,14 @@ function seedBaselineStatesFromSubscriptions(
     if (subscription.created >= fromStartSeconds)
       continue
     states.set(getStateKey(state), state)
+    if (state.mrr > 0)
+      seenPaidCustomerIds.add(state.customerId)
   }
 }
 
 function replayPreRangeEvents(
   states: Map<string, RevenueSubscriptionState>,
+  seenPaidCustomerIds: Set<string>,
   events: Stripe.Event[],
   priceLookup: Map<string, PriceLookupEntry>,
   fromDateId: string,
@@ -570,12 +579,13 @@ function replayPreRangeEvents(
     if (customerId && eventCustomerId !== customerId)
       continue
 
-    applySubscriptionEventToStates(states, event, priceLookup, null)
+    applySubscriptionEventToStates(states, seenPaidCustomerIds, event, priceLookup, null)
   }
 }
 
 function seedOpeningStateFromFirstRangeEvents(
   states: Map<string, RevenueSubscriptionState>,
+  seenPaidCustomerIds: Set<string>,
   events: Stripe.Event[],
   priceLookup: Map<string, PriceLookupEntry>,
   fromDateId: string,
@@ -602,8 +612,11 @@ function seedOpeningStateFromFirstRangeEvents(
       continue
 
     const previousState = buildPreviousStateFromEvent(event, priceLookup)
-    if (previousState)
+    if (previousState) {
       states.set(getStateKey(previousState), previousState)
+      if (previousState.mrr > 0)
+        seenPaidCustomerIds.add(previousState.customerId)
+    }
   }
 }
 
@@ -697,11 +710,12 @@ export function buildRevenueTrendBackfillRows(
   const existingRowsByDateId = new Map(existingRows.map(row => [row.date_id, row]))
   const priceLookup = buildPriceLookup(options.plans)
   const states = new Map<string, RevenueSubscriptionState>()
+  const seenPaidCustomerIds = new Set<string>()
   const sortedEvents = sortStripeEvents(options.events)
 
-  seedBaselineStatesFromSubscriptions(states, options.baselineSubscriptions ?? [], priceLookup, options.fromDateId, options.customerId)
-  replayPreRangeEvents(states, sortedEvents, priceLookup, options.fromDateId, options.customerId)
-  seedOpeningStateFromFirstRangeEvents(states, sortedEvents, priceLookup, options.fromDateId, options.toDateId, options.customerId)
+  seedBaselineStatesFromSubscriptions(states, seenPaidCustomerIds, options.baselineSubscriptions ?? [], priceLookup, options.fromDateId, options.customerId)
+  replayPreRangeEvents(states, seenPaidCustomerIds, sortedEvents, priceLookup, options.fromDateId, options.customerId)
+  seedOpeningStateFromFirstRangeEvents(states, seenPaidCustomerIds, sortedEvents, priceLookup, options.fromDateId, options.toDateId, options.customerId)
 
   const eventsByDateId = new Map<string, Stripe.Event[]>()
   for (const event of sortedEvents) {
@@ -723,7 +737,7 @@ export function buildRevenueTrendBackfillRows(
   for (const dateId of getDateIdsBetween(options.fromDateId, options.toDateId)) {
     const daily = createDailyCounters()
     for (const event of eventsByDateId.get(dateId) ?? [])
-      applySubscriptionEventToStates(states, event, priceLookup, daily)
+      applySubscriptionEventToStates(states, seenPaidCustomerIds, event, priceLookup, daily)
 
     expireStatesForDate(states, dateId, daily)
 
