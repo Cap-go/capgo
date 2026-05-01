@@ -949,6 +949,81 @@ describe('[DELETE] /organization/members', () => {
   })
 })
 
+describe('[DELETE] /organization/members - org_admin can delete members', () => {
+  const adminDeleteOrgId = randomUUID()
+  const adminDeleteGlobalId = randomUUID()
+  const adminDeleteCustomerId = `cus_test_admin_del_${adminDeleteOrgId}`
+
+  beforeAll(async () => {
+    const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
+      customer_id: adminDeleteCustomerId,
+      status: 'succeeded',
+      product_id: 'prod_LQIregjtNduh4q',
+      subscription_id: `sub_${adminDeleteGlobalId}`,
+      trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+      is_good_plan: true,
+    })
+    if (stripeError)
+      throw stripeError
+
+    // Create org with legacy RBAC path (use_new_rbac: false) to test the fixed legacy mapping
+    const { error: orgError } = await getSupabaseClient().from('orgs').insert({
+      id: adminDeleteOrgId,
+      name: `Admin Delete Test Org ${adminDeleteGlobalId}`,
+      management_email: TEST_EMAIL,
+      created_by: USER_ID,
+      customer_id: adminDeleteCustomerId,
+      website: 'https://admin-delete-test.example/',
+      use_new_rbac: false,
+    })
+    if (orgError)
+      throw orgError
+
+    // Add USER_ID as admin (NOT super_admin) — this is the key scenario under test
+    const { error: orgUserError } = await getSupabaseClient().from('org_users').insert({
+      org_id: adminDeleteOrgId,
+      user_id: USER_ID,
+      user_right: 'admin',
+    })
+    if (orgUserError)
+      throw orgUserError
+  })
+
+  afterAll(async () => {
+    await getSupabaseClient().from('org_users').delete().eq('org_id', adminDeleteOrgId)
+    await getSupabaseClient().from('orgs').delete().eq('id', adminDeleteOrgId)
+    await getSupabaseClient().from('stripe_info').delete().eq('customer_id', adminDeleteCustomerId)
+  })
+
+  it.concurrent('org_admin can delete a read member', async () => {
+    // Add USER_ADMIN as a read member to the org
+    const { data: userData, error: userError } = await getSupabaseClient().from('users').select().eq('email', USER_ADMIN_EMAIL).single()
+    expect(userError).toBeNull()
+    expect(userData).toBeTruthy()
+
+    const { error: addError } = await getSupabaseClient().from('org_users').insert({
+      org_id: adminDeleteOrgId,
+      user_id: userData!.id,
+      user_right: 'read',
+    })
+    expect(addError).toBeNull()
+
+    // USER_ID (admin) deletes USER_ADMIN (read) — should succeed
+    const response = await fetch(`${BASE_URL}/organization/members?orgId=${adminDeleteOrgId}&email=${USER_ADMIN_EMAIL}`, {
+      headers,
+      method: 'DELETE',
+    })
+    expect(response.status).toBe(200)
+    const responseData = await response.json() as { status: string }
+    expect(responseData.status).toBe('ok')
+
+    // Verify the member was actually removed
+    const { data, error: orgUserError } = await getSupabaseClient().from('org_users').select().eq('org_id', adminDeleteOrgId).eq('user_id', userData!.id).single()
+    expect(orgUserError).toBeTruthy()
+    expect(data).toBeNull()
+  })
+})
+
 describe('[POST] /organization', () => {
   it.concurrent('create organization', async () => {
     const name = `Created Organization ${new Date().toISOString()}`

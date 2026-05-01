@@ -112,7 +112,7 @@ const PERMISSION_TO_LEGACY_RIGHT: Record<Permission, Database['public']['Enums']
   'org.delete': 'super_admin',
   'org.read_members': 'read',
   'org.invite_user': 'admin',
-  'org.update_user_roles': 'super_admin',
+  'org.update_user_roles': 'admin',
   'org.read_billing': 'admin',
   'org.update_billing': 'super_admin',
   'org.read_invoices': 'admin',
