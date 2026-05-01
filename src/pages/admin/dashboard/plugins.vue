@@ -35,6 +35,8 @@ interface PluginBreakdownData {
   trend?: PluginBreakdownTrendPoint[]
 }
 
+type PluginBreakdownKey = 'version_breakdown' | 'major_breakdown'
+
 const { t } = useI18n()
 const displayStore = useDisplayStore()
 const mainStore = useMainStore()
@@ -48,6 +50,7 @@ const thresholdSelection = ref<'0' | '0.1' | '0.5' | '1' | '2' | '5' | 'custom'>
 const customThreshold = ref(1)
 const maxVersionRows = 20
 const maxTrendVersions = 5
+const maxTrendMajorVersions = 8
 const trendColorPalette = ['#119eff', '#10b981', '#f59e0b', '#6366f1', '#ec4899', '#14b8a6', '#f97316', '#8b5cf6']
 
 async function loadPluginBreakdown() {
@@ -113,34 +116,63 @@ const hasMajorData = computed(() => majorEntries.value.length > 0)
 const versionCountTotal = computed(() => Object.keys(pluginBreakdown.value?.version_breakdown ?? {}).length)
 const versionCountShown = computed(() => versionEntries.value.length)
 const versionTrendPoints = computed(() => pluginBreakdown.value?.trend ?? [])
-const topVersionsForTrend = computed(() => {
-  const latestPoint = versionTrendPoints.value[versionTrendPoints.value.length - 1]
+
+function getTopBreakdownEntries(
+  latestPoint: PluginBreakdownTrendPoint | undefined,
+  key: PluginBreakdownKey,
+  minPercent: number,
+  limit: number,
+) {
   if (!latestPoint)
     return []
 
-  return Object.entries(latestPoint.version_breakdown ?? {})
+  return Object.entries(latestPoint[key] ?? {})
     .map(([version, percent]) => ({
       version,
       percent: Number(percent) || 0,
     }))
-    .filter(entry => entry.percent > thresholdValue.value)
+    .filter(entry => entry.percent > minPercent)
     .sort((a, b) => b.percent - a.percent)
-    .slice(0, maxTrendVersions)
+    .slice(0, limit)
+}
+
+function buildTrendSeries(
+  points: PluginBreakdownTrendPoint[],
+  entries: Array<{ version: string }>,
+  key: PluginBreakdownKey,
+) {
+  return entries.map((entry, index) => ({
+    label: entry.version,
+    data: points.map(point => ({
+      date: point.date,
+      value: Number(point[key]?.[entry.version]) || 0,
+    })),
+    color: trendColorPalette[index % trendColorPalette.length],
+  }))
+}
+
+const topVersionsForTrend = computed(() => {
+  const latestPoint = versionTrendPoints.value[versionTrendPoints.value.length - 1]
+  return getTopBreakdownEntries(latestPoint, 'version_breakdown', thresholdValue.value, maxTrendVersions)
 })
 const versionTrendSeries = computed(() => {
   if (versionTrendPoints.value.length === 0 || topVersionsForTrend.value.length === 0)
     return []
 
-  return topVersionsForTrend.value.map((entry, index) => ({
-    label: entry.version,
-    data: versionTrendPoints.value.map(point => ({
-      date: point.date,
-      value: Number(point.version_breakdown?.[entry.version]) || 0,
-    })),
-    color: trendColorPalette[index % trendColorPalette.length],
-  }))
+  return buildTrendSeries(versionTrendPoints.value, topVersionsForTrend.value, 'version_breakdown')
 })
 const hasVersionTrendData = computed(() => versionTrendSeries.value.length > 0)
+const topMajorVersionsForTrend = computed(() => {
+  const latestPoint = versionTrendPoints.value[versionTrendPoints.value.length - 1]
+  return getTopBreakdownEntries(latestPoint, 'major_breakdown', 0, maxTrendMajorVersions)
+})
+const majorTrendSeries = computed(() => {
+  if (versionTrendPoints.value.length === 0 || topMajorVersionsForTrend.value.length === 0)
+    return []
+
+  return buildTrendSeries(versionTrendPoints.value, topMajorVersionsForTrend.value, 'major_breakdown')
+})
+const hasMajorTrendData = computed(() => majorTrendSeries.value.length > 0)
 
 watch(() => adminStore.activeDateRange, () => {
   loadPluginBreakdown()
@@ -227,6 +259,32 @@ displayStore.defaultBack = '/dashboard'
             <AdminMultiLineChart
               :series="versionTrendSeries"
               :is-loading="isLoadingBreakdown"
+              value-suffix="%"
+              :suggested-max="100"
+            />
+          </ChartCard>
+
+          <ChartCard
+            title="Major Version Breakdown Over Time"
+            :is-loading="isLoadingBreakdown"
+            :has-data="hasMajorTrendData"
+            no-data-message="No major version trend data available"
+          >
+            <template #header>
+              <div class="flex flex-col gap-1">
+                <h2 class="text-2xl font-semibold leading-tight dark:text-white text-slate-600">
+                  Major Version Breakdown Over Time
+                </h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  Top {{ topMajorVersionsForTrend.length }} major versions from latest snapshot
+                </p>
+              </div>
+            </template>
+            <AdminMultiLineChart
+              :series="majorTrendSeries"
+              :is-loading="isLoadingBreakdown"
+              value-suffix="%"
+              :suggested-max="100"
             />
           </ChartCard>
 
