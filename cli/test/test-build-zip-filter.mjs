@@ -450,10 +450,18 @@ await t('generated build zip can pull native pnpm workspace packages from an exp
       join(projectRoot, 'ios', 'App', 'Podfile'),
       "platform :ios, '14.0'\npod 'CapacitorCommunityKeepAwake', :path => '../../node_modules/@capacitor-community/keep-awake'\n",
     )
+    writeFile(
+      join(projectRoot, 'ios', 'App', 'CapApp-SPM', 'Package.swift'),
+      'let package = Package(name: "CapApp-SPM", dependencies: [.package(name: "CapacitorCommunityKeepAwake", path: "../../../../../node_modules/.pnpm/@capacitor-community+keep-awake@8.0.0_@capacitor+core@8.2.0/node_modules/@capacitor-community/keep-awake")])\n',
+    )
 
     writeFile(
       join(keepAwakePath, 'package.json'),
       JSON.stringify({ name: '@capacitor-community/keep-awake', version: '8.0.0' }, null, 2),
+    )
+    writeFile(
+      join(keepAwakePath, 'Package.swift'),
+      'let package = Package(name: "CapacitorCommunityKeepAwake")\n',
     )
     writeFile(
       join(keepAwakePath, 'KeepAwake.podspec'),
@@ -476,9 +484,14 @@ await t('generated build zip can pull native pnpm workspace packages from an exp
     const entries = zip.getEntries().map(entry => entry.entryName).sort()
 
     assert.ok(entries.includes('node_modules/@capacitor-community/keep-awake/package.json'), 'missing workspace plugin package.json in zip')
+    assert.ok(entries.includes('node_modules/@capacitor-community/keep-awake/Package.swift'), 'missing workspace plugin Package.swift in zip')
     assert.ok(entries.includes('node_modules/@capacitor-community/keep-awake/KeepAwake.podspec'), 'missing workspace plugin podspec in zip')
     assert.ok(entries.includes('node_modules/@capacitor-community/keep-awake/ios/KeepAwakePlugin.swift'), 'missing workspace plugin ios code in zip')
     assert.ok(entries.includes('ios/App/Podfile'), 'native platform folder not included')
+    assert.equal(
+      zip.readAsText('ios/App/CapApp-SPM/Package.swift'),
+      'let package = Package(name: "CapApp-SPM", dependencies: [.package(name: "CapacitorCommunityKeepAwake", path: "../../../node_modules/@capacitor-community/keep-awake")])\n',
+    )
   }
   finally {
     rmSync(testRoot, { recursive: true, force: true })
