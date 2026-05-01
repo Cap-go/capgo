@@ -267,6 +267,7 @@
   "api-keys-legacy-title": "Legacy API Keys",
   "api-keys-legacy-description": "Legacy API keys continue to function, but new legacy keys can no longer be created. They still rely on mode and explicit organization/application scopes.",
   "api-keys-are-used-for-cli-and-public-api": "API keys are used for CLI and public API",
+  "api-keys-unavailable": "API keys are not available for your organization.",
   "app": "app",
   "app-access-control": "Access Control",
   "app-access-control-description": "Manage who can access this app and what they can do",
