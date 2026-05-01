@@ -992,6 +992,10 @@ function findPackageInNodeModules(nodeModulesPath: string, packagePath: string):
     .filter(name => name.startsWith(`${encodedPackageName}@`))
     .sort()
 
+  if (pnpmEntries.length > 1) {
+    throw new Error(`Multiple pnpm store entries found for ${packagePath} in ${pnpmStoreDir}; provide the app-specific node_modules path so the native build archive can use the exact resolved package.`)
+  }
+
   for (const entry of pnpmEntries) {
     const packageDir = join(pnpmStoreDir, entry, 'node_modules', ...packagePath.split('/'))
     if (existsSync(packageDir))
