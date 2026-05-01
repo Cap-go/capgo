@@ -1002,7 +1002,7 @@ async function syncAppBindings() {
               @click="isCreateMode ? createKey() : saveKey()"
             >
               <span v-if="isSubmitting" class="d-loading d-loading-spinner d-loading-xs" />
-              {{ isCreateMode ? t('create') : t('save') }}
+              {{ isCreateMode ? t('create') : t('save-changes') }}
             </button>
           </div>
         </template>
