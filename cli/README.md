@@ -1197,6 +1197,7 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | Param          | Type          | Description          |
 | -------------- | ------------- | -------------------- |
 | **--path** | <code>string</code> | Path to the project directory to build (default: current directory) |
+| **--node-modules** | <code>string</code> | Paths to node_modules directories for monorepos (comma-separated) |
 | **--platform** | <code>string</code> | Target platform: ios or android (required) |
 | **--build-mode** | <code>string</code> | Build mode: debug or release (default: release) |
 | **--build-certificate-base64** | <code>string</code> | iOS: Base64-encoded .p12 certificate |

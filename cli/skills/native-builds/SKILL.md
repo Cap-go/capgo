@@ -85,6 +85,7 @@ interface BuildLogger {
   - Before requesting a build, save credentials with `build credentials save`.
 - Core options:
   - `--path <path>`
+  - `--node-modules <nodeModules>`: paths to `node_modules` directories for monorepos, comma-separated.
   - `--platform <platform>`: `ios` or `android`, required.
   - `--build-mode <buildMode>`: `debug` or `release`.
   - `-a, --apikey <apikey>`

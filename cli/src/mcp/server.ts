@@ -523,12 +523,14 @@ export async function startMcpServer(): Promise<void> {
       appId: z.string().describe('App ID to build'),
       platform: z.enum(['ios', 'android']).describe('Target platform'),
       path: z.string().optional().describe('Path to project directory'),
+      nodeModules: z.string().optional().describe('Paths to node_modules directories for monorepos (comma-separated)'),
     },
-    async ({ appId, platform, path }) => {
+    async ({ appId, platform, path, nodeModules }) => {
       const result = await sdk.requestBuild({
         appId,
         platform,
         path,
+        nodeModules,
         // Credentials should be pre-saved using the CLI
       })
       if (!result.success) {
