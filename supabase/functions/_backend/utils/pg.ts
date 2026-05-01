@@ -574,6 +574,11 @@ export function requestInfosChannelPostgres(
         : and(
             eq(channelAlias.app_id, app_id),
             eq(channelAlias.name, defaultChannel),
+            eq(platformQuery, true),
+            or(
+              eq(channelAlias.public, true),
+              eq(channelAlias.allow_device_self_set, true),
+            ),
           ),
     )
     .groupBy(channelAlias.id, versionAlias.id)

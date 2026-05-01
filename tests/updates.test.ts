@@ -15,6 +15,8 @@ interface UpdateRes {
   version?: string
   message?: string
   manifest?: { file_name: string | null, file_hash?: string | null, download_url?: string | null }[]
+  old?: string
+  major?: boolean
 }
 
 const updateNewScheme = type({
@@ -525,8 +527,8 @@ describe('[POST] /updates parallel tests', () => {
     const uuid = randomUUID().toLowerCase()
 
     const baseData = getBaseData(APP_NAME_UPDATE)
-    baseData.device_id = uuid;
-    (baseData as any).defaultChannel = 'beta'
+    baseData.device_id = uuid
+    baseData.defaultChannel = 'beta'
 
     const response = await postUpdate(baseData)
     expect(response.status).toBe(200)
@@ -534,6 +536,155 @@ describe('[POST] /updates parallel tests', () => {
     const json = await response.json<UpdateRes>()
     expect(() => parseSchema(updateNewScheme, json)).not.toThrow()
     expect(json.version).toBe('1.361.0')
+  })
+
+  it('hides private defaultChannel before major upgrade checks', async () => {
+    const supabase = getSupabaseClient()
+    const versionName = `9.9.${Math.floor(Math.random() * 100000) + 1000}`
+    const channelName = `private-noself-${randomUUID().slice(0, 8)}`
+
+    const version = await createAppVersions(versionName, APP_NAME_UPDATE)
+    await supabase
+      .from('app_versions')
+      .update({ external_url: `https://example.com/${channelName}.zip` })
+      .eq('id', version.id)
+      .throwOnError()
+
+    await supabase
+      .from('channels')
+      .insert({
+        name: channelName,
+        app_id: APP_NAME_UPDATE,
+        version: version.id,
+        owner_org: ORG_ID,
+        created_by: USER_ID,
+        public: false,
+        disable_auto_update_under_native: false,
+        disable_auto_update: 'major',
+        allow_device_self_set: false,
+        allow_emulator: true,
+        allow_device: true,
+        allow_dev: true,
+        allow_prod: true,
+        ios: true,
+        android: true,
+        electron: true,
+      })
+      .throwOnError()
+
+    const baseData = getBaseData(APP_NAME_UPDATE)
+    baseData.platform = 'android'
+    baseData.defaultChannel = channelName
+    baseData.version_build = '0.0.1'
+    baseData.version_name = '0.0.1'
+
+    const response = await postUpdate(baseData)
+    expect(response.status).toBe(200)
+
+    const json = await response.json<UpdateRes>()
+    expect(json.error).toBe('no_channel')
+    expect(json.version).toBeUndefined()
+    expect(json.old).toBeUndefined()
+    expect(json.major).toBeUndefined()
+  })
+
+  it('allows private self-settable platform-compatible defaultChannel', async () => {
+    const supabase = getSupabaseClient()
+    const versionName = `9.7.${Math.floor(Math.random() * 100000) + 1000}`
+    const channelName = `private-selfset-${randomUUID().slice(0, 8)}`
+
+    const version = await createAppVersions(versionName, APP_NAME_UPDATE)
+    await supabase
+      .from('app_versions')
+      .update({ external_url: `https://example.com/${channelName}.zip` })
+      .eq('id', version.id)
+      .throwOnError()
+
+    await supabase
+      .from('channels')
+      .insert({
+        name: channelName,
+        app_id: APP_NAME_UPDATE,
+        version: version.id,
+        owner_org: ORG_ID,
+        created_by: USER_ID,
+        public: false,
+        disable_auto_update_under_native: false,
+        disable_auto_update: 'none',
+        allow_device_self_set: true,
+        allow_emulator: true,
+        allow_device: true,
+        allow_dev: true,
+        allow_prod: true,
+        ios: false,
+        android: true,
+        electron: false,
+      })
+      .throwOnError()
+
+    const baseData = getBaseData(APP_NAME_UPDATE)
+    baseData.platform = 'android'
+    baseData.defaultChannel = channelName
+    baseData.version_build = '0.0.1'
+    baseData.version_name = '0.0.1'
+
+    const response = await postUpdate(baseData)
+    expect(response.status).toBe(200)
+
+    const json = await response.json<UpdateRes>()
+    expect(() => updateNewScheme.parse(json)).not.toThrow()
+    expect(json.version).toBe(versionName)
+    expect(json.error).toBeUndefined()
+  })
+
+  it('hides platform-incompatible private defaultChannel before platform checks', async () => {
+    const supabase = getSupabaseClient()
+    const versionName = `9.8.${Math.floor(Math.random() * 100000) + 1000}`
+    const channelName = `private-iosonly-${randomUUID().slice(0, 8)}`
+
+    const version = await createAppVersions(versionName, APP_NAME_UPDATE)
+    await supabase
+      .from('app_versions')
+      .update({ external_url: `https://example.com/${channelName}.zip` })
+      .eq('id', version.id)
+      .throwOnError()
+
+    await supabase
+      .from('channels')
+      .insert({
+        name: channelName,
+        app_id: APP_NAME_UPDATE,
+        version: version.id,
+        owner_org: ORG_ID,
+        created_by: USER_ID,
+        public: false,
+        disable_auto_update_under_native: false,
+        disable_auto_update: 'none',
+        allow_device_self_set: true,
+        allow_emulator: true,
+        allow_device: true,
+        allow_dev: true,
+        allow_prod: true,
+        ios: true,
+        android: false,
+        electron: false,
+      })
+      .throwOnError()
+
+    const baseData = getBaseData(APP_NAME_UPDATE)
+    baseData.platform = 'android'
+    baseData.defaultChannel = channelName
+    baseData.version_build = '0.0.1'
+    baseData.version_name = '0.0.1'
+
+    const response = await postUpdate(baseData)
+    expect(response.status).toBe(200)
+
+    const json = await response.json<UpdateRes>()
+    expect(json.error).toBe('no_channel')
+    expect(json.version).toBeUndefined()
+    expect(json.old).toBeUndefined()
+    expect(json.major).toBeUndefined()
   })
 })
 
@@ -865,14 +1016,14 @@ describe('update scenarios', () => {
     }
   })
 
-  it('cannot update via private channel', async () => {
+  it('hides private channel that does not allow self-assignment', async () => {
     // First reset the channel to ensure it's working properly
     await updateChannel('production', {
       public: true,
       allow_device_self_set: true,
     })
 
-    // Now set both conditions for the error
+    // Now set both conditions that make the channel private.
     await updateChannel('production', {
       public: false,
       allow_device_self_set: false,
@@ -880,15 +1031,17 @@ describe('update scenarios', () => {
 
     const baseData = getBaseData(APP_NAME_UPDATE)
     baseData.version_name = '1.1.0'
-    // Need to specify defaultChannel so the non-public channel can be found
-    ;(baseData as any).defaultChannel = 'production'
+    // A caller-supplied defaultChannel must not reveal that this private channel exists.
+    baseData.defaultChannel = 'production'
 
     try {
       const response = await postUpdate(baseData)
       expect(response.status).toBe(200)
       const json = await response.json<UpdateRes>()
-      expect(json.error).toBe('cannot_update_via_private_channel')
-      expect(json.message).toContain('Cannot update via a private channel')
+      expect(json.error).toBe('no_channel')
+      expect(json.version).toBeUndefined()
+      expect(json.old).toBeUndefined()
+      expect(json.major).toBeUndefined()
     }
     finally {
       await updateChannel('production', {
@@ -938,7 +1091,7 @@ describe('update scenarios', () => {
       const baseData = getBaseData(APP_NAME_UPDATE)
       baseData.device_id = uuid
       baseData.version_name = '1.1.0'
-      ;(baseData as any).defaultChannel = 'production'
+      baseData.defaultChannel = 'production'
 
       const response = await postUpdate(baseData)
       expect(response.status).toBe(200)
