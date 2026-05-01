@@ -2,8 +2,22 @@ import type { AuthInfo } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
+import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
+import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
+import { checkPermission } from '../../utils/rbac.ts'
 import { resolveApikeyPolicyOrgIds, supabaseAdmin, supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
 import { Constants } from '../../utils/supabase.types.ts'
+import { createRoleBindingForPrincipal } from '../../private/role_bindings.ts'
+import type { CreateBindingParams } from '../../private/role_bindings.ts'
+
+interface BindingInput {
+  role_name: string
+  scope_type: 'org' | 'app' | 'channel'
+  org_id: string
+  app_id?: string | null
+  channel_id?: string | number | null
+  reason?: string
+}
 
 const app = honoFactory.createApp()
 
@@ -39,16 +53,41 @@ app.post('/', middlewareV2(['all']), async (c) => {
   const expiresAt = body.expires_at ?? null
   const isHashed = body.hashed === true
 
-  const mode = body.mode ?? 'all'
+  // Validate and parse bindings array
+  const bindings: BindingInput[] = Array.isArray(body.bindings) ? body.bindings : []
+  if (body.bindings !== undefined && !Array.isArray(body.bindings)) {
+    throw simpleError('invalid_bindings', 'bindings must be an array')
+  }
+  for (const binding of bindings) {
+    if (!binding || typeof binding !== 'object') {
+      throw simpleError('invalid_bindings', 'Each binding must be an object')
+    }
+    if (typeof binding.role_name !== 'string' || !binding.role_name) {
+      throw simpleError('invalid_bindings', 'Each binding must have a role_name')
+    }
+    if (!['org', 'app', 'channel'].includes(binding.scope_type)) {
+      throw simpleError('invalid_bindings', 'Each binding must have a valid scope_type (org, app, channel)')
+    }
+    if (typeof binding.org_id !== 'string' || !binding.org_id) {
+      throw simpleError('invalid_bindings', 'Each binding must have an org_id')
+    }
+  }
+
+  const hasBindings = bindings.length > 0
+
+  // mode is required when no bindings are provided, optional (null) otherwise
+  const mode = body.mode ?? null
   if (!name) {
     throw simpleError('name_is_required', 'Name is required')
   }
-  if (!mode) {
-    throw simpleError('mode_is_required', 'Mode is required')
+  if (!hasBindings && !mode) {
+    throw simpleError('mode_is_required', 'Mode is required when no bindings are provided')
   }
-  const validModes = Constants.public.Enums.key_mode
-  if (!validModes.includes(mode)) {
-    throw simpleError('invalid_mode', 'Invalid mode')
+  if (mode !== null) {
+    const validModes = Constants.public.Enums.key_mode
+    if (!validModes.includes(mode)) {
+      throw simpleError('invalid_mode', 'Invalid mode')
+    }
   }
 
   // Validate expiration date format (throws if invalid)
@@ -115,6 +154,93 @@ app.post('/', middlewareV2(['all']), async (c) => {
   }
   if (apikeyError || !apikeyData) {
     throw simpleError('failed_to_create_apikey', 'Failed to create API key', { supabaseError: apikeyError })
+  }
+
+  // If bindings are provided, create them using the new key's rbac_id
+  if (hasBindings && apikeyData.rbac_id) {
+    let pgClient: ReturnType<typeof getPgClient> | undefined
+    try {
+      pgClient = getPgClient(c)
+      const drizzle = getDrizzleClient(pgClient)
+
+      // Check RBAC permission for each unique org in the bindings
+      const bindingOrgIds = [...new Set(bindings.map(b => b.org_id))]
+      for (const bindingOrgId of bindingOrgIds) {
+        if (!(await checkPermission(c, 'org.update_user_roles', { orgId: bindingOrgId }))) {
+          // Rollback the created key
+          await supabase.from('apikeys').delete().eq('id', apikeyData.id)
+          throw quickError(403, 'forbidden_binding', `Forbidden - Admin rights required for org ${bindingOrgId}`)
+        }
+      }
+
+      // Guard: an API key caller cannot create bindings for keys it doesn't own
+      // Note: since we just created the key with auth.userId, this is inherently safe.
+      // This guard is a defense-in-depth measure for future code changes.
+
+      const callerPrincipalId = auth.authType === 'apikey' ? auth.apikey!.rbac_id : auth.userId
+      const createdBindings = []
+
+      for (const binding of bindings) {
+        const bindingParams: CreateBindingParams = {
+          principal_type: 'apikey',
+          principal_id: apikeyData.rbac_id,
+          role_name: binding.role_name,
+          scope_type: binding.scope_type,
+          org_id: binding.org_id,
+          app_id: binding.app_id,
+          channel_id: binding.channel_id,
+          reason: binding.reason,
+        }
+
+        const result = await createRoleBindingForPrincipal(
+          drizzle,
+          bindingParams,
+          auth.userId,
+          auth.authType as 'jwt' | 'apikey',
+          callerPrincipalId,
+        )
+
+        if (!result.ok) {
+          // Rollback: delete the created key and any bindings created so far
+          cloudlogErr({
+            requestId: c.get('requestId'),
+            message: 'apikey_binding_failed',
+            binding,
+            error: result.error,
+          })
+          await supabase.from('apikeys').delete().eq('id', apikeyData.id)
+          throw quickError(result.status as any, 'binding_failed', result.error)
+        }
+
+        createdBindings.push(result.data)
+      }
+
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'apikey_bindings_created',
+        apikeyId: apikeyData.id,
+        bindingsCount: createdBindings.length,
+      })
+    }
+    catch (error: any) {
+      // Re-throw our own quickError/simpleError
+      if (error?.status || error?.code) {
+        throw error
+      }
+      // Unexpected error: rollback the key
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'apikey_bindings_unexpected_error',
+        error,
+      })
+      await supabase.from('apikeys').delete().eq('id', apikeyData.id)
+      throw simpleError('binding_creation_failed', 'Failed to create role bindings for the API key')
+    }
+    finally {
+      if (pgClient) {
+        await closeClient(c, pgClient)
+      }
+    }
   }
 
   return c.json(apikeyData)

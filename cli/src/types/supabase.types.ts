@@ -23,7 +23,7 @@ export type Database = {
           key_hash: string | null
           limited_to_apps: string[] | null
           limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"]
+          mode: Database["public"]["Enums"]["key_mode"] | null
           name: string
           updated_at: string | null
           user_id: string
@@ -36,7 +36,7 @@ export type Database = {
           key_hash?: string | null
           limited_to_apps?: string[] | null
           limited_to_orgs?: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"]
+          mode?: Database["public"]["Enums"]["key_mode"] | null
           name: string
           updated_at?: string | null
           user_id: string
@@ -49,7 +49,7 @@ export type Database = {
           key_hash?: string | null
           limited_to_apps?: string[] | null
           limited_to_orgs?: string[] | null
-          mode?: Database["public"]["Enums"]["key_mode"]
+          mode?: Database["public"]["Enums"]["key_mode"] | null
           name?: string
           updated_at?: string | null
           user_id?: string

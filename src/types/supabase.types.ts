@@ -23,7 +23,7 @@ export type Database = {
           key_hash: string | null
           limited_to_apps: string[] | null
           limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"]
+          mode: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id: string
           updated_at: string | null
@@ -37,7 +37,7 @@ export type Database = {
           key_hash?: string | null
           limited_to_apps?: string[] | null
           limited_to_orgs?: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"]
+          mode?: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id?: string
           updated_at?: string | null
@@ -51,7 +51,7 @@ export type Database = {
           key_hash?: string | null
           limited_to_apps?: string[] | null
           limited_to_orgs?: string[] | null
-          mode?: Database["public"]["Enums"]["key_mode"]
+          mode?: Database["public"]["Enums"]["key_mode"] | null
           name?: string
           rbac_id?: string
           updated_at?: string | null

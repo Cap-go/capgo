@@ -21,7 +21,7 @@ interface OrgApiKey {
   id: number
   rbac_id: string
   name: string
-  mode: string
+  mode: string | null
   limited_to_orgs: string[] | null
   limited_to_apps: string[] | null
   user_id: string
@@ -521,15 +521,42 @@ async function createAppRoleBinding(principalId: string, orgId: string, appId: s
 }
 
 async function createApiKeyRecord(orgId: string) {
+  // Build bindings array for the atomic API call
+  const bindings: Array<{
+    role_name: string
+    scope_type: 'org' | 'app'
+    org_id: string
+    app_id?: string
+  }> = []
+
+  if (selectedOrgRole.value) {
+    bindings.push({
+      role_name: selectedOrgRole.value,
+      scope_type: 'org',
+      org_id: orgId,
+    })
+  }
+
+  for (const [appId, roleName] of Object.entries(pendingAppBindings.value)) {
+    if (!roleName)
+      continue
+    bindings.push({
+      role_name: roleName,
+      scope_type: 'app',
+      org_id: orgId,
+      app_id: appId,
+    })
+  }
+
   const { data, error } = await supabase.functions.invoke('apikey', {
     method: 'POST',
     body: {
-      mode: 'all',
       name: editName.value.trim(),
       limited_to_orgs: [orgId],
       limited_to_apps: configuredLimitedAppIds.value,
       expires_at: getApiKeyExpirationValue(),
       hashed: createAsHashed.value,
+      bindings,
     },
   })
 
@@ -641,15 +668,8 @@ async function createKey() {
 
   isSubmitting.value = true
   try {
+    // Single atomic call: creates key + bindings in one request
     const createdApiKey = await createApiKeyRecord(orgId)
-
-    try {
-      await assignBindingsForNewApiKey(orgId, createdApiKey.rbacId)
-    }
-    catch (bindingError) {
-      await rollbackCreatedApiKeyAfterBindingFailure(bindingError, createdApiKey)
-    }
-
     await finalizeCreatedApiKey(createdApiKey.key)
   }
   catch (err) {

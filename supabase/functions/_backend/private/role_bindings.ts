@@ -384,6 +384,111 @@ async function getCallerMaxPriorityRank(
   return result[0]?.max_rank ?? 0
 }
 
+// Reusable binding creation logic - used by both the POST route and apikey/post.ts
+export interface CreateBindingParams {
+  principal_type: PrincipalType
+  principal_id: string
+  role_name: string
+  scope_type: ScopeType
+  org_id: string
+  app_id?: string | null
+  channel_id?: string | number | null
+  reason?: string
+}
+
+export type CreateBindingResult = {
+  ok: true
+  data: typeof schema.role_bindings.$inferSelect
+} | {
+  ok: false
+  status: number
+  error: string
+}
+
+export async function createRoleBindingForPrincipal(
+  drizzle: ReturnType<typeof getDrizzleClient>,
+  params: CreateBindingParams,
+  grantedBy: string,
+  authType: 'jwt' | 'apikey',
+  callerPrincipalId: string,
+): Promise<CreateBindingResult> {
+  const {
+    principal_type,
+    principal_id,
+    role_name,
+    scope_type,
+    org_id,
+    app_id,
+    channel_id,
+    reason,
+  } = params
+
+  // 1. Resolve role by name
+  const [role] = await drizzle
+    .select()
+    .from(schema.roles)
+    .where(eq(schema.roles.name, role_name))
+    .limit(1)
+
+  if (!role) {
+    return { ok: false, status: 404, error: 'Role not found' }
+  }
+
+  if (!role.is_assignable) {
+    return { ok: false, status: 403, error: 'Role is not assignable' }
+  }
+
+  // 2. Role scope must match binding scope
+  const roleScopeValidation = validateRoleScope(role.scope_type, scope_type)
+  if (!roleScopeValidation.ok) {
+    return { ok: false, status: roleScopeValidation.status, error: roleScopeValidation.error }
+  }
+
+  // 3. Anti-escalation: caller's max priority rank must be >= role.priority_rank
+  const callerMaxRank = await getCallerMaxPriorityRank(drizzle, authType, callerPrincipalId, org_id)
+  if (role.priority_rank > callerMaxRank) {
+    return { ok: false, status: 403, error: 'Cannot assign a role with higher privileges than your own' }
+  }
+
+  // 4. Scope field validation (app_id / channel_id required when scope demands it)
+  const scopeValidation = validateScope(scope_type, app_id, channel_id)
+  if (!scopeValidation.ok) {
+    return { ok: false, status: scopeValidation.status, error: scopeValidation.error }
+  }
+
+  // 5. App/channel ownership check; also normalises channel_id -> rbac_id
+  const scopedAppValidation = await validateScopedAppOwnership(drizzle, scope_type, org_id, app_id, channel_id)
+  if (!scopedAppValidation.ok) {
+    return { ok: false, status: scopedAppValidation.status, error: scopedAppValidation.error }
+  }
+  const normalizedChannelId = scopedAppValidation.data.channelRbacId
+
+  // 6. Principal existence & org-membership check
+  const principalValidation = await validatePrincipalAccess(drizzle, principal_type, principal_id, org_id)
+  if (!principalValidation.ok) {
+    return { ok: false, status: principalValidation.status, error: principalValidation.error }
+  }
+
+  // 7. Create the binding
+  const [binding] = await drizzle
+    .insert(schema.role_bindings)
+    .values({
+      principal_type,
+      principal_id,
+      role_id: role.id,
+      scope_type,
+      org_id,
+      app_id: app_id || null,
+      channel_id: normalizedChannelId,
+      granted_by: grantedBy,
+      reason: reason || null,
+      is_direct: true,
+    })
+    .returning()
+
+  return { ok: true, data: binding }
+}
+
 // GET /private/role_bindings/:org_id - List role bindings for an org
 app.get('/:org_id', requireUserAuth, sValidator('param', orgIdParamSchema, invalidOrgIdHook), async (c) => {
   const { org_id: orgId } = c.req.valid('param')
