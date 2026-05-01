@@ -31,6 +31,7 @@ export type BuildCredentials = z.infer<typeof buildCredentialsSchema>
 
 export const buildRequestOptionsSchema = optionsBaseSchema.extend({
   path: z.string().optional(),
+  nodeModules: z.string().optional(),
   platform: z.enum(['ios', 'android']),
   buildMode: z.enum(['debug', 'release']).optional(),
   userId: z.string().optional(),

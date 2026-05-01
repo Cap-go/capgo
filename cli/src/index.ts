@@ -772,6 +772,7 @@ The build will be processed and sent directly to app stores.
 Example: npx @capgo/cli@latest build request com.example.app --platform ios --path .`)
   .action(requestBuildCommand)
   .option('--path <path>', `Path to the project directory to build (default: current directory)`)
+  .option('--node-modules <nodeModules>', optionDescriptions.nodeModules)
   .option('--platform <platform>', `Target platform: ios or android (required)`)
   .option('--build-mode <buildMode>', `Build mode: debug or release (default: release)`)
   // iOS credential CLI options (can also be set via env vars or saved credentials)

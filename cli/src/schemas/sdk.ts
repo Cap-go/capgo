@@ -338,6 +338,7 @@ export type ZipBundleOptions = z.infer<typeof zipBundleOptionsSchema>
 export const requestBuildOptionsSchema = z.object({
   appId: z.string(),
   path: z.string().optional(),
+  nodeModules: z.string().optional(),
   platform: z.enum(['ios', 'android']),
   credentials: buildCredentialsSchema.optional(),
   userId: z.string().optional(),

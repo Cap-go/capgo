@@ -410,4 +410,143 @@ await t('generated build zip includes Cordova plugin files referenced from capac
   }
 })
 
+await t('generated build zip can pull native pnpm workspace packages from an explicit node_modules root', async () => {
+  const testRoot = mkdtempSync(join(tmpdir(), 'capgo-build-zip-filter-'))
+  const workspaceRoot = join(testRoot, 'typescript')
+  const projectRoot = join(workspaceRoot, 'apps', 'pay-tablet')
+  const zipPath = join(testRoot, 'build.zip')
+  const keepAwakePath = join(
+    workspaceRoot,
+    'node_modules',
+    '.pnpm',
+    '@capacitor-community+keep-awake@8.0.0_@capacitor+core@8.2.0',
+    'node_modules',
+    '@capacitor-community',
+    'keep-awake',
+  )
+
+  try {
+    writeFile(
+      join(projectRoot, 'package.json'),
+      JSON.stringify({
+        dependencies: {
+          '@capacitor-community/keep-awake': '^8.0.0',
+        },
+      }, null, 2),
+    )
+
+    writeFile(
+      join(projectRoot, 'capacitor.config.json'),
+      JSON.stringify({
+        ios: {
+          path: 'ios',
+        },
+        appId: 'com.example.pay',
+        appName: 'Pay Tablet',
+      }, null, 2),
+    )
+
+    writeFile(
+      join(projectRoot, 'ios', 'App', 'Podfile'),
+      "platform :ios, '14.0'\npod 'CapacitorCommunityKeepAwake', :path => '../../node_modules/@capacitor-community/keep-awake'\n",
+    )
+
+    writeFile(
+      join(keepAwakePath, 'package.json'),
+      JSON.stringify({ name: '@capacitor-community/keep-awake', version: '8.0.0' }, null, 2),
+    )
+    writeFile(
+      join(keepAwakePath, 'KeepAwake.podspec'),
+      "Pod::Spec.new do |s|\n  s.name = 'KeepAwake'\nend",
+    )
+    writeFile(
+      join(keepAwakePath, 'ios', 'KeepAwakePlugin.swift'),
+      '// iOS source file',
+    )
+
+    await zipDirectory(projectRoot, zipPath, 'ios', {
+      ios: {
+        path: 'ios',
+      },
+    }, {
+      nodeModules: join(workspaceRoot, 'node_modules'),
+    })
+
+    const zip = new AdmZip(zipPath)
+    const entries = zip.getEntries().map(entry => entry.entryName).sort()
+
+    assert.ok(entries.includes('node_modules/@capacitor-community/keep-awake/package.json'), 'missing workspace plugin package.json in zip')
+    assert.ok(entries.includes('node_modules/@capacitor-community/keep-awake/KeepAwake.podspec'), 'missing workspace plugin podspec in zip')
+    assert.ok(entries.includes('node_modules/@capacitor-community/keep-awake/ios/KeepAwakePlugin.swift'), 'missing workspace plugin ios code in zip')
+    assert.ok(entries.includes('ios/App/Podfile'), 'native platform folder not included')
+  }
+  finally {
+    rmSync(testRoot, { recursive: true, force: true })
+  }
+})
+
+await t('generated build zip rejects ambiguous pnpm workspace package versions', async () => {
+  const testRoot = mkdtempSync(join(tmpdir(), 'capgo-build-zip-filter-'))
+  const workspaceRoot = join(testRoot, 'typescript')
+  const projectRoot = join(workspaceRoot, 'apps', 'pay-tablet')
+  const zipPath = join(testRoot, 'build.zip')
+
+  try {
+    writeFile(
+      join(projectRoot, 'package.json'),
+      JSON.stringify({
+        dependencies: {
+          '@capacitor-community/keep-awake': '^8.0.0',
+        },
+      }, null, 2),
+    )
+
+    writeFile(
+      join(projectRoot, 'capacitor.config.json'),
+      JSON.stringify({
+        ios: {
+          path: 'ios',
+        },
+        appId: 'com.example.pay',
+        appName: 'Pay Tablet',
+      }, null, 2),
+    )
+
+    writeFile(
+      join(projectRoot, 'ios', 'App', 'Podfile'),
+      "platform :ios, '14.0'\npod 'CapacitorCommunityKeepAwake', :path => '../../node_modules/@capacitor-community/keep-awake'\n",
+    )
+
+    for (const version of ['8.0.0', '8.1.0']) {
+      writeFile(
+        join(
+          workspaceRoot,
+          'node_modules',
+          '.pnpm',
+          `@capacitor-community+keep-awake@${version}_@capacitor+core@8.2.0`,
+          'node_modules',
+          '@capacitor-community',
+          'keep-awake',
+          'package.json',
+        ),
+        JSON.stringify({ name: '@capacitor-community/keep-awake', version }, null, 2),
+      )
+    }
+
+    await assert.rejects(
+      () => zipDirectory(projectRoot, zipPath, 'ios', {
+        ios: {
+          path: 'ios',
+        },
+      }, {
+        nodeModules: join(workspaceRoot, 'node_modules'),
+      }),
+      /Multiple pnpm store entries found for @capacitor-community\/keep-awake/,
+    )
+  }
+  finally {
+    rmSync(testRoot, { recursive: true, force: true })
+  }
+})
+
 process.stdout.write('OK\n')
