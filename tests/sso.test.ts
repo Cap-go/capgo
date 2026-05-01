@@ -29,7 +29,6 @@ beforeAll(async () => {
     management_email: `sso-test-${SSO_TEST_ORG_ID}@capgo.app`,
     created_by: USER_ID,
     customer_id: SSO_TEST_CUSTOMER_ID,
-    sso_enabled: true,
   })
   if (orgError)
     throw orgError
@@ -168,8 +167,7 @@ describe('[POST] /private/sso/check-enforcement', () => {
         management_email: `sso-enforcement-${enforcementOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: enforcementCustomerId,
-        sso_enabled: true,
-      })
+          })
       if (enforcementOrgError)
         throw enforcementOrgError
 
@@ -286,8 +284,7 @@ describe('[POST] /private/sso/prelink-users', () => {
         management_email: `sso-prelink-${prelinkOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: prelinkCustomerId,
-        sso_enabled: true,
-      })
+          })
       if (prelinkOrgError)
         throw prelinkOrgError
 
@@ -316,8 +313,7 @@ describe('[POST] /private/sso/prelink-users', () => {
         management_email: `sso-foreign-${foreignOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: foreignCustomerId,
-        sso_enabled: true,
-      })
+          })
       if (foreignOrgError)
         throw foreignOrgError
 
@@ -497,8 +493,7 @@ describe('generate_org_on_user_create', () => {
         management_email: `managed-sso-${managedOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: managedCustomerId,
-        sso_enabled: true,
-      })
+          })
       if (orgError)
         throw orgError
 
@@ -584,8 +579,7 @@ describe('generate_org_on_user_create', () => {
         management_email: `email-managed-${managedOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: managedCustomerId,
-        sso_enabled: true,
-      })
+          })
       if (orgError)
         throw orgError
 
@@ -738,8 +732,7 @@ describe('[POST] /private/sso/provision-user', () => {
         management_email: `sso-missing-profile-${managedOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: managedCustomerId,
-        sso_enabled: true,
-      })
+          })
       if (orgError)
         throw orgError
 
@@ -862,8 +855,7 @@ describe('[POST] /private/sso/provision-user', () => {
         management_email: `sso-invite-promotion-${managedOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: managedCustomerId,
-        sso_enabled: true,
-      })
+          })
       if (orgError)
         throw orgError
 
@@ -999,8 +991,7 @@ describe('[POST] /private/sso/provision-user', () => {
         management_email: `sso-merge-${managedOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: managedCustomerId,
-        sso_enabled: true,
-      })
+          })
       if (orgError)
         throw orgError
 
@@ -1175,8 +1166,7 @@ describe('[POST] /private/sso/provision-user', () => {
         management_email: `sso-first-login-${managedOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: managedCustomerId,
-        sso_enabled: true,
-      })
+          })
       if (orgError)
         throw orgError
 

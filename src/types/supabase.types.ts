@@ -1672,7 +1672,6 @@ export type Database = {
           password_policy_config: Json | null
           require_apikey_expiration: boolean
           required_encryption_key: string | null
-          sso_enabled: boolean
           stats_refresh_requested_at: string | null
           stats_updated_at: string | null
           updated_at: string | null
@@ -1697,7 +1696,6 @@ export type Database = {
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
-          sso_enabled?: boolean
           stats_refresh_requested_at?: string | null
           stats_updated_at?: string | null
           updated_at?: string | null
@@ -1722,7 +1720,6 @@ export type Database = {
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
-          sso_enabled?: boolean
           stats_refresh_requested_at?: string | null
           stats_updated_at?: string | null
           updated_at?: string | null
@@ -3543,7 +3540,6 @@ export type Database = {
               require_apikey_expiration: boolean
               required_encryption_key: string
               role: string
-              sso_enabled: boolean
               stats_refresh_requested_at: string
               stats_updated_at: string
               subscription_end: string
@@ -3581,7 +3577,6 @@ export type Database = {
               require_apikey_expiration: boolean
               required_encryption_key: string
               role: string
-              sso_enabled: boolean
               stats_refresh_requested_at: string
               stats_updated_at: string
               subscription_end: string
