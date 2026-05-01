@@ -632,7 +632,7 @@ describe('[POST] /updates parallel tests', () => {
     expect(response.status).toBe(200)
 
     const json = await response.json<UpdateRes>()
-    expect(() => updateNewScheme.parse(json)).not.toThrow()
+    expect(() => parseSchema(updateNewScheme, json)).not.toThrow()
     expect(json.version).toBe(versionName)
     expect(json.error).toBeUndefined()
   })
