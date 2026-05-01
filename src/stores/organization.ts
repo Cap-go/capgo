@@ -22,9 +22,11 @@ export interface PasswordPolicyConfig {
 // Extended organization type with password policy and 2FA fields (from get_orgs_v7)
 // Note: Using get_orgs_v7 return type with explicit JSON parsing for password_policy_config
 type RawOrganization = ArrayElement<Database['public']['Functions']['get_orgs_v7']['Returns']>
-export type Organization = Omit<RawOrganization, 'password_policy_config'> & {
+export type Organization = Omit<RawOrganization, 'password_policy_config' | 'stats_refresh_requested_at' | 'stats_updated_at'> & {
   logo_storage_path?: string | null
   password_policy_config: PasswordPolicyConfig | null
+  stats_refresh_requested_at: string | null
+  stats_updated_at: string | null
 }
 export type OrganizationRole
   = Database['public']['Enums']['user_min_right']
