@@ -658,6 +658,17 @@ describe('[PUT] /organization with API key policy', () => {
     expect(response.status).toBe(400)
   })
 
+  it('rejects direct Supabase writes with invalid max expiration days', async () => {
+    const supabase = createAuthenticatedSupabaseClient(authHeaders)
+    const { error } = await supabase
+      .from('orgs')
+      .update({ max_apikey_expiration_days: -1 })
+      .eq('id', updateOrgId)
+
+    expect(error).not.toBeNull()
+    expect(error?.code).toBe('23514')
+  })
+
   // This test must be last because it enables require_apikey_expiration,
   // which would block subsequent tests using a non-expiring API key
   it('update organization to require API key expiration', async () => {
