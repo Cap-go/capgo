@@ -35,6 +35,8 @@ interface PluginBreakdownData {
   trend?: PluginBreakdownTrendPoint[]
 }
 
+type PluginBreakdownKey = 'version_breakdown' | 'major_breakdown'
+
 const { t } = useI18n()
 const displayStore = useDisplayStore()
 const mainStore = useMainStore()
@@ -114,60 +116,61 @@ const hasMajorData = computed(() => majorEntries.value.length > 0)
 const versionCountTotal = computed(() => Object.keys(pluginBreakdown.value?.version_breakdown ?? {}).length)
 const versionCountShown = computed(() => versionEntries.value.length)
 const versionTrendPoints = computed(() => pluginBreakdown.value?.trend ?? [])
-const topVersionsForTrend = computed(() => {
-  const latestPoint = versionTrendPoints.value[versionTrendPoints.value.length - 1]
+
+function getTopBreakdownEntries(
+  latestPoint: PluginBreakdownTrendPoint | undefined,
+  key: PluginBreakdownKey,
+  minPercent: number,
+  limit: number,
+) {
   if (!latestPoint)
     return []
 
-  return Object.entries(latestPoint.version_breakdown ?? {})
+  return Object.entries(latestPoint[key] ?? {})
     .map(([version, percent]) => ({
       version,
       percent: Number(percent) || 0,
     }))
-    .filter(entry => entry.percent > thresholdValue.value)
+    .filter(entry => entry.percent > minPercent)
     .sort((a, b) => b.percent - a.percent)
-    .slice(0, maxTrendVersions)
+    .slice(0, limit)
+}
+
+function buildTrendSeries(
+  points: PluginBreakdownTrendPoint[],
+  entries: Array<{ version: string }>,
+  key: PluginBreakdownKey,
+) {
+  return entries.map((entry, index) => ({
+    label: entry.version,
+    data: points.map(point => ({
+      date: point.date,
+      value: Number(point[key]?.[entry.version]) || 0,
+    })),
+    color: trendColorPalette[index % trendColorPalette.length],
+  }))
+}
+
+const topVersionsForTrend = computed(() => {
+  const latestPoint = versionTrendPoints.value[versionTrendPoints.value.length - 1]
+  return getTopBreakdownEntries(latestPoint, 'version_breakdown', thresholdValue.value, maxTrendVersions)
 })
 const versionTrendSeries = computed(() => {
   if (versionTrendPoints.value.length === 0 || topVersionsForTrend.value.length === 0)
     return []
 
-  return topVersionsForTrend.value.map((entry, index) => ({
-    label: entry.version,
-    data: versionTrendPoints.value.map(point => ({
-      date: point.date,
-      value: Number(point.version_breakdown?.[entry.version]) || 0,
-    })),
-    color: trendColorPalette[index % trendColorPalette.length],
-  }))
+  return buildTrendSeries(versionTrendPoints.value, topVersionsForTrend.value, 'version_breakdown')
 })
 const hasVersionTrendData = computed(() => versionTrendSeries.value.length > 0)
 const topMajorVersionsForTrend = computed(() => {
   const latestPoint = versionTrendPoints.value[versionTrendPoints.value.length - 1]
-  if (!latestPoint)
-    return []
-
-  return Object.entries(latestPoint.major_breakdown ?? {})
-    .map(([version, percent]) => ({
-      version,
-      percent: Number(percent) || 0,
-    }))
-    .filter(entry => entry.percent > 0)
-    .sort((a, b) => b.percent - a.percent)
-    .slice(0, maxTrendMajorVersions)
+  return getTopBreakdownEntries(latestPoint, 'major_breakdown', 0, maxTrendMajorVersions)
 })
 const majorTrendSeries = computed(() => {
   if (versionTrendPoints.value.length === 0 || topMajorVersionsForTrend.value.length === 0)
     return []
 
-  return topMajorVersionsForTrend.value.map((entry, index) => ({
-    label: entry.version,
-    data: versionTrendPoints.value.map(point => ({
-      date: point.date,
-      value: Number(point.major_breakdown?.[entry.version]) || 0,
-    })),
-    color: trendColorPalette[index % trendColorPalette.length],
-  }))
+  return buildTrendSeries(versionTrendPoints.value, topMajorVersionsForTrend.value, 'major_breakdown')
 })
 const hasMajorTrendData = computed(() => majorTrendSeries.value.length > 0)
 
