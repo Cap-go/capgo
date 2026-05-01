@@ -8,7 +8,7 @@ import { safeParseSchema } from '../utils/ark_validation.ts'
 import { parseBody, quickError, simpleError, simpleRateLimit, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { getEffectivePasswordMinLength, getPasswordPolicyValidationErrors } from '../utils/password_policy.ts'
-import { isIPRateLimited, recordFailedAuth } from '../utils/rate_limit.ts'
+import { clearFailedAccountAuth, isAccountRateLimited, isIPRateLimited, recordFailedAccountAuth, recordFailedAuth } from '../utils/rate_limit.ts'
 import { buildRateLimitInfo } from '../utils/rateLimitInfo.ts'
 import { emptySupabase, supabaseClient, supabaseAdmin as useSupabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
@@ -149,6 +149,11 @@ app.post('/', async (c) => {
   }
 
   const body = validationResult.data
+  const accountRateLimitStatus = await isAccountRateLimited(c, body.email)
+  if (accountRateLimitStatus.limited) {
+    return simpleRateLimit({ reason: 'too_many_failed_account_auth_attempts', ...buildRateLimitInfo(accountRateLimitStatus.resetAt) })
+  }
+
   const { password: _password, captcha_token: _captchaToken, ...bodyWithoutPassword } = body
   cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance raw body', rawBody: bodyWithoutPassword })
 
@@ -165,16 +170,27 @@ app.post('/', async (c) => {
   })
 
   if (signInError || !signInData.user || !signInData.session) {
+    const errorCode = signInError?.code
+    const authErrorStatus = (signInError as { status?: unknown } | null)?.status
+    const errorStatus = typeof authErrorStatus === 'number' ? authErrorStatus : undefined
+    const errorMessage = signInError?.message ?? 'Authentication failed'
+    const missingAuthenticatedSession = !signInError && (!signInData.user || !signInData.session)
+    cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - login failed', error: errorMessage, errorCode: errorCode ?? 'auth_failed', errorStatus })
     await recordFailedAuth(c)
-    const errorMessage = signInError?.message ?? 'Unknown error'
-    cloudlog({ requestId: c.get('requestId'), context: 'validate_password_compliance - login failed', error: errorMessage })
 
-    if (errorMessage.toLowerCase().includes('captcha')) {
+    if (errorCode === 'captcha_failed') {
       return quickError(401, 'captcha_failed', 'Captcha verification failed')
+    }
+
+    if (errorCode === 'invalid_credentials' || (!errorCode && errorStatus === 400) || missingAuthenticatedSession) {
+      await recordFailedAccountAuth(c, body.email)
+      return quickError(401, 'invalid_credentials', 'Invalid email or password')
     }
 
     return quickError(401, 'invalid_credentials', 'Invalid email or password')
   }
+
+  await clearFailedAccountAuth(c, body.email)
 
   const userId = signInData.user.id
   const userClient = supabaseClient(c, `Bearer ${signInData.session.access_token}`)

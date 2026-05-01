@@ -1,9 +1,11 @@
 import type { Context } from 'hono'
 import { Hono } from 'hono/tiny'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { app as validatePasswordComplianceApp } from '../supabase/functions/_backend/private/validate_password_compliance.ts'
 import {
   clearFailedAccountAuth,
   isAccountRateLimited,
+  isIPRateLimited,
   normalizeRateLimitAccountIdentifier,
   recordFailedAccountAuth,
 } from '../supabase/functions/_backend/utils/rate_limit.ts'
@@ -103,5 +105,50 @@ describe('account failed-auth rate limiting', () => {
       '198.51.100.5',
     )
     expect(afterClear.limited).toBe(false)
+  })
+
+  it('blocks password compliance verification by account across different client IPs', async () => {
+    for (let attempt = 0; attempt < 20; attempt++) {
+      await withContext(c => recordFailedAccountAuth(c, 'password-policy@example.com'), `198.51.100.${attempt + 1}`)
+    }
+
+    const app = new Hono()
+    app.route('/validate_password_compliance', validatePasswordComplianceApp)
+    app.onError((error, _c) => {
+      const errorDetails = error as unknown as {
+        cause?: { error?: string, moreInfo?: { reason?: string } }
+        status?: unknown
+      }
+      const status = typeof errorDetails.status === 'number' ? errorDetails.status : 500
+      const cause = errorDetails.cause
+      return new Response(JSON.stringify({ error: cause?.error, reason: cause?.moreInfo?.reason }), {
+        headers: { 'Content-Type': 'application/json' },
+        status,
+      })
+    })
+
+    const response = await app.request('http://rate-limit.test/validate_password_compliance', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'cf-connecting-ip': '203.0.113.20',
+      },
+      body: JSON.stringify({
+        email: 'password-policy@example.com',
+        password: 'WrongPassword123!',
+        org_id: '00000000-0000-4000-8000-000000000000',
+      }),
+    })
+
+    expect(response.status).toBe(429)
+    const responseBody = await response.json() as { error?: string, reason?: string }
+    expect(responseBody.error).toBe('too_many_requests')
+    expect(responseBody.reason).toBe('too_many_failed_account_auth_attempts')
+
+    const freshIpStatus = await withContext(
+      c => isIPRateLimited(c),
+      '203.0.113.20',
+    )
+    expect(freshIpStatus.limited).toBe(false)
   })
 })
