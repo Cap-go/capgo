@@ -973,6 +973,8 @@ async function main(args = process.argv.slice(2), runtimeEnv: Record<string, str
     throw new Error('--from must be before or equal to --to')
   if (customerId && !customerId.startsWith('cus_'))
     throw new Error('--customer-id must be a Stripe customer id that starts with cus_')
+  if (apply && customerId)
+    throw new Error('--apply cannot be combined with --customer-id because global_stats metrics are global aggregates')
 
   const fileEnv = await loadEnv(envFile)
   const env = {
