@@ -1,9 +1,10 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Database } from '../utils/supabase.types.ts'
+import { type } from 'arktype'
 import dayjs from 'dayjs'
 import { Hono } from 'hono/tiny'
-import { z } from 'zod/mini'
+import { safeParseSchema } from '../utils/ark_validation.ts'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { verifyCaptchaToken } from '../utils/captcha.ts'
 import { BRES, middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
@@ -13,23 +14,13 @@ import { supabaseAdmin, supabaseClient } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 
 // Define the schema for the invite user request
-const inviteUserSchema = z.object({
-  email: z.email(),
-  org_id: z.string().check(z.minLength(1)),
-  invite_type: z.enum([
-    'read',
-    'upload',
-    'write',
-    'admin',
-    'super_admin',
-    'org_member',
-    'org_billing_admin',
-    'org_admin',
-    'org_super_admin',
-  ]),
-  captcha_token: z.optional(z.string().check(z.minLength(1))),
-  first_name: z.string().check(z.minLength(1)),
-  last_name: z.string().check(z.minLength(1)),
+const inviteUserSchema = type({
+  'email': 'string.email',
+  'org_id': 'string > 0',
+  'invite_type': '"read" | "upload" | "write" | "admin" | "super_admin" | "org_member" | "org_billing_admin" | "org_admin" | "org_super_admin"',
+  'captcha_token?': 'string > 0',
+  'first_name': 'string > 0',
+  'last_name': 'string > 0',
 })
 
 const legacyInviteRoles = ['read', 'upload', 'write', 'admin', 'super_admin'] as const
@@ -88,10 +79,9 @@ export const app = new Hono<MiddlewareKeyVariables>()
 app.use('/', useCors)
 
 async function validateInvite(c: Context, rawBody: any) {
-  // Validate the request body using Zod
-  const validationResult = inviteUserSchema.safeParse(rawBody)
+  const validationResult = safeParseSchema(inviteUserSchema, rawBody)
   if (!validationResult.success) {
-    throw simpleError('invalid_request', 'Invalid request', { errors: z.prettifyError(validationResult.error) })
+    throw simpleError('invalid_request', 'Invalid request', { errors: validationResult.error.message })
   }
 
   const body = validationResult.data

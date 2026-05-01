@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
+import { type } from 'arktype'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { z } from 'zod'
+import { safeParseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
 
 import { BASE_URL, fetchWithRetry, getAuthHeaders, getSupabaseClient, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
@@ -11,27 +12,42 @@ const customerId = `cus_audit_${ORG_ID}`
 const APIKEY_AUDIT_APP_ID = `com.audit.logs.${globalId.replace(/-/g, '')}`
 
 // Schema for audit log response
-const auditLogSchema = z.object({
-  id: z.number(),
-  created_at: z.string(),
-  table_name: z.string(),
-  record_id: z.string(),
-  operation: z.string(),
-  user_id: z.nullable(z.string()),
-  org_id: z.string(),
-  old_record: z.unknown(),
-  new_record: z.unknown(),
-  changed_fields: z.nullable(z.array(z.string())),
+const auditLogSchema = type({
+  id: 'number',
+  created_at: 'string',
+  table_name: 'string',
+  record_id: 'string',
+  operation: 'string',
+  user_id: 'string | null',
+  org_id: 'string',
+  old_record: 'unknown',
+  new_record: 'unknown',
+  changed_fields: 'string[] | null',
 })
 
-const auditLogsResponseSchema = z.object({
-  data: z.array(auditLogSchema),
-  total: z.number(),
-  page: z.number(),
-  limit: z.number(),
+const auditLogsResponseSchema = type({
+  data: auditLogSchema.array(),
+  total: 'number',
+  page: 'number',
+  limit: 'number',
 })
 
-type AuditLog = z.infer<typeof auditLogSchema>
+interface AuditLog {
+  id: number
+  created_at: string
+  table_name: string
+  record_id: string
+  operation: string
+  user_id: string | null
+  org_id: string
+  old_record: unknown
+  new_record: unknown
+  changed_fields: string[] | null
+}
+
+function parseAuditLogsResponse(value: unknown) {
+  return safeParseSchema(auditLogsResponseSchema, value)
+}
 
 let authHeaders: Record<string, string>
 let apiKeyAuthHeaders: Record<string, string>
@@ -54,7 +70,7 @@ async function waitForAuditLog(
     lastBody = await response.json()
 
     if (response.status === 200) {
-      const safe = auditLogsResponseSchema.safeParse(lastBody)
+      const safe = parseAuditLogsResponse(lastBody)
       if (safe.success) {
         const matchedLog = safe.data.data.find(matcher)
         if (matchedLog)
@@ -156,7 +172,7 @@ describe('[GET] /organization/audit', () => {
     })
     expect(response.status).toBe(200)
     const responseData = await response.json()
-    const safe = auditLogsResponseSchema.safeParse(responseData)
+    const safe = parseAuditLogsResponse(responseData)
     expect(safe.success).toBe(true)
     if (safe.success) {
       expect(safe.data.page).toBe(0)
@@ -171,7 +187,7 @@ describe('[GET] /organization/audit', () => {
     })
     expect(response.status).toBe(200)
     const responseData = await response.json()
-    const safe = auditLogsResponseSchema.safeParse(responseData)
+    const safe = parseAuditLogsResponse(responseData)
     expect(safe.success).toBe(true)
     if (safe.success) {
       expect(safe.data.page).toBe(0)
@@ -185,7 +201,7 @@ describe('[GET] /organization/audit', () => {
     })
     expect(response.status).toBe(200)
     const responseData = await response.json()
-    const safe = auditLogsResponseSchema.safeParse(responseData)
+    const safe = parseAuditLogsResponse(responseData)
     expect(safe.success).toBe(true)
     if (safe.success) {
       // All returned logs should be for the 'orgs' table
@@ -201,7 +217,7 @@ describe('[GET] /organization/audit', () => {
     })
     expect(response.status).toBe(200)
     const responseData = await response.json()
-    const safe = auditLogsResponseSchema.safeParse(responseData)
+    const safe = parseAuditLogsResponse(responseData)
     expect(safe.success).toBe(true)
     if (safe.success) {
       // All returned logs should be INSERT operations
@@ -217,7 +233,7 @@ describe('[GET] /organization/audit', () => {
     })
     expect(response.status).toBe(200)
     const responseData = await response.json()
-    const safe = auditLogsResponseSchema.safeParse(responseData)
+    const safe = parseAuditLogsResponse(responseData)
     expect(safe.success).toBe(true)
     if (safe.success) {
       for (const log of safe.data.data) {
@@ -233,7 +249,7 @@ describe('[GET] /organization/audit', () => {
     })
     expect(response.status).toBe(200)
     const responseData = await response.json()
-    const safe = auditLogsResponseSchema.safeParse(responseData)
+    const safe = parseAuditLogsResponse(responseData)
     expect(safe.success).toBe(true)
     if (safe.success) {
       // Server should cap limit at 100
@@ -281,7 +297,7 @@ describe('audit log triggers', () => {
     })
     expect(response.status).toBe(200)
     const responseData = await response.json()
-    const safe = auditLogsResponseSchema.safeParse(responseData)
+    const safe = parseAuditLogsResponse(responseData)
     expect(safe.success).toBe(true)
 
     if (safe.success && safe.data.data.length > 0) {
@@ -339,7 +355,7 @@ describe('audit log triggers', () => {
     })
     expect(response.status).toBe(200)
     const responseData = await response.json()
-    const safe = auditLogsResponseSchema.safeParse(responseData)
+    const safe = parseAuditLogsResponse(responseData)
     expect(safe.success).toBe(true)
 
     if (safe.success && safe.data.data.length > 0) {
@@ -406,7 +422,7 @@ describe('audit log triggers', () => {
     })
     expect(response.status).toBe(200)
     const responseData = await response.json()
-    const safe = auditLogsResponseSchema.safeParse(responseData)
+    const safe = parseAuditLogsResponse(responseData)
     expect(safe.success).toBe(true)
 
     if (safe.success && safe.data.data.length > 0) {
@@ -463,7 +479,7 @@ describe('audit logs for app_versions via API key', () => {
     })
     expect(auditResponse.status).toBe(200)
     const auditData = await auditResponse.json()
-    const safe = auditLogsResponseSchema.safeParse(auditData)
+    const safe = parseAuditLogsResponse(auditData)
     expect(safe.success).toBe(true)
 
     if (safe.success) {
@@ -555,7 +571,7 @@ describe('audit logs for app_versions via API key', () => {
     })
     expect(auditResponse.status).toBe(200)
     const auditData = await auditResponse.json()
-    const safe = auditLogsResponseSchema.safeParse(auditData)
+    const safe = parseAuditLogsResponse(auditData)
     expect(safe.success).toBe(true)
 
     if (safe.success) {

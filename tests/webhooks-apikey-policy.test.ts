@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { getEndpointUrl, getSupabaseClient, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { getEndpointUrl, getSupabaseClient, TEST_EMAIL, USER_ID, USER_ID_2 } from './test-utils.ts'
 
 const globalId = randomUUID()
 const numericGlobalId = Number.parseInt(globalId.replaceAll('-', '').slice(0, 12), 16)
@@ -11,6 +11,7 @@ const WEBHOOKS_TEST_URL = getEndpointUrl('/webhooks/test')
 const WEBHOOKS_RETRY_URL = getEndpointUrl('/webhooks/deliveries/retry')
 const legacyApiKeySeedId = numericGlobalId * 2
 const expiringSubkeySeedId = legacyApiKeySeedId + 1
+const delegatedApiKeySeedId = expiringSubkeySeedId + 1
 const seededWebhookId = randomUUID()
 const seededDeliveryId = randomUUID()
 
@@ -18,6 +19,8 @@ let legacyApiKeyId: number | null = null
 let legacyApiKeyValue: string | null = null
 let expiringSubkeyId: number | null = null
 let expiringSubkeyValue: string | null = null
+let delegatedApiKeyId: number | null = null
+let delegatedApiKeyValue: string | null = null
 let createdWebhookId: string | null = null
 let createdDeliveryId: string | null = null
 
@@ -128,6 +131,45 @@ beforeAll(async () => {
   }
   expiringSubkeyId = expiringKeyData.id
   expiringSubkeyValue = expiringKeyData.key
+
+  const { data: delegatedKeyData, error: delegatedKeyError } = await supabase.from('apikeys').insert({
+    id: delegatedApiKeySeedId,
+    user_id: USER_ID_2,
+    key: `delegated-webhook-key-${globalId}`,
+    key_hash: null,
+    mode: 'all',
+    name: `delegated-webhook-key-${globalId}`,
+    limited_to_apps: [],
+    limited_to_orgs: [policyOrgId],
+    expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+  }).select('id, key, rbac_id').single()
+  if (delegatedKeyError || !delegatedKeyData?.rbac_id) {
+    throw new Error(`Failed to seed delegated webhook API key: ${delegatedKeyError?.message ?? 'missing delegated key data'}`)
+  }
+  delegatedApiKeyId = delegatedKeyData.id
+  delegatedApiKeyValue = delegatedKeyData.key
+
+  const { data: orgAdminRole, error: orgAdminRoleError } = await supabase
+    .from('roles')
+    .select('id')
+    .eq('name', 'org_admin')
+    .single()
+  if (orgAdminRoleError || !orgAdminRole?.id) {
+    throw new Error(`Failed to load org_admin role: ${orgAdminRoleError?.message ?? 'missing role data'}`)
+  }
+
+  const { error: delegatedBindingError } = await supabase.from('role_bindings').insert({
+    principal_type: 'apikey',
+    principal_id: delegatedKeyData.rbac_id,
+    role_id: orgAdminRole.id,
+    scope_type: 'org',
+    org_id: policyOrgId,
+    granted_by: USER_ID,
+    reason: 'Webhook delegated API key regression test',
+    is_direct: true,
+  })
+  if (delegatedBindingError)
+    throw delegatedBindingError
 }, 60000)
 
 afterAll(async () => {
@@ -145,6 +187,11 @@ afterAll(async () => {
     await supabase.from('apikeys').delete().eq('id', expiringSubkeyId)
   }
 
+  if (delegatedApiKeyId) {
+    await supabase.from('apikeys').delete().eq('id', delegatedApiKeyId)
+  }
+
+  await supabase.from('role_bindings').delete().eq('org_id', policyOrgId)
   await supabase.from('org_users').delete().eq('org_id', policyOrgId)
   await supabase.from('orgs').delete().eq('id', policyOrgId)
   await supabase.from('stripe_info').delete().eq('customer_id', policyCustomerId)
@@ -289,5 +336,27 @@ describe('webhook endpoints enforce org API key expiration policy', () => {
     expect(response.status).toBe(200)
     const data = await response.json()
     expect(Array.isArray(data)).toBe(true)
+  })
+
+  it('allows delivery retry for a delegated API key with org_admin RBAC', async () => {
+    if (!delegatedApiKeyValue || !createdDeliveryId)
+      throw new Error('Delegated webhook retry prerequisites were not created')
+
+    const response = await fetch(WEBHOOKS_RETRY_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': delegatedApiKeyValue,
+      },
+      body: JSON.stringify({
+        orgId: policyOrgId,
+        deliveryId: createdDeliveryId,
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const data = await response.json() as { deliveryId: string, status: string }
+    expect(data.deliveryId).toBe(createdDeliveryId)
+    expect(data.status).toBe('Delivery queued for retry')
   })
 })

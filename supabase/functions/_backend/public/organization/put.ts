@@ -1,8 +1,9 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
+import { type } from 'arktype'
 import { HTTPException } from 'hono/http-exception'
-import { z } from 'zod/mini'
+import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { createSignedImageUrl, normalizeImagePath } from '../../utils/storage.ts'
@@ -10,25 +11,39 @@ import { getStripeCustomerName, isDeterministicStripeCustomerUpdateError, update
 import { apikeyHasOrgRightWithPolicy, supabaseAdmin, supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
 import { normalizeWebsiteUrl } from './website.ts'
 
-const bodySchema = z.object({
-  orgId: z.string(),
-  logo: z.optional(z.string()),
-  name: z.optional(z.string()),
-  website: z.optional(z.nullable(z.string())),
-  management_email: z.optional(z.email()),
-  require_apikey_expiration: z.optional(z.boolean()),
-  max_apikey_expiration_days: z.optional(z.nullable(z.number())),
-  enforce_hashed_api_keys: z.optional(z.boolean()),
-  enforce_encrypted_bundles: z.optional(z.boolean()),
-  required_encryption_key: z.optional(z.nullable(z.string())),
-  enforcing_2fa: z.optional(z.boolean()),
+const bodySchema = type({
+  'orgId': 'string',
+  'logo?': 'string',
+  'name?': 'string',
+  'website?': 'string | null',
+  'management_email?': 'string.email',
+  'require_apikey_expiration?': 'boolean',
+  'max_apikey_expiration_days?': 'number | null',
+  'enforce_hashed_api_keys?': 'boolean',
+  'enforce_encrypted_bundles?': 'boolean',
+  'required_encryption_key?': 'string | null',
+  'enforcing_2fa?': 'boolean',
 })
 
 type OrgRow = Database['public']['Tables']['orgs']['Row']
 type OrgUpdateFields = Partial<Database['public']['Tables']['orgs']['Update']>
 
-function parseBody(bodyRaw: unknown) {
-  const bodyParsed = bodySchema.safeParse(bodyRaw)
+interface OrganizationPutBody {
+  orgId: string
+  logo?: string
+  name?: string
+  website?: string | null
+  management_email?: string
+  require_apikey_expiration?: boolean
+  max_apikey_expiration_days?: number | null
+  enforce_hashed_api_keys?: boolean
+  enforce_encrypted_bundles?: boolean
+  required_encryption_key?: string | null
+  enforcing_2fa?: boolean
+}
+
+function parseOrganizationBody(bodyRaw: unknown): OrganizationPutBody {
+  const bodyParsed = safeParseSchema(bodySchema, bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
@@ -77,7 +92,7 @@ function validateRequiredEncryptionKey(requiredKey?: string | null) {
   }
 }
 
-function buildUpdateFields(body: z.infer<typeof bodySchema>, sanitizedName?: string) {
+function buildUpdateFields(body: OrganizationPutBody, sanitizedName?: string) {
   const updateFields: OrgUpdateFields = {}
   if (body.name !== undefined)
     updateFields.name = sanitizedName ?? body.name
@@ -237,7 +252,7 @@ export async function put(
   bodyRaw: any,
   apikey: Database['public']['Tables']['apikeys']['Row'] | null | undefined,
 ): Promise<Response> {
-  const body = parseBody(bodyRaw)
+  const body = parseOrganizationBody(bodyRaw)
   const auth = c.get('auth')
   if (!auth?.userId) {
     throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })

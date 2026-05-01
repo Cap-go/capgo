@@ -1,6 +1,7 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { type } from 'arktype'
 import { Hono } from 'hono/tiny'
-import { z } from 'zod/mini'
+import { safeParseSchema } from '../utils/ark_validation.ts'
 import { parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { getEffectivePasswordMinLength, getPasswordPolicyValidationErrors } from '../utils/password_policy.ts'
@@ -40,11 +41,11 @@ const DEFAULT_PASSWORD_POLICY: PasswordPolicy = {
 }
 
 // Base schema for initial validation (without password)
-const baseInvitationSchema = z.object({
-  password: z.string(),
-  magic_invite_string: z.string().check(z.minLength(1)),
-  opt_for_newsletters: z.boolean(),
-  captchaToken: z.optional(z.string().check(z.minLength(1))),
+const baseInvitationSchema = type({
+  'password': 'string',
+  'magic_invite_string': 'string > 0',
+  'opt_for_newsletters': 'boolean',
+  'captchaToken?': 'string > 0',
 })
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -265,9 +266,9 @@ app.post('/', async (c) => {
   const rawBody = await parseBody<AcceptInvitation>(c)
 
   // First, validate base schema (without password policy checks)
-  const baseValidationResult = baseInvitationSchema.safeParse(rawBody)
+  const baseValidationResult = safeParseSchema(baseInvitationSchema, rawBody)
   if (!baseValidationResult.success) {
-    throw simpleError('invalid_json_body', 'Invalid request', { errors: z.prettifyError(baseValidationResult.error) })
+    throw simpleError('invalid_json_body', 'Invalid request', { errors: baseValidationResult.error.message })
   }
 
   const baseBody = baseValidationResult.data
