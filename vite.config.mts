@@ -13,7 +13,6 @@ import VueMacros from 'unplugin-vue-macros/vite'
 import { defineConfig } from 'vite'
 import devtoolsJson from 'vite-plugin-devtools-json'
 import EnvironmentPlugin from 'vite-plugin-environment'
-import { VitePWA } from 'vite-plugin-pwa'
 import VueDevTools from 'vite-plugin-vue-devtools'
 import Layouts from 'vite-plugin-vue-layouts'
 import WebfontDownload from 'vite-plugin-webfont-dl'
@@ -110,36 +109,6 @@ export default defineConfig({
         'src/stores',
       ],
       vueTemplate: true,
-    }),
-
-    // https://github.com/antfu/vite-plugin-pwa
-    VitePWA({
-      selfDestroying: true, // do not use SW
-      registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'robots.txt', 'safari-pinned-tab.svg'],
-      manifest: {
-        name: 'Capgo',
-        short_name: 'CapGo',
-        theme_color: '#ffffff',
-        icons: [
-          {
-            src: '/pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png',
-          },
-          {
-            src: '/pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-          },
-          {
-            src: '/pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable',
-          },
-        ],
-      },
     }),
 
     // https://github.com/intlify/bundle-tools/tree/main/packages/unplugin-vue-i18n
