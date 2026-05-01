@@ -1086,13 +1086,14 @@ export async function zipDirectory(projectDir: string, outputPath: string, platf
     const original = entry.getData().toString('utf-8')
     let rewritten = original.replace(pnpmPathPattern, 'node_modules/')
 
-    // pnpm can leave deep relative paths in iOS files like Package.swift and Pods output,
-    // for example ../../../../../node_modules/... instead of ../../../node_modules/...
-    // Collapse any excessive ../ before project-root ios/ or node_modules/ paths back to 3 levels.
+    // pnpm can leave deep relative paths in iOS files like Package.swift and Pods output.
+    // Collapse any excessive ../ before project-root ios/ or node_modules/ paths back to
+    // the current zip entry's actual depth.
     if (platform === 'ios') {
+      const rootRelativePrefix = '../'.repeat(entry.entryName.split('/').length - 1)
       rewritten = rewritten.replace(
         /(?:\.\.\/){4,}(ios\/|node_modules\/)/g,
-        '../../../$1',
+        (_match, rootPath: string) => `${rootRelativePrefix}${rootPath}`,
       )
     }
 

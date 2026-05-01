@@ -201,6 +201,10 @@ await t('generated build zip supports nested Capacitor Podfile paths in monorepo
       join(testRoot, 'apps/native/ios/App/Podfile'),
       "platform :ios, '14.0'\npod 'CapacitorApp', :path => '../../../node_modules/@capacitor/app'\n",
     )
+    writeFile(
+      join(testRoot, 'apps/native/ios/App/CapApp-SPM/Package.swift'),
+      'let package = Package(name: "CapApp-SPM", dependencies: [.package(name: "CapacitorApp", path: "../../../../../node_modules/.pnpm/@capacitor+app@6.0.0_@capacitor+core@6.0.0/node_modules/@capacitor/app")])\n',
+    )
 
     writeFile(
       join(testRoot, 'apps/native/ios/App/Podfile.lock'),
@@ -216,6 +220,10 @@ await t('generated build zip supports nested Capacitor Podfile paths in monorepo
       join(testRoot, 'node_modules', '@capacitor', 'app', 'CapacitorApp.podspec'),
       "Pod::Spec.new do |s|\n  s.name = 'CapacitorApp'\nend",
     )
+    writeFile(
+      join(testRoot, 'node_modules', '@capacitor', 'app', 'Package.swift'),
+      'let package = Package(name: "CapacitorApp")\n',
+    )
 
     await zipDirectory(testRoot, zipPath, 'ios', {
       ios: {
@@ -229,6 +237,10 @@ await t('generated build zip supports nested Capacitor Podfile paths in monorepo
     assert.ok(entries.includes('apps/native/ios/App/Podfile'), 'native platform podfile not included')
     assert.ok(entries.includes('node_modules/@capacitor/app/package.json'), 'missing plugin package.json in zip')
     assert.ok(entries.includes('node_modules/@capacitor/app/CapacitorApp.podspec'), 'missing plugin podspec in zip')
+    assert.equal(
+      zip.readAsText('apps/native/ios/App/CapApp-SPM/Package.swift'),
+      'let package = Package(name: "CapApp-SPM", dependencies: [.package(name: "CapacitorApp", path: "../../../../../node_modules/@capacitor/app")])\n',
+    )
     assert.ok(!entries.includes('apps/native/ios/Podfile.lock'), 'unexpected root lockfile was included')
   }
   finally {
