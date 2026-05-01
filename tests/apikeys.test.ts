@@ -93,9 +93,8 @@ describe('[POST] /apikey operations', () => {
       method: 'POST',
       headers: limitedHeaders,
       body: JSON.stringify({
-        name: 'blocked-unrestricted-creation',
-        limited_to_orgs: [],
-        limited_to_apps: [],
+        name: 'blocked-limited-creation',
+        limited_to_apps: [APPNAME],
       }),
     })
     const escalationData = await escalationResponse.json() as { error: string }
@@ -106,6 +105,86 @@ describe('[POST] /apikey operations', () => {
       method: 'DELETE',
       headers,
     })
+  })
+
+  it('app-limited key cannot manage sibling API keys', async () => {
+    const createdKeyIds: number[] = []
+
+    try {
+      const limitedResponse = await fetch(`${BASE_URL}/apikey`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          name: 'app-limited-management-blocked',
+          mode: 'all',
+          limited_to_apps: [APPNAME],
+        }),
+      })
+      expect(limitedResponse.status).toBe(200)
+      const limitedData = await limitedResponse.json<{ id: number, key: string }>()
+      createdKeyIds.push(limitedData.id)
+
+      const siblingResponse = await fetch(`${BASE_URL}/apikey`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          name: 'sibling-management-target',
+          mode: 'all',
+        }),
+      })
+      expect(siblingResponse.status).toBe(200)
+      const siblingData = await siblingResponse.json<{ id: number }>()
+      createdKeyIds.push(siblingData.id)
+
+      const limitedHeaders = {
+        'Content-Type': 'application/json',
+        'capgkey': limitedData.key,
+      }
+
+      const listResponse = await fetch(`${BASE_URL}/apikey`, {
+        method: 'GET',
+        headers: limitedHeaders,
+      })
+      expect(listResponse.status).toBe(401)
+      await expect(listResponse.json()).resolves.toHaveProperty('error', 'cannot_list_apikeys')
+
+      const getResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
+        method: 'GET',
+        headers: limitedHeaders,
+      })
+      expect(getResponse.status).toBe(401)
+      await expect(getResponse.json()).resolves.toHaveProperty('error', 'cannot_get_apikey')
+
+      const updateResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
+        method: 'PUT',
+        headers: limitedHeaders,
+        body: JSON.stringify({
+          name: 'sibling-renamed-by-limited-key',
+        }),
+      })
+      expect(updateResponse.status).toBe(401)
+      await expect(updateResponse.json()).resolves.toHaveProperty('error', 'cannot_update_apikey')
+
+      const deleteResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, {
+        method: 'DELETE',
+        headers: limitedHeaders,
+      })
+      expect(deleteResponse.status).toBe(401)
+      await expect(deleteResponse.json()).resolves.toHaveProperty('error', 'cannot_delete_apikey')
+
+      const verifyResponse = await fetch(`${BASE_URL}/apikey/${siblingData.id}`, { headers })
+      expect(verifyResponse.status).toBe(200)
+      const verifyData = await verifyResponse.json<{ name: string }>()
+      expect(verifyData.name).toBe('sibling-management-target')
+    }
+    finally {
+      for (const keyId of createdKeyIds.reverse()) {
+        await fetch(`${BASE_URL}/apikey/${keyId}`, {
+          method: 'DELETE',
+          headers,
+        })
+      }
+    }
   })
 
   it('create api key with missing name', async () => {
