@@ -48,6 +48,7 @@ const thresholdSelection = ref<'0' | '0.1' | '0.5' | '1' | '2' | '5' | 'custom'>
 const customThreshold = ref(1)
 const maxVersionRows = 20
 const maxTrendVersions = 5
+const maxTrendMajorVersions = 8
 const trendColorPalette = ['#119eff', '#10b981', '#f59e0b', '#6366f1', '#ec4899', '#14b8a6', '#f97316', '#8b5cf6']
 
 async function loadPluginBreakdown() {
@@ -141,6 +142,34 @@ const versionTrendSeries = computed(() => {
   }))
 })
 const hasVersionTrendData = computed(() => versionTrendSeries.value.length > 0)
+const topMajorVersionsForTrend = computed(() => {
+  const latestPoint = versionTrendPoints.value[versionTrendPoints.value.length - 1]
+  if (!latestPoint)
+    return []
+
+  return Object.entries(latestPoint.major_breakdown ?? {})
+    .map(([version, percent]) => ({
+      version,
+      percent: Number(percent) || 0,
+    }))
+    .filter(entry => entry.percent > 0)
+    .sort((a, b) => b.percent - a.percent)
+    .slice(0, maxTrendMajorVersions)
+})
+const majorTrendSeries = computed(() => {
+  if (versionTrendPoints.value.length === 0 || topMajorVersionsForTrend.value.length === 0)
+    return []
+
+  return topMajorVersionsForTrend.value.map((entry, index) => ({
+    label: entry.version,
+    data: versionTrendPoints.value.map(point => ({
+      date: point.date,
+      value: Number(point.major_breakdown?.[entry.version]) || 0,
+    })),
+    color: trendColorPalette[index % trendColorPalette.length],
+  }))
+})
+const hasMajorTrendData = computed(() => majorTrendSeries.value.length > 0)
 
 watch(() => adminStore.activeDateRange, () => {
   loadPluginBreakdown()
@@ -227,6 +256,32 @@ displayStore.defaultBack = '/dashboard'
             <AdminMultiLineChart
               :series="versionTrendSeries"
               :is-loading="isLoadingBreakdown"
+              value-suffix="%"
+              :suggested-max="100"
+            />
+          </ChartCard>
+
+          <ChartCard
+            title="Major Version Breakdown Over Time"
+            :is-loading="isLoadingBreakdown"
+            :has-data="hasMajorTrendData"
+            no-data-message="No major version trend data available"
+          >
+            <template #header>
+              <div class="flex flex-col gap-1">
+                <h2 class="text-2xl font-semibold leading-tight dark:text-white text-slate-600">
+                  Major Version Breakdown Over Time
+                </h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  Top {{ topMajorVersionsForTrend.length }} major versions from latest snapshot
+                </p>
+              </div>
+            </template>
+            <AdminMultiLineChart
+              :series="majorTrendSeries"
+              :is-loading="isLoadingBreakdown"
+              value-suffix="%"
+              :suggested-max="100"
             />
           </ChartCard>
 
