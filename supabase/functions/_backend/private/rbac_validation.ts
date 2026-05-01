@@ -162,7 +162,7 @@ export const createRoleBindingBodySchema = type({
   'scope_type': ROLE_SCOPE_TYPE_SCHEMA,
   'org_id': 'string.uuid',
   'app_id?': 'string.uuid | null',
-  'channel_id?': 'string.uuid | number | null',
+  'channel_id?': 'string.uuid | string.digits | number | null',
   'reason?': 'string | null',
   'role_name': NON_EMPTY_STRING_SCHEMA,
 })
