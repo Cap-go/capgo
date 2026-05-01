@@ -107,6 +107,7 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.28",
     "@types/tmp": "^0.2.6",
+    "@types/ws": "^8.18.1",
     "@vercel/ncc": "^0.38.4",
     "adm-zip": "^0.5.16",
     "ci-info": "^4.3.1",

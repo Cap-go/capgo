@@ -89,6 +89,18 @@ describe('[POST] /private/verify_email_otp', () => {
     expect(data.error).toBe('invalid_otp')
   })
 
+  it.concurrent('accepts missing type and falls back to email verification', async () => {
+    const response = await fetch(getEndpointUrl(OTP_ENDPOINT), {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({ token: '000000' }),
+    })
+
+    expect(response.status).toBe(401)
+    const data = await response.json() as { error?: string }
+    expect(data.error).toBe('invalid_otp')
+  })
+
   it.concurrent('returns 403 when OTP user mismatches JWT user', async () => {
     const { tokenHash } = await generateEmailOtp(OTHER_USER_EMAIL)
 

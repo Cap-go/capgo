@@ -1,17 +1,18 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { type } from 'arktype'
 import { Hono } from 'hono/tiny'
-import { z } from 'zod/mini'
+import { safeParseSchema } from '../utils/ark_validation.ts'
 import { BRES, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { createStatsDevices } from '../utils/stats.ts'
 import { supabaseWithAuth } from '../utils/supabase.ts'
 
-const bodySchema = z.object({
-  device_id: z.uuid(),
-  app_id: z.string(),
-  org_id: z.string(),
-  platform: z.enum(['ios', 'android']),
-  version_name: z.string(),
+const bodySchema = type({
+  device_id: 'string.uuid',
+  app_id: 'string',
+  org_id: 'string',
+  platform: '"ios" | "android"',
+  version_name: 'string',
 })
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -30,7 +31,7 @@ app.post('/', middlewareV2(['all', 'write']), async (c) => {
   const auth = c.get('auth')!
 
   const body = await parseBody<CreateDeviceBody>(c)
-  const parsedBodyResult = bodySchema.safeParse(body)
+  const parsedBodyResult = safeParseSchema(bodySchema, body)
   if (!parsedBodyResult.success) {
     throw simpleError('invalid_json_body', 'Invalid JSON body', { body, parsedBodyResult })
   }

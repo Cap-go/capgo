@@ -1,24 +1,58 @@
-import { z } from 'zod/mini'
+import { type } from 'arktype'
+import { literalUnion } from './ark_validation.ts'
 import { Constants } from './supabase.types.ts'
-import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, NON_STRING_APP_ID, reverseDomainRegex } from './utils.ts'
+import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, reverseDomainRegex } from './utils.ts'
 
 export const MAX_QUERY_TEXT_LENGTH = 512
 export const MAX_QUERY_LIMIT = 50_000
 
-export const appIdSchema = z.string({
-  error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,
-}).check(z.regex(reverseDomainRegex, { message: INVALID_STRING_APP_ID }))
+export const appIdSchema = type('string').narrow((value, ctx) => {
+  if (!reverseDomainRegex.test(value)) {
+    return ctx.reject({
+      expected: INVALID_STRING_APP_ID,
+      actual: JSON.stringify(value),
+    })
+  }
+  return true
+})
 
-export const deviceIdSchema = z.string().check(
-  z.maxLength(36),
-  z.regex(deviceIdRegex, { message: INVALID_STRING_DEVICE_ID }),
-)
+export const deviceIdSchema = type('string <= 36').narrow((value, ctx) => {
+  if (!deviceIdRegex.test(value)) {
+    return ctx.reject({
+      expected: INVALID_STRING_DEVICE_ID,
+      actual: JSON.stringify(value),
+    })
+  }
+  return true
+})
 
-export const safeQueryTextSchema = z.string().check(z.maxLength(MAX_QUERY_TEXT_LENGTH))
-export const safeQueryDateSchema = z.string().check(z.maxLength(128))
-export const cursorSchema = z.string().check(z.maxLength(128))
-export const queryLimitSchema = z.coerce.number().check(z.int(), z.minimum(1), z.maximum(MAX_QUERY_LIMIT))
-export const statsActionSchema = z.enum(Constants.public.Enums.stats_action)
+export const safeQueryTextSchema = type(`string <= ${MAX_QUERY_TEXT_LENGTH}`)
+export const safeQueryDateSchema = type('string <= 128')
+export const cursorSchema = type('string <= 128')
+const queryLimitNumberSchema = type('number.integer >= 1').narrow((value, ctx) => {
+  if (value > MAX_QUERY_LIMIT) {
+    return ctx.reject({
+      expected: `a value <= ${MAX_QUERY_LIMIT}`,
+      actual: JSON.stringify(value),
+    })
+  }
+
+  return true
+})
+
+const queryLimitStringSchema = type('string.numeric.parse |> number.integer >= 1').narrow((value, ctx) => {
+  if (value > MAX_QUERY_LIMIT) {
+    return ctx.reject({
+      expected: `a value <= ${MAX_QUERY_LIMIT}`,
+      actual: JSON.stringify(value),
+    })
+  }
+
+  return true
+})
+
+export const queryLimitSchema = queryLimitNumberSchema.or(queryLimitStringSchema)
+export const statsActionSchema = literalUnion(Constants.public.Enums.stats_action)
 
 export function hasControlChars(value: string): boolean {
   for (let i = 0; i < value.length; i++) {

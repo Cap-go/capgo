@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { __queueConsumerTestUtils__, MAX_QUEUE_READS, messagesArraySchema } from '../supabase/functions/_backend/triggers/queue_consumer.ts'
+import { parseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
 
 describe('queue_consumer legacy message compatibility', () => {
   it.concurrent('uses the payload envelope when it is present', () => {
-    const [message] = messagesArraySchema.parse([
+    const [message] = parseSchema(messagesArraySchema, [
       {
         msg_id: 1,
         read_ct: 0,
@@ -25,7 +26,7 @@ describe('queue_consumer legacy message compatibility', () => {
   })
 
   it.concurrent('falls back to legacy top-level fields when payload is missing', () => {
-    const [message] = messagesArraySchema.parse([
+    const [message] = parseSchema(messagesArraySchema, [
       {
         msg_id: 2,
         read_ct: 0,
@@ -44,7 +45,7 @@ describe('queue_consumer legacy message compatibility', () => {
   })
 
   it.concurrent('drops legacy routing metadata from fallback bodies', () => {
-    const [message] = messagesArraySchema.parse([
+    const [message] = parseSchema(messagesArraySchema, [
       {
         msg_id: 3,
         read_ct: 0,

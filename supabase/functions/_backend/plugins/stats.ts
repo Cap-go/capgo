@@ -4,18 +4,15 @@ import type { Database } from '../utils/supabase.types.ts'
 import type { AppStats, StatsActions } from '../utils/types.ts'
 import { greaterOrEqual, parse } from '@std/semver'
 import { Hono } from 'hono/tiny'
-import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { BRES, simpleError, simpleError200, simpleRateLimit } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
 import { sendNotifOrgCached } from '../utils/notifications.ts'
 import { closeClient, ensurePlaceholderVersions, getAppOwnerPostgres, getAppVersionPostgres, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
+import { statsRequestSchema } from '../utils/plugin_validation.ts'
 import { createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from '../utils/stats.ts'
-import { backgroundTask, deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../utils/utils.ts'
-import { ALLOWED_STATS_ACTIONS } from './stats_actions.ts'
-
-z.config(z.locales.en())
+import { backgroundTask, INVALID_STRING_APP_ID, isLimited, MISSING_STRING_APP_ID, reverseDomainRegex } from '../utils/utils.ts'
 
 const PLAN_ERROR = 'Cannot send stats, upgrade plan to continue to update'
 
@@ -26,37 +23,6 @@ export interface BatchStatsResult {
   index?: number
   moreInfo?: Record<string, unknown>
 }
-
-export const jsonRequestSchema = z.object({
-  app_id: z.string({
-    error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,
-  }).check(z.regex(reverseDomainRegex, { message: INVALID_STRING_APP_ID })),
-  device_id: z.string({
-    error: issue => issue.input === undefined ? MISSING_STRING_DEVICE_ID : NON_STRING_DEVICE_ID,
-  }).check(z.maxLength(36), z.regex(deviceIdRegex, { message: INVALID_STRING_DEVICE_ID })),
-  platform: z.string({
-    error: issue => issue.input === undefined ? MISSING_STRING_PLATFORM : NON_STRING_PLATFORM,
-  }),
-  version_name: z.string({
-    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_NAME : NON_STRING_VERSION_NAME,
-  }),
-  old_version_name: z.optional(z.string({
-    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_NAME : NON_STRING_VERSION_NAME,
-  })),
-  version_os: z.string({
-    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_OS : NON_STRING_VERSION_OS,
-  }),
-  version_code: z.optional(z.string()),
-  version_build: z.optional(z.string()),
-  action: z.optional(z.enum(ALLOWED_STATS_ACTIONS)),
-  custom_id: z.optional(z.string().check(z.maxLength(36))),
-  channel: z.optional(z.string()),
-  defaultChannel: z.optional(z.string()),
-  plugin_version: z.optional(z.string()),
-  is_emulator: z.boolean(),
-  is_prod: z.boolean(),
-  key_id: z.optional(z.string().check(z.maxLength(20))),
-})
 
 interface PostResult {
   success: boolean
@@ -261,7 +227,7 @@ app.post('/', async (c) => {
   try {
     // For single event, process directly and let errors propagate for proper status codes
     if (!isBatch) {
-      const bodyParsed = parsePluginBody<AppStats>(c, events[0], jsonRequestSchema)
+      const bodyParsed = parsePluginBody<AppStats>(c, events[0], statsRequestSchema)
       const result = await post(c, drizzleClient, bodyParsed)
       if (result.isOnprem) {
         return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
@@ -281,7 +247,7 @@ app.post('/', async (c) => {
     for (let i = 0; i < events.length; i++) {
       const event = events[i]
       try {
-        const bodyParsed = parsePluginBody<AppStats>(c, event, jsonRequestSchema)
+        const bodyParsed = parsePluginBody<AppStats>(c, event, statsRequestSchema)
         const result = await post(c, drizzleClient, bodyParsed)
 
         if (result.isOnprem) {

@@ -1,31 +1,34 @@
 import type { Context } from 'hono'
 import type { Database } from '../../utils/supabase.types.ts'
-import { z } from 'zod/mini'
+import { type } from 'arktype'
+import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
 import { checkWebhookPermission } from './index.ts'
 
-const bodySchema = z.object({
-  orgId: z.string(),
-  webhookId: z.optional(z.string()),
-  page: z.optional(z.number()),
+const bodySchema = type({
+  'orgId': 'string',
+  'webhookId?': 'string',
+  'page?': 'number',
 })
 
-const webhookSchema = z.object({
-  id: z.string(),
-  org_id: z.string(),
-  name: z.string(),
-  url: z.string(),
-  enabled: z.boolean(),
-  events: z.array(z.string()),
-  created_at: z.string(),
-  updated_at: z.string(),
-  created_by: z.nullable(z.string()),
+const webhookSchema = type({
+  id: 'string',
+  org_id: 'string',
+  name: 'string',
+  url: 'string',
+  enabled: 'boolean',
+  events: 'string[]',
+  created_at: 'string',
+  updated_at: 'string',
+  created_by: 'string | null',
 })
+
+const webhooksSchema = webhookSchema.array()
 
 export async function get(c: Context, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  const bodyParsed = bodySchema.safeParse(bodyRaw)
+  const bodyParsed = safeParseSchema(bodySchema, bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
@@ -50,7 +53,7 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
       throw simpleError('webhook_not_found', 'Webhook not found', { error })
     }
 
-    const dataParsed = webhookSchema.safeParse(data)
+    const dataParsed = safeParseSchema(webhookSchema, data)
     if (!dataParsed.success) {
       throw simpleError('cannot_parse_webhook', 'Cannot parse webhook', { error: dataParsed.error })
     }
@@ -92,7 +95,7 @@ export async function get(c: Context, bodyRaw: any, apikey: Database['public']['
     throw simpleError('cannot_get_webhooks', 'Cannot get webhooks', { error })
   }
 
-  const dataParsed = z.array(webhookSchema).safeParse(data)
+  const dataParsed = safeParseSchema(webhooksSchema, data)
   if (!dataParsed.success) {
     throw simpleError('cannot_parse_webhooks', 'Cannot parse webhooks', { error: dataParsed.error })
   }

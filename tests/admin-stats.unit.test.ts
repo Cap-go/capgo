@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { adminStatsBodySchema, MAX_ADMIN_STATS_LIMIT, MAX_ADMIN_STATS_OFFSET } from '../supabase/functions/_backend/private/admin_stats.ts'
+import { safeParseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
 import { normalizeAnalyticsLimit } from '../supabase/functions/_backend/utils/cloudflare.ts'
 
 describe('admin stats validation', () => {
@@ -16,7 +17,7 @@ describe('admin stats validation', () => {
     ['oversized limit', { limit: MAX_ADMIN_STATS_LIMIT + 1 }],
     ['oversized offset', { offset: MAX_ADMIN_STATS_OFFSET + 1 }],
   ])('rejects %s', (_label, body) => {
-    const parsed = adminStatsBodySchema.safeParse({
+    const parsed = safeParseSchema(adminStatsBodySchema, {
       ...baseBody,
       ...body,
     })
@@ -25,7 +26,7 @@ describe('admin stats validation', () => {
   })
 
   it('accepts bounded integer pagination', () => {
-    const parsed = adminStatsBodySchema.safeParse({
+    const parsed = safeParseSchema(adminStatsBodySchema, {
       ...baseBody,
       limit: 250,
       offset: 10,
@@ -40,7 +41,7 @@ describe('admin stats validation', () => {
   })
 
   it('accepts the customer country breakdown metric', () => {
-    const parsed = adminStatsBodySchema.safeParse({
+    const parsed = safeParseSchema(adminStatsBodySchema, {
       ...baseBody,
       metric_category: 'customer_country_breakdown',
     })
@@ -54,7 +55,7 @@ describe('admin stats validation', () => {
     ['offset datetime start', { start_date: '2025-01-01T01:00:00+01:00' }],
     ['offset datetime end', { end_date: '2025-01-31T01:00:00+01:00' }],
   ])('rejects non-UTC ISO datetimes for %s', (_label, body) => {
-    const parsed = adminStatsBodySchema.safeParse({
+    const parsed = safeParseSchema(adminStatsBodySchema, {
       ...baseBody,
       ...body,
     })

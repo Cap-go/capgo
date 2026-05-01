@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
+import { type } from 'arktype'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { z } from 'zod'
+import { parseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
 
 import { APP_NAME, createAppVersions, getBaseData, getEndpointUrl, getSupabaseClient, getVersionFromAction, headers, ORG_ID, postUpdate, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils.ts'
 
@@ -16,9 +17,9 @@ interface UpdateRes {
   manifest?: { file_name: string | null, file_hash?: string | null, download_url?: string | null }[]
 }
 
-const updateNewScheme = z.object({
-  url: z.string(),
-  version: z.string(),
+const updateNewScheme = type({
+  url: 'string',
+  version: 'string',
 })
 
 async function updateChannel(
@@ -127,7 +128,7 @@ describe('[POST] /updates', () => {
     expect(response.status).toBe(200)
 
     const json = await response.json<UpdateRes>()
-    expect(() => updateNewScheme.parse(json)).not.toThrow()
+    expect(() => parseSchema(updateNewScheme, json)).not.toThrow()
     expect(json.version).toBe('1.0.0')
   })
 
@@ -531,7 +532,7 @@ describe('[POST] /updates parallel tests', () => {
     expect(response.status).toBe(200)
 
     const json = await response.json<UpdateRes>()
-    expect(() => updateNewScheme.parse(json)).not.toThrow()
+    expect(() => parseSchema(updateNewScheme, json)).not.toThrow()
     expect(json.version).toBe('1.361.0')
   })
 })
@@ -839,7 +840,7 @@ describe('update scenarios', () => {
     expect(response.status).toBe(200)
 
     const json = await response.json<UpdateRes>()
-    expect(() => updateNewScheme.parse(json)).not.toThrow()
+    expect(() => parseSchema(updateNewScheme, json)).not.toThrow()
     expect(json.version).toBe('1.361.0')
 
     // Clean up
@@ -944,7 +945,7 @@ describe('update scenarios', () => {
 
       const json = await response.json<UpdateRes>()
       // Should succeed with the new version, not error
-      expect(() => updateNewScheme.parse(json)).not.toThrow()
+      expect(() => parseSchema(updateNewScheme, json)).not.toThrow()
       expect(json.version).toBe('1.0.0')
       expect(json.error).toBeUndefined()
     }
