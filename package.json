@@ -82,6 +82,8 @@
     "test:cloudflare:api": "vitest run --exclude=tests/cli* --exclude=tests/updates* --exclude=tests/stats* --exclude=tests/channel_self* --config vitest.config.cloudflare.ts",
     "test:cloudflare:updates": "vitest run tests/updates* --config vitest.config.cloudflare.ts",
     "stripe:backfill-retention-metrics": "bun scripts/backfill_retention_metrics.ts",
+    "stripe:backfill-org-conversion-rate": "bun scripts/backfill_org_conversion_rate_trend.ts",
+    "stripe:backfill-customer-countries": "bun scripts/backfill_stripe_customer_countries.ts",
     "stripe:sync-org-names": "bun scripts/sync_stripe_org_names.ts",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",
     "fmt": "bun run lint:fix && bun run lint:sql",
