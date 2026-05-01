@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APIKEY_STATS, getEndpointUrl, getSupabaseClient, headers, NON_OWNER_ORG_ID, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
+import { APIKEY_STATS, getEndpointUrl, getSupabaseClient, headers, NON_OWNER_ORG_ID, ORG_ID, resetAndSeedAppData, resetAppData, USER_ID } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.private.error.${id}`
@@ -59,6 +59,65 @@ afterAll(async () => {
 })
 
 describe('[POST] /private/create_device - Error Cases', () => {
+  it.concurrent('should reject app/org scope mismatch in permission checks', async () => {
+    const { data, error } = await getSupabaseClient().rpc('check_min_rights', {
+      min_right: 'write',
+      org_id: testOrgId,
+      user_id: USER_ID,
+      channel_id: null as any,
+      app_id: APPNAME,
+    })
+
+    expect(error).toBeNull()
+    expect(data).toBe(false)
+  })
+
+  it.concurrent('should return 401 when org_id does not own the app', async () => {
+    const deviceId = randomUUID()
+    const response = await fetch(getEndpointUrl('/private/create_device'), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        app_id: APPNAME,
+        org_id: testOrgId,
+        device_id: deviceId,
+        platform: 'android',
+        version_name: '1.0.0',
+      }),
+    })
+
+    expect(response.status).toBe(401)
+    const data = await response.json() as { error: string }
+    expect(data.error).toBe('not_authorized')
+
+    const { data: device, error: deviceError } = await getSupabaseClient()
+      .from('devices')
+      .select('device_id')
+      .eq('app_id', APPNAME)
+      .eq('device_id', deviceId)
+      .maybeSingle()
+    expect(deviceError).toBeNull()
+    expect(device).toBeNull()
+  })
+
+  it.concurrent('should allow device creation when normalized org_id owns the app', async () => {
+    const response = await fetch(getEndpointUrl('/private/create_device'), {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        app_id: APPNAME,
+        org_id: ORG_ID.toUpperCase(),
+        device_id: randomUUID(),
+        platform: 'android',
+        version_name: '1.0.0',
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const data = await response.json() as { status: string }
+    expect(data.status).toBe('ok')
+  })
+
   it('should return 401 when not authorized', async () => {
     const response = await fetch(getEndpointUrl('/private/create_device'), {
       method: 'POST',
