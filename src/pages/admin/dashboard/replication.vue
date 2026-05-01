@@ -7,10 +7,12 @@ meta:
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import BeakerIcon from '~icons/heroicons/beaker'
 import AdminStatsCard from '~/components/admin/AdminStatsCard.vue'
 import Spinner from '~/components/Spinner.vue'
 import { formatLocalDateTime } from '~/services/date'
 import { defaultApiHost, useSupabase } from '~/services/supabase'
+import { showUploadReplicationToast } from '~/services/updateReplicationToast'
 import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 
@@ -146,6 +148,15 @@ async function loadReplicationStatus() {
   }
 }
 
+function triggerFakeReplicationToast() {
+  showUploadReplicationToast({
+    eventLabel: 'Upload was uploaded',
+    route: '/admin/dashboard/replication',
+    actionLabel: t('view'),
+    onAction: () => router.push('/admin/dashboard/replication'),
+  })
+}
+
 onMounted(async () => {
   if (!mainStore.isAdmin) {
     console.error('Non-admin user attempted to access admin replication dashboard')
@@ -174,13 +185,24 @@ displayStore.defaultBack = '/dashboard'
               Logical replication slot lag monitoring
             </p>
           </div>
-          <button
-            class="d-btn d-btn-outline d-btn-sm"
-            :disabled="isLoading"
-            @click="loadReplicationStatus"
-          >
-            {{ isLoading ? 'Refreshing...' : 'Refresh' }}
-          </button>
+          <div class="flex flex-wrap gap-2">
+            <button
+              class="d-btn d-btn-primary d-btn-sm"
+              type="button"
+              @click="triggerFakeReplicationToast"
+            >
+              <BeakerIcon class="h-4 w-4" aria-hidden="true" />
+              {{ t('admin-debug') }}
+            </button>
+            <button
+              class="d-btn d-btn-outline d-btn-sm"
+              type="button"
+              :disabled="isLoading"
+              @click="loadReplicationStatus"
+            >
+              {{ isLoading ? 'Refreshing...' : 'Refresh' }}
+            </button>
+          </div>
         </div>
 
         <div v-if="errorMessage && !data" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-200">
