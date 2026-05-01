@@ -1,7 +1,9 @@
 import { type } from 'arktype'
 import { safeParseSchema } from '../utils/ark_validation.ts'
-import { createHono, getClaimsFromJWT, middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { createHono, getClaimsFromJWT, middlewareAuth, parseBody, quickError, simpleError, simpleRateLimit, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { clearFailedAccountAuth, isAccountRateLimited, recordFailedAccountAuth } from '../utils/rate_limit.ts'
+import { buildRateLimitInfo } from '../utils/rateLimitInfo.ts'
 import { emptySupabase, supabaseAdmin } from '../utils/supabase.ts'
 import { version } from '../utils/version.ts'
 
@@ -51,6 +53,11 @@ app.post('/', middlewareAuth, async (c) => {
     return quickError(401, 'invalid_auth_type', 'JWT authentication required')
   }
 
+  const accountRateLimitStatus = await isAccountRateLimited(c, auth.userId)
+  if (accountRateLimitStatus.limited) {
+    return simpleRateLimit({ reason: 'too_many_failed_account_auth_attempts', ...buildRateLimitInfo(accountRateLimitStatus.resetAt) })
+  }
+
   const authorization = c.get('authorization')
   if (!authorization) {
     return quickError(401, 'no_authorization', 'No authorization header provided')
@@ -83,16 +90,21 @@ app.post('/', middlewareAuth, async (c) => {
   }
 
   if (verifyError || !verifyData?.session?.access_token) {
+    await recordFailedAccountAuth(c, auth.userId)
     cloudlog({ requestId: c.get('requestId'), context: 'verify_email_otp - verifyOtp failed', error: verifyError?.message })
     return quickError(401, 'invalid_otp', 'Invalid or expired OTP')
   }
 
   if (verifyData.user?.id && verifyData.user.id !== auth.userId) {
+    await recordFailedAccountAuth(c, auth.userId)
     return quickError(403, 'otp_user_mismatch', 'OTP does not match current user')
   }
   if (!verifyData.user?.id) {
+    await recordFailedAccountAuth(c, auth.userId)
     return quickError(500, 'no_user', 'No user associated with OTP')
   }
+
+  await clearFailedAccountAuth(c, auth.userId)
 
   const otpVerifiedAt = new Date().toISOString()
   const { error: recordError } = await supabaseAdmin(c).rpc('record_email_otp_verified', {

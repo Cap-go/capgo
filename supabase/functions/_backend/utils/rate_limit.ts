@@ -10,6 +10,9 @@ const API_KEY_RATE_LIMIT_TTL = 60 // 1 minute window for API key rate limiting
 // Default limits - set high to catch only severe abuse, not normal usage
 const DEFAULT_FAILED_AUTH_LIMIT = 20 // 20 failed attempts before blocking (catches brute force, allows mistakes)
 const DEFAULT_API_KEY_RATE_LIMIT = 2000 // 2000 requests per minute per API key (catches infinite loops)
+const FAILED_AUTH_PATH = '/rate-limit/failed-auth'
+const FAILED_ACCOUNT_AUTH_PATH = '/rate-limit/failed-auth-account'
+const API_KEY_RATE_LIMIT_PATH = '/rate-limit/apikey'
 
 interface RateLimitData {
   count: number
@@ -49,6 +52,35 @@ export function getClientIP(c: Context): string {
   return 'unknown'
 }
 
+function bytesToHex(bytes: Uint8Array) {
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
+async function hashIdentifier(identifier: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(identifier))
+  return bytesToHex(new Uint8Array(digest))
+}
+
+export function normalizeRateLimitAccountIdentifier(identifier: string): string {
+  return identifier.trim().toLowerCase()
+}
+
+async function getAccountRateLimitKey(identifier: string): Promise<string | null> {
+  const normalized = normalizeRateLimitAccountIdentifier(identifier)
+  if (!normalized)
+    return null
+
+  return await hashIdentifier(normalized)
+}
+
+function getRateLimitWindowSeconds(resetAt: number, now: number): number {
+  return Math.max(1, Math.ceil((resetAt - now) / 1000))
+}
+
+function buildResetAt() {
+  return Date.now() + FAILED_AUTH_TTL * 1000
+}
+
 /**
  * Check if an IP is rate limited due to failed authentication attempts.
  * Returns true if the IP should be blocked.
@@ -66,7 +98,7 @@ export async function isIPRateLimited(c: Context): Promise<RateLimitStatus> {
   }
 
   const cacheHelper = new CacheHelper(c)
-  const cacheKey = cacheHelper.buildRequest('/rate-limit/failed-auth', { ip })
+  const cacheKey = cacheHelper.buildRequest(FAILED_AUTH_PATH, { ip })
   const data = await cacheHelper.matchJson<RateLimitData>(cacheKey)
 
   // If no data or cache unavailable, fail open (don't block)
@@ -105,15 +137,16 @@ export async function recordFailedAuth(c: Context): Promise<void> {
   }
 
   const cacheHelper = new CacheHelper(c)
-  const cacheKey = cacheHelper.buildRequest('/rate-limit/failed-auth', { ip })
+  const cacheKey = cacheHelper.buildRequest(FAILED_AUTH_PATH, { ip })
   const existingData = await cacheHelper.matchJson<RateLimitData>(cacheKey)
+  const resetAt = buildResetAt()
 
   const newData: RateLimitData = {
     count: (existingData?.count ?? 0) + 1,
-    resetAt: Date.now() + FAILED_AUTH_TTL * 1000,
+    resetAt,
   }
 
-  await cacheHelper.putJson(cacheKey, newData, FAILED_AUTH_TTL)
+  await cacheHelper.putJson(cacheKey, newData, getRateLimitWindowSeconds(resetAt, Date.now()))
 
   cloudlog({
     requestId: c.get('requestId'),
@@ -133,10 +166,95 @@ export async function clearFailedAuth(c: Context): Promise<void> {
     return
 
   const cacheHelper = new CacheHelper(c)
-  const cacheKey = cacheHelper.buildRequest('/rate-limit/failed-auth', { ip })
+  const cacheKey = cacheHelper.buildRequest(FAILED_AUTH_PATH, { ip })
 
   // Set count to 0 to effectively clear the rate limit
   // Use 60s TTL for cache consistency across Cloudflare edge nodes
+  await cacheHelper.putJson(cacheKey, { count: 0 }, 60)
+}
+
+/**
+ * Check if a specific account is rate limited due to failed authentication attempts.
+ * The account identifier is hashed before it is used as a cache key to avoid storing
+ * raw email addresses or user IDs in Cache API URLs.
+ */
+export async function isAccountRateLimited(c: Context, accountIdentifier: string): Promise<RateLimitStatus> {
+  const accountKey = await getAccountRateLimitKey(accountIdentifier)
+  if (!accountKey) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Account rate limit check skipped: empty account identifier',
+    })
+    return { limited: false }
+  }
+
+  const cacheHelper = new CacheHelper(c)
+  const cacheKey = cacheHelper.buildRequest(FAILED_ACCOUNT_AUTH_PATH, { account: accountKey })
+  const data = await cacheHelper.matchJson<RateLimitData>(cacheKey)
+
+  if (!data)
+    return { limited: false }
+
+  const limit = getFailedAuthLimit(c)
+  const isLimited = data.count >= limit
+
+  if (isLimited) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Account rate limited due to failed auth attempts',
+      accountKey,
+      count: data.count,
+      limit,
+    })
+  }
+
+  return { limited: isLimited, resetAt: data.resetAt }
+}
+
+/**
+ * Record a failed authentication attempt for a specific account.
+ */
+export async function recordFailedAccountAuth(c: Context, accountIdentifier: string): Promise<void> {
+  const accountKey = await getAccountRateLimitKey(accountIdentifier)
+  if (!accountKey) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Failed account auth not recorded: empty account identifier',
+    })
+    return
+  }
+
+  const cacheHelper = new CacheHelper(c)
+  const cacheKey = cacheHelper.buildRequest(FAILED_ACCOUNT_AUTH_PATH, { account: accountKey })
+  const existingData = await cacheHelper.matchJson<RateLimitData>(cacheKey)
+  const resetAt = buildResetAt()
+
+  const newData: RateLimitData = {
+    count: (existingData?.count ?? 0) + 1,
+    resetAt,
+  }
+
+  await cacheHelper.putJson(cacheKey, newData, getRateLimitWindowSeconds(resetAt, Date.now()))
+
+  cloudlog({
+    requestId: c.get('requestId'),
+    message: 'Recorded failed account auth attempt',
+    accountKey,
+    count: newData.count,
+  })
+}
+
+/**
+ * Clear failed authentication attempts for a specific account after successful authentication.
+ */
+export async function clearFailedAccountAuth(c: Context, accountIdentifier: string): Promise<void> {
+  const accountKey = await getAccountRateLimitKey(accountIdentifier)
+  if (!accountKey)
+    return
+
+  const cacheHelper = new CacheHelper(c)
+  const cacheKey = cacheHelper.buildRequest(FAILED_ACCOUNT_AUTH_PATH, { account: accountKey })
+
   await cacheHelper.putJson(cacheKey, { count: 0 }, 60)
 }
 
@@ -147,7 +265,7 @@ export async function clearFailedAuth(c: Context): Promise<void> {
  */
 export async function isAPIKeyRateLimited(c: Context, apiKeyId: number): Promise<RateLimitStatus> {
   const cacheHelper = new CacheHelper(c)
-  const cacheKey = cacheHelper.buildRequest('/rate-limit/apikey', { id: String(apiKeyId) })
+  const cacheKey = cacheHelper.buildRequest(API_KEY_RATE_LIMIT_PATH, { id: String(apiKeyId) })
   const data = await cacheHelper.matchJson<RateLimitData>(cacheKey)
 
   // If no data or cache unavailable, fail open (don't block)
@@ -177,7 +295,7 @@ export async function isAPIKeyRateLimited(c: Context, apiKeyId: number): Promise
  */
 export async function recordAPIKeyUsage(c: Context, apiKeyId: number): Promise<void> {
   const cacheHelper = new CacheHelper(c)
-  const cacheKey = cacheHelper.buildRequest('/rate-limit/apikey', { id: String(apiKeyId) })
+  const cacheKey = cacheHelper.buildRequest(API_KEY_RATE_LIMIT_PATH, { id: String(apiKeyId) })
   const existingData = await cacheHelper.matchJson<RateLimitData>(cacheKey)
 
   const newData: RateLimitData = {
