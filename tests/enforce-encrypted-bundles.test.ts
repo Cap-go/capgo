@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APIKEY_ENCRYPTED, APP_NAME_ENCRYPTED, getEndpointUrl, getSupabaseClient, ORG_ID_ENCRYPTED, USER_ID_ENCRYPTED } from './test-utils.ts'
+import { APIKEY_ENCRYPTED, APP_NAME_ENCRYPTED, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, ORG_ID_ENCRYPTED, USER_ID_ENCRYPTED, USER_PASSWORD } from './test-utils.ts'
 
 // This test file uses ISOLATED test data seeded in seed.sql:
 // - USER_ID_ENCRYPTED: f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f708193
@@ -12,12 +12,16 @@ const headersEncrypted = {
   'Content-Type': 'application/json',
   'Authorization': APIKEY_ENCRYPTED,
 }
+const USER_EMAIL_ENCRYPTED = 'encrypted@capgo.app'
+let authHeadersEncrypted: Record<string, string>
 
 beforeAll(async () => {
+  authHeadersEncrypted = await getAuthHeadersForCredentials(USER_EMAIL_ENCRYPTED, USER_PASSWORD)
+
   // Ensure enforcement is disabled at the start of tests
   await getSupabaseClient()
     .from('orgs')
-    .update({ enforce_encrypted_bundles: false })
+    .update({ enforce_encrypted_bundles: false, required_encryption_key: null })
     .eq('id', ORG_ID_ENCRYPTED)
 
   // Clean up any test versions from previous test runs
@@ -41,7 +45,7 @@ afterAll(async () => {
   // Reset enforcement to false
   await getSupabaseClient()
     .from('orgs')
-    .update({ enforce_encrypted_bundles: false })
+    .update({ enforce_encrypted_bundles: false, required_encryption_key: null })
     .eq('id', ORG_ID_ENCRYPTED)
 })
 
@@ -82,6 +86,50 @@ describe('[Encrypted Bundles Enforcement]', () => {
         .from('orgs')
         .update({ enforce_encrypted_bundles: false })
         .eq('id', ORG_ID_ENCRYPTED)
+    })
+
+    it('should update encrypted bundle settings through the organization endpoint', async () => {
+      const requiredKey = 'a'.repeat(21)
+      const response = await fetch(getEndpointUrl('/organization'), {
+        headers: authHeadersEncrypted,
+        method: 'PUT',
+        body: JSON.stringify({
+          orgId: ORG_ID_ENCRYPTED,
+          enforce_encrypted_bundles: true,
+          required_encryption_key: requiredKey,
+        }),
+      })
+      expect(response.status).toBe(200)
+
+      const { data, error } = await getSupabaseClient()
+        .from('orgs')
+        .select('enforce_encrypted_bundles, required_encryption_key')
+        .eq('id', ORG_ID_ENCRYPTED)
+        .single()
+
+      expect(error).toBeNull()
+      expect(data?.enforce_encrypted_bundles).toBe(true)
+      expect(data?.required_encryption_key).toBe(requiredKey)
+
+      await getSupabaseClient()
+        .from('orgs')
+        .update({ enforce_encrypted_bundles: false, required_encryption_key: null })
+        .eq('id', ORG_ID_ENCRYPTED)
+    })
+
+    it('should reject invalid required encryption key through the organization endpoint', async () => {
+      const response = await fetch(getEndpointUrl('/organization'), {
+        headers: authHeadersEncrypted,
+        method: 'PUT',
+        body: JSON.stringify({
+          orgId: ORG_ID_ENCRYPTED,
+          required_encryption_key: 'short',
+        }),
+      })
+      expect(response.status).toBe(400)
+
+      const responseData = await response.json() as { error: string }
+      expect(responseData.error).toBe('invalid_required_encryption_key')
     })
   })
 
