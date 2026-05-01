@@ -1,9 +1,10 @@
 import type { Context } from 'hono'
-import type { ZodMiniObject } from 'zod/mini'
+import type { StandardSchema } from './ark_validation.ts'
 import type { Database } from './supabase.types.ts'
 import type { AppInfos, AppStats, DeviceWithoutCreatedAt } from './types.ts'
 import { format, tryParse } from '@std/semver'
 import { fixSemver } from '../utils/utils.ts'
+import { safeParseSchema } from './ark_validation.ts'
 import { simpleError } from './hono.ts'
 
 export interface DeviceLink extends AppInfos {
@@ -42,7 +43,7 @@ export function makeDevice(devBody: AppInfos | DeviceLink | AppStats, allowCusto
   return device
 }
 
-export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: Context, body: T, schema: ZodMiniObject, requireDevice = true) {
+export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: Context, body: T, schema: StandardSchema<T>, requireDevice = true) {
   if (Object.keys(body ?? {}).length === 0) {
     throw simpleError(getInvalidCode(c), 'Cannot parse body', { body })
   }
@@ -66,11 +67,11 @@ export function parsePluginBody<T extends AppInfos | DeviceLink | AppStats>(c: C
   if (body.version_name) {
     body.version_name = (body.version_name === 'builtin' || !body.version_name) ? body.version_build : body.version_name
   }
-  const parseResult = schema.safeParse(body)
+  const parseResult = safeParseSchema(schema, body)
   if (!parseResult.success) {
     throw simpleError(getInvalidCode(c), 'Cannot parse body', { parseResult })
   }
-  return body
+  return parseResult.data
 }
 
 export function convertQueryToBody(query: Record<string, string>): DeviceLink {

@@ -1,51 +1,10 @@
+import type { StandardSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod/mini'
-import { deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS, reverseDomainRegex } from '../supabase/functions/_backend/utils/utils.ts'
+import { safeParseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
+import { channelSelfRequestSchema, statsRequestSchema, updateRequestSchema } from '../supabase/functions/_backend/utils/plugin_validation.ts'
+import { INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_PLATFORM, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, MISSING_STRING_VERSION_OS, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_PLATFORM, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, NON_STRING_VERSION_OS } from '../supabase/functions/_backend/utils/utils.ts'
 
 const NO_ERROR = { error: '' }
-
-const updateRequestSchema = z.object({
-  app_id: z.string({
-    error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,
-  }).check(z.regex(reverseDomainRegex, { message: INVALID_STRING_APP_ID })),
-  device_id: z.string({
-    error: issue => issue.input === undefined ? MISSING_STRING_DEVICE_ID : NON_STRING_DEVICE_ID,
-  }).check(z.maxLength(36), z.regex(deviceIdRegex, { message: INVALID_STRING_DEVICE_ID })),
-  version_name: z.string({
-    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_NAME : NON_STRING_VERSION_NAME,
-  }),
-  version_build: z.string({
-    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_BUILD : NON_STRING_VERSION_BUILD,
-  }),
-  is_emulator: z.boolean(),
-  is_prod: z.boolean(),
-})
-
-const statsRequestSchema = z.object({
-  app_id: z.string({
-    error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,
-  }).check(z.regex(reverseDomainRegex, { message: INVALID_STRING_APP_ID })),
-  device_id: z.string({
-    error: issue => issue.input === undefined ? MISSING_STRING_DEVICE_ID : NON_STRING_DEVICE_ID,
-  }).check(z.maxLength(36), z.regex(deviceIdRegex, { message: INVALID_STRING_DEVICE_ID })),
-  platform: z.string({
-    error: issue => issue.input === undefined ? MISSING_STRING_PLATFORM : NON_STRING_PLATFORM,
-  }),
-  version_name: z.string({
-    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_NAME : NON_STRING_VERSION_NAME,
-  }),
-  version_os: z.string({
-    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_OS : NON_STRING_VERSION_OS,
-  }),
-  version_code: z.optional(z.string()),
-  version_build: z.optional(z.string()),
-  action: z.optional(z.string()),
-  custom_id: z.optional(z.string()),
-  channel: z.optional(z.string()),
-  plugin_version: z.optional(z.string()),
-  is_emulator: z.boolean(),
-  is_prod: z.boolean(),
-})
 
 interface RequestJSON {
   app_id?: string | number
@@ -270,6 +229,29 @@ describe('test schemas', () => {
   })
 })
 
+describe('test version_name compatibility', () => {
+  it('rejects empty version_name for /updates', () => {
+    const body = getJSON()
+    body.version_name = ''
+    const response = parseJSON(body, updateRequestSchema)
+    expectError(response, MISSING_STRING_VERSION_NAME)
+  })
+
+  it('accepts empty version_name for /stats', () => {
+    const body = getJSON()
+    body.version_name = ''
+    const response = parseJSON(body, statsRequestSchema)
+    expect(response).toEqual(NO_ERROR)
+  })
+
+  it('accepts empty version_name for /channel_self', () => {
+    const body = getJSON()
+    body.version_name = ''
+    const response = parseJSON(body, channelSelfRequestSchema)
+    expect(response).toEqual(NO_ERROR)
+  })
+})
+
 describe('test version_build - /updates', () => {
   it('version_build missing', () => {
     const body = getJSON()
@@ -290,6 +272,20 @@ describe('test version_build - /updates', () => {
     body.version_build = true
     const response = parseJSON(body, updateRequestSchema)
     expectError(response, NON_STRING_VERSION_BUILD)
+  })
+
+  it('version_build invalid #3', () => {
+    const body = getJSON()
+    body.version_build = ''
+    const response = parseJSON(body, updateRequestSchema)
+    expectError(response, MISSING_STRING_VERSION_BUILD)
+  })
+
+  it('accepts empty version_build for /channel_self', () => {
+    const body = getJSON()
+    body.version_build = ''
+    const response = parseJSON(body, channelSelfRequestSchema)
+    expect(response).toEqual(NO_ERROR)
   })
 })
 
@@ -343,8 +339,8 @@ function getJSON(): RequestJSON {
   return { ...requestJSON }
 }
 
-function parseJSON(body: RequestJSON, jsonRequestSchema: z.ZodMiniObject) {
-  const parseResult = jsonRequestSchema.safeParse(body)
+function parseJSON(body: RequestJSON, jsonRequestSchema: StandardSchema<unknown>) {
+  const parseResult = safeParseSchema(jsonRequestSchema, body)
   if (!parseResult.success)
     return { error: `Cannot parse json: ${parseResult.error}`, nestedError: parseResult.error }
   else

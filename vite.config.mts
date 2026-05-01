@@ -13,7 +13,6 @@ import VueMacros from 'unplugin-vue-macros/vite'
 import { defineConfig } from 'vite'
 import devtoolsJson from 'vite-plugin-devtools-json'
 import EnvironmentPlugin from 'vite-plugin-environment'
-import { VitePWA } from 'vite-plugin-pwa'
 import VueDevTools from 'vite-plugin-vue-devtools'
 import Layouts from 'vite-plugin-vue-layouts'
 import WebfontDownload from 'vite-plugin-webfont-dl'
@@ -112,36 +111,6 @@ export default defineConfig({
       vueTemplate: true,
     }),
 
-    // https://github.com/antfu/vite-plugin-pwa
-    VitePWA({
-      selfDestroying: true, // do not use SW
-      registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'robots.txt', 'safari-pinned-tab.svg'],
-      manifest: {
-        name: 'Capgo',
-        short_name: 'CapGo',
-        theme_color: '#ffffff',
-        icons: [
-          {
-            src: '/pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png',
-          },
-          {
-            src: '/pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-          },
-          {
-            src: '/pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png',
-            purpose: 'any maskable',
-          },
-        ],
-      },
-    }),
-
     // https://github.com/intlify/bundle-tools/tree/main/packages/unplugin-vue-i18n
     VueI18n({
       module: 'vue-i18n',
@@ -167,10 +136,31 @@ export default defineConfig({
   },
 
   optimizeDeps: {
+    // Pre-scan the entire app so Playwright does not trigger late dep re-optimization
+    // while navigating across lazily loaded routes in the local Vite server.
+    entries: [
+      'index.html',
+      'src/**/*.{vue,ts,js,mts}',
+    ],
     include: [
       'vue',
       'vue-router',
       '@vueuse/core',
+      '@formkit/core',
+      '@formkit/i18n',
+      '@formkit/icons',
+      '@formkit/vue',
+      '@vuepic/vue-datepicker',
+      '@capacitor/camera',
+      '@capacitor/filesystem',
+      'chart.js',
+      'country-code-to-flag-emoji',
+      'dayjs',
+      'dompurify',
+      'mime',
+      'tailwindcss/colors',
+      'vue-chartjs',
+      'vue-turnstile',
     ],
     exclude: [
       'vue-demi',

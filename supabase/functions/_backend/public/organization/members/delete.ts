@@ -1,19 +1,20 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../../utils/hono.ts'
 import type { Database } from '../../../utils/supabase.types.ts'
-import { z } from 'zod/mini'
+import { type } from 'arktype'
+import { safeParseSchema } from '../../../utils/ark_validation.ts'
 import { BRES, quickError, simpleError } from '../../../utils/hono.ts'
 import { cloudlog } from '../../../utils/logging.ts'
 import { checkPermission } from '../../../utils/rbac.ts'
 import { supabaseAdmin, supabaseApikey } from '../../../utils/supabase.ts'
 
-const deleteBodySchema = z.object({
-  orgId: z.string(),
-  email: z.email(),
+const deleteBodySchema = type({
+  orgId: 'string',
+  email: 'string.email',
 })
 
 export async function deleteMember(c: Context<MiddlewareKeyVariables>, bodyRaw: any, _apikey: Database['public']['Tables']['apikeys']['Row']) {
-  const bodyParsed = deleteBodySchema.safeParse(bodyRaw)
+  const bodyParsed = safeParseSchema(deleteBodySchema, bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }

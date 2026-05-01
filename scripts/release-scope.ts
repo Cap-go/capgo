@@ -1,12 +1,30 @@
 import { execFileSync } from 'node:child_process'
 
-type Component = 'capgo' | 'cli'
-type ReleaseAs = 'patch' | 'minor' | 'major'
+export type Component = 'capgo' | 'cli'
+export type ReleaseAs = 'patch' | 'minor' | 'major'
 
-const componentMatchers: Record<Component, RegExp[]> = {
+const sharedMatchers = [
+  /^\.github\/workflows\/bump_version\.yml$/,
+  /^\.github\/workflows\/tests\.yml$/,
+  /^\.github\/scripts\//,
+  /^scripts\/release-scope\.ts$/,
+  /^scripts\/setup-bun\.sh$/,
+  /^scripts\/setup-bun\.ps1$/,
+  /^package\.json$/,
+  /^bun\.lock$/,
+  /^\.npmrc$/,
+  /^\.typos\.toml$/,
+  /^bunfig\.toml$/,
+  /^tsconfig\.json$/,
+  /^vitest\.config\.ts$/,
+  /^vitest\.config\.cloudflare\.ts$/,
+  /^vitest\.config\.cloudflare-plugin\.ts$/,
+]
+
+export const componentMatchers: Record<Component, RegExp[]> = {
   capgo: [
-    /^package\.json$/,
-    /^bun\.lock$/,
+    ...sharedMatchers,
+    /^\.github\/workflows\/build_and_deploy\.yml$/,
     /^aliproxy\//,
     /^android\//,
     /^assets\//,
@@ -35,7 +53,8 @@ const componentMatchers: Record<Component, RegExp[]> = {
     /^wrangler\.jsonc$/,
   ],
   cli: [
-    /^bun\.lock$/,
+    ...sharedMatchers,
+    /^\.github\/workflows\/publish_cli\.yml$/,
     /^cli\/src\//,
     /^cli\/skills\/[^/]+\/SKILL\.md$/,
     /^cli\/skills\/(?!.*\.(md|mdx)$)/,
@@ -82,11 +101,11 @@ function getCommitMessage(commit: string): { subject: string, body: string } {
   }
 }
 
-function matchesComponent(component: Component, files: string[]): boolean {
+export function matchesComponent(component: Component, files: string[]): boolean {
   return files.some(file => componentMatchers[component].some(pattern => pattern.test(file)))
 }
 
-function getSeverity(subject: string, body: string): number {
+export function getSeverity(subject: string, body: string): number {
   const conventionalMatch = subject.match(/^([a-z]+)(\([^)]+\))?(!)?:/)
   const hasBreakingChange = body.includes('BREAKING CHANGE:') || conventionalMatch?.[3] === '!'
 
@@ -101,7 +120,7 @@ function getSeverity(subject: string, body: string): number {
   return 1
 }
 
-function toReleaseAs(severity: number): ReleaseAs {
+export function toReleaseAs(severity: number): ReleaseAs {
   if (severity >= 3) {
     return 'major'
   }
@@ -113,31 +132,41 @@ function toReleaseAs(severity: number): ReleaseAs {
   return 'patch'
 }
 
-const componentArg = process.argv[2]
-const before = process.argv[3] ?? ''
-const after = process.argv[4] ?? 'HEAD'
+export function resolveReleaseScope(component: Component, before: string, after: string) {
+  const commits = getCommitShas(before, after)
 
-if (componentArg !== 'capgo' && componentArg !== 'cli') {
-  console.error('Usage: bun scripts/release-scope.ts <capgo|cli> [before] [after]')
-  process.exit(1)
-}
+  let shouldRelease = false
+  let highestSeverity = 0
 
-const component = componentArg as Component
-const commits = getCommitShas(before, after)
+  for (const commit of commits) {
+    const files = getChangedFiles(commit)
+    if (!matchesComponent(component, files)) {
+      continue
+    }
 
-let shouldRelease = false
-let highestSeverity = 0
-
-for (const commit of commits) {
-  const files = getChangedFiles(commit)
-  if (!matchesComponent(component, files)) {
-    continue
+    shouldRelease = true
+    const message = getCommitMessage(commit)
+    highestSeverity = Math.max(highestSeverity, getSeverity(message.subject, message.body))
   }
 
-  shouldRelease = true
-  const message = getCommitMessage(commit)
-  highestSeverity = Math.max(highestSeverity, getSeverity(message.subject, message.body))
+  return {
+    shouldRelease,
+    releaseAs: shouldRelease ? toReleaseAs(highestSeverity) : 'patch',
+  }
 }
 
-console.log(`should_release=${shouldRelease}`)
-console.log(`release_as=${shouldRelease ? toReleaseAs(highestSeverity) : 'patch'}`)
+if (import.meta.main) {
+  const componentArg = process.argv[2]
+  const before = process.argv[3] ?? ''
+  const after = process.argv[4] ?? 'HEAD'
+
+  if (componentArg !== 'capgo' && componentArg !== 'cli') {
+    console.error('Usage: bun scripts/release-scope.ts <capgo|cli> [before] [after]')
+    process.exit(1)
+  }
+
+  const scope = resolveReleaseScope(componentArg, before, after)
+
+  console.log(`should_release=${scope.shouldRelease}`)
+  console.log(`release_as=${scope.releaseAs}`)
+}

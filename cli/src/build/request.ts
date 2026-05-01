@@ -678,6 +678,10 @@ interface NativeDependencies {
   usesCocoaPods: boolean
 }
 
+interface ZipDirectoryOptions {
+  nodeModules?: string
+}
+
 async function extractNativeDependencies(
   projectDir: string,
   platform: 'ios' | 'android',
@@ -937,8 +941,98 @@ function addDirectoryToZip(
 
       // Check if we should include this file
       if (shouldIncludeFile(itemZipPath, platform, nativeDeps, platformDir)) {
-        zip.addLocalFile(itemPath, zipPath || undefined)
+        addFileToZip(zip, itemPath, itemZipPath)
       }
+    }
+  }
+}
+
+function addFileToZip(zip: AdmZip, filePath: string, zipEntryPath: string) {
+  const normalizedEntryPath = zipEntryPath.replace(/\\/g, '/')
+  if (zip.getEntry(normalizedEntryPath))
+    return
+
+  const lastSlashIndex = normalizedEntryPath.lastIndexOf('/')
+  const zipFolder = lastSlashIndex === -1 ? undefined : normalizedEntryPath.slice(0, lastSlashIndex)
+  zip.addLocalFile(filePath, zipFolder)
+}
+
+function parseNodeModulesPaths(nodeModules: string | undefined): string[] {
+  if (!nodeModules)
+    return []
+
+  const paths = nodeModules
+    .split(',')
+    .map(nodeModulesPath => nodeModulesPath.trim())
+    .filter(Boolean)
+    .map(nodeModulesPath => resolve(nodeModulesPath))
+
+  return [...new Set(paths)]
+}
+
+function getNativePackagePaths(platform: 'ios' | 'android', nativeDeps: NativeDependencies): Set<string> {
+  const packages = new Set([...nativeDeps.packages, ...nativeDeps.cordovaPackages])
+  packages.add(platform === 'ios' ? '@capacitor/ios' : '@capacitor/android')
+  return packages
+}
+
+function findPackageInNodeModules(nodeModulesPath: string, packagePath: string): string | undefined {
+  const directPackageDir = join(nodeModulesPath, ...packagePath.split('/'))
+  if (existsSync(directPackageDir))
+    return directPackageDir
+
+  const pnpmStoreDir = join(nodeModulesPath, '.pnpm')
+  if (!existsSync(pnpmStoreDir))
+    return undefined
+
+  const encodedPackageName = packagePath.replace('/', '+')
+  const pnpmEntries = readdirSync(pnpmStoreDir, { withFileTypes: true })
+    .filter(entry => entry.isDirectory())
+    .map(entry => entry.name)
+    .filter(name => name.startsWith(`${encodedPackageName}@`))
+    .sort()
+
+  if (pnpmEntries.length > 1) {
+    throw new Error(`Multiple pnpm store entries found for ${packagePath} in ${pnpmStoreDir}; provide the app-specific node_modules path so the native build archive can use the exact resolved package.`)
+  }
+
+  for (const entry of pnpmEntries) {
+    const packageDir = join(pnpmStoreDir, entry, 'node_modules', ...packagePath.split('/'))
+    if (existsSync(packageDir))
+      return packageDir
+  }
+
+  return undefined
+}
+
+function addNativePackagesFromNodeModules(
+  zip: AdmZip,
+  nodeModulesPaths: string[],
+  platform: 'ios' | 'android',
+  nativeDeps: NativeDependencies,
+  platformDir: string,
+) {
+  if (nodeModulesPaths.length === 0)
+    return
+
+  const missingPaths = nodeModulesPaths.filter(nodeModulesPath => !existsSync(nodeModulesPath))
+  if (missingPaths.length > 0)
+    throw new Error(`Missing node_modules folder at ${missingPaths.join(', ')}`)
+
+  for (const nodeModulesPath of nodeModulesPaths) {
+    for (const packagePath of getNativePackagePaths(platform, nativeDeps)) {
+      const packageDir = findPackageInNodeModules(nodeModulesPath, packagePath)
+      if (!packageDir)
+        continue
+
+      addDirectoryToZip(
+        zip,
+        packageDir,
+        `node_modules/${packagePath}`,
+        platform,
+        nativeDeps,
+        platformDir,
+      )
     }
   }
 }
@@ -949,7 +1043,7 @@ function addDirectoryToZip(
  * - node_modules with native code (from Podfile/settings.gradle)
  * - capacitor.config.*, package.json, package-lock.json
  */
-export async function zipDirectory(projectDir: string, outputPath: string, platform: 'ios' | 'android', capConfig: any): Promise<void> {
+export async function zipDirectory(projectDir: string, outputPath: string, platform: 'ios' | 'android', capConfig: any, options: ZipDirectoryOptions = {}): Promise<void> {
   const platformDir = getPlatformDirFromCapacitorConfig(capConfig, platform)
 
   // Extract which node_modules have native code for this platform
@@ -959,6 +1053,7 @@ export async function zipDirectory(projectDir: string, outputPath: string, platf
 
   // Add files with filtering
   addDirectoryToZip(zip, projectDir, '', platform, nativeDeps, platformDir)
+  addNativePackagesFromNodeModules(zip, parseNodeModulesPaths(options.nodeModules), platform, nativeDeps, platformDir)
 
   // Rewrite pnpm store paths (node_modules/.pnpm/…/node_modules/@scope/pkg)
   // to standard flat paths (node_modules/@scope/pkg).
@@ -991,14 +1086,14 @@ export async function zipDirectory(projectDir: string, outputPath: string, platf
     const original = entry.getData().toString('utf-8')
     let rewritten = original.replace(pnpmPathPattern, 'node_modules/')
 
-    // pod install with pnpm resolves symlinks, producing deep relative paths
-    // like ../../../../../../ios/App/Pods/ (6 levels) instead of ../../../ios/App/Pods/ (3 levels).
-    // Collapse any excessive ../ before the platform directory back to 3 levels
-    // (node_modules/@scope/pkg → 3 levels up to project root).
+    // pnpm can leave deep relative paths in iOS files like Package.swift and Pods output.
+    // Collapse any excessive ../ before project-root ios/ or node_modules/ paths back to
+    // the current zip entry's actual depth.
     if (platform === 'ios') {
+      const rootRelativePrefix = '../'.repeat(entry.entryName.split('/').length - 1)
       rewritten = rewritten.replace(
-        /(?:\.\.\/){4,}(ios\/)/g,
-        '../../../$1',
+        /(?:\.\.\/){4,}(ios\/|node_modules\/)/g,
+        (_match, rootPath: string) => `${rootRelativePrefix}${rootPath}`,
       )
     }
 
@@ -1476,7 +1571,9 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       // Zip the project directory
       log.info(`Zipping ${options.platform} project from ${projectDir}...`)
 
-      await zipDirectory(projectDir, zipPath, options.platform, config?.config)
+      await zipDirectory(projectDir, zipPath, options.platform, config?.config, {
+        nodeModules: options.nodeModules,
+      })
 
       const zipStats = await stat(zipPath)
       const sizeMB = (zipStats.size / 1024 / 1024).toFixed(2)

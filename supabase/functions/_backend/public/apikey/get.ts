@@ -18,9 +18,10 @@ app.get('/', middlewareV2(['all']), async (c) => {
   const auth = c.get('auth') as AuthInfo
   const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
 
-  // Only check limited_to_orgs constraint for API key auth (not JWT)
-  if (auth.authType === 'apikey' && apikey?.limited_to_orgs?.length) {
-    throw quickError(401, 'cannot_list_apikeys', 'You cannot do that as a limited API key', { apikeyId: apikey.id })
+  const callerHasLimitedScope = (apikey?.limited_to_orgs?.length ?? 0) > 0
+    || (apikey?.limited_to_apps?.length ?? 0) > 0
+  if (auth.authType === 'apikey' && callerHasLimitedScope) {
+    throw quickError(401, 'cannot_list_apikeys', 'You cannot do that as a limited API key', { apikeyId: apikey?.id })
   }
 
   // Use supabaseWithAuth which handles both JWT and API key authentication
@@ -42,9 +43,10 @@ app.get('/:id', middlewareV2(['all']), async (c) => {
   const auth = c.get('auth') as AuthInfo
   const authApikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
 
-  // Only check limited_to_orgs constraint for API key auth (not JWT)
-  if (auth.authType === 'apikey' && authApikey?.limited_to_orgs?.length) {
-    throw quickError(401, 'cannot_get_apikey', 'You cannot do that as a limited API key', { apikeyId: authApikey.id })
+  const callerHasLimitedScope = (authApikey?.limited_to_orgs?.length ?? 0) > 0
+    || (authApikey?.limited_to_apps?.length ?? 0) > 0
+  if (auth.authType === 'apikey' && callerHasLimitedScope) {
+    throw quickError(401, 'cannot_get_apikey', 'You cannot do that as a limited API key', { apikeyId: authApikey?.id })
   }
 
   const id = c.req.param('id')

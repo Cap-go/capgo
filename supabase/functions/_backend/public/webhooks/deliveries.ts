@@ -4,7 +4,8 @@ import type { Database } from '../../utils/supabase.types.ts'
 import type {
   WebhookPayload,
 } from '../../utils/webhook.ts'
-import { z } from 'zod/mini'
+import { type } from 'arktype'
+import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { supabaseApikey, supabaseWithAuth } from '../../utils/supabase.ts'
 import {
@@ -15,22 +16,22 @@ import {
 } from '../../utils/webhook.ts'
 import { checkWebhookPermission, checkWebhookPermissionV2 } from './index.ts'
 
-const getDeliveriesSchema = z.object({
-  orgId: z.string(),
-  webhookId: z.string(),
-  page: z.optional(z.coerce.number()),
-  status: z.optional(z.string()), // 'pending', 'success', 'failed'
+const getDeliveriesSchema = type({
+  'orgId': 'string',
+  'webhookId': 'string',
+  'page?': 'number | string.numeric.parse',
+  'status?': 'string',
 })
 
-const retryDeliverySchema = z.object({
-  orgId: z.string(),
-  deliveryId: z.string(),
+const retryDeliverySchema = type({
+  orgId: 'string',
+  deliveryId: 'string',
 })
 
 const DELIVERIES_PER_PAGE = 50
 
 export async function getDeliveries(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  const bodyParsed = getDeliveriesSchema.safeParse(bodyRaw)
+  const bodyParsed = safeParseSchema(getDeliveriesSchema, bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
@@ -107,7 +108,7 @@ export async function getDeliveries(c: Context<MiddlewareKeyVariables, any, any>
 }
 
 export async function retryDelivery(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw: any, auth: AuthInfo): Promise<Response> {
-  const bodyParsed = retryDeliverySchema.safeParse(bodyRaw)
+  const bodyParsed = safeParseSchema(retryDeliverySchema, bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }

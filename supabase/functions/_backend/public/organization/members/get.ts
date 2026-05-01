@@ -1,38 +1,28 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../../utils/hono.ts'
 import type { Database } from '../../../utils/supabase.types.ts'
-import { z } from 'zod/mini'
+import { type } from 'arktype'
+import { safeParseSchema } from '../../../utils/ark_validation.ts'
 import { quickError, simpleError } from '../../../utils/hono.ts'
 import { cloudlog } from '../../../utils/logging.ts'
 import { checkPermission } from '../../../utils/rbac.ts'
 import { createSignedImageUrl } from '../../../utils/storage.ts'
 import { apikeyHasOrgRightWithPolicy, supabaseApikey } from '../../../utils/supabase.ts'
 
-const bodySchema = z.object({
-  orgId: z.string(),
+const bodySchema = type({
+  orgId: 'string',
 })
 
-const memberSchema = z.array(z.object({
-  uid: z.uuid(),
-  email: z.email(),
-  image_url: z.nullable(z.optional(z.string())),
-  role: z.enum([
-    'invite_read',
-    'invite_upload',
-    'invite_write',
-    'invite_admin',
-    'invite_super_admin',
-    'read',
-    'upload',
-    'write',
-    'admin',
-    'super_admin',
-  ]),
-  is_tmp: z.boolean(),
-}))
+const memberSchema = type({
+  uid: 'string.uuid',
+  email: 'string.email',
+  image_url: 'string | null | undefined',
+  role: '"invite_read" | "invite_upload" | "invite_write" | "invite_admin" | "invite_super_admin" | "read" | "upload" | "write" | "admin" | "super_admin"',
+  is_tmp: 'boolean',
+}).array()
 
 export async function get(c: Context<MiddlewareKeyVariables>, bodyRaw: any, apikey: Database['public']['Tables']['apikeys']['Row']): Promise<Response> {
-  const bodyParsed = bodySchema.safeParse(bodyRaw)
+  const bodyParsed = safeParseSchema(bodySchema, bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
@@ -66,7 +56,7 @@ export async function get(c: Context<MiddlewareKeyVariables>, bodyRaw: any, apik
     throw simpleError('cannot_get_organization_members', 'Cannot get organization members', { error })
   }
 
-  const parsed = memberSchema.safeParse(data)
+  const parsed = safeParseSchema(memberSchema, data)
   if (!parsed.success) {
     throw simpleError('cannot_parse_members', 'Cannot parse members', { error: parsed.error })
   }

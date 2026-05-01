@@ -1,8 +1,9 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
+import { type } from 'arktype'
 import { HTTPException } from 'hono/http-exception'
-import { z } from 'zod/mini'
+import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { createSignedImageUrl, normalizeImagePath } from '../../utils/storage.ts'
@@ -10,23 +11,39 @@ import { getStripeCustomerName, isDeterministicStripeCustomerUpdateError, update
 import { apikeyHasOrgRightWithPolicy, supabaseAdmin, supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
 import { normalizeWebsiteUrl } from './website.ts'
 
-const bodySchema = z.object({
-  orgId: z.string(),
-  logo: z.optional(z.string()),
-  name: z.optional(z.string()),
-  website: z.optional(z.nullable(z.string())),
-  management_email: z.optional(z.email()),
-  require_apikey_expiration: z.optional(z.boolean()),
-  max_apikey_expiration_days: z.optional(z.nullable(z.number())),
-  enforce_hashed_api_keys: z.optional(z.boolean()),
-  enforcing_2fa: z.optional(z.boolean()),
+const bodySchema = type({
+  'orgId': 'string',
+  'logo?': 'string',
+  'name?': 'string',
+  'website?': 'string | null',
+  'management_email?': 'string.email',
+  'require_apikey_expiration?': 'boolean',
+  'max_apikey_expiration_days?': 'number | null',
+  'enforce_hashed_api_keys?': 'boolean',
+  'enforce_encrypted_bundles?': 'boolean',
+  'required_encryption_key?': 'string | null',
+  'enforcing_2fa?': 'boolean',
 })
 
 type OrgRow = Database['public']['Tables']['orgs']['Row']
 type OrgUpdateFields = Partial<Database['public']['Tables']['orgs']['Update']>
 
-function parseBody(bodyRaw: unknown) {
-  const bodyParsed = bodySchema.safeParse(bodyRaw)
+interface OrganizationPutBody {
+  orgId: string
+  logo?: string
+  name?: string
+  website?: string | null
+  management_email?: string
+  require_apikey_expiration?: boolean
+  max_apikey_expiration_days?: number | null
+  enforce_hashed_api_keys?: boolean
+  enforce_encrypted_bundles?: boolean
+  required_encryption_key?: string | null
+  enforcing_2fa?: boolean
+}
+
+function parseOrganizationBody(bodyRaw: unknown): OrganizationPutBody {
+  const bodyParsed = safeParseSchema(bodySchema, bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
@@ -61,12 +78,21 @@ function validateMaxExpirationDays(maxDays?: number | null) {
   if (maxDays === undefined || maxDays === null) {
     return
   }
-  if (maxDays < 1 || maxDays > 365) {
+  if (!Number.isInteger(maxDays) || maxDays < 1 || maxDays > 365) {
     throw simpleError('invalid_max_expiration_days', 'Maximum expiration days must be between 1 and 365')
   }
 }
 
-function buildUpdateFields(body: z.infer<typeof bodySchema>, sanitizedName?: string) {
+function validateRequiredEncryptionKey(requiredKey?: string | null) {
+  if (requiredKey === undefined || requiredKey === null) {
+    return
+  }
+  if (requiredKey.length !== 20 && requiredKey.length !== 21) {
+    throw simpleError('invalid_required_encryption_key', 'Encryption key fingerprint must be 20 or 21 characters')
+  }
+}
+
+function buildUpdateFields(body: OrganizationPutBody, sanitizedName?: string) {
   const updateFields: OrgUpdateFields = {}
   if (body.name !== undefined)
     updateFields.name = sanitizedName ?? body.name
@@ -82,6 +108,10 @@ function buildUpdateFields(body: z.infer<typeof bodySchema>, sanitizedName?: str
     updateFields.max_apikey_expiration_days = body.max_apikey_expiration_days
   if (body.enforce_hashed_api_keys !== undefined)
     updateFields.enforce_hashed_api_keys = body.enforce_hashed_api_keys
+  if (body.enforce_encrypted_bundles !== undefined)
+    updateFields.enforce_encrypted_bundles = body.enforce_encrypted_bundles
+  if (body.required_encryption_key !== undefined)
+    updateFields.required_encryption_key = body.required_encryption_key
   if (body.enforcing_2fa !== undefined)
     updateFields.enforcing_2fa = body.enforcing_2fa
   return updateFields
@@ -222,7 +252,7 @@ export async function put(
   bodyRaw: any,
   apikey: Database['public']['Tables']['apikeys']['Row'] | null | undefined,
 ): Promise<Response> {
-  const body = parseBody(bodyRaw)
+  const body = parseOrganizationBody(bodyRaw)
   const auth = c.get('auth')
   if (!auth?.userId) {
     throw simpleError('cannot_access_organization', 'You can\'t access this organization', { orgId: body.orgId })
@@ -241,6 +271,7 @@ export async function put(
   }
 
   validateMaxExpirationDays(body.max_apikey_expiration_days)
+  validateRequiredEncryptionKey(body.required_encryption_key)
   const sanitizedOrgName = body.name !== undefined
     ? await sanitizeOrgNameForSync(supabase, body.name)
     : undefined

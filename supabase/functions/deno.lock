@@ -2,58 +2,79 @@
   "version": "5",
   "specifiers": {
     "jsr:@bradenmacdonald/s3-lite-client@0.9.6": "0.9.6",
-    "jsr:@std/semver@1.0.6": "1.0.6",
+    "jsr:@std/semver@1.0.8": "1.0.8",
     "npm:@cloudflare/workers-types@4.20260409.1": "4.20260409.1",
+    "npm:@hono/standard-validator@~0.2.2": "0.2.2_@standard-schema+spec@1.1.0_hono@4.12.15",
     "npm:@logsnag/node@1.0.1": "1.0.1",
-    "npm:@supabase/supabase-js@2.103.0": "2.103.0",
-    "npm:@types/pg@*": "8.16.0",
-    "npm:cron-schedule@5.0.4": "5.0.4",
+    "npm:@standard-schema/spec@^1.1.0": "1.1.0",
+    "npm:@supabase/supabase-js@2.105.1": "2.105.1",
+    "npm:@types/pg@*": "8.20.0",
+    "npm:arktype@^2.2.0": "2.2.0",
+    "npm:cron-schedule@6.0.0": "6.0.0",
     "npm:dayjs@1.11.20": "1.11.20",
     "npm:discord-api-types@~0.38.44": "0.38.47",
-    "npm:drizzle-orm@0.45.2": "0.45.2_@cloudflare+workers-types@4.20260409.1_@types+pg@8.16.0_pg@8.20.0",
-    "npm:hono@^4.12.2": "4.12.15",
+    "npm:drizzle-orm@1.0.0-rc.1": "1.0.0-rc.1_@cloudflare+workers-types@4.20260409.1_@types+pg@8.20.0_arktype@2.2.0_pg@8.20.0",
+    "npm:hono@4.12.15": "4.12.15",
     "npm:pg@8.20.0": "8.20.0",
-    "npm:stripe@22.0.1": "22.0.1",
-    "npm:zod@^4.3.6": "4.3.6"
+    "npm:stripe@22.1.0": "22.1.0"
   },
   "jsr": {
     "@bradenmacdonald/s3-lite-client@0.9.6": {
       "integrity": "5dac4eb9ce4d8574ce2eb21e1cff1e96b409ca3ba333913a8bbf918710dc50d9"
     },
-    "@std/semver@1.0.6": {
-      "integrity": "b7c98ae2843547cf3f7ac37f3995889e6e4cee0a97b57b57f17f62722843303c"
+    "@std/semver@1.0.8": {
+      "integrity": "dc830e8b8b6a380c895d53fbfd1258dc253704ca57bbe1629ac65fd7830179b7"
     }
   },
   "npm": {
+    "@ark/schema@0.56.0": {
+      "integrity": "sha512-ECg3hox/6Z/nLajxXqNhgPtNdHWC9zNsDyskwO28WinoFEnWow4IsERNz9AnXRhTZJnYIlAJ4uGn3nlLk65vZA==",
+      "dependencies": [
+        "@ark/util"
+      ]
+    },
+    "@ark/util@0.56.0": {
+      "integrity": "sha512-BghfRC8b9pNs3vBoDJhcta0/c1J1rsoS1+HgVUreMFPdhz/CRAKReAu57YEllNaSy98rWAdY1gE+gFup7OXpgA=="
+    },
     "@cloudflare/workers-types@4.20260409.1": {
       "integrity": "sha512-0rGuppPeip6dqlI6013wC8tE+kbRK+tcaDfqCxKf9sEHDNfSWWUuKgIEDpt6IHHP2O0iYBQpngk5Siv4CL/HGQ=="
+    },
+    "@hono/standard-validator@0.2.2_@standard-schema+spec@1.1.0_hono@4.12.15": {
+      "integrity": "sha512-mJ7W84Bt/rSvoIl63Ynew+UZOHAzzRAoAXb3JaWuxAkM/Lzg+ZHTCUiz77KOtn2e623WNN8LkD57Dk0szqUrIw==",
+      "dependencies": [
+        "@standard-schema/spec",
+        "hono"
+      ]
     },
     "@logsnag/node@1.0.1": {
       "integrity": "sha512-JW2S1KN91XyOb0oG2PblboZ1Ys4mkOSMn83GDYjM8CXzcFbkYFMnlFQoEgP0Y5z+1A56hOO+a7uLsvxO5IdUFA=="
     },
-    "@supabase/auth-js@2.103.0": {
-      "integrity": "sha512-6zAanO6c+6gpHOlt5Lb9TlBBkJdZiUWkWCJKAxzkywBDcwaHlLJKXnjQGX6GyVCyKRR1e7sTq4re/yRTH6U/9A==",
+    "@standard-schema/spec@1.1.0": {
+      "integrity": "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="
+    },
+    "@supabase/auth-js@2.105.1": {
+      "integrity": "sha512-zc4s8Xg4truwE1Q4Q8M8oUVDARMd05pKh73NyQsMbYU1HDdDN2iiKzena/yu+yJze3WrD4c092FdckPiK1rLQw==",
       "dependencies": [
         "tslib"
       ]
     },
-    "@supabase/functions-js@2.103.0": {
-      "integrity": "sha512-YrneV2NjskUkkmkZ2Jt2n3elBgbWzV4Y1M9MM370z2Zd5ZPFqFbY8KIoPwuNjtAGE9YrpKBxnbZqeF07BiN9Og==",
+    "@supabase/functions-js@2.105.1": {
+      "integrity": "sha512-dTk1e7oE51VGc1lS2S0J0NLo0Wp4JYChj74ArJKbIWgoWuFwO0wcJYjeyOV3AAEpKst8/LQWUZOUKO1tRXBrpA==",
       "dependencies": [
         "tslib"
       ]
     },
-    "@supabase/phoenix@0.4.0": {
-      "integrity": "sha512-RHSx8bHS02xwfHdAbX5Lpbo6PXbgyf7lTaXTlwtFDPwOIw64NnVRwFAXGojHhjtVYI+PEPNSWwkL90f4agN3bw=="
+    "@supabase/phoenix@0.4.1": {
+      "integrity": "sha512-hWGJkDAfWUNY8k0C080u3sGNFd2ncl9erhKgP7hnGkgJWEfT5Pd/SXal4QmWXBECVlZrannMAc9sBaaRyWpiUA=="
     },
-    "@supabase/postgrest-js@2.103.0": {
-      "integrity": "sha512-rC3sRxYdPZymkp2CZR1MiNQgbOleD01bGsW8VxEKRR5nMkLZ1NgAS1QTQf78Wh30czFyk505ZYr9Od8/mWT2TA==",
+    "@supabase/postgrest-js@2.105.1": {
+      "integrity": "sha512-6SbtsoWC55xfsm7gbfLqvF+yIwTQEbjt+jFGf4klDpwSnUy17Hv5x0Dq52oqwTQlw6Ta0h1D5gTP0/pApqNojA==",
       "dependencies": [
         "tslib"
       ]
     },
-    "@supabase/realtime-js@2.103.0": {
-      "integrity": "sha512-gcPtXzZ6izyyBVf2of7K3dEt8CScPJn8VcSlQq6oWL9QoE1kqfQl0oFrOMHd5qrcADewxI7OxxosLB8W4XqtIQ==",
+    "@supabase/realtime-js@2.105.1": {
+      "integrity": "sha512-3X3cUEl5cJ4lRQHr1hXHx0b98OaL97RRO2vrRZ98FD91JV/MquZHhrGJSv/+IkOnjF6E2e0RUOxE8P3Zi035ow==",
       "dependencies": [
         "@supabase/phoenix",
         "@types/ws",
@@ -61,15 +82,15 @@
         "ws"
       ]
     },
-    "@supabase/storage-js@2.103.0": {
-      "integrity": "sha512-DHmlvdAXwtOmZNbkIZi4lkobPR3XjIzoOgzoz5duMf6G+sDeY015YrzMJCnqdccuYr7X5x4yYuSwF//RoN2dvQ==",
+    "@supabase/storage-js@2.105.1": {
+      "integrity": "sha512-owfdCNH5ikXXDusjzsgU6LavEBqGUoueOnL/9XIucld70/WJ/rbqp89K//c9QPICDNuegsmpoeasydDAiucLKQ==",
       "dependencies": [
         "iceberg-js",
         "tslib"
       ]
     },
-    "@supabase/supabase-js@2.103.0": {
-      "integrity": "sha512-j/6q5+LtXbR/YOLSLhy7Na74RD1cV2v+KwIIuuqMEjk1JpLEEyu0ynwDHpGoxMncDQl+R5FogaVqZm+85lZvtw==",
+    "@supabase/supabase-js@2.105.1": {
+      "integrity": "sha512-4gn6HmsAkCCVU7p8JmgKGhHJ5Btod4ZzSp8qKZf4JHaTxbhaIK86/usHzeLxWv7EJJDhBmILDmJOSOf9iF4CLA==",
       "dependencies": [
         "@supabase/auth-js",
         "@supabase/functions-js",
@@ -78,14 +99,14 @@
         "@supabase/storage-js"
       ]
     },
-    "@types/node@25.0.3": {
-      "integrity": "sha512-W609buLVRVmeW693xKfzHeIV6nJGGz98uCPfeXI1ELMLXVeKYZ9m15fAMSaUPBHYLGFsVRcMmSCksQOrZV9BYA==",
+    "@types/node@25.6.0": {
+      "integrity": "sha512-+qIYRKdNYJwY3vRCZMdJbPLJAtGjQBudzZzdzwQYkEPQd+PJGixUL5QfvCLDaULoLv+RhT3LDkwEfKaAkgSmNQ==",
       "dependencies": [
         "undici-types"
       ]
     },
-    "@types/pg@8.16.0": {
-      "integrity": "sha512-RmhMd/wD+CF8Dfo+cVIy3RR5cl8CyfXQ0tGgW6XBL8L4LM/UTEbNXYRbLwU6w+CgrKBNbrQWt4FUtTfaU5jSYQ==",
+    "@types/pg@8.20.0": {
+      "integrity": "sha512-bEPFOaMAHTEP1EzpvHTbmwR8UsFyHSKsRisLIHVMXnpNefSbGA1bD6CVy+qKjGSqmZqNqBDV2azOBo8TgkcVow==",
       "dependencies": [
         "@types/node",
         "pg-protocol",
@@ -98,8 +119,22 @@
         "@types/node"
       ]
     },
-    "cron-schedule@5.0.4": {
-      "integrity": "sha512-nH0a49E/kSVk6BeFgKZy4uUsy6D2A16p120h5bYD9ILBhQu7o2sJFH+WI4R731TSBQ0dB1Ik7inB/dRAB4C8QQ=="
+    "arkregex@0.0.5": {
+      "integrity": "sha512-ncYjBdLlh5/QnVsAA8De16Tc9EqmYM7y/WU9j+236KcyYNUXogpz3sC4ATIZYzzLxwI+0sEOaQLEmLmRleaEXw==",
+      "dependencies": [
+        "@ark/util"
+      ]
+    },
+    "arktype@2.2.0": {
+      "integrity": "sha512-t54MZ7ti5BhOEvzEkgKnWvqj+UbDfWig+DHr5I34xatymPusKLS0lQpNJd8M6DzmIto2QGszHfNKoFIT8tMCZQ==",
+      "dependencies": [
+        "@ark/schema",
+        "@ark/util",
+        "arkregex"
+      ]
+    },
+    "cron-schedule@6.0.0": {
+      "integrity": "sha512-BoZaseYGXOo5j5HUwTaegIog3JJbuH4BbrY9A1ArLjXpy+RWb3mV28F/9Gv1dDA7E2L8kngWva4NWisnLTyfgQ=="
     },
     "dayjs@1.11.20": {
       "integrity": "sha512-YbwwqR/uYpeoP4pu043q+LTDLFBLApUP6VxRihdfNTqu4ubqMlGDLd6ErXhEgsyvY0K6nCs7nggYumAN+9uEuQ=="
@@ -107,16 +142,18 @@
     "discord-api-types@0.38.47": {
       "integrity": "sha512-XgXQodHQBAE6kfD7kMvVo30863iHX1LHSqNq6MGUTDwIFCCvHva13+rwxyxVXDqudyApMNAd32PGjgVETi5rjA=="
     },
-    "drizzle-orm@0.45.2_@cloudflare+workers-types@4.20260409.1_@types+pg@8.16.0_pg@8.20.0": {
-      "integrity": "sha512-kY0BSaTNYWnoDMVoyY8uxmyHjpJW1geOmBMdSSicKo9CIIWkSxMIj2rkeSR51b8KAPB7m+qysjuHme5nKP+E5Q==",
+    "drizzle-orm@1.0.0-rc.1_@cloudflare+workers-types@4.20260409.1_@types+pg@8.20.0_arktype@2.2.0_pg@8.20.0": {
+      "integrity": "sha512-jGCqAgxpz+OSHP2jQGooUHBxnFMTYl0TTRSfULBl52VNf7CtyNRnazUi+VdbSxvJrDP2lnIsmUh5O+HhKeSJCg==",
       "dependencies": [
         "@cloudflare/workers-types",
         "@types/pg",
+        "arktype",
         "pg"
       ],
       "optionalPeers": [
         "@cloudflare/workers-types",
         "@types/pg",
+        "arktype",
         "pg"
       ]
     },
@@ -191,41 +228,41 @@
     "split2@4.2.0": {
       "integrity": "sha512-UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg=="
     },
-    "stripe@22.0.1": {
-      "integrity": "sha512-Yw764pZ6s8Xu4CtUZdD5uWOkw6gc9xzO9OKylCuj1gMhMDLbyGbDtaPNNSFE4mB6njYSHESYIVbF1iIzUfAl2g=="
+    "stripe@22.1.0": {
+      "integrity": "sha512-w/xHyJGxXWnLPbNHG13sz/fae0MrFGC80Oz7YbICQymbfpqfEcsoG+6yG+9BWb81PWc4rrkeSO4wmTcmefmbLw=="
     },
     "tslib@2.8.1": {
       "integrity": "sha512-oJFu94HQb+KVduSUQL7wnpmqnfmLsOA/nAh6b6EH0wCEoK0/mPeXU6c3wKDV83MkOuHPRHtSXKKU99IBazS/2w=="
     },
-    "undici-types@7.16.0": {
-      "integrity": "sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw=="
+    "undici-types@7.19.2": {
+      "integrity": "sha512-qYVnV5OEm2AW8cJMCpdV20CDyaN3g0AjDlOGf1OW4iaDEx8MwdtChUp4zu4H0VP3nDRF/8RKWH+IPp9uW0YGZg=="
     },
     "ws@8.20.0": {
       "integrity": "sha512-sAt8BhgNbzCtgGbt2OxmpuryO63ZoDk/sqaB/znQm94T4fCEsy/yV+7CdC1kJhOU9lboAEU7R3kquuycDoibVA=="
     },
     "xtend@4.0.2": {
       "integrity": "sha512-LKYU1iAXJXUgAXn9URjiu+MWhyUXHsvfp7mcuYm9dSUKK0/CjtrUwFAxD82/mCWbtLsGjFIad0wIsod4zrTAEQ=="
-    },
-    "zod@4.3.6": {
-      "integrity": "sha512-rftlrkhHZOcjDwkGlnUtZZkvaPHCsDATp4pGpuOOMDaTdDDXF91wuVDJoWoPsKX/3YPQ5fHuF3STjcYyKr+Qhg=="
     }
   },
   "workspace": {
     "dependencies": [
       "jsr:@bradenmacdonald/s3-lite-client@0.9.6",
-      "jsr:@std/semver@1.0.6",
+      "jsr:@std/semver@1.0.8",
       "npm:@cloudflare/workers-types@4.20260409.1",
+      "npm:@hono/standard-validator@~0.2.2",
       "npm:@logsnag/node@1.0.1",
-      "npm:@supabase/supabase-js@2.103.0",
+      "npm:@standard-schema/spec@^1.1.0",
+      "npm:@supabase/supabase-js@2.105.1",
       "npm:@types/pg@8.20.0",
-      "npm:cron-schedule@5.0.4",
+      "npm:adm-zip@0.5.17",
+      "npm:arktype@^2.2.0",
+      "npm:cron-schedule@6.0.0",
       "npm:dayjs@1.11.20",
       "npm:discord-api-types@~0.38.44",
-      "npm:drizzle-orm@0.45.2",
-      "npm:hono@^4.12.2",
+      "npm:drizzle-orm@1.0.0-rc.1",
+      "npm:hono@4.12.15",
       "npm:pg@8.20.0",
-      "npm:stripe@22.0.1",
-      "npm:zod@^4.3.6"
+      "npm:stripe@22.1.0"
     ]
   }
 }

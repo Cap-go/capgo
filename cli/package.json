@@ -1,7 +1,7 @@
 {
   "name": "@capgo/cli",
   "type": "module",
-  "version": "7.93.4",
+  "version": "7.94.9",
   "description": "A CLI to upload to capgo servers",
   "author": "Martin martin@capgo.app",
   "license": "Apache 2.0",
@@ -78,6 +78,7 @@
     "test:onboarding-run-targets": "bun test/test-onboarding-run-targets.mjs",
     "test:run-device-command": "bun test/test-run-device-command.mjs",
     "test:init-app-conflict": "bun test/test-init-app-conflict.mjs",
+    "test:init-guardrails": "bun test/test-init-guardrails.mjs",
     "test:prompt-preferences": "bun test/test-prompt-preferences.mjs",
     "test:esm-sdk": "node test/test-sdk-esm.mjs",
     "test:mcp": "node test/test-mcp.mjs",
@@ -85,7 +86,7 @@
     "test:version-detection:setup": "./test/fixtures/setup-test-projects.sh",
     "test:platform-paths": "bun test/test-platform-paths.mjs",
     "test:payload-split": "bun test/test-payload-split.mjs",
-    "test": "bun run build && bun run test:version-detection:setup && bun run test:bundle && bun run test:functional && bun run test:semver && bun run test:version-edge-cases && bun run test:regex && bun run test:upload && bun run test:credentials && bun run test:credentials-validation && bun run test:build-zip-filter && bun run test:checksum && bun run test:ci-prompts && bun run test:onboarding-recovery && bun run test:onboarding-run-targets && bun run test:run-device-command && bun run test:init-app-conflict && bun run test:prompt-preferences && bun run test:esm-sdk && bun run test:mcp && bun run test:version-detection && bun run test:platform-paths && bun run test:payload-split"
+    "test": "bun run build && bun run test:version-detection:setup && bun run test:bundle && bun run test:functional && bun run test:semver && bun run test:version-edge-cases && bun run test:regex && bun run test:upload && bun run test:credentials && bun run test:credentials-validation && bun run test:build-zip-filter && bun run test:checksum && bun run test:ci-prompts && bun run test:onboarding-recovery && bun run test:onboarding-run-targets && bun run test:run-device-command && bun run test:init-app-conflict && bun run test:init-guardrails && bun run test:prompt-preferences && bun run test:esm-sdk && bun run test:mcp && bun run test:version-detection && bun run test:platform-paths && bun run test:payload-split"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^7.0.0",
@@ -106,6 +107,7 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.28",
     "@types/tmp": "^0.2.6",
+    "@types/ws": "^8.18.1",
     "@vercel/ncc": "^0.38.4",
     "adm-zip": "^0.5.16",
     "ci-info": "^4.3.1",

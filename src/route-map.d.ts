@@ -14,6 +14,9 @@ import type {
   ParamValueZeroOrMore,
   ParamValueZeroOrOne,
 } from 'vue-router'
+import type {
+  _ExtractParamParserType,
+} from 'vue-router/experimental'
 
 declare module 'vue-router' {
   interface TypesConfig {
@@ -191,6 +194,13 @@ declare module 'vue-router/auto-routes' {
     '/app/[app].channel.[channel].history': RouteRecordInfo<
       '/app/[app].channel.[channel].history',
       '/app/:app/channel/:channel/history',
+      { app: ParamValue<true>, channel: ParamValue<true> },
+      { app: ParamValue<false>, channel: ParamValue<false> },
+      | never
+    >,
+    '/app/[app].channel.[channel].preview': RouteRecordInfo<
+      '/app/[app].channel.[channel].preview',
+      '/app/:app/channel/:channel/preview',
       { app: ParamValue<true>, channel: ParamValue<true> },
       { app: ParamValue<false>, channel: ParamValue<false> },
       | never
@@ -664,6 +674,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/app/[app].channel.[channel].history.vue': {
       routes:
         | '/app/[app].channel.[channel].history'
+      views:
+        | never
+    }
+    'src/pages/app/[app].channel.[channel].preview.vue': {
+      routes:
+        | '/app/[app].channel.[channel].preview'
       views:
         | never
     }

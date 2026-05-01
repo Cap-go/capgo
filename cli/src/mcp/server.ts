@@ -3,7 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import pack from '../../package.json'
-import { addAppOptionsSchema, cleanupOptionsSchema, getStatsOptionsSchema, starAllRepositoriesOptionsSchema, starRepoOptionsSchema, updateAppOptionsSchema, updateChannelOptionsSchema, uploadOptionsSchema } from '../schemas/sdk'
+import { addAppOptionsSchema, cleanupOptionsSchema, getStatsOptionsSchema, requestBuildOptionsSchema, starAllRepositoriesOptionsSchema, starRepoOptionsSchema, updateAppOptionsSchema, updateChannelOptionsSchema, uploadOptionsSchema } from '../schemas/sdk'
 import { CapgoSDK } from '../sdk'
 import { findSavedKey } from '../utils'
 
@@ -519,16 +519,13 @@ export async function startMcpServer(): Promise<void> {
   server.tool(
     'capgo_request_build',
     'Request a native iOS/Android build from Capgo Cloud',
-    {
-      appId: z.string().describe('App ID to build'),
-      platform: z.enum(['ios', 'android']).describe('Target platform'),
-      path: z.string().optional().describe('Path to project directory'),
-    },
-    async ({ appId, platform, path }) => {
+    requestBuildOptionsSchema.pick({ appId: true, platform: true, path: true, nodeModules: true }).shape,
+    async ({ appId, platform, path, nodeModules }) => {
       const result = await sdk.requestBuild({
         appId,
         platform,
         path,
+        nodeModules,
         // Credentials should be pre-saved using the CLI
       })
       if (!result.success) {
