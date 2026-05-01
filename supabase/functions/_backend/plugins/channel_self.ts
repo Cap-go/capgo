@@ -525,6 +525,7 @@ async function runChannelSelfWithPgClient(
   record: () => Promise<void>,
 ) {
   await setReplicationLagHeader(c, pgClient)
+
   try {
     return await run(getDrizzleClient(pgClient as any))
   }

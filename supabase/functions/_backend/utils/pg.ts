@@ -6,14 +6,16 @@ import { getRuntimeKey } from 'hono/adapter'
 // @ts-types="npm:@types/pg"
 import { Pool } from 'pg'
 import { backgroundTask, existInEnv, getEnv } from '../utils/utils.ts'
+import { CacheHelper } from './cache.ts'
 import { DISPOSABLE_EMAIL_DOMAINS, PERSONAL_EMAIL_DOMAINS } from './emailClassification.ts'
 import { getClientDbRegionSB } from './geolocation.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
 import * as schema from './postgres_schema.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
 
-// Replication lag threshold
-const REPLICATION_LAG_THRESHOLD_SECONDS = 180 // 3 minutes threshold
+const REPLICATION_LAG_THRESHOLD_SECONDS = 180
+const REPLICATION_LAG_CACHE_TTL_SECONDS = 60
+const REPLICATION_LAG_CACHE_TTL_MS = REPLICATION_LAG_CACHE_TTL_SECONDS * 1000
 
 type ReplicationStatus = 'ok' | 'lagging' | 'unknown'
 
@@ -21,6 +23,13 @@ interface ReplicationLagStatus {
   status: ReplicationStatus
   max_lag_seconds: number | null
 }
+
+interface ReplicationLagCacheEntry extends ReplicationLagStatus {
+  expiresAt: number
+}
+
+const replicationLagMemoryCache = new Map<string, ReplicationLagCacheEntry>()
+const replicationLagInflight = new Map<string, Promise<ReplicationLagStatus>>()
 
 const PLAN_EXCEEDED_COLUMNS: Record<'mau' | 'storage' | 'bandwidth', string> = {
   mau: 'mau_exceeded',
@@ -88,6 +97,38 @@ function fixSupabaseHost(host: string): string {
   return host
 }
 
+function getReplicationLagCacheKey(c: Context): string {
+  return String(c.get('databaseSource') ?? c.res.headers.get('X-Database-Source') ?? 'unknown')
+}
+
+function getFreshReplicationLagMemoryEntry(cacheKey: string, now = Date.now()): ReplicationLagStatus | null {
+  const cached = replicationLagMemoryCache.get(cacheKey)
+  if (!cached)
+    return null
+  if (cached.expiresAt <= now) {
+    replicationLagMemoryCache.delete(cacheKey)
+    return null
+  }
+  return {
+    status: cached.status,
+    max_lag_seconds: cached.max_lag_seconds,
+  }
+}
+
+function setReplicationLagMemoryEntry(cacheKey: string, status: ReplicationLagStatus, expiresAt = Date.now() + REPLICATION_LAG_CACHE_TTL_MS) {
+  replicationLagMemoryCache.set(cacheKey, {
+    ...status,
+    expiresAt,
+  })
+}
+
+function toReplicationLagSeconds(value: unknown): number | null {
+  if (value === null || value === undefined)
+    return null
+  const lagSeconds = Number(value)
+  return Number.isFinite(lagSeconds) ? lagSeconds : null
+}
+
 /**
  * Query replication lag from the REPLICA database using pg_stat_subscription.
  * Uses the existing pool - no new connections.
@@ -102,9 +143,7 @@ async function queryReplicaLag(c: Context, pool: Pool): Promise<ReplicationLagSt
     `
 
     const result = await pool.query(query)
-    const lagSeconds = result.rows[0]?.lag_seconds
-      ? Number(result.rows[0].lag_seconds)
-      : null
+    const lagSeconds = toReplicationLagSeconds(result.rows[0]?.lag_seconds)
 
     let status: ReplicationStatus = 'unknown'
     if (lagSeconds !== null) {
@@ -127,12 +166,53 @@ async function queryReplicaLag(c: Context, pool: Pool): Promise<ReplicationLagSt
   }
 }
 
+async function getCachedReplicaLag(c: Context, pool: Pool): Promise<ReplicationLagStatus> {
+  const cacheKey = getReplicationLagCacheKey(c)
+  const memoryEntry = getFreshReplicationLagMemoryEntry(cacheKey)
+  if (memoryEntry)
+    return memoryEntry
+
+  const existingQuery = replicationLagInflight.get(cacheKey)
+  if (existingQuery)
+    return existingQuery
+
+  const cacheHelper = new CacheHelper(c)
+  const cacheRequest = cacheHelper.buildRequest('/cache/replication-lag', { source: cacheKey })
+  const cachedEntry = await cacheHelper.matchJson<ReplicationLagCacheEntry>(cacheRequest)
+
+  if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
+    const cachedStatus = {
+      status: cachedEntry.status,
+      max_lag_seconds: cachedEntry.max_lag_seconds,
+    }
+    setReplicationLagMemoryEntry(cacheKey, cachedStatus, cachedEntry.expiresAt)
+    return cachedStatus
+  }
+
+  const existingQueryAfterCache = replicationLagInflight.get(cacheKey)
+  if (existingQueryAfterCache)
+    return existingQueryAfterCache
+
+  const query = queryReplicaLag(c, pool)
+    .then(async (status) => {
+      const expiresAt = Date.now() + REPLICATION_LAG_CACHE_TTL_MS
+      setReplicationLagMemoryEntry(cacheKey, status, expiresAt)
+      await cacheHelper.putJson(cacheRequest, { ...status, expiresAt }, REPLICATION_LAG_CACHE_TTL_SECONDS)
+      return status
+    })
+    .finally(() => {
+      replicationLagInflight.delete(cacheKey)
+    })
+
+  replicationLagInflight.set(cacheKey, query)
+  return query
+}
+
 /**
- * Set replication lag header on the response.
- * Uses the provided pool to query pg_stat_subscription on the replica.
+ * Set replication lag headers on hot plugin responses using a 60-second cache.
  */
 export async function setReplicationLagHeader(c: Context, pool: Pool): Promise<void> {
-  const status = await queryReplicaLag(c, pool)
+  const status = await getCachedReplicaLag(c, pool)
   safeSetResponseHeader(c, 'X-Replication-Lag', status.status)
   if (status.max_lag_seconds !== null) {
     safeSetResponseHeader(c, 'X-Replication-Lag-Seconds', String(Math.round(status.max_lag_seconds)))
