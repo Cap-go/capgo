@@ -157,19 +157,13 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /apikey with atomic bindings', () => {
   })
 
   it('rolls back the API key when a binding fails', async () => {
-    const supabase = getSupabaseClient()
-
-    // Count keys before
-    const { data: keysBefore } = await supabase
-      .from('apikeys')
-      .select('id')
-      .eq('user_id', USER_ID)
+    const uniqueKeyName = `rollback-test-key-${TEST_ID.slice(0, 8)}-${Date.now()}`
 
     const response = await fetch(getEndpointUrl('/apikey'), {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: `rollback-test-key-${TEST_ID.slice(0, 8)}`,
+        name: uniqueKeyName,
         limited_to_orgs: [TEST_ORG_ID],
         bindings: [
           {
@@ -183,13 +177,15 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /apikey with atomic bindings', () => {
 
     expect(response.status).not.toBe(200)
 
-    // Verify no new key was created (rollback worked)
-    const { data: keysAfter } = await supabase
+    // Verify the specific key was rolled back (not present in DB)
+    const supabase = getSupabaseClient()
+    const { data: matchingKeys } = await supabase
       .from('apikeys')
       .select('id')
       .eq('user_id', USER_ID)
+      .eq('name', uniqueKeyName)
 
-    expect(keysAfter?.length).toBe(keysBefore?.length)
+    expect(matchingKeys).toHaveLength(0)
   })
 
   it('creates multiple bindings in a single call', async () => {

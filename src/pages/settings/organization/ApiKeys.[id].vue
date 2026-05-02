@@ -404,38 +404,6 @@ async function copyCreatedKey() {
   }
 }
 
-async function showPartialFailureKeyModal(plainKey: string, isHashed: boolean) {
-  createdKeyDialogMode.value = isHashed ? 'partial-failure-hashed' : 'partial-failure-plain'
-  createdPlainKey.value = plainKey
-  dialogStore.openDialog({
-    id: 'org-apikey-created',
-    title: t('api-key-create-partial-failure-title'),
-    size: 'lg',
-    preventAccidentalClose: true,
-    buttons: [
-      {
-        text: t('ok'),
-        role: 'primary',
-      },
-    ],
-  })
-
-  await dialogStore.onDialogDismiss()
-  createdPlainKey.value = ''
-  createdKeyDialogMode.value = 'success'
-}
-
-async function rollbackCreatedApiKey(apikeyId: number | string | null) {
-  if (!apikeyId)
-    return null
-
-  const { error } = await supabase.functions.invoke(`apikey/${apikeyId}`, {
-    method: 'DELETE',
-  })
-
-  return error ?? null
-}
-
 function validateApiKeyForm() {
   if (!editName.value.trim()) {
     toast.error(t('please-enter-api-key-name'))
@@ -568,30 +536,6 @@ async function createApiKeyRecord(orgId: string) {
     throw new Error(t('failed-to-create-api-key'))
 
   return createdApiKey
-}
-
-async function assignBindingsForNewApiKey(orgId: string, principalId: string) {
-  if (selectedOrgRole.value)
-    await createOrgRoleBinding(principalId, orgId, selectedOrgRole.value)
-
-  for (const [appId, roleName] of Object.entries(pendingAppBindings.value)) {
-    if (!roleName)
-      continue
-    await createAppRoleBinding(principalId, orgId, appId, roleName)
-  }
-}
-
-async function rollbackCreatedApiKeyAfterBindingFailure(
-  bindingError: unknown,
-  createdApiKey: CreatedApiKeyResult,
-) {
-  const rollbackError = await rollbackCreatedApiKey(createdApiKey.id)
-  if (rollbackError) {
-    console.error('Failed to rollback API key after binding error:', rollbackError)
-    if (createdApiKey.key)
-      await showPartialFailureKeyModal(createdApiKey.key, createAsHashed.value)
-  }
-  throw bindingError
 }
 
 async function finalizeCreatedApiKey(createdPlainKey: string | null) {

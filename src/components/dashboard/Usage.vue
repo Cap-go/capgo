@@ -248,8 +248,8 @@ function syncLocalOrgRefreshState(state: { stats_refresh_requested_at: string | 
   localOrgStatsRefreshRequestedAt.value = state.stats_refresh_requested_at ?? null
 
   if (effectiveOrganization.value) {
-    effectiveOrganization.value.stats_updated_at = state.stats_updated_at
-    effectiveOrganization.value.stats_refresh_requested_at = state.stats_refresh_requested_at
+    effectiveOrganization.value.stats_updated_at = state.stats_updated_at ?? effectiveOrganization.value.stats_updated_at
+    effectiveOrganization.value.stats_refresh_requested_at = state.stats_refresh_requested_at ?? effectiveOrganization.value.stats_refresh_requested_at
   }
 }
 

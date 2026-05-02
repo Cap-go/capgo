@@ -1653,6 +1653,7 @@ describe('hashed API key enforcement integration', () => {
       method: 'POST',
       body: JSON.stringify({
         name: 'test-hashed-key-for-find',
+        mode: 'all',
         hashed: true,
       }),
     })
@@ -1704,6 +1705,7 @@ describe('hashed API key enforcement integration', () => {
       method: 'POST',
       body: JSON.stringify({
         name: 'test-verify-hash-key',
+        mode: 'all',
         hashed: true,
       }),
     })

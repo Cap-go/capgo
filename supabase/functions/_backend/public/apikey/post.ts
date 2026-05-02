@@ -1,5 +1,7 @@
+import type { CreateBindingParams } from '../../private/role_bindings.ts'
 import type { AuthInfo } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
+import { createRoleBindingForPrincipal } from '../../private/role_bindings.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
@@ -7,8 +9,6 @@ import { closeClient, getDrizzleClient, getPgClient } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { resolveApikeyPolicyOrgIds, supabaseAdmin, supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
 import { Constants } from '../../utils/supabase.types.ts'
-import { createRoleBindingForPrincipal } from '../../private/role_bindings.ts'
-import type { CreateBindingParams } from '../../private/role_bindings.ts'
 
 interface BindingInput {
   role_name: string
@@ -168,7 +168,9 @@ app.post('/', middlewareV2(['all']), async (c) => {
       for (const bindingOrgId of bindingOrgIds) {
         if (!(await checkPermission(c, 'org.update_user_roles', { orgId: bindingOrgId }))) {
           // Rollback the created key
-          await supabase.from('apikeys').delete().eq('id', apikeyData.id)
+          const { error: rollbackError } = await supabase.from('apikeys').delete().eq('id', apikeyData.id)
+          if (rollbackError)
+            cloudlogErr({ requestId: c.get('requestId'), message: 'apikey_rollback_failed', rollbackError })
           throw quickError(403, 'forbidden_binding', `Forbidden - Admin rights required for org ${bindingOrgId}`)
         }
       }
@@ -208,7 +210,9 @@ app.post('/', middlewareV2(['all']), async (c) => {
             binding,
             error: result.error,
           })
-          await supabase.from('apikeys').delete().eq('id', apikeyData.id)
+          const { error: rollbackError } = await supabase.from('apikeys').delete().eq('id', apikeyData.id)
+          if (rollbackError)
+            cloudlogErr({ requestId: c.get('requestId'), message: 'apikey_rollback_failed', rollbackError })
           throw quickError(result.status as any, 'binding_failed', result.error)
         }
 
@@ -223,8 +227,8 @@ app.post('/', middlewareV2(['all']), async (c) => {
       })
     }
     catch (error: any) {
-      // Re-throw our own quickError/simpleError
-      if (error?.status || error?.code) {
+      // Re-throw our own quickError/simpleError (HTTP errors thrown above)
+      if (error?.status) {
         throw error
       }
       // Unexpected error: rollback the key
@@ -233,7 +237,9 @@ app.post('/', middlewareV2(['all']), async (c) => {
         message: 'apikey_bindings_unexpected_error',
         error,
       })
-      await supabase.from('apikeys').delete().eq('id', apikeyData.id)
+      const { error: rollbackError } = await supabase.from('apikeys').delete().eq('id', apikeyData.id)
+      if (rollbackError)
+        cloudlogErr({ requestId: c.get('requestId'), message: 'apikey_rollback_failed', rollbackError })
       throw simpleError('binding_creation_failed', 'Failed to create role bindings for the API key')
     }
     finally {
