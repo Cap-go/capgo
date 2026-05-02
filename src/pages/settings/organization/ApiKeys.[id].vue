@@ -415,6 +415,16 @@ function validateApiKeyForm() {
     return false
   }
 
+  // In create mode, at least one binding (org role or app binding) is required
+  if (isCreateMode.value) {
+    const hasOrgRole = !!selectedOrgRole.value
+    const hasAppBindings = configuredAppIds.value.length > 0
+    if (!hasOrgRole && !hasAppBindings) {
+      toast.error(t('select-at-least-one-role'))
+      return false
+    }
+  }
+
   return true
 }
 
