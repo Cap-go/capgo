@@ -5,11 +5,11 @@ import { Pool } from 'pg'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { validatePrincipalAccess, validateRoleScope } from '../supabase/functions/_backend/private/role_bindings.ts'
 import { getDrizzleClient } from '../supabase/functions/_backend/utils/pg.ts'
-import { getAuthHeaders, getEndpointUrl, getSupabaseClient, POSTGRES_URL, USER_ID, USER_ID_2 } from './test-utils.ts'
+import { getAuthHeaders, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, POSTGRES_URL, USER_ID, USER_ID_2, USER_PASSWORD } from './test-utils.ts'
 
 let authHeaders: Record<string, string>
+let user2AuthHeaders: Record<string, string>
 const USE_CLOUDFLARE = env.USE_CLOUDFLARE_WORKERS === 'true'
-const ADMIN_USER_ID = 'c591b04e-cf29-4945-b9a0-776d0672061a'
 
 interface RoleBindingFixture {
   attackerOrgId: string
@@ -127,6 +127,7 @@ beforeAll(async () => {
     return
 
   authHeaders = await getAuthHeaders()
+  user2AuthHeaders = await getAuthHeadersForCredentials('test2@capgo.app', USER_PASSWORD)
 })
 
 // /private/role_bindings is currently served by the Supabase private functions stack, not the Cloudflare API worker.
@@ -219,14 +220,13 @@ describe.skipIf(USE_CLOUDFLARE)('[PATCH] /private/role_bindings/:binding_id', ()
       const { data: roles, error: rolesError } = await supabase
         .from('roles')
         .select('id, name')
-        .in('name', ['org_super_admin', 'org_admin'])
+        .eq('name', 'org_super_admin')
       if (rolesError)
         throw rolesError
 
-      const superAdminRoleId = roles?.find(role => role.name === 'org_super_admin')?.id
-      const adminRoleId = roles?.find(role => role.name === 'org_admin')?.id
-      if (!superAdminRoleId || !adminRoleId)
-        throw new Error('Expected RBAC org roles to exist')
+      const superAdminRoleId = roles?.[0]?.id
+      if (!superAdminRoleId)
+        throw new Error('Expected RBAC org_super_admin role to exist')
 
       const { error: orgError } = await supabase.from('orgs').insert({
         id: orgId,
@@ -240,7 +240,6 @@ describe.skipIf(USE_CLOUDFLARE)('[PATCH] /private/role_bindings/:binding_id', ()
 
       const { error: membersError } = await supabase.from('org_users').insert([
         { org_id: orgId, user_id: USER_ID, user_right: 'admin' },
-        { org_id: orgId, user_id: ADMIN_USER_ID, user_right: 'super_admin' },
       ])
       if (membersError)
         throw membersError
@@ -276,6 +275,48 @@ describe.skipIf(USE_CLOUDFLARE)('[PATCH] /private/role_bindings/:binding_id', ()
 
       expect(unchangedError).toBeNull()
       expect(unchangedBinding?.role_id).toBe(superAdminRoleId)
+    }
+    finally {
+      await supabase.from('orgs').delete().eq('id', orgId)
+    }
+  })
+
+  it('returns a conflict when the last org_super_admin binding cannot be demoted', async () => {
+    const id = randomUUID()
+    const orgId = randomUUID()
+    const supabase = getSupabaseClient()
+
+    try {
+      const { error: orgError } = await supabase.from('orgs').insert({
+        id: orgId,
+        created_by: USER_ID_2,
+        name: `Last Super Admin API Org ${id}`,
+        management_email: `last-super-admin-api-${id}@capgo.app`,
+        use_new_rbac: true,
+      })
+      if (orgError)
+        throw orgError
+
+      const { data: targetBinding, error: bindingError } = await supabase
+        .from('role_bindings')
+        .select('id')
+        .eq('org_id', orgId)
+        .eq('principal_type', 'user')
+        .eq('principal_id', USER_ID_2)
+        .eq('scope_type', 'org')
+        .single()
+      if (bindingError)
+        throw bindingError
+
+      const response = await fetch(getEndpointUrl(`/private/role_bindings/${targetBinding.id}`), {
+        method: 'PATCH',
+        headers: user2AuthHeaders,
+        body: JSON.stringify({ role_name: 'org_member' }),
+      })
+      const data = await response.json() as { error: string }
+
+      expect(response.status).toBe(409)
+      expect(data.error).toBe('Cannot demote the last org_super_admin')
     }
     finally {
       await supabase.from('orgs').delete().eq('id', orgId)

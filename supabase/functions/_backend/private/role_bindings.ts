@@ -646,22 +646,38 @@ app.patch(
         return c.json({ error: 'Cannot assign a role with higher privileges than your own' }, 403)
       }
 
-      // Prevent privilege escalation: caller cannot modify a binding for a role with higher priority than their own
-      const [existingRole] = await drizzle
-        .select({ priority_rank: schema.roles.priority_rank })
-        .from(schema.roles)
-        .where(eq(schema.roles.id, binding.role_id!))
-        .limit(1)
+      const updateResult = await pgClient.query<RoleBindingRecord>(`
+        UPDATE public.role_bindings AS rb
+        SET role_id = $2::uuid
+        FROM public.roles AS bound_role
+        WHERE rb.id = $1::uuid
+          AND rb.org_id IS NOT DISTINCT FROM $4::uuid
+          AND rb.app_id IS NOT DISTINCT FROM $5::uuid
+          AND rb.bundle_id IS NOT DISTINCT FROM $6::bigint
+          AND rb.channel_id IS NOT DISTINCT FROM $7::uuid
+          AND rb.scope_type = $8::text
+          AND rb.principal_type = $9::text
+          AND rb.principal_id = $10::uuid
+          AND rb.role_id = bound_role.id
+          AND bound_role.priority_rank <= $3::integer
+        RETURNING rb.*
+      `, [
+        bindingId,
+        role.id,
+        callerMaxRank,
+        binding.org_id,
+        binding.app_id,
+        binding.bundle_id,
+        binding.channel_id,
+        binding.scope_type,
+        binding.principal_type,
+        binding.principal_id,
+      ])
 
-      if (existingRole && existingRole.priority_rank > callerMaxRank) {
+      const updated = updateResult.rows[0]
+      if (!updated) {
         return c.json({ error: 'Cannot modify a binding for a role with higher privileges than your own' }, 403)
       }
-
-      const [updated] = await drizzle
-        .update(schema.role_bindings)
-        .set({ role_id: role.id })
-        .where(eq(schema.role_bindings.id, bindingId))
-        .returning()
 
       cloudlog({
         requestId: c.get('requestId'),
@@ -686,6 +702,11 @@ app.patch(
         bindingId,
         error,
       })
+      const errorMessage = error instanceof Error ? error.message : String(error)
+      const errorCode = typeof error === 'object' && error !== null && 'code' in error ? (error as { code?: string }).code : undefined
+      if (errorMessage.includes('CANNOT_DEMOTE_LAST_SUPER_ADMIN_BINDING') || errorCode === 'CANNOT_DEMOTE_LAST_SUPER_ADMIN_BINDING') {
+        return c.json({ error: 'Cannot demote the last org_super_admin' }, 409)
+      }
       return c.json({ error: 'Internal server error' }, 500)
     }
     finally {
