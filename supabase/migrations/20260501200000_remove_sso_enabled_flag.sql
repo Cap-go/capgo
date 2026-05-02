@@ -76,9 +76,8 @@ BEGIN
       AND sp.status = 'active'
     ) INTO has_sso;
 
-    -- Skip org creation for SSO-managed domains: genuine SAML logins and email signups
-    -- on domains with an active SSO provider both get assigned via provision-user.ts.
-    IF NOT ((user_provider ~ '^sso:' OR user_provider = 'email') AND has_sso) THEN
+    -- Skip org creation only for genuine SAML SSO logins on SSO-managed domains.
+    IF NOT (user_provider ~ '^sso:' AND has_sso) THEN
       INSERT INTO public.orgs (created_by, name, management_email) values (NEW.id, format('%s organization', NEW.first_name), NEW.email) RETURNING * INTO org_record;
     END IF;
 
