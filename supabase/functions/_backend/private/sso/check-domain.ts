@@ -5,7 +5,7 @@ import { CacheHelper } from '../../utils/cache.ts'
 import { createHono, parseBody, quickError, simpleError, useCors } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
 import { getClientIP } from '../../utils/rate_limit.ts'
-import { emptySupabase } from '../../utils/supabase.ts'
+import { supabaseAdmin } from '../../utils/supabase.ts'
 import { version } from '../../utils/version.ts'
 
 // Rate limiting: 10 requests per minute per IP
@@ -69,7 +69,7 @@ app.post('/', async (c) => {
     return quickError(400, 'invalid_email', 'Email must contain a domain')
   }
 
-  const supabase = emptySupabase(c)
+  const supabase = supabaseAdmin(c)
   const requestId = c.get('requestId')
 
   try {
@@ -112,8 +112,6 @@ app.post('/', async (c) => {
     return c.json({
       has_sso: true,
       enforce_sso: enforcementRow?.enforce_sso === true,
-      provider_id: legacyRow?.provider_id,
-      org_id: enforcementRow?.org_id ?? legacyRow?.org_id,
     })
   }
   catch (err) {

@@ -3,8 +3,7 @@ import { defaultApiHost, useSupabase } from '~/services/supabase'
 
 export interface CheckDomainResponse {
   has_sso: boolean
-  provider_id?: string
-  org_id?: string
+  enforce_sso?: boolean
 }
 
 export function useSSORouting() {

@@ -1,6 +1,6 @@
 import { createHono, getClaimsFromJWT, middlewareAuth, parseBody, quickError, useCors } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
-import { supabaseWithAuth } from '../../utils/supabase.ts'
+import { supabaseAdmin, supabaseWithAuth } from '../../utils/supabase.ts'
 import { version } from '../../utils/version.ts'
 
 export const app = createHono('', version)
@@ -49,10 +49,10 @@ app.post('/', middlewareAuth, async (c) => {
     return quickError(400, 'invalid_email', 'Email must contain a domain')
   }
 
-  const supabase = supabaseWithAuth(c, auth)
+  const ssoLookupClient = supabaseAdmin(c)
 
   try {
-    const { data: providerData, error: providerError } = await (supabase.rpc as any)('check_domain_sso', { p_domain: domain })
+    const { data: providerData, error: providerError } = await (ssoLookupClient.rpc as any)('check_domain_sso', { p_domain: domain })
     if (providerError) {
       cloudlog({ requestId, context: 'check_enforcement - provider query error', error: providerError.message, domain })
       return quickError(500, 'query_error', 'Failed to check SSO enforcement')
@@ -63,7 +63,7 @@ app.post('/', middlewareAuth, async (c) => {
       return c.json({ allowed: true })
     }
 
-    const { data: enforcementData, error: enforcementError } = await (supabase.rpc as any)('get_sso_enforcement_by_domain', {
+    const { data: enforcementData, error: enforcementError } = await (ssoLookupClient.rpc as any)('get_sso_enforcement_by_domain', {
       p_domain: domain,
     })
 
@@ -87,7 +87,8 @@ app.post('/', middlewareAuth, async (c) => {
     }
 
     // SSO is enforced - check if user is super_admin (break-glass bypass)
-    const { data: roleData, error: roleError } = await (supabase.from as any)('org_users')
+    const userClient = supabaseWithAuth(c, auth)
+    const { data: roleData, error: roleError } = await (userClient.from as any)('org_users')
       .select('user_right')
       .eq('org_id', orgId)
       .eq('user_id', userId)
