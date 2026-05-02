@@ -9,6 +9,7 @@ import { getAuthHeaders, getEndpointUrl, getSupabaseClient, POSTGRES_URL, USER_I
 
 let authHeaders: Record<string, string>
 const USE_CLOUDFLARE = env.USE_CLOUDFLARE_WORKERS === 'true'
+const ADMIN_USER_ID = 'c591b04e-cf29-4945-b9a0-776d0672061a'
 
 interface RoleBindingFixture {
   attackerOrgId: string
@@ -208,6 +209,80 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /private/role_bindings', () => {
   })
 })
 
+describe.skipIf(USE_CLOUDFLARE)('[PATCH] /private/role_bindings/:binding_id', () => {
+  it('rejects org_admin demotion of an existing org_super_admin binding', async () => {
+    const id = randomUUID()
+    const orgId = randomUUID()
+    const supabase = getSupabaseClient()
+
+    try {
+      const { data: roles, error: rolesError } = await supabase
+        .from('roles')
+        .select('id, name')
+        .in('name', ['org_super_admin', 'org_admin'])
+      if (rolesError)
+        throw rolesError
+
+      const superAdminRoleId = roles?.find(role => role.name === 'org_super_admin')?.id
+      const adminRoleId = roles?.find(role => role.name === 'org_admin')?.id
+      if (!superAdminRoleId || !adminRoleId)
+        throw new Error('Expected RBAC org roles to exist')
+
+      const { error: orgError } = await supabase.from('orgs').insert({
+        id: orgId,
+        created_by: USER_ID_2,
+        name: `Role Binding Rank Org ${id}`,
+        management_email: `role-binding-rank-${id}@capgo.app`,
+        use_new_rbac: true,
+      })
+      if (orgError)
+        throw orgError
+
+      const { error: membersError } = await supabase.from('org_users').insert([
+        { org_id: orgId, user_id: USER_ID, user_right: 'admin' },
+        { org_id: orgId, user_id: ADMIN_USER_ID, user_right: 'super_admin' },
+      ])
+      if (membersError)
+        throw membersError
+
+      const { data: targetBinding, error: bindingError } = await supabase
+        .from('role_bindings')
+        .select('id, role_id')
+        .eq('org_id', orgId)
+        .eq('principal_type', 'user')
+        .eq('principal_id', USER_ID_2)
+        .eq('scope_type', 'org')
+        .single()
+      if (bindingError)
+        throw bindingError
+
+      expect(targetBinding.role_id).toBe(superAdminRoleId)
+
+      const response = await fetch(getEndpointUrl(`/private/role_bindings/${targetBinding.id}`), {
+        method: 'PATCH',
+        headers: authHeaders,
+        body: JSON.stringify({ role_name: 'org_member' }),
+      })
+      const data = await response.json() as { error: string }
+
+      expect(response.status).toBe(403)
+      expect(data.error).toBe('Cannot modify a binding for a role with higher privileges than your own')
+
+      const { data: unchangedBinding, error: unchangedError } = await supabase
+        .from('role_bindings')
+        .select('role_id')
+        .eq('id', targetBinding.id)
+        .single()
+
+      expect(unchangedError).toBeNull()
+      expect(unchangedBinding?.role_id).toBe(superAdminRoleId)
+    }
+    finally {
+      await supabase.from('orgs').delete().eq('id', orgId)
+    }
+  })
+})
+
 describe('private role bindings helpers', () => {
   let pool: Pool
   let client: PoolClient
@@ -402,5 +477,40 @@ describe('private role bindings helpers', () => {
       status: 400,
       error: 'Role scope_type does not match binding scope',
     })
+  })
+
+  it('blocks demoting the last org_super_admin binding at the database layer', async () => {
+    const id = randomUUID()
+    const orgId = randomUUID()
+
+    await query(`
+      INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
+      VALUES ($1::uuid, $2, $3, $4::uuid, true)
+    `, [orgId, `Last Super Admin Demotion Org ${id}`, `last-super-admin-demotion-${id}@capgo.app`, USER_ID])
+
+    const bindingResult = await query(`
+      SELECT rb.id, member_role.id AS member_role_id
+      FROM public.role_bindings rb
+      INNER JOIN public.roles bound_role
+        ON bound_role.id = rb.role_id
+      CROSS JOIN public.roles member_role
+      WHERE rb.org_id = $1::uuid
+        AND rb.principal_type = public.rbac_principal_user()
+        AND rb.principal_id = $2::uuid
+        AND rb.scope_type = public.rbac_scope_org()
+        AND bound_role.name = public.rbac_role_org_super_admin()
+        AND member_role.name = public.rbac_role_org_member()
+      LIMIT 1
+    `, [orgId, USER_ID])
+
+    expect(bindingResult.rowCount).toBe(1)
+
+    await expect(query(`
+      UPDATE public.role_bindings
+      SET role_id = $2::uuid
+      WHERE id = $1::uuid
+    `, [bindingResult.rows[0].id, bindingResult.rows[0].member_role_id]))
+      .rejects
+      .toThrow('CANNOT_DEMOTE_LAST_SUPER_ADMIN_BINDING')
   })
 })

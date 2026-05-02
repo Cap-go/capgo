@@ -646,6 +646,17 @@ app.patch(
         return c.json({ error: 'Cannot assign a role with higher privileges than your own' }, 403)
       }
 
+      // Prevent privilege escalation: caller cannot modify a binding for a role with higher priority than their own
+      const [existingRole] = await drizzle
+        .select({ priority_rank: schema.roles.priority_rank })
+        .from(schema.roles)
+        .where(eq(schema.roles.id, binding.role_id!))
+        .limit(1)
+
+      if (existingRole && existingRole.priority_rank > callerMaxRank) {
+        return c.json({ error: 'Cannot modify a binding for a role with higher privileges than your own' }, 403)
+      }
+
       const [updated] = await drizzle
         .update(schema.role_bindings)
         .set({ role_id: role.id })

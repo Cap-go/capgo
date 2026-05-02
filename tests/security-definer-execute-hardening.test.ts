@@ -30,6 +30,7 @@ const SERVICE_ONLY_PROCS = [
   'public.get_apikey()',
   'public.noupdate()',
   'public.prevent_last_super_admin_binding_delete()',
+  'public.prevent_last_super_admin_binding_update()',
   'public.resync_org_user_role_bindings(uuid, uuid)',
   'public.sanitize_apps_text_fields()',
   'public.sanitize_orgs_text_fields()',
