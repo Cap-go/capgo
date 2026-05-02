@@ -1574,7 +1574,6 @@ CREATE OR REPLACE FUNCTION "public"."check_domain_sso"("p_domain" "text") RETURN
     JOIN public.orgs AS o ON o.id = sp.org_id
     WHERE sp."domain" = lower(btrim(p_domain))
       AND sp.status = 'active'
-      AND o.sso_enabled = true
     LIMIT 1;
 $$;
 
@@ -3846,6 +3845,39 @@ $$;
 ALTER FUNCTION "public"."force_valid_user_id_on_app"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."generate_org_on_user_create"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  org_record record;
+  has_sso boolean;
+  user_provider text;
+BEGIN
+    SELECT raw_app_meta_data->>'provider'
+    INTO user_provider
+    FROM auth.users
+    WHERE id = NEW.id;
+
+    SELECT EXISTS (
+      SELECT 1 FROM public.sso_providers sp
+      JOIN public.orgs o ON o.id = sp.org_id
+      WHERE sp.domain = lower(btrim(split_part(NEW.email, '@', 2)))
+      AND sp.status = 'active'
+    ) INTO has_sso;
+
+    -- Skip org creation only for genuine SAML SSO logins on SSO-managed domains.
+    IF NOT (user_provider ~ '^sso:' AND has_sso) THEN
+      INSERT INTO public.orgs (created_by, name, management_email) values (NEW.id, format('%s organization', NEW.first_name), NEW.email) RETURNING * INTO org_record;
+    END IF;
+
+    RETURN NEW;
+END $$;
+
+
+ALTER FUNCTION "public"."generate_org_on_user_create"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."generate_org_user_on_org_create"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -5903,7 +5935,7 @@ COMMENT ON FUNCTION "public"."get_orgs_v6"("userid" "uuid") IS 'Get organization
 
 
 
-CREATE OR REPLACE FUNCTION "public"."get_orgs_v7"() RETURNS TABLE("gid" "uuid", "created_by" "uuid", "created_at" timestamp with time zone, "logo" "text", "website" "text", "name" "text", "role" character varying, "paying" boolean, "trial_left" integer, "can_use_more" boolean, "is_canceled" boolean, "app_count" bigint, "subscription_start" timestamp with time zone, "subscription_end" timestamp with time zone, "management_email" "text", "is_yearly" boolean, "stats_updated_at" timestamp without time zone, "stats_refresh_requested_at" timestamp without time zone, "next_stats_update_at" timestamp with time zone, "credit_available" numeric, "credit_total" numeric, "credit_next_expiration" timestamp with time zone, "enforcing_2fa" boolean, "2fa_has_access" boolean, "enforce_hashed_api_keys" boolean, "password_policy_config" "jsonb", "password_has_access" boolean, "require_apikey_expiration" boolean, "max_apikey_expiration_days" integer, "enforce_encrypted_bundles" boolean, "required_encryption_key" character varying, "use_new_rbac" boolean, "sso_enabled" boolean)
+CREATE OR REPLACE FUNCTION "public"."get_orgs_v7"() RETURNS TABLE("gid" "uuid", "created_by" "uuid", "created_at" timestamp with time zone, "logo" "text", "website" "text", "name" "text", "role" character varying, "paying" boolean, "trial_left" integer, "can_use_more" boolean, "is_canceled" boolean, "app_count" bigint, "subscription_start" timestamp with time zone, "subscription_end" timestamp with time zone, "management_email" "text", "is_yearly" boolean, "stats_updated_at" timestamp without time zone, "stats_refresh_requested_at" timestamp without time zone, "next_stats_update_at" timestamp with time zone, "credit_available" numeric, "credit_total" numeric, "credit_next_expiration" timestamp with time zone, "enforcing_2fa" boolean, "2fa_has_access" boolean, "enforce_hashed_api_keys" boolean, "password_policy_config" "jsonb", "password_has_access" boolean, "require_apikey_expiration" boolean, "max_apikey_expiration_days" integer, "enforce_encrypted_bundles" boolean, "required_encryption_key" character varying, "use_new_rbac" boolean)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
@@ -5956,7 +5988,7 @@ $$;
 ALTER FUNCTION "public"."get_orgs_v7"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."get_orgs_v7"("userid" "uuid") RETURNS TABLE("gid" "uuid", "created_by" "uuid", "created_at" timestamp with time zone, "logo" "text", "website" "text", "name" "text", "role" character varying, "paying" boolean, "trial_left" integer, "can_use_more" boolean, "is_canceled" boolean, "app_count" bigint, "subscription_start" timestamp with time zone, "subscription_end" timestamp with time zone, "management_email" "text", "is_yearly" boolean, "stats_updated_at" timestamp without time zone, "stats_refresh_requested_at" timestamp without time zone, "next_stats_update_at" timestamp with time zone, "credit_available" numeric, "credit_total" numeric, "credit_next_expiration" timestamp with time zone, "enforcing_2fa" boolean, "2fa_has_access" boolean, "enforce_hashed_api_keys" boolean, "password_policy_config" "jsonb", "password_has_access" boolean, "require_apikey_expiration" boolean, "max_apikey_expiration_days" integer, "enforce_encrypted_bundles" boolean, "required_encryption_key" character varying, "use_new_rbac" boolean, "sso_enabled" boolean)
+CREATE OR REPLACE FUNCTION "public"."get_orgs_v7"("userid" "uuid") RETURNS TABLE("gid" "uuid", "created_by" "uuid", "created_at" timestamp with time zone, "logo" "text", "website" "text", "name" "text", "role" character varying, "paying" boolean, "trial_left" integer, "can_use_more" boolean, "is_canceled" boolean, "app_count" bigint, "subscription_start" timestamp with time zone, "subscription_end" timestamp with time zone, "management_email" "text", "is_yearly" boolean, "stats_updated_at" timestamp without time zone, "stats_refresh_requested_at" timestamp without time zone, "next_stats_update_at" timestamp with time zone, "credit_available" numeric, "credit_total" numeric, "credit_next_expiration" timestamp with time zone, "enforcing_2fa" boolean, "2fa_has_access" boolean, "enforce_hashed_api_keys" boolean, "password_policy_config" "jsonb", "password_has_access" boolean, "require_apikey_expiration" boolean, "max_apikey_expiration_days" integer, "enforce_encrypted_bundles" boolean, "required_encryption_key" character varying, "use_new_rbac" boolean)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
@@ -6137,8 +6169,7 @@ BEGIN
     o.max_apikey_expiration_days,
     o.enforce_encrypted_bundles,
     o.required_encryption_key,
-    o.use_new_rbac,
-    o.sso_enabled
+    o.use_new_rbac
   FROM public.orgs o
   JOIN user_orgs uo ON uo.org_id = o.id
   LEFT JOIN public.org_users ou ON ou.user_id = userid AND o.id = ou.org_id
@@ -6560,7 +6591,6 @@ CREATE OR REPLACE FUNCTION "public"."get_sso_enforcement_by_domain"("p_domain" "
   JOIN "public"."orgs" o ON o.id = sp.org_id
   WHERE sp.domain = lower(btrim(p_domain))
     AND sp.status = 'active'
-    AND o.sso_enabled = true
   LIMIT 1;
 $$;
 
@@ -13752,21 +13782,28 @@ CREATE OR REPLACE FUNCTION "public"."total_bundle_storage_bytes"() RETURNS bigin
     SET "search_path" TO ''
     AS $$
   SELECT (
-    -- Sum of bundle sizes from app_versions_meta
+    -- Sum bundle sizes only for active app versions.
     COALESCE(
-      (SELECT SUM(size) FROM public.app_versions_meta),
+      (
+        SELECT SUM(avm.size)
+        FROM public.app_versions_meta avm
+        INNER JOIN public.app_versions av ON av.id = avm.id
+        WHERE av.deleted = false
+      ),
       0
     ) +
-    -- Sum of manifest file sizes for non-deleted versions
+    -- Sum manifest file sizes only for active app versions.
     COALESCE(
-      (SELECT SUM(m.file_size)
-       FROM public.manifest m
-       WHERE EXISTS (
-         SELECT 1
-         FROM public.app_versions av
-         WHERE av.id = m.app_version_id
-         AND av.deleted = false
-       )),
+      (
+        SELECT SUM(m.file_size)
+        FROM public.manifest m
+        WHERE EXISTS (
+          SELECT 1
+          FROM public.app_versions av
+          WHERE av.id = m.app_version_id
+            AND av.deleted = false
+        )
+      ),
       0
     )
   )::bigint;
@@ -13776,7 +13813,7 @@ $$;
 ALTER FUNCTION "public"."total_bundle_storage_bytes"() OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."total_bundle_storage_bytes"() IS 'Returns total storage in bytes including both bundle sizes (app_versions_meta.size) and manifest file sizes';
+COMMENT ON FUNCTION "public"."total_bundle_storage_bytes"() IS 'Returns active bundle storage in bytes including bundle sizes (app_versions_meta.size) and manifest file sizes for non-deleted app versions.';
 
 
 
@@ -15644,10 +15681,11 @@ CREATE TABLE IF NOT EXISTS "public"."orgs" (
     "required_encryption_key" character varying(21) DEFAULT NULL::character varying,
     "use_new_rbac" boolean DEFAULT true NOT NULL,
     "has_usage_credits" boolean DEFAULT false NOT NULL,
-    "sso_enabled" boolean DEFAULT false NOT NULL,
     "website" "text",
     "stats_refresh_requested_at" timestamp without time zone,
-    CONSTRAINT "orgs_password_policy_config_min_length_check" CHECK ((("password_policy_config" IS NULL) OR (("jsonb_typeof"("password_policy_config") = 'object'::"text") AND ((NOT ("password_policy_config" ? 'min_length'::"text")) OR (("jsonb_typeof"(("password_policy_config" -> 'min_length'::"text")) = 'number'::"text") AND ((("password_policy_config" ->> 'min_length'::"text"))::numeric = "trunc"((("password_policy_config" ->> 'min_length'::"text"))::numeric)) AND (((("password_policy_config" ->> 'min_length'::"text"))::numeric >= (6)::numeric) AND ((("password_policy_config" ->> 'min_length'::"text"))::numeric <= (72)::numeric)))))))
+    CONSTRAINT "orgs_max_apikey_expiration_days_valid" CHECK ((("max_apikey_expiration_days" IS NULL) OR (("max_apikey_expiration_days" >= 1) AND ("max_apikey_expiration_days" <= 365)))),
+    CONSTRAINT "orgs_password_policy_config_min_length_check" CHECK ((("password_policy_config" IS NULL) OR (("jsonb_typeof"("password_policy_config") = 'object'::"text") AND ((NOT ("password_policy_config" ? 'min_length'::"text")) OR (("jsonb_typeof"(("password_policy_config" -> 'min_length'::"text")) = 'number'::"text") AND ((("password_policy_config" ->> 'min_length'::"text"))::numeric = "trunc"((("password_policy_config" ->> 'min_length'::"text"))::numeric)) AND (((("password_policy_config" ->> 'min_length'::"text"))::numeric >= (6)::numeric) AND ((("password_policy_config" ->> 'min_length'::"text"))::numeric <= (72)::numeric))))))),
+    CONSTRAINT "orgs_required_encryption_key_valid" CHECK ((("required_encryption_key" IS NULL) OR ("length"(("required_encryption_key")::"text") = ANY (ARRAY[20, 21]))))
 );
 
 ALTER TABLE ONLY "public"."orgs" REPLICA IDENTITY FULL;
@@ -19621,6 +19659,10 @@ GRANT ALL ON FUNCTION "public"."find_apikey_by_value"("key_value" "text") TO "se
 
 
 REVOKE ALL ON FUNCTION "public"."force_valid_user_id_on_app"() FROM PUBLIC;
+
+
+
+GRANT ALL ON FUNCTION "public"."generate_org_on_user_create"() TO "service_role";
 
 
 
