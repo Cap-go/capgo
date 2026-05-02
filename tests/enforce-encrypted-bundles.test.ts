@@ -146,6 +146,12 @@ beforeAll(async () => {
     .update({ enforce_encrypted_bundles: false, required_encryption_key: null })
     .eq('id', ORG_ID_ENCRYPTED)
 
+  await getSupabaseClient()
+    .from('apikeys')
+    .update({ limited_to_apps: [APP_NAME_ENCRYPTED], limited_to_orgs: null })
+    .eq('key', APIKEY_ENCRYPTED)
+    .throwOnError()
+
   // Clean up any test versions from previous test runs
   await getSupabaseClient()
     .from('app_versions')
@@ -169,6 +175,12 @@ afterAll(async () => {
     .from('orgs')
     .update({ enforce_encrypted_bundles: false, required_encryption_key: null })
     .eq('id', ORG_ID_ENCRYPTED)
+
+  await getSupabaseClient()
+    .from('apikeys')
+    .update({ limited_to_apps: null, limited_to_orgs: null })
+    .eq('key', APIKEY_ENCRYPTED)
+    .throwOnError()
 })
 
 describe('[Encrypted Bundles Enforcement]', () => {
@@ -472,6 +484,63 @@ describe('[Encrypted Bundles Enforcement]', () => {
 
       expect(fetchError).toBeNull()
       expect(afterUpdate?.session_key).toBe('encrypted-session-key-for-direct-update')
+
+      await getSupabaseClient()
+        .from('orgs')
+        .update({ enforce_encrypted_bundles: false })
+        .eq('id', ORG_ID_ENCRYPTED)
+    })
+
+    it('should reject app-scoped API key direct update that invalidates session_key', async () => {
+      await getSupabaseClient()
+        .from('orgs')
+        .update({ enforce_encrypted_bundles: true })
+        .eq('id', ORG_ID_ENCRYPTED)
+
+      const bundleName = `1.0.0-app-scoped-update-rejected-${Date.now()}`
+      const { data: inserted, error: insertError } = await getSupabaseClient()
+        .from('app_versions')
+        .insert({
+          app_id: APP_NAME_ENCRYPTED,
+          name: bundleName,
+          checksum: 'e5f6789abcdef123456789abcdef123456789abcdef123456789abcdef123',
+          owner_org: ORG_ID_ENCRYPTED,
+          storage_provider: 'r2',
+          session_key: 'encrypted-session-key-for-app-scoped-update',
+        })
+        .select('id, session_key')
+        .single()
+
+      expect(insertError).toBeNull()
+      expect(inserted?.session_key).toBe('encrypted-session-key-for-app-scoped-update')
+
+      const response = await fetch(`${SUPABASE_BASE_URL}/rest/v1/app_versions?id=eq.${inserted!.id}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'capgkey': APIKEY_ENCRYPTED,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation',
+        },
+        body: JSON.stringify({
+          session_key: '   ',
+          key_id: null,
+        }),
+      })
+
+      const responseData = await response.json() as { message?: string, error?: string }
+      expect(response.ok).toBe(false)
+      expect(responseData.message ?? responseData.error).toContain('encryption_required')
+
+      const { data: afterUpdate, error: fetchError } = await getSupabaseClient()
+        .from('app_versions')
+        .select('session_key')
+        .eq('id', inserted!.id)
+        .single()
+
+      expect(fetchError).toBeNull()
+      expect(afterUpdate?.session_key).toBe('encrypted-session-key-for-app-scoped-update')
 
       await getSupabaseClient()
         .from('orgs')
