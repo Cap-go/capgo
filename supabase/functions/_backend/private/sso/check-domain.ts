@@ -105,8 +105,6 @@ app.post('/', async (c) => {
       context: 'check_domain - SSO provider found',
       domain,
       enforce_sso: enforcementRow?.enforce_sso,
-      provider_id: legacyRow?.provider_id,
-      org_id: enforcementRow?.org_id ?? legacyRow?.org_id,
     })
 
     return c.json({
