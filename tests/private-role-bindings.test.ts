@@ -129,7 +129,7 @@ beforeAll(async () => {
 })
 
 // /private/role_bindings is currently served by the Supabase private functions stack, not the Cloudflare API worker.
-describe.skipIf(USE_CLOUDFLARE)('[POST] /private/role_bindings', () => {
+describe.skipIf(USE_CLOUDFLARE)('/private/role_bindings', () => {
   it('accepts channel-scoped bindings when channel_id is the channel RBAC uuid', async () => {
     const fixture = await createRoleBindingFixture()
 
@@ -204,6 +204,89 @@ describe.skipIf(USE_CLOUDFLARE)('[POST] /private/role_bindings', () => {
     }
     finally {
       await fixture.cleanup()
+    }
+  })
+
+  it('clears legacy org_users rights when an org-scope user binding is deleted', async () => {
+    const id = randomUUID()
+    const orgId = randomUUID()
+    const supabase = getSupabaseClient()
+
+    try {
+      const { error: orgError } = await supabase.from('orgs').insert({
+        id: orgId,
+        created_by: USER_ID,
+        name: `Role Binding Delete Org ${id}`,
+        management_email: `role-binding-delete-${id}@capgo.app`,
+        use_new_rbac: true,
+      })
+      expect(orgError).toBeNull()
+
+      const { error: memberError } = await supabase.from('org_users').insert({
+        org_id: orgId,
+        user_id: USER_ID_2,
+        user_right: 'super_admin',
+        rbac_role_name: 'org_super_admin',
+      })
+      expect(memberError).toBeNull()
+
+      const { data: superAdminRole, error: roleError } = await supabase
+        .from('roles')
+        .select('id')
+        .eq('name', 'org_super_admin')
+        .single()
+      expect(roleError).toBeNull()
+
+      const { error: bindingInsertError } = await supabase.from('role_bindings').insert({
+        principal_type: 'user',
+        principal_id: USER_ID_2,
+        role_id: superAdminRole!.id,
+        scope_type: 'org',
+        org_id: orgId,
+        granted_by: USER_ID,
+        reason: 'delete advisory regression',
+        is_direct: true,
+      })
+      expect(bindingInsertError).toBeNull()
+
+      const { data: binding, error: bindingError } = await supabase
+        .from('role_bindings')
+        .select('id')
+        .eq('principal_type', 'user')
+        .eq('principal_id', USER_ID_2)
+        .eq('scope_type', 'org')
+        .eq('org_id', orgId)
+        .single()
+
+      expect(bindingError).toBeNull()
+      expect(binding?.id).toBeTruthy()
+
+      const deleteResponse = await fetch(getEndpointUrl(`/private/role_bindings/${binding!.id}`), {
+        method: 'DELETE',
+        headers: authHeaders,
+      })
+
+      const deleteData = await deleteResponse.json() as { success?: boolean, error?: string }
+      expect(deleteResponse.status).toBe(200)
+      expect(deleteData.success).toBe(true)
+
+      const { data: legacyRows, error: legacyError } = await supabase
+        .from('org_users')
+        .select('user_right, rbac_role_name')
+        .eq('org_id', orgId)
+        .eq('user_id', USER_ID_2)
+        .is('app_id', null)
+        .is('channel_id', null)
+
+      expect(legacyError).toBeNull()
+      expect(legacyRows).toHaveLength(1)
+      expect(legacyRows?.[0]?.user_right).toBeNull()
+      expect(legacyRows?.[0]?.rbac_role_name).toBeNull()
+    }
+    finally {
+      await supabase.from('role_bindings').delete().eq('org_id', orgId)
+      await supabase.from('org_users').delete().eq('org_id', orgId)
+      await supabase.from('orgs').delete().eq('id', orgId)
     }
   })
 })
