@@ -1684,7 +1684,6 @@ export type Database = {
           password_policy_config: Json | null
           require_apikey_expiration: boolean
           required_encryption_key: string | null
-          sso_enabled: boolean
           stats_refresh_requested_at: string | null
           stats_updated_at: string | null
           updated_at: string | null
@@ -1709,7 +1708,6 @@ export type Database = {
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
-          sso_enabled?: boolean
           stats_refresh_requested_at?: string | null
           stats_updated_at?: string | null
           updated_at?: string | null
@@ -1734,7 +1732,6 @@ export type Database = {
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
-          sso_enabled?: boolean
           stats_refresh_requested_at?: string | null
           stats_updated_at?: string | null
           updated_at?: string | null
@@ -3567,7 +3564,6 @@ export type Database = {
               require_apikey_expiration: boolean
               required_encryption_key: string
               role: string
-              sso_enabled: boolean
               stats_refresh_requested_at: string
               stats_updated_at: string
               subscription_end: string
@@ -3605,7 +3601,6 @@ export type Database = {
               require_apikey_expiration: boolean
               required_encryption_key: string
               role: string
-              sso_enabled: boolean
               stats_refresh_requested_at: string
               stats_updated_at: string
               subscription_end: string
@@ -4320,25 +4315,6 @@ export type Database = {
         Args: { email: string; org_id: string }
         Returns: string
       }
-      reset_and_seed_app_data: {
-        Args: {
-          p_admin_user_id?: string
-          p_app_id: string
-          p_org_id?: string
-          p_plan_product_id?: string
-          p_stripe_customer_id?: string
-          p_user_id?: string
-        }
-        Returns: undefined
-      }
-      reset_and_seed_app_stats_data: {
-        Args: { p_app_id: string }
-        Returns: undefined
-      }
-      reset_and_seed_data: { Args: never; Returns: undefined }
-      reset_and_seed_stats_data: { Args: never; Returns: undefined }
-      reset_app_data: { Args: { p_app_id: string }; Returns: undefined }
-      reset_app_stats_data: { Args: { p_app_id: string }; Returns: undefined }
       restore_deleted_account: { Args: never; Returns: undefined }
       resync_org_user_role_bindings: {
         Args: { p_org_id: string; p_user_id: string }

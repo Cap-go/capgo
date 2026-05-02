@@ -993,7 +993,7 @@ async function syncAppBindings() {
       defer
     >
       <div class="space-y-4">
-        <p class="text-sm text-slate-600 dark:text-slate-300">
+        <p class="text-sm text-slate-600">
           {{
             createdKeyDialogMode === 'partial-failure-hashed'
               ? t('api-key-create-partial-failure-warning-hashed')
@@ -1003,17 +1003,17 @@ async function syncAppBindings() {
           }}
         </p>
 
-        <div class="p-4 border rounded-lg border-blue-200 bg-blue-50 dark:border-blue-700 dark:bg-blue-900/20">
-          <p class="mb-2 text-sm font-semibold text-blue-800 dark:text-blue-200">
+        <div class="p-4 border rounded-lg border-blue-200 bg-blue-50">
+          <p class="mb-2 text-sm font-semibold text-blue-800">
             {{ t('your-api-key') }}
           </p>
 
-          <div class="flex flex-col gap-3 p-3 border rounded-lg border-blue-200 bg-white dark:border-blue-700 dark:bg-gray-800 sm:flex-row sm:items-start sm:justify-between">
-            <code class="flex-1 text-sm break-all whitespace-pre-wrap text-slate-800 dark:text-white">{{ createdPlainKey }}</code>
+          <div class="flex flex-col gap-3 p-3 border rounded-lg border-blue-200 bg-white sm:flex-row sm:items-start sm:justify-between">
+            <code class="flex-1 text-sm break-all whitespace-pre-wrap text-slate-800">{{ createdPlainKey }}</code>
 
             <button
               type="button"
-              class="d-btn d-btn-sm d-btn-outline border-blue-300 text-blue-700 hover:bg-blue-100 dark:border-blue-600 dark:text-blue-200 dark:hover:bg-blue-900/30"
+              class="d-btn d-btn-sm d-btn-outline border-blue-300 text-blue-700 hover:bg-blue-100"
               @click="copyCreatedKey"
             >
               <IconClipboard class="w-4 h-4" />
