@@ -93,9 +93,7 @@ describe('[POST] /private/sso/check-domain', () => {
     try {
       const response = await fetchWithRetry(getEndpointUrl('/private/sso/check-domain'), {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: authHeaders,
         body: JSON.stringify({ email: `user@${expectedDomain.toUpperCase()}` }),
       })
 
@@ -103,11 +101,13 @@ describe('[POST] /private/sso/check-domain', () => {
       const data = await response.json() as {
         has_sso: boolean
         enforce_sso?: boolean
+        provider_id?: string
+        org_id?: string
       }
       expect(data.has_sso).toBe(true)
       expect(data.enforce_sso).toBe(false)
-      expect(data).not.toHaveProperty('provider_id')
-      expect(data).not.toHaveProperty('org_id')
+      expect(data.provider_id).toBeUndefined()
+      expect(data.org_id).toBeUndefined()
 
       const { data: rpcData, error: rpcError } = await (getSupabaseClient().rpc as any)('check_domain_sso', { p_domain: `  ${expectedDomain.toUpperCase()}  ` })
       expect(rpcError).toBeNull()

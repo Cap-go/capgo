@@ -233,7 +233,7 @@ async function login(form: { email: string, password: string }) {
   await checkMfa()
 }
 
-async function checkDomain(email: string): Promise<{ has_sso: boolean, enforce_sso?: boolean }> {
+async function checkDomain(email: string): Promise<{ has_sso: boolean, enforce_sso?: boolean, provider_id?: string, org_id?: string }> {
   try {
     const { data: sessionData } = await supabase.auth.getSession()
     const token = sessionData?.session?.access_token
