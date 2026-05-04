@@ -453,20 +453,26 @@ async function createGroup() {
       console.error('Error syncing app bindings:', bindingError)
       toast.warning(t('error-syncing-app-bindings'))
     }
-
-    toast.success(t('group-created'))
-    await fetchOrgMembers()
-    openAddMembersModal()
-    await dialogStore.onDialogDismiss()
-    await router.replace('/settings/organization/groups')
   }
   catch (error) {
     console.error('Error creating group:', error)
     toast.error(t('error-creating-group'))
+    return
   }
   finally {
     isSubmitting.value = false
   }
+
+  toast.success(t('group-created'))
+  try {
+    await fetchOrgMembers()
+    openAddMembersModal()
+    await dialogStore.onDialogDismiss()
+  }
+  catch (memberError) {
+    console.error('Error opening add-members modal:', memberError)
+  }
+  await router.replace('/settings/organization/groups')
 }
 
 async function saveGroup() {
