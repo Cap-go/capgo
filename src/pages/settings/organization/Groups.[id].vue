@@ -355,10 +355,14 @@ async function fetchOrgMembers() {
 }
 
 async function fetchGroupMembers() {
+  const id = group.value?.id
+  if (!id)
+    return
+
   const { data, error } = await supabase
     .from('group_members')
     .select('user_id')
-    .eq('group_id', groupId.value)
+    .eq('group_id', id)
 
   if (error)
     throw error
@@ -451,7 +455,10 @@ async function createGroup() {
     }
 
     toast.success(t('group-created'))
-    await router.replace(`/settings/organization/groups/${data.id}`)
+    await fetchOrgMembers()
+    openAddMembersModal()
+    await dialogStore.onDialogDismiss()
+    await router.replace('/settings/organization/groups')
   }
   catch (error) {
     console.error('Error creating group:', error)
@@ -948,7 +955,7 @@ async function removeMemberFromGroup(userId: string) {
     <div class="w-full space-y-3">
       <SearchInput
         v-model="modalMemberSearch"
-        :placeholder="t('search')"
+        :placeholder="t('search-members')"
         class="d-input-sm"
       />
       <div v-if="availableMembersToAdd.length === 0" class="py-4 text-sm text-center text-slate-500">

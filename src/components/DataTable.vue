@@ -293,7 +293,7 @@ watch(
       pendingReset.value = false
       pendingAdd.value = false
     }
-    if (previousLoading && !loading)
+    if (!loading)
       hasLoadingCycleCompleted.value = true
   },
   { immediate: true },
