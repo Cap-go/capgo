@@ -1,5 +1,6 @@
+import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
-import { APP_NAME_STATS, BASE_URL, getAuthHeadersForCredentials, getSupabaseClient, headersStats, ORG_ID_STATS } from './test-utils.ts'
+import { APP_NAME_STATS, BASE_URL, getAuthHeadersForCredentials, getSupabaseClient, headersStats, ORG_ID_STATS, USER_ID_STATS } from './test-utils.ts'
 
 function hasSeededStats(statsData: unknown) {
   if (!Array.isArray(statsData))
@@ -18,6 +19,29 @@ async function deleteApikeyById(id: number) {
     .from('apikeys')
     .delete()
     .eq('id', id)
+    .throwOnError()
+}
+
+async function createStatsSiblingApp(appId: string) {
+  await getSupabaseClient()
+    .from('apps')
+    .insert({
+      app_id: appId,
+      icon_url: '',
+      name: 'Stats sibling oracle test app',
+      last_version: '1.0.0',
+      updated_at: new Date().toISOString(),
+      owner_org: ORG_ID_STATS,
+      user_id: USER_ID_STATS,
+    })
+    .throwOnError()
+}
+
+async function deleteAppByAppId(appId: string) {
+  await getSupabaseClient()
+    .from('apps')
+    .delete()
+    .eq('app_id', appId)
     .throwOnError()
 }
 
@@ -140,6 +164,40 @@ describe('[GET] /statistics operations with and without subkey', () => {
     const statsData = await getStats.json()
     expect(Array.isArray(statsData)).toBe(true)
     expect(hasSeededStats(statsData)).toBe(true)
+  })
+
+  it('should not reveal sibling app existence outside an app-limited subkey', async () => {
+    expect(subkeyId).not.toBe(0)
+    const siblingApp = `com.stats.oracle.${randomUUID().replaceAll('-', '')}`
+    const fakeApp = `com.stats.fake.${randomUUID().replaceAll('-', '')}`
+    await createStatsSiblingApp(siblingApp)
+
+    try {
+      const subkeyHeaders = { 'x-limited-key-id': String(subkeyId) }
+      const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      const toDate = new Date().toISOString().split('T')[0]
+      const headers = { ...headersStats, ...subkeyHeaders }
+      const [realSiblingStats, fakeStats] = await Promise.all([
+        fetch(`${BASE_URL}/statistics/app/${siblingApp}?from=${fromDate}&to=${toDate}`, {
+          method: 'GET',
+          headers,
+        }),
+        fetch(`${BASE_URL}/statistics/app/${fakeApp}?from=${fromDate}&to=${toDate}`, {
+          method: 'GET',
+          headers,
+        }),
+      ])
+
+      expect(realSiblingStats.status).toBe(401)
+      expect(fakeStats.status).toBe(401)
+      const realSiblingData = await realSiblingStats.json<{ error: string }>()
+      const fakeData = await fakeStats.json<{ error: string }>()
+      expect(realSiblingData.error).toBe('no_access_to_app')
+      expect(fakeData.error).toBe('no_access_to_app')
+    }
+    finally {
+      await deleteAppByAppId(siblingApp)
+    }
   })
 
   it('should get organization statistics with subkey', async () => {

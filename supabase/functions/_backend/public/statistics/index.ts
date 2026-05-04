@@ -239,6 +239,9 @@ async function getStatsAppOwnerOrgOrThrow(
   if (error)
     throw quickError(500, 'cannot_get_app_statistics', 'Cannot get app statistics', { error })
 
+  if (notFound && auth.authType === 'apikey')
+    throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth.userId ?? null })
+
   if (notFound)
     throw quickError(404, 'app_not_found', 'App not found', { app_id: appId })
 
