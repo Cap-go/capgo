@@ -34,6 +34,7 @@ function clearCredentialEnvVars() {
   const credKeys = [
     'BUILD_CERTIFICATE_BASE64',
     'CAPGO_IOS_PROVISIONING_MAP',
+    'CAPGO_IOS_PROVISIONING_MAP_BASE64',
     'P12_PASSWORD',
     'APPLE_KEY_ID',
     'APPLE_ISSUER_ID',
@@ -468,6 +469,42 @@ await test('--no-playstore-upload: deleting PLAY_CONFIG_JSON removes it from cre
   assert(!('PLAY_CONFIG_JSON' in merged), 'PLAY_CONFIG_JSON should not be in credentials after deletion')
   assertEquals(merged.ANDROID_KEYSTORE_FILE, 'keystoredata', 'Other credentials should remain')
   assertEquals(merged.BUILD_OUTPUT_UPLOAD_ENABLED, 'true', 'Output upload should still be enabled')
+
+  clearCredentialEnvVars()
+  await cleanupTestEnv()
+})
+
+// ─── Test: CAPGO_IOS_PROVISIONING_MAP_BASE64 is decoded into the JSON form ───
+
+await test('CAPGO_IOS_PROVISIONING_MAP_BASE64 is base64-decoded to the JSON form', async () => {
+  await setupTestEnv()
+  clearCredentialEnvVars()
+
+  const json = '{"com.test.app":{"profile":"base64data","name":"match AppStore com.test.app"}}'
+  process.env.CAPGO_IOS_PROVISIONING_MAP_BASE64 = Buffer.from(json, 'utf-8').toString('base64')
+
+  const { loadCredentialsFromEnv } = await importCredentials()
+  const creds = loadCredentialsFromEnv()
+
+  assertEquals(creds.CAPGO_IOS_PROVISIONING_MAP, json, 'BASE64 form must be decoded to raw JSON')
+
+  clearCredentialEnvVars()
+  await cleanupTestEnv()
+})
+
+await test('CAPGO_IOS_PROVISIONING_MAP takes precedence over the BASE64 form', async () => {
+  await setupTestEnv()
+  clearCredentialEnvVars()
+
+  const rawJson = '{"com.test.app":{"profile":"raw","name":"raw"}}'
+  const otherJson = '{"com.test.app":{"profile":"b64","name":"b64"}}'
+  process.env.CAPGO_IOS_PROVISIONING_MAP = rawJson
+  process.env.CAPGO_IOS_PROVISIONING_MAP_BASE64 = Buffer.from(otherJson, 'utf-8').toString('base64')
+
+  const { loadCredentialsFromEnv } = await importCredentials()
+  const creds = loadCredentialsFromEnv()
+
+  assertEquals(creds.CAPGO_IOS_PROVISIONING_MAP, rawJson, 'Raw JSON form must win over BASE64')
 
   clearCredentialEnvVars()
   await cleanupTestEnv()
