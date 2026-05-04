@@ -255,7 +255,7 @@ function currentStepText(entryId: DemoStep) {
     return 'border-violet-300 bg-violet-50 text-violet-700 shadow-sm'
   if (entryId < step.value)
     return 'border-emerald-200 bg-emerald-50 text-emerald-700'
-  return 'border-slate-200 bg-white text-slate-500'
+  return 'border-base-200 bg-base-100 text-base-content/60'
 }
 
 const wireStyle = computed(() => ({
@@ -615,7 +615,7 @@ onUnmounted(() => {
       aria-modal="true"
     >
       <button
-        class="absolute inline-flex items-center justify-center rounded-full top-4 right-4 h-9 w-9 bg-base-100/90 text-base-content/60 hover:bg-base-200"
+        class="absolute top-4 right-4 h-9 w-9 text-base-content/60 d-btn d-btn-sm d-btn-circle d-btn-ghost"
         aria-label="Close modal"
         type="button"
         @click="closeModal"
@@ -630,7 +630,7 @@ onUnmounted(() => {
               <p class="inline-flex rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-semibold tracking-[0.08em] text-violet-700">
                 START WITH CAPGO
               </p>
-              <div class="p-1.5 mt-3 border rounded-2xl border-slate-200 bg-slate-50">
+              <div class="p-1.5 mt-3 border rounded-2xl border-base-200 bg-base-200">
                 <div class="grid grid-cols-3 gap-2">
                   <div
                     v-for="entry in onboardingSteps"
@@ -641,16 +641,16 @@ onUnmounted(() => {
                     <p class="text-[11px] font-semibold tracking-wide">
                       {{ entry.id }}. {{ entry.label }}
                     </p>
-                    <p class="mt-1 text-[11px]" :class="entry.id <= step ? 'opacity-80' : 'text-slate-400'">
+                    <p class="mt-1 text-[11px]" :class="entry.id <= step ? 'opacity-80' : 'text-base-content/40'">
                       {{ entry.caption }}
                     </p>
                   </div>
                 </div>
               </div>
-              <h2 class="mt-3 text-2xl font-semibold text-slate-900">
+              <h2 class="mt-3 text-2xl font-semibold text-base-content">
                 {{ stepTitle }}
               </h2>
-              <p class="max-w-2xl mt-1.5 text-sm leading-relaxed text-slate-600">
+              <p class="max-w-2xl mt-1.5 text-sm leading-relaxed text-base-content/70">
                 {{ stepDescription }}
               </p>
             </div>
@@ -666,7 +666,7 @@ onUnmounted(() => {
                     placeholder="App Name"
                     maxlength="40"
                     :disabled="isCreatingApp"
-                    class="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-900 placeholder-slate-400 shadow-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 disabled:opacity-50"
+                    class="flex-1 rounded-xl border border-base-200 bg-base-100 px-4 py-2.5 text-sm text-base-content placeholder-base-content/40 shadow-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 disabled:opacity-50"
                   >
                   <button
                     type="submit"
@@ -676,7 +676,7 @@ onUnmounted(() => {
                     {{ isCreatingApp ? 'Creating…' : 'Continue' }}
                   </button>
                 </form>
-                <p v-if="isCreatingApp" class="text-xs text-slate-500">
+                <p v-if="isCreatingApp" class="text-xs text-base-content/60">
                   Running <span class="font-mono text-emerald-600">{{ CAPGO_CLI_COMMAND }} app add</span> ...
                 </p>
               </div>
@@ -685,27 +685,27 @@ onUnmounted(() => {
                 <button
                   v-for="choice in updateChoices"
                   :key="choice.id"
-                  class="h-full p-3 text-left transition bg-white border rounded-xl border-slate-200 hover:border-violet-300 hover:bg-violet-50 sm:p-4 sm:rounded-2xl"
+                  class="h-full p-3 text-left transition bg-base-100 border rounded-xl border-base-200 hover:border-violet-300 hover:bg-violet-50 sm:p-4 sm:rounded-2xl"
                   type="button"
                   :disabled="isUploading"
                   :class="isUploading ? 'opacity-60 cursor-not-allowed' : ''"
                   @click="triggerUpload(choice)"
                 >
-                  <p class="text-sm font-semibold text-slate-900">
+                  <p class="text-sm font-semibold text-base-content">
                     {{ choice.label }}
                   </p>
-                  <p class="mt-1 text-xs text-slate-500">
+                  <p class="mt-1 text-xs text-base-content/60">
                     Result: {{ choice.result }}
                   </p>
                 </button>
               </div>
 
               <div v-else class="flex flex-col h-full space-y-3">
-                <article class="p-4 bg-white border shadow-sm rounded-2xl border-slate-200">
-                  <p class="text-sm text-slate-600">
+                <article class="p-4 bg-base-100 border shadow-sm rounded-2xl border-base-200">
+                  <p class="text-sm text-base-content/70">
                     {{ phoneStatusMessage }}
                   </p>
-                  <p class="mt-2 text-xl font-semibold text-slate-900">
+                  <p class="mt-2 text-xl font-semibold text-base-content">
                     {{ selectedActionResult }}
                   </p>
                 </article>

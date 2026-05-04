@@ -128,7 +128,7 @@ onUnmounted(() => {
         <!-- Close button -->
         <button
           v-if="!dialogStore.dialogOptions?.preventAccidentalClose"
-          class="absolute z-10 text-2xl text-base-content top-4 right-4 hover:text-white hover:bg-gray-500 d-btn d-btn-sm d-btn-circle d-btn-ghost"
+          class="absolute z-10 text-2xl text-base-content top-4 right-4 hover:text-base-content hover:bg-base-200 d-btn d-btn-sm d-btn-circle d-btn-ghost"
           @click="close()"
         >
           ✕
