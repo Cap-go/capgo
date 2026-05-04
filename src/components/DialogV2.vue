@@ -110,7 +110,7 @@ onUnmounted(() => {
 
 <template>
   <Teleport to="body">
-    <div v-if="dialogStore.showDialog" data-theme="capgolight" class="fixed inset-0 z-50 flex items-center justify-center">
+    <div v-if="dialogStore.showDialog" class="fixed inset-0 z-50 flex items-center justify-center">
       <!-- Backdrop -->
       <div
         class="fixed inset-0 bg-black/50"
@@ -120,7 +120,7 @@ onUnmounted(() => {
 
       <!-- Dialog -->
       <div
-        class="overflow-y-auto relative mx-4 w-full bg-white rounded-lg shadow-xl max-h-[90vh]"
+        class="overflow-y-auto relative mx-4 w-full bg-base-100 rounded-lg shadow-xl max-h-[90vh]"
         :class="[
           sizeClasses[dialogStore.dialogOptions?.size || 'md'],
         ]"
@@ -128,7 +128,7 @@ onUnmounted(() => {
         <!-- Close button -->
         <button
           v-if="!dialogStore.dialogOptions?.preventAccidentalClose"
-          class="absolute z-10 text-2xl text-black top-4 right-4 hover:text-white hover:bg-gray-500 d-btn d-btn-sm d-btn-circle d-btn-ghost"
+          class="absolute z-10 text-2xl text-base-content top-4 right-4 hover:text-white hover:bg-gray-500 d-btn d-btn-sm d-btn-circle d-btn-ghost"
           @click="close()"
         >
           ✕
@@ -136,7 +136,7 @@ onUnmounted(() => {
 
         <!-- Header -->
         <div v-if="dialogStore.dialogOptions?.title" class="px-6 pt-6 pb-2">
-          <h3 class="text-lg font-bold text-gray-900">
+          <h3 class="text-lg font-bold text-base-content">
             {{ dialogStore.dialogOptions.title }}
           </h3>
         </div>
@@ -145,13 +145,13 @@ onUnmounted(() => {
         <div class="px-6" :class="{ 'pt-6': !dialogStore.dialogOptions?.title }">
           <!-- Default description -->
           <div v-if="dialogStore.dialogOptions?.description" class="pb-4">
-            <p class="text-base text-gray-500 whitespace-pre-wrap break-all">
+            <p class="text-base text-base-content/70 whitespace-pre-wrap break-all">
               {{ dialogStore.dialogOptions.description }}
             </p>
           </div>
 
           <!-- Teleport target for custom content -->
-          <div id="dialog-v2-content" class="pb-4 text-gray-500" />
+          <div id="dialog-v2-content" class="pb-4 text-base-content/70" />
         </div>
 
         <!-- Buttons -->

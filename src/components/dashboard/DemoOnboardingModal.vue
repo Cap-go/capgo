@@ -610,12 +610,12 @@ onUnmounted(() => {
   <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center p-4">
     <div class="absolute inset-0 bg-slate-950/70 backdrop-blur-sm" />
     <div
-      class="relative z-10 w-full max-w-6xl max-h-[90vh] overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl"
+      class="relative z-10 w-full max-w-6xl max-h-[90vh] overflow-hidden rounded-[28px] border border-slate-200 bg-base-100 shadow-2xl"
       role="dialog"
       aria-modal="true"
     >
       <button
-        class="absolute inline-flex items-center justify-center rounded-full top-4 right-4 h-9 w-9 bg-white/90 text-slate-500 hover:bg-slate-100"
+        class="absolute inline-flex items-center justify-center rounded-full top-4 right-4 h-9 w-9 bg-base-100/90 text-base-content/60 hover:bg-base-200"
         aria-label="Close modal"
         type="button"
         @click="closeModal"
@@ -625,7 +625,7 @@ onUnmounted(() => {
 
       <div class="overflow-y-auto max-h-[90vh]">
         <div class="grid gap-0 overflow-hidden md:grid-cols-[1.08fr,0.92fr]">
-          <div class="flex flex-col h-full gap-4 p-5 bg-white md:p-6">
+          <div class="flex flex-col h-full gap-4 p-5 bg-base-100 md:p-6">
             <div>
               <p class="inline-flex rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-[11px] font-semibold tracking-[0.08em] text-violet-700">
                 START WITH CAPGO
@@ -713,7 +713,7 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <div class="relative flex items-center justify-center p-4 border-l border-slate-100 bg-gradient-to-b from-white to-slate-100">
+          <div class="relative flex items-center justify-center p-4 border-l border-slate-100 bg-gradient-to-b from-base-100 to-base-200">
             <div class="w-full max-w-[56rem] space-y-3">
               <div class="flex flex-col items-center gap-3 md:flex-row">
                 <div class="flex-1 w-full p-4 border rounded-xl border-slate-800 bg-slate-950 md:flex-[2.2]">
