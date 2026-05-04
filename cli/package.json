@@ -90,7 +90,7 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^7.0.0",
-    "@bradenmacdonald/s3-lite-client": "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.5",
+    "@bradenmacdonald/s3-lite-client": "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.6",
     "@capacitor/cli": "^8.0.0",
     "@capgo/find-package-manager": "^0.0.18",
     "@clack/prompts": "^1.0.0",

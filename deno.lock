@@ -60,7 +60,6 @@
     "npm:@iconify/json@^2.2.467": "2.2.469",
     "npm:@inkjs/ui@2": "2.0.0_ink@5.2.1__@types+react@18.3.28__react@18.3.1_@types+react@18.3.28_react@18.3.1",
     "npm:@intlify/unplugin-vue-i18n@^11.1.2": "11.1.2_vite@8.0.10__@types+node@25.5.2__sass@1.99.0_vue@3.5.33__typescript@6.0.3_vue-i18n@11.4.0__vue@3.5.33___typescript@6.0.3__typescript@6.0.3_@types+node@25.5.2_eslint@10.2.1_sass@1.99.0_typescript@6.0.3",
-    "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.5": "0.9.5",
     "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.6": "0.9.6",
     "npm:@jsr/sauber__table@*": "0.1.0",
     "npm:@jsr/std__semver@1.0.8": "1.0.8",
@@ -1761,7 +1760,6 @@
     "@eslint-community/eslint-utils@4.9.1_eslint@9.39.4": {
       "integrity": "sha512-phrYmNiYppR7znFEdqgfWHXR6NCkZEK7hwWDHZUjit/2/U0r6XvkDl0SYnoM51Hq7FhCGdLDT6zxCCOY1hexsQ==",
       "dependencies": [
-        "eslint@9.39.4",
         "eslint-visitor-keys@3.4.3"
       ]
     },
@@ -2414,10 +2412,6 @@
         "@jridgewell/resolve-uri",
         "@jridgewell/sourcemap-codec"
       ]
-    },
-    "@jsr/bradenmacdonald__s3-lite-client@0.9.5": {
-      "integrity": "sha512-zGopLx2evvA4cDezUYI5dMk1axF665FmFAgz1ShjP6YYx9KKT4GzpM8Nf6KY+f41z2lS1QdVUgwL9g6AH760Dw==",
-      "tarball": "https://npm.jsr.io/~/11/@jsr/bradenmacdonald__s3-lite-client/0.9.5.tgz"
     },
     "@jsr/bradenmacdonald__s3-lite-client@0.9.6": {
       "integrity": "sha512-YJewLR/K0YmDGhSwKsvZ4vCJaXPjvE+2G2z/EAKIkuP7BSQ5BnJ3Tw6KYYAgfx37ktjp2VozimD2BjfcBuz18A==",
@@ -4048,6 +4042,7 @@
     "@vue-macros/common@3.1.2_vue@3.5.33__typescript@6.0.3_typescript@6.0.3": {
       "integrity": "sha512-h9t4ArDdniO9ekYHAD95t9AZcAbb19lEGK+26iAjUODOIJKmObDNBSe4+6ELQAA3vtYiFPPBtHh7+cQCKi3Dng==",
       "dependencies": [
+        "@vue/compiler-sfc",
         "ast-kit@2.2.0",
         "local-pkg",
         "magic-string-ast@1.0.3",
@@ -8819,13 +8814,11 @@
       "integrity": "sha512-qGkXjQo8yTq5QknP8f8p8/Aw3BJKqclTbTe8de0pC6exHzpoPBnH69Eztf00G2oc50IaIlV7KX/g4cKgzCq9BA==",
       "dependencies": [
         "rollup",
-        "unplugin@1.16.1",
         "vite@8.0.8_@types+node@25.5.2_sass@1.99.0",
         "webpack"
       ],
       "optionalPeers": [
         "rollup",
-        "unplugin@1.16.1",
         "vite@8.0.8_@types+node@25.5.2_sass@1.99.0",
         "webpack"
       ]
@@ -9694,7 +9687,7 @@
             "npm:@capgo/find-package-manager@^0.0.18",
             "npm:@clack/prompts@1",
             "npm:@inkjs/ui@2",
-            "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.5",
+            "npm:@jsr/bradenmacdonald__s3-lite-client@0.9.6",
             "npm:@jsr/sauber__table@*",
             "npm:@jsr/std__semver@1.0.8",
             "npm:@modelcontextprotocol/sdk@^1.25.3",
