@@ -288,13 +288,12 @@ watch(
 
 watch(
   () => props.isLoading,
-  (loading, previousLoading) => {
+  (loading, _previousLoading) => {
     if (!loading) {
       pendingReset.value = false
       pendingAdd.value = false
-    }
-    if (!loading)
       hasLoadingCycleCompleted.value = true
+    }
   },
   { immediate: true },
 )
