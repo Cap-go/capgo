@@ -166,14 +166,24 @@ describe('[GET] /statistics operations with and without subkey', () => {
     expect(hasSeededStats(statsData)).toBe(true)
   })
 
-  it('should not reveal sibling app existence outside an app-limited subkey', async () => {
-    expect(subkeyId).not.toBe(0)
+  it.concurrent('should not reveal sibling app existence outside an app-limited subkey', async () => {
+    const createSubkey = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers: headersStats,
+      body: JSON.stringify({
+        name: 'Limited Stats Subkey - oracle test',
+        mode: 'read',
+        limited_to_apps: [APPNAME],
+      }),
+    })
+    expect(createSubkey.status).toBe(200)
+    const localSubkey = await createSubkey.json() as { id: number }
     const siblingApp = `com.stats.oracle.${randomUUID().replaceAll('-', '')}`
     const fakeApp = `com.stats.fake.${randomUUID().replaceAll('-', '')}`
-    await createStatsSiblingApp(siblingApp)
 
     try {
-      const subkeyHeaders = { 'x-limited-key-id': String(subkeyId) }
+      await createStatsSiblingApp(siblingApp)
+      const subkeyHeaders = { 'x-limited-key-id': String(localSubkey.id) }
       const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
       const toDate = new Date().toISOString().split('T')[0]
       const headers = { ...headersStats, ...subkeyHeaders }
@@ -197,6 +207,7 @@ describe('[GET] /statistics operations with and without subkey', () => {
     }
     finally {
       await deleteAppByAppId(siblingApp)
+      await deleteApikeyById(localSubkey.id)
     }
   })
 
