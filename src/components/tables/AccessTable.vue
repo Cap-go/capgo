@@ -514,8 +514,14 @@ const dynamicColumns = computed<TableColumn[]>(() => {
   const baseColumns: TableColumn[] = [
     {
       key: 'principal_name',
-      label: t('email'),
+      label: t('name'),
       sortable: true,
+    },
+    {
+      key: 'principal_type',
+      label: t('type'),
+      sortable: true,
+      displayFunction: (row: Element) => row.principal_type === 'group' ? t('group') : t('user'),
     },
     {
       key: 'role_name',
