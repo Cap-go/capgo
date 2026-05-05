@@ -1,16 +1,19 @@
 -- Test that audit logs are created correctly when using API key authentication
--- This verifies the fix for the issue where CLI/API users were not logged in audit_logs
+-- This verifies the fix for the issue where CLI/API users were not logged in
+-- audit_logs
 -- because get_identity() was called without key_mode parameter
 BEGIN;
 
 -- Use existing seed identities:
--- API key: ae6e7458-c46d-4c00-aa3b-153b0b8520ea (mode: all, user: 6aa76066-55ef-4238-ade6-0b32334a4097)
+-- API key: ae6e7458-c46d-4c00-aa3b-153b0b8520ea
+-- mode: all, user: 6aa76066-55ef-4238-ade6-0b32334a4097
 -- Org: 046a36ac-e03c-4590-9257-bd6c9dba9ee8
 -- App: com.demo.app
 
-SELECT plan(9);
+SELECT plan(11);
 
--- Test 1: audit_logs_allowed_orgs should fail fast when no auth and no API key header is set
+-- Test 1: audit_logs_allowed_orgs should fail fast when no auth and no
+-- API key header is set
 DO $$
 BEGIN
   PERFORM set_config('request.headers', '{}', true);
@@ -36,7 +39,7 @@ SELECT
         'audit_logs_allowed_orgs includes the org for API key requests'
     );
 
--- Test 3: policy should be implemented via audit_logs_allowed_orgs (avoid per-row identity resolution)
+-- Test 3: policy should wrap audit_logs_allowed_orgs in SELECT (initPlan)
 SELECT
     ok(
         position(
@@ -51,11 +54,83 @@ SELECT
                     AND p.polname
                     = 'Allow select for auth, api keys (super_admin+)'
             )
-        ) > 0,
-        'audit_logs SELECT policy uses audit_logs_allowed_orgs()'
+        ) > 0
+        AND (
+            SELECT pg_get_expr(p.polqual, p.polrelid)
+            FROM pg_policy AS p
+            INNER JOIN pg_class AS c ON p.polrelid = c.oid
+            INNER JOIN pg_namespace AS n ON c.relnamespace = n.oid
+            WHERE
+                n.nspname = 'public'
+                AND c.relname = 'audit_logs'
+                AND p.polname
+                = 'Allow select for auth, api keys (super_admin+)'
+        ) ~* 'ANY\s*\([^;]*SELECT[^;]*audit_logs_allowed_orgs',
+        'audit_logs SELECT policy uses initPlan-wrapped'
+        || ' audit_logs_allowed_orgs()'
     );
 
--- Test 4: Verify get_identity returns user_id when API key header is set
+-- Test 4: audit_logs direct table reads should keep API key support
+SELECT
+    ok(
+        'anon'::regrole::oid = any(p.polroles)
+        AND 'authenticated'::regrole::oid = any(p.polroles),
+        'audit_logs SELECT policy targets anon and authenticated'
+    )
+FROM pg_policy AS p
+INNER JOIN pg_class AS c ON p.polrelid = c.oid
+INNER JOIN pg_namespace AS n ON c.relnamespace = n.oid
+WHERE
+    n.nspname = 'public'
+    AND c.relname = 'audit_logs'
+    AND p.polname = 'Allow select for auth, api keys (super_admin+)';
+
+-- Test 5: anon without a Capgo API key gets an empty result through RLS
+INSERT INTO public.audit_logs (
+    table_name,
+    record_id,
+    operation,
+    user_id,
+    org_id,
+    old_record,
+    new_record,
+    changed_fields
+) VALUES (
+    'test_rls_probe',
+    'rls-probe',
+    'INSERT',
+    '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
+    '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid,
+    '{}'::jsonb,
+    '{}'::jsonb,
+    ARRAY['rls_probe']::text []
+);
+
+SET LOCAL ROLE anon;
+
+DO $$
+DECLARE
+  v_visible boolean;
+BEGIN
+  PERFORM set_config('request.headers', '{}', true);
+
+  SELECT EXISTS(SELECT 1 FROM public.audit_logs LIMIT 1) INTO v_visible;
+
+  IF v_visible THEN
+    RAISE EXCEPTION 'anon without capgkey can read audit_logs';
+  END IF;
+END $$;
+
+RESET ROLE;
+
+SELECT ok(TRUE, 'anon without capgkey cannot read audit_logs directly');
+
+-- Test 6: Verify get_identity returns user_id when API key header is set
+DO $$
+BEGIN
+  PERFORM set_config('request.headers', '{"capgkey": "ae6e7458-c46d-4c00-aa3b-153b0b8520ea"}', true);
+END $$;
+
 SELECT
     is(
         public.get_identity('{read,upload,write,all}'::public.key_mode []),
@@ -63,8 +138,10 @@ SELECT
         'get_identity with key_mode returns API key user_id'
     );
 
--- Test 5: Verify get_identity WITHOUT parameters returns NULL for API key (the old broken behavior)
--- Note: This shows the original bug - parameterless get_identity doesn't check API keys
+-- Test 7: Verify get_identity WITHOUT parameters returns NULL for API key
+-- (the old broken behavior)
+-- Note: This shows the original bug - parameterless get_identity doesn't
+-- check API keys
 SELECT
     is(
         public.get_identity(),
@@ -72,7 +149,8 @@ SELECT
         'get_identity without key_mode returns NULL for API key (original bug)'
     );
 
--- Test 6: Insert app_version with API key context and verify audit log is created
+-- Test 8: Insert app_version with API key context and verify audit log is
+-- created
 DO $$
 DECLARE
   v_version_id bigint;
@@ -103,23 +181,34 @@ END $$;
 
 SELECT ok(TRUE, 'app_version INSERT with API key creates audit log');
 
--- Test 7: Update app_version with API key context and verify audit log is created
+-- Test 9: Update app_version with API key context and verify audit log is
+-- created
 DO $$
 DECLARE
+  v_version_id bigint;
   v_audit_count int;
 BEGIN
   -- Set API key context
   PERFORM set_config('request.headers', '{"capgkey": "ae6e7458-c46d-4c00-aa3b-153b0b8520ea"}', true);
 
+  SELECT id INTO v_version_id
+  FROM public.app_versions
+  WHERE name = '99.0.0-test-audit' AND app_id = 'com.demo.app';
+
+  IF v_version_id IS NULL THEN
+    RAISE EXCEPTION 'No app_version found for API key audit UPDATE test';
+  END IF;
+
   -- Update the app_version
   UPDATE public.app_versions
   SET comment = 'Updated via API key test'
-  WHERE name = '99.0.0-test-audit' AND app_id = 'com.demo.app';
+  WHERE id = v_version_id;
 
   -- Check that an audit log was created for the UPDATE
   SELECT COUNT(*) INTO v_audit_count
   FROM public.audit_logs
   WHERE table_name = 'app_versions'
+    AND record_id = v_version_id::text
     AND operation = 'UPDATE'
     AND user_id = '6aa76066-55ef-4238-ade6-0b32334a4097'
     AND 'comment' = ANY(changed_fields);
@@ -131,9 +220,15 @@ BEGIN
   RAISE NOTICE 'Audit log created for app_version UPDATE';
 END $$;
 
-SELECT ok(TRUE, 'app_version UPDATE with API key creates audit log with changed_fields');
+SELECT
+    ok(
+        TRUE,
+        'app_version UPDATE with API key creates audit log'
+        || ' with changed_fields'
+    );
 
--- Test 8: Delete app_version with API key context and verify audit log is created
+-- Test 10: Delete app_version with API key context and verify audit log is
+-- created
 DO $$
 DECLARE
   v_version_id bigint;
@@ -168,7 +263,7 @@ END $$;
 
 SELECT ok(TRUE, 'app_version DELETE with API key creates audit log');
 
--- Test 9: Verify audit log contains correct old_record and new_record data
+-- Test 11: Verify audit log contains correct old_record and new_record data
 DO $$
 DECLARE
   v_version_id bigint;
@@ -242,9 +337,7 @@ END $$;
 SELECT ok(TRUE, 'audit log contains correct old_record and new_record data');
 
 -- Finish
-SELECT *
-FROM
-    finish();
+SELECT * FROM finish(); -- noqa: AM04
 
 -- Roll back any changes done in this test
 ROLLBACK;
