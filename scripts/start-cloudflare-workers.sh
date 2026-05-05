@@ -100,7 +100,7 @@ sleep 2
 
 # Start API worker on port 8787
 echo -e "${GREEN}Starting API worker on port 8787...${NC}"
-(cd "${ROOT_DIR}/cloudflare_workers/api" && bunx wrangler dev -c wrangler.jsonc --port 8787 --inspector-port "${API_INSPECTOR_PORT}" --env-file="${RUNTIME_ENV_FILE}" --env=local --persist-to "${ROOT_DIR}/.wrangler-shared") &
+(cd "${ROOT_DIR}/cloudflare_workers/api" && bunx wrangler dev -c wrangler.jsonc --local --port 8787 --inspector-port "${API_INSPECTOR_PORT}" --env-file="${RUNTIME_ENV_FILE}" --env=local --persist-to "${ROOT_DIR}/.wrangler-shared") &
 API_PID=$!
 
 # Wait a bit for the first worker to start
@@ -108,7 +108,7 @@ sleep 3
 
 # Start Plugin worker on port 8788
 echo -e "${GREEN}Starting Plugin worker on port 8788...${NC}"
-(cd "${ROOT_DIR}/cloudflare_workers/plugin" && bunx wrangler dev -c wrangler.jsonc --port 8788 --inspector-port "${PLUGIN_INSPECTOR_PORT}" --env-file="${RUNTIME_ENV_FILE}" --env=local --persist-to "${ROOT_DIR}/.wrangler-shared") &
+(cd "${ROOT_DIR}/cloudflare_workers/plugin" && bunx wrangler dev -c wrangler.jsonc --local --port 8788 --inspector-port "${PLUGIN_INSPECTOR_PORT}" --env-file="${RUNTIME_ENV_FILE}" --env=local --persist-to "${ROOT_DIR}/.wrangler-shared") &
 PLUGIN_PID=$!
 
 # Wait a bit for the second worker to start
@@ -116,7 +116,7 @@ sleep 3
 
 # Start Files worker on port 8789
 echo -e "${GREEN}Starting Files worker on port 8789...${NC}"
-(cd "${ROOT_DIR}/cloudflare_workers/files" && bunx wrangler dev -c wrangler.jsonc --port 8789 --inspector-port "${FILES_INSPECTOR_PORT}" --env-file="${RUNTIME_ENV_FILE}" --env=local --persist-to "${ROOT_DIR}/.wrangler-shared") &
+(cd "${ROOT_DIR}/cloudflare_workers/files" && bunx wrangler dev -c wrangler.jsonc --local --port 8789 --inspector-port "${FILES_INSPECTOR_PORT}" --env-file="${RUNTIME_ENV_FILE}" --env=local --persist-to "${ROOT_DIR}/.wrangler-shared") &
 FILES_PID=$!
 
 echo -e "${GREEN}All workers started!${NC}"
