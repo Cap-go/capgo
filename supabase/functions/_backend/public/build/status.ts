@@ -143,6 +143,7 @@ export async function getBuildStatus(
         resolvedPlatform,
         buildTimeSeconds,
         builderJob.job.completed_at,
+        buildRequest.app_id,
       )
     }
   }
