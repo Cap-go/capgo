@@ -57,6 +57,7 @@ describe('[POST] /apikey operations', () => {
       headers,
       body: JSON.stringify({
         name: keyName,
+        mode: 'all',
       }),
     })
     const data = await response.json<{ key: string, id: number }>()
@@ -78,6 +79,7 @@ describe('[POST] /apikey operations', () => {
       headers,
       body: JSON.stringify({
         name: 'limited-app-key-creator',
+        mode: 'all',
         limited_to_apps: [APPNAME],
       }),
     })
@@ -94,6 +96,7 @@ describe('[POST] /apikey operations', () => {
       headers: limitedHeaders,
       body: JSON.stringify({
         name: 'blocked-limited-creation',
+        mode: 'all',
         limited_to_apps: [APPNAME],
       }),
     })
@@ -230,6 +233,7 @@ describe('[POST] /apikey operations', () => {
       headers,
       body: JSON.stringify({
         name: 'test-key',
+        mode: 'all',
         org_id: nonExistentOrgId,
       }),
     })
@@ -245,6 +249,7 @@ describe('[POST] /apikey operations', () => {
       headers,
       body: JSON.stringify({
         name: 'test-key',
+        mode: 'all',
         app_id: nonExistentAppId,
       }),
     })
@@ -329,7 +334,7 @@ describe('[PUT] /apikey/:id operations', () => {
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ name: 'temp-test-key' }),
+      body: JSON.stringify({ name: 'temp-test-key', mode: 'all' }),
     })
     const createData = await createResponse.json<{ id: number }>()
 
@@ -350,7 +355,7 @@ describe('[PUT] /apikey/:id operations', () => {
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ name: 'temp-test-key-2' }),
+      body: JSON.stringify({ name: 'temp-test-key-2', mode: 'all' }),
     })
     const createData = await createResponse.json<{ id: number }>()
 
@@ -368,7 +373,7 @@ describe('[PUT] /apikey/:id operations', () => {
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ name: 'temp-plain-key-regenerate', hashed: false }),
+      body: JSON.stringify({ name: 'temp-plain-key-regenerate', mode: 'all', hashed: false }),
     })
     const createData = await createResponse.json<{ id: number, key: string }>()
     expect(createResponse.status).toBe(200)
@@ -404,7 +409,7 @@ describe('[PUT] /apikey/:id operations', () => {
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ name: 'temp-hashed-key-regenerate', hashed: true }),
+      body: JSON.stringify({ name: 'temp-hashed-key-regenerate', mode: 'all', hashed: true }),
     })
     const createData = await createResponse.json<{ id: number, key: string, key_hash: string }>()
     expect(createResponse.status).toBe(200)
@@ -446,7 +451,7 @@ describe('[PUT] /apikey/:id operations', () => {
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ name: 'temp-key-regenerate-and-rename', hashed: false }),
+      body: JSON.stringify({ name: 'temp-key-regenerate-and-rename', mode: 'all', hashed: false }),
     })
     const createData = await createResponse.json<{ id: number, key: string }>()
     expect(createResponse.status).toBe(200)
@@ -481,7 +486,7 @@ describe('[DELETE] /apikey/:id operations', () => {
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ name: 'key-to-delete' }),
+      body: JSON.stringify({ name: 'key-to-delete', mode: 'all' }),
     })
     const createData = await createResponse.json<{ id: number }>()
 
@@ -514,7 +519,7 @@ describe('[DELETE] /apikey/:id operations', () => {
     const createResponse = await fetch(`${BASE_URL}/apikey`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ name: 'key-to-double-delete' }),
+      body: JSON.stringify({ name: 'key-to-double-delete', mode: 'all' }),
     })
     const createData = await createResponse.json<{ id: number }>()
 
@@ -543,6 +548,7 @@ describe('[POST] /apikey hashed key operations', () => {
       headers,
       body: JSON.stringify({
         name: keyName,
+        mode: 'all',
         hashed: true,
       }),
     })
@@ -580,6 +586,7 @@ describe('[POST] /apikey hashed key operations', () => {
       headers,
       body: JSON.stringify({
         name: keyName,
+        mode: 'all',
         hashed: false,
       }),
     })
@@ -633,6 +640,7 @@ describe('[POST] /apikey hashed key operations', () => {
       headers,
       body: JSON.stringify({
         name: 'hashed-key-for-auth-test',
+        mode: 'all',
         hashed: true,
       }),
     })
@@ -670,6 +678,7 @@ describe('[POST] /apikey hashed key with expiration', () => {
       headers,
       body: JSON.stringify({
         name: 'hashed-key-with-expiration',
+        mode: 'all',
         hashed: true,
         expires_at: futureDate,
       }),
@@ -707,6 +716,7 @@ describe('[POST] /apikey hashed key with expiration', () => {
       headers,
       body: JSON.stringify({
         name: 'hashed-key-expiration-auth-test',
+        mode: 'all',
         hashed: true,
         expires_at: futureDate,
       }),
@@ -742,6 +752,7 @@ describe('[POST] /apikey hashed key with expiration', () => {
       headers,
       body: JSON.stringify({
         name: 'hashed-key-to-expire',
+        mode: 'all',
         hashed: true,
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       }),
@@ -776,6 +787,7 @@ describe('[RLS] hashed API key with direct Supabase SDK', () => {
       headers,
       body: JSON.stringify({
         name: 'hashed-key-rls-test',
+        mode: 'all',
         hashed: true,
       }),
     })
@@ -826,6 +838,7 @@ describe('[RLS] hashed API key with direct Supabase SDK', () => {
       headers,
       body: JSON.stringify({
         name: 'plain-key-rls-test',
+        mode: 'all',
         hashed: false,
       }),
     })

@@ -28,8 +28,9 @@ async function createStatsSiblingApp(appId: string) {
     .insert({
       app_id: appId,
       icon_url: '',
-      name: 'Stats Sibling App',
+      name: 'Stats sibling oracle test app',
       last_version: '1.0.0',
+      updated_at: new Date().toISOString(),
       owner_org: ORG_ID_STATS,
       user_id: USER_ID_STATS,
     })
@@ -165,31 +166,48 @@ describe('[GET] /statistics operations with and without subkey', () => {
     expect(hasSeededStats(statsData)).toBe(true)
   })
 
-  it('should not reveal sibling app existence with app-limited subkey', async () => {
-    expect(subkeyId).toBeGreaterThan(0)
-
-    const subkeyHeaders = { 'x-limited-key-id': String(subkeyId) }
-    const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-    const toDate = new Date().toISOString().split('T')[0]
-    const suffix = randomUUID().replaceAll('-', '')
-    const siblingApp = `com.stats.sibling.${suffix}`
-    const fakeApp = `com.stats.missing.${suffix}`
-
-    await createStatsSiblingApp(siblingApp)
+  it.concurrent('should not reveal sibling app existence outside an app-limited subkey', async () => {
+    const createSubkey = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers: headersStats,
+      body: JSON.stringify({
+        name: 'Limited Stats Subkey - oracle test',
+        mode: 'read',
+        limited_to_apps: [APPNAME],
+      }),
+    })
+    expect(createSubkey.status).toBe(200)
+    const localSubkey = await createSubkey.json() as { id: number }
+    const siblingApp = `com.stats.oracle.${randomUUID().replaceAll('-', '')}`
+    const fakeApp = `com.stats.fake.${randomUUID().replaceAll('-', '')}`
 
     try {
-      for (const appId of [siblingApp, fakeApp]) {
-        const getStats = await fetch(`${BASE_URL}/statistics/app/${appId}?from=${fromDate}&to=${toDate}`, {
+      await createStatsSiblingApp(siblingApp)
+      const subkeyHeaders = { 'x-limited-key-id': String(localSubkey.id) }
+      const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      const toDate = new Date().toISOString().split('T')[0]
+      const headers = { ...headersStats, ...subkeyHeaders }
+      const [realSiblingStats, fakeStats] = await Promise.all([
+        fetch(`${BASE_URL}/statistics/app/${siblingApp}?from=${fromDate}&to=${toDate}`, {
           method: 'GET',
-          headers: { ...headersStats, ...subkeyHeaders },
-        })
-        expect(getStats.status).toBe(401)
-        const statsData = await getStats.json<{ error: string }>()
-        expect(statsData.error).toBe('no_access_to_app')
-      }
+          headers,
+        }),
+        fetch(`${BASE_URL}/statistics/app/${fakeApp}?from=${fromDate}&to=${toDate}`, {
+          method: 'GET',
+          headers,
+        }),
+      ])
+
+      expect(realSiblingStats.status).toBe(401)
+      expect(fakeStats.status).toBe(401)
+      const realSiblingData = await realSiblingStats.json<{ error: string }>()
+      const fakeData = await fakeStats.json<{ error: string }>()
+      expect(realSiblingData.error).toBe('no_access_to_app')
+      expect(fakeData.error).toBe('no_access_to_app')
     }
     finally {
       await deleteAppByAppId(siblingApp)
+      await deleteApikeyById(localSubkey.id)
     }
   })
 

@@ -332,6 +332,14 @@ describe('tus upload protocol tests', () => {
       expect(body.error).toBe('invalid_file_path_encoding')
     })
 
+    cloudflareIt('should reject malformed read paths before an embedded attachment route prefix', async () => {
+      const response = await fetch(getEndpointUrl(`/files/read/attachments/orgs/${ORG_ID}/apps/${APPNAME}/test-%zz/files/upload/attachments/ok.zip`))
+
+      expect(response.status).toBe(400)
+      const body = await response.json() as { error?: string }
+      expect(body.error).toBe('invalid_file_path_encoding')
+    })
+
     localIt('should reject read paths containing malformed percent encoding without a server error', async () => {
       const response = await fetch(getEndpointUrl(`/files/read/attachments/orgs/${ORG_ID}/apps/${APPNAME}/test-%zz.zip`))
 

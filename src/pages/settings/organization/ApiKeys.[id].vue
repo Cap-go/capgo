@@ -21,7 +21,7 @@ interface OrgApiKey {
   id: number
   rbac_id: string
   name: string
-  mode: string
+  mode: string | null
   limited_to_orgs: string[] | null
   limited_to_apps: string[] | null
   user_id: string
@@ -404,38 +404,6 @@ async function copyCreatedKey() {
   }
 }
 
-async function showPartialFailureKeyModal(plainKey: string, isHashed: boolean) {
-  createdKeyDialogMode.value = isHashed ? 'partial-failure-hashed' : 'partial-failure-plain'
-  createdPlainKey.value = plainKey
-  dialogStore.openDialog({
-    id: 'org-apikey-created',
-    title: t('api-key-create-partial-failure-title'),
-    size: 'lg',
-    preventAccidentalClose: true,
-    buttons: [
-      {
-        text: t('ok'),
-        role: 'primary',
-      },
-    ],
-  })
-
-  await dialogStore.onDialogDismiss()
-  createdPlainKey.value = ''
-  createdKeyDialogMode.value = 'success'
-}
-
-async function rollbackCreatedApiKey(apikeyId: number | string | null) {
-  if (!apikeyId)
-    return null
-
-  const { error } = await supabase.functions.invoke(`apikey/${apikeyId}`, {
-    method: 'DELETE',
-  })
-
-  return error ?? null
-}
-
 function validateApiKeyForm() {
   if (!editName.value.trim()) {
     toast.error(t('please-enter-api-key-name'))
@@ -445,6 +413,16 @@ function validateApiKeyForm() {
   if (hasIncompleteAppBindings()) {
     toast.error(t('select-role-for-each-app'))
     return false
+  }
+
+  // In create mode, at least one binding (org role or app binding) is required
+  if (isCreateMode.value) {
+    const hasOrgRole = !!selectedOrgRole.value
+    const hasAppBindings = configuredAppIds.value.length > 0
+    if (!hasOrgRole && !hasAppBindings) {
+      toast.error(t('select-at-least-one-role'))
+      return false
+    }
   }
 
   return true
@@ -521,15 +499,42 @@ async function createAppRoleBinding(principalId: string, orgId: string, appId: s
 }
 
 async function createApiKeyRecord(orgId: string) {
+  // Build bindings array for the atomic API call
+  const bindings: Array<{
+    role_name: string
+    scope_type: 'org' | 'app'
+    org_id: string
+    app_id?: string
+  }> = []
+
+  if (selectedOrgRole.value) {
+    bindings.push({
+      role_name: selectedOrgRole.value,
+      scope_type: 'org',
+      org_id: orgId,
+    })
+  }
+
+  for (const [appId, roleName] of Object.entries(pendingAppBindings.value)) {
+    if (!roleName)
+      continue
+    bindings.push({
+      role_name: roleName,
+      scope_type: 'app',
+      org_id: orgId,
+      app_id: appId,
+    })
+  }
+
   const { data, error } = await supabase.functions.invoke('apikey', {
     method: 'POST',
     body: {
-      mode: 'all',
       name: editName.value.trim(),
       limited_to_orgs: [orgId],
       limited_to_apps: configuredLimitedAppIds.value,
       expires_at: getApiKeyExpirationValue(),
       hashed: createAsHashed.value,
+      bindings,
     },
   })
 
@@ -541,30 +546,6 @@ async function createApiKeyRecord(orgId: string) {
     throw new Error(t('failed-to-create-api-key'))
 
   return createdApiKey
-}
-
-async function assignBindingsForNewApiKey(orgId: string, principalId: string) {
-  if (selectedOrgRole.value)
-    await createOrgRoleBinding(principalId, orgId, selectedOrgRole.value)
-
-  for (const [appId, roleName] of Object.entries(pendingAppBindings.value)) {
-    if (!roleName)
-      continue
-    await createAppRoleBinding(principalId, orgId, appId, roleName)
-  }
-}
-
-async function rollbackCreatedApiKeyAfterBindingFailure(
-  bindingError: unknown,
-  createdApiKey: CreatedApiKeyResult,
-) {
-  const rollbackError = await rollbackCreatedApiKey(createdApiKey.id)
-  if (rollbackError) {
-    console.error('Failed to rollback API key after binding error:', rollbackError)
-    if (createdApiKey.key)
-      await showPartialFailureKeyModal(createdApiKey.key, createAsHashed.value)
-  }
-  throw bindingError
 }
 
 async function finalizeCreatedApiKey(createdPlainKey: string | null) {
@@ -641,15 +622,8 @@ async function createKey() {
 
   isSubmitting.value = true
   try {
+    // Single atomic call: creates key + bindings in one request
     const createdApiKey = await createApiKeyRecord(orgId)
-
-    try {
-      await assignBindingsForNewApiKey(orgId, createdApiKey.rbacId)
-    }
-    catch (bindingError) {
-      await rollbackCreatedApiKeyAfterBindingFailure(bindingError, createdApiKey)
-    }
-
     await finalizeCreatedApiKey(createdApiKey.key)
   }
   catch (err) {

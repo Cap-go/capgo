@@ -628,9 +628,8 @@ function assertValidPercentEncodedAttachmentKey(c: Context, value: string, conte
 function getRawAttachmentRouteId(c: Context): string | null {
   const pathname = new URL(c.req.url).pathname
   for (const prefix of ATTACHMENT_ROUTE_PREFIXES) {
-    const prefixIndex = pathname.indexOf(prefix)
-    if (prefixIndex >= 0)
-      return pathname.slice(prefixIndex + prefix.length)
+    if (pathname.startsWith(prefix))
+      return pathname.slice(prefix.length)
   }
   return null
 }

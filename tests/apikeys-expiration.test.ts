@@ -180,6 +180,7 @@ describe('[POST] /apikey with expiration', () => {
       headers: authHeaders,
       body: JSON.stringify({
         name: keyName('key-with-expiration'),
+        mode: 'all',
         expires_at: futureDate,
       }),
     })
@@ -197,6 +198,7 @@ describe('[POST] /apikey with expiration', () => {
       headers: authHeaders,
       body: JSON.stringify({
         name: keyName('key-no-expiration'),
+        mode: 'all',
       }),
     })
     const data = await response.json<{ key: string, id: number, expires_at: string | null }>()
@@ -212,6 +214,7 @@ describe('[POST] /apikey with expiration', () => {
       headers: authHeaders,
       body: JSON.stringify({
         name: keyName('key-past-expiration'),
+        mode: 'all',
         expires_at: pastDate,
       }),
     })
@@ -226,6 +229,7 @@ describe('[POST] /apikey with expiration', () => {
       headers: authHeaders,
       body: JSON.stringify({
         name: keyName('key-invalid-date'),
+        mode: 'all',
         expires_at: 'not-a-date',
       }),
     })
@@ -245,6 +249,7 @@ describe('[PUT] /apikey/:id with expiration', () => {
       headers: authHeaders,
       body: JSON.stringify({
         name: keyName('key-for-update-expiration'),
+        mode: 'all',
       }),
     })
     expect(response.status).toBe(200)
@@ -320,6 +325,7 @@ describe('[GET] /apikey with expiration info', () => {
       headers: authHeaders,
       body: JSON.stringify({
         name: keyName('key-with-exp-get-test'),
+        mode: 'all',
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       }),
     })
@@ -332,6 +338,7 @@ describe('[GET] /apikey with expiration info', () => {
       headers: authHeaders,
       body: JSON.stringify({
         name: keyName('key-without-exp-get-test'),
+        mode: 'all',
       }),
     })
     expect(response2.status).toBe(200)
@@ -388,6 +395,7 @@ describe('organization API key expiration policy', () => {
       headers: authHeaders,
       body: JSON.stringify({
         name: keyName('key-policy-test'),
+        mode: 'all',
         limited_to_orgs: [POLICY_ORG_ID],
       }),
     })
@@ -404,6 +412,7 @@ describe('organization API key expiration policy', () => {
       headers: authHeaders,
       body: JSON.stringify({
         name: keyName('key-policy-exceeds-max'),
+        mode: 'all',
         limited_to_orgs: [POLICY_ORG_ID],
         expires_at: tooFarDate,
       }),
@@ -421,6 +430,7 @@ describe('organization API key expiration policy', () => {
       headers: authHeaders,
       body: JSON.stringify({
         name: keyName('key-policy-valid'),
+        mode: 'all',
         limited_to_orgs: [POLICY_ORG_ID],
         expires_at: validDate,
       }),
@@ -438,6 +448,7 @@ describe('organization API key expiration policy', () => {
       headers: authHeaders,
       body: JSON.stringify({
         name: keyName('key-no-policy-org'),
+        mode: 'all',
         limited_to_orgs: [BASE_ORG_ID],
       }),
     })
@@ -453,6 +464,7 @@ describe('organization API key expiration policy', () => {
       headers: authHeaders,
       body: JSON.stringify({
         name: keyName('key-policy-app-scope'),
+        mode: 'all',
         app_id: policyAppUuid,
       }),
     })
@@ -468,6 +480,7 @@ describe('organization API key expiration policy', () => {
       headers: authHeaders,
       body: JSON.stringify({
         name: keyName('key-policy-app-scope-too-far'),
+        mode: 'all',
         limited_to_apps: [POLICY_APPNAME],
         expires_at: tooFarDate,
       }),
@@ -483,6 +496,7 @@ describe('organization API key expiration policy', () => {
       headers: authHeaders,
       body: JSON.stringify({
         name: keyName('key-policy-app-scope-missing-app'),
+        mode: 'all',
         limited_to_apps: [`com.app.expiration.missing.${id}`],
       }),
     })
@@ -498,6 +512,7 @@ describe('organization API key expiration policy', () => {
       headers: authHeaders,
       body: JSON.stringify({
         name: keyName('key-policy-app-scope-update'),
+        mode: 'all',
       }),
     })
     expect(createResponse.status).toBe(200)
@@ -523,6 +538,7 @@ describe('organization API key expiration policy', () => {
       headers: authHeaders,
       body: JSON.stringify({
         name: keyName('key-policy-limited-updater'),
+        mode: 'all',
         limited_to_apps: [POLICY_APPNAME],
         expires_at: validDate,
       }),
@@ -535,6 +551,7 @@ describe('organization API key expiration policy', () => {
       headers: authHeaders,
       body: JSON.stringify({
         name: keyName('key-policy-sibling-target'),
+        mode: 'all',
       }),
     })
     expect(siblingKeyResponse.status).toBe(200)
@@ -769,13 +786,10 @@ describe('expired API key rejection', () => {
 })
 
 describe('api key expiration boundary conditions', () => {
-  it('api key expiring exactly at current time should be rejected', async () => {
-    const data = await seedPlainApiKey('key-boundary-test', new Date().toISOString())
+  it.concurrent('api key already expired should be rejected', async () => {
+    const data = await seedPlainApiKey('key-boundary-test', new Date(Date.now() - 1000).toISOString())
 
     try {
-      // Wait a tiny bit to ensure we're past the exact timestamp.
-      await new Promise(resolve => setTimeout(resolve, 50))
-
       const authResponse = await apiFetch('/apikey', {
         method: 'GET',
         headers: {
@@ -790,7 +804,7 @@ describe('api key expiration boundary conditions', () => {
     }
   })
 
-  it('api key expiring in the near future should still work', async () => {
+  it.concurrent('api key expiring in the near future should still work', async () => {
     const data = await seedPlainApiKey('key-near-expiration', new Date(Date.now() + 30_000).toISOString())
 
     try {
@@ -808,7 +822,7 @@ describe('api key expiration boundary conditions', () => {
     }
   })
 
-  it('api key with null expiration should never expire', async () => {
+  it.concurrent('api key with null expiration should never expire', async () => {
     const data = await seedPlainApiKey('key-no-expiration-test', null)
 
     try {
