@@ -170,7 +170,7 @@ type FindApikeyByValueResult = {
   user_id: string
   key: string | null
   key_hash: string | null
-  mode: Database['public']['Enums']['key_mode']
+  mode: Database['public']['Enums']['key_mode'] | null
   updated_at: string | null
   name: string
   limited_to_orgs: string[] | null
@@ -200,8 +200,8 @@ async function checkKeyPg(
       return null
     }
 
-    // Check if mode is allowed
-    if (!rights.includes(apiKey.mode)) {
+    // Check if mode is allowed (NULL mode = RBAC-managed, always passes mode check)
+    if (apiKey.mode !== null && !rights.includes(apiKey.mode)) {
       cloudlog({ requestId: _c.get('requestId'), message: 'Invalid apikey mode (pg)', keyStringPrefix: keyString?.substring(0, 8), rights, mode: apiKey.mode })
       return null
     }
@@ -246,7 +246,7 @@ async function checkKeyByIdPg(
   try {
     const conditions = [
       eq(schema.apikeys.id, id),
-      inArray(schema.apikeys.mode, rights),
+      or(isNull(schema.apikeys.mode), inArray(schema.apikeys.mode, rights)),
       notExpiredCondition,
     ]
     if (expectedUserId) {

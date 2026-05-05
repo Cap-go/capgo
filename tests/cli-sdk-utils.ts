@@ -233,7 +233,7 @@ async function getAuthorizedApp(
   allowedModes: Database['public']['Enums']['key_mode'][],
 ) {
   const apiKey = await getApiKeyRecord(apikey)
-  if (!apiKey || !hasModeAccess(apiKey.mode, allowedModes))
+  if (!apiKey || !apiKey.mode || !hasModeAccess(apiKey.mode, allowedModes))
     return { error: 'Invalid API key or insufficient permissions.' as const }
 
   const app = await getAppRecord(appId)
@@ -251,7 +251,7 @@ async function getAuthorizedApp(
 
 async function getAppsForApiKey(apikey: string, allowedModes: Database['public']['Enums']['key_mode'][]) {
   const apiKey = await getApiKeyRecord(apikey)
-  if (!apiKey || !hasModeAccess(apiKey.mode, allowedModes))
+  if (!apiKey || !apiKey.mode || !hasModeAccess(apiKey.mode, allowedModes))
     return { error: 'Invalid API key or insufficient permissions.' as const }
 
   const { data, error } = await getSupabaseClient()
