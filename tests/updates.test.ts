@@ -10,6 +10,7 @@ const APP_NAME_UPDATE = `${APP_NAME}.${id}`
 
 interface UpdateRes {
   error?: string
+  kind?: 'up_to_date' | 'blocked' | 'failed'
   url?: string
   checksum?: string
   version?: string
@@ -120,6 +121,7 @@ describe('[POST] /updates', () => {
     expect(response.status).toBe(200)
     const json = await response.json<UpdateRes>()
     expect(json.error).toEqual('no_new_version_available')
+    expect(json.kind).toBe('up_to_date')
   })
 
   it('new version available', async () => {
@@ -497,6 +499,7 @@ describe('[POST] /updates parallel tests', () => {
     expect(response2.status).toBe(200)
     const json = await response2.json<UpdateRes>()
     expect(json.error).toEqual('no_new_version_available')
+    expect(json.kind).toBe('up_to_date')
 
     // Clean up
     await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APP_NAME_UPDATE)
@@ -511,6 +514,7 @@ describe('[POST] /updates parallel tests', () => {
     expect(response.status).toBe(200)
     const json = await response.json<UpdateRes>()
     expect(json.error).toBe('disable_auto_update_to_major')
+    expect(json.kind).toBe('blocked')
   })
 
   it('app that does not exist', async () => {
@@ -521,6 +525,7 @@ describe('[POST] /updates parallel tests', () => {
     expect(response.status).toBe(429)
     const json = await response.json<UpdateRes>()
     expect(json.error).toBe('on_premise_app')
+    expect(json.kind).toBe('failed')
   })
 
   it('direct channel overwrite', async () => {
@@ -766,6 +771,7 @@ describe('[POST] /updates invalid data', () => {
 
     const json = await response.json<UpdateRes>()
     expect(json.error).toBe('on_premise_app')
+    expect(json.kind).toBe('failed')
   })
 })
 

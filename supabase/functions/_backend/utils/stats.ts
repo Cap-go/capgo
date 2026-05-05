@@ -44,7 +44,7 @@ export async function onPremStats(c: Context, app_id: string, action: string, de
   await createStatsLogsExternal(c, device.app_id, device.device_id, 'get', device.version_name)
   cloudlog({ requestId: c.get('requestId'), message: 'App is external (onPremise), returning 429', app_id: device.app_id, country: c.req.raw.cf?.country, user_agent: c.req.raw.headers.get('user-agent') })
   // Return 429 to prevent device from retrying until next app kill (DDOS prevention)
-  return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  return c.json({ error: 'on_premise_app', message: 'On-premise app detected', kind: 'failed' }, 429)
 }
 
 export function createStatsBandwidth(c: Context, device_id: string, app_id: string, file_size: number) {
