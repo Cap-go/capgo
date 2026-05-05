@@ -459,6 +459,7 @@ export function usePageTranslation() {
     const requestedPath = route.path
     const requestHash = await sha256Hex(JSON.stringify({
       lang,
+      path: requestedPath,
       strings: uniqueSources,
     }))
 

@@ -16,7 +16,7 @@ const DEFAULT_TRANSLATION_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast'
 const TRANSLATION_MODEL_ATTEMPTS = 3
 const TRANSLATION_SINGLE_TEXT_ATTEMPTS = 2
 const TRANSLATION_BATCH_TIMEOUT_MS = 30_000
-const AI_OUTPUT_PREVIEW_CHARS = 240
+const TRANSLATION_PAGE_PATH_MAX_LENGTH = 200
 const TRANSLATION_IP_RATE_PATH = '/translation/ip-rate'
 const TRANSLATION_IP_RATE_TTL_SECONDS = 60
 // High enough for real users behind shared NATs while still limiting quota abuse.
@@ -127,6 +127,9 @@ interface TranslationRateLimitStatus {
   limited: boolean
   resetAt?: number
 }
+
+// The Cache API has no atomic increment; mutate this in-isolate map synchronously before any await.
+const translationIpRateLimitEntries = new Map<string, TranslationRateLimitEntry>()
 
 function normalizeWhitespace(value: string) {
   return value.replace(/\s+/g, ' ').trim()
@@ -309,7 +312,27 @@ function getTranslationIpRateLimit(c: Context) {
   return DEFAULT_TRANSLATION_IP_RATE_LIMIT
 }
 
-async function recordTranslationRequest(c: Context): Promise<TranslationRateLimitStatus> {
+function incrementTranslationRateLimit(cacheKey: Request, now = Date.now()): TranslationRateLimitEntry {
+  const key = cacheKey.url
+  const existing = translationIpRateLimitEntries.get(key)
+  if (!existing || existing.resetAt <= now) {
+    const entry = {
+      count: 1,
+      resetAt: now + TRANSLATION_IP_RATE_TTL_SECONDS * 1000,
+    }
+    translationIpRateLimitEntries.set(key, entry)
+    return entry
+  }
+
+  const entry = {
+    count: existing.count + 1,
+    resetAt: existing.resetAt,
+  }
+  translationIpRateLimitEntries.set(key, entry)
+  return entry
+}
+
+function recordTranslationRequest(c: Context): TranslationRateLimitStatus {
   const ip = getClientIP(c)
   if (ip === 'unknown') {
     cloudlog({
@@ -321,13 +344,7 @@ async function recordTranslationRequest(c: Context): Promise<TranslationRateLimi
 
   const cacheHelper = new CacheHelper(c)
   const cacheKey = cacheHelper.buildRequest(TRANSLATION_IP_RATE_PATH, { ip })
-  const existing = await cacheHelper.matchJson<TranslationRateLimitEntry>(cacheKey)
-  const entry: TranslationRateLimitEntry = {
-    count: (existing?.count ?? 0) + 1,
-    resetAt: Date.now() + TRANSLATION_IP_RATE_TTL_SECONDS * 1000,
-  }
-
-  await cacheHelper.putJson(cacheKey, entry, TRANSLATION_IP_RATE_TTL_SECONDS)
+  const entry = incrementTranslationRateLimit(cacheKey)
 
   const limit = getTranslationIpRateLimit(c)
   const limited = entry.count >= limit
@@ -454,9 +471,13 @@ function plainTranslationFromUnknown(payload: unknown): string {
   return ''
 }
 
-function aiPayloadPreview(payload: unknown): string {
-  const raw = typeof payload === 'string' ? payload : JSON.stringify(payload)
-  return raw.length > AI_OUTPUT_PREVIEW_CHARS ? `${raw.slice(0, AI_OUTPUT_PREVIEW_CHARS)}...` : raw
+function aiPayloadSummary(payload: unknown) {
+  const serialized = typeof payload === 'string' ? payload : JSON.stringify(payload)
+  const raw = serialized ?? ''
+  return {
+    outputLength: raw.length,
+    outputType: Array.isArray(payload) ? 'array' : typeof payload,
+  }
 }
 
 function normalizedTranslationValue(value: string) {
@@ -531,9 +552,10 @@ async function runAiWithTimeout(ai: { run: (model: string, input: unknown) => Pr
   }
 }
 
-async function translateBatchWithJsonMode(ai: { run: (model: string, input: unknown) => Promise<unknown> }, model: string, targetLanguage: string, batch: ProtectedEntry[]) {
+async function translateBatchWithJsonMode(ai: { run: (model: string, input: unknown) => Promise<unknown> }, model: string, targetLanguage: string, batch: ProtectedEntry[], pagePath = '') {
   let lastError: Error | null = null
   const sources = batch.map(entry => entry.source)
+  const pageContext = pageContextPrompt(pagePath)
 
   for (let attempt = 1; attempt <= TRANSLATION_MODEL_ATTEMPTS; attempt += 1) {
     let payload: unknown = ''
@@ -552,6 +574,7 @@ async function translateBatchWithJsonMode(ai: { run: (model: string, input: unkn
               'You translate Capgo app interface copy for the target locale.',
               'Translate naturally for the user cultural context; adapt idioms, grammar, tone, and phrasing instead of translating word for word.',
               'Translate every human-readable label, heading, sentence, and paragraph into the target language, including short navigation labels.',
+              pageContext,
               'Preserve brand names, product names, developer terms, URLs, code identifiers, file paths, package names, language codes, numbers, punctuation, and whitespace meaning.',
               'Do not translate or transliterate literal tokens such as Capgo, Capacitor, code, API, SDK, CLI, npm, bun, GitHub, Cloudflare, package names, command names, and framework names.',
               'Source text may include placeholders like __CAPGO_TOKEN_0__. Copy every placeholder exactly as written; placeholders are restored after translation.',
@@ -563,6 +586,7 @@ async function translateBatchWithJsonMode(ai: { run: (model: string, input: unkn
             role: 'user',
             content: JSON.stringify({
               targetLanguage,
+              pagePath: pagePath || undefined,
               protectedTokens: PROTECTED_TRANSLATION_TOKENS,
               texts: batch.map(entry => entry.protectedText),
             }),
@@ -595,15 +619,16 @@ async function translateBatchWithJsonMode(ai: { run: (model: string, input: unkn
       maxAttempts: TRANSLATION_MODEL_ATTEMPTS,
       batchSize: batch.length,
       error: lastError.message,
-      outputPreview: aiPayloadPreview(payload),
+      outputSummary: aiPayloadSummary(payload),
     })
   }
 
   throw new Error(`Translation JSON mode failed for ${targetLanguage}: ${lastError?.message ?? 'unknown error'}`)
 }
 
-async function translateSingleText(ai: { run: (model: string, input: unknown) => Promise<unknown> }, model: string, targetLanguage: string, entry: ProtectedEntry) {
+async function translateSingleText(ai: { run: (model: string, input: unknown) => Promise<unknown> }, model: string, targetLanguage: string, entry: ProtectedEntry, pagePath = '') {
   let lastError: Error | null = null
+  const pageContext = pageContextPrompt(pagePath)
 
   for (let attempt = 1; attempt <= TRANSLATION_SINGLE_TEXT_ATTEMPTS; attempt += 1) {
     let payload: unknown = ''
@@ -616,6 +641,7 @@ async function translateSingleText(ai: { run: (model: string, input: unknown) =>
             role: 'system',
             content: [
               'You translate one Capgo app interface string for the target locale.',
+              pageContext,
               'Translate naturally for the user cultural context; adapt idioms, grammar, tone, and phrasing instead of translating word for word.',
               'Preserve brand names, product names, developer terms, URLs, code identifiers, file paths, package names, language codes, numbers, punctuation, and whitespace meaning.',
               'Do not translate or transliterate literal tokens such as Capgo, Capacitor, code, API, SDK, CLI, npm, bun, GitHub, Cloudflare, package names, command names, and framework names.',
@@ -627,6 +653,7 @@ async function translateSingleText(ai: { run: (model: string, input: unknown) =>
             role: 'user',
             content: JSON.stringify({
               targetLanguage,
+              pagePath: pagePath || undefined,
               protectedTokens: PROTECTED_TRANSLATION_TOKENS,
               text: entry.protectedText,
             }),
@@ -650,25 +677,25 @@ async function translateSingleText(ai: { run: (model: string, input: unknown) =>
       attempt,
       maxAttempts: TRANSLATION_SINGLE_TEXT_ATTEMPTS,
       error: lastError.message,
-      outputPreview: aiPayloadPreview(payload),
+      outputSummary: aiPayloadSummary(payload),
     })
   }
 
   throw new Error(`Single-text translation failed for ${targetLanguage}: ${lastError?.message ?? 'unknown error'}`)
 }
 
-async function translateBatchIndividually(ai: { run: (model: string, input: unknown) => Promise<unknown> }, model: string, targetLanguage: string, batch: ProtectedEntry[]) {
+async function translateBatchIndividually(ai: { run: (model: string, input: unknown) => Promise<unknown> }, model: string, targetLanguage: string, batch: ProtectedEntry[], pagePath = '') {
   const translated: string[] = []
   for (const entry of batch) {
-    translated.push(await translateSingleText(ai, model, targetLanguage, entry))
+    translated.push(await translateSingleText(ai, model, targetLanguage, entry, pagePath))
   }
   assertTranslatedBatch(targetLanguage, batch.map(entry => entry.source), translated)
   return translated
 }
 
-async function translateBatch(ai: { run: (model: string, input: unknown) => Promise<unknown> }, model: string, targetLanguage: string, batch: ProtectedEntry[]) {
+async function translateBatch(ai: { run: (model: string, input: unknown) => Promise<unknown> }, model: string, targetLanguage: string, batch: ProtectedEntry[], pagePath = '') {
   try {
-    return await translateBatchWithJsonMode(ai, model, targetLanguage, batch)
+    return await translateBatchWithJsonMode(ai, model, targetLanguage, batch, pagePath)
   }
   catch (error) {
     cloudlog({
@@ -679,7 +706,7 @@ async function translateBatch(ai: { run: (model: string, input: unknown) => Prom
     })
   }
 
-  return await translateBatchIndividually(ai, model, targetLanguage, batch)
+  return await translateBatchIndividually(ai, model, targetLanguage, batch, pagePath)
 }
 
 function getTranslationModel(c: Context) {
@@ -690,13 +717,23 @@ function getTargetLanguageName(targetLanguage: string) {
   return LANGUAGE_NAMES[targetLanguage] ?? targetLanguage
 }
 
-async function translateStrings(ai: { run: (model: string, input: unknown) => Promise<unknown> }, strings: string[], targetLanguage: string, model: string) {
+function normalizePagePath(value: unknown) {
+  if (typeof value !== 'string')
+    return ''
+  return value.trim().replace(/\s+/g, ' ').slice(0, TRANSLATION_PAGE_PATH_MAX_LENGTH)
+}
+
+function pageContextPrompt(pagePath: string) {
+  return pagePath ? `Use source page path ${pagePath} only as context for choosing page-appropriate wording.` : ''
+}
+
+async function translateStrings(ai: { run: (model: string, input: unknown) => Promise<unknown> }, strings: string[], targetLanguage: string, model: string, pagePath = '') {
   const entries = createProtectedEntries(strings)
   const batches = buildBatches(entries)
   const translations = new Map<string, string>()
 
   for (const batch of batches) {
-    const translatedBatch = await translateBatch(ai, model, getTargetLanguageName(targetLanguage), batch)
+    const translatedBatch = await translateBatch(ai, model, getTargetLanguageName(targetLanguage), batch, pagePath)
     batch.forEach((entry, index) => {
       translations.set(entry.source, translatedBatch[index] ?? entry.source)
     })
@@ -732,9 +769,11 @@ app.post('/page', async (c) => {
   }
 
   const strings = normalizeTranslationStrings(body.strings)
+  const pagePath = normalizePagePath(body.pagePath)
   const model = getTranslationModel(c)
   const requestHash = await sha256Hex(JSON.stringify({
     model,
+    pagePath,
     targetLanguage,
     strings,
   }))
@@ -751,7 +790,7 @@ app.post('/page', async (c) => {
   if (cached)
     return c.json(cached)
 
-  const rateLimitStatus = await recordTranslationRequest(c)
+  const rateLimitStatus = recordTranslationRequest(c)
   if (rateLimitStatus.limited) {
     const retryAfter = rateLimitStatus.resetAt
       ? Math.max(1, Math.ceil((rateLimitStatus.resetAt - Date.now()) / 1000))
@@ -763,7 +802,7 @@ app.post('/page', async (c) => {
   let translations: Record<string, string> = {}
   try {
     translations = strings.length > 0
-      ? await translateStrings(c.env.AI, strings, targetLanguage, model)
+      ? await translateStrings(c.env.AI, strings, targetLanguage, model, pagePath)
       : {}
   }
   catch (error) {
@@ -819,7 +858,7 @@ app.post('/messages', async (c) => {
   if (cached)
     return c.json(cached)
 
-  const rateLimitStatus = await recordTranslationRequest(c)
+  const rateLimitStatus = recordTranslationRequest(c)
   if (rateLimitStatus.limited) {
     const retryAfter = rateLimitStatus.resetAt
       ? Math.max(1, Math.ceil((rateLimitStatus.resetAt - Date.now()) / 1000))

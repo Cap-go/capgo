@@ -1858,7 +1858,5 @@
   "start-of-selected-period-help": "{count} devices were on {version} on {date}.",
   "restore-account": "Restore account",
   "restoring-account": "Restoring account...",
-  "account-deletion-contact-support": "Please contact",
-  "account-deletion-support-link": "Capgo support",
-  "account-deletion-restore-suffix": "if you would like to restore it"
+  "account-deletion-support-full": "Please contact {supportLink} if you would like to restore it"
 }

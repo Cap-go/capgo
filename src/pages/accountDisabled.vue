@@ -11,6 +11,7 @@ const route = useRoute()
 const router = useRouter()
 const main = useMainStore()
 const supabase = useSupabase()
+const SUPPORT_LINK_TOKEN = '__CAPGO_SUPPORT_LINK__'
 
 async function handleLogout() {
   await main.logout()
@@ -29,6 +30,18 @@ const restoreTarget = computed(() => {
   if (target.startsWith('/') && target !== '/accountDisabled')
     return target
   return '/dashboard'
+})
+
+const accountDeletionSupportText = computed(() => t('account-deletion-support-full', { supportLink: SUPPORT_LINK_TOKEN }))
+const accountDeletionSupportParts = computed(() => {
+  const supportLinkIndex = accountDeletionSupportText.value.indexOf(SUPPORT_LINK_TOKEN)
+  if (supportLinkIndex < 0)
+    return { before: accountDeletionSupportText.value, after: '' }
+
+  return {
+    before: accountDeletionSupportText.value.slice(0, supportLinkIndex),
+    after: accountDeletionSupportText.value.slice(supportLinkIndex + SUPPORT_LINK_TOKEN.length),
+  }
 })
 
 async function handleRestore() {
@@ -152,14 +165,14 @@ const timeRemaining = computed(() => {
           {{ t('account-deletion-requested') }}
         </h1>
         <p class="mb-4 text-lg text-gray-600 dark:text-gray-300">
-          {{ t('account-deletion-contact-support') }}
+          {{ accountDeletionSupportParts.before }}
           <a
             href="https://support.capgo.app/"
             target="_blank"
             rel="noopener noreferrer"
             class="text-blue-500 underline hover:text-blue-600"
-          >{{ t('account-deletion-support-link') }}</a>
-          {{ t('account-deletion-restore-suffix') }}
+          >Capgo support</a>
+          {{ accountDeletionSupportParts.after }}
         </p>
         <div class="p-4 mt-6 bg-red-50 rounded-lg border border-red-200 dark:border-red-800 dark:bg-red-900/20">
           <p class="font-medium text-red-800 dark:text-red-200">
