@@ -126,7 +126,7 @@ async function getUsage(orgId: string) {
   const totalBandwidth = bytesToGb(totalBandwidthBytes)
   const totalStorageBytes = await getTotalStorage(orgId)
   const totalStorage = bytesToGb(totalStorageBytes)
-  const totalBuildTime = relevantUsage.reduce((acc, entry) => acc + (entry.build_time_unit ?? 0), 0)
+  const totalBuildTime = relevantUsage.reduce((acc, entry) => acc + (entry.build_time_seconds ?? 0), 0)
 
   detailPlanUsage = maybeDeriveMissingUsagePercents({
     detailPlanUsage,
