@@ -44,12 +44,12 @@ async function redirectToEmailVerification() {
 async function checkEmailVerification() {
   isLoadingSession.value = true
   const { data: sessionResult, error: sessionError } = await supabase.auth.getSession()
-  if (sessionError) {
-    isEmailVerified.value = false
+  if (sessionError || !sessionResult?.session) {
+    isEmailVerified.value = true
     isLoadingSession.value = false
     return
   }
-  isEmailVerified.value = !!sessionResult?.session?.user?.email_confirmed_at
+  isEmailVerified.value = !!sessionResult.session.user.email_confirmed_at
   isLoadingSession.value = false
 }
 
