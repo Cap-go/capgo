@@ -18383,7 +18383,7 @@ CREATE POLICY "Allow select for auth, api keys (read+)" ON "public"."orgs" FOR S
 
 
 
-CREATE POLICY "Allow select for auth, api keys (super_admin+)" ON "public"."audit_logs" FOR SELECT TO "anon", "authenticated" USING (("org_id" = ANY ("public"."audit_logs_allowed_orgs"())));
+CREATE POLICY "Allow select for auth, api keys (super_admin+)" ON "public"."audit_logs" FOR SELECT TO "anon", "authenticated" USING (("org_id" = ANY (COALESCE(( SELECT "public"."audit_logs_allowed_orgs"() AS "audit_logs_allowed_orgs"), '{}'::"uuid"[]))));
 
 
 

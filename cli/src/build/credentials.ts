@@ -21,6 +21,7 @@
 
 import type { AllCredentials, CredentialFile, SavedCredentials } from '../schemas/build'
 import type { BuildCredentials } from './request'
+import { Buffer } from 'node:buffer'
 import { readFile as readNodeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -185,7 +186,15 @@ export function loadCredentialsFromEnv(): Partial<BuildCredentials> {
   const appStoreConnectTeamId = readRuntimeEnv('APP_STORE_CONNECT_TEAM_ID')
   const capgoIosScheme = readRuntimeEnv('CAPGO_IOS_SCHEME')
   const capgoIosTarget = readRuntimeEnv('CAPGO_IOS_TARGET')
-  const capgoIosProvisioningMap = readRuntimeEnv('CAPGO_IOS_PROVISIONING_MAP')
+  // Provisioning map can be supplied as raw JSON (CAPGO_IOS_PROVISIONING_MAP) or
+  // base64-encoded JSON (CAPGO_IOS_PROVISIONING_MAP_BASE64). The base64 form
+  // avoids quoting/newline pitfalls when storing the stringified JSON in CI secrets.
+  const capgoIosProvisioningMapRaw = readRuntimeEnv('CAPGO_IOS_PROVISIONING_MAP')
+  const capgoIosProvisioningMapBase64 = readRuntimeEnv('CAPGO_IOS_PROVISIONING_MAP_BASE64')
+  const capgoIosProvisioningMap = capgoIosProvisioningMapRaw
+    || (capgoIosProvisioningMapBase64
+      ? Buffer.from(capgoIosProvisioningMapBase64, 'base64').toString('utf-8')
+      : undefined)
   const rawCapgoAndroidFlavor = readRuntimeEnv('CAPGO_ANDROID_FLAVOR')
   const capgoAndroidFlavor = rawCapgoAndroidFlavor?.trim() || undefined
   const androidKeystoreFile = readRuntimeEnv('ANDROID_KEYSTORE_FILE')
