@@ -29,7 +29,7 @@ test.describe('SSO Login Flow (Two-Step)', () => {
 
     await expect(page.locator('[data-test="password"]')).toBeVisible({ timeout: 10000 })
 
-    await page.locator('p').filter({ hasText: '←' }).first().click()
+    await page.locator('[data-test="back-to-email"]').click()
 
     await expect(page.locator('[data-test="email"]')).toBeVisible()
     await expect(page.locator('[data-test="continue"]')).toBeVisible()

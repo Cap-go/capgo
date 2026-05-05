@@ -838,7 +838,7 @@ onMounted(checkLogin)
                       </div>
                     </div>
                     <div class="text-center">
-                      <button type="button" class="appearance-none" :class="authInlineLinkClass" @click="goBackToEmail">
+                      <button type="button" data-test="back-to-email" class="appearance-none" :class="authInlineLinkClass" @click="goBackToEmail">
                         ← {{ t('go-back') }}
                       </button>
                     </div>
@@ -927,7 +927,7 @@ onMounted(checkLogin)
 
                         <div :class="authPanelClass">
                           <div>
-                            <button type="button" class="appearance-none" :class="authInlineLinkClass" @click="goBackToEmail">
+                            <button type="button" data-test="back-to-email" class="appearance-none" :class="authInlineLinkClass" @click="goBackToEmail">
                               ← {{ t('go-back') }}
                             </button>
                           </div>
