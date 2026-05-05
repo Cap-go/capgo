@@ -22,6 +22,39 @@ function keyName(name: string): string {
   return `${name}-${id}`
 }
 
+async function seedPlainApiKey(name: string, expiresAt: string | null) {
+  const key = randomUUID()
+  const { data, error } = await getSupabaseClient()
+    .from('apikeys')
+    .insert({
+      user_id: USER_ID_APIKEY_EXPIRATION,
+      key,
+      key_hash: null,
+      mode: 'all',
+      name: keyName(name),
+      limited_to_apps: [],
+      limited_to_orgs: [],
+      expires_at: expiresAt,
+    })
+    .select('id, key, expires_at')
+    .single()
+
+  if (error || !data?.key)
+    throw error ?? new Error('Missing seeded API key')
+
+  return { id: data.id, key: data.key, expires_at: data.expires_at }
+}
+
+async function deleteSeededApiKeys(ids: number[]) {
+  if (ids.length === 0)
+    return
+
+  await getSupabaseClient()
+    .from('apikeys')
+    .delete()
+    .in('id', ids)
+}
+
 function apiFetch(path: string, init?: RequestInit) {
   return fetchWithRetry(`${BASE_URL}${path}`, init)
 }
@@ -696,40 +729,19 @@ describe('[PUT] /organization with API key policy', () => {
 describe('expired API key rejection', () => {
   let expiredKeyValue: string
   let validKeyValue: string
+  const seededApiKeyIds: number[] = []
 
   beforeAll(async () => {
-    // Create an API key with expiration, then manually set it to expired via DB
-    const response1 = await apiFetch('/apikey', {
-      method: 'POST',
-      headers: authHeaders,
-      body: JSON.stringify({
-        name: keyName('key-to-be-expired'),
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      }),
-    })
-    expect(response1.status).toBe(200)
-    const data1 = await response1.json<{ id: number, key: string }>()
-    expiredKeyValue = data1.key
+    const expiredKey = await seedPlainApiKey('key-to-be-expired', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+    const validKey = await seedPlainApiKey('key-valid-for-test', new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString())
 
-    // Manually set the key to expired (1 day ago)
-    const { error } = await getSupabaseClient().from('apikeys').update({
-      expires_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
-    }).eq('id', data1.id)
-    if (error)
-      throw error
+    expiredKeyValue = expiredKey.key
+    validKeyValue = validKey.key
+    seededApiKeyIds.push(expiredKey.id, validKey.id)
+  })
 
-    // Create a valid key for comparison
-    const response2 = await apiFetch('/apikey', {
-      method: 'POST',
-      headers: authHeaders,
-      body: JSON.stringify({
-        name: keyName('key-valid-for-test'),
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      }),
-    })
-    expect(response2.status).toBe(200)
-    const data2 = await response2.json<{ key: string }>()
-    validKeyValue = data2.key
+  afterAll(async () => {
+    await deleteSeededApiKeys(seededApiKeyIds)
   })
 
   it('expired API key should be rejected when used for authentication', async () => {
@@ -758,96 +770,61 @@ describe('expired API key rejection', () => {
 
 describe('api key expiration boundary conditions', () => {
   it('api key expiring exactly at current time should be rejected', async () => {
-    // Create an API key with future expiration
-    const response = await apiFetch('/apikey', {
-      method: 'POST',
-      headers: authHeaders,
-      body: JSON.stringify({
-        name: keyName('key-boundary-test'),
-        expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      }),
-    })
-    const data = await response.json<{ id: number, key: string }>()
-    expect(response.status).toBe(200)
+    const data = await seedPlainApiKey('key-boundary-test', new Date().toISOString())
 
-    // Set expiration to exactly now (should be considered expired since condition is > now)
-    const { error } = await getSupabaseClient().from('apikeys').update({
-      expires_at: new Date().toISOString(),
-    }).eq('id', data.id)
-    expect(error).toBeNull()
+    try {
+      // Wait a tiny bit to ensure we're past the exact timestamp.
+      await new Promise(resolve => setTimeout(resolve, 50))
 
-    // Wait a tiny bit to ensure we're past the exact timestamp
-    await new Promise(resolve => setTimeout(resolve, 50))
-
-    // Try to use the key - should be rejected
-    const authResponse = await apiFetch('/apikey', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': data.key,
-      },
-    })
-    expect(authResponse.status).toBe(401)
+      const authResponse = await apiFetch('/apikey', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': data.key,
+        },
+      })
+      expect(authResponse.status).toBe(401)
+    }
+    finally {
+      await deleteSeededApiKeys([data.id])
+    }
   })
 
-  it('api key expiring 1 second in the future should still work', async () => {
-    // Create an API key with 1 second future expiration
-    const futureDate = new Date(Date.now() + 5000).toISOString() // 5 seconds from now
-    const response = await apiFetch('/apikey', {
-      method: 'POST',
-      headers: authHeaders,
-      body: JSON.stringify({
-        name: keyName('key-near-expiration'),
-        expires_at: futureDate,
-      }),
-    })
-    const data = await response.json<{ id: number, key: string }>()
-    expect(response.status).toBe(200)
+  it('api key expiring in the near future should still work', async () => {
+    const data = await seedPlainApiKey('key-near-expiration', new Date(Date.now() + 30_000).toISOString())
 
-    // Use the key immediately - should work
-    const authResponse = await apiFetch('/apikey', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': data.key,
-      },
-    })
-    expect(authResponse.status).toBe(200)
-
-    // Cleanup
-    await apiFetch(`/apikey/${data.id}`, {
-      method: 'DELETE',
-      headers: authHeaders,
-    })
+    try {
+      const authResponse = await apiFetch('/apikey', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': data.key,
+        },
+      })
+      expect(authResponse.status).toBe(200)
+    }
+    finally {
+      await deleteSeededApiKeys([data.id])
+    }
   })
 
   it('api key with null expiration should never expire', async () => {
-    // Create an API key without expiration
-    const response = await apiFetch('/apikey', {
-      method: 'POST',
-      headers: authHeaders,
-      body: JSON.stringify({
-        name: keyName('key-no-expiration-test'),
-      }),
-    })
-    const data = await response.json<{ id: number, key: string, expires_at: string | null }>()
-    expect(response.status).toBe(200)
-    expect(data.expires_at).toBeNull()
+    const data = await seedPlainApiKey('key-no-expiration-test', null)
 
-    // Use the key - should always work
-    const authResponse = await apiFetch('/apikey', {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': data.key,
-      },
-    })
-    expect(authResponse.status).toBe(200)
+    try {
+      expect(data.expires_at).toBeNull()
 
-    // Cleanup
-    await apiFetch(`/apikey/${data.id}`, {
-      method: 'DELETE',
-      headers: authHeaders,
-    })
+      const authResponse = await apiFetch('/apikey', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': data.key,
+        },
+      })
+      expect(authResponse.status).toBe(200)
+    }
+    finally {
+      await deleteSeededApiKeys([data.id])
+    }
   })
 })
