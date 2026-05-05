@@ -373,7 +373,7 @@ async function ensureMessageCatalogLoaded(lang: string) {
   const loadPromise = fetchTranslatedMessageCatalog(normalized, messageCatalog)
     .then((messages) => {
       if (!messages)
-        return messageCatalog
+        return translatedMessageCatalogs.get(normalized)?.messages ?? messageCatalog
 
       translatedMessageCatalogs.set(normalized, { complete: true, messages })
       persistMessageCatalog(normalized, messages)

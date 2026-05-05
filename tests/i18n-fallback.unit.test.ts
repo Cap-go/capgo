@@ -60,4 +60,29 @@ describe('i18n fallback loading', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(translateMessage('account')).toBe('Compte')
   })
+
+  it('keeps partial catalog translations when the background full fetch fails', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        messages: {
+          account: 'Compte',
+        },
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        status: 200,
+      }))
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { loadLanguageAsync, translateMessage } = await import('../src/modules/i18n.ts')
+
+    translateMessage('account')
+    await loadLanguageAsync('fr')
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(translateMessage('account')).toBe('Compte')
+  })
 })
