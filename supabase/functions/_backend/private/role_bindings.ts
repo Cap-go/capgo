@@ -773,9 +773,30 @@ app.delete('/:binding_id', requireUserAuth, sValidator('param', bindingIdParamSc
     if (targetRole && targetRole.priority_rank > callerMaxRank) {
       return c.json({ error: 'Cannot delete a binding for a role with higher privileges than your own' }, 403)
     }
-    await drizzle
-      .delete(schema.role_bindings)
-      .where(eq(schema.role_bindings.id, bindingId))
+    await drizzle.transaction(async (tx) => {
+      await tx
+        .delete(schema.role_bindings)
+        .where(eq(schema.role_bindings.id, bindingId))
+
+      if (binding.principal_type === 'user' && binding.scope_type === 'org' && binding.org_id) {
+        await tx
+          .update(schema.org_users)
+          .set({
+            user_right: null,
+            rbac_role_name: null,
+            updated_at: sql`now()`,
+          })
+          .where(
+            and(
+              eq(schema.org_users.user_id, binding.principal_id),
+              eq(schema.org_users.org_id, binding.org_id),
+              sql`${schema.org_users.app_id} IS NULL`,
+              sql`${schema.org_users.channel_id} IS NULL`,
+              sql`(${schema.org_users.user_right} IS NULL OR ${schema.org_users.user_right}::text NOT LIKE 'invite_%')`,
+            ),
+          )
+      }
+    })
 
     cloudlog({
       requestId: c.get('requestId'),
