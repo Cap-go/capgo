@@ -1,5 +1,6 @@
 import type { TrackOptions } from '@logsnag/node'
 import type { Context } from 'hono'
+import type { PostHogGroups } from './posthog.ts'
 import { cloudlogErr, serializeError } from './logging.ts'
 import { logsnag } from './logsnag.ts'
 import { sendNotifToOrgMembers } from './org_email_notifications.ts'
@@ -17,6 +18,7 @@ export interface BentoTrackingPayload {
 
 export interface SendEventToTrackingPayload extends TrackOptions {
   bento?: BentoTrackingPayload
+  groups?: PostHogGroups
   sentToBento?: boolean
 }
 
@@ -46,7 +48,7 @@ function getTrackingIp(c: Context, ip?: string) {
   return c.req.header('cf-connecting-ip') ?? c.req.header('x-forwarded-for')?.split(',')[0]?.trim()
 }
 
-async function executeTracking(c: Context, payload: TrackOptions, options: SendEventToTrackingOptions) {
+async function executeTracking(c: Context, payload: SendEventToTrackingPayload, options: SendEventToTrackingOptions) {
   const tasks: Array<Promise<void>> = [
     runTrackedCall(c, 'logsnag', () => logsnag(c).track(payload)),
     runTrackedCall(c, 'posthog', () => trackPosthogEvent(c, {
@@ -55,6 +57,7 @@ async function executeTracking(c: Context, payload: TrackOptions, options: SendE
       tags: payload.tags,
       channel: payload.channel,
       description: payload.description,
+      groups: payload.groups,
       ip: getTrackingIp(c, options.ip),
     })),
   ]

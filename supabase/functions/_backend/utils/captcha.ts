@@ -1,10 +1,11 @@
 import type { Context } from 'hono'
-import { z } from 'zod/mini'
+import { type } from 'arktype'
+import { safeParseSchema } from './ark_validation.ts'
 import { simpleError } from './hono.ts'
 import { cloudlog } from './logging.ts'
 
-const captchaSchema = z.object({
-  success: z.boolean(),
+const captchaSchema = type({
+  success: 'boolean',
 })
 
 export async function verifyCaptchaToken(c: Context, token: string, captchaSecret: string) {
@@ -21,7 +22,7 @@ export async function verifyCaptchaToken(c: Context, token: string, captchaSecre
   })
 
   const captchaResult = await result.json()
-  const captchaResultData = captchaSchema.safeParse(captchaResult)
+  const captchaResultData = safeParseSchema(captchaSchema, captchaResult)
   if (!captchaResultData.success) {
     throw simpleError('invalid_captcha', 'Invalid captcha result')
   }

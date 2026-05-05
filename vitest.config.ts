@@ -1,8 +1,15 @@
+import path from 'node:path'
 import { cwd } from 'node:process'
 import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig(({ mode }) => ({
+  resolve: {
+    alias: {
+      '@capgo/cli/sdk': path.resolve(cwd(), 'cli/src/sdk.ts'),
+      '~/': `${path.resolve(cwd(), 'src')}/`,
+    },
+  },
   test: {
     include: ['tests/*.test.ts'],
     environment: 'node',

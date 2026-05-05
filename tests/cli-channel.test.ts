@@ -138,11 +138,17 @@ describe('tests CLI channel commands', () => {
       const channelName = generateChannelName()
       await createChannel(channelName, APPNAME)
 
-      // Upload bundle first
-      const bundle = '1.0.0'
-      const { uploadBundleSDK, prepareCli } = await import('./cli-sdk-utils')
-      await prepareCli(APPNAME)
-      await uploadBundleSDK(APPNAME, bundle)
+      const bundle = `1.0.${Math.floor(Math.random() * 10000)}`
+      await getSupabaseClient()
+        .from('app_versions')
+        .insert({
+          app_id: APPNAME,
+          name: bundle,
+          owner_org: ORG_ID,
+          user_id: USER_ID,
+          storage_provider: 'r2-direct',
+        })
+        .throwOnError()
 
       const result = await createTestSDK().updateChannel({ channelId: channelName, appId: APPNAME, bundle })
       expect(result.success).toBe(true)

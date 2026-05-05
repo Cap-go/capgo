@@ -1,15 +1,22 @@
+import path from 'node:path'
 import { cwd } from 'node:process'
 import { loadEnv } from 'vite'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig(({ mode }) => ({
+  resolve: {
+    alias: {
+      '@capgo/cli/sdk': path.resolve(cwd(), 'cli/src/sdk.ts'),
+      '~/': `${path.resolve(cwd(), 'src')}/`,
+    },
+  },
   test: {
     include: ['tests/*.test.ts'],
     environment: 'node',
     watch: false,
     bail: 0, // Run all tests to see full results
     testTimeout: 30_000, // Increased timeout for Cloudflare Workers
-    hookTimeout: 10_000,
+    hookTimeout: 15_000, // Match the main config for slower CI setup hooks
     retry: 2,
     maxConcurrency: 10, // Reduced for replica sync reliability
     maxWorkers: 5, // Reduced for replica sync reliability

@@ -1,0 +1,17 @@
+skills:
+  - name: usage
+    path: skills/usage/SKILL.md
+    domain: cli-usage
+    focus: High-level routing and shared invocation rules.
+  - name: release-management
+    path: skills/release-management/SKILL.md
+    domain: ota-release-management
+    focus: OTA bundle, channel, compatibility, cleanup, and encryption workflows.
+  - name: native-builds
+    path: skills/native-builds/SKILL.md
+    domain: native-builds
+    focus: Native build request flows and local build credential management.
+  - name: organization-management
+    path: skills/organization-management/SKILL.md
+    domain: organization-management
+    focus: Account and organization administration commands, including deprecated aliases.

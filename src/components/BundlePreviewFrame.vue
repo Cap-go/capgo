@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import QRCode from 'qrcode'
+import { toSvg } from 'better-qr'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconExternalLink from '~icons/lucide/external-link'
 import IconSmartphone from '~icons/lucide/smartphone'
+import { buildChannelPreviewSubdomain, buildPreviewSubdomain } from '../../shared/preview-subdomain.ts'
 
 const props = defineProps<{
   appId: string
-  versionId: number
+  versionId?: number
+  channelId?: number
 }>()
 
 const { t } = useI18n()
@@ -49,36 +51,57 @@ function checkMobile() {
 
 const currentDevice = computed(() => devices[selectedDevice.value])
 
-// Build the preview URL using subdomain format (no auth - relies on obscure subdomain)
-const previewUrl = computed(() => {
-  // Encode app_id: lowercase for DNS, replace . with __ (underscores work in practice)
-  const encodedAppId = props.appId.toLowerCase().replace(/\./g, '__')
-  const subdomain = `${encodedAppId}-${props.versionId}`
-  // Extract base domain from current host, default to capgo.app for localhost
-  // Preserve environment segments (e.g., 'dev' in console.dev.capgo.app)
-  const hostname = window.location.hostname
-  let baseDomain = 'capgo.app'
-  if (hostname.includes('.') && hostname !== '127.0.0.1') {
-    const hostParts = hostname.split('.')
-    // Check if hostname contains an env segment (dev, preprod, staging, etc.)
-    const envSegments = ['dev', 'preprod', 'staging']
-    const hasEnvSegment = hostParts.length > 2 && envSegments.some(env => hostParts.includes(env))
-    baseDomain = hasEnvSegment ? hostParts.slice(-3).join('.') : hostParts.slice(-2).join('.')
+// Build the preview URL using a reversible preview subdomain format.
+const previewUrl = computed<string | null>(() => {
+  try {
+    const hasVersionId = typeof props.versionId === 'number'
+    const hasChannelId = typeof props.channelId === 'number'
+
+    if (hasVersionId === hasChannelId) {
+      console.error('BundlePreviewFrame requires exactly one preview target')
+      return null
+    }
+
+    const subdomain = hasChannelId
+      ? buildChannelPreviewSubdomain(props.appId, props.channelId as number)
+      : buildPreviewSubdomain(props.appId, props.versionId as number)
+    // Extract base domain from current host, default to capgo.app for localhost
+    // Preserve environment segments (e.g., 'dev' in console.dev.capgo.app)
+    const hostname = window.location.hostname
+    let baseDomain = 'capgo.app'
+    if (hostname.includes('.') && hostname !== '127.0.0.1') {
+      const hostParts = hostname.split('.')
+      // Check if hostname contains an env segment (dev, preprod, staging, etc.)
+      const envSegments = ['dev', 'preprod', 'staging']
+      const hasEnvSegment = hostParts.length > 2 && envSegments.some(env => hostParts.includes(env))
+      baseDomain = hasEnvSegment ? hostParts.slice(-3).join('.') : hostParts.slice(-2).join('.')
+    }
+    return `https://${subdomain}.preview.${baseDomain}/`
   }
-  return `https://${subdomain}.preview.${baseDomain}/`
+  catch (error) {
+    console.error('Failed to build preview URL:', error)
+    return null
+  }
 })
 
+function svgToDataUrl(svg: string): string {
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+}
+
 // Generate QR code linking to the preview URL
-async function generateQRCode() {
+function generateQRCode() {
+  if (!previewUrl.value) {
+    qrCodeDataUrl.value = ''
+    return
+  }
+
   try {
-    qrCodeDataUrl.value = await QRCode.toDataURL(previewUrl.value, {
-      width: 150,
+    qrCodeDataUrl.value = svgToDataUrl(toSvg(previewUrl.value, {
       margin: 2,
-      color: {
-        dark: '#000000',
-        light: '#ffffff',
-      },
-    })
+      moduleSize: 4,
+      foreground: '#000000',
+      background: '#ffffff',
+    }))
   }
   catch (error) {
     console.error('Failed to generate QR code:', error)
@@ -89,6 +112,8 @@ async function generateQRCode() {
 watch(previewUrl, generateQRCode)
 
 function openExternal() {
+  if (!previewUrl.value)
+    return
   window.open(previewUrl.value, '_blank')
 }
 </script>
@@ -99,6 +124,7 @@ function openExternal() {
     <button
       class="absolute z-10 p-2 transition-colors bg-white rounded-lg shadow-lg top-4 right-4 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700"
       :title="t('open-in-external')"
+      :disabled="!previewUrl"
       @click="openExternal"
     >
       <IconExternalLink class="w-5 h-5" />
@@ -154,7 +180,7 @@ function openExternal() {
           >
             <iframe
               title="Preview App"
-              :src="previewUrl"
+              :src="previewUrl || 'about:blank'"
               class="w-full h-full border-0"
               :style="{
                 width: `${currentDevice.width}px`,

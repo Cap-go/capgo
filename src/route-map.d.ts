@@ -14,10 +14,14 @@ import type {
   ParamValueZeroOrMore,
   ParamValueZeroOrOne,
 } from 'vue-router'
+import type {
+  _ExtractParamParserType,
+} from 'vue-router/experimental'
 
 declare module 'vue-router' {
   interface TypesConfig {
-    ParamParsers: never
+    ParamParsers:
+      | never
   }
 }
 
@@ -98,7 +102,7 @@ declare module 'vue-router/auto-routes' {
     >,
     '/ApiKeys': RouteRecordInfo<
       '/ApiKeys',
-      '/ApiKeys',
+      '/apikeys',
       Record<never, never>,
       Record<never, never>,
       | never
@@ -190,6 +194,13 @@ declare module 'vue-router/auto-routes' {
     '/app/[app].channel.[channel].history': RouteRecordInfo<
       '/app/[app].channel.[channel].history',
       '/app/:app/channel/:channel/history',
+      { app: ParamValue<true>, channel: ParamValue<true> },
+      { app: ParamValue<false>, channel: ParamValue<false> },
+      | never
+    >,
+    '/app/[app].channel.[channel].preview': RouteRecordInfo<
+      '/app/[app].channel.[channel].preview',
+      '/app/:app/channel/:channel/preview',
       { app: ParamValue<true>, channel: ParamValue<true> },
       { app: ParamValue<false>, channel: ParamValue<false> },
       | never
@@ -402,6 +413,20 @@ declare module 'vue-router/auto-routes' {
       '/settings/organization',
       Record<never, never>,
       Record<never, never>,
+      | never
+    >,
+    '/settings/organization/ApiKeys': RouteRecordInfo<
+      '/settings/organization/ApiKeys',
+      '/settings/organization/api-keys',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/settings/organization/ApiKeys.[id]': RouteRecordInfo<
+      '/settings/organization/ApiKeys.[id]',
+      '/settings/organization/api-keys/:id',
+      { id: ParamValue<true> },
+      { id: ParamValue<false> },
       | never
     >,
     '/settings/organization/Security': RouteRecordInfo<
@@ -652,6 +677,12 @@ declare module 'vue-router/auto-routes' {
       views:
         | never
     }
+    'src/pages/app/[app].channel.[channel].preview.vue': {
+      routes:
+        | '/app/[app].channel.[channel].preview'
+      views:
+        | never
+    }
     'src/pages/app/[app].channel.[channel].statistics.vue': {
       routes:
         | '/app/[app].channel.[channel].statistics'
@@ -829,6 +860,18 @@ declare module 'vue-router/auto-routes' {
     'src/pages/settings/organization/index.vue': {
       routes:
         | '/settings/organization/'
+      views:
+        | never
+    }
+    'src/pages/settings/organization/ApiKeys.vue': {
+      routes:
+        | '/settings/organization/ApiKeys'
+      views:
+        | never
+    }
+    'src/pages/settings/organization/ApiKeys.[id].vue': {
+      routes:
+        | '/settings/organization/ApiKeys.[id]'
       views:
         | never
     }

@@ -15,6 +15,7 @@ let createdWebhookId: string | null = null
 let lastDeliveryId: string | null = null
 let appScopedKeyId: number | null = null
 let appScopedKey: string | null = null
+let orgScopedSubkeyId: number | null = null
 
 beforeAll(async () => {
   // Create stripe_info for this test org
@@ -49,21 +50,34 @@ beforeAll(async () => {
   if (appError)
     throw appError
 
-  const appScopedKeyResponse = await fetch(`${BASE_URL}/apikey`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      name: `webhook-app-scoped-${globalId}`,
-      limited_to_apps: [webhookAppId],
-    }),
+  const { data: appScopedKeyData, error: appScopedKeyError } = await getSupabaseClient().rpc('create_hashed_apikey_for_user', {
+    p_user_id: USER_ID,
+    p_mode: 'all',
+    p_name: `webhook-app-scoped-${globalId}`,
+    p_limited_to_orgs: [],
+    p_limited_to_apps: [webhookAppId],
+    p_expires_at: null as unknown as string,
   })
-  if (appScopedKeyResponse.status !== 200) {
-    throw new Error(`Failed to create app-scoped API key for webhook tests: ${await appScopedKeyResponse.text()}`)
+  if (appScopedKeyError || !appScopedKeyData?.key) {
+    throw new Error(`Failed to create app-scoped API key for webhook tests: ${appScopedKeyError?.message ?? 'missing key data'}`)
   }
 
-  const appScopedKeyData = await appScopedKeyResponse.json() as { id: number, key: string }
   appScopedKeyId = appScopedKeyData.id
   appScopedKey = appScopedKeyData.key
+
+  const { data: orgScopedSubkeyData, error: orgScopedSubkeyError } = await getSupabaseClient().rpc('create_hashed_apikey_for_user', {
+    p_user_id: USER_ID,
+    p_mode: 'all',
+    p_name: `webhook-org-scoped-subkey-${globalId}`,
+    p_limited_to_orgs: [WEBHOOK_TEST_ORG_ID],
+    p_limited_to_apps: [],
+    p_expires_at: null as unknown as string,
+  })
+  if (orgScopedSubkeyError || !orgScopedSubkeyData?.id) {
+    throw new Error(`Failed to create org-scoped API subkey for webhook tests: ${orgScopedSubkeyError?.message ?? 'missing key data'}`)
+  }
+
+  orgScopedSubkeyId = orgScopedSubkeyData.id
 })
 
 afterAll(async () => {
@@ -73,16 +87,16 @@ afterAll(async () => {
     await (getSupabaseClient() as any).from('webhooks').delete().eq('id', createdWebhookId)
   }
   if (appScopedKeyId) {
-    await fetch(`${BASE_URL}/apikey/${appScopedKeyId}`, {
-      method: 'DELETE',
-      headers,
-    })
+    await getSupabaseClient().from('apikeys').delete().eq('id', appScopedKeyId)
+  }
+  if (orgScopedSubkeyId) {
+    await getSupabaseClient().from('apikeys').delete().eq('id', orgScopedSubkeyId)
   }
   await getSupabaseClient().from('apps').delete().eq('app_id', webhookAppId)
   // Clean up test organization and stripe_info
   await getSupabaseClient().from('orgs').delete().eq('id', WEBHOOK_TEST_ORG_ID)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
-})
+}, 60000)
 
 describe('[GET] /webhooks', () => {
   it('list webhooks for organization', async () => {
@@ -109,6 +123,24 @@ describe('[GET] /webhooks', () => {
       headers,
     })
     expect(response.status).toBe(400)
+  })
+
+  it('rejects app-scoped parent keys with org-scoped subkeys for webhook listing', async () => {
+    if (!appScopedKey || !orgScopedSubkeyId)
+      throw new Error('Webhook subkey list prerequisites were not created')
+
+    const response = await fetchWithRetry(`${BASE_URL}/webhooks?orgId=${WEBHOOK_TEST_ORG_ID}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'authorization': appScopedKey,
+        'x-limited-key-id': String(orgScopedSubkeyId),
+      },
+    })
+
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string, message: string }
+    expect(data.error).toBe('no_permission')
+    expect(data.message).toContain('App-scoped API keys')
   })
 })
 
@@ -500,6 +532,29 @@ describe('[POST] /webhooks/test', () => {
     expect(data.error).toBe('no_permission')
     expect(data.message).toContain('App-scoped API keys')
   })
+
+  it('rejects app-scoped parent keys with org-scoped subkeys for webhook tests', async () => {
+    if (!createdWebhookId || !appScopedKey || !orgScopedSubkeyId)
+      throw new Error('Webhook subkey test prerequisites were not created')
+
+    const response = await fetch(`${BASE_URL}/webhooks/test`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': appScopedKey,
+        'x-limited-key-id': String(orgScopedSubkeyId),
+      },
+      body: JSON.stringify({
+        orgId: WEBHOOK_TEST_ORG_ID,
+        webhookId: createdWebhookId,
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string, message: string }
+    expect(data.error).toBe('no_permission')
+    expect(data.message).toContain('App-scoped API keys')
+  })
 })
 
 describe('[GET] /webhooks/deliveries', () => {
@@ -587,6 +642,29 @@ describe('[POST] /webhooks/deliveries/retry', () => {
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': appScopedKey,
+      },
+      body: JSON.stringify({
+        orgId: WEBHOOK_TEST_ORG_ID,
+        deliveryId: lastDeliveryId,
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    const data = await response.json() as { error: string, message: string }
+    expect(data.error).toBe('no_permission')
+    expect(data.message).toContain('App-scoped API keys')
+  })
+
+  it('rejects app-scoped parent keys with org-scoped subkeys for delivery retries', async () => {
+    if (!lastDeliveryId || !appScopedKey || !orgScopedSubkeyId)
+      throw new Error('Delivery retry subkey prerequisites were not created')
+
+    const response = await fetch(`${BASE_URL}/webhooks/deliveries/retry`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': appScopedKey,
+        'x-limited-key-id': String(orgScopedSubkeyId),
       },
       body: JSON.stringify({
         orgId: WEBHOOK_TEST_ORG_ID,

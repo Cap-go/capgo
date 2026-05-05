@@ -1,30 +1,31 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
-import { z } from 'zod/mini'
+import { type } from 'arktype'
+import { literalUnion, safeParseSchema } from '../../utils/ark_validation.ts'
 import { BRES, createHono, middlewareAuth, parseBody, quickError, simpleError, useCors } from '../../utils/hono.ts'
 import { cloudlogErr } from '../../utils/logging.ts'
 import { closeClient, getPgClient } from '../../utils/pg.ts'
 import { requireEnterprisePlan } from '../../utils/plan-gating.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { createSSOProvider, deleteSSOProvider, ManagementAPIError } from '../../utils/supabase-management.ts'
-import { supabaseAdmin, supabaseWithAuth } from '../../utils/supabase.ts'
+import { supabaseWithAuth } from '../../utils/supabase.ts'
 import { version } from '../../utils/version.ts'
 
-const createBodySchema = z.object({
-  org_id: z.string().check(z.uuid()),
-  domain: z.string().check(z.minLength(1)),
-  metadata_url: z.string().check(z.url()),
-  attribute_mapping: z.optional(z.unknown()),
+const createBodySchema = type({
+  'org_id': 'string.uuid',
+  'domain': 'string > 0',
+  'metadata_url': 'string.url',
+  'attribute_mapping?': 'unknown',
 })
 
-const updateBodySchema = z.object({
-  metadata_url: z.optional(z.string().check(z.url())),
-  attribute_mapping: z.optional(z.unknown()),
-  enforce_sso: z.optional(z.boolean()),
-  status: z.optional(z.enum(['verified', 'active', 'disabled'])),
+const updateBodySchema = type({
+  'metadata_url?': 'string.url',
+  'attribute_mapping?': 'unknown',
+  'enforce_sso?': 'boolean',
+  'status?': literalUnion(['verified', 'active', 'disabled'] as const),
 })
 
-const uuidSchema = z.string().check(z.uuid())
+const uuidSchema = type('string.uuid')
 
 function sanitizeProvider(provider: Record<string, unknown>) {
   const { dns_verification_token: _dnsVerificationToken, ...safeProvider } = provider
@@ -126,9 +127,9 @@ app.post('/', async (c) => {
     attribute_mapping?: unknown
   }>(c)
 
-  const validation = createBodySchema.safeParse(rawBody)
+  const validation = safeParseSchema(createBodySchema, rawBody)
   if (!validation.success) {
-    throw simpleError('invalid_body', 'Invalid request body', { errors: z.prettifyError(validation.error) })
+    throw simpleError('invalid_body', 'Invalid request body', { errors: validation.error.message })
   }
 
   const body = validation.data
@@ -140,21 +141,6 @@ app.post('/', async (c) => {
 
   await requireManageSsoPermission(c, body.org_id)
   await requireEnterprisePlan(c, body.org_id)
-
-  const adminClient = supabaseAdmin(c)
-  const { data: orgData, error: orgError } = await adminClient
-    .from('orgs')
-    .select('sso_enabled')
-    .eq('id', body.org_id)
-    .single()
-
-  if (orgError || !orgData) {
-    return quickError(404, 'org_not_found', 'Organization not found')
-  }
-
-  if (!orgData.sso_enabled) {
-    return quickError(403, 'sso_not_enabled', 'SSO is not enabled for this organization')
-  }
 
   let managementProvider: Awaited<ReturnType<typeof createSSOProvider>>
   try {
@@ -211,7 +197,7 @@ app.get('/:orgId', async (c) => {
   }
 
   const orgId = c.req.param('orgId')
-  const orgIdValidation = uuidSchema.safeParse(orgId)
+  const orgIdValidation = safeParseSchema(uuidSchema, orgId)
   if (!orgIdValidation.success) {
     throw simpleError('invalid_org_id', 'Invalid org_id')
   }
@@ -239,7 +225,7 @@ app.patch('/:id', async (c) => {
   }
 
   const id = c.req.param('id')
-  const idValidation = uuidSchema.safeParse(id)
+  const idValidation = safeParseSchema(uuidSchema, id)
   if (!idValidation.success) {
     throw simpleError('invalid_provider_id', 'Invalid provider id')
   }
@@ -250,9 +236,9 @@ app.patch('/:id', async (c) => {
     enforce_sso?: boolean
   }>(c)
 
-  const validation = updateBodySchema.safeParse(rawBody)
+  const validation = safeParseSchema(updateBodySchema, rawBody)
   if (!validation.success) {
-    throw simpleError('invalid_body', 'Invalid request body', { errors: z.prettifyError(validation.error) })
+    throw simpleError('invalid_body', 'Invalid request body', { errors: validation.error.message })
   }
 
   const body = validation.data
@@ -346,7 +332,7 @@ app.delete('/:id', async (c) => {
   }
 
   const id = c.req.param('id')
-  const idValidation = uuidSchema.safeParse(id)
+  const idValidation = safeParseSchema(uuidSchema, id)
   if (!idValidation.success) {
     throw simpleError('invalid_provider_id', 'Invalid provider id')
   }

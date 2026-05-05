@@ -3,7 +3,7 @@ import type { Ref } from 'vue'
 import type { TableColumn } from '../comp_def'
 import type { Database } from '~/types/supabase.types'
 import { Capacitor } from '@capacitor/core'
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconEye from '~icons/heroicons/eye'
@@ -30,6 +30,7 @@ const dialogStore = useDialogV2Store()
 const offset = 20
 const search = ref('')
 const showSteps = ref(false)
+const showSetupInvite = ref(false)
 const autoShowSteps = ref(false)
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const elements = ref<Element[]>([])
@@ -47,22 +48,36 @@ const currentBuildsNumber = computed(() => {
 function closeSteps() {
   autoShowSteps.value = false
   showSteps.value = false
+  // If we closed onboarding but still have no builds, fall back to invite screen
+  if ((totalAllBuilds.value ?? 0) === 0) {
+    showSetupInvite.value = true
+  }
 }
 
 function addOne() {
   autoShowSteps.value = false
+  showSetupInvite.value = false
+  showSteps.value = true
+}
+
+function startIosOnboardingFromInvite() {
+  autoShowSteps.value = true
+  showSetupInvite.value = false
   showSteps.value = true
 }
 
 function onboardingDone() {
+  showSetupInvite.value = false
   closeSteps()
   reload()
 }
 
 function applyAutoOnboardingState() {
-  if ((totalAllBuilds.value ?? 0) === 0 && !autoShowSteps.value) {
-    autoShowSteps.value = true
-    showSteps.value = true
+  if (totalAllBuilds.value === 0 && !autoShowSteps.value && !showSteps.value) {
+    showSetupInvite.value = true
+  }
+  else if (typeof totalAllBuilds.value === 'number' && totalAllBuilds.value > 0) {
+    showSetupInvite.value = false
   }
 }
 
@@ -234,6 +249,14 @@ watch(props, async () => {
   await reload()
 })
 
+// Ensure totalAllBuilds is populated on initial mount so the setup invite
+// renders when the org has no builds yet. watch(props, ...) doesn't fire
+// for the initial value, and DataTable's @reload hook only calls getData().
+onMounted(async () => {
+  await organizationStore.awaitInitialLoad()
+  await reload()
+})
+
 watch(showSteps, (newValue) => {
   emit('update:showingSteps', newValue)
 })
@@ -241,7 +264,11 @@ watch(showSteps, (newValue) => {
 
 <template>
   <div>
-    <div v-if="!showSteps" class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+    <BuildSetupInvite
+      v-if="showSetupInvite && !showSteps"
+      @start-ios-onboarding="startIosOnboardingFromInvite"
+    />
+    <div v-else-if="!showSteps" class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
       <DataTable
         v-model:filters="filters"
         v-model:search="search"

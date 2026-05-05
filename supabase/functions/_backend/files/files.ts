@@ -11,7 +11,7 @@ import { sendDiscordAlert } from '../utils/discord.ts'
 import { quickError, simpleError } from '../utils/hono.ts'
 import { middlewareKey } from '../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
-import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
+import { closeClient, getAppByIdPg, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { getAppByAppIdPg, getUserIdFromApikey } from '../utils/pg_files.ts'
 import { checkPermissionPg } from '../utils/rbac.ts'
 import { createStatsBandwidth } from '../utils/stats.ts'
@@ -21,40 +21,239 @@ import { app as files_config } from './files_config.ts'
 import { parseUploadMetadata } from './parse.ts'
 import { DEFAULT_RETRY_PARAMS, RetryBucket } from './retry.ts'
 import { supabaseTusCreateHandler, supabaseTusHeadHandler, supabaseTusPatchHandler } from './supabaseTusProxy.ts'
-import { ALLOWED_HEADERS, ALLOWED_METHODS, buildFileHttpMetadata, EXPOSED_HEADERS, MAX_UPLOAD_LENGTH_BYTES, toBase64, TUS_EXTENSIONS, TUS_VERSION, withNoTransformCacheControl, X_CHECKSUM_SHA256 } from './util.ts'
+import { ALLOWED_HEADERS, ALLOWED_METHODS, buildFileHttpMetadata, EXPOSED_HEADERS, isRetryableDurableObjectResetError, MAX_UPLOAD_LENGTH_BYTES, toBase64, TUS_EXTENSIONS, TUS_VERSION, withNoTransformCacheControl, X_CHECKSUM_SHA256, X_UPLOAD_HANDLER_RETRYABLE } from './util.ts'
 
-const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 20 minutes
+const DO_CALL_TIMEOUT = 1000 * 60 * 30 // 30 minutes
+const DO_FETCH_RETRY_ATTEMPTS = 3
+const DO_FETCH_RETRY_DELAY_MS = 250
 
 const ATTACHMENT_PREFIX = 'attachments'
+const ATTACHMENT_PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth', 'storage']
+const TUS_UPLOAD_CONTENT_TYPE = 'application/offset+octet-stream'
+
+type AppScopedAttachmentPath
+  = | { kind: 'scoped', app_id: string, owner_org: string }
+    | { kind: 'invalid_scoped' }
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
-function getExternalBaseUrl(c: Context): string {
-  const protoHeader = c.req.header('X-Forwarded-Proto')
-  const proto = protoHeader?.split(',')[0]?.trim() || new URL(c.req.url).protocol.replace(':', '') || 'http'
+function isRetryableDurableObjectFetchError(error: unknown): boolean {
+  return isRetryableDurableObjectResetError(error)
+}
 
-  const forwardedHost = c.req.header('X-Forwarded-Host')
-  const forwardedPort = c.req.header('X-Forwarded-Port')
-  const hostHeader = c.req.header('Host') || 'localhost:54321'
-
-  let host: string
-  if (forwardedHost) {
-    if (forwardedHost.includes(':')) {
-      host = forwardedHost
-    }
-    else if (forwardedPort) {
-      host = `${forwardedHost}:${forwardedPort}`
-    }
-    else {
-      // Prefer Host header in local/worktree setups where it usually includes the mapped port.
-      host = hostHeader
-    }
-  }
-  else {
-    host = hostHeader
+function readIntHeader(request: Request, headerName: string): number | null {
+  const rawValue = request.headers.get(headerName)
+  if (rawValue == null) {
+    return null
   }
 
-  return `${proto}://${host}`
+  const parsedValue = Number.parseInt(rawValue, 10)
+  return Number.isFinite(parsedValue) ? parsedValue : Number.NaN
+}
+
+function isZeroLengthTusUploadBody(request: Request): boolean {
+  return request.method !== 'HEAD'
+    && request.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase() === TUS_UPLOAD_CONTENT_TYPE
+    && readIntHeader(request, 'content-length') === 0
+}
+
+function requestHasNonEmptyUploadBody(request: Request): boolean {
+  if (request.body == null) {
+    return false
+  }
+
+  if (request.headers.has('transfer-encoding')) {
+    return true
+  }
+
+  const contentLength = readIntHeader(request, 'content-length')
+  if (contentLength == null) {
+    return true
+  }
+
+  return Number.isNaN(contentLength) || contentLength > 0
+}
+
+function getForwardedUploadBody(request: Request): ReadableStream<Uint8Array> | ArrayBuffer | null {
+  if (request.method === 'HEAD') {
+    return null
+  }
+
+  if (isZeroLengthTusUploadBody(request)) {
+    return new ArrayBuffer(0)
+  }
+
+  return requestHasNonEmptyUploadBody(request)
+    ? request.body as ReadableStream<Uint8Array>
+    : null
+}
+
+function canReplayUploadRequest(request: Request): boolean {
+  return request.method === 'HEAD' || !requestHasNonEmptyUploadBody(request)
+}
+
+function buildDurableObjectRequest(request: Request): Request {
+  const requestInit: RequestInit & { duplex?: 'half' } = {
+    headers: request.headers,
+    method: request.method,
+    signal: AbortSignal.timeout(DO_CALL_TIMEOUT),
+  }
+
+  const uploadBody = getForwardedUploadBody(request)
+  if (uploadBody != null) {
+    requestInit.body = uploadBody
+    requestInit.duplex = 'half'
+  }
+
+  return new Request(request.url, requestInit)
+}
+
+function isRetryableDurableObjectResponse(response: Response): boolean {
+  return response.headers.get(X_UPLOAD_HANDLER_RETRYABLE) === '1'
+}
+
+async function recoverUploadOffsetFromDurableObject(
+  c: Context,
+  handler: DurableObjectStub,
+  request: Request,
+  fallbackResponse: Response,
+): Promise<Response> {
+  if (request.method !== 'PATCH') {
+    return fallbackResponse
+  }
+
+  try {
+    const headers = new Headers(request.headers)
+    headers.delete('content-length')
+
+    const headResponse = await handler.fetch(new Request(request.url, {
+      method: 'HEAD',
+      headers,
+      signal: AbortSignal.timeout(DO_CALL_TIMEOUT),
+    }))
+
+    const uploadOffset = headResponse.headers.get('Upload-Offset')
+    if (!headResponse.ok || uploadOffset == null) {
+      return fallbackResponse
+    }
+
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'upload handler - recovered upload offset after durable object reset',
+      fileId: c.get('fileId'),
+      uploadOffset,
+    })
+
+    return new Response(null, {
+      status: 409,
+      headers: new Headers(headResponse.headers),
+    })
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'upload handler - failed to recover upload offset after durable object reset',
+      error,
+      fileId: c.get('fileId'),
+    })
+    return fallbackResponse
+  }
+}
+
+function retryableUploadUnavailableResponse(): Response {
+  return new Response(JSON.stringify({
+    error: 'upload_retryable',
+    message: 'Upload worker moved during this request. Retry the upload request.',
+  }), {
+    status: 503,
+    headers: {
+      'Content-Type': 'application/json',
+      'Retry-After': '1',
+      'Tus-Resumable': TUS_VERSION,
+    },
+  })
+}
+
+async function fetchUploadHandlerWithRetry(
+  c: Context,
+  handler: DurableObjectStub,
+  request: Request,
+): Promise<Response> {
+  const canRetryRequest = canReplayUploadRequest(request)
+  const maxAttempts = canRetryRequest ? DO_FETCH_RETRY_ATTEMPTS : 1
+  let lastError: unknown
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      const response = await handler.fetch(buildDurableObjectRequest(request))
+
+      const shouldRetryResponse = canRetryRequest
+        && attempt < maxAttempts
+        && isRetryableDurableObjectResponse(response)
+
+      if (shouldRetryResponse) {
+        cloudlogErr({
+          requestId: c.get('requestId'),
+          message: 'upload handler - durable object returned retryable response, retrying',
+          attempt,
+          fileId: c.get('fileId'),
+          status: response.status,
+        })
+        await new Promise(resolve => setTimeout(resolve, DO_FETCH_RETRY_DELAY_MS * attempt))
+        continue
+      }
+
+      if (!canRetryRequest && isRetryableDurableObjectResponse(response)) {
+        return await recoverUploadOffsetFromDurableObject(c, handler, request, response)
+      }
+
+      if (attempt > 1) {
+        cloudlog({
+          requestId: c.get('requestId'),
+          message: 'upload handler - durable object retry succeeded',
+          attempt,
+          fileId: c.get('fileId'),
+        })
+      }
+
+      return response
+    }
+    catch (error) {
+      lastError = error
+      const isRetryableDurableObjectError = isRetryableDurableObjectFetchError(error)
+      const shouldRetry = canRetryRequest
+        && attempt < maxAttempts
+        && isRetryableDurableObjectError
+
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: shouldRetry
+          ? 'upload handler - durable object fetch failed, retrying'
+          : 'upload handler - durable object fetch failed',
+        error,
+        attempt,
+        fileId: c.get('fileId'),
+        retryable: shouldRetry,
+      })
+
+      if (!shouldRetry) {
+        if (!canRetryRequest && isRetryableDurableObjectError) {
+          cloudlog({
+            requestId: c.get('requestId'),
+            message: 'upload handler - durable object fetch failed for streaming request, returning retryable response',
+            attempt,
+            fileId: c.get('fileId'),
+          })
+          return retryableUploadUnavailableResponse()
+        }
+        throw error
+      }
+
+      await new Promise(resolve => setTimeout(resolve, DO_FETCH_RETRY_DELAY_MS * attempt))
+    }
+  }
+
+  throw lastError ?? new Error('Durable Object upload fetch failed')
 }
 
 function ensureNoTransformResponse(response: Response): Response {
@@ -70,6 +269,39 @@ function ensureNoTransformResponse(response: Response): Response {
     status: response.status,
     statusText: response.statusText,
   })
+}
+
+function withAttachmentResponseHeaders(response: Response, fileId: string): Response {
+  const headers = new Headers(response.headers)
+  headers.set('cache-control', withNoTransformCacheControl(headers.get('cache-control')))
+  headers.set('content-disposition', `attachment; filename="${fileId}"`)
+
+  return new Response(response.body, {
+    headers,
+    status: response.status,
+    statusText: response.statusText,
+  })
+}
+
+function getTransferredBytesFromResponse(response: Response): number | null {
+  const contentRange = response.headers.get('content-range')
+  if (contentRange) {
+    const match = contentRange.match(/^bytes (\d+)-(\d+)\/(?:\d+|\*)$/i)
+    if (match) {
+      const startIndex = Number.parseInt(match[1], 10)
+      const endIndex = Number.parseInt(match[2], 10)
+      if (Number.isFinite(startIndex) && Number.isFinite(endIndex) && endIndex >= startIndex) {
+        return endIndex - startIndex + 1
+      }
+    }
+  }
+
+  const contentLength = Number.parseInt(response.headers.get('content-length') || '', 10)
+  if (Number.isFinite(contentLength) && contentLength > 0) {
+    return contentLength
+  }
+
+  return null
 }
 
 async function saveBandwidthUsage(c: Context, fileSize: number | null | undefined) {
@@ -89,24 +321,111 @@ async function saveBandwidthUsage(c: Context, fileSize: number | null | undefine
   }
 }
 
+function parseAppScopedAttachmentPath(fileId: unknown): AppScopedAttachmentPath | null {
+  if (typeof fileId !== 'string') {
+    return null
+  }
+
+  const [orgs, owner_org, apps, app_id, ...suffix] = fileId.split('/')
+  if (orgs !== 'orgs') {
+    return null
+  }
+
+  if (!owner_org || apps !== 'apps' || !app_id || suffix.length === 0 || suffix.some(part => part.length === 0)) {
+    return { kind: 'invalid_scoped' }
+  }
+
+  return { kind: 'scoped', app_id, owner_org }
+}
+
+async function assertReadableAppScopedAttachment(c: Context, fileId: unknown): Promise<void> {
+  const scopedPath = parseAppScopedAttachmentPath(fileId)
+  if (scopedPath?.kind === 'invalid_scoped') {
+    quickError(404, 'not_found', 'Not found')
+  }
+  if (!scopedPath) {
+    return
+  }
+
+  // Attachment reads must use the primary to avoid replica lag serving deleted-app files.
+  const pgClient = getPgClient(c, false)
+  const drizzleClient = getDrizzleClient(pgClient)
+
+  try {
+    const app = await getAppByAppIdPg(c, scopedPath.app_id, drizzleClient)
+    if (!app || app.owner_org !== scopedPath.owner_org) {
+      quickError(404, 'not_found', 'Not found')
+    }
+  }
+  finally {
+    await closeClient(c, pgClient)
+  }
+}
+
+async function getSupabaseStorageResponse(c: Context, fileId: string): Promise<Response> {
+  const { data: signedUrlData, error: signedUrlError } = await supabaseAdmin(c).storage.from('capgo').createSignedUrl(fileId, 60)
+
+  if (signedUrlError || !signedUrlData?.signedUrl) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'getHandler files signed URL creation failed',
+      fileId,
+      error: signedUrlError,
+    })
+    if (signedUrlError?.status === 404) {
+      return c.json({ error: 'not_found', message: 'Not found' }, 404)
+    }
+    throw quickError(503, 'upstream_unavailable', 'File storage temporarily unavailable', { fileId }, signedUrlError, { alert: false })
+  }
+
+  const requestHeaders = new Headers()
+  const rangeHeader = c.req.header('range')
+  const method = c.req.raw.method === 'HEAD' ? 'HEAD' : 'GET'
+  if (method === 'GET' && rangeHeader) {
+    requestHeaders.set('range', rangeHeader)
+  }
+
+  let response: Response
+  try {
+    const fetchInit: RequestInit = { method }
+    if (rangeHeader) {
+      fetchInit.headers = requestHeaders
+    }
+    response = await fetch(signedUrlData.signedUrl, fetchInit)
+  }
+  catch (error) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'getHandler files signed URL fetch failed', fileId, error })
+    throw quickError(503, 'upstream_unavailable', 'File storage temporarily unavailable', { fileId }, error, { alert: false })
+  }
+
+  if (!response.ok) {
+    const responseBody = await response.text().catch(() => '')
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'getHandler files signed URL response failed',
+      fileId,
+      status: response.status,
+      responseBody,
+    })
+    if (response.status === 404 || responseBody.toLowerCase().includes('not found')) {
+      return c.json({ error: 'not_found', message: 'Not found' }, 404)
+    }
+    throw quickError(503, 'upstream_unavailable', 'File storage temporarily unavailable', { fileId, status: response.status }, responseBody, { alert: false })
+  }
+
+  if (method !== 'HEAD') {
+    await saveBandwidthUsage(c, getTransferredBytesFromResponse(response))
+  }
+  return withAttachmentResponseHeaders(response, fileId)
+}
+
 async function getHandler(c: Context): Promise<Response> {
   const fileId = c.get('fileId')
+  await assertReadableAppScopedAttachment(c, fileId)
   cloudlog({ requestId: c.get('requestId'), message: 'getHandler files', fileId })
   if (getRuntimeKey() !== 'workerd') {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files using supabase storage' })
-    // serve file from supabase storage using they sdk
-    const { data } = supabaseAdmin(c).storage.from('capgo').getPublicUrl(fileId)
-
-    // cloudlog('publicUrl', data.publicUrl)
-    // `data.publicUrl` points to the internal Supabase gateway (Kong) on local stacks.
-    // Rewrite the origin using the externally visible base URL derived from forwarded headers.
-    const internalUrl = new URL(data.publicUrl)
-    const externalBase = new URL(getExternalBaseUrl(c))
-    internalUrl.protocol = externalBase.protocol
-    internalUrl.host = externalBase.host
-    const url = internalUrl.toString()
-    // cloudlog('url', url)
-    return c.redirect(url)
+    return getSupabaseStorageResponse(c, fileId)
   }
 
   const bucket: R2Bucket = c.env.ATTACHMENT_BUCKET
@@ -180,7 +499,7 @@ async function getHandler(c: Context): Promise<Response> {
   }
   catch (error) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'getHandler files get failed', fileId, error })
-    throw quickError(503, 'upstream_unavailable', 'File storage temporarily unavailable', { fileId })
+    throw quickError(503, 'upstream_unavailable', 'File storage temporarily unavailable', { fileId }, error, { alert: false })
   }
   if (object == null) {
     cloudlog({ requestId: c.get('requestId'), message: 'getHandler files object is null' })
@@ -290,13 +609,18 @@ async function uploadHandler(c: Context) {
   headers.set('X-Request-Id', c.get('requestId') || 'unknown')
 
   const method = c.req.raw.method
-  return await handler.fetch(c.req.url, {
+  const requestInit: RequestInit & { duplex?: 'half' } = {
     // HEAD must not forward a request body and must preserve the verb (Hono/tiny maps HEAD to GET).
-    body: method === 'HEAD' ? undefined : c.req.raw.body,
     method,
     headers,
-    signal: AbortSignal.timeout(DO_CALL_TIMEOUT),
-  })
+  }
+  const uploadBody = getForwardedUploadBody(c.req.raw)
+  if (uploadBody != null) {
+    requestInit.body = uploadBody
+    requestInit.duplex = 'half'
+  }
+  const request = new Request(c.req.url, requestInit)
+  return await fetchUploadHandlerWithRetry(c, handler, request)
 }
 
 async function setKeyFromMetadata(c: Context, next: Next) {
@@ -450,43 +774,25 @@ async function checkWriteAppAccess(c: Context, next: Next) {
     fileId: requestId,
   })
 
-  const parts = requestId.split('/')
-  const [orgs, owner_org, apps, app_id] = parts
+  const scopedPath = parseAppScopedAttachmentPath(requestId)
 
-  if (orgs !== 'orgs' || apps !== 'apps') {
+  if (!scopedPath || scopedPath.kind !== 'scoped') {
     cloudlog({
       requestId: c.get('requestId'),
       message: 'checkWriteAppAccess - invalid path structure',
       fileId: requestId,
-      orgs,
-      apps,
-      expected: 'orgs/*/apps/*',
+      expected: 'orgs/*/apps/*/*',
     })
     throw new HTTPException(400, {
       res: c.json({
         error: 'invalid_file_path',
         message: 'Invalid file path structure. Expected: orgs/{owner_org}/apps/{app_id}/...',
-        moreInfo: { fileId: requestId, orgs, apps, requestId: c.get('requestId') },
+        moreInfo: { fileId: requestId, requestId: c.get('requestId') },
       }),
     })
   }
 
-  if (parts.length < 5) {
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'checkWriteAppAccess - path too short',
-      fileId: requestId,
-      pathLength: parts.length,
-      minRequired: 5,
-    })
-    throw new HTTPException(400, {
-      res: c.json({
-        error: 'invalid_file_path',
-        message: 'Invalid file path. Path must have at least 5 segments: orgs/{owner_org}/apps/{app_id}/{filename}',
-        moreInfo: { fileId: requestId, pathLength: parts.length, requestId: c.get('requestId') },
-      }),
-    })
-  }
+  const { owner_org, app_id } = scopedPath
 
   cloudlog({
     requestId: c.get('requestId'),
@@ -508,7 +814,7 @@ async function checkWriteAppAccess(c: Context, next: Next) {
   })
 
   // Use Postgres instead of Supabase SDK
-  const pgClient = getPgClient(c, true) // read-only query
+  const pgClient = getPgClient(c, false) // authz + plan gating must read primary
   const drizzleClient = getDrizzleClient(pgClient)
 
   try {
@@ -547,7 +853,7 @@ async function checkWriteAppAccess(c: Context, next: Next) {
     })
 
     // Use the new RBAC permission check
-    const hasPermission = await checkPermissionPg(c, 'app.read_bundles', { appId: app_id }, drizzleClient, userId, capgkey)
+    const hasPermission = await checkPermissionPg(c, 'app.upload_bundle', { appId: app_id }, drizzleClient, userId, capgkey)
 
     cloudlog({
       requestId: c.get('requestId'),
@@ -611,6 +917,20 @@ async function checkWriteAppAccess(c: Context, next: Next) {
       })
     }
 
+    const appPlan = await getAppByIdPg(c, app_id, drizzleClient, ATTACHMENT_PLAN_LIMIT)
+    if (!appPlan) {
+      throw quickError(503, 'upstream_unavailable', 'App plan state temporarily unavailable', { app_id })
+    }
+
+    if (!appPlan.plan_valid) {
+      // Keep the explicit JSON 429 payload here: onError rewrites thrown 429s to
+      // too_many_requests, and the edge cache contract depends on on_premise_app.
+      return c.json({
+        error: 'on_premise_app',
+        message: 'On-premise app detected',
+      }, 429)
+    }
+
     cloudlog({
       requestId: c.get('requestId'),
       message: 'checkWriteAppAccess - access granted',
@@ -671,3 +991,9 @@ app.route('/config', files_config)
 app.route('/download_link', download_link)
 app.route('/upload_link', upload_link)
 app.route('/ok', ok)
+
+export const filesTestUtils = {
+  fetchUploadHandlerWithRetry,
+  isRetryableDurableObjectFetchError,
+  retryableUploadUnavailableResponse,
+}

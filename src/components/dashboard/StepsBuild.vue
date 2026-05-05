@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onUnmounted, ref, watchEffect } from 'vue'
+import { computed, onUnmounted, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
@@ -40,36 +40,53 @@ interface Step {
 
 const config = getLocalConfig()
 const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ``
-const steps = ref<Step[]>([
-  {
-    title: t('build-step-request-build'),
-    // keep NPX for better support of our customers env, everyone has npx but not everyone has bunx, and bunx has some issues with pnpm
-    command: `npx @capgo/cli@latest build request -a [APIKEY] --platform ios${localCommand}`,
-    subtitle: t('build-step-request-subtitle'),
-  },
-  {
-    title: t('build-step-wait'),
-    command: '',
-    subtitle: t('build-step-wait-subtitle'),
-  },
-])
+
+const onboardingStep: Step = {
+  title: t('build-step-onboarding-title'),
+  command: `npx @capgo/cli@latest build init -a [APIKEY]`,
+  subtitle: t('build-step-onboarding-subtitle'),
+}
+
+const requestStep: Step = {
+  title: t('build-step-request-build'),
+  // keep NPX for better support of our customers env, everyone has npx but not everyone has bunx, and bunx has some issues with pnpm
+  command: `npx @capgo/cli@latest build request -a [APIKEY] --platform ios${localCommand}`,
+  subtitle: t('build-step-request-subtitle'),
+}
+
+const waitStep: Step = {
+  title: t('build-step-wait'),
+  command: '',
+  subtitle: t('build-step-wait-subtitle'),
+}
+
+// Freeze the onboarding mode at setup time. The parent binds this prop to a
+// reactive value (totalAllBuilds === 0), which can flip mid-flow once a build
+// is detected. Recomputing steps / indices against a live prop would cause
+// drift (e.g. waitStepIndex shrinks while the steps array stays long).
+const initialOnboarding = props.onboarding
+
+// When invoked from the "Start onboarding" flow (first-time user, no builds
+// yet), prepend the build-init wizard step so users set up iOS credentials
+// before requesting a build. For regular "add a build" flows, start at request.
+const steps = ref<Step[]>(
+  initialOnboarding ? [onboardingStep, requestStep, waitStep] : [requestStep, waitStep],
+)
+
+// Index of the polling/wait step — depends on whether we're in onboarding mode.
+const waitStepIndex = computed(() => (initialOnboarding ? 2 : 1))
+const completedStepIndex = computed(() => waitStepIndex.value + 1)
 
 function stepToName(stepNumber: number): string {
-  switch (stepNumber) {
-    case 0:
-      return 'request-build'
-    case 1:
-      return 'wait-for-build'
-    case 2:
-      return 'build-completed'
-    default:
-      return 'unknown-step'
-  }
+  const stepNames = initialOnboarding
+    ? ['run-onboarding', 'request-build', 'wait-for-build', 'build-completed']
+    : ['request-build', 'wait-for-build', 'build-completed']
+  return stepNames[stepNumber] ?? 'unknown-step'
 }
 
 function setLog() {
-  console.log('setLog', props.onboarding, main.user?.id, step.value)
-  if (props.onboarding && main.user?.id) {
+  console.log('setLog', initialOnboarding, main.user?.id, step.value)
+  if (initialOnboarding && main.user?.id) {
     sendEvent({
       channel: 'onboarding-build',
       event: `onboarding-build-step-${stepToName(step.value)}`,
@@ -79,7 +96,7 @@ function setLog() {
     }).catch()
     pushEvent(`user:onboarding-build-${stepToName(step.value)}`, config.supaHost)
   }
-  if (step.value === 2) {
+  if (step.value === completedStepIndex.value) {
     emit('done')
   }
 }
@@ -156,13 +173,19 @@ async function getKey(retry = true): Promise<void> {
     .select()
     .eq('user_id', main?.user?.id)
     .eq('mode', 'all')
+    .order('created_at', { ascending: true })
+    .limit(1)
 
   if (typeof data !== 'undefined' && data !== null && !error) {
     if (data.length === 0) {
       await addNewApiKey()
       return getKey(false)
     }
-    steps.value[0].command = steps.value[0].command?.replace('[APIKEY]', data[0].key ?? '')
+    const key = data[0].key ?? ''
+    steps.value = steps.value.map(s => ({
+      ...s,
+      command: s.command?.replace('[APIKEY]', key),
+    }))
   }
   else if (retry && main?.user?.id) {
     return getKey(false)
@@ -204,8 +227,8 @@ async function getLatestBuildId(): Promise<string | undefined> {
 }
 
 watchEffect(async () => {
-  if (step.value === 1 && !realtimeListener.value) {
-    console.log('watch build change step 1 via polling')
+  if (step.value === waitStepIndex.value && !realtimeListener.value) {
+    console.log('watch build change wait-step via polling')
     realtimeListener.value = true
     await organizationStore.awaitInitialLoad()
 
@@ -250,10 +273,10 @@ onUnmounted(() => {
   <section class="overflow-y-auto py-12 h-full sm:py-16 lg:py-20 max-h-fit bg-slate-100 dark:bg-slate-900">
     <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
       <div class="flex justify-items-center items-center place-content-center">
-        <button v-if="!onboarding" class="mr-6 text-white bg-gray-800 d-btn d-btn-outline" @click="emit('closeStep')">
+        <button class="mr-6 text-white bg-gray-800 d-btn d-btn-outline" @click="emit('closeStep')">
           <arrowBack />
         </button>
-        <div v-if="props.onboarding" class="text-center">
+        <div v-if="initialOnboarding" class="text-center">
           <h2 class="text-3xl font-bold text-gray-900 sm:text-4xl xl:text-5xl dark:text-gray-50 font-pj">
             {{ t('start-your-first-build') }}
             <span class="inline-flex items-center py-0.5 px-2.5 ml-3 text-xs font-medium text-yellow-800 bg-yellow-100 rounded-full dark:text-yellow-200 dark:bg-yellow-900">
@@ -287,7 +310,7 @@ onUnmounted(() => {
                 <template v-if="i + 1 !== steps.length">
                   {{ i + 1 }}
                 </template>
-                <template v-else-if="step === 1 && i === 1">
+                <template v-else-if="step === waitStepIndex && i === waitStepIndex">
                   <div class="flex justify-center">
                     <IconLoader class="w-10 h-10 text-blue-500 animate-spin" />
                   </div>

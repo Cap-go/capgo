@@ -1,11 +1,11 @@
-import type { Context } from 'hono'
-import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { sValidator } from '@hono/standard-validator'
 import { and, eq } from 'drizzle-orm'
 import { createHono, middlewareAuth, useCors } from '../utils/hono.ts'
 import { cloudlogErr } from '../utils/logging.ts'
 import { getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { schema } from '../utils/postgres_schema.ts'
 import { version } from '../utils/version.ts'
+import { invalidScopeTypeHook, roleScopeParamSchema } from './rbac_validation.ts'
 
 export const app = createHono('', version)
 
@@ -13,7 +13,7 @@ app.use('*', useCors)
 app.use('*', middlewareAuth)
 
 // GET /private/roles - Liste des rôles assignables
-app.get('/', async (c: Context<MiddlewareKeyVariables>) => {
+app.get('/', async (c) => {
   const userId = c.get('auth')?.userId
 
   if (!userId) {
@@ -52,16 +52,12 @@ app.get('/', async (c: Context<MiddlewareKeyVariables>) => {
 })
 
 // GET /private/roles/:scope_type - Liste des rôles par scope
-app.get('/:scope_type', async (c: Context<MiddlewareKeyVariables>) => {
-  const scopeType = c.req.param('scope_type')
+app.get('/:scope_type', sValidator('param', roleScopeParamSchema, invalidScopeTypeHook), async (c) => {
+  const { scope_type: scopeType } = c.req.valid('param')
   const userId = c.get('auth')?.userId
 
   if (!userId) {
     return c.json({ error: 'Unauthorized' }, 401)
-  }
-
-  if (!['org', 'app', 'channel'].includes(scopeType)) {
-    return c.json({ error: 'Invalid scope_type' }, 400)
   }
 
   try {

@@ -125,6 +125,27 @@ watchEffect(() => {
   if (!needsGroups && hasGroups)
     organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/groups')
 
+  const needsApiKeys = hasOrgRbacEnabled
+  const hasApiKeys = organizationTabs.value.find(tab => tab.key === '/settings/organization/api-keys')
+  if (needsApiKeys && !hasApiKeys) {
+    const base = baseOrgTabs.find(t => t.key === '/settings/organization/api-keys')
+    const insertAfterKeys = [
+      '/settings/organization/groups',
+      '/settings/organization/members',
+      '/settings/organization',
+    ]
+    const insertAfterIndex = insertAfterKeys
+      .map(key => organizationTabs.value.findIndex(tab => tab.key === key))
+      .find(index => index >= 0) ?? -1
+
+    if (base && insertAfterIndex >= 0)
+      organizationTabs.value.splice(insertAfterIndex + 1, 0, { ...base })
+    else if (base)
+      organizationTabs.value.push({ ...base })
+  }
+  if (!needsApiKeys && hasApiKeys)
+    organizationTabs.value = organizationTabs.value.filter(tab => tab.key !== '/settings/organization/api-keys')
+
   // ensure usage/plans tabs based on permissions (keeps icons from base)
   const needsUsage = billingEnabled && canReadBilling.value
   const hasUsage = organizationTabs.value.find(tab => tab.key === '/settings/organization/usage')

@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
-import { z } from 'zod/mini'
+import { type } from 'arktype'
+import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { supabaseWithAuth } from '../../utils/supabase.ts'
 import {
@@ -12,13 +13,13 @@ import {
 } from '../../utils/webhook.ts'
 import { checkWebhookPermissionV2 } from './index.ts'
 
-const bodySchema = z.object({
-  orgId: z.string(),
-  webhookId: z.string(),
+const bodySchema = type({
+  orgId: 'string',
+  webhookId: 'string',
 })
 
 export async function test(c: Context<MiddlewareKeyVariables, any, any>, bodyRaw: any, auth: AuthInfo): Promise<Response> {
-  const bodyParsed = bodySchema.safeParse(bodyRaw)
+  const bodyParsed = safeParseSchema(bodySchema, bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }

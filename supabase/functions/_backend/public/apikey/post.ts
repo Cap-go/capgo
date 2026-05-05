@@ -2,7 +2,7 @@ import type { AuthInfo } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
-import { supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
+import { resolveApikeyPolicyOrgIds, supabaseAdmin, supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
 import { Constants } from '../../utils/supabase.types.ts'
 
 const app = honoFactory.createApp()
@@ -34,11 +34,7 @@ app.post('/', middlewareV2(['all']), async (c) => {
   // Limit API key creation for constrained caller keys (not JWT).
   const callerHasLimitedScope = (apikey?.limited_to_orgs?.length ?? 0) > 0 || (apikey?.limited_to_apps?.length ?? 0) > 0
   if (auth.authType === 'apikey' && callerHasLimitedScope) {
-    // A limited key cannot create an unlimited key (privilege escalation)
-    const newKeyIsUnlimited = (limitedToOrgs.length === 0 && limitedToApps.length === 0)
-    if (newKeyIsUnlimited) {
-      throw simpleError('cannot_create_apikey', 'You cannot create an unlimited API key with a limited API key', { keyId: apikey?.id })
-    }
+    throw simpleError('cannot_create_apikey', 'You cannot create API keys with a limited API key', { keyId: apikey?.id })
   }
   const expiresAt = body.expires_at ?? null
   const isHashed = body.hashed === true
@@ -60,9 +56,7 @@ app.post('/', middlewareV2(['all']), async (c) => {
 
   // Use supabaseWithAuth which handles both JWT and API key authentication
   const supabase = supabaseWithAuth(c, auth)
-
-  // Collect all org IDs for policy validation
-  let allOrgIds: string[] = [...limitedToOrgs]
+  const policyLookupSupabase = supabaseAdmin(c)
 
   if (orgId) {
     const { data: org, error } = await supabase.from('orgs').select('*').eq('id', orgId).single()
@@ -70,7 +64,6 @@ app.post('/', middlewareV2(['all']), async (c) => {
       throw quickError(404, 'org_not_found', 'Org not found', { supabaseError: error })
     }
     limitedToOrgs.splice(0, limitedToOrgs.length, org.id)
-    allOrgIds = [org.id]
   }
   if (appId) {
     const { data: app, error } = await supabase.from('apps').select('*').eq('id', appId).single()
@@ -81,6 +74,11 @@ app.post('/', middlewareV2(['all']), async (c) => {
   }
 
   // Validate expiration against org policies (throws if invalid)
+  const allOrgIds = await resolveApikeyPolicyOrgIds(supabase, {
+    limitedToApps,
+    limitedToOrgs,
+    policyLookupSupabase,
+  })
   await validateExpirationAgainstOrgPolicies(allOrgIds, expiresAt, supabase)
 
   let apikeyData: Database['public']['Tables']['apikeys']['Row'] | null = null

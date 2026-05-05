@@ -23,6 +23,7 @@ export interface TableAction {
   visible?: (item: any) => boolean
   disabled?: (item: any) => boolean
   title?: string | ((item: any) => string)
+  testId?: string | ((item: any) => string)
 }
 
 export interface TableColumn {

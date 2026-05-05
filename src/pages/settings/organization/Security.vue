@@ -155,6 +155,19 @@ async function hasVerified2faFactor() {
   return !!verifiedFactor
 }
 
+async function updateOrganizationSecuritySettings(body: Record<string, unknown>) {
+  if (!currentOrganization.value?.gid)
+    return { error: new Error('missing_organization') }
+
+  return supabase.functions.invoke('organization', {
+    method: 'PUT',
+    body: {
+      orgId: currentOrganization.value.gid,
+      ...body,
+    },
+  })
+}
+
 // Load current password policy settings
 function loadPolicyFromOrg() {
   const config = currentOrganization.value?.password_policy_config
@@ -422,7 +435,7 @@ async function save2faEnforcement(value: boolean) {
   isSaving.value = true
 
   try {
-    const { error } = await updateOrganizationSettings({
+    const { error } = await updateOrganizationSecuritySettings({
       enforcing_2fa: value,
     })
 
@@ -456,19 +469,6 @@ async function save2faEnforcement(value: boolean) {
   }
 }
 
-async function updateOrganizationSettings(body: Record<string, unknown>) {
-  if (!currentOrganization.value?.gid)
-    return { error: new Error('No organization selected') }
-
-  return await supabase.functions.invoke('organization', {
-    method: 'PUT',
-    body: {
-      orgId: currentOrganization.value.gid,
-      ...body,
-    },
-  })
-}
-
 async function toggleEnforceHashedApiKeys() {
   if (!currentOrganization.value || !hasOrgPerm.value) {
     toast.error(t('no-permission'))
@@ -484,7 +484,7 @@ async function toggleEnforceHashedApiKeys() {
   isSaving.value = true
 
   try {
-    const { error } = await updateOrganizationSettings({
+    const { error } = await updateOrganizationSecuritySettings({
       enforce_hashed_api_keys: newValue,
     })
 
@@ -619,8 +619,7 @@ async function saveEncryptedBundlesEnforcement(enable: boolean, keyFingerprint: 
       }
     }
 
-    // Update the org settings
-    const { error } = await updateOrganizationSettings({
+    const { error } = await updateOrganizationSecuritySettings({
       enforce_encrypted_bundles: enable,
       required_encryption_key: keyFingerprint || null,
     })
@@ -876,7 +875,7 @@ async function saveApikeyPolicy() {
 
   isSaving.value = true
 
-  const { error } = await updateOrganizationSettings({
+  const { error } = await updateOrganizationSecuritySettings({
     require_apikey_expiration: requireApikeyExpiration.value,
     max_apikey_expiration_days: maxApikeyExpirationDays.value,
   })
@@ -1451,8 +1450,8 @@ onMounted(async () => {
             </div>
           </section>
 
-          <!-- SSO Configuration Section (Enterprise only) -->
-          <section v-if="hasOrgPerm && currentOrganization?.sso_enabled" class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
+          <!-- SSO Configuration Section -->
+          <section v-if="hasOrgPerm" class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
             <!-- Enterprise Plan: Show SSO Configuration -->
             <template v-if="isEnterprisePlan">
               <div class="flex items-start gap-4 mb-6">

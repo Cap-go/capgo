@@ -1,11 +1,12 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { type } from 'arktype'
 import { Hono } from 'hono/tiny'
-import { z } from 'zod/mini'
+import { safeParseSchema } from '../utils/ark_validation.ts'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { emptySupabase, supabaseAdmin as useSupabaseAdmin, supabaseClient as useSupabaseClient } from '../utils/supabase.ts'
 
-const bodySchema = z.object({
-  user_id: z.uuid(),
+const bodySchema = type({
+  user_id: 'string.uuid',
 })
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -19,7 +20,7 @@ app.post('/', middlewareAuth, async (c) => {
     throw simpleError('not_authorized', 'Not authorized')
 
   const body = await parseBody<any>(c)
-  const parsedBodyResult = bodySchema.safeParse(body)
+  const parsedBodyResult = safeParseSchema(bodySchema, body)
   if (!parsedBodyResult.success) {
     throw simpleError('invalid_json_body', 'Invalid json body', { body, parsedBodyResult })
   }

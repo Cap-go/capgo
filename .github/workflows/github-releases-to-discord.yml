@@ -6,9 +6,6 @@ on:
 
 permissions: {}
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
-
 jobs:
   github-releases-to-discord:
     runs-on: ubuntu-latest
@@ -23,6 +20,5 @@ jobs:
         with:
           webhook_url: ${{ secrets.WEBHOOK_DISCORD_RELEASE_URL }}
           color: "2105893"
-          username: "Release @${{ github.repository }}"
-          avatar_url: "https://cdn.discordapp.com/avatars/487431320314576937/bd64361e4ba6313d561d54e78c9e7171.png"
+          footer_title: "Release @${{ github.repository }}"
           reduce_headings: true

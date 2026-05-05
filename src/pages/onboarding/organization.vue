@@ -50,6 +50,7 @@ const createdOrgId = ref('')
 const isSubmitting = ref(false)
 const isUploadingLogo = ref(false)
 const isLoadingWebsitePreview = ref(false)
+const isLoggingOut = ref(false)
 const selectedLogoPreview = ref('')
 const sentInvites = ref<SentInvite[]>([])
 const websitePreview = ref<WebsitePreview | null>(null)
@@ -69,6 +70,7 @@ const activeOrgName = computed(() => {
     return currentOrganization.value.name
   return orgNameInput.value.trim() || websitePreview.value?.name || ''
 })
+const hasSavedLogo = computed(() => currentOrganization.value?.gid === activeOrgId.value && !!currentOrganization.value.logo)
 
 const websiteHostname = computed(() => {
   const value = websiteInput.value.trim()
@@ -176,6 +178,25 @@ async function goBack() {
     ? route.query.to
     : '/login'
   await router.push(fallbackPath)
+}
+
+async function logoutFromOnboarding() {
+  if (isLoggingOut.value)
+    return
+
+  isLoggingOut.value = true
+
+  try {
+    await main.logout()
+    await router.replace('/login')
+  }
+  catch (error) {
+    console.error('Failed to log out from organization onboarding', error)
+    toast.error(t('cannot-sign-off'))
+  }
+  finally {
+    isLoggingOut.value = false
+  }
 }
 
 async function syncRouteQuery(nextStep: OnboardingStep, orgId = createdOrgId.value) {
@@ -493,8 +514,9 @@ onUnmounted(() => {
       >
 
       <div class="space-y-6">
-        <div v-if="hasExistingOrganization" class="flex justify-start">
+        <div class="flex items-center justify-between gap-3">
           <button
+            v-if="hasExistingOrganization"
             type="button"
             class="inline-flex items-center gap-1 rounded-sm p-2 text-slate-500 transition hover:bg-slate-200 hover:text-slate-700 dark:text-slate-300 dark:hover:bg-white/8 dark:hover:text-white"
             :aria-label="t('button-back')"
@@ -502,6 +524,18 @@ onUnmounted(() => {
           >
             <IconBack class="w-5 h-5 fill-current" />
             <span>{{ t('button-back') }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="d-btn d-btn-ghost ml-auto text-slate-600 hover:text-slate-900"
+            data-test="onboarding-logout"
+            :aria-label="t('logout')"
+            :disabled="isLoggingOut"
+            @click="logoutFromOnboarding"
+          >
+            <IconLoader v-if="isLoggingOut" class="w-4 h-4 animate-spin" />
+            <span :class="{ 'sr-only': isLoggingOut }">{{ t('logout') }}</span>
           </button>
         </div>
 
@@ -764,10 +798,20 @@ onUnmounted(() => {
                 >
                   {{ t('organization-onboarding-use-imported-logo') }}
                 </button>
-                <button type="button" class="d-btn d-btn-ghost" data-test="onboarding-skip-logo" :disabled="isUploadingLogo" @click="skipLogo">
-                  {{ t('skip') }}
+                <button
+                  type="button"
+                  class="d-btn"
+                  :class="hasSavedLogo ? 'd-btn-secondary' : 'd-btn-ghost'"
+                  data-test="onboarding-logo-action"
+                  :disabled="isUploadingLogo"
+                  @click="skipLogo"
+                >
+                  {{ hasSavedLogo ? t('button-next') : t('skip') }}
                 </button>
               </div>
+              <p v-if="hasSavedLogo" class="text-sm font-medium text-emerald-600">
+                {{ t('organization-onboarding-logo-saved') }}
+              </p>
             </div>
 
             <div class="rounded-[28px] border border-slate-200 bg-slate-950 p-5 text-white">

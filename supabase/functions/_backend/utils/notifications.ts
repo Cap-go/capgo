@@ -14,6 +14,11 @@ interface EventData {
   [key: string]: any
 }
 
+export interface SendNotifOrgOnceResult {
+  cleanupFailed: boolean
+  sent: boolean
+}
+
 const NOTIF_CACHE_PATH = '/.notif-sendable'
 
 interface NotifCachePayload {
@@ -83,7 +88,7 @@ async function getNotification(
   orgId: string,
   eventName: string,
   uniqId: string,
-): Promise<{ last_send_at: Date, total_send: number } | null> {
+): Promise<{ last_send_at: Date, total_send: number } | null | undefined> {
   try {
     const notif = await drizzleClient
       .select({
@@ -103,8 +108,59 @@ async function getNotification(
   }
   catch (e: unknown) {
     logPgError(c, 'getNotification', e)
-    return null
+    return undefined
   }
+}
+
+export async function hasNotifOrgClaim(
+  c: Context,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  eventName: string,
+  orgId: string,
+  uniqId: string,
+): Promise<boolean | null> {
+  const notif = await getNotification(c, drizzleClient, orgId, eventName, uniqId)
+  if (notif === undefined)
+    return null
+  return notif !== null
+}
+
+async function insertNotificationClaim(
+  writeClient: ReturnType<typeof getDrizzleClient>,
+  eventName: string,
+  orgId: string,
+  uniqId: string,
+): Promise<boolean> {
+  const inserted = await writeClient
+    .insert(schema.notifications)
+    .values({
+      event: eventName,
+      uniq_id: uniqId,
+      owner_org: orgId,
+      last_send_at: new Date(),
+      total_send: 1,
+    })
+    .onConflictDoNothing({
+      target: [schema.notifications.owner_org, schema.notifications.event, schema.notifications.uniq_id],
+    })
+    .returning()
+
+  return inserted.length > 0
+}
+
+async function deleteNotificationClaim(
+  writeClient: ReturnType<typeof getDrizzleClient>,
+  eventName: string,
+  orgId: string,
+  uniqId: string,
+) {
+  await writeClient
+    .delete(schema.notifications)
+    .where(and(
+      eq(schema.notifications.event, eventName),
+      eq(schema.notifications.uniq_id, uniqId),
+      eq(schema.notifications.owner_org, orgId),
+    ))
 }
 
 export async function sendNotifOrg(
@@ -119,6 +175,10 @@ export async function sendNotifOrg(
 ) {
   // Check if notification has already been sent (read from replica)
   const notif = await getNotification(c, drizzleClient, orgId, eventName, uniqId)
+  if (notif === undefined) {
+    cloudlog({ requestId: c.get('requestId'), message: 'notif lookup failed', event: eventName, orgId, uniqId })
+    return false
+  }
 
   // Create write-capable drizzle client for mutations
   const pgClient = getPgClient(c)
@@ -132,23 +192,8 @@ export async function sendNotifOrg(
       // First time: use insert with onConflictDoNothing to avoid error logs
       isFirstSend = true
 
-      const inserted = await writeClient
-        .insert(schema.notifications)
-        .values({
-          event: eventName,
-          uniq_id: uniqId,
-          owner_org: orgId,
-          last_send_at: new Date(),
-          total_send: 1,
-        })
-        .onConflictDoNothing({
-          target: [schema.notifications.owner_org, schema.notifications.event, schema.notifications.uniq_id],
-        })
-        .returning()
-
       // Only send if we successfully inserted (won the race)
-      // If conflict occurred, inserted will be empty array
-      shouldSend = inserted.length > 0
+      shouldSend = await insertNotificationClaim(writeClient, eventName, orgId, uniqId)
       if (!shouldSend) {
         cloudlog({ requestId: c.get('requestId'), message: 'notif insert race lost', event: eventName, orgId })
         return false
@@ -204,6 +249,69 @@ export async function sendNotifOrg(
   catch (e: unknown) {
     logPgError(c, 'sendNotifOrg', e)
     return false
+  }
+}
+
+export async function claimNotifOrgOnce(
+  c: Context,
+  eventName: string,
+  orgId: string,
+  uniqId: string,
+  writeClient = createDrizzleClient(getPgClient(c)),
+): Promise<boolean> {
+  try {
+    const claimed = await insertNotificationClaim(writeClient, eventName, orgId, uniqId)
+    if (!claimed) {
+      cloudlog({ requestId: c.get('requestId'), message: 'notif once already claimed', event: eventName, orgId, uniqId })
+    }
+    return claimed
+  }
+  catch (e: unknown) {
+    logPgError(c, 'claimNotifOrgOnce', e)
+    return false
+  }
+}
+
+export async function sendNotifOrgOnce(
+  c: Context,
+  eventName: string,
+  eventData: EventData,
+  orgId: string,
+  uniqId: string,
+  recipientEmail: string,
+  _drizzleClient: ReturnType<typeof getDrizzleClient>,
+  writeClient = createDrizzleClient(getPgClient(c)),
+): Promise<SendNotifOrgOnceResult> {
+  const claimed = await claimNotifOrgOnce(c, eventName, orgId, uniqId, writeClient)
+  if (!claimed)
+    return { sent: false, cleanupFailed: false }
+
+  const cleanupClaim = async (): Promise<boolean> => {
+    try {
+      await deleteNotificationClaim(writeClient, eventName, orgId, uniqId)
+      return true
+    }
+    catch (cleanupError) {
+      logPgError(c, 'sendNotifOrgOnce cleanup', cleanupError)
+      return false
+    }
+  }
+
+  try {
+    const res = await trackBentoEvent(c, recipientEmail, eventData, eventName)
+    if (!res) {
+      const cleanupSucceeded = await cleanupClaim()
+      cloudlog({ requestId: c.get('requestId'), message: 'trackEvent failed for one-time notif', eventName, email: recipientEmail, eventData })
+      return { sent: false, cleanupFailed: !cleanupSucceeded }
+    }
+
+    cloudlog({ requestId: c.get('requestId'), message: 'send one-time notif done', eventName, email: recipientEmail, uniqId })
+    return { sent: true, cleanupFailed: false }
+  }
+  catch (e: unknown) {
+    const cleanupSucceeded = await cleanupClaim()
+    logPgError(c, 'sendNotifOrgOnce', e)
+    return { sent: false, cleanupFailed: !cleanupSucceeded }
   }
 }
 

@@ -22,9 +22,11 @@ export interface PasswordPolicyConfig {
 // Extended organization type with password policy and 2FA fields (from get_orgs_v7)
 // Note: Using get_orgs_v7 return type with explicit JSON parsing for password_policy_config
 type RawOrganization = ArrayElement<Database['public']['Functions']['get_orgs_v7']['Returns']>
-export type Organization = Omit<RawOrganization, 'password_policy_config'> & {
+export type Organization = Omit<RawOrganization, 'password_policy_config' | 'stats_refresh_requested_at' | 'stats_updated_at'> & {
   logo_storage_path?: string | null
   password_policy_config: PasswordPolicyConfig | null
+  stats_refresh_requested_at: string | null
+  stats_updated_at: string | null
 }
 export type OrganizationRole
   = Database['public']['Enums']['user_min_right']
@@ -250,7 +252,8 @@ export const useOrganizationStore = defineStore('organization', () => {
       return
 
     const organizations = Array.from(organizationsMap.values())
-    const orgIds = organizations.map(org => org.gid)
+    const selectableOrganizations = organizations.filter(org => isSelectableOrganization(org.role))
+    const orgIds = selectableOrganizations.map(org => org.gid)
 
     if (orgIds.length === 0) {
       _initialLoadPromise.value.resolve(true)
@@ -272,7 +275,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     for (const app of allAppsByOwner) {
       // For each app find the org_id that owns said app
       // This is needed for the "banner"
-      const org = organizations.find(org => org.gid === app.owner_org)
+      const org = selectableOrganizations.find(org => org.gid === app.owner_org)
       if (!org) {
         console.error(`Cannot find organization for app`, app)
         _initialLoadPromise.value.reject(`Cannot find organization for app ${app}`)
@@ -353,7 +356,7 @@ export const useOrganizationStore = defineStore('organization', () => {
   const fetchOrganizations = async () => {
     const main = useMainStore()
 
-    const userId = main.user?.id
+    const userId = main.user?.id ?? main.auth?.id
     if (!userId)
       return
 
@@ -402,8 +405,8 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     const organization = selectableOrganizations[0]
     if (!organization) {
-      // Clear visible organizations because none are selectable.
-      _organizations.value = new Map()
+      // Keep invitation-only organizations available so invite deep links
+      // can still open the accept-invite dialog before the user joins.
       currentOrganization.value = undefined
       currentRole.value = null
       currentOrganizationFailed.value = false

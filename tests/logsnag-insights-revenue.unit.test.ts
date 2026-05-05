@@ -40,4 +40,28 @@ describe('logsnag revenue metric helpers', () => {
     expect(nextDayStart.toISOString()).toBe('2026-03-25T00:00:00.000Z')
     expect(dayDateId).toBe('2026-03-24')
   })
+
+  it.concurrent('computes NRR from prior MRR, churn, contraction, and expansion', () => {
+    expect(logsnagInsightsTestUtils.calculateNrr(100, {
+      churnMrr: 15,
+      contractionMrr: 5,
+      expansionMrr: 10,
+    })).toBe(90)
+  })
+
+  it.concurrent('defaults NRR to 100 when there is no starting MRR baseline', () => {
+    expect(logsnagInsightsTestUtils.calculateNrr(0, {
+      churnMrr: 12,
+      contractionMrr: 4,
+      expansionMrr: 0,
+    })).toBe(100)
+  })
+
+  it.concurrent('sums full churn and downgrade revenue into the churn revenue metric', () => {
+    expect(logsnagInsightsTestUtils.calculateChurnRevenue({
+      churnMrr: 18.25,
+      contractionMrr: 7.75,
+      expansionMrr: 0,
+    })).toBe(26)
+  })
 })

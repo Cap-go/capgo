@@ -1,7 +1,7 @@
 {
   "name": "capgo_file",
   "logpush": true,
-  "compatibility_date": "2025-09-15",
+  "compatibility_date": "2026-04-21",
   "main": "./index.ts",
   "compatibility_flags": [
     "nodejs_compat",

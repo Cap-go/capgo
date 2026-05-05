@@ -236,8 +236,17 @@ Run tests:
 bun test:all
 bun test:backend
 bun test:cli
-bun test:local
 bun test:front
+
+# CLI workspace
+bun run cli:build
+bun run cli:test
+bun run cli:check
+
+# Legacy aliases kept for compatibility
+bun test:local
+bun test:all:local
+bun test:cli:local
 
 # Database SQL tests (Supabase CLI)
 supabase test db
@@ -255,7 +264,10 @@ Notes:
 
 - Tests run in parallel across files. If a test mutates shared data, add
   dedicated seed data in `supabase/seed.sql`.
-- `LOCAL_CLI_PATH=true bun test:all:local` uses a local CLI build.
+- The repository is a Bun workspace monorepo. The Capgo app lives at the root
+  and the CLI lives in `cli/`.
+- Capgo's Vitest CLI coverage now resolves the local `cli/` workspace by
+  default, so monorepo changes are exercised together.
 - SQL tests in `supabase/tests/` are run by the Supabase CLI test runner.
 - Run `bun run supabase:start` first so the local DB is available (worktree-isolated).
 
@@ -396,6 +408,11 @@ self-hosted credentials, and keep the file local (it is gitignored). Use that
 file for commands such as
 `supabase secrets set --env-file supabase/functions/.env`.
 
+Organization invitation emails depend on Bento. If `BENTO_PUBLISHABLE_KEY`,
+`BENTO_SECRET_KEY`, and `BENTO_SITE_UUID` are not configured in
+`supabase/functions/.env` and synced to Supabase secrets, invite-org emails
+will not be sent.
+
 ### Deploy Supabase cloud
 
 To deploy the Supabase instance on cloud, you need a paid account, which costs
@@ -462,6 +479,17 @@ SUPA_ANON=your-supabase-anon-key
 SUPA_URL=https://your-supabase-url.supabase.co
 API_DOMAIN=api.yourdomain.com
 CAPTCHA_KEY=your-turnstile-key
+```
+
+#### Bento Email Variables
+
+If you want organization invitation emails to work, you also need to configure
+these Bento environment variables:
+
+```bash
+BENTO_PUBLISHABLE_KEY=your-bento-publishable-key
+BENTO_SECRET_KEY=your-bento-secret-key
+BENTO_SITE_UUID=your-bento-site-uuid
 ```
 
 #### How It Works

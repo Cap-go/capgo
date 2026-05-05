@@ -13,13 +13,10 @@ on:
 
 permissions: {}
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
-
 jobs:
   build_android:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     permissions:
       contents: read
       actions: write
@@ -40,48 +37,41 @@ jobs:
         with:
           bun-version: latest
       - name: Install dependencies
-        id: install_code
-        run: bun install
-      - name: Build
-        id: build_code
-        run: bun mobile
-      - name: Sync
-        id: sync_code
-        run: bun x cap sync android
-      - name: Setup java
-        uses: actions/setup-java@v5
-        with:
-          distribution: zulu
-          java-version: '17'
-      - name: Decode Keystore File
-        uses: timheuer/base64-to-file@v1
-        id: android_keystore
-        with:
-          fileName: android_keystore.keystore
-          encodedString: ${{ secrets.ANDROID_KEYSTORE_FILE }}
-      - name: Decode Google Play Confi File
-        uses: timheuer/base64-to-file@v1
-        id: service_account_json_file
-        with:
-          fileName: serviceAccount.json
-          encodedString: ${{ secrets.PLAY_CONFIG_JSON }}
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: '3.4.9'
-          bundler-cache: true
-      - uses: maierj/fastlane-action@v3.1.0
+        run: bun install --frozen-lockfile
+      - name: Resolve app id
+        id: app_config
+        run: echo "app_id=$(bun -e \"import config from './capacitor.config.ts'; console.log(config.appId)\")" >> "$GITHUB_OUTPUT"
+      - name: Prepare mobile project
+        run: bun run build:mobile
+      - name: Save Android build credentials for Capgo CLI
         env:
-          KEYSTORE_PATH: ${{ steps.android_keystore.outputs.filePath }}
-          ANDROID_JSON_KEY_FILE: ${{ steps.service_account_json_file.outputs.filePath }}
-          DEVELOPER_PACKAGE_NAME: ${{ secrets.DEVELOPER_PACKAGE_NAME }}
+          ANDROID_KEYSTORE_FILE: ${{ secrets.ANDROID_KEYSTORE_FILE }}
+          PLAY_CONFIG_JSON: ${{ secrets.PLAY_CONFIG_JSON }}
           KEYSTORE_KEY_ALIAS: ${{ secrets.KEYSTORE_KEY_ALIAS }}
           KEYSTORE_KEY_PASSWORD: ${{ secrets.KEYSTORE_KEY_PASSWORD }}
           KEYSTORE_STORE_PASSWORD: ${{ secrets.KEYSTORE_STORE_PASSWORD }}
-        with:
-          lane: android beta
-      - name: Upload release bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: android-release
-          path: ./android/app/build/outputs/bundle/release/app-release.aab
-          retention-days: 10
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          keystore_path="$RUNNER_TEMP/android_keystore.keystore"
+          play_config_path="$RUNNER_TEMP/serviceAccount.json"
+
+          printf '%s' "$ANDROID_KEYSTORE_FILE" | base64 --decode > "$keystore_path"
+          printf '%s' "$PLAY_CONFIG_JSON" | base64 --decode > "$play_config_path"
+
+          bunx @capgo/cli@latest build credentials save \
+            --local \
+            --appId "${{ steps.app_config.outputs.app_id }}" \
+            --platform android \
+            --keystore "$keystore_path" \
+            --keystore-alias "$KEYSTORE_KEY_ALIAS" \
+            --keystore-key-password "$KEYSTORE_KEY_PASSWORD" \
+            --keystore-store-password "$KEYSTORE_STORE_PASSWORD" \
+            --play-config "$play_config_path" \
+            --output-upload \
+            --output-retention 7d
+      - name: Request Android build through Capgo CLI
+        env:
+          CAPGO_TOKEN: ${{ secrets.CAPGO_TOKEN }}
+        run: bunx @capgo/cli@latest build request "${{ steps.app_config.outputs.app_id }}" --platform android --path . --output-upload --output-retention 7d

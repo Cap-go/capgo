@@ -1,0 +1,6 @@
+dist
+__tests__/data
+__tests__/fixtures
+coverage
+output
+sample

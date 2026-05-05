@@ -131,14 +131,17 @@ export async function startCreditTopUp(orgId: string, quantity = 100) {
   }
 }
 
-export async function completeCreditTopUp(orgId: string, sessionId: string) {
-  if (!orgId || !sessionId)
+export async function completeCreditTopUp(orgId: string, sessionId?: string | null) {
+  if (!orgId)
     return null
 
   const supabase = useSupabase()
   try {
     const { data, error } = await supabase.functions.invoke('private/credits/complete-top-up', {
-      body: JSON.stringify({ orgId, sessionId }),
+      body: JSON.stringify({
+        orgId,
+        ...(sessionId ? { sessionId } : {}),
+      }),
     })
     if (error) {
       console.error('Failed to complete credit top-up', error)

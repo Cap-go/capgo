@@ -6,16 +6,139 @@ concurrency:
 
 on:
   pull_request:
-  workflow_call: # Allow this workflow to be called by other workflows
+  push:
+    branches-ignore:
+      - main
+      - development
+  merge_group:
+    types:
+      - checks_requested
+  workflow_call:
+    inputs:
+      run_capgo:
+        type: boolean
+        required: false
+        default: true
+      run_cli:
+        type: boolean
+        required: false
+        default: true
 
 permissions: {}
 
 env:
   DENO_DIR: my_cache_directory
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  CLICOLOR: '1'
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      run_capgo: ${{ steps.set.outputs.capgo }}
+      run_cli: ${{ steps.set.outputs.cli }}
+    steps:
+      - name: Checkout repository
+        if: github.event_name != 'workflow_call'
+        uses: actions/checkout@v6 # v6
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed paths
+        if: github.event_name != 'workflow_call'
+        id: filter
+        uses: dorny/paths-filter@v3 # v3
+        with:
+          filters: |
+            shared:
+              - '.github/workflows/**'
+              - '.github/scripts/**'
+              - 'scripts/release-scope.ts'
+              - 'scripts/setup-bun.sh'
+              - 'scripts/setup-bun.ps1'
+              - '.npmrc'
+              - '.typos.toml'
+              - 'package.json'
+              - 'bun.lock'
+              - 'bunfig.toml'
+              - 'tsconfig.json'
+              - 'vitest.config.ts'
+              - 'vitest.config.cloudflare.ts'
+              - 'vitest.config.cloudflare-plugin.ts'
+            cli:
+              - 'cli/**'
+            capgo:
+              - 'aliproxy/**'
+              - 'android/**'
+              - 'assets/**'
+              - 'benches/**'
+              - 'cloudflare_workers/**'
+              - 'codemagic.yaml'
+              - 'configs.json'
+              - 'deno-env.d.ts'
+              - 'deno.lock'
+              - 'eslint.config.js'
+              - 'formkit.config.ts'
+              - 'formkit.theme.ts'
+              - 'icons/**'
+              - 'index.html'
+              - 'internal/**'
+              - 'ionic.config.json'
+              - 'ios/**'
+              - 'jean.json'
+              - 'messages/**'
+              - 'playwright/**'
+              - 'playwright.config.ts'
+              - 'project.inlang'
+              - 'public/**'
+              - 'read_replicate/**'
+              - 'scriptable/**'
+              - 'scripts/**'
+              - 'shared/**'
+              - 'sql/**'
+              - 'src/**'
+              - 'supabase/**'
+              - 'tests/**'
+              - 'capacitor.config.ts'
+              - 'vite.config.mts'
+              - 'vitest.config.bench.ts'
+              - 'wrangler.jsonc'
+
+      - name: Resolve workflow scope
+        id: set
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_RUN_CAPGO: ${{ inputs.run_capgo }}
+          INPUT_RUN_CLI: ${{ inputs.run_cli }}
+          FILTER_CAPGO: ${{ steps.filter.outputs.capgo }}
+          FILTER_CLI: ${{ steps.filter.outputs.cli }}
+          FILTER_SHARED: ${{ steps.filter.outputs.shared }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_call" ]; then
+            echo "capgo=$INPUT_RUN_CAPGO" >> "$GITHUB_OUTPUT"
+            echo "cli=$INPUT_RUN_CLI" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          run_capgo=false
+          run_cli=false
+
+          if [ "$FILTER_CAPGO" = "true" ] || [ "$FILTER_SHARED" = "true" ]; then
+            run_capgo=true
+          fi
+
+          if [ "$FILTER_CLI" = "true" ] || [ "$FILTER_SHARED" = "true" ]; then
+            run_cli=true
+          fi
+
+          echo "capgo=$run_capgo" >> "$GITHUB_OUTPUT"
+          echo "cli=$run_cli" >> "$GITHUB_OUTPUT"
+
   test_all:
+    needs: changes
+    if: needs.changes.outputs.run_capgo == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     name: Run tests
@@ -24,174 +147,567 @@ jobs:
       actions: write
     steps:
       - name: Cache Deno dependencies
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@v5 # v5
         with:
           path: ${{ env.DENO_DIR }}
           key: my_cache_key
-      - name: Checkout capgo
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - name: Checkout repository
+        uses: actions/checkout@v6 # v6
         with:
           fetch-depth: 2
       - name: Setup bun
-        uses: oven-sh/setup-bun@3d267786b128fe76c2f16a390aa2448b815359f3 # v2
-        with:
-          bun-version: latest
+        run: bash scripts/setup-bun.sh
       - name: Validate migration timestamps
-        if: github.event_name == 'pull_request'
-        run: |
-          set -euo pipefail
-
-          extract_timestamp() {
-            local file_name="$1"
-            local base_name
-            base_name="$(basename "$file_name")"
-
-            if [[ "$base_name" =~ ^([0-9]{14})_ ]]; then
-              echo "${BASH_REMATCH[1]}"
-            else
-              return 1
-            fi
-          }
-
-          BASE_REF="HEAD^1"
-
-          declare -A base_timestamp_to_file
-          while IFS= read -r file; do
-            ts="$(extract_timestamp "$file" || true)"
-            [ -z "$ts" ] && continue
-            base_timestamp_to_file["$ts"]="$file"
-          done < <(git ls-tree -r --name-only "$BASE_REF" -- 'supabase/migrations/*.sql')
-
-          latest_base_timestamp="00000000000000"
-          for ts in "${!base_timestamp_to_file[@]}"; do
-            if [[ "$ts" > "$latest_base_timestamp" ]]; then
-              latest_base_timestamp="$ts"
-            fi
-          done
-
-          added_files="$(git diff --name-only --diff-filter=A "${BASE_REF}" HEAD -- 'supabase/migrations/*.sql')"
-          duplicate_timestamps=0
-
-          if [ -n "$added_files" ]; then
-            declare -A added_timestamp_count
-            declare -A added_timestamp_files
-
-            while IFS= read -r file; do
-              [ -z "$file" ] && continue
-              ts="$(extract_timestamp "$file" || true)"
-              [ -z "$ts" ] && continue
-
-              if [[ -n "${base_timestamp_to_file["$ts"]+x}" ]]; then
-                echo "❌ Duplicate migration timestamp: ${ts}"
-                echo "  PR file: $file"
-                echo "  Existing file on main: ${base_timestamp_to_file["$ts"]}"
-                duplicate_timestamps=1
-              fi
-
-              if [ -n "${added_timestamp_count["$ts"]+x}" ]; then
-                echo "❌ Duplicate migration timestamp in PR: ${ts}"
-                echo "  Previous file: ${added_timestamp_files["$ts"]}"
-                echo "  Additional file: ${file}"
-                duplicate_timestamps=1
-              else
-                added_timestamp_count["$ts"]=1
-                added_timestamp_files["$ts"]="$file"
-              fi
-
-              if [[ "$ts" < "$latest_base_timestamp" ]]; then
-                echo "❌ Migration timestamp regression detected"
-                echo "  Last migration timestamp on main: ${latest_base_timestamp}"
-                echo "  New migration file: $file"
-                echo "  New migration timestamp: ${ts}"
-                duplicate_timestamps=1
-              fi
-            done <<< "$added_files"
-          fi
-
-          if [ "$duplicate_timestamps" -ne 0 ]; then
-            exit 1
-          fi
-
-          echo "✅ Migration filename timestamps are unique and strictly newer than main."
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        run: bash scripts/check-supabase-migration-order.sh
       - name: Check for typos
-        uses: crate-ci/typos@631208b7aac2daa8b707f55e7331f9112b0e062d # v1.44.0
+        uses: crate-ci/typos@v1 # v1.45.1
       - name: Show bun version
         run: bun --version
-      - name: Show capgo version
-        run: bunx @capgo/cli@latest -v
+      - name: Show local CLI version
+        run: bun -e "import pack from './cli/package.json'; console.log(pack.version)"
       - name: Check for console statements
         run: |
           if grep -r --exclude="logging.ts" --exclude=".env" --exclude=".env.*" "console\." supabase/functions/; then
-            echo "❌ Found console statements in supabase/functions directory, use cloudlog instead"
+            echo "Found console statements in supabase/functions directory, use cloudlog instead"
             exit 1
           else
-            echo "✅ No console statements found in supabase/functions directory"
+            echo "No console statements found in supabase/functions directory"
           fi
       - name: Install dependencies
         run: bun install
-      # - name: Install playwright
-      #   run: bunx playwright install
       - name: Lint
         run: bun lint && bun lint:backend
       - name: Typecheck
         run: bun typecheck
-      # TODO: enable I18n linting when the issue they have with npm not found is fixed
-      # - name: Lint I18n
-      #   run: bunx @inlang/cli lint --project project.inlang
       - name: Install Supabase CLI
-        uses: supabase/setup-cli@b60b5899c73b63a2d2d651b1e90db8d4c9392f51 # v1
+        uses: supabase/setup-cli@v2 # v2.0.0
         with:
-          version: latest
+          version: 2.84.2
       - name: Show Supabase CLI version
         run: supabase --version
+      - name: Link Supabase templates
+        run: ln -sfn supabase/templates templates
       - name: Run Supabase Start
         run: supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,studio,logflare,vector,realtime
+      - name: Reset Supabase DB
+        run: supabase db reset
       - name: Run Supabase Test DB
         run: supabase test db
       - name: Lint SQL
         run: supabase db lint -s public --fail-on warning
-      - uses: JarvusInnovations/background-action@2428e7b970a846423095c79d43f759abf979a635 # v1
+      - id: bootstrap_edge_server
         name: Bootstrap Edge server
-        with:
-          run: supabase functions serve &
-          wait-on: |
+        env:
+          BACKGROUND_SERVICE_NAME: Bootstrap Edge server
+          BACKGROUND_RUN_COMMAND: supabase functions serve
+          BACKGROUND_WAIT_ON: |
             http-get://127.0.0.1:54321/functions/v1/ok
-          # IMPORTANT: to use environment variables in wait-on, you must use this form: ${{ env.VAR }}
-          # See wait-on section below for all resource types and prefixes
-
-          tail: stderr,stdout # true = stderr,stdout
-          # This will allow you to monitor the progress live
-
-          log-output-resume: stderr,stdout
-          # Eliminates previously output stderr log entries from post-run output
-
-          wait-for: 1m
-
-          log-output: stderr,stdout # same as true
-
-          log-output-if: true
-          # failure = exit-early or timeout
-
-          working-directory: .
+          BACKGROUND_LOG_PATH: ${{ runner.temp }}/bootstrap-edge-server.log
+          BACKGROUND_WAIT_TIMEOUT_MS: 60000
+        run: bash .github/scripts/start-background-service.sh
       - name: Run all backend and CLI tests
         run: bun run test:all
-      - uses: JarvusInnovations/background-action@2428e7b970a846423095c79d43f759abf979a635 # v1
+      - name: Show Edge server logs after backend test failure
+        if: failure() && steps.bootstrap_edge_server.outputs.log_path != ''
+        run: |
+          echo "::group::Bootstrap Edge server log"
+          tail -n 200 "${{ steps.bootstrap_edge_server.outputs.log_path }}" || true
+          echo "::endgroup::"
+      - name: Reset Supabase DB before Cloudflare Workers tests
+        run: supabase db reset
+      - id: start_cloudflare_workers
         name: Start Cloudflare Workers for testing
-        with:
-          run: |
+        env:
+          BACKGROUND_SERVICE_NAME: Cloudflare Workers
+          BACKGROUND_RUN_COMMAND: |
             chmod +x scripts/start-cloudflare-workers.sh
             ./scripts/start-cloudflare-workers.sh
-          wait-on: |
+          BACKGROUND_WAIT_ON: |
             http-get://127.0.0.1:8787/ok
             http-get://127.0.0.1:8788/ok
             http-get://127.0.0.1:8789/ok
-          tail: stderr,stdout
-          log-output-resume: stderr,stdout
-          wait-for: 2m
-          log-output: stderr,stdout
-          log-output-if: true
-          working-directory: .
+          BACKGROUND_LOG_PATH: ${{ runner.temp }}/cloudflare-workers.log
+          BACKGROUND_WAIT_TIMEOUT_MS: 120000
+          BACKGROUND_TAIL_LINES: 400
+        run: bash .github/scripts/start-background-service.sh
       - name: Run Cloudflare Workers backend tests
         run: bun run test:cloudflare:backend
-      # - name: Run playwright tests
-      #   run: bun run test:front
+      - name: Show Cloudflare Worker logs after Cloudflare test failure
+        if: failure() && steps.start_cloudflare_workers.outputs.log_path != ''
+        run: |
+          echo "::group::Cloudflare Worker log"
+          tail -n 400 "${{ steps.start_cloudflare_workers.outputs.log_path }}" || true
+          echo "::endgroup::"
+      - name: Upload background service logs
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: test-all-background-service-logs
+          path: |
+            ${{ steps.bootstrap_edge_server.outputs.log_path }}
+            ${{ steps.start_cloudflare_workers.outputs.log_path }}
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Stop background services
+        if: always()
+        run: |
+          for pid in "${{ steps.bootstrap_edge_server.outputs.pid }}" "${{ steps.start_cloudflare_workers.outputs.pid }}"; do
+            if [ -n "${pid}" ] && kill -0 "${pid}" 2>/dev/null; then
+              kill "${pid}" 2>/dev/null || true
+            fi
+          done
+
+  test_playwright:
+    needs: changes
+    if: needs.changes.outputs.run_capgo == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    name: Run Playwright tests
+    permissions:
+      contents: read
+    steps:
+      - name: Cache Deno dependencies
+        uses: actions/cache@v5 # v5
+        with:
+          path: ${{ env.DENO_DIR }}
+          key: my_cache_key
+      - name: Checkout repository
+        uses: actions/checkout@v6 # v6
+        with:
+          fetch-depth: 2
+      - name: Setup bun
+        run: bash scripts/setup-bun.sh
+      - name: Install dependencies
+        run: bun install
+      - name: Install Playwright browser
+        run: bunx playwright install --with-deps chromium
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v2 # v2.0.0
+        with:
+          version: 2.84.2
+      - name: Link Supabase templates
+        run: ln -sfn supabase/templates templates
+      - id: start_playwright_stripe_emulator
+        name: Start Stripe emulator for Playwright
+        env:
+          BACKGROUND_SERVICE_NAME: Stripe emulator
+          BACKGROUND_RUN_COMMAND: STRIPE_EMULATOR_PORT=4510 bun run stripe:emulator
+          BACKGROUND_WAIT_ON: |
+            tcp:127.0.0.1:4510
+          BACKGROUND_LOG_PATH: ${{ runner.temp }}/playwright-stripe-emulator.log
+          BACKGROUND_WAIT_TIMEOUT_MS: 60000
+          BACKGROUND_TAIL_LINES: 300
+        run: bash .github/scripts/start-background-service.sh
+      - id: start_playwright_backend
+        name: Start Playwright backend
+        env:
+          BACKGROUND_SERVICE_NAME: Playwright backend
+          BACKGROUND_RUN_COMMAND: |
+            rm -f .context/playwright/gha-backend.ready
+            PLAYWRIGHT_READY_FILE=.context/playwright/gha-backend.ready \
+            ENV=local \
+            STRIPE_SECRET_KEY=sk_test_emulator \
+            STRIPE_API_BASE_URL=http://host.docker.internal:4510 \
+            STRIPE_WEBHOOK_SECRET=testsecret \
+            WEBAPP_URL=http://localhost:5173 \
+            bun run backend:playwright
+          BACKGROUND_WAIT_ON: |
+            file:${{ github.workspace }}/.context/playwright/gha-backend.ready
+          BACKGROUND_LOG_PATH: ${{ runner.temp }}/playwright-backend.log
+          BACKGROUND_WAIT_TIMEOUT_MS: 360000
+          BACKGROUND_TAIL_LINES: 400
+        run: bash .github/scripts/start-background-service.sh
+      - id: start_playwright_frontend
+        name: Start Playwright frontend
+        env:
+          BACKGROUND_SERVICE_NAME: Playwright frontend
+          BACKGROUND_RUN_COMMAND: CAPTCHA_KEY='' bun run serve:worktree
+          BACKGROUND_WAIT_ON: |
+            http-get://localhost:5173
+          BACKGROUND_LOG_PATH: ${{ runner.temp }}/playwright-frontend.log
+          BACKGROUND_WAIT_TIMEOUT_MS: 360000
+          BACKGROUND_TAIL_LINES: 300
+        run: bash .github/scripts/start-background-service.sh
+      - name: Run Playwright tests
+        env:
+          SKIP_STRIPE_EMULATOR_START: 'true'
+          SKIP_BACKEND_START: 'true'
+          SKIP_FRONTEND_START: 'true'
+        run: bunx playwright test
+      - name: Show Playwright service logs after failure
+        if: failure()
+        run: |
+          echo "::group::Stripe emulator log"
+          tail -n 200 "${{ steps.start_playwright_stripe_emulator.outputs.log_path }}" || true
+          echo "::endgroup::"
+          echo "::group::Playwright backend log"
+          tail -n 300 "${{ steps.start_playwright_backend.outputs.log_path }}" || true
+          echo "::endgroup::"
+          echo "::group::Playwright frontend log"
+          tail -n 200 "${{ steps.start_playwright_frontend.outputs.log_path }}" || true
+          echo "::endgroup::"
+      - name: Upload Playwright background service logs
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-background-service-logs
+          path: |
+            ${{ steps.start_playwright_stripe_emulator.outputs.log_path }}
+            ${{ steps.start_playwright_backend.outputs.log_path }}
+            ${{ steps.start_playwright_frontend.outputs.log_path }}
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Upload Playwright artifacts
+        if: failure()
+        uses: actions/upload-artifact@v6 # v6
+        with:
+          name: playwright-artifacts
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Stop Playwright background services
+        if: always()
+        run: |
+          for pid in "${{ steps.start_playwright_frontend.outputs.pid }}" "${{ steps.start_playwright_backend.outputs.pid }}" "${{ steps.start_playwright_stripe_emulator.outputs.pid }}"; do
+            if [ -n "${pid}" ] && kill -0 "${pid}" 2>/dev/null; then
+              kill "${pid}" 2>/dev/null || true
+            fi
+          done
+
+  cli_node_compatibility:
+    needs: changes
+    if: needs.changes.outputs.run_cli == 'true'
+    name: CLI on Node.js ${{ matrix.node-version }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['20', '21', '22', '23', '24', '25']
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6 # v6
+      - name: Setup bun
+        run: bash scripts/setup-bun.sh
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v6 # v6
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Display Node.js version
+        run: node --version
+      - name: Install dependencies
+        run: bun install
+      - name: Build CLI
+        run: bun run cli:build
+      - name: Test CLI --version
+        run: node cli/dist/index.js --version
+      - name: Test CLI --help
+        run: node cli/dist/index.js --help
+
+  cli_typos:
+    needs: changes
+    if: needs.changes.outputs.run_cli == 'true'
+    name: Check for typos (CLI)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6 # v6
+      - name: Check spelling with typos
+        uses: crate-ci/typos@v1 # v1.45.1
+        with:
+          files: ./cli
+          config: ./.typos.toml
+
+  cli_create_valid_zip_linux:
+    needs: changes
+    if: needs.changes.outputs.run_cli == 'true'
+    name: CLI create valid zip (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6 # v6
+      - name: Setup bun
+        run: bash scripts/setup-bun.sh
+      - name: Install dependencies
+        run: bun install
+      - name: Install test_upload dependencies
+        run: bun install --cwd cli/test/test_upload
+      - name: Build CLI
+        run: bun run cli:build
+      - name: Create a valid zip test
+        run: node ./cli/dist/index.js bundle zip --path cli/test/test_upload -n build-linux.zip --package-json cli/test/test_upload/package.json
+      - name: Check build directory contents
+        run: ls -R ./cli/dist
+      - name: Check ZIP file contents
+        run: unzip -l build-linux.zip
+      - name: Upload build-linux.zip artifact
+        uses: actions/upload-artifact@v4 # v4
+        with:
+          name: build-zip-linux
+          path: build-linux.zip
+
+  cli_check_posix_paths_windows:
+    needs: changes
+    if: needs.changes.outputs.run_cli == 'true'
+    name: CLI POSIX paths (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      matrix:
+        os: [windows-2025, windows-2022]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6 # v6
+      - name: Setup bun
+        if: runner.os != 'Windows'
+        run: bash scripts/setup-bun.sh
+      - name: Setup bun on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./scripts/setup-bun.ps1
+      - name: Install dependencies
+        run: bun install
+      - name: Install test_upload dependencies
+        run: bun install --cwd cli/test/test_upload
+      - name: Build CLI
+        run: bun run cli:build
+      - name: Create a zip test
+        run: node ./cli/dist/index.js bundle zip --path cli/test/test_upload -n build-${{ matrix.os }}.zip --package-json cli/test/test_upload/package.json
+      - name: Upload build.zip artifact
+        uses: actions/upload-artifact@v4 # v4
+        with:
+          name: build-zip-${{ matrix.os }}
+          path: build-${{ matrix.os }}.zip
+
+  cli_check_posix_paths_unix:
+    needs: [changes, cli_create_valid_zip_linux, cli_check_posix_paths_windows]
+    if: needs.changes.outputs.run_cli == 'true'
+    name: CLI POSIX paths (Unix)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6 # v6
+      - name: Download build-linux.zip artifact
+        uses: actions/download-artifact@v4 # v4
+        with:
+          name: build-zip-linux
+      - name: List files
+        run: ls -lh
+      - name: Check file size of Linux build
+        run: ls -lh build-linux.zip
+      - name: Verify ZIP file integrity for Linux build with zipinfo
+        run: |
+          zipinfo ./build-linux.zip || (echo "ZIP file is corrupted: build-linux.zip" && exit 1)
+      - name: Verify POSIX paths for Linux build
+        run: |
+          unzip build-linux.zip -d extracted-linux
+          if find extracted-linux -type f | grep -qE '\\\\'; then
+            echo "Non-POSIX paths detected in build-linux.zip."
+            exit 1
+          else
+            echo "All paths are POSIX compliant in build-linux.zip."
+          fi
+      - name: Setup Java
+        uses: actions/setup-java@v5 # v5
+        with:
+          distribution: zulu
+          java-version: '17'
+      - name: Compile VerifyZip.java
+        run: javac ./cli/test/VerifyZip.java
+      - name: Verify ZIP file integrity for Linux build with Java
+        run: java -cp ./cli/test VerifyZip build-linux.zip
+      - name: Download build-windows-2025.zip artifact
+        uses: actions/download-artifact@v4 # v4
+        with:
+          name: build-zip-windows-2025
+      - name: Download build-windows-2022.zip artifact
+        uses: actions/download-artifact@v4 # v4
+        with:
+          name: build-zip-windows-2022
+      - name: Check file sizes of Windows builds
+        run: |
+          ls -lh build-windows-2025.zip
+          ls -lh build-windows-2022.zip
+      - name: Verify ZIP file integrity for Windows 2025 build with zipinfo
+        run: |
+          zipinfo ./build-windows-2025.zip || (echo "ZIP file is corrupted: build-windows-2025.zip" && exit 1)
+      - name: Verify ZIP file integrity for Windows 2022 build with zipinfo
+        run: |
+          zipinfo ./build-windows-2022.zip || (echo "ZIP file is corrupted: build-windows-2022.zip" && exit 1)
+      - name: Verify POSIX paths for Windows 2025 build
+        run: |
+          unzip build-windows-2025.zip -d extracted-2025
+          if find extracted-2025 -type f | grep -qE '\\\\'; then
+            echo "Non-POSIX paths detected in build-windows-2025.zip."
+            exit 1
+          else
+            echo "All paths are POSIX compliant in build-windows-2025.zip."
+          fi
+      - name: Verify POSIX paths for Windows 2022 build
+        run: |
+          unzip build-windows-2022.zip -d extracted-2022
+          if find extracted-2022 -type f | grep -qE '\\\\'; then
+            echo "Non-POSIX paths detected in build-windows-2022.zip."
+            exit 1
+          else
+            echo "All paths are POSIX compliant in build-windows-2022.zip."
+          fi
+      - name: Verify ZIP file integrity for Windows 2025 build with Java
+        run: java -cp ./cli/test VerifyZip build-windows-2025.zip
+      - name: Verify ZIP file integrity for Windows 2022 build with Java
+        run: java -cp ./cli/test VerifyZip build-windows-2022.zip
+
+  cli_check_posix_paths_macos:
+    needs: [changes, cli_create_valid_zip_linux, cli_check_posix_paths_windows]
+    if: needs.changes.outputs.run_cli == 'true'
+    name: CLI POSIX paths (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6 # v6
+      - name: Download build-linux.zip artifact
+        uses: actions/download-artifact@v4 # v4
+        with:
+          name: build-zip-linux
+      - name: Download build-windows-2025.zip artifact
+        uses: actions/download-artifact@v4 # v4
+        with:
+          name: build-zip-windows-2025
+      - name: Download build-windows-2022.zip artifact
+        uses: actions/download-artifact@v4 # v4
+        with:
+          name: build-zip-windows-2022
+      - name: List files
+        run: ls -lh
+      - name: Check file size of Linux build
+        run: ls -lh build-linux.zip
+      - name: Setup Swift
+        uses: swift-actions/setup-swift@v3 # v3
+      - name: Get swift version
+        run: swift --version
+      - name: Compile test executable
+        run: swift build -c release
+        working-directory: ./cli/test/test_zip_swift
+      - name: Run the swift test
+        run: ./cli/test/test_zip_swift/.build/release/MyCLI --zip-files build-linux.zip build-windows-2025.zip build-windows-2022.zip
+
+  cli_posix_paths_final:
+    needs: [changes, cli_check_posix_paths_unix, cli_check_posix_paths_macos]
+    if: needs.changes.outputs.run_cli == 'true'
+    name: CLI POSIX paths final
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Final check
+        run: echo "All POSIX path checks completed successfully"
+
+  cli_tests:
+    needs: changes
+    if: needs.changes.outputs.run_cli == 'true'
+    runs-on: ubuntu-latest
+    name: Run CLI tests
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6 # v6
+      - name: Setup bun
+        run: bash scripts/setup-bun.sh
+      - name: Setup Node.js
+        uses: actions/setup-node@v6 # v6
+        with:
+          node-version: 24
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4 # v4
+        with:
+          version: latest
+      - name: Install dependencies
+        run: bun install
+      - name: Lint CLI
+        run: bun run cli:lint
+      - name: Typecheck CLI
+        run: bun run cli:typecheck
+      - name: Build CLI
+        run: bun run cli:build
+      - name: Quick ESM SDK check
+        run: bun run --cwd cli test:esm-sdk
+      - name: Run CLI help
+        run: node cli/dist/index.js --help
+      - name: Setup test fixtures for version detection
+        run: ./cli/test/fixtures/setup-test-projects.sh
+      - name: Run CLI validation tests
+        run: bun run cli:test
+
+  cli_capgo_integration:
+    needs: changes
+    if: needs.changes.outputs.run_cli == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    name: Run Capgo CLI integration tests
+    permissions:
+      contents: read
+      actions: write
+    steps:
+      - name: Cache Deno dependencies
+        uses: actions/cache@v5 # v5
+        with:
+          path: ${{ env.DENO_DIR }}
+          key: my_cache_key
+      - name: Checkout repository
+        uses: actions/checkout@v6 # v6
+        with:
+          fetch-depth: 2
+      - name: Setup bun
+        run: bash scripts/setup-bun.sh
+      - name: Install dependencies
+        run: bun install
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v2 # v2.0.0
+        with:
+          version: 2.84.2
+      - name: Link Supabase templates
+        run: ln -sfn supabase/templates templates
+      - name: Run Supabase Start
+        run: supabase start -x imgproxy,studio,mailpit,realtime,postgres-meta,supavisor,studio,logflare,vector,realtime
+      - name: Reset Supabase DB
+        run: supabase db reset
+      - id: bootstrap_cli_edge_server
+        name: Bootstrap Edge server
+        env:
+          BACKGROUND_SERVICE_NAME: Bootstrap Edge server
+          BACKGROUND_RUN_COMMAND: supabase functions serve
+          BACKGROUND_WAIT_ON: |
+            http-get://127.0.0.1:54321/functions/v1/ok
+          BACKGROUND_LOG_PATH: ${{ runner.temp }}/bootstrap-cli-edge-server.log
+          BACKGROUND_WAIT_TIMEOUT_MS: 60000
+        run: bash .github/scripts/start-background-service.sh
+      - name: Run Capgo CLI integration tests
+        run: bun run cli:test:capgo
+      - name: Show CLI Edge server logs after failure
+        if: failure() && steps.bootstrap_cli_edge_server.outputs.log_path != ''
+        run: |
+          echo "::group::CLI Bootstrap Edge server log"
+          tail -n 200 "${{ steps.bootstrap_cli_edge_server.outputs.log_path }}" || true
+          echo "::endgroup::"
+      - name: Upload CLI background service logs
+        if: failure()
+        uses: actions/upload-artifact@v6 # v6
+        with:
+          name: cli-background-service-logs
+          path: ${{ steps.bootstrap_cli_edge_server.outputs.log_path }}
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Stop CLI background services
+        if: always()
+        run: |
+          for pid in "${{ steps.bootstrap_cli_edge_server.outputs.pid }}"; do
+            if [ -n "${pid}" ] && kill -0 "${pid}" 2>/dev/null; then
+              kill "${pid}" 2>/dev/null || true
+            fi
+          done

@@ -23,6 +23,45 @@ import { backgroundTask, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSI
 
 const PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth']
 
+export type UpdateResponseKind = 'up_to_date' | 'blocked' | 'failed'
+
+const UPDATE_UP_TO_DATE_CODES = new Set([
+  'no_new_version_available',
+  'already_on_builtin',
+])
+
+const UPDATE_BLOCKED_CODES = new Set([
+  'cannot_update_via_private_channel',
+  'disabled_platform_ios',
+  'disabled_platform_android',
+  'disabled_platform_electron',
+  'disable_auto_update_to_major',
+  'disable_auto_update_to_minor',
+  'disable_auto_update_to_patch',
+  'disable_auto_update_to_metadata',
+  'disable_auto_update_under_native',
+  'disable_prod_build',
+  'disable_dev_build',
+  'disable_device',
+  'disable_emulator',
+  'key_id_mismatch',
+])
+
+export function getUpdateResponseKind(errorCode: string): UpdateResponseKind {
+  if (UPDATE_UP_TO_DATE_CODES.has(errorCode))
+    return 'up_to_date'
+  if (UPDATE_BLOCKED_CODES.has(errorCode))
+    return 'blocked'
+  return 'failed'
+}
+
+function updateError200(c: Context, errorCode: string, message: string, moreInfo: Record<string, unknown> = {}) {
+  return simpleError200(c, errorCode, message, {
+    ...moreInfo,
+    kind: getUpdateResponseKind(errorCode),
+  })
+}
+
 export function resToVersion(plugin_version: string, signedURL: string, version: Database['public']['Tables']['app_versions']['Row'], manifest: ManifestEntry[], expose_metadata: boolean = false) {
   const pluginVersion = parse(plugin_version)
   const res: {
@@ -118,7 +157,7 @@ export async function updateWithPG(
     fetchManifestEntries,
   })
   if (body.version_build === 'unknown') {
-    return simpleError200(c, 'unknown_version_build', 'Version build is unknown, cannot proceed with update', { body })
+    return updateError200(c, 'unknown_version_build', 'Version build is unknown, cannot proceed with update', { body })
   }
   const coerce = tryParse(fixSemver(body.version_build))
   if (!coerce) {
@@ -129,7 +168,7 @@ export async function updateWithPG(
       version_id: version_build,
       app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient))
-    return simpleError200(c, 'semver_error', `Native version: ${body.version_build} doesn't follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo`)
+    return updateError200(c, 'semver_error', `Native version: ${body.version_build} doesn't follow semver convention, please check https://capgo.app/semver_tester/ to learn more about semver usage in Capgo`)
   }
   // Reject v4 completely - it's no longer supported
   if (pluginVersion.major === 4) {
@@ -141,7 +180,7 @@ export async function updateWithPG(
       app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient))
     await sendStatsAndDevice(c, device, [{ action: 'backend_refusal' }])
-    return simpleError200(c, 'unsupported_plugin_version', `Plugin version ${plugin_version} (v4) is no longer supported. Please upgrade to v5.10.0 or later.`)
+    return updateError200(c, 'unsupported_plugin_version', `Plugin version ${plugin_version} (v4) is no longer supported. Please upgrade to v5.10.0 or later.`)
   }
 
   // Check if plugin_version is deprecated and send notification
@@ -154,7 +193,7 @@ export async function updateWithPG(
     }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient))
   }
   if (!app_id || !device_id || !version_build || !version_name || !platform) {
-    return simpleError200(c, 'missing_info', 'Cannot find device_id or app_id')
+    return updateError200(c, 'missing_info', 'Cannot find device_id or app_id')
   }
 
   await backgroundTask(c, createStatsMau(c, device_id, app_id, appOwner.owner_org, platform))
@@ -172,7 +211,7 @@ export async function updateWithPG(
   if (!channelData && !channelOverride) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot get channel or override', id: app_id, date: new Date().toISOString() })
     await sendStatsAndDevice(c, device, [{ action: 'NoChannelOrOverride' }])
-    return simpleError200(c, 'no_channel', 'no default channel or override')
+    return updateError200(c, 'no_channel', 'no default channel or override')
   }
 
   // Trigger only if the channel is overwritten but the version is not
@@ -180,7 +219,7 @@ export async function updateWithPG(
     channelData = channelOverride
 
   if (!channelData) {
-    return simpleError200(c, 'null_channel_data', 'channel data still null')
+    return updateError200(c, 'null_channel_data', 'channel data still null')
   }
 
   const version = channelOverride?.version ?? channelData.version
@@ -192,7 +231,7 @@ export async function updateWithPG(
   if (!version.external_url && !version.r2_path && !isInternalVersionName(version.name) && (!manifestEntries || manifestEntries.length === 0)) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot get bundle', id: app_id, version, manifestEntriesLength: manifestEntries ? manifestEntries.length : 0, channelData: channelData ? channelData.channels.name : 'no channel data', defaultChannel })
     await sendStatsAndDevice(c, device, [{ action: 'missingBundle', versionName: version.name }])
-    return simpleError200(c, 'no_bundle', 'Cannot get bundle')
+    return updateError200(c, 'no_bundle', 'Cannot get bundle')
   }
 
   // Check for encryption key mismatch between device and bundle
@@ -201,7 +240,7 @@ export async function updateWithPG(
   if (body.key_id && version.key_id && body.key_id !== version.key_id && greaterThan(pluginVersion, parse('8.40.7'))) {
     cloudlog({ requestId: c.get('requestId'), message: 'Encryption key mismatch', device_id, deviceKeyId: body.key_id, bundleKeyId: version.key_id, versionName: version.name })
     await sendStatsAndDevice(c, device, [{ action: 'keyMismatch', versionName: version.name }])
-    return simpleError200(c, 'key_id_mismatch', 'Device encryption key does not match bundle encryption key. The device may have a different public key than the one used to encrypt this bundle.', {
+    return updateError200(c, 'key_id_mismatch', 'Device encryption key does not match bundle encryption key. The device may have a different public key than the one used to encrypt this bundle.', {
       deviceKeyId: body.key_id,
       bundleKeyId: version.key_id,
     })
@@ -212,7 +251,7 @@ export async function updateWithPG(
     cloudlog({ requestId: c.get('requestId'), message: 'No new version available', id: device_id, version_name, version: version.name, date: new Date().toISOString() })
     // TODO: check why this event is send with wrong version_name
     await sendStatsAndDevice(c, device, [{ action: 'noNew', versionName: version.name }])
-    return simpleError200(c, 'no_new_version_available', 'No new version available')
+    return updateError200(c, 'no_new_version_available', 'No new version available')
   }
 
   if (channelData) {
@@ -220,7 +259,7 @@ export async function updateWithPG(
     if (!channelData.channels.ios && platform === 'ios') {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, ios is disabled', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disablePlatformIos', versionName: version.name }])
-      return simpleError200(c, 'disabled_platform_ios', 'Cannot update, ios it\'s disabled', {
+      return updateError200(c, 'disabled_platform_ios', 'Cannot update, ios it\'s disabled', {
         version: version.name,
         old: version_name,
       })
@@ -229,7 +268,7 @@ export async function updateWithPG(
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, android is disabled', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disablePlatformAndroid', versionName: version.name }])
       cloudlog({ requestId: c.get('requestId'), message: 'sendStats', date: new Date().toISOString() })
-      return simpleError200(c, 'disabled_platform_android', 'Cannot update, android is disabled', {
+      return updateError200(c, 'disabled_platform_android', 'Cannot update, android is disabled', {
         version: version.name,
         old: version_name,
       })
@@ -237,7 +276,7 @@ export async function updateWithPG(
     if (!channelData.channels.electron && platform === 'electron') {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, electron is disabled', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disablePlatformElectron', versionName: version.name }])
-      return simpleError200(c, 'disabled_platform_electron', 'Cannot update, electron is disabled', {
+      return updateError200(c, 'disabled_platform_electron', 'Cannot update, electron is disabled', {
         version: version.name,
         old: version_name,
       })
@@ -245,7 +284,7 @@ export async function updateWithPG(
     if (!isInternalVersionName(version.name) && channelData?.channels.disable_auto_update === 'major' && parse(version.name).major > parse(version_build).major) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot upgrade major version', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMajor', versionName: version.name }])
-      return simpleError200(c, 'disable_auto_update_to_major', 'Cannot upgrade major version', {
+      return updateError200(c, 'disable_auto_update_to_major', 'Cannot upgrade major version', {
         major: true,
         version: version.name,
         old: version_build,
@@ -258,7 +297,7 @@ export async function updateWithPG(
       const errorMessage = defaultChannel
         ? `Cannot update via a private channel. The channel "${channelData.channels.name}" does not allow device self-assignment. Please ensure your defaultChannel "${defaultChannel}" has "Allow devices to self dissociate/associate" set to true.`
         : `Cannot update via a private channel. The channel "${channelData.channels.name}" does not allow device self-assignment. Please set a defaultChannel with "Allow devices to self dissociate/associate" enabled.`
-      return simpleError200(c, 'cannot_update_via_private_channel', errorMessage)
+      return updateError200(c, 'cannot_update_via_private_channel', errorMessage)
     }
 
     if (!isInternalVersionName(version.name) && channelData.channels.disable_auto_update === 'minor' && (
@@ -267,7 +306,7 @@ export async function updateWithPG(
     )) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot upgrade minor version', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMinor', versionName: version.name }])
-      return simpleError200(c, 'disable_auto_update_to_minor', 'Cannot upgrade minor version', {
+      return updateError200(c, 'disable_auto_update_to_minor', 'Cannot upgrade minor version', {
         major: true,
         version: version.name,
         old: version_build,
@@ -282,7 +321,7 @@ export async function updateWithPG(
     )) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot upgrade patch version', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToPatch', versionName: version.name }])
-      return simpleError200(c, 'disable_auto_update_to_patch', 'Cannot upgrade patch version', {
+      return updateError200(c, 'disable_auto_update_to_patch', 'Cannot upgrade patch version', {
         major: true,
         version: version.name,
         old: version_build,
@@ -296,7 +335,7 @@ export async function updateWithPG(
       if (minUpdateVersion === null) {
         cloudlog({ requestId: c.get('requestId'), message: 'Channel is misconfigured', channel: channelData.channels.name, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'channelMisconfigured', versionName: version.name }])
-        return simpleError200(c, 'misconfigured_channel', `Channel ${channelData.channels.name} is misconfigured`, {
+        return updateError200(c, 'misconfigured_channel', `Channel ${channelData.channels.name} is misconfigured`, {
           version: version.name,
           old: version_build,
         })
@@ -306,7 +345,7 @@ export async function updateWithPG(
       if (greaterThan(parse(minUpdateVersion), parse(version_build))) {
         cloudlog({ requestId: c.get('requestId'), message: 'Cannot upgrade, metadata > current version', id: device_id, min: minUpdateVersion, old: version_name, date: new Date().toISOString() })
         await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateMetadata', versionName: version.name }])
-        return simpleError200(c, 'disable_auto_update_to_metadata', 'Cannot upgrade version, min update version > current version', {
+        return updateError200(c, 'disable_auto_update_to_metadata', 'Cannot upgrade version, min update version > current version', {
           major: true,
           version: version.name,
           old: version_build,
@@ -318,7 +357,7 @@ export async function updateWithPG(
     if (!isInternalVersionName(version.name) && channelData.channels.disable_auto_update_under_native && lessThan(parse(version.name), parse(version_build))) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot revert under native version', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateUnderNative', versionName: version.name }])
-      return simpleError200(c, 'disable_auto_update_under_native', 'Cannot revert under native version', {
+      return updateError200(c, 'disable_auto_update_under_native', 'Cannot revert under native version', {
         version: version.name,
         old: version_name,
       })
@@ -327,7 +366,7 @@ export async function updateWithPG(
     if (!channelData.channels.allow_prod && body.is_prod) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update prod build is disabled', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableProdBuild', versionName: version.name }])
-      return simpleError200(c, 'disable_prod_build', 'Cannot update, prod build is disabled', {
+      return updateError200(c, 'disable_prod_build', 'Cannot update, prod build is disabled', {
         version: version.name,
         old: version_name,
       })
@@ -335,7 +374,7 @@ export async function updateWithPG(
     if (!channelData.channels.allow_dev && !body.is_prod) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update dev build is disabled', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableDevBuild', versionName: version.name }])
-      return simpleError200(c, 'disable_dev_build', 'Cannot update, dev build is disabled', {
+      return updateError200(c, 'disable_dev_build', 'Cannot update, dev build is disabled', {
         version: version.name,
         old: version_name,
       })
@@ -343,7 +382,7 @@ export async function updateWithPG(
     if (!channelData.channels.allow_device && !body.is_emulator) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update device is disabled', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableDevice', versionName: version.name }])
-      return simpleError200(c, 'disable_device', 'Cannot update, device is disabled', {
+      return updateError200(c, 'disable_device', 'Cannot update, device is disabled', {
         version: version.name,
         old: version_name,
       })
@@ -351,7 +390,7 @@ export async function updateWithPG(
     if (!channelData.channels.allow_emulator && body.is_emulator) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot update emulator is disabled', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableEmulator', versionName: version.name }])
-      return simpleError200(c, 'disable_emulator', 'Cannot update, emulator is disabled', {
+      return updateError200(c, 'disable_emulator', 'Cannot update, emulator is disabled', {
         version: version.name,
         old: version_name,
       })
@@ -359,16 +398,16 @@ export async function updateWithPG(
   }
   if (version.name === 'builtin' && greaterOrEqual(parse(plugin_version), parse('6.2.0'))) {
     if (body.version_name === 'builtin' && version.name === 'builtin') {
-      return simpleError200(c, 'already_on_builtin', 'Already on builtin')
+      return updateError200(c, 'already_on_builtin', 'Already on builtin')
     }
     else {
-      return simpleError200(c, 'already_on_builtin', 'Already on builtin', {
+      return updateError200(c, 'already_on_builtin', 'Already on builtin', {
         version: 'builtin',
       })
     }
   }
   else if (version.name === 'builtin' && !greaterOrEqual(parse(plugin_version), parse('6.2.0'))) {
-    return simpleError200(c, 'revert_to_builtin_plugin_version_too_old', 'revert_to_builtin used, but plugin version is too old')
+    return updateError200(c, 'revert_to_builtin_plugin_version_too_old', 'revert_to_builtin used, but plugin version is too old')
   }
   const startBundleUrl = performance.now()
   let signedURL = version.external_url ?? ''
@@ -395,7 +434,7 @@ export async function updateWithPG(
   if ((!signedURL || (!(signedURL.startsWith('http://') || signedURL.startsWith('https://')))) && !manifest.length) {
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot get bundle signedURL', url: signedURL, id: app_id, date: new Date().toISOString() })
     await sendStatsAndDevice(c, device, [{ action: 'cannotGetBundle', versionName: version.name }])
-    return simpleError200(c, 'no_bundle_url', 'Cannot get bundle url')
+    return updateError200(c, 'no_bundle_url', 'Cannot get bundle url')
   }
   if (manifest.length && !signedURL) {
     // TODO: remove this when all plugin accept no URL
@@ -411,7 +450,7 @@ export async function updateWithPG(
   const res = resToVersion(plugin_version, signedURL, version as any, manifest, needsMetadata)
   if (!res.url && !res.manifest) {
     cloudlog({ requestId: c.get('requestId'), message: 'No url or manifest', id: app_id, version: version.name, date: new Date().toISOString() })
-    return simpleError200(c, 'no_url_or_manifest', 'No url or manifest')
+    return updateError200(c, 'no_url_or_manifest', 'No url or manifest')
   }
   return c.json(res, 200)
 }
@@ -419,7 +458,6 @@ export async function updateWithPG(
 export async function update(c: Context, body: AppInfos) {
   const pgClient = getPgClient(c, true)
 
-  // Set replication lag header (uses cached status, non-blocking)
   await setReplicationLagHeader(c, pgClient)
 
   const drizzlePg = pgClient ? getDrizzleClient(pgClient) : (null as any)

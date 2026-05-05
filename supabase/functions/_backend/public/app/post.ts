@@ -27,9 +27,12 @@ export async function post(c: Context<MiddlewareKeyVariables>, body: CreateApp):
   if (!body.name) {
     throw simpleError('missing_name', 'Missing name', { body })
   }
+  if (!body.owner_org) {
+    throw quickError(400, 'missing_owner_org', 'Missing owner_org', { body })
+  }
 
   // Check if the user is allowed to create an app in this organization (auth context set by middlewareKey)
-  if (body.owner_org && !(await checkPermission(c, 'org.update_settings', { orgId: body.owner_org }))) {
+  if (!(await checkPermission(c, 'org.create_app', { orgId: body.owner_org }))) {
     throw quickError(403, 'cannot_access_organization', 'You can\'t access this organization', { org_id: body.owner_org })
   }
 

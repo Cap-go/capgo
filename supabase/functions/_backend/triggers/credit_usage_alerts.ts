@@ -77,6 +77,7 @@ app.post('/', middlewareAPISecret, async (c) => {
         event: `Credit usage ${threshold}%+`,
         icon: '⚡️',
         user_id: orgId,
+        groups: { organization: orgId },
         notify: threshold >= 100,
         tags: {
           alert_cycle: alertCycle.toString(),

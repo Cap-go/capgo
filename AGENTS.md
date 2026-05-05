@@ -12,6 +12,9 @@ when working with code in this repository.
 - `bun build` - Build production version of the web app
 - `bun mobile` - Build for mobile and copy to Capacitor platforms
 - `bun dev-build` - Build with development branch configuration
+- `bun run cli:build` - Build the CLI workspace in `cli/`
+- `bun run cli:test` - Run the CLI workspace test suite
+- `bun run cli:check` - Lint, typecheck, build, and test the CLI workspace
 
 ### Testing
 
@@ -20,10 +23,10 @@ when working with code in this repository.
 - `bun test:all` - Run all backend tests
 - `bun test:backend` - Run backend tests excluding CLI tests
 - `bun test:cli` - Run CLI-specific tests
-- `bun test:local` - Run tests with local CLI path
+- `bun test:local` - Legacy alias for the default monorepo backend test run
 - `bun test:front` - Run Playwright frontend tests
-- `LOCAL_CLI_PATH=true bun test:all:local` - Run all tests with local CLI
-  configuration
+- `bun test:all:local` - Legacy alias for `bun test:all`
+- `bun test:cli:local` - Legacy alias for `bun test:cli`
 
 #### Cloudflare Workers Testing
 
@@ -49,6 +52,7 @@ testing against Cloudflare Workers.
 ### Database and Backend
 
 - `bun run supabase:start` - Start local Supabase instance (worktree-isolated)
+- `bun run supabase:cleanup` - Stop local Supabase and delete this worktree's Supabase volumes
 - `bun run supabase:db:reset` - Reset and seed local database
 - `bun backend` - Start Supabase functions locally
 - `bun reset` - Reset Supabase database
@@ -99,6 +103,13 @@ testing against Cloudflare Workers.
   service-role writes. Example:
   - `const loginAdmin = supabaseAdmin(c)` → use for `signInWithPassword`
   - `const adminClient = supabaseAdmin(c)` → use for admin writes
+- **Backend DB access style:** prefer `getPgClient()` / `getDrizzleClient()` for
+  multi-step SQL, transactions, joins, schema-backed writes, or code that
+  benefits from explicit pool lifecycle handling. Do **not** force every simple
+  one-statement internal helper write into Drizzle just for consistency. A
+  small service-role helper that is already a single clear `supabaseAdmin(c)`
+  call may stay on `supabaseAdmin` when that keeps the code smaller and equally
+  correct.
 
 ### HTTP Response Conventions
 
@@ -156,6 +167,16 @@ Capgo relies on two layered caches for plugin endpoints (`/updates`, `/stats`, `
    - Use the public shape like `npx @capgo/cli@latest ...` for customer-facing command examples.
    - Use internal execution equivalents (for example, `bunx @capgo/cli@latest ...`) only in internal tooling context.
 
+### Email Templates
+
+- `supabase/templates/invite_new_user_to_org.html` and `supabase/templates/invite_existing_user_to_org.html` are Bento templates.
+- Every other file in `supabase/templates/` is a Supabase auth or notification template.
+- Supabase templates use Supabase template syntax.
+- Bento templates use Bento template syntax.
+- Updating templates in the repository does not upload them anywhere automatically.
+- Supabase email templates must be uploaded manually to Supabase.
+- Bento email templates must be uploaded manually to Bento.
+
 ### Environment Setup
 
 1. Install dependencies: `bun install`
@@ -176,7 +197,7 @@ Capgo relies on two layered caches for plugin endpoints (`/updates`, `/stats`, `
 - Use Vitest test runner with custom configuration
 - Require running Supabase instance
 - Tests modify local database state
-- CLI tests require `LOCAL_CLI_PATH=true` environment variable
+- Capgo CLI tests resolve the local `cli/` workspace by default in this monorepo
 
 ### Test Categories
 
@@ -432,6 +453,43 @@ CREATE POLICY "policy_2" ON public.my_table FOR SELECT USING (condition_2);
 CREATE POLICY "Allow select on my_table" ON public.my_table
 FOR SELECT USING (condition_1 OR condition_2);
 ```
+
+**Rule 1.5: Never rely on implicit deny for table operations.**
+
+If an operation is intentionally forbidden, add an explicit deny policy for that
+operation instead of relying on the absence of a policy.
+
+- Do not use "no INSERT policy means INSERT is blocked" as the final design.
+- Do not use "no DELETE policy means DELETE is blocked" as the final design.
+- The expected repository style is explicit allow or explicit deny for each
+  operation you intentionally care about.
+- This is especially important for security-sensitive tables and system-managed
+  tables such as `manifest`.
+
+When an operation must be impossible for user-facing roles, prefer an explicit
+deny policy with a clear name, for example:
+
+```sql
+-- Example: system-managed table, users must never insert rows directly
+CREATE POLICY "Deny insert on my_table"
+ON public.my_table
+AS RESTRICTIVE
+FOR INSERT
+TO authenticated
+WITH CHECK (false);
+
+-- Example: users must never delete rows directly
+CREATE POLICY "Deny delete on my_table"
+ON public.my_table
+AS RESTRICTIVE
+FOR DELETE
+TO authenticated
+USING (false);
+```
+
+If API key traffic must also be denied through user-context RLS, make that
+intent explicit in the policy design and naming. Do not leave the operation
+blocked only because no policy happened to exist.
 
 **Rule 2: Call `auth.uid()` only once using a subquery.**
 

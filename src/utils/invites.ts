@@ -1,3 +1,5 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '~/types/supabase.types'
 import { FunctionsHttpError } from '@supabase/supabase-js'
 
 type TranslateFn = (key: string, params?: Record<string, unknown> | string, defaultMsg?: string) => string
@@ -31,4 +33,46 @@ export async function resolveInviteNewUserErrorMessage(
   const rawCooldown = moreInfo?.cooldown_minutes
   const cooldownMinutes = Number.isFinite(rawCooldown) ? Number(rawCooldown) : 5
   return t('invitation-resend-wait', { minutes: cooldownMinutes })
+}
+
+export async function notifyExistingUserInvite(
+  supabase: SupabaseClient<Database>,
+  email: string,
+  orgId: string,
+): Promise<boolean> {
+  const { error } = await supabase.functions.invoke('private/invite_existing_user_to_org', {
+    body: {
+      email,
+      org_id: orgId,
+    },
+  })
+
+  if (error) {
+    console.error('Failed to send organization invite email to existing user:', error)
+    return false
+  }
+
+  return true
+}
+
+export function shouldNotifyExistingUserInvite(role: string, useNewRbac: boolean) {
+  if (useNewRbac)
+    return true
+
+  return role.startsWith('invite_')
+}
+
+export function shouldAttemptExistingUserInviteNotification(
+  output: string,
+  role: string,
+  useNewRbac: boolean,
+  hasPendingInvite = false,
+) {
+  if (output === 'ALREADY_INVITED')
+    return hasPendingInvite && shouldNotifyExistingUserInvite(role, useNewRbac)
+
+  if (output !== 'OK')
+    return false
+
+  return shouldNotifyExistingUserInvite(role, useNewRbac)
 }

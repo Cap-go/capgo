@@ -1,5 +1,6 @@
+import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
-import { APP_NAME_STATS, BASE_URL, getAuthHeadersForCredentials, headersStats, ORG_ID_STATS } from './test-utils.ts'
+import { APP_NAME_STATS, BASE_URL, getAuthHeadersForCredentials, getSupabaseClient, headersStats, ORG_ID_STATS, USER_ID_STATS } from './test-utils.ts'
 
 function hasSeededStats(statsData: unknown) {
   if (!Array.isArray(statsData))
@@ -13,18 +14,43 @@ function hasSeededStats(statsData: unknown) {
   )
 }
 
+async function deleteApikeyById(id: number) {
+  await getSupabaseClient()
+    .from('apikeys')
+    .delete()
+    .eq('id', id)
+    .throwOnError()
+}
+
+async function createStatsSiblingApp(appId: string) {
+  await getSupabaseClient()
+    .from('apps')
+    .insert({
+      app_id: appId,
+      icon_url: '',
+      name: 'Stats Sibling App',
+      last_version: '1.0.0',
+      owner_org: ORG_ID_STATS,
+      user_id: USER_ID_STATS,
+    })
+    .throwOnError()
+}
+
+async function deleteAppByAppId(appId: string) {
+  await getSupabaseClient()
+    .from('apps')
+    .delete()
+    .eq('app_id', appId)
+    .throwOnError()
+}
+
 describe('[GET] /statistics operations with and without subkey', () => {
   const APPNAME = APP_NAME_STATS // Use the seeded stats app
   let subkeyId = 0
 
   afterAll(async () => {
-    if (subkeyId) {
-      const deleteApikey = await fetch(`${BASE_URL}/apikey/${subkeyId}`, {
-        method: 'DELETE',
-        headers: headersStats,
-      })
-      expect(deleteApikey.status).toBe(200)
-    }
+    if (subkeyId)
+      await deleteApikeyById(subkeyId)
   })
 
   it('should get app statistics without subkey', async () => {
@@ -139,6 +165,34 @@ describe('[GET] /statistics operations with and without subkey', () => {
     expect(hasSeededStats(statsData)).toBe(true)
   })
 
+  it('should not reveal sibling app existence with app-limited subkey', async () => {
+    expect(subkeyId).toBeGreaterThan(0)
+
+    const subkeyHeaders = { 'x-limited-key-id': String(subkeyId) }
+    const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const toDate = new Date().toISOString().split('T')[0]
+    const suffix = randomUUID().replaceAll('-', '')
+    const siblingApp = `com.stats.sibling.${suffix}`
+    const fakeApp = `com.stats.missing.${suffix}`
+
+    await createStatsSiblingApp(siblingApp)
+
+    try {
+      for (const appId of [siblingApp, fakeApp]) {
+        const getStats = await fetch(`${BASE_URL}/statistics/app/${appId}?from=${fromDate}&to=${toDate}`, {
+          method: 'GET',
+          headers: { ...headersStats, ...subkeyHeaders },
+        })
+        expect(getStats.status).toBe(401)
+        const statsData = await getStats.json<{ error: string }>()
+        expect(statsData.error).toBe('no_access_to_app')
+      }
+    }
+    finally {
+      await deleteAppByAppId(siblingApp)
+    }
+  })
+
   it('should get organization statistics with subkey', async () => {
     const subkeyHeaders = { 'x-limited-key-id': String(subkeyId) }
     const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
@@ -220,23 +274,21 @@ describe('[GET] /statistics operations with and without subkey', () => {
     const subkeyData = await createSubkey.json() as { id: number }
     const nonAccessibleOrgSubkeyId = subkeyData.id
 
-    const subkeyHeaders = { 'x-limited-key-id': String(nonAccessibleOrgSubkeyId) }
-    const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-    const toDate = new Date().toISOString().split('T')[0]
-    const getOrgStats = await fetch(`${BASE_URL}/statistics/org/22dbad8a-b885-4309-9b3b-a09f8460fb6d?from=${fromDate}&to=${toDate}`, {
-      method: 'GET',
-      headers: { ...headersStats, ...subkeyHeaders },
-    })
-    expect(getOrgStats.status).toBe(401)
-    const orgStatsData = await getOrgStats.json<{ error: string }>()
-    expect(orgStatsData.error).toBe('no_access_to_organization')
-
-    // Clean up
-    const deleteApikey = await fetch(`${BASE_URL}/apikey/${nonAccessibleOrgSubkeyId}`, {
-      method: 'DELETE',
-      headers: headersStats,
-    })
-    expect(deleteApikey.status).toBe(200)
+    try {
+      const subkeyHeaders = { 'x-limited-key-id': String(nonAccessibleOrgSubkeyId) }
+      const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      const toDate = new Date().toISOString().split('T')[0]
+      const getOrgStats = await fetch(`${BASE_URL}/statistics/org/22dbad8a-b885-4309-9b3b-a09f8460fb6d?from=${fromDate}&to=${toDate}`, {
+        method: 'GET',
+        headers: { ...headersStats, ...subkeyHeaders },
+      })
+      expect(getOrgStats.status).toBe(401)
+      const orgStatsData = await getOrgStats.json<{ error: string }>()
+      expect(orgStatsData.error).toBe('no_access_to_organization')
+    }
+    finally {
+      await deleteApikeyById(nonAccessibleOrgSubkeyId)
+    }
   })
 
   it('should create subkey with non-accessible app and fail to get app statistics', async () => {
@@ -254,22 +306,20 @@ describe('[GET] /statistics operations with and without subkey', () => {
     const subkeyData = await createSubkey.json() as { id: number }
     const nonAccessibleAppSubkeyId = subkeyData.id
 
-    const subkeyHeaders = { 'x-limited-key-id': String(nonAccessibleAppSubkeyId) }
-    const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-    const toDate = new Date().toISOString().split('T')[0]
-    const getStats = await fetch(`${BASE_URL}/statistics/app/com.demoadmin.app?from=${fromDate}&to=${toDate}`, {
-      method: 'GET',
-      headers: { ...headersStats, ...subkeyHeaders },
-    })
-    expect(getStats.status).toBe(401)
-    const statsData = await getStats.json<{ error: string }>()
-    expect(statsData.error).toBe('no_access_to_app')
-
-    // Clean up
-    const deleteApikey = await fetch(`${BASE_URL}/apikey/${nonAccessibleAppSubkeyId}`, {
-      method: 'DELETE',
-      headers: headersStats,
-    })
-    expect(deleteApikey.status).toBe(200)
+    try {
+      const subkeyHeaders = { 'x-limited-key-id': String(nonAccessibleAppSubkeyId) }
+      const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+      const toDate = new Date().toISOString().split('T')[0]
+      const getStats = await fetch(`${BASE_URL}/statistics/app/com.demoadmin.app?from=${fromDate}&to=${toDate}`, {
+        method: 'GET',
+        headers: { ...headersStats, ...subkeyHeaders },
+      })
+      expect(getStats.status).toBe(401)
+      const statsData = await getStats.json<{ error: string }>()
+      expect(statsData.error).toBe('no_access_to_app')
+    }
+    finally {
+      await deleteApikeyById(nonAccessibleAppSubkeyId)
+    }
   })
 })
