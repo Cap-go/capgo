@@ -107,7 +107,7 @@ describe('dynamic translation language selection', () => {
       json: async () => ({
         messages: {
           account: 'Compte',
-          'personal-information': 'Informations personnelles',
+          'personal-information': 'Renseignement personnel',
         },
       }),
     }))
@@ -123,7 +123,7 @@ describe('dynamic translation language selection', () => {
 
     await loadLanguageAsync('fr')
     expect(translateMessage('account')).toBe('Compte')
-    expect(translateMessage('personal-information')).toBe('Informations personnelles')
+    expect(translateMessage('personal-information')).toBe('Renseignement personnel')
     expect(fetchMock).toHaveBeenCalledTimes(1)
 
     await loadLanguageAsync('en')
