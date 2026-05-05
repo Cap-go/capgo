@@ -39,6 +39,7 @@ interface RoleBindingBody {
 type ValidationResult<T> = { ok: true, data: T } | { ok: false, status: number, error: string }
 type RouteValidationResult<T> = { ok: true, data: T } | { ok: false, response: Response }
 type RoleBindingRecord = typeof schema.role_bindings.$inferSelect
+type RoleRecord = typeof schema.roles.$inferSelect
 const INVALID_APIKEY_ACCESS_ERROR = 'Invalid API key or access'
 
 export const app = createHono('', version)
@@ -404,6 +405,41 @@ const LEGACY_RIGHT_TO_ROLE_NAME: Record<string, string> = {
   admin: 'org_admin',
 }
 
+async function loadAssignableRoleForBinding(
+  c: Context<MiddlewareKeyVariables>,
+  drizzle: ReturnType<typeof getDrizzleClient>,
+  binding: RoleBindingRecord,
+  roleName: string,
+): Promise<RouteValidationResult<RoleRecord>> {
+  const [role] = await drizzle
+    .select()
+    .from(schema.roles)
+    .where(eq(schema.roles.name, roleName))
+    .limit(1)
+
+  if (!role) {
+    return { ok: false, response: c.json({ error: 'Role not found' }, 404) }
+  }
+
+  if (!role.is_assignable) {
+    return { ok: false, response: c.json({ error: 'Role is not assignable' }, 403) }
+  }
+
+  const principalValidation = binding.org_id
+    ? await validatePrincipalAccess(drizzle, binding.principal_type as RoleBindingBody['principal_type'], binding.principal_id, binding.org_id)
+    : { ok: true as const, data: null }
+  if (!principalValidation.ok) {
+    return { ok: false, response: c.json({ error: principalValidation.error }, principalValidation.status as any) }
+  }
+
+  const roleScopeValidation = validateRoleScope(role.scope_type, binding.scope_type)
+  if (!roleScopeValidation.ok) {
+    return { ok: false, response: c.json({ error: roleScopeValidation.error }, roleScopeValidation.status as any) }
+  }
+
+  return { ok: true, data: role }
+}
+
 async function getCallerMaxPriorityRank(
   drizzle: ReturnType<typeof getDrizzleClient>,
   authType: 'apikey' | 'jwt',
@@ -568,6 +604,50 @@ export async function createRoleBindingForPrincipal(
     .returning()
 
   return { ok: true, data: binding }
+}
+
+async function updateRoleBindingRole(
+  pgClient: ReturnType<typeof getPgClient>,
+  bindingId: string,
+  binding: RoleBindingRecord,
+  roleId: string,
+  callerMaxRank: number,
+): Promise<RoleBindingRecord | null> {
+  const updateResult = await pgClient.query<RoleBindingRecord>(`
+    UPDATE public.role_bindings AS rb
+    SET role_id = $2::uuid
+    FROM public.roles AS bound_role
+    WHERE rb.id = $1::uuid
+      AND rb.org_id IS NOT DISTINCT FROM $4::uuid
+      AND rb.app_id IS NOT DISTINCT FROM $5::uuid
+      AND rb.bundle_id IS NOT DISTINCT FROM $6::bigint
+      AND rb.channel_id IS NOT DISTINCT FROM $7::uuid
+      AND rb.scope_type = $8::text
+      AND rb.principal_type = $9::text
+      AND rb.principal_id = $10::uuid
+      AND rb.role_id = bound_role.id
+      AND bound_role.priority_rank <= $3::integer
+    RETURNING rb.*
+  `, [
+    bindingId,
+    roleId,
+    callerMaxRank,
+    binding.org_id,
+    binding.app_id,
+    binding.bundle_id,
+    binding.channel_id,
+    binding.scope_type,
+    binding.principal_type,
+    binding.principal_id,
+  ])
+
+  return updateResult.rows[0] ?? null
+}
+
+function isLastSuperAdminDemotionError(error: unknown): boolean {
+  const errorMessage = error instanceof Error ? error.message : String(error)
+  const errorCode = typeof error === 'object' && error !== null && 'code' in error ? (error as { code?: string }).code : undefined
+  return errorMessage.includes('CANNOT_DEMOTE_LAST_SUPER_ADMIN_BINDING') || errorCode === 'CANNOT_DEMOTE_LAST_SUPER_ADMIN_BINDING'
 }
 
 // GET /private/role_bindings/:org_id - List role bindings for an org
@@ -799,31 +879,10 @@ app.patch(
         return bindingResult.response
       const binding = bindingResult.data
 
-      const [role] = await drizzle
-        .select()
-        .from(schema.roles)
-        .where(eq(schema.roles.name, roleName))
-        .limit(1)
-
-      if (!role) {
-        return c.json({ error: 'Role not found' }, 404)
-      }
-
-      if (!role.is_assignable) {
-        return c.json({ error: 'Role is not assignable' }, 403)
-      }
-
-      const principalValidation = binding.org_id
-        ? await validatePrincipalAccess(drizzle, binding.principal_type as RoleBindingBody['principal_type'], binding.principal_id, binding.org_id)
-        : { ok: true as const, data: null }
-      if (!principalValidation.ok) {
-        return c.json({ error: principalValidation.error }, principalValidation.status as any)
-      }
-
-      const roleScopeValidation = validateRoleScope(role.scope_type, binding.scope_type)
-      if (!roleScopeValidation.ok) {
-        return c.json({ error: roleScopeValidation.error }, roleScopeValidation.status as any)
-      }
+      const roleResult = await loadAssignableRoleForBinding(c, drizzle, binding, roleName)
+      if (!roleResult.ok)
+        return roleResult.response
+      const role = roleResult.data
 
       // Prevent privilege escalation: caller cannot assign a role with higher priority than their own
       const callerPrincipalId = auth.authType === 'apikey' ? auth.apikey!.rbac_id : auth.userId
@@ -832,11 +891,10 @@ app.patch(
         return c.json({ error: 'Cannot assign a role with higher privileges than your own' }, 403)
       }
 
-      const [updated] = await drizzle
-        .update(schema.role_bindings)
-        .set({ role_id: role.id })
-        .where(eq(schema.role_bindings.id, bindingId))
-        .returning()
+      const updated = await updateRoleBindingRole(pgClient, bindingId, binding, role.id, callerMaxRank)
+      if (!updated) {
+        return c.json({ error: 'Cannot modify a binding for a role with higher privileges than your own' }, 403)
+      }
 
       cloudlog({
         requestId: c.get('requestId'),
@@ -861,6 +919,9 @@ app.patch(
         bindingId,
         error,
       })
+      if (isLastSuperAdminDemotionError(error)) {
+        return c.json({ error: 'Cannot demote the last org_super_admin' }, 409)
+      }
       return c.json({ error: 'Internal server error' }, 500)
     }
     finally {
@@ -898,9 +959,30 @@ app.delete('/:binding_id', requireAuthAndGuardLimitedKeys, sValidator('param', b
     if (targetRole && targetRole.priority_rank > callerMaxRank) {
       return c.json({ error: 'Cannot delete a binding for a role with higher privileges than your own' }, 403)
     }
-    await drizzle
-      .delete(schema.role_bindings)
-      .where(eq(schema.role_bindings.id, bindingId))
+    await drizzle.transaction(async (tx) => {
+      await tx
+        .delete(schema.role_bindings)
+        .where(eq(schema.role_bindings.id, bindingId))
+
+      if (binding.principal_type === 'user' && binding.scope_type === 'org' && binding.org_id) {
+        await tx
+          .update(schema.org_users)
+          .set({
+            user_right: null,
+            rbac_role_name: null,
+            updated_at: sql`now()`,
+          })
+          .where(
+            and(
+              eq(schema.org_users.user_id, binding.principal_id),
+              eq(schema.org_users.org_id, binding.org_id),
+              sql`${schema.org_users.app_id} IS NULL`,
+              sql`${schema.org_users.channel_id} IS NULL`,
+              sql`(${schema.org_users.user_right} IS NULL OR ${schema.org_users.user_right}::text NOT LIKE 'invite_%')`,
+            ),
+          )
+      }
+    })
 
     cloudlog({
       requestId: c.get('requestId'),

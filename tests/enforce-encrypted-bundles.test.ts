@@ -1,5 +1,6 @@
+import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { APIKEY_ENCRYPTED, APP_NAME_ENCRYPTED, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, ORG_ID_ENCRYPTED, USER_ID_ENCRYPTED, USER_PASSWORD } from './test-utils.ts'
+import { APIKEY_ENCRYPTED, APP_NAME_ENCRYPTED, getAuthHeadersForCredentials, getEndpointUrl, getSupabaseClient, ORG_ID_ENCRYPTED, SUPABASE_ANON_KEY, SUPABASE_BASE_URL, USER_ID, USER_ID_2, USER_ID_ENCRYPTED, USER_PASSWORD } from './test-utils.ts'
 
 // This test file uses ISOLATED test data seeded in seed.sql:
 // - USER_ID_ENCRYPTED: f6a7b8c9-d0e1-4f2a-9b3c-4d5e6f708193
@@ -13,10 +14,131 @@ const headersEncrypted = {
   'Authorization': APIKEY_ENCRYPTED,
 }
 const USER_EMAIL_ENCRYPTED = 'encrypted@capgo.app'
+const USER_EMAIL_2 = 'test2@capgo.app'
 let authHeadersEncrypted: Record<string, string>
+let authHeadersUser2: Record<string, string>
+
+async function createStaleLegacySuperAdminFixture() {
+  const id = randomUUID()
+  const orgId = randomUUID()
+  const appUuid = randomUUID()
+  const appId = `com.encrypted.rbac-stale.${id}`
+  const bundleName = `stale-rbac-${id}`
+  const supabase = getSupabaseClient()
+
+  const { error: orgError } = await supabase.from('orgs').insert({
+    id: orgId,
+    created_by: USER_ID,
+    name: `Encrypted RBAC Stale Org ${id}`,
+    management_email: `encrypted-rbac-stale-${id}@capgo.app`,
+    use_new_rbac: true,
+  })
+  if (orgError)
+    throw orgError
+
+  const { error: appError } = await supabase.from('apps').insert({
+    id: appUuid,
+    app_id: appId,
+    owner_org: orgId,
+    icon_url: 'encrypted-rbac-stale-icon',
+    name: `Encrypted RBAC Stale App ${id}`,
+  })
+  if (appError)
+    throw appError
+
+  const { data: memberRole, error: roleError } = await supabase
+    .from('roles')
+    .select('id')
+    .eq('name', 'org_member')
+    .single()
+  if (roleError)
+    throw roleError
+
+  const { error: memberError } = await supabase.from('org_users').insert({
+    org_id: orgId,
+    user_id: USER_ID_2,
+    user_right: 'read',
+    rbac_role_name: 'org_member',
+  })
+  if (memberError)
+    throw memberError
+
+  await supabase
+    .from('role_bindings')
+    .delete()
+    .eq('principal_type', 'user')
+    .eq('principal_id', USER_ID_2)
+    .eq('org_id', orgId)
+
+  const { error: bindingError } = await supabase.from('role_bindings').insert({
+    principal_type: 'user',
+    principal_id: USER_ID_2,
+    role_id: memberRole!.id,
+    scope_type: 'org',
+    org_id: orgId,
+    granted_by: USER_ID,
+    reason: 'stale legacy super-admin regression',
+    is_direct: true,
+  })
+  if (bindingError)
+    throw bindingError
+
+  const { error: staleLegacyError } = await supabase
+    .from('org_users')
+    .update({ user_right: 'super_admin' })
+    .eq('org_id', orgId)
+    .eq('user_id', USER_ID_2)
+    .is('app_id', null)
+    .is('channel_id', null)
+  if (staleLegacyError)
+    throw staleLegacyError
+
+  const { data: version, error: versionError } = await supabase
+    .from('app_versions')
+    .insert({
+      app_id: appId,
+      name: bundleName,
+      checksum: `stale-rbac-${id}`,
+      owner_org: orgId,
+      user_id: USER_ID,
+      storage_provider: 'r2',
+      r2_path: `orgs/${orgId}/apps/${appId}/${bundleName}.zip`,
+      deleted: false,
+    })
+    .select('id')
+    .single()
+  if (versionError)
+    throw versionError
+
+  return {
+    orgId,
+    appId,
+    appUuid,
+    versionId: version!.id,
+    cleanup: async () => {
+      await supabase.from('app_versions').delete().eq('owner_org', orgId)
+      await supabase.from('role_bindings').delete().eq('org_id', orgId)
+      await supabase.from('org_users').delete().eq('org_id', orgId)
+      await supabase.from('apps').delete().eq('id', appUuid)
+      await supabase.from('orgs').delete().eq('id', orgId)
+    },
+  }
+}
+
+async function callBundleCleanupRpc(functionName: 'count_non_compliant_bundles' | 'delete_non_compliant_bundles', orgId: string) {
+  return fetch(`${SUPABASE_BASE_URL}/rest/v1/rpc/${functionName}`, {
+    method: 'POST',
+    headers: {
+      ...authHeadersUser2,
+      apikey: SUPABASE_ANON_KEY,
+    },
+    body: JSON.stringify({ org_id: orgId }),
+  })
+}
 
 beforeAll(async () => {
   authHeadersEncrypted = await getAuthHeadersForCredentials(USER_EMAIL_ENCRYPTED, USER_PASSWORD)
+  authHeadersUser2 = await getAuthHeadersForCredentials(USER_EMAIL_2, USER_PASSWORD)
 
   // Ensure enforcement is disabled at the start of tests
   await getSupabaseClient()
@@ -444,6 +566,37 @@ describe('[Encrypted Bundles Enforcement]', () => {
         .from('orgs')
         .update({ enforce_encrypted_bundles: false })
         .eq('id', ORG_ID_ENCRYPTED)
+    })
+  })
+
+  describe('cleanup RPC authorization', () => {
+    it('rejects stale legacy super_admin when RBAC only grants org_member', async () => {
+      const fixture = await createStaleLegacySuperAdminFixture()
+      const supabase = getSupabaseClient()
+
+      try {
+        const countResponse = await callBundleCleanupRpc('count_non_compliant_bundles', fixture.orgId)
+        const countData = await countResponse.json() as { message?: string, error?: string }
+        expect(countResponse.status).not.toBe(200)
+        expect(countData.message ?? countData.error).toContain('Unauthorized')
+
+        const deleteResponse = await callBundleCleanupRpc('delete_non_compliant_bundles', fixture.orgId)
+        const deleteData = await deleteResponse.json() as { message?: string, error?: string }
+        expect(deleteResponse.status).not.toBe(200)
+        expect(deleteData.message ?? deleteData.error).toContain('Unauthorized')
+
+        const { data: version, error: versionError } = await supabase
+          .from('app_versions')
+          .select('deleted')
+          .eq('id', fixture.versionId)
+          .single()
+
+        expect(versionError).toBeNull()
+        expect(version?.deleted).toBe(false)
+      }
+      finally {
+        await fixture.cleanup()
+      }
     })
   })
 

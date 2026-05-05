@@ -1,5 +1,6 @@
+import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
-import { APP_NAME_STATS, BASE_URL, getAuthHeadersForCredentials, getSupabaseClient, headersStats, ORG_ID_STATS } from './test-utils.ts'
+import { APP_NAME_STATS, BASE_URL, getAuthHeadersForCredentials, getSupabaseClient, headersStats, ORG_ID_STATS, USER_ID_STATS } from './test-utils.ts'
 
 function hasSeededStats(statsData: unknown) {
   if (!Array.isArray(statsData))
@@ -18,6 +19,28 @@ async function deleteApikeyById(id: number) {
     .from('apikeys')
     .delete()
     .eq('id', id)
+    .throwOnError()
+}
+
+async function createStatsSiblingApp(appId: string) {
+  await getSupabaseClient()
+    .from('apps')
+    .insert({
+      app_id: appId,
+      icon_url: '',
+      name: 'Stats Sibling App',
+      last_version: '1.0.0',
+      owner_org: ORG_ID_STATS,
+      user_id: USER_ID_STATS,
+    })
+    .throwOnError()
+}
+
+async function deleteAppByAppId(appId: string) {
+  await getSupabaseClient()
+    .from('apps')
+    .delete()
+    .eq('app_id', appId)
     .throwOnError()
 }
 
@@ -140,6 +163,34 @@ describe('[GET] /statistics operations with and without subkey', () => {
     const statsData = await getStats.json()
     expect(Array.isArray(statsData)).toBe(true)
     expect(hasSeededStats(statsData)).toBe(true)
+  })
+
+  it('should not reveal sibling app existence with app-limited subkey', async () => {
+    expect(subkeyId).toBeGreaterThan(0)
+
+    const subkeyHeaders = { 'x-limited-key-id': String(subkeyId) }
+    const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const toDate = new Date().toISOString().split('T')[0]
+    const suffix = randomUUID().replaceAll('-', '')
+    const siblingApp = `com.stats.sibling.${suffix}`
+    const fakeApp = `com.stats.missing.${suffix}`
+
+    await createStatsSiblingApp(siblingApp)
+
+    try {
+      for (const appId of [siblingApp, fakeApp]) {
+        const getStats = await fetch(`${BASE_URL}/statistics/app/${appId}?from=${fromDate}&to=${toDate}`, {
+          method: 'GET',
+          headers: { ...headersStats, ...subkeyHeaders },
+        })
+        expect(getStats.status).toBe(401)
+        const statsData = await getStats.json<{ error: string }>()
+        expect(statsData.error).toBe('no_access_to_app')
+      }
+    }
+    finally {
+      await deleteAppByAppId(siblingApp)
+    }
   })
 
   it('should get organization statistics with subkey', async () => {

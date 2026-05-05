@@ -29,6 +29,13 @@ interface EnsureOrgMembershipResult {
   alreadyMember: boolean
 }
 
+interface SsoProviderRecord {
+  id: string
+  org_id: string
+  provider_id: string | null
+  enforce_sso?: boolean | null
+}
+
 export const app = createHono('', version)
 
 app.use('*', useCors)
@@ -67,7 +74,7 @@ async function findCanonicalAuthUserIdByEmail(pgClient: ReturnType<typeof getPgC
 
 function getTrustedSsoProviders(userProvider: string, userIdentities: any[]): string[] {
   const trustedProviders = new Set<string>()
-  const isTrustedSsoProvider = (provider: string) => provider === 'sso' || provider.startsWith('sso:') || provider === userProvider
+  const isTrustedSsoProvider = (provider: string) => provider === 'sso' || provider.startsWith('sso:')
 
   if (isTrustedSsoProvider(userProvider)) {
     trustedProviders.add(userProvider)
@@ -81,6 +88,51 @@ function getTrustedSsoProviders(userProvider: string, userIdentities: any[]): st
   }
 
   return [...trustedProviders]
+}
+
+function extractProviderId(provider: unknown): string | null {
+  if (typeof provider !== 'string' || !provider.startsWith('sso:')) {
+    return null
+  }
+
+  const providerId = provider.slice('sso:'.length).trim()
+  return providerId.length > 0 ? providerId : null
+}
+
+function getAuthenticatedSsoProviders(userProvider: string | undefined, userProviders: string[], userIdentities: any[]): string[] {
+  const currentProviderId = extractProviderId(userProvider)
+  if (currentProviderId) {
+    return [`sso:${currentProviderId}`]
+  }
+
+  const providers = new Set<string>()
+  const addProvider = (provider: unknown) => {
+    const providerId = extractProviderId(provider)
+    if (providerId) {
+      providers.add(`sso:${providerId}`)
+    }
+  }
+
+  for (const provider of userProviders) {
+    addProvider(provider)
+  }
+  for (const identity of userIdentities) {
+    addProvider(identity?.provider)
+  }
+
+  return [...providers]
+}
+
+function getAuthorizedSsoProviders(provider: SsoProviderRecord, authenticatedProviders: string[]): string[] {
+  const authorizedProviderIds = new Set(
+    [provider.provider_id]
+      .filter((providerId): providerId is string => typeof providerId === 'string' && providerId.length > 0),
+  )
+
+  return authenticatedProviders.filter((authenticatedProvider) => {
+    const providerId = extractProviderId(authenticatedProvider)
+    return !!providerId && authorizedProviderIds.has(providerId)
+  })
 }
 
 async function transferSsoIdentities(pgClient: ReturnType<typeof getPgClient>, originalUserId: string, duplicateUserId: string, trustedProviders: string[]): Promise<number> {
@@ -294,6 +346,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       cloudlog({ requestId, message: 'User has no SSO identity, rejecting provisioning', userId })
       return quickError(403, 'sso_identity_required', 'User must have an SSO identity to be provisioned')
     }
+    const authenticatedSsoProviders = getAuthenticatedSsoProviders(userProvider, userProviders, userIdentities)
 
     const userEmail = userAuth.user.email
     if (!userEmail) {
@@ -310,11 +363,9 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     // This happens when SSO is enabled for a domain where users already had email/password accounts.
     // Supabase Auth creates a new auth.users record instead of linking — we fix this by merging.
     //
-    // Security note: merging on email match is safe here because we only reach this point after
-    // Supabase has verified the SAML assertion's cryptographic signature from the trusted IdP
-    // (configured by an org admin). The email claim therefore carries the same trust as the IdP's
-    // signing certificate — not standard email verification. This merge must NOT be replicated in
-    // contexts where the email claim is unverified (e.g., OAuth without verified_email, magic links).
+    // Security note: the email match only selects a merge candidate. The merge must not proceed
+    // until the domain's active SSO provider is resolved and matched against the provider that
+    // authenticated this session; a valid SAML signature alone does not prove email-domain control.
     const { data: existingUser, error: existingUserError } = await (admin as any)
       .from('users')
       .select('id')
@@ -357,7 +408,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       // Step 1: Resolve the SSO provider org so we can ensure the original user is a member
       const { data: mergeProvider, error: mergeProviderError } = await (admin as any)
         .from('sso_providers')
-        .select('id, org_id, enforce_sso')
+        .select('id, org_id, provider_id, enforce_sso')
         .eq('domain', userDomain)
         .eq('status', 'active')
         .maybeSingle()
@@ -370,6 +421,12 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       if (!mergeProvider) {
         cloudlogErr({ requestId, message: 'No active SSO provider found during merge', originalUserId, domain: userDomain })
         return quickError(404, 'provider_not_found', 'No active SSO provider found for your email domain')
+      }
+
+      const authorizedSsoProviders = getAuthorizedSsoProviders(mergeProvider, authenticatedSsoProviders)
+      if (authorizedSsoProviders.length === 0) {
+        cloudlog({ requestId, message: 'Authenticating SSO provider does not match email domain provider — aborting merge', userId, originalUserId, domain: userDomain, providerId: mergeProvider.id, externalProviderId: mergeProvider.provider_id, authenticatedProviders: authenticatedSsoProviders })
+        return quickError(403, 'provider_mismatch', 'SSO provider does not match the email domain provider')
       }
 
       try {
@@ -391,7 +448,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
 
       // Step 2: Transfer SSO identity from duplicate user (userId) → original user (originalUserId)
       try {
-        const transferredIdentityCount = await transferSsoIdentities(getSharedPgClient(), originalUserId, userId, trustedSsoProviders)
+        const transferredIdentityCount = await transferSsoIdentities(getSharedPgClient(), originalUserId, userId, authorizedSsoProviders)
         if (transferredIdentityCount === 0) {
           cloudlogErr({ requestId, message: 'No SSO identities were transferred during merge', userId, originalUserId })
           return quickError(500, 'identity_transfer_failed', 'Failed to merge SSO identity with existing account')
@@ -427,7 +484,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       // update this field. Without this, the next SSO login returns provider='email' and
       // the provider check above rejects the user with sso_auth_required.
       const { error: updateProviderError } = await admin.auth.admin.updateUserById(originalUserId, {
-        app_metadata: { provider: userProvider },
+        app_metadata: { provider: authorizedSsoProviders[0] },
       })
       if (updateProviderError) {
         cloudlogErr({ requestId, message: 'Failed to update app_metadata.provider on original user after merge', originalUserId, error: updateProviderError })
@@ -441,7 +498,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     // Resolve the provider from the user's email domain server-side
     const { data: provider, error: providerError } = await (admin as any)
       .from('sso_providers')
-      .select('id, org_id, domain, status')
+      .select('id, org_id, domain, status, provider_id')
       .eq('domain', userDomain)
       .eq('status', 'active')
       .maybeSingle()
@@ -454,6 +511,12 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
     if (!provider) {
       cloudlog({ requestId, message: 'No active SSO provider found for domain', userId, domain: userDomain })
       return quickError(404, 'provider_not_found', 'No active SSO provider found for your email domain')
+    }
+
+    const authorizedSsoProviders = getAuthorizedSsoProviders(provider, authenticatedSsoProviders)
+    if (authorizedSsoProviders.length === 0) {
+      cloudlog({ requestId, message: 'Authenticating SSO provider does not match email domain provider — rejecting provisioning', userId, domain: userDomain, providerId: provider.id, externalProviderId: provider.provider_id, authenticatedProviders: authenticatedSsoProviders })
+      return quickError(403, 'provider_mismatch', 'SSO provider does not match the email domain provider')
     }
 
     try {

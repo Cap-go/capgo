@@ -296,6 +296,8 @@ export async function hasAppRightApikey(c: Context<MiddlewareKeyVariables, any, 
 }
 
 export function apikeyHasOrgRight(key: Database['public']['Tables']['apikeys']['Row'], orgId: string) {
+  if (key.limited_to_apps?.length)
+    return false
   if (!key.limited_to_orgs || key.limited_to_orgs.length === 0)
     return true
   return key.limited_to_orgs.includes(orgId)
@@ -656,7 +658,8 @@ export async function recordBuildTime(
   buildId: string,
   platform: 'ios' | 'android',
   buildTimeSeconds: number,
-  completedAt?: number | null,
+  completedAt: number | null | undefined,
+  appId: string,
 ): Promise<string | null> {
   try {
     const { data, error } = await supabaseAdmin(c)
@@ -666,6 +669,7 @@ export async function recordBuildTime(
         p_build_id: buildId,
         p_platform: platform,
         p_build_time_unit: buildTimeSeconds,
+        p_app_id: appId,
       })
       .single()
 
