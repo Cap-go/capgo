@@ -442,7 +442,7 @@ describe('[Encrypted Bundles Enforcement]', () => {
       expect(data?.name).toBe('1.0.0-direct-no-enforcement')
     })
 
-    it('should reject direct update that clears session_key when enforcement is enabled', async () => {
+    it('should reject direct update that changes session_key after the bundle is ready', async () => {
       await getSupabaseClient()
         .from('orgs')
         .update({ enforce_encrypted_bundles: true })
@@ -474,7 +474,7 @@ describe('[Encrypted Bundles Enforcement]', () => {
         .eq('id', inserted!.id)
 
       expect(updateError).not.toBeNull()
-      expect(updateError?.message).toContain('encryption_required')
+      expect(updateError?.message).toContain('bundle_already_ready')
 
       const { data: afterUpdate, error: fetchError } = await getSupabaseClient()
         .from('app_versions')
@@ -484,6 +484,56 @@ describe('[Encrypted Bundles Enforcement]', () => {
 
       expect(fetchError).toBeNull()
       expect(afterUpdate?.session_key).toBe('encrypted-session-key-for-direct-update')
+
+      await getSupabaseClient()
+        .from('orgs')
+        .update({ enforce_encrypted_bundles: false })
+        .eq('id', ORG_ID_ENCRYPTED)
+    })
+
+    it('should allow CLI completion update that marks encrypted bundle ready', async () => {
+      await getSupabaseClient()
+        .from('orgs')
+        .update({ enforce_encrypted_bundles: true })
+        .eq('id', ORG_ID_ENCRYPTED)
+
+      const sessionKey = 'encrypted-session-key-for-cli-ready-update'
+      const bundleName = `1.0.0-cli-ready-update-${Date.now()}`
+      const { data: inserted, error: insertError } = await getSupabaseClient()
+        .from('app_versions')
+        .insert({
+          app_id: APP_NAME_ENCRYPTED,
+          name: bundleName,
+          checksum: 'f6789abcdef123456789abcdef123456789abcdef123456789abcdef1234',
+          owner_org: ORG_ID_ENCRYPTED,
+          storage_provider: 'r2-direct',
+          session_key: sessionKey,
+        })
+        .select('id, session_key, storage_provider')
+        .single()
+
+      expect(insertError).toBeNull()
+      expect(inserted?.storage_provider).toBe('r2-direct')
+
+      const { error: completionError } = await getSupabaseClient()
+        .from('app_versions')
+        .update({
+          storage_provider: 'r2',
+          session_key: sessionKey,
+        })
+        .eq('id', inserted!.id)
+
+      expect(completionError).toBeNull()
+
+      const { data: afterUpdate, error: fetchError } = await getSupabaseClient()
+        .from('app_versions')
+        .select('session_key, storage_provider')
+        .eq('id', inserted!.id)
+        .single()
+
+      expect(fetchError).toBeNull()
+      expect(afterUpdate?.session_key).toBe(sessionKey)
+      expect(afterUpdate?.storage_provider).toBe('r2')
 
       await getSupabaseClient()
         .from('orgs')
@@ -531,7 +581,7 @@ describe('[Encrypted Bundles Enforcement]', () => {
 
       const responseData = await response.json() as { message?: string, error?: string }
       expect(response.ok).toBe(false)
-      expect(responseData.message ?? responseData.error).toContain('encryption_required')
+      expect(responseData.message ?? responseData.error).toContain('bundle_already_ready')
 
       const { data: afterUpdate, error: fetchError } = await getSupabaseClient()
         .from('app_versions')

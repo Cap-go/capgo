@@ -13,7 +13,33 @@ DECLARE
   org_required_key varchar(21);
   bundle_is_encrypted boolean;
   bundle_key_id varchar(20);
+  bundle_was_ready boolean;
 BEGIN
+  IF TG_OP = 'UPDATE' THEN
+    bundle_was_ready := OLD.storage_provider IS DISTINCT FROM 'r2-direct';
+
+    IF bundle_was_ready
+      AND (
+        NEW.session_key IS DISTINCT FROM OLD.session_key
+        OR NEW.key_id IS DISTINCT FROM OLD.key_id
+      )
+    THEN
+      PERFORM public.pg_log('deny: BUNDLE_ENCRYPTION_METADATA_LOCKED_TRIGGER',
+        jsonb_build_object(
+          'org_id', OLD.owner_org,
+          'app_id', OLD.app_id,
+          'version_name', OLD.name,
+          'user_id', OLD.user_id,
+          'old_storage_provider', OLD.storage_provider,
+          'new_storage_provider', NEW.storage_provider,
+          'reason', 'bundle_ready'
+        ));
+      RAISE EXCEPTION '%',
+        'bundle_already_ready: Bundle encryption metadata cannot be changed '
+        || 'after upload is complete. Upload a new bundle instead.';
+    END IF;
+  END IF;
+
   -- Derive org_id from app_id directly to avoid trigger ordering issues.
   -- The force_valid_owner_org_app_versions trigger runs after this one
   -- alphabetically, so NEW.owner_org may not be populated yet.
