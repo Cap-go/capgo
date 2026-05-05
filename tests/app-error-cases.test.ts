@@ -28,8 +28,6 @@ beforeAll(async () => {
     body: JSON.stringify({
       name: `app-error-cases-${id}`,
       mode: 'all',
-      limited_to_orgs: [testOrgId],
-      limited_to_apps: [],
     }),
   })
 
