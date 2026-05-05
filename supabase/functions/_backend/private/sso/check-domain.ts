@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
-import { z } from 'zod/mini'
+import { type } from 'arktype'
+import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { CacheHelper } from '../../utils/cache.ts'
 import { createHono, parseBody, quickError, simpleError, useCors } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
@@ -39,8 +40,8 @@ async function checkDomainRateLimit(c: Context): Promise<boolean> {
   return false
 }
 
-const bodySchema = z.object({
-  email: z.string().check(z.email()),
+const bodySchema = type({
+  email: 'string.email',
 })
 
 export const app = createHono('', version)
@@ -55,9 +56,9 @@ app.post('/', async (c) => {
 
   const rawBody = await parseBody<{ email?: string }>(c)
 
-  const validation = bodySchema.safeParse({ email: rawBody.email })
+  const validation = safeParseSchema(bodySchema, { email: rawBody.email })
   if (!validation.success) {
-    throw simpleError('invalid_body', 'Invalid request body', { errors: z.prettifyError(validation.error) })
+    throw simpleError('invalid_body', 'Invalid request body', { errors: validation.error.message })
   }
 
   const { email } = validation.data
@@ -111,8 +112,6 @@ app.post('/', async (c) => {
     return c.json({
       has_sso: true,
       enforce_sso: enforcementRow?.enforce_sso === true,
-      provider_id: legacyRow?.provider_id,
-      org_id: enforcementRow?.org_id ?? legacyRow?.org_id,
     })
   }
   catch (err) {

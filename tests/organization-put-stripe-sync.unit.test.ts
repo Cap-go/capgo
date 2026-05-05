@@ -80,7 +80,7 @@ function createOrgRow(overrides: Partial<OrgRow> & Pick<OrgRow, 'id' | 'name' | 
     password_policy_config: null,
     require_apikey_expiration: false,
     required_encryption_key: null,
-    sso_enabled: false,
+    stats_refresh_requested_at: null,
     stats_updated_at: null,
     updated_at: null,
     use_new_rbac: false,

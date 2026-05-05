@@ -31,8 +31,10 @@ import {
   AsyncLock,
   BUFFER_SIZE,
   buildFileHttpMetadata,
+  encodeR2KeyForUploadLocation,
   EXPOSED_HEADERS,
   generateParts,
+  isRetryableDurableObjectResetError,
   MAX_UPLOAD_LENGTH_BYTES,
   readIntFromHeader,
   toBase64,
@@ -43,6 +45,7 @@ import {
   UPLOAD_OFFSET_KEY,
   WritableStreamBuffer,
   X_CHECKSUM_SHA256,
+  X_UPLOAD_HANDLER_RETRYABLE,
 } from './util.ts'
 
 // Stored for each part with the key of the multipart part number. Part numbers start with 1
@@ -59,6 +62,12 @@ interface StoredUploadInfo {
   checksum?: Uint8Array
   multipartUploadId?: string
   contentType?: string
+}
+
+const TUS_UPLOAD_CONTENT_TYPE = 'application/offset+octet-stream'
+
+function normalizeContentType(contentType: string | null | undefined): string | null {
+  return contentType?.split(';', 1)[0]?.trim().toLowerCase() || null
 }
 
 function optionsHandler(c: Context) {
@@ -107,7 +116,26 @@ export class UploadHandler extends DurableObject {
     this.router.options('/private/files/upload/:bucket/:id{.+}', optionsHandler as any)
     this.router.patch('/private/files/upload/:bucket/:id{.+}', this.exclusive(this.patch) as any)
     this.router.get('/private/files/upload/:bucket/:id{.+}', this.exclusive(this.head) as any)
-    this.router.onError(onError('TUS handler'))
+    const defaultOnError = onError('TUS handler')
+    this.router.onError(async (error, c) => {
+      if (isRetryableDurableObjectResetError(error)) {
+        cloudlogErr({
+          requestId: c.get('requestId'),
+          message: 'TUS handler hit retryable durable object reset',
+          error,
+          fileId: c.req.param('id') ?? parseUploadMetadata(c, c.req.raw.headers).filename,
+        })
+
+        const response = c.json({
+          error: 'durable_object_temporarily_unavailable',
+          message: 'Upload handler temporarily unavailable',
+        }, 503)
+        response.headers.set(X_UPLOAD_HANDLER_RETRYABLE, '1')
+        return response
+      }
+
+      return await defaultOnError(error, c)
+    })
   }
 
   // forbid concurrent requests while running clsMethod
@@ -200,12 +228,12 @@ export class UploadHandler extends DurableObject {
       contentType,
     })
 
-    if (contentType != null && contentType !== 'application/offset+octet-stream') {
+    if (contentType != null && normalizeContentType(contentType) !== TUS_UPLOAD_CONTENT_TYPE) {
       cloudlog({
         requestId: c.get('requestId'),
         message: 'TUS initCreate - invalid content type',
         contentType,
-        expected: 'application/offset+octet-stream',
+        expected: TUS_UPLOAD_CONTENT_TYPE,
       })
       throw new HTTPException(415, {
         res: c.json({
@@ -334,7 +362,7 @@ export class UploadHandler extends DurableObject {
     await this.ctx.storage.put(UPLOAD_OFFSET_KEY, 0)
     await this.ctx.storage.put(UPLOAD_INFO_KEY, uploadInfo)
 
-    const uploadLocation = new URL(r2Key, c.req.url.endsWith('/') ? c.req.url : `${c.req.url}/`)
+    const uploadLocation = new URL(encodeR2KeyForUploadLocation(r2Key), c.req.url.endsWith('/') ? c.req.url : `${c.req.url}/`)
 
     const uploadOffset = hasContent
       ? await this.appendBody(c, r2Key, c.req.raw.body as ReadableStream<Uint8Array>, 0, uploadInfo)

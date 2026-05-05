@@ -1,7 +1,7 @@
 BEGIN;
 
 
-SELECT plan(32);
+SELECT plan(34);
 
 -- Test read_bandwidth_usage
 SELECT
@@ -386,12 +386,90 @@ SELECT
     );
 
 -- Test transfer_app
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM public.channels
+        WHERE id = 9876501001
+    ) THEN
+        RAISE EXCEPTION 'transfer_app test fixture channel id already exists';
+    END IF;
+END $$;
+
+INSERT INTO public.org_users (org_id, user_id, user_right)
+VALUES (
+    '34a8c55d-2d0f-4652-a43f-684c7a9403ac',
+    tests.get_supabase_uid('test_admin'),
+    'super_admin'::public.user_min_right
+)
+ON CONFLICT DO NOTHING;
+
+WITH seeded_channel AS (
+    INSERT INTO public.channels (
+        id,
+        name,
+        app_id,
+        version,
+        owner_org,
+        created_by
+    )
+    OVERRIDING SYSTEM VALUE
+    VALUES (
+        9876501001,
+        'transfer-history-test',
+        'com.demoadmin.app',
+        10,
+        '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
+        tests.get_supabase_uid('test_admin')
+    )
+    RETURNING id
+)
+INSERT INTO public.deploy_history (
+    channel_id,
+    app_id,
+    version_id,
+    created_by,
+    owner_org
+)
+SELECT
+    id,
+    'com.demoadmin.app',
+    10,
+    tests.get_supabase_uid('test_admin'),
+    '22dbad8a-b885-4309-9b3b-a09f8460fb6d'
+FROM seeded_channel;
+
 SELECT tests.authenticate_as('test_admin');
 
 SELECT
     lives_ok(
-        'SELECT transfer_app(''com.demoadmin.app'', ''22dbad8a-b885-4309-9b3b-a09f8460fb6d'')',
+        'SELECT transfer_app(''com.demoadmin.app'', ''34a8c55d-2d0f-4652-a43f-684c7a9403ac'')',
         'transfer_app test - function executes without error'
+    );
+
+SELECT
+    is(
+        (
+            SELECT owner_org::text
+            FROM public.apps
+            WHERE app_id = 'com.demoadmin.app'
+        ),
+        '34a8c55d-2d0f-4652-a43f-684c7a9403ac',
+        'transfer_app test - app ownership moves to destination org'
+    );
+
+SELECT
+    is(
+        (
+            SELECT owner_org::text
+            FROM public.deploy_history
+            WHERE
+                channel_id = 9876501001
+                AND app_id = 'com.demoadmin.app'
+        ),
+        '34a8c55d-2d0f-4652-a43f-684c7a9403ac',
+        'transfer_app test - deploy history ownership moves to destination org'
     );
 
 SELECT tests.clear_authentication();

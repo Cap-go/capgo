@@ -1,21 +1,79 @@
+import type { Database } from '../src/types/supabase.types'
 import { randomUUID } from 'node:crypto'
+import { env } from 'node:process'
+import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, fetchWithRetry, getSupabaseClient, headers, ORG_ID, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, fetchWithRetry, getAuthHeadersForCredentials, getSupabaseClient, normalizeLocalhostUrl, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_EMAIL_APIKEY_EXPIRATION, USER_ID_APIKEY_EXPIRATION, USER_PASSWORD } from './test-utils.ts'
 
 const id = randomUUID()
-const APPNAME = `com.app.expiration.${id}`
+const BASE_ORG_ID = randomUUID()
+const BASE_ORG_CUSTOMER_ID = `cus_test_expiration_base_${id}`
+const POLICY_APPNAME = `com.app.expiration.policy.${id}`
 
-// Org for testing expiration policies
+// Orgs for testing expiration policies
+const BASE_ORG_NAME = `Test Expiration Base Org ${id}`
 const POLICY_ORG_ID = randomUUID()
 const POLICY_ORG_CUSTOMER_ID = `cus_test_policy_${id}`
 const POLICY_ORG_NAME = `Test Policy Org ${id}`
+let authHeaders: Record<string, string>
+let policyAppUuid: string
 
 function apiFetch(path: string, init?: RequestInit) {
   return fetchWithRetry(`${BASE_URL}${path}`, init)
 }
 
+function createAuthenticatedSupabaseClient(headers: Record<string, string>) {
+  const supabaseUrl = normalizeLocalhostUrl(env.SUPABASE_URL)
+  const supabaseAnonKey = env.SUPABASE_ANON_KEY
+  const authorization = headers.Authorization ?? headers.authorization
+
+  if (!supabaseUrl || !supabaseAnonKey || !authorization) {
+    throw new Error('Missing Supabase auth environment for authenticated client')
+  }
+
+  return createClient<Database>(supabaseUrl, supabaseAnonKey, {
+    global: {
+      headers: {
+        Authorization: authorization,
+      },
+    },
+    auth: {
+      persistSession: false,
+    },
+  })
+}
+
 beforeAll(async () => {
-  await resetAndSeedAppData(APPNAME)
+  authHeaders = await getAuthHeadersForCredentials(USER_EMAIL_APIKEY_EXPIRATION, USER_PASSWORD)
+
+  const { error: baseStripeError } = await getSupabaseClient().from('stripe_info').insert({
+    customer_id: BASE_ORG_CUSTOMER_ID,
+    status: 'succeeded',
+    product_id: 'prod_LQIregjtNduh4q',
+    subscription_id: `sub_base_${id}`,
+    trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+    is_good_plan: true,
+  })
+  if (baseStripeError)
+    throw baseStripeError
+
+  const { error: baseOrgError } = await getSupabaseClient().from('orgs').insert({
+    id: BASE_ORG_ID,
+    name: BASE_ORG_NAME,
+    management_email: TEST_EMAIL,
+    created_by: USER_ID_APIKEY_EXPIRATION,
+    customer_id: BASE_ORG_CUSTOMER_ID,
+  })
+  if (baseOrgError)
+    throw baseOrgError
+
+  const { error: baseMemberError } = await getSupabaseClient().from('org_users').insert({
+    org_id: BASE_ORG_ID,
+    user_id: USER_ID_APIKEY_EXPIRATION,
+    user_right: 'super_admin',
+  })
+  if (baseMemberError)
+    throw baseMemberError
 
   // Create a test org with specific expiration policies
   const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
@@ -33,20 +91,48 @@ beforeAll(async () => {
     id: POLICY_ORG_ID,
     name: POLICY_ORG_NAME,
     management_email: TEST_EMAIL,
-    created_by: USER_ID,
+    created_by: USER_ID_APIKEY_EXPIRATION,
     customer_id: POLICY_ORG_CUSTOMER_ID,
     require_apikey_expiration: true,
     max_apikey_expiration_days: 30,
   })
   if (orgError)
     throw orgError
+
+  const { error: policyMemberError } = await getSupabaseClient().from('org_users').insert({
+    org_id: POLICY_ORG_ID,
+    user_id: USER_ID_APIKEY_EXPIRATION,
+    user_right: 'super_admin',
+  })
+  if (policyMemberError)
+    throw policyMemberError
+
+  await resetAndSeedAppData(POLICY_APPNAME, {
+    orgId: POLICY_ORG_ID,
+    stripeCustomerId: POLICY_ORG_CUSTOMER_ID,
+    userId: USER_ID_APIKEY_EXPIRATION,
+  })
+
+  const { data: policyApp, error: policyAppError } = await getSupabaseClient()
+    .from('apps')
+    .select('id')
+    .eq('app_id', POLICY_APPNAME)
+    .single()
+
+  if (policyAppError || !policyApp?.id)
+    throw policyAppError ?? new Error('Missing policy app')
+
+  policyAppUuid = policyApp.id
 })
 
 afterAll(async () => {
-  await resetAppData(APPNAME)
-  // Clean up policy org
+  await resetAppData(POLICY_APPNAME)
+  await getSupabaseClient().from('org_users').delete().eq('org_id', POLICY_ORG_ID)
   await getSupabaseClient().from('orgs').delete().eq('id', POLICY_ORG_ID)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', POLICY_ORG_CUSTOMER_ID)
+  await getSupabaseClient().from('org_users').delete().eq('org_id', BASE_ORG_ID)
+  await getSupabaseClient().from('orgs').delete().eq('id', BASE_ORG_ID)
+  await getSupabaseClient().from('stripe_info').delete().eq('customer_id', BASE_ORG_CUSTOMER_ID)
 })
 
 describe('[POST] /apikey with expiration', () => {
@@ -54,7 +140,7 @@ describe('[POST] /apikey with expiration', () => {
     const futureDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days from now
     const response = await apiFetch('/apikey', {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'key-with-expiration',
         expires_at: futureDate,
@@ -71,7 +157,7 @@ describe('[POST] /apikey with expiration', () => {
   it('create api key without expiration (null)', async () => {
     const response = await apiFetch('/apikey', {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'key-no-expiration',
       }),
@@ -86,7 +172,7 @@ describe('[POST] /apikey with expiration', () => {
     const pastDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString() // 1 day ago
     const response = await apiFetch('/apikey', {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'key-past-expiration',
         expires_at: pastDate,
@@ -100,7 +186,7 @@ describe('[POST] /apikey with expiration', () => {
   it('fail to create api key with invalid expiration date format', async () => {
     const response = await apiFetch('/apikey', {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'key-invalid-date',
         expires_at: 'not-a-date',
@@ -119,7 +205,7 @@ describe('[PUT] /apikey/:id with expiration', () => {
     // Create a key to update
     const response = await apiFetch('/apikey', {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'key-for-update-expiration',
       }),
@@ -133,7 +219,7 @@ describe('[PUT] /apikey/:id with expiration', () => {
     const futureDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString() // 14 days from now
     const response = await apiFetch(`/apikey/${testKeyId}`, {
       method: 'PUT',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         expires_at: futureDate,
       }),
@@ -148,7 +234,7 @@ describe('[PUT] /apikey/:id with expiration', () => {
     const newFutureDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days from now
     const response = await apiFetch(`/apikey/${testKeyId}`, {
       method: 'PUT',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         expires_at: newFutureDate,
       }),
@@ -161,7 +247,7 @@ describe('[PUT] /apikey/:id with expiration', () => {
   it('update api key to remove expiration (set to null)', async () => {
     const response = await apiFetch(`/apikey/${testKeyId}`, {
       method: 'PUT',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         expires_at: null,
       }),
@@ -175,7 +261,7 @@ describe('[PUT] /apikey/:id with expiration', () => {
     const pastDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     const response = await apiFetch(`/apikey/${testKeyId}`, {
       method: 'PUT',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         expires_at: pastDate,
       }),
@@ -194,7 +280,7 @@ describe('[GET] /apikey with expiration info', () => {
     // Create key with expiration
     const response1 = await apiFetch('/apikey', {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'key-with-exp-get-test',
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
@@ -206,7 +292,7 @@ describe('[GET] /apikey with expiration info', () => {
     // Create key without expiration
     const response2 = await apiFetch('/apikey', {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'key-without-exp-get-test',
       }),
@@ -218,7 +304,7 @@ describe('[GET] /apikey with expiration info', () => {
   it('get api key includes expires_at field when set', async () => {
     const response = await apiFetch(`/apikey/${keyWithExpiration.id}`, {
       method: 'GET',
-      headers,
+      headers: authHeaders,
     })
     const data = await response.json<{ id: number, expires_at: string | null }>()
     expect(response.status).toBe(200)
@@ -229,7 +315,7 @@ describe('[GET] /apikey with expiration info', () => {
   it('get api key includes expires_at as null when not set', async () => {
     const response = await apiFetch(`/apikey/${keyWithoutExpiration.id}`, {
       method: 'GET',
-      headers,
+      headers: authHeaders,
     })
     const data = await response.json<{ id: number, expires_at: string | null }>()
     expect(response.status).toBe(200)
@@ -240,7 +326,7 @@ describe('[GET] /apikey with expiration info', () => {
   it('list all api keys includes expires_at field', async () => {
     const response = await apiFetch('/apikey', {
       method: 'GET',
-      headers,
+      headers: authHeaders,
     })
     const data = await response.json() as Array<{ id: number, expires_at: string | null }>
     expect(response.status).toBe(200)
@@ -262,7 +348,7 @@ describe('organization API key expiration policy', () => {
   it('fail to create api key without expiration for org requiring expiration', async () => {
     const response = await apiFetch('/apikey', {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'key-policy-test',
         limited_to_orgs: [POLICY_ORG_ID],
@@ -278,7 +364,7 @@ describe('organization API key expiration policy', () => {
     const tooFarDate = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString()
     const response = await apiFetch('/apikey', {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'key-policy-exceeds-max',
         limited_to_orgs: [POLICY_ORG_ID],
@@ -295,7 +381,7 @@ describe('organization API key expiration policy', () => {
     const validDate = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
     const response = await apiFetch('/apikey', {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'key-policy-valid',
         limited_to_orgs: [POLICY_ORG_ID],
@@ -309,19 +395,165 @@ describe('organization API key expiration policy', () => {
   })
 
   it('create api key without expiration for org without policy', async () => {
-    // Use the default org which doesn't have expiration policy
+    // Use this suite's dedicated org which does not enforce expiration policy
     const response = await apiFetch('/apikey', {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'key-no-policy-org',
-        limited_to_orgs: [ORG_ID],
+        limited_to_orgs: [BASE_ORG_ID],
       }),
     })
     const data = await response.json<{ key: string, id: number, expires_at: string | null }>()
     expect(response.status).toBe(200)
     expect(data).toHaveProperty('key')
     // Should succeed even without expiration since org doesn't require it
+  })
+
+  it('fail to create app-scoped api key without expiration for org requiring expiration', async () => {
+    const response = await apiFetch('/apikey', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        name: 'key-policy-app-scope',
+        app_id: policyAppUuid,
+      }),
+    })
+    const data = await response.json() as { error: string }
+    expect(response.status).toBe(400)
+    expect(data.error).toBe('expiration_required')
+  })
+
+  it('fail to create app-scoped api key with expiration exceeding org max days', async () => {
+    const tooFarDate = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString()
+    const response = await apiFetch('/apikey', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        name: 'key-policy-app-scope-too-far',
+        limited_to_apps: [POLICY_APPNAME],
+        expires_at: tooFarDate,
+      }),
+    })
+    const data = await response.json() as { error: string }
+    expect(response.status).toBe(400)
+    expect(data.error).toBe('expiration_exceeds_max')
+  })
+
+  it('fail to create app-scoped api key for unknown app ids', async () => {
+    const response = await apiFetch('/apikey', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        name: 'key-policy-app-scope-missing-app',
+        limited_to_apps: [`com.app.expiration.missing.${id}`],
+      }),
+    })
+    const data = await response.json() as { error: string }
+
+    expect(response.status).toBe(400)
+    expect(data.error).toBe('failed_to_resolve_apikey_policy_scope')
+  })
+
+  it('fail to update api key scope to app owner org without expiration (scope-change regression)', async () => {
+    const createResponse = await apiFetch('/apikey', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        name: 'key-policy-app-scope-update',
+      }),
+    })
+    expect(createResponse.status).toBe(200)
+    const createdKey = await createResponse.json<{ id: number }>()
+
+    const updateResponse = await apiFetch(`/apikey/${createdKey.id}`, {
+      method: 'PUT',
+      headers: authHeaders,
+      body: JSON.stringify({
+        limited_to_apps: [POLICY_APPNAME],
+      }),
+    })
+    const data = await updateResponse.json() as { error: string }
+
+    expect(updateResponse.status).toBe(400)
+    expect(data.error).toBe('expiration_required')
+  })
+
+  it('reject limited app-scoped api keys from updating sibling keys', async () => {
+    const validDate = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
+    const limitedKeyResponse = await apiFetch('/apikey', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        name: 'key-policy-limited-updater',
+        limited_to_apps: [POLICY_APPNAME],
+        expires_at: validDate,
+      }),
+    })
+    expect(limitedKeyResponse.status).toBe(200)
+    const limitedKey = await limitedKeyResponse.json<{ key: string }>()
+
+    const siblingKeyResponse = await apiFetch('/apikey', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify({
+        name: 'key-policy-sibling-target',
+      }),
+    })
+    expect(siblingKeyResponse.status).toBe(200)
+    const siblingKey = await siblingKeyResponse.json<{ id: number }>()
+
+    const limitedAuthHeaders = {
+      'Content-Type': 'application/json',
+      'Authorization': limitedKey.key,
+    }
+    const updateResponse = await apiFetch(`/apikey/${siblingKey.id}`, {
+      method: 'PUT',
+      headers: limitedAuthHeaders,
+      body: JSON.stringify({
+        name: 'key-policy-escalation-attempt',
+      }),
+    })
+    const data = await updateResponse.json() as { error: string }
+
+    expect(updateResponse.status).toBe(401)
+    expect(data.error).toBe('cannot_update_apikey')
+  })
+
+  it('reject direct apikey inserts that bypass app-scoped expiration policy', async () => {
+    const supabase = createAuthenticatedSupabaseClient(authHeaders)
+    const { data, error } = await supabase
+      .from('apikeys')
+      .insert({
+        user_id: USER_ID_APIKEY_EXPIRATION,
+        key: null,
+        key_hash: '0'.repeat(64),
+        mode: 'all',
+        name: 'direct-insert-policy-bypass',
+        limited_to_apps: [POLICY_APPNAME],
+        limited_to_orgs: [],
+        expires_at: null,
+      })
+      .select()
+      .single()
+
+    expect(data).toBeNull()
+    expect(error?.message).toBe('expiration_required')
+  })
+
+  it('reject hashed apikey RPC creation that exceeds app owner org max expiration', async () => {
+    const supabase = createAuthenticatedSupabaseClient(authHeaders)
+    const tooFarDate = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString()
+    const { data, error } = await supabase.rpc('create_hashed_apikey', {
+      p_mode: 'all',
+      p_name: 'direct-rpc-policy-bypass',
+      p_limited_to_orgs: [],
+      p_limited_to_apps: [POLICY_APPNAME],
+      p_expires_at: tooFarDate,
+    })
+
+    expect(data).toBeNull()
+    expect(error?.message).toBe('expiration_exceeds_max')
   })
 })
 
@@ -346,7 +578,7 @@ describe('[PUT] /organization with API key policy', () => {
       id: updateOrgId,
       name: `Test Update Org ${id}`,
       management_email: TEST_EMAIL,
-      created_by: USER_ID,
+      created_by: USER_ID_APIKEY_EXPIRATION,
       customer_id: updateOrgCustomerId,
     })
     if (orgError)
@@ -355,7 +587,7 @@ describe('[PUT] /organization with API key policy', () => {
     // Add user as super_admin to be able to update the org
     const { error: memberError } = await getSupabaseClient().from('org_users').insert({
       org_id: updateOrgId,
-      user_id: USER_ID,
+      user_id: USER_ID_APIKEY_EXPIRATION,
       user_right: 'super_admin',
     })
     if (memberError)
@@ -371,7 +603,7 @@ describe('[PUT] /organization with API key policy', () => {
   it('update organization to set max API key expiration days', async () => {
     const response = await apiFetch('/organization', {
       method: 'PUT',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         orgId: updateOrgId,
         max_apikey_expiration_days: 90,
@@ -388,7 +620,7 @@ describe('[PUT] /organization with API key policy', () => {
   it('update organization to remove max expiration (set to null)', async () => {
     const response = await apiFetch('/organization', {
       method: 'PUT',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         orgId: updateOrgId,
         max_apikey_expiration_days: null,
@@ -405,7 +637,7 @@ describe('[PUT] /organization with API key policy', () => {
   it('fail to set invalid max expiration days (negative)', async () => {
     const response = await apiFetch('/organization', {
       method: 'PUT',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         orgId: updateOrgId,
         max_apikey_expiration_days: -1,
@@ -417,7 +649,7 @@ describe('[PUT] /organization with API key policy', () => {
   it('fail to set invalid max expiration days (too large)', async () => {
     const response = await apiFetch('/organization', {
       method: 'PUT',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         orgId: updateOrgId,
         max_apikey_expiration_days: 500,
@@ -426,12 +658,23 @@ describe('[PUT] /organization with API key policy', () => {
     expect(response.status).toBe(400)
   })
 
+  it('rejects direct Supabase writes with invalid max expiration days', async () => {
+    const supabase = createAuthenticatedSupabaseClient(authHeaders)
+    const { error } = await supabase
+      .from('orgs')
+      .update({ max_apikey_expiration_days: -1 })
+      .eq('id', updateOrgId)
+
+    expect(error).not.toBeNull()
+    expect(error?.code).toBe('23514')
+  })
+
   // This test must be last because it enables require_apikey_expiration,
   // which would block subsequent tests using a non-expiring API key
   it('update organization to require API key expiration', async () => {
     const response = await apiFetch('/organization', {
       method: 'PUT',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         orgId: updateOrgId,
         require_apikey_expiration: true,
@@ -454,7 +697,7 @@ describe('expired API key rejection', () => {
     // Create an API key with expiration, then manually set it to expired via DB
     const response1 = await apiFetch('/apikey', {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'key-to-be-expired',
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
@@ -474,7 +717,7 @@ describe('expired API key rejection', () => {
     // Create a valid key for comparison
     const response2 = await apiFetch('/apikey', {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'key-valid-for-test',
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
@@ -514,7 +757,7 @@ describe('api key expiration boundary conditions', () => {
     // Create an API key with future expiration
     const response = await apiFetch('/apikey', {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'key-boundary-test',
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
@@ -548,7 +791,7 @@ describe('api key expiration boundary conditions', () => {
     const futureDate = new Date(Date.now() + 5000).toISOString() // 5 seconds from now
     const response = await apiFetch('/apikey', {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'key-near-expiration',
         expires_at: futureDate,
@@ -570,7 +813,7 @@ describe('api key expiration boundary conditions', () => {
     // Cleanup
     await apiFetch(`/apikey/${data.id}`, {
       method: 'DELETE',
-      headers,
+      headers: authHeaders,
     })
   })
 
@@ -578,7 +821,7 @@ describe('api key expiration boundary conditions', () => {
     // Create an API key without expiration
     const response = await apiFetch('/apikey', {
       method: 'POST',
-      headers,
+      headers: authHeaders,
       body: JSON.stringify({
         name: 'key-no-expiration-test',
       }),
@@ -600,7 +843,7 @@ describe('api key expiration boundary conditions', () => {
     // Cleanup
     await apiFetch(`/apikey/${data.id}`, {
       method: 'DELETE',
-      headers,
+      headers: authHeaders,
     })
   })
 })

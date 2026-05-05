@@ -1,7 +1,8 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { Order } from '../utils/types.ts'
+import { type } from 'arktype'
 import { Hono } from 'hono/tiny'
-import { z } from 'zod/mini'
+import { literalUnion, safeParseSchema } from '../utils/ark_validation.ts'
 import { parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog } from '../utils/logging.ts'
@@ -24,20 +25,22 @@ interface DataDevice {
   limit?: number
 }
 
-const devicesBodySchema = z.object({
-  appId: appIdSchema,
-  count: z.optional(z.boolean()),
-  versionName: z.optional(safeQueryTextSchema),
-  devicesId: z.optional(z.array(deviceIdSchema)),
-  deviceIds: z.optional(z.array(deviceIdSchema)),
-  search: z.optional(safeQueryTextSchema),
-  customIdMode: z.optional(z.boolean()),
-  order: z.optional(z.array(z.object({
-    key: z.string().check(z.maxLength(64)),
-    sortable: z.optional(z.enum(['asc', 'desc'])),
-  }))),
-  cursor: z.optional(cursorSchema),
-  limit: z.optional(queryLimitSchema),
+const orderItemSchema = type({
+  'key': 'string <= 64',
+  'sortable?': literalUnion(['asc', 'desc']),
+})
+
+const devicesBodySchema = type({
+  'appId': appIdSchema,
+  'count?': 'boolean',
+  'versionName?': safeQueryTextSchema,
+  'devicesId?': deviceIdSchema.array(),
+  'deviceIds?': deviceIdSchema.array(),
+  'search?': safeQueryTextSchema,
+  'customIdMode?': 'boolean',
+  'order?': orderItemSchema.array(),
+  'cursor?': cursorSchema,
+  'limit?': queryLimitSchema,
 })
 
 export const app = new Hono<MiddlewareKeyVariables>()
@@ -48,7 +51,7 @@ app.post('/', middlewareV2(['read', 'write', 'all', 'upload']), async (c) => {
   const bodyRaw = await parseBody<DataDevice>(c)
   if (hasInvalidQueryLimitInput(bodyRaw.limit))
     throw simpleError('invalid_body', 'Invalid body')
-  const parsed = devicesBodySchema.safeParse(bodyRaw)
+  const parsed = safeParseSchema(devicesBodySchema, bodyRaw)
   if (!parsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: parsed.error })
   }

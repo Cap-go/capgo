@@ -44,6 +44,39 @@ async function assertWebhookOrgPolicy(
   throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: orgId })
 }
 
+function uniqueApiKeys(
+  apikeys: (Database['public']['Tables']['apikeys']['Row'] | null | undefined)[],
+) {
+  const filteredApiKeys = apikeys.filter((apikey): apikey is Database['public']['Tables']['apikeys']['Row'] => !!apikey)
+  return filteredApiKeys.filter((apikey, index) => filteredApiKeys.findIndex(existing => existing.id === apikey.id) === index)
+}
+
+function getWebhookApiKeyChain(c: Context<MiddlewareKeyVariables, any, any>, apikey: Database['public']['Tables']['apikeys']['Row']) {
+  const parentApikey = c.get('parentApikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
+  return uniqueApiKeys([parentApikey, apikey])
+}
+
+function getWebhookAuthApiKeyChain(c: Context<MiddlewareKeyVariables, any, any>, auth: AuthInfo) {
+  if (auth.authType !== 'apikey' || !auth.apikey)
+    return []
+
+  return getWebhookApiKeyChain(c, auth.apikey)
+}
+
+async function assertWebhookApiKeyChain(
+  c: Context<MiddlewareKeyVariables, any, any>,
+  orgId: string,
+  apiKeyChain: Database['public']['Tables']['apikeys']['Row'][],
+) {
+  for (const apikey of apiKeyChain) {
+    assertOrgWebhookScope(orgId, apikey)
+  }
+
+  for (const apikey of apiKeyChain) {
+    await assertWebhookOrgPolicy(c, orgId, apikey)
+  }
+}
+
 /**
  * Shared permission check for webhook endpoints (API key auth)
  * Validates admin access to organization
@@ -53,20 +86,10 @@ export async function checkWebhookPermission(
   orgId: string,
   apikey: Database['public']['Tables']['apikeys']['Row'],
 ): Promise<void> {
-  const orgCheck = await apikeyHasOrgRightWithPolicy(c, apikey, orgId, supabaseApikey(c, c.get('capgkey') as string))
-  if (!orgCheck.valid) {
-    if (orgCheck.error === 'org_requires_expiring_key') {
-      throw quickError(401, 'org_requires_expiring_key', 'This organization requires API keys with an expiration date. Please use a different key or update this key with an expiration date.')
-    }
-    throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: orgId })
-  }
+  await assertWebhookApiKeyChain(c, orgId, getWebhookApiKeyChain(c, apikey))
 
   if (!(await hasOrgRightApikey(c, orgId, apikey.user_id, 'admin', c.get('capgkey') as string))) {
     throw simpleError('no_permission', 'You need admin access to manage webhooks', { org_id: orgId })
-  }
-
-  if (apikey.limited_to_apps?.length) {
-    throw simpleError('no_permission', 'App-scoped API keys cannot manage organization webhooks', { org_id: orgId })
   }
 }
 
@@ -79,29 +102,14 @@ export async function checkWebhookPermissionV2(
   orgId: string,
   auth: AuthInfo,
 ): Promise<void> {
-  const parentApikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
-  const policyApikey = parentApikey ?? auth.apikey
+  await assertWebhookApiKeyChain(c, orgId, getWebhookAuthApiKeyChain(c, auth))
 
-  if (auth.authType === 'apikey' && policyApikey) {
-    const orgCheck = await apikeyHasOrgRightWithPolicy(c, policyApikey, orgId, supabaseApikey(c, c.get('capgkey') as string))
-    if (!orgCheck.valid) {
-      if (orgCheck.error === 'org_requires_expiring_key') {
-        throw quickError(401, 'org_requires_expiring_key', 'This organization requires API keys with an expiration date. Please use a different key or update this key with an expiration date.')
-      }
-      throw simpleError('invalid_org_id', 'You can\'t access this organization', { org_id: orgId })
-    }
-  }
+  const hasWebhookAdminRight = auth.authType === 'apikey'
+    ? await hasOrgRightApikey(c, orgId, auth.userId, 'admin', c.get('capgkey') as string)
+    : await hasOrgRight(c, orgId, auth.userId, 'admin')
 
-  // Check org admin access
-  if (!(await hasOrgRight(c, orgId, auth.userId, 'admin'))) {
+  if (!hasWebhookAdminRight) {
     throw simpleError('no_permission', 'You need admin access to manage webhooks', { org_id: orgId })
-  }
-
-  // If using API key, also check the key has org access
-  if (auth.authType === 'apikey' && auth.apikey) {
-    assertOrgWebhookScope(orgId, auth.apikey)
-    const policyKey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
-    await assertWebhookOrgPolicy(c, orgId, policyKey ?? auth.apikey)
   }
 }
 

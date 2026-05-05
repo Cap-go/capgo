@@ -2,20 +2,30 @@
 <script setup lang="ts">
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import iconEmail from '~icons/oui/email?raw'
+import { getRecentEmailOtpVerification, sendEmailOtpVerification, verifyEmailOtp } from '~/services/emailOtp'
 import { useSupabase } from '~/services/supabase'
+import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
 const supabase = useSupabase()
 const route = useRoute()
+const router = useRouter()
+const main = useMainStore()
 const isLoading = ref(false)
 const isLoadingMain = ref(false)
+const otpSending = ref(false)
+const otpVerificationCode = ref('')
+const otpVerificationLoading = ref(false)
+const currentUserId = ref('')
+const currentUserEmail = ref('')
 const emailVerificationBlockingReason = computed(() => route.query.reason === 'email_not_verified')
 const returnTo = computed(() => (typeof route.query.return_to === 'string' ? route.query.return_to : ''))
+const usesEmailOtpFlow = computed(() => emailVerificationBlockingReason.value && !!currentUserId.value && !!currentUserEmail.value)
 
 async function submit(form: { email: string, password: string }) {
   isLoading.value = true
@@ -28,6 +38,75 @@ async function submit(form: { email: string, password: string }) {
     setErrors('resend-email', [error.message], {})
   else toast.success(t('confirm-email-sent'))
 }
+
+async function loadDeleteEmailVerificationState() {
+  if (!emailVerificationBlockingReason.value)
+    return
+
+  isLoadingMain.value = true
+  try {
+    await main.awaitInitialLoad()
+    const { data: sessionData } = await supabase.auth.getSession()
+    currentUserId.value = sessionData.session?.user.id ?? main.auth?.id ?? ''
+    currentUserEmail.value = sessionData.session?.user.email ?? main.auth?.email ?? main.user?.email ?? ''
+
+    if (!currentUserId.value)
+      return
+
+    const { isVerified } = await getRecentEmailOtpVerification(supabase, currentUserId.value)
+    if (isVerified)
+      await router.replace(returnTo.value || '/settings/account')
+  }
+  catch (error) {
+    console.error('Cannot load email verification state', error)
+  }
+  finally {
+    isLoadingMain.value = false
+  }
+}
+
+async function sendOtpCode() {
+  if (!currentUserEmail.value || otpSending.value)
+    return
+
+  otpSending.value = true
+  const { error } = await sendEmailOtpVerification(supabase, currentUserEmail.value)
+  otpSending.value = false
+
+  if (error) {
+    toast.error(t('verification-failed'))
+    console.error('Cannot send email OTP', error)
+    return
+  }
+
+  toast.success(t('email-otp-sent'))
+}
+
+async function verifyOtpCode() {
+  const token = otpVerificationCode.value.replaceAll(' ', '')
+  if (!token) {
+    toast.error(t('email-otp-code-required'))
+    return
+  }
+  if (otpVerificationLoading.value)
+    return
+
+  otpVerificationLoading.value = true
+  const { data, error } = await verifyEmailOtp(supabase, token)
+  otpVerificationLoading.value = false
+
+  if (error || !data?.verified_at) {
+    toast.error(t('verification-failed'))
+    console.error('Cannot verify email OTP', error)
+    return
+  }
+
+  await router.replace(returnTo.value || '/settings/account')
+}
+
+onMounted(async () => {
+  await loadDeleteEmailVerificationState()
+})
 </script>
 
 <template>
@@ -58,7 +137,55 @@ async function submit(form: { email: string, password: string }) {
                   {{ t('attempted-destination') }} {{ returnTo }}
                 </p>
               </div>
-              <FormKit id="resend-email" type="form" :actions="false" @submit="submit">
+
+              <div v-if="usesEmailOtpFlow" class="space-y-5 text-gray-500">
+                <div class="rounded-md border border-slate-200 px-4 py-3 text-sm dark:border-slate-700">
+                  <p class="mb-1 font-medium text-gray-700 dark:text-gray-100">
+                    {{ currentUserEmail }}
+                  </p>
+                  <p class="text-xs leading-5">
+                    {{ t('email-otp-code-required') }}
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md border border-transparent transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden disabled:opacity-60"
+                  :disabled="otpSending || otpVerificationLoading"
+                  @click="sendOtpCode"
+                >
+                  <svg v-if="otpSending" class="inline-block mr-3 -ml-1 w-5 h-5 text-gray-100 align-middle animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span v-else>{{ t('email-otp-send-code') }}</span>
+                </button>
+
+                <FormKit
+                  v-model="otpVerificationCode"
+                  type="text"
+                  name="email_otp"
+                  :label="t('email-otp-code-required')"
+                  inputmode="numeric"
+                  autocomplete="one-time-code"
+                  validation="required:trim|length:6"
+                />
+
+                <button
+                  type="button"
+                  class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md border border-transparent transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden disabled:opacity-60"
+                  :disabled="otpVerificationLoading || otpSending"
+                  @click="verifyOtpCode"
+                >
+                  <svg v-if="otpVerificationLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-gray-100 align-middle animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  <span v-else>{{ t('validate-email') }}</span>
+                </button>
+              </div>
+
+              <FormKit v-else id="resend-email" type="form" :actions="false" @submit="submit">
                 <div class="space-y-5 text-gray-500">
                   <FormKit
                     type="email"

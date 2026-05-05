@@ -5,6 +5,7 @@ import { fetchWithRetry, getAuthHeaders, getAuthHeadersForCredentials, getEndpoi
 
 const SSO_TEST_ORG_ID = randomUUID()
 const SSO_TEST_CUSTOMER_ID = `cus_sso_test_${randomUUID()}`
+const ENTERPRISE_PRODUCT_ID = 'prod_MH5Jh6ajC9e7ZH'
 
 let authHeaders: Record<string, string>
 
@@ -28,7 +29,6 @@ beforeAll(async () => {
     management_email: `sso-test-${SSO_TEST_ORG_ID}@capgo.app`,
     created_by: USER_ID,
     customer_id: SSO_TEST_CUSTOMER_ID,
-    sso_enabled: true,
   })
   if (orgError)
     throw orgError
@@ -105,8 +105,8 @@ describe('[POST] /private/sso/check-domain', () => {
       }
       expect(data.has_sso).toBe(true)
       expect(data.enforce_sso).toBe(false)
-      expect(data.provider_id).toBe(externalProviderId)
-      expect(data.org_id).toBe(SSO_TEST_ORG_ID)
+      expect(data.provider_id).toBeUndefined()
+      expect(data.org_id).toBeUndefined()
 
       const { data: rpcData, error: rpcError } = await (getSupabaseClient().rpc as any)('check_domain_sso', { p_domain: `  ${expectedDomain.toUpperCase()}  ` })
       expect(rpcError).toBeNull()
@@ -167,8 +167,7 @@ describe('[POST] /private/sso/check-enforcement', () => {
         management_email: `sso-enforcement-${enforcementOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: enforcementCustomerId,
-        sso_enabled: true,
-      })
+          })
       if (enforcementOrgError)
         throw enforcementOrgError
 
@@ -290,6 +289,207 @@ describe('[GET] /private/sso/sp-metadata', () => {
   })
 })
 
+describe('[POST] /private/sso/prelink-users', () => {
+  it.concurrent('only unlinks password identities for members of the provider org', async () => {
+    const prelinkOrgId = randomUUID()
+    const prelinkCustomerId = `cus_sso_prelink_${randomUUID()}`
+    const foreignOrgId = randomUUID()
+    const foreignCustomerId = `cus_sso_prelink_foreign_${randomUUID()}`
+    const providerId = randomUUID()
+    const domain = `${randomUUID()}.sso.test`
+    const memberEmail = `member-${randomUUID()}@${domain}`
+    const outsiderEmail = `outsider-${randomUUID()}@${domain}`
+    const pool = new Pool({ connectionString: POSTGRES_URL })
+
+    let memberUserId: string | null = null
+    let outsiderUserId: string | null = null
+
+    try {
+      const { error: prelinkStripeError } = await getSupabaseClient().from('stripe_info').insert({
+        customer_id: prelinkCustomerId,
+        status: 'succeeded',
+        product_id: ENTERPRISE_PRODUCT_ID,
+        subscription_id: `sub_sso_prelink_${randomUUID()}`,
+        trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+        is_good_plan: true,
+      })
+      if (prelinkStripeError)
+        throw prelinkStripeError
+
+      const { error: prelinkOrgError } = await getSupabaseClient().from('orgs').insert({
+        id: prelinkOrgId,
+        name: `SSO Prelink Org ${prelinkOrgId}`,
+        management_email: `sso-prelink-${prelinkOrgId}@capgo.app`,
+        created_by: USER_ID,
+        customer_id: prelinkCustomerId,
+          })
+      if (prelinkOrgError)
+        throw prelinkOrgError
+
+      const { error: prelinkAdminError } = await getSupabaseClient().from('org_users').insert({
+        org_id: prelinkOrgId,
+        user_id: USER_ID,
+        user_right: 'super_admin' as const,
+      })
+      if (prelinkAdminError)
+        throw prelinkAdminError
+
+      const { error: foreignStripeError } = await getSupabaseClient().from('stripe_info').insert({
+        customer_id: foreignCustomerId,
+        status: 'succeeded',
+        product_id: ENTERPRISE_PRODUCT_ID,
+        subscription_id: `sub_sso_prelink_foreign_${randomUUID()}`,
+        trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+        is_good_plan: true,
+      })
+      if (foreignStripeError)
+        throw foreignStripeError
+
+      const { error: foreignOrgError } = await getSupabaseClient().from('orgs').insert({
+        id: foreignOrgId,
+        name: `SSO Foreign Org ${foreignOrgId}`,
+        management_email: `sso-foreign-${foreignOrgId}@capgo.app`,
+        created_by: USER_ID,
+        customer_id: foreignCustomerId,
+          })
+      if (foreignOrgError)
+        throw foreignOrgError
+
+      const { error: providerError } = await (getSupabaseClient().from as any)('sso_providers').insert({
+        id: providerId,
+        org_id: prelinkOrgId,
+        domain,
+        provider_id: randomUUID(),
+        status: 'active',
+        enforce_sso: false,
+        dns_verification_token: `dns-${randomUUID()}`,
+      })
+      if (providerError)
+        throw providerError
+
+      const { data: memberUserData, error: memberUserError } = await getSupabaseClient().auth.admin.createUser({
+        email: memberEmail,
+        password: 'testtest',
+        email_confirm: true,
+      })
+      if (memberUserError || !memberUserData.user) {
+        throw memberUserError ?? new Error('Failed to create prelink org member user')
+      }
+      memberUserId = memberUserData.user.id
+
+      const { data: outsiderUserData, error: outsiderUserError } = await getSupabaseClient().auth.admin.createUser({
+        email: outsiderEmail,
+        password: 'testtest',
+        email_confirm: true,
+      })
+      if (outsiderUserError || !outsiderUserData.user) {
+        throw outsiderUserError ?? new Error('Failed to create foreign org user for prelink test')
+      }
+      outsiderUserId = outsiderUserData.user.id
+
+      const { error: publicUsersError } = await getSupabaseClient().from('users').insert([
+        {
+          id: memberUserId,
+          email: memberEmail,
+          first_name: 'Prelink',
+          last_name: 'Member',
+          country: null,
+          enable_notifications: true,
+          opt_for_newsletters: true,
+        },
+        {
+          id: outsiderUserId,
+          email: outsiderEmail,
+          first_name: 'Prelink',
+          last_name: 'Outsider',
+          country: null,
+          enable_notifications: true,
+          opt_for_newsletters: true,
+        },
+      ])
+      if (publicUsersError)
+        throw publicUsersError
+
+      const { error: orgUsersError } = await getSupabaseClient().from('org_users').insert([
+        {
+          org_id: prelinkOrgId,
+          user_id: memberUserId,
+          user_right: 'read' as const,
+        },
+        {
+          org_id: foreignOrgId,
+          user_id: outsiderUserId,
+          user_right: 'read' as const,
+        },
+      ])
+      if (orgUsersError)
+        throw orgUsersError
+
+      const beforeMemberIdentities = await pool.query<{ provider: string }>(
+        'select provider from auth.identities where user_id = $1 order by provider',
+        [memberUserId],
+      )
+      const beforeOutsiderIdentities = await pool.query<{ provider: string }>(
+        'select provider from auth.identities where user_id = $1 order by provider',
+        [outsiderUserId],
+      )
+
+      expect(beforeMemberIdentities.rows.some(row => row.provider === 'email')).toBe(true)
+      expect(beforeOutsiderIdentities.rows.some(row => row.provider === 'email')).toBe(true)
+
+      const response = await fetchWithRetry(getEndpointUrl('/private/sso/prelink-users'), {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({ provider_id: providerId }),
+      })
+
+      expect(response.status).toBe(200)
+      const responseBody = await response.json() as {
+        processed: number
+        linked: number
+        error_count: number
+      }
+      expect(responseBody).toEqual({
+        processed: 1,
+        linked: 1,
+        error_count: 0,
+      })
+
+      const memberIdentities = await pool.query<{ provider: string }>(
+        'select provider from auth.identities where user_id = $1 order by provider',
+        [memberUserId],
+      )
+      const outsiderIdentities = await pool.query<{ provider: string }>(
+        'select provider from auth.identities where user_id = $1 order by provider',
+        [outsiderUserId],
+      )
+
+      expect(memberIdentities.rows.some(row => row.provider === 'email')).toBe(false)
+      expect(outsiderIdentities.rows.some(row => row.provider === 'email')).toBe(true)
+    }
+    finally {
+      await pool.end()
+
+      await Promise.allSettled([
+        (getSupabaseClient().from as any)('sso_providers').delete().eq('id', providerId),
+        getSupabaseClient().from('org_users').delete().eq('org_id', prelinkOrgId),
+        getSupabaseClient().from('org_users').delete().eq('org_id', foreignOrgId),
+        memberUserId ? getSupabaseClient().from('users').delete().eq('id', memberUserId) : Promise.resolve(null),
+        outsiderUserId ? getSupabaseClient().from('users').delete().eq('id', outsiderUserId) : Promise.resolve(null),
+      ])
+
+      await Promise.allSettled([
+        getSupabaseClient().from('orgs').delete().eq('id', prelinkOrgId),
+        getSupabaseClient().from('orgs').delete().eq('id', foreignOrgId),
+        getSupabaseClient().from('stripe_info').delete().eq('customer_id', prelinkCustomerId),
+        getSupabaseClient().from('stripe_info').delete().eq('customer_id', foreignCustomerId),
+        memberUserId ? getSupabaseClient().auth.admin.deleteUser(memberUserId) : Promise.resolve(null),
+        outsiderUserId ? getSupabaseClient().auth.admin.deleteUser(outsiderUserId) : Promise.resolve(null),
+      ])
+    }
+  })
+})
+
 describe('generate_org_on_user_create', () => {
   it('skips personal org creation for SSO-authenticated users on managed domains', async () => {
     const managedOrgId = randomUUID()
@@ -331,8 +531,7 @@ describe('generate_org_on_user_create', () => {
         management_email: `managed-sso-${managedOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: managedCustomerId,
-        sso_enabled: true,
-      })
+          })
       if (orgError)
         throw orgError
 
@@ -418,8 +617,7 @@ describe('generate_org_on_user_create', () => {
         management_email: `email-managed-${managedOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: managedCustomerId,
-        sso_enabled: true,
-      })
+          })
       if (orgError)
         throw orgError
 
@@ -531,10 +729,11 @@ describe('[POST] /private/sso/provision-user', () => {
     const managedOrgId = randomUUID()
     const managedCustomerId = `cus_sso_missing_profile_${randomUUID()}`
     const providerId = randomUUID()
+    const externalProviderId = randomUUID()
     const domain = `${randomUUID()}.sso.test`
     const email = `missing-profile-${randomUUID()}@${domain}`
     const password = 'testtest'
-    const identityProvider = `sso:${providerId}`
+    const identityProvider = `sso:${externalProviderId}`
     const identityProviderId = `nameid-${randomUUID()}`
     const pool = new Pool({ connectionString: POSTGRES_URL })
 
@@ -572,8 +771,7 @@ describe('[POST] /private/sso/provision-user', () => {
         management_email: `sso-missing-profile-${managedOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: managedCustomerId,
-        sso_enabled: true,
-      })
+          })
       if (orgError)
         throw orgError
 
@@ -581,7 +779,7 @@ describe('[POST] /private/sso/provision-user', () => {
         id: providerId,
         org_id: managedOrgId,
         domain,
-        provider_id: randomUUID(),
+        provider_id: externalProviderId,
         status: 'active',
         enforce_sso: false,
         dns_verification_token: `dns-${randomUUID()}`,
@@ -650,14 +848,122 @@ describe('[POST] /private/sso/provision-user', () => {
     }
   })
 
+  it('rejects first-time SSO provisioning when the authenticating provider does not own the email domain', async () => {
+    const managedOrgId = randomUUID()
+    const managedCustomerId = `cus_sso_provider_mismatch_${randomUUID()}`
+    const providerId = randomUUID()
+    const externalProviderId = randomUUID()
+    const attackerExternalProviderId = randomUUID()
+    const domain = `${randomUUID()}.sso.test`
+    const email = `provider-mismatch-${randomUUID()}@${domain}`
+    const password = 'testtest'
+    const attackerIdentityProvider = `sso:${attackerExternalProviderId}`
+    const attackerIdentityProviderId = `nameid-${randomUUID()}`
+    const pool = new Pool({ connectionString: POSTGRES_URL })
+
+    let createdUserId: string | null = null
+
+    try {
+      const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
+        customer_id: managedCustomerId,
+        status: 'succeeded',
+        product_id: 'prod_LQIregjtNduh4q',
+        subscription_id: `sub_sso_provider_mismatch_${randomUUID()}`,
+        trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+        is_good_plan: true,
+      })
+      if (stripeError)
+        throw stripeError
+
+      await pool.query(
+        `
+          insert into public.orgs (id, name, management_email, created_by, customer_id)
+          values ($1, $2, $3, $4, $5)
+        `,
+        [
+          managedOrgId,
+          `SSO Provider Mismatch Org ${managedOrgId}`,
+          `sso-provider-mismatch-${managedOrgId}@capgo.app`,
+          USER_ID,
+          managedCustomerId,
+        ],
+      )
+
+      const { error: providerError } = await (getSupabaseClient().from as any)('sso_providers').insert({
+        id: providerId,
+        org_id: managedOrgId,
+        domain,
+        provider_id: externalProviderId,
+        status: 'active',
+        enforce_sso: false,
+        dns_verification_token: `dns-${randomUUID()}`,
+      })
+      if (providerError)
+        throw providerError
+
+      const { data: createdUser, error: createUserError } = await getSupabaseClient().auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        app_metadata: {
+          provider: attackerIdentityProvider,
+        },
+        user_metadata: {
+          first_name: 'Provider',
+          last_name: 'Mismatch',
+        },
+      })
+      if (createUserError || !createdUser.user) {
+        throw createUserError ?? new Error('Failed to create mismatched SSO auth user')
+      }
+      createdUserId = createdUser.user.id
+
+      await pool.query(
+        'update auth.identities set provider = $1, provider_id = $2, identity_data = jsonb_build_object($$sub$$, $2::text, $$email$$, $3::text, $$email_verified$$, true) where user_id = $4',
+        [attackerIdentityProvider, attackerIdentityProviderId, email, createdUserId],
+      )
+
+      const ssoAuthHeaders = await getAuthHeadersForCredentials(email, password)
+      const response = await fetchWithRetry(getEndpointUrl('/private/sso/provision-user'), {
+        method: 'POST',
+        headers: ssoAuthHeaders,
+        body: JSON.stringify({}),
+      })
+
+      expect(response.status).toBe(403)
+      const responseBody = await response.json() as { error: string }
+      expect(responseBody.error).toBe('provider_mismatch')
+
+      const { data: membership, error: membershipError } = await getSupabaseClient()
+        .from('org_users')
+        .select('id')
+        .eq('org_id', managedOrgId)
+        .eq('user_id', createdUserId)
+        .maybeSingle()
+
+      expect(membershipError).toBeNull()
+      expect(membership).toBeNull()
+    }
+    finally {
+      await Promise.allSettled([
+        createdUserId ? getSupabaseClient().auth.admin.deleteUser(createdUserId) : Promise.resolve(null),
+        (getSupabaseClient().from as any)('sso_providers').delete().eq('id', providerId),
+        getSupabaseClient().from('orgs').delete().eq('id', managedOrgId),
+        getSupabaseClient().from('stripe_info').delete().eq('customer_id', managedCustomerId),
+        pool.end(),
+      ])
+    }
+  })
+
   it('promotes invite-only org memberships during SSO provisioning instead of treating them as completed membership', async () => {
     const managedOrgId = randomUUID()
     const managedCustomerId = `cus_sso_invite_promotion_${randomUUID()}`
     const providerId = randomUUID()
+    const externalProviderId = randomUUID()
     const domain = `${randomUUID()}.sso.test`
     const email = `invite-only-user@${domain}`
     const password = 'testtest'
-    const identityProvider = `sso:${providerId}`
+    const identityProvider = `sso:${externalProviderId}`
     const identityProviderId = `nameid-${randomUUID()}`
     const pool = new Pool({ connectionString: POSTGRES_URL })
 
@@ -696,8 +1002,7 @@ describe('[POST] /private/sso/provision-user', () => {
         management_email: `sso-invite-promotion-${managedOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: managedCustomerId,
-        sso_enabled: true,
-      })
+          })
       if (orgError)
         throw orgError
 
@@ -705,7 +1010,7 @@ describe('[POST] /private/sso/provision-user', () => {
         id: providerId,
         org_id: managedOrgId,
         domain,
-        provider_id: randomUUID(),
+        provider_id: externalProviderId,
         status: 'active',
         enforce_sso: false,
         dns_verification_token: `dns-${randomUUID()}`,
@@ -778,12 +1083,15 @@ describe('[POST] /private/sso/provision-user', () => {
     const managedOrgId = randomUUID()
     const managedCustomerId = `cus_sso_merge_${randomUUID()}`
     const providerId = randomUUID()
+    const externalProviderId = randomUUID()
     const domain = `${randomUUID()}.sso.test`
     const targetEmail = `merge-user@${domain}`
     const tempSsoEmail = `temp-sso-${randomUUID()}@${domain}`
     const password = 'testtest'
-    const identityProvider = `sso:${providerId}`
+    const identityProvider = `sso:${externalProviderId}`
     const identityProviderId = `nameid-${randomUUID()}`
+    const unrelatedSsoProvider = `sso:${randomUUID()}`
+    const unrelatedSsoProviderId = `nameid-${randomUUID()}`
     const unrelatedProviderId = `github-${randomUUID()}`
     const originalAuthEmail = `stored-original-${randomUUID()}@${domain}`
     const pool = new Pool({ connectionString: POSTGRES_URL })
@@ -833,8 +1141,7 @@ describe('[POST] /private/sso/provision-user', () => {
         management_email: `sso-merge-${managedOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: managedCustomerId,
-        sso_enabled: true,
-      })
+          })
       if (orgError)
         throw orgError
 
@@ -842,7 +1149,7 @@ describe('[POST] /private/sso/provision-user', () => {
         id: providerId,
         org_id: managedOrgId,
         domain,
-        provider_id: randomUUID(),
+        provider_id: externalProviderId,
         status: 'active',
         enforce_sso: false,
         dns_verification_token: `dns-${randomUUID()}`,
@@ -887,6 +1194,13 @@ describe('[POST] /private/sso/provision-user', () => {
       await pool.query(
         'update auth.identities set provider = $1, provider_id = $2, identity_data = jsonb_build_object($$sub$$, $2::text, $$email$$, $3::text, $$email_verified$$, true) where user_id = $4',
         [identityProvider, identityProviderId, targetEmail, duplicateUser.user.id],
+      )
+      await pool.query(
+        `
+          insert into auth.identities (id, user_id, identity_data, provider, provider_id, created_at, updated_at, last_sign_in_at)
+          values ($1, $2, jsonb_build_object($$sub$$, $3::text, $$email$$, $4::text, $$email_verified$$, true), $5, $3, now(), now(), now())
+        `,
+        [randomUUID(), duplicateUser.user.id, unrelatedSsoProviderId, targetEmail, unrelatedSsoProvider],
       )
       await pool.query(
         `
@@ -950,6 +1264,174 @@ describe('[POST] /private/sso/provision-user', () => {
         row.provider === 'github'
         && row.provider_id === unrelatedProviderId,
       )).toBe(false)
+      expect(identitiesAfterMerge.rows.some(row =>
+        row.provider === unrelatedSsoProvider
+        && row.provider_id === unrelatedSsoProviderId,
+      )).toBe(false)
+    }
+    finally {
+      await Promise.allSettled([
+        getSupabaseClient().auth.admin.deleteUser(duplicateUser.user.id),
+        getSupabaseClient().auth.admin.deleteUser(originalUser.user.id),
+        (getSupabaseClient().from as any)('sso_providers').delete().eq('id', providerId),
+        getSupabaseClient().from('orgs').delete().eq('id', managedOrgId),
+        getSupabaseClient().from('stripe_info').delete().eq('customer_id', managedCustomerId),
+      ])
+      await pool.end()
+    }
+  })
+
+  it('rejects account merge when the authenticating SSO provider does not match the email domain provider', async () => {
+    const managedOrgId = randomUUID()
+    const managedCustomerId = `cus_sso_merge_mismatch_${randomUUID()}`
+    const providerId = randomUUID()
+    const externalProviderId = randomUUID()
+    const attackerExternalProviderId = randomUUID()
+    const domain = `${randomUUID()}.sso.test`
+    const targetEmail = `merge-mismatch-user@${domain}`
+    const tempSsoEmail = `temp-sso-mismatch-${randomUUID()}@${domain}`
+    const password = 'testtest'
+    const attackerIdentityProvider = `sso:${attackerExternalProviderId}`
+    const attackerIdentityProviderId = `nameid-${randomUUID()}`
+    const originalAuthEmail = `stored-original-mismatch-${randomUUID()}@${domain}`
+    const pool = new Pool({ connectionString: POSTGRES_URL })
+
+    const { data: originalUser, error: originalUserError } = await getSupabaseClient().auth.admin.createUser({
+      email: targetEmail,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        first_name: 'Merge',
+        last_name: 'MismatchOriginal',
+      },
+    })
+    if (originalUserError || !originalUser.user) {
+      await pool.end()
+      throw originalUserError ?? new Error('Failed to create original password auth user for provider mismatch test')
+    }
+
+    const { data: duplicateUser, error: duplicateUserError } = await getSupabaseClient().auth.admin.createUser({
+      email: tempSsoEmail,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        first_name: 'Merge',
+        last_name: 'MismatchDuplicate',
+      },
+    })
+    if (duplicateUserError || !duplicateUser.user) {
+      await pool.end()
+      throw duplicateUserError ?? new Error('Failed to create duplicate auth user for provider mismatch test')
+    }
+
+    try {
+      const { error: stripeError } = await getSupabaseClient().from('stripe_info').insert({
+        customer_id: managedCustomerId,
+        status: 'succeeded',
+        product_id: 'prod_LQIregjtNduh4q',
+        subscription_id: `sub_sso_merge_mismatch_${randomUUID()}`,
+        trial_at: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+        is_good_plan: true,
+      })
+      if (stripeError)
+        throw stripeError
+
+      await pool.query(
+        `
+          insert into public.orgs (id, name, management_email, created_by, customer_id)
+          values ($1, $2, $3, $4, $5)
+        `,
+        [
+          managedOrgId,
+          `SSO Merge Mismatch Org ${managedOrgId}`,
+          `sso-merge-mismatch-${managedOrgId}@capgo.app`,
+          USER_ID,
+          managedCustomerId,
+        ],
+      )
+
+      const { error: providerError } = await (getSupabaseClient().from as any)('sso_providers').insert({
+        id: providerId,
+        org_id: managedOrgId,
+        domain,
+        provider_id: externalProviderId,
+        status: 'active',
+        enforce_sso: false,
+        dns_verification_token: `dns-${randomUUID()}`,
+      })
+      if (providerError)
+        throw providerError
+
+      const { error: originalPublicUserError } = await getSupabaseClient().from('users').insert({
+        id: originalUser.user.id,
+        email: targetEmail,
+        first_name: 'Merge',
+        last_name: 'MismatchOriginal',
+        country: null,
+        enable_notifications: true,
+        opt_for_newsletters: true,
+      })
+      if (originalPublicUserError)
+        throw originalPublicUserError
+
+      const duplicateAuthHeaders = await getAuthHeadersForCredentials(tempSsoEmail, password)
+
+      const { error: originalAuthUpdateError } = await getSupabaseClient().auth.admin.updateUserById(originalUser.user.id, {
+        email: originalAuthEmail,
+        email_confirm: true,
+      })
+      if (originalAuthUpdateError)
+        throw originalAuthUpdateError
+
+      const { error: duplicateAuthUpdateError } = await getSupabaseClient().auth.admin.updateUserById(duplicateUser.user.id, {
+        email: targetEmail,
+        email_confirm: true,
+        app_metadata: {
+          provider: attackerIdentityProvider,
+        },
+      })
+      if (duplicateAuthUpdateError)
+        throw duplicateAuthUpdateError
+
+      await pool.query(
+        'update auth.identities set provider = $1, provider_id = $2, identity_data = jsonb_build_object($$sub$$, $2::text, $$email$$, $3::text, $$email_verified$$, true) where user_id = $4',
+        [attackerIdentityProvider, attackerIdentityProviderId, targetEmail, duplicateUser.user.id],
+      )
+
+      const response = await fetchWithRetry(getEndpointUrl('/private/sso/provision-user'), {
+        method: 'POST',
+        headers: duplicateAuthHeaders,
+        body: JSON.stringify({}),
+      })
+
+      expect(response.status).toBe(403)
+      const responseBody = await response.json() as { error: string }
+      expect(responseBody.error).toBe('provider_mismatch')
+
+      const { data: duplicateAuthLookup } = await getSupabaseClient().auth.admin.getUserById(duplicateUser.user.id)
+      expect(duplicateAuthLookup.user?.id).toBe(duplicateUser.user.id)
+
+      const { data: mergedMembership, error: mergedMembershipError } = await getSupabaseClient()
+        .from('org_users')
+        .select('id')
+        .eq('org_id', managedOrgId)
+        .eq('user_id', originalUser.user.id)
+        .maybeSingle()
+
+      expect(mergedMembershipError).toBeNull()
+      expect(mergedMembership).toBeNull()
+
+      const identitiesAfterRejectedMerge = await pool.query(
+        'select provider, user_id from auth.identities where provider = $1 and user_id in ($2, $3) order by user_id',
+        [attackerIdentityProvider, originalUser.user.id, duplicateUser.user.id],
+      )
+
+      expect(identitiesAfterRejectedMerge.rows).toEqual([
+        {
+          provider: attackerIdentityProvider,
+          user_id: duplicateUser.user.id,
+        },
+      ])
     }
     finally {
       await Promise.allSettled([
@@ -967,10 +1449,11 @@ describe('[POST] /private/sso/provision-user', () => {
     const managedOrgId = randomUUID()
     const managedCustomerId = `cus_sso_first_login_${randomUUID()}`
     const providerId = randomUUID()
+    const externalProviderId = randomUUID()
     const domain = `${randomUUID()}.sso.test`
     const email = `first-login-user@${domain}`
     const password = 'testtest'
-    const identityProvider = `sso:${providerId}`
+    const identityProvider = `sso:${externalProviderId}`
     const identityProviderId = `nameid-${randomUUID()}`
     const pool = new Pool({ connectionString: POSTGRES_URL })
 
@@ -1009,8 +1492,7 @@ describe('[POST] /private/sso/provision-user', () => {
         management_email: `sso-first-login-${managedOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: managedCustomerId,
-        sso_enabled: true,
-      })
+          })
       if (orgError)
         throw orgError
 
@@ -1018,7 +1500,7 @@ describe('[POST] /private/sso/provision-user', () => {
         id: providerId,
         org_id: managedOrgId,
         domain,
-        provider_id: randomUUID(),
+        provider_id: externalProviderId,
         status: 'active',
         enforce_sso: false,
         dns_verification_token: `dns-${randomUUID()}`,

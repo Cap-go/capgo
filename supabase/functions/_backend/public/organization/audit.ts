@@ -1,32 +1,35 @@
 import type { Context } from 'hono'
 import type { AuthInfo } from '../../utils/hono.ts'
-import { z } from 'zod/mini'
+import { type } from 'arktype'
+import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { apikeyHasOrgRightWithPolicy, hasOrgRightApikey, supabaseWithAuth } from '../../utils/supabase.ts'
 
-const bodySchema = z.object({
-  orgId: z.string(),
-  tableName: z.optional(z.string()),
-  operation: z.optional(z.string()),
-  page: z.optional(z.coerce.number()),
-  limit: z.optional(z.coerce.number()),
+const bodySchema = type({
+  'orgId': 'string',
+  'tableName?': 'string',
+  'operation?': 'string',
+  'page?': 'number | string.numeric.parse',
+  'limit?': 'number | string.numeric.parse',
 })
 
-const auditLogSchema = z.object({
-  id: z.number(),
-  created_at: z.string(),
-  table_name: z.string(),
-  record_id: z.string(),
-  operation: z.string(),
-  user_id: z.nullable(z.string()),
-  org_id: z.string(),
-  old_record: z.unknown(),
-  new_record: z.unknown(),
-  changed_fields: z.nullable(z.array(z.string())),
+const auditLogSchema = type({
+  id: 'number',
+  created_at: 'string',
+  table_name: 'string',
+  record_id: 'string',
+  operation: 'string',
+  user_id: 'string | null',
+  org_id: 'string',
+  old_record: 'unknown',
+  new_record: 'unknown',
+  changed_fields: 'string[] | null',
 })
+
+const auditLogsSchema = auditLogSchema.array()
 
 export async function getAuditLogs(c: Context, bodyRaw: any): Promise<Response> {
-  const bodyParsed = bodySchema.safeParse(bodyRaw)
+  const bodyParsed = safeParseSchema(bodySchema, bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
@@ -103,7 +106,7 @@ export async function getAuditLogs(c: Context, bodyRaw: any): Promise<Response> 
     throw simpleError('cannot_get_audit_logs', 'Cannot get audit logs', { error })
   }
 
-  const dataParsed = z.array(auditLogSchema).safeParse(data)
+  const dataParsed = safeParseSchema(auditLogsSchema, data)
   if (!dataParsed.success) {
     throw simpleError('cannot_parse_audit_logs', 'Cannot parse audit logs', { error: dataParsed.error })
   }

@@ -6,6 +6,7 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
+      '@capgo/cli/sdk': path.resolve(cwd(), 'cli/src/sdk.ts'),
       '~/': `${path.resolve(cwd(), 'src')}/`,
     },
   },

@@ -58,6 +58,7 @@ app.post('/', middlewareAPISecret, triggerValidator('deploy_history', 'INSERT'),
       event: 'Bundle Deployed',
       icon: '🚀',
       user_id: version.owner_org,
+      groups: { organization: version.owner_org },
       tags: {
         app_id: record.app_id,
         bundle_name: version.name,

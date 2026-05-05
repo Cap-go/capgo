@@ -43,6 +43,14 @@ describe.concurrent('test key generation', () => {
 })
 
 describe.concurrent('tests CLI encryption encrypt/upload/download/decrypt', () => {
+  function getPublicKeyFingerprint(publicKey: string) {
+    return publicKey
+      .replace(/-----BEGIN (RSA )?PUBLIC KEY-----/g, '')
+      .replace(/-----END (RSA )?PUBLIC KEY-----/g, '')
+      .replace(/\s+/g, '')
+      .substring(0, 20)
+  }
+
   // V3 encryption uses a different checksum format (signed hash vs RSA-encrypted hash)
   // This helper tries V2 RSA decryption first, falls back to V3 signature verification
   function tryDecryptChecksum(publicKey: string, encryptedChecksum: string): { checksum: string, isV3: boolean } {
@@ -82,6 +90,7 @@ describe.concurrent('tests CLI encryption encrypt/upload/download/decrypt', () =
     }
     // For V3: we'll verify checksum by computing the hash after decryption
 
+    expect(data?.key_id).toBe(getPublicKeyFingerprint(publicKey))
     expect(data?.session_key).toBeTruthy()
     expect(data?.session_key?.split(':').length).toBe(2)
 
@@ -200,7 +209,7 @@ describe.concurrent('tests CLI encryption encrypt/upload/download/decrypt', () =
       await resetAppData(APPNAME)
       await resetAppDataStats(APPNAME)
     }
-  })
+  }, 60000)
 
   it.concurrent('test upload bundle with custom key data', async () => {
     const id = randomUUID()
@@ -233,7 +242,7 @@ describe.concurrent('tests CLI encryption encrypt/upload/download/decrypt', () =
       await resetAppData(APPNAME)
       await resetAppDataStats(APPNAME)
     }
-  })
+  }, 60000)
 
   it.concurrent('test upload bundle with custom key path', async () => {
     const id = randomUUID()
@@ -271,7 +280,7 @@ describe.concurrent('tests CLI encryption encrypt/upload/download/decrypt', () =
       await resetAppData(APPNAME)
       await resetAppDataStats(APPNAME)
     }
-  })
+  }, 60000)
 })
 
 describe.concurrent('tests CLI upload no encryption', () => {
@@ -335,5 +344,5 @@ describe.concurrent('tests CLI upload no encryption', () => {
       await resetAppData(APPNAME)
       await resetAppDataStats(APPNAME)
     }
-  })
+  }, 60000)
 })

@@ -1,38 +1,57 @@
 import { randomUUID } from 'node:crypto'
+import { type } from 'arktype'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { z } from 'zod'
+import { safeParseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
 
-import { BASE_URL, fetchWithRetry, getAuthHeaders, getSupabaseClient, headers as apiKeyHeaders, ORG_ID as SEED_ORG_ID, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { BASE_URL, fetchWithRetry, getAuthHeaders, getSupabaseClient, TEST_EMAIL, USER_ID } from './test-utils.ts'
 
 const ORG_ID = randomUUID()
 const globalId = randomUUID()
 const name = `Test Audit Organization ${globalId}`
 const customerId = `cus_audit_${ORG_ID}`
+const APIKEY_AUDIT_APP_ID = `com.audit.logs.${globalId.replace(/-/g, '')}`
 
 // Schema for audit log response
-const auditLogSchema = z.object({
-  id: z.number(),
-  created_at: z.string(),
-  table_name: z.string(),
-  record_id: z.string(),
-  operation: z.string(),
-  user_id: z.nullable(z.string()),
-  org_id: z.string(),
-  old_record: z.unknown(),
-  new_record: z.unknown(),
-  changed_fields: z.nullable(z.array(z.string())),
+const auditLogSchema = type({
+  id: 'number',
+  created_at: 'string',
+  table_name: 'string',
+  record_id: 'string',
+  operation: 'string',
+  user_id: 'string | null',
+  org_id: 'string',
+  old_record: 'unknown',
+  new_record: 'unknown',
+  changed_fields: 'string[] | null',
 })
 
-const auditLogsResponseSchema = z.object({
-  data: z.array(auditLogSchema),
-  total: z.number(),
-  page: z.number(),
-  limit: z.number(),
+const auditLogsResponseSchema = type({
+  data: auditLogSchema.array(),
+  total: 'number',
+  page: 'number',
+  limit: 'number',
 })
 
-type AuditLog = z.infer<typeof auditLogSchema>
+interface AuditLog {
+  id: number
+  created_at: string
+  table_name: string
+  record_id: string
+  operation: string
+  user_id: string | null
+  org_id: string
+  old_record: unknown
+  new_record: unknown
+  changed_fields: string[] | null
+}
+
+function parseAuditLogsResponse(value: unknown) {
+  return safeParseSchema(auditLogsResponseSchema, value)
+}
 
 let authHeaders: Record<string, string>
+let apiKeyAuthHeaders: Record<string, string>
+let apiKeyId: number | null = null
 
 async function waitForAuditLog(
   url: string,
@@ -51,7 +70,7 @@ async function waitForAuditLog(
     lastBody = await response.json()
 
     if (response.status === 200) {
-      const safe = auditLogsResponseSchema.safeParse(lastBody)
+      const safe = parseAuditLogsResponse(lastBody)
       if (safe.success) {
         const matchedLog = safe.data.data.find(matcher)
         if (matchedLog)
@@ -101,6 +120,35 @@ beforeAll(async () => {
   })
   if (memberError)
     throw memberError
+
+  const { error: appError } = await getSupabaseClient().from('apps').insert({
+    app_id: APIKEY_AUDIT_APP_ID,
+    name: `Audit API App ${globalId}`,
+    icon_url: 'https://example.com/icon.png',
+    owner_org: ORG_ID,
+  })
+  if (appError)
+    throw appError
+
+  const { data: apiKeyData, error: apiKeyError } = await getSupabaseClient().rpc('create_hashed_apikey_for_user', {
+    p_user_id: USER_ID,
+    // This suite exercises bundle create, metadata update, delete, and channel promotion flows.
+    // Use an all-mode key so the audit assertions track the current permission model instead of failing on RBAC gating.
+    p_mode: 'all',
+    p_name: `audit-api-key-${globalId}`,
+    p_limited_to_orgs: [ORG_ID],
+    p_limited_to_apps: [APIKEY_AUDIT_APP_ID],
+    p_expires_at: null as unknown as string,
+  })
+  if (apiKeyError || !apiKeyData?.id || !apiKeyData.key) {
+    throw new Error(`Failed to create isolated audit API key: ${apiKeyError?.message ?? 'missing key data'}`)
+  }
+
+  apiKeyId = apiKeyData.id
+  apiKeyAuthHeaders = {
+    'Content-Type': 'application/json',
+    'Authorization': apiKeyData.key,
+  }
 })
 
 afterAll(async () => {
@@ -108,6 +156,10 @@ afterAll(async () => {
   await getSupabaseClient().from('audit_logs').delete().eq('org_id', ORG_ID)
 
   // Clean up test organization and stripe_info
+  if (apiKeyId !== null)
+    await getSupabaseClient().from('apikeys').delete().eq('id', apiKeyId)
+  await getSupabaseClient().from('app_versions').delete().eq('app_id', APIKEY_AUDIT_APP_ID)
+  await getSupabaseClient().from('apps').delete().eq('app_id', APIKEY_AUDIT_APP_ID)
   await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID)
   await getSupabaseClient().from('orgs').delete().eq('id', ORG_ID)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
@@ -120,7 +172,7 @@ describe('[GET] /organization/audit', () => {
     })
     expect(response.status).toBe(200)
     const responseData = await response.json()
-    const safe = auditLogsResponseSchema.safeParse(responseData)
+    const safe = parseAuditLogsResponse(responseData)
     expect(safe.success).toBe(true)
     if (safe.success) {
       expect(safe.data.page).toBe(0)
@@ -135,7 +187,7 @@ describe('[GET] /organization/audit', () => {
     })
     expect(response.status).toBe(200)
     const responseData = await response.json()
-    const safe = auditLogsResponseSchema.safeParse(responseData)
+    const safe = parseAuditLogsResponse(responseData)
     expect(safe.success).toBe(true)
     if (safe.success) {
       expect(safe.data.page).toBe(0)
@@ -149,7 +201,7 @@ describe('[GET] /organization/audit', () => {
     })
     expect(response.status).toBe(200)
     const responseData = await response.json()
-    const safe = auditLogsResponseSchema.safeParse(responseData)
+    const safe = parseAuditLogsResponse(responseData)
     expect(safe.success).toBe(true)
     if (safe.success) {
       // All returned logs should be for the 'orgs' table
@@ -165,7 +217,7 @@ describe('[GET] /organization/audit', () => {
     })
     expect(response.status).toBe(200)
     const responseData = await response.json()
-    const safe = auditLogsResponseSchema.safeParse(responseData)
+    const safe = parseAuditLogsResponse(responseData)
     expect(safe.success).toBe(true)
     if (safe.success) {
       // All returned logs should be INSERT operations
@@ -181,7 +233,7 @@ describe('[GET] /organization/audit', () => {
     })
     expect(response.status).toBe(200)
     const responseData = await response.json()
-    const safe = auditLogsResponseSchema.safeParse(responseData)
+    const safe = parseAuditLogsResponse(responseData)
     expect(safe.success).toBe(true)
     if (safe.success) {
       for (const log of safe.data.data) {
@@ -197,7 +249,7 @@ describe('[GET] /organization/audit', () => {
     })
     expect(response.status).toBe(200)
     const responseData = await response.json()
-    const safe = auditLogsResponseSchema.safeParse(responseData)
+    const safe = parseAuditLogsResponse(responseData)
     expect(safe.success).toBe(true)
     if (safe.success) {
       // Server should cap limit at 100
@@ -245,7 +297,7 @@ describe('audit log triggers', () => {
     })
     expect(response.status).toBe(200)
     const responseData = await response.json()
-    const safe = auditLogsResponseSchema.safeParse(responseData)
+    const safe = parseAuditLogsResponse(responseData)
     expect(safe.success).toBe(true)
 
     if (safe.success && safe.data.data.length > 0) {
@@ -303,7 +355,7 @@ describe('audit log triggers', () => {
     })
     expect(response.status).toBe(200)
     const responseData = await response.json()
-    const safe = auditLogsResponseSchema.safeParse(responseData)
+    const safe = parseAuditLogsResponse(responseData)
     expect(safe.success).toBe(true)
 
     if (safe.success && safe.data.data.length > 0) {
@@ -370,7 +422,7 @@ describe('audit log triggers', () => {
     })
     expect(response.status).toBe(200)
     const responseData = await response.json()
-    const safe = auditLogsResponseSchema.safeParse(responseData)
+    const safe = parseAuditLogsResponse(responseData)
     expect(safe.success).toBe(true)
 
     if (safe.success && safe.data.data.length > 0) {
@@ -403,9 +455,9 @@ describe('audit logs for app_versions via API key', () => {
     // Create a bundle via the API (uses API key authentication)
     const response = await fetchWithRetry(`${BASE_URL}/bundle`, {
       method: 'POST',
-      headers: apiKeyHeaders,
+      headers: apiKeyAuthHeaders,
       body: JSON.stringify({
-        app_id: 'com.demo.app',
+        app_id: APIKEY_AUDIT_APP_ID,
         version: testVersionName,
         external_url: 'https://example.com/test-audit-bundle.zip',
         checksum: 'abc123def456',
@@ -421,13 +473,13 @@ describe('audit logs for app_versions via API key', () => {
     // Wait for the trigger to execute
     await new Promise(resolve => setTimeout(resolve, 200))
 
-    // Fetch audit logs for this org - use the seed org ID since that's where the app belongs
-    const auditResponse = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${SEED_ORG_ID}&tableName=app_versions&operation=INSERT`, {
+    // Fetch audit logs for the dedicated test org
+    const auditResponse = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=app_versions&operation=INSERT`, {
       headers: authHeaders,
     })
     expect(auditResponse.status).toBe(200)
     const auditData = await auditResponse.json()
-    const safe = auditLogsResponseSchema.safeParse(auditData)
+    const safe = parseAuditLogsResponse(auditData)
     expect(safe.success).toBe(true)
 
     if (safe.success) {
@@ -440,7 +492,7 @@ describe('audit logs for app_versions via API key', () => {
       if (versionAuditLog) {
         expect(versionAuditLog.operation).toBe('INSERT')
         expect(versionAuditLog.table_name).toBe('app_versions')
-        expect(versionAuditLog.org_id).toBe(SEED_ORG_ID)
+        expect(versionAuditLog.org_id).toBe(ORG_ID)
         // This is the key assertion: user_id should be set from the API key
         expect(versionAuditLog.user_id).toBe(USER_ID)
         expect(versionAuditLog.old_record).toBeNull()
@@ -462,9 +514,9 @@ describe('audit logs for app_versions via API key', () => {
     // Update the bundle via the API - note: endpoint requires version_id (number), not version name
     const response = await fetchWithRetry(`${BASE_URL}/bundle/metadata`, {
       method: 'POST',
-      headers: apiKeyHeaders,
+      headers: apiKeyAuthHeaders,
       body: JSON.stringify({
-        app_id: 'com.demo.app',
+        app_id: APIKEY_AUDIT_APP_ID,
         version_id: createdVersionId,
         comment: 'Updated via API key test',
       }),
@@ -473,13 +525,13 @@ describe('audit logs for app_versions via API key', () => {
     expect(response.status).toBe(200)
 
     const updateAuditLog = await waitForAuditLog(
-      `${BASE_URL}/organization/audit?orgId=${SEED_ORG_ID}&tableName=app_versions&operation=UPDATE`,
+      `${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=app_versions&operation=UPDATE`,
       log => log.record_id === createdVersionId?.toString() && log.changed_fields?.includes('comment') === true,
     )
 
     expect(updateAuditLog.operation).toBe('UPDATE')
     expect(updateAuditLog.table_name).toBe('app_versions')
-    expect(updateAuditLog.org_id).toBe(SEED_ORG_ID)
+    expect(updateAuditLog.org_id).toBe(ORG_ID)
     // user_id should be set from the API key
     expect(updateAuditLog.user_id).toBe(USER_ID)
     expect(updateAuditLog.old_record).toBeTruthy()
@@ -501,9 +553,9 @@ describe('audit logs for app_versions via API key', () => {
     // Delete the bundle via the API - note: this is a soft-delete (sets deleted=true)
     const response = await fetchWithRetry(`${BASE_URL}/bundle`, {
       method: 'DELETE',
-      headers: apiKeyHeaders,
+      headers: apiKeyAuthHeaders,
       body: JSON.stringify({
-        app_id: 'com.demo.app',
+        app_id: APIKEY_AUDIT_APP_ID,
         version: testVersionName,
       }),
     })
@@ -514,12 +566,12 @@ describe('audit logs for app_versions via API key', () => {
     await new Promise(resolve => setTimeout(resolve, 200))
 
     // Fetch audit logs for UPDATE operations (soft-delete creates UPDATE, not DELETE)
-    const auditResponse = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${SEED_ORG_ID}&tableName=app_versions&operation=UPDATE`, {
+    const auditResponse = await fetchWithRetry(`${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=app_versions&operation=UPDATE`, {
       headers: authHeaders,
     })
     expect(auditResponse.status).toBe(200)
     const auditData = await auditResponse.json()
-    const safe = auditLogsResponseSchema.safeParse(auditData)
+    const safe = parseAuditLogsResponse(auditData)
     expect(safe.success).toBe(true)
 
     if (safe.success) {
@@ -533,7 +585,7 @@ describe('audit logs for app_versions via API key', () => {
       if (deleteAuditLog) {
         expect(deleteAuditLog.operation).toBe('UPDATE')
         expect(deleteAuditLog.table_name).toBe('app_versions')
-        expect(deleteAuditLog.org_id).toBe(SEED_ORG_ID)
+        expect(deleteAuditLog.org_id).toBe(ORG_ID)
         // user_id should be set from the API key
         expect(deleteAuditLog.user_id).toBe(USER_ID)
         // Both old and new record should exist for UPDATE
@@ -546,6 +598,114 @@ describe('audit logs for app_versions via API key', () => {
           expect((deleteAuditLog.new_record as Record<string, unknown>).deleted).toBe(true)
         }
       }
+    }
+  })
+})
+
+describe('audit logs for channel promotions via API key bundle flow', () => {
+  const sourceVersionName = `99.0.0-audit-channel-source-${randomUUID()}`
+  const targetVersionName = `99.0.0-audit-channel-target-${randomUUID()}`
+  const channelName = `audit-channel-${randomUUID()}`
+  let sourceVersionId: number | null = null
+  let targetVersionId: number | null = null
+  let channelId: number | null = null
+
+  beforeAll(async () => {
+    const supabase = getSupabaseClient()
+
+    const { data: insertedVersions, error: versionError } = await supabase
+      .from('app_versions')
+      .insert([
+        {
+          app_id: APIKEY_AUDIT_APP_ID,
+          name: sourceVersionName,
+          owner_org: ORG_ID,
+        },
+        {
+          app_id: APIKEY_AUDIT_APP_ID,
+          name: targetVersionName,
+          owner_org: ORG_ID,
+        },
+      ])
+      .select('id,name')
+
+    if (versionError || !insertedVersions || insertedVersions.length !== 2) {
+      throw new Error(`Failed to create audit channel versions: ${versionError?.message ?? 'missing versions'}`)
+    }
+
+    sourceVersionId = insertedVersions.find(version => version.name === sourceVersionName)?.id ?? null
+    targetVersionId = insertedVersions.find(version => version.name === targetVersionName)?.id ?? null
+    if (sourceVersionId === null || targetVersionId === null) {
+      throw new Error('Failed to resolve audit channel version IDs')
+    }
+
+    const { data: insertedChannel, error: channelError } = await supabase
+      .from('channels')
+      .insert({
+        name: channelName,
+        app_id: APIKEY_AUDIT_APP_ID,
+        version: sourceVersionId,
+        created_by: USER_ID,
+        owner_org: ORG_ID,
+      })
+      .select('id')
+      .single()
+
+    if (channelError || !insertedChannel) {
+      throw new Error(`Failed to create audit channel: ${channelError?.message ?? 'missing channel'}`)
+    }
+
+    channelId = insertedChannel.id
+  })
+
+  afterAll(async () => {
+    const supabase = getSupabaseClient()
+
+    if (channelId !== null) {
+      await supabase.from('channels').delete().eq('id', channelId)
+      await supabase.from('audit_logs').delete().eq('record_id', channelId.toString()).eq('table_name', 'channels')
+    }
+
+    if (sourceVersionId !== null) {
+      await supabase.from('app_versions').delete().eq('id', sourceVersionId)
+    }
+
+    if (targetVersionId !== null) {
+      await supabase.from('app_versions').delete().eq('id', targetVersionId)
+    }
+  })
+
+  it('channel UPDATE via API key bundle promotion keeps audit user_id attribution', async () => {
+    if (!channelId || !targetVersionId) {
+      throw new Error('Audit channel promotion test setup did not complete')
+    }
+    const promotionChannelId = channelId
+
+    const response = await fetchWithRetry(`${BASE_URL}/bundle`, {
+      method: 'PUT',
+      headers: apiKeyAuthHeaders,
+      body: JSON.stringify({
+        app_id: APIKEY_AUDIT_APP_ID,
+        version_id: targetVersionId,
+        channel_id: promotionChannelId,
+      }),
+    })
+
+    expect(response.status).toBe(200)
+
+    const promotionAuditLog = await waitForAuditLog(
+      `${BASE_URL}/organization/audit?orgId=${ORG_ID}&tableName=channels&operation=UPDATE`,
+      log => log.record_id === promotionChannelId.toString() && log.changed_fields?.includes('version') === true,
+    )
+
+    expect(promotionAuditLog.operation).toBe('UPDATE')
+    expect(promotionAuditLog.table_name).toBe('channels')
+    expect(promotionAuditLog.org_id).toBe(ORG_ID)
+    expect(promotionAuditLog.user_id).toBe(USER_ID)
+    expect(promotionAuditLog.changed_fields).toContain('version')
+
+    if (promotionAuditLog.new_record && typeof promotionAuditLog.new_record === 'object') {
+      expect((promotionAuditLog.new_record as Record<string, unknown>).version).toBe(targetVersionId)
     }
   })
 })

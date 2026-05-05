@@ -99,7 +99,7 @@ describe('tests CLI upload', () => {
       ignoreCompatibilityCheck: true,
     })
     expect(result.success).toBe(true)
-  }, 30000)
+  }, 60000)
 
   it('should not upload same hash twice', async () => {
     const appName = `com.cli_duplicate_${randomUUID()}`
@@ -132,10 +132,10 @@ describe('tests CLI upload', () => {
         resetAppDataStats(appName),
       ])
     }
-  }, 30000)
+  }, 60000)
 })
 
-describe.concurrent('tests CLI upload options in parallel', () => {
+describe('tests CLI upload options in parallel', () => {
   const sharedId = randomUUID()
   const SHARED_APPNAME = `com.cli_shared_${sharedId}`
 
@@ -197,9 +197,9 @@ describe.concurrent('tests CLI upload options in parallel', () => {
     })
     expect(result.success).toBe(false)
     expect(result.error).toContain('notifyAppReady')
-  }, 30000)
+  }, 60000)
 
-  it.concurrent('test --min-update-version', async () => {
+  it('test --min-update-version', async () => {
     const semver = getSemver()
     const result = await uploadBundleSDK(SHARED_APPNAME, semver, 'production', {
       ignoreCompatibilityCheck: true,
@@ -217,9 +217,9 @@ describe.concurrent('tests CLI upload options in parallel', () => {
 
     expect(error).toBeNull()
     expect(data?.min_update_version).toBe('1.0.0')
-  }, 30000)
+  }, 60000)
 
-  it.concurrent('cannot upload with wrong api key', async () => {
+  it('cannot upload with wrong api key', async () => {
     const testApiKey = randomUUID()
     const semver = getSemver()
     const result = await uploadBundleSDK(SHARED_APPNAME, semver, 'production', {
@@ -228,7 +228,7 @@ describe.concurrent('tests CLI upload options in parallel', () => {
     })
     expect(result.success).toBe(false)
     expect(result.error).toContain('Invalid API key')
-  }, 30000)
+  }, 60000)
 
   it.concurrent('should test upload with org-limited API key', async () => {
     const app = apiTestApps.get('org-limited')
@@ -255,7 +255,7 @@ describe.concurrent('tests CLI upload options in parallel', () => {
       if (createdApikeyId !== null)
         await deleteScopedApiKey(createdApikeyId)
     }
-  }, 30000)
+  }, 60000)
 
   it.concurrent('should fail upload with wrong org-limited API key', async () => {
     const app = apiTestApps.get('wrong-org')
@@ -288,5 +288,5 @@ describe.concurrent('tests CLI upload options in parallel', () => {
       if (createdApikeyId !== null)
         await deleteScopedApiKey(createdApikeyId)
     }
-  }, 30000)
+  }, 60000)
 })

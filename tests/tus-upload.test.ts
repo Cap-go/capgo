@@ -296,18 +296,16 @@ describe('tus upload protocol tests', () => {
   })
 
   describe('error handling', () => {
-    it.concurrent('should reject upload filenames containing a literal percent sign without a server error', async () => {
+    it.concurrent('should reject upload filenames containing an unencoded percent sign without a server error', async () => {
       const { response, uploadUrl } = await createTusUploadViaApi(
         APPNAME,
         `test-percent-${Date.now()}-100%.zip`,
         1024,
       )
 
-      expect([201, 400]).toContain(response.status)
-      if (response.status === 201)
-        expect(uploadUrl).toBeTruthy()
-      else
-        expect(await response.text()).toContain('Invalid key')
+      expect(response.status).toBe(400)
+      expect(uploadUrl).toBe('')
+      expect(await response.text()).toContain('invalid_file_path_encoding')
     })
 
     it.concurrent('should reject upload filenames containing malformed percent encoding without a server error', async () => {
@@ -317,17 +315,15 @@ describe('tus upload protocol tests', () => {
         1024,
       )
 
-      expect([201, 400]).toContain(response.status)
-      if (response.status === 201)
-        expect(uploadUrl).toBeTruthy()
-      else
-        expect(await response.text()).toContain('Invalid key')
+      expect(response.status).toBe(400)
+      expect(uploadUrl).toBe('')
+      expect(await response.text()).toContain('invalid_file_path_encoding')
     })
 
     it.concurrent('should reject read paths containing malformed percent encoding without a server error', async () => {
       const response = await fetch(getEndpointUrl(`/files/read/attachments/orgs/${ORG_ID}/apps/${APPNAME}/test-%zz.zip`))
 
-      expect([400, 404]).toContain(response.status)
+      expect(response.status).toBe(400)
     })
 
     it('should reject upload without Upload-Length header', async () => {

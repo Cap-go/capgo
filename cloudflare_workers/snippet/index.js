@@ -204,6 +204,21 @@ function isPlanUpgradeResponse(status, responseBody) {
   return status === 429 && responseBody && responseBody.error === 'need_plan_upgrade'
 }
 
+async function buildOnPremResponse(hostname, appId, endpoint, method, responseBody, status, responseHeaders) {
+  // Cache only after every configured fallback agrees this is an on-prem app.
+  await setOnPremCache(hostname, appId, endpoint, method, responseBody, status, responseHeaders)
+
+  const newHeaders = new Headers(responseHeaders)
+  newHeaders.set('Content-Type', 'application/json')
+  newHeaders.set('X-Onprem-Cached', 'false')
+  newHeaders.set('X-Onprem-App-Id', appId)
+
+  return new Response(JSON.stringify(responseBody), {
+    status,
+    headers: newHeaders,
+  })
+}
+
 async function setPlanUpgradeCache(hostname, appId, endpoint, method, responseBody, status, responseHeaders) {
   try {
     const cacheTtl = getCacheTtlSeconds(responseHeaders)
@@ -662,11 +677,20 @@ export default {
     const pathWithQuery = url.pathname + url.search
 
     const fallbackUrls = zoneFallbackUrls[zone] || [WORKER_URL.EUROPE]
+    const requestBody = method === 'POST' || method === 'PUT'
+      ? await request.clone().arrayBuffer()
+      : undefined
+    let pendingOnPrem = null
+    let onPremConfirmations = 0
+    let successfulFallbacks = 0
+    let fallbackFailure = false
 
-    for (const workerUrl of fallbackUrls) {
+    for (let index = 0; index < fallbackUrls.length; index++) {
+      const workerUrl = fallbackUrls[index]
       // Skip unhealthy workers (circuit is open)
       const healthy = await isHealthy(hostname, colo, workerUrl)
       if (!healthy) {
+        fallbackFailure = true
         console.log(`Skipping ${workerUrl} (circuit open for ${colo})`)
         continue
       }
@@ -678,7 +702,7 @@ export default {
         const response = await fetch(`${workerUrl}${pathWithQuery}`, {
           method: request.method,
           headers: request.headers,
-          body: request.body,
+          body: requestBody ? requestBody.slice(0) : undefined,
           signal: abortController.signal,
         })
 
@@ -686,6 +710,7 @@ export default {
 
         // Check for server errors (5xx) - infrastructure problem
         if (response.status >= 500) {
+          fallbackFailure = true
           console.log(`${workerUrl} returned ${response.status}, marking unhealthy`)
           await markUnhealthy(hostname, colo, workerUrl)
           continue // try fallback
@@ -693,6 +718,7 @@ export default {
 
         // Success (2xx, 3xx, 4xx) - worker is healthy
         await markHealthy(hostname, colo, workerUrl)
+        successfulFallbacks += 1
         console.log(`Request served by ${workerUrl}`)
 
         // Check if this is an on-prem response that should be cached
@@ -702,19 +728,18 @@ export default {
             const responseBody = await responseClone.json()
 
             if (isOnPremResponse(response.status, responseBody)) {
-              // Cache the on-prem response (fire-and-forget, errors handled internally)
-              setOnPremCache(hostname, appId, endpoint, method, responseBody, response.status, response.headers)
-
-              // Return a new response, preserving original headers and adding on-prem headers
-              const newHeaders = new Headers(response.headers)
-              newHeaders.set('Content-Type', 'application/json')
-              newHeaders.set('X-Onprem-Cached', 'false')
-              newHeaders.set('X-Onprem-App-Id', appId)
-
-              return new Response(JSON.stringify(responseBody), {
+              onPremConfirmations += 1
+              pendingOnPrem = {
+                responseBody,
                 status: response.status,
-                headers: newHeaders,
-              })
+                headers: response.headers,
+                workerUrl,
+              }
+              if (index < fallbackUrls.length - 1) {
+                console.log(`${workerUrl} returned on-prem for ${appId}; trying fallback worker before finalizing`)
+                continue
+              }
+              continue
             }
 
             if (isPlanUpgradeResponse(response.status, responseBody)) {
@@ -741,14 +766,27 @@ export default {
       }
       catch (error) {
         // Network failure or timeout - mark unhealthy
+        fallbackFailure = true
         console.log(`${workerUrl} failed: ${error.message}, marking unhealthy`)
         await markUnhealthy(hostname, colo, workerUrl)
         // continue to next fallback
       }
     }
 
-    // All workers failed or are unhealthy - try the original request as last resort
-    console.log('All workers failed, falling back to original request')
+    // Skipped/failed fallback workers are not counted as agreement because a partial outage can reflect stale replicas.
+    if (pendingOnPrem && !fallbackFailure && successfulFallbacks > 0 && onPremConfirmations === successfulFallbacks) {
+      console.log(`All ${onPremConfirmations}/${successfulFallbacks} successful fallback workers returned on-prem for ${appId}`)
+      return await buildOnPremResponse(hostname, appId, endpoint, method, pendingOnPrem.responseBody, pendingOnPrem.status, pendingOnPrem.headers)
+    }
+    if (pendingOnPrem) {
+      const failureLog = fallbackFailure ? '; at least one configured fallback failed or was skipped' : ''
+      console.log(`Only ${onPremConfirmations}/${successfulFallbacks} successful fallback workers returned on-prem for ${appId}${failureLog}; falling back to original request`)
+    }
+    else {
+      console.log('All workers failed, falling back to original request')
+    }
+
+    // No worker produced a usable non-on-prem response, so try the original request as last resort.
     return fetch(request)
   },
 }

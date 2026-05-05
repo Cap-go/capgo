@@ -1,4 +1,5 @@
-import { z } from 'zod/mini'
+import { type } from 'arktype'
+import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { verifyDnsTxtRecord } from '../../utils/dns-verification.ts'
 import { createHono, middlewareAuth, parseBody, quickError, simpleError, useCors } from '../../utils/hono.ts'
 import { cloudlog } from '../../utils/logging.ts'
@@ -8,8 +9,8 @@ import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseAdmin } from '../../utils/supabase.ts'
 import { version } from '../../utils/version.ts'
 
-const bodySchema = z.object({
-  provider_id: z.string().check(z.uuid()),
+const bodySchema = type({
+  provider_id: 'string.uuid',
 })
 
 export const app = createHono('', version)
@@ -24,9 +25,9 @@ app.post('/', middlewareAuth, async (c) => {
 
   const rawBody = await parseBody<{ provider_id?: string }>(c)
 
-  const validation = bodySchema.safeParse({ provider_id: rawBody.provider_id })
+  const validation = safeParseSchema(bodySchema, { provider_id: rawBody.provider_id })
   if (!validation.success) {
-    throw simpleError('invalid_body', 'Invalid request body', { errors: z.prettifyError(validation.error) })
+    throw simpleError('invalid_body', 'Invalid request body', { errors: validation.error.message })
   }
 
   const { provider_id } = validation.data

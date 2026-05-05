@@ -87,7 +87,7 @@ SET
 
 WITH ios_channel AS (
     INSERT INTO public.channels (
-        created_by, app_id, name, version, public, ios, android, owner_org
+        created_by, app_id, name, version, public, ios, android, electron, owner_org
     )
     SELECT
         user_id,
@@ -97,6 +97,7 @@ WITH ios_channel AS (
         true,
         true,
         false,
+        false,
         org_id
     FROM deploy_stats_context
     RETURNING id
@@ -104,7 +105,7 @@ WITH ios_channel AS (
 
 android_channel AS (
     INSERT INTO public.channels (
-        created_by, app_id, name, version, public, ios, android, owner_org
+        created_by, app_id, name, version, public, ios, android, electron, owner_org
     )
     SELECT
         user_id,
@@ -114,6 +115,7 @@ android_channel AS (
         true,
         false,
         true,
+        false,
         org_id
     FROM deploy_stats_context
     RETURNING id
@@ -121,7 +123,7 @@ android_channel AS (
 
 private_channel AS (
     INSERT INTO public.channels (
-        created_by, app_id, name, version, public, ios, android, owner_org
+        created_by, app_id, name, version, public, ios, android, electron, owner_org
     )
     SELECT
         user_id,
@@ -130,6 +132,7 @@ private_channel AS (
         ios_version_id,
         false,
         true,
+        false,
         false,
         org_id
     FROM deploy_stats_context

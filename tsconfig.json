@@ -22,7 +22,6 @@
       "vitest",
       "vite/client",
       "vite-plugin-vue-layouts/client",
-      "vite-plugin-pwa/client",
       "unplugin-vue-macros/macros-global",
       "vue-router/auto"
     ],
@@ -39,8 +38,7 @@
   },
   "vueCompilerOptions": {
     "plugins": [
-      "@vue-macros/volar/define-models",
-      "@vue-macros/volar/define-slots"
+      "unplugin-vue-macros/volar"
     ]
   },
   "exclude": [
@@ -49,6 +47,7 @@
     "scripts",
     "supabase/functions/_script",
     "cypress",
+    "cli",
     "vite.config.mts",
     "temp_cli_test",
     "tests/device_comparison.test.ts"

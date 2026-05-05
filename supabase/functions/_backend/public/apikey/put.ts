@@ -3,7 +3,7 @@ import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
-import { supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
+import { resolveApikeyPolicyOrgIds, supabaseAdmin, supabaseWithAuth, validateExpirationAgainstOrgPolicies, validateExpirationDate } from '../../utils/supabase.ts'
 import { Constants } from '../../utils/supabase.types.ts'
 
 const app = honoFactory.createApp()
@@ -31,9 +31,11 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
   const auth = c.get('auth') as AuthInfo
   const authApikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
 
-  // Only check limited_to_orgs constraint for API key auth (not JWT)
-  if (auth.authType === 'apikey' && authApikey?.limited_to_orgs?.length) {
-    throw quickError(401, 'cannot_update_apikey', 'You cannot do that as a limited API key', { requestId, apikeyId: authApikey.id })
+  // Block any constrained API key from mutating other keys owned by the same user.
+  const callerHasLimitedScope = (authApikey?.limited_to_orgs?.length ?? 0) > 0
+    || (authApikey?.limited_to_apps?.length ?? 0) > 0
+  if (auth.authType === 'apikey' && callerHasLimitedScope) {
+    throw quickError(401, 'cannot_update_apikey', 'You cannot do that as a limited API key', { requestId, apikeyId: authApikey?.id })
   }
 
   const body = await parseBody<ApiKeyPut>(c)
@@ -101,11 +103,12 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
 
   // Use supabaseWithAuth which handles both JWT and API key authentication
   const supabase = supabaseWithAuth(c, auth)
+  const policyLookupSupabase = supabaseAdmin(c)
 
   // Check if the apikey to update exists (RLS handles ownership)
   const baseQuery = supabase
     .from('apikeys')
-    .select('id, limited_to_orgs, expires_at, key, key_hash') // Also fetch expires_at for policy validation
+    .select('id, limited_to_orgs, limited_to_apps, expires_at, key, key_hash') // Also fetch scope + expires_at for policy validation
     .eq('user_id', auth.userId)
 
   // Avoid PostgREST cast errors by querying only the relevant column:
@@ -125,13 +128,18 @@ async function handlePut(c: Context<MiddlewareKeyVariables>, idParam?: string) {
     throw quickError(404, 'api_key_not_found_or_access_denied', 'API key not found or access denied', { requestId })
   }
 
-  // Determine the org IDs to validate against (use new ones if provided, otherwise existing)
-  const orgsToValidate = limited_to_orgs?.length ? limited_to_orgs : (existingApikey.limited_to_orgs || [])
+  const nextLimitedToOrgs = limited_to_orgs !== undefined ? limited_to_orgs : (existingApikey.limited_to_orgs || [])
+  const nextLimitedToApps = limited_to_apps !== undefined ? limited_to_apps : (existingApikey.limited_to_apps || [])
 
-  // Validate expiration against org policies (only if expires_at is being set or orgs are being changed)
-  if (expires_at !== undefined || limited_to_orgs?.length) {
+  // Validate expiration against org policies (only if expiration or scopes are changing)
+  if (expires_at !== undefined || limited_to_orgs !== undefined || limited_to_apps !== undefined) {
     // Use new expires_at if provided, otherwise fall back to existing
     const expirationToValidate = expires_at !== undefined ? expires_at : (existingApikey.expires_at ?? null)
+    const orgsToValidate = await resolveApikeyPolicyOrgIds(supabase, {
+      limitedToApps: nextLimitedToApps,
+      limitedToOrgs: nextLimitedToOrgs,
+      policyLookupSupabase,
+    })
     await validateExpirationAgainstOrgPolicies(orgsToValidate, expirationToValidate, supabase)
   }
 

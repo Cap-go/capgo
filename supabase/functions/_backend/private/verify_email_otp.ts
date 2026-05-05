@@ -1,13 +1,16 @@
-import { z } from 'zod/mini'
-import { createHono, getClaimsFromJWT, middlewareAuth, parseBody, quickError, simpleError, useCors } from '../utils/hono.ts'
+import { type } from 'arktype'
+import { safeParseSchema } from '../utils/ark_validation.ts'
+import { createHono, getClaimsFromJWT, middlewareAuth, parseBody, quickError, simpleError, simpleRateLimit, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { clearFailedAccountAuth, isAccountRateLimited, recordFailedAccountAuth } from '../utils/rate_limit.ts'
+import { buildRateLimitInfo } from '../utils/rateLimitInfo.ts'
 import { emptySupabase, supabaseAdmin } from '../utils/supabase.ts'
 import { version } from '../utils/version.ts'
 
-const bodySchema = z.object({
-  token: z.optional(z.string()),
-  token_hash: z.optional(z.string()),
-  type: z.optional(z.enum(['email', 'magiclink'])),
+const bodySchema = type({
+  'token?': 'string',
+  'token_hash?': 'string',
+  'type?': '"email" | "magiclink"',
 })
 
 export const app = createHono('', version)
@@ -19,9 +22,17 @@ app.post('/', middlewareAuth, async (c) => {
   const token = rawBody.token?.replaceAll(' ', '') ?? ''
   const tokenHash = rawBody.token_hash?.trim() ?? ''
 
-  const validation = bodySchema.safeParse({ token, token_hash: tokenHash, type: rawBody.type })
+  const validationPayload: { token: string, token_hash: string, type?: 'email' | 'magiclink' } = {
+    token,
+    token_hash: tokenHash,
+  }
+  if (rawBody.type !== undefined) {
+    validationPayload.type = rawBody.type
+  }
+
+  const validation = safeParseSchema(bodySchema, validationPayload)
   if (!validation.success) {
-    throw simpleError('invalid_body', 'Invalid request body', { errors: z.prettifyError(validation.error) })
+    throw simpleError('invalid_body', 'Invalid request body', { errors: validation.error.message })
   }
   const otpType = validation.data.type ?? 'email'
   if (!token && !tokenHash) {
@@ -40,6 +51,11 @@ app.post('/', middlewareAuth, async (c) => {
   }
   if (auth.authType !== 'jwt') {
     return quickError(401, 'invalid_auth_type', 'JWT authentication required')
+  }
+
+  const accountRateLimitStatus = await isAccountRateLimited(c, auth.userId)
+  if (accountRateLimitStatus.limited) {
+    return simpleRateLimit({ reason: 'too_many_failed_account_auth_attempts', ...buildRateLimitInfo(accountRateLimitStatus.resetAt) })
   }
 
   const authorization = c.get('authorization')
@@ -74,16 +90,21 @@ app.post('/', middlewareAuth, async (c) => {
   }
 
   if (verifyError || !verifyData?.session?.access_token) {
+    await recordFailedAccountAuth(c, auth.userId)
     cloudlog({ requestId: c.get('requestId'), context: 'verify_email_otp - verifyOtp failed', error: verifyError?.message })
     return quickError(401, 'invalid_otp', 'Invalid or expired OTP')
   }
 
   if (verifyData.user?.id && verifyData.user.id !== auth.userId) {
+    await recordFailedAccountAuth(c, auth.userId)
     return quickError(403, 'otp_user_mismatch', 'OTP does not match current user')
   }
   if (!verifyData.user?.id) {
+    await recordFailedAccountAuth(c, auth.userId)
     return quickError(500, 'no_user', 'No user associated with OTP')
   }
+
+  await clearFailedAccountAuth(c, auth.userId)
 
   const otpVerifiedAt = new Date().toISOString()
   const { error: recordError } = await supabaseAdmin(c).rpc('record_email_otp_verified', {

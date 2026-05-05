@@ -197,6 +197,8 @@ describe('[DELETE] /bundle operations', () => {
 describe('[PUT] /bundle operations - Set bundle to channel', () => {
   let versionId: number
   let channelId: number
+  let writeScopedKeyId: number | undefined
+  let writeScopedHeaders: Record<string, string> | undefined
 
   beforeAll(async () => {
     // Create a test version
@@ -235,6 +237,36 @@ describe('[PUT] /bundle operations - Set bundle to channel', () => {
       throw new Error('Failed to create test channel: channel is null')
     }
     channelId = channel.id
+
+    const createKeyResponse = await fetch(`${BASE_URL}/apikey`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        name: `bundle-write-key-${APPNAME}`,
+        mode: 'write',
+        limited_to_apps: [APPNAME],
+      }),
+    })
+
+    const createKeyData = await createKeyResponse.json() as { id: number, key: string }
+    if (createKeyResponse.status !== 200) {
+      throw new Error(`Failed to create write-scoped bundle key: ${JSON.stringify(createKeyData)}`)
+    }
+
+    writeScopedKeyId = createKeyData.id
+    writeScopedHeaders = {
+      'Content-Type': 'application/json',
+      'capgkey': createKeyData.key,
+    }
+  })
+
+  afterAll(async () => {
+    if (writeScopedKeyId != null) {
+      await fetch(`${BASE_URL}/apikey/${writeScopedKeyId}`, {
+        method: 'DELETE',
+        headers,
+      })
+    }
   })
 
   it('should set bundle to channel successfully', async () => {
@@ -264,6 +296,38 @@ describe('[PUT] /bundle operations - Set bundle to channel', () => {
     if (channel) {
       expect(channel.version).toBe(versionId)
     }
+  })
+
+  it('should keep the supported write-scoped API key bundle promotion flow working', async () => {
+    if (!writeScopedHeaders) {
+      throw new Error('Write-scoped bundle test key was not created')
+    }
+
+    const response = await fetch(`${BASE_URL}/bundle`, {
+      method: 'PUT',
+      headers: writeScopedHeaders,
+      body: JSON.stringify({
+        app_id: APPNAME,
+        version_id: versionId,
+        channel_id: channelId,
+      }),
+    })
+
+    const data = await response.json() as { status: string, message: string }
+    expect(response.status).toBe(200)
+    expect(data.status).toBe('success')
+    expect(data.message).toContain('set to channel')
+
+    const supabase = getSupabaseClient()
+    const { data: channel, error } = await supabase
+      .from('channels')
+      .select('version')
+      .eq('id', channelId)
+      .eq('app_id', APPNAME)
+      .single()
+
+    expect(error).toBeNull()
+    expect(channel?.version).toBe(versionId)
   })
 
   it('should handle missing required fields', async () => {

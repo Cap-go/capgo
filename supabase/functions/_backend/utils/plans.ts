@@ -320,6 +320,7 @@ async function userAbovePlan(c: Context, org: {
       event: `User need upgrade to ${bestPlanKey}`,
       icon: '⚠️',
       user_id: orgId,
+      groups: { organization: orgId },
       notify: false,
     }).catch()
   }
@@ -344,6 +345,7 @@ async function userIsAtPlanUsage(c: Context, orgId: string, customerId: string |
         event: 'User is at 90% of plan usage',
         icon: '⚠️',
         user_id: orgId,
+        groups: { organization: orgId },
         notify: false,
       }).catch()
     }
@@ -357,6 +359,7 @@ async function userIsAtPlanUsage(c: Context, orgId: string, customerId: string |
         event: 'User is at 70% of plan usage',
         icon: '⚠️',
         user_id: orgId,
+        groups: { organization: orgId },
         notify: false,
       }).catch()
     }
@@ -369,6 +372,7 @@ async function userIsAtPlanUsage(c: Context, orgId: string, customerId: string |
         event: 'User is at 50% of plan usage',
         icon: '⚠️',
         user_id: orgId,
+        groups: { organization: orgId },
         notify: false,
       }).catch()
     }
@@ -381,9 +385,11 @@ export async function getOrgWithCustomerInfo(c: Context, orgId: string) {
     .from('orgs')
     .select('customer_id, name, website, stripe_info(status, subscription_id, subscription_anchor_start, subscription_anchor_end)')
     .eq('id', orgId)
-    .single()
-  if (userError || !org)
-    return quickError(404, 'org_not_found', 'Org not found', { orgId, userError })
+    .maybeSingle()
+  if (userError)
+    return quickError(500, 'cannot_get_org', 'Cannot get org', { orgId, userError })
+  if (!org)
+    return quickError(404, 'org_not_found', 'Org not found', { orgId })
   return org
 }
 
@@ -455,6 +461,7 @@ export async function handleOrgNotificationsAndEvents(c: Context, org: any, orgI
         event: 'User need onboarding',
         icon: '🥲',
         user_id: orgId,
+        groups: { organization: orgId },
         notify: false,
       }).catch()
     }

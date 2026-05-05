@@ -89,22 +89,43 @@ app.post('/upload/:jobId', middlewareKey(['all', 'write']), async (c) => {
   return tusProxy(c, jobId, apikey)
 })
 
-// HEAD /build/upload/:jobId/* - Check TUS upload progress (proxied to builder)
-// Hono resolves HEAD via GET route matching, so we gate by request method here.
+async function proxyTusHead(c: Parameters<typeof tusProxy>[0]) {
+  const jobId = c.req.param('jobId')
+  if (!jobId) {
+    throw new Error('jobId is required in request path')
+  }
+  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
+  return tusProxy(c, jobId, apikey, 'HEAD')
+}
+
+function isTusHeadProbe(c: Parameters<typeof tusProxy>[0]) {
+  return !!c.req.header('Tus-Resumable')
+}
+
+// Some runtimes normalize HEAD to GET on mounted routes.
+// Accept only TUS-shaped GET probes here and forward them upstream as HEAD.
 app.get(
-  '/upload/:jobId/*',
+  '/upload/:jobId',
   async (c, next) => {
-    if (c.req.method !== 'HEAD') {
+    if (!isTusHeadProbe(c)) {
       return c.notFound()
     }
     return next()
   },
   uploadWriteMiddleware,
-  async (c) => {
-    const jobId = c.req.param('jobId')
-    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row']
-    return tusProxy(c, jobId, apikey)
+  proxyTusHead,
+)
+
+app.get(
+  '/upload/:jobId/*',
+  async (c, next) => {
+    if (!isTusHeadProbe(c)) {
+      return c.notFound()
+    }
+    return next()
   },
+  uploadWriteMiddleware,
+  proxyTusHead,
 )
 
 // PATCH /build/upload/:jobId/* - Upload TUS chunk (proxied to builder)

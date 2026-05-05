@@ -1,12 +1,14 @@
 import type { Context } from 'hono'
+import type { ValidationIssue } from '../../utils/ark_validation.ts'
 import type { AuthInfo } from '../../utils/hono.ts'
 import dayjs from 'dayjs'
 import utc from 'dayjs/plugin/utc.js'
-import { z } from 'zod/mini'
+import { createSchema, makeIssue, safeParseSchema } from '../../utils/ark_validation.ts'
 import { honoFactory, quickError, simpleError, useCors } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
 import { cloudlog } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
+import { getRetryablePostgrestStatus, isRetryablePostgrestError, isRetryablePostgrestResult, retryWithBackoff } from '../../utils/retry.ts'
 import { supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
 import { isStripeConfigured } from '../../utils/utils.ts'
 import { buildDailyReportedCountsByName, convertCountsToPercentagesByName, fillMissingDailyCounts } from '../../utils/version_stats_helpers.ts'
@@ -17,16 +19,90 @@ export const app = honoFactory.createApp()
 app.use('*', useCors)
 app.use('*', middlewareV2(['all', 'read']))
 
-const bundleUsageSchema = z.object({
-  from: z.coerce.date(),
-  to: z.coerce.date(),
+function parseQueryDate(query: Record<string, string>, key: 'from' | 'to', issues: ValidationIssue[]): Date | undefined {
+  const value = query[key]
+  if (typeof value !== 'string') {
+    issues.push(makeIssue(`${key} is required`, [key]))
+    return undefined
+  }
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    issues.push(makeIssue(`${key} must be a valid date`, [key]))
+    return undefined
+  }
+
+  return parsed
+}
+
+function parseOptionalQueryBoolean(query: Record<string, string>, key: 'breakdown' | 'noAccumulate', issues: ValidationIssue[]): boolean | undefined {
+  const value = query[key]
+  if (value === undefined) {
+    return undefined
+  }
+
+  if (value === 'true') {
+    return true
+  }
+  if (value === 'false') {
+    return false
+  }
+
+  issues.push(makeIssue(`${key} must be true or false`, [key]))
+  return undefined
+}
+
+const bundleUsageSchema = createSchema<{ from: Date, to: Date }>((value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { issues: [makeIssue('Expected query object')] }
+  }
+
+  const query = value as Record<string, string>
+  const issues: ValidationIssue[] = []
+  const from = parseQueryDate(query, 'from', issues)
+  const to = parseQueryDate(query, 'to', issues)
+
+  if (issues.length > 0) {
+    return { issues }
+  }
+
+  return {
+    value: {
+      from: from!,
+      to: to!,
+    },
+  }
 })
 
-const normalStatsSchema = z.object({
-  from: z.coerce.date(),
-  to: z.coerce.date(),
-  breakdown: z.optional(z.coerce.boolean()),
-  noAccumulate: z.optional(z.coerce.boolean()), // Default to true for backward compatibility
+const normalStatsSchema = createSchema<{
+  from: Date
+  to: Date
+  breakdown?: boolean
+  noAccumulate?: boolean
+}>((value) => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { issues: [makeIssue('Expected query object')] }
+  }
+
+  const query = value as Record<string, string>
+  const issues: ValidationIssue[] = []
+  const from = parseQueryDate(query, 'from', issues)
+  const to = parseQueryDate(query, 'to', issues)
+  const breakdown = parseOptionalQueryBoolean(query, 'breakdown', issues)
+  const noAccumulate = parseOptionalQueryBoolean(query, 'noAccumulate', issues)
+
+  if (issues.length > 0) {
+    return { issues }
+  }
+
+  return {
+    value: {
+      from: from!,
+      to: to!,
+      breakdown,
+      noAccumulate,
+    },
+  }
 })
 
 interface AppUsageByVersion {
@@ -51,6 +127,19 @@ interface AppMetricRow {
   uninstall: number
 }
 
+interface QueryResult<T> {
+  data: T | null
+  error: unknown
+  status?: number | null
+}
+
+interface AppOwnerOrgRow {
+  owner_org: string | null
+}
+
+const STATS_QUERY_RETRY_ATTEMPTS = 3
+const STATS_QUERY_RETRY_DELAY_MS = 250
+
 // Helper to get authenticated supabase client based on auth type
 function getAuthenticatedSupabase(c: Context, auth: AuthInfo) {
   if (auth.authType === 'apikey' && auth.apikey) {
@@ -62,6 +151,124 @@ function getAuthenticatedSupabase(c: Context, auth: AuthInfo) {
     throw quickError(401, 'no_authorization', 'No authorization header')
   }
   return supabaseClient(c, authorization)
+}
+
+function denyAppLimitedApiKeyOutsideScope(auth: AuthInfo, appId: string) {
+  if (auth.authType !== 'apikey')
+    return
+
+  const limitedToApps = auth.apikey?.limited_to_apps
+  if (!Array.isArray(limitedToApps) || limitedToApps.length === 0)
+    return
+
+  // Deny before app lookups so real sibling apps and missing apps are indistinguishable to scoped keys.
+  if (!limitedToApps.includes(appId)) {
+    throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth.userId ?? null })
+  }
+}
+
+function isRetryableStatsError(error: unknown) {
+  return isRetryablePostgrestError(error)
+}
+
+function getMissingAppStatsError(errors: unknown[]) {
+  return errors.find((error) => {
+    if (!error || typeof error !== 'object')
+      return false
+
+    const appError = error as { app_id?: unknown, error?: unknown, status?: unknown }
+    return appError.error === 'app_not_found'
+      || (appError.status === 404 && typeof appError.app_id === 'string')
+  })
+}
+
+function isRetryableStatsResult(result: QueryResult<unknown>) {
+  return isRetryablePostgrestResult(result)
+}
+
+async function executeStatsQueryWithRetry<T>(
+  c: Context,
+  label: string,
+  query: () => Promise<QueryResult<T>>,
+): Promise<QueryResult<T>> {
+  const { result, lastError, attempts } = await retryWithBackoff(async () => {
+    try {
+      return await query()
+    }
+    catch (error) {
+      return { data: null, error }
+    }
+  }, {
+    attempts: STATS_QUERY_RETRY_ATTEMPTS,
+    baseDelayMs: STATS_QUERY_RETRY_DELAY_MS,
+    shouldRetry: current => isRetryableStatsResult(current),
+  })
+
+  const finalResult = result ?? { data: null, error: lastError }
+  if (attempts > 1) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'statistics query retried',
+      label,
+      attempts,
+      hasError: Boolean(finalResult.error),
+    })
+  }
+
+  return finalResult
+}
+
+async function resolveAppOwnerOrg(
+  c: Context,
+  appId: string,
+  supabase: ReturnType<typeof supabaseClient>,
+): Promise<{ ownerOrg: string | null, error: unknown, notFound: boolean }> {
+  const { data, error } = await executeStatsQueryWithRetry<AppOwnerOrgRow>(
+    c,
+    'statistics_app_lookup',
+    async () => await supabase
+      .from('apps')
+      .select('owner_org')
+      .eq('app_id', appId)
+      .maybeSingle() as QueryResult<AppOwnerOrgRow>,
+  )
+
+  if (error)
+    return { ownerOrg: null, error, notFound: false }
+
+  if (!data)
+    return { ownerOrg: null, error: null, notFound: true }
+
+  return { ownerOrg: data.owner_org ?? null, error: null, notFound: false }
+}
+
+async function getStatsAppOwnerOrgOrThrow(
+  c: Context,
+  auth: AuthInfo,
+  appId: string,
+  supabase: ReturnType<typeof supabaseClient>,
+) {
+  const { ownerOrg, error, notFound } = await resolveAppOwnerOrg(c, appId, supabase)
+
+  if (error)
+    throw quickError(500, 'cannot_get_app_statistics', 'Cannot get app statistics', { error })
+
+  if (notFound)
+    throw quickError(404, 'app_not_found', 'App not found', { app_id: appId })
+
+  if (ownerOrg && auth.authType !== 'jwt')
+    await checkOrganizationAccess(c, ownerOrg, supabase)
+
+  return ownerOrg
+}
+
+export const statisticsTestUtils = {
+  executeStatsQueryWithRetry,
+  getMissingAppStatsError,
+  getRetryableStatus: getRetryablePostgrestStatus,
+  isRetryableStatsError,
+  getStatsAppOwnerOrgOrThrow,
+  resolveAppOwnerOrg,
 }
 
 async function checkOrganizationAccess(c: Context, orgId: string, supabase: ReturnType<typeof supabaseClient>) {
@@ -96,10 +303,13 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
 
   let ownerOrgId = ownerOrg
   if (appId && !ownerOrgId) {
-    const { data, error } = await supabase.from('apps').select('*').eq('app_id', appId).single()
+    const { ownerOrg: resolvedOwnerOrg, error, notFound } = await resolveAppOwnerOrg(c, appId, supabase)
     if (error)
       return { data: null, error }
-    ownerOrgId = data.owner_org
+    if (notFound) {
+      return { data: null, error: { error: 'app_not_found', status: 404, app_id: appId } }
+    }
+    ownerOrgId = resolvedOwnerOrg
   }
 
   const startDate = dayjs(from).utc().format('YYYY-MM-DD')
@@ -109,19 +319,27 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
   let metricsError: unknown
 
   if (appId) {
-    ({ data: rawMetrics, error: metricsError } = await supabase.rpc('get_app_metrics' as any, {
-      p_org_id: ownerOrgId!,
-      p_app_id: appId,
-      p_start_date: startDate,
-      p_end_date: endDate,
-    }) as { data: AppMetricRow[] | null, error: unknown })
+    ({ data: rawMetrics, error: metricsError } = await executeStatsQueryWithRetry<AppMetricRow[]>(
+      c,
+      'get_app_metrics_for_app',
+      async () => await supabase.rpc('get_app_metrics' as any, {
+        p_org_id: ownerOrgId!,
+        p_app_id: appId,
+        p_start_date: startDate,
+        p_end_date: endDate,
+      }) as QueryResult<AppMetricRow[]>,
+    ))
   }
   else {
-    ({ data: rawMetrics, error: metricsError } = await supabase.rpc('get_app_metrics', {
-      org_id: ownerOrgId!,
-      start_date: startDate,
-      end_date: endDate,
-    }))
+    ({ data: rawMetrics, error: metricsError } = await executeStatsQueryWithRetry<AppMetricRow[]>(
+      c,
+      'get_app_metrics_for_org',
+      async () => await supabase.rpc('get_app_metrics', {
+        org_id: ownerOrgId!,
+        start_date: startDate,
+        end_date: endDate,
+      }) as QueryResult<AppMetricRow[]>,
+    ))
   }
 
   if (metricsError)
@@ -200,13 +418,18 @@ async function getNormalStats(c: Context, appId: string | null, ownerOrg: string
 
   if (storage.length !== 0) {
     // some magic, copied from the frontend without much understanding
-    const { data: currentStorageBytes, error: storageError } = await supabase.rpc(appId ? 'get_total_app_storage_size_orgs' : 'get_total_storage_size_org', appId ? { org_id: ownerOrgId!, app_id: appId } : { org_id: ownerOrgId! })
-      .single()
+    const { data: currentStorageBytes, error: storageError } = await executeStatsQueryWithRetry<number>(
+      c,
+      appId ? 'get_total_app_storage_size_orgs' : 'get_total_storage_size_org',
+      async () => await supabase
+        .rpc(appId ? 'get_total_app_storage_size_orgs' : 'get_total_storage_size_org', appId ? { org_id: ownerOrgId!, app_id: appId } : { org_id: ownerOrgId! })
+        .single() as QueryResult<number>,
+    )
     if (storageError)
       return { data: null, error: storageError }
 
     const storageVariance = storage.reduce((p, c) => (p + (c ?? 0)), 0)
-    const currentStorage = currentStorageBytes
+    const currentStorage = currentStorageBytes ?? 0
     const initValue = Math.max(0, (currentStorage - storageVariance + (storage[0] ?? 0)))
     storage[0] = initValue
   }
@@ -540,12 +763,14 @@ function getDaysBetweenDates(firstDate: Date, secondDate: Date) {
 app.get('/app/:app_id', async (c) => {
   const appId = c.req.param('app_id')
   const query = c.req.query()
-  const bodyParsed = normalStatsSchema.safeParse(query)
+  const bodyParsed = safeParseSchema(normalStatsSchema, query)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
   const auth = c.get('auth') as AuthInfo
+
+  denyAppLimitedApiKeyOutsideScope(auth, appId)
 
   // Use unified RBAC permission check
   if (!await checkPermission(c, 'app.read', { appId })) {
@@ -555,21 +780,12 @@ app.get('/app/:app_id', async (c) => {
   // Use authenticated client - RLS will enforce access
   const supabase = getAuthenticatedSupabase(c, auth)
 
-  // Get the organization ID for this app and check organization access
-  const { data: app } = await supabase
-    .from('apps')
-    .select('owner_org')
-    .eq('app_id', appId)
-    .single()
+  const ownerOrg = await getStatsAppOwnerOrgOrThrow(c, auth, appId, supabase)
 
-  if (app?.owner_org && auth.authType !== 'jwt') {
-    await checkOrganizationAccess(c, app.owner_org, supabase)
-  }
+  const { data: finalStats, error: statsError } = await getNormalStats(c, appId, ownerOrg, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt', false, body.noAccumulate ?? false)
 
-  const { data: finalStats, error } = await getNormalStats(c, appId, app?.owner_org ?? null, body.from, body.to, supabase, c.get('auth')?.authType === 'jwt', false, body.noAccumulate ?? false)
-
-  if (error) {
-    throw quickError(500, 'cannot_get_app_statistics', 'Cannot get app statistics', { error })
+  if (statsError) {
+    throw quickError(500, 'cannot_get_app_statistics', 'Cannot get app statistics', { error: statsError })
   }
 
   return c.json(finalStats)
@@ -579,7 +795,7 @@ app.get('/org/:org_id', async (c) => {
   const orgId = c.req.param('org_id')
   const query = c.req.query()
 
-  const bodyParsed = normalStatsSchema.safeParse(query)
+  const bodyParsed = safeParseSchema(normalStatsSchema, query)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
@@ -621,12 +837,14 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
   const query = c.req.query()
   const useDashboard = false
 
-  const bodyParsed = bundleUsageSchema.safeParse(query)
+  const bodyParsed = safeParseSchema(bundleUsageSchema, query)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
   const auth = c.get('auth') as AuthInfo
+
+  denyAppLimitedApiKeyOutsideScope(auth, appId)
 
   // Use unified RBAC permission check
   if (!await checkPermission(c, 'app.read', { appId })) {
@@ -636,16 +854,7 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
   // Use authenticated client - RLS will enforce access
   const supabase = getAuthenticatedSupabase(c, auth)
 
-  // Get the organization ID for this app and check organization access
-  const { data: app } = await supabase
-    .from('apps')
-    .select('owner_org')
-    .eq('app_id', appId)
-    .single()
-
-  if (app?.owner_org && auth.authType !== 'jwt') {
-    await checkOrganizationAccess(c, app.owner_org, supabase)
-  }
+  await getStatsAppOwnerOrgOrThrow(c, auth, appId, supabase)
 
   const { data, error } = await getBundleUsage(appId, body.from, body.to, useDashboard, supabase)
 
@@ -662,7 +871,7 @@ app.get('/user', async (c) => {
   const supabase = getAuthenticatedSupabase(c, auth)
 
   const query = c.req.query()
-  const bodyParsed = normalStatsSchema.safeParse(query)
+  const bodyParsed = safeParseSchema(normalStatsSchema, query)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
@@ -699,6 +908,10 @@ app.get('/user', async (c) => {
 
   const errors = stats.filter(stat => stat.error).map(stat => stat.error)
   if (errors.length > 0) {
+    const missingAppError = getMissingAppStatsError(errors)
+    if (missingAppError)
+      throw quickError(404, 'app_not_found', 'App not found', { error: missingAppError })
+
     throw quickError(500, 'cannot_get_user_statistics', 'Cannot get user statistics', { error: errors })
   }
 

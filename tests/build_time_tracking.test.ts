@@ -153,6 +153,7 @@ describe('build Time Tracking System', () => {
       p_build_id: randomUUID(),
       p_platform: 'ios',
       p_build_time_unit: 30,
+      p_app_id: APPNAME,
     })
     expect(error).toBeTruthy()
   })
@@ -186,6 +187,7 @@ describe('build Time Tracking System', () => {
         p_build_id: buildId,
         p_platform: 'ios',
         p_build_time_unit: 30,
+        p_app_id: APPNAME,
       }),
     })
     const after = await supabase
@@ -203,7 +205,6 @@ describe('build Time Tracking System', () => {
     const supabase = getSupabaseClient()
 
     // Insert high build time usage directly into daily_build_time
-    // (get_total_metrics reads from daily_build_time, not build_logs)
     // Solo plan limit is 1800 seconds (30 min), so we insert way over that
     const today = new Date().toISOString().split('T')[0]
     const { error: buildTimeInsertError } = await supabase
@@ -273,6 +274,7 @@ describe('build Time Tracking System', () => {
       p_build_id: excessiveBuildId,
       p_platform: 'ios',
       p_build_time_unit: 18000, // 5 hours, 2x multiplier = 10 hours billable
+      p_app_id: APPNAME,
     })
     expect(rpcError).toBeFalsy()
 
@@ -310,10 +312,8 @@ describe('build Time Tracking System', () => {
     expect(buildTimeExceededAfter).toBe(false)
   })
 
-  // Note: get_total_metrics reads from daily_build_time, not build_logs.
-  // build_logs are aggregated by a scheduled job, not synchronously.
-  // These tests verify record_build_time inserts into build_logs correctly (tested below).
-  // Testing get_total_metrics requires inserting into daily_build_time directly.
+  // Note: get_total_metrics reads from daily_build_time, which is now
+  // automatically populated via a trigger on build_logs inserts/updates.
 
   it('should correctly record build time using RPC function (iOS 2x multiplier)', async () => {
     const supabase = getSupabaseClient()
@@ -325,6 +325,7 @@ describe('build Time Tracking System', () => {
       p_build_id: buildId,
       p_platform: 'ios',
       p_build_time_unit: 600, // 10 minutes
+      p_app_id: APPNAME,
     })
     expect(rpcError).toBeFalsy()
 
@@ -348,6 +349,7 @@ describe('build Time Tracking System', () => {
       p_build_id: buildId,
       p_platform: 'android',
       p_build_time_unit: 150,
+      p_app_id: APPNAME,
     })
     expect(rpcError).toBeFalsy()
 
@@ -372,6 +374,7 @@ describe('build Time Tracking System', () => {
       p_build_id: buildId,
       p_platform: 'ios',
       p_build_time_unit: 600,
+      p_app_id: APPNAME,
     })
 
     // Second call with updated time
@@ -381,6 +384,7 @@ describe('build Time Tracking System', () => {
       p_build_id: buildId,
       p_platform: 'ios',
       p_build_time_unit: 700,
+      p_app_id: APPNAME,
     })
     expect(rpcError).toBeFalsy()
 
@@ -405,6 +409,7 @@ describe('build Time Tracking System', () => {
       p_build_id: buildId,
       p_platform: 'windows' as any,
       p_build_time_unit: 600,
+      p_app_id: APPNAME,
     })
     expect(error).toBeTruthy()
   })
@@ -419,6 +424,7 @@ describe('build Time Tracking System', () => {
       p_build_id: buildId,
       p_platform: 'ios',
       p_build_time_unit: -100,
+      p_app_id: APPNAME,
     })
     expect(error).toBeTruthy()
   })

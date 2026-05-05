@@ -1,12 +1,11 @@
 // channel self old function
 import type { Context } from 'hono'
-import type { ZodMiniObject } from 'zod/mini'
+import type { StandardSchema } from '../utils/ark_validation.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import type { DeviceLink } from '../utils/plugin_parser.ts'
 import type { Database } from '../utils/supabase.types.ts'
 import { parse } from '@std/semver'
 import { Hono } from 'hono/tiny'
-import { z } from 'zod/mini'
 import { getAppStatus, setAppStatus } from '../utils/appStatus.ts'
 import { checkChannelSelfIPRateLimit, isChannelSelfRateLimited, recordChannelSelfIPRequest, recordChannelSelfRequest } from '../utils/channelSelfRateLimit.ts'
 import { BRES, parseBody, simpleError200, simpleRateLimit } from '../utils/hono.ts'
@@ -15,9 +14,10 @@ import { sendNotifOrgCached } from '../utils/notifications.ts'
 import { sendNotifToOrgMembersCached } from '../utils/org_email_notifications.ts'
 import { closeClient, deleteChannelDevicePg, getAppByIdPg, getAppOwnerPostgres, getChannelByNamePg, getChannelDeviceOverridePg, getChannelsPg, getCompatibleChannelsPg, getDrizzleClient, getMainChannelsPg, getPgClient, setReplicationLagHeader, upsertChannelDevicePg } from '../utils/pg.ts'
 import { convertQueryToBody, makeDevice, parsePluginBody } from '../utils/plugin_parser.ts'
+import { channelSelfGetRequestSchema, channelSelfRequestSchema, isDevicePlatform } from '../utils/plugin_validation.ts'
 import { buildRateLimitInfo } from '../utils/rateLimitInfo.ts'
 import { sendStatsAndDevice } from '../utils/stats.ts'
-import { backgroundTask, deviceIdRegex, INVALID_STRING_APP_ID, INVALID_STRING_DEVICE_ID, isDeprecatedPluginVersion, isLimited, MISSING_STRING_APP_ID, MISSING_STRING_DEVICE_ID, MISSING_STRING_VERSION_BUILD, MISSING_STRING_VERSION_NAME, NON_STRING_APP_ID, NON_STRING_DEVICE_ID, NON_STRING_VERSION_BUILD, NON_STRING_VERSION_NAME, reverseDomainRegex } from '../utils/utils.ts'
+import { backgroundTask, isDeprecatedPluginVersion, isLimited } from '../utils/utils.ts'
 
 // Minimum versions for local channel storage behavior
 const CHANNEL_SELF_MIN_V5 = '5.34.0'
@@ -25,8 +25,6 @@ const CHANNEL_SELF_MIN_V6 = '6.34.0'
 const CHANNEL_SELF_MIN_V7 = '7.34.0'
 const CHANNEL_SELF_MIN_V8 = '8.0.0'
 
-z.config(z.locales.en())
-const devicePlatformScheme = z.enum(['ios', 'android', 'electron'])
 const PLAN_MAU_ACTIONS: Array<'mau'> = ['mau']
 
 async function assertChannelSelfIPRateLimit(c: Context, appId: string) {
@@ -140,39 +138,6 @@ function isChannelSelfLocalChannelStorageVersion(c: Context, body: DeviceLink, o
     return false
   }
 }
-
-export const jsonRequestSchema = z.looseObject({
-  app_id: z.string({
-    error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,
-  }).check(z.regex(reverseDomainRegex, { message: INVALID_STRING_APP_ID })),
-  device_id: z.string({
-    error: issue => issue.input === undefined ? MISSING_STRING_DEVICE_ID : NON_STRING_DEVICE_ID,
-  }).check(z.maxLength(36), z.regex(deviceIdRegex, { message: INVALID_STRING_DEVICE_ID })),
-  version_name: z.string({
-    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_NAME : NON_STRING_VERSION_NAME,
-  }),
-  version_build: z.string({
-    error: issue => issue.input === undefined ? MISSING_STRING_VERSION_BUILD : NON_STRING_VERSION_BUILD,
-  }),
-  is_emulator: z.boolean(),
-  defaultChannel: z.optional(z.string()),
-  channel: z.optional(z.string()),
-  plugin_version: z.optional(z.string()),
-  is_prod: z.boolean(),
-  platform: devicePlatformScheme,
-  key_id: z.optional(z.string().check(z.maxLength(20))),
-})
-
-// TODO: delete when all migrated to jsonRequestSchema
-export const jsonRequestSchemaGet = z.looseObject({
-  app_id: z.string({
-    error: issue => issue.input === undefined ? MISSING_STRING_APP_ID : NON_STRING_APP_ID,
-  }).check(z.regex(reverseDomainRegex, { message: INVALID_STRING_APP_ID })),
-  is_emulator: z.boolean(),
-  is_prod: z.boolean(),
-  platform: devicePlatformScheme,
-  key_id: z.optional(z.string().check(z.maxLength(20))),
-})
 
 async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient>, body: DeviceLink): Promise<Response> {
   cloudlog({ requestId: c.get('requestId'), message: 'post channel self body', body })
@@ -395,14 +360,14 @@ async function put(c: Context, drizzleClient: ReturnType<typeof getDrizzleClient
     return simpleError200(c, 'channel_not_found', 'Cannot find channel')
   }
 
-  const devicePlatform = devicePlatformScheme.safeParse(body.platform)
-  if (!devicePlatform.success) {
+  if (!isDevicePlatform(body.platform)) {
     return simpleError200(c, 'invalid_platform', 'Invalid device platform', { platform: body.platform })
   }
 
+  const platform = body.platform
   const finalChannel = defaultChannel
     ? dataChannel.find((channel: { name: string }) => channel.name === defaultChannel)
-    : dataChannel.find((channel: { ios: boolean, android: boolean, electron: boolean }) => channel[devicePlatform.data])
+    : dataChannel.find((channel: { ios: boolean, android: boolean, electron: boolean }) => channel[platform])
 
   if (!finalChannel) {
     return simpleError200(c, 'channel_not_found', 'Cannot find channel')
@@ -534,7 +499,7 @@ async function parseChannelSelfPluginRequest(
   c: Context,
   body: DeviceLink,
   logMessage: string,
-  schema: ZodMiniObject,
+  schema: StandardSchema<DeviceLink>,
   requireDevice = true,
 ): Promise<{ response: Response } | { body: DeviceLink, bodyParsed: DeviceLink }> {
   cloudlog({ requestId: c.get('requestId'), message: logMessage, body })
@@ -560,6 +525,7 @@ async function runChannelSelfWithPgClient(
   record: () => Promise<void>,
 ) {
   await setReplicationLagHeader(c, pgClient)
+
   try {
     return await run(getDrizzleClient(pgClient as any))
   }
@@ -573,7 +539,7 @@ export const app = new Hono<MiddlewareKeyVariables>()
 
 app.post('/', async (c) => {
   const body = await parseBody<DeviceLink>(c)
-  const parsed = await parseChannelSelfPluginRequest(c, body, 'post body', jsonRequestSchema)
+  const parsed = await parseChannelSelfPluginRequest(c, body, 'post body', channelSelfRequestSchema)
   if ('response' in parsed) {
     return parsed.response
   }
@@ -607,7 +573,7 @@ app.post('/', async (c) => {
 app.put('/', async (c) => {
   // TODO: Used as get, should be refactor with query param instead
   const body = await parseBody<DeviceLink>(c)
-  const parsed = await parseChannelSelfPluginRequest(c, body, 'put body', jsonRequestSchema)
+  const parsed = await parseChannelSelfPluginRequest(c, body, 'put body', channelSelfRequestSchema)
   if ('response' in parsed) {
     return parsed.response
   }
@@ -636,7 +602,7 @@ app.put('/', async (c) => {
 
 app.delete('/', async (c) => {
   const body = convertQueryToBody(c.req.query())
-  const parsed = await parseChannelSelfPluginRequest(c, body, 'delete body', jsonRequestSchema)
+  const parsed = await parseChannelSelfPluginRequest(c, body, 'delete body', channelSelfRequestSchema)
   if ('response' in parsed) {
     return parsed.response
   }
@@ -666,7 +632,7 @@ app.delete('/', async (c) => {
 
 app.get('/', async (c) => {
   const body = convertQueryToBody(c.req.query())
-  const parsed = await parseChannelSelfPluginRequest(c, body, 'list compatible channels', jsonRequestSchemaGet, false)
+  const parsed = await parseChannelSelfPluginRequest(c, body, 'list compatible channels', channelSelfGetRequestSchema as StandardSchema<DeviceLink>, false)
   if ('response' in parsed) {
     return parsed.response
   }

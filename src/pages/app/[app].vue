@@ -198,7 +198,14 @@ watchEffect(async () => {
           </div>
           <DeploymentBanner v-if="!appNotFound" :app-id="id" @deployed="refreshData" />
           <ReleaseBanner v-if="!appNotFound" :app-id="id" />
-          <Usage v-if="!lacksSecurityAccess" ref="usageComponent" :app-id="id" :force-demo="appNotFound" />
+          <Usage
+            v-if="!lacksSecurityAccess"
+            ref="usageComponent"
+            :app-id="id"
+            :app-stats-updated-at="app?.stats_updated_at ?? null"
+            :app-stats-refresh-requested-at="app?.stats_refresh_requested_at ?? null"
+            :force-demo="appNotFound"
+          />
 
           <!-- Charts section -->
           <div class="grid grid-cols-1 gap-6 mb-6 sm:grid-cols-12 xl:grid-cols-12">
@@ -206,6 +213,7 @@ watchEffect(async () => {
               :app-id="id"
               :use-billing-period="usageComponent?.useBillingPeriod ?? true"
               :accumulated="(usageComponent?.useBillingPeriod ?? true) && (usageComponent?.showCumulative ?? false)"
+              :reload-trigger="usageComponent?.reloadTrigger ?? 0"
               :force-demo="appNotFound"
               class="col-span-full sm:col-span-6 xl:col-span-4"
             />
@@ -213,6 +221,7 @@ watchEffect(async () => {
               :app-id="id"
               :use-billing-period="usageComponent?.useBillingPeriod ?? true"
               :accumulated="(usageComponent?.useBillingPeriod ?? true) && (usageComponent?.showCumulative ?? false)"
+              :reload-trigger="usageComponent?.reloadTrigger ?? 0"
               :force-demo="appNotFound"
               class="col-span-full sm:col-span-6 xl:col-span-4"
             />
@@ -220,6 +229,7 @@ watchEffect(async () => {
               :app-id="id"
               :use-billing-period="usageComponent?.useBillingPeriod ?? true"
               :accumulated="(usageComponent?.useBillingPeriod ?? true) && (usageComponent?.showCumulative ?? false)"
+              :reload-trigger="usageComponent?.reloadTrigger ?? 0"
               :force-demo="appNotFound"
               class="col-span-full sm:col-span-6 xl:col-span-4"
             />
