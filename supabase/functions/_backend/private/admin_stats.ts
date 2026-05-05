@@ -1,7 +1,8 @@
 import type Stripe from 'stripe'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import { type } from 'arktype'
 import { Hono } from 'hono/tiny'
-import { z } from 'zod/mini'
+import { literalUnion, safeParseSchema } from '../utils/ark_validation.ts'
 import { getAdminAppsTrend, getAdminBandwidthTrend, getAdminBundlesTrend, getAdminDistributionMetrics, getAdminFailureMetrics, getAdminMauTrend, getAdminOrgMetrics, getAdminPlatformOverview, getAdminStorageTrend, getAdminSuccessRate, getAdminSuccessRateTrend, getAdminUploadMetrics } from '../utils/cloudflare.ts'
 import { middlewareAuth, parseBody, simpleError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
@@ -14,14 +15,70 @@ export const MAX_ADMIN_STATS_OFFSET = 100_000
 const ISO_UTC_DATETIME_REGEX = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/
 const INVALID_ADMIN_STATS_DATE = 'Expected ISO 8601 UTC datetime string'
 
-export const adminStatsBodySchema = z.object({
-  metric_category: z.enum(['uploads', 'distribution', 'failures', 'success_rate', 'platform_overview', 'org_metrics', 'mau_trend', 'success_rate_trend', 'apps_trend', 'bundles_trend', 'deployments_trend', 'storage_trend', 'bandwidth_trend', 'global_stats_trend', 'plugin_breakdown', 'trial_organizations', 'onboarding_funnel', 'cancelled_users', 'email_type_breakdown', 'customer_country_breakdown']),
-  start_date: z.string().check(z.minLength(1), z.regex(ISO_UTC_DATETIME_REGEX, { message: INVALID_ADMIN_STATS_DATE })),
-  end_date: z.string().check(z.minLength(1), z.regex(ISO_UTC_DATETIME_REGEX, { message: INVALID_ADMIN_STATS_DATE })),
-  app_id: z.optional(z.string().check(z.minLength(1))),
-  org_id: z.optional(z.string().check(z.minLength(1))),
-  limit: z.optional(z.number().check(z.int(), z.minimum(1), z.maximum(MAX_ADMIN_STATS_LIMIT))),
-  offset: z.optional(z.number().check(z.int(), z.minimum(0), z.maximum(MAX_ADMIN_STATS_OFFSET))),
+const metricCategories = [
+  'uploads',
+  'distribution',
+  'failures',
+  'success_rate',
+  'platform_overview',
+  'org_metrics',
+  'mau_trend',
+  'success_rate_trend',
+  'apps_trend',
+  'bundles_trend',
+  'deployments_trend',
+  'storage_trend',
+  'bandwidth_trend',
+  'global_stats_trend',
+  'plugin_breakdown',
+  'trial_organizations',
+  'onboarding_funnel',
+  'cancelled_users',
+  'email_type_breakdown',
+  'customer_country_breakdown',
+] as const
+
+const isoUtcDatetimeSchema = type('string').narrow((value, ctx) => {
+  if (value.length === 0 || !ISO_UTC_DATETIME_REGEX.test(value)) {
+    return ctx.reject({
+      expected: INVALID_ADMIN_STATS_DATE,
+      actual: JSON.stringify(value),
+    })
+  }
+
+  return true
+})
+
+const limitSchema = type('number.integer >= 1').narrow((value, ctx) => {
+  if (value > MAX_ADMIN_STATS_LIMIT) {
+    return ctx.reject({
+      expected: `a value <= ${MAX_ADMIN_STATS_LIMIT}`,
+      actual: JSON.stringify(value),
+    })
+  }
+
+  return true
+})
+
+const offsetSchema = type('number.integer >= 0').narrow((value, ctx) => {
+  if (value > MAX_ADMIN_STATS_OFFSET) {
+    return ctx.reject({
+      expected: `a value <= ${MAX_ADMIN_STATS_OFFSET}`,
+      actual: JSON.stringify(value),
+    })
+  }
+
+  return true
+})
+
+export const adminStatsBodySchema = type({
+  'metric_category': literalUnion(metricCategories),
+  'start_date': isoUtcDatetimeSchema,
+  'end_date': isoUtcDatetimeSchema,
+  'app_id?': 'string > 0',
+  'org_id?': 'string > 0',
+  'limit?': limitSchema,
+  'offset?': offsetSchema,
 })
 
 interface AdminStatsBody {
@@ -82,7 +139,7 @@ app.post('/', middlewareAuth, async (c) => {
     throw simpleError('not_authorized', 'Not authorized')
 
   const body = await parseBody<AdminStatsBody>(c)
-  const parsedBodyResult = adminStatsBodySchema.safeParse(body)
+  const parsedBodyResult = safeParseSchema(adminStatsBodySchema, body)
   if (!parsedBodyResult.success) {
     throw simpleError('invalid_json_body', 'Invalid json body', { body, parsedBodyResult })
   }

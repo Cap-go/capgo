@@ -9,6 +9,7 @@ import VueTurnstile from 'vue-turnstile'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import { authGhostButtonClass, authInsetCardClass, authPanelClass, authPrimaryButtonClass, authSecondaryButtonClass } from '~/components/auth/pageStyles'
+import { getRecentEmailOtpVerification } from '~/services/emailOtp'
 import { hideLoader } from '~/services/loader'
 import { useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
@@ -50,6 +51,22 @@ async function checkEmailVerification() {
   }
   isEmailVerified.value = !!sessionResult?.session?.user?.email_confirmed_at
   isLoadingSession.value = false
+}
+
+async function ensureRecentEmailVerification(userId: string) {
+  try {
+    const { isVerified } = await getRecentEmailOtpVerification(supabase, userId)
+    if (isVerified)
+      return true
+  }
+  catch (error) {
+    console.error('Cannot load email OTP verification state', error)
+    toast.error(t('something-went-wrong-try-again-later'))
+    return false
+  }
+
+  await redirectToEmailVerification()
+  return false
 }
 
 async function deleteAccount() {
@@ -105,6 +122,11 @@ async function deleteAccount() {
             if (!user) {
               isLoading.value = false
               return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
+            }
+
+            if (!await ensureRecentEmailVerification(userId)) {
+              isLoading.value = false
+              return false
             }
 
             // Delete user using RPC function
@@ -190,6 +212,18 @@ async function submit(form: { email: string, password: string }) {
     toast.error(t('invalid-auth'))
   }
   else {
+    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims()
+    const userId = claimsData?.claims?.sub
+    if (claimsError || !userId) {
+      isLoading.value = false
+      return setErrors('delete-account', [t('something-went-wrong-try-again-later')], {})
+    }
+
+    if (!await ensureRecentEmailVerification(userId)) {
+      isLoading.value = false
+      return
+    }
+
     pendingEmail.value = form.email
     pendingPassword.value = form.password
     turnstileToken.value = ''

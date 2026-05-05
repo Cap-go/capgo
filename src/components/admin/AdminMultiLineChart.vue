@@ -44,6 +44,18 @@ const props = defineProps({
     type: String,
     default: '',
   },
+  beginAtZero: {
+    type: Boolean,
+    default: true,
+  },
+  suggestedMin: {
+    type: Number,
+    default: undefined,
+  },
+  suggestedMax: {
+    type: Number,
+    default: undefined,
+  },
 })
 
 const isDark = useDark()
@@ -158,7 +170,9 @@ const chartOptions = computed<ChartOptions<'line'>>(() => ({
       },
     },
     y: {
-      beginAtZero: true,
+      beginAtZero: props.beginAtZero,
+      suggestedMin: props.suggestedMin,
+      suggestedMax: props.suggestedMax,
       grid: {
         color: isDark.value ? 'rgba(75, 85, 99, 0.3)' : 'rgba(229, 231, 235, 0.8)',
       },

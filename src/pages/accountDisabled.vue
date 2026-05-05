@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
-import { authGhostButtonClass, authPrimaryButtonClass } from '~/components/auth/pageStyles'
+import { useRoute, useRouter } from 'vue-router'
+import { toast } from 'vue-sonner'
+import { authGhostButtonClass, authPrimaryButtonClass, authSecondaryButtonClass } from '~/components/auth/pageStyles'
 import { useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
+const route = useRoute()
 const router = useRouter()
 const main = useMainStore()
 const supabase = useSupabase()
@@ -21,7 +23,46 @@ const deletionDate = ref<Date | null>(null)
 const currentTime = ref(new Date())
 const loading = ref(true)
 const error = ref<string | null>(null)
+const isRestoring = ref(false)
 let intervalId: NodeJS.Timeout | null = null
+
+const restoreTarget = computed(() => {
+  const target = typeof route.query.to === 'string' ? route.query.to : ''
+  if (target.startsWith('/') && target !== '/accountDisabled')
+    return target
+  return '/dashboard'
+})
+
+async function handleRestore() {
+  if (isRestoring.value)
+    return
+
+  isRestoring.value = true
+
+  try {
+    const { error: restoreError } = await supabase.rpc('restore_deleted_account')
+    if (restoreError) {
+      console.error('Error restoring deleted account:', restoreError)
+      if (restoreError.message?.includes('reauth_required')) {
+        toast.error(t('account-restore-reauth-required'))
+      }
+      else {
+        toast.error(t('account-restore-failed'))
+      }
+      return
+    }
+
+    toast.success(t('account-restored-successfully'))
+    await router.replace(restoreTarget.value)
+  }
+  catch (restoreError) {
+    console.error('Error restoring deleted account:', restoreError)
+    toast.error(t('account-restore-failed'))
+  }
+  finally {
+    isRestoring.value = false
+  }
+}
 
 // Use i18n component interpolation in the template; no HTML parsing here
 
@@ -108,7 +149,10 @@ const timeRemaining = computed(() => {
     :card-title="t('account-deletion-requested')"
   >
     <div class="space-y-5 text-center text-slate-500 dark:text-slate-300">
-      <i18n-t keypath="account-deletion-restore" tag="p" class="text-sm leading-6">
+      <p class="text-sm leading-6">
+        {{ t('account-deletion-restore') }}
+      </p>
+      <i18n-t keypath="account-deletion-support" tag="p" class="text-sm leading-6">
         <template #link>
           <a
             href="https://support.capgo.app/"
@@ -128,7 +172,11 @@ const timeRemaining = computed(() => {
         </p>
       </div>
 
-      <button :class="authPrimaryButtonClass" @click="handleLogout">
+      <button :class="authPrimaryButtonClass" :disabled="isRestoring" :aria-busy="isRestoring ? 'true' : 'false'" @click="handleRestore">
+        {{ isRestoring ? t('restoring-account') : t('restore-account') }}
+      </button>
+
+      <button :class="authSecondaryButtonClass" @click="handleLogout">
         {{ t('sign-out') }}
       </button>
     </div>

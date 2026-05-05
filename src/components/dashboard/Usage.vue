@@ -3,7 +3,7 @@ import type { Database } from '~/types/supabase.types'
 import dayjs from 'dayjs'
 import { storeToRefs } from 'pinia'
 import colors from 'tailwindcss/colors'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import ArrowPathIconSolid from '~icons/heroicons/arrow-path-solid'
@@ -12,6 +12,19 @@ import CalendarDaysIcon from '~icons/heroicons/calendar-days'
 import ChartBarIcon from '~icons/heroicons/chart-bar'
 import InformationInfo from '~icons/heroicons/information-circle'
 import { bytesToGb, getDaysBetweenDates } from '~/services/conversion'
+import {
+  CHART_REFRESH_POLL_MS,
+  CHART_REFRESH_TIMEOUT_MS,
+  fetchAppChartRefreshState,
+  fetchOrgChartRefreshState,
+  isChartDataStale,
+  isChartRefreshInProgress,
+  isOrgCacheReadyForRefresh,
+  requestAppChartRefresh,
+  requestOrgChartRefresh,
+  shouldAutoRequestChartRefresh,
+} from '~/services/dashboardRefresh'
+import { formatUtcDateTimeAsLocal } from '~/services/date'
 import { DEMO_APP_NAMES, generateDemoBandwidthData, generateDemoMauData, generateDemoStorageData } from '~/services/demoChartData'
 import { getPlans, useSupabase } from '~/services/supabase'
 import { useDashboardAppsStore } from '~/stores/dashboardApps'
@@ -24,6 +37,8 @@ import UsageCard from './UsageCard.vue'
 
 const props = defineProps<{
   appId?: string
+  appStatsRefreshRequestedAt?: string | null
+  appStatsUpdatedAt?: string | null
   forceDemo?: boolean
 }>()
 
@@ -104,10 +119,39 @@ const main = useMainStore()
 const organizationStore = useOrganizationStore()
 const dashboardAppsStore = useDashboardAppsStore()
 const dialogStore = useDialogV2Store()
+const localOrgStatsUpdatedAt = ref<string | null>(null)
+const localOrgStatsRefreshRequestedAt = ref<string | null>(null)
+const localAppStatsUpdatedAt = ref<string | null>(props.appStatsUpdatedAt ?? null)
+const localAppStatsRefreshRequestedAt = ref<string | null>(props.appStatsRefreshRequestedAt ?? null)
+const refreshStateClock = ref(Date.now())
+const isRefreshPolling = ref(false)
+const autoRefreshScopeKey = ref<string | null>(null)
+let refreshPollTimer: ReturnType<typeof setTimeout> | null = null
+let refreshPollStartedAt = 0
+let refreshClockTimer: ReturnType<typeof setInterval> | null = null
 const effectiveOrganization = computed(() => {
   if (props.appId)
     return organizationStore.getOrgByAppId(props.appId) ?? organizationStore.currentOrganization
   return organizationStore.currentOrganization
+})
+
+const currentScopeKey = computed(() => props.appId
+  ? `app:${props.appId}`
+  : `org:${effectiveOrganization.value?.gid ?? 'none'}`)
+const scopeStatsUpdatedAt = computed(() => props.appId ? localAppStatsUpdatedAt.value : localOrgStatsUpdatedAt.value)
+const scopeStatsRefreshRequestedAt = computed(() => props.appId ? localAppStatsRefreshRequestedAt.value : localOrgStatsRefreshRequestedAt.value)
+const isCurrentScopeRefreshing = computed(() => isChartRefreshInProgress(scopeStatsRefreshRequestedAt.value, scopeStatsUpdatedAt.value, refreshStateClock.value))
+const isCurrentScopeStale = computed(() => isChartDataStale(scopeStatsUpdatedAt.value, refreshStateClock.value))
+const hasRefreshableScope = computed(() => {
+  if (props.forceDemo)
+    return false
+  if (props.appId)
+    return !!props.appId
+  if (!effectiveOrganization.value?.gid || !dashboardAppsStore.isLoaded)
+    return false
+  if (dashboardAppsStore.appIds.length === 0)
+    return false
+  return true
 })
 
 const { dashboard } = storeToRefs(main)
@@ -121,22 +165,12 @@ const subscriptionAnchorEnd = computed(() => {
   return end ? dayjs(end).format('YYYY/MM/D') : t('unknown')
 })
 const lastRunDisplay = computed(() => {
-  const source = effectiveOrganization.value?.stats_updated_at
-  return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
+  const source = scopeStatsUpdatedAt.value
+  return formatUtcDateTimeAsLocal(source) || t('unknown')
 })
 const nextRunDisplay = computed(() => {
   const source = effectiveOrganization.value?.next_stats_update_at
   return source ? dayjs(source).format('MMMM D, YYYY HH:mm') : t('unknown')
-})
-const dashboardOverviewSummary = computed(() => {
-  return useBillingPeriod.value
-    ? t('dashboard-overview-billing-copy')
-    : t('dashboard-overview-thirty-day-copy')
-})
-const dashboardOverviewMode = computed(() => {
-  return showCumulative.value && useBillingPeriod.value
-    ? t('dashboard-overview-cumulative-copy')
-    : t('dashboard-overview-daily-copy')
 })
 
 // Confirmation logic for cumulative mode in 30-day view
@@ -204,6 +238,162 @@ function clearDashboardParams() {
   router.replace({ query })
 }
 
+function touchRefreshStateClock(now: number = Date.now()) {
+  refreshStateClock.value = now
+}
+
+function syncLocalOrgRefreshState(state: { stats_refresh_requested_at: string | null, stats_updated_at: string | null }) {
+  touchRefreshStateClock()
+  localOrgStatsUpdatedAt.value = state.stats_updated_at ?? null
+  localOrgStatsRefreshRequestedAt.value = state.stats_refresh_requested_at ?? null
+
+  if (effectiveOrganization.value) {
+    effectiveOrganization.value.stats_updated_at = state.stats_updated_at
+    effectiveOrganization.value.stats_refresh_requested_at = state.stats_refresh_requested_at
+  }
+}
+
+function clearUsageCaches() {
+  const currentOrgId = effectiveOrganization.value?.gid ?? null
+  const cacheKey = `${currentOrgId ?? 'none'}:${props.appId ?? 'org'}`
+  cacheByOrg.delete(cacheKey)
+  cacheByOrgByApp.delete(cacheKey)
+}
+
+function stopRefreshPolling() {
+  touchRefreshStateClock()
+  if (refreshPollTimer !== null) {
+    clearTimeout(refreshPollTimer)
+    refreshPollTimer = null
+  }
+  isRefreshPolling.value = false
+}
+
+async function reloadChartsAfterRefresh() {
+  clearUsageCaches()
+  await reloadAllCharts()
+}
+
+async function pollRefreshState() {
+  touchRefreshStateClock()
+  try {
+    if (props.appId) {
+      const appState = await fetchAppChartRefreshState(props.appId)
+      localAppStatsUpdatedAt.value = appState.stats_updated_at ?? null
+      localAppStatsRefreshRequestedAt.value = appState.stats_refresh_requested_at ?? null
+
+      const orgState = await fetchOrgChartRefreshState(appState.owner_org)
+      syncLocalOrgRefreshState(orgState)
+
+      const appSettled = !isChartRefreshInProgress(appState.stats_refresh_requested_at, appState.stats_updated_at)
+      const orgCacheReady = isOrgCacheReadyForRefresh(orgState.stats_updated_at, appState.stats_refresh_requested_at)
+      if (appSettled && orgCacheReady) {
+        stopRefreshPolling()
+        await reloadChartsAfterRefresh()
+        return
+      }
+    }
+    else {
+      const orgId = effectiveOrganization.value?.gid
+      if (!orgId) {
+        stopRefreshPolling()
+        return
+      }
+
+      const orgState = await fetchOrgChartRefreshState(orgId)
+      syncLocalOrgRefreshState(orgState)
+
+      const orgSettled = !isChartRefreshInProgress(orgState.stats_refresh_requested_at, orgState.stats_updated_at)
+      const orgCacheReady = isOrgCacheReadyForRefresh(orgState.stats_updated_at, orgState.stats_refresh_requested_at)
+      if (orgSettled && orgCacheReady) {
+        stopRefreshPolling()
+        await reloadChartsAfterRefresh()
+        return
+      }
+    }
+  }
+  catch (error) {
+    console.error('Error polling chart refresh state:', error)
+  }
+
+  if (Date.now() - refreshPollStartedAt >= CHART_REFRESH_TIMEOUT_MS) {
+    stopRefreshPolling()
+    return
+  }
+
+  refreshPollTimer = setTimeout(() => {
+    void pollRefreshState()
+  }, CHART_REFRESH_POLL_MS)
+}
+
+function startRefreshPolling() {
+  touchRefreshStateClock()
+  stopRefreshPolling()
+  isRefreshPolling.value = true
+  refreshPollStartedAt = Date.now()
+  refreshPollTimer = setTimeout(() => {
+    void pollRefreshState()
+  }, CHART_REFRESH_POLL_MS)
+}
+
+async function queueScopeRefresh(auto = false): Promise<boolean> {
+  if (!hasRefreshableScope.value || props.forceDemo || isRefreshPolling.value)
+    return false
+
+  try {
+    if (props.appId) {
+      const result = await requestAppChartRefresh(props.appId)
+      localAppStatsRefreshRequestedAt.value = result.requested_at
+      touchRefreshStateClock()
+
+      if (result.requested_at && isChartRefreshInProgress(result.requested_at, localAppStatsUpdatedAt.value, refreshStateClock.value)) {
+        startRefreshPolling()
+        return true
+      }
+    }
+    else {
+      const orgId = effectiveOrganization.value?.gid
+      if (!orgId)
+        return false
+
+      const result = await requestOrgChartRefresh(orgId)
+      syncLocalOrgRefreshState({
+        stats_updated_at: localOrgStatsUpdatedAt.value,
+        stats_refresh_requested_at: result.requested_at,
+      })
+
+      if (result.requested_at && isChartRefreshInProgress(result.requested_at, localOrgStatsUpdatedAt.value, refreshStateClock.value)) {
+        startRefreshPolling()
+        return true
+      }
+    }
+
+    if (!auto) {
+      await reloadChartsAfterRefresh()
+    }
+    return false
+  }
+  catch (error) {
+    console.error('Error requesting chart refresh:', error)
+    if (auto) {
+      autoRefreshScopeKey.value = null
+    }
+    return false
+  }
+}
+
+async function handleReloadClick() {
+  if (props.forceDemo || !hasRefreshableScope.value || (!isCurrentScopeStale.value && !isCurrentScopeRefreshing.value)) {
+    await reloadChartsAfterRefresh()
+    return
+  }
+
+  if (isCurrentScopeRefreshing.value || isRefreshPolling.value)
+    return
+
+  await queueScopeRefresh()
+}
+
 // Function to reload all chart data
 async function reloadAllCharts() {
   // Force reload of main dashboard data
@@ -234,6 +424,7 @@ async function reloadAllCharts() {
 // Expose function and state for parent components
 defineExpose({
   clearDashboardParams,
+  reloadTrigger,
   useBillingPeriod,
   showCumulative,
 })
@@ -661,7 +852,76 @@ watch(() => route.query, (newQuery) => {
   }
 }, { deep: true })
 
+watch(() => props.appStatsUpdatedAt, (value) => {
+  touchRefreshStateClock()
+  localAppStatsUpdatedAt.value = value ?? null
+}, { immediate: true })
+
+watch(() => props.appStatsRefreshRequestedAt, (value) => {
+  touchRefreshStateClock()
+  localAppStatsRefreshRequestedAt.value = value ?? null
+}, { immediate: true })
+
+watch(() => [
+  effectiveOrganization.value?.gid ?? null,
+  effectiveOrganization.value?.stats_updated_at ?? null,
+  effectiveOrganization.value?.stats_refresh_requested_at ?? null,
+], ([, updatedAt, requestedAt]) => {
+  syncLocalOrgRefreshState({
+    stats_refresh_requested_at: requestedAt,
+    stats_updated_at: updatedAt,
+  })
+}, { immediate: true })
+
+watch(currentScopeKey, (_newKey, oldKey) => {
+  if (oldKey && oldKey !== _newKey) {
+    autoRefreshScopeKey.value = null
+  }
+  stopRefreshPolling()
+})
+
+watch(isCurrentScopeStale, (isStale) => {
+  if (!isStale) {
+    autoRefreshScopeKey.value = null
+  }
+})
+
+watch(() => ({
+  canRefresh: hasRefreshableScope.value,
+  forceDemo: !!props.forceDemo,
+  key: currentScopeKey.value,
+  now: refreshStateClock.value,
+  shouldAutoRequest: shouldAutoRequestChartRefresh(
+    scopeStatsUpdatedAt.value,
+    scopeStatsRefreshRequestedAt.value,
+    refreshStateClock.value,
+  ),
+}), async (state) => {
+  if (!state.canRefresh || state.forceDemo || !state.shouldAutoRequest)
+    return
+  if (autoRefreshScopeKey.value === state.key)
+    return
+
+  autoRefreshScopeKey.value = state.key
+  await queueScopeRefresh(true)
+}, { immediate: true })
+
+watch(() => ({
+  canRefresh: hasRefreshableScope.value,
+  key: currentScopeKey.value,
+  refreshing: isCurrentScopeRefreshing.value,
+}), (state) => {
+  if (!state.canRefresh || !state.refreshing || isRefreshPolling.value)
+    return
+
+  startRefreshPolling()
+}, { immediate: true })
+
 onMounted(async () => {
+  refreshClockTimer = setInterval(() => {
+    touchRefreshStateClock()
+  }, CHART_REFRESH_POLL_MS)
+
   // If forceDemo is true, load immediately with demo data
   if (props.forceDemo) {
     loadData()
@@ -679,162 +939,123 @@ onMounted(async () => {
   // If dashboard not fetched yet, the watcher on 'dashboard' will handle loading
   // and will check needsForceRefresh there
 })
+
+onBeforeUnmount(() => {
+  if (refreshClockTimer !== null) {
+    clearInterval(refreshClockTimer)
+    refreshClockTimer = null
+  }
+  stopRefreshPolling()
+})
 </script>
 
 <template>
   <!-- View Mode Selectors -->
   <div v-if="!noData" class="mb-4">
-    <div class="relative overflow-hidden rounded-[2rem] border border-slate-200/80 bg-gradient-to-br from-white via-slate-50 to-sky-50/70 p-5 shadow-[0_24px_70px_-42px_rgba(15,23,42,0.28)] dark:border-slate-700/70 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/80 dark:shadow-[0_24px_70px_-42px_rgba(2,6,23,0.7)] sm:p-6">
-      <div class="pointer-events-none absolute inset-y-0 right-0 w-2/5 bg-[radial-gradient(circle_at_top_right,rgba(17,158,255,0.16),transparent_62%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(17,158,255,0.2),transparent_64%)]" />
-      <div class="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-        <div class="max-w-3xl">
-          <div class="inline-flex flex-wrap items-center gap-2">
-            <span class="rounded-full bg-slate-900 px-3 py-1 text-[0.68rem] font-semibold tracking-[0.24em] text-white uppercase dark:bg-slate-100 dark:text-slate-900">
-              {{ t('dashboard-overview-kicker') }}
-            </span>
-            <span class="rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs font-medium text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
-              {{ useBillingPeriod ? t('billing-period') : t('last-30-days') }}
-            </span>
-            <span class="rounded-full border border-slate-200 bg-white/80 px-3 py-1 text-xs font-medium text-slate-500 shadow-sm dark:border-slate-700 dark:bg-slate-900/70 dark:text-slate-300">
-              {{ showCumulative && useBillingPeriod ? t('cumulative') : t('daily') }}
-            </span>
-          </div>
-          <h2 class="mt-4 text-2xl font-semibold tracking-tight text-slate-900 dark:text-white sm:text-3xl">
-            {{ t('dashboard-overview-title') }}
-          </h2>
-          <p class="mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">
-            {{ dashboardOverviewSummary }}
-          </p>
-          <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-            {{ dashboardOverviewMode }}
-          </p>
-        </div>
-
-        <div class="grid gap-3 sm:grid-cols-3 xl:min-w-[34rem]">
-          <div class="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-sm backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/70">
-            <div class="flex items-start gap-3">
-              <div class="mt-1 h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
-              <div>
-                <p class="text-[0.7rem] font-semibold tracking-[0.24em] text-slate-400 uppercase dark:text-slate-500">
-                  {{ t('last-run') }}
-                </p>
-                <p class="mt-2 text-sm font-medium leading-6 text-slate-800 dark:text-slate-100">
-                  {{ lastRunDisplay }}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div class="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-sm backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/70">
-            <div class="flex items-start gap-3">
-              <div class="mt-1 h-2 w-2 rounded-full bg-sky-500 shrink-0" />
-              <div>
-                <p class="text-[0.7rem] font-semibold tracking-[0.24em] text-slate-400 uppercase dark:text-slate-500">
-                  {{ t('next-run') }}
-                </p>
-                <p class="mt-2 text-sm font-medium leading-6 text-slate-800 dark:text-slate-100">
-                  {{ nextRunDisplay }}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div class="rounded-2xl border border-white/80 bg-white/90 p-4 shadow-sm backdrop-blur dark:border-slate-700/70 dark:bg-slate-900/70">
-            <div class="flex items-start gap-3">
-              <div class="mt-1 h-2 w-2 rounded-full bg-violet-500 shrink-0" />
-              <div>
-                <p class="text-[0.7rem] font-semibold tracking-[0.24em] text-slate-400 uppercase dark:text-slate-500">
-                  {{ t('billing-cycle') }}
-                </p>
-                <p class="mt-2 text-sm font-medium leading-6 text-slate-800 dark:text-slate-100">
-                  {{ subscriptionAnchorStart }} {{ t('to') }} {{ subscriptionAnchorEnd }}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
+    <div class="flex items-center justify-end gap-2 flex-nowrap sm:gap-4">
+      <!-- Daily vs Cumulative Switch -->
+      <div class="flex items-center p-1 space-x-1 bg-gray-200 rounded-lg dark:bg-gray-800">
+        <button
+          class="flex gap-0.5 justify-center items-center py-1 px-2 text-xs font-medium text-center whitespace-nowrap rounded-md transition-colors cursor-pointer sm:gap-1.5 sm:px-3"
+          :class="[!showCumulative || !useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
+          :aria-label="t('daily')"
+          @click="showCumulative = false"
+        >
+          <CalendarDaysIcon class="w-4 h-4" />
+          <span class="hidden sm:inline">{{ t('daily') }}</span>
+        </button>
+        <button
+          class="flex gap-0.5 justify-center items-center py-1 px-2 text-xs font-medium text-center whitespace-nowrap rounded-md transition-colors cursor-pointer sm:gap-1.5 sm:px-3"
+          :class="[
+            showCumulative && useBillingPeriod
+              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white',
+          ]"
+          :aria-label="t('cumulative')"
+          @click="handleCumulativeClick"
+        >
+          <ChartBarIcon class="w-4 h-4" />
+          <span class="hidden sm:inline">{{ t('cumulative') }}</span>
+        </button>
       </div>
 
-      <div class="relative mt-6 flex flex-col gap-3 rounded-[1.6rem] border border-slate-200/80 bg-slate-950/4 p-3 dark:border-slate-700/70 dark:bg-white/5 lg:flex-row lg:items-center lg:justify-between">
-        <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-          <!-- Daily vs Cumulative Switch -->
-          <div class="flex items-center p-1 space-x-1 rounded-2xl bg-white/90 shadow-sm dark:bg-slate-900/80">
-            <button
-              type="button"
-              class="d-btn d-btn-sm min-h-10 h-10 rounded-xl border-0 px-3 text-xs font-medium normal-case sm:px-4"
-              :class="[!showCumulative || !useBillingPeriod ? 'd-btn-neutral shadow-sm' : 'd-btn-ghost text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white']"
-              :aria-label="t('daily')"
-              @click="showCumulative = false"
-            >
-              <CalendarDaysIcon class="w-4 h-4" />
-              <span>{{ t('daily') }}</span>
-            </button>
-            <button
-              type="button"
-              class="d-btn d-btn-sm min-h-10 h-10 rounded-xl border-0 px-3 text-xs font-medium normal-case sm:px-4"
-              :class="[
-                showCumulative && useBillingPeriod
-                  ? 'd-btn-neutral shadow-sm'
-                  : 'd-btn-ghost text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white',
-              ]"
-              :aria-label="t('cumulative')"
-              @click="handleCumulativeClick"
-            >
-              <ChartBarIcon class="w-4 h-4" />
-              <span>{{ t('cumulative') }}</span>
-            </button>
-          </div>
+      <!-- Billing Period vs Last 30 Days Switch -->
+      <div class="flex items-center p-1 space-x-1 bg-gray-200 rounded-lg dark:bg-gray-800">
+        <button
+          class="flex gap-0.5 justify-center items-center py-1 px-2 text-xs font-medium text-center whitespace-nowrap rounded-md transition-colors cursor-pointer sm:gap-1.5 sm:px-3" :class="[useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
+          :aria-label="t('billing-period')"
+          @click="useBillingPeriod = true"
+        >
+          <BanknotesIcon class="w-4 h-4" />
+          <span class="hidden sm:inline">{{ t('billing-period') }}</span>
+        </button>
+        <button
+          class="flex gap-0.5 justify-center items-center py-1 px-2 text-xs font-medium text-center whitespace-nowrap rounded-md transition-colors cursor-pointer sm:gap-1.5 sm:px-3" :class="[!useBillingPeriod ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white']"
+          :aria-label="t('last-30-days')"
+          @click="useBillingPeriod = false"
+        >
+          <CalendarDaysIcon class="w-4 h-4" />
+          <span class="hidden sm:inline">{{ t('last-30-days') }}</span>
+        </button>
+      </div>
 
-          <!-- Billing Period vs Last 30 Days Switch -->
-          <div class="flex items-center p-1 space-x-1 rounded-2xl bg-white/90 shadow-sm dark:bg-slate-900/80">
-            <button
-              type="button"
-              class="d-btn d-btn-sm min-h-10 h-10 rounded-xl border-0 px-3 text-xs font-medium normal-case sm:px-4"
-              :class="[useBillingPeriod ? 'd-btn-neutral shadow-sm' : 'd-btn-ghost text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white']"
-              :aria-label="t('billing-period')"
-              @click="useBillingPeriod = true"
-            >
-              <BanknotesIcon class="w-4 h-4" />
-              <span>{{ t('billing-period') }}</span>
-            </button>
-            <button
-              type="button"
-              class="d-btn d-btn-sm min-h-10 h-10 rounded-xl border-0 px-3 text-xs font-medium normal-case sm:px-4"
-              :class="[!useBillingPeriod ? 'd-btn-neutral shadow-sm' : 'd-btn-ghost text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white']"
-              :aria-label="t('last-30-days')"
-              @click="useBillingPeriod = false"
-            >
-              <CalendarDaysIcon class="w-4 h-4" />
-              <span>{{ t('last-30-days') }}</span>
-            </button>
-          </div>
-        </div>
+      <!-- Reload Button -->
+      <button
+        type="button"
+        class="flex items-center justify-center w-8 h-8 text-gray-700 transition-colors bg-white rounded-md shadow-sm cursor-pointer sm:w-9 sm:h-9 dark:text-gray-200 dark:bg-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:hover:bg-gray-600 dark:hover:text-white dark:focus:ring-blue-400"
+        :aria-label="t('reload')"
+        :class="{ 'opacity-60 cursor-not-allowed': isCurrentScopeRefreshing || isRefreshPolling }"
+        :disabled="isCurrentScopeRefreshing || isRefreshPolling"
+        @click="handleReloadClick"
+      >
+        <ArrowPathIconSolid class="w-4 h-4" :class="{ 'animate-spin': isCurrentScopeRefreshing || isRefreshPolling }" />
+      </button>
 
-        <div class="flex items-center gap-2 self-end lg:self-auto">
-          <button
-            type="button"
-            class="d-btn d-btn-outline d-btn-sm h-10 min-h-10 w-10 rounded-2xl border-slate-200 bg-white/90 p-0 text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white dark:focus:ring-blue-400"
-            :aria-label="t('reload')"
-            @click="reloadAllCharts"
-          >
-            <ArrowPathIconSolid class="w-4 h-4" />
-          </button>
-
-          <div class="relative flex items-center group">
-            <button
-              type="button"
-              class="d-btn d-btn-outline d-btn-sm h-10 min-h-10 w-10 rounded-2xl border-slate-200 bg-white/90 p-0 text-slate-700 shadow-sm hover:bg-slate-50 hover:text-slate-900 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-200 dark:hover:bg-slate-800 dark:hover:text-white dark:focus:ring-blue-400"
-              :aria-label="t('info')"
-            >
-              <InformationInfo class="w-4 h-4" />
-            </button>
-            <div class="hidden absolute right-0 top-full z-10 p-4 text-sm text-gray-800 bg-white rounded-2xl border border-gray-200 shadow-2xl translate-y-2 pointer-events-none dark:text-white dark:bg-gray-800 dark:border-gray-600 group-hover:block w-[min(320px,calc(100vw-32px))] group-focus-within:block">
-              <p class="font-semibold text-slate-800 dark:text-slate-100">
-                {{ t('dashboard-overview-title') }}
-              </p>
-              <p class="mt-2 leading-6 text-slate-500 dark:text-slate-300">
-                {{ dashboardOverviewSummary }}
-              </p>
+      <!-- Usage Info Tooltip -->
+      <div class="relative flex items-center group">
+        <button
+          type="button"
+          class="flex items-center justify-center w-8 h-8 text-gray-700 transition-colors bg-white rounded-md shadow-sm cursor-pointer sm:w-9 sm:h-9 dark:text-gray-200 dark:bg-gray-700 hover:text-gray-900 hover:bg-gray-50 focus:ring-2 focus:ring-blue-500 focus:outline-none dark:hover:bg-gray-600 dark:hover:text-white dark:focus:ring-blue-400"
+          :aria-label="t('info')"
+        >
+          <InformationInfo class="w-4 h-4" />
+        </button>
+        <div class="hidden absolute right-0 top-full z-10 p-4 text-sm text-gray-800 bg-white rounded-lg border border-gray-200 shadow-2xl translate-y-2 pointer-events-none dark:text-white dark:bg-gray-800 dark:border-gray-600 group-hover:block w-[min(320px,calc(100vw-32px))] group-focus-within:block">
+          <div class="space-y-3">
+            <div class="flex items-start space-x-2">
+              <div class="w-2 h-2 mt-2 bg-green-500 rounded-full shrink-0" />
+              <div>
+                <div class="text-xs font-medium tracking-wide text-gray-500 uppercase dark:text-gray-400">
+                  {{ t('last-run') }}
+                </div>
+                <div class="text-sm font-medium">
+                  {{ lastRunDisplay }}
+                </div>
+              </div>
+            </div>
+            <div class="flex items-start space-x-2">
+              <div class="w-2 h-2 mt-2 bg-blue-500 rounded-full shrink-0" />
+              <div>
+                <div class="text-xs font-medium tracking-wide text-gray-500 uppercase dark:text-gray-400">
+                  {{ t('next-run') }}
+                </div>
+                <div class="text-sm font-medium">
+                  {{ nextRunDisplay }}
+                </div>
+              </div>
+            </div>
+            <div class="pt-2 border-t border-gray-200 dark:border-gray-600">
+              <div class="flex items-start space-x-2">
+                <div class="w-2 h-2 mt-2 bg-purple-500 rounded-full shrink-0" />
+                <div>
+                  <div class="text-xs font-medium tracking-wide text-gray-500 uppercase dark:text-gray-400">
+                    {{ t('billing-cycle') }}
+                  </div>
+                  <div class="text-sm font-medium">
+                    {{ subscriptionAnchorStart }} {{ t('to') }} {{ subscriptionAnchorEnd }}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -844,7 +1065,7 @@ onMounted(async () => {
 
   <div
     v-if="!noData || isLoading"
-    class="grid grid-cols-1 gap-5 mb-6 sm:grid-cols-12 xl:mt-6"
+    class="grid grid-cols-1 gap-6 mb-6 sm:grid-cols-12"
     :class="appId ? 'xl:grid-cols-16' : 'xl:grid-cols-12'"
   >
     <UsageCard

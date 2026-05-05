@@ -83,7 +83,7 @@ const heroHighlights = computed(() => props.heroHighlights ?? [
 
           <div class="mt-8 space-y-5">
             <div class="inline-flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200/70 bg-white/80 shadow-lg shadow-slate-900/5 backdrop-blur dark:border-slate-700/80 dark:bg-slate-900/70">
-              <img src="/capgo.webp" alt="logo" class="h-8 w-8 rounded-sm invert dark:invert-0">
+              <img src="/capgo.webp" alt="Capgo logo" class="h-8 w-8 rounded-sm invert dark:invert-0">
             </div>
             <div>
               <p class="text-xs font-semibold tracking-[0.26em] text-slate-500 uppercase dark:text-slate-300">
@@ -118,7 +118,7 @@ const heroHighlights = computed(() => props.heroHighlights ?? [
 
       <div class="relative mx-auto w-full lg:max-w-none" :class="cardWidthClass">
         <div class="mb-6 text-center lg:hidden">
-          <img src="/capgo.webp" alt="logo" class="mx-auto mb-4 h-12 w-12 rounded-sm invert dark:invert-0">
+          <img src="/capgo.webp" alt="Capgo logo" class="mx-auto mb-4 h-12 w-12 rounded-sm invert dark:invert-0">
           <p class="text-xs font-semibold tracking-[0.24em] text-slate-500 uppercase dark:text-slate-300">
             {{ heroKickerValue }}
           </p>

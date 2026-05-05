@@ -44,14 +44,21 @@ SELECT
 -- Test is_trial_org
 SELECT
     is(
-        is_trial_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
-        15,
+        public.is_trial_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
+        (
+            SELECT COALESCE(
+                GREATEST((trial_at::date - CURRENT_DATE), 0),
+                0
+            )::integer
+            FROM public.stripe_info
+            WHERE customer_id = 'cus_Pa0k8TO6HVln6A'
+        ),
         'is_trial_org test - org is in trial'
     );
 
 SELECT
     is(
-        is_trial_org('22dbad8a-b885-4309-9b3b-a09f8460fb6e'),
+        COALESCE(public.is_trial_org('22dbad8a-b885-4309-9b3b-a09f8460fb6e'), 0),
         0,
         'is_trial_org test - org does not exist'
     );

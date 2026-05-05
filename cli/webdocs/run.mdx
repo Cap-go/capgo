@@ -1,0 +1,35 @@
+---
+title: 📱 run
+description: "📱 Run Capacitor apps on devices from the CLI."
+sidebar_label: run
+sidebar:
+  order: 2
+---
+
+📱 Run Capacitor apps on devices from the CLI.
+
+
+### <a id="run-device"></a> 🔹 **Device**
+
+```bash
+npx @capgo/cli@latest run device
+```
+
+📱 Run your Capacitor app on a connected device or simulator.
+If you omit the platform in an interactive terminal, the command asks whether to start on iOS or Android.
+The command lists available devices and simulators, lets you reload the list, and runs with your selection.
+For iOS, this asks whether to use a physical iPhone/iPad or simulator before showing devices.
+Use --no-launch to print the resolved command without starting the app.
+
+**Example:**
+
+```bash
+npx @capgo/cli@latest run device ios --no-launch
+```
+
+**Options:**
+
+| Param          | Type          | Description          |
+| -------------- | ------------- | -------------------- |
+| **--no-launch** | <code>boolean</code> | Resolve and print the run command without starting the app |
+

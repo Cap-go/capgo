@@ -43,6 +43,7 @@ extend-exclude = [
   "*.woff2",
   "*.ttf",
   "*.eot",
+  "cli/test/data.ts",
 
   # Mobile platforms
   "ios/",

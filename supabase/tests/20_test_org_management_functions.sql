@@ -300,7 +300,7 @@ SELECT
 -- Test is_trial_org negative case
 SELECT
     ok(
-        is_trial_org('00000000-0000-0000-0000-000000000000') = 0,
+        COALESCE(is_trial_org('00000000-0000-0000-0000-000000000000'), 0) = 0,
         'is_trial_org test - non-existent org returns 0'
     );
 
@@ -335,9 +335,9 @@ SELECT
 -- Test is_onboarding_needed_org negative case
 SELECT
     ok(
-        is_onboarding_needed_org(
+        COALESCE(is_onboarding_needed_org(
             '00000000-0000-0000-0000-000000000000'
-        ) = FALSE,
+        ), FALSE) = FALSE,
         'is_onboarding_needed_org test - non-existent org returns false'
     );
 

@@ -635,7 +635,7 @@ onMounted(checkLogin)
 
           <div class="mt-8 space-y-5">
             <div class="inline-flex h-14 w-14 items-center justify-center rounded-2xl border border-slate-200/70 bg-white/80 shadow-lg shadow-slate-900/5 backdrop-blur dark:border-slate-700/80 dark:bg-slate-900/70">
-              <img src="/capgo.webp" alt="logo" class="h-8 w-8 rounded-sm invert dark:invert-0">
+              <img src="/capgo.webp" alt="Capgo logo" class="h-8 w-8 rounded-sm invert dark:invert-0">
             </div>
             <div>
               <p class="text-xs font-semibold tracking-[0.26em] text-slate-500 uppercase dark:text-slate-300">
@@ -670,7 +670,7 @@ onMounted(checkLogin)
 
       <div class="relative mx-auto w-full max-w-lg lg:max-w-none">
         <div class="mb-6 text-center lg:hidden">
-          <img src="/capgo.webp" alt="logo" class="mx-auto mb-4 h-12 w-12 rounded-sm invert dark:invert-0">
+          <img src="/capgo.webp" alt="Capgo logo" class="mx-auto mb-4 h-12 w-12 rounded-sm invert dark:invert-0">
           <p class="text-xs font-semibold tracking-[0.24em] text-slate-500 uppercase dark:text-slate-300">
             {{ t('login-console-kicker') }}
           </p>
@@ -733,7 +733,16 @@ onMounted(checkLogin)
               </div>
             </div>
 
-            <Transition v-else name="step-slide" mode="out-in">
+            <Transition
+              v-else
+              mode="out-in"
+              enter-active-class="transition duration-200 ease-out"
+              enter-from-class="translate-x-6 opacity-0"
+              enter-to-class="translate-x-0 opacity-100"
+              leave-active-class="transition duration-200 ease-in"
+              leave-from-class="translate-x-0 opacity-100"
+              leave-to-class="-translate-x-6 opacity-0"
+            >
               <!-- Step 1: Email -->
               <div v-if="statusAuth === 'email'" key="step-email" :class="authStepCardClass">
                 <div class="text-slate-500 dark:text-slate-300" :class="authCardBodyClass">
@@ -1017,21 +1026,6 @@ onMounted(checkLogin)
     </div>
   </section>
 </template>
-
-<style scoped>
-.step-slide-enter-active,
-.step-slide-leave-active {
-  transition: all 0.25s ease;
-}
-.step-slide-enter-from {
-  opacity: 0;
-  transform: translateX(24px);
-}
-.step-slide-leave-to {
-  opacity: 0;
-  transform: translateX(-24px);
-}
-</style>
 
 <route lang="yaml">
 meta:

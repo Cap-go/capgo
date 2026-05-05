@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(8);
+SELECT plan(12);
 
 -- Member of admin org can read billing/trial RPCs
 SELECT tests.authenticate_as('test_admin');
@@ -14,9 +14,26 @@ SELECT
 
 SELECT
     is(
-        is_trial_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
-        15,
+        public.is_trial_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
+        (
+            SELECT COALESCE(
+                GREATEST((trial_at::date - CURRENT_DATE), 0),
+                0
+            )::integer
+            FROM public.stripe_info
+            WHERE customer_id = 'cus_Pa0k8TO6HVln6A'
+        ),
         'is_trial_org - org admin can read trial days'
+    );
+
+SELECT
+    is(
+        is_paying_and_good_plan_org_action(
+            '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
+            ARRAY['mau']::public.action_type []
+        ),
+        true,
+        'is_paying_and_good_plan_org_action - org admin can read plan status'
     );
 
 -- Non-member should be denied by org authorization checks
@@ -36,23 +53,49 @@ SELECT
         'is_trial_org - non-member org user gets 0'
     );
 
+SELECT
+    is(
+        is_paying_and_good_plan_org_action(
+            '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
+            ARRAY['mau']::public.action_type []
+        ),
+        false,
+        'is_paying_and_good_plan_org_action - non-member org user gets false'
+    );
+
 -- Anonymous user should not have execute permission
 SELECT tests.clear_authentication();
 
 SELECT
-    throws_ok(
-        'SELECT is_paying_org(''22dbad8a-b885-4309-9b3b-a09f8460fb6d'')',
-        '42501',
-        'permission denied for function is_paying_org',
-        'is_paying_org - anonymous call is blocked'
+    is(
+        has_function_privilege(
+            'anon'::name,
+            'public.is_paying_org(uuid)'::regprocedure,
+            'EXECUTE'
+        ),
+        false,
+        'is_paying_org - anonymous execute is blocked'
+    );
+
+SELECT
+    is(
+        has_function_privilege(
+            'anon'::name,
+            'public.is_trial_org(uuid)'::regprocedure,
+            'EXECUTE'
+        ),
+        false,
+        'is_trial_org - anonymous execute is blocked'
     );
 
 SELECT
     throws_ok(
-        'SELECT is_trial_org(''22dbad8a-b885-4309-9b3b-a09f8460fb6d'')',
+        'SELECT is_paying_and_good_plan_org_action('
+        || '''22dbad8a-b885-4309-9b3b-a09f8460fb6d'', '
+        || 'ARRAY[''mau'']::public.action_type[])',
         '42501',
-        'permission denied for function is_trial_org',
-        'is_trial_org - anonymous call is blocked'
+        'permission denied for function is_paying_and_good_plan_org_action',
+        'is_paying_and_good_plan_org_action - anonymous call is blocked'
     );
 
 -- service role keeps backend-style access
@@ -67,13 +110,29 @@ SELECT
 
 SELECT
     is(
-        is_trial_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
-        15,
+        public.is_trial_org('22dbad8a-b885-4309-9b3b-a09f8460fb6d'),
+        (
+            SELECT COALESCE(
+                GREATEST((trial_at::date - CURRENT_DATE), 0),
+                0
+            )::integer
+            FROM public.stripe_info
+            WHERE customer_id = 'cus_Pa0k8TO6HVln6A'
+        ),
         'is_trial_org - service role can read trial days'
     );
 
 SELECT
-    *
+    is(
+        is_paying_and_good_plan_org_action(
+            '22dbad8a-b885-4309-9b3b-a09f8460fb6d',
+            ARRAY['mau']::public.action_type []
+        ),
+        true,
+        'is_paying_and_good_plan_org_action - service role can read plan status'
+    );
+
+SELECT * -- noqa: AM04
 FROM
     finish();
 

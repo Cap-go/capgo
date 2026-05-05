@@ -1,0 +1,32 @@
+domains:
+  - name: cli-usage
+    summary: High-level command routing, setup, diagnostics, app management, docs generation, MCP, and GitHub support commands.
+    primary_sources:
+      - webdocs/init.mdx
+      - webdocs/doctor.mdx
+      - webdocs/login.mdx
+      - webdocs/app.mdx
+      - webdocs/account.mdx
+      - webdocs/probe.mdx
+      - webdocs/star.mdx
+      - webdocs/star-all.mdx
+      - src/index.ts
+  - name: ota-release-management
+    summary: OTA bundle uploads, channel operations, compatibility checks, cleanup, and encryption-key workflows.
+    primary_sources:
+      - webdocs/bundle.mdx
+      - webdocs/channel.mdx
+      - webdocs/key.mdx
+      - src/index.ts
+  - name: native-builds
+    summary: Native cloud build requests and local build credential management for iOS and Android.
+    primary_sources:
+      - webdocs/build.mdx
+      - src/index.ts
+  - name: organization-management
+    summary: Account lookup, organization administration, and deprecated organisation aliases.
+    primary_sources:
+      - webdocs/account.mdx
+      - webdocs/organization.mdx
+      - webdocs/organisation.mdx
+      - src/index.ts

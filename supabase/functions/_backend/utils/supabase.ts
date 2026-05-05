@@ -109,6 +109,7 @@ export function emptySupabase(c: Context) {
 
 // WARNING: The service role key has admin privileges and should only be used in secure server environments!
 export function supabaseAdmin(c: Context) {
+  const serviceRoleKey = getEnv(c, 'SUPABASE_SERVICE_ROLE_KEY')
   const options = {
     auth: {
       autoRefreshToken: false,
@@ -116,7 +117,7 @@ export function supabaseAdmin(c: Context) {
       detectSessionInUrl: false,
     },
   }
-  return createClient<Database>(getEnv(c, 'SUPABASE_URL'), getEnv(c, 'SUPABASE_SERVICE_ROLE_KEY'), options)
+  return createClient<Database>(getEnv(c, 'SUPABASE_URL'), serviceRoleKey, options)
 }
 
 export function supabaseApikey(c: Context, apikey: string | null | undefined) {
@@ -295,6 +296,8 @@ export async function hasAppRightApikey(c: Context<MiddlewareKeyVariables, any, 
 }
 
 export function apikeyHasOrgRight(key: Database['public']['Tables']['apikeys']['Row'], orgId: string) {
+  if (key.limited_to_apps?.length)
+    return false
   if (!key.limited_to_orgs || key.limited_to_orgs.length === 0)
     return true
   return key.limited_to_orgs.includes(orgId)
@@ -655,7 +658,8 @@ export async function recordBuildTime(
   buildId: string,
   platform: 'ios' | 'android',
   buildTimeSeconds: number,
-  completedAt?: number | null,
+  completedAt: number | null | undefined,
+  appId: string,
 ): Promise<string | null> {
   try {
     const { data, error } = await supabaseAdmin(c)
@@ -665,6 +669,7 @@ export async function recordBuildTime(
         p_build_id: buildId,
         p_platform: platform,
         p_build_time_unit: buildTimeSeconds,
+        p_app_id: appId,
       })
       .single()
 
@@ -1538,6 +1543,65 @@ export function validateExpirationDate(expiresAt: string | null | undefined): vo
   if (expirationDate <= new Date()) {
     throw simpleError('invalid_expiration_date', 'Expiration date must be in the future')
   }
+}
+
+/**
+ * Resolve all organization IDs affected by API key scopes.
+ * App-scoped keys inherit expiration policy from the app owner organization.
+ */
+export async function resolveApikeyPolicyOrgIds(
+  supabase: SupabaseClient<Database>,
+  options: {
+    limitedToApps?: string[] | null
+    limitedToOrgs?: string[] | null
+    policyLookupSupabase?: SupabaseClient<Database>
+  },
+): Promise<string[]> {
+  const orgIds = new Set((options.limitedToOrgs ?? []).filter(Boolean))
+  const limitedToApps = [...new Set((options.limitedToApps ?? []).filter(Boolean))]
+
+  if (limitedToApps.length === 0) {
+    return [...orgIds]
+  }
+
+  const resolvedAppIds = new Set<string>()
+
+  async function addResolvedApps(client: SupabaseClient<Database>, appIds: string[]) {
+    if (appIds.length === 0) {
+      return
+    }
+
+    const { data: apps, error } = await client
+      .from('apps')
+      .select('app_id, owner_org')
+      .in('app_id', appIds)
+
+    if (error) {
+      throw simpleError('failed_to_resolve_apikey_policy_scope', 'Failed to resolve API key policy scope', { supabaseError: error })
+    }
+
+    for (const app of apps ?? []) {
+      if (!app.app_id || !app.owner_org)
+        continue
+      resolvedAppIds.add(app.app_id)
+      orgIds.add(app.owner_org)
+    }
+  }
+
+  await addResolvedApps(supabase, limitedToApps)
+
+  let unresolvedAppIds = limitedToApps.filter(appId => !resolvedAppIds.has(appId))
+  if (unresolvedAppIds.length > 0 && options.policyLookupSupabase) {
+    // Hidden apps still need owner-org policy enforcement even when caller RLS cannot see them.
+    await addResolvedApps(options.policyLookupSupabase, unresolvedAppIds)
+    unresolvedAppIds = unresolvedAppIds.filter(appId => !resolvedAppIds.has(appId))
+  }
+
+  if (unresolvedAppIds.length > 0) {
+    throw simpleError('failed_to_resolve_apikey_policy_scope', 'Failed to resolve API key policy scope', { unresolvedAppIds })
+  }
+
+  return [...orgIds]
 }
 
 /**

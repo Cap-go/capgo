@@ -1,15 +1,16 @@
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
-import { z } from 'zod/mini'
+import { type } from 'arktype'
+import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { simpleError } from '../../utils/hono.ts'
 import { supabaseWithAuth } from '../../utils/supabase.ts'
 import { normalizeWebsiteUrl } from './website.ts'
 
-const bodySchema = z.object({
-  name: z.string().check(z.minLength(3)),
-  email: z.optional(z.email()),
-  website: z.optional(z.string()),
+const bodySchema = type({
+  'name': 'string >= 3',
+  'email?': 'string.email',
+  'website?': 'string',
 })
 
 export async function post(
@@ -17,7 +18,7 @@ export async function post(
   bodyRaw: any,
   _apikey: Database['public']['Tables']['apikeys']['Row'] | null | undefined,
 ): Promise<Response> {
-  const bodyParsed = bodySchema.safeParse(bodyRaw)
+  const bodyParsed = safeParseSchema(bodySchema, bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }

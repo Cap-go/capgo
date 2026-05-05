@@ -105,6 +105,7 @@ BEGIN
 END $$;
 
 SELECT tests.clear_authentication();
+SELECT tests.authenticate_as('test_user');
 
 -- Test get_user_id with apikey
 SELECT
@@ -141,6 +142,8 @@ SELECT
         '6aa76066-55ef-4238-ade6-0b32334a4097',
         'get_user_id test - valid apikey returns user even with invalid app'
     );
+
+SELECT tests.clear_authentication();
 
 -- Test is_allowed_action (requires proper app ownership and organization plan)
 -- Note: This may be false if organization limits are in effect

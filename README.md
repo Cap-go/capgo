@@ -236,8 +236,17 @@ Run tests:
 bun test:all
 bun test:backend
 bun test:cli
-bun test:local
 bun test:front
+
+# CLI workspace
+bun run cli:build
+bun run cli:test
+bun run cli:check
+
+# Legacy aliases kept for compatibility
+bun test:local
+bun test:all:local
+bun test:cli:local
 
 # Database SQL tests (Supabase CLI)
 supabase test db
@@ -255,7 +264,10 @@ Notes:
 
 - Tests run in parallel across files. If a test mutates shared data, add
   dedicated seed data in `supabase/seed.sql`.
-- `LOCAL_CLI_PATH=true bun test:all:local` uses a local CLI build.
+- The repository is a Bun workspace monorepo. The Capgo app lives at the root
+  and the CLI lives in `cli/`.
+- Capgo's Vitest CLI coverage now resolves the local `cli/` workspace by
+  default, so monorepo changes are exercised together.
 - SQL tests in `supabase/tests/` are run by the Supabase CLI test runner.
 - Run `bun run supabase:start` first so the local DB is available (worktree-isolated).
 

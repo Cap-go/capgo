@@ -1,6 +1,20 @@
 import dayjs from 'dayjs'
 import { i18n } from '~/modules/i18n'
 
+const ZONELESS_ISO_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/
+
+function parseDatePreservingUtc(date: Date | string | undefined | null): Date | null {
+  if (!date)
+    return null
+
+  if (date instanceof Date)
+    return Number.isNaN(date.getTime()) ? null : date
+
+  const normalized = ZONELESS_ISO_DATETIME_RE.test(date) ? `${date}Z` : date
+  const parsed = new Date(normalized)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
 /**
  * Get the current app locale for date formatting
  */
@@ -36,12 +50,17 @@ export function formatLocalDateLong(date: Date | string | undefined | null): str
  * Format a date/time using the app's locale (e.g., "Dec 15, 2025, 3:45 PM" in English)
  */
 export function formatLocalDateTime(date: Date | string | undefined | null): string {
-  if (!date)
-    return ''
-  const d = typeof date === 'string' ? new Date(date) : date
-  if (Number.isNaN(d.getTime()))
+  const d = parseDatePreservingUtc(date)
+  if (!d)
     return ''
   return d.toLocaleString(getAppLocale(), { dateStyle: 'medium', timeStyle: 'short' })
+}
+
+export function formatUtcDateTimeAsLocal(date: Date | string | undefined | null, format = 'MMMM D, YYYY HH:mm'): string {
+  const parsed = parseDatePreservingUtc(date)
+  if (!parsed)
+    return ''
+  return dayjs(parsed).format(format)
 }
 
 export function formatDate(date: string | undefined) {

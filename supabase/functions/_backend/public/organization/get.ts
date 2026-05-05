@@ -1,31 +1,34 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
-import { z } from 'zod/mini'
+import { type } from 'arktype'
+import { safeParseSchema } from '../../utils/ark_validation.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { createSignedImageUrl } from '../../utils/storage.ts'
 import { apikeyHasOrgRightWithPolicy, supabaseApikey } from '../../utils/supabase.ts'
 import { fetchLimit } from '../../utils/utils.ts'
 
-const bodySchema = z.object({
-  orgId: z.optional(z.string()),
-  page: z.optional(z.number()),
+const bodySchema = type({
+  'orgId?': 'string',
+  'page?': 'number',
 })
-const orgSchema = z.object({
-  id: z.uuid(),
-  created_by: z.uuid(),
-  created_at: z.coerce.date(),
-  updated_at: z.coerce.date(),
-  logo: z.nullable(z.string()),
-  name: z.string(),
-  management_email: z.email(),
-  customer_id: z.nullable(z.string()),
-  website: z.nullable(z.string()),
+const orgSchema = type({
+  id: 'string.uuid',
+  created_by: 'string.uuid',
+  created_at: 'string | Date',
+  updated_at: 'string | Date',
+  logo: 'string | null',
+  name: 'string',
+  management_email: 'string.email',
+  customer_id: 'string | null',
+  website: 'string | null',
 })
 
+const orgsSchema = orgSchema.array()
+
 function parseBody(bodyRaw: unknown) {
-  const bodyParsed = bodySchema.safeParse(bodyRaw)
+  const bodyParsed = safeParseSchema(bodySchema, bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
@@ -33,7 +36,7 @@ function parseBody(bodyRaw: unknown) {
 }
 
 function parseOrg(data: unknown) {
-  const dataParsed = orgSchema.safeParse(data)
+  const dataParsed = safeParseSchema(orgSchema, data)
   if (!dataParsed.success) {
     throw simpleError('cannot_parse_organization', 'Cannot parse organization', { error: dataParsed.error })
   }
@@ -41,7 +44,7 @@ function parseOrg(data: unknown) {
 }
 
 function parseOrgs(data: unknown) {
-  const dataParsed = z.array(orgSchema).safeParse(data)
+  const dataParsed = safeParseSchema(orgsSchema, data)
   if (!dataParsed.success) {
     throw simpleError('cannot_parse_organizations', 'Cannot parse organizations', { error: dataParsed.error })
   }

@@ -3,6 +3,7 @@ import type { NavigationGuardNext, RouteLocationNormalized } from 'vue-router'
 import type { UserModule } from '~/types'
 import { hideLoader } from '~/services/loader'
 import { setUser } from '~/services/posthog'
+import { isSsoUser, provisionSsoUser } from '~/services/ssoProvisioning'
 import { createSignedImageUrl } from '~/services/storage'
 import { getLocalConfig, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
@@ -82,6 +83,70 @@ async function updateUser(
   }
 }
 
+async function maybeProvisionSsoMembership(
+  supabase: SupabaseClient,
+  session: Awaited<ReturnType<SupabaseClient['auth']['getSession']>>['data']['session'] | null,
+): Promise<'continue' | 'redirect_login' | 'abort_navigation'> {
+  if (!session || !isSsoUser(session.user))
+    return 'continue'
+
+  const result = await provisionSsoUser(session)
+
+  if (result.merged) {
+    const { error: signOutError } = await supabase.auth.signOut()
+    if (signOutError) {
+      console.error('Failed to sign out merged SSO session during auth guard:', signOutError)
+      return 'abort_navigation'
+    }
+
+    return 'redirect_login'
+  }
+
+  if (result.error) {
+    console.error('Failed to provision SSO membership during auth guard:', result.error)
+    return 'abort_navigation'
+  }
+
+  return 'continue'
+}
+
+async function isDisabledAccount(supabase: SupabaseClient, userId: string | null | undefined) {
+  if (!userId)
+    return false
+
+  try {
+    const { data: isDisabled, error } = await supabase
+      .rpc('is_account_disabled', { user_id: userId })
+
+    if (error) {
+      console.error('Error checking account status:', error)
+      return true
+    }
+
+    return !!isDisabled
+  }
+  catch (error) {
+    console.error('Error checking if account is disabled:', error)
+    return true
+  }
+}
+
+function getAccountDisabledRedirect(to: RouteLocationNormalized) {
+  return {
+    path: '/accountDisabled',
+    query: to.fullPath && to.path !== '/accountDisabled'
+      ? { to: to.fullPath }
+      : {},
+  }
+}
+
+function getPostRestorePath(to: RouteLocationNormalized) {
+  const target = typeof to.query.to === 'string' ? to.query.to : ''
+  if (target.startsWith('/') && target !== '/accountDisabled')
+    return target
+  return '/dashboard'
+}
+
 async function guard(
   next: NavigationGuardNext,
   to: RouteLocationNormalized,
@@ -95,7 +160,6 @@ async function guard(
   const sessionUser = sessionData?.session?.user ?? null
   const hasAuth = !!claimsData?.claims?.sub && !!sessionUser
   const hadAuth = !!main.auth
-  const needsVerifiedEmail = to.path.startsWith('/settings') || to.path === '/delete_account'
   const inviteOrgId = typeof to.query.invite_org === 'string' && to.query.invite_org.length > 0
     ? to.query.invite_org
     : null
@@ -153,31 +217,23 @@ async function guard(
   }
 
   if (hasAuth && sessionUser && !hadAuth) {
-    if (!sessionUser.email_confirmed_at && needsVerifiedEmail) {
-      return next({
-        path: '/resend_email',
-        query: {
-          reason: 'email_not_verified',
-          return_to: to.fullPath,
-        },
-      })
+    const isDisabled = await isDisabledAccount(supabase, sessionUser.id)
+    if (to.path === '/accountDisabled') {
+      hideLoader()
+      return isDisabled ? next() : next(getPostRestorePath(to))
+    }
+    if (isDisabled) {
+      hideLoader()
+      return next(getAccountDisabledRedirect(to))
     }
 
-    // Check if account is disabled (marked for deletion)
-    try {
-      const { data: isDisabled, error: disabledError } = await supabase
-        .rpc('is_account_disabled', { user_id: sessionUser.id })
-
-      if (disabledError) {
-        console.error('Error checking account status:', disabledError)
-      }
-      else if (isDisabled) {
-        // Account is disabled, redirect to account disabled page
-        return next('/accountDisabled')
-      }
+    const provisioningResult = await maybeProvisionSsoMembership(supabase, sessionData?.session ?? null)
+    if (provisioningResult === 'redirect_login') {
+      return next('/login?message=sso_account_linked')
     }
-    catch (error) {
-      console.error('Error checking if account is disabled:', error)
+    if (provisioningResult === 'abort_navigation') {
+      hideLoader()
+      return next(false)
     }
 
     if (!main.user) {
@@ -240,37 +296,30 @@ async function guard(
     })
   }
   else if (hasAuth && main.auth) {
-    // User is already authenticated, but check if account got disabled
-    // (only if not already on account disabled page)
-    if (to.path !== '/accountDisabled') {
-      if (!sessionUser?.email_confirmed_at && needsVerifiedEmail) {
-        return next({
-          path: '/resend_email',
-          query: {
-            reason: 'email_not_verified',
-            return_to: to.fullPath,
-          },
-        })
-      }
-
-      try {
-        const { data: isDisabled, error: disabledError } = await supabase
-          .rpc('is_account_disabled', { user_id: main.auth.id })
-
-        if (disabledError) {
-          console.error('Error checking account status:', disabledError)
-        }
-        else if (isDisabled) {
-          // Account is disabled, redirect to account disabled page
-          return next('/accountDisabled')
-        }
-      }
-      catch (error) {
-        console.error('Error checking if account is disabled:', error)
-      }
+    const isDisabled = await isDisabledAccount(supabase, sessionUser?.id ?? main.auth.id)
+    if (isDisabled && to.path !== '/accountDisabled') {
+      hideLoader()
+      return next(getAccountDisabledRedirect(to))
+    }
+    if (!isDisabled && to.path === '/accountDisabled') {
+      hideLoader()
+      return next(getPostRestorePath(to))
     }
 
-    const organizationsLoaded = await tryLoadOrganizations(() => organizationStore.dedupFetchOrganizations())
+    let organizationsLoaded = await tryLoadOrganizations(() => organizationStore.dedupFetchOrganizations())
+    if (organizationsLoaded && !organizationStore.hasOrganizations && isSsoUser(sessionUser)) {
+      const didProvisionSsoMembership = await maybeProvisionSsoMembership(supabase, sessionData?.session ?? null)
+      if (didProvisionSsoMembership === 'redirect_login') {
+        return next('/login?message=sso_account_linked')
+      }
+      if (didProvisionSsoMembership === 'abort_navigation') {
+        hideLoader()
+        return next(false)
+      }
+
+      organizationsLoaded = await tryLoadOrganizations(() => organizationStore.fetchOrganizations())
+    }
+
     if (organizationsLoaded && !organizationStore.hasOrganizations && shouldRedirectToOrgOnboarding()) {
       return next('/onboarding/organization')
     }

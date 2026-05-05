@@ -1,26 +1,17 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../../utils/hono.ts'
 import type { Database } from '../../../utils/supabase.types.ts'
-import { z } from 'zod/mini'
+import { type } from 'arktype'
+import { safeParseSchema } from '../../../utils/ark_validation.ts'
 import { BRES, simpleError } from '../../../utils/hono.ts'
 import { cloudlog } from '../../../utils/logging.ts'
 import { checkPermission } from '../../../utils/rbac.ts'
 import { supabaseApikey } from '../../../utils/supabase.ts'
 
-const inviteBodySchema = z.object({
-  orgId: z.string(),
-  email: z.email(),
-  invite_type: z.enum([
-    'read',
-    'upload',
-    'write',
-    'admin',
-    'super_admin',
-    'org_member',
-    'org_billing_admin',
-    'org_admin',
-    'org_super_admin',
-  ]),
+const inviteBodySchema = type({
+  orgId: 'string',
+  email: 'string.email',
+  invite_type: '"read" | "upload" | "write" | "admin" | "super_admin" | "org_member" | "org_billing_admin" | "org_admin" | "org_super_admin"',
 })
 
 const rbacInviteRoles = ['org_member', 'org_billing_admin', 'org_admin', 'org_super_admin'] as const
@@ -38,7 +29,7 @@ const legacyToRbac: Partial<Record<LegacyInviteRole, RbacInviteRole>> = {
 }
 
 export async function post(c: Context<MiddlewareKeyVariables>, bodyRaw: any, _apikey: Database['public']['Tables']['apikeys']['Row']) {
-  const bodyParsed = inviteBodySchema.safeParse(bodyRaw)
+  const bodyParsed = safeParseSchema(inviteBodySchema, bodyRaw)
   if (!bodyParsed.success) {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }

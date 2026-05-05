@@ -25,6 +25,26 @@ function normalizeImageStoragePath(path?: string | null) {
   return pathWithoutQuery.replace(IMAGES_PREFIX_REGEX, '').replace(LEADING_SLASHES_REGEX, '')
 }
 
+function getPhotoErrorMessage(error: unknown) {
+  if (typeof error === 'string')
+    return error
+  if (error instanceof Error)
+    return error.message
+  if (error && typeof error === 'object' && 'message' in error && typeof error.message === 'string')
+    return error.message
+  return ''
+}
+
+export function isPhotoSelectionCancelledError(error: unknown) {
+  const message = getPhotoErrorMessage(error).toLowerCase()
+  if (!message)
+    return false
+
+  return message.includes('user')
+    && /cancel(?:led|ed)/.test(message)
+    && /photos?|images?|camera|picker|selection|picking|app/.test(message)
+}
+
 function base64ToArrayBuffer(base64: string) {
   const binary = atob(base64)
   const bytes = new Uint8Array(binary.length)
@@ -212,15 +232,19 @@ function blobToData(blob: Blob) {
 
 export async function takePhoto(formId: string, isLoading: Ref<boolean>, type: 'org' | 'user', wentWrong: string) {
   const uploadPhoto = (type === 'user') ? uploadPhotoUser : uploadPhotoOrg
-  const cameraPhoto = await Camera.getPhoto({
-    resultType: CameraResultType.DataUrl,
-    source: CameraSource.Camera,
-    quality: 100,
-  })
-
-  isLoading.value = true
-
-  const fileName = `${Date.now()}.${cameraPhoto.format}`
+  let cameraPhoto
+  try {
+    cameraPhoto = await Camera.getPhoto({
+      resultType: CameraResultType.DataUrl,
+      source: CameraSource.Camera,
+      quality: 100,
+    })
+  }
+  catch (error) {
+    if (!isPhotoSelectionCancelledError(error))
+      console.error(error)
+    return
+  }
 
   if (!cameraPhoto.dataUrl)
     return
@@ -229,6 +253,9 @@ export async function takePhoto(formId: string, isLoading: Ref<boolean>, type: '
 
   if (!contentType)
     return
+
+  isLoading.value = true
+  const fileName = `${Date.now()}.${cameraPhoto.format}`
   try {
     await uploadPhoto(formId, cameraPhoto.dataUrl.split('base64,')[1], fileName, contentType, isLoading, wentWrong)
   }
@@ -240,11 +267,19 @@ export async function takePhoto(formId: string, isLoading: Ref<boolean>, type: '
 
 export async function pickPhoto(formId: string, isLoading: Ref<boolean>, type: 'org' | 'user', wentWrong: string) {
   const uploadPhoto = (type === 'user') ? uploadPhotoUser : uploadPhotoOrg
-  const { photos } = await Camera.pickImages({
-    limit: 1,
-    quality: 100,
-  })
-  isLoading.value = true
+  let pickedImages
+  try {
+    pickedImages = await Camera.pickImages({
+      limit: 1,
+      quality: 100,
+    })
+  }
+  catch (error) {
+    if (!isPhotoSelectionCancelledError(error))
+      console.error(error)
+    return
+  }
+  const { photos } = pickedImages
   if (photos.length === 0)
     return
   try {
@@ -261,6 +296,7 @@ export async function pickPhoto(formId: string, isLoading: Ref<boolean>, type: '
     const contentType = mime.getType(photos[0].format)
     if (!contentType)
       return
+    isLoading.value = true
     await uploadPhoto(
       formId,
       contents.data as any,

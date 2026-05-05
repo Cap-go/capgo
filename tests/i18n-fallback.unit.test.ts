@@ -28,12 +28,16 @@ describe('i18n fallback loading', () => {
     const { i18n, loadLanguageAsync } = await import('../src/modules/i18n.ts')
 
     await loadLanguageAsync('fr')
+    const enMessages = i18n.global.getLocaleMessage('en') as Record<string, string>
+    const frMessages = i18n.global.getLocaleMessage('fr') as Record<string, string>
 
     expect(i18n.global.availableLocales).toEqual(expect.arrayContaining(['en', 'fr']))
     expect(i18n.global.locale.value).toBe('fr')
+    expect(enMessages['credits-plan-overage']).toBe('{included}, then {price}')
+    expect(frMessages['credits-plan-overage']).toBe('{included}, puis {price}')
     expect(i18n.global.t('credits-plan-overage', {
       included: 'Included in plan',
       price: '$0.08 per minute',
-    })).toBe('Included in plan, then $0.08 per minute')
+    })).toBe('Included in plan, puis $0.08 per minute')
   })
 })

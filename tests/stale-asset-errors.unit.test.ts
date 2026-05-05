@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { getErrorMessage, isStaleAssetErrorMessage, shouldSuppressPostHogExceptionEvent } from '../src/services/staleAssetErrors'
+import { getErrorMessage, isKnownCrawlerNoiseErrorMessage, isStaleAssetErrorMessage, shouldSuppressPostHogExceptionEvent } from '../src/services/staleAssetErrors'
 
 describe('stale asset error helpers', () => {
   it('matches the stale asset errors currently seen in PostHog', () => {
@@ -17,6 +17,12 @@ describe('stale asset error helpers', () => {
     expect(isStaleAssetErrorMessage('Cannot read properties of undefined (reading \'digest\')')).toBe(false)
     expect(isStaleAssetErrorMessage('\'application/json\' is not a valid JavaScript MIME type.')).toBe(false)
     expect(isStaleAssetErrorMessage('\'text/plain\' is not a valid JavaScript MIME type.')).toBe(false)
+  })
+
+  it('matches the known crawler-only Object Not Found noise seen in PostHog', () => {
+    expect(isKnownCrawlerNoiseErrorMessage('Object Not Found Matching Id:2, MethodName:update, ParamCount:4')).toBe(true)
+    expect(isKnownCrawlerNoiseErrorMessage('Non-Error promise rejection captured with value: Object Not Found Matching Id:5')).toBe(true)
+    expect(isKnownCrawlerNoiseErrorMessage('Cannot read properties of null (reading \'save\')')).toBe(false)
   })
 
   it('extracts useful messages from arbitrary rejection values', () => {
@@ -46,5 +52,12 @@ describe('stale asset error helpers', () => {
         $exception_list: [{ value: 'ResizeObserver loop completed with undelivered notifications.' }],
       },
     })).toBe(false)
+
+    expect(shouldSuppressPostHogExceptionEvent({
+      event: '$exception',
+      properties: {
+        $exception_list: [{ value: 'Object Not Found Matching Id:3, MethodName:update, ParamCount:4' }],
+      },
+    })).toBe(true)
   })
 })

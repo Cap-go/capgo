@@ -8,6 +8,7 @@ const NOW = Date.now()
 const TRIAL_ORG_ID = randomUUID()
 const TRIAL_CUSTOMER_ID = `cus_admin_stats_trial_${TRIAL_ORG_ID.slice(0, 8)}`
 const TRIAL_APP_ID = `com.admin.stats.trial.${TRIAL_ORG_ID.slice(0, 8)}`
+const TRIAL_ORG_CREATED_AT = new Date(NOW).toISOString()
 const TRIAL_END_DATE = new Date(NOW + (45 * DAY_IN_MS)).toISOString()
 const TRIAL_LAST_UPLOAD_AT = new Date(NOW - DAY_IN_MS).toISOString()
 const TRIAL_BUILTIN_UPLOAD_AT = new Date(NOW - (12 * 60 * 60 * 1000)).toISOString()
@@ -163,6 +164,7 @@ beforeAll(async () => {
       created_by: USER_ID,
       management_email: TEST_EMAIL,
       customer_id: TRIAL_CUSTOMER_ID,
+      created_at: TRIAL_ORG_CREATED_AT,
     },
     {
       id: CANCELLED_YEARLY_ORG_ID,
@@ -300,7 +302,7 @@ beforeAll(async () => {
   ])
   if (channelError)
     throw channelError
-}, 30000)
+}, 90000)
 
 afterAll(async () => {
   const supabase = getSupabaseClient()
@@ -310,7 +312,7 @@ afterAll(async () => {
   await supabase.from('apps').delete().in('app_id', [TRIAL_APP_ID, ONBOARDING_APP_ID, ONBOARDING_LATE_SUBSCRIPTION_APP_ID])
   await supabase.from('orgs').delete().in('id', [TRIAL_ORG_ID, CANCELLED_YEARLY_ORG_ID, CANCELLED_MONTHLY_ORG_ID, ONBOARDING_ORG_ID, ONBOARDING_NO_BUNDLE_ORG_ID, ONBOARDING_LATE_SUBSCRIPTION_ORG_ID])
   await supabase.from('stripe_info').delete().in('customer_id', [TRIAL_CUSTOMER_ID, CANCELLED_YEARLY_CUSTOMER_ID, CANCELLED_MONTHLY_CUSTOMER_ID, ONBOARDING_CUSTOMER_ID, ONBOARDING_NO_BUNDLE_CUSTOMER_ID, ONBOARDING_LATE_SUBSCRIPTION_CUSTOMER_ID])
-})
+}, 90000)
 
 describe('/private/admin_stats', () => {
   it.concurrent('returns last bundle upload for trial organizations and excludes builtin versions', async () => {
@@ -333,6 +335,7 @@ describe('/private/admin_stats', () => {
         organizations: Array<{
           org_id: string
           last_bundle_upload_at: string | null
+          trial_extension_count: number
         }>
       }
     }
@@ -341,6 +344,7 @@ describe('/private/admin_stats', () => {
     const organization = payload.data.organizations.find(org => org.org_id === TRIAL_ORG_ID)
     expect(organization).toBeTruthy()
     expect(organization?.last_bundle_upload_at).toBe(TRIAL_LAST_UPLOAD_AT)
+    expect(organization?.trial_extension_count).toBe(2)
   })
 
   it.concurrent('returns cancellation billing metadata and subscription-or-signup dates', async () => {

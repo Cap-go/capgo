@@ -13,9 +13,6 @@ on:
 
 permissions: {}
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
-
 jobs:
   build_ios:
     runs-on: ubuntu-latest

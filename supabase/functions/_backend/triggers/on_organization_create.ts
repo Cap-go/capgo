@@ -3,8 +3,10 @@ import type { Database } from '../utils/supabase.types.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret, simpleError, triggerValidator } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
+import { groupIdentifyPosthog } from '../utils/posthog.ts'
 import { createStripeCustomer, finalizePendingStripeCustomer } from '../utils/supabase.ts'
 import { sendEventToTracking } from '../utils/tracking.ts'
+import { backgroundTask } from '../utils/utils.ts'
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
@@ -24,6 +26,19 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c)
     await finalizePendingStripeCustomer(c, record)
   }
 
+  await backgroundTask(c, groupIdentifyPosthog(c, {
+    groupType: 'organization',
+    groupKey: record.id,
+    properties: {
+      name: record.name,
+      management_email: record.management_email,
+      customer_id: record.customer_id,
+      created_by: record.created_by,
+      created_at: record.created_at,
+      website: record.website,
+    },
+  }))
+
   await sendEventToTracking(c, {
     bento: {
       cron: '* * * * *',
@@ -40,6 +55,7 @@ app.post('/', middlewareAPISecret, triggerValidator('orgs', 'INSERT'), async (c)
     icon: '🎉',
     sentToBento: true,
     user_id: record.id,
+    groups: { organization: record.id },
     notify: false,
   })
 

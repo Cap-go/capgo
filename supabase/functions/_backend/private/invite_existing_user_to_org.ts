@@ -1,6 +1,7 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import { z } from 'zod/mini'
+import { type } from 'arktype'
+import { safeParseSchema } from '../utils/ark_validation.ts'
 import { trackBentoEvent } from '../utils/bento.ts'
 import { CacheHelper } from '../utils/cache.ts'
 import { BRES, createHono, middlewareAuth, parseBody, quickError, useCors } from '../utils/hono.ts'
@@ -11,9 +12,9 @@ import { supabaseAdmin } from '../utils/supabase.ts'
 import { getEnv } from '../utils/utils.ts'
 import { version } from '../utils/version.ts'
 
-const inviteExistingUserSchema = z.object({
-  email: z.email(),
-  org_id: z.string().check(z.minLength(1)),
+const inviteExistingUserSchema = type({
+  email: 'string.email',
+  org_id: 'string > 0',
 })
 const INVITE_RESEND_COOLDOWN_MINUTES = 5
 // CacheHelper is the durable cross-instance cooldown layer. Keep this in-memory
@@ -101,9 +102,9 @@ async function unlockInviteNotification(
 }
 
 async function validateRequest(c: AppContext, rawBody: unknown) {
-  const validationResult = inviteExistingUserSchema.safeParse(rawBody)
+  const validationResult = safeParseSchema(inviteExistingUserSchema, rawBody)
   if (!validationResult.success)
-    return quickError(400, 'invalid_request', 'Invalid request', { errors: z.prettifyError(validationResult.error) })
+    return quickError(400, 'invalid_request', 'Invalid request', { errors: validationResult.error.message })
 
   const body = validationResult.data
   // Check org-scoped permissions before fetching org details so this endpoint

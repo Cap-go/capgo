@@ -1,19 +1,26 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { getEndpointUrl, getSupabaseClient, headers, TEST_EMAIL, USER_ID } from './test-utils.ts'
+import { getEndpointUrl, getSupabaseClient, TEST_EMAIL, USER_ID, USER_ID_2 } from './test-utils.ts'
 
 const globalId = randomUUID()
+const numericGlobalId = Number.parseInt(globalId.replaceAll('-', '').slice(0, 12), 16)
 const policyOrgId = randomUUID()
 const policyCustomerId = `cus_webhook_policy_${globalId}`
-const APIKEY_URL = getEndpointUrl('/apikey')
 const WEBHOOKS_URL = getEndpointUrl('/webhooks')
 const WEBHOOKS_TEST_URL = getEndpointUrl('/webhooks/test')
 const WEBHOOKS_RETRY_URL = getEndpointUrl('/webhooks/deliveries/retry')
+const legacyApiKeySeedId = numericGlobalId * 2
+const expiringSubkeySeedId = legacyApiKeySeedId + 1
+const delegatedApiKeySeedId = expiringSubkeySeedId + 1
+const seededWebhookId = randomUUID()
+const seededDeliveryId = randomUUID()
 
 let legacyApiKeyId: number | null = null
 let legacyApiKeyValue: string | null = null
 let expiringSubkeyId: number | null = null
 let expiringSubkeyValue: string | null = null
+let delegatedApiKeyId: number | null = null
+let delegatedApiKeyValue: string | null = null
 let createdWebhookId: string | null = null
 let createdDeliveryId: string | null = null
 
@@ -49,44 +56,57 @@ beforeAll(async () => {
   if (memberError)
     throw memberError
 
-  const keyResponse = await fetch(APIKEY_URL, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      name: `legacy-webhook-key-${globalId}`,
-      limited_to_orgs: [policyOrgId],
-    }),
-  })
-  expect(keyResponse.status).toBe(200)
-  const keyData = await keyResponse.json() as { id: number, key: string }
-  legacyApiKeyId = keyData.id
-  legacyApiKeyValue = keyData.key
+  const { data: legacyKeyData, error: legacyKeyError } = await supabase.from('apikeys').insert({
+    id: legacyApiKeySeedId,
+    user_id: USER_ID,
+    key: `legacy-webhook-key-${globalId}`,
+    key_hash: null,
+    mode: 'all',
+    name: `legacy-webhook-key-${globalId}`,
+    limited_to_apps: [],
+    limited_to_orgs: [policyOrgId],
+    expires_at: null,
+  }).select('id, key').single()
+  if (legacyKeyError || !legacyKeyData) {
+    throw new Error(`Failed to seed legacy webhook API key: ${legacyKeyError?.message ?? 'missing key data'}`)
+  }
+  legacyApiKeyId = legacyKeyData.id
+  legacyApiKeyValue = legacyKeyData.key
 
-  const webhookResponse = await fetch(WEBHOOKS_URL, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      orgId: policyOrgId,
-      name: `policy-webhook-${globalId}`,
-      url: 'https://example.com/webhook-policy',
-      events: ['orgs'],
-    }),
+  // Seed preconditions directly so policy tests do not depend on webhook delivery side effects.
+  const { error: webhookError } = await (supabase as any).from('webhooks').insert({
+    id: seededWebhookId,
+    org_id: policyOrgId,
+    name: `policy-webhook-${globalId}`,
+    url: 'https://example.com/webhook-policy',
+    events: ['orgs'],
+    enabled: true,
+    created_by: USER_ID,
   })
-  expect(webhookResponse.status).toBe(201)
-  const webhookData = await webhookResponse.json() as { webhook: { id: string } }
-  createdWebhookId = webhookData.webhook.id
+  if (webhookError)
+    throw webhookError
+  createdWebhookId = seededWebhookId
 
-  const testWebhookResponse = await fetch(WEBHOOKS_TEST_URL, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      orgId: policyOrgId,
-      webhookId: createdWebhookId,
-    }),
+  const { error: deliveryError } = await (supabase as any).from('webhook_deliveries').insert({
+    id: seededDeliveryId,
+    webhook_id: seededWebhookId,
+    org_id: policyOrgId,
+    event_type: 'orgs.TEST',
+    status: 'failed',
+    request_payload: {
+      event_id: seededDeliveryId,
+      event_type: 'orgs.TEST',
+      org_id: policyOrgId,
+      data: { test: true },
+    },
+    response_status: 500,
+    response_body: 'seeded test delivery',
+    attempt_count: 1,
+    max_attempts: 3,
   })
-  expect(testWebhookResponse.status).toBe(200)
-  const testWebhookData = await testWebhookResponse.json() as { delivery_id: string }
-  createdDeliveryId = testWebhookData.delivery_id
+  if (deliveryError)
+    throw deliveryError
+  createdDeliveryId = seededDeliveryId
 
   const { error: policyError } = await supabase.from('orgs').update({
     require_apikey_expiration: true,
@@ -95,19 +115,61 @@ beforeAll(async () => {
   if (policyError)
     throw policyError
 
-  const subkeyResponse = await fetch(APIKEY_URL, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      name: `expiring-webhook-subkey-${globalId}`,
-      limited_to_orgs: [policyOrgId],
-      expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-    }),
+  const { data: expiringKeyData, error: expiringKeyError } = await supabase.from('apikeys').insert({
+    id: expiringSubkeySeedId,
+    user_id: USER_ID,
+    key: `expiring-webhook-subkey-${globalId}`,
+    key_hash: null,
+    mode: 'all',
+    name: `expiring-webhook-subkey-${globalId}`,
+    limited_to_apps: [],
+    limited_to_orgs: [policyOrgId],
+    expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+  }).select('id, key').single()
+  if (expiringKeyError || !expiringKeyData) {
+    throw new Error(`Failed to seed expiring webhook API key: ${expiringKeyError?.message ?? 'missing key data'}`)
+  }
+  expiringSubkeyId = expiringKeyData.id
+  expiringSubkeyValue = expiringKeyData.key
+
+  const { data: delegatedKeyData, error: delegatedKeyError } = await supabase.from('apikeys').insert({
+    id: delegatedApiKeySeedId,
+    user_id: USER_ID_2,
+    key: `delegated-webhook-key-${globalId}`,
+    key_hash: null,
+    mode: 'all',
+    name: `delegated-webhook-key-${globalId}`,
+    limited_to_apps: [],
+    limited_to_orgs: [policyOrgId],
+    expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+  }).select('id, key, rbac_id').single()
+  if (delegatedKeyError || !delegatedKeyData?.rbac_id) {
+    throw new Error(`Failed to seed delegated webhook API key: ${delegatedKeyError?.message ?? 'missing delegated key data'}`)
+  }
+  delegatedApiKeyId = delegatedKeyData.id
+  delegatedApiKeyValue = delegatedKeyData.key
+
+  const { data: orgAdminRole, error: orgAdminRoleError } = await supabase
+    .from('roles')
+    .select('id')
+    .eq('name', 'org_admin')
+    .single()
+  if (orgAdminRoleError || !orgAdminRole?.id) {
+    throw new Error(`Failed to load org_admin role: ${orgAdminRoleError?.message ?? 'missing role data'}`)
+  }
+
+  const { error: delegatedBindingError } = await supabase.from('role_bindings').insert({
+    principal_type: 'apikey',
+    principal_id: delegatedKeyData.rbac_id,
+    role_id: orgAdminRole.id,
+    scope_type: 'org',
+    org_id: policyOrgId,
+    granted_by: USER_ID,
+    reason: 'Webhook delegated API key regression test',
+    is_direct: true,
   })
-  expect(subkeyResponse.status).toBe(200)
-  const subkeyData = await subkeyResponse.json() as { id: number, key: string }
-  expiringSubkeyId = subkeyData.id
-  expiringSubkeyValue = subkeyData.key
+  if (delegatedBindingError)
+    throw delegatedBindingError
 }, 60000)
 
 afterAll(async () => {
@@ -125,6 +187,11 @@ afterAll(async () => {
     await supabase.from('apikeys').delete().eq('id', expiringSubkeyId)
   }
 
+  if (delegatedApiKeyId) {
+    await supabase.from('apikeys').delete().eq('id', delegatedApiKeyId)
+  }
+
+  await supabase.from('role_bindings').delete().eq('org_id', policyOrgId)
   await supabase.from('org_users').delete().eq('org_id', policyOrgId)
   await supabase.from('orgs').delete().eq('id', policyOrgId)
   await supabase.from('stripe_info').delete().eq('customer_id', policyCustomerId)
@@ -269,5 +336,27 @@ describe('webhook endpoints enforce org API key expiration policy', () => {
     expect(response.status).toBe(200)
     const data = await response.json()
     expect(Array.isArray(data)).toBe(true)
+  })
+
+  it('allows delivery retry for a delegated API key with org_admin RBAC', async () => {
+    if (!delegatedApiKeyValue || !createdDeliveryId)
+      throw new Error('Delegated webhook retry prerequisites were not created')
+
+    const response = await fetch(WEBHOOKS_RETRY_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': delegatedApiKeyValue,
+      },
+      body: JSON.stringify({
+        orgId: policyOrgId,
+        deliveryId: createdDeliveryId,
+      }),
+    })
+
+    expect(response.status).toBe(200)
+    const data = await response.json() as { deliveryId: string, status: string }
+    expect(data.deliveryId).toBe(createdDeliveryId)
+    expect(data.status).toBe('Delivery queued for retry')
   })
 })

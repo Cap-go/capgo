@@ -91,6 +91,7 @@ app.delete('/', middlewareKey(['all', 'write', 'upload']), async (c) => {
     channel: 'upload-failed',
     event: 'Failed to upload a bundle',
     user_id: version.owner_org,
+    groups: { organization: version.owner_org },
     icon: '💀',
   })
 

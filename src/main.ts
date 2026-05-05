@@ -6,7 +6,7 @@ import { createApp } from 'vue'
 import { createRouter, createWebHistory } from 'vue-router'
 import { routes } from 'vue-router/auto-routes'
 import { posthogLoader } from '~/services/posthog'
-import { getErrorMessage, isStaleAssetErrorMessage } from '~/services/staleAssetErrors'
+import { getErrorMessage, isKnownCrawlerNoiseErrorMessage, isStaleAssetErrorMessage } from '~/services/staleAssetErrors'
 import { getLocalConfig } from '~/services/supabase'
 import App from './App.vue'
 import { getRemoteConfig } from './services/supabase'
@@ -87,6 +87,12 @@ window.addEventListener('error', (event) => {
     event.preventDefault()
     event.stopImmediatePropagation()
     handleChunkError(event.message)
+    return
+  }
+
+  if (isKnownCrawlerNoiseErrorMessage(event.message)) {
+    event.preventDefault()
+    event.stopImmediatePropagation()
   }
 }, true)
 
@@ -97,6 +103,12 @@ window.addEventListener('unhandledrejection', (event) => {
     event.preventDefault()
     event.stopImmediatePropagation()
     handleChunkError(message)
+    return
+  }
+
+  if (isKnownCrawlerNoiseErrorMessage(message)) {
+    event.preventDefault()
+    event.stopImmediatePropagation()
   }
 })
 

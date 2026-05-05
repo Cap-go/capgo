@@ -2,6 +2,7 @@ import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
 import { quickError, simpleError } from '../../utils/hono.ts'
+import { closeClient, getPgClient, logPgError } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
 import { isValidAppId } from '../../utils/utils.ts'
@@ -64,15 +65,58 @@ export async function setChannel(c: Context<MiddlewareKeyVariables>, body: SetCh
     throw simpleError('cannot_find_channel', 'Cannot find channel', { supabaseError: channelError })
   }
 
-  // Update the channel to set the new version
-  const { error: updateError } = await supabaseApikey(c, apikey.key)
-    .from('channels')
-    .update({ version: body.version_id })
-    .eq('id', body.channel_id)
-    .eq('app_id', body.app_id)
+  const effectiveApikey = apikey.key ?? c.get('capgkey')
+  if (!effectiveApikey) {
+    throw simpleError('cannot_set_bundle_to_channel', 'Cannot set bundle to channel', { error: 'Missing API key context for audit logging' })
+  }
 
-  if (updateError) {
-    throw simpleError('cannot_set_bundle_to_channel', 'Cannot set bundle to channel', { supabaseError: updateError })
+  // Update the channel to set the new version
+  // Keep the supported write-scoped /bundle flow working after explicit RBAC
+  // and ownership checks while preserving API-key identity for audit triggers.
+  const pgClient = getPgClient(c)
+  let dbClient: {
+    query: (text: string, params?: unknown[]) => Promise<{ rowCount?: number | null }>
+    release: () => void
+  } | null = null
+  try {
+    dbClient = await pgClient.connect()
+    await dbClient.query('BEGIN')
+    await dbClient.query(
+      'SELECT set_config(\'request.headers\', $1, true)',
+      [JSON.stringify({ capgkey: effectiveApikey })],
+    )
+
+    const updateResult = await dbClient.query(
+      `UPDATE public.channels
+       SET version = $1
+       WHERE id = $2
+         AND app_id = $3
+         AND owner_org = $4
+       RETURNING id`,
+      [body.version_id, body.channel_id, body.app_id, org.owner_org],
+    )
+
+    if ((updateResult.rowCount ?? 0) !== 1) {
+      throw new Error('Channel update affected 0 rows')
+    }
+
+    await dbClient.query('COMMIT')
+  }
+  catch (error) {
+    if (dbClient) {
+      try {
+        await dbClient.query('ROLLBACK')
+      }
+      catch {
+        // Ignore rollback failures to preserve the original database error.
+      }
+    }
+    logPgError(c, 'set_channel_update', error)
+    throw simpleError('cannot_set_bundle_to_channel', 'Cannot set bundle to channel', { error: (error as Error)?.message })
+  }
+  finally {
+    dbClient?.release()
+    await closeClient(c, pgClient)
   }
 
   return c.json({
