@@ -142,7 +142,7 @@ describe('[POST] /apikey with expiration', () => {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: 'key-with-expiration',
+        name: `key-with-expiration-${id}`,
         expires_at: futureDate,
       }),
     })
@@ -159,7 +159,7 @@ describe('[POST] /apikey with expiration', () => {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: 'key-no-expiration',
+        name: `key-no-expiration-${id}`,
       }),
     })
     const data = await response.json<{ key: string, id: number, expires_at: string | null }>()
@@ -174,7 +174,7 @@ describe('[POST] /apikey with expiration', () => {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: 'key-past-expiration',
+        name: `key-past-expiration-${id}`,
         expires_at: pastDate,
       }),
     })
@@ -188,7 +188,7 @@ describe('[POST] /apikey with expiration', () => {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: 'key-invalid-date',
+        name: `key-invalid-date-${id}`,
         expires_at: 'not-a-date',
       }),
     })
@@ -207,7 +207,7 @@ describe('[PUT] /apikey/:id with expiration', () => {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: 'key-for-update-expiration',
+        name: `key-for-update-expiration-${id}`,
       }),
     })
     expect(response.status).toBe(200)
@@ -282,7 +282,7 @@ describe('[GET] /apikey with expiration info', () => {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: 'key-with-exp-get-test',
+        name: `key-with-exp-get-test-${id}`,
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       }),
     })
@@ -294,7 +294,7 @@ describe('[GET] /apikey with expiration info', () => {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: 'key-without-exp-get-test',
+        name: `key-without-exp-get-test-${id}`,
       }),
     })
     expect(response2.status).toBe(200)
@@ -350,7 +350,7 @@ describe('organization API key expiration policy', () => {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: 'key-policy-test',
+        name: `key-policy-test-${id}`,
         limited_to_orgs: [POLICY_ORG_ID],
       }),
     })
@@ -366,7 +366,7 @@ describe('organization API key expiration policy', () => {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: 'key-policy-exceeds-max',
+        name: `key-policy-exceeds-max-${id}`,
         limited_to_orgs: [POLICY_ORG_ID],
         expires_at: tooFarDate,
       }),
@@ -383,7 +383,7 @@ describe('organization API key expiration policy', () => {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: 'key-policy-valid',
+        name: `key-policy-valid-${id}`,
         limited_to_orgs: [POLICY_ORG_ID],
         expires_at: validDate,
       }),
@@ -400,7 +400,7 @@ describe('organization API key expiration policy', () => {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: 'key-no-policy-org',
+        name: `key-no-policy-org-${id}`,
         limited_to_orgs: [BASE_ORG_ID],
       }),
     })
@@ -415,7 +415,7 @@ describe('organization API key expiration policy', () => {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: 'key-policy-app-scope',
+        name: `key-policy-app-scope-${id}`,
         app_id: policyAppUuid,
       }),
     })
@@ -430,7 +430,7 @@ describe('organization API key expiration policy', () => {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: 'key-policy-app-scope-too-far',
+        name: `key-policy-app-scope-too-far-${id}`,
         limited_to_apps: [POLICY_APPNAME],
         expires_at: tooFarDate,
       }),
@@ -445,7 +445,7 @@ describe('organization API key expiration policy', () => {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: 'key-policy-app-scope-missing-app',
+        name: `key-policy-app-scope-missing-app-${id}`,
         limited_to_apps: [`com.app.expiration.missing.${id}`],
       }),
     })
@@ -460,7 +460,7 @@ describe('organization API key expiration policy', () => {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: 'key-policy-app-scope-update',
+        name: `key-policy-app-scope-update-${id}`,
       }),
     })
     expect(createResponse.status).toBe(200)
@@ -485,7 +485,7 @@ describe('organization API key expiration policy', () => {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: 'key-policy-limited-updater',
+        name: `key-policy-limited-updater-${id}`,
         limited_to_apps: [POLICY_APPNAME],
         expires_at: validDate,
       }),
@@ -497,7 +497,7 @@ describe('organization API key expiration policy', () => {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: 'key-policy-sibling-target',
+        name: `key-policy-sibling-target-${id}`,
       }),
     })
     expect(siblingKeyResponse.status).toBe(200)
@@ -511,7 +511,7 @@ describe('organization API key expiration policy', () => {
       method: 'PUT',
       headers: limitedAuthHeaders,
       body: JSON.stringify({
-        name: 'key-policy-escalation-attempt',
+        name: `key-policy-escalation-attempt-${id}`,
       }),
     })
     const data = await updateResponse.json() as { error: string }
@@ -529,7 +529,7 @@ describe('organization API key expiration policy', () => {
         key: null,
         key_hash: '0'.repeat(64),
         mode: 'all',
-        name: 'direct-insert-policy-bypass',
+        name: `direct-insert-policy-bypass-${id}`,
         limited_to_apps: [POLICY_APPNAME],
         limited_to_orgs: [],
         expires_at: null,
@@ -546,7 +546,7 @@ describe('organization API key expiration policy', () => {
     const tooFarDate = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString()
     const { data, error } = await supabase.rpc('create_hashed_apikey', {
       p_mode: 'all',
-      p_name: 'direct-rpc-policy-bypass',
+      p_name: `direct-rpc-policy-bypass-${id}`,
       p_limited_to_orgs: [],
       p_limited_to_apps: [POLICY_APPNAME],
       p_expires_at: tooFarDate,
@@ -699,7 +699,7 @@ describe('expired API key rejection', () => {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: 'key-to-be-expired',
+        name: `key-to-be-expired-${id}`,
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       }),
     })
@@ -719,7 +719,7 @@ describe('expired API key rejection', () => {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: 'key-valid-for-test',
+        name: `key-valid-for-test-${id}`,
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       }),
     })
@@ -759,7 +759,7 @@ describe('api key expiration boundary conditions', () => {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: 'key-boundary-test',
+        name: `key-boundary-test-${id}`,
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       }),
     })
@@ -793,7 +793,7 @@ describe('api key expiration boundary conditions', () => {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: 'key-near-expiration',
+        name: `key-near-expiration-${id}`,
         expires_at: futureDate,
       }),
     })
@@ -823,7 +823,7 @@ describe('api key expiration boundary conditions', () => {
       method: 'POST',
       headers: authHeaders,
       body: JSON.stringify({
-        name: 'key-no-expiration-test',
+        name: `key-no-expiration-test-${id}`,
       }),
     })
     const data = await response.json<{ id: number, key: string, expires_at: string | null }>()
