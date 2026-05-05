@@ -63,12 +63,17 @@ function normalizeWhitespace(value: string) {
 }
 
 function splitTextNodeValue(value: string) {
-  const leadingWhitespace = value.match(/^\s*/)?.[0] ?? ''
-  const trailingWhitespace = value.match(/\s*$/)?.[0] ?? ''
+  let start = 0
+  let end = value.length
+  while (start < end && value[start]?.trim() === '')
+    start++
+  while (end > start && value[end - 1]?.trim() === '')
+    end--
+
   return {
-    leadingWhitespace,
-    source: value.slice(leadingWhitespace.length, value.length - trailingWhitespace.length),
-    trailingWhitespace,
+    leadingWhitespace: value.slice(0, start),
+    source: value.slice(start, end),
+    trailingWhitespace: value.slice(end),
   }
 }
 

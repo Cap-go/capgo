@@ -429,11 +429,12 @@ function parseTranslationArray(payload: unknown): string[] | null {
       return parseTranslationArray(JSON.parse(trimmed))
     }
     catch {
-      const arrayMatch = trimmed.match(/\{[\s\S]*\}/)
-      if (!arrayMatch)
+      const start = trimmed.indexOf('{')
+      const end = trimmed.lastIndexOf('}')
+      if (start < 0 || end <= start)
         return null
       try {
-        return parseTranslationArray(JSON.parse(arrayMatch[0]))
+        return parseTranslationArray(JSON.parse(trimmed.slice(start, end + 1)))
       }
       catch {
         return null
