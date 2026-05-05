@@ -625,18 +625,6 @@ function assertValidPercentEncodedAttachmentKey(c: Context, value: string, conte
   }
 }
 
-function decodeAttachmentKeyFromMetadata(c: Context, value: string, context: string): string {
-  if (!value.includes('%'))
-    return value
-
-  try {
-    return decodeURIComponent(value)
-  }
-  catch (error) {
-    throwInvalidAttachmentPathEncoding(c, value, context, error)
-  }
-}
-
 function getRawAttachmentRouteId(c: Context): string | null {
   const pathname = new URL(c.req.url).pathname
   for (const prefix of ATTACHMENT_ROUTE_PREFIXES) {
@@ -748,7 +736,7 @@ async function setKeyFromMetadata(c: Context, next: Next) {
     })
   }
 
-  const normalizedFileId = decodeAttachmentKeyFromMetadata(c, decodedFileId, 'setKeyFromMetadata')
+  const normalizedFileId = decodedFileId
   cloudlog({ requestId: c.get('requestId'), message: 'setKeyFromMetadata - final normalized fileId', normalizedFileId })
   c.set('fileId', normalizedFileId)
   await next()

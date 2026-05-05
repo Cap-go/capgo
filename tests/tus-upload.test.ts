@@ -296,28 +296,38 @@ describe('tus upload protocol tests', () => {
   })
 
   describe('error handling', () => {
-    it.concurrent('should reject upload filenames containing an unencoded percent sign without a server error', async () => {
+    it.concurrent('should not treat metadata filenames containing literal percent signs as malformed path encoding', async () => {
       const { response, uploadUrl } = await createTusUploadViaApi(
         APPNAME,
         `test-percent-${Date.now()}-100%.zip`,
         1024,
       )
 
-      expect(response.status).toBe(400)
-      expect(uploadUrl).toBe('')
-      expect(await response.text()).toContain('invalid_file_path_encoding')
+      if (response.status === 400) {
+        expect(await response.text()).not.toContain('invalid_file_path_encoding')
+        return
+      }
+
+      expect(response.status).toBe(201)
+      expect(uploadUrl).not.toBe('')
+      expect(uploadUrl).not.toMatch(/%(?![0-9A-Fa-f]{2})/)
     })
 
-    it.concurrent('should reject upload filenames containing malformed percent encoding without a server error', async () => {
+    it.concurrent('should not treat metadata filenames containing percent-like sequences as malformed path encoding', async () => {
       const { response, uploadUrl } = await createTusUploadViaApi(
         APPNAME,
         `test-percent-${Date.now()}-%zz.zip`,
         1024,
       )
 
-      expect(response.status).toBe(400)
-      expect(uploadUrl).toBe('')
-      expect(await response.text()).toContain('invalid_file_path_encoding')
+      if (response.status === 400) {
+        expect(await response.text()).not.toContain('invalid_file_path_encoding')
+        return
+      }
+
+      expect(response.status).toBe(201)
+      expect(uploadUrl).not.toBe('')
+      expect(uploadUrl).not.toMatch(/%(?![0-9A-Fa-f]{2})/)
     })
 
     it.concurrent('should reject read paths containing malformed percent encoding without a server error', async () => {
