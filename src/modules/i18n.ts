@@ -293,12 +293,15 @@ async function fetchTranslatedMessageCatalog(lang: string, messages: MessageCata
       }),
     })
 
-    if (response.status === 404 || response.status === 501 || response.status === 503) {
+    if (response.status === 404 || response.status === 501) {
       // Supabase-only/local runtimes intentionally do not expose translation
       // bundles, and workers without AI bindings should keep the source English UI.
       messageCatalogTranslationDisabled = true
       return null
     }
+
+    if (response.status === 503)
+      return null
 
     if (!response.ok)
       throw new Error(`Message translation request failed with ${response.status}`)

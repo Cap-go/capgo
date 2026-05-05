@@ -36,4 +36,28 @@ describe('i18n fallback loading', () => {
       price: '$0.08 per minute',
     })).toBe('Included in plan, then $0.08 per minute')
   })
+
+  it('retries message catalog translation after a transient 503', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        messages: {
+          account: 'Compte',
+        },
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        status: 200,
+      }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { loadLanguageAsync, translateMessage } = await import('../src/modules/i18n.ts')
+
+    await loadLanguageAsync('fr')
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+    expect(translateMessage('account')).toBe('Compte')
+  })
 })
