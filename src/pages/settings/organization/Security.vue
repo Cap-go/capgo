@@ -496,6 +496,7 @@ async function toggleEnforceHashedApiKeys() {
       return
     }
 
+    await organizationStore.fetchOrganizations()
     toast.success(newValue ? t('hashed-api-keys-enforcement-enabled') : t('hashed-api-keys-enforcement-disabled'))
   }
   catch (error) {
@@ -631,6 +632,7 @@ async function saveEncryptedBundlesEnforcement(enable: boolean, keyFingerprint: 
       return
     }
 
+    await organizationStore.fetchOrganizations()
     if (enable) {
       const deletedCount = nonCompliantBundleCounts.value?.total_non_compliant ?? 0
       if (deletedCount > 0) {
