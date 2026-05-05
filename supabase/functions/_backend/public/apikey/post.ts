@@ -40,6 +40,20 @@ function apiKeyHasLimitedScope(apikey: ApiKeyRow | undefined) {
   return (apikey?.limited_to_orgs?.length ?? 0) > 0 || (apikey?.limited_to_apps?.length ?? 0) > 0
 }
 
+function uuidSqlArray(values: string[]) {
+  if (!values.length)
+    return sql`ARRAY[]::uuid[]`
+
+  return sql`ARRAY[${sql.join(values.map(value => sql`${value}::uuid`), sql`, `)}]::uuid[]`
+}
+
+function textSqlArray(values: string[]) {
+  if (!values.length)
+    return sql`ARRAY[]::text[]`
+
+  return sql`ARRAY[${sql.join(values.map(value => sql`${value}::text`), sql`, `)}]::text[]`
+}
+
 async function createApiKeyRecord(
   db: DrizzleExecutor,
   params: CreateApiKeyRecordParams,
@@ -61,8 +75,8 @@ async function createApiKeyRecord(
       CASE WHEN ${params.isHashed}::boolean THEN encode(extensions.digest(${plainKey}::text, 'sha256'), 'hex') ELSE NULL END,
       ${params.mode}::public.key_mode,
       ${params.name}::text,
-      ${params.limitedToOrgs}::uuid[],
-      ${params.limitedToApps}::text[],
+      ${uuidSqlArray(params.limitedToOrgs)},
+      ${textSqlArray(params.limitedToApps)},
       ${params.expiresAt}::timestamptz
     )
     RETURNING *`)
