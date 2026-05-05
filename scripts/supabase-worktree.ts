@@ -137,6 +137,7 @@ function ensureWorktreeSupabaseDir(repoRoot: string): { workdir: string, cfg: Re
   }
 
   if (existsSync(repoTemplatesDir)) {
+    // `supabase start --workdir` resolves template paths from the workdir root.
     ensureSymlink(resolve(workdir, 'templates'), repoTemplatesDir)
     ensureSymlink(resolve(supaDir, 'templates'), repoTemplatesDir)
   }
