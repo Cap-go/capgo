@@ -1614,6 +1614,7 @@
   "select-user-perms": "Select user's permissions",
   "select-user-perms-expanded": "Select which permission should the invited user have",
   "select-user-role": "Select a role",
+  "select-at-least-one-role": "Select at least one org role or app role",
   "select-role-for-each-app": "Select a role for each app",
   "select-user-role-expanded": "Choose the RBAC role to assign. Legacy roles remain visible during migration.",
   "select_all": "select all",

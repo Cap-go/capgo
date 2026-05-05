@@ -229,7 +229,7 @@ columns.value = [
     label: t('type'),
     sortable: true,
     displayFunction: (row: Database['public']['Tables']['apikeys']['Row']) => {
-      return row.mode.toUpperCase()
+      return row.mode ? row.mode.toUpperCase() : 'RBAC'
     },
   },
   {

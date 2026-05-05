@@ -1336,6 +1336,55 @@ describe('[DELETE] /organization', () => {
   })
 })
 
+describe('[PUT] /organization - encrypted bundles settings', () => {
+  afterAll(async () => {
+    await getSupabaseClient().from('orgs').update({
+      enforce_encrypted_bundles: false,
+      required_encryption_key: null,
+    }).eq('id', ORG_ID)
+  })
+
+  it('updates encrypted bundle enforcement and required key', async () => {
+    const requiredEncryptionKey = 'ABCDEFGHIJKLMNOPQRSTU'
+
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'PUT',
+      body: JSON.stringify({
+        orgId: ORG_ID,
+        enforce_encrypted_bundles: true,
+        required_encryption_key: requiredEncryptionKey,
+      }),
+    })
+    expect(response.status).toBe(200)
+
+    const { data, error } = await getSupabaseClient()
+      .from('orgs')
+      .select('enforce_encrypted_bundles, required_encryption_key')
+      .eq('id', ORG_ID)
+      .single()
+
+    expect(error).toBeNull()
+    expect(data?.enforce_encrypted_bundles).toBe(true)
+    expect(data?.required_encryption_key).toBe(requiredEncryptionKey)
+  })
+
+  it('rejects invalid required encryption key length', async () => {
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'PUT',
+      body: JSON.stringify({
+        orgId: ORG_ID,
+        required_encryption_key: 'too-short',
+      }),
+    })
+
+    expect(response.status).toBe(400)
+    const responseData = await response.json() as { error: string }
+    expect(responseData.error).toBe('invalid_required_encryption_key')
+  })
+})
+
 describe('[PUT] /organization - enforce_hashed_api_keys setting', () => {
   const enforceOrgId = randomUUID()
   const enforceGlobalId = randomUUID()
@@ -1653,6 +1702,7 @@ describe('hashed API key enforcement integration', () => {
       method: 'POST',
       body: JSON.stringify({
         name: 'test-hashed-key-for-find',
+        mode: 'all',
         hashed: true,
       }),
     })
@@ -1704,6 +1754,7 @@ describe('hashed API key enforcement integration', () => {
       method: 'POST',
       body: JSON.stringify({
         name: 'test-verify-hash-key',
+        mode: 'all',
         hashed: true,
       }),
     })

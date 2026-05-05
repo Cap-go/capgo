@@ -18,7 +18,7 @@ export async function createDefaultApiKey(
 
 interface ApiKeyListRow {
   name?: string | null
-  mode: string
+  mode: string | null
   created_at: string | null
 }
 
@@ -80,8 +80,8 @@ export function sortApiKeyRows<T extends ApiKeyListRow>(
           bValue = b.name?.toLowerCase() || ''
           break
         case 'mode':
-          aValue = a.mode.toLowerCase()
-          bValue = b.mode.toLowerCase()
+          aValue = (a.mode ?? '').toLowerCase()
+          bValue = (b.mode ?? '').toLowerCase()
           break
         case 'created_at':
           aValue = a.created_at ? new Date(a.created_at).getTime() : 0

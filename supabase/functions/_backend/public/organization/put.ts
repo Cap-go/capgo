@@ -83,13 +83,23 @@ function validateMaxExpirationDays(maxDays?: number | null) {
   }
 }
 
-function validateRequiredEncryptionKey(requiredKey?: string | null) {
-  if (requiredKey === undefined || requiredKey === null) {
-    return
+function normalizeRequiredEncryptionKey(requiredEncryptionKey?: string | null) {
+  if (requiredEncryptionKey === undefined) {
+    return undefined
   }
-  if (requiredKey.length !== 20 && requiredKey.length !== 21) {
+  const normalized = requiredEncryptionKey?.trim() ?? null
+  return normalized === '' ? null : normalized
+}
+
+function validateRequiredEncryptionKey(requiredKey?: string | null) {
+  const normalized = normalizeRequiredEncryptionKey(requiredKey)
+  if (normalized === undefined || normalized === null) {
+    return normalized
+  }
+  if (normalized.length !== 20 && normalized.length !== 21) {
     throw simpleError('invalid_required_encryption_key', 'Encryption key fingerprint must be 20 or 21 characters')
   }
+  return normalized
 }
 
 function buildUpdateFields(body: OrganizationPutBody, sanitizedName?: string) {
@@ -111,7 +121,7 @@ function buildUpdateFields(body: OrganizationPutBody, sanitizedName?: string) {
   if (body.enforce_encrypted_bundles !== undefined)
     updateFields.enforce_encrypted_bundles = body.enforce_encrypted_bundles
   if (body.required_encryption_key !== undefined)
-    updateFields.required_encryption_key = body.required_encryption_key
+    updateFields.required_encryption_key = validateRequiredEncryptionKey(body.required_encryption_key)
   if (body.enforcing_2fa !== undefined)
     updateFields.enforcing_2fa = body.enforcing_2fa
   return updateFields
