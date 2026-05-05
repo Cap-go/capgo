@@ -344,7 +344,7 @@ export function usePageTranslation() {
   }
 
   async function fetchTranslations(strings: string[], lang: string, pagePath: string, signal: AbortSignal) {
-    const response = await fetch(`${defaultApiHost}/translation/page`, {
+    const response = await fetch(`${defaultApiHost || ''}/translation/page`, {
       method: 'POST',
       signal,
       headers: {

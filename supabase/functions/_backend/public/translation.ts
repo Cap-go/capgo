@@ -347,7 +347,7 @@ function recordTranslationRequest(c: Context): TranslationRateLimitStatus {
   const entry = incrementTranslationRateLimit(cacheKey)
 
   const limit = getTranslationIpRateLimit(c)
-  const limited = entry.count >= limit
+  const limited = entry.count > limit
   if (limited) {
     cloudlog({
       requestId: c.get('requestId'),

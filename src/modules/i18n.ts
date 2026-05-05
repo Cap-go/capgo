@@ -13,6 +13,7 @@ export interface LanguageOption {
 
 export const SOURCE_LOCALE = 'en'
 const LANGUAGE_STORAGE_KEY = 'lang'
+const MESSAGE_CATALOG_TRANSLATION_TIMEOUT_MS = 10_000
 
 export const languageOptions: LanguageOption[] = [
   { id: 'en', label: 'English', workerCode: 'en', countryCode: 'US' },
@@ -280,10 +281,14 @@ async function fetchTranslatedMessageCatalog(lang: string, messages: MessageCata
   if (messageCatalogTranslationDisabled)
     return null
 
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), MESSAGE_CATALOG_TRANSLATION_TIMEOUT_MS)
+
   try {
     const translationEndpoint = `${defaultApiHost || ''}/translation/messages`
     const response = await fetch(translationEndpoint, {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -315,6 +320,9 @@ async function fetchTranslatedMessageCatalog(lang: string, messages: MessageCata
   catch (error) {
     console.error('Message catalog translation failed', error)
     return null
+  }
+  finally {
+    clearTimeout(timeoutId)
   }
 }
 
