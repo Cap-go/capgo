@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { env } from 'node:process'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
   APIKEY_TEST_ALL,
@@ -10,6 +11,9 @@ import {
 
 // TUS protocol constants
 const TUS_VERSION = '1.0.0'
+const USE_CLOUDFLARE = env.USE_CLOUDFLARE_WORKERS === 'true'
+const cloudflareIt = USE_CLOUDFLARE ? it.concurrent : it.skip
+const localIt = USE_CLOUDFLARE ? it.skip : it.concurrent
 
 /**
  * Helper to create a TUS upload via the Capgo API (goes through middleware)
@@ -296,41 +300,39 @@ describe('tus upload protocol tests', () => {
   })
 
   describe('error handling', () => {
-    it.concurrent('should not treat metadata filenames containing literal percent signs as malformed path encoding', async () => {
+    cloudflareIt('should accept upload filenames containing literal percent signs without returning malformed URLs', async () => {
       const { response, uploadUrl } = await createTusUploadViaApi(
         APPNAME,
         `test-percent-${Date.now()}-100%.zip`,
         1024,
       )
 
-      if (response.status === 400) {
-        expect(await response.text()).not.toContain('invalid_file_path_encoding')
-        return
-      }
-
       expect(response.status).toBe(201)
       expect(uploadUrl).not.toBe('')
       expect(uploadUrl).not.toMatch(/%(?![0-9A-Fa-f]{2})/)
     })
 
-    it.concurrent('should not treat metadata filenames containing percent-like sequences as malformed path encoding', async () => {
+    cloudflareIt('should accept upload filenames containing percent-like sequences without returning malformed URLs', async () => {
       const { response, uploadUrl } = await createTusUploadViaApi(
         APPNAME,
         `test-percent-${Date.now()}-%zz.zip`,
         1024,
       )
 
-      if (response.status === 400) {
-        expect(await response.text()).not.toContain('invalid_file_path_encoding')
-        return
-      }
-
       expect(response.status).toBe(201)
       expect(uploadUrl).not.toBe('')
       expect(uploadUrl).not.toMatch(/%(?![0-9A-Fa-f]{2})/)
     })
 
-    it.concurrent('should reject read paths containing malformed percent encoding without a server error', async () => {
+    cloudflareIt('should reject read paths containing malformed percent encoding with a client error body', async () => {
+      const response = await fetch(getEndpointUrl(`/files/read/attachments/orgs/${ORG_ID}/apps/${APPNAME}/test-%zz.zip`))
+
+      expect(response.status).toBe(400)
+      const body = await response.json() as { error?: string }
+      expect(body.error).toBe('invalid_file_path_encoding')
+    })
+
+    localIt('should reject read paths containing malformed percent encoding without a server error', async () => {
       const response = await fetch(getEndpointUrl(`/files/read/attachments/orgs/${ORG_ID}/apps/${APPNAME}/test-%zz.zip`))
 
       expect(response.status).toBe(400)
