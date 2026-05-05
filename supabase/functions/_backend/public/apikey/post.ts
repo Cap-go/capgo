@@ -1,6 +1,7 @@
 import type { CreateBindingParams } from '../../private/role_bindings.ts'
 import type { AuthInfo } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
+import { sql } from 'drizzle-orm'
 import { createRoleBindingForPrincipal } from '../../private/role_bindings.ts'
 import { honoFactory, parseBody, quickError, simpleError } from '../../utils/hono.ts'
 import { middlewareV2 } from '../../utils/hono_middleware.ts'
@@ -19,11 +20,65 @@ interface BindingInput {
   reason?: string
 }
 
+type ApiKeyRow = Database['public']['Tables']['apikeys']['Row']
+
+type DrizzleExecutor = Pick<ReturnType<typeof getDrizzleClient>, 'execute'>
+
+interface CreateApiKeyRecordParams {
+  userId: string
+  mode: Database['public']['Enums']['key_mode'] | null
+  name: string
+  limitedToOrgs: string[]
+  limitedToApps: string[]
+  expiresAt: string | null
+  isHashed: boolean
+}
+
 const app = honoFactory.createApp()
+
+function apiKeyHasLimitedScope(apikey: ApiKeyRow | undefined) {
+  return (apikey?.limited_to_orgs?.length ?? 0) > 0 || (apikey?.limited_to_apps?.length ?? 0) > 0
+}
+
+async function createApiKeyRecord(
+  db: DrizzleExecutor,
+  params: CreateApiKeyRecordParams,
+): Promise<ApiKeyRow> {
+  const plainKey = crypto.randomUUID()
+  const result = await db.execute<ApiKeyRow>(sql`INSERT INTO public.apikeys (
+      user_id,
+      key,
+      key_hash,
+      mode,
+      name,
+      limited_to_orgs,
+      limited_to_apps,
+      expires_at
+    )
+    VALUES (
+      ${params.userId}::uuid,
+      CASE WHEN ${params.isHashed}::boolean THEN NULL ELSE ${plainKey}::text END,
+      CASE WHEN ${params.isHashed}::boolean THEN encode(extensions.digest(${plainKey}::text, 'sha256'), 'hex') ELSE NULL END,
+      ${params.mode}::public.key_mode,
+      ${params.name}::text,
+      ${params.limitedToOrgs}::uuid[],
+      ${params.limitedToApps}::text[],
+      ${params.expiresAt}::timestamptz
+    )
+    RETURNING *`)
+
+  const apiKey = result.rows[0] as ApiKeyRow | undefined
+  if (!apiKey) {
+    throw new Error('API key insert returned no rows')
+  }
+
+  apiKey.key = plainKey
+  return apiKey
+}
 
 app.post('/', middlewareV2(['all']), async (c) => {
   const auth = c.get('auth') as AuthInfo
-  const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
+  const apikey = c.get('apikey') as ApiKeyRow | undefined
 
   const body = await parseBody<any>(c)
 
@@ -45,10 +100,10 @@ app.post('/', middlewareV2(['all']), async (c) => {
     throw simpleError('invalid_limited_to_orgs', 'limited_to_orgs must be an array of org ids')
   }
 
-  // Limit API key creation for constrained caller keys (not JWT).
-  const callerHasLimitedScope = (apikey?.limited_to_orgs?.length ?? 0) > 0 || (apikey?.limited_to_apps?.length ?? 0) > 0
-  if (auth.authType === 'apikey' && callerHasLimitedScope) {
-    throw simpleError('cannot_create_apikey', 'You cannot create API keys with a limited API key', { keyId: apikey?.id })
+  // API key callers must be full legacy keys. Limited keys, write keys, and
+  // RBAC-managed keys must not be able to mint broader credentials.
+  if (auth.authType === 'apikey' && (apikey?.mode !== 'all' || apiKeyHasLimitedScope(apikey))) {
+    throw simpleError('cannot_create_apikey', 'You cannot create API keys with this API key', { keyId: apikey?.id })
   }
   const expiresAt = body.expires_at ?? null
   const isHashed = body.hashed === true
@@ -120,10 +175,98 @@ app.post('/', middlewareV2(['all']), async (c) => {
   })
   await validateExpirationAgainstOrgPolicies(allOrgIds, expiresAt, supabase)
 
-  let apikeyData: Database['public']['Tables']['apikeys']['Row'] | null = null
-  let apikeyError: unknown = null
+  let apikeyData: ApiKeyRow | null = null
 
-  if (isHashed) {
+  if (hasBindings) {
+    let pgClient: ReturnType<typeof getPgClient> | undefined
+    try {
+      // Check RBAC permission for each unique org in the bindings before creating anything.
+      const bindingOrgIds = [...new Set(bindings.map(b => b.org_id))]
+      for (const bindingOrgId of bindingOrgIds) {
+        if (!(await checkPermission(c, 'org.update_user_roles', { orgId: bindingOrgId }))) {
+          throw quickError(403, 'forbidden_binding', `Forbidden - Admin rights required for org ${bindingOrgId}`)
+        }
+      }
+
+      pgClient = getPgClient(c)
+      const drizzle = getDrizzleClient(pgClient)
+      const createdBindings: unknown[] = []
+      const callerPrincipalId = auth.authType === 'apikey' ? auth.apikey!.rbac_id : auth.userId
+
+      await drizzle.transaction(async (tx) => {
+        apikeyData = await createApiKeyRecord(tx, {
+          userId: auth.userId,
+          mode,
+          name,
+          limitedToOrgs,
+          limitedToApps,
+          expiresAt,
+          isHashed,
+        })
+
+        if (!apikeyData.rbac_id) {
+          throw new Error('Created API key is missing rbac_id')
+        }
+
+        for (const binding of bindings) {
+          const bindingParams: CreateBindingParams = {
+            principal_type: 'apikey',
+            principal_id: apikeyData.rbac_id,
+            role_name: binding.role_name,
+            scope_type: binding.scope_type,
+            org_id: binding.org_id,
+            app_id: binding.app_id,
+            channel_id: binding.channel_id,
+            reason: binding.reason,
+          }
+
+          const result = await createRoleBindingForPrincipal(
+            tx as unknown as ReturnType<typeof getDrizzleClient>,
+            bindingParams,
+            auth.userId,
+            auth.authType as 'jwt' | 'apikey',
+            callerPrincipalId,
+          )
+
+          if (!result.ok) {
+            cloudlogErr({
+              requestId: c.get('requestId'),
+              message: 'apikey_binding_failed',
+              binding,
+              error: result.error,
+            })
+            throw quickError(result.status as any, 'binding_failed', result.error)
+          }
+
+          createdBindings.push(result.data)
+        }
+      })
+
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'apikey_bindings_created',
+        apikeyId: (apikeyData as ApiKeyRow | null)?.id,
+        bindingsCount: createdBindings.length,
+      })
+    }
+    catch (error: any) {
+      if (error?.status) {
+        throw error
+      }
+      cloudlogErr({
+        requestId: c.get('requestId'),
+        message: 'apikey_bindings_unexpected_error',
+        error,
+      })
+      throw simpleError('binding_creation_failed', 'Failed to create role bindings for the API key')
+    }
+    finally {
+      if (pgClient) {
+        await closeClient(c, pgClient)
+      }
+    }
+  }
+  else if (isHashed) {
     const { data, error } = await supabase.rpc('create_hashed_apikey', {
       p_mode: mode,
       p_name: name,
@@ -132,7 +275,9 @@ app.post('/', middlewareV2(['all']), async (c) => {
       p_expires_at: expiresAt,
     })
     apikeyData = data
-    apikeyError = error
+    if (error || !apikeyData) {
+      throw simpleError('failed_to_create_apikey', 'Failed to create API key', { supabaseError: error })
+    }
   }
   else {
     const { data, error } = await supabase
@@ -150,102 +295,8 @@ app.post('/', middlewareV2(['all']), async (c) => {
       .select()
       .single()
     apikeyData = data
-    apikeyError = error
-  }
-  if (apikeyError || !apikeyData) {
-    throw simpleError('failed_to_create_apikey', 'Failed to create API key', { supabaseError: apikeyError })
-  }
-
-  // If bindings are provided, create them using the new key's rbac_id
-  if (hasBindings && apikeyData.rbac_id) {
-    let pgClient: ReturnType<typeof getPgClient> | undefined
-    try {
-      pgClient = getPgClient(c)
-      const drizzle = getDrizzleClient(pgClient)
-
-      // Check RBAC permission for each unique org in the bindings
-      const bindingOrgIds = [...new Set(bindings.map(b => b.org_id))]
-      for (const bindingOrgId of bindingOrgIds) {
-        if (!(await checkPermission(c, 'org.update_user_roles', { orgId: bindingOrgId }))) {
-          // Rollback the created key
-          const { error: rollbackError } = await supabase.from('apikeys').delete().eq('id', apikeyData.id)
-          if (rollbackError)
-            cloudlogErr({ requestId: c.get('requestId'), message: 'apikey_rollback_failed', rollbackError })
-          throw quickError(403, 'forbidden_binding', `Forbidden - Admin rights required for org ${bindingOrgId}`)
-        }
-      }
-
-      // Guard: an API key caller cannot create bindings for keys it doesn't own
-      // Note: since we just created the key with auth.userId, this is inherently safe.
-      // This guard is a defense-in-depth measure for future code changes.
-
-      const callerPrincipalId = auth.authType === 'apikey' ? auth.apikey!.rbac_id : auth.userId
-      const createdBindings = []
-
-      for (const binding of bindings) {
-        const bindingParams: CreateBindingParams = {
-          principal_type: 'apikey',
-          principal_id: apikeyData.rbac_id,
-          role_name: binding.role_name,
-          scope_type: binding.scope_type,
-          org_id: binding.org_id,
-          app_id: binding.app_id,
-          channel_id: binding.channel_id,
-          reason: binding.reason,
-        }
-
-        const result = await createRoleBindingForPrincipal(
-          drizzle,
-          bindingParams,
-          auth.userId,
-          auth.authType as 'jwt' | 'apikey',
-          callerPrincipalId,
-        )
-
-        if (!result.ok) {
-          // Rollback: delete the created key and any bindings created so far
-          cloudlogErr({
-            requestId: c.get('requestId'),
-            message: 'apikey_binding_failed',
-            binding,
-            error: result.error,
-          })
-          const { error: rollbackError } = await supabase.from('apikeys').delete().eq('id', apikeyData.id)
-          if (rollbackError)
-            cloudlogErr({ requestId: c.get('requestId'), message: 'apikey_rollback_failed', rollbackError })
-          throw quickError(result.status as any, 'binding_failed', result.error)
-        }
-
-        createdBindings.push(result.data)
-      }
-
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: 'apikey_bindings_created',
-        apikeyId: apikeyData.id,
-        bindingsCount: createdBindings.length,
-      })
-    }
-    catch (error: any) {
-      // Re-throw our own quickError/simpleError (HTTP errors thrown above)
-      if (error?.status) {
-        throw error
-      }
-      // Unexpected error: rollback the key
-      cloudlogErr({
-        requestId: c.get('requestId'),
-        message: 'apikey_bindings_unexpected_error',
-        error,
-      })
-      const { error: rollbackError } = await supabase.from('apikeys').delete().eq('id', apikeyData.id)
-      if (rollbackError)
-        cloudlogErr({ requestId: c.get('requestId'), message: 'apikey_rollback_failed', rollbackError })
-      throw simpleError('binding_creation_failed', 'Failed to create role bindings for the API key')
-    }
-    finally {
-      if (pgClient) {
-        await closeClient(c, pgClient)
-      }
+    if (error || !apikeyData) {
+      throw simpleError('failed_to_create_apikey', 'Failed to create API key', { supabaseError: error })
     }
   }
 
