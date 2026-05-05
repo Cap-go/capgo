@@ -525,7 +525,7 @@ describe('[POST] /updates parallel tests', () => {
     expect(response.status).toBe(429)
     const json = await response.json<UpdateRes>()
     expect(json.error).toBe('on_premise_app')
-    expect(json.kind).toBe('failed')
+    expect(json.kind).toBeUndefined()
   })
 
   it('direct channel overwrite', async () => {
@@ -771,7 +771,7 @@ describe('[POST] /updates invalid data', () => {
 
     const json = await response.json<UpdateRes>()
     expect(json.error).toBe('on_premise_app')
-    expect(json.kind).toBe('failed')
+    expect(json.kind).toBeUndefined()
   })
 })
 

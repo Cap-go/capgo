@@ -117,7 +117,7 @@ export async function updateWithPG(
     const device = makeDevice(body, cachedAppStatus.allow_device_custom_id)
     cloudlog({ requestId: c.get('requestId'), message: 'Cannot update, upgrade plan to continue to update', id: app_id })
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
-    return c.json({ error: 'on_premise_app', message: 'On-premise app detected', kind: getUpdateResponseKind('on_premise_app') }, 429)
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT)
   // if version_build is not semver, then make it semver
@@ -136,7 +136,7 @@ export async function updateWithPG(
       device_id,
       app_id_url: app_id,
     }, appOwner.owner_org, app_id, '0 0 * * 1', appOwner.orgs.management_email, drizzleClient)) // Weekly on Monday
-    return c.json({ error: 'on_premise_app', message: 'On-premise app detected', kind: getUpdateResponseKind('on_premise_app') }, 429)
+    return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
   await setAppStatus(c, app_id, 'cloud', appOwner.allow_device_custom_id)
   const channelDeviceCount = appOwner.channel_device_count ?? 0
