@@ -8,7 +8,7 @@ import { closeClient, getPgClient } from '../../utils/pg.ts'
 import { requireEnterprisePlan } from '../../utils/plan-gating.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { createSSOProvider, deleteSSOProvider, ManagementAPIError } from '../../utils/supabase-management.ts'
-import { supabaseAdmin, supabaseWithAuth } from '../../utils/supabase.ts'
+import { supabaseWithAuth } from '../../utils/supabase.ts'
 import { version } from '../../utils/version.ts'
 
 const createBodySchema = type({
@@ -141,21 +141,6 @@ app.post('/', async (c) => {
 
   await requireManageSsoPermission(c, body.org_id)
   await requireEnterprisePlan(c, body.org_id)
-
-  const adminClient = supabaseAdmin(c)
-  const { data: orgData, error: orgError } = await adminClient
-    .from('orgs')
-    .select('sso_enabled')
-    .eq('id', body.org_id)
-    .single()
-
-  if (orgError || !orgData) {
-    return quickError(404, 'org_not_found', 'Organization not found')
-  }
-
-  if (!orgData.sso_enabled) {
-    return quickError(403, 'sso_not_enabled', 'SSO is not enabled for this organization')
-  }
 
   let managementProvider: Awaited<ReturnType<typeof createSSOProvider>>
   try {

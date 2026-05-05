@@ -1448,8 +1448,8 @@ onMounted(async () => {
             </div>
           </section>
 
-          <!-- SSO Configuration Section (Enterprise only) -->
-          <section v-if="hasOrgPerm && currentOrganization?.sso_enabled" class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
+          <!-- SSO Configuration Section -->
+          <section v-if="hasOrgPerm" class="p-6 border rounded-lg border-slate-200 dark:border-slate-700">
             <!-- Enterprise Plan: Show SSO Configuration -->
             <template v-if="isEnterprisePlan">
               <div class="flex items-start gap-4 mb-6">

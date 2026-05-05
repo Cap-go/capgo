@@ -522,6 +522,51 @@ $$;
 ALTER FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."aggregate_build_log_to_daily"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_old_date date;
+BEGIN
+  -- Handle DELETE: subtract old values and return
+  IF TG_OP = 'DELETE' THEN
+    IF OLD.app_id IS NOT NULL THEN
+      v_old_date := (OLD.created_at AT TIME ZONE 'UTC')::date;
+      UPDATE public.daily_build_time
+      SET build_time_unit = GREATEST(build_time_unit - OLD.billable_seconds, 0),
+          build_count = GREATEST(build_count - 1, 0)
+      WHERE app_id = OLD.app_id AND date = v_old_date;
+    END IF;
+    RETURN OLD;
+  END IF;
+
+  -- Handle UPDATE: subtract old values from the old bucket (if old had app_id)
+  IF TG_OP = 'UPDATE' AND OLD.app_id IS NOT NULL THEN
+    v_old_date := (OLD.created_at AT TIME ZONE 'UTC')::date;
+    UPDATE public.daily_build_time
+    SET build_time_unit = GREATEST(build_time_unit - OLD.billable_seconds, 0),
+        build_count = GREATEST(build_count - 1, 0)
+    WHERE app_id = OLD.app_id AND date = v_old_date;
+  END IF;
+
+  -- Handle INSERT/UPDATE: add new values (only if new app_id is set)
+  IF NEW.app_id IS NOT NULL THEN
+    INSERT INTO public.daily_build_time (app_id, date, build_time_unit, build_count)
+    VALUES (NEW.app_id, (NEW.created_at AT TIME ZONE 'UTC')::date, NEW.billable_seconds, 1)
+    ON CONFLICT (app_id, date) DO UPDATE SET
+      build_time_unit = public.daily_build_time.build_time_unit + EXCLUDED.build_time_unit,
+      build_count = public.daily_build_time.build_count + EXCLUDED.build_count;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."aggregate_build_log_to_daily"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."apikeys_force_server_key"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -1574,7 +1619,6 @@ CREATE OR REPLACE FUNCTION "public"."check_domain_sso"("p_domain" "text") RETURN
     JOIN public.orgs AS o ON o.id = sp.org_id
     WHERE sp."domain" = lower(btrim(p_domain))
       AND sp.status = 'active'
-      AND o.sso_enabled = true
     LIMIT 1;
 $$;
 
@@ -3846,6 +3890,39 @@ $$;
 ALTER FUNCTION "public"."force_valid_user_id_on_app"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."generate_org_on_user_create"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  org_record record;
+  has_sso boolean;
+  user_provider text;
+BEGIN
+    SELECT raw_app_meta_data->>'provider'
+    INTO user_provider
+    FROM auth.users
+    WHERE id = NEW.id;
+
+    SELECT EXISTS (
+      SELECT 1 FROM public.sso_providers sp
+      JOIN public.orgs o ON o.id = sp.org_id
+      WHERE sp.domain = lower(btrim(split_part(NEW.email, '@', 2)))
+      AND sp.status = 'active'
+    ) INTO has_sso;
+
+    -- Skip org creation only for genuine SAML SSO logins on SSO-managed domains.
+    IF NOT (user_provider ~ '^sso:' AND has_sso) THEN
+      INSERT INTO public.orgs (created_by, name, management_email) values (NEW.id, format('%s organization', NEW.first_name), NEW.email) RETURNING * INTO org_record;
+    END IF;
+
+    RETURN NEW;
+END $$;
+
+
+ALTER FUNCTION "public"."generate_org_on_user_create"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."generate_org_user_on_org_create"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -5903,7 +5980,7 @@ COMMENT ON FUNCTION "public"."get_orgs_v6"("userid" "uuid") IS 'Get organization
 
 
 
-CREATE OR REPLACE FUNCTION "public"."get_orgs_v7"() RETURNS TABLE("gid" "uuid", "created_by" "uuid", "created_at" timestamp with time zone, "logo" "text", "website" "text", "name" "text", "role" character varying, "paying" boolean, "trial_left" integer, "can_use_more" boolean, "is_canceled" boolean, "app_count" bigint, "subscription_start" timestamp with time zone, "subscription_end" timestamp with time zone, "management_email" "text", "is_yearly" boolean, "stats_updated_at" timestamp without time zone, "stats_refresh_requested_at" timestamp without time zone, "next_stats_update_at" timestamp with time zone, "credit_available" numeric, "credit_total" numeric, "credit_next_expiration" timestamp with time zone, "enforcing_2fa" boolean, "2fa_has_access" boolean, "enforce_hashed_api_keys" boolean, "password_policy_config" "jsonb", "password_has_access" boolean, "require_apikey_expiration" boolean, "max_apikey_expiration_days" integer, "enforce_encrypted_bundles" boolean, "required_encryption_key" character varying, "use_new_rbac" boolean, "sso_enabled" boolean)
+CREATE OR REPLACE FUNCTION "public"."get_orgs_v7"() RETURNS TABLE("gid" "uuid", "created_by" "uuid", "created_at" timestamp with time zone, "logo" "text", "website" "text", "name" "text", "role" character varying, "paying" boolean, "trial_left" integer, "can_use_more" boolean, "is_canceled" boolean, "app_count" bigint, "subscription_start" timestamp with time zone, "subscription_end" timestamp with time zone, "management_email" "text", "is_yearly" boolean, "stats_updated_at" timestamp without time zone, "stats_refresh_requested_at" timestamp without time zone, "next_stats_update_at" timestamp with time zone, "credit_available" numeric, "credit_total" numeric, "credit_next_expiration" timestamp with time zone, "enforcing_2fa" boolean, "2fa_has_access" boolean, "enforce_hashed_api_keys" boolean, "password_policy_config" "jsonb", "password_has_access" boolean, "require_apikey_expiration" boolean, "max_apikey_expiration_days" integer, "enforce_encrypted_bundles" boolean, "required_encryption_key" character varying, "use_new_rbac" boolean)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
@@ -5956,7 +6033,7 @@ $$;
 ALTER FUNCTION "public"."get_orgs_v7"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."get_orgs_v7"("userid" "uuid") RETURNS TABLE("gid" "uuid", "created_by" "uuid", "created_at" timestamp with time zone, "logo" "text", "website" "text", "name" "text", "role" character varying, "paying" boolean, "trial_left" integer, "can_use_more" boolean, "is_canceled" boolean, "app_count" bigint, "subscription_start" timestamp with time zone, "subscription_end" timestamp with time zone, "management_email" "text", "is_yearly" boolean, "stats_updated_at" timestamp without time zone, "stats_refresh_requested_at" timestamp without time zone, "next_stats_update_at" timestamp with time zone, "credit_available" numeric, "credit_total" numeric, "credit_next_expiration" timestamp with time zone, "enforcing_2fa" boolean, "2fa_has_access" boolean, "enforce_hashed_api_keys" boolean, "password_policy_config" "jsonb", "password_has_access" boolean, "require_apikey_expiration" boolean, "max_apikey_expiration_days" integer, "enforce_encrypted_bundles" boolean, "required_encryption_key" character varying, "use_new_rbac" boolean, "sso_enabled" boolean)
+CREATE OR REPLACE FUNCTION "public"."get_orgs_v7"("userid" "uuid") RETURNS TABLE("gid" "uuid", "created_by" "uuid", "created_at" timestamp with time zone, "logo" "text", "website" "text", "name" "text", "role" character varying, "paying" boolean, "trial_left" integer, "can_use_more" boolean, "is_canceled" boolean, "app_count" bigint, "subscription_start" timestamp with time zone, "subscription_end" timestamp with time zone, "management_email" "text", "is_yearly" boolean, "stats_updated_at" timestamp without time zone, "stats_refresh_requested_at" timestamp without time zone, "next_stats_update_at" timestamp with time zone, "credit_available" numeric, "credit_total" numeric, "credit_next_expiration" timestamp with time zone, "enforcing_2fa" boolean, "2fa_has_access" boolean, "enforce_hashed_api_keys" boolean, "password_policy_config" "jsonb", "password_has_access" boolean, "require_apikey_expiration" boolean, "max_apikey_expiration_days" integer, "enforce_encrypted_bundles" boolean, "required_encryption_key" character varying, "use_new_rbac" boolean)
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
@@ -6137,8 +6214,7 @@ BEGIN
     o.max_apikey_expiration_days,
     o.enforce_encrypted_bundles,
     o.required_encryption_key,
-    o.use_new_rbac,
-    o.sso_enabled
+    o.use_new_rbac
   FROM public.orgs o
   JOIN user_orgs uo ON uo.org_id = o.id
   LEFT JOIN public.org_users ou ON ou.user_id = userid AND o.id = ou.org_id
@@ -6560,7 +6636,6 @@ CREATE OR REPLACE FUNCTION "public"."get_sso_enforcement_by_domain"("p_domain" "
   JOIN "public"."orgs" o ON o.id = sp.org_id
   WHERE sp.domain = lower(btrim(p_domain))
     AND sp.status = 'active'
-    AND o.sso_enabled = true
   LIMIT 1;
 $$;
 
@@ -11940,7 +12015,7 @@ $$;
 ALTER FUNCTION "public"."read_version_usage"("p_app_id" character varying, "p_period_start" timestamp without time zone, "p_period_end" timestamp without time zone) OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."record_build_time"("p_org_id" "uuid", "p_user_id" "uuid", "p_build_id" character varying, "p_platform" character varying, "p_build_time_unit" bigint) RETURNS "uuid"
+CREATE OR REPLACE FUNCTION "public"."record_build_time"("p_org_id" "uuid", "p_user_id" "uuid", "p_build_id" character varying, "p_platform" character varying, "p_build_time_unit" bigint, "p_app_id" character varying) RETURNS "uuid"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
@@ -11951,6 +12026,19 @@ DECLARE
   v_caller_user_id uuid;
   v_invoking_role text;
 BEGIN
+  -- Reject NULL/empty app_id: daily_build_time is keyed by app_id
+  IF p_app_id IS NULL OR p_app_id = '' THEN
+    RAISE EXCEPTION 'INVALID_APP_ID';
+  END IF;
+
+  -- Verify the app belongs to the org to prevent wrong attribution
+  IF NOT EXISTS (
+    SELECT 1 FROM public.apps
+    WHERE app_id = p_app_id AND owner_org = p_org_id
+  ) THEN
+    RAISE EXCEPTION 'INVALID_APP_ID';
+  END IF;
+
   SELECT NULLIF(current_setting('role', true), '') INTO v_invoking_role;
 
   -- Service-role callers do not have JWT/API key context and pass p_user_id directly.
@@ -11958,9 +12046,12 @@ BEGIN
   IF v_invoking_role = 'service_role' THEN
     v_caller_user_id := p_user_id;
   ELSE
-    v_caller_user_id := public.get_identity_org_allowed(
+    -- Use get_identity_org_appid (not get_identity_org_allowed) per project guidelines,
+    -- since we have app_id available for scoped authorization.
+    v_caller_user_id := public.get_identity_org_appid(
       '{read,upload,write,all}'::public.key_mode[],
-      p_org_id
+      p_org_id,
+      p_app_id
     );
   END IF;
 
@@ -11972,7 +12063,7 @@ BEGIN
     'write'::public.user_min_right,
     v_caller_user_id,
     p_org_id,
-    NULL::character varying,
+    p_app_id,
     NULL::bigint
   ) THEN
     RAISE EXCEPTION 'NO_RIGHTS';
@@ -11994,13 +12085,14 @@ BEGIN
 
   v_billable_seconds := (p_build_time_unit * v_multiplier)::bigint;
 
-  INSERT INTO public.build_logs (org_id, user_id, build_id, platform, build_time_unit, billable_seconds)
-  VALUES (p_org_id, v_caller_user_id, p_build_id, p_platform, p_build_time_unit, v_billable_seconds)
+  INSERT INTO public.build_logs (org_id, user_id, build_id, platform, build_time_unit, billable_seconds, app_id)
+  VALUES (p_org_id, v_caller_user_id, p_build_id, p_platform, p_build_time_unit, v_billable_seconds, p_app_id)
   ON CONFLICT (build_id, org_id) DO UPDATE SET
     user_id = EXCLUDED.user_id,
     platform = EXCLUDED.platform,
     build_time_unit = EXCLUDED.build_time_unit,
-    billable_seconds = EXCLUDED.billable_seconds
+    billable_seconds = EXCLUDED.billable_seconds,
+    app_id = EXCLUDED.app_id
   RETURNING id INTO v_build_log_id;
 
   RETURN v_build_log_id;
@@ -12008,7 +12100,7 @@ END;
 $$;
 
 
-ALTER FUNCTION "public"."record_build_time"("p_org_id" "uuid", "p_user_id" "uuid", "p_build_id" character varying, "p_platform" character varying, "p_build_time_unit" bigint) OWNER TO "postgres";
+ALTER FUNCTION "public"."record_build_time"("p_org_id" "uuid", "p_user_id" "uuid", "p_build_id" character varying, "p_platform" character varying, "p_build_time_unit" bigint, "p_app_id" character varying) OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."record_deployment_history"() RETURNS "trigger"
@@ -13752,21 +13844,28 @@ CREATE OR REPLACE FUNCTION "public"."total_bundle_storage_bytes"() RETURNS bigin
     SET "search_path" TO ''
     AS $$
   SELECT (
-    -- Sum of bundle sizes from app_versions_meta
+    -- Sum bundle sizes only for active app versions.
     COALESCE(
-      (SELECT SUM(size) FROM public.app_versions_meta),
+      (
+        SELECT SUM(avm.size)
+        FROM public.app_versions_meta avm
+        INNER JOIN public.app_versions av ON av.id = avm.id
+        WHERE av.deleted = false
+      ),
       0
     ) +
-    -- Sum of manifest file sizes for non-deleted versions
+    -- Sum manifest file sizes only for active app versions.
     COALESCE(
-      (SELECT SUM(m.file_size)
-       FROM public.manifest m
-       WHERE EXISTS (
-         SELECT 1
-         FROM public.app_versions av
-         WHERE av.id = m.app_version_id
-         AND av.deleted = false
-       )),
+      (
+        SELECT SUM(m.file_size)
+        FROM public.manifest m
+        WHERE EXISTS (
+          SELECT 1
+          FROM public.app_versions av
+          WHERE av.id = m.app_version_id
+            AND av.deleted = false
+        )
+      ),
       0
     )
   )::bigint;
@@ -13776,7 +13875,7 @@ $$;
 ALTER FUNCTION "public"."total_bundle_storage_bytes"() OWNER TO "postgres";
 
 
-COMMENT ON FUNCTION "public"."total_bundle_storage_bytes"() IS 'Returns total storage in bytes including both bundle sizes (app_versions_meta.size) and manifest file sizes';
+COMMENT ON FUNCTION "public"."total_bundle_storage_bytes"() IS 'Returns active bundle storage in bytes including bundle sizes (app_versions_meta.size) and manifest file sizes for non-deleted app versions.';
 
 
 
@@ -14764,6 +14863,7 @@ CREATE TABLE IF NOT EXISTS "public"."build_logs" (
     "platform" character varying NOT NULL,
     "billable_seconds" bigint NOT NULL,
     "build_time_unit" bigint NOT NULL,
+    "app_id" character varying,
     CONSTRAINT "build_logs_billable_seconds_check" CHECK (("billable_seconds" >= 0)),
     CONSTRAINT "build_logs_build_time_unit_check" CHECK (("build_time_unit" >= 0)),
     CONSTRAINT "build_logs_platform_check" CHECK ((("platform")::"text" = ANY (ARRAY[('ios'::character varying)::"text", ('android'::character varying)::"text"])))
@@ -15644,10 +15744,11 @@ CREATE TABLE IF NOT EXISTS "public"."orgs" (
     "required_encryption_key" character varying(21) DEFAULT NULL::character varying,
     "use_new_rbac" boolean DEFAULT true NOT NULL,
     "has_usage_credits" boolean DEFAULT false NOT NULL,
-    "sso_enabled" boolean DEFAULT false NOT NULL,
     "website" "text",
     "stats_refresh_requested_at" timestamp without time zone,
-    CONSTRAINT "orgs_password_policy_config_min_length_check" CHECK ((("password_policy_config" IS NULL) OR (("jsonb_typeof"("password_policy_config") = 'object'::"text") AND ((NOT ("password_policy_config" ? 'min_length'::"text")) OR (("jsonb_typeof"(("password_policy_config" -> 'min_length'::"text")) = 'number'::"text") AND ((("password_policy_config" ->> 'min_length'::"text"))::numeric = "trunc"((("password_policy_config" ->> 'min_length'::"text"))::numeric)) AND (((("password_policy_config" ->> 'min_length'::"text"))::numeric >= (6)::numeric) AND ((("password_policy_config" ->> 'min_length'::"text"))::numeric <= (72)::numeric)))))))
+    CONSTRAINT "orgs_max_apikey_expiration_days_valid" CHECK ((("max_apikey_expiration_days" IS NULL) OR (("max_apikey_expiration_days" >= 1) AND ("max_apikey_expiration_days" <= 365)))),
+    CONSTRAINT "orgs_password_policy_config_min_length_check" CHECK ((("password_policy_config" IS NULL) OR (("jsonb_typeof"("password_policy_config") = 'object'::"text") AND ((NOT ("password_policy_config" ? 'min_length'::"text")) OR (("jsonb_typeof"(("password_policy_config" -> 'min_length'::"text")) = 'number'::"text") AND ((("password_policy_config" ->> 'min_length'::"text"))::numeric = "trunc"((("password_policy_config" ->> 'min_length'::"text"))::numeric)) AND (((("password_policy_config" ->> 'min_length'::"text"))::numeric >= (6)::numeric) AND ((("password_policy_config" ->> 'min_length'::"text"))::numeric <= (72)::numeric))))))),
+    CONSTRAINT "orgs_required_encryption_key_valid" CHECK ((("required_encryption_key" IS NULL) OR ("length"(("required_encryption_key")::"text") = ANY (ARRAY[20, 21]))))
 );
 
 ALTER TABLE ONLY "public"."orgs" REPLICA IDENTITY FULL;
@@ -17079,6 +17180,10 @@ CREATE INDEX "idx_audit_logs_user_id" ON "public"."audit_logs" USING "btree" ("u
 
 
 
+CREATE INDEX "idx_build_logs_app_id_created_at" ON "public"."build_logs" USING "btree" ("app_id", "created_at");
+
+
+
 CREATE INDEX "idx_build_logs_created_at_platform" ON "public"."build_logs" USING "btree" ("created_at", "platform");
 
 
@@ -17360,6 +17465,10 @@ CREATE INDEX "webhooks_enabled_idx" ON "public"."webhooks" USING "btree" ("org_i
 
 
 CREATE INDEX "webhooks_org_id_idx" ON "public"."webhooks" USING "btree" ("org_id");
+
+
+
+CREATE OR REPLACE TRIGGER "aggregate_build_log_to_daily_trigger" AFTER INSERT OR DELETE OR UPDATE ON "public"."build_logs" FOR EACH ROW EXECUTE FUNCTION "public"."aggregate_build_log_to_daily"();
 
 
 
@@ -17684,6 +17793,11 @@ ALTER TABLE ONLY "public"."audit_logs"
 
 ALTER TABLE ONLY "public"."audit_logs"
     ADD CONSTRAINT "audit_logs_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE SET NULL;
+
+
+
+ALTER TABLE ONLY "public"."build_logs"
+    ADD CONSTRAINT "build_logs_app_id_fkey" FOREIGN KEY ("app_id") REFERENCES "public"."apps"("app_id") ON DELETE SET NULL;
 
 
 
@@ -19263,6 +19377,10 @@ GRANT ALL ON FUNCTION "public"."accept_invitation_to_org"("org_id" "uuid") TO "s
 
 
 
+GRANT ALL ON FUNCTION "public"."aggregate_build_log_to_daily"() TO "service_role";
+
+
+
 REVOKE ALL ON FUNCTION "public"."apikeys_force_server_key"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."apikeys_force_server_key"() TO "service_role";
 
@@ -19621,6 +19739,10 @@ GRANT ALL ON FUNCTION "public"."find_apikey_by_value"("key_value" "text") TO "se
 
 
 REVOKE ALL ON FUNCTION "public"."force_valid_user_id_on_app"() FROM PUBLIC;
+
+
+
+GRANT ALL ON FUNCTION "public"."generate_org_on_user_create"() TO "service_role";
 
 
 
@@ -20973,8 +21095,8 @@ GRANT ALL ON FUNCTION "public"."read_version_usage"("p_app_id" character varying
 
 
 
-REVOKE ALL ON FUNCTION "public"."record_build_time"("p_org_id" "uuid", "p_user_id" "uuid", "p_build_id" character varying, "p_platform" character varying, "p_build_time_unit" bigint) FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."record_build_time"("p_org_id" "uuid", "p_user_id" "uuid", "p_build_id" character varying, "p_platform" character varying, "p_build_time_unit" bigint) TO "service_role";
+REVOKE ALL ON FUNCTION "public"."record_build_time"("p_org_id" "uuid", "p_user_id" "uuid", "p_build_id" character varying, "p_platform" character varying, "p_build_time_unit" bigint, "p_app_id" character varying) FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."record_build_time"("p_org_id" "uuid", "p_user_id" "uuid", "p_build_id" character varying, "p_platform" character varying, "p_build_time_unit" bigint, "p_app_id" character varying) TO "service_role";
 
 
 

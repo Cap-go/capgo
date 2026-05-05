@@ -423,6 +423,7 @@ export type Database = {
       }
       build_logs: {
         Row: {
+          app_id: string | null
           billable_seconds: number
           build_id: string
           build_time_unit: number
@@ -433,6 +434,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          app_id?: string | null
           billable_seconds: number
           build_id: string
           build_time_unit: number
@@ -443,6 +445,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          app_id?: string | null
           billable_seconds?: number
           build_id?: string
           build_time_unit?: number
@@ -453,6 +456,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "build_logs_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["app_id"]
+          },
           {
             foreignKeyName: "build_logs_org_id_fkey"
             columns: ["org_id"]
@@ -1672,7 +1682,6 @@ export type Database = {
           password_policy_config: Json | null
           require_apikey_expiration: boolean
           required_encryption_key: string | null
-          sso_enabled: boolean
           stats_refresh_requested_at: string | null
           stats_updated_at: string | null
           updated_at: string | null
@@ -1697,7 +1706,6 @@ export type Database = {
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
-          sso_enabled?: boolean
           stats_refresh_requested_at?: string | null
           stats_updated_at?: string | null
           updated_at?: string | null
@@ -1722,7 +1730,6 @@ export type Database = {
           password_policy_config?: Json | null
           require_apikey_expiration?: boolean
           required_encryption_key?: string | null
-          sso_enabled?: boolean
           stats_refresh_requested_at?: string | null
           stats_updated_at?: string | null
           updated_at?: string | null
@@ -3543,7 +3550,6 @@ export type Database = {
               require_apikey_expiration: boolean
               required_encryption_key: string
               role: string
-              sso_enabled: boolean
               stats_refresh_requested_at: string
               stats_updated_at: string
               subscription_end: string
@@ -3581,7 +3587,6 @@ export type Database = {
               require_apikey_expiration: boolean
               required_encryption_key: string
               role: string
-              sso_enabled: boolean
               stats_refresh_requested_at: string
               stats_updated_at: string
               subscription_end: string
@@ -4189,6 +4194,7 @@ export type Database = {
       }
       record_build_time: {
         Args: {
+          p_app_id: string
           p_build_id: string
           p_build_time_unit: number
           p_org_id: string

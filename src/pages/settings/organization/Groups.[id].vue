@@ -355,10 +355,14 @@ async function fetchOrgMembers() {
 }
 
 async function fetchGroupMembers() {
+  const id = group.value?.id
+  if (!id)
+    return
+
   const { data, error } = await supabase
     .from('group_members')
     .select('user_id')
-    .eq('group_id', groupId.value)
+    .eq('group_id', id)
 
   if (error)
     throw error
@@ -449,17 +453,26 @@ async function createGroup() {
       console.error('Error syncing app bindings:', bindingError)
       toast.warning(t('error-syncing-app-bindings'))
     }
-
-    toast.success(t('group-created'))
-    await router.replace(`/settings/organization/groups/${data.id}`)
   }
   catch (error) {
     console.error('Error creating group:', error)
     toast.error(t('error-creating-group'))
+    return
   }
   finally {
     isSubmitting.value = false
   }
+
+  toast.success(t('group-created'))
+  try {
+    await fetchOrgMembers()
+    openAddMembersModal()
+    await dialogStore.onDialogDismiss()
+  }
+  catch (memberError) {
+    console.error('Error opening add-members modal:', memberError)
+  }
+  await router.replace('/settings/organization/groups')
 }
 
 async function saveGroup() {
@@ -948,7 +961,7 @@ async function removeMemberFromGroup(userId: string) {
     <div class="w-full space-y-3">
       <SearchInput
         v-model="modalMemberSearch"
-        :placeholder="t('search')"
+        :placeholder="t('search-members')"
         class="d-input-sm"
       />
       <div v-if="availableMembersToAdd.length === 0" class="py-4 text-sm text-center text-slate-500">

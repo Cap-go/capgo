@@ -112,8 +112,6 @@ app.post('/', async (c) => {
     return c.json({
       has_sso: true,
       enforce_sso: enforcementRow?.enforce_sso === true,
-      provider_id: legacyRow?.provider_id,
-      org_id: enforcementRow?.org_id ?? legacyRow?.org_id,
     })
   }
   catch (err) {
