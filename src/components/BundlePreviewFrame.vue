@@ -21,14 +21,14 @@ const devices = {
     width: 375,
     height: 812,
     frameClass: 'rounded-[40px]',
-    screenRadius: 28,
+    screenClass: 'rounded-[28px] [clip-path:inset(0_round_28px)]',
   },
   pixel: {
     name: 'Google Pixel',
     width: 412,
     height: 915,
     frameClass: 'rounded-[30px]',
-    screenRadius: 18,
+    screenClass: 'rounded-[18px] [clip-path:inset(0_round_18px)]',
   },
 }
 
@@ -178,10 +178,7 @@ function openExternal() {
           <!-- Screen -->
           <div
             class="w-full h-full overflow-hidden bg-white"
-            :style="{
-              borderRadius: `${currentDevice.screenRadius}px`,
-              clipPath: `inset(0 round ${currentDevice.screenRadius}px)`,
-            }"
+            :class="currentDevice.screenClass"
           >
             <iframe
               title="Preview App"
