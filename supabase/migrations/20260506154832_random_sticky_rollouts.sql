@@ -181,21 +181,20 @@ SET search_path TO ''
 AS $$
 BEGIN
     UPDATE public.app_versions AS av
-    SET deleted = true, updated_at = NOW()
-    FROM public.apps AS a
-    WHERE av.deleted IS FALSE
-      AND a.app_id = av.app_id
-      AND a.retention >= 0
-      AND a.retention < 63113904
-      AND av.created_at < NOW() - make_interval(secs => a.retention)
-      AND av.id NOT IN (
-          SELECT c.version
+    SET deleted = true
+    WHERE av.deleted = false
+      AND (SELECT retention FROM public.apps WHERE apps.app_id = av.app_id) >= 0
+      AND (SELECT retention FROM public.apps WHERE apps.app_id = av.app_id) < 63113904
+      AND av.created_at < (
+          SELECT NOW() - make_interval(secs => apps.retention)
+          FROM public.apps
+          WHERE apps.app_id = av.app_id
+      )
+      AND NOT EXISTS (
+          SELECT 1
           FROM public.channels AS c
-          WHERE c.version IS NOT NULL
-          UNION
-          SELECT c.rollout_version
-          FROM public.channels AS c
-          WHERE c.rollout_version IS NOT NULL
+          WHERE c.app_id = av.app_id
+            AND (c.version = av.id OR c.rollout_version = av.id)
       );
 END;
 $$;
@@ -212,16 +211,14 @@ DECLARE
   deleted_count bigint;
 BEGIN
     DELETE FROM public.app_versions AS av
-    WHERE av.deleted IS TRUE
-      AND av.updated_at < NOW() - INTERVAL '1 year'
-      AND av.id NOT IN (
-        SELECT c.version
+    WHERE av.deleted_at IS NOT NULL
+      AND av.deleted_at < NOW() - INTERVAL '3 months'
+      AND av.name NOT IN ('builtin', 'unknown')
+      AND NOT EXISTS (
+        SELECT 1
         FROM public.channels AS c
-        WHERE c.version IS NOT NULL
-        UNION
-        SELECT c.rollout_version
-        FROM public.channels AS c
-        WHERE c.rollout_version IS NOT NULL
+        WHERE c.app_id = av.app_id
+          AND (c.version = av.id OR c.rollout_version = av.id)
       );
 
     GET DIAGNOSTICS deleted_count = ROW_COUNT;
