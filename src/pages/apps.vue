@@ -48,16 +48,12 @@ function updateAppIconState(appId: string, patch: Partial<AppRowWithIconState>, 
   if (appIconLoadRun !== runId)
     return
 
-  let hasIconUpdate = false
   for (const app of apps.value) {
     if (app.app_id === appId) {
       Object.assign(app, patch)
-      hasIconUpdate = true
-      break
+      return
     }
   }
-  if (hasIconUpdate)
-    apps.value = Array.from(apps.value)
 }
 
 async function loadAppIcon(app: AppRow, runId: number) {
