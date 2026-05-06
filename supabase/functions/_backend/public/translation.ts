@@ -15,6 +15,7 @@ const MAX_TOTAL_CHARACTERS = 12_000
 const DEFAULT_TRANSLATION_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast'
 const TRANSLATION_MODEL_ATTEMPTS = 3
 const TRANSLATION_SINGLE_TEXT_ATTEMPTS = 2
+const TRANSLATION_SINGLE_TEXT_CONCURRENCY = 4
 const TRANSLATION_BATCH_TIMEOUT_MS = 30_000
 const TRANSLATION_PAGE_PATH_MAX_LENGTH = 200
 const TRANSLATION_IP_RATE_PATH = '/translation/ip-rate'
@@ -312,8 +313,16 @@ function getTranslationIpRateLimit(c: Context) {
   return DEFAULT_TRANSLATION_IP_RATE_LIMIT
 }
 
+function pruneTranslationIpRateLimitEntries(now: number) {
+  for (const [key, entry] of translationIpRateLimitEntries.entries()) {
+    if (entry.resetAt <= now)
+      translationIpRateLimitEntries.delete(key)
+  }
+}
+
 function incrementTranslationRateLimit(cacheKey: Request, now = Date.now()): TranslationRateLimitEntry {
   const key = cacheKey.url
+  pruneTranslationIpRateLimitEntries(now)
   const existing = translationIpRateLimitEntries.get(key)
   if (!existing || existing.resetAt <= now) {
     const entry = {
@@ -484,9 +493,16 @@ function normalizedTranslationValue(value: string) {
   return value.replace(/\s+/g, ' ').trim().toLowerCase()
 }
 
+const NON_TRANSLATABLE_LITERALS = new Set(
+  PROTECTED_TRANSLATION_TOKENS.map(value => normalizedTranslationValue(value)),
+)
+
 function shouldCheckUnchangedTranslation(value: string) {
   const normalized = normalizedTranslationValue(value)
-  return normalized.length >= 4 && /[a-z]/i.test(normalized) && !/^https?:\/\//i.test(normalized)
+  return normalized.length >= 4
+    && /[a-z]/i.test(normalized)
+    && !/^https?:\/\//i.test(normalized)
+    && !NON_TRANSLATABLE_LITERALS.has(normalized)
 }
 
 function assertTranslatedBatch(targetLanguage: string, batch: string[], translated: string[]) {
@@ -685,10 +701,29 @@ async function translateSingleText(ai: { run: (model: string, input: unknown) =>
 }
 
 async function translateBatchIndividually(ai: { run: (model: string, input: unknown) => Promise<unknown> }, model: string, targetLanguage: string, batch: ProtectedEntry[], pagePath = '') {
-  const translated: string[] = []
-  for (const entry of batch) {
-    translated.push(await translateSingleText(ai, model, targetLanguage, entry, pagePath))
+  const translated = Array.from({ length: batch.length }).fill('') as string[]
+  let nextIndex = 0
+
+  const translateNext = async () => {
+    while (nextIndex < batch.length) {
+      const index = nextIndex
+      nextIndex += 1
+      const entry = batch[index]
+      if (!entry)
+        return
+
+      translated[index] = await translateSingleText(
+        ai,
+        model,
+        targetLanguage,
+        entry,
+        pagePath,
+      )
+    }
   }
+
+  const workerCount = Math.min(TRANSLATION_SINGLE_TEXT_CONCURRENCY, batch.length)
+  await Promise.all(Array.from({ length: workerCount }, () => translateNext()))
   assertTranslatedBatch(targetLanguage, batch.map(entry => entry.source), translated)
   return translated
 }
