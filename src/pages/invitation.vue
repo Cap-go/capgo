@@ -262,7 +262,7 @@ function openPrivacy() {
         </div>
       </div>
 
-      <div v-if="captchaKey" :class="authInsetCardClass">
+      <div v-if="captchaKey" class="overflow-hidden">
         <VueTurnstile ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
       </div>
 

@@ -8,7 +8,7 @@ import VueTurnstile from 'vue-turnstile'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
 import iconName from '~icons/ph/user?raw'
-import { authGhostButtonClass, authInlineLinkClass, authInsetCardClass, authPanelClass, authPrimaryButtonClass } from '~/components/auth/pageStyles'
+import { authGhostButtonClass, authInlineLinkClass, authPanelClass, authPrimaryButtonClass } from '~/components/auth/pageStyles'
 import { hashEmail, useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 
@@ -152,10 +152,8 @@ async function submit(form: { first_name: string, last_name: string, password: s
           :validation-label="t('password-confirmatio')"
         />
 
-        <div v-if="captchaKey" class="md:col-span-2">
-          <div :class="authInsetCardClass">
-            <VueTurnstile v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
-          </div>
+        <div v-if="captchaKey" class="md:col-span-2 overflow-hidden">
+          <VueTurnstile v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
         </div>
 
         <div class="md:col-span-2">
