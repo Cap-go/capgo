@@ -1,24 +1,51 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watchEffect } from 'vue'
+import type { Component } from 'vue'
+import { computed, onUnmounted, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import arrowBack from '~icons/ion/arrow-back?width=2em&height=2em'
+import IconArrowLeft from '~icons/lucide/arrow-left'
+import IconCheckCircle from '~icons/lucide/check-circle-2'
+import IconClipboard from '~icons/lucide/clipboard'
+import IconExternalLink from '~icons/lucide/external-link'
 import IconLoader from '~icons/lucide/loader-2'
+import IconPlay from '~icons/lucide/play'
+import IconSettings from '~icons/lucide/settings-2'
+import IconTerminal from '~icons/lucide/terminal-square'
+import IconAndroid from '~icons/mdi/android'
+import IconApple from '~icons/mdi/apple'
 import { createDefaultApiKey } from '~/services/apikeys'
 import { pushEvent } from '~/services/posthog'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { sendEvent } from '~/services/tracking'
 import { useDialogV2Store } from '~/stores/dialogv2'
-import { useDisplayStore } from '~/stores/display'
 import { useMainStore } from '~/stores/main'
 import { useOrganizationStore } from '~/stores/organization'
 
-const props = defineProps<{
+type Platform = 'ios' | 'android'
+
+interface Step {
+  key: string
+  title: string
+  command?: string
+  subtitle: string
+  icon: Component
+}
+
+interface PlatformBuildCounts {
+  ios: number
+  android: number
+}
+
+const props = withDefaults(defineProps<{
   onboarding: boolean
   appId: string
-}>()
+  platformBuildCounts?: PlatformBuildCounts
+  canClose?: boolean
+}>(), {
+  canClose: true,
+  platformBuildCounts: () => ({ ios: 0, android: 0 }),
+})
 const emit = defineEmits(['done', 'closeStep'])
-const displayStore = useDisplayStore()
 const isLoading = ref(false)
 const step = ref(0)
 const clicked = ref(0)
@@ -26,71 +53,98 @@ const buildId = ref<string>()
 const realtimeListener = ref(false)
 const pollTimer = ref<number | null>(null)
 const initialCount = ref<number | null>(null)
+const selectedPlatform = ref<Platform>('ios')
+const apiKey = ref('[APIKEY]')
 const supabase = useSupabase()
 const main = useMainStore()
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
 const dialogStore = useDialogV2Store()
-
-interface Step {
-  title: string
-  command?: string
-  subtitle: string
-}
-
 const config = getLocalConfig()
-const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ``
+const initialOnboarding = props.onboarding
+const localCommand = isLocal(config.supaHost) ? ` --supa-host ${config.supaHost} --supa-anon ${config.supaKey}` : ''
 
-const onboardingStep: Step = {
-  title: t('build-step-onboarding-title'),
-  command: `npx @capgo/cli@latest build init -a [APIKEY]`,
-  subtitle: t('build-step-onboarding-subtitle'),
-}
+const platformBuildCounts = computed<PlatformBuildCounts>(() => ({
+  ios: props.platformBuildCounts?.ios ?? 0,
+  android: props.platformBuildCounts?.android ?? 0,
+}))
 
-const requestStep: Step = {
+const selectedPlatformLabel = computed(() => selectedPlatform.value === 'ios' ? t('build-platform-ios') : t('build-platform-android'))
+const selectedPlatformDocsUrl = computed(() => `https://capgo.app/docs/cli/cloud-build/${selectedPlatform.value}/`)
+const selectedPlatformHasBuilds = computed(() => platformBuildCounts.value[selectedPlatform.value] > 0)
+
+const platformOptions = computed(() => [
+  {
+    value: 'ios' as const,
+    label: t('build-platform-ios'),
+    icon: IconApple,
+    count: platformBuildCounts.value.ios,
+  },
+  {
+    value: 'android' as const,
+    label: t('build-platform-android'),
+    icon: IconAndroid,
+    count: platformBuildCounts.value.android,
+  },
+])
+
+const setupStep = computed<Step>(() => {
+  if (selectedPlatform.value === 'ios') {
+    return {
+      key: 'setup-ios',
+      title: t('build-step-ios-setup-title'),
+      command: `npx @capgo/cli@latest build init -a ${apiKey.value}`,
+      subtitle: t('build-step-ios-setup-subtitle'),
+      icon: IconSettings,
+    }
+  }
+
+  return {
+    key: 'setup-android',
+    title: t('build-step-android-setup-title'),
+    command: `npx @capgo/cli@latest build credentials save --appId ${props.appId} --platform android`,
+    subtitle: t('build-step-android-setup-subtitle'),
+    icon: IconSettings,
+  }
+})
+
+const requestStep = computed<Step>(() => ({
+  key: 'request-build',
   title: t('build-step-request-build'),
-  // keep NPX for better support of our customers env, everyone has npx but not everyone has bunx, and bunx has some issues with pnpm
-  command: `npx @capgo/cli@latest build request -a [APIKEY] --platform ios${localCommand}`,
-  subtitle: t('build-step-request-subtitle'),
-}
+  command: `npx @capgo/cli@latest build request ${props.appId} -a ${apiKey.value} --platform ${selectedPlatform.value}${localCommand}`,
+  subtitle: t('build-step-request-subtitle-platform', { platform: selectedPlatformLabel.value }),
+  icon: IconTerminal,
+}))
 
-const waitStep: Step = {
+const waitStep = computed<Step>(() => ({
+  key: 'wait-for-build',
   title: t('build-step-wait'),
   command: '',
   subtitle: t('build-step-wait-subtitle'),
-}
+  icon: IconPlay,
+}))
 
-// Freeze the onboarding mode at setup time. The parent binds this prop to a
-// reactive value (totalAllBuilds === 0), which can flip mid-flow once a build
-// is detected. Recomputing steps / indices against a live prop would cause
-// drift (e.g. waitStepIndex shrinks while the steps array stays long).
-const initialOnboarding = props.onboarding
+const steps = computed<Step[]>(() => {
+  if (selectedPlatformHasBuilds.value)
+    return [requestStep.value, waitStep.value]
+  return [setupStep.value, requestStep.value, waitStep.value]
+})
 
-// When invoked from the "Start onboarding" flow (first-time user, no builds
-// yet), prepend the build-init wizard step so users set up iOS credentials
-// before requesting a build. For regular "add a build" flows, start at request.
-const steps = ref<Step[]>(
-  initialOnboarding ? [onboardingStep, requestStep, waitStep] : [requestStep, waitStep],
-)
-
-// Index of the polling/wait step — depends on whether we're in onboarding mode.
-const waitStepIndex = computed(() => (initialOnboarding ? 2 : 1))
-const completedStepIndex = computed(() => waitStepIndex.value + 1)
+const waitStepIndex = computed(() => steps.value.length - 1)
+const completedStepIndex = computed(() => steps.value.length)
 
 function stepToName(stepNumber: number): string {
-  const stepNames = initialOnboarding
-    ? ['run-onboarding', 'request-build', 'wait-for-build', 'build-completed']
-    : ['request-build', 'wait-for-build', 'build-completed']
-  return stepNames[stepNumber] ?? 'unknown-step'
+  if (stepNumber === completedStepIndex.value)
+    return 'build-completed'
+  return steps.value[stepNumber]?.key ?? 'unknown-step'
 }
 
 function setLog() {
-  console.log('setLog', initialOnboarding, main.user?.id, step.value)
   if (initialOnboarding && main.user?.id) {
     sendEvent({
       channel: 'onboarding-build',
       event: `onboarding-build-step-${stepToName(step.value)}`,
-      icon: '🏗️',
+      icon: 'build',
       user_id: organizationStore.currentOrganization?.gid,
       notify: false,
     }).catch()
@@ -103,17 +157,30 @@ function setLog() {
 
 function clearWatchers() {
   if (pollTimer.value !== null) {
-    console.log('clear poll timer', pollTimer.value)
     clearInterval(pollTimer.value)
     pollTimer.value = null
   }
 }
 
+function resetFlow() {
+  clicked.value = 0
+  step.value = 0
+  realtimeListener.value = false
+  initialCount.value = null
+  buildId.value = undefined
+  clearWatchers()
+}
+
+function selectPlatform(platform: Platform) {
+  if (selectedPlatform.value === platform)
+    return
+  selectedPlatform.value = platform
+}
+
 function scrollToElement(id: string) {
   const el = document.getElementById(id)
-  console.log('el', el)
   if (el) {
-    el.scrollIntoView({ behavior: 'smooth' })
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }
 }
 
@@ -122,7 +189,6 @@ async function copyToast(allowed: boolean, id: string, text?: string) {
     return
   try {
     await navigator.clipboard.writeText(text)
-    console.log('displayStore.messageToast', displayStore.messageToast)
     toast.success(t('copied-to-clipboard'))
   }
   catch (err) {
@@ -181,11 +247,7 @@ async function getKey(retry = true): Promise<void> {
       await addNewApiKey()
       return getKey(false)
     }
-    const key = data[0].key ?? ''
-    steps.value = steps.value.map(s => ({
-      ...s,
-      command: s.command?.replace('[APIKEY]', key),
-    }))
+    apiKey.value = data[0].key ?? '[APIKEY]'
   }
   else if (retry && main?.user?.id) {
     return getKey(false)
@@ -194,7 +256,7 @@ async function getKey(retry = true): Promise<void> {
   isLoading.value = false
 }
 
-async function getBuildRequestsCount(): Promise<number> {
+async function getBuildRequestsCount(platform: Platform): Promise<number> {
   const orgId = organizationStore.currentOrganization?.gid
   if (!orgId || !props.appId)
     return 0
@@ -203,13 +265,14 @@ async function getBuildRequestsCount(): Promise<number> {
     .select('id', { count: 'exact', head: true })
     .eq('owner_org', orgId)
     .eq('app_id', props.appId)
+    .eq('platform', platform)
 
   if (error)
     return 0
   return count ?? 0
 }
 
-async function getLatestBuildId(): Promise<string | undefined> {
+async function getLatestBuildId(platform: Platform): Promise<string | undefined> {
   const orgId = organizationStore.currentOrganization?.gid
   if (!orgId || !props.appId)
     return undefined
@@ -218,6 +281,7 @@ async function getLatestBuildId(): Promise<string | undefined> {
     .select('id, created_at')
     .eq('owner_org', orgId)
     .eq('app_id', props.appId)
+    .eq('platform', platform)
     .order('created_at', { ascending: false })
     .limit(1)
 
@@ -226,14 +290,17 @@ async function getLatestBuildId(): Promise<string | undefined> {
   return `${data[0].id}`
 }
 
+watch(selectedPlatform, resetFlow)
+watch(() => props.appId, resetFlow)
+
 watchEffect(async () => {
   if (step.value === waitStepIndex.value && !realtimeListener.value) {
-    console.log('watch build change wait-step via polling')
+    const platform = selectedPlatform.value
     realtimeListener.value = true
     await organizationStore.awaitInitialLoad()
 
     try {
-      initialCount.value = await getBuildRequestsCount()
+      initialCount.value = await getBuildRequestsCount(platform)
     }
     catch {
       initialCount.value = 0
@@ -243,9 +310,9 @@ watchEffect(async () => {
 
     pollTimer.value = window.setInterval(async () => {
       try {
-        const current = await getBuildRequestsCount()
+        const current = await getBuildRequestsCount(platform)
         if (initialCount.value !== null && current > initialCount.value) {
-          const latestId = await getLatestBuildId()
+          const latestId = await getLatestBuildId(platform)
           step.value += 1
           buildId.value = latestId ?? ''
           realtimeListener.value = false
@@ -270,71 +337,115 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="overflow-y-auto py-12 h-full sm:py-16 lg:py-20 max-h-fit bg-slate-100 dark:bg-slate-900">
-    <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8">
-      <div class="flex justify-items-center items-center place-content-center">
-        <button class="mr-6 text-white bg-gray-800 d-btn d-btn-outline" @click="emit('closeStep')">
-          <arrowBack />
-        </button>
-        <div v-if="initialOnboarding" class="text-center">
-          <h2 class="text-3xl font-bold text-gray-900 sm:text-4xl xl:text-5xl dark:text-gray-50 font-pj">
-            {{ t('start-your-first-build') }}
-            <span class="inline-flex items-center py-0.5 px-2.5 ml-3 text-xs font-medium text-yellow-800 bg-yellow-100 rounded-full dark:text-yellow-200 dark:bg-yellow-900">
-              BETA
-            </span>
-          </h2>
-          <p class="mx-auto mt-6 text-lg font-normal text-gray-600 dark:text-gray-200 font-pj">
-            {{ t('build-native-apps-with-cli') }}
-          </p>
-          <p class="mx-auto mt-2 font-normal text-md font-pj text-muted-blue-300 dark:text-muted-blue-50">
-            {{ t('pro-tip-you-can-copy') }} <span class="text-pumpkin-orange-900">{{ t('commands') }}</span> {{ t('by-clicking-on-them') }}
-          </p>
-        </div>
-
-        <div v-else class="text-center">
-          <h2 class="text-3xl font-bold text-gray-900 sm:text-4xl xl:text-5xl dark:text-gray-50 font-pj">
-            {{ t('request-new-build') }}
-            <span class="inline-flex items-center py-0.5 px-2.5 ml-3 text-xs font-medium text-yellow-800 bg-yellow-100 rounded-full dark:text-yellow-200 dark:bg-yellow-900">
-              BETA
-            </span>
-          </h2>
-        </div>
-      </div>
-      <div class="mx-auto mt-12 max-w-6xl sm:px-10">
-        <template v-for="(s, i) in steps" :key="i">
-          <div v-if="i > 0" class="mx-auto w-1 h-10 bg-gray-200" :class="[step !== i ? 'opacity-30' : '']" />
-
-          <div :class="[step !== i ? 'opacity-30' : '']" class="overflow-hidden relative p-5 bg-white rounded-2xl dark:border dark:border-gray-200">
-            <div class="flex gap-6 items-start">
-              <div class="inline-flex justify-center items-center w-14 h-14 text-xl font-bold text-white rounded-xl shrink-0 font-pj bg-muted-blue-800">
-                <template v-if="i + 1 !== steps.length">
-                  {{ i + 1 }}
-                </template>
-                <template v-else-if="step === waitStepIndex && i === waitStepIndex">
-                  <div class="flex justify-center">
-                    <IconLoader class="w-10 h-10 text-blue-500 animate-spin" />
-                  </div>
-                </template>
-                <template v-else>
-                  🚀
-                </template>
+  <section class="min-h-[70vh] overflow-y-auto bg-slate-100 py-8 dark:bg-slate-950 sm:py-10">
+    <div class="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
+      <header class="flex flex-col gap-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div class="flex min-w-0 gap-3">
+            <button
+              v-if="canClose"
+              type="button"
+              class="d-btn d-btn-ghost d-btn-square shrink-0 text-slate-600 dark:text-slate-200"
+              :aria-label="t('button-back')"
+              @click="emit('closeStep')"
+            >
+              <IconArrowLeft class="h-5 w-5" />
+            </button>
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-3">
+                <h2 class="text-2xl font-semibold text-slate-950 dark:text-white sm:text-3xl">
+                  {{ t('build-setup-command-title') }}
+                </h2>
+                <span class="rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-200">
+                  BETA
+                </span>
               </div>
-              <div class="flex-1 min-w-0">
-                <div class="text-xl font-medium text-gray-900 font-pj">
-                  {{ s.title }}<br>
-                  <span class="text-sm">{{ s.subtitle }}</span>
-                </div>
-                <div v-if="s.command" class="relative p-5 pr-16 mt-4 bg-black rounded-lg cursor-pointer group" @click="copyToast(step === i, `step_command_${i}`, s.command)">
-                  <code :id="`step_command_${i}`" class="block text-xl whitespace-pre-wrap break-all text-pumpkin-orange-700">
-                    {{ s.command }}
-                  </code>
-                  <i-ion-copy-outline class="absolute top-5 right-5 w-6 h-6 text-muted-blue-300" />
-                </div>
-                <br v-if="s.command">
-              </div>
+              <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">
+                {{ t('build-setup-command-subtitle') }}
+              </p>
             </div>
           </div>
-        </template>
+
+          <a
+            class="d-btn d-btn-outline min-h-11 shrink-0 gap-2 border-slate-300 text-slate-700 dark:border-slate-700 dark:text-slate-100"
+            :href="selectedPlatformDocsUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {{ t('build-docs-link', { platform: selectedPlatformLabel }) }}
+            <IconExternalLink class="h-4 w-4" />
+          </a>
+        </div>
+
+        <div class="grid gap-3 rounded-lg bg-slate-100 p-1 dark:bg-slate-800 sm:grid-cols-2">
+          <button
+            v-for="option in platformOptions"
+            :key="option.value"
+            type="button"
+            class="flex min-h-12 items-center justify-between rounded-md px-4 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-azure-500"
+            :class="selectedPlatform === option.value ? 'bg-white text-slate-950 shadow-sm dark:bg-slate-950 dark:text-white' : 'text-slate-600 hover:bg-white/70 dark:text-slate-300 dark:hover:bg-slate-900/70'"
+            @click="selectPlatform(option.value)"
+          >
+            <span class="flex items-center gap-3 font-medium">
+              <component :is="option.icon" class="h-5 w-5" />
+              {{ option.label }}
+            </span>
+            <span class="text-xs font-medium" :class="option.count > 0 ? 'text-emerald-600 dark:text-emerald-300' : 'text-slate-500 dark:text-slate-400'">
+              {{ option.count > 0 ? t('build-platform-ready') : t('build-platform-needs-setup') }}
+            </span>
+          </button>
+        </div>
+      </header>
+
+      <div class="flex flex-col gap-3">
+        <article
+          v-for="(s, i) in steps"
+          :id="`build_step_${i}`"
+          :key="s.key"
+          class="rounded-lg border bg-white p-5 shadow-sm transition-opacity dark:bg-slate-900 sm:p-6"
+          :class="step === i ? 'border-azure-500 dark:border-azure-500' : 'border-slate-200 opacity-60 dark:border-slate-800'"
+        >
+          <div class="flex gap-4">
+            <div
+              class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-white"
+              :class="step === i ? 'bg-azure-500' : 'bg-slate-500 dark:bg-slate-700'"
+            >
+              <IconLoader v-if="step === waitStepIndex && i === waitStepIndex" class="h-5 w-5 animate-spin" />
+              <IconCheckCircle v-else-if="step > i" class="h-5 w-5" />
+              <component :is="s.icon" v-else class="h-5 w-5" />
+            </div>
+
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 class="text-base font-semibold text-slate-950 dark:text-white sm:text-lg">
+                    {{ s.title }}
+                  </h3>
+                  <p class="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                    {{ s.subtitle }}
+                  </p>
+                </div>
+                <span class="text-sm font-medium text-slate-500 dark:text-slate-400">
+                  {{ i + 1 }} / {{ steps.length }}
+                </span>
+              </div>
+
+              <button
+                v-if="s.command"
+                type="button"
+                class="mt-4 flex w-full items-start gap-3 rounded-lg bg-slate-950 p-4 text-left text-sm text-orange-300 transition-colors hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-black dark:hover:bg-slate-950 sm:text-base"
+                :disabled="step !== i"
+                :aria-label="t('copy-command')"
+                @click="copyToast(step === i, `build_step_${i}`, s.command)"
+              >
+                <code class="min-w-0 flex-1 whitespace-pre-wrap break-all font-mono leading-6">
+                  {{ s.command }}
+                </code>
+                <IconClipboard class="mt-0.5 h-5 w-5 shrink-0 text-slate-300" />
+              </button>
+            </div>
+          </div>
+        </article>
       </div>
     </div>
   </section>
