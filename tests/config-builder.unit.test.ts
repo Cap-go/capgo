@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { app } from '../supabase/functions/_backend/private/config_google_oauth.ts'
+import { app } from '../supabase/functions/_backend/private/config_builder.ts'
 
 beforeEach(() => {
   // Establish a clean baseline so tests don't leak state from each other or
@@ -19,7 +19,7 @@ function get(env: Record<string, string>) {
   return app.request('http://local/', { method: 'GET' })
 }
 
-describe('get /private/config/google_oauth', () => {
+describe('get /private/config/builder', () => {
   it('returns enabled:true with clientId, clientSecret, and default scopes when both required env vars are set', async () => {
     const response = await get({
       GOOGLE_OAUTH_CLIENT_ID: '1234.apps.googleusercontent.com',
