@@ -913,7 +913,15 @@ export type Database = {
       daily_revenue_metrics: {
         Row: {
           churn_mrr: number
+          churn_mrr_enterprise: number
+          churn_mrr_maker: number
+          churn_mrr_solo: number
+          churn_mrr_team: number
           contraction_mrr: number
+          contraction_mrr_enterprise: number
+          contraction_mrr_maker: number
+          contraction_mrr_solo: number
+          contraction_mrr_team: number
           created_at: string
           customer_id: string
           date_id: string
@@ -924,7 +932,15 @@ export type Database = {
         }
         Insert: {
           churn_mrr?: number
+          churn_mrr_enterprise?: number
+          churn_mrr_maker?: number
+          churn_mrr_solo?: number
+          churn_mrr_team?: number
           contraction_mrr?: number
+          contraction_mrr_enterprise?: number
+          contraction_mrr_maker?: number
+          contraction_mrr_solo?: number
+          contraction_mrr_team?: number
           created_at?: string
           customer_id: string
           date_id: string
@@ -935,7 +951,15 @@ export type Database = {
         }
         Update: {
           churn_mrr?: number
+          churn_mrr_enterprise?: number
+          churn_mrr_maker?: number
+          churn_mrr_solo?: number
+          churn_mrr_team?: number
           contraction_mrr?: number
+          contraction_mrr_enterprise?: number
+          contraction_mrr_maker?: number
+          contraction_mrr_solo?: number
+          contraction_mrr_team?: number
           created_at?: string
           customer_id?: string
           date_id?: string
@@ -1210,6 +1234,10 @@ export type Database = {
           bundle_storage_gb: number
           canceled_orgs: number
           churn_revenue: number
+          churn_revenue_enterprise: number
+          churn_revenue_maker: number
+          churn_revenue_solo: number
+          churn_revenue_team: number
           created_at: string | null
           credits_bought: number
           credits_consumed: number
@@ -1242,6 +1270,7 @@ export type Database = {
           plan_team_yearly: number
           plugin_major_breakdown: Json
           plugin_version_breakdown: Json
+          plugin_version_ladder: Json
           registers_today: number
           revenue_enterprise: number
           revenue_maker: number
@@ -1279,6 +1308,10 @@ export type Database = {
           bundle_storage_gb?: number
           canceled_orgs?: number
           churn_revenue?: number
+          churn_revenue_enterprise?: number
+          churn_revenue_maker?: number
+          churn_revenue_solo?: number
+          churn_revenue_team?: number
           created_at?: string | null
           credits_bought?: number
           credits_consumed?: number
@@ -1311,6 +1344,7 @@ export type Database = {
           plan_team_yearly?: number
           plugin_major_breakdown?: Json
           plugin_version_breakdown?: Json
+          plugin_version_ladder?: Json
           registers_today?: number
           revenue_enterprise?: number
           revenue_maker?: number
@@ -1348,6 +1382,10 @@ export type Database = {
           bundle_storage_gb?: number
           canceled_orgs?: number
           churn_revenue?: number
+          churn_revenue_enterprise?: number
+          churn_revenue_maker?: number
+          churn_revenue_solo?: number
+          churn_revenue_team?: number
           created_at?: string | null
           credits_bought?: number
           credits_consumed?: number
@@ -1380,6 +1418,7 @@ export type Database = {
           plan_team_yearly?: number
           plugin_major_breakdown?: Json
           plugin_version_breakdown?: Json
+          plugin_version_ladder?: Json
           registers_today?: number
           revenue_enterprise?: number
           revenue_maker?: number

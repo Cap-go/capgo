@@ -997,6 +997,39 @@ async function checkWriteAppAccess(c: Context, next: Next) {
       }, 429)
     }
 
+    // Ready bundle objects are immutable. Refuse resumable uploads that target a
+    // finalized bundle path even if the caller has upload permission on the app.
+    const readyBundlePath = await pgClient.query<{ id: number }>(
+      `
+        SELECT id
+        FROM public.app_versions
+        WHERE owner_org = $1
+          AND app_id = $2
+          AND r2_path = $3
+          AND COALESCE(deleted, false) = false
+          AND storage_provider IS DISTINCT FROM 'r2-direct'
+        LIMIT 1
+      `,
+      [owner_org, app_id, requestId],
+    )
+
+    if (readyBundlePath.rows.length > 0) {
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'checkWriteAppAccess - ready bundle path mutation blocked',
+        app_id,
+        owner_org,
+        fileId: requestId,
+      })
+      throw new HTTPException(409, {
+        res: c.json({
+          error: 'bundle_already_ready',
+          message: 'Bundle content cannot be changed after upload is complete. Upload a new bundle instead.',
+          moreInfo: { app_id, requestId: c.get('requestId') },
+        }),
+      })
+    }
+
     cloudlog({
       requestId: c.get('requestId'),
       message: 'checkWriteAppAccess - access granted',
