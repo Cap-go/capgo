@@ -13,6 +13,7 @@ import {
 } from 'chart.js'
 import { computed } from 'vue'
 import { Line } from 'vue-chartjs'
+import { createChartColorWithOpacity, resolveAccessibleChartColor } from '~/services/chartConfig'
 import { formatLocalDate } from '~/services/date'
 
 const props = defineProps({
@@ -54,6 +55,7 @@ const chartData = computed<ChartData<'line'>>(() => {
   const labels = props.data.map(item => item.date)
     .map(item => formatChartDate(item))
   const values = props.data.map(item => item.value)
+  const lineColor = resolveAccessibleChartColor(props.color, isDark.value)
 
   return {
     labels,
@@ -61,13 +63,14 @@ const chartData = computed<ChartData<'line'>>(() => {
       {
         label: props.label,
         data: values,
-        borderColor: props.color,
-        backgroundColor: `${props.color}33`, // 20% opacity
+        borderColor: lineColor,
+        backgroundColor: createChartColorWithOpacity(lineColor, 0.2),
         fill: true,
         tension: 0.4,
         pointRadius: 3,
-        pointBackgroundColor: props.color,
-        pointBorderWidth: 0,
+        pointBackgroundColor: lineColor,
+        pointBorderColor: isDark.value ? '#0f172a' : '#ffffff',
+        pointBorderWidth: 1,
         borderWidth: 2,
       },
     ],
