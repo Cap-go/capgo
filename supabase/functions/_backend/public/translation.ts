@@ -1,4 +1,5 @@
 import type { Context } from 'hono'
+import sourceMessages from '../../../../messages/en.json'
 import { CacheHelper } from '../utils/cache.ts'
 import { honoFactory, parseBody, quickError, useCors } from '../utils/hono.ts'
 import { cloudlog } from '../utils/logging.ts'
@@ -8,8 +9,6 @@ const CACHE_TTL_SECONDS = 5 * 60
 const DEFAULT_TRANSLATION_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast'
 const MAX_BATCH_CHARACTERS = 6_000
 const MAX_BATCH_ITEMS = 60
-const MAX_MESSAGE_ENTRIES = 2_500
-const MAX_MESSAGE_TOTAL_CHARACTERS = 120_000
 const TRANSLATION_ATTEMPTS = 3
 const TRANSLATION_CACHE_PATH = '/translation/messages-cache'
 const PLACEHOLDER_PATTERN = /\{[\w.]+\}|%\w+%?|\$\d+/g
@@ -55,7 +54,6 @@ const LANGUAGE_NAMES: Record<string, string> = {
 }
 
 interface TranslationBody {
-  messages?: unknown
   targetLanguage?: string
 }
 
@@ -72,43 +70,8 @@ interface AiBinding {
 
 type MessageEntry = [string, string]
 
+const sourceMessageCatalog = sourceMessages as Record<string, string>
 const pendingTranslations = new Map<string, Promise<void>>()
-
-function normalizeWhitespace(value: string) {
-  return value.replace(/\s+/g, ' ').trim()
-}
-
-function normalizeTranslationMessages(messages: unknown) {
-  if (!messages || typeof messages !== 'object' || Array.isArray(messages))
-    quickError(400, 'invalid_translation_payload', 'messages must be an object')
-
-  const filtered: Record<string, string> = {}
-  let entryCount = 0
-  let totalCharacters = 0
-
-  for (const [key, value] of Object.entries(messages as Record<string, unknown>)) {
-    if (typeof value !== 'string')
-      continue
-
-    const normalized = normalizeWhitespace(value)
-    if (!normalized)
-      continue
-    if (normalized.length > 1_000)
-      continue
-    if (key.length > 200)
-      continue
-    if (entryCount >= MAX_MESSAGE_ENTRIES)
-      break
-    if (totalCharacters + value.length > MAX_MESSAGE_TOTAL_CHARACTERS)
-      break
-
-    filtered[key] = value
-    entryCount += 1
-    totalCharacters += value.length
-  }
-
-  return filtered
-}
 
 function getTranslationModel(c: Context) {
   return getEnv(c, 'TRANSLATION_MODEL') || DEFAULT_TRANSLATION_MODEL
@@ -385,7 +348,7 @@ app.post('/messages', async (c) => {
   if (targetLanguage === 'en')
     quickError(400, 'unsupported_translation_language', 'English messages are already bundled')
 
-  const messages = normalizeTranslationMessages(body.messages)
+  const messages = sourceMessageCatalog
   const checksum = await sha256Hex(JSON.stringify(messages))
   const model = getTranslationModel(c)
   const cacheHelper = new CacheHelper(c)

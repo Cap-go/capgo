@@ -63,27 +63,26 @@ export const i18n = createI18n({
 
 const loadedLanguages = new Set<string>([FALLBACK_LOCALE])
 const pendingLanguageLoads = new Map<string, Promise<MessageCatalog>>()
-const sourceChecksum = checksumMessageCatalog(sourceMessages)
-
-function checksumMessageCatalog(messages: MessageCatalog) {
-  const input = JSON.stringify(messages)
-  let hash = 5381
-  for (let index = 0; index < input.length; index += 1)
-    hash = ((hash << 5) + hash) ^ input.charCodeAt(index)
-  return (hash >>> 0).toString(36)
-}
-
 function isMessageCatalog(value: unknown): value is MessageCatalog {
   return !!value && typeof value === 'object' && !Array.isArray(value)
     && Object.values(value).every(entry => typeof entry === 'string')
 }
 
+function setDocumentLanguage(lang: Locale) {
+  if (typeof document !== 'undefined')
+    document.documentElement.setAttribute('lang', lang)
+}
+
 function setI18nLanguage(lang: Locale) {
   i18n.global.locale.value = lang as any
   localStorage.setItem(LANGUAGE_STORAGE_KEY, lang)
-  if (typeof document !== 'undefined')
-    document.documentElement.setAttribute('lang', lang)
+  setDocumentLanguage(lang)
   return lang
+}
+
+function showFallbackLanguage() {
+  i18n.global.locale.value = FALLBACK_LOCALE as any
+  setDocumentLanguage(FALLBACK_LOCALE)
 }
 
 function readStoredLanguage() {
@@ -136,8 +135,6 @@ async function fetchRemoteMessages(lang: string): Promise<MessageCatalog> {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      checksum: sourceChecksum,
-      messages: sourceMessages,
       targetLanguage: getWorkerLanguageCode(lang),
     }),
   }).then(async (response) => {
@@ -188,7 +185,7 @@ export const install: UserModule = ({ app }) => {
   const initialLanguage = normalizeLanguage(readStoredLanguage() ?? getNavigatorLanguage())
   if (initialLanguage !== FALLBACK_LOCALE) {
     void loadLanguageAsync(initialLanguage).catch(() => {
-      setI18nLanguage(FALLBACK_LOCALE)
+      showFallbackLanguage()
     })
   }
   else {

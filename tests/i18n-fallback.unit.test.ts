@@ -71,6 +71,27 @@ describe('i18n remote message loading', () => {
     expect(mocks.toast.error).toHaveBeenCalledWith('This language is not available right now.')
   })
 
+  it('keeps the stored startup locale when backend translation is pending', async () => {
+    const stored = new Map<string, string>([['lang', 'fr']])
+    const setItem = vi.fn((key: string, value: string) => stored.set(key, value))
+    vi.stubGlobal('localStorage', {
+      clear: vi.fn(() => stored.clear()),
+      getItem: vi.fn((key: string) => stored.get(key) ?? null),
+      removeItem: vi.fn((key: string) => stored.delete(key)),
+      setItem,
+    })
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ status: 'pending' }), { status: 202 })))
+
+    const { install, i18n } = await import('../src/modules/i18n.ts')
+
+    install({ app: { use: vi.fn() } } as any)
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(i18n.global.locale.value).toBe('en')
+    expect(stored.get('lang')).toBe('fr')
+    expect(setItem).not.toHaveBeenCalledWith('lang', 'en')
+  })
+
   it('loads backend messages before switching locale', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({
       messages: {
@@ -87,14 +108,12 @@ describe('i18n remote message loading', () => {
 
     const selectedLanguage = await changeLanguage('fr')
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
-    const request = JSON.parse(init.body as string) as { checksum?: string, messages?: Record<string, string>, targetLanguage?: string }
+    const request = JSON.parse(init.body as string) as { targetLanguage?: string }
 
     expect(selectedLanguage).toBe('fr')
     expect(i18n.global.locale.value).toBe('fr')
     expect(mocks.changeLocale).toHaveBeenCalledWith('fr')
-    expect(request.targetLanguage).toBe('fr')
-    expect(request.checksum).toEqual(expect.any(String))
-    expect(request.messages?.['credits-plan-overage']).toBe('{included}, then {price}')
+    expect(request).toEqual({ targetLanguage: 'fr' })
     expect(i18n.global.t('credits-plan-overage', {
       included: 'Included in plan',
       price: '$0.08 per minute',
