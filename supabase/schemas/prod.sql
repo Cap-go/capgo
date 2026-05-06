@@ -1382,7 +1382,7 @@ CREATE TABLE IF NOT EXISTS "public"."apikeys" (
     "created_at" timestamp with time zone DEFAULT "now"(),
     "user_id" "uuid" NOT NULL,
     "key" character varying,
-    "mode" "public"."key_mode" NOT NULL,
+    "mode" "public"."key_mode",
     "updated_at" timestamp with time zone DEFAULT "now"(),
     "name" character varying NOT NULL,
     "limited_to_orgs" "uuid"[] DEFAULT '{}'::"uuid"[],
@@ -1395,6 +1395,10 @@ CREATE TABLE IF NOT EXISTS "public"."apikeys" (
 
 
 ALTER TABLE "public"."apikeys" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."apikeys"."mode" IS 'Legacy permission mode. NULL means permissions are managed via RBAC role_bindings.';
+
 
 
 COMMENT ON COLUMN "public"."apikeys"."key_hash" IS 'SHA-256 hash of the API key. When set, the key column is cleared to null for security.';
@@ -1636,41 +1640,69 @@ DECLARE
   org_required_key varchar(21);
   bundle_is_encrypted boolean;
   bundle_key_id varchar(20);
+  bundle_was_ready boolean;
 BEGIN
-  -- Derive org_id from app_id directly to avoid trigger ordering issues.
-  -- The force_valid_owner_org_app_versions trigger runs after this one
-  -- (alphabetically), so NEW.owner_org may not be populated yet.
-  -- We look up the org from the apps table using the app_id.
-  IF NEW.owner_org IS NOT NULL THEN
-    org_id := NEW.owner_org;
-  ELSE
-    SELECT apps.owner_org INTO org_id
-    FROM public.apps
-    WHERE apps.app_id = NEW.app_id;
+  IF TG_OP = 'UPDATE' THEN
+    bundle_was_ready := OLD.storage_provider IS DISTINCT FROM 'r2-direct';
+
+    IF bundle_was_ready
+      AND (
+        NEW.name IS DISTINCT FROM OLD.name
+        OR NEW.app_id IS DISTINCT FROM OLD.app_id
+        OR NEW.session_key IS DISTINCT FROM OLD.session_key
+        OR NEW.key_id IS DISTINCT FROM OLD.key_id
+        OR NEW.storage_provider IS DISTINCT FROM OLD.storage_provider
+        OR NEW.r2_path IS DISTINCT FROM OLD.r2_path
+        OR NEW.external_url IS DISTINCT FROM OLD.external_url
+        OR NEW.checksum IS DISTINCT FROM OLD.checksum
+        OR NEW.manifest IS DISTINCT FROM OLD.manifest
+        OR NEW.native_packages IS DISTINCT FROM OLD.native_packages
+      )
+    THEN
+      PERFORM public.pg_log('deny: BUNDLE_CONTENT_LOCKED_TRIGGER',
+        jsonb_build_object(
+          'org_id', OLD.owner_org,
+          'app_id', OLD.app_id,
+          'version_name', OLD.name,
+          'user_id', OLD.user_id,
+          'old_storage_provider', OLD.storage_provider,
+          'new_storage_provider', NEW.storage_provider,
+          'reason', 'bundle_ready'
+        ));
+      RAISE EXCEPTION '%',
+        'bundle_already_ready: Bundle content cannot be changed '
+        || 'after upload is complete. Upload a new bundle instead.';
+    END IF;
   END IF;
 
-  -- If org not found, allow (will fail on other checks)
+  -- Derive org_id from NEW.app_id first because
+  -- force_valid_owner_org_app_versions runs after this trigger.
+  SELECT apps.owner_org INTO org_id
+  FROM public.apps
+  WHERE apps.app_id = NEW.app_id;
+
+  IF org_id IS NULL THEN
+    org_id := NEW.owner_org;
+  END IF;
+
+  -- If org not found, allow the existing foreign-key/owner checks to fail.
   IF org_id IS NULL THEN
     RETURN NEW;
   END IF;
 
-  -- Get the org's enforcement settings
   SELECT enforce_encrypted_bundles, required_encryption_key
   INTO org_enforcing, org_required_key
   FROM public.orgs
   WHERE id = org_id;
 
-  -- If org doesn't exist or doesn't enforce encrypted bundles, allow
   IF org_enforcing IS NULL OR org_enforcing = false THEN
     RETURN NEW;
   END IF;
 
-  -- Check if this bundle is encrypted (has a non-empty session_key)
-  bundle_is_encrypted := NEW.session_key IS NOT NULL AND NEW.session_key <> '';
-  bundle_key_id := NEW.key_id;
+  bundle_is_encrypted := public.is_bundle_encrypted(NEW.session_key);
+  bundle_key_id := NULLIF(btrim(NEW.key_id), '')::varchar(20);
 
   IF NOT bundle_is_encrypted THEN
-    -- Log the rejection for audit
     PERFORM public.pg_log('deny: ORG_REQUIRES_ENCRYPTED_BUNDLES_TRIGGER',
       jsonb_build_object(
         'org_id', org_id,
@@ -1679,13 +1711,13 @@ BEGIN
         'user_id', NEW.user_id,
         'reason', 'not_encrypted'
       ));
-    RAISE EXCEPTION 'encryption_required: This organization requires all bundles to be encrypted. Please upload an encrypted bundle with a session_key.';
+    RAISE EXCEPTION '%',
+      'encryption_required: This organization requires all bundles to be '
+      || 'encrypted. Please upload an encrypted bundle with a session_key.';
   END IF;
 
-  -- If org requires a specific key, check the key_id matches
   IF org_required_key IS NOT NULL AND org_required_key <> '' THEN
-    -- Bundle must have a key_id that starts with the required key fingerprint
-    IF bundle_key_id IS NULL OR bundle_key_id = '' THEN
+    IF bundle_key_id IS NULL THEN
       PERFORM public.pg_log('deny: ORG_REQUIRES_SPECIFIC_ENCRYPTION_KEY_TRIGGER',
         jsonb_build_object(
           'org_id', org_id,
@@ -1696,12 +1728,17 @@ BEGIN
           'bundle_key_id', bundle_key_id,
           'reason', 'missing_key_id'
         ));
-      RAISE EXCEPTION 'encryption_key_required: This organization requires bundles to be encrypted with a specific key. The uploaded bundle does not have a key_id.';
+      RAISE EXCEPTION '%',
+        'encryption_key_required: This organization requires bundles to be '
+        || 'encrypted with a specific key. The uploaded bundle does not have '
+        || 'a key_id.';
     END IF;
 
-    -- Check if the bundle's key_id starts with the required key fingerprint
-    -- We use starts_with because key_id is 20 chars and required_encryption_key is up to 21 chars
-    IF NOT (bundle_key_id = LEFT(org_required_key, 20) OR LEFT(bundle_key_id, LENGTH(org_required_key)) = org_required_key) THEN
+    -- key_id is 20 chars and required_encryption_key may be 20 or 21 chars.
+    IF NOT (
+      bundle_key_id = LEFT(org_required_key, 20)
+      OR LEFT(bundle_key_id, LENGTH(org_required_key)) = org_required_key
+    ) THEN
       PERFORM public.pg_log('deny: ORG_REQUIRES_SPECIFIC_ENCRYPTION_KEY_TRIGGER',
         jsonb_build_object(
           'org_id', org_id,
@@ -1712,7 +1749,10 @@ BEGIN
           'bundle_key_id', bundle_key_id,
           'reason', 'key_mismatch'
         ));
-      RAISE EXCEPTION 'encryption_key_mismatch: This organization requires bundles to be encrypted with a specific key. The uploaded bundle was encrypted with a different key.';
+      RAISE EXCEPTION '%',
+        'encryption_key_mismatch: This organization requires bundles to be '
+        || 'encrypted with a specific key. The uploaded bundle was encrypted '
+        || 'with a different key.';
     END IF;
   END IF;
 
@@ -2803,38 +2843,39 @@ DECLARE
   non_encrypted bigint := 0;
   wrong_key bigint := 0;
   caller_user_id uuid;
-  caller_right public.user_min_right;
+  api_key_text text;
 BEGIN
-  -- Get the current user's ID (supports both JWT and API key authentication)
   SELECT public.get_identity('{read,upload,write,all}'::public.key_mode[]) INTO caller_user_id;
+  SELECT public.get_apikey_header() INTO api_key_text;
 
   IF caller_user_id IS NULL THEN
     RAISE EXCEPTION 'Unauthorized: Authentication required';
   END IF;
 
-  -- Check if the caller is a super_admin of this organization
-  SELECT user_right INTO caller_right
-  FROM public.org_users
-  WHERE org_users.user_id = caller_user_id
-    AND org_users.org_id = count_non_compliant_bundles.org_id;
-
-  IF caller_right IS NULL OR caller_right <> 'super_admin'::public.user_min_right THEN
+  -- org.delete is the RBAC/legacy super_admin-equivalent org gate. Using it
+  -- preserves the previous super_admin-only requirement for this org-wide scan.
+  IF NOT public.rbac_check_permission_direct(
+    public.rbac_perm_org_delete(),
+    caller_user_id,
+    count_non_compliant_bundles.org_id,
+    NULL::character varying,
+    NULL::bigint,
+    api_key_text
+  ) THEN
     RAISE EXCEPTION 'Unauthorized: Only super_admin can access this function';
   END IF;
 
-  -- Count bundles without encryption (no session_key)
   SELECT COUNT(*) INTO non_encrypted
   FROM public.app_versions av
-  JOIN public.apps a ON a.app_id = av.app_id
+  INNER JOIN public.apps a ON a.app_id = av.app_id
   WHERE a.owner_org = count_non_compliant_bundles.org_id
     AND av.deleted = false
     AND (av.session_key IS NULL OR av.session_key = '');
 
-  -- Count bundles with wrong key (if required_key is specified)
   IF required_key IS NOT NULL AND required_key <> '' THEN
     SELECT COUNT(*) INTO wrong_key
     FROM public.app_versions av
-    JOIN public.apps a ON a.app_id = av.app_id
+    INNER JOIN public.apps a ON a.app_id = av.app_id
     WHERE a.owner_org = count_non_compliant_bundles.org_id
       AND av.deleted = false
       AND av.session_key IS NOT NULL
@@ -2842,6 +2883,7 @@ BEGIN
       AND (
         av.key_id IS NULL
         OR av.key_id = ''
+        -- key_id can store either the 20-char required_key prefix or the full key, so accept both match directions.
         OR NOT (av.key_id = LEFT(required_key, 20) OR LEFT(av.key_id, LENGTH(required_key)) = required_key)
       );
   END IF;
@@ -2854,28 +2896,53 @@ $$;
 ALTER FUNCTION "public"."count_non_compliant_bundles"("org_id" "uuid", "required_key" "text") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."create_hashed_apikey"("p_mode" "public"."key_mode", "p_name" "text", "p_limited_to_orgs" "uuid"[], "p_limited_to_apps" "text"[], "p_expires_at" timestamp with time zone) RETURNS "public"."apikeys"
+CREATE OR REPLACE FUNCTION "public"."create_hashed_apikey"("p_mode" "public"."key_mode" DEFAULT NULL::"public"."key_mode", "p_name" "text" DEFAULT ''::"text", "p_limited_to_orgs" "uuid"[] DEFAULT '{}'::"uuid"[], "p_limited_to_apps" "text"[] DEFAULT '{}'::"text"[], "p_expires_at" timestamp with time zone DEFAULT NULL::timestamp with time zone) RETURNS "public"."apikeys"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $$
-	DECLARE
-	  v_user_id uuid;
-	BEGIN
-	  -- Use the key_mode-aware identity function so this RPC works for both JWT auth
-	  -- (role: authenticated) and API key auth (role: anon + capgkey header).
-	  SELECT public.get_identity('{write,all}'::public.key_mode[]) INTO v_user_id;
-	  IF v_user_id IS NULL THEN
-	    RAISE EXCEPTION 'No authentication provided';
-	  END IF;
+DECLARE
+  v_user_id uuid;
+  v_plain_key text;
+  v_apikey public.apikeys;
+BEGIN
+  IF p_mode IS NULL THEN
+    RAISE EXCEPTION 'RBAC_MANAGED_APIKEY_REQUIRES_BINDINGS';
+  END IF;
 
-  RETURN public.create_hashed_apikey_for_user(
+  SELECT public.get_identity_for_apikey_creation() INTO v_user_id;
+  IF v_user_id IS NULL THEN
+    RAISE EXCEPTION 'No authentication provided';
+  END IF;
+
+  v_plain_key := gen_random_uuid()::text;
+
+  PERFORM set_config('capgo.skip_apikey_trigger', 'true', true);
+
+  INSERT INTO public.apikeys (
+    user_id,
+    key,
+    key_hash,
+    mode,
+    name,
+    limited_to_orgs,
+    limited_to_apps,
+    expires_at
+  )
+  VALUES (
     v_user_id,
+    NULL,
+    encode(extensions.digest(v_plain_key, 'sha256'), 'hex'),
     p_mode,
     p_name,
     COALESCE(p_limited_to_orgs, '{}'::uuid[]),
     COALESCE(p_limited_to_apps, '{}'::text[]),
     p_expires_at
-  );
+  )
+  RETURNING * INTO v_apikey;
+
+  v_apikey.key := v_plain_key;
+
+  RETURN v_apikey;
 END;
 $$;
 
@@ -2883,7 +2950,7 @@ $$;
 ALTER FUNCTION "public"."create_hashed_apikey"("p_mode" "public"."key_mode", "p_name" "text", "p_limited_to_orgs" "uuid"[], "p_limited_to_apps" "text"[], "p_expires_at" timestamp with time zone) OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."create_hashed_apikey_for_user"("p_user_id" "uuid", "p_mode" "public"."key_mode", "p_name" "text", "p_limited_to_orgs" "uuid"[], "p_limited_to_apps" "text"[], "p_expires_at" timestamp with time zone) RETURNS "public"."apikeys"
+CREATE OR REPLACE FUNCTION "public"."create_hashed_apikey_for_user"("p_user_id" "uuid", "p_mode" "public"."key_mode" DEFAULT NULL::"public"."key_mode", "p_name" "text" DEFAULT ''::"text", "p_limited_to_orgs" "uuid"[] DEFAULT '{}'::"uuid"[], "p_limited_to_apps" "text"[] DEFAULT '{}'::"text"[], "p_expires_at" timestamp with time zone DEFAULT NULL::timestamp with time zone) RETURNS "public"."apikeys"
     LANGUAGE "plpgsql"
     SET "search_path" TO ''
     AS $$
@@ -3164,59 +3231,56 @@ DECLARE
   deleted_count bigint := 0;
   bundle_ids bigint[];
   caller_user_id uuid;
-  caller_right public.user_min_right;
+  api_key_text text;
 BEGIN
-  -- Get the current user's ID (supports both JWT and API key authentication)
   SELECT public.get_identity('{read,upload,write,all}'::public.key_mode[]) INTO caller_user_id;
+  SELECT public.get_apikey_header() INTO api_key_text;
 
   IF caller_user_id IS NULL THEN
     RAISE EXCEPTION 'Unauthorized: Authentication required';
   END IF;
 
-  -- Check if the caller is a super_admin of this organization
-  SELECT user_right INTO caller_right
-  FROM public.org_users
-  WHERE org_users.user_id = caller_user_id
-    AND org_users.org_id = delete_non_compliant_bundles.org_id;
-
-  IF caller_right IS NULL OR caller_right <> 'super_admin'::public.user_min_right THEN
+  -- org.delete is the RBAC/legacy super_admin-equivalent org gate. Using it
+  -- preserves the previous super_admin-only requirement for this destructive cleanup.
+  IF NOT public.rbac_check_permission_direct(
+    public.rbac_perm_org_delete(),
+    caller_user_id,
+    delete_non_compliant_bundles.org_id,
+    NULL::character varying,
+    NULL::bigint,
+    api_key_text
+  ) THEN
     RAISE EXCEPTION 'Unauthorized: Only super_admin can access this function';
   END IF;
 
-  -- First, collect all bundle IDs that will be deleted
   IF required_key IS NULL OR required_key = '' THEN
-    -- Only delete non-encrypted bundles
     SELECT ARRAY_AGG(av.id) INTO bundle_ids
     FROM public.app_versions av
-    JOIN public.apps a ON a.app_id = av.app_id
+    INNER JOIN public.apps a ON a.app_id = av.app_id
     WHERE a.owner_org = delete_non_compliant_bundles.org_id
       AND av.deleted = false
       AND (av.session_key IS NULL OR av.session_key = '');
   ELSE
-    -- Delete non-encrypted bundles AND bundles with wrong key
     SELECT ARRAY_AGG(av.id) INTO bundle_ids
     FROM public.app_versions av
-    JOIN public.apps a ON a.app_id = av.app_id
+    INNER JOIN public.apps a ON a.app_id = av.app_id
     WHERE a.owner_org = delete_non_compliant_bundles.org_id
       AND av.deleted = false
       AND (
-        -- Non-encrypted bundles
         (av.session_key IS NULL OR av.session_key = '')
-        OR
-        -- Encrypted but with wrong key
-        (
+        OR (
           av.session_key IS NOT NULL
           AND av.session_key <> ''
           AND (
             av.key_id IS NULL
             OR av.key_id = ''
+            -- key_id can store either the 20-char required_key prefix or the full key, so accept both match directions.
             OR NOT (av.key_id = LEFT(required_key, 20) OR LEFT(av.key_id, LENGTH(required_key)) = required_key)
           )
         )
       );
   END IF;
 
-  -- If there are bundles to delete, mark them as deleted
   IF bundle_ids IS NOT NULL AND array_length(bundle_ids, 1) > 0 THEN
     UPDATE public.app_versions
     SET deleted = true
@@ -3224,7 +3288,6 @@ BEGIN
 
     deleted_count := array_length(bundle_ids, 1);
 
-    -- Log the action
     PERFORM public.pg_log('action: DELETED_NON_COMPLIANT_BUNDLES',
       jsonb_build_object(
         'org_id', org_id,
@@ -5018,6 +5081,60 @@ $$;
 
 
 ALTER FUNCTION "public"."get_identity_apikey_only"("keymode" "public"."key_mode"[]) OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."get_identity_for_apikey_creation"() RETURNS "uuid"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  auth_uid uuid;
+  api_key_text text;
+  api_key public.apikeys%ROWTYPE;
+BEGIN
+  SELECT auth.uid() INTO auth_uid;
+
+  IF auth_uid IS NOT NULL THEN
+    RETURN auth_uid;
+  END IF;
+
+  SELECT public.get_apikey_header() INTO api_key_text;
+
+  IF api_key_text IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  SELECT * INTO api_key
+  FROM public.find_apikey_by_value(api_key_text)
+  LIMIT 1;
+
+  IF api_key.id IS NULL THEN
+    RETURN NULL;
+  END IF;
+
+  IF public.is_apikey_expired(api_key.expires_at) THEN
+    PERFORM public.pg_log('deny: APIKEY_CREATE_API_KEY_EXPIRED', jsonb_build_object('key_id', api_key.id));
+    RETURN NULL;
+  END IF;
+
+  IF api_key.mode IS DISTINCT FROM 'all'::public.key_mode THEN
+    PERFORM public.pg_log('deny: APIKEY_CREATE_API_KEY_MODE', jsonb_build_object('key_id', api_key.id, 'mode', api_key.mode));
+    RETURN NULL;
+  END IF;
+
+  IF COALESCE(array_length(api_key.limited_to_orgs, 1), 0) > 0
+    OR COALESCE(array_length(api_key.limited_to_apps, 1), 0) > 0
+  THEN
+    PERFORM public.pg_log('deny: APIKEY_CREATE_LIMITED_API_KEY', jsonb_build_object('key_id', api_key.id));
+    RETURN NULL;
+  END IF;
+
+  RETURN api_key.user_id;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."get_identity_for_apikey_creation"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."get_identity_org_allowed"("keymode" "public"."key_mode"[], "org_id" "uuid") RETURNS "uuid"
@@ -9024,6 +9141,74 @@ $$;
 
 
 ALTER FUNCTION "public"."prevent_last_super_admin_binding_delete"() OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."prevent_last_super_admin_binding_update"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_remaining_count integer;
+  v_org_exists boolean;
+BEGIN
+  IF OLD.role_id IS NOT DISTINCT FROM NEW.role_id THEN
+    RETURN NEW;
+  END IF;
+
+  IF OLD.scope_type != public.rbac_scope_org() THEN
+    RETURN NEW;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.roles r
+    WHERE r.id = OLD.role_id
+      AND r.name = public.rbac_role_org_super_admin()
+  ) THEN
+    RETURN NEW;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
+    FROM public.roles r
+    WHERE r.id = NEW.role_id
+      AND r.name = public.rbac_role_org_super_admin()
+  ) THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT EXISTS(
+    SELECT 1
+    FROM public.orgs
+    WHERE id = OLD.org_id
+  ) INTO v_org_exists;
+
+  IF NOT v_org_exists THEN
+    RETURN NEW;
+  END IF;
+
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtext(OLD.org_id::text));
+
+  SELECT COUNT(*) INTO v_remaining_count
+  FROM public.role_bindings rb
+  INNER JOIN public.roles r ON rb.role_id = r.id
+  WHERE rb.scope_type = public.rbac_scope_org()
+    AND rb.org_id = OLD.org_id
+    AND rb.principal_type = public.rbac_principal_user()
+    AND r.name = public.rbac_role_org_super_admin()
+    AND rb.id != OLD.id;
+
+  IF v_remaining_count < 1 THEN
+    RAISE EXCEPTION 'CANNOT_DEMOTE_LAST_SUPER_ADMIN_BINDING'
+      USING HINT = 'At least one super_admin binding must remain in the org';
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."prevent_last_super_admin_binding_update"() OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."process_admin_stats"() RETURNS "void"
@@ -17524,7 +17709,7 @@ CREATE OR REPLACE TRIGGER "credit_usage_alert_on_transactions" AFTER INSERT ON "
 
 
 
-CREATE OR REPLACE TRIGGER "enforce_encrypted_bundle_trigger" BEFORE INSERT OR UPDATE OF "session_key", "key_id" ON "public"."app_versions" FOR EACH ROW EXECUTE FUNCTION "public"."check_encrypted_bundle_on_insert"();
+CREATE OR REPLACE TRIGGER "enforce_encrypted_bundle_trigger" BEFORE INSERT OR UPDATE OF "name", "app_id", "session_key", "key_id", "storage_provider", "r2_path", "external_url", "checksum", "manifest", "native_packages" ON "public"."app_versions" FOR EACH ROW EXECUTE FUNCTION "public"."check_encrypted_bundle_on_insert"();
 
 
 
@@ -17709,6 +17894,10 @@ CREATE OR REPLACE TRIGGER "on_version_update" AFTER UPDATE ON "public"."app_vers
 
 
 CREATE OR REPLACE TRIGGER "prevent_last_super_admin_delete" BEFORE DELETE ON "public"."role_bindings" FOR EACH ROW EXECUTE FUNCTION "public"."prevent_last_super_admin_binding_delete"();
+
+
+
+CREATE OR REPLACE TRIGGER "prevent_last_super_admin_update" BEFORE UPDATE OF "role_id" ON "public"."role_bindings" FOR EACH ROW EXECUTE FUNCTION "public"."prevent_last_super_admin_binding_update"();
 
 
 
@@ -18317,7 +18506,7 @@ CREATE POLICY "Allow owner to delete own apikeys" ON "public"."apikeys" FOR DELE
 
 
 
-CREATE POLICY "Allow owner to insert own apikeys" ON "public"."apikeys" FOR INSERT TO "anon", "authenticated" WITH CHECK (("user_id" = ( SELECT "public"."get_identity"('{write,all}'::"public"."key_mode"[]) AS "get_identity")));
+CREATE POLICY "Allow owner to insert own apikeys" ON "public"."apikeys" FOR INSERT TO "anon", "authenticated" WITH CHECK ((("mode" IS NOT NULL) AND ("user_id" = ( SELECT "public"."get_identity_for_apikey_creation"() AS "get_identity_for_apikey_creation"))));
 
 
 
@@ -18333,7 +18522,7 @@ CREATE POLICY "Allow owner to select own user" ON "public"."users" FOR SELECT TO
 
 
 
-CREATE POLICY "Allow owner to update own apikeys" ON "public"."apikeys" FOR UPDATE TO "anon", "authenticated" USING (("user_id" = ( SELECT "public"."get_identity"('{read,upload,write,all}'::"public"."key_mode"[]) AS "get_identity"))) WITH CHECK (("user_id" = ( SELECT "public"."get_identity"('{write,all}'::"public"."key_mode"[]) AS "get_identity")));
+CREATE POLICY "Allow owner to update own apikeys" ON "public"."apikeys" FOR UPDATE TO "anon", "authenticated" USING (("user_id" = ( SELECT "public"."get_identity_for_apikey_creation"() AS "get_identity_for_apikey_creation"))) WITH CHECK (("user_id" = ( SELECT "public"."get_identity_for_apikey_creation"() AS "get_identity_for_apikey_creation")));
 
 
 
@@ -19633,6 +19822,7 @@ GRANT ALL ON FUNCTION "public"."create_hashed_apikey"("p_mode" "public"."key_mod
 
 
 
+REVOKE ALL ON FUNCTION "public"."create_hashed_apikey_for_user"("p_user_id" "uuid", "p_mode" "public"."key_mode", "p_name" "text", "p_limited_to_orgs" "uuid"[], "p_limited_to_apps" "text"[], "p_expires_at" timestamp with time zone) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."create_hashed_apikey_for_user"("p_user_id" "uuid", "p_mode" "public"."key_mode", "p_name" "text", "p_limited_to_orgs" "uuid"[], "p_limited_to_apps" "text"[], "p_expires_at" timestamp with time zone) TO "service_role";
 
 
@@ -19872,6 +20062,13 @@ GRANT ALL ON FUNCTION "public"."get_identity"("keymode" "public"."key_mode"[]) T
 
 REVOKE ALL ON FUNCTION "public"."get_identity_apikey_only"("keymode" "public"."key_mode"[]) FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."get_identity_apikey_only"("keymode" "public"."key_mode"[]) TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."get_identity_for_apikey_creation"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."get_identity_for_apikey_creation"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."get_identity_for_apikey_creation"() TO "anon";
+GRANT ALL ON FUNCTION "public"."get_identity_for_apikey_creation"() TO "authenticated";
 
 
 
@@ -20445,6 +20642,11 @@ REVOKE ALL ON FUNCTION "public"."pg_log"("decision" "text", "input" "jsonb") FRO
 
 REVOKE ALL ON FUNCTION "public"."prevent_last_super_admin_binding_delete"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."prevent_last_super_admin_binding_delete"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."prevent_last_super_admin_binding_update"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."prevent_last_super_admin_binding_update"() TO "service_role";
 
 
 

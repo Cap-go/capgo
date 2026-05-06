@@ -1945,9 +1945,99 @@ export interface PluginVersionBreakdown {
   [version: string]: number // percentage (0-100)
 }
 
+export interface PluginVersionTopApp {
+  app_id: string
+  device_count: number
+  share: number
+}
+
+export interface PluginVersionLadderEntry {
+  version: string
+  device_count: number
+  percent: number
+  top_apps: PluginVersionTopApp[]
+}
+
+export interface PluginBreakdownRow {
+  plugin_version: string
+  app_id: string
+  device_count: number | string
+}
+
 export interface PluginBreakdownResult {
   version_breakdown: PluginVersionBreakdown // Full version breakdown (e.g., {"6.2.5": 45.2})
   major_breakdown: PluginVersionBreakdown // Major version breakdown (e.g., {"6": 75.3})
+  version_ladder: PluginVersionLadderEntry[]
+}
+
+export function buildPluginBreakdownResult(result: PluginBreakdownRow[]): PluginBreakdownResult {
+  const emptyResult: PluginBreakdownResult = { version_breakdown: {}, major_breakdown: {}, version_ladder: [] }
+  if (result.length === 0)
+    return emptyResult
+
+  const versionCounts = new Map<string, number>()
+  const versionAppCounts = new Map<string, Map<string, number>>()
+  for (const row of result) {
+    const version = row.plugin_version
+    const appId = row.app_id
+    const deviceCount = Number(row.device_count) || 0
+    if (!(version && appId && deviceCount > 0))
+      continue
+
+    versionCounts.set(version, (versionCounts.get(version) || 0) + deviceCount)
+    const appCounts = versionAppCounts.get(version) ?? new Map<string, number>()
+    appCounts.set(appId, (appCounts.get(appId) || 0) + deviceCount)
+    versionAppCounts.set(version, appCounts)
+  }
+
+  const total = Array.from(versionCounts.values()).reduce((sum, count) => sum + count, 0)
+
+  if (total === 0)
+    return emptyResult
+
+  const version_breakdown: PluginVersionBreakdown = {}
+  const majorCounts = new Map<string, number>()
+
+  for (const [version, count] of versionCounts) {
+    const percentage = Number(((count / total) * 100).toFixed(2))
+    if (percentage > 0)
+      version_breakdown[version] = percentage
+
+    const major = version.split('.')[0]
+    if (major)
+      majorCounts.set(major, (majorCounts.get(major) || 0) + count)
+  }
+
+  const major_breakdown: PluginVersionBreakdown = {}
+  for (const [major, count] of majorCounts) {
+    const percentage = Number(((count / total) * 100).toFixed(2))
+    if (percentage > 0)
+      major_breakdown[major] = percentage
+  }
+
+  const version_ladder = Array.from(versionCounts.entries())
+    .sort(([versionA, countA], [versionB, countB]) => countB - countA || versionA.localeCompare(versionB))
+    .slice(0, 20)
+    .map(([version, count]) => {
+      const appCounts = versionAppCounts.get(version) ?? new Map<string, number>()
+      const top_apps = Array.from(appCounts.entries())
+        .sort(([appA, countA], [appB, countB]) => countB - countA || appA.localeCompare(appB))
+        .slice(0, 3)
+        .map(([app_id, device_count]) => ({
+          app_id,
+          device_count,
+          share: Number(((device_count / count) * 100).toFixed(2)),
+        }))
+
+      return {
+        version,
+        device_count: count,
+        percent: Number(version_breakdown[version]) || 0,
+        top_apps,
+      }
+    })
+
+  return { version_breakdown, major_breakdown, version_ladder }
 }
 
 /**
@@ -1955,79 +2045,40 @@ export interface PluginBreakdownResult {
  * Returns percentage breakdown of plugin versions installed on devices (last 30 days)
  */
 export async function getPluginBreakdownCF(c: Context): Promise<PluginBreakdownResult> {
+  const emptyResult: PluginBreakdownResult = { version_breakdown: {}, major_breakdown: {}, version_ladder: [] }
   if (!c.env.DEVICE_INFO)
-    return { version_breakdown: {}, major_breakdown: {} }
+    return emptyResult
 
   const last30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
-  // Query latest plugin_version per device, then aggregate counts by version
-  // Using a subquery keeps the result set small (one row per version).
+  // Query latest plugin_version per app/device pair, then aggregate by version and app.
   const query = `SELECT
     plugin_version,
+    app_id,
     count() AS device_count
   FROM (
     SELECT
+      argMax(index1, timestamp) AS app_id,
       argMax(blob3, timestamp) AS plugin_version,
       blob1 AS device_id
     FROM device_info
     WHERE timestamp >= toDateTime('${formatDateCF(last30d)}')
       AND timestamp < now()
       AND blob3 != ''
-    GROUP BY blob1
+    GROUP BY index1, blob1
   )
   WHERE plugin_version != ''
-  GROUP BY plugin_version`
+    AND app_id != ''
+  GROUP BY plugin_version, app_id`
 
   cloudlog({ requestId: c.get('requestId'), message: 'getPluginBreakdownCF query', query })
 
   try {
-    const result = await runQueryToCFA<{ plugin_version: string, device_count: number }>(c, query)
-
-    if (result.length === 0)
-      return { version_breakdown: {}, major_breakdown: {} }
-
-    // Aggregate by full version
-    const versionCounts = new Map<string, number>()
-    for (const row of result) {
-      const version = row.plugin_version
-      versionCounts.set(version, (versionCounts.get(version) || 0) + row.device_count)
-    }
-
-    // Calculate total devices
-    const total = Array.from(versionCounts.values()).reduce((sum, count) => sum + count, 0)
-
-    if (total === 0)
-      return { version_breakdown: {}, major_breakdown: {} }
-
-    // Calculate full version breakdown
-    const version_breakdown: PluginVersionBreakdown = {}
-    const majorCounts = new Map<string, number>()
-
-    for (const [version, count] of versionCounts) {
-      const percentage = Number(((count / total) * 100).toFixed(2))
-      if (percentage > 0) {
-        version_breakdown[version] = percentage
-      }
-
-      // Extract major version (first number before first dot)
-      const major = version.split('.')[0]
-      if (major) {
-        majorCounts.set(major, (majorCounts.get(major) || 0) + count)
-      }
-    }
-
-    // Calculate major version breakdown
-    const major_breakdown: PluginVersionBreakdown = {}
-    for (const [major, count] of majorCounts) {
-      const percentage = Number(((count / total) * 100).toFixed(2))
-      if (percentage > 0)
-        major_breakdown[major] = percentage
-    }
-
-    return { version_breakdown, major_breakdown }
+    const result = await runQueryToCFA<PluginBreakdownRow>(c, query)
+    return buildPluginBreakdownResult(result)
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error in getPluginBreakdownCF', error: serializeError(e) })
-    return { version_breakdown: {}, major_breakdown: {} }
+    return emptyResult
   }
 }

@@ -25,6 +25,19 @@ interface PluginBreakdownTrendPoint {
   major_breakdown: Record<string, number>
 }
 
+interface PluginVersionTopApp {
+  app_id: string
+  device_count: number
+  share: number
+}
+
+interface PluginVersionLadderEntry {
+  version: string
+  device_count: number
+  percent: number
+  top_apps: PluginVersionTopApp[]
+}
+
 interface PluginBreakdownData {
   date: string | null
   devices_last_month: number
@@ -32,6 +45,7 @@ interface PluginBreakdownData {
   devices_last_month_android: number
   version_breakdown: Record<string, number>
   major_breakdown: Record<string, number>
+  version_ladder?: PluginVersionLadderEntry[]
   trend?: PluginBreakdownTrendPoint[]
 }
 
@@ -112,10 +126,16 @@ const majorValues = computed(() => majorEntries.value.map(entry => entry.percent
 
 const hasVersionData = computed(() => versionEntries.value.length > 0)
 const hasMajorData = computed(() => majorEntries.value.length > 0)
+const versionLadderEntries = computed(() => (pluginBreakdown.value?.version_ladder ?? []).slice(0, maxVersionRows))
+const hasVersionLadderData = computed(() => versionLadderEntries.value.length > 0)
 
 const versionCountTotal = computed(() => Object.keys(pluginBreakdown.value?.version_breakdown ?? {}).length)
 const versionCountShown = computed(() => versionEntries.value.length)
 const versionTrendPoints = computed(() => pluginBreakdown.value?.trend ?? [])
+
+function formatPercent(value: number) {
+  return `${Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })}%`
+}
 
 function getTopBreakdownEntries(
   latestPoint: PluginBreakdownTrendPoint | undefined,
@@ -286,6 +306,77 @@ displayStore.defaultBack = '/dashboard'
               value-suffix="%"
               :suggested-max="100"
             />
+          </ChartCard>
+
+          <ChartCard
+            title="Version Ladder"
+            :is-loading="isLoadingBreakdown"
+            :has-data="hasVersionLadderData"
+            no-data-message="No plugin version ladder data available"
+          >
+            <template #header>
+              <div class="flex flex-col gap-1">
+                <h2 class="text-2xl font-semibold leading-tight dark:text-white text-slate-600">
+                  Version Ladder
+                </h2>
+                <p class="text-xs text-slate-500 dark:text-slate-400">
+                  Top {{ maxVersionRows }} plugin versions with their top 3 app IDs
+                </p>
+              </div>
+            </template>
+            <div class="overflow-x-auto">
+              <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-700">
+                <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-900 dark:text-slate-400">
+                  <tr>
+                    <th class="px-4 py-3">
+                      Rank
+                    </th>
+                    <th class="px-4 py-3">
+                      Version
+                    </th>
+                    <th class="px-4 py-3 text-right">
+                      Devices
+                    </th>
+                    <th class="px-4 py-3">
+                      Top app IDs
+                    </th>
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200 dark:divide-slate-700">
+                  <tr v-for="(entry, index) in versionLadderEntries" :key="entry.version" class="align-top">
+                    <td class="px-4 py-4 font-semibold text-slate-500 dark:text-slate-400">
+                      #{{ index + 1 }}
+                    </td>
+                    <td class="px-4 py-4">
+                      <div class="font-semibold text-slate-900 dark:text-white">
+                        {{ entry.version }}
+                      </div>
+                      <div class="text-xs text-slate-500 dark:text-slate-400">
+                        {{ formatPercent(entry.percent) }} share
+                      </div>
+                    </td>
+                    <td class="px-4 py-4 text-right font-semibold text-slate-700 dark:text-slate-200">
+                      {{ entry.device_count.toLocaleString() }}
+                    </td>
+                    <td class="px-4 py-4">
+                      <div v-if="entry.top_apps.length > 0" class="min-w-[16rem] space-y-2">
+                        <div
+                          v-for="app in entry.top_apps"
+                          :key="`${entry.version}-${app.app_id}`"
+                          class="flex flex-col gap-1 rounded-md bg-slate-50 px-3 py-2 dark:bg-slate-800/80 sm:flex-row sm:items-center sm:justify-between"
+                        >
+                          <span class="min-w-0 break-all font-medium text-slate-700 dark:text-slate-200">{{ app.app_id }}</span>
+                          <span class="shrink-0 text-xs text-slate-500 dark:text-slate-400">
+                            {{ app.device_count.toLocaleString() }} ({{ formatPercent(app.share) }})
+                          </span>
+                        </div>
+                      </div>
+                      <span v-else class="text-slate-400">-</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </ChartCard>
 
           <div class="grid grid-cols-1 gap-6 xl:grid-cols-2">

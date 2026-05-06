@@ -3,6 +3,7 @@ import { stripeEventTestUtils } from '../supabase/functions/_backend/triggers/st
 
 const plans = [
   {
+    name: 'Solo',
     stripe_id: 'prod_solo',
     price_m: 12,
     price_m_id: 'price_solo_monthly',
@@ -10,6 +11,7 @@ const plans = [
     price_y_id: 'price_solo_yearly',
   },
   {
+    name: 'Team',
     stripe_id: 'prod_team',
     price_m: 49,
     price_m_id: 'price_team_monthly',
@@ -147,6 +149,7 @@ describe('stripe revenue movement classification', () => {
       newBusinessMrr: 0,
       expansionMrr: 0,
       churnMrr: 0,
+      lostPlan: 'team',
     })
   })
 
@@ -174,6 +177,7 @@ describe('stripe revenue movement classification', () => {
       newBusinessMrr: 0,
       expansionMrr: 0,
       contractionMrr: 0,
+      lostPlan: 'team',
     })
   })
 
