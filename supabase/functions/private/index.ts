@@ -3,6 +3,7 @@ import { app as admin_credits } from '../_backend/private/admin_credits.ts'
 import { app as admin_stats } from '../_backend/private/admin_stats.ts'
 import { app as channel_stats } from '../_backend/private/channel_stats.ts'
 import { app as config } from '../_backend/private/config.ts'
+import { app as configBuilder } from '../_backend/private/config_builder.ts'
 import { app as create_device } from '../_backend/private/create_device.ts'
 import { app as credits } from '../_backend/private/credits.ts'
 import { app as deleted_failed_version } from '../_backend/private/delete_failed_version.ts'
@@ -49,6 +50,7 @@ appGlobal.route('/credits', credits)
 appGlobal.route('/store_top', storeTop)
 appGlobal.route('/website_stats', publicStats)
 appGlobal.route('/config', config)
+appGlobal.route('/config/builder', configBuilder)
 appGlobal.route('/devices', devices_priv)
 appGlobal.route('/create_device', create_device)
 appGlobal.route('/channel_stats', channel_stats)
