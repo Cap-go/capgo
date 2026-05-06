@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { adminStatsBodySchema, MAX_ADMIN_STATS_LIMIT, MAX_ADMIN_STATS_OFFSET } from '../supabase/functions/_backend/private/admin_stats.ts'
 import { safeParseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
-import { normalizeAnalyticsLimit } from '../supabase/functions/_backend/utils/cloudflare.ts'
+import { buildPluginBreakdownResult, normalizeAnalyticsLimit } from '../supabase/functions/_backend/utils/cloudflare.ts'
 
 describe('admin stats validation', () => {
   const baseBody = {
@@ -73,5 +73,45 @@ describe('normalizeAnalyticsLimit', () => {
     ['oversized', 99_999_999, 50_000],
   ])('normalizes %s', (_label, input, expected) => {
     expect(normalizeAnalyticsLimit(input, 100)).toBe(expected)
+  })
+})
+
+describe('buildPluginBreakdownResult', () => {
+  it.concurrent('aggregates plugin versions with major breakdown and top app IDs', () => {
+    const result = buildPluginBreakdownResult([
+      { plugin_version: '8.1.0', app_id: 'com.capgo.first', device_count: '8' },
+      { plugin_version: '8.1.0', app_id: 'com.capgo.second', device_count: 4 },
+      { plugin_version: '7.5.1', app_id: 'com.capgo.third', device_count: 4 },
+      { plugin_version: '', app_id: 'com.capgo.empty', device_count: 10 },
+      { plugin_version: '8.1.0', app_id: '', device_count: 10 },
+    ])
+
+    expect(result.version_breakdown).toEqual({
+      '8.1.0': 75,
+      '7.5.1': 25,
+    })
+    expect(result.major_breakdown).toEqual({
+      8: 75,
+      7: 25,
+    })
+    expect(result.version_ladder).toEqual([
+      {
+        version: '8.1.0',
+        device_count: 12,
+        percent: 75,
+        top_apps: [
+          { app_id: 'com.capgo.first', device_count: 8, share: 66.67 },
+          { app_id: 'com.capgo.second', device_count: 4, share: 33.33 },
+        ],
+      },
+      {
+        version: '7.5.1',
+        device_count: 4,
+        percent: 25,
+        top_apps: [
+          { app_id: 'com.capgo.third', device_count: 4, share: 100 },
+        ],
+      },
+    ])
   })
 })

@@ -6,7 +6,6 @@ import {
   fetchWithRetry,
   getEndpointUrl,
   getSupabaseClient,
-  headers,
   USER_ID,
 } from './test-utils.ts'
 
@@ -84,6 +83,29 @@ async function seedApp(appId: string, orgId: string, stripeCustomerId: string) {
   )
 }
 
+async function seedReadyBundle(appId: string, orgId: string, filename: string) {
+  const filePath = `orgs/${orgId}/apps/${appId}/${filename}`
+  const { uploadMetadata } = buildAttachmentPath(orgId, appId, filename)
+  const { error } = await getSupabaseClient()
+    .from('app_versions')
+    .insert({
+      app_id: appId,
+      name: `ready-${randomUUID()}`,
+      checksum: randomUUID().replaceAll('-', ''),
+      owner_org: orgId,
+      user_id: USER_ID,
+      storage_provider: 'r2',
+      r2_path: filePath,
+      deleted: false,
+      session_key: `ready-session-${randomUUID()}`,
+    })
+
+  if (error)
+    throw new Error(`Failed to seed ready bundle: ${error.message}`)
+
+  return { filePath, uploadMetadata }
+}
+
 describe('attachment upload plan gating regression', () => {
   const scopeId = randomUUID().replaceAll('-', '')
   const orgId = randomUUID()
@@ -127,6 +149,46 @@ describe('attachment upload plan gating regression', () => {
     expect(response.status).toBe(429)
     const data = await response.json() as { error?: string }
     expect(data.error).toBe('on_premise_app')
+  })
+})
+
+describe('ready bundle upload immutability regression', () => {
+  const scopeId = randomUUID().replaceAll('-', '')
+  const orgId = randomUUID()
+  const stripeCustomerId = `cus_files_ready_${scopeId}`
+  const appId = `com.files.ready.${scopeId}`
+  let uploadKeyId: number | undefined
+  let uploadKey: string | undefined
+  let readyBundle: { filePath: string, uploadMetadata: string } | undefined
+
+  beforeAll(async () => {
+    await seedApp(appId, orgId, stripeCustomerId)
+
+    const createdKey = await createSeededApiKey({ appId, limitedToApp: true, mode: 'upload', name: `upload-ready-${appId}` })
+    uploadKeyId = createdKey.id
+    uploadKey = createdKey.key
+    readyBundle = await seedReadyBundle(appId, orgId, `ready-${scopeId}.zip`)
+  }, 60_000)
+
+  afterAll(async () => {
+    await cleanupSeededOrg(appId, orgId, stripeCustomerId, [uploadKeyId])
+  }, 60_000)
+
+  it.concurrent('blocks resumable upload creation for an already ready bundle path', async () => {
+    const response = await fetch(getEndpointUrl('/files/upload/attachments'), {
+      method: 'POST',
+      headers: {
+        'Authorization': uploadKey!,
+        'Content-Type': 'application/offset+octet-stream',
+        'Tus-Resumable': TUS_VERSION,
+        'Upload-Length': '4',
+        'Upload-Metadata': readyBundle!.uploadMetadata,
+      },
+    })
+
+    expect(response.status).toBe(409)
+    const data = await response.json() as { error?: string }
+    expect(data.error).toBe('bundle_already_ready')
   })
 })
 
@@ -195,7 +257,6 @@ describe('attachment cleanup on app deletion regression', () => {
     const deleteResponse = await fetchWithRetry(`${BASE_URL}/app/${appId}`, {
       method: 'DELETE',
       headers: {
-        ...headers,
         Authorization: deleteKey!,
       },
     })

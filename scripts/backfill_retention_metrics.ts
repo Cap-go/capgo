@@ -57,7 +57,9 @@ type StripeInfoRevenueState = {
   product_id?: string | null
   status?: StripeStatus | null
 } | null | undefined
-type RevenuePlanRow = Pick<PlanRow, 'price_m' | 'price_m_id' | 'price_y' | 'price_y_id' | 'stripe_id'>
+type RevenuePlanRow = Pick<PlanRow, 'name' | 'price_m' | 'price_m_id' | 'price_y' | 'price_y_id' | 'stripe_id'>
+type RevenuePlanKey = 'solo' | 'maker' | 'team' | 'enterprise'
+type RevenuePlanBreakdown = Record<RevenuePlanKey, number>
 
 interface CustomerRevenueBaselineRow {
   customer_id: string
@@ -86,6 +88,7 @@ export interface BackfillRevenueMovementEvent {
   expansion_mrr: number
   contraction_mrr: number
   churn_mrr: number
+  lost_plan: RevenuePlanKey | null
 }
 
 export interface BackfillSummary {
@@ -150,6 +153,10 @@ interface RetentionMetricSummaryRow {
   has_global_stats: boolean
   lost_churn_mrr: number | string | null
   lost_contraction_mrr: number | string | null
+  lost_revenue_enterprise_mrr: number | string | null
+  lost_revenue_maker_mrr: number | string | null
+  lost_revenue_solo_mrr: number | string | null
+  lost_revenue_team_mrr: number | string | null
   previous_mrr: number | string | null
   retained_churn_mrr: number | string | null
   retained_contraction_mrr: number | string | null
@@ -163,6 +170,7 @@ interface RevenueMovement {
   expansionMrr: number
   contractionMrr: number
   churnMrr: number
+  lostPlan: RevenuePlanKey | null
 }
 
 interface DailyRevenueChangeSummary {
@@ -178,6 +186,7 @@ const ZERO_REVENUE_MOVEMENT: RevenueMovement = {
   expansionMrr: 0,
   contractionMrr: 0,
   churnMrr: 0,
+  lostPlan: null,
 }
 
 function getArgValue(args: string[], prefix: string): string | null {
@@ -226,7 +235,9 @@ export function getRequiredDatabaseUrl(env: Record<string, string | undefined>) 
     throw new Error(`--apply requires ${DATABASE_URL_ENV_KEYS.join(', ')} so metric writes and processed-event markers are committed atomically`)
 
   try {
-    new URL(value)
+    const parsed = new URL(value)
+    if (!parsed.protocol)
+      throw new Error('Missing URL protocol')
   }
   catch {
     throw new Error(`--apply requires a valid Postgres URL from ${DATABASE_URL_ENV_KEYS.join(', ')}`)
@@ -521,6 +532,29 @@ function getPreviousDateId(dateId: string) {
   return getRevenueMetricDateId(target)
 }
 
+function getPlanKey(name: string | null | undefined): RevenuePlanKey | null {
+  const normalized = name?.toLowerCase()
+  if (normalized === 'solo' || normalized === 'maker' || normalized === 'team' || normalized === 'enterprise')
+    return normalized
+  return null
+}
+
+function createZeroPlanBreakdown(): RevenuePlanBreakdown {
+  return {
+    solo: 0,
+    maker: 0,
+    team: 0,
+    enterprise: 0,
+  }
+}
+
+function getMovementPlanBreakdown(lostPlan: RevenuePlanKey | null, amount: number): RevenuePlanBreakdown {
+  const breakdown = createZeroPlanBreakdown()
+  if (lostPlan && amount > 0)
+    breakdown[lostPlan] = amount
+  return breakdown
+}
+
 function getPlanMrr(plan: RevenuePlanRow | null | undefined, priceId: string | null | undefined) {
   if (!plan || !priceId)
     return 0
@@ -541,11 +575,15 @@ function getPlanByProductId(plans: RevenuePlanRow[], productId: string | null | 
   return plans.find(plan => plan.stripe_id === productId) ?? null
 }
 
-function getSubscriptionMrr(plans: RevenuePlanRow[], stripeInfo: StripeInfoRevenueState) {
+function getSubscriptionPlan(plans: RevenuePlanRow[], stripeInfo: StripeInfoRevenueState) {
   if (stripeInfo?.status !== 'succeeded' || stripeInfo?.is_good_plan === false)
-    return 0
+    return null
 
-  return getPlanMrr(getPlanByProductId(plans, stripeInfo.product_id), stripeInfo.price_id)
+  return getPlanByProductId(plans, stripeInfo.product_id)
+}
+
+function getSubscriptionMrr(plans: RevenuePlanRow[], stripeInfo: StripeInfoRevenueState) {
+  return getPlanMrr(getSubscriptionPlan(plans, stripeInfo), stripeInfo?.price_id)
 }
 
 function classifyRevenueMovement(
@@ -553,8 +591,11 @@ function classifyRevenueMovement(
   nextStripeInfo: StripeInfoRevenueState,
   plans: RevenuePlanRow[],
 ): RevenueMovement {
-  const currentMrr = getSubscriptionMrr(plans, currentStripeInfo)
-  const nextMrr = getSubscriptionMrr(plans, nextStripeInfo)
+  const currentPlan = getSubscriptionPlan(plans, currentStripeInfo)
+  const nextPlan = getSubscriptionPlan(plans, nextStripeInfo)
+  const currentMrr = getPlanMrr(currentPlan, currentStripeInfo?.price_id)
+  const nextMrr = getPlanMrr(nextPlan, nextStripeInfo?.price_id)
+  const lostPlan = getPlanKey(currentPlan?.name)
 
   if (currentMrr === 0 && nextMrr === 0)
     return { ...ZERO_REVENUE_MOVEMENT }
@@ -583,6 +624,7 @@ function classifyRevenueMovement(
       currentMrr,
       nextMrr,
       churnMrr: currentMrr,
+      lostPlan,
     }
   }
 
@@ -601,6 +643,7 @@ function classifyRevenueMovement(
       currentMrr,
       nextMrr,
       contractionMrr: currentMrr - nextMrr,
+      lostPlan,
     }
   }
 
@@ -697,6 +740,7 @@ function toMovementEvent(
     expansion_mrr: movement.expansionMrr,
     contraction_mrr: movement.contractionMrr,
     churn_mrr: movement.churnMrr,
+    lost_plan: movement.lostPlan,
   }
 }
 
@@ -824,6 +868,8 @@ export function aggregateRevenueMovementEvents(movements: BackfillRevenueMovemen
     const key = `${movement.date_id}:${movement.customer_id}`
     const existing = metricsByKey.get(key)
     if (!existing) {
+      const churnBreakdown = getMovementPlanBreakdown(movement.lost_plan, movement.churn_mrr)
+      const contractionBreakdown = getMovementPlanBreakdown(movement.lost_plan, movement.contraction_mrr)
       metricsByKey.set(key, {
         date_id: movement.date_id,
         customer_id: movement.customer_id,
@@ -832,14 +878,32 @@ export function aggregateRevenueMovementEvents(movements: BackfillRevenueMovemen
         expansion_mrr: movement.expansion_mrr,
         contraction_mrr: movement.contraction_mrr,
         churn_mrr: movement.churn_mrr,
+        churn_mrr_solo: churnBreakdown.solo,
+        churn_mrr_maker: churnBreakdown.maker,
+        churn_mrr_team: churnBreakdown.team,
+        churn_mrr_enterprise: churnBreakdown.enterprise,
+        contraction_mrr_solo: contractionBreakdown.solo,
+        contraction_mrr_maker: contractionBreakdown.maker,
+        contraction_mrr_team: contractionBreakdown.team,
+        contraction_mrr_enterprise: contractionBreakdown.enterprise,
       })
       continue
     }
 
+    const churnBreakdown = getMovementPlanBreakdown(movement.lost_plan, movement.churn_mrr)
+    const contractionBreakdown = getMovementPlanBreakdown(movement.lost_plan, movement.contraction_mrr)
     existing.new_business_mrr = Number(existing.new_business_mrr) + movement.new_business_mrr
     existing.expansion_mrr = Number(existing.expansion_mrr) + movement.expansion_mrr
     existing.contraction_mrr = Number(existing.contraction_mrr) + movement.contraction_mrr
     existing.churn_mrr = Number(existing.churn_mrr) + movement.churn_mrr
+    existing.churn_mrr_solo = Number(existing.churn_mrr_solo) + churnBreakdown.solo
+    existing.churn_mrr_maker = Number(existing.churn_mrr_maker) + churnBreakdown.maker
+    existing.churn_mrr_team = Number(existing.churn_mrr_team) + churnBreakdown.team
+    existing.churn_mrr_enterprise = Number(existing.churn_mrr_enterprise) + churnBreakdown.enterprise
+    existing.contraction_mrr_solo = Number(existing.contraction_mrr_solo) + contractionBreakdown.solo
+    existing.contraction_mrr_maker = Number(existing.contraction_mrr_maker) + contractionBreakdown.maker
+    existing.contraction_mrr_team = Number(existing.contraction_mrr_team) + contractionBreakdown.team
+    existing.contraction_mrr_enterprise = Number(existing.contraction_mrr_enterprise) + contractionBreakdown.enterprise
   }
 
   return [...metricsByKey.values()].sort((left, right) => {
@@ -961,7 +1025,7 @@ function getCustomerIdsFromEvents(events: Stripe.Event[], customerId?: string | 
 async function fetchRevenuePlans(supabase: SupabaseClient): Promise<RevenuePlanRow[]> {
   const { data, error } = await supabase
     .from('plans')
-    .select('stripe_id, price_m, price_y, price_m_id, price_y_id')
+    .select('name, stripe_id, price_m, price_y, price_m_id, price_y_id')
     .in('name', ['Solo', 'Maker', 'Team', 'Enterprise'])
 
   if (error)
@@ -1021,6 +1085,14 @@ export function mergeMetricRows(existingRows: DailyRevenueMetricRow[], rowsToAdd
       expansion_mrr: (Number(existing.expansion_mrr) || 0) + (Number(row.expansion_mrr) || 0),
       contraction_mrr: (Number(existing.contraction_mrr) || 0) + (Number(row.contraction_mrr) || 0),
       churn_mrr: (Number(existing.churn_mrr) || 0) + (Number(row.churn_mrr) || 0),
+      churn_mrr_solo: (Number(existing.churn_mrr_solo) || 0) + (Number(row.churn_mrr_solo) || 0),
+      churn_mrr_maker: (Number(existing.churn_mrr_maker) || 0) + (Number(row.churn_mrr_maker) || 0),
+      churn_mrr_team: (Number(existing.churn_mrr_team) || 0) + (Number(row.churn_mrr_team) || 0),
+      churn_mrr_enterprise: (Number(existing.churn_mrr_enterprise) || 0) + (Number(row.churn_mrr_enterprise) || 0),
+      contraction_mrr_solo: (Number(existing.contraction_mrr_solo) || 0) + (Number(row.contraction_mrr_solo) || 0),
+      contraction_mrr_maker: (Number(existing.contraction_mrr_maker) || 0) + (Number(row.contraction_mrr_maker) || 0),
+      contraction_mrr_team: (Number(existing.contraction_mrr_team) || 0) + (Number(row.contraction_mrr_team) || 0),
+      contraction_mrr_enterprise: (Number(existing.contraction_mrr_enterprise) || 0) + (Number(row.contraction_mrr_enterprise) || 0),
     }
   })
 }
@@ -1063,7 +1135,7 @@ async function upsertDailyRevenueMetricsPg(client: PgClient, rows: DailyRevenueM
 
     const values: Array<number | string> = []
     const placeholders = chunk.map((row, index) => {
-      const offset = index * 7
+      const offset = index * 15
       values.push(
         row.date_id,
         row.customer_id,
@@ -1072,8 +1144,16 @@ async function upsertDailyRevenueMetricsPg(client: PgClient, rows: DailyRevenueM
         Number(row.expansion_mrr) || 0,
         Number(row.contraction_mrr) || 0,
         Number(row.churn_mrr) || 0,
+        Number(row.churn_mrr_solo) || 0,
+        Number(row.churn_mrr_maker) || 0,
+        Number(row.churn_mrr_team) || 0,
+        Number(row.churn_mrr_enterprise) || 0,
+        Number(row.contraction_mrr_solo) || 0,
+        Number(row.contraction_mrr_maker) || 0,
+        Number(row.contraction_mrr_team) || 0,
+        Number(row.contraction_mrr_enterprise) || 0,
       )
-      return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7})`
+      return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8}, $${offset + 9}, $${offset + 10}, $${offset + 11}, $${offset + 12}, $${offset + 13}, $${offset + 14}, $${offset + 15})`
     })
 
     const updateClause = mode === 'exact'
@@ -1082,13 +1162,29 @@ async function upsertDailyRevenueMetricsPg(client: PgClient, rows: DailyRevenueM
         new_business_mrr = EXCLUDED.new_business_mrr,
         expansion_mrr = EXCLUDED.expansion_mrr,
         contraction_mrr = EXCLUDED.contraction_mrr,
-        churn_mrr = EXCLUDED.churn_mrr
+        churn_mrr = EXCLUDED.churn_mrr,
+        churn_mrr_solo = EXCLUDED.churn_mrr_solo,
+        churn_mrr_maker = EXCLUDED.churn_mrr_maker,
+        churn_mrr_team = EXCLUDED.churn_mrr_team,
+        churn_mrr_enterprise = EXCLUDED.churn_mrr_enterprise,
+        contraction_mrr_solo = EXCLUDED.contraction_mrr_solo,
+        contraction_mrr_maker = EXCLUDED.contraction_mrr_maker,
+        contraction_mrr_team = EXCLUDED.contraction_mrr_team,
+        contraction_mrr_enterprise = EXCLUDED.contraction_mrr_enterprise
       `
       : `
         new_business_mrr = public.daily_revenue_metrics.new_business_mrr + EXCLUDED.new_business_mrr,
         expansion_mrr = public.daily_revenue_metrics.expansion_mrr + EXCLUDED.expansion_mrr,
         contraction_mrr = public.daily_revenue_metrics.contraction_mrr + EXCLUDED.contraction_mrr,
-        churn_mrr = public.daily_revenue_metrics.churn_mrr + EXCLUDED.churn_mrr
+        churn_mrr = public.daily_revenue_metrics.churn_mrr + EXCLUDED.churn_mrr,
+        churn_mrr_solo = public.daily_revenue_metrics.churn_mrr_solo + EXCLUDED.churn_mrr_solo,
+        churn_mrr_maker = public.daily_revenue_metrics.churn_mrr_maker + EXCLUDED.churn_mrr_maker,
+        churn_mrr_team = public.daily_revenue_metrics.churn_mrr_team + EXCLUDED.churn_mrr_team,
+        churn_mrr_enterprise = public.daily_revenue_metrics.churn_mrr_enterprise + EXCLUDED.churn_mrr_enterprise,
+        contraction_mrr_solo = public.daily_revenue_metrics.contraction_mrr_solo + EXCLUDED.contraction_mrr_solo,
+        contraction_mrr_maker = public.daily_revenue_metrics.contraction_mrr_maker + EXCLUDED.contraction_mrr_maker,
+        contraction_mrr_team = public.daily_revenue_metrics.contraction_mrr_team + EXCLUDED.contraction_mrr_team,
+        contraction_mrr_enterprise = public.daily_revenue_metrics.contraction_mrr_enterprise + EXCLUDED.contraction_mrr_enterprise
       `
 
     await client.query(`
@@ -1099,7 +1195,15 @@ async function upsertDailyRevenueMetricsPg(client: PgClient, rows: DailyRevenueM
         new_business_mrr,
         expansion_mrr,
         contraction_mrr,
-        churn_mrr
+        churn_mrr,
+        churn_mrr_solo,
+        churn_mrr_maker,
+        churn_mrr_team,
+        churn_mrr_enterprise,
+        contraction_mrr_solo,
+        contraction_mrr_maker,
+        contraction_mrr_team,
+        contraction_mrr_enterprise
       )
       VALUES ${placeholders.join(', ')}
       ON CONFLICT (date_id, customer_id) DO UPDATE
@@ -1204,7 +1308,11 @@ async function refreshGlobalRetentionMetricsPg(client: PgClient, dateIds: string
         COALESCE(SUM(CASE WHEN opening_mrr > 0 THEN contraction_mrr ELSE 0 END), 0) AS retained_contraction_mrr,
         COALESCE(SUM(CASE WHEN opening_mrr > 0 THEN expansion_mrr ELSE 0 END), 0) AS retained_expansion_mrr,
         COALESCE(SUM(churn_mrr), 0) AS lost_churn_mrr,
-        COALESCE(SUM(contraction_mrr), 0) AS lost_contraction_mrr
+        COALESCE(SUM(contraction_mrr), 0) AS lost_contraction_mrr,
+        COALESCE(SUM(churn_mrr_solo + contraction_mrr_solo), 0) AS lost_revenue_solo_mrr,
+        COALESCE(SUM(churn_mrr_maker + contraction_mrr_maker), 0) AS lost_revenue_maker_mrr,
+        COALESCE(SUM(churn_mrr_team + contraction_mrr_team), 0) AS lost_revenue_team_mrr,
+        COALESCE(SUM(churn_mrr_enterprise + contraction_mrr_enterprise), 0) AS lost_revenue_enterprise_mrr
       FROM public.daily_revenue_metrics
       WHERE date_id = $1
     `, [dateId, getPreviousDateId(dateId)])
@@ -1219,7 +1327,11 @@ async function refreshGlobalRetentionMetricsPg(client: PgClient, dateIds: string
       UPDATE public.global_stats
       SET
         churn_revenue = $2,
-        nrr = $3
+        nrr = $3,
+        churn_revenue_solo = $4,
+        churn_revenue_maker = $5,
+        churn_revenue_team = $6,
+        churn_revenue_enterprise = $7
       WHERE date_id = $1
     `, [
       dateId,
@@ -1233,6 +1345,10 @@ async function refreshGlobalRetentionMetricsPg(client: PgClient, dateIds: string
         contractionMrr: Number(row.retained_contraction_mrr) || 0,
         expansionMrr: Number(row.retained_expansion_mrr) || 0,
       }),
+      Number(row.lost_revenue_solo_mrr) || 0,
+      Number(row.lost_revenue_maker_mrr) || 0,
+      Number(row.lost_revenue_team_mrr) || 0,
+      Number(row.lost_revenue_enterprise_mrr) || 0,
     ])
     updated++
   }

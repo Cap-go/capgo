@@ -46,6 +46,10 @@ type GlobalStatsRow = Pick<
   Database['public']['Tables']['global_stats']['Row'],
   | 'canceled_orgs'
   | 'churn_revenue'
+  | 'churn_revenue_enterprise'
+  | 'churn_revenue_maker'
+  | 'churn_revenue_solo'
+  | 'churn_revenue_team'
   | 'date_id'
   | 'mrr'
   | 'new_paying_orgs'
@@ -97,6 +101,7 @@ interface RevenueSubscriptionState {
 interface DailyCounters {
   canceledCustomerIds: Set<string>
   churnRevenue: number
+  churnRevenueByPlan: Record<PlanKey, number>
   newCustomerIds: Set<string>
   upgradedCustomerIds: Set<string>
 }
@@ -104,6 +109,10 @@ interface DailyCounters {
 export interface RevenueTrendMetricValues {
   canceled_orgs: number
   churn_revenue: number
+  churn_revenue_enterprise: number
+  churn_revenue_maker: number
+  churn_revenue_solo: number
+  churn_revenue_team: number
   mrr: number
   new_paying_orgs: number
   paying: number
@@ -203,6 +212,10 @@ function createEmptyMetrics(): RevenueTrendMetricValues {
   return {
     canceled_orgs: 0,
     churn_revenue: 0,
+    churn_revenue_enterprise: 0,
+    churn_revenue_maker: 0,
+    churn_revenue_solo: 0,
+    churn_revenue_team: 0,
     mrr: 0,
     new_paying_orgs: 0,
     paying: 0,
@@ -478,10 +491,16 @@ function getStateKey(state: Pick<RevenueSubscriptionState, 'subscriptionId'>) {
   return state.subscriptionId
 }
 
-function createDailyCounters() {
+function createDailyCounters(): DailyCounters {
   return {
     canceledCustomerIds: new Set<string>(),
     churnRevenue: 0,
+    churnRevenueByPlan: {
+      solo: 0,
+      maker: 0,
+      team: 0,
+      enterprise: 0,
+    },
     newCustomerIds: new Set<string>(),
     upgradedCustomerIds: new Set<string>(),
   }
@@ -524,11 +543,17 @@ function recordTransition(
   if (currentMrr > 0 && nextMrr <= 0) {
     daily.canceledCustomerIds.add(customerId)
     daily.churnRevenue += currentMrr
+    if (currentState)
+      daily.churnRevenueByPlan[currentState.plan] += currentMrr
     return
   }
 
-  if (currentMrr > nextMrr)
-    daily.churnRevenue += currentMrr - nextMrr
+  if (currentMrr > nextMrr) {
+    const lostMrr = currentMrr - nextMrr
+    daily.churnRevenue += lostMrr
+    if (currentState)
+      daily.churnRevenueByPlan[currentState.plan] += lostMrr
+  }
 }
 
 function applySubscriptionEventToStates(
@@ -654,6 +679,7 @@ function expireStatesForDate(states: Map<string, RevenueSubscriptionState>, date
 
     daily.canceledCustomerIds.add(state.customerId)
     daily.churnRevenue += state.mrr
+    daily.churnRevenueByPlan[state.plan] += state.mrr
     states.delete(getStateKey(state))
   }
 }
@@ -710,6 +736,10 @@ export function summarizeRevenueSnapshot(states: Iterable<RevenueSubscriptionSta
   metrics.churn_revenue = daily.churnRevenue
   metrics.paying = payingCustomerIds.size
   metrics.upgraded_orgs = daily.upgradedCustomerIds.size
+  metrics.churn_revenue_solo = daily.churnRevenueByPlan.solo
+  metrics.churn_revenue_maker = daily.churnRevenueByPlan.maker
+  metrics.churn_revenue_team = daily.churnRevenueByPlan.team
+  metrics.churn_revenue_enterprise = daily.churnRevenueByPlan.enterprise
   metrics.mrr = roundMoney(metrics.mrr)
   metrics.total_revenue = roundMoney(metrics.mrr * 12)
   metrics.revenue_solo = roundMoney(metrics.revenue_solo)
@@ -717,6 +747,10 @@ export function summarizeRevenueSnapshot(states: Iterable<RevenueSubscriptionSta
   metrics.revenue_team = roundMoney(metrics.revenue_team)
   metrics.revenue_enterprise = roundMoney(metrics.revenue_enterprise)
   metrics.churn_revenue = roundMoney(metrics.churn_revenue)
+  metrics.churn_revenue_solo = roundMoney(metrics.churn_revenue_solo)
+  metrics.churn_revenue_maker = roundMoney(metrics.churn_revenue_maker)
+  metrics.churn_revenue_team = roundMoney(metrics.churn_revenue_team)
+  metrics.churn_revenue_enterprise = roundMoney(metrics.churn_revenue_enterprise)
 
   return metrics
 }
@@ -920,6 +954,10 @@ async function fetchGlobalStatsRows(supabase: SupabaseClient, fromDateId: string
         plan_enterprise_monthly,
         plan_enterprise_yearly,
         churn_revenue,
+        churn_revenue_solo,
+        churn_revenue_maker,
+        churn_revenue_team,
+        churn_revenue_enterprise,
         upgraded_orgs
       `)
       .gte('date_id', fromDateId)
@@ -945,6 +983,10 @@ function toGlobalStatsUpdate(row: RevenueTrendBackfillRow): GlobalStatsUpdate {
   return {
     canceled_orgs: row.canceled_orgs,
     churn_revenue: row.churn_revenue,
+    churn_revenue_enterprise: row.churn_revenue_enterprise,
+    churn_revenue_maker: row.churn_revenue_maker,
+    churn_revenue_solo: row.churn_revenue_solo,
+    churn_revenue_team: row.churn_revenue_team,
     mrr: row.mrr,
     new_paying_orgs: row.new_paying_orgs,
     paying: row.paying,
@@ -983,7 +1025,7 @@ async function updateGlobalStatsRow(supabase: SupabaseClient, row: RevenueTrendB
 
 function printSampleRows(rows: RevenueTrendBackfillRow[]) {
   for (const row of rows.slice(0, 10)) {
-    console.log(`${row.date_id}: paying=${row.paying}, monthly=${row.paying_monthly}, yearly=${row.paying_yearly}, mrr=$${row.mrr.toFixed(2)}, arr=$${row.total_revenue.toFixed(2)}, new=${row.new_paying_orgs}, canceled=${row.canceled_orgs}, upgraded=${row.upgraded_orgs}, churn=$${row.churn_revenue.toFixed(2)}, plans=${row.plan_solo}/${row.plan_maker}/${row.plan_team}/${row.plan_enterprise}`)
+    console.log(`${row.date_id}: paying=${row.paying}, monthly=${row.paying_monthly}, yearly=${row.paying_yearly}, mrr=$${row.mrr.toFixed(2)}, arr=$${row.total_revenue.toFixed(2)}, new=${row.new_paying_orgs}, canceled=${row.canceled_orgs}, upgraded=${row.upgraded_orgs}, churn=$${row.churn_revenue.toFixed(2)}, churn_plans=$${row.churn_revenue_solo.toFixed(2)}/$${row.churn_revenue_maker.toFixed(2)}/$${row.churn_revenue_team.toFixed(2)}/$${row.churn_revenue_enterprise.toFixed(2)}, plans=${row.plan_solo}/${row.plan_maker}/${row.plan_team}/${row.plan_enterprise}`)
   }
 }
 

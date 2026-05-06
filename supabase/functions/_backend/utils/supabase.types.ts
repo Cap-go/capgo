@@ -23,7 +23,7 @@ export type Database = {
           key_hash: string | null
           limited_to_apps: string[] | null
           limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"]
+          mode: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id: string
           updated_at: string | null
@@ -37,7 +37,7 @@ export type Database = {
           key_hash?: string | null
           limited_to_apps?: string[] | null
           limited_to_orgs?: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"]
+          mode?: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id?: string
           updated_at?: string | null
@@ -51,7 +51,7 @@ export type Database = {
           key_hash?: string | null
           limited_to_apps?: string[] | null
           limited_to_orgs?: string[] | null
-          mode?: Database["public"]["Enums"]["key_mode"]
+          mode?: Database["public"]["Enums"]["key_mode"] | null
           name?: string
           rbac_id?: string
           updated_at?: string | null
@@ -913,7 +913,15 @@ export type Database = {
       daily_revenue_metrics: {
         Row: {
           churn_mrr: number
+          churn_mrr_enterprise: number
+          churn_mrr_maker: number
+          churn_mrr_solo: number
+          churn_mrr_team: number
           contraction_mrr: number
+          contraction_mrr_enterprise: number
+          contraction_mrr_maker: number
+          contraction_mrr_solo: number
+          contraction_mrr_team: number
           created_at: string
           customer_id: string
           date_id: string
@@ -924,7 +932,15 @@ export type Database = {
         }
         Insert: {
           churn_mrr?: number
+          churn_mrr_enterprise?: number
+          churn_mrr_maker?: number
+          churn_mrr_solo?: number
+          churn_mrr_team?: number
           contraction_mrr?: number
+          contraction_mrr_enterprise?: number
+          contraction_mrr_maker?: number
+          contraction_mrr_solo?: number
+          contraction_mrr_team?: number
           created_at?: string
           customer_id: string
           date_id: string
@@ -935,7 +951,15 @@ export type Database = {
         }
         Update: {
           churn_mrr?: number
+          churn_mrr_enterprise?: number
+          churn_mrr_maker?: number
+          churn_mrr_solo?: number
+          churn_mrr_team?: number
           contraction_mrr?: number
+          contraction_mrr_enterprise?: number
+          contraction_mrr_maker?: number
+          contraction_mrr_solo?: number
+          contraction_mrr_team?: number
           created_at?: string
           customer_id?: string
           date_id?: string
@@ -1210,6 +1234,10 @@ export type Database = {
           bundle_storage_gb: number
           canceled_orgs: number
           churn_revenue: number
+          churn_revenue_enterprise: number
+          churn_revenue_maker: number
+          churn_revenue_solo: number
+          churn_revenue_team: number
           created_at: string | null
           credits_bought: number
           credits_consumed: number
@@ -1242,6 +1270,7 @@ export type Database = {
           plan_team_yearly: number
           plugin_major_breakdown: Json
           plugin_version_breakdown: Json
+          plugin_version_ladder: Json
           registers_today: number
           revenue_enterprise: number
           revenue_maker: number
@@ -1279,6 +1308,10 @@ export type Database = {
           bundle_storage_gb?: number
           canceled_orgs?: number
           churn_revenue?: number
+          churn_revenue_enterprise?: number
+          churn_revenue_maker?: number
+          churn_revenue_solo?: number
+          churn_revenue_team?: number
           created_at?: string | null
           credits_bought?: number
           credits_consumed?: number
@@ -1311,6 +1344,7 @@ export type Database = {
           plan_team_yearly?: number
           plugin_major_breakdown?: Json
           plugin_version_breakdown?: Json
+          plugin_version_ladder?: Json
           registers_today?: number
           revenue_enterprise?: number
           revenue_maker?: number
@@ -1348,6 +1382,10 @@ export type Database = {
           bundle_storage_gb?: number
           canceled_orgs?: number
           churn_revenue?: number
+          churn_revenue_enterprise?: number
+          churn_revenue_maker?: number
+          churn_revenue_solo?: number
+          churn_revenue_team?: number
           created_at?: string | null
           credits_bought?: number
           credits_consumed?: number
@@ -1380,6 +1418,7 @@ export type Database = {
           plan_team_yearly?: number
           plugin_major_breakdown?: Json
           plugin_version_breakdown?: Json
+          plugin_version_ladder?: Json
           registers_today?: number
           revenue_enterprise?: number
           revenue_maker?: number
@@ -3037,11 +3076,11 @@ export type Database = {
       }
       create_hashed_apikey: {
         Args: {
-          p_expires_at: string
-          p_limited_to_apps: string[]
-          p_limited_to_orgs: string[]
-          p_mode: Database["public"]["Enums"]["key_mode"]
-          p_name: string
+          p_expires_at?: string
+          p_limited_to_apps?: string[]
+          p_limited_to_orgs?: string[]
+          p_mode?: Database["public"]["Enums"]["key_mode"]
+          p_name?: string
         }
         Returns: {
           created_at: string | null
@@ -3051,7 +3090,7 @@ export type Database = {
           key_hash: string | null
           limited_to_apps: string[] | null
           limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"]
+          mode: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id: string
           updated_at: string | null
@@ -3066,11 +3105,11 @@ export type Database = {
       }
       create_hashed_apikey_for_user: {
         Args: {
-          p_expires_at: string
-          p_limited_to_apps: string[]
-          p_limited_to_orgs: string[]
-          p_mode: Database["public"]["Enums"]["key_mode"]
-          p_name: string
+          p_expires_at?: string
+          p_limited_to_apps?: string[]
+          p_limited_to_orgs?: string[]
+          p_mode?: Database["public"]["Enums"]["key_mode"]
+          p_name?: string
           p_user_id: string
         }
         Returns: {
@@ -3081,7 +3120,7 @@ export type Database = {
           key_hash: string | null
           limited_to_apps: string[] | null
           limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"]
+          mode: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id: string
           updated_at: string | null
@@ -3136,7 +3175,7 @@ export type Database = {
           key_hash: string | null
           limited_to_apps: string[] | null
           limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"]
+          mode: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id: string
           updated_at: string | null
@@ -3341,6 +3380,7 @@ export type Database = {
         Args: { keymode: Database["public"]["Enums"]["key_mode"][] }
         Returns: string
       }
+      get_identity_for_apikey_creation: { Args: never; Returns: string }
       get_identity_org_allowed: {
         Args: {
           keymode: Database["public"]["Enums"]["key_mode"][]
@@ -4218,7 +4258,7 @@ export type Database = {
           key_hash: string | null
           limited_to_apps: string[] | null
           limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"]
+          mode: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id: string
           updated_at: string | null
@@ -4241,7 +4281,7 @@ export type Database = {
           key_hash: string | null
           limited_to_apps: string[] | null
           limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"]
+          mode: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id: string
           updated_at: string | null

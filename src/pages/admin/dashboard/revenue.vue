@@ -52,6 +52,10 @@ const globalStatsTrendData = ref<Array<{
   mrr: number
   nrr: number
   churn_revenue: number
+  churn_revenue_solo: number
+  churn_revenue_maker: number
+  churn_revenue_team: number
+  churn_revenue_enterprise: number
   total_revenue: number
   revenue_solo: number
   revenue_maker: number
@@ -186,16 +190,53 @@ const churnRevenueSeries = computed(() => {
   if (globalStatsTrendData.value.length === 0)
     return []
 
-  return [
+  const totalSeries = {
+    label: 'Total Lost MRR ($)',
+    data: globalStatsTrendData.value.map(item => ({
+      date: item.date,
+      value: item.churn_revenue || 0,
+    })),
+    color: '#ef4444', // red
+  }
+  const planSeries = [
     {
-      label: 'Churn Revenue - Lost MRR ($)',
+      label: 'Solo Lost MRR ($)',
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
-        value: item.churn_revenue || 0,
+        value: item.churn_revenue_solo || 0,
       })),
-      color: '#ef4444', // red
+      color: '#8b5cf6', // purple
+    },
+    {
+      label: 'Maker Lost MRR ($)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.churn_revenue_maker || 0,
+      })),
+      color: '#ec4899', // pink
+    },
+    {
+      label: 'Team Lost MRR ($)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.churn_revenue_team || 0,
+      })),
+      color: '#10b981', // green
+    },
+    {
+      label: 'Enterprise Lost MRR ($)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.churn_revenue_enterprise || 0,
+      })),
+      color: '#f59e0b', // amber
     },
   ]
+
+  if (planSeries.some(series => series.data.some(point => point.value > 0)))
+    return [totalSeries, ...planSeries]
+
+  return [totalSeries]
 })
 
 const arrSeries = computed(() => {
@@ -590,7 +631,7 @@ displayStore.defaultBack = '/dashboard'
             </ChartCard>
 
             <ChartCard
-              title="Churn Revenue - Lost MRR"
+              title="Churn Revenue - Lost MRR by Plan"
               :is-loading="isLoadingGlobalStatsTrend"
               :has-data="churnRevenueSeries.length > 0"
             >

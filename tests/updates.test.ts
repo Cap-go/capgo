@@ -141,12 +141,9 @@ describe('[POST] /updates', () => {
     const versionName = `1.0.${Math.floor(Math.random() * 100000) + 1000}`
     const channelName = `deleted-bundle-${randomUUID().slice(0, 8)}`
 
-    const version = await createAppVersions(versionName, APP_NAME_UPDATE)
-    await supabase
-      .from('app_versions')
-      .update({ external_url: `https://example.com/${channelName}.zip` })
-      .eq('id', version.id)
-      .throwOnError()
+    const version = await createAppVersions(versionName, APP_NAME_UPDATE, {
+      external_url: `https://example.com/${channelName}.zip`,
+    })
 
     await supabase
       .from('channels')
@@ -198,12 +195,9 @@ describe('[POST] /updates', () => {
     const channelName = `deleted-override-${randomUUID().slice(0, 8)}`
     const deviceId = randomUUID().toLowerCase()
 
-    const version = await createAppVersions(versionName, APP_NAME_UPDATE)
-    await supabase
-      .from('app_versions')
-      .update({ external_url: `https://example.com/${channelName}.zip` })
-      .eq('id', version.id)
-      .throwOnError()
+    const version = await createAppVersions(versionName, APP_NAME_UPDATE, {
+      external_url: `https://example.com/${channelName}.zip`,
+    })
 
     const { data: insertedChannel } = await supabase
       .from('channels')
@@ -548,12 +542,9 @@ describe('[POST] /updates parallel tests', () => {
     const versionName = `9.9.${Math.floor(Math.random() * 100000) + 1000}`
     const channelName = `private-noself-${randomUUID().slice(0, 8)}`
 
-    const version = await createAppVersions(versionName, APP_NAME_UPDATE)
-    await supabase
-      .from('app_versions')
-      .update({ external_url: `https://example.com/${channelName}.zip` })
-      .eq('id', version.id)
-      .throwOnError()
+    const version = await createAppVersions(versionName, APP_NAME_UPDATE, {
+      external_url: `https://example.com/${channelName}.zip`,
+    })
 
     await supabase
       .from('channels')
@@ -598,12 +589,9 @@ describe('[POST] /updates parallel tests', () => {
     const versionName = `9.7.${Math.floor(Math.random() * 100000) + 1000}`
     const channelName = `private-selfset-${randomUUID().slice(0, 8)}`
 
-    const version = await createAppVersions(versionName, APP_NAME_UPDATE)
-    await supabase
-      .from('app_versions')
-      .update({ external_url: `https://example.com/${channelName}.zip` })
-      .eq('id', version.id)
-      .throwOnError()
+    const version = await createAppVersions(versionName, APP_NAME_UPDATE, {
+      external_url: `https://example.com/${channelName}.zip`,
+    })
 
     await supabase
       .from('channels')
@@ -647,12 +635,9 @@ describe('[POST] /updates parallel tests', () => {
     const versionName = `9.8.${Math.floor(Math.random() * 100000) + 1000}`
     const channelName = `private-iosonly-${randomUUID().slice(0, 8)}`
 
-    const version = await createAppVersions(versionName, APP_NAME_UPDATE)
-    await supabase
-      .from('app_versions')
-      .update({ external_url: `https://example.com/${channelName}.zip` })
-      .eq('id', version.id)
-      .throwOnError()
+    const version = await createAppVersions(versionName, APP_NAME_UPDATE, {
+      external_url: `https://example.com/${channelName}.zip`,
+    })
 
     await supabase
       .from('channels')

@@ -17,6 +17,10 @@ function globalStatsRow(dateId: string) {
   return {
     canceled_orgs: 0,
     churn_revenue: 0,
+    churn_revenue_enterprise: 0,
+    churn_revenue_maker: 0,
+    churn_revenue_solo: 0,
+    churn_revenue_team: 0,
     date_id: dateId,
     mrr: 0,
     new_paying_orgs: 0,
@@ -158,6 +162,7 @@ describe('revenue trend backfill metrics', () => {
     expect(rows[1]).toMatchObject({
       canceled_orgs: 1,
       churn_revenue: 12,
+      churn_revenue_solo: 12,
       mrr: 0,
       new_paying_orgs: 0,
       paying: 0,
@@ -287,6 +292,7 @@ describe('revenue trend backfill metrics', () => {
     expect(rows[0]).toMatchObject({
       canceled_orgs: 0,
       churn_revenue: 37,
+      churn_revenue_team: 37,
       mrr: 12,
       plan_solo: 1,
       plan_team: 0,
@@ -373,6 +379,7 @@ describe('revenue trend backfill metrics', () => {
     expect(rows[2]).toMatchObject({
       canceled_orgs: 1,
       churn_revenue: 49,
+      churn_revenue_team: 49,
       mrr: 0,
       plan_team: 0,
     })
