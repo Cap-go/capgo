@@ -218,10 +218,14 @@ async function guard(
 
   if (hasAuth && sessionUser && !hadAuth) {
     const isDisabled = await isDisabledAccount(supabase, sessionUser.id)
-    if (to.path === '/accountDisabled')
+    if (to.path === '/accountDisabled') {
+      hideLoader()
       return isDisabled ? next() : next(getPostRestorePath(to))
-    if (isDisabled)
+    }
+    if (isDisabled) {
+      hideLoader()
       return next(getAccountDisabledRedirect(to))
+    }
 
     const provisioningResult = await maybeProvisionSsoMembership(supabase, sessionData?.session ?? null)
     if (provisioningResult === 'redirect_login') {
@@ -293,10 +297,14 @@ async function guard(
   }
   else if (hasAuth && main.auth) {
     const isDisabled = await isDisabledAccount(supabase, sessionUser?.id ?? main.auth.id)
-    if (isDisabled && to.path !== '/accountDisabled')
+    if (isDisabled && to.path !== '/accountDisabled') {
+      hideLoader()
       return next(getAccountDisabledRedirect(to))
-    if (!isDisabled && to.path === '/accountDisabled')
+    }
+    if (!isDisabled && to.path === '/accountDisabled') {
+      hideLoader()
       return next(getPostRestorePath(to))
+    }
 
     let organizationsLoaded = await tryLoadOrganizations(() => organizationStore.dedupFetchOrganizations())
     if (organizationsLoaded && !organizationStore.hasOrganizations && isSsoUser(sessionUser)) {
