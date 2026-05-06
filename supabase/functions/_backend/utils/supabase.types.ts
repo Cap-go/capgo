@@ -1242,6 +1242,7 @@ export type Database = {
           plan_team_yearly: number
           plugin_major_breakdown: Json
           plugin_version_breakdown: Json
+          plugin_version_ladder: Json
           registers_today: number
           revenue_enterprise: number
           revenue_maker: number
@@ -1311,6 +1312,7 @@ export type Database = {
           plan_team_yearly?: number
           plugin_major_breakdown?: Json
           plugin_version_breakdown?: Json
+          plugin_version_ladder?: Json
           registers_today?: number
           revenue_enterprise?: number
           revenue_maker?: number
@@ -1380,6 +1382,7 @@ export type Database = {
           plan_team_yearly?: number
           plugin_major_breakdown?: Json
           plugin_version_breakdown?: Json
+          plugin_version_ladder?: Json
           registers_today?: number
           revenue_enterprise?: number
           revenue_maker?: number

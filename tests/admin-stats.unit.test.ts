@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { adminStatsBodySchema, MAX_ADMIN_STATS_LIMIT, MAX_ADMIN_STATS_OFFSET } from '../supabase/functions/_backend/private/admin_stats.ts'
 import { safeParseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
-import { normalizeAnalyticsLimit } from '../supabase/functions/_backend/utils/cloudflare.ts'
-import { buildAdminPluginVersionLadder } from '../supabase/functions/_backend/utils/pg.ts'
+import { buildPluginBreakdownResult, normalizeAnalyticsLimit } from '../supabase/functions/_backend/utils/cloudflare.ts'
 
 describe('admin stats validation', () => {
   const baseBody = {
@@ -77,35 +76,40 @@ describe('normalizeAnalyticsLimit', () => {
   })
 })
 
-describe('buildAdminPluginVersionLadder', () => {
-  it.concurrent('normalizes top plugin versions with top app IDs', () => {
-    const result = buildAdminPluginVersionLadder([
-      {
-        plugin_version: '8.1.0',
-        device_count: '12',
-        top_apps: JSON.stringify([
-          { app_id: 'com.capgo.first', device_count: '8', share: '66.67' },
-          { app_id: 'com.capgo.second', device_count: 4, share: 33.33 },
-          { app_id: '', device_count: 1, share: 8.33 },
-        ]),
-      },
-      {
-        plugin_version: '',
-        device_count: 10,
-        top_apps: [],
-      },
-    ], {
-      '8.1.0': 42.5,
-    })
+describe('buildPluginBreakdownResult', () => {
+  it.concurrent('aggregates plugin versions with major breakdown and top app IDs', () => {
+    const result = buildPluginBreakdownResult([
+      { plugin_version: '8.1.0', app_id: 'com.capgo.first', device_count: '8' },
+      { plugin_version: '8.1.0', app_id: 'com.capgo.second', device_count: 4 },
+      { plugin_version: '7.5.1', app_id: 'com.capgo.third', device_count: 4 },
+      { plugin_version: '', app_id: 'com.capgo.empty', device_count: 10 },
+      { plugin_version: '8.1.0', app_id: '', device_count: 10 },
+    ])
 
-    expect(result).toEqual([
+    expect(result.version_breakdown).toEqual({
+      '8.1.0': 75,
+      '7.5.1': 25,
+    })
+    expect(result.major_breakdown).toEqual({
+      8: 75,
+      7: 25,
+    })
+    expect(result.version_ladder).toEqual([
       {
         version: '8.1.0',
         device_count: 12,
-        percent: 42.5,
+        percent: 75,
         top_apps: [
           { app_id: 'com.capgo.first', device_count: 8, share: 66.67 },
           { app_id: 'com.capgo.second', device_count: 4, share: 33.33 },
+        ],
+      },
+      {
+        version: '7.5.1',
+        device_count: 4,
+        percent: 25,
+        top_apps: [
+          { app_id: 'com.capgo.third', device_count: 4, share: 100 },
         ],
       },
     ])
