@@ -15,6 +15,7 @@ import {
 import dayjs from 'dayjs'
 import { computed } from 'vue'
 import { Line } from 'vue-chartjs'
+import { createChartColorWithOpacity, resolveAccessibleChartColor } from '~/services/chartConfig'
 import { formatLocalDate } from '~/services/date'
 
 interface DataSeries {
@@ -95,18 +96,23 @@ const chartData = computed<ChartData<'line'>>(() => {
   const labels = props.series[0].data.map(item => item.date)
     .map(item => formatChartDate(item))
 
-  const datasets = props.series.map(series => ({
-    label: series.label,
-    data: series.data.map(item => item.value),
-    borderColor: series.color,
-    backgroundColor: `${series.color}33`, // 20% opacity
-    fill: false,
-    tension: 0.4,
-    pointRadius: 3,
-    pointBackgroundColor: series.color,
-    pointBorderWidth: 0,
-    borderWidth: 2,
-  }))
+  const datasets = props.series.map((series) => {
+    const lineColor = resolveAccessibleChartColor(series.color, isDark.value)
+
+    return {
+      label: series.label,
+      data: series.data.map(item => item.value),
+      borderColor: lineColor,
+      backgroundColor: createChartColorWithOpacity(lineColor, 0.2),
+      fill: false,
+      tension: 0.4,
+      pointRadius: 3,
+      pointBackgroundColor: lineColor,
+      pointBorderColor: isDark.value ? '#0f172a' : '#ffffff',
+      pointBorderWidth: 1,
+      borderWidth: 2,
+    }
+  })
 
   return {
     labels,
