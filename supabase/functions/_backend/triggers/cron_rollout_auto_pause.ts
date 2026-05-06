@@ -1,8 +1,9 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { AutoPauseAction } from '../utils/rollout.ts'
 import { Hono } from 'hono/tiny'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
-import { evaluateAutoPausePolicy, type AutoPauseAction } from '../utils/rollout.ts'
+import { evaluateAutoPausePolicy } from '../utils/rollout.ts'
 import { readStatsVersion } from '../utils/stats.ts'
 import { supabaseAdmin } from '../utils/supabase.ts'
 

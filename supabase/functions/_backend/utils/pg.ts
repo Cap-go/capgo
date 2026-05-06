@@ -10,9 +10,9 @@ import { CacheHelper } from './cache.ts'
 import { DISPOSABLE_EMAIL_DOMAINS, PERSONAL_EMAIL_DOMAINS } from './emailClassification.ts'
 import { getClientDbRegionSB } from './geolocation.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
-import { getRolloutDecision } from './rollout.ts'
 import * as schema from './postgres_schema.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
+import { getRolloutDecision } from './rollout.ts'
 
 const REPLICATION_LAG_THRESHOLD_SECONDS = 180
 const REPLICATION_LAG_CACHE_TTL_SECONDS = 60
@@ -606,7 +606,6 @@ export function requestInfosChannelPostgres(
 
   return channel
 }
-
 
 export function requestManifestEntriesPostgres(
   c: Context,
