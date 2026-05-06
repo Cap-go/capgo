@@ -23,7 +23,7 @@ export type Database = {
           key_hash: string | null
           limited_to_apps: string[] | null
           limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"]
+          mode: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id: string
           updated_at: string | null
@@ -37,7 +37,7 @@ export type Database = {
           key_hash?: string | null
           limited_to_apps?: string[] | null
           limited_to_orgs?: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"]
+          mode?: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id?: string
           updated_at?: string | null
@@ -51,7 +51,7 @@ export type Database = {
           key_hash?: string | null
           limited_to_apps?: string[] | null
           limited_to_orgs?: string[] | null
-          mode?: Database["public"]["Enums"]["key_mode"]
+          mode?: Database["public"]["Enums"]["key_mode"] | null
           name?: string
           rbac_id?: string
           updated_at?: string | null
@@ -3037,11 +3037,11 @@ export type Database = {
       }
       create_hashed_apikey: {
         Args: {
-          p_expires_at: string
-          p_limited_to_apps: string[]
-          p_limited_to_orgs: string[]
-          p_mode: Database["public"]["Enums"]["key_mode"]
-          p_name: string
+          p_expires_at?: string
+          p_limited_to_apps?: string[]
+          p_limited_to_orgs?: string[]
+          p_mode?: Database["public"]["Enums"]["key_mode"]
+          p_name?: string
         }
         Returns: {
           created_at: string | null
@@ -3051,7 +3051,7 @@ export type Database = {
           key_hash: string | null
           limited_to_apps: string[] | null
           limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"]
+          mode: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id: string
           updated_at: string | null
@@ -3066,11 +3066,11 @@ export type Database = {
       }
       create_hashed_apikey_for_user: {
         Args: {
-          p_expires_at: string
-          p_limited_to_apps: string[]
-          p_limited_to_orgs: string[]
-          p_mode: Database["public"]["Enums"]["key_mode"]
-          p_name: string
+          p_expires_at?: string
+          p_limited_to_apps?: string[]
+          p_limited_to_orgs?: string[]
+          p_mode?: Database["public"]["Enums"]["key_mode"]
+          p_name?: string
           p_user_id: string
         }
         Returns: {
@@ -3081,7 +3081,7 @@ export type Database = {
           key_hash: string | null
           limited_to_apps: string[] | null
           limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"]
+          mode: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id: string
           updated_at: string | null
@@ -3136,7 +3136,7 @@ export type Database = {
           key_hash: string | null
           limited_to_apps: string[] | null
           limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"]
+          mode: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id: string
           updated_at: string | null
@@ -3341,6 +3341,7 @@ export type Database = {
         Args: { keymode: Database["public"]["Enums"]["key_mode"][] }
         Returns: string
       }
+      get_identity_for_apikey_creation: { Args: never; Returns: string }
       get_identity_org_allowed: {
         Args: {
           keymode: Database["public"]["Enums"]["key_mode"][]
@@ -4218,7 +4219,7 @@ export type Database = {
           key_hash: string | null
           limited_to_apps: string[] | null
           limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"]
+          mode: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id: string
           updated_at: string | null
@@ -4241,7 +4242,7 @@ export type Database = {
           key_hash: string | null
           limited_to_apps: string[] | null
           limited_to_orgs: string[] | null
-          mode: Database["public"]["Enums"]["key_mode"]
+          mode: Database["public"]["Enums"]["key_mode"] | null
           name: string
           rbac_id: string
           updated_at: string | null
