@@ -664,7 +664,28 @@ export function requestInfosChannelPostgresRollout(
   includeMetadata = false,
 ) {
   const { versionSelect, rolloutVersionSelect, channelAlias, channelSelect, versionAlias, rolloutVersionAlias } = getSchemaUpdatesAlias(includeMetadata)
-  const platformQuery = platform === 'android' ? channelAlias.android : platform === 'electron' ? channelAlias.electron : channelAlias.ios
+  let platformQuery = channelAlias.ios
+  if (platform === 'android')
+    platformQuery = channelAlias.android
+  else if (platform === 'electron')
+    platformQuery = channelAlias.electron
+
+  const channelFilter = defaultChannel
+    ? and(
+        eq(channelAlias.app_id, app_id),
+        eq(channelAlias.name, defaultChannel),
+        eq(platformQuery, true),
+        or(
+          eq(channelAlias.public, true),
+          eq(channelAlias.allow_device_self_set, true),
+        ),
+      )
+    : and(
+        eq(channelAlias.public, true),
+        eq(channelAlias.app_id, app_id),
+        eq(platformQuery, true),
+      )
+
   const channelQuery = drizzleClient
     .select({
       version: versionSelect,
@@ -674,23 +695,7 @@ export function requestInfosChannelPostgresRollout(
     .from(channelAlias)
     .innerJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
     .leftJoin(rolloutVersionAlias, activeChannelVersionJoin(channelAlias.rollout_version, rolloutVersionAlias, channelAlias.app_id))
-    .where(
-      !defaultChannel
-        ? and(
-            eq(channelAlias.public, true),
-            eq(channelAlias.app_id, app_id),
-            eq(platformQuery, true),
-          )
-        : and(
-            eq(channelAlias.app_id, app_id),
-            eq(channelAlias.name, defaultChannel),
-            eq(platformQuery, true),
-            or(
-              eq(channelAlias.public, true),
-              eq(channelAlias.allow_device_self_set, true),
-            ),
-          ),
-    )
+    .where(channelFilter)
     .limit(1)
 
   cloudlog({ requestId: c.get('requestId'), message: 'channel rollout Query:', channelQuery: channelQuery.toSQL() })

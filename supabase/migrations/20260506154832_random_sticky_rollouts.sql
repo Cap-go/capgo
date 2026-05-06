@@ -77,21 +77,21 @@ SECURITY DEFINER
 SET "search_path" TO ''
 AS $$
 BEGIN
-  IF "p_app_id" IS NULL THEN
+  IF p_app_id IS NULL THEN
     RETURN;
   END IF;
 
-  UPDATE "public"."apps" AS a
+  UPDATE public.apps AS a
   SET
-    "rollout_channel_count" = (
+    rollout_channel_count = (
       SELECT count(*)::bigint
-      FROM "public"."channels" AS c
-      WHERE c."app_id" = "p_app_id"
-        AND c."rollout_enabled" = true
-        AND c."rollout_version" IS NOT NULL
+      FROM public.channels AS c
+      WHERE c.app_id = p_app_id
+        AND c.rollout_enabled IS TRUE
+        AND c.rollout_version IS NOT NULL
     ),
-    "updated_at" = now()
-  WHERE a."app_id" = "p_app_id";
+    updated_at = now()
+  WHERE a.app_id = p_app_id;
 END;
 $$;
 
@@ -174,53 +174,54 @@ FROM (
 ) AS rollout_counts
 WHERE rollout_counts."app_id" = a."app_id";
 
-CREATE OR REPLACE FUNCTION "public"."update_app_versions_retention"()
+CREATE OR REPLACE FUNCTION public.update_app_versions_retention()
 RETURNS void
-LANGUAGE "plpgsql"
-SET "search_path" TO ''
+LANGUAGE plpgsql
+SET search_path TO ''
 AS $$
 BEGIN
-    UPDATE "public"."app_versions"
-    SET "deleted" = true, "updated_at" = NOW()
-    WHERE "app_versions"."deleted" = false
-      AND (SELECT "retention" FROM "public"."apps" WHERE "apps"."app_id" = "app_versions"."app_id") >= 0
-      AND (SELECT "retention" FROM "public"."apps" WHERE "apps"."app_id" = "app_versions"."app_id") < 63113904
-      AND "app_versions"."created_at" < (
-          SELECT NOW() - make_interval(secs => "apps"."retention")
-          FROM "public"."apps"
-          WHERE "apps"."app_id" = "app_versions"."app_id"
-      )
-      AND NOT EXISTS (
-          SELECT 1
-          FROM "public"."channels"
-          WHERE "channels"."app_id" = "app_versions"."app_id"
-            AND (
-              "channels"."version" = "app_versions"."id"
-              OR "channels"."rollout_version" = "app_versions"."id"
-            )
+    UPDATE public.app_versions AS av
+    SET deleted = true, updated_at = NOW()
+    FROM public.apps AS a
+    WHERE av.deleted IS FALSE
+      AND a.app_id = av.app_id
+      AND a.retention >= 0
+      AND a.retention < 63113904
+      AND av.created_at < NOW() - make_interval(secs => a.retention)
+      AND av.id NOT IN (
+          SELECT c.version
+          FROM public.channels AS c
+          WHERE c.version IS NOT NULL
+          UNION
+          SELECT c.rollout_version
+          FROM public.channels AS c
+          WHERE c.rollout_version IS NOT NULL
       );
 END;
 $$;
 
-ALTER FUNCTION "public"."update_app_versions_retention"() OWNER TO "postgres";
+ALTER FUNCTION public.update_app_versions_retention() OWNER TO postgres;
 
-CREATE OR REPLACE FUNCTION "public"."delete_old_deleted_versions"()
-RETURNS "void"
-LANGUAGE "plpgsql"
+CREATE OR REPLACE FUNCTION public.delete_old_deleted_versions()
+RETURNS void
+LANGUAGE plpgsql
 SECURITY DEFINER
-SET "search_path" TO ''
+SET search_path TO ''
 AS $$
 DECLARE
   deleted_count bigint;
 BEGIN
-    DELETE FROM "public"."app_versions"
-    WHERE "deleted" = true
-      AND "updated_at" < NOW() - INTERVAL '1 year'
-      AND NOT EXISTS (
-        SELECT 1
-        FROM "public"."channels"
-        WHERE "channels"."version" = "app_versions"."id"
-          OR "channels"."rollout_version" = "app_versions"."id"
+    DELETE FROM public.app_versions AS av
+    WHERE av.deleted IS TRUE
+      AND av.updated_at < NOW() - INTERVAL '1 year'
+      AND av.id NOT IN (
+        SELECT c.version
+        FROM public.channels AS c
+        WHERE c.version IS NOT NULL
+        UNION
+        SELECT c.rollout_version
+        FROM public.channels AS c
+        WHERE c.rollout_version IS NOT NULL
       );
 
     GET DIAGNOSTICS deleted_count = ROW_COUNT;
@@ -231,9 +232,9 @@ BEGIN
 END;
 $$;
 
-ALTER FUNCTION "public"."delete_old_deleted_versions"() OWNER TO "postgres";
-REVOKE EXECUTE ON FUNCTION "public"."delete_old_deleted_versions"() FROM public;
-GRANT EXECUTE ON FUNCTION "public"."delete_old_deleted_versions"() TO service_role;
+ALTER FUNCTION public.delete_old_deleted_versions() OWNER TO postgres;
+REVOKE EXECUTE ON FUNCTION public.delete_old_deleted_versions() FROM public;
+GRANT EXECUTE ON FUNCTION public.delete_old_deleted_versions() TO service_role;
 
 SELECT pgmq.create('cron_rollout_auto_pause');
 
