@@ -1290,14 +1290,15 @@ export async function readDevicesSB(c: Context, params: ReadDevicesParams, custo
 
   const devicesOrder = getDevicesOrder(params.order)
 
-  // Cursor-based pagination only works when an updated_at order is active
-  if (params.cursor && devicesOrder) {
+  if (params.cursor) {
     // Cursor format: "updated_at|device_id"
     const [cursorTime, cursorDeviceId] = params.cursor.split('|')
     if (cursorTime && cursorDeviceId) {
       const quotedCursorTime = quotePostgrestFilterValue(cursorTime)
       const quotedCursorDeviceId = quotePostgrestFilterValue(cursorDeviceId)
-      if (devicesOrder.ascending)
+      if (!devicesOrder)
+        query = query.gt('device_id', cursorDeviceId)
+      else if (devicesOrder.ascending)
         query = query.or(`updated_at.gt.${quotedCursorTime},and(updated_at.eq.${quotedCursorTime},device_id.gt.${quotedCursorDeviceId})`)
       else
         query = query.or(`updated_at.lt.${quotedCursorTime},and(updated_at.eq.${quotedCursorTime},device_id.gt.${quotedCursorDeviceId})`)

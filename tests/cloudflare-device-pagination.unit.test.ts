@@ -2,6 +2,21 @@ import { describe, expect, it } from 'vitest'
 import { buildReadDevicesCFQuery } from '../supabase/functions/_backend/utils/cloudflare.ts'
 
 describe('buildReadDevicesCFQuery', () => {
+  it.concurrent('applies default device_id cursor pagination when no order is provided', () => {
+    const query = buildReadDevicesCFQuery({
+      app_id: 'com.example.app',
+      cursor: '2026-04-04 03:05:59|11111111-1111-4111-8111-111111111111',
+      limit: 1,
+    }, false)
+
+    const groupByIndex = query.indexOf('GROUP BY blob1')
+    const cursorIndex = query.indexOf(`WHERE device_id > '11111111-1111-4111-8111-111111111111'`)
+
+    expect(groupByIndex).toBeGreaterThan(-1)
+    expect(cursorIndex).toBeGreaterThan(groupByIndex)
+    expect(query).toContain('ORDER BY device_id ASC')
+  })
+
   it.concurrent('applies descending cursor pagination after device grouping', () => {
     const query = buildReadDevicesCFQuery({
       app_id: 'com.example.app',

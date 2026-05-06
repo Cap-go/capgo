@@ -625,15 +625,18 @@ function getReadDevicesCFOrder(params: ReadDevicesParams): DevicesOrderCF | null
 }
 
 function buildReadDevicesCFCursorFilter(cursor: string | undefined, devicesOrder: DevicesOrderCF | null) {
-  if (!(cursor && devicesOrder))
+  if (!cursor)
     return ''
 
   const [cursorTime, cursorDeviceId] = cursor.split('|')
   if (!(cursorTime && cursorDeviceId))
     return ''
 
-  const safeCursorTime = escapeSqlString(cursorTime)
   const safeCursorDeviceId = escapeSqlString(cursorDeviceId)
+  if (!devicesOrder)
+    return `WHERE device_id > '${safeCursorDeviceId}'`
+
+  const safeCursorTime = escapeSqlString(cursorTime)
   const comparison = devicesOrder.ascending ? '>' : '<'
 
   return `WHERE (updated_at ${comparison} toDateTime('${safeCursorTime}') OR (updated_at = toDateTime('${safeCursorTime}') AND device_id > '${safeCursorDeviceId}'))`
