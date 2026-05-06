@@ -71,29 +71,25 @@ const authCardShellClass = [
   'sm:dark:border-slate-600/70 sm:dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.88)_0%,rgba(15,23,42,0.7)_100%)]',
 ].join(' ')
 const authCardHeaderClass = 'flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'
-const authStepCardClass = [
-  'min-w-0',
-  'sm:overflow-hidden sm:rounded-3xl sm:border sm:border-slate-200/75 sm:bg-white/88 sm:shadow-[0_26px_60px_-40px_rgba(15,23,42,0.42)]',
-  'sm:dark:border-slate-600/70 sm:dark:bg-slate-950/80',
-].join(' ')
-const authCardBodyClass = 'py-1 sm:p-7'
-const authPanelClass = 'border-t border-slate-200/80 pt-4 text-center dark:border-slate-700 sm:rounded-2xl sm:border sm:bg-slate-50/80 sm:px-4 sm:py-4 sm:dark:bg-slate-900/70'
+const authStepCardClass = 'min-w-0'
+const authCardBodyClass = 'py-1'
+const authPanelClass = 'flex flex-wrap items-center justify-center gap-x-2 gap-y-1 border-t border-slate-200/70 pt-4 text-center text-sm dark:border-slate-700/80'
 const authPrimaryButtonClass = [
-  'inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-4 text-base font-semibold text-white',
+  'inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-4 text-base font-semibold text-white',
   'bg-[linear-gradient(135deg,rgba(36,67,102,1)_0%,rgba(12,110,184,1)_100%)] shadow-[0_20px_38px_-26px_rgba(17,158,255,0.85)]',
   'transition duration-200 hover:-translate-y-0.5 hover:brightness-105',
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--color-azure-500)]',
   'disabled:pointer-events-none disabled:opacity-60',
 ].join(' ')
 const authSecondaryButtonClass = [
-  'inline-flex w-full items-center justify-center rounded-2xl border border-slate-400/55 bg-white/92 px-4 py-4 text-base font-semibold text-slate-700',
+  'inline-flex w-full items-center justify-center rounded-xl border border-slate-400/55 bg-white/92 px-4 py-4 text-base font-semibold text-slate-700',
   'transition duration-200 hover:border-[rgba(17,158,255,0.45)] hover:bg-slate-100/95',
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--color-azure-500)]',
   'dark:border-slate-600/90 dark:bg-slate-950/85 dark:text-slate-200 dark:hover:bg-slate-800/95',
   'disabled:pointer-events-none disabled:opacity-60',
 ].join(' ')
 const authInlineLinkClass = [
-  'inline-flex items-center justify-center gap-1 border-none bg-transparent p-0 text-[0.95rem] font-semibold text-[rgb(255,114,17)]',
+  'inline-flex min-h-6 items-center justify-center gap-1 border-none bg-transparent p-0 text-[0.95rem] font-semibold text-[rgb(255,114,17)]',
   'transition-colors duration-200 hover:text-[rgb(235,94,0)]',
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--color-azure-500)]',
 ].join(' ')
@@ -778,18 +774,16 @@ onMounted(checkLogin)
                       </div>
 
                       <div :class="authPanelClass">
-                        <p class="text-xs font-semibold tracking-[0.2em] text-slate-400 uppercase dark:text-slate-500">
-                          {{ t('login-auth-kicker') }}
-                        </p>
-                        <div class="mt-3">
-                          <a
-                            :href="registerUrl"
-                            data-test="register"
-                            :class="authInlineLinkClass"
-                          >
-                            {{ t('create-a-free-account') }}
-                          </a>
-                        </div>
+                        <span class="text-slate-500 dark:text-slate-400">
+                          {{ t('dont-have-an-account') }}
+                        </span>
+                        <a
+                          :href="registerUrl"
+                          data-test="register"
+                          :class="authInlineLinkClass"
+                        >
+                          {{ t('create-a-free-account') }}
+                        </a>
                       </div>
                     </div>
                   </FormKit>
@@ -841,7 +835,7 @@ onMounted(checkLogin)
                     </div>
                     <div class="text-center">
                       <button type="button" data-test="back-to-email" class="appearance-none" :class="authInlineLinkClass" @click="goBackToEmail">
-                        ← {{ t('go-back') }}
+                        {{ t('go-back') }}
                       </button>
                     </div>
                   </div>
@@ -928,29 +922,23 @@ onMounted(checkLogin)
                         </div>
 
                         <div :class="authPanelClass">
-                          <div>
-                            <button type="button" data-test="back-to-email" class="appearance-none" :class="authInlineLinkClass" @click="goBackToEmail">
-                              ← {{ t('go-back') }}
-                            </button>
-                          </div>
-                          <div class="mt-3">
-                            <a
-                              :href="registerUrl"
-                              data-test="register"
-                              :class="authInlineLinkClass"
-                            >
-                              {{ t('create-a-free-account') }}
-                            </a>
-                          </div>
-                          <div class="mt-3">
-                            <router-link
-                              to="/forgot_password"
-                              data-test="forgot-password"
-                              :class="authInlineLinkClass"
-                            >
-                              {{ t('forgot') }} {{ t('password') }} ?
-                            </router-link>
-                          </div>
+                          <button type="button" data-test="back-to-email" class="appearance-none" :class="authInlineLinkClass" @click="goBackToEmail">
+                            {{ t('go-back') }}
+                          </button>
+                          <a
+                            :href="registerUrl"
+                            data-test="register"
+                            :class="authInlineLinkClass"
+                          >
+                            {{ t('create-a-free-account') }}
+                          </a>
+                          <router-link
+                            to="/forgot_password"
+                            data-test="forgot-password"
+                            :class="authInlineLinkClass"
+                          >
+                            {{ t('forgot') }} {{ t('password') }} ?
+                          </router-link>
                         </div>
                       </div>
                     </FormKit>
@@ -999,7 +987,6 @@ onMounted(checkLogin)
                       </div>
 
                       <div :class="authPanelClass">
-                        <p class="text-base text-slate-600 dark:text-slate-300" />
                         <button type="button" class="appearance-none" :class="authInlineLinkClass" @click="goback">
                           {{ t('go-back') }}
                         </button>

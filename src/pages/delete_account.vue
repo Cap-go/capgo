@@ -8,7 +8,7 @@ import { toast } from 'vue-sonner'
 import VueTurnstile from 'vue-turnstile'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
-import { authGhostButtonClass, authInsetCardClass, authPanelClass, authPrimaryButtonClass, authSecondaryButtonClass } from '~/components/auth/pageStyles'
+import { authGhostButtonClass, authPanelClass, authPrimaryButtonClass, authSecondaryButtonClass } from '~/components/auth/pageStyles'
 import { getRecentEmailOtpVerification } from '~/services/emailOtp'
 import { hideLoader } from '~/services/loader'
 import { useSupabase } from '~/services/supabase'
@@ -251,8 +251,7 @@ onMounted (() => {
 
     <div
       v-else-if="isDeleteBlocked"
-      class="border-amber-200/80 bg-amber-50/90 text-amber-900 dark:border-amber-700/70 dark:bg-amber-900/25 dark:text-amber-100"
-      :class="authInsetCardClass"
+      class="overflow-hidden rounded-xl border border-amber-200/80 bg-amber-50/90 p-3 text-amber-900 dark:border-amber-700/70 dark:bg-amber-900/25 dark:text-amber-100"
     >
       <p class="font-semibold">
         {{ t('email-not-verified') }}
@@ -306,7 +305,7 @@ onMounted (() => {
           />
         </div>
 
-        <div v-if="captchaKey" :class="authInsetCardClass">
+        <div v-if="captchaKey" class="space-y-2 overflow-hidden">
           <label class="mb-2 block text-sm font-medium text-slate-700 dark:text-slate-200">
             {{ t('captcha') }}
           </label>

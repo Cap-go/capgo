@@ -8,7 +8,7 @@ import { toast } from 'vue-sonner'
 import VueTurnstile from 'vue-turnstile'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
-import { authGhostButtonClass, authInsetCardClass, authPanelClass, authPrimaryButtonClass } from '~/components/auth/pageStyles'
+import { authGhostButtonClass, authPanelClass, authPrimaryButtonClass } from '~/components/auth/pageStyles'
 import { useSupabase } from '~/services/supabase'
 import { openSupport } from '~/services/support'
 import { useDialogV2Store } from '~/stores/dialogv2'
@@ -230,7 +230,7 @@ watchEffect(() => {
           />
         </div>
 
-        <div v-if="step === 1 && captchaKey" :class="authInsetCardClass">
+        <div v-if="step === 1 && captchaKey" class="overflow-hidden">
           <VueTurnstile v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
         </div>
 

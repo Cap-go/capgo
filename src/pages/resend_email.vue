@@ -123,8 +123,7 @@ onMounted(async () => {
     <template v-else>
       <div
         v-if="emailVerificationBlockingReason"
-        class="mb-5 border-amber-200/80 bg-amber-50/90 text-amber-900 dark:border-amber-700/70 dark:bg-amber-900/25 dark:text-amber-100"
-        :class="authInsetCardClass"
+        class="mb-5 overflow-hidden rounded-xl border border-amber-200/80 bg-amber-50/90 p-3 text-amber-900 dark:border-amber-700/70 dark:bg-amber-900/25 dark:text-amber-100"
       >
         <p class="font-semibold">
           {{ t('email-not-verified-banner-title') }}
