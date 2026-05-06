@@ -34,6 +34,7 @@ type AppRow = Database['public']['Tables']['apps']['Row']
 const isLoading = ref(true)
 const isSubmitting = ref(false)
 const isImportingStore = ref(false)
+const isResumeIconLoading = ref(false)
 const isSeedingDemo = ref(false)
 const isCliCommandVisible = ref(false)
 const apiKey = ref<string | null>(null)
@@ -175,9 +176,13 @@ function getStoreUrls(url: string) {
 
 let resumeIconLoadRun = 0
 async function loadResumeIconPreview(rawIconUrl: string | null | undefined, appId: string, run: number) {
-  if (!rawIconUrl || getImmediateImageUrl(rawIconUrl))
+  if (!rawIconUrl || getImmediateImageUrl(rawIconUrl)) {
+    if (run === resumeIconLoadRun)
+      isResumeIconLoading.value = false
     return
+  }
 
+  isResumeIconLoading.value = true
   try {
     const signedIconUrl = await createSignedImageUrl(rawIconUrl)
     if (!signedIconUrl || run !== resumeIconLoadRun || createdApp.value?.app_id !== appId)
@@ -187,6 +192,10 @@ async function loadResumeIconPreview(rawIconUrl: string | null | undefined, appI
   }
   catch (error) {
     console.warn('Cannot load signed resume app icon', { appId, error })
+  }
+  finally {
+    if (run === resumeIconLoadRun)
+      isResumeIconLoading.value = false
   }
 }
 
@@ -310,6 +319,7 @@ function onSelectIconFormKit(value: unknown) {
   if (localIconPreview.value.startsWith('blob:'))
     URL.revokeObjectURL(localIconPreview.value)
   localIconPreview.value = file ? URL.createObjectURL(file) : ''
+  isResumeIconLoading.value = false
 }
 
 function onAppIdInput(event: Event) {
@@ -809,6 +819,7 @@ watch(suggestedAppId, (value) => {
                 <div class="flex items-center gap-4">
                   <div class="flex h-18 w-18 items-center justify-center overflow-hidden rounded-[22px] bg-slate-800 text-3xl">
                     <img v-if="iconPreview" :src="iconPreview" :alt="t('app-onboarding-icon-preview-alt')" class="h-full w-full object-cover">
+                    <span v-else-if="isResumeIconLoading" class="h-7 w-7 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" :aria-label="t('loading')" />
                     <span v-else>📱</span>
                   </div>
                   <div class="min-w-0">

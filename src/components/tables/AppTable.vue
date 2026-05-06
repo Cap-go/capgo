@@ -127,9 +127,18 @@ const columns = ref<TableColumn[]>([
             width: 42,
             height: 42,
           })
-        : h('div', { class: 'p-2 mr-2 text-xl bg-gray-700 d-mask d-mask-squircle' }, [
-            h('span', { class: 'font-medium text-gray-300' }, (item.name?.slice(0, 2).toUpperCase() || 'AP')),
-          ])
+        : item.icon_url_loading
+          ? h('div', {
+              'class': 'flex items-center justify-center mr-2 bg-gray-700 rounded-sm shrink-0 sm:mr-3 d-mask d-mask-squircle',
+              'style': 'width: 42px; height: 42px;',
+              'aria-label': t('loading'),
+            }, [
+              h('span', { class: 'w-5 h-5 rounded-full border-2 border-blue-400 border-t-transparent animate-spin' }),
+              h('span', { class: 'sr-only' }, t('loading')),
+            ])
+          : h('div', { class: 'p-2 mr-2 text-xl bg-gray-700 d-mask d-mask-squircle' }, [
+              h('span', { class: 'font-medium text-gray-300' }, (item.name?.slice(0, 2).toUpperCase() || 'AP')),
+            ])
 
       return h('div', { class: 'flex flex-wrap items-center text-slate-800 dark:text-white' }, [
         avatar,

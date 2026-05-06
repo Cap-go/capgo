@@ -67,6 +67,7 @@ const RETENTION_PRESETS = [
 const selectedRetentionPreset = ref<number>(2592000)
 const customRetentionValue = ref<number>(0)
 const isImportingStoreIcon = ref(false)
+const isAppIconLoading = ref(false)
 
 const isCustomRetention = computed(() => selectedRetentionPreset.value === -1)
 
@@ -97,9 +98,13 @@ function initializeRetentionPreset() {
 
 let appIconLoadRun = 0
 async function loadAppSettingIcon(rawIconUrl: string | null | undefined, run: number) {
-  if (!rawIconUrl || getImmediateImageUrl(rawIconUrl))
+  if (!rawIconUrl || getImmediateImageUrl(rawIconUrl)) {
+    if (run === appIconLoadRun)
+      isAppIconLoading.value = false
     return
+  }
 
+  isAppIconLoading.value = true
   try {
     const signedIconUrl = await createSignedImageUrl(rawIconUrl)
     if (!signedIconUrl || run !== appIconLoadRun || !appRef.value)
@@ -109,6 +114,10 @@ async function loadAppSettingIcon(rawIconUrl: string | null | undefined, run: nu
   }
   catch (error) {
     console.warn('Cannot load signed app setting icon', { appId: props.appId, error })
+  }
+  finally {
+    if (run === appIconLoadRun)
+      isAppIconLoading.value = false
   }
 }
 
@@ -268,7 +277,7 @@ async function submit(form: {
 }
 
 const storeImportUrl = computed(() => appRef.value?.ios_store_url || appRef.value?.android_store_url || '')
-const shouldShowStoreIconImport = computed(() => !appRef.value?.icon_url && !!storeImportUrl.value)
+const shouldShowStoreIconImport = computed(() => !appRef.value?.icon_url && !isAppIconLoading.value && !!storeImportUrl.value)
 
 function normalizeStoreUrl(rawUrl: string, expectedHost: 'apps.apple.com' | 'play.google.com') {
   const trimmedUrl = rawUrl.trim()
@@ -352,6 +361,7 @@ async function uploadIconFromSource(iconSourceUrl: string) {
   }
 
   appRef.value.icon_url = await createSignedImageUrl(iconPath)
+  isAppIconLoading.value = false
 }
 
 async function importIconFromStore() {
@@ -931,8 +941,10 @@ async function editPhoto() {
             return false
           }
 
-          if (appRef.value)
+          if (appRef.value) {
             appRef.value.icon_url = await createSignedImageUrl(iconPath)
+            isAppIconLoading.value = false
+          }
 
           toast.success(t('picture-uploaded'))
         },
@@ -1113,6 +1125,14 @@ async function transferAppOwnership() {
                 v-if="appRef?.icon_url" class="object-cover w-20 h-20 d-mask d-mask-squircle" :src="appRef?.icon_url"
                 width="80" height="80" alt="User upload"
               >
+              <div
+                v-else-if="isAppIconLoading"
+                class="flex items-center justify-center w-20 h-20 bg-gray-700 d-mask d-mask-squircle"
+                :aria-label="t('loading')"
+              >
+                <span class="w-8 h-8 rounded-full border-2 border-blue-400 border-t-transparent animate-spin" />
+                <span class="sr-only">{{ t('loading') }}</span>
+              </div>
               <div v-else class="p-6 text-xl bg-gray-700 d-mask d-mask-squircle">
                 <span class="font-medium text-gray-300">
                   {{ acronym }}

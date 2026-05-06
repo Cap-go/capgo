@@ -24,6 +24,7 @@ export interface PasswordPolicyConfig {
 type RawOrganization = ArrayElement<Database['public']['Functions']['get_orgs_v7']['Returns']>
 export type Organization = Omit<RawOrganization, 'password_policy_config' | 'stats_refresh_requested_at' | 'stats_updated_at'> & {
   logo_storage_path?: string | null
+  logo_is_loading?: boolean
   password_policy_config: PasswordPolicyConfig | null
   stats_refresh_requested_at: string | null
   stats_updated_at: string | null
@@ -232,51 +233,51 @@ export const useOrganizationStore = defineStore('organization', () => {
       onSignedImages(signedImages)
   }
 
-  const loadOrganizationLogos = async (sourceOrganizations: Array<Organization & { id: number }>, run: number) => {
-    const signedLogoEntries = await Promise.all(sourceOrganizations.map(async (org) => {
-      const logoSource = org.logo_storage_path ?? org.logo
-      const { normalized, shouldSign } = resolveImagePath(logoSource)
-      if (!normalized || !shouldSign)
-        return null
-
-      try {
-        const signedLogo = await createSignedImageUrl(normalized)
-        return signedLogo ? [org.gid, { logo: signedLogo, logoStoragePath: normalized }] as const : null
-      }
-      catch (error) {
-        console.warn('Cannot load signed organization logo', { orgId: org.gid, error })
-        return null
-      }
-    }))
-
+  const updateOrganizationLogoState = (orgId: string, patch: Partial<Organization>, run: number) => {
     if (run !== organizationLogoLoadRun)
       return
 
-    const nextOrganizations = new Map(_organizations.value)
-    let updated = false
-    for (const entry of signedLogoEntries) {
-      if (!entry)
-        continue
-
-      const [orgId, logoData] = entry
-      const organization = nextOrganizations.get(orgId)
-      if (!organization || organization.logo === logoData.logo)
-        continue
-
-      nextOrganizations.set(orgId, {
-        ...organization,
-        logo: logoData.logo,
-        logo_storage_path: logoData.logoStoragePath,
-      })
-      updated = true
-    }
-
-    if (!updated)
+    const organization = _organizations.value.get(orgId)
+    if (!organization)
       return
 
+    const nextOrganization = {
+      ...organization,
+      ...patch,
+    }
+    const nextOrganizations = new Map(_organizations.value)
+    nextOrganizations.set(orgId, nextOrganization)
     _organizations.value = nextOrganizations
-    if (currentOrganization.value)
-      currentOrganization.value = nextOrganizations.get(currentOrganization.value.gid)
+
+    if (currentOrganization.value?.gid === orgId)
+      currentOrganization.value = nextOrganization
+  }
+
+  const loadOrganizationLogo = async (org: Organization & { id: number }, run: number) => {
+    const logoSource = org.logo_storage_path ?? org.logo
+    const { normalized, shouldSign } = resolveImagePath(logoSource)
+    if (!normalized || !shouldSign) {
+      updateOrganizationLogoState(org.gid, { logo_is_loading: false }, run)
+      return
+    }
+
+    try {
+      const signedLogo = await createSignedImageUrl(normalized)
+      updateOrganizationLogoState(org.gid, {
+        logo: signedLogo || org.logo,
+        logo_storage_path: normalized,
+        logo_is_loading: false,
+      }, run)
+    }
+    catch (error) {
+      console.warn('Cannot load signed organization logo', { orgId: org.gid, error })
+      updateOrganizationLogoState(org.gid, { logo_is_loading: false }, run)
+    }
+  }
+
+  const loadOrganizationLogos = (sourceOrganizations: Array<Organization & { id: number }>, run: number) => {
+    for (const org of sourceOrganizations)
+      void loadOrganizationLogo(org, run)
   }
 
   watch([currentOrganization, stripeEnabled], async ([currentOrganizationRaw, stripeEnabledValue], [previousOrganization]) => {
@@ -472,12 +473,13 @@ export const useOrganizationStore = defineStore('organization', () => {
 
     const logoLoadRun = ++organizationLogoLoadRun
     const mappedData = data.map((item, id) => {
-      const logoStoragePath = resolveImagePath(item.logo).normalized
+      const { normalized: logoStoragePath, shouldSign: shouldSignLogo } = resolveImagePath(item.logo)
       return {
         id,
         ...item,
         logo: getImmediateImageUrl(item.logo) || null,
         logo_storage_path: logoStoragePath || null,
+        logo_is_loading: shouldSignLogo,
         password_policy_config: item.password_policy_config as PasswordPolicyConfig | null,
       } as Organization & { id: number }
     })
@@ -547,6 +549,7 @@ export const useOrganizationStore = defineStore('organization', () => {
         ...org,
         logo: refreshedLogo,
         logo_storage_path: logoStoragePath || null,
+        logo_is_loading: false,
       })
       updated = true
     }
