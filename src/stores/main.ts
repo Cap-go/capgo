@@ -20,7 +20,7 @@ interface TotalStats {
   mau: number
   storage: number
   bandwidth: number
-  build_time_unit: number
+  build_time_seconds: number
 }
 
 export const useMainStore = defineStore('main', () => {
@@ -32,7 +32,7 @@ export const useMainStore = defineStore('main', () => {
     mau: 0,
     storage: 0,
     bandwidth: 0,
-    build_time_unit: 0,
+    build_time_seconds: 0,
   })
   const bestPlan = ref<string>('')
   const statsTime = ref<{ next_run: string, last_run: string }>({
@@ -76,13 +76,13 @@ export const useMainStore = defineStore('main', () => {
       acc.mau += cur.mau
       acc.bandwidth += cur.bandwidth
       acc.storage += cur.storage
-      acc.build_time_unit += cur.build_time_unit
+      acc.build_time_seconds += cur.build_time_seconds
       return acc
     }, {
       mau: 0,
       bandwidth: 0,
       storage: 0,
-      build_time_unit: 0,
+      build_time_seconds: 0,
     })
   }
 

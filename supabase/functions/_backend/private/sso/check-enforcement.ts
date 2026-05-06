@@ -34,8 +34,10 @@ app.post('/', middlewareAuth, async (c) => {
   // and providers[] (array, cumulative). After an account merge Supabase resets provider='email'
   // while providers[] retains the sso:X entry, so providers[] is the reliable source of truth.
   const provider = claims?.app_metadata?.provider
-  const providers: string[] = Array.isArray(claims?.app_metadata?.providers) ? claims.app_metadata.providers as string[] : []
-  const isSsoProvider = (p: string) => p === 'sso' || p.startsWith('sso:')
+  const providers = Array.isArray(claims?.app_metadata?.providers)
+    ? claims.app_metadata.providers.filter((item): item is string => typeof item === 'string')
+    : []
+  const isSsoProvider = (value: unknown): value is string => typeof value === 'string' && (value === 'sso' || value.startsWith('sso:'))
   const isSsoAuth = isSsoProvider(provider ?? '') || providers.some(isSsoProvider)
 
   // SSO authentication is always allowed

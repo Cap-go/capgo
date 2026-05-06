@@ -19,26 +19,38 @@ function buildAttachmentPath(orgId: string, appId: string, filename: string) {
   }
 }
 
-async function createScopedKey(appId: string, name: string, mode: 'all' | 'upload' = 'upload'): Promise<{ id: number, key: string }> {
-  // Seed the scoped key directly so this suite only validates files behavior.
-  // API key creation behavior is covered in the dedicated apikey suites and can
+async function createSeededApiKey({
+  appId,
+  limitedToApp,
+  mode,
+  name,
+}: {
+  appId: string
+  limitedToApp: boolean
+  mode: 'all' | 'upload'
+  name: string
+}): Promise<{ id: number, key: string }> {
+  // Seed keys directly so this suite only validates files behavior. API key
+  // creation behavior is covered in the dedicated apikey suites and can
   // otherwise introduce unrelated worker-auth flakiness here.
   const plainKey = randomUUID()
+  const keyRow = {
+    user_id: USER_ID,
+    key: plainKey,
+    key_hash: null,
+    mode,
+    name,
+    limited_to_apps: limitedToApp ? [appId] : null,
+  }
+
   const { data: created, error } = await getSupabaseClient()
     .from('apikeys')
-    .insert({
-      user_id: USER_ID,
-      key: plainKey,
-      key_hash: null,
-      mode,
-      name,
-      limited_to_apps: [appId],
-    })
+    .insert(keyRow)
     .select('id, key')
     .single()
 
   if (error || !created) {
-    throw new Error(`Failed to seed upload-scoped key: ${error?.message ?? 'missing key row'}`)
+    throw new Error(`Failed to seed ${mode} API key: ${error?.message ?? 'missing key row'}`)
   }
 
   const key = created.key
@@ -50,12 +62,12 @@ async function createScopedKey(appId: string, name: string, mode: 'all' | 'uploa
   }
 }
 
-async function cleanupSeededOrg(appId: string, orgId: string, stripeCustomerId: string, apikeyIds: number[] = []) {
+async function cleanupSeededOrg(appId: string, orgId: string, stripeCustomerId: string, apikeyIds: Array<number | undefined> = []) {
   const supabase = getSupabaseClient()
+  const seededApikeyIds = apikeyIds.filter((id): id is number => id != null)
 
-  if (apikeyIds.length > 0) {
-    await supabase.from('apikeys').delete().in('id', apikeyIds)
-  }
+  if (seededApikeyIds.length > 0)
+    await supabase.from('apikeys').delete().in('id', seededApikeyIds)
 
   await executeSQL('SELECT public.reset_app_data($1)', [appId])
   await executeSQL('DELETE FROM public.deleted_apps WHERE app_id = $1', [appId])
@@ -82,7 +94,7 @@ describe('attachment upload plan gating regression', () => {
   beforeAll(async () => {
     await seedApp(appId, orgId, stripeCustomerId)
 
-    const createdKey = await createScopedKey(appId, `upload-only-${appId}`)
+    const createdKey = await createSeededApiKey({ appId, limitedToApp: true, mode: 'upload', name: `upload-only-${appId}` })
     uploadKeyId = createdKey.id
     uploadKey = createdKey.key
 
@@ -94,7 +106,7 @@ describe('attachment upload plan gating regression', () => {
   }, 60_000)
 
   afterAll(async () => {
-    await cleanupSeededOrg(appId, orgId, stripeCustomerId, uploadKeyId == null ? [] : [uploadKeyId])
+    await cleanupSeededOrg(appId, orgId, stripeCustomerId, [uploadKeyId])
   }, 60_000)
 
   it('blocks attachment uploads for plan-blocked apps even with upload-scoped API keys', async () => {
@@ -129,25 +141,22 @@ describe('attachment cleanup on app deletion regression', () => {
 
   beforeAll(async () => {
     await seedApp(appId, orgId, stripeCustomerId)
-    const createdKey = await createScopedKey(appId, `upload-cleanup-${appId}`)
-    uploadKeyId = createdKey.id
-    uploadKey = createdKey.key
+    const createdUploadKey = await createSeededApiKey({ appId, limitedToApp: true, mode: 'upload', name: `upload-cleanup-${appId}` })
+    uploadKeyId = createdUploadKey.id
+    uploadKey = createdUploadKey.key
 
-    const createdDeleteKey = await createScopedKey(appId, `delete-cleanup-${appId}`, 'all')
+    const createdDeleteKey = await createSeededApiKey({ appId, limitedToApp: false, mode: 'all', name: `delete-cleanup-${appId}` })
     deleteKeyId = createdDeleteKey.id
     deleteKey = createdDeleteKey.key
   }, 60_000)
 
   afterAll(async () => {
-    await cleanupSeededOrg(
-      appId,
-      orgId,
-      stripeCustomerId,
-      [uploadKeyId, deleteKeyId].filter((id): id is number => id != null),
-    )
+    await cleanupSeededOrg(appId, orgId, stripeCustomerId, [uploadKeyId, deleteKeyId])
   }, 60_000)
 
   it('returns not_found for uploaded attachments after the app is deleted', async () => {
+    await seedApp(appId, orgId, stripeCustomerId)
+
     const body = new TextEncoder().encode('delete-me-after-app-delete')
     const { filePath, uploadMetadata } = buildAttachmentPath(orgId, appId, `orphan-check-${randomUUID()}.txt`)
 

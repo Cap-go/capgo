@@ -222,6 +222,44 @@ describe('[POST] /private/sso/check-enforcement', () => {
     const data = await response.json() as { allowed: boolean }
     expect(data.allowed).toBe(true)
   })
+
+  it.concurrent('should ignore malformed provider entries in JWT app metadata', async () => {
+    const email = `${randomUUID()}@no-sso-enforcement-domain.com`
+    const password = 'testtest'
+
+    const { data: createdUser, error: createUserError } = await getSupabaseClient().auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      app_metadata: {
+        provider: 'email',
+        providers: [{}],
+      } as any,
+    })
+    if (createUserError || !createdUser.user) {
+      throw createUserError ?? new Error('Failed to create dedicated malformed provider auth user')
+    }
+
+    try {
+      const isolatedAuthHeaders = await getAuthHeadersForCredentials(email, password)
+
+      const response = await fetchWithRetry(getEndpointUrl('/private/sso/check-enforcement'), {
+        method: 'POST',
+        headers: isolatedAuthHeaders,
+        body: JSON.stringify({
+          email: 'ignored@example.com',
+          auth_type: 'password',
+        }),
+      })
+
+      expect(response.status).toBe(200)
+      const data = await response.json() as { allowed: boolean }
+      expect(data.allowed).toBe(true)
+    }
+    finally {
+      await getSupabaseClient().auth.admin.deleteUser(createdUser.user.id)
+    }
+  })
 })
 
 describe('[GET] /private/sso/sp-metadata', () => {

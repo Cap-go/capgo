@@ -31,6 +31,7 @@ import {
   AsyncLock,
   BUFFER_SIZE,
   buildFileHttpMetadata,
+  encodeR2KeyForUploadLocation,
   EXPOSED_HEADERS,
   generateParts,
   isRetryableDurableObjectResetError,
@@ -361,7 +362,7 @@ export class UploadHandler extends DurableObject {
     await this.ctx.storage.put(UPLOAD_OFFSET_KEY, 0)
     await this.ctx.storage.put(UPLOAD_INFO_KEY, uploadInfo)
 
-    const uploadLocation = new URL(r2Key, c.req.url.endsWith('/') ? c.req.url : `${c.req.url}/`)
+    const uploadLocation = new URL(encodeR2KeyForUploadLocation(r2Key), c.req.url.endsWith('/') ? c.req.url : `${c.req.url}/`)
 
     const uploadOffset = hasContent
       ? await this.appendBody(c, r2Key, c.req.raw.body as ReadableStream<Uint8Array>, 0, uploadInfo)
