@@ -244,13 +244,18 @@ export async function tusProxy(
   })
 
   // Forward the request
-  const builderResponse = await fetch(builderTusUrl, {
+  const forwardInit: RequestInit = {
     method: forwardMethod,
     headers,
-    body: c.req.raw.body,
+  }
+
+  if (forwardMethod !== 'HEAD' && forwardMethod !== 'GET') {
+    forwardInit.body = c.req.raw.body
     // @ts-expect-error - duplex is valid for streaming
-    duplex: 'half',
-  })
+    forwardInit.duplex = 'half'
+  }
+
+  const builderResponse = await fetch(builderTusUrl, forwardInit)
 
   cloudlog({
     requestId: c.get('requestId'),
