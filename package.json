@@ -81,6 +81,7 @@
     "test:cloudflare:plugin": "USE_CLOUDFLARE_WORKERS=true vitest run tests/updates*.test.ts tests/stats*.test.ts tests/channel_self*.test.ts --config vitest.config.cloudflare-plugin.ts",
     "test:cloudflare:api": "vitest run --exclude=tests/cli* --exclude=tests/updates* --exclude=tests/stats* --exclude=tests/channel_self* --config vitest.config.cloudflare.ts",
     "test:cloudflare:updates": "vitest run tests/updates* --config vitest.config.cloudflare.ts",
+    "admin:backfill-plugin-version-ladder": "bun scripts/backfill_plugin_version_ladder.ts",
     "stripe:backfill-retention-metrics": "bun scripts/backfill_retention_metrics.ts",
     "stripe:backfill-org-conversion-rate": "bun scripts/backfill_org_conversion_rate_trend.ts",
     "stripe:backfill-customer-countries": "bun scripts/backfill_stripe_customer_countries.ts",
