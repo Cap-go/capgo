@@ -27,6 +27,22 @@ const manualUrl = ref('')
 
 let downloadListener: Awaited<ReturnType<typeof CapacitorUpdater.addListener>> | null = null
 
+function isValidUrl(value: string) {
+  if (!value)
+    return false
+
+  if (typeof URL.canParse === 'function')
+    return URL.canParse(value)
+
+  try {
+    const parsedUrl = new URL(value)
+    return !!parsedUrl.href
+  }
+  catch {
+    return false
+  }
+}
+
 const isFallbackMode = computed(() => !isNativePlatform || !!errorMessage.value)
 const progressPercentage = computed(() => Math.round(downloadProgress.value))
 const normalizedManualUrl = computed(() => {
@@ -36,7 +52,7 @@ const normalizedManualUrl = computed(() => {
 
   return /^https?:\/\//i.test(value) ? value : `https://${value}`
 })
-const canSubmitManualUrl = computed(() => !isLoading.value && URL.canParse(normalizedManualUrl.value))
+const canSubmitManualUrl = computed(() => !isLoading.value && isValidUrl(normalizedManualUrl.value))
 const manualActionLabel = computed(() => (isNativePlatform ? 'Download update' : 'Open update URL'))
 const scannerStatusLabel = computed(() => {
   if (isLoading.value)
@@ -48,7 +64,7 @@ const scannerStatusLabel = computed(() => {
   return 'Ready'
 })
 const downloadHost = computed(() => {
-  if (!scannedUrl.value || !URL.canParse(scannedUrl.value))
+  if (!scannedUrl.value || !isValidUrl(scannedUrl.value))
     return ''
 
   return new URL(scannedUrl.value).host
@@ -106,7 +122,7 @@ async function startScanner() {
 }
 
 async function handleBarcodeScan(scannedValue: string) {
-  if (!URL.canParse(scannedValue)) {
+  if (!isValidUrl(scannedValue)) {
     errorMessage.value = 'The scanned QR code does not contain a valid update URL.'
     toast.error('Scanned QR code is not a valid URL')
     return
