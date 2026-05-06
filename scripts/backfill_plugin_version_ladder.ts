@@ -146,7 +146,7 @@ function parseJsonString(value: string) {
   }
 }
 
-function parseBreakdown(value: Json | null): Record<string, number> {
+export function parseBreakdown(value: Json | null): Record<string, number> {
   if (!value)
     return {}
 
@@ -162,7 +162,7 @@ function parseBreakdown(value: Json | null): Record<string, number> {
   }, {})
 }
 
-function parseLadder(value: Json | null): PluginVersionLadderEntry[] {
+export function parseLadder(value: Json | null): PluginVersionLadderEntry[] {
   if (!value)
     return []
 
@@ -222,14 +222,14 @@ function normalizeLadderForCompare(ladder: PluginVersionLadderEntry[]) {
   })))
 }
 
-function applyStoredPercents(ladder: PluginVersionLadderEntry[], storedBreakdown: Record<string, number>) {
+export function applyStoredPercents(ladder: PluginVersionLadderEntry[], storedBreakdown: Record<string, number>) {
   return ladder.map(entry => ({
     ...entry,
     percent: Number(storedBreakdown[entry.version]) || entry.percent,
   }))
 }
 
-function buildPluginBreakdownResult(result: PluginBreakdownRow[]): PluginBreakdownResult {
+export function buildPluginBreakdownResult(result: PluginBreakdownRow[]): PluginBreakdownResult {
   const emptyResult: PluginBreakdownResult = { version_breakdown: {}, major_breakdown: {}, version_ladder: [] }
   if (result.length === 0)
     return emptyResult
