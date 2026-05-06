@@ -137,7 +137,7 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
 
   // Don't update device record on failure actions - the version_name in the request
   // is the failed version, not the actual running version on the device
-  await backgroundTask(c, createStatsMau(c, device.device_id, app_id, appOwner.owner_org, device.platform))
+  await backgroundTask(c, createStatsMau(c, device.device_id, app_id, appOwner.owner_org, device.platform, device.version_build))
   await sendStatsAndDevice(c, device, statsActions, action.endsWith('_fail'))
   return { success: true }
 }

@@ -2,7 +2,7 @@ import type { AnalyticsEngineDataPoint, D1Database, Hyperdrive } from '@cloudfla
 import type { Context } from 'hono'
 import type { DeviceComparable } from './deviceComparison.ts'
 import type { Database } from './supabase.types.ts'
-import type { DeviceRes, DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams, VersionUsage } from './types.ts'
+import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevicesParams, ReadStatsParams, VersionUsage } from './types.ts'
 import dayjs from 'dayjs'
 import { CacheHelper } from './cache.ts'
 import { hasComparableDeviceChanged, toComparableDevice } from './deviceComparison.ts'
@@ -79,7 +79,7 @@ const TRACK_DEVICE_USAGE_CACHE_MAX_AGE_SECONDS = 2 * 24 * 60 * 60
  * @param org_id - Organization identifier (optional, defaults to empty string)
  * @param platform - Device platform ('ios' or 'android')
  */
-export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: string, org_id: string, platform: string) {
+export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: string, org_id: string, platform: string, version_build?: string | null) {
   if (!c.env.DEVICE_USAGE)
     return
 
@@ -89,13 +89,14 @@ export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: 
       app_id,
       device_id,
       day: dayjs().format('YYYY-MM-DD'),
+      version_build: version_build || 'unknown',
     })
 
-    // Check if device was already tracked within the cache period (29 days)
+    // Check if device/version was already tracked for the current day
     if (usageCache.available) {
       const cachedUsage = await usageCache.matchJson<{ t: number }>(usageCacheRequest)
       if (cachedUsage) {
-        // Device already tracked within 29 days, skip write
+        // Device/version already tracked for this day, skip write
         return
       }
     }
@@ -105,12 +106,12 @@ export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: 
 
     // Write to Analytics Engine
     c.env.DEVICE_USAGE.writeDataPoint({
-      blobs: [device_id, org_id],
+      blobs: [device_id, org_id, version_build || 'unknown'],
       doubles: [platformValue],
       indexes: [app_id],
     })
 
-    // Cache the write for 29 days
+    // Cache the write for this native version during the current day
     if (usageCache.available) {
       await usageCache.putJson(usageCacheRequest, { t: Date.now() }, TRACK_DEVICE_USAGE_CACHE_MAX_AGE_SECONDS)
     }
@@ -120,7 +121,7 @@ export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: 
     const platformValue = platform?.toLowerCase() === 'ios' ? 1 : 0
     // On error, still try to write to Analytics Engine without caching
     c.env.DEVICE_USAGE.writeDataPoint({
-      blobs: [device_id, org_id],
+      blobs: [device_id, org_id, version_build || 'unknown'],
       doubles: [platformValue],
       indexes: [app_id],
     })
@@ -507,6 +508,32 @@ ORDER BY date`
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading version usage', error: serializeError(e), query })
+  }
+  return []
+}
+
+export async function readNativeVersionUsageCF(c: Context, app_id: string, period_start: string, period_end: string): Promise<NativeVersionUsage[]> {
+  if (!c.env.DEVICE_USAGE)
+    return []
+
+  const query = `SELECT
+  formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
+  if(blob3 = '', 'unknown', blob3) AS version_build,
+  COUNT(DISTINCT blob1) AS devices
+FROM device_usage
+WHERE
+  index1 = '${escapeSqlString(app_id)}'
+  AND timestamp >= toDateTime('${formatDateCF(period_start)}')
+  AND timestamp < toDateTime('${formatDateCF(period_end)}')
+GROUP BY date, version_build
+ORDER BY date`
+
+  cloudlog({ requestId: c.get('requestId'), message: 'readNativeVersionUsageCF query', query })
+  try {
+    return await runQueryToCFA<NativeVersionUsage>(c, query)
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading native version usage', error: serializeError(e), query })
   }
   return []
 }
