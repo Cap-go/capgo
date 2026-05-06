@@ -45,7 +45,7 @@ async function updateChannel(
   if (!version) {
     const { data, error } = await getSupabaseClient()
       .from('channels')
-      .select('version(name)')
+      .select('version:app_versions!channels_version_fkey(name)')
       .eq('app_id', APP_NAME_UPDATE)
       .eq('name', channel)
       .single()

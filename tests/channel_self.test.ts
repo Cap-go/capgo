@@ -1110,7 +1110,7 @@ it('saves default_channel when provided', async () => {
   await getSupabaseClient().from('devices').delete().eq('device_id', uuid).eq('app_id', APPNAME)
 })
 
-describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () => {
+describe('[POST] /channel_self - new plugin version:app_versions!channels_version_fkey(>= 7.34.0) behavior', () => {
   it('should validate and return success without storing in channel_devices for new plugin versions', async () => {
     const data = getUniqueBaseData(APPNAME)
     data.plugin_version = '7.34.0' // New version
@@ -1187,7 +1187,7 @@ describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () =>
       .eq('app_id', APPNAME)
 
     try {
-      // First, set channel with old version (stores in channel_devices)
+      // First, set channel with old version:app_versions!channels_version_fkey(stores in channel_devices)
       data.plugin_version = '7.33.0'
       data.channel = 'beta' // Use non-default channel
 
@@ -1204,7 +1204,7 @@ describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () =>
 
       expect(oldChannelDevice).toBeTruthy()
 
-      // Then, set channel with new version (should clean up old entry)
+      // Then, set channel with new version:app_versions!channels_version_fkey(should clean up old entry)
       data.plugin_version = '7.34.0'
       data.channel = 'development'
 
@@ -1242,7 +1242,7 @@ describe('[POST] /channel_self - new plugin version (>= 7.34.0) behavior', () =>
   })
 })
 
-describe('[PUT] /channel_self - new plugin version (>= 7.34.0) behavior', () => {
+describe('[PUT] /channel_self - new plugin version:app_versions!channels_version_fkey(>= 7.34.0) behavior', () => {
   it('should return channel from request body for new plugin versions', async () => {
     const data = getUniqueBaseData(APPNAME)
     data.plugin_version = '7.34.0'
@@ -1273,7 +1273,7 @@ describe('[PUT] /channel_self - new plugin version (>= 7.34.0) behavior', () => 
   })
 })
 
-describe('[DELETE] /channel_self - new plugin version (>= 7.34.0) behavior', () => {
+describe('[DELETE] /channel_self - new plugin version:app_versions!channels_version_fkey(>= 7.34.0) behavior', () => {
   it('should return success and clean up old channel_devices entries for new plugin versions', async () => {
     const deviceId = randomUUID()
     const data = getUniqueBaseData(APPNAME)

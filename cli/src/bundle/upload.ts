@@ -137,7 +137,7 @@ async function verifyCompatibility(supabase: SupabaseType, pm: pmType, options: 
 
   const { data: channelData, error: channelError } = await supabase
     .from('channels')
-    .select('disable_auto_update, version ( min_update_version, native_packages )')
+    .select('disable_auto_update, version:app_versions!channels_version_fkey( min_update_version, native_packages )')
     .eq('name', channel)
     .eq('app_id', appid)
     .maybeSingle()
@@ -616,7 +616,7 @@ type LinkedChannelVersion = {
 async function getLinkedBundleOnChannel(supabase: SupabaseType, appid: string, channel: string): Promise<LinkedChannelVersion> {
   const { data, error } = await supabase
     .from('channels')
-    .select('version ( id, name, deleted )')
+    .select('version:app_versions!channels_version_fkey( id, name, deleted )')
     .eq('app_id', appid)
     .eq('name', channel)
 

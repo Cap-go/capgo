@@ -334,8 +334,8 @@ export async function startMcpServer(): Promise<void> {
   server.tool(
     'capgo_update_channel',
     'Update channel settings including linked bundle and targeting options',
-    updateChannelOptionsSchema.pick({ appId: true, channelId: true, bundle: true, state: true, downgrade: true, ios: true, android: true, selfAssign: true, disableAutoUpdate: true, dev: true, emulator: true, device: true, prod: true }).shape,
-    async ({ appId, channelId, bundle, state, downgrade, ios, android, selfAssign, disableAutoUpdate, dev, emulator, device, prod }) => {
+    updateChannelOptionsSchema.pick({ appId: true, channelId: true, bundle: true, state: true, downgrade: true, ios: true, android: true, selfAssign: true, disableAutoUpdate: true, dev: true, emulator: true, device: true, prod: true, rolloutBundle: true, rolloutPercentage: true, rolloutPercentageBps: true, rolloutEnable: true, rolloutDisable: true, rolloutPause: true, rolloutResume: true, rolloutRollback: true, rolloutPromote: true, rolloutCacheTtlSeconds: true, autoPauseEnabled: true, autoPauseDisabled: true, autoPauseWindowMinutes: true, autoPauseFailureRateBps: true, autoPauseConfidence: true, autoPauseMinAttempts: true, autoPauseMinFailures: true, autoPauseAction: true, autoPauseCooldownMinutes: true }).shape,
+    async ({ appId, channelId, bundle, state, downgrade, ios, android, selfAssign, disableAutoUpdate, dev, emulator, device, prod, rolloutBundle, rolloutPercentage, rolloutPercentageBps, rolloutEnable, rolloutDisable, rolloutPause, rolloutResume, rolloutRollback, rolloutPromote, rolloutCacheTtlSeconds, autoPauseEnabled, autoPauseDisabled, autoPauseWindowMinutes, autoPauseFailureRateBps, autoPauseConfidence, autoPauseMinAttempts, autoPauseMinFailures, autoPauseAction, autoPauseCooldownMinutes }) => {
       const result = await sdk.updateChannel({
         appId,
         channelId,
@@ -350,6 +350,25 @@ export async function startMcpServer(): Promise<void> {
         emulator,
         device,
         prod,
+        rolloutBundle,
+        rolloutPercentage,
+        rolloutPercentageBps,
+        rolloutEnable,
+        rolloutDisable,
+        rolloutPause,
+        rolloutResume,
+        rolloutRollback,
+        rolloutPromote,
+        rolloutCacheTtlSeconds,
+        autoPauseEnabled,
+        autoPauseDisabled,
+        autoPauseWindowMinutes,
+        autoPauseFailureRateBps,
+        autoPauseConfidence,
+        autoPauseMinAttempts,
+        autoPauseMinFailures,
+        autoPauseAction,
+        autoPauseCooldownMinutes,
       })
       if (!result.success) {
         return formatMcpError(result)

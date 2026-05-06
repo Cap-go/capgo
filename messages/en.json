@@ -1890,5 +1890,19 @@
   "restore-account": "Restore account",
   "restoring-account": "Restoring account...",
   "translation-not-ready": "Translation is being prepared. Try again in a bit.",
-  "translation-unavailable": "This language is not available right now."
+  "translation-unavailable": "This language is not available right now.",
+  "progressive-rollout": "Progressive rollout",
+  "set-rollout-target": "Set target",
+  "rollout-percentage": "Rollout percentage",
+  "rollout-target-linked": "Rollout target linked",
+  "invalid-rollout-percentage": "Rollout percentage must be between 0 and 100",
+  "manual-rollout-pause": "Paused manually",
+  "not-configured": "Not configured",
+  "pause": "Pause",
+  "resume": "Resume",
+  "promote": "Promote",
+  "notify": "Notify",
+  "auto-pause": "Auto-pause",
+  "failure-rate-bps": "Failure bps",
+  "current-rollout-target": "Current rollout target"
 }
