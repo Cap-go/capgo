@@ -146,7 +146,10 @@ function parseJsonString(value: string) {
   }
 }
 
-function parseBreakdown(value: Json | null): Record<string, number> {
+/**
+ * Normalizes the stored plugin version percentage object from global_stats.
+ */
+export function parseBreakdown(value: Json | null): Record<string, number> {
   if (!value)
     return {}
 
@@ -162,7 +165,10 @@ function parseBreakdown(value: Json | null): Record<string, number> {
   }, {})
 }
 
-function parseLadder(value: Json | null): PluginVersionLadderEntry[] {
+/**
+ * Normalizes stored ladder JSON so existing rows can be compared safely.
+ */
+export function parseLadder(value: Json | null): PluginVersionLadderEntry[] {
   if (!value)
     return []
 
@@ -222,14 +228,20 @@ function normalizeLadderForCompare(ladder: PluginVersionLadderEntry[]) {
   })))
 }
 
-function applyStoredPercents(ladder: PluginVersionLadderEntry[], storedBreakdown: Record<string, number>) {
+/**
+ * Reuses stored chart percentages so ladder and chart snapshots stay aligned.
+ */
+export function applyStoredPercents(ladder: PluginVersionLadderEntry[], storedBreakdown: Record<string, number>) {
   return ladder.map(entry => ({
     ...entry,
     percent: Number(storedBreakdown[entry.version]) || entry.percent,
   }))
 }
 
-function buildPluginBreakdownResult(result: PluginBreakdownRow[]): PluginBreakdownResult {
+/**
+ * Aggregates Analytics Engine rows into chart breakdowns and top-app ladder entries.
+ */
+export function buildPluginBreakdownResult(result: PluginBreakdownRow[]): PluginBreakdownResult {
   const emptyResult: PluginBreakdownResult = { version_breakdown: {}, major_breakdown: {}, version_ladder: [] }
   if (result.length === 0)
     return emptyResult
