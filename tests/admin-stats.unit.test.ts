@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { adminStatsBodySchema, MAX_ADMIN_STATS_LIMIT, MAX_ADMIN_STATS_OFFSET } from '../supabase/functions/_backend/private/admin_stats.ts'
 import { safeParseSchema } from '../supabase/functions/_backend/utils/ark_validation.ts'
 import { normalizeAnalyticsLimit } from '../supabase/functions/_backend/utils/cloudflare.ts'
+import { buildAdminPluginVersionLadder } from '../supabase/functions/_backend/utils/pg.ts'
 
 describe('admin stats validation', () => {
   const baseBody = {
@@ -73,5 +74,40 @@ describe('normalizeAnalyticsLimit', () => {
     ['oversized', 99_999_999, 50_000],
   ])('normalizes %s', (_label, input, expected) => {
     expect(normalizeAnalyticsLimit(input, 100)).toBe(expected)
+  })
+})
+
+describe('buildAdminPluginVersionLadder', () => {
+  it.concurrent('normalizes top plugin versions with top app IDs', () => {
+    const result = buildAdminPluginVersionLadder([
+      {
+        plugin_version: '8.1.0',
+        device_count: '12',
+        top_apps: JSON.stringify([
+          { app_id: 'com.capgo.first', device_count: '8', share: '66.67' },
+          { app_id: 'com.capgo.second', device_count: 4, share: 33.33 },
+          { app_id: '', device_count: 1, share: 8.33 },
+        ]),
+      },
+      {
+        plugin_version: '',
+        device_count: 10,
+        top_apps: [],
+      },
+    ], {
+      '8.1.0': 42.5,
+    })
+
+    expect(result).toEqual([
+      {
+        version: '8.1.0',
+        device_count: 12,
+        percent: 42.5,
+        top_apps: [
+          { app_id: 'com.capgo.first', device_count: 8, share: 66.67 },
+          { app_id: 'com.capgo.second', device_count: 4, share: 33.33 },
+        ],
+      },
+    ])
   })
 })

@@ -1550,11 +1550,31 @@ export interface AdminPluginBreakdown {
   devices_last_month_android: number
   version_breakdown: Record<string, number>
   major_breakdown: Record<string, number>
+  version_ladder: AdminPluginVersionLadderEntry[]
   trend: Array<{
     date: string
     version_breakdown: Record<string, number>
     major_breakdown: Record<string, number>
   }>
+}
+
+export interface AdminPluginVersionTopApp {
+  app_id: string
+  device_count: number
+  share: number
+}
+
+export interface AdminPluginVersionLadderEntry {
+  version: string
+  device_count: number
+  percent: number
+  top_apps: AdminPluginVersionTopApp[]
+}
+
+export interface AdminPluginVersionLadderRow {
+  plugin_version: unknown
+  device_count: unknown
+  top_apps: unknown
 }
 
 function parseBreakdownJson(value: unknown): Record<string, number> {
@@ -1571,6 +1591,58 @@ function parseBreakdownJson(value: unknown): Record<string, number> {
   if (typeof value === 'object')
     return value as Record<string, number>
   return {}
+}
+
+function parsePluginTopApps(value: unknown): AdminPluginVersionTopApp[] {
+  if (!value)
+    return []
+
+  let rawValue: unknown = value
+  if (typeof value === 'string') {
+    try {
+      rawValue = JSON.parse(value) as unknown
+    }
+    catch {
+      return []
+    }
+  }
+
+  if (!Array.isArray(rawValue))
+    return []
+
+  return rawValue
+    .map((item) => {
+      const app = item as Record<string, unknown>
+      const appId = typeof app.app_id === 'string' ? app.app_id : ''
+      const deviceCount = Number(app.device_count) || 0
+      const share = Number(app.share) || 0
+
+      return {
+        app_id: appId,
+        device_count: deviceCount,
+        share,
+      }
+    })
+    .filter(app => app.app_id.length > 0 && app.device_count > 0)
+}
+
+export function buildAdminPluginVersionLadder(
+  rows: AdminPluginVersionLadderRow[],
+  versionBreakdown: Record<string, number>,
+): AdminPluginVersionLadderEntry[] {
+  return rows
+    .map((row) => {
+      const version = typeof row.plugin_version === 'string' ? row.plugin_version : ''
+      const deviceCount = Number(row.device_count) || 0
+
+      return {
+        version,
+        device_count: deviceCount,
+        percent: Number(versionBreakdown[version]) || 0,
+        top_apps: parsePluginTopApps(row.top_apps),
+      }
+    })
+    .filter(entry => entry.version.length > 0 && entry.device_count > 0)
 }
 
 function normalizeTimestamp(value: unknown): string | null {
@@ -2022,6 +2094,85 @@ export async function getAdminOnboardingFunnel(
   }
 }
 
+async function fetchAdminPluginVersionLadder(
+  c: Context,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  snapshotDate: string,
+  versionBreakdown: Record<string, number>,
+): Promise<AdminPluginVersionLadderEntry[]> {
+  try {
+    const query = sql`
+      WITH per_app AS (
+        SELECT
+          d.plugin_version,
+          d.app_id,
+          COUNT(*)::int AS device_count
+        FROM devices d
+        WHERE d.plugin_version != ''
+          AND d.updated_at >= (${snapshotDate}::date - INTERVAL '30 days')
+          AND d.updated_at < (${snapshotDate}::date + INTERVAL '1 day')
+        GROUP BY d.plugin_version, d.app_id
+      ),
+      version_totals AS (
+        SELECT
+          plugin_version,
+          SUM(device_count)::int AS device_count
+        FROM per_app
+        GROUP BY plugin_version
+      ),
+      top_versions AS (
+        SELECT
+          plugin_version,
+          device_count,
+          ROW_NUMBER() OVER (ORDER BY device_count DESC, plugin_version ASC) AS version_rank
+        FROM version_totals
+      ),
+      ranked_apps AS (
+        SELECT
+          per_app.plugin_version,
+          per_app.app_id,
+          per_app.device_count,
+          ROUND((per_app.device_count::numeric / NULLIF(top_versions.device_count, 0)) * 100, 2)::float AS share,
+          ROW_NUMBER() OVER (
+            PARTITION BY per_app.plugin_version
+            ORDER BY per_app.device_count DESC, per_app.app_id ASC
+          ) AS app_rank
+        FROM per_app
+        INNER JOIN top_versions
+          ON top_versions.plugin_version = per_app.plugin_version
+        WHERE top_versions.version_rank <= 20
+      )
+      SELECT
+        top_versions.plugin_version,
+        top_versions.device_count,
+        COALESCE(
+          jsonb_agg(
+            jsonb_build_object(
+              'app_id', ranked_apps.app_id,
+              'device_count', ranked_apps.device_count,
+              'share', ranked_apps.share
+            )
+            ORDER BY ranked_apps.app_rank
+          ) FILTER (WHERE ranked_apps.app_rank <= 3),
+          '[]'::jsonb
+        ) AS top_apps
+      FROM top_versions
+      LEFT JOIN ranked_apps
+        ON ranked_apps.plugin_version = top_versions.plugin_version
+      WHERE top_versions.version_rank <= 20
+      GROUP BY top_versions.plugin_version, top_versions.device_count, top_versions.version_rank
+      ORDER BY top_versions.version_rank ASC
+    `
+
+    const result = await drizzleClient.execute(query)
+    return buildAdminPluginVersionLadder(result.rows as unknown as AdminPluginVersionLadderRow[], versionBreakdown)
+  }
+  catch (e: unknown) {
+    logPgError(c, 'fetchAdminPluginVersionLadder', e)
+    return []
+  }
+}
+
 export async function getAdminPluginBreakdown(
   c: Context,
   start_date: string,
@@ -2059,6 +2210,7 @@ export async function getAdminPluginBreakdown(
         devices_last_month_android: 0,
         version_breakdown: {},
         major_breakdown: {},
+        version_ladder: [],
         trend: [],
       }
     }
@@ -2073,14 +2225,18 @@ export async function getAdminPluginBreakdown(
     })
     const latestRow = rows[rows.length - 1]
     const latestDate = latestRow.date instanceof Date ? latestRow.date.toISOString().split('T')[0] : String(latestRow.date)
+    const versionBreakdown = parseBreakdownJson(latestRow.plugin_version_breakdown)
+    const majorBreakdown = parseBreakdownJson(latestRow.plugin_major_breakdown)
+    const versionLadder = await fetchAdminPluginVersionLadder(c, drizzleClient, latestDate, versionBreakdown)
 
     return {
       date: latestDate,
       devices_last_month: Number(latestRow.devices_last_month) || 0,
       devices_last_month_ios: Number(latestRow.devices_last_month_ios) || 0,
       devices_last_month_android: Number(latestRow.devices_last_month_android) || 0,
-      version_breakdown: parseBreakdownJson(latestRow.plugin_version_breakdown),
-      major_breakdown: parseBreakdownJson(latestRow.plugin_major_breakdown),
+      version_breakdown: versionBreakdown,
+      major_breakdown: majorBreakdown,
+      version_ladder: versionLadder,
       trend,
     }
   }
@@ -2093,6 +2249,7 @@ export async function getAdminPluginBreakdown(
       devices_last_month_android: 0,
       version_breakdown: {},
       major_breakdown: {},
+      version_ladder: [],
       trend: [],
     }
   }
