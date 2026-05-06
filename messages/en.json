@@ -128,6 +128,7 @@
   "activation-notification-desc": "I accept to receive notifications when new app versions are available",
   "active-bundle": "Active Bundle",
   "active_users_by_version": "Active bundle",
+  "active_users_by_native_version": "Native build",
   "add-an-app-to-get-started": "Add an app to get started",
   "add-another-app": "Add your app",
   "add-another-bundle": "Add new bundle",

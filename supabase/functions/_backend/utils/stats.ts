@@ -1,24 +1,24 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
-import type { DeviceRes, DeviceWithoutCreatedAt, ReadDevicesParams, ReadDevicesResponse, ReadStatsParams, StatsActions, VersionUsage } from './types.ts'
+import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevicesParams, ReadDevicesResponse, ReadStatsParams, StatsActions, VersionUsage } from './types.ts'
 import { getRuntimeKey } from 'hono/adapter'
-import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readDeviceVersionCountsCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
+import { countDevicesCF, countUpdatesFromLogsCF, countUpdatesFromLogsExternalCF, createIfNotExistStoreInfo, getAppsFromCF, getUpdateStatsCF, readBandwidthUsageCF, readDevicesCF, readDeviceUsageCF, readDeviceVersionCountsCF, readNativeVersionUsageCF, readStatsCF, readStatsVersionCF, trackBandwidthUsageCF, trackDevicesCF, trackDeviceUsageCF, trackLogsCF, trackLogsCFExternal, trackVersionUsageCF, updateStoreApp } from './cloudflare.ts'
 import { isDemoApp } from './demo.ts'
 import { simpleError200 } from './hono.ts'
 import { cloudlog } from './logging.ts'
-import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readDeviceVersionCountsSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
+import { countDevicesSB, getAppsFromSB, getUpdateStatsSB, readBandwidthUsageSB, readDevicesSB, readDeviceUsageSB, readDeviceVersionCountsSB, readNativeVersionUsageSB, readStatsSB, readStatsStorageSB, readStatsVersionSB, supabaseWithAuth, trackBandwidthUsageSB, trackDevicesSB, trackDeviceUsageSB, trackLogsSB, trackMetaSB, trackVersionUsageSB } from './supabase.ts'
 import { DEFAULT_LIMIT } from './types.ts'
 import { backgroundTask, getEnv, isInternalVersionName } from './utils.ts'
 
-export function createStatsMau(c: Context, device_id: string, app_id: string, org_id: string, platform: string): Promise<void> {
+export function createStatsMau(c: Context, device_id: string, app_id: string, org_id: string, platform: string, version_build?: string | null): Promise<void> {
   const lowerDeviceId = device_id
   const jobs: Promise<unknown>[] = []
   if (!c.env.DEVICE_USAGE) {
-    jobs.push(Promise.resolve(trackDeviceUsageSB(c, lowerDeviceId, app_id, org_id)))
+    jobs.push(Promise.resolve(trackDeviceUsageSB(c, lowerDeviceId, app_id, org_id, version_build)))
   }
   else {
-    jobs.push(Promise.resolve(trackDeviceUsageCF(c, lowerDeviceId, app_id, org_id, platform)))
+    jobs.push(Promise.resolve(trackDeviceUsageCF(c, lowerDeviceId, app_id, org_id, platform, version_build)))
   }
   return Promise.all(jobs).then(() => undefined)
 }
@@ -135,6 +135,12 @@ export function readStatsVersion(c: Context, app_id: string, start_date: string,
   if (!c.env.VERSION_USAGE)
     return readStatsVersionSB(c, app_id, start_date, end_date)
   return readStatsVersionCF(c, app_id, start_date, end_date)
+}
+
+export function readNativeVersionUsage(c: Context, app_id: string, start_date: string, end_date: string): Promise<NativeVersionUsage[]> {
+  if (!c.env.DEVICE_USAGE)
+    return readNativeVersionUsageSB(c, app_id, start_date, end_date)
+  return readNativeVersionUsageCF(c, app_id, start_date, end_date)
 }
 
 function shouldUseAnalyticsEngine(c: Context): boolean {
