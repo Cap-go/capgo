@@ -153,14 +153,14 @@ export function normalizeTranslationStrings(strings: unknown) {
       continue
     if (normalized.length > 800)
       continue
-    if (unique.has(normalized))
+    if (unique.has(entry))
       continue
     if (filtered.length >= MAX_STRINGS)
       break
     if (totalCharacters + entry.length > MAX_TOTAL_CHARACTERS)
       break
 
-    unique.add(normalized)
+    unique.add(entry)
     filtered.push(entry)
     totalCharacters += entry.length
   }
@@ -823,10 +823,11 @@ app.post('/page', async (c) => {
   })
 
   const cached = await cacheHelper.matchJson<TranslationResponsePayload>(cacheRequest)
-  c.header('Cache-Control', `public, max-age=0, s-maxage=${CACHE_TTL_SECONDS}`)
 
-  if (cached)
+  if (cached) {
+    c.header('Cache-Control', `public, max-age=0, s-maxage=${CACHE_TTL_SECONDS}`)
     return c.json(cached)
+  }
 
   const rateLimitStatus = recordTranslationRequest(c)
   if (rateLimitStatus.limited) {
@@ -861,6 +862,7 @@ app.post('/page', async (c) => {
   }
 
   await cacheHelper.putJson(cacheRequest, payload, CACHE_TTL_SECONDS)
+  c.header('Cache-Control', `public, max-age=0, s-maxage=${CACHE_TTL_SECONDS}`)
 
   return c.json(payload)
 })
@@ -891,10 +893,11 @@ app.post('/messages', async (c) => {
   })
 
   const cached = await cacheHelper.matchJson<TranslationMessagesResponsePayload>(cacheRequest)
-  c.header('Cache-Control', `public, max-age=0, s-maxage=${CACHE_TTL_SECONDS}`)
 
-  if (cached)
+  if (cached) {
+    c.header('Cache-Control', `public, max-age=0, s-maxage=${CACHE_TTL_SECONDS}`)
     return c.json(cached)
+  }
 
   const rateLimitStatus = recordTranslationRequest(c)
   if (rateLimitStatus.limited) {
@@ -927,6 +930,7 @@ app.post('/messages', async (c) => {
   }
 
   await cacheHelper.putJson(cacheRequest, payload, CACHE_TTL_SECONDS)
+  c.header('Cache-Control', `public, max-age=0, s-maxage=${CACHE_TTL_SECONDS}`)
 
   return c.json(payload)
 })

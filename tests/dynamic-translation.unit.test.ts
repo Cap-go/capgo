@@ -136,7 +136,7 @@ describe('dynamic translation language selection', () => {
 })
 
 describe('dynamic translation worker helpers', () => {
-  it.concurrent('deduplicates and bounds page strings before translating', () => {
+  it.concurrent('preserves exact page string keys while bounding translation input', () => {
     expect(normalizeTranslationStrings([
       '  Settings  ',
       'Settings',
@@ -145,6 +145,7 @@ describe('dynamic translation worker helpers', () => {
       'Bundle uploads',
     ])).toEqual([
       '  Settings  ',
+      'Settings',
       'https://capgo.app',
       'Bundle uploads',
     ])
