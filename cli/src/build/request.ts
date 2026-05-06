@@ -33,13 +33,13 @@ import { mkdir, readFile as readFileAsync, rm, stat, writeFile } from 'node:fs/p
 import { tmpdir } from 'node:os'
 import { basename, join, resolve } from 'node:path'
 import process, { chdir, cwd, exit } from 'node:process'
-import { log as clackLog, spinner as spinnerC } from '@clack/prompts'
+import { isCancel as clackIsCancel, log as clackLog, select as clackSelect, spinner as spinnerC } from '@clack/prompts'
 import AdmZip from 'adm-zip'
 import { WebSocket as PartySocket } from 'partysocket'
 import * as tus from 'tus-js-client'
 import WS from 'ws' // TODO: remove when min version nodejs 22 is bump, should do it in july 2026 as it become deprecated
 import pack from '../../package.json'
-import { assertCliPermission, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent } from '../utils'
+import { assertCliPermission, canPromptInteractively, createSupabaseClient, findSavedKey, getConfig, getOrganizationId, sendEvent } from '../utils'
 import { mergeCredentials, MIN_OUTPUT_RETENTION_SECONDS, parseOptionalBoolean, parseOutputRetentionSeconds } from './credentials'
 import { buildProvisioningMap } from './credentials-command'
 import { getPlatformDirFromCapacitorConfig } from './platform-paths'
@@ -61,6 +61,52 @@ export interface BuildLogger {
   uploadProgress: (percent: number) => void
   /** Called with custom messages from the builder (QR codes, etc.) */
   customMsg: (kind: string, data: Record<string, unknown>) => void | Promise<void>
+}
+
+type BuildPlatform = 'ios' | 'android'
+
+interface ResolveBuildPlatformOptions {
+  silent?: boolean
+  interactive?: boolean
+  promptPlatform?: () => Promise<unknown>
+}
+
+async function promptBuildPlatform(): Promise<unknown> {
+  return clackSelect({
+    message: 'No platform selected. Which platform do you want to build?',
+    options: [
+      { value: 'ios', label: 'iOS' },
+      { value: 'android', label: 'Android' },
+    ],
+  })
+}
+
+export async function resolveBuildPlatform(
+  platform: string | undefined,
+  {
+    silent = false,
+    interactive = canPromptInteractively({ silent }),
+    promptPlatform = promptBuildPlatform,
+  }: ResolveBuildPlatformOptions = {},
+): Promise<BuildPlatform> {
+  if (platform === 'ios' || platform === 'android')
+    return platform
+
+  if (platform)
+    throw new Error(`Invalid platform "${platform}". Must be "ios" or "android"`)
+
+  if (!interactive) {
+    throw new Error('Missing required argument: --platform <ios|android>. In an interactive terminal, you can omit --platform and choose one when prompted.')
+  }
+
+  const selectedPlatform = await promptPlatform()
+  if (clackIsCancel(selectedPlatform))
+    throw new Error('Build request canceled.')
+
+  if (selectedPlatform !== 'ios' && selectedPlatform !== 'android')
+    throw new Error('Build request canceled.')
+
+  return selectedPlatform
 }
 
 /** Default logger that uses @clack/prompts (used by CLI command) */
@@ -1211,13 +1257,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       throw new Error('Missing argument, you need to provide a appId, or be in a capacitor project')
     }
 
-    if (!options.platform) {
-      throw new Error('Missing required argument: --platform <ios|android>')
-    }
-
-    if (options.platform !== 'ios' && options.platform !== 'android') {
-      throw new Error(`Invalid platform "${options.platform}". Must be "ios" or "android"`)
-    }
+    const platform = await resolveBuildPlatform(options.platform, { silent })
 
     const host = options.supaHost || 'https://api.capgo.app'
 
@@ -1231,7 +1271,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     const orgId = await getOrganizationId(supabase, appId)
 
     log.info(`Requesting native build for ${appId}`)
-    log.info(`Platform: ${options.platform}`)
+    log.info(`Platform: ${platform}`)
     log.info(`Project: ${projectDir}`)
     log.info(`\n🔒 Security: Credentials are never stored on Capgo servers`)
     log.info(`   They are used only during build and deleted after`)
@@ -1310,7 +1350,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     // 3. Saved credentials file (lowest priority)
     const mergedCredentials = await mergeCredentials(
       appId,
-      options.platform,
+      platform,
       Object.keys(cliCredentials).length > 0 ? cliCredentials : undefined,
     )
 
@@ -1320,9 +1360,9 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       log.info('ℹ️  --no-playstore-upload specified, Play Store upload disabled for this build')
     }
 
-    const nativeProjectDir = getPlatformDirFromCapacitorConfig(config?.config, options.platform)
+    const nativeProjectDir = getPlatformDirFromCapacitorConfig(config?.config, platform)
     if (mergedCredentials && nativeProjectDir) {
-      if (options.platform === 'ios') {
+      if (platform === 'ios') {
         mergedCredentials.CAPGO_IOS_SOURCE_DIR = nativeProjectDir
         mergedCredentials.CAPGO_IOS_APP_DIR = nativeProjectDir
         mergedCredentials.CAPGO_IOS_PROJECT_DIR = nativeProjectDir
@@ -1347,7 +1387,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       log.error('  1. CLI arguments (--apple-key-id, --p12-password, etc.)')
       log.error('  2. Environment variables (APPLE_KEY_ID, P12_PASSWORD, etc.)')
       log.error('  3. Saved credentials file:')
-      log.error(`     npx @capgo/cli build credentials save --appId ${appId} --platform ${options.platform}`)
+      log.error(`     npx @capgo/cli build credentials save --appId ${appId} --platform ${platform}`)
       log.error('')
       log.error('Documentation:')
       log.error('  https://capgo.app/docs/cli/cloud-build/credentials/')
@@ -1357,7 +1397,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     // Validate platform-specific required credentials
     const missingCreds: string[] = []
 
-    if (options.platform === 'ios') {
+    if (platform === 'ios') {
       const rawDistributionMode = mergedCredentials.CAPGO_IOS_DISTRIBUTION
       const validModes = ['app_store', 'ad_hoc'] as const
       if (rawDistributionMode && !validModes.includes(rawDistributionMode as any)) {
@@ -1436,7 +1476,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       if (!mergedCredentials.APP_STORE_CONNECT_TEAM_ID)
         missingCreds.push('APP_STORE_CONNECT_TEAM_ID (or --app-store-connect-team-id)')
     }
-    else if (options.platform === 'android') {
+    else if (platform === 'android') {
       // Android minimum requirements
       if (!mergedCredentials.ANDROID_KEYSTORE_FILE)
         missingCreds.push('ANDROID_KEYSTORE_FILE (or --android-keystore-file)')
@@ -1460,20 +1500,20 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
     }
 
     if (missingCreds.length > 0) {
-      log.error(`❌ Missing required credentials for ${options.platform}:`)
+      log.error(`❌ Missing required credentials for ${platform}:`)
       log.error('')
       for (const cred of missingCreds) {
         log.error(`  • ${cred}`)
       }
       log.error('')
       log.error('Provide credentials via:')
-      log.error(`  1. CLI arguments: npx @capgo/cli build request --platform ${options.platform} ${options.platform === 'ios' ? '--apple-key-id "..." --apple-issuer-id "..." --apple-key-content "..."' : '--android-keystore-file "..." --keystore-key-alias "..."'}`)
-      log.error(`  2. Environment variables: ${options.platform === 'ios' ? 'export APPLE_KEY_ID="..." APPLE_ISSUER_ID="..." APPLE_KEY_CONTENT="..."' : 'export ANDROID_KEYSTORE_FILE="..." KEYSTORE_KEY_ALIAS="..."'}`)
-      log.error(`  3. Saved credentials: npx @capgo/cli build credentials save --platform ${options.platform} ...`)
+      log.error(`  1. CLI arguments: npx @capgo/cli build request --platform ${platform} ${platform === 'ios' ? '--apple-key-id "..." --apple-issuer-id "..." --apple-key-content "..."' : '--android-keystore-file "..." --keystore-key-alias "..."'}`)
+      log.error(`  2. Environment variables: ${platform === 'ios' ? 'export APPLE_KEY_ID="..." APPLE_ISSUER_ID="..." APPLE_KEY_CONTENT="..."' : 'export ANDROID_KEYSTORE_FILE="..." KEYSTORE_KEY_ALIAS="..."'}`)
+      log.error(`  3. Saved credentials: npx @capgo/cli build credentials save --platform ${platform} ...`)
       log.error('')
       log.error('Documentation:')
-      log.error(`  https://capgo.app/docs/cli/cloud-build/${options.platform}/`)
-      throw new Error(`Missing required credentials for ${options.platform}: ${missingCreds.join(', ')}`)
+      log.error(`  https://capgo.app/docs/cli/cloud-build/${platform}/`)
+      throw new Error(`Missing required credentials for ${platform}: ${missingCreds.join(', ')}`)
     }
 
     // Log defaults for output control fields when not explicitly set
@@ -1492,14 +1532,14 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 
     const { buildOptions: buildOptionsPayload, buildCredentials: buildCredentialsPayload } = splitPayload(
       mergedCredentials,
-      options.platform,
+      platform,
       options.buildMode || 'release',
       pack.version,
     )
 
     const requestPayload = {
       app_id: appId,
-      platform: options.platform,
+      platform,
       build_mode: options.buildMode || 'release',
       build_options: buildOptionsPayload,
       build_credentials: buildCredentialsPayload,
@@ -1557,7 +1597,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       user_id: orgId,
       tags: {
         'app-id': appId,
-        'platform': options.platform,
+        'platform': platform,
       },
       notify: false,
     }).catch()
@@ -1569,9 +1609,9 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
 
     try {
       // Zip the project directory
-      log.info(`Zipping ${options.platform} project from ${projectDir}...`)
+      log.info(`Zipping ${platform} project from ${projectDir}...`)
 
-      await zipDirectory(projectDir, zipPath, options.platform, config?.config, {
+      await zipDirectory(projectDir, zipPath, platform, config?.config, {
         nodeModules: options.nodeModules,
       })
 
@@ -1742,7 +1782,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       let showStatusChecks = false
       const statusCheck = async (): Promise<string | null> => {
         try {
-          const response = await fetch(`${host}/build/status?job_id=${encodeURIComponent(buildRequest.job_id)}&app_id=${encodeURIComponent(appId)}&platform=${options.platform}`, {
+          const response = await fetch(`${host}/build/status?job_id=${encodeURIComponent(buildRequest.job_id)}&app_id=${encodeURIComponent(appId)}&platform=${platform}`, {
             headers: {
               authorization: options.apikey,
             },
@@ -1794,7 +1834,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
       }
       else {
         // Fall back to polling if stream ended without final status
-        finalStatus = await pollBuildStatus(host, buildRequest.job_id, appId, options.platform, options.apikey, silent, showStatusChecks, abortController.signal, log)
+        finalStatus = await pollBuildStatus(host, buildRequest.job_id, appId, platform, options.apikey, silent, showStatusChecks, abortController.signal, log)
       }
 
       if (finalStatus === 'succeeded') {
@@ -1818,7 +1858,7 @@ export async function requestBuildInternal(appId: string, options: BuildRequestO
         user_id: orgId,
         tags: {
           'app-id': appId,
-          'platform': options.platform,
+          'platform': platform,
           'status': finalStatus || 'unknown',
           'time': buildTime,
         },

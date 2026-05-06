@@ -22,6 +22,7 @@ const emit = defineEmits<{
 
 type BuildRequest = Database['public']['Tables']['build_requests']['Row']
 type Element = BuildRequest
+type Platform = 'ios' | 'android'
 
 const { t } = useI18n()
 const supabase = useSupabase()
@@ -30,14 +31,14 @@ const dialogStore = useDialogV2Store()
 const offset = 20
 const search = ref('')
 const showSteps = ref(false)
-const showSetupInvite = ref(false)
-const autoShowSteps = ref(false)
 const columns: Ref<TableColumn[]> = ref<TableColumn[]>([])
 const elements = ref<Element[]>([])
 const isLoading = ref(true)
 const currentPage = ref(1)
 const total = ref(0)
 const totalAllBuilds = ref<number | null>(null)
+const platformBuildCounts = ref<Record<Platform, number>>({ ios: 0, android: 0 })
+const showSetupFlow = computed(() => showSteps.value || totalAllBuilds.value === 0)
 const organizationStore = useOrganizationStore()
 const filters = ref({})
 
@@ -46,53 +47,54 @@ const currentBuildsNumber = computed(() => {
 })
 
 function closeSteps() {
-  autoShowSteps.value = false
   showSteps.value = false
-  // If we closed onboarding but still have no builds, fall back to invite screen
-  if ((totalAllBuilds.value ?? 0) === 0) {
-    showSetupInvite.value = true
-  }
 }
 
 function addOne() {
-  autoShowSteps.value = false
-  showSetupInvite.value = false
-  showSteps.value = true
-}
-
-function startIosOnboardingFromInvite() {
-  autoShowSteps.value = true
-  showSetupInvite.value = false
   showSteps.value = true
 }
 
 function onboardingDone() {
-  showSetupInvite.value = false
-  closeSteps()
+  showSteps.value = false
   reload()
 }
 
-function applyAutoOnboardingState() {
-  if (totalAllBuilds.value === 0 && !autoShowSteps.value && !showSteps.value) {
-    showSetupInvite.value = true
-  }
-  else if (typeof totalAllBuilds.value === 'number' && totalAllBuilds.value > 0) {
-    showSetupInvite.value = false
-  }
-}
-
-async function updateOverallBuildsCount(): Promise<void> {
+async function countBuildRequests(platform?: Platform): Promise<number | null> {
   const orgId = organizationStore.currentOrganization?.gid
   if (!orgId || !props.appId)
-    return
-  const { count, error } = await supabase
+    return null
+
+  let query = supabase
     .from('build_requests')
     .select('id', { count: 'exact', head: true })
     .eq('owner_org', orgId)
     .eq('app_id', props.appId)
 
-  if (!error)
-    totalAllBuilds.value = count
+  if (platform)
+    query = query.eq('platform', platform)
+
+  const { count, error } = await query
+  if (error) {
+    console.error('Error counting build requests:', error)
+    return null
+  }
+  return count ?? 0
+}
+
+async function updateOverallBuildsCount(): Promise<void> {
+  const [allBuilds, iosBuilds, androidBuilds] = await Promise.all([
+    countBuildRequests(),
+    countBuildRequests('ios'),
+    countBuildRequests('android'),
+  ])
+
+  if (allBuilds !== null)
+    totalAllBuilds.value = allBuilds
+
+  platformBuildCounts.value = {
+    ios: iosBuilds ?? platformBuildCounts.value.ios,
+    android: androidBuilds ?? platformBuildCounts.value.android,
+  }
 }
 
 async function getData() {
@@ -144,7 +146,6 @@ async function reload() {
   elements.value = []
   try {
     await Promise.all([getData(), updateOverallBuildsCount()])
-    applyAutoOnboardingState()
   }
   catch (error) {
     console.error(error)
@@ -249,7 +250,7 @@ watch(props, async () => {
   await reload()
 })
 
-// Ensure totalAllBuilds is populated on initial mount so the setup invite
+// Ensure totalAllBuilds is populated on initial mount so the setup flow
 // renders when the org has no builds yet. watch(props, ...) doesn't fire
 // for the initial value, and DataTable's @reload hook only calls getData().
 onMounted(async () => {
@@ -257,18 +258,23 @@ onMounted(async () => {
   await reload()
 })
 
-watch(showSteps, (newValue) => {
+watch(showSetupFlow, (newValue) => {
   emit('update:showingSteps', newValue)
-})
+}, { immediate: true })
 </script>
 
 <template>
   <div>
-    <BuildSetupInvite
-      v-if="showSetupInvite && !showSteps"
-      @start-ios-onboarding="startIosOnboardingFromInvite"
+    <StepsBuild
+      v-if="showSetupFlow"
+      :onboarding="(totalAllBuilds ?? 0) === 0"
+      :app-id="props.appId"
+      :platform-build-counts="platformBuildCounts"
+      :can-close="(totalAllBuilds ?? 0) > 0"
+      @done="onboardingDone"
+      @close-step="closeSteps()"
     />
-    <div v-else-if="!showSteps" class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
+    <div v-else class="flex flex-col overflow-hidden overflow-y-auto bg-white border shadow-lg md:rounded-lg dark:bg-gray-800 border-slate-300 dark:border-slate-900">
       <DataTable
         v-model:filters="filters"
         v-model:search="search"
@@ -309,11 +315,6 @@ watch(showSteps, (newValue) => {
         </template>
         <template #empty>
           <div class="flex flex-col items-center justify-center p-8">
-            <div class="mb-4 text-gray-400 dark:text-gray-600">
-              <svg class="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-              </svg>
-            </div>
             <h3 class="mb-2 text-lg font-semibold text-gray-900 dark:text-white">
               {{ t('no-builds-yet') }}
             </h3>
@@ -324,7 +325,5 @@ watch(showSteps, (newValue) => {
         </template>
       </DataTable>
     </div>
-
-    <StepsBuild v-else :onboarding="(totalAllBuilds ?? 0) === 0" :app-id="props.appId" @done="onboardingDone" @close-step="closeSteps()" />
   </div>
 </template>

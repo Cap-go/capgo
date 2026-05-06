@@ -32,7 +32,7 @@ export type BuildCredentials = z.infer<typeof buildCredentialsSchema>
 export const buildRequestOptionsSchema = optionsBaseSchema.extend({
   path: z.string().optional(),
   nodeModules: z.string().optional(),
-  platform: z.enum(['ios', 'android']),
+  platform: z.enum(['ios', 'android']).optional(),
   buildMode: z.enum(['debug', 'release']).optional(),
   userId: z.string().optional(),
   // iOS credential options (flattened)
