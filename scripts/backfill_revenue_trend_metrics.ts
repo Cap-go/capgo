@@ -359,6 +359,11 @@ function getItemBillingInterval(item: Stripe.SubscriptionItem | null | undefined
   return null
 }
 
+function getLookupOrItemBillingInterval(item: Stripe.SubscriptionItem | null | undefined, priceLookup: Map<string, PriceLookupEntry>): BillingInterval | null {
+  const priceId = getItemPriceId(item)
+  return (priceId ? priceLookup.get(priceId)?.interval : null) ?? getItemBillingInterval(item)
+}
+
 function getItemPeriodEndSeconds(item: Stripe.SubscriptionItem | null | undefined) {
   const periodEnd = (item as { current_period_end?: number } | null | undefined)?.current_period_end
   return typeof periodEnd === 'number' && Number.isFinite(periodEnd) ? periodEnd : null
@@ -425,7 +430,7 @@ function buildStateFromSubscription(
     return null
 
   const price = priceLookup.get(priceId) ?? null
-  const interval = price?.interval ?? getItemBillingInterval(item)
+  const interval = price?.interval ?? getLookupOrItemBillingInterval(item, priceLookup)
 
   const status = options.status ?? subscription.status
   const eventSeconds = options.eventSeconds ?? null
@@ -523,6 +528,7 @@ function recordTransition(
   seenPaidCustomerIds: Set<string>,
   currentState: RevenueSubscriptionState | null,
   nextState: RevenueSubscriptionState | null,
+  options: { cadenceUpgrade?: boolean } = {},
 ) {
   const currentMrr = currentState?.mrr ?? 0
   const nextMrr = nextState?.mrr ?? 0
@@ -531,6 +537,9 @@ function recordTransition(
   const customerId = nextState?.customerId ?? currentState?.customerId
   if (!customerId)
     return
+
+  if (daily && nextActive && options.cadenceUpgrade)
+    daily.upgradedCustomerIds.add(customerId)
 
   if (!currentActive && nextActive) {
     if (!seenPaidCustomerIds.has(customerId)) {
@@ -544,7 +553,7 @@ function recordTransition(
     return
 
   const isRevenueUpgrade = currentMrr > 0 && nextMrr > currentMrr
-  const isCadenceUpgrade = currentState?.interval === 'monthly' && nextState?.interval === 'yearly'
+  const isCadenceUpgrade = options.cadenceUpgrade || (currentState?.interval === 'monthly' && nextState?.interval === 'yearly')
   if (currentActive && nextActive && (isRevenueUpgrade || isCadenceUpgrade))
     daily.upgradedCustomerIds.add(customerId)
 
@@ -582,8 +591,12 @@ function applySubscriptionEventToStates(
   const existingState = states.get(subscriptionId) ?? null
   const previousState = existingState ?? buildPreviousStateFromEvent(event, priceLookup)
   const nextState = buildNextStateFromEvent(event, priceLookup)
+  const previousInterval = previousState?.interval ?? getLookupOrItemBillingInterval(getLicensedSubscriptionItem(getPreviousSubscriptionItems(event)), priceLookup)
+  const nextInterval = nextState?.interval ?? getLookupOrItemBillingInterval(getLicensedSubscriptionItem(getSubscriptionItems(subscription)), priceLookup)
 
-  recordTransition(daily, seenPaidCustomerIds, previousState, nextState)
+  recordTransition(daily, seenPaidCustomerIds, previousState, nextState, {
+    cadenceUpgrade: previousInterval === 'monthly' && nextInterval === 'yearly',
+  })
 
   if (nextState)
     states.set(getStateKey(nextState), nextState)

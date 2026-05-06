@@ -357,6 +357,34 @@ describe('revenue trend backfill metrics', () => {
     })
   })
 
+  it.concurrent('counts activation cadence changes as new paying and upgraded orgs', () => {
+    const rows = buildRevenueTrendBackfillRows([
+      globalStatsRow('2026-04-01'),
+    ], {
+      events: [
+        subscriptionEvent('evt_activation_yearly_upgrade', 'customer.subscription.updated', DAY_1 + 3600, 'cus_activation_yearly_upgrade', 'sub_activation_yearly_upgrade', 'price_solo_yearly', {
+          previousPriceId: 'price_solo_monthly',
+          previousStatus: 'incomplete',
+          subscriptionCreated: DAY_1 - 86400,
+        }),
+      ],
+      fromDateId: '2026-04-01',
+      plans,
+      toDateId: '2026-04-01',
+    })
+
+    expect(rows[0]).toMatchObject({
+      mrr: 10,
+      new_paying_orgs: 1,
+      paying: 1,
+      paying_monthly: 0,
+      paying_yearly: 1,
+      plan_solo: 1,
+      plan_solo_yearly: 1,
+      upgraded_orgs: 1,
+    })
+  })
+
   it.concurrent('counts active legacy price subscriptions as paying organizations', () => {
     const rows = buildRevenueTrendBackfillRows([
       globalStatsRow('2026-04-01'),
