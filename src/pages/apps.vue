@@ -4,7 +4,7 @@ import { storeToRefs } from 'pinia'
 import { computed, ref, watch, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { createSignedImageUrl } from '~/services/storage'
+import { createSignedImageUrl, resolveImagePath } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDisplayStore } from '~/stores/display'
 import { useOrganizationStore } from '~/stores/organization'
@@ -17,12 +17,14 @@ const isTableLoading = ref(false)
 const supabase = useSupabase()
 const { t } = useI18n()
 const displayStore = useDisplayStore()
-const apps = ref<Database['public']['Tables']['apps']['Row'][]>([])
+type AppRow = Database['public']['Tables']['apps']['Row']
+const apps = ref<AppRow[]>([])
 const currentPage = ref(1)
 const pageSize = 10
 const totalApps = ref(0)
 const searchQuery = ref('')
 const { currentOrganization } = storeToRefs(organizationStore)
+let appIconLoadRun = 0
 
 // Check if user lacks security compliance (2FA or password) - don't load data in this case
 const lacksSecurityAccess = computed(() => {
@@ -32,7 +34,48 @@ const lacksSecurityAccess = computed(() => {
   return lacks2FA || lacksPassword
 })
 
+function appWithImmediateIcon(app: AppRow) {
+  const { normalized, shouldSign } = resolveImagePath(app.icon_url)
+  return {
+    ...app,
+    icon_url: shouldSign ? '' : normalized,
+  }
+}
+
+async function loadAppIcons(sourceApps: AppRow[], runId: number) {
+  const signedIcons = (await Promise.all(sourceApps.map(async (app) => {
+    const { shouldSign } = resolveImagePath(app.icon_url)
+    if (!shouldSign)
+      return null
+
+    try {
+      const signedIcon = await createSignedImageUrl(app.icon_url)
+      return signedIcon ? { appId: app.app_id, signedIcon } : null
+    }
+    catch {
+      return null
+    }
+  })))
+    .filter((entry): entry is { appId: string, signedIcon: string } => !!entry)
+
+  if (appIconLoadRun !== runId || signedIcons.length === 0)
+    return
+
+  const iconByAppId = new Map<string, string>(signedIcons.map(({ appId, signedIcon }) => [appId, signedIcon]))
+  let hasIconUpdate = false
+  for (const app of apps.value) {
+    const signedIcon = iconByAppId.get(app.app_id)
+    if (signedIcon) {
+      app.icon_url = signedIcon
+      hasIconUpdate = true
+    }
+  }
+  if (hasIconUpdate)
+    apps.value = Array.from(apps.value)
+}
+
 async function getMyApps() {
+  const currentRun = ++appIconLoadRun
   isTableLoading.value = true
   try {
     await organizationStore.awaitInitialLoad()
@@ -83,20 +126,9 @@ async function getMyApps() {
       .range(offset, offset + pageSize - 1)
       .order('updated_at', { ascending: false })
 
-    if (data && data.length) {
-      const signedApps = await Promise.all(
-        data.map(async (app) => {
-          return {
-            ...app,
-            icon_url: await createSignedImageUrl(app.icon_url),
-          }
-        }),
-      )
-      apps.value = signedApps
-    }
-    else {
-      apps.value = []
-    }
+    apps.value = data?.map(appWithImmediateIcon) ?? []
+    if (data?.length)
+      void loadAppIcons(data, currentRun)
   }
   finally {
     isTableLoading.value = false
