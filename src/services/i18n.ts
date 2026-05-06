@@ -1,30 +1,49 @@
 import { changeLocale } from '@formkit/vue'
 import countryCodeToFlagEmoji from 'country-code-to-flag-emoji'
-import { loadLanguageAsync } from '~/modules/i18n'
+import { toast } from 'vue-sonner'
+import { getSelectedLanguage, i18n, loadLanguageAsync, normalizeLanguage, RemoteLanguageError } from '../modules/i18n'
 
-export function getEmoji(country: string) {
-  // convert country code to emoji flag
-  let countryCode = country
-  switch (country) {
-    case 'en':
-      countryCode = 'US'
-      break
-    case 'ko':
-      countryCode = 'KR'
-      break
-    case 'ja':
-      countryCode = 'JP'
-      break
-    case 'hi':
-      countryCode = 'IN'
-      break
-    default:
-      break
-  }
-  return countryCodeToFlagEmoji(countryCode)
+const countryCodes: Record<string, string> = {
+  'en': 'US',
+  'hi': 'IN',
+  'ja': 'JP',
+  'ko': 'KR',
+  'pt-br': 'BR',
+  'vi': 'VN',
+  'zh-cn': 'CN',
+}
+
+const formkitLocales: Record<string, string> = {
+  'pt-br': 'pt',
+  'zh-cn': 'zh',
+}
+
+export function getEmoji(locale: string) {
+  return countryCodeToFlagEmoji((countryCodes[locale] ?? locale).toUpperCase())
+}
+
+export function getLanguageEmoji(locale: string) {
+  return getEmoji(locale)
 }
 
 export async function changeLanguage(lang: string) {
-  await loadLanguageAsync(lang)
-  changeLocale(lang)
+  const currentLanguage = getSelectedLanguage()
+  const nextLanguage = normalizeLanguage(lang)
+
+  if (currentLanguage === nextLanguage)
+    return currentLanguage
+
+  try {
+    await loadLanguageAsync(nextLanguage)
+    changeLocale(formkitLocales[nextLanguage] ?? nextLanguage)
+    return nextLanguage
+  }
+  catch (error) {
+    if (error instanceof RemoteLanguageError && error.reason === 'pending')
+      toast.info(i18n.global.t('translation-not-ready'))
+    else
+      toast.error(i18n.global.t('translation-unavailable'))
+
+    return currentLanguage
+  }
 }

@@ -1876,5 +1876,7 @@
   "start-of-selected-period": "Start of selected period",
   "start-of-selected-period-help": "{count} devices were on {version} on {date}.",
   "restore-account": "Restore account",
-  "restoring-account": "Restoring account..."
+  "restoring-account": "Restoring account...",
+  "translation-not-ready": "Translation is being prepared. Try again in a bit.",
+  "translation-unavailable": "This language is not available right now."
 }

@@ -10,11 +10,17 @@
   "placement": {
     "mode": "smart"
   },
+  "ai": {
+    "binding": "AI"
+  },
   "workers_dev": false,
   "upload_source_maps": true,
   "env": {
     "prod": {
       "name": "capgo_api-prod",
+      "ai": {
+        "binding": "AI"
+      },
       "vars": {
         "ENV_NAME": "capgo_api-prod"
       },
@@ -68,6 +74,9 @@
     },
     "preprod": {
       "name": "capgo_api-preprod",
+      "ai": {
+        "binding": "AI"
+      },
       "vars": {
         "ENV_NAME": "capgo_api-preprod"
       },
@@ -120,6 +129,9 @@
     },
     "alpha": {
       "name": "capgo_api-alpha",
+      "ai": {
+        "binding": "AI"
+      },
       "vars": {
         "ENV_NAME": "capgo_api-alpha"
       },
@@ -172,6 +184,9 @@
     },
     "local": {
       "name": "capgo_api-local",
+      "ai": {
+        "binding": "AI"
+      },
       "vars": {
         "ENV_NAME": "capgo_api-local"
       }

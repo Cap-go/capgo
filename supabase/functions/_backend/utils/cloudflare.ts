@@ -30,6 +30,11 @@ export function normalizeAnalyticsLimit(limit: unknown, fallback = DEFAULT_LIMIT
 
 // type is require for the bindings no interface
 // eslint-disable-next-line ts/consistent-type-definitions
+type AiBinding = {
+  run: (model: string, input: unknown) => Promise<unknown>
+}
+
+// eslint-disable-next-line ts/consistent-type-definitions
 export type Bindings = {
   DEVICE_USAGE: AnalyticsEngineDataPoint
   BANDWIDTH_USAGE: AnalyticsEngineDataPoint
@@ -49,6 +54,7 @@ export type Bindings = {
   HYPERDRIVE_CAPGO_GG_HK: Hyperdrive
   ATTACHMENT_UPLOAD_HANDLER: DurableObjectNamespace
   ATTACHMENT_BUCKET: R2Bucket
+  AI?: AiBinding
 }
 
 const TRACK_DEVICE_USAGE_CACHE_PATH = '/.track-device-usage-cache'
