@@ -1,6 +1,3 @@
-import type { ExecutionContext, MessageBatch } from '@cloudflare/workers-types'
-import type { TranslationQueuePayload } from '../../supabase/functions/_backend/public/translation.ts'
-import type { Bindings } from '../../supabase/functions/_backend/utils/cloudflare.ts'
 import { app as accept_invitation } from '../../supabase/functions/_backend/private/accept_invitation.ts'
 import { app as admin_credits } from '../../supabase/functions/_backend/private/admin_credits.ts'
 import { app as admin_stats } from '../../supabase/functions/_backend/private/admin_stats.ts'
@@ -44,7 +41,7 @@ import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
 import { app as organization } from '../../supabase/functions/_backend/public/organization/index.ts'
 import { app as replication } from '../../supabase/functions/_backend/public/replication.ts'
 import { app as statistics } from '../../supabase/functions/_backend/public/statistics/index.ts'
-import { app as translation, queueApp as translation_messages } from '../../supabase/functions/_backend/public/translation.ts'
+import { app as translation } from '../../supabase/functions/_backend/public/translation.ts'
 import { app as webhooks } from '../../supabase/functions/_backend/public/webhooks/index.ts'
 import { app as credit_usage_alerts } from '../../supabase/functions/_backend/triggers/credit_usage_alerts.ts'
 import { app as cron_clean_orphan_images } from '../../supabase/functions/_backend/triggers/cron_clean_orphan_images.ts'
@@ -75,7 +72,6 @@ import { app as stripe_event } from '../../supabase/functions/_backend/triggers/
 import { app as webhook_delivery } from '../../supabase/functions/_backend/triggers/webhook_delivery.ts'
 import { app as webhook_dispatcher } from '../../supabase/functions/_backend/triggers/webhook_dispatcher.ts'
 import { createAllCatch, createHono } from '../../supabase/functions/_backend/utils/hono.ts'
-import { cloudlogErr, serializeError } from '../../supabase/functions/_backend/utils/logging.ts'
 import { version } from '../../supabase/functions/_backend/utils/version.ts'
 
 // Public API
@@ -173,30 +169,4 @@ createAllCatch(appTriggers, functionNameTriggers)
 
 export default {
   fetch: app.fetch,
-  async queue(batch: MessageBatch<Required<TranslationQueuePayload>>, env: Bindings, ctx: ExecutionContext) {
-    for (const message of batch.messages) {
-      let responseStatus: number | undefined
-      try {
-        const response = await translation_messages.fetch(new Request('https://translation-messages.queue/', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(message.body),
-        }), env, ctx)
-        responseStatus = response.status
-        if (!response.ok)
-          throw new Error(`Translation queue consumer failed with ${response.status}`)
-
-        message.ack()
-      }
-      catch (error) {
-        cloudlogErr({
-          message: 'Translation queue consumer error',
-          error: serializeError(error),
-          queueMessage: message.body,
-          responseStatus,
-        })
-        message.retry({ delaySeconds: 30 })
-      }
-    }
-  },
 }

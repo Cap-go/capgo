@@ -10,17 +10,11 @@
   "placement": {
     "mode": "smart"
   },
-  "ai": {
-    "binding": "AI"
-  },
   "workers_dev": false,
   "upload_source_maps": true,
   "env": {
     "prod": {
       "name": "capgo_api-prod",
-      "ai": {
-        "binding": "AI"
-      },
       "vars": {
         "ENV_NAME": "capgo_api-prod"
       },
@@ -77,23 +71,11 @@
             "binding": "TRANSLATION_MESSAGES_QUEUE",
             "queue": "capgo-api-prod-translation-messages"
           }
-        ],
-        "consumers": [
-          {
-            "queue": "capgo-api-prod-translation-messages",
-            "max_batch_size": 1,
-            "max_batch_timeout": 5,
-            "max_retries": 5,
-            "retry_delay": 30
-          }
         ]
       }
     },
     "preprod": {
       "name": "capgo_api-preprod",
-      "ai": {
-        "binding": "AI"
-      },
       "vars": {
         "ENV_NAME": "capgo_api-preprod"
       },
@@ -149,23 +131,11 @@
             "binding": "TRANSLATION_MESSAGES_QUEUE",
             "queue": "capgo-api-preprod-translation-messages"
           }
-        ],
-        "consumers": [
-          {
-            "queue": "capgo-api-preprod-translation-messages",
-            "max_batch_size": 1,
-            "max_batch_timeout": 5,
-            "max_retries": 5,
-            "retry_delay": 30
-          }
         ]
       }
     },
     "alpha": {
       "name": "capgo_api-alpha",
-      "ai": {
-        "binding": "AI"
-      },
       "vars": {
         "ENV_NAME": "capgo_api-alpha"
       },
@@ -221,23 +191,11 @@
             "binding": "TRANSLATION_MESSAGES_QUEUE",
             "queue": "capgo-api-alpha-translation-messages"
           }
-        ],
-        "consumers": [
-          {
-            "queue": "capgo-api-alpha-translation-messages",
-            "max_batch_size": 1,
-            "max_batch_timeout": 5,
-            "max_retries": 5,
-            "retry_delay": 30
-          }
         ]
       }
     },
     "local": {
       "name": "capgo_api-local",
-      "ai": {
-        "binding": "AI"
-      },
       "vars": {
         "ENV_NAME": "capgo_api-local"
       },
@@ -246,15 +204,6 @@
           {
             "binding": "TRANSLATION_MESSAGES_QUEUE",
             "queue": "capgo-api-local-translation-messages"
-          }
-        ],
-        "consumers": [
-          {
-            "queue": "capgo-api-local-translation-messages",
-            "max_batch_size": 1,
-            "max_batch_timeout": 5,
-            "max_retries": 5,
-            "retry_delay": 30
           }
         ]
       },

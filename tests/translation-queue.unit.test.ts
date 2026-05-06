@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { __translationWorkerTestUtils__ } from '../cloudflare_workers/translation/index.ts'
 import sourceMessages from '../messages/en.json'
 import { __translationTestUtils__ } from '../supabase/functions/_backend/public/translation.ts'
 
@@ -11,7 +12,7 @@ describe('translation queue helpers', () => {
   })
 
   it.concurrent('keeps source text when translation drops a placeholder', () => {
-    expect(__translationTestUtils__.keepTranslation('Used {count} times', 'Utilise plusieurs fois')).toBe('Used {count} times')
+    expect(__translationWorkerTestUtils__.keepTranslation('Used {count} times', 'Utilise plusieurs fois')).toBe('Used {count} times')
   })
 
   it.concurrent('normalizes invalid queued batch indexes to the first batch', () => {
