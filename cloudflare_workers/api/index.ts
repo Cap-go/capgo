@@ -75,6 +75,7 @@ import { app as stripe_event } from '../../supabase/functions/_backend/triggers/
 import { app as webhook_delivery } from '../../supabase/functions/_backend/triggers/webhook_delivery.ts'
 import { app as webhook_dispatcher } from '../../supabase/functions/_backend/triggers/webhook_dispatcher.ts'
 import { createAllCatch, createHono } from '../../supabase/functions/_backend/utils/hono.ts'
+import { cloudlogErr, serializeError } from '../../supabase/functions/_backend/utils/logging.ts'
 import { version } from '../../supabase/functions/_backend/utils/version.ts'
 
 // Public API
@@ -174,18 +175,26 @@ export default {
   fetch: app.fetch,
   async queue(batch: MessageBatch<Required<TranslationQueuePayload>>, env: Bindings, ctx: ExecutionContext) {
     for (const message of batch.messages) {
+      let responseStatus: number | undefined
       try {
         const response = await translation_messages.fetch(new Request('https://translation-messages.queue/', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(message.body),
         }), env, ctx)
+        responseStatus = response.status
         if (!response.ok)
           throw new Error(`Translation queue consumer failed with ${response.status}`)
 
         message.ack()
       }
-      catch {
+      catch (error) {
+        cloudlogErr({
+          message: 'Translation queue consumer error',
+          error: serializeError(error),
+          queueMessage: message.body,
+          responseStatus,
+        })
         message.retry({ delaySeconds: 30 })
       }
     }

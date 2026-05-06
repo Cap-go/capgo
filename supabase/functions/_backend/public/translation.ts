@@ -1,4 +1,4 @@
-import type { D1Database, Queue } from '@cloudflare/workers-types'
+import type { D1Database } from '@cloudflare/workers-types'
 import type { Context } from 'hono'
 import sourceMessages from '../../../../messages/en.json' with { type: 'json' }
 import { CacheHelper } from '../utils/cache.ts'
@@ -12,6 +12,7 @@ const MAX_BATCH_CHARACTERS = 6_000
 const MAX_BATCH_ITEMS = 60
 const TRANSLATION_ATTEMPTS = 3
 const TRANSLATION_CACHE_PATH = '/translation/messages-cache'
+const TRANSLATION_STORE_CLEANUP_INTERVAL_SECONDS = 60
 const TRANSLATION_REQUEUE_AFTER_SECONDS = 60
 const TRANSLATION_STORE_TABLE = 'translation_messages_cache'
 const PLACEHOLDER_PATTERN = /\{[\w.]+\}|%\w+%?|\$\d+/g
@@ -93,6 +94,8 @@ interface AiBinding {
 type MessageEntry = [string, string]
 
 const sourceMessageCatalog = sourceMessages as Record<string, string>
+let translationStoreInitialized = false
+let lastTranslationStoreCleanupAt = 0
 
 function getTranslationModel(c: Context) {
   return getEnv(c, 'TRANSLATION_MODEL') || DEFAULT_TRANSLATION_MODEL
@@ -353,7 +356,7 @@ function messageCatalogOf(value: unknown): Record<string, string> {
 }
 
 function getTranslationStore(c: Context) {
-  const store = c.env.DB_STOREAPPS as D1Database | undefined
+  const store = c.env.DB_STOREAPPS
   if (!store)
     quickError(503, 'translation_unavailable', 'Cloudflare D1 translation store is not configured')
 
@@ -361,7 +364,7 @@ function getTranslationStore(c: Context) {
 }
 
 function getTranslationQueue(c: Context) {
-  const queue = c.env.TRANSLATION_MESSAGES_QUEUE as Queue<Required<TranslationQueuePayload>> | undefined
+  const queue = c.env.TRANSLATION_MESSAGES_QUEUE
   if (!queue)
     quickError(503, 'translation_unavailable', 'Cloudflare translation queue is not configured')
 
@@ -369,6 +372,9 @@ function getTranslationQueue(c: Context) {
 }
 
 async function ensureTranslationStore(db: D1Database) {
+  if (translationStoreInitialized)
+    return
+
   await db.prepare(
     `CREATE TABLE IF NOT EXISTS ${TRANSLATION_STORE_TABLE} (
        target_language TEXT NOT NULL,
@@ -387,6 +393,7 @@ async function ensureTranslationStore(db: D1Database) {
     `CREATE INDEX IF NOT EXISTS idx_${TRANSLATION_STORE_TABLE}_expires_at
      ON ${TRANSLATION_STORE_TABLE} (expires_at)`,
   ).run()
+  translationStoreInitialized = true
 }
 
 function parseTranslationStoreEntry(row: unknown): TranslationStoreEntry | null {
@@ -432,7 +439,12 @@ function isPendingTranslationStale(entry: TranslationStoreEntry) {
 }
 
 async function deleteExpiredTranslationStoreEntries(db: D1Database) {
+  const now = nowSeconds()
+  if (now - lastTranslationStoreCleanupAt < TRANSLATION_STORE_CLEANUP_INTERVAL_SECONDS)
+    return
+
   await db.prepare(`DELETE FROM ${TRANSLATION_STORE_TABLE} WHERE expires_at <= unixepoch()`).run()
+  lastTranslationStoreCleanupAt = now
 }
 
 async function readTranslationStoreEntry(c: Context, checksum: string, targetLanguage: string) {
