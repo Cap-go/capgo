@@ -21,12 +21,14 @@ const devices = {
     width: 375,
     height: 812,
     frameClass: 'rounded-[40px]',
+    screenRadius: 28,
   },
   pixel: {
     name: 'Google Pixel',
     width: 412,
     height: 915,
     frameClass: 'rounded-[30px]',
+    screenRadius: 18,
   },
 }
 
@@ -176,7 +178,10 @@ function openExternal() {
           <!-- Screen -->
           <div
             class="w-full h-full overflow-hidden bg-white"
-            :class="currentDevice.frameClass.replace('40', '35').replace('30', '25')"
+            :style="{
+              borderRadius: `${currentDevice.screenRadius}px`,
+              clipPath: `inset(0 round ${currentDevice.screenRadius}px)`,
+            }"
           >
             <iframe
               title="Preview App"
