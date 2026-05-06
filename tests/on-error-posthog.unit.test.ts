@@ -205,6 +205,21 @@ describe('onError PostHog capture', () => {
     })
   })
 
+  it('skips Discord for expected TUS handler Durable Object storage timeouts', async () => {
+    const { onError } = await import('../supabase/functions/_backend/utils/on_error.ts')
+
+    const response = await onError('TUS handler')(new Error('Durable Object storage operation exceeded timeout which caused object to be reset.'), createContext())
+
+    expect(backgroundTaskMock).toHaveBeenCalledTimes(1)
+    expect(sendDiscordAlert500Mock).not.toHaveBeenCalled()
+    expect(capturePosthogExceptionMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      functionName: 'TUS handler',
+      kind: 'unhandled_error',
+      status: 500,
+    }))
+    expect(response.status).toBe(500)
+  })
+
   it('captures generic unhandled errors in PostHog', async () => {
     const { onError } = await import('../supabase/functions/_backend/utils/on_error.ts')
 

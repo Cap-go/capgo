@@ -7,9 +7,10 @@ import { capturePosthogException } from './posthog.ts'
 import { backgroundTask } from './utils.ts'
 
 const drizzleErrorNames = new Set(['DrizzleError', 'DrizzleQueryError', 'TransactionRollbackError'])
+const filesUploadFunctionNames = new Set(['files', 'TUS handler'])
 
 function isFilesDurableObjectStorageTimeout(functionName: string, error: unknown): boolean {
-  if (functionName !== 'files' || !error || typeof error !== 'object' || !('message' in error))
+  if (!filesUploadFunctionNames.has(functionName) || !error || typeof error !== 'object' || !('message' in error))
     return false
 
   const { message } = error as { message?: unknown }
