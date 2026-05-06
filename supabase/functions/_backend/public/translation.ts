@@ -505,7 +505,15 @@ function shouldCheckUnchangedTranslation(value: string) {
     && !NON_TRANSLATABLE_LITERALS.has(normalized)
 }
 
-function assertTranslatedBatch(targetLanguage: string, batch: string[], translated: string[]) {
+function isEnglishTranslationTarget(targetLanguage: string) {
+  const normalized = targetLanguage.trim().toLowerCase()
+  return normalized === 'en' || normalized === 'english'
+}
+
+export function assertTranslatedBatch(targetLanguage: string, batch: string[], translated: string[]) {
+  if (isEnglishTranslationTarget(targetLanguage))
+    return
+
   const candidates = batch
     .map((source, index) => ({
       source: normalizedTranslationValue(source),

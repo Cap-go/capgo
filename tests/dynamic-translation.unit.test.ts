@@ -10,6 +10,7 @@ import {
 } from '../src/modules/i18n'
 import { changeLanguage } from '../src/services/i18n'
 import {
+  assertTranslatedBatch,
   normalizeTranslationMessages,
   normalizeTranslationStrings,
   parseSegmentedTranslation,
@@ -22,6 +23,7 @@ const originalWindow = globalThis.window
 const originalLocalStorage = globalThis.localStorage
 
 afterEach(() => {
+  vi.useRealTimers()
   vi.restoreAllMocks()
   resetDynamicTranslationRuntimeStateForTests()
   if (originalFetch === undefined)
@@ -133,9 +135,61 @@ describe('dynamic translation language selection', () => {
     expect(translateMessage('account')).toBe('Compte')
     expect(fetchMock).not.toHaveBeenCalled()
   })
+
+  it('keeps the full background catalog request running past the priority timeout', async () => {
+    vi.useFakeTimers()
+
+    const storage = new Map<string, string>()
+    const localStorageMock = {
+      clear: vi.fn(() => storage.clear()),
+      getItem: vi.fn((key: string) => storage.get(key) ?? null),
+      key: vi.fn(() => null),
+      length: 0,
+      removeItem: vi.fn((key: string) => storage.delete(key)),
+      setItem: vi.fn((key: string, value: string) => storage.set(key, value)),
+    } as unknown as Storage
+    let fullCatalogSignal: AbortSignal | undefined
+    let fetchCount = 0
+    const fetchMock = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      fetchCount += 1
+      if (fetchCount === 1) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => ({ messages: { account: 'Compte' } }),
+        } as unknown as Response)
+      }
+
+      fullCatalogSignal = init?.signal ?? undefined
+      return new Promise<Response>(() => {})
+    })
+
+    Object.defineProperty(globalThis, 'fetch', {
+      configurable: true,
+      value: fetchMock,
+    })
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: localStorageMock,
+    })
+
+    translateMessage('account')
+    await loadLanguageAsync('fr')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+
+    await vi.advanceTimersByTimeAsync(10_001)
+    expect(fullCatalogSignal).toBeUndefined()
+  })
 })
 
 describe('dynamic translation worker helpers', () => {
+  it.concurrent('allows unchanged output when the target language is English', () => {
+    const unchangedMessages = ['Account', 'Settings', 'Billing']
+
+    expect(() => assertTranslatedBatch('English', unchangedMessages, unchangedMessages)).not.toThrow()
+    expect(() => assertTranslatedBatch('French', unchangedMessages, unchangedMessages)).toThrow(/left 3\/3/)
+  })
+
   it.concurrent('preserves exact page string keys while bounding translation input', () => {
     expect(normalizeTranslationStrings([
       '  Settings  ',

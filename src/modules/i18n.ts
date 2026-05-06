@@ -13,7 +13,7 @@ export interface LanguageOption {
 
 export const SOURCE_LOCALE = 'en'
 const LANGUAGE_STORAGE_KEY = 'lang'
-const MESSAGE_CATALOG_TRANSLATION_TIMEOUT_MS = 10_000
+const PRIORITY_MESSAGE_CATALOG_TRANSLATION_TIMEOUT_MS = 10_000
 
 export const languageOptions: LanguageOption[] = [
   { id: 'en', label: 'English', workerCode: 'en', countryCode: 'US' },
@@ -74,6 +74,9 @@ type MessageCatalog = Record<string, string>
 interface LoadedMessageCatalog {
   complete: boolean
   messages: MessageCatalog
+}
+interface MessageCatalogFetchOptions {
+  timeoutMs?: number
 }
 
 const messageCatalog = sourceMessages as MessageCatalog
@@ -277,18 +280,20 @@ function getTrackedMessageCatalog() {
   return trackedCatalog
 }
 
-async function fetchTranslatedMessageCatalog(lang: string, messages: MessageCatalog): Promise<MessageCatalog | null> {
+async function fetchTranslatedMessageCatalog(lang: string, messages: MessageCatalog, options: MessageCatalogFetchOptions = {}): Promise<MessageCatalog | null> {
   if (messageCatalogTranslationDisabled)
     return null
 
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), MESSAGE_CATALOG_TRANSLATION_TIMEOUT_MS)
+  const controller = options.timeoutMs ? new AbortController() : undefined
+  const timeoutId = controller && options.timeoutMs
+    ? setTimeout(() => controller.abort(), options.timeoutMs)
+    : undefined
 
   try {
     const translationEndpoint = `${defaultApiHost || ''}/translation/messages`
     const response = await fetch(translationEndpoint, {
       method: 'POST',
-      signal: controller.signal,
+      signal: controller?.signal,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -322,7 +327,8 @@ async function fetchTranslatedMessageCatalog(lang: string, messages: MessageCata
     return null
   }
   finally {
-    clearTimeout(timeoutId)
+    if (timeoutId)
+      clearTimeout(timeoutId)
   }
 }
 
@@ -337,7 +343,9 @@ async function loadPriorityMessageCatalog(lang: string) {
 
   const trackedCatalog = getTrackedMessageCatalog()
   const priorityMessages = Object.keys(trackedCatalog).length > 0 ? trackedCatalog : messageCatalog
-  const messages = await fetchTranslatedMessageCatalog(normalized, priorityMessages)
+  const messages = await fetchTranslatedMessageCatalog(normalized, priorityMessages, {
+    timeoutMs: PRIORITY_MESSAGE_CATALOG_TRANSLATION_TIMEOUT_MS,
+  })
   if (!messages)
     return messageCatalog
 
@@ -370,6 +378,8 @@ async function ensureMessageCatalogLoaded(lang: string) {
   if (pending)
     return pending
 
+  // Full catalog translation runs in the background and can outlast the quick
+  // priority request because the worker translates large catalogs in many AI batches.
   const loadPromise = fetchTranslatedMessageCatalog(normalized, messageCatalog)
     .then((messages) => {
       if (!messages)
