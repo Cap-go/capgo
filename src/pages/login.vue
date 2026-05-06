@@ -65,18 +65,19 @@ const loginHeroHighlights = computed(() => [
   },
 ])
 const authCardShellClass = [
-  'rounded-[1.75rem] border border-slate-200/75 p-6 backdrop-blur-[18px] shadow-[0_34px_80px_-42px_rgba(15,23,42,0.5)]',
-  'bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(255,255,255,0.84)_100%)]',
-  'dark:border-slate-600/70 dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.88)_0%,rgba(15,23,42,0.7)_100%)]',
-  'sm:p-7',
+  'rounded-none border-0 bg-transparent p-0 shadow-none backdrop-blur-0',
+  'sm:rounded-[1.75rem] sm:border sm:border-slate-200/75 sm:bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(255,255,255,0.84)_100%)]',
+  'sm:p-7 sm:shadow-[0_34px_80px_-42px_rgba(15,23,42,0.5)] sm:backdrop-blur-[18px]',
+  'sm:dark:border-slate-600/70 sm:dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.88)_0%,rgba(15,23,42,0.7)_100%)]',
 ].join(' ')
-const authCardHeaderClass = 'flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'
+const authCardHeaderClass = 'flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'
 const authStepCardClass = [
-  'overflow-hidden rounded-3xl border border-slate-200/75 bg-white/88 shadow-[0_26px_60px_-40px_rgba(15,23,42,0.42)]',
-  'dark:border-slate-600/70 dark:bg-slate-950/80',
+  'min-w-0',
+  'sm:overflow-hidden sm:rounded-3xl sm:border sm:border-slate-200/75 sm:bg-white/88 sm:shadow-[0_26px_60px_-40px_rgba(15,23,42,0.42)]',
+  'sm:dark:border-slate-600/70 sm:dark:bg-slate-950/80',
 ].join(' ')
-const authCardBodyClass = 'px-5 py-6 sm:p-7'
-const authPanelClass = 'rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-4 text-center dark:border-slate-700 dark:bg-slate-900/70'
+const authCardBodyClass = 'py-1 sm:p-7'
+const authPanelClass = 'border-t border-slate-200/80 pt-4 text-center dark:border-slate-700 sm:rounded-2xl sm:border sm:bg-slate-50/80 sm:px-4 sm:py-4 sm:dark:bg-slate-900/70'
 const authPrimaryButtonClass = [
   'inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-4 text-base font-semibold text-white',
   'bg-[linear-gradient(135deg,rgba(36,67,102,1)_0%,rgba(12,110,184,1)_100%)] shadow-[0_20px_38px_-26px_rgba(17,158,255,0.85)]',
@@ -610,9 +611,9 @@ onMounted(checkLogin)
 
 <template>
   <section
-    class="relative flex min-h-full w-full overflow-y-auto bg-[linear-gradient(180deg,rgba(248,250,252,0.98)_0%,rgba(238,244,255,0.92)_55%,rgba(248,250,252,0.98)_100%)] dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.98)_0%,rgba(20,29,53,0.96)_52%,rgba(15,23,42,0.98)_100%)]"
+    class="relative flex h-dvh min-h-dvh w-full overflow-y-auto bg-[linear-gradient(180deg,rgba(248,250,252,0.98)_0%,rgba(238,244,255,0.9)_55%,rgba(248,250,252,0.98)_100%)] dark:bg-[linear-gradient(180deg,rgba(15,23,42,0.98)_0%,rgba(20,29,53,0.96)_52%,rgba(15,23,42,0.98)_100%)]"
   >
-    <div class="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+    <div class="pointer-events-none absolute inset-0 hidden overflow-hidden lg:block" aria-hidden="true">
       <div class="absolute top-[10%] -left-32 h-[22rem] w-[22rem] rounded-full bg-[rgba(17,158,255,0.22)] opacity-55 blur-[52px]" />
       <div class="absolute right-[-7rem] bottom-[8%] h-[18rem] w-[18rem] rounded-full bg-[rgba(104,118,225,0.18)] opacity-55 blur-[52px]" />
       <div
@@ -620,7 +621,7 @@ onMounted(checkLogin)
       />
     </div>
 
-    <div class="relative mx-auto grid w-full max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:min-h-full lg:grid-cols-[minmax(0,1.08fr)_minmax(24rem,30rem)] lg:items-center lg:px-8 lg:py-10">
+    <div class="relative mx-auto grid w-full max-w-7xl gap-6 px-4 py-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:py-8 lg:min-h-dvh lg:grid-cols-[minmax(0,1.08fr)_minmax(24rem,30rem)] lg:items-center lg:gap-8 lg:px-8 lg:py-10">
       <section class="hidden lg:block">
         <div class="max-w-2xl">
           <div class="inline-flex flex-wrap gap-2">
@@ -668,18 +669,19 @@ onMounted(checkLogin)
         </div>
       </section>
 
-      <div class="relative mx-auto w-full max-w-lg lg:max-w-none">
-        <div class="mb-6 text-center lg:hidden">
-          <img src="/capgo.webp" alt="Capgo logo" class="mx-auto mb-4 h-12 w-12 rounded-sm invert dark:invert-0">
-          <p class="text-xs font-semibold tracking-[0.24em] text-slate-500 uppercase dark:text-slate-300">
-            {{ t('login-console-kicker') }}
-          </p>
-          <h1 class="mt-4 text-3xl font-semibold leading-tight text-slate-950 dark:text-white sm:text-4xl">
-            {{ t('welcome-to') }} <span class="font-prompt">Capgo</span> !
-          </h1>
-          <p class="mx-auto mt-4 max-w-md text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">
-            {{ t('login-console-description') }}
-          </p>
+      <div class="relative mx-auto flex w-full max-w-[calc(100vw-2rem)] flex-col sm:max-w-lg lg:block lg:max-w-none">
+        <div class="mb-5 flex items-center gap-3 lg:hidden">
+          <span class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200/80 bg-white/80 shadow-sm dark:border-slate-700 dark:bg-slate-900/70">
+            <img src="/capgo.webp" alt="Capgo logo" class="h-7 w-7 rounded-sm invert dark:invert-0">
+          </span>
+          <div class="min-w-0">
+            <p class="text-[0.7rem] font-semibold tracking-[0.18em] text-slate-500 uppercase dark:text-slate-300">
+              {{ t('login-console-kicker') }}
+            </p>
+            <p class="mt-1 truncate text-sm font-medium text-slate-600 dark:text-slate-300">
+              <span class="font-prompt">Capgo</span>
+            </p>
+          </div>
         </div>
 
         <div :class="authCardShellClass">
@@ -688,19 +690,19 @@ onMounted(checkLogin)
               <p class="text-[0.72rem] font-bold tracking-[0.22em] text-slate-500 uppercase dark:text-slate-400">
                 {{ t('login-auth-kicker') }}
               </p>
-              <h2 class="mt-3 text-2xl font-semibold text-slate-950 dark:text-white">
+              <h2 class="mt-2 text-2xl font-semibold leading-tight text-slate-950 dark:text-white sm:mt-3">
                 {{ t('login-to-your-account') }}
               </h2>
               <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-300">
                 {{ t('login-auth-description') }}
               </p>
             </div>
-            <span class="self-start rounded-full border border-slate-300/90 bg-slate-50/95 px-3.5 py-2 text-[0.78rem] font-semibold text-slate-600 dark:border-slate-600/90 dark:bg-slate-800/90 dark:text-slate-200">
+            <span class="self-start shrink-0 rounded-full border border-slate-300/90 bg-white/90 px-3 py-1.5 text-[0.72rem] font-semibold text-slate-600 dark:border-slate-600/90 dark:bg-slate-800/90 dark:text-slate-200 sm:bg-slate-50/95 sm:px-3.5 sm:py-2 sm:text-[0.78rem]">
               {{ version }}
             </span>
           </div>
 
-          <div class="relative mt-6">
+          <div class="relative mt-5 sm:mt-6">
             <div v-if="hasQuerySession" :class="authStepCardClass">
               <div class="space-y-4 text-slate-500 dark:text-slate-300" :class="authCardBodyClass">
                 <p class="text-sm">

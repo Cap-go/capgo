@@ -26,6 +26,6 @@ export const authGhostButtonClass = [
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[var(--color-azure-500)]',
 ].join(' ')
 
-export const authPanelClass = 'rounded-2xl border border-slate-200/80 bg-slate-50/80 px-4 py-4 text-center dark:border-slate-700 dark:bg-slate-900/70'
+export const authPanelClass = 'border-t border-slate-200/80 pt-4 text-center dark:border-slate-700 sm:rounded-2xl sm:border sm:bg-slate-50/80 sm:px-4 sm:py-4 sm:dark:bg-slate-900/70'
 
-export const authInsetCardClass = 'rounded-2xl border border-slate-200/80 bg-white/70 p-4 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.45)] dark:border-slate-700/80 dark:bg-slate-950/55'
+export const authInsetCardClass = 'overflow-hidden rounded-xl sm:rounded-2xl sm:border sm:border-slate-200/80 sm:bg-white/70 sm:p-4 sm:shadow-[0_18px_40px_-34px_rgba(15,23,42,0.45)] sm:dark:border-slate-700/80 sm:dark:bg-slate-950/55'
