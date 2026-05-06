@@ -52,7 +52,11 @@ BEGIN
   PERFORM set_config('role', 'postgres', true);
   PERFORM set_config('request.jwt.claims', null, true);
 
+  -- This fixture relocates a seeded ready bundle to build plan math data.
+  -- Disable bundle immutability only for this test setup mutation.
+  ALTER TABLE public.app_versions DISABLE TRIGGER enforce_encrypted_bundle_trigger;
   UPDATE public.app_versions set app_id='com.demoadmin.app', r2_path='orgs/046a36ac-e03c-4590-9257-bd6c9dba9ee8/apps/com.demoadmin.app/1.359.0.zip' where id=7;
+  ALTER TABLE public.app_versions ENABLE TRIGGER enforce_encrypted_bundle_trigger;
   ALTER TABLE public.app_versions ENABLE TRIGGER force_valid_owner_org_app_versions;
   INSERT INTO "public"."daily_mau" ("app_id", "mau", "date") VALUES 
   ('com.demoadmin.app', 10, (NOW() - interval '1 day')::date);
