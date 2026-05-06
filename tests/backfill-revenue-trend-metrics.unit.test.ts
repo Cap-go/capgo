@@ -332,8 +332,15 @@ describe('revenue trend backfill metrics', () => {
     })
 
     expect(rows[0]).toMatchObject({
+      mrr: 10,
       paying: 1,
+      paying_monthly: 0,
       paying_yearly: 1,
+      plan_solo: 1,
+      plan_solo_monthly: 0,
+      plan_solo_yearly: 1,
+      revenue_solo: 120,
+      total_revenue: 120,
       upgraded_orgs: 1,
     })
   })
