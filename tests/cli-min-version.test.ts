@@ -135,7 +135,7 @@ describe('tests min version', () => {
 
     await writeBundleContent(APPNAME, `auto-min-${semverDefault}`)
 
-    // Upload with auto-min-update-version (needs metadata check enabled)
+    // Upload with auto-min-update-version:app_versions!channels_version_fkey(needs metadata check enabled)
     const result0 = await retryUpload(() => uploadBundleSDK(APPNAME, semverDefault, channelName, {
       ignoreCompatibilityCheck: false,
       packageJsonPaths: packageJsonPath,

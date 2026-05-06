@@ -1,4 +1,4 @@
-import { bigint, boolean, integer, jsonb, pgEnum, pgTable, primaryKey, serial, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
+import { bigint, boolean, integer, jsonb, numeric, pgEnum, pgTable, primaryKey, serial, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
 
 // do_not_change
 
@@ -28,6 +28,7 @@ export const apps = pgTable('apps', {
   retention: bigint('retention', { mode: 'number' }).notNull().default(2592000),
   channel_device_count: bigint('channel_device_count', { mode: 'number' }).notNull().default(0),
   manifest_bundle_count: bigint('manifest_bundle_count', { mode: 'number' }).notNull().default(0),
+  rollout_channel_count: bigint('rollout_channel_count', { mode: 'number' }).notNull().default(0),
   expose_metadata: boolean('expose_metadata').notNull().default(false),
   allow_device_custom_id: boolean('allow_device_custom_id').notNull().default(true),
   need_onboarding: boolean('need_onboarding').notNull().default(false),
@@ -55,6 +56,7 @@ export const app_versions = pgTable('app_versions', {
   r2_path: varchar('r2_path'),
   link: varchar('link'),
   comment: varchar('comment'),
+  manifest_count: integer('manifest_count').notNull().default(0),
 })
 
 export const manifest = pgTable('manifest', {
@@ -86,6 +88,23 @@ export const channels = pgTable('channels', {
   allow_device: boolean('allow_device').notNull().default(true),
   allow_dev: boolean('allow_dev').notNull().default(true),
   allow_prod: boolean('allow_prod').notNull().default(true),
+  rollout_version: bigint('rollout_version', { mode: 'number' }).references(() => app_versions.id, { onDelete: 'set null' }),
+  rollout_percentage_bps: integer('rollout_percentage_bps').notNull().default(0),
+  rollout_enabled: boolean('rollout_enabled').notNull().default(false),
+  rollout_id: uuid('rollout_id').notNull().defaultRandom(),
+  rollout_paused_at: timestamp('rollout_paused_at', { withTimezone: true }),
+  rollout_pause_reason: text('rollout_pause_reason'),
+  rollout_cache_ttl_seconds: integer('rollout_cache_ttl_seconds').notNull().default(2592000),
+  auto_pause_enabled: boolean('auto_pause_enabled').notNull().default(false),
+  auto_pause_window_minutes: integer('auto_pause_window_minutes').notNull().default(60),
+  auto_pause_failure_rate_bps: integer('auto_pause_failure_rate_bps'),
+  auto_pause_confidence: numeric('auto_pause_confidence', { precision: 5, scale: 4 }).notNull().default('0.9500'),
+  auto_pause_min_attempts: integer('auto_pause_min_attempts'),
+  auto_pause_min_failures: integer('auto_pause_min_failures'),
+  auto_pause_action: text('auto_pause_action').notNull().default('pause'),
+  auto_pause_cooldown_minutes: integer('auto_pause_cooldown_minutes').notNull().default(60),
+  auto_pause_last_triggered_at: timestamp('auto_pause_last_triggered_at', { withTimezone: true }),
+  auto_pause_last_checked_at: timestamp('auto_pause_last_checked_at', { withTimezone: true }),
   rbac_id: uuid('rbac_id').notNull(),
 })
 

@@ -146,7 +146,7 @@ app.post('/', middlewareAuth, async (c) => {
 
     const { data: channelData, error: channelError } = await supabase
       .from('channels')
-      .select('id, name, version, updated_at, version (name)')
+      .select('id, name, version, updated_at, version:app_versions!channels_version_fkey(name)')
       .eq('id', body.channel_id)
       .eq('app_id', body.app_id)
       .single()

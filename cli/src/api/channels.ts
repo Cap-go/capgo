@@ -198,7 +198,7 @@ export function findBundleIdByChannelName(supabase: SupabaseClient<Database>, ap
     .from('channels')
     .select(`
       id,
-      version (id, name)
+      version:app_versions!channels_version_fkey(id, name)
     `)
     .eq('app_id', appId)
     .eq('name', name)
@@ -263,7 +263,7 @@ export async function getActiveChannels(
       created_at,
       created_by,
       app_id,
-      version (id, name)
+      version:app_versions!channels_version_fkey(id, name)
     `)
     .eq('app_id', appid)
     .order('created_at', { ascending: false })

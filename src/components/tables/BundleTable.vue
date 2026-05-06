@@ -323,7 +323,7 @@ async function deleteOne(one: Element) {
     // Check for linked channels
     const { data: channelFound, error: errorChannel } = await supabase
       .from('channels')
-      .select('id, name, version(name)')
+      .select('id, name, version:app_versions!channels_version_fkey(name)')
       .eq('app_id', one.app_id)
       .eq('version', one.id)
 
@@ -485,7 +485,7 @@ async function massDelete() {
     return {
       data: (await supabase
         .from('channels')
-        .select('id, name, version(name)')
+        .select('id, name, version:app_versions!channels_version_fkey(name)')
         .eq('app_id', element.app_id)
         .eq('version', element.id)),
       element,

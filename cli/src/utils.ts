@@ -2026,7 +2026,7 @@ interface ChannelChecksum {
 export async function getRemoteChecksums(supabase: SupabaseClient<Database>, appId: string, channel: string) {
   const { data, error } = await supabase
     .from('channels')
-    .select(`version(checksum)`)
+    .select(`version:app_versions!channels_version_fkey(checksum)`)
     .eq('name', channel)
     .eq('app_id', appId)
     .single()
@@ -2069,7 +2069,7 @@ export function convertNativePackages(nativePackages: NativePackage[]): Map<stri
 export async function getRemoteDependencies(supabase: SupabaseClient<Database>, appId: string, channel: string) {
   const { data: remoteNativePackages, error } = await supabase
     .from('channels')
-    .select(`version ( 
+    .select(`version:app_versions!channels_version_fkey(
             native_packages 
         )`)
     .eq('name', channel)

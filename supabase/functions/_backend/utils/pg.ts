@@ -10,6 +10,7 @@ import { CacheHelper } from './cache.ts'
 import { DISPOSABLE_EMAIL_DOMAINS, PERSONAL_EMAIL_DOMAINS } from './emailClassification.ts'
 import { getClientDbRegionSB } from './geolocation.ts'
 import { cloudlog, cloudlogErr } from './logging.ts'
+import { getRolloutDecision } from './rollout.ts'
 import * as schema from './postgres_schema.ts'
 import { withOptionalManifestSelect } from './queryHelpers.ts'
 
@@ -440,31 +441,38 @@ export function closeClient(c: Context, db: ReturnType<typeof getPgClient>) {
 
 export function getAlias() {
   const versionAlias = alias(schema.app_versions, 'version')
+  const rolloutVersionAlias = alias(schema.app_versions, 'rollout_version')
   const channelDevicesAlias = alias(schema.channel_devices, 'channel_devices')
   const channelAlias = alias(schema.channels, 'channels')
-  return { versionAlias, channelDevicesAlias, channelAlias }
+  return { versionAlias, rolloutVersionAlias, channelDevicesAlias, channelAlias }
+}
+
+function getVersionSelect(versionAlias: any, prefix: string, includeMetadata = false) {
+  const versionSelect: any = {
+    id: sql<number>`${versionAlias.id}`.as(`${prefix}id`),
+    name: sql<string>`${versionAlias.name}`.as(`${prefix}name`),
+    checksum: sql<string | null>`${versionAlias.checksum}`.as(`${prefix}checksum`),
+    session_key: sql<string | null>`${versionAlias.session_key}`.as(`${prefix}session_key`),
+    key_id: sql<string | null>`${versionAlias.key_id}`.as(`${prefix}key_id`),
+    storage_provider: sql<string>`${versionAlias.storage_provider}`.as(`${prefix}storage_provider`),
+    external_url: sql<string | null>`${versionAlias.external_url}`.as(`${prefix}external_url`),
+    min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as(`${prefix}minUpdateVersion`),
+    manifest_count: sql<number>`${versionAlias.manifest_count}`.as(`${prefix}manifest_count`),
+    r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as(`${prefix}r2_path`),
+  }
+
+  if (includeMetadata) {
+    versionSelect.link = sql<string | null>`${versionAlias.link}`.as(`${prefix}link`)
+    versionSelect.comment = sql<string | null>`${versionAlias.comment}`.as(`${prefix}comment`)
+  }
+
+  return versionSelect
 }
 
 function getSchemaUpdatesAlias(includeMetadata = false) {
-  const { versionAlias, channelDevicesAlias, channelAlias } = getAlias()
-
-  const versionSelect: any = {
-    id: sql<number>`${versionAlias.id}`.as('vid'),
-    name: sql<string>`${versionAlias.name}`.as('vname'),
-    checksum: sql<string | null>`${versionAlias.checksum}`.as('vchecksum'),
-    session_key: sql<string | null>`${versionAlias.session_key}`.as('vsession_key'),
-    key_id: sql<string | null>`${versionAlias.key_id}`.as('vkey_id'),
-    storage_provider: sql<string>`${versionAlias.storage_provider}`.as('vstorage_provider'),
-    external_url: sql<string | null>`${versionAlias.external_url}`.as('vexternal_url'),
-    min_update_version: sql<string | null>`${versionAlias.min_update_version}`.as('vminUpdateVersion'),
-    r2_path: sql`${versionAlias.r2_path}`.mapWith(versionAlias.r2_path).as('vr2_path'),
-  }
-
-  // Only include link and comment when needed (for plugin v7.35.0+ with expose_metadata enabled)
-  if (includeMetadata) {
-    versionSelect.link = sql<string | null>`${versionAlias.link}`.as('vlink')
-    versionSelect.comment = sql<string | null>`${versionAlias.comment}`.as('vcomment')
-  }
+  const { versionAlias, rolloutVersionAlias, channelDevicesAlias, channelAlias } = getAlias()
+  const versionSelect = getVersionSelect(versionAlias, 'v', includeMetadata)
+  const rolloutVersionSelect = getVersionSelect(rolloutVersionAlias, 'rv', includeMetadata)
   const channelSelect = {
     id: channelAlias.id,
     name: channelAlias.name,
@@ -480,6 +488,13 @@ function getSchemaUpdatesAlias(includeMetadata = false) {
     electron: channelAlias.electron,
     allow_device_self_set: channelAlias.allow_device_self_set,
     public: channelAlias.public,
+    rollout_version: channelAlias.rollout_version,
+    rollout_percentage_bps: channelAlias.rollout_percentage_bps,
+    rollout_enabled: channelAlias.rollout_enabled,
+    rollout_id: channelAlias.rollout_id,
+    rollout_paused_at: channelAlias.rollout_paused_at,
+    rollout_pause_reason: channelAlias.rollout_pause_reason,
+    rollout_cache_ttl_seconds: channelAlias.rollout_cache_ttl_seconds,
   }
   const manifestSelect = sql<{ file_name: string, file_hash: string, s3_path: string }[]>`COALESCE(json_agg(
         json_build_object(
@@ -488,21 +503,24 @@ function getSchemaUpdatesAlias(includeMetadata = false) {
           's3_path', ${schema.manifest.s3_path}
         )
       ) FILTER (WHERE ${schema.manifest.file_name} IS NOT NULL), '[]'::json)`
-  return { versionSelect, channelDevicesAlias, channelAlias, channelSelect, manifestSelect, versionAlias }
+  return { versionSelect, rolloutVersionSelect, channelDevicesAlias, channelAlias, channelSelect, manifestSelect, versionAlias, rolloutVersionAlias }
 }
 
 function activeChannelVersionJoin(
-  channelVersionColumn: typeof schema.channels.version,
-  versionAlias: ReturnType<typeof getAlias>['versionAlias'],
+  channelVersionColumn: any,
+  versionAlias: any,
+  channelAppIdColumn?: any,
 ) {
-  // /updates still reaches app_versions through the channel/version PK join.
-  // The deleted filter is only applied to that single matched row, so it does not widen the hot-path scan.
-  return and(
+  const conditions = [
     eq(channelVersionColumn, versionAlias.id),
     or(eq(versionAlias.deleted, false), eq(versionAlias.name, 'builtin')),
-  )
-}
+  ]
 
+  if (channelAppIdColumn)
+    conditions.push(eq(versionAlias.app_id, channelAppIdColumn))
+
+  return and(...conditions)
+}
 export function requestInfosChannelDevicePostgres(
   c: Context,
   app_id: string,
@@ -589,6 +607,144 @@ export function requestInfosChannelPostgres(
   return channel
 }
 
+
+export function requestManifestEntriesPostgres(
+  c: Context,
+  versionId: number,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+) {
+  const manifestQuery = drizzleClient
+    .select({
+      file_name: schema.manifest.file_name,
+      file_hash: schema.manifest.file_hash,
+      s3_path: schema.manifest.s3_path,
+    })
+    .from(schema.manifest)
+    .where(eq(schema.manifest.app_version_id, versionId))
+
+  cloudlog({ requestId: c.get('requestId'), message: 'rollout manifest Query:', manifestQuery: manifestQuery.toSQL() })
+  return manifestQuery
+}
+
+export function requestInfosChannelDevicePostgresRollout(
+  c: Context,
+  app_id: string,
+  device_id: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  includeMetadata = false,
+) {
+  const { versionSelect, rolloutVersionSelect, channelDevicesAlias, channelAlias, channelSelect, versionAlias, rolloutVersionAlias } = getSchemaUpdatesAlias(includeMetadata)
+  const channelDevice = drizzleClient
+    .select({
+      channel_devices: {
+        device_id: channelDevicesAlias.device_id,
+        app_id: sql<string>`${channelDevicesAlias.app_id}`.as('cd_app_id'),
+      },
+      version: versionSelect,
+      rolloutVersion: rolloutVersionSelect,
+      channels: channelSelect,
+    })
+    .from(channelDevicesAlias)
+    .innerJoin(channelAlias, eq(channelDevicesAlias.channel_id, channelAlias.id))
+    .innerJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
+    .leftJoin(rolloutVersionAlias, activeChannelVersionJoin(channelAlias.rollout_version, rolloutVersionAlias, channelAlias.app_id))
+    .where(and(eq(channelDevicesAlias.device_id, device_id), eq(channelDevicesAlias.app_id, app_id)))
+    .limit(1)
+
+  cloudlog({ requestId: c.get('requestId'), message: 'channelDevice rollout Query:', channelDeviceQuery: channelDevice.toSQL() })
+  return channelDevice.then(data => data.at(0))
+}
+
+export function requestInfosChannelPostgresRollout(
+  c: Context,
+  platform: string,
+  app_id: string,
+  defaultChannel: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  includeMetadata = false,
+) {
+  const { versionSelect, rolloutVersionSelect, channelAlias, channelSelect, versionAlias, rolloutVersionAlias } = getSchemaUpdatesAlias(includeMetadata)
+  const platformQuery = platform === 'android' ? channelAlias.android : platform === 'electron' ? channelAlias.electron : channelAlias.ios
+  const channelQuery = drizzleClient
+    .select({
+      version: versionSelect,
+      rolloutVersion: rolloutVersionSelect,
+      channels: channelSelect,
+    })
+    .from(channelAlias)
+    .innerJoin(versionAlias, activeChannelVersionJoin(channelAlias.version, versionAlias))
+    .leftJoin(rolloutVersionAlias, activeChannelVersionJoin(channelAlias.rollout_version, rolloutVersionAlias, channelAlias.app_id))
+    .where(
+      !defaultChannel
+        ? and(
+            eq(channelAlias.public, true),
+            eq(channelAlias.app_id, app_id),
+            eq(platformQuery, true),
+          )
+        : and(
+            eq(channelAlias.app_id, app_id),
+            eq(channelAlias.name, defaultChannel),
+            eq(platformQuery, true),
+            or(
+              eq(channelAlias.public, true),
+              eq(channelAlias.allow_device_self_set, true),
+            ),
+          ),
+    )
+    .limit(1)
+
+  cloudlog({ requestId: c.get('requestId'), message: 'channel rollout Query:', channelQuery: channelQuery.toSQL() })
+  return channelQuery.then(data => data.at(0))
+}
+
+async function resolveRolloutChannelDataPostgres(
+  c: Context,
+  channelData: any,
+  appId: string,
+  deviceId: string,
+  currentVersionName: string,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  includeManifest: boolean,
+) {
+  if (!channelData)
+    return channelData
+
+  const stableVersion = channelData.version
+  const rolloutVersion = channelData.rolloutVersion
+  let selectedVersion = stableVersion
+
+  if (rolloutVersion?.id && channelData.channels?.rollout_version) {
+    const decision = await getRolloutDecision(c, {
+      appId,
+      channelId: channelData.channels.id,
+      currentVersionName,
+      deviceId,
+      rolloutCacheTtlSeconds: channelData.channels.rollout_cache_ttl_seconds,
+      rolloutEnabled: channelData.channels.rollout_enabled,
+      rolloutId: channelData.channels.rollout_id,
+      rolloutPausedAt: channelData.channels.rollout_paused_at,
+      rolloutPercentageBps: channelData.channels.rollout_percentage_bps,
+      rolloutVersionId: rolloutVersion.id,
+      rolloutVersionName: rolloutVersion.name,
+    })
+
+    if (decision.selected)
+      selectedVersion = rolloutVersion
+
+    cloudlog({ requestId: c.get('requestId'), message: 'rollout decision', appId, channelId: channelData.channels.id, selected: decision.selected, reason: decision.reason })
+  }
+
+  const manifestEntries = includeManifest && selectedVersion?.manifest_count > 0
+    ? await requestManifestEntriesPostgres(c, selectedVersion.id, drizzleClient)
+    : []
+
+  return {
+    ...channelData,
+    version: selectedVersion,
+    manifestEntries,
+  }
+}
+
 export function requestInfosPostgres(
   c: Context,
   platform: string,
@@ -598,22 +754,49 @@ export function requestInfosPostgres(
   drizzleClient: ReturnType<typeof getDrizzleClient>,
   channelDeviceCount?: number | null,
   manifestBundleCount?: number | null,
+  rolloutChannelCount?: number | null,
+  currentVersionName = '',
   includeMetadata = false,
 ) {
   const shouldQueryChannelOverride = channelDeviceCount === undefined || channelDeviceCount === null ? true : channelDeviceCount > 0
   const shouldFetchManifest = manifestBundleCount === undefined || manifestBundleCount === null ? true : manifestBundleCount > 0
+  const shouldUseRolloutPath = rolloutChannelCount === undefined || rolloutChannelCount === null ? false : rolloutChannelCount > 0
+
+  if (!shouldUseRolloutPath) {
+    const channelDevice = shouldQueryChannelOverride
+      ? requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient, shouldFetchManifest, includeMetadata)
+      : Promise.resolve(undefined)
+          .then(() => {
+            cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
+            return null
+          })
+    const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient, shouldFetchManifest, includeMetadata)
+
+    return Promise.all([channelDevice, channel])
+      .then(([channelOverride, channelData]) => ({ channelData, channelOverride }))
+      .catch((e) => {
+        logPgError(c, 'requestInfosPostgres', e)
+        throw e
+      })
+  }
 
   const channelDevice = shouldQueryChannelOverride
-    ? requestInfosChannelDevicePostgres(c, app_id, device_id, drizzleClient, shouldFetchManifest, includeMetadata)
+    ? requestInfosChannelDevicePostgresRollout(c, app_id, device_id, drizzleClient, includeMetadata)
     : Promise.resolve(undefined)
         .then(() => {
-          cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override query' })
+          cloudlog({ requestId: c.get('requestId'), message: 'Skipping channel device override rollout query' })
           return null
         })
-  const channel = requestInfosChannelPostgres(c, platform, app_id, defaultChannel, drizzleClient, shouldFetchManifest, includeMetadata)
+  const channel = requestInfosChannelPostgresRollout(c, platform, app_id, defaultChannel, drizzleClient, includeMetadata)
 
   return Promise.all([channelDevice, channel])
-    .then(([channelOverride, channelData]) => ({ channelData, channelOverride }))
+    .then(async ([channelOverride, channelData]) => {
+      const resolvedChannelOverride = await resolveRolloutChannelDataPostgres(c, channelOverride, app_id, device_id, currentVersionName, drizzleClient, shouldFetchManifest)
+      const resolvedChannelData = resolvedChannelOverride
+        ? channelData
+        : await resolveRolloutChannelDataPostgres(c, channelData, app_id, device_id, currentVersionName, drizzleClient, shouldFetchManifest)
+      return { channelOverride: resolvedChannelOverride, channelData: resolvedChannelData }
+    })
     .catch((e) => {
       logPgError(c, 'requestInfosPostgres', e)
       throw e
@@ -626,6 +809,7 @@ export interface AppOwnerPostgresResult {
   plan_valid: boolean
   channel_device_count: number
   manifest_bundle_count: number
+  rollout_channel_count: number
   expose_metadata: boolean
   allow_device_custom_id: boolean
 }
@@ -648,6 +832,7 @@ export async function getAppOwnerPostgres(
         plan_valid: planExpression,
         channel_device_count: schema.apps.channel_device_count,
         manifest_bundle_count: schema.apps.manifest_bundle_count,
+        rollout_channel_count: schema.apps.rollout_channel_count,
         expose_metadata: schema.apps.expose_metadata,
         allow_device_custom_id: schema.apps.allow_device_custom_id,
         orgs: {

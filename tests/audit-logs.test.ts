@@ -577,7 +577,7 @@ describe('audit logs for app_versions via API key', () => {
     expect(safe.success).toBe(true)
 
     if (safe.success) {
-      // Find the audit log for our soft-deleted version (look for 'deleted' in changed_fields)
+      // Find the audit log for our soft-deleted version:app_versions!channels_version_fkey(look for 'deleted' in changed_fields)
       const deleteAuditLog = safe.data.data.find(
         log => log.record_id === versionIdToDelete.toString()
           && log.changed_fields?.includes('deleted'),

@@ -155,7 +155,7 @@ describe('expose_metadata feature', () => {
         })
         .eq('customer_id', STRIPE_INFO_CUSTOMER_ID)
 
-      // Add link and comment to the default version (1.0.0)
+      // Add link and comment to the default version:app_versions!channels_version_fkey(1.0.0)
       const { data, error } = await supabase
         .from('app_versions')
         .update({

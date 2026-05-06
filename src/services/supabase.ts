@@ -648,8 +648,8 @@ export function convertNativePackages(nativePackages: { name: string, version: s
 export async function getRemoteDependencies(appId: string, channel: string) {
   const { data: remoteNativePackages, error } = await useSupabase()
     .from('channels')
-    .select(`version ( 
-            native_packages 
+    .select(`version:app_versions!channels_version_fkey(
+            native_packages
         )`)
     .eq('name', channel)
     .eq('app_id', appId)

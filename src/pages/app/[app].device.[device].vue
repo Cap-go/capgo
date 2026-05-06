@@ -87,7 +87,7 @@ async function getChannelOverride() {
         channel_id (
           name,
           id,
-          version (
+          version:app_versions!channels_version_fkey(
             name,
             id
           )

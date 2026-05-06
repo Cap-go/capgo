@@ -97,6 +97,25 @@ export async function setChannelInternal(channel: string, appId: string, options
     emulator,
     device,
     prod,
+    rolloutBundle,
+    rolloutPercentage,
+    rolloutPercentageBps,
+    rolloutEnable,
+    rolloutDisable,
+    rolloutPause,
+    rolloutResume,
+    rolloutRollback,
+    rolloutPromote,
+    rolloutCacheTtlSeconds,
+    autoPauseEnabled,
+    autoPauseDisabled,
+    autoPauseWindowMinutes,
+    autoPauseFailureRateBps,
+    autoPauseConfidence,
+    autoPauseMinAttempts,
+    autoPauseMinFailures,
+    autoPauseAction,
+    autoPauseCooldownMinutes,
   } = options
 
   if (latest && bundle) {
@@ -131,6 +150,25 @@ export async function setChannelInternal(channel: string, appId: string, options
     && device == null
     && prod == null
     && disableAutoUpdate == null
+    && rolloutBundle == null
+    && rolloutPercentage == null
+    && rolloutPercentageBps == null
+    && rolloutEnable == null
+    && rolloutDisable == null
+    && rolloutPause == null
+    && rolloutResume == null
+    && rolloutRollback == null
+    && rolloutPromote == null
+    && rolloutCacheTtlSeconds == null
+    && autoPauseEnabled == null
+    && autoPauseDisabled == null
+    && autoPauseWindowMinutes == null
+    && autoPauseFailureRateBps === undefined
+    && autoPauseConfidence == null
+    && autoPauseMinAttempts === undefined
+    && autoPauseMinFailures === undefined
+    && autoPauseAction == null
+    && autoPauseCooldownMinutes == null
   ) {
     if (!silent)
       log.error('Missing argument, you need to provide a option to set')
@@ -147,7 +185,7 @@ export async function setChannelInternal(channel: string, appId: string, options
     version: undefined as any,
   }
 
-  const { error: channelError } = await supabase
+  const { data: existingChannel, error: channelError } = await supabase
     .from('channels')
     .select()
     .eq('app_id', appId)
@@ -163,6 +201,25 @@ export async function setChannelInternal(channel: string, appId: string, options
   const resolvedBundleVersion = latest
     ? (extConfig?.config?.plugins?.CapacitorUpdater?.version || getBundleVersion('', options.packageJson))
     : bundle
+
+  async function findRemoteBundle(versionName: string) {
+    const { data, error: vError } = await supabase
+      .from('app_versions')
+      .select()
+      .eq('app_id', appId)
+      .eq('name', versionName)
+      .eq('user_id', userId)
+      .eq('deleted', false)
+      .single()
+
+    if (vError || !data) {
+      if (!silent)
+        log.error(`Cannot find version ${versionName}`)
+      throw new Error(`Cannot find version ${versionName}`)
+    }
+
+    return data
+  }
 
   if (resolvedBundleVersion != null) {
     const { data, error: vError } = await supabase
@@ -258,6 +315,79 @@ export async function setChannelInternal(channel: string, appId: string, options
 
     channelPayload.version = data.id
   }
+
+  if (rolloutBundle != null) {
+    const data = await findRemoteBundle(rolloutBundle)
+    channelPayload.rollout_version = data.id
+    if (rolloutEnable == null)
+      channelPayload.rollout_enabled = true
+    if (!silent)
+      log.info(`Set ${appId} channel: ${channel} rollout target to @${rolloutBundle}`)
+  }
+
+  const finalRolloutPercentageBps = rolloutPercentageBps ?? (rolloutPercentage == null ? undefined : Math.round(rolloutPercentage * 100))
+  if (finalRolloutPercentageBps != null) {
+    if (finalRolloutPercentageBps < 0 || finalRolloutPercentageBps > 10000)
+      throw new Error('Rollout percentage must be between 0 and 100')
+    channelPayload.rollout_percentage_bps = finalRolloutPercentageBps
+  }
+
+  if (rolloutEnable != null)
+    channelPayload.rollout_enabled = !!rolloutEnable
+  if (rolloutDisable)
+    channelPayload.rollout_enabled = false
+
+  if (rolloutPause) {
+    channelPayload.rollout_paused_at = new Date().toISOString()
+    channelPayload.rollout_pause_reason = 'Paused from CLI'
+  }
+
+  if (rolloutResume) {
+    channelPayload.rollout_paused_at = null
+    channelPayload.rollout_pause_reason = null
+  }
+
+  if (rolloutRollback) {
+    channelPayload.rollout_version = null
+    channelPayload.rollout_enabled = false
+    channelPayload.rollout_percentage_bps = 0
+    channelPayload.rollout_paused_at = null
+    channelPayload.rollout_pause_reason = null
+  }
+
+  if (rolloutPromote) {
+    const rolloutVersion = channelPayload.rollout_version ?? existingChannel?.rollout_version
+    if (!rolloutVersion)
+      throw new Error('Cannot promote rollout without a rollout target')
+    channelPayload.version = rolloutVersion
+    channelPayload.rollout_version = null
+    channelPayload.rollout_enabled = false
+    channelPayload.rollout_percentage_bps = 0
+    channelPayload.rollout_paused_at = null
+    channelPayload.rollout_pause_reason = null
+  }
+
+  if (rolloutCacheTtlSeconds != null)
+    channelPayload.rollout_cache_ttl_seconds = rolloutCacheTtlSeconds
+
+  if (autoPauseEnabled != null)
+    channelPayload.auto_pause_enabled = !!autoPauseEnabled
+  if (autoPauseDisabled)
+    channelPayload.auto_pause_enabled = false
+  if (autoPauseWindowMinutes != null)
+    channelPayload.auto_pause_window_minutes = autoPauseWindowMinutes
+  if (autoPauseFailureRateBps !== undefined)
+    channelPayload.auto_pause_failure_rate_bps = autoPauseFailureRateBps
+  if (autoPauseConfidence != null)
+    channelPayload.auto_pause_confidence = autoPauseConfidence as any
+  if (autoPauseMinAttempts !== undefined)
+    channelPayload.auto_pause_min_attempts = autoPauseMinAttempts
+  if (autoPauseMinFailures !== undefined)
+    channelPayload.auto_pause_min_failures = autoPauseMinFailures
+  if (autoPauseAction != null)
+    channelPayload.auto_pause_action = autoPauseAction
+  if (autoPauseCooldownMinutes != null)
+    channelPayload.auto_pause_cooldown_minutes = autoPauseCooldownMinutes
 
   if (state != null) {
     if (state !== 'normal' && state !== 'default') {

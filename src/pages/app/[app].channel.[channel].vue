@@ -26,6 +26,7 @@ import { useDisplayStore } from '~/stores/display'
 
 interface Channel {
   version: Database['public']['Tables']['app_versions']['Row']
+  rollout_version_info?: Pick<Database['public']['Tables']['app_versions']['Row'], 'id' | 'name'> | null
 }
 
 type ChannelUpdate = Database['public']['Tables']['channels']['Update']
@@ -38,12 +39,27 @@ type EditableChannelKey = 'allow_dev'
   | 'disable_auto_update_under_native'
   | 'electron'
   | 'ios'
+  | 'rollout_cache_ttl_seconds'
+  | 'rollout_enabled'
+  | 'rollout_paused_at'
+  | 'rollout_pause_reason'
+  | 'rollout_percentage_bps'
+  | 'rollout_version'
+  | 'auto_pause_enabled'
+  | 'auto_pause_window_minutes'
+  | 'auto_pause_failure_rate_bps'
+  | 'auto_pause_confidence'
+  | 'auto_pause_min_attempts'
+  | 'auto_pause_min_failures'
+  | 'auto_pause_action'
+  | 'auto_pause_cooldown_minutes'
   | 'version'
 
 // Bundle link dialog state
 const bundleLinkVersions = ref<Database['public']['Tables']['app_versions']['Row'][]>([])
 const bundleLinkSearchVal = ref('')
 const bundleLinkSearchMode = ref(false)
+const bundleLinkMode = ref<'stable' | 'rollout'>('stable')
 
 const main = useMainStore()
 const route = useRoute('/app/[app].channel.[channel]')
@@ -111,7 +127,7 @@ async function getChannel(force = false) {
           name,
           public,
           owner_org,
-          version (
+          version:app_versions!channels_version_fkey(
             id,
             name,
             app_id,
@@ -120,6 +136,26 @@ async function getChannel(force = false) {
             storage_provider,
             link,
             comment
+          ),
+          rollout_version,
+          rollout_percentage_bps,
+          rollout_enabled,
+          rollout_id,
+          rollout_paused_at,
+          rollout_pause_reason,
+          rollout_cache_ttl_seconds,
+          auto_pause_enabled,
+          auto_pause_window_minutes,
+          auto_pause_failure_rate_bps,
+          auto_pause_confidence,
+          auto_pause_min_attempts,
+          auto_pause_min_failures,
+          auto_pause_action,
+          auto_pause_cooldown_minutes,
+          auto_pause_last_triggered_at,
+          rollout_version_info:app_versions!channels_rollout_version_fkey(
+            id,
+            name
           ),
           created_at,
           app_id,
@@ -255,6 +291,13 @@ async function handleVersionLink(appVersion: Database['public']['Tables']['app_v
   else {
     toast.info(t('bundle-compatible-with-channel', { channel: channel.value.name }))
   }
+  if (bundleLinkMode.value === 'rollout') {
+    await saveChannelChange('rollout_version', appVersion.id as any)
+    await saveChannelChange('rollout_enabled', true as any)
+    toast.success(t('rollout-target-linked'))
+    return
+  }
+
   await saveChannelChange('version', appVersion.id)
   toast.success(t('linked-bundle'))
 }
@@ -402,6 +445,52 @@ async function openSelectVersion() {
   })
 
   await dialogStore.onDialogDismiss()
+}
+
+async function openSelectStableVersion() {
+  bundleLinkMode.value = 'stable'
+  await openSelectVersion()
+}
+
+async function openSelectRolloutVersion() {
+  bundleLinkMode.value = 'rollout'
+  await openSelectVersion()
+}
+
+async function saveRolloutPercentage(value: string) {
+  const percentage = Number.parseFloat(value)
+  if (Number.isNaN(percentage) || percentage < 0 || percentage > 100) {
+    toast.error(t('invalid-rollout-percentage'))
+    return
+  }
+  await saveChannelChange('rollout_percentage_bps', Math.round(percentage * 100) as any)
+}
+
+async function rollbackRollout() {
+  await Promise.all([
+    saveChannelChange('rollout_version', null as any),
+    saveChannelChange('rollout_enabled', false as any),
+    saveChannelChange('rollout_percentage_bps', 0 as any),
+    saveChannelChange('rollout_paused_at', null as any),
+    saveChannelChange('rollout_pause_reason', null as any),
+  ])
+}
+
+async function promoteRollout() {
+  if (!channel.value?.rollout_version)
+    return
+  await saveChannelChange('version', channel.value.rollout_version as any)
+  await rollbackRollout()
+}
+
+async function toggleRolloutPause() {
+  if (channel.value?.rollout_paused_at) {
+    await saveChannelChange('rollout_paused_at', null as any)
+    await saveChannelChange('rollout_pause_reason', null as any)
+    return
+  }
+  await saveChannelChange('rollout_paused_at', new Date().toISOString() as any)
+  await saveChannelChange('rollout_pause_reason', t('manual-rollout-pause') as any)
 }
 
 async function refreshFilteredVersions() {
@@ -689,7 +778,7 @@ async function copyCurlCommand() {
                   v-if="channel"
                   class="p-1 transition-colors border border-gray-200 rounded-md dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:border-gray-200 dark:disabled:hover:border-gray-700"
                   :disabled="!canPromoteBundle"
-                  @click="openSelectVersion()"
+                  @click="openSelectStableVersion()"
                 >
                   <Settings class="w-4 h-4 text-gray-500 dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400" />
                 </button>
@@ -718,6 +807,100 @@ async function copyCurlCommand() {
             <!-- Bundle Comment -->
             <InfoRow v-if="channel.version.comment" :label="t('bundle-comment')">
               {{ channel.version.comment }}
+            </InfoRow>
+            <InfoRow :label="t('progressive-rollout')">
+              <div class="flex flex-col items-end w-full gap-3 text-right sm:flex-row sm:items-center sm:justify-end">
+                <div class="flex flex-col items-end gap-1">
+                  <span class="font-medium text-slate-900 dark:text-white">
+                    {{ channel?.rollout_version_info?.name ?? t('not-configured') }}
+                  </span>
+                  <span v-if="channel.rollout_pause_reason" class="text-xs text-amber-600 dark:text-amber-300">
+                    {{ channel.rollout_pause_reason }}
+                  </span>
+                </div>
+                <span
+                  class="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-md"
+                  :class="channel.rollout_enabled && !channel.rollout_paused_at
+                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200'
+                    : 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200'"
+                >
+                  {{ channel.rollout_paused_at ? t('paused') : channel.rollout_enabled ? t('enabled') : t('disabled') }}
+                </span>
+                <div class="flex flex-wrap justify-end gap-2">
+                  <button class="d-btn d-btn-sm d-btn-outline" :disabled="!canPromoteBundle" @click="openSelectRolloutVersion()">
+                    {{ t('set-rollout-target') }}
+                  </button>
+                  <button class="d-btn d-btn-sm d-btn-outline" :disabled="!canPromoteBundle || !channel.rollout_version" @click="saveChannelChange('rollout_enabled', !channel.rollout_enabled as any)">
+                    {{ channel.rollout_enabled ? t('disable') : t('enable') }}
+                  </button>
+                  <button class="d-btn d-btn-sm d-btn-outline" :disabled="!canPromoteBundle || !channel.rollout_version" @click="toggleRolloutPause()">
+                    {{ channel.rollout_paused_at ? t('resume') : t('pause') }}
+                  </button>
+                  <button class="d-btn d-btn-sm d-btn-outline" :disabled="!canPromoteBundle || !channel.rollout_version" @click="promoteRollout()">
+                    {{ t('promote') }}
+                  </button>
+                  <button class="d-btn d-btn-sm d-btn-error d-btn-outline" :disabled="!canPromoteBundle || !channel.rollout_version" @click="rollbackRollout()">
+                    {{ t('rollback') }}
+                  </button>
+                </div>
+              </div>
+            </InfoRow>
+            <InfoRow :label="t('rollout-percentage')">
+              <div class="flex items-center justify-end w-full gap-3">
+                <input
+                  class="w-24 d-input d-input-sm d-input-bordered"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  :disabled="!canPromoteBundle"
+                  :value="(channel.rollout_percentage_bps ?? 0) / 100"
+                  @change="saveRolloutPercentage(($event.target as HTMLInputElement).value)"
+                >
+                <span class="text-sm text-slate-500 dark:text-slate-300">%</span>
+              </div>
+            </InfoRow>
+            <InfoRow :label="t('auto-pause')">
+              <div class="flex flex-col items-end w-full gap-2 text-right">
+                <label class="inline-flex items-center gap-2 text-sm">
+                  <input
+                    class="d-toggle d-toggle-sm"
+                    type="checkbox"
+                    :checked="channel.auto_pause_enabled"
+                    :disabled="!canPromoteBundle"
+                    @change="saveChannelChange('auto_pause_enabled', !channel.auto_pause_enabled as any)"
+                  >
+                  <span>{{ channel.auto_pause_enabled ? t('enabled') : t('disabled') }}</span>
+                </label>
+                <div class="flex flex-wrap justify-end gap-2">
+                  <input
+                    class="w-28 d-input d-input-sm d-input-bordered"
+                    type="number"
+                    min="0"
+                    max="10000"
+                    :disabled="!canPromoteBundle"
+                    :placeholder="t('failure-rate-bps')"
+                    :value="channel.auto_pause_failure_rate_bps ?? ''"
+                    @change="saveChannelChange('auto_pause_failure_rate_bps', Number(($event.target as HTMLInputElement).value) as any)"
+                  >
+                  <select
+                    class="d-select d-select-sm d-select-bordered"
+                    :disabled="!canPromoteBundle"
+                    :value="channel.auto_pause_action"
+                    @change="saveChannelChange('auto_pause_action', ($event.target as HTMLSelectElement).value as any)"
+                  >
+                    <option value="pause">
+                      {{ t('pause') }}
+                    </option>
+                    <option value="rollback">
+                      {{ t('rollback') }}
+                    </option>
+                    <option value="notify">
+                      {{ t('notify') }}
+                    </option>
+                  </select>
+                </div>
+              </div>
             </InfoRow>
             <InfoRow :label="t('channel-is-public')">
               <div class="flex items-center justify-end w-full gap-3 text-right">
@@ -927,11 +1110,11 @@ async function copyCurlCommand() {
           <!-- Current Bundle Info -->
           <div class="flex flex-col gap-1 px-1">
             <div class="text-sm font-medium text-gray-500 dark:text-gray-400">
-              {{ t('current-bundle') }}
+              {{ bundleLinkMode === 'rollout' ? t('current-rollout-target') : t('current-bundle') }}
             </div>
             <div class="flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-white">
               <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              {{ currentChannelVersion?.name || t('unknown') }}
+              {{ bundleLinkMode === 'rollout' ? (channel?.rollout_version_info?.name || t('not-configured')) : (currentChannelVersion?.name || t('unknown')) }}
             </div>
           </div>
 
