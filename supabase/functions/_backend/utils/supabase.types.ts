@@ -1141,6 +1141,7 @@ export type Database = {
           id: number
           org_id: string
           timestamp: string
+          version_build: string | null
         }
         Insert: {
           app_id: string
@@ -1148,6 +1149,7 @@ export type Database = {
           id?: number
           org_id: string
           timestamp?: string
+          version_build?: string | null
         }
         Update: {
           app_id?: string
@@ -1155,6 +1157,7 @@ export type Database = {
           id?: number
           org_id?: string
           timestamp?: string
+          version_build?: string | null
         }
         Relationships: []
       }
@@ -4210,6 +4213,14 @@ export type Database = {
           app_id: string
           date: string
           mau: number
+        }[]
+      }
+      read_native_version_usage: {
+        Args: { p_app_id: string; p_period_end: string; p_period_start: string }
+        Returns: {
+          date: string
+          devices: number
+          version_build: string
         }[]
       }
       read_storage_usage: {
