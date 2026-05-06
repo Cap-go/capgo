@@ -289,7 +289,7 @@ async function insertPendingTranslationStoreEntry(c: Context, entry: Translation
   await ensureTranslationStore(db)
   await deleteExpiredTranslationStoreEntries(db)
   const result = await db.prepare(
-    `INSERT OR IGNORE INTO ${TRANSLATION_STORE_TABLE} (
+    `INSERT INTO ${TRANSLATION_STORE_TABLE} (
        target_language,
        checksum,
        model,
@@ -299,7 +299,15 @@ async function insertPendingTranslationStoreEntry(c: Context, entry: Translation
        expires_at,
        updated_at
      )
-     VALUES (?, ?, ?, ?, ?, ?, unixepoch() + ?, unixepoch())`,
+     VALUES (?, ?, ?, ?, ?, ?, unixepoch() + ?, unixepoch())
+     ON CONFLICT (target_language, checksum) DO UPDATE
+     SET model = excluded.model,
+         status = excluded.status,
+         messages = excluded.messages,
+         next_batch_index = excluded.next_batch_index,
+         expires_at = excluded.expires_at,
+         updated_at = unixepoch()
+     WHERE ${TRANSLATION_STORE_TABLE}.expires_at <= unixepoch()`,
   ).bind(entry.targetLanguage, entry.checksum, entry.model, entry.status, JSON.stringify(entry.messages), entry.nextBatchIndex, CACHE_TTL_SECONDS).run()
 
   return result.meta.changes > 0
