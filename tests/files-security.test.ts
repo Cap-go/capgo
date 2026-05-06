@@ -6,7 +6,6 @@ import {
   fetchWithRetry,
   getEndpointUrl,
   getSupabaseClient,
-  headers,
   USER_ID,
 } from './test-utils.ts'
 
@@ -20,7 +19,7 @@ function buildAttachmentPath(orgId: string, appId: string, filename: string) {
   }
 }
 
-async function createUploadScopedKey(appId: string, name: string): Promise<{ id: number, key: string }> {
+async function createScopedKey(appId: string, name: string, mode: 'all' | 'upload' = 'upload'): Promise<{ id: number, key: string }> {
   // Seed the scoped key directly so this suite only validates files behavior.
   // API key creation behavior is covered in the dedicated apikey suites and can
   // otherwise introduce unrelated worker-auth flakiness here.
@@ -31,7 +30,7 @@ async function createUploadScopedKey(appId: string, name: string): Promise<{ id:
       user_id: USER_ID,
       key: plainKey,
       key_hash: null,
-      mode: 'upload',
+      mode,
       name,
       limited_to_apps: [appId],
     })
@@ -51,11 +50,11 @@ async function createUploadScopedKey(appId: string, name: string): Promise<{ id:
   }
 }
 
-async function cleanupSeededOrg(appId: string, orgId: string, stripeCustomerId: string, apikeyId?: number) {
+async function cleanupSeededOrg(appId: string, orgId: string, stripeCustomerId: string, apikeyIds: number[] = []) {
   const supabase = getSupabaseClient()
 
-  if (apikeyId != null) {
-    await supabase.from('apikeys').delete().eq('id', apikeyId)
+  if (apikeyIds.length > 0) {
+    await supabase.from('apikeys').delete().in('id', apikeyIds)
   }
 
   await executeSQL('SELECT public.reset_app_data($1)', [appId])
@@ -83,7 +82,7 @@ describe('attachment upload plan gating regression', () => {
   beforeAll(async () => {
     await seedApp(appId, orgId, stripeCustomerId)
 
-    const createdKey = await createUploadScopedKey(appId, `upload-only-${appId}`)
+    const createdKey = await createScopedKey(appId, `upload-only-${appId}`)
     uploadKeyId = createdKey.id
     uploadKey = createdKey.key
 
@@ -95,7 +94,7 @@ describe('attachment upload plan gating regression', () => {
   }, 60_000)
 
   afterAll(async () => {
-    await cleanupSeededOrg(appId, orgId, stripeCustomerId, uploadKeyId)
+    await cleanupSeededOrg(appId, orgId, stripeCustomerId, uploadKeyId == null ? [] : [uploadKeyId])
   }, 60_000)
 
   it('blocks attachment uploads for plan-blocked apps even with upload-scoped API keys', async () => {
@@ -125,21 +124,32 @@ describe('attachment cleanup on app deletion regression', () => {
   const appId = `com.files.delete.${scopeId}`
   let uploadKeyId: number | undefined
   let uploadKey: string | undefined
+  let deleteKeyId: number | undefined
+  let deleteKey: string | undefined
 
   beforeAll(async () => {
     await seedApp(appId, orgId, stripeCustomerId)
-    const createdKey = await createUploadScopedKey(appId, `upload-cleanup-${appId}`)
+    const createdKey = await createScopedKey(appId, `upload-cleanup-${appId}`)
     uploadKeyId = createdKey.id
     uploadKey = createdKey.key
+
+    const createdDeleteKey = await createScopedKey(appId, `delete-cleanup-${appId}`, 'all')
+    deleteKeyId = createdDeleteKey.id
+    deleteKey = createdDeleteKey.key
   }, 60_000)
 
   afterAll(async () => {
-    await cleanupSeededOrg(appId, orgId, stripeCustomerId, uploadKeyId)
+    await cleanupSeededOrg(
+      appId,
+      orgId,
+      stripeCustomerId,
+      [uploadKeyId, deleteKeyId].filter((id): id is number => id != null),
+    )
   }, 60_000)
 
   it('returns not_found for uploaded attachments after the app is deleted', async () => {
     const body = new TextEncoder().encode('delete-me-after-app-delete')
-    const { filePath, uploadMetadata } = buildAttachmentPath(orgId, appId, 'orphan-check.txt')
+    const { filePath, uploadMetadata } = buildAttachmentPath(orgId, appId, `orphan-check-${randomUUID()}.txt`)
 
     const createResponse = await fetch(getEndpointUrl('/files/upload/attachments'), {
       method: 'POST',
@@ -174,7 +184,9 @@ describe('attachment cleanup on app deletion regression', () => {
 
     const deleteResponse = await fetchWithRetry(`${BASE_URL}/app/${appId}`, {
       method: 'DELETE',
-      headers,
+      headers: {
+        Authorization: deleteKey!,
+      },
     })
     expect(deleteResponse.status).toBe(200)
 
