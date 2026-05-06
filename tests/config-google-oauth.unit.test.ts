@@ -35,4 +35,39 @@ describe('GET /private/config/google_oauth', () => {
       scopes: ['https://www.googleapis.com/auth/androidpublisher'],
     })
   })
+
+  it('returns enabled:false with no other fields when neither required env var is set', async () => {
+    const response = await get({})
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ enabled: false })
+  })
+
+  it('returns enabled:false when only GOOGLE_OAUTH_CLIENT_ID is set', async () => {
+    const response = await get({
+      GOOGLE_OAUTH_CLIENT_ID: '1234.apps.googleusercontent.com',
+    })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ enabled: false })
+  })
+
+  it('returns enabled:false when only GOOGLE_OAUTH_CLIENT_SECRET is set', async () => {
+    const response = await get({
+      GOOGLE_OAUTH_CLIENT_SECRET: 'GOCSPX-abc',
+    })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ enabled: false })
+  })
+
+  it('treats whitespace-only env vars the same as missing (returns enabled:false)', async () => {
+    const response = await get({
+      GOOGLE_OAUTH_CLIENT_ID: '   ',
+      GOOGLE_OAUTH_CLIENT_SECRET: '\t\n',
+    })
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ enabled: false })
+  })
 })
