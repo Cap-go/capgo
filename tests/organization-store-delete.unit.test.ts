@@ -49,6 +49,10 @@ vi.mock('~/services/supabase', () => ({
 
 vi.mock('~/services/storage', () => ({
   createSignedImageUrl: mockCreateSignedImageUrl,
+  getImmediateImageUrl: (value?: string | null) => {
+    const { normalized, shouldSign } = mockResolveImagePath(value)
+    return shouldSign ? '' : normalized
+  },
   resolveImagePath: mockResolveImagePath,
 }))
 
