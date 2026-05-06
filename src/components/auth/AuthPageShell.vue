@@ -68,7 +68,7 @@ const heroHighlights = computed(() => props.heroHighlights ?? [
       />
     </div>
 
-    <div class="relative mx-auto grid w-full max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:min-h-screen lg:grid-cols-[minmax(0,1.04fr)_minmax(24rem,38rem)] lg:items-center lg:px-8 lg:py-10">
+    <div class="relative mx-auto grid w-full max-w-7xl gap-8 px-4 py-8 sm:px-6 lg:min-h-screen lg:grid-cols-[minmax(0,1.08fr)_minmax(24rem,30rem)] lg:items-center lg:px-8 lg:py-10 xl:grid-cols-[minmax(0,1.12fr)_minmax(24rem,32rem)]">
       <section class="hidden lg:block">
         <div class="max-w-2xl">
           <div class="inline-flex flex-wrap gap-2">
@@ -116,17 +116,11 @@ const heroHighlights = computed(() => props.heroHighlights ?? [
         </div>
       </section>
 
-      <div class="relative mx-auto w-full lg:max-w-none" :class="cardWidthClass">
+      <div class="relative mx-auto w-full min-w-0 max-w-[calc(100vw-2rem)]! lg:max-w-none!" :class="cardWidthClass">
         <div class="mb-6 text-center lg:hidden">
           <img src="/capgo.webp" alt="Capgo logo" class="mx-auto mb-4 h-12 w-12 rounded-sm invert dark:invert-0">
           <p class="text-xs font-semibold tracking-[0.24em] text-slate-500 uppercase dark:text-slate-300">
             {{ heroKickerValue }}
-          </p>
-          <h1 class="mt-4 text-3xl font-semibold leading-tight text-slate-950 dark:text-white sm:text-4xl">
-            {{ heroTitleValue }}
-          </h1>
-          <p class="mx-auto mt-4 max-w-md text-sm leading-6 text-slate-600 dark:text-slate-300 sm:text-base">
-            {{ heroDescriptionValue }}
           </p>
         </div>
 

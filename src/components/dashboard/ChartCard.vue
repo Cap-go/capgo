@@ -60,10 +60,7 @@ const displayNoDataMessage = computed(() => props.noDataMessage ?? t('no-data'))
           <div class="min-w-0 flex-1">
             <slot name="header">
               <div class="min-w-0">
-                <p class="text-[0.68rem] font-semibold tracking-[0.24em] text-slate-400 uppercase dark:text-slate-500">
-                  {{ t('dashboard-card-kicker') }}
-                </p>
-                <h2 class="mt-3 max-w-[18rem] text-xl font-semibold leading-tight text-slate-900 dark:text-white sm:text-2xl">
+                <h2 class="text-xl font-semibold leading-tight text-slate-900 dark:text-white sm:text-2xl">
                   {{ title }}
                 </h2>
               </div>
