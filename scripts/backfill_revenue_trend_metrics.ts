@@ -91,9 +91,9 @@ interface PriceLookupEntry {
 interface RevenueSubscriptionState {
   activeUntilSeconds: number | null
   customerId: string
-  interval: BillingInterval
+  interval: BillingInterval | null
   mrr: number
-  plan: PlanKey
+  plan: PlanKey | null
   priceId: string
   subscriptionId: string
 }
@@ -346,6 +346,19 @@ function getItemPriceId(item: Stripe.SubscriptionItem | null | undefined) {
   return item.plan?.id ?? toStripeId(item.price) ?? null
 }
 
+function getItemBillingInterval(item: Stripe.SubscriptionItem | null | undefined): BillingInterval | null {
+  const priceInterval = (item?.price as { recurring?: { interval?: unknown } } | undefined)?.recurring?.interval
+  const planInterval = (item?.plan as { interval?: unknown } | undefined)?.interval
+  const interval = priceInterval ?? planInterval
+
+  if (interval === 'month')
+    return 'monthly'
+  if (interval === 'year')
+    return 'yearly'
+
+  return null
+}
+
 function getItemPeriodEndSeconds(item: Stripe.SubscriptionItem | null | undefined) {
   const periodEnd = (item as { current_period_end?: number } | null | undefined)?.current_period_end
   return typeof periodEnd === 'number' && Number.isFinite(periodEnd) ? periodEnd : null
@@ -411,9 +424,8 @@ function buildStateFromSubscription(
   if (!priceId)
     return null
 
-  const price = priceLookup.get(priceId)
-  if (!price)
-    return null
+  const price = priceLookup.get(priceId) ?? null
+  const interval = price?.interval ?? getItemBillingInterval(item)
 
   const status = options.status ?? subscription.status
   const eventSeconds = options.eventSeconds ?? null
@@ -433,9 +445,9 @@ function buildStateFromSubscription(
   return {
     activeUntilSeconds: endSeconds && !activeByStatus ? endSeconds : subscription.cancel_at_period_end ? endSeconds : null,
     customerId,
-    interval: price.interval,
-    mrr: price.mrr,
-    plan: price.plan,
+    interval,
+    mrr: price?.mrr ?? 0,
+    plan: price?.plan ?? null,
     priceId,
     subscriptionId: subscription.id,
   }
@@ -514,11 +526,13 @@ function recordTransition(
 ) {
   const currentMrr = currentState?.mrr ?? 0
   const nextMrr = nextState?.mrr ?? 0
+  const currentActive = Boolean(currentState)
+  const nextActive = Boolean(nextState)
   const customerId = nextState?.customerId ?? currentState?.customerId
   if (!customerId)
     return
 
-  if (currentMrr <= 0 && nextMrr > 0) {
+  if (!currentActive && nextActive) {
     if (!seenPaidCustomerIds.has(customerId)) {
       daily?.newCustomerIds.add(customerId)
       seenPaidCustomerIds.add(customerId)
@@ -529,21 +543,15 @@ function recordTransition(
   if (!daily)
     return
 
-  if (
-    currentMrr > 0
-    && nextMrr > 0
-    && (
-      nextMrr > currentMrr
-      || (currentState?.interval === 'monthly' && nextState?.interval === 'yearly')
-    )
-  ) {
+  const isRevenueUpgrade = currentMrr > 0 && nextMrr > currentMrr
+  const isCadenceUpgrade = currentState?.interval === 'monthly' && nextState?.interval === 'yearly'
+  if (currentActive && nextActive && (isRevenueUpgrade || isCadenceUpgrade))
     daily.upgradedCustomerIds.add(customerId)
-  }
 
-  if (currentMrr > 0 && nextMrr <= 0) {
+  if (currentActive && !nextActive) {
     daily.canceledCustomerIds.add(customerId)
     daily.churnRevenue += currentMrr
-    if (currentState)
+    if (currentState?.plan)
       daily.churnRevenueByPlan[currentState.plan] += currentMrr
     return
   }
@@ -551,7 +559,7 @@ function recordTransition(
   if (currentMrr > nextMrr) {
     const lostMrr = currentMrr - nextMrr
     daily.churnRevenue += lostMrr
-    if (currentState)
+    if (currentState?.plan)
       daily.churnRevenueByPlan[currentState.plan] += lostMrr
   }
 }
@@ -604,8 +612,7 @@ function seedBaselineStatesFromSubscriptions(
     if (subscription.created >= fromStartSeconds)
       continue
     states.set(getStateKey(state), state)
-    if (state.mrr > 0)
-      seenPaidCustomerIds.add(state.customerId)
+    seenPaidCustomerIds.add(state.customerId)
   }
 }
 
@@ -661,8 +668,7 @@ function seedOpeningStateFromFirstRangeEvents(
     const previousState = buildPreviousStateFromEvent(event, priceLookup)
     if (previousState) {
       states.set(getStateKey(previousState), previousState)
-      if (previousState.mrr > 0)
-        seenPaidCustomerIds.add(previousState.customerId)
+      seenPaidCustomerIds.add(previousState.customerId)
     }
   }
 }
@@ -679,7 +685,8 @@ function expireStatesForDate(states: Map<string, RevenueSubscriptionState>, date
 
     daily.canceledCustomerIds.add(state.customerId)
     daily.churnRevenue += state.mrr
-    daily.churnRevenueByPlan[state.plan] += state.mrr
+    if (state.plan)
+      daily.churnRevenueByPlan[state.plan] += state.mrr
     states.delete(getStateKey(state))
   }
 }
@@ -694,8 +701,11 @@ export function summarizeRevenueSnapshot(states: Iterable<RevenueSubscriptionSta
 
     if (state.interval === 'monthly')
       metrics.paying_monthly++
-    else
+    else if (state.interval === 'yearly')
       metrics.paying_yearly++
+
+    if (!state.plan)
+      continue
 
     if (state.plan === 'solo') {
       metrics.plan_solo++
