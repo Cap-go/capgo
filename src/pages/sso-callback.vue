@@ -5,8 +5,11 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import IconLoader from '~icons/lucide/loader-2'
+import IconTriangleAlert from '~icons/lucide/triangle-alert'
+import { authGhostButtonClass, authSecondaryButtonClass } from '~/components/auth/pageStyles'
 import { useSSOProvisioning } from '~/composables/useSSOProvisioning'
 import { useSupabase } from '~/services/supabase'
+import { openSupport } from '~/services/support'
 
 const route = useRoute()
 const router = useRouter()
@@ -148,40 +151,50 @@ onMounted(completeSsoLogin)
 </script>
 
 <template>
-  <div class="flex flex-col justify-center items-center p-4 min-h-screen bg-gray-50 dark:bg-slate-900">
-    <div class="p-8 space-y-6 w-full max-w-md bg-white rounded-lg shadow-lg dark:bg-slate-800">
-      <div class="text-center">
-        <img src="/capgo.webp" alt="logo" class="mx-auto mb-4 w-16 rounded-sm invert dark:invert-0">
-        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">
-          SSO Authentication
-        </h1>
+  <AuthPageShell
+    card-width-class="max-w-md"
+    card-kicker="SSO"
+    :card-title="t('continue-with-sso')"
+    :card-description="t('login-to-your-account')"
+  >
+    <div class="space-y-5 text-center text-slate-500 dark:text-slate-300">
+      <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-slate-200/80 bg-slate-50/85 shadow-[0_20px_40px_-32px_rgba(15,23,42,0.45)] dark:border-slate-700/80 dark:bg-slate-900/80">
+        <component :is="isLoading ? IconLoader : IconTriangleAlert" class="h-8 w-8" :class="isLoading ? 'animate-spin text-[var(--color-azure-500)]' : 'text-rose-500 dark:text-rose-300'" />
+      </div>
 
-        <div v-if="isLoading" class="mt-6 space-y-4">
-          <div class="flex justify-center">
-            <IconLoader class="w-10 h-10 text-blue-500 animate-spin" />
-          </div>
-          <p class="text-gray-700 dark:text-gray-300">
-            Completing sign in...
-          </p>
-        </div>
+      <div v-if="isLoading" class="space-y-3">
+        <p class="text-base font-semibold text-slate-900 dark:text-white">
+          {{ t('continue-with-sso') }}
+        </p>
+        <p class="text-sm leading-6">
+          {{ t('login-to-your-account') }}
+        </p>
+      </div>
 
-        <div v-else class="mt-6 space-y-4">
-          <p class="font-medium text-red-600">
-            {{ errorMessage }}
-          </p>
-          <p class="text-gray-700 dark:text-gray-300">
-            Please try again or contact your administrator.
-          </p>
-          <router-link
-            to="/login"
-            class="inline-flex justify-center items-center py-3 px-6 text-base font-semibold text-white rounded-md transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden"
-          >
-            Back to Login
-          </router-link>
+      <div v-else class="space-y-4">
+        <div class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-4 text-sm font-medium text-rose-700 dark:border-rose-900/70 dark:bg-rose-950/30 dark:text-rose-200">
+          {{ errorMessage }}
         </div>
+        <p class="text-sm leading-6">
+          {{ t('something-went-wrong-try-again-later') }}
+        </p>
+        <router-link to="/login" :class="authSecondaryButtonClass">
+          {{ t('back-to-login-page') }}
+        </router-link>
       </div>
     </div>
-  </div>
+
+    <template #footer>
+      <section class="mt-6 flex flex-col items-center">
+        <div class="mx-auto">
+          <LangSelector />
+        </div>
+        <button class="mt-3" :class="authGhostButtonClass" @click="openSupport">
+          {{ t('support') }}
+        </button>
+      </section>
+    </template>
+  </AuthPageShell>
 </template>
 
 <route lang="yaml">

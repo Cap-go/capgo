@@ -3,8 +3,14 @@ import type { Database } from '~/types/supabase.types'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import VueTurnstile from 'vue-turnstile'
+import IconCheck from '~icons/lucide/check'
+import IconLoader from '~icons/lucide/loader-2'
+import IconShield from '~icons/lucide/shield-check'
+import IconX from '~icons/lucide/x'
+import { authGhostButtonClass, authInsetCardClass, authPrimaryButtonClass, authSecondaryButtonClass } from '~/components/auth/pageStyles'
 import Toggle from '~/components/Toggle.vue'
 import { useSupabase } from '~/services/supabase'
+import { openSupport } from '~/services/support'
 
 const { t } = useI18n()
 const route = useRoute('/invitation')
@@ -17,7 +23,8 @@ const captchaComponent = ref<InstanceType<typeof VueTurnstile> | null>(null)
 const password = ref('')
 const inviteMagicString = ref('')
 const inviteRow = ref<Database['public']['Functions']['get_invite_by_magic_lookup']['Returns'][0] | null>(null)
-const isLoading = ref(true)
+const isLoading = ref(false)
+const isFetchingInvite = ref(true)
 const isError = ref(null) as Ref<string | null>
 const supabase = useSupabase()
 
@@ -49,6 +56,25 @@ const isPasswordValid = computed(() =>
   && hasNumber.value
   && hasSymbols.value,
 )
+const invitationTitle = computed(() => inviteRow.value ? `${t('welcome-to')} Capgo` : t('accept-invitation'))
+const inviteDescription = computed(() => inviteRow.value ? t('invitation-page-description') : '')
+const passwordChecks = computed(() => [
+  { label: t('at-least-6-characters'), passed: hasMinLength.value },
+  { label: t('at-least-one-uppercase-letter'), passed: hasUppercase.value },
+  { label: t('at-least-one-number'), passed: hasNumber.value },
+  { label: t('at-least-one-special-character'), passed: hasSymbols.value },
+])
+const organizationInitials = computed(() => {
+  const name = inviteRow.value?.org_name?.trim() ?? ''
+  if (!name)
+    return 'CG'
+
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map(part => part[0]?.toUpperCase() ?? '')
+    .join('')
+})
 
 onMounted(async () => {
   const supabase = useSupabase()
@@ -62,15 +88,15 @@ onMounted(async () => {
       captchaComponent.value?.reset()
       console.error('Error fetching invite:', error)
       isError.value = error.message
-      isLoading.value = false
+      isFetchingInvite.value = false
     }
     else {
       inviteRow.value = data
-      isLoading.value = false
+      isFetchingInvite.value = false
     }
   }
   else {
-    isLoading.value = false
+    isFetchingInvite.value = false
   }
 
   const { data: claimsData } = await supabase.auth.getClaims()
@@ -149,160 +175,137 @@ function openPrivacy() {
 </script>
 
 <template>
-  <section class="flex w-full h-full py-10 overflow-y-auto sm:py-8 lg:py-2">
-    <div class="px-4 mx-auto max-w-7xl sm:px-6 lg:px-8" style="margin-top: 5vh;">
-      <div class="max-w-2xl mx-auto text-center">
-        <img src="/capgo.webp" alt="logo" class="w-1/6 mx-auto mb-6 rounded-sm invert dark:invert-0">
-        <h1 class="text-3xl font-bold leading-tight text-black sm:text-4xl lg:text-5xl dark:text-white">
-          {{ t('welcome-to') }}
-          <p class="inline font-prompt">
-            Capgo
-          </p> !
-        </h1>
-        <template v-if="!isLoading && inviteRow">
-          <p class="max-w-xl mx-auto mt-6 text-base leading-relaxed text-gray-600 dark:text-gray-300">
-            {{ t('invitation-page') }}
-          </p>
-          <p class="max-w-xl mx-auto mt-2 text-base leading-relaxed text-gray-600 dark:text-gray-300">
-            {{ t('invitation-page-description') }}
-          </p>
-        </template>
-      </div>
-      <div v-if="!isLoading" class="relative mx-auto mt-8 max-w-md md:mt-4 pb-[10vh]">
-        <div v-if="inviteRow">
-          <div class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
-            <div class="px-4 py-6 text-gray-500 sm:py-7 sm:px-8">
-              <div class="space-y-5">
-                <!-- Organization Section -->
-                <div class="mb-6">
-                  <h2 class="mb-3 text-lg font-medium text-center text-gray-700 dark:text-gray-300">
-                    Organization
-                  </h2>
-                  <div class="flex flex-col items-center mb-4">
-                    <img v-if="inviteRow.org_logo" :src="inviteRow.org_logo" alt="organization logo" class="w-16 h-16 mb-2 rounded-sm">
-                    <div v-else class="p-6 mb-3 text-xl bg-gray-700 d-mask d-mask-squircle">
-                      <span class="font-medium text-gray-300">
-                        N/A
-                      </span>
-                    </div>
-                    <p class="font-medium text-gray-800 dark:text-gray-200">
-                      {{ t('organization-name') }}: {{ inviteRow.org_name }}
-                    </p>
-                    <p class="text-gray-600 dark:text-gray-400">
-                      {{ t('your-role-in-org') }}: {{ inviteRow.role.replace('_', ' ') }}
-                    </p>
-                  </div>
-                </div>
+  <AuthPageShell
+    card-width-class="max-w-xl"
+    :card-kicker="t('accept-invitation')"
+    :card-title="invitationTitle"
+    :card-description="inviteDescription"
+  >
+    <div v-if="isFetchingInvite" class="flex items-center justify-center py-12">
+      <Spinner size="w-14 h-14" />
+    </div>
 
-                <!-- Separator -->
-                <div class="w-full h-px bg-gray-300 dark:bg-gray-600" />
-
-                <!-- Login Details Section -->
-                <div class="mb-6">
-                  <h2 class="mb-3 text-lg font-medium text-center text-gray-700 dark:text-gray-300">
-                    Your login details
-                  </h2>
-
-                  <div class="mb-4">
-                    <label for="password" class="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">{{ t('password-colon') }}</label>
-                    <input
-                      v-model="password"
-                      type="password"
-                      :placeholder="t('password-placeholder')"
-                      autocomplete="new-password"
-                      class="w-full px-3 py-2 text-gray-700 border border-gray-300 rounded-md dark:text-gray-300 dark:bg-gray-800 dark:border-gray-600 focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                    >
-
-                    <!-- Password requirements section -->
-                    <div class="p-4 mt-3 bg-gray-100 rounded-md dark:bg-gray-700">
-                      <h3 class="mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">
-                        Password Requirements:
-                      </h3>
-                      <ul class="space-y-2 text-sm">
-                        <li class="flex items-center" :class="hasMinLength ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
-                          <span class="mr-2">{{ hasMinLength ? '✓' : '✗' }}</span>
-                          {{ t('at-least-6-characters') }}
-                        </li>
-                        <li class="flex items-center" :class="hasUppercase ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
-                          <span class="mr-2">{{ hasUppercase ? '✓' : '✗' }}</span>
-                          {{ t('at-least-one-uppercase-letter') }}
-                        </li>
-                        <li class="flex items-center" :class="hasNumber ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
-                          <span class="mr-2">{{ hasNumber ? '✓' : '✗' }}</span>
-                          {{ t('at-least-one-number') }}
-                        </li>
-                        <li class="flex items-center" :class="hasSymbols ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'">
-                          <span class="mr-2">{{ hasSymbols ? '✓' : '✗' }}</span>
-                          {{ t('at-least-one-special-character') }}
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Terms and Conditions Section -->
-                <div class="mb-4">
-                  <div class="flex items-center mb-4">
-                    <Toggle :value="acceptTerms" class="mr-2" @update:value="acceptTerms = !acceptTerms" />
-                    <span class="text-sm text-gray-700 dark:text-gray-300">
-                      {{ t('accept-terms-of-service-and-privacy-policy') }}
-                      <a class="text-blue-600 cursor-pointer hover:underline" @click="openTos">{{ t('terms-of-service') }}</a>
-                      {{ t('and') }}
-                      <a class="text-blue-600 cursor-pointer hover:underline" @click="openPrivacy">{{ t('privacy-policy') }}</a>
-                    </span>
-                  </div>
-                </div>
-
-                <!-- Marketing Consent Section -->
-                <div class="mb-6">
-                  <div class="flex items-center">
-                    <Toggle :value="acceptMarketing" class="mr-2" @update:value="acceptMarketing = !acceptMarketing" />
-                    <span class="text-sm text-gray-700 dark:text-gray-300">
-                      {{ t('accept-email-newsletter-and-future-marketing-offers') }}
-                    </span>
-                  </div>
-                </div>
-                <div v-if="!!captchaKey">
-                  <VueTurnstile ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
-                </div>
-
-                <!-- Submit Button -->
-                <button
-                  :disabled="!isPasswordValid || !acceptTerms"
-                  class="w-full px-4 py-3 text-base font-semibold text-white transition-all duration-200 rounded-md focus:outline-none"
-                  :class="isPasswordValid && acceptTerms ? 'bg-muted-blue-700 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'"
-                  @click="submitForm"
-                >
-                  {{ t('accept-invitation') }}
-                </button>
-              </div>
+    <div v-else-if="inviteRow" class="space-y-5 text-slate-500 dark:text-slate-300">
+      <div :class="authInsetCardClass">
+        <div class="flex items-start gap-4">
+          <img v-if="inviteRow.org_logo" :src="inviteRow.org_logo" alt="organization logo" class="h-16 w-16 rounded-2xl border border-slate-200 object-cover dark:border-slate-700">
+          <div v-else class="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-900 text-sm font-semibold tracking-[0.18em] text-white">
+            {{ organizationInitials }}
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-xs font-semibold tracking-[0.18em] text-slate-500 uppercase dark:text-slate-400">
+              {{ t('organization-name') }}
+            </p>
+            <p class="mt-2 text-lg font-semibold text-slate-900 dark:text-white">
+              {{ inviteRow.org_name }}
+            </p>
+            <div class="mt-3 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">
+              <IconShield class="h-3.5 w-3.5" />
+              {{ t('your-role-in-org') }}: {{ inviteRow.role.replace('_', ' ') }}
             </div>
           </div>
         </div>
-        <div v-else class="p-6 mt-12 bg-white rounded-md shadow-md dark:bg-slate-800">
-          <div class="flex flex-col items-center justify-center h-full">
-            <p class="text-xl text-center">
-              {{ t('invitation-page-not-found') }}
-            </p>
-            <p class="mt-2 mt-8 text-center text-md">
-              {{ t('you-can-still-join-capgo') }}
-            </p>
-            <p v-if="isError" class="mt-2 text-center text-md">
-              {{ t('error-message-invitation') }}: {{ isError }}
-            </p>
-            <button class="w-full px-4 py-3 mt-12 text-base font-semibold text-white transition-all duration-200 bg-blue-700 rounded-md hover:scale-105 focus:outline-none" @click="joinCapgo">
-              {{ t('join-capgo') }}
-            </button>
+      </div>
+
+      <div :class="authInsetCardClass">
+        <label for="password" class="block text-sm font-medium text-slate-800 dark:text-slate-100">{{ t('password-colon') }}</label>
+        <input
+          id="password"
+          v-model="password"
+          type="password"
+          :placeholder="t('password-placeholder')"
+          autocomplete="new-password"
+          class="mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-azure-400 focus:ring-2 focus:ring-azure-100 dark:border-slate-700 dark:bg-slate-950 dark:text-white dark:placeholder:text-slate-500 dark:focus:border-azure-400 dark:focus:ring-azure-200/20"
+        >
+
+        <div class="mt-4 grid gap-2">
+          <div
+            v-for="entry in passwordChecks"
+            :key="entry.label"
+            class="flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition-colors"
+            :class="entry.passed
+              ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800/70 dark:bg-emerald-950/30 dark:text-emerald-200'
+              : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/70 dark:bg-rose-950/30 dark:text-rose-200'"
+          >
+            <component :is="entry.passed ? IconCheck : IconX" class="h-4 w-4 shrink-0" />
+            <span>{{ entry.label }}</span>
           </div>
         </div>
       </div>
-      <div v-else>
-        <div class="flex items-center justify-center h-full mt-12">
-          <Spinner size="w-40 h-40" />
+
+      <div :class="authInsetCardClass">
+        <div class="space-y-4">
+          <label class="flex items-start gap-3">
+            <Toggle :value="acceptTerms" class="mt-0.5 shrink-0" @update:value="acceptTerms = !acceptTerms" />
+            <span class="text-sm leading-6 text-slate-600 dark:text-slate-300">
+              {{ t('accept-terms-of-service-and-privacy-policy') }}
+              <button type="button" class="font-semibold text-[rgb(255,114,17)] transition-colors duration-200 hover:text-[rgb(235,94,0)]" @click="openTos">
+                {{ t('terms-of-service') }}
+              </button>
+              {{ t('and') }}
+              <button type="button" class="font-semibold text-[rgb(255,114,17)] transition-colors duration-200 hover:text-[rgb(235,94,0)]" @click="openPrivacy">
+                {{ t('privacy-policy') }}
+              </button>
+            </span>
+          </label>
+
+          <div v-if="showTermsError" class="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700 dark:border-rose-900/70 dark:bg-rose-950/30 dark:text-rose-200">
+            {{ t('accept-terms-of-service-and-privacy-policy') }}
+          </div>
+
+          <label class="flex items-start gap-3">
+            <Toggle :value="acceptMarketing" class="mt-0.5 shrink-0" @update:value="acceptMarketing = !acceptMarketing" />
+            <span class="text-sm leading-6 text-slate-600 dark:text-slate-300">
+              {{ t('accept-email-newsletter-and-future-marketing-offers') }}
+            </span>
+          </label>
         </div>
       </div>
+
+      <div v-if="captchaKey" :class="authInsetCardClass">
+        <VueTurnstile ref="captchaComponent" v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
+      </div>
+
+      <button
+        :disabled="isLoading || !isPasswordValid || !acceptTerms"
+        :aria-busy="isLoading ? 'true' : 'false'"
+        :class="authPrimaryButtonClass"
+        @click="submitForm"
+      >
+        <IconLoader v-if="isLoading" class="h-5 w-5 animate-spin" />
+        <span>{{ t('accept-invitation') }}</span>
+      </button>
     </div>
-  </section>
+
+    <div v-else class="space-y-5 text-center text-slate-500 dark:text-slate-300">
+      <div class="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-rose-200 bg-rose-50 text-rose-600 dark:border-rose-900/70 dark:bg-rose-950/30 dark:text-rose-200">
+        <IconX class="h-7 w-7" />
+      </div>
+      <p class="text-xl font-semibold text-slate-900 dark:text-white">
+        {{ t('invitation-page-not-found') }}
+      </p>
+      <p class="text-sm leading-6">
+        {{ t('you-can-still-join-capgo') }}
+      </p>
+      <div v-if="isError" class="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 dark:border-rose-900/70 dark:bg-rose-950/30 dark:text-rose-200">
+        {{ isError }}
+      </div>
+      <button :class="authSecondaryButtonClass" @click="joinCapgo">
+        {{ t('join-capgo') }}
+      </button>
+    </div>
+
+    <template #footer>
+      <section class="mt-6 flex flex-col items-center">
+        <div class="mx-auto">
+          <LangSelector />
+        </div>
+        <button class="mt-3" :class="authGhostButtonClass" @click="openSupport">
+          {{ t('support') }}
+        </button>
+      </section>
+    </template>
+  </AuthPageShell>
 </template>
 
 <route lang="yaml">
