@@ -37,6 +37,11 @@ export function resolveImagePath(raw?: string | null) {
   }
 }
 
+export function getImmediateImageUrl(raw?: string | null) {
+  const { normalized, shouldSign } = resolveImagePath(raw)
+  return shouldSign ? '' : normalized
+}
+
 export async function createSignedImageUrl(path?: string | null, options: { forceRefresh?: boolean } = {}) {
   const { normalized, shouldSign } = resolveImagePath(path)
   if (!normalized)

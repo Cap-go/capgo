@@ -17,7 +17,7 @@ import IconWrench from '~icons/heroicons/wrench'
 import RoleSelect from '~/components/forms/RoleSelect.vue'
 import SearchInput from '~/components/forms/SearchInput.vue'
 import { checkPermissions } from '~/services/permissions'
-import { createSignedImageUrl } from '~/services/storage'
+import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
@@ -111,6 +111,51 @@ const selectedUserToDelegateAdmin = ref()
 const searchUserForAdminDelegation = ref('')
 
 const members = ref([] as OrganizationMemberRows)
+let memberImageLoadRun = 0
+
+interface MemberImageSource {
+  key: string
+  imageUrl?: string | null
+}
+
+function getMemberImageKey(member: { uid?: string | null, id?: string | number | null, email?: string | null }) {
+  return String(member.uid ?? member.id ?? member.email ?? '')
+}
+
+function applySignedMemberImages(signedImages: Map<string, string>) {
+  members.value = members.value.map((member) => {
+    const signedImage = signedImages.get(getMemberImageKey(member))
+    return signedImage ? { ...member, image_url: signedImage } : member
+  })
+}
+
+async function loadMemberImages(sources: MemberImageSource[], run: number) {
+  const signedEntries = await Promise.all(sources.map(async (source) => {
+    if (!source.key || !source.imageUrl || getImmediateImageUrl(source.imageUrl))
+      return null
+
+    try {
+      const signedImage = await createSignedImageUrl(source.imageUrl)
+      return signedImage ? [source.key, signedImage] as const : null
+    }
+    catch (error) {
+      console.warn('Cannot load signed member image', { memberKey: source.key, error })
+      return null
+    }
+  }))
+
+  if (run !== memberImageLoadRun)
+    return
+
+  const signedImages = new Map<string, string>()
+  for (const entry of signedEntries) {
+    if (entry)
+      signedImages.set(entry[0], entry[1])
+  }
+
+  if (signedImages.size > 0)
+    applySignedMemberImages(signedImages)
+}
 
 const isInviteFormValid = computed(() => {
   return inviteUserFirstName.value.trim() !== ''
@@ -417,6 +462,7 @@ columns.value = [
 
 async function reloadData() {
   isLoading.value = true
+  const imageLoadRun = ++memberImageLoadRun
   try {
     await checkRbacEnabled()
 
@@ -433,29 +479,37 @@ async function reloadData() {
         return
       }
 
+      const memberImageSources: MemberImageSource[] = []
       // Mapper les données RBAC vers le format attendu par la table
-      members.value = await Promise.all((rbacMembers || []).map(async (member: any) => {
+      members.value = (rbacMembers || []).map((member: any) => {
         const isInvite = member.is_invite === true
         const isTmp = member.is_tmp === true
         const orgUserId = member.org_user_id
         const hasOrgUserInvite = isInvite && !isTmp && orgUserId != null && orgUserId !== ''
-        const signedImage = member.image_url ? await createSignedImageUrl(member.image_url) : ''
+        const memberKey = String(member.user_id ?? member.email ?? '')
+        memberImageSources.push({ key: memberKey, imageUrl: member.image_url })
 
         return {
           id: member.user_id,
           aid: hasOrgUserInvite ? Number(orgUserId) : -1,
           uid: member.user_id,
           email: member.email,
-          image_url: signedImage || '',
+          image_url: getImmediateImageUrl(member.image_url) || '',
           role: member.role_name,
           is_tmp: isTmp,
           is_invite: isInvite,
         }
-      }))
+      })
+      void loadMemberImages(memberImageSources, imageLoadRun)
     }
     else {
       // Utiliser l'ancienne méthode pour les orgs sans RBAC
-      members.value = await organizationStore.getMembers()
+      members.value = await organizationStore.getMembers((signedImages) => {
+        if (imageLoadRun !== memberImageLoadRun)
+          return
+
+        applySignedMemberImages(signedImages)
+      })
     }
   }
   catch (error) {
