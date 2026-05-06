@@ -70,7 +70,24 @@
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
-      ]
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "TRANSLATION_MESSAGES_QUEUE",
+            "queue": "capgo-api-prod-translation-messages"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "capgo-api-prod-translation-messages",
+            "max_batch_size": 1,
+            "max_batch_timeout": 5,
+            "max_retries": 5,
+            "retry_delay": 30
+          }
+        ]
+      }
     },
     "preprod": {
       "name": "capgo_api-preprod",
@@ -125,7 +142,24 @@
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
-      ]
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "TRANSLATION_MESSAGES_QUEUE",
+            "queue": "capgo-api-preprod-translation-messages"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "capgo-api-preprod-translation-messages",
+            "max_batch_size": 1,
+            "max_batch_timeout": 5,
+            "max_retries": 5,
+            "retry_delay": 30
+          }
+        ]
+      }
     },
     "alpha": {
       "name": "capgo_api-alpha",
@@ -180,7 +214,24 @@
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
-      ]
+      ],
+      "queues": {
+        "producers": [
+          {
+            "binding": "TRANSLATION_MESSAGES_QUEUE",
+            "queue": "capgo-api-alpha-translation-messages"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "capgo-api-alpha-translation-messages",
+            "max_batch_size": 1,
+            "max_batch_timeout": 5,
+            "max_retries": 5,
+            "retry_delay": 30
+          }
+        ]
+      }
     },
     "local": {
       "name": "capgo_api-local",
@@ -189,7 +240,31 @@
       },
       "vars": {
         "ENV_NAME": "capgo_api-local"
-      }
+      },
+      "queues": {
+        "producers": [
+          {
+            "binding": "TRANSLATION_MESSAGES_QUEUE",
+            "queue": "capgo-api-local-translation-messages"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "capgo-api-local-translation-messages",
+            "max_batch_size": 1,
+            "max_batch_timeout": 5,
+            "max_retries": 5,
+            "retry_delay": 30
+          }
+        ]
+      },
+      "d1_databases": [
+        {
+          "binding": "DB_STOREAPPS",
+          "database_name": "capgo_prod_storeapps",
+          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
+        }
+      ]
     }
   }
 }
