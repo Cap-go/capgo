@@ -7,6 +7,20 @@ import { capturePosthogException } from './posthog.ts'
 import { backgroundTask } from './utils.ts'
 
 const drizzleErrorNames = new Set(['DrizzleError', 'DrizzleQueryError', 'TransactionRollbackError'])
+const filesUploadFunctionNames = new Set(['files', 'TUS handler'])
+
+function isFilesDurableObjectStorageTimeout(functionName: string, error: unknown): boolean {
+  if (!filesUploadFunctionNames.has(functionName) || !error || typeof error !== 'object' || !('message' in error))
+    return false
+
+  const { message } = error as { message?: unknown }
+  if (typeof message !== 'string')
+    return false
+
+  const normalizedMessage = message.toLowerCase()
+  return normalizedMessage.includes('storage operation exceeded timeout')
+    && normalizedMessage.includes('object to be reset')
+}
 
 export function onError(functionName: string) {
   return async (e: any, c: Context) => {
@@ -153,6 +167,7 @@ export function onError(functionName: string) {
       return c.json(defaultResponse, 500)
     }
     // Non-HTTP errors: log with stack and return 500
+    const suppressDiscordAlert = isFilesDurableObjectStorageTimeout(functionName, e)
     cloudlogErr({
       requestId: c.get('requestId'),
       functionName,
@@ -162,7 +177,9 @@ export function onError(functionName: string) {
       errorMessage: e?.message ?? 'Unknown error',
       stack: serializeError(e)?.stack ?? 'N/A',
     })
-    await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
+    if (!suppressDiscordAlert)
+      await backgroundTask(c, sendDiscordAlert500(c, functionName, body, e))
+
     void backgroundTask(c, capturePosthogException(c, {
       error: e,
       functionName,
