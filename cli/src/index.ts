@@ -10,6 +10,7 @@ import { listApp } from './app/list'
 import { setApp } from './app/set'
 import { setSetting } from './app/setting'
 import { clearCredentialsCommand, listCredentialsCommand, migrateCredentialsCommand, saveCredentialsCommand, updateCredentialsCommand } from './build/credentials-command'
+import { manageCredentialsCommand } from './build/credentials-manage'
 import { onboardingBuilderCommand } from './build/onboarding/command'
 import { requestBuildCommand } from './build/request'
 import { cleanupBundle } from './bundle/cleanup'
@@ -952,6 +953,23 @@ Examples:
   .option('--output-retention <duration>', 'Output link TTL: 1h to 7d. Examples: 1h, 6h, 2d')
   .option('--skip-build-number-bump', 'Skip automatic build number/version code incrementing on future builds')
   .option('--no-skip-build-number-bump', 'Re-enable automatic build number incrementing (default behavior)')
+
+buildCredentials
+  .command('manage')
+  .description(`Interactively manage saved build credentials.
+
+Browse stored credentials, view what's configured, export a CI/CD-ready .env file,
+or delete a platform's credentials. Reuses the same TUI as \`capgo init\`.
+
+Examples:
+  npx @capgo/cli build credentials manage
+  npx @capgo/cli build credentials manage --appId com.example.app
+  npx @capgo/cli build credentials manage --appId com.example.app --platform ios
+  npx @capgo/cli build credentials manage --local`)
+  .action(manageCredentialsCommand)
+  .option('--appId <appId>', 'App ID to manage (optional, prompts to pick if omitted)')
+  .option('--platform <platform>', 'Platform to manage: ios or android (optional, prompts to pick if omitted)')
+  .option('--local', 'Only browse local .capgo-credentials.json')
 
 buildCredentials
   .command('migrate')
