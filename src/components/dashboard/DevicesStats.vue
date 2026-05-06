@@ -301,20 +301,6 @@ function generateDayLabels(_totalLength: number) {
   return generateChartDayLabels(props.useBillingPeriod, startDate, endDate)
 }
 
-function roundPercentageInString(text: string) {
-  if (!text)
-    return text
-
-  return text.replace(/(\d+(?:\.\d+)?)(?=%)/g, (match) => {
-    const numeric = Number(match)
-    if (Number.isNaN(numeric))
-      return match
-
-    const rounded = Number(numeric.toFixed(1))
-    return Number.isInteger(rounded) ? Math.trunc(rounded).toString() : rounded.toFixed(1)
-  })
-}
-
 const processedChartData = computed<ChartData<'line'> | null>(() => {
   if (!rawChartData.value)
     return null
@@ -537,22 +523,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
 
   const pluginOptions = {
     legend: {
-      display: hasMultipleDatasets,
-      position: 'bottom',
-      labels: {
-        color: isDark.value ? 'white' : 'black',
-        padding: 10,
-        font: {
-          size: 11,
-        },
-        generateLabels(chart: Chart) {
-          const original = Chart.defaults.plugins.legend.labels.generateLabels(chart)
-          return original.map(item => ({
-            ...item,
-            text: roundPercentageInString(item.text),
-          }))
-        },
-      },
+      display: false,
     },
     title: { display: false },
     tooltip: tooltipOptions,
@@ -746,6 +717,6 @@ watch(
       </div>
     </template>
 
-    <Line :data="processedChartData!" :options="chartOptions" :plugins="chartPlugins" />
+    <Line class="h-full w-full" :data="processedChartData!" :options="chartOptions" :plugins="chartPlugins" />
   </ChartCard>
 </template>
