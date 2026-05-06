@@ -14,7 +14,7 @@ import gearSix from '~icons/ph/gear-six?raw'
 import iconName from '~icons/ph/user?raw'
 import Toggle from '~/components/Toggle.vue'
 import { checkPermissions } from '~/services/permissions'
-import { createSignedImageUrl } from '~/services/storage'
+import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
 import { useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
@@ -95,6 +95,23 @@ function initializeRetentionPreset() {
   }
 }
 
+let appIconLoadRun = 0
+async function loadAppSettingIcon(rawIconUrl: string | null | undefined, run: number) {
+  if (!rawIconUrl || getImmediateImageUrl(rawIconUrl))
+    return
+
+  try {
+    const signedIconUrl = await createSignedImageUrl(rawIconUrl)
+    if (!signedIconUrl || run !== appIconLoadRun || !appRef.value)
+      return
+
+    appRef.value.icon_url = signedIconUrl
+  }
+  catch (error) {
+    console.warn('Cannot load signed app setting icon', { appId: props.appId, error })
+  }
+}
+
 onMounted(async () => {
   isLoading.value = true
 
@@ -112,9 +129,13 @@ onMounted(async () => {
   }
 
   await organizationStore.awaitInitialLoad()
-  appRef.value = data as any
-  if (appRef.value?.icon_url)
-    appRef.value.icon_url = await createSignedImageUrl(appRef.value.icon_url)
+  const rawIconUrl = data.icon_url
+  const iconLoadRun = ++appIconLoadRun
+  appRef.value = {
+    ...(data as any),
+    icon_url: getImmediateImageUrl(rawIconUrl) || null,
+  }
+  void loadAppSettingIcon(rawIconUrl, iconLoadRun)
   initializeRetentionPreset()
   await loadChannels()
   isLoading.value = false

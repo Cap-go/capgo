@@ -10,7 +10,7 @@ import IconCopy from '~icons/ion/copy-outline'
 import IconCheck from '~icons/lucide/check'
 import IconLoader from '~icons/lucide/loader-2'
 import { createDefaultApiKey } from '~/services/apikeys'
-import { createSignedImageUrl } from '~/services/storage'
+import { createSignedImageUrl, getImmediateImageUrl } from '~/services/storage'
 import { getLocalConfig, isLocal, useSupabase } from '~/services/supabase'
 import { useDialogV2Store } from '~/stores/dialogv2'
 import { useMainStore } from '~/stores/main'
@@ -173,6 +173,23 @@ function getStoreUrls(url: string) {
   return { iosStoreUrl: null, androidStoreUrl: null }
 }
 
+let resumeIconLoadRun = 0
+async function loadResumeIconPreview(rawIconUrl: string | null | undefined, appId: string, run: number) {
+  if (!rawIconUrl || getImmediateImageUrl(rawIconUrl))
+    return
+
+  try {
+    const signedIconUrl = await createSignedImageUrl(rawIconUrl)
+    if (!signedIconUrl || run !== resumeIconLoadRun || createdApp.value?.app_id !== appId)
+      return
+
+    localIconPreview.value = signedIconUrl
+  }
+  catch (error) {
+    console.warn('Cannot load signed resume app icon', { appId, error })
+  }
+}
+
 async function ensureApiKey() {
   const userId = main.user?.id
   if (!userId)
@@ -233,8 +250,9 @@ async function loadResumeApp() {
   existingApp.value = data.existing_app ?? null
   storeUrl.value = data.ios_store_url ?? data.android_store_url ?? ''
   importedStoreAppId.value = extractAndroidAppId(data.android_store_url ?? '') || ''
-  if (data.icon_url)
-    localIconPreview.value = await createSignedImageUrl(data.icon_url) ?? ''
+  const iconLoadRun = ++resumeIconLoadRun
+  localIconPreview.value = getImmediateImageUrl(data.icon_url) || ''
+  void loadResumeIconPreview(data.icon_url, data.app_id, iconLoadRun)
   storeScreenshotPreview.value = ''
   flowStep.value = 'install'
   return true
