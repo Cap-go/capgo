@@ -1,3 +1,6 @@
+import type { ExecutionContext, MessageBatch } from '@cloudflare/workers-types'
+import type { TranslationQueuePayload } from '../../supabase/functions/_backend/public/translation.ts'
+import type { Bindings } from '../../supabase/functions/_backend/utils/cloudflare.ts'
 import { app as accept_invitation } from '../../supabase/functions/_backend/private/accept_invitation.ts'
 import { app as admin_credits } from '../../supabase/functions/_backend/private/admin_credits.ts'
 import { app as admin_stats } from '../../supabase/functions/_backend/private/admin_stats.ts'
@@ -157,7 +160,6 @@ appTriggers.route('/cron_stat_app', cron_stat_app)
 appTriggers.route('/cron_stat_org', cron_stat_org)
 appTriggers.route('/cron_sync_sub', cron_sync_sub)
 appTriggers.route('/queue_consumer', queue_consumer)
-appTriggers.route('/translation_messages', translation_messages)
 appTriggers.route('/webhook_delivery', webhook_delivery)
 appTriggers.route('/webhook_dispatcher', webhook_dispatcher)
 
@@ -170,4 +172,22 @@ createAllCatch(appTriggers, functionNameTriggers)
 
 export default {
   fetch: app.fetch,
+  async queue(batch: MessageBatch<Required<TranslationQueuePayload>>, env: Bindings, ctx: ExecutionContext) {
+    for (const message of batch.messages) {
+      try {
+        const response = await translation_messages.fetch(new Request('https://translation-messages.queue/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(message.body),
+        }), env, ctx)
+        if (!response.ok)
+          throw new Error(`Translation queue consumer failed with ${response.status}`)
+
+        message.ack()
+      }
+      catch {
+        message.retry({ delaySeconds: 30 })
+      }
+    }
+  },
 }

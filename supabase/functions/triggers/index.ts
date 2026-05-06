@@ -1,4 +1,3 @@
-import { queueApp as translation_messages } from '../_backend/public/translation.ts'
 import { app as credit_usage_alerts } from '../_backend/triggers/credit_usage_alerts.ts'
 import { app as cron_clean_orphan_images } from '../_backend/triggers/cron_clean_orphan_images.ts'
 import { app as cron_clear_versions } from '../_backend/triggers/cron_clear_versions.ts'
@@ -59,7 +58,6 @@ appGlobal.route('/credit_usage_alerts', credit_usage_alerts)
 appGlobal.route('/on_organization_delete', on_organization_delete)
 appGlobal.route('/on_deploy_history_create', on_deploy_history_create)
 appGlobal.route('/queue_consumer', queue_consumer)
-appGlobal.route('/translation_messages', translation_messages)
 appGlobal.route('/webhook_delivery', webhook_delivery)
 appGlobal.route('/webhook_dispatcher', webhook_dispatcher)
 
