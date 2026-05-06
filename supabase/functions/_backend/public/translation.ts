@@ -481,6 +481,27 @@ async function writeTranslationStoreEntry(c: Context, entry: TranslationStoreEnt
   await upsertTranslationStoreEntry(db, entry)
 }
 
+async function insertPendingTranslationStoreEntry(c: Context, entry: TranslationStoreEntry) {
+  const db = getTranslationStore(c)
+  await ensureTranslationStore(db)
+  await deleteExpiredTranslationStoreEntries(db)
+  const result = await db.prepare(
+    `INSERT OR IGNORE INTO ${TRANSLATION_STORE_TABLE} (
+       target_language,
+       checksum,
+       model,
+       status,
+       messages,
+       next_batch_index,
+       expires_at,
+       updated_at
+     )
+     VALUES (?, ?, ?, ?, ?, ?, unixepoch() + ?, unixepoch())`,
+  ).bind(entry.targetLanguage, entry.checksum, entry.model, entry.status, JSON.stringify(entry.messages), entry.nextBatchIndex, CACHE_TTL_SECONDS).run()
+
+  return result.meta.changes > 0
+}
+
 async function touchTranslationStoreEntry(c: Context, entry: TranslationStoreEntry) {
   const db = getTranslationStore(c)
   await ensureTranslationStore(db)
@@ -520,10 +541,6 @@ async function deleteTranslationStoreEntry(c: Context, entry: TranslationStoreEn
 }
 
 async function queueTranslationIfNeeded(c: Context, payload: Required<TranslationQueuePayload>) {
-  const existingEntry = await readTranslationStoreEntry(c, payload.checksum, payload.targetLanguage)
-  if (existingEntry)
-    return existingEntry
-
   const pendingEntry: TranslationStoreEntry = {
     checksum: payload.checksum,
     messages: {},
@@ -534,7 +551,15 @@ async function queueTranslationIfNeeded(c: Context, payload: Required<Translatio
     updatedAt: nowSeconds(),
   }
 
-  await writeTranslationStoreEntry(c, pendingEntry)
+  const claimed = await insertPendingTranslationStoreEntry(c, pendingEntry)
+  if (!claimed) {
+    const existingEntry = await readTranslationStoreEntry(c, payload.checksum, payload.targetLanguage)
+    if (existingEntry)
+      return existingEntry
+
+    quickError(503, 'translation_unavailable', 'Translation queue is not available')
+  }
+
   try {
     await enqueueTranslationBatch(c, payload)
   }
