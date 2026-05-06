@@ -9,6 +9,7 @@ import { APIKEY_ENCRYPTED, APP_NAME_ENCRYPTED, getAuthHeadersForCredentials, get
 // - APP_NAME_ENCRYPTED: com.encrypted.app
 // This ensures test isolation and prevents interference with parallel tests.
 
+const APIKEY_ENCRYPTED_SCOPED_NAME = `encrypted scoped test key ${randomUUID()}`
 const headersEncrypted = {
   'Content-Type': 'application/json',
   'Authorization': APIKEY_ENCRYPTED,
@@ -17,6 +18,33 @@ const USER_EMAIL_ENCRYPTED = 'encrypted@capgo.app'
 const USER_EMAIL_2 = 'test2@capgo.app'
 let authHeadersEncrypted: Record<string, string>
 let authHeadersUser2: Record<string, string>
+let apiKeyEncryptedScoped: string
+
+async function resetEncryptedBundleSettings() {
+  await getSupabaseClient()
+    .from('orgs')
+    .update({ enforce_encrypted_bundles: false, required_encryption_key: null })
+    .eq('id', ORG_ID_ENCRYPTED)
+    .throwOnError()
+}
+
+async function enableEncryptedBundleEnforcement() {
+  await getSupabaseClient()
+    .from('orgs')
+    .update({ enforce_encrypted_bundles: true })
+    .eq('id', ORG_ID_ENCRYPTED)
+    .throwOnError()
+}
+
+async function withEncryptedBundleEnforcement<T>(callback: () => Promise<T>) {
+  await enableEncryptedBundleEnforcement()
+  try {
+    return await callback()
+  }
+  finally {
+    await resetEncryptedBundleSettings()
+  }
+}
 
 async function createStaleLegacySuperAdminFixture() {
   const id = randomUUID()
@@ -141,10 +169,25 @@ beforeAll(async () => {
   authHeadersUser2 = await getAuthHeadersForCredentials(USER_EMAIL_2, USER_PASSWORD)
 
   // Ensure enforcement is disabled at the start of tests
-  await getSupabaseClient()
-    .from('orgs')
-    .update({ enforce_encrypted_bundles: false, required_encryption_key: null })
-    .eq('id', ORG_ID_ENCRYPTED)
+  await resetEncryptedBundleSettings()
+
+  const { data: scopedApiKey, error: scopedApiKeyError } = await getSupabaseClient()
+    .from('apikeys')
+    .insert({
+      user_id: USER_ID_ENCRYPTED,
+      key: APIKEY_ENCRYPTED_SCOPED_NAME,
+      mode: 'all',
+      name: APIKEY_ENCRYPTED_SCOPED_NAME,
+      limited_to_apps: [APP_NAME_ENCRYPTED],
+      limited_to_orgs: [],
+    })
+    .select('key')
+    .single()
+
+  if (scopedApiKeyError || !scopedApiKey?.key)
+    throw new Error(`Failed to seed scoped encrypted API key: ${scopedApiKeyError?.message ?? 'missing key'}`)
+
+  apiKeyEncryptedScoped = scopedApiKey.key
 
   // Clean up any test versions from previous test runs
   await getSupabaseClient()
@@ -165,10 +208,13 @@ afterAll(async () => {
     .neq('name', 'unknown')
 
   // Reset enforcement to false
+  await resetEncryptedBundleSettings()
+
   await getSupabaseClient()
-    .from('orgs')
-    .update({ enforce_encrypted_bundles: false, required_encryption_key: null })
-    .eq('id', ORG_ID_ENCRYPTED)
+    .from('apikeys')
+    .delete()
+    .eq('name', APIKEY_ENCRYPTED_SCOPED_NAME)
+    .throwOnError()
 })
 
 describe('[Encrypted Bundles Enforcement]', () => {
@@ -185,58 +231,46 @@ describe('[Encrypted Bundles Enforcement]', () => {
     })
 
     it('should allow updating enforce_encrypted_bundles setting', async () => {
-      // Enable enforcement
-      const { error: updateError } = await getSupabaseClient()
-        .from('orgs')
-        .update({ enforce_encrypted_bundles: true })
-        .eq('id', ORG_ID_ENCRYPTED)
+      await withEncryptedBundleEnforcement(async () => {
+        const { data, error } = await getSupabaseClient()
+          .from('orgs')
+          .select('enforce_encrypted_bundles')
+          .eq('id', ORG_ID_ENCRYPTED)
+          .single()
 
-      expect(updateError).toBeNull()
-
-      // Verify it was updated
-      const { data, error } = await getSupabaseClient()
-        .from('orgs')
-        .select('enforce_encrypted_bundles')
-        .eq('id', ORG_ID_ENCRYPTED)
-        .single()
-
-      expect(error).toBeNull()
-      expect(data?.enforce_encrypted_bundles).toBe(true)
-
-      // Reset back to false for other tests
-      await getSupabaseClient()
-        .from('orgs')
-        .update({ enforce_encrypted_bundles: false })
-        .eq('id', ORG_ID_ENCRYPTED)
+        expect(error).toBeNull()
+        expect(data?.enforce_encrypted_bundles).toBe(true)
+      })
     })
 
     it('should update encrypted bundle settings through the organization endpoint', async () => {
       const requiredKey = 'a'.repeat(21)
-      const response = await fetch(getEndpointUrl('/organization'), {
-        headers: authHeadersEncrypted,
-        method: 'PUT',
-        body: JSON.stringify({
-          orgId: ORG_ID_ENCRYPTED,
-          enforce_encrypted_bundles: true,
-          required_encryption_key: requiredKey,
-        }),
-      })
-      expect(response.status).toBe(200)
 
-      const { data, error } = await getSupabaseClient()
-        .from('orgs')
-        .select('enforce_encrypted_bundles, required_encryption_key')
-        .eq('id', ORG_ID_ENCRYPTED)
-        .single()
+      try {
+        const response = await fetch(getEndpointUrl('/organization'), {
+          headers: authHeadersEncrypted,
+          method: 'PUT',
+          body: JSON.stringify({
+            orgId: ORG_ID_ENCRYPTED,
+            enforce_encrypted_bundles: true,
+            required_encryption_key: requiredKey,
+          }),
+        })
+        expect(response.status).toBe(200)
 
-      expect(error).toBeNull()
-      expect(data?.enforce_encrypted_bundles).toBe(true)
-      expect(data?.required_encryption_key).toBe(requiredKey)
+        const { data, error } = await getSupabaseClient()
+          .from('orgs')
+          .select('enforce_encrypted_bundles, required_encryption_key')
+          .eq('id', ORG_ID_ENCRYPTED)
+          .single()
 
-      await getSupabaseClient()
-        .from('orgs')
-        .update({ enforce_encrypted_bundles: false, required_encryption_key: null })
-        .eq('id', ORG_ID_ENCRYPTED)
+        expect(error).toBeNull()
+        expect(data?.enforce_encrypted_bundles).toBe(true)
+        expect(data?.required_encryption_key).toBe(requiredKey)
+      }
+      finally {
+        await resetEncryptedBundleSettings()
+      }
     })
 
     it('should reject invalid required encryption key through the organization endpoint', async () => {
@@ -257,65 +291,40 @@ describe('[Encrypted Bundles Enforcement]', () => {
 
   describe('aPI Bundle Creation Enforcement', () => {
     it('should reject unencrypted bundle via API when enforcement is enabled', async () => {
-      // Enable enforcement
-      await getSupabaseClient()
-        .from('orgs')
-        .update({ enforce_encrypted_bundles: true })
-        .eq('id', ORG_ID_ENCRYPTED)
+      await withEncryptedBundleEnforcement(async () => {
+        const response = await fetch(getEndpointUrl('/bundle'), {
+          method: 'POST',
+          headers: headersEncrypted,
+          body: JSON.stringify({
+            app_id: APP_NAME_ENCRYPTED,
+            version: '1.0.0-unencrypted-api-test',
+            checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
+            external_url: 'https://example.com/bundle-unencrypted.zip',
+          }),
+        })
 
-      // Try to create a bundle without encryption via API
-      const response = await fetch(getEndpointUrl('/bundle'), {
-        method: 'POST',
-        headers: headersEncrypted,
-        body: JSON.stringify({
-          app_id: APP_NAME_ENCRYPTED,
-          version: '1.0.0-unencrypted-api-test',
-          checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
-          external_url: 'https://example.com/bundle-unencrypted.zip',
-          // No session_key - should be rejected
-        }),
+        expect(response.ok).toBe(false)
+        const data = await response.json() as { error: string }
+        expect(data.error).toContain('encryption')
       })
-
-      // The API should reject this request
-      expect(response.ok).toBe(false)
-      const data = await response.json() as { error: string }
-      expect(data.error).toContain('encryption')
-
-      // Reset enforcement
-      await getSupabaseClient()
-        .from('orgs')
-        .update({ enforce_encrypted_bundles: false })
-        .eq('id', ORG_ID_ENCRYPTED)
     })
 
     it('should allow encrypted bundle via API when enforcement is enabled', async () => {
-      // Enable enforcement
-      await getSupabaseClient()
-        .from('orgs')
-        .update({ enforce_encrypted_bundles: true })
-        .eq('id', ORG_ID_ENCRYPTED)
+      await withEncryptedBundleEnforcement(async () => {
+        const response = await fetch(getEndpointUrl('/bundle'), {
+          method: 'POST',
+          headers: headersEncrypted,
+          body: JSON.stringify({
+            app_id: APP_NAME_ENCRYPTED,
+            version: '1.0.0-encrypted-api-test',
+            checksum: 'b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcde',
+            external_url: 'https://example.com/bundle-encrypted.zip',
+            session_key: 'encrypted-session-key-for-api-test',
+          }),
+        })
 
-      // Try to create a bundle with encryption via API
-      const response = await fetch(getEndpointUrl('/bundle'), {
-        method: 'POST',
-        headers: headersEncrypted,
-        body: JSON.stringify({
-          app_id: APP_NAME_ENCRYPTED,
-          version: '1.0.0-encrypted-api-test',
-          checksum: 'b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcde',
-          external_url: 'https://example.com/bundle-encrypted.zip',
-          session_key: 'encrypted-session-key-for-api-test',
-        }),
+        expect(response.ok).toBe(true)
       })
-
-      // The API should accept this request
-      expect(response.ok).toBe(true)
-
-      // Reset enforcement
-      await getSupabaseClient()
-        .from('orgs')
-        .update({ enforce_encrypted_bundles: false })
-        .eq('id', ORG_ID_ENCRYPTED)
     })
 
     it('should allow unencrypted bundle via API when enforcement is disabled', async () => {
@@ -325,7 +334,6 @@ describe('[Encrypted Bundles Enforcement]', () => {
         .update({ enforce_encrypted_bundles: false })
         .eq('id', ORG_ID_ENCRYPTED)
 
-      // Try to create a bundle without encryption via API
       const response = await fetch(getEndpointUrl('/bundle'), {
         method: 'POST',
         headers: headersEncrypted,
@@ -334,7 +342,6 @@ describe('[Encrypted Bundles Enforcement]', () => {
           version: '1.0.0-no-enforcement-api-test',
           checksum: 'c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcdef1',
           external_url: 'https://example.com/bundle-no-enforcement.zip',
-          // No session_key - should be allowed since enforcement is disabled
         }),
       })
 
@@ -345,64 +352,41 @@ describe('[Encrypted Bundles Enforcement]', () => {
 
   describe('database Trigger Enforcement', () => {
     it('should reject direct insert of unencrypted bundle via trigger', async () => {
-      // Enable enforcement
-      await getSupabaseClient()
-        .from('orgs')
-        .update({ enforce_encrypted_bundles: true })
-        .eq('id', ORG_ID_ENCRYPTED)
+      await withEncryptedBundleEnforcement(async () => {
+        const { error } = await getSupabaseClient()
+          .from('app_versions')
+          .insert({
+            app_id: APP_NAME_ENCRYPTED,
+            name: '1.0.0-direct-insert-rejected',
+            checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
+            owner_org: ORG_ID_ENCRYPTED,
+            storage_provider: 'r2',
+          })
 
-      // Try to insert directly via Supabase SDK (bypassing API)
-      const { error } = await getSupabaseClient()
-        .from('app_versions')
-        .insert({
-          app_id: APP_NAME_ENCRYPTED,
-          name: '1.0.0-direct-insert-rejected',
-          checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
-          owner_org: ORG_ID_ENCRYPTED,
-          storage_provider: 'r2',
-          // No session_key - should be rejected by trigger
-        })
-
-      expect(error).not.toBeNull()
-      expect(error?.message).toContain('encryption_required')
-
-      // Reset enforcement
-      await getSupabaseClient()
-        .from('orgs')
-        .update({ enforce_encrypted_bundles: false })
-        .eq('id', ORG_ID_ENCRYPTED)
+        expect(error).not.toBeNull()
+        expect(error?.message).toContain('encryption_required')
+      })
     })
 
     it('should allow direct insert of encrypted bundle via trigger', async () => {
-      // Enable enforcement
-      await getSupabaseClient()
-        .from('orgs')
-        .update({ enforce_encrypted_bundles: true })
-        .eq('id', ORG_ID_ENCRYPTED)
+      await withEncryptedBundleEnforcement(async () => {
+        const { data, error } = await getSupabaseClient()
+          .from('app_versions')
+          .insert({
+            app_id: APP_NAME_ENCRYPTED,
+            name: '1.0.0-direct-insert-allowed',
+            checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
+            owner_org: ORG_ID_ENCRYPTED,
+            storage_provider: 'r2',
+            session_key: 'encrypted-session-key-for-direct-insert',
+          })
+          .select()
+          .single()
 
-      // Try to insert directly via Supabase SDK with session_key
-      const { data, error } = await getSupabaseClient()
-        .from('app_versions')
-        .insert({
-          app_id: APP_NAME_ENCRYPTED,
-          name: '1.0.0-direct-insert-allowed',
-          checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
-          owner_org: ORG_ID_ENCRYPTED,
-          storage_provider: 'r2',
-          session_key: 'encrypted-session-key-for-direct-insert',
-        })
-        .select()
-        .single()
-
-      expect(error).toBeNull()
-      expect(data?.name).toBe('1.0.0-direct-insert-allowed')
-      expect(data?.session_key).toBe('encrypted-session-key-for-direct-insert')
-
-      // Reset enforcement
-      await getSupabaseClient()
-        .from('orgs')
-        .update({ enforce_encrypted_bundles: false })
-        .eq('id', ORG_ID_ENCRYPTED)
+        expect(error).toBeNull()
+        expect(data?.name).toBe('1.0.0-direct-insert-allowed')
+        expect(data?.session_key).toBe('encrypted-session-key-for-direct-insert')
+      })
     })
 
     it('should allow direct insert when enforcement is disabled', async () => {
@@ -421,7 +405,6 @@ describe('[Encrypted Bundles Enforcement]', () => {
           checksum: 'a1b2c3d4e5f6789abcdef123456789abcdef123456789abcdef123456789abcd',
           owner_org: ORG_ID_ENCRYPTED,
           storage_provider: 'r2',
-          // No session_key - should be allowed since enforcement is disabled
         })
         .select()
         .single()
@@ -430,53 +413,194 @@ describe('[Encrypted Bundles Enforcement]', () => {
       expect(data?.name).toBe('1.0.0-direct-no-enforcement')
     })
 
-    it('should reject direct update that clears session_key when enforcement is enabled', async () => {
-      await getSupabaseClient()
-        .from('orgs')
-        .update({ enforce_encrypted_bundles: true })
-        .eq('id', ORG_ID_ENCRYPTED)
+    it('should reject direct update that changes session_key after the bundle is ready', async () => {
+      await withEncryptedBundleEnforcement(async () => {
+        const bundleName = `1.0.0-direct-update-rejected-${Date.now()}`
+        const { data: inserted, error: insertError } = await getSupabaseClient()
+          .from('app_versions')
+          .insert({
+            app_id: APP_NAME_ENCRYPTED,
+            name: bundleName,
+            checksum: 'd4e5f6789abcdef123456789abcdef123456789abcdef123456789abcdef12',
+            owner_org: ORG_ID_ENCRYPTED,
+            storage_provider: 'r2',
+            session_key: 'encrypted-session-key-for-direct-update',
+          })
+          .select('id, session_key')
+          .single()
 
-      const bundleName = `1.0.0-direct-update-rejected-${Date.now()}`
-      const { data: inserted, error: insertError } = await getSupabaseClient()
-        .from('app_versions')
-        .insert({
-          app_id: APP_NAME_ENCRYPTED,
-          name: bundleName,
-          checksum: 'd4e5f6789abcdef123456789abcdef123456789abcdef123456789abcdef12',
-          owner_org: ORG_ID_ENCRYPTED,
-          storage_provider: 'r2',
-          session_key: 'encrypted-session-key-for-direct-update',
+        expect(insertError).toBeNull()
+        expect(inserted?.session_key).toBe('encrypted-session-key-for-direct-update')
+
+        const { error: updateError } = await getSupabaseClient()
+          .from('app_versions')
+          .update({
+            session_key: '',
+            key_id: null,
+          })
+          .eq('id', inserted!.id)
+
+        expect(updateError).not.toBeNull()
+        expect(updateError?.message).toContain('bundle_already_ready')
+
+        const { data: afterUpdate, error: fetchError } = await getSupabaseClient()
+          .from('app_versions')
+          .select('session_key')
+          .eq('id', inserted!.id)
+          .single()
+
+        expect(fetchError).toBeNull()
+        expect(afterUpdate?.session_key).toBe('encrypted-session-key-for-direct-update')
+      })
+    })
+
+    it('should allow CLI completion update that marks encrypted bundle ready', async () => {
+      await withEncryptedBundleEnforcement(async () => {
+        const sessionKey = 'encrypted-session-key-for-cli-ready-update'
+        const r2Path = `orgs/${ORG_ID_ENCRYPTED}/apps/${APP_NAME_ENCRYPTED}/cli-ready-update-${Date.now()}.zip`
+        const bundleName = `1.0.0-cli-ready-update-${Date.now()}`
+        const { data: inserted, error: insertError } = await getSupabaseClient()
+          .from('app_versions')
+          .insert({
+            app_id: APP_NAME_ENCRYPTED,
+            name: bundleName,
+            checksum: 'f6789abcdef123456789abcdef123456789abcdef123456789abcdef1234',
+            owner_org: ORG_ID_ENCRYPTED,
+            storage_provider: 'r2-direct',
+            session_key: sessionKey,
+          })
+          .select('id, session_key, storage_provider')
+          .single()
+
+        expect(insertError).toBeNull()
+        expect(inserted?.storage_provider).toBe('r2-direct')
+
+        const { error: completionError } = await getSupabaseClient()
+          .from('app_versions')
+          .update({
+            storage_provider: 'r2',
+            session_key: sessionKey,
+            r2_path: r2Path,
+          })
+          .eq('id', inserted!.id)
+
+        expect(completionError).toBeNull()
+
+        const { data: afterUpdate, error: fetchError } = await getSupabaseClient()
+          .from('app_versions')
+          .select('session_key, storage_provider, r2_path')
+          .eq('id', inserted!.id)
+          .single()
+
+        expect(fetchError).toBeNull()
+        expect(afterUpdate?.session_key).toBe(sessionKey)
+        expect(afterUpdate?.storage_provider).toBe('r2')
+        expect(afterUpdate?.r2_path).toBe(r2Path)
+      })
+    })
+
+    it('should reject ready bundle content updates', async () => {
+      await withEncryptedBundleEnforcement(async () => {
+        const originalChecksum = 'f789abcdef123456789abcdef123456789abcdef123456789abcdef12345'
+        const originalNativePackages = [{ name: '@capacitor/core', version: '6.0.0' }]
+        const bundleName = `1.0.0-ready-immutable-${Date.now()}`
+        const originalR2Path = `orgs/${ORG_ID_ENCRYPTED}/apps/${APP_NAME_ENCRYPTED}/${bundleName}.zip`
+        const { data: inserted, error: insertError } = await getSupabaseClient()
+          .from('app_versions')
+          .insert({
+            app_id: APP_NAME_ENCRYPTED,
+            name: bundleName,
+            checksum: originalChecksum,
+            owner_org: ORG_ID_ENCRYPTED,
+            storage_provider: 'r2',
+            r2_path: originalR2Path,
+            session_key: 'encrypted-session-key-for-ready-immutable',
+            native_packages: originalNativePackages,
+          })
+          .select('id, checksum, storage_provider, r2_path, external_url, native_packages')
+          .single()
+
+        expect(insertError).toBeNull()
+        expect(inserted?.storage_provider).toBe('r2')
+
+        const { error: updateError } = await getSupabaseClient()
+          .from('app_versions')
+          .update({
+            name: `${bundleName}-rewritten`,
+            checksum: '089abcdef123456789abcdef123456789abcdef123456789abcdef123456',
+            storage_provider: 'external',
+            r2_path: `orgs/${ORG_ID_ENCRYPTED}/apps/${APP_NAME_ENCRYPTED}/rewritten.zip`,
+            external_url: 'https://example.com/rewritten.zip',
+            native_packages: [{ name: '@capacitor/core', version: '7.0.0' }],
+          })
+          .eq('id', inserted!.id)
+
+        expect(updateError).not.toBeNull()
+        expect(updateError?.message).toContain('bundle_already_ready')
+
+        const { data: afterUpdate, error: fetchError } = await getSupabaseClient()
+          .from('app_versions')
+          .select('name, checksum, storage_provider, r2_path, external_url, native_packages')
+          .eq('id', inserted!.id)
+          .single()
+
+        expect(fetchError).toBeNull()
+        expect(afterUpdate?.name).toBe(bundleName)
+        expect(afterUpdate?.checksum).toBe(originalChecksum)
+        expect(afterUpdate?.storage_provider).toBe('r2')
+        expect(afterUpdate?.r2_path).toBe(originalR2Path)
+        expect(afterUpdate?.external_url).toBeNull()
+        expect(afterUpdate?.native_packages).toEqual(originalNativePackages)
+      })
+    })
+
+    it('should reject app-scoped API key direct update that invalidates session_key', async () => {
+      await withEncryptedBundleEnforcement(async () => {
+        const bundleName = `1.0.0-app-scoped-update-rejected-${Date.now()}`
+        const { data: inserted, error: insertError } = await getSupabaseClient()
+          .from('app_versions')
+          .insert({
+            app_id: APP_NAME_ENCRYPTED,
+            name: bundleName,
+            checksum: 'e5f6789abcdef123456789abcdef123456789abcdef123456789abcdef123',
+            owner_org: ORG_ID_ENCRYPTED,
+            storage_provider: 'r2',
+            session_key: 'encrypted-session-key-for-app-scoped-update',
+          })
+          .select('id, session_key')
+          .single()
+
+        expect(insertError).toBeNull()
+        expect(inserted?.session_key).toBe('encrypted-session-key-for-app-scoped-update')
+
+        const response = await fetch(`${SUPABASE_BASE_URL}/rest/v1/app_versions?id=eq.${inserted!.id}`, {
+          method: 'PATCH',
+          headers: {
+            'apikey': SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+            'capgkey': apiKeyEncryptedScoped,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation',
+          },
+          body: JSON.stringify({
+            session_key: '   ',
+            key_id: null,
+          }),
         })
-        .select('id, session_key')
-        .single()
 
-      expect(insertError).toBeNull()
-      expect(inserted?.session_key).toBe('encrypted-session-key-for-direct-update')
+        const responseData = await response.json() as { message?: string, error?: string }
+        expect(response.ok).toBe(false)
+        expect(responseData.message ?? responseData.error).toContain('bundle_already_ready')
 
-      const { error: updateError } = await getSupabaseClient()
-        .from('app_versions')
-        .update({
-          session_key: '',
-          key_id: null,
-        })
-        .eq('id', inserted!.id)
+        const { data: afterUpdate, error: fetchError } = await getSupabaseClient()
+          .from('app_versions')
+          .select('session_key')
+          .eq('id', inserted!.id)
+          .single()
 
-      expect(updateError).not.toBeNull()
-      expect(updateError?.message).toContain('encryption_required')
-
-      const { data: afterUpdate, error: fetchError } = await getSupabaseClient()
-        .from('app_versions')
-        .select('session_key')
-        .eq('id', inserted!.id)
-        .single()
-
-      expect(fetchError).toBeNull()
-      expect(afterUpdate?.session_key).toBe('encrypted-session-key-for-direct-update')
-
-      await getSupabaseClient()
-        .from('orgs')
-        .update({ enforce_encrypted_bundles: false })
-        .eq('id', ORG_ID_ENCRYPTED)
+        expect(fetchError).toBeNull()
+        expect(afterUpdate?.session_key).toBe('encrypted-session-key-for-app-scoped-update')
+      })
     })
   })
 
@@ -523,49 +647,29 @@ describe('[Encrypted Bundles Enforcement]', () => {
     })
 
     it('check_org_encrypted_bundle_enforcement should reject unencrypted when enforcement is enabled', async () => {
-      // Enable enforcement
-      await getSupabaseClient()
-        .from('orgs')
-        .update({ enforce_encrypted_bundles: true })
-        .eq('id', ORG_ID_ENCRYPTED)
+      await withEncryptedBundleEnforcement(async () => {
+        const { data, error } = await getSupabaseClient()
+          .rpc('check_org_encrypted_bundle_enforcement', {
+            org_id: ORG_ID_ENCRYPTED,
+            session_key: null as unknown as string,
+          })
 
-      const { data, error } = await getSupabaseClient()
-        .rpc('check_org_encrypted_bundle_enforcement', {
-          org_id: ORG_ID_ENCRYPTED,
-          session_key: null as unknown as string,
-        })
-
-      expect(error).toBeNull()
-      expect(data).toBe(false) // Should reject
-
-      // Reset enforcement
-      await getSupabaseClient()
-        .from('orgs')
-        .update({ enforce_encrypted_bundles: false })
-        .eq('id', ORG_ID_ENCRYPTED)
+        expect(error).toBeNull()
+        expect(data).toBe(false) // Should reject
+      })
     })
 
     it('check_org_encrypted_bundle_enforcement should allow encrypted when enforcement is enabled', async () => {
-      // Enable enforcement
-      await getSupabaseClient()
-        .from('orgs')
-        .update({ enforce_encrypted_bundles: true })
-        .eq('id', ORG_ID_ENCRYPTED)
+      await withEncryptedBundleEnforcement(async () => {
+        const { data, error } = await getSupabaseClient()
+          .rpc('check_org_encrypted_bundle_enforcement', {
+            org_id: ORG_ID_ENCRYPTED,
+            session_key: 'some-encrypted-data',
+          })
 
-      const { data, error } = await getSupabaseClient()
-        .rpc('check_org_encrypted_bundle_enforcement', {
-          org_id: ORG_ID_ENCRYPTED,
-          session_key: 'some-encrypted-data',
-        })
-
-      expect(error).toBeNull()
-      expect(data).toBe(true) // Should allow
-
-      // Reset enforcement
-      await getSupabaseClient()
-        .from('orgs')
-        .update({ enforce_encrypted_bundles: false })
-        .eq('id', ORG_ID_ENCRYPTED)
+        expect(error).toBeNull()
+        expect(data).toBe(true) // Should allow
+      })
     })
   })
 

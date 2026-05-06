@@ -2,16 +2,15 @@ import type { ManifestEntry } from '../supabase/functions/_backend/utils/downloa
 
 import { randomUUID } from 'node:crypto'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { getBaseData, getSupabaseClient, postUpdate, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
+import { createAppVersions, getBaseData, getSupabaseClient, postUpdate, resetAndSeedAppData, resetAppData, resetAppDataStats } from './test-utils.ts'
 
 const id = randomUUID()
 const APPNAME = `com.demo.app.updates.${id}`
 
 const manifestData = { file_name: 'test', s3_path: '/test_file.html', file_hash: '1234567890' }
 
-// Store initial state for cleanup
-let initialR2Path: string | null = null
 let versionId: number | null = null
+let createdVersionIds: number[] = []
 
 interface UpdateRes {
   error?: string
@@ -56,6 +55,24 @@ async function removeManifestEntries(appVersionId: number) {
   await supabase.from('app_versions').update({ manifest_count: 0 }).eq('id', appVersionId)
 }
 
+async function createVersionWithoutR2Path(versionName: string) {
+  const version = await createAppVersions(versionName, APPNAME, {
+    checksum: `manifest-${versionName}`,
+    r2_path: null,
+  })
+  createdVersionIds.push(version.id)
+  return version
+}
+
+async function setProductionVersion(appVersionId: number) {
+  await getSupabaseClient()
+    .from('channels')
+    .update({ version: appVersionId })
+    .eq('app_id', APPNAME)
+    .eq('name', 'production')
+    .throwOnError()
+}
+
 beforeAll(async () => {
   await resetAndSeedAppData(APPNAME)
 
@@ -70,7 +87,6 @@ beforeAll(async () => {
 
   if (versionData) {
     versionId = versionData.id
-    initialR2Path = versionData.r2_path
   }
 })
 
@@ -79,22 +95,26 @@ afterEach(async () => {
   // This ensures test isolation and prevents interdependencies
   const supabase = getSupabaseClient()
 
-  if (versionId) {
-    // Remove any manifest entries added during the test
-    await supabase.from('manifest').delete().eq('app_version_id', versionId)
+  const appVersionIds = [versionId, ...createdVersionIds].filter((id): id is number => id != null)
 
-    // Reset app_versions fields to initial state
+  if (appVersionIds.length) {
+    // Remove any manifest entries added during the test
+    await supabase.from('manifest').delete().in('app_version_id', appVersionIds)
+
+    // Reset manifest counts after direct manifest fixture setup.
     await supabase
       .from('app_versions')
-      .update({
-        r2_path: initialR2Path,
-        manifest_count: 0,
-      })
-      .eq('id', versionId)
+      .update({ manifest_count: 0 })
+      .in('id', appVersionIds)
+  }
+
+  if (versionId) {
+    await setProductionVersion(versionId)
   }
 
   // Reset app-level manifest_bundle_count
   await supabase.from('apps').update({ manifest_bundle_count: 0 }).eq('app_id', APPNAME)
+  createdVersionIds = []
 })
 
 afterAll(async () => {
@@ -161,25 +181,9 @@ describe('update manifest scenarios', () => {
   it('update fail with nothing', async () => {
     const baseData = getBaseData(APPNAME)
 
-    // Get the version ID
-    const { data: versionData } = await getSupabaseClient()
-      .from('app_versions')
-      .select('id')
-      .eq('name', '1.0.0')
-      .eq('app_id', APPNAME)
-      .single()
-
-    // Clear r2_path and remove manifest entries
-    await getSupabaseClient()
-      .from('app_versions')
-      .update({ r2_path: null })
-      .eq('name', '1.0.0')
-      .eq('app_id', APPNAME)
-      .throwOnError()
-
-    if (versionData) {
-      await removeManifestEntries(versionData.id)
-    }
+    const version = await createVersionWithoutR2Path(`1.0.${Math.floor(Math.random() * 100000) + 1000}`)
+    await setProductionVersion(version.id)
+    await removeManifestEntries(version.id)
 
     // Also reset manifest_bundle_count on the app
     await getSupabaseClient().from('apps').update({ manifest_bundle_count: 0 }).eq('app_id', APPNAME)
@@ -195,26 +199,9 @@ describe('update manifest scenarios', () => {
   it('update with only manifest', async () => {
     const baseData = getBaseData(APPNAME)
 
-    // Get the version ID
-    const { data: versionData } = await getSupabaseClient()
-      .from('app_versions')
-      .select('id')
-      .eq('name', '1.0.0')
-      .eq('app_id', APPNAME)
-      .single()
-
-    // Clear r2_path
-    await getSupabaseClient()
-      .from('app_versions')
-      .update({ r2_path: null })
-      .eq('name', '1.0.0')
-      .eq('app_id', APPNAME)
-      .throwOnError()
-
-    // Insert manifest entries
-    if (versionData) {
-      await insertManifestEntries(versionData.id)
-    }
+    const version = await createVersionWithoutR2Path(`1.0.${Math.floor(Math.random() * 100000) + 1000}`)
+    await setProductionVersion(version.id)
+    await insertManifestEntries(version.id)
 
     baseData.version_name = '1.1.0'
     baseData.plugin_version = '6.25.0'

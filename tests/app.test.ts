@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, describe, expect, it } from 'vitest'
-import { APIKEY_TEST2_ALL, BASE_URL, fetchWithRetry, getSupabaseClient, headers, NON_OWNER_ORG_ID, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID } from './test-utils.ts'
+import { BASE_URL, fetchWithRetry, getSupabaseClient, headers, NON_OWNER_ORG_ID, ORG_ID, resetAndSeedAppData, resetAppData, resetAppDataStats, USER_ID, USER_ID_2 } from './test-utils.ts'
 
 function isDuplicateAppCreationError(body: any): boolean {
   if (!body || typeof body !== 'object')
@@ -251,36 +251,32 @@ describe('[GET] /app operations with subkey', () => {
 })
 
 describe('[GET] /app subkey ownership enforcement', () => {
-  const headersTest2 = {
-    'Content-Type': 'application/json',
-    'Authorization': APIKEY_TEST2_ALL,
-  }
   const appId = 'com.test2.app'
   let subkeyId = 0
 
   afterAll(async () => {
     if (subkeyId) {
-      const deleteApikey = await fetch(`${BASE_URL}/apikey/${subkeyId}`, {
-        method: 'DELETE',
-        headers: headersTest2,
-      })
-      expect(deleteApikey.status).toBe(200)
+      await getSupabaseClient().from('apikeys').delete().eq('id', subkeyId)
     }
   })
 
   it('should reject subkey id owned by another user', async () => {
-    const createSubkey = await fetch(`${BASE_URL}/apikey`, {
-      method: 'POST',
-      headers: headersTest2,
-      body: JSON.stringify({
-        name: `Cross-tenant subkey ${randomUUID()}`,
+    const { data: subkeyData, error } = await getSupabaseClient()
+      .from('apikeys')
+      .insert({
+        user_id: USER_ID_2,
+        key: randomUUID(),
+        key_hash: null,
         mode: 'read',
+        name: `Cross-tenant subkey ${randomUUID()}`,
         limited_to_apps: [appId],
-      }),
-    })
-    expect(createSubkey.status).toBe(200)
-    const subkeyData = await createSubkey.json() as { id: number }
-    subkeyId = subkeyData.id
+      })
+      .select('id')
+      .single()
+
+    expect(error).toBeNull()
+    expect(subkeyData?.id).toBeTruthy()
+    subkeyId = subkeyData!.id
 
     const subkeyHeaders = { 'x-limited-key-id': String(subkeyId) }
     const response = await fetch(`${BASE_URL}/app/${appId}`, {
