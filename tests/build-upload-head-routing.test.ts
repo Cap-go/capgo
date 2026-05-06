@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono } from 'hono/tiny'
 import { describe, expect, it } from 'vitest'
 import { app as buildApp } from '../supabase/functions/_backend/public/build/index.ts'
 

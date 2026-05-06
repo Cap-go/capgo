@@ -87,6 +87,8 @@ testing against Cloudflare Workers.
 
 ### AI Workflow Notes
 
+- **Hono v4 HEAD routing:** do not add HEAD routes with `app.on`. Hono v4 removed `app.head()` because `GET` handlers implicitly serve `HEAD`; keep shared GET/HEAD logic in the `app.get(...)` handler and branch on `c.req.raw.method` only when the behavior must differ.
+
 - For understanding the **current DB schema**, prefer
   `supabase/schemas/prod.sql` (schema dump) instead of scanning all migrations.
 - For **schema changes**, always edit or add files under

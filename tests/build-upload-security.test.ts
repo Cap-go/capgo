@@ -81,7 +81,7 @@ describe('build upload proxy security', () => {
     mockCheckPermission.mockResolvedValue(true)
   })
 
-  it.concurrent('rejects path traversal attempts before forwarding to builder', async () => {
+  it('rejects path traversal attempts before forwarding to builder', async () => {
     const context = fakeContext(`http://localhost/build/upload/${jobId}/%2e%2e%2Fjobs`, 'PATCH')
 
     let error: HTTPException | undefined
@@ -105,7 +105,7 @@ describe('build upload proxy security', () => {
     })
   })
 
-  it.concurrent('rejects invalidly encoded paths before forwarding to builder', async () => {
+  it('rejects invalidly encoded paths before forwarding to builder', async () => {
     const context = fakeContext(`http://localhost/build/upload/${jobId}/%`, 'PATCH')
 
     let error: HTTPException | undefined
@@ -129,7 +129,7 @@ describe('build upload proxy security', () => {
     })
   })
 
-  it.concurrent('does not reject canonical upload suffixes', async () => {
+  it('does not reject canonical upload suffixes', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, {
       status: 201,
       headers: {
@@ -146,6 +146,31 @@ describe('build upload proxy security', () => {
         'https://builder.capgo.app/upload/artifact.zip',
         expect.anything(),
       )
+    }
+    finally {
+      fetchMock.mockRestore()
+    }
+  })
+
+  it('forwards HEAD probes to builder without a request body', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, {
+      status: 204,
+      headers: {
+        'Upload-Offset': '5',
+        'Tus-Resumable': '1.0.0',
+      },
+    }))
+
+    try {
+      const context = fakeContext(`http://localhost/build/upload/${jobId}/artifact.zip`, 'HEAD')
+      const response = await tusProxy(context as any, jobId, { user_id: 'user-test', key: 'api-test' } as any, 'HEAD')
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit]
+
+      expect(response.status).toBe(204)
+      expect(response.headers.get('Upload-Offset')).toBe('5')
+      expect(init.method).toBe('HEAD')
+      expect(init).not.toHaveProperty('body')
+      expect(init).not.toHaveProperty('duplex')
     }
     finally {
       fetchMock.mockRestore()
