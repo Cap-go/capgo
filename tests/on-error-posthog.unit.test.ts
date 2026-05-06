@@ -174,6 +174,37 @@ describe('onError PostHog capture', () => {
     })
   })
 
+  it('skips Discord for expected files Durable Object storage timeouts', async () => {
+    const { onError } = await import('../supabase/functions/_backend/utils/on_error.ts')
+
+    const error = Object.assign(
+      new Error('Durable Object storage operation exceeded timeout which caused object to be reset.'),
+      {
+        durableObjectReset: true,
+        overloaded: true,
+      },
+    )
+
+    const response = await onError('files')(error, createContext())
+
+    expect(backgroundTaskMock).toHaveBeenCalledTimes(1)
+    expect(backgroundTaskMock.mock.calls[0]?.[1]).toBeInstanceOf(Promise)
+    expect(sendDiscordAlert500Mock).not.toHaveBeenCalled()
+    expect(capturePosthogExceptionMock).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({
+      functionName: 'files',
+      kind: 'unhandled_error',
+      status: 500,
+    }))
+    expect(response).toEqual({
+      body: {
+        error: 'unknown_error',
+        message: 'Unknown error',
+        moreInfo: {},
+      },
+      status: 500,
+    })
+  })
+
   it('captures generic unhandled errors in PostHog', async () => {
     const { onError } = await import('../supabase/functions/_backend/utils/on_error.ts')
 
