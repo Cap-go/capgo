@@ -14,10 +14,10 @@ afterAll(async () => {
   await resetAppDataStats(APPNAME_DEVICE)
 })
 
-describe('[GET] /device operations', () => {
-  it('all devices', async () => {
+describe.concurrent('[GET] /device operations', () => {
+  it.concurrent('all devices', async () => {
     const params = new URLSearchParams({ app_id: APPNAME_DEVICE })
-    const response = await fetchWithRetry(`${BASE_URL}/device?${params.toString()}`, {
+    const response = await fetch(`${BASE_URL}/device?${params.toString()}`, {
       method: 'GET',
       headers,
     })
@@ -28,12 +28,12 @@ describe('[GET] /device operations', () => {
     expect(typeof data.hasMore).toBe('boolean')
   })
 
-  it('specific device', async () => {
+  it.concurrent('specific device', async () => {
     const params = new URLSearchParams({
       app_id: APPNAME_DEVICE,
       device_id: '00000000-0000-0000-0000-000000000000',
     })
-    const response = await fetchWithRetry(`${BASE_URL}/device?${params.toString()}`, {
+    const response = await fetch(`${BASE_URL}/device?${params.toString()}`, {
       method: 'GET',
       headers,
     })
@@ -43,9 +43,9 @@ describe('[GET] /device operations', () => {
     expect(data.device_id).toBe('00000000-0000-0000-0000-000000000000')
   })
 
-  it('invalid app_id', async () => {
+  it.concurrent('invalid app_id', async () => {
     const params = new URLSearchParams({ app_id: 'invalid_app' })
-    const response = await fetchWithRetry(`${BASE_URL}/device?${params.toString()}`, {
+    const response = await fetch(`${BASE_URL}/device?${params.toString()}`, {
       method: 'GET',
       headers,
     })
@@ -53,12 +53,12 @@ describe('[GET] /device operations', () => {
     expect(response.status).toBe(400)
   })
 
-  it('invalid device_id', async () => {
+  it.concurrent('invalid device_id', async () => {
     const params = new URLSearchParams({
       app_id: APPNAME_DEVICE,
       device_id: 'invalid_device',
     })
-    const response = await fetchWithRetry(`${BASE_URL}/device?${params.toString()}`, {
+    const response = await fetch(`${BASE_URL}/device?${params.toString()}`, {
       method: 'GET',
       headers,
     })
