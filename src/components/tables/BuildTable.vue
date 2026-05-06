@@ -59,10 +59,10 @@ function onboardingDone() {
   reload()
 }
 
-async function countBuildRequests(platform?: Platform): Promise<number> {
+async function countBuildRequests(platform?: Platform): Promise<number | null> {
   const orgId = organizationStore.currentOrganization?.gid
   if (!orgId || !props.appId)
-    return 0
+    return null
 
   let query = supabase
     .from('build_requests')
@@ -74,8 +74,10 @@ async function countBuildRequests(platform?: Platform): Promise<number> {
     query = query.eq('platform', platform)
 
   const { count, error } = await query
-  if (error)
-    return 0
+  if (error) {
+    console.error('Error counting build requests:', error)
+    return null
+  }
   return count ?? 0
 }
 
@@ -86,10 +88,12 @@ async function updateOverallBuildsCount(): Promise<void> {
     countBuildRequests('android'),
   ])
 
-  totalAllBuilds.value = allBuilds
+  if (allBuilds !== null)
+    totalAllBuilds.value = allBuilds
+
   platformBuildCounts.value = {
-    ios: iosBuilds,
-    android: androidBuilds,
+    ios: iosBuilds ?? platformBuildCounts.value.ios,
+    android: androidBuilds ?? platformBuildCounts.value.android,
   }
 }
 
