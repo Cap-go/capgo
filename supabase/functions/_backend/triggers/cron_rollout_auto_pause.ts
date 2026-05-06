@@ -51,6 +51,16 @@ function buildReason(channel: RolloutAutoPauseChannel, versionName: string, resu
   return `Auto-pause ${result.action} for ${channel.name} rollout ${versionName}: fail ${result.failureRateBps}bps, confidence lower bound ${result.lowerBoundBps}bps, threshold ${result.thresholdBps}bps, attempts ${result.attempts}.`
 }
 
+async function updateChannelOrThrow(supabase: ReturnType<typeof supabaseAdmin>, channelId: number, patch: Record<string, unknown>) {
+  const { error } = await supabase
+    .from('channels')
+    .update(patch as any)
+    .eq('id', channelId)
+
+  if (error)
+    throw error
+}
+
 async function evaluateChannel(c: Parameters<typeof supabaseAdmin>[0], supabase: ReturnType<typeof supabaseAdmin>, channel: RolloutAutoPauseChannel, now: Date) {
   const versionName = getRolloutVersionName(channel)
   if (!versionName)
@@ -81,10 +91,7 @@ async function evaluateChannel(c: Parameters<typeof supabaseAdmin>[0], supabase:
   })
 
   if (!result.shouldTrigger) {
-    await supabase
-      .from('channels')
-      .update({ auto_pause_last_checked_at: now.toISOString() } as any)
-      .eq('id', channel.id)
+    await updateChannelOrThrow(supabase, channel.id, { auto_pause_last_checked_at: now.toISOString() })
     return { triggered: false, reason: result.reason, result }
   }
 
@@ -96,31 +103,22 @@ async function evaluateChannel(c: Parameters<typeof supabaseAdmin>[0], supabase:
   } as any
 
   if (result.action === 'pause') {
-    await supabase
-      .from('channels')
-      .update({
-        ...basePatch,
-        rollout_paused_at: now.toISOString(),
-      })
-      .eq('id', channel.id)
+    await updateChannelOrThrow(supabase, channel.id, {
+      ...basePatch,
+      rollout_paused_at: now.toISOString(),
+    })
   }
   else if (result.action === 'rollback') {
-    await supabase
-      .from('channels')
-      .update({
-        ...basePatch,
-        rollout_enabled: false,
-        rollout_percentage_bps: 0,
-        rollout_version: null,
-        rollout_paused_at: null,
-      })
-      .eq('id', channel.id)
+    await updateChannelOrThrow(supabase, channel.id, {
+      ...basePatch,
+      rollout_enabled: false,
+      rollout_percentage_bps: 0,
+      rollout_version: null,
+      rollout_paused_at: null,
+    })
   }
   else {
-    await supabase
-      .from('channels')
-      .update(basePatch)
-      .eq('id', channel.id)
+    await updateChannelOrThrow(supabase, channel.id, basePatch)
   }
 
   cloudlog({ requestId: c.get('requestId'), message: 'rollout auto-pause triggered', appId: channel.app_id, channelId: channel.id, action: result.action, reason })

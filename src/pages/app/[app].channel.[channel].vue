@@ -466,6 +466,22 @@ async function saveRolloutPercentage(value: string) {
   await saveChannelChange('rollout_percentage_bps', Math.round(percentage * 100) as any)
 }
 
+async function saveAutoPauseFailureRate(value: string) {
+  const trimmedValue = value.trim()
+  if (!trimmedValue) {
+    await saveChannelChange('auto_pause_failure_rate_bps', null as any)
+    return
+  }
+
+  const failureRateBps = Number(trimmedValue)
+  if (!Number.isFinite(failureRateBps) || failureRateBps < 0 || failureRateBps > 10000) {
+    toast.error(t('error-update-channel'))
+    return
+  }
+
+  await saveChannelChange('auto_pause_failure_rate_bps', Math.round(failureRateBps) as any)
+}
+
 async function rollbackRollout() {
   await Promise.all([
     saveChannelChange('rollout_version', null as any),
@@ -881,7 +897,7 @@ async function copyCurlCommand() {
                     :disabled="!canPromoteBundle"
                     :placeholder="t('failure-rate-bps')"
                     :value="channel.auto_pause_failure_rate_bps ?? ''"
-                    @change="saveChannelChange('auto_pause_failure_rate_bps', Number(($event.target as HTMLInputElement).value) as any)"
+                    @change="saveAutoPauseFailureRate(($event.target as HTMLInputElement).value)"
                   >
                   <select
                     class="d-select d-select-sm d-select-bordered"
