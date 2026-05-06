@@ -226,8 +226,20 @@ function nowSeconds() {
   return Math.floor(Date.now() / 1000)
 }
 
-function isPendingTranslationStale(entry: TranslationStoreEntry) {
+export function isPendingTranslationStale(entry: TranslationStoreEntry) {
   return entry.status === 'pending' && nowSeconds() - entry.updatedAt >= TRANSLATION_REQUEUE_AFTER_SECONDS
+}
+
+export function claimedTranslationBatchIndex(nextBatchIndex: number) {
+  return nextBatchIndex < 0 ? Math.abs(nextBatchIndex) - 1 : null
+}
+
+export function translationBatchIndexFromStore(nextBatchIndex: number) {
+  return claimedTranslationBatchIndex(nextBatchIndex) ?? nextBatchIndex
+}
+
+function claimedTranslationBatchMarker(batchIndex: number) {
+  return -batchIndex - 1
 }
 
 async function deleteExpiredTranslationStoreEntries(db: D1Database) {
@@ -328,6 +340,41 @@ async function touchTranslationStoreEntry(c: Context, entry: TranslationStoreEnt
      WHERE target_language = ?
        AND checksum = ?`,
   ).bind(PENDING_TRANSLATION_STORE_TTL_SECONDS, entry.targetLanguage, entry.checksum).run()
+}
+
+export async function claimTranslationBatch(c: Context, checksum: string, targetLanguage: string, batchIndex: number) {
+  const db = getTranslationStore(c)
+  await ensureTranslationStore(db)
+  const result = await db.prepare(
+    `UPDATE ${TRANSLATION_STORE_TABLE}
+     SET next_batch_index = ?,
+         expires_at = unixepoch() + ?,
+         updated_at = unixepoch()
+     WHERE target_language = ?
+       AND checksum = ?
+       AND status = 'pending'
+       AND next_batch_index = ?
+       AND expires_at > unixepoch()`,
+  ).bind(claimedTranslationBatchMarker(batchIndex), PENDING_TRANSLATION_STORE_TTL_SECONDS, targetLanguage, checksum, batchIndex).run()
+
+  return result.meta.changes > 0
+}
+
+export async function releaseTranslationBatchClaim(c: Context, checksum: string, targetLanguage: string, batchIndex: number) {
+  const db = getTranslationStore(c)
+  await ensureTranslationStore(db)
+  const result = await db.prepare(
+    `UPDATE ${TRANSLATION_STORE_TABLE}
+     SET next_batch_index = ?,
+         expires_at = unixepoch() + ?,
+         updated_at = unixepoch()
+     WHERE target_language = ?
+       AND checksum = ?
+       AND status = 'pending'
+       AND next_batch_index = ?`,
+  ).bind(batchIndex, PENDING_TRANSLATION_STORE_TTL_SECONDS, targetLanguage, checksum, claimedTranslationBatchMarker(batchIndex)).run()
+
+  return result.meta.changes > 0
 }
 
 export async function cacheReadyTranslationPayload(c: Context, cacheHelper: CacheHelper, readyRequest: Request, payload: TranslationMessagesResponsePayload, targetLanguage: string) {
@@ -436,7 +483,7 @@ app.post('/messages', async (c) => {
     if (isPendingTranslationStale(storedEntry)) {
       try {
         await enqueueTranslationBatch(c, {
-          batchIndex: storedEntry.nextBatchIndex,
+          batchIndex: translationBatchIndexFromStore(storedEntry.nextBatchIndex),
           checksum,
           model: storedEntry.model,
           targetLanguage,
@@ -491,6 +538,8 @@ app.post('/messages', async (c) => {
 
 export const __translationTestUtils__ = {
   buildBatches,
+  claimedTranslationBatchIndex,
   normalizeBatchIndex,
+  translationBatchIndexFromStore,
   translationStoreTtlSeconds,
 }

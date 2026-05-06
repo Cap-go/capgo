@@ -5,12 +5,16 @@ import {
   buildBatches,
   buildTranslationCacheRequests,
   cacheReadyTranslationPayload,
+  claimedTranslationBatchIndex,
+  claimTranslationBatch,
   currentSourceChecksum,
   enqueueTranslationBatch,
   getTranslationModel,
+  isPendingTranslationStale,
   normalizeBatchIndex,
   readTranslationStoreEntry,
   readyPayloadFromStore,
+  releaseTranslationBatchClaim,
   sourceMessageCatalog,
   SUPPORTED_LANGUAGES,
   writeTranslationStoreEntry,
@@ -270,15 +274,35 @@ async function processTranslationQueueBatch(c: Context, body: TranslationQueuePa
     return
 
   const storedEntry = await readTranslationStoreEntry(c, checksum, targetLanguage)
-  if (storedEntry?.status === 'ready') {
+  if (!storedEntry)
+    return
+
+  if (storedEntry.status === 'ready') {
     await cacheReadyTranslationPayload(c, cacheHelper, readyRequest, readyPayloadFromStore(storedEntry), targetLanguage)
     return
   }
 
+  if (storedEntry.status !== 'pending')
+    return
+
   const batches = buildBatches(sourceMessageCatalog)
-  const translatedMessages = storedEntry?.messages ?? {}
-  const nextBatchIndex = storedEntry?.nextBatchIndex ?? 0
+  const translatedMessages = storedEntry.messages
+  let nextBatchIndex = storedEntry.nextBatchIndex
   const batchIndex = normalizeBatchIndex(body.batchIndex)
+  const claimedBatchIndex = claimedTranslationBatchIndex(nextBatchIndex)
+
+  if (claimedBatchIndex !== null) {
+    if (batchIndex !== claimedBatchIndex)
+      return
+    if (!isPendingTranslationStale(storedEntry))
+      return
+
+    const released = await releaseTranslationBatchClaim(c, checksum, targetLanguage, batchIndex)
+    if (!released)
+      return
+
+    nextBatchIndex = claimedBatchIndex
+  }
 
   if (nextBatchIndex >= batches.length) {
     const readyEntry: TranslationStoreEntry = {
@@ -295,6 +319,9 @@ async function processTranslationQueueBatch(c: Context, body: TranslationQueuePa
     return
   }
 
+  if (batchIndex < nextBatchIndex)
+    return
+
   if (batchIndex !== nextBatchIndex) {
     await enqueueTranslationBatch(c, {
       batchIndex: nextBatchIndex,
@@ -305,53 +332,81 @@ async function processTranslationQueueBatch(c: Context, body: TranslationQueuePa
     return
   }
 
-  const batch = batches[batchIndex]
-  if (!batch)
+  const claimed = await claimTranslationBatch(c, checksum, targetLanguage, batchIndex)
+  if (!claimed)
     return
 
-  const translatedBatch = await translateBatch(ai, model, targetLanguage, batch)
+  const batch = batches[batchIndex]
+  if (!batch) {
+    await releaseTranslationBatchClaim(c, checksum, targetLanguage, batchIndex).catch(() => {})
+    return
+  }
+
+  let translatedBatch: Record<string, string>
+  try {
+    translatedBatch = await translateBatch(ai, model, targetLanguage, batch)
+  }
+  catch (error) {
+    await releaseTranslationBatchClaim(c, checksum, targetLanguage, batchIndex).catch(() => {})
+    throw error
+  }
+
   const mergedMessages = {
     ...translatedMessages,
     ...translatedBatch,
   }
   const followingBatchIndex = batchIndex + 1
 
-  if (followingBatchIndex >= batches.length) {
-    const readyEntry: TranslationStoreEntry = {
+  try {
+    if (followingBatchIndex >= batches.length) {
+      const readyEntry: TranslationStoreEntry = {
+        checksum,
+        messages: mergedMessages,
+        model,
+        nextBatchIndex: followingBatchIndex,
+        status: 'ready',
+        targetLanguage,
+        updatedAt: Math.floor(Date.now() / 1000),
+      }
+      await writeTranslationStoreEntry(c, readyEntry)
+      await cacheReadyTranslationPayload(c, cacheHelper, readyRequest, readyPayloadFromStore(readyEntry), targetLanguage)
+      cloudlog({
+        requestId: c.get('requestId'),
+        message: 'Message catalog translation cached',
+        targetLanguage,
+        batchCount: batches.length,
+      })
+      return
+    }
+
+    await writeTranslationStoreEntry(c, {
       checksum,
       messages: mergedMessages,
       model,
       nextBatchIndex: followingBatchIndex,
-      status: 'ready',
+      status: 'pending',
       targetLanguage,
       updatedAt: Math.floor(Date.now() / 1000),
-    }
-    await writeTranslationStoreEntry(c, readyEntry)
-    await cacheReadyTranslationPayload(c, cacheHelper, readyRequest, readyPayloadFromStore(readyEntry), targetLanguage)
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'Message catalog translation cached',
-      targetLanguage,
-      batchCount: batches.length,
     })
-    return
+    await enqueueTranslationBatch(c, {
+      batchIndex: followingBatchIndex,
+      checksum,
+      model,
+      targetLanguage,
+    })
   }
-
-  await writeTranslationStoreEntry(c, {
-    checksum,
-    messages: mergedMessages,
-    model,
-    nextBatchIndex: followingBatchIndex,
-    status: 'pending',
-    targetLanguage,
-    updatedAt: Math.floor(Date.now() / 1000),
-  })
-  await enqueueTranslationBatch(c, {
-    batchIndex: followingBatchIndex,
-    checksum,
-    model,
-    targetLanguage,
-  })
+  catch (error) {
+    await writeTranslationStoreEntry(c, {
+      checksum,
+      messages: translatedMessages,
+      model,
+      nextBatchIndex: batchIndex,
+      status: 'pending',
+      targetLanguage,
+      updatedAt: Math.floor(Date.now() / 1000),
+    }).catch(() => {})
+    throw error
+  }
 }
 
 const translationMessagesQueue = honoFactory.createApp()

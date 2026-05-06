@@ -21,6 +21,13 @@ describe('translation queue helpers', () => {
     expect(__translationTestUtils__.normalizeBatchIndex(2)).toBe(2)
   })
 
+  it.concurrent('maps claimed queue batch indexes back to their batch', () => {
+    expect(__translationTestUtils__.claimedTranslationBatchIndex(-1)).toBe(0)
+    expect(__translationTestUtils__.claimedTranslationBatchIndex(-3)).toBe(2)
+    expect(__translationTestUtils__.claimedTranslationBatchIndex(2)).toBeNull()
+    expect(__translationTestUtils__.translationBatchIndexFromStore(-2)).toBe(1)
+  })
+
   it.concurrent('keeps pending queue state longer than ready cache entries', () => {
     expect(__translationTestUtils__.translationStoreTtlSeconds({ status: 'pending' })).toBeGreaterThan(
       __translationTestUtils__.translationStoreTtlSeconds({ status: 'ready' }),
