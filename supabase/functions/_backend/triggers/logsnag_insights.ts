@@ -69,6 +69,10 @@ interface DailyRevenueChangeSummary {
 }
 interface RevenueRetentionMetrics {
   churnRevenue: number
+  churnRevenueSolo: number
+  churnRevenueMaker: number
+  churnRevenueTeam: number
+  churnRevenueEnterprise: number
   nrr: number
 }
 interface GlobalStats {
@@ -485,6 +489,10 @@ async function getRevenueRetentionMetrics(c: Context, dateId: string): Promise<R
       retained_expansion_mrr: number
       total_churn_mrr: number
       total_contraction_mrr: number
+      churn_revenue_solo: number
+      churn_revenue_maker: number
+      churn_revenue_team: number
+      churn_revenue_enterprise: number
       previous_mrr: number
     }>(sql`
       WITH daily AS (
@@ -493,8 +501,24 @@ async function getRevenueRetentionMetrics(c: Context, dateId: string): Promise<R
           COALESCE(SUM(CASE WHEN opening_mrr > 0 THEN contraction_mrr ELSE 0 END), 0)::float AS retained_contraction_mrr,
           COALESCE(SUM(CASE WHEN opening_mrr > 0 THEN expansion_mrr ELSE 0 END), 0)::float AS retained_expansion_mrr,
           COALESCE(SUM(churn_mrr), 0)::float AS total_churn_mrr,
-          COALESCE(SUM(contraction_mrr), 0)::float AS total_contraction_mrr
-        FROM public.daily_revenue_metrics
+          COALESCE(SUM(contraction_mrr), 0)::float AS total_contraction_mrr,
+          COALESCE(SUM(
+            COALESCE(NULLIF(to_jsonb(drm) ->> 'churn_mrr_solo', '')::float, 0)
+            + COALESCE(NULLIF(to_jsonb(drm) ->> 'contraction_mrr_solo', '')::float, 0)
+          ), 0)::float AS churn_revenue_solo,
+          COALESCE(SUM(
+            COALESCE(NULLIF(to_jsonb(drm) ->> 'churn_mrr_maker', '')::float, 0)
+            + COALESCE(NULLIF(to_jsonb(drm) ->> 'contraction_mrr_maker', '')::float, 0)
+          ), 0)::float AS churn_revenue_maker,
+          COALESCE(SUM(
+            COALESCE(NULLIF(to_jsonb(drm) ->> 'churn_mrr_team', '')::float, 0)
+            + COALESCE(NULLIF(to_jsonb(drm) ->> 'contraction_mrr_team', '')::float, 0)
+          ), 0)::float AS churn_revenue_team,
+          COALESCE(SUM(
+            COALESCE(NULLIF(to_jsonb(drm) ->> 'churn_mrr_enterprise', '')::float, 0)
+            + COALESCE(NULLIF(to_jsonb(drm) ->> 'contraction_mrr_enterprise', '')::float, 0)
+          ), 0)::float AS churn_revenue_enterprise
+        FROM public.daily_revenue_metrics drm
         WHERE date_id = ${dateId}
       ),
       previous_snapshot AS (
@@ -509,6 +533,10 @@ async function getRevenueRetentionMetrics(c: Context, dateId: string): Promise<R
         daily.retained_expansion_mrr,
         daily.total_churn_mrr,
         daily.total_contraction_mrr,
+        daily.churn_revenue_solo,
+        daily.churn_revenue_maker,
+        daily.churn_revenue_team,
+        daily.churn_revenue_enterprise,
         COALESCE(previous_snapshot.previous_mrr, 0)::float AS previous_mrr
       FROM daily
       LEFT JOIN previous_snapshot ON true
@@ -529,6 +557,10 @@ async function getRevenueRetentionMetrics(c: Context, dateId: string): Promise<R
 
     return {
       churnRevenue: calculateChurnRevenue(totalLostRevenue),
+      churnRevenueSolo: Number((Number(row?.churn_revenue_solo) || 0).toFixed(2)),
+      churnRevenueMaker: Number((Number(row?.churn_revenue_maker) || 0).toFixed(2)),
+      churnRevenueTeam: Number((Number(row?.churn_revenue_team) || 0).toFixed(2)),
+      churnRevenueEnterprise: Number((Number(row?.churn_revenue_enterprise) || 0).toFixed(2)),
       nrr: calculateNrr(previousMrr, retainedChanges),
     }
   }
@@ -995,6 +1027,10 @@ app.post('/', middlewareAPISecret, async (c) => {
     ...(retention_metrics
       ? {
           churn_revenue: retention_metrics.churnRevenue,
+          churn_revenue_solo: retention_metrics.churnRevenueSolo,
+          churn_revenue_maker: retention_metrics.churnRevenueMaker,
+          churn_revenue_team: retention_metrics.churnRevenueTeam,
+          churn_revenue_enterprise: retention_metrics.churnRevenueEnterprise,
           nrr: retention_metrics.nrr,
         }
       : {}),

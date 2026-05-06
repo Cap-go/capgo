@@ -4,6 +4,7 @@ import { aggregateRevenueMovementEvents, buildRevenueMovementEvents, fetchStripe
 
 const plans = [
   {
+    name: 'Solo',
     stripe_id: 'prod_solo',
     price_m: 12,
     price_m_id: 'price_solo_monthly',
@@ -11,6 +12,7 @@ const plans = [
     price_y_id: 'price_solo_yearly',
   },
   {
+    name: 'Team',
     stripe_id: 'prod_team',
     price_m: 49,
     price_m_id: 'price_team_monthly',
@@ -200,6 +202,7 @@ describe('retention metric backfill helpers', () => {
       current_mrr: 39,
       next_mrr: 0,
       churn_mrr: 39,
+      lost_plan: 'team',
     })
   })
 
@@ -235,6 +238,14 @@ describe('retention metric backfill helpers', () => {
         expansion_mrr: 37,
         contraction_mrr: 0,
         churn_mrr: 49,
+        churn_mrr_solo: 0,
+        churn_mrr_maker: 0,
+        churn_mrr_team: 49,
+        churn_mrr_enterprise: 0,
+        contraction_mrr_solo: 0,
+        contraction_mrr_maker: 0,
+        contraction_mrr_team: 0,
+        contraction_mrr_enterprise: 0,
       },
     ])
     expect(summarizeDailyRevenueMetrics(rows)).toMatchObject({
@@ -268,6 +279,7 @@ describe('retention metric backfill helpers', () => {
       new_business_mrr: 0,
       expansion_mrr: 0,
       churn_mrr: 12,
+      lost_plan: 'solo',
     })
   })
 
@@ -315,6 +327,7 @@ describe('retention metric backfill helpers', () => {
         expansion_mrr: 0,
         contraction_mrr: 0,
         churn_mrr: 0,
+        lost_plan: null,
       },
     ], ['evt_known', 'evt_missing'])
 
@@ -458,6 +471,7 @@ describe('retention metric backfill helpers', () => {
     expect(result.movements[0]).toMatchObject({
       event_id: 'evt_deleted',
       churn_mrr: 49,
+      lost_plan: 'team',
     })
   })
 })

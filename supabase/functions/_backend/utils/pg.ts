@@ -1114,6 +1114,10 @@ export interface AdminGlobalStatsTrend {
   mrr: number
   nrr: number
   churn_revenue: number
+  churn_revenue_solo: number
+  churn_revenue_maker: number
+  churn_revenue_team: number
+  churn_revenue_enterprise: number
   total_revenue: number
   revenue_solo: number
   revenue_maker: number
@@ -1192,6 +1196,10 @@ export async function getAdminGlobalStatsTrend(
         mrr::float,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'nrr', '')::float, 100)::float AS nrr,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue', '')::float, 0)::float AS churn_revenue,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue_solo', '')::float, 0)::float AS churn_revenue_solo,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue_maker', '')::float, 0)::float AS churn_revenue_maker,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue_team', '')::float, 0)::float AS churn_revenue_team,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue_enterprise', '')::float, 0)::float AS churn_revenue_enterprise,
         total_revenue::float,
         revenue_solo::float,
         revenue_maker::float,
@@ -1286,6 +1294,10 @@ export async function getAdminGlobalStatsTrend(
       mrr: Number(row.mrr) || 0,
       nrr: Number(row.nrr) || 0,
       churn_revenue: Number(row.churn_revenue) || 0,
+      churn_revenue_solo: Number(row.churn_revenue_solo) || 0,
+      churn_revenue_maker: Number(row.churn_revenue_maker) || 0,
+      churn_revenue_team: Number(row.churn_revenue_team) || 0,
+      churn_revenue_enterprise: Number(row.churn_revenue_enterprise) || 0,
       total_revenue: Number(row.total_revenue) || 0,
       revenue_solo: Number(row.revenue_solo) || 0,
       revenue_maker: Number(row.revenue_maker) || 0,
