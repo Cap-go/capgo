@@ -7,15 +7,24 @@ import { isAdminRole, useOrganizationStore } from '~/stores/organization'
 const { t } = useI18n()
 const organizationStore = useOrganizationStore()
 
-const admins = ref<{ email: string, image_url: string }[]>([])
+const admins = ref<{ key: string, email: string, image_url: string }[]>([])
 const isLoading = ref(true)
+
+function getMemberKey(member: { uid?: string | null, id?: string | number | null, email: string }) {
+  return String(member.uid ?? member.id ?? member.email)
+}
 
 onMounted(async () => {
   try {
-    const members = await organizationStore.getMembers()
+    const members = await organizationStore.getMembers((signedImages) => {
+      admins.value = admins.value.map((admin) => {
+        const signedImage = signedImages.get(admin.key)
+        return signedImage ? { ...admin, image_url: signedImage } : admin
+      })
+    })
     admins.value = members
       .filter(m => isAdminRole(m.role))
-      .map(m => ({ email: m.email, image_url: m.image_url }))
+      .map(m => ({ key: getMemberKey(m), email: m.email, image_url: m.image_url }))
   }
   catch (e) {
     console.error('Failed to fetch admins:', e)

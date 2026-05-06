@@ -3,7 +3,7 @@ import type { ArrayElement, Concrete, Merge } from '~/services/types'
 import type { Database } from '~/types/supabase.types'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import { createSignedImageUrl, resolveImagePath } from '~/services/storage'
+import { createSignedImageUrl, getImmediateImageUrl, resolveImagePath } from '~/services/storage'
 import { stripeEnabled, useSupabase } from '~/services/supabase'
 import { createDeferredPromise } from '../utils/promise'
 import { useDashboardAppsStore } from './dashboardApps'
@@ -37,6 +37,7 @@ export type OrganizationRole
     | 'org_super_admin'
 export type ExtendedOrganizationMember = Concrete<Merge<ArrayElement<Database['public']['Functions']['get_org_members']['Returns']>, { id: number | string }>>
 export type ExtendedOrganizationMembers = ExtendedOrganizationMember[]
+type SignedMemberImageCallback = (signedImages: Map<string, string>) => void
 
 type LegacyMinRight = Database['public']['Enums']['user_min_right'] | 'owner'
 
@@ -197,6 +198,86 @@ export const useOrganizationStore = defineStore('organization', () => {
   const currentRole = ref<OrganizationRole | null>(null)
 
   const STORAGE_KEY = 'capgo_current_org_id'
+  let organizationLogoLoadRun = 0
+
+  const getMemberImageKey = (member: { uid?: string | null, id?: number | string | null, email?: string | null }) => {
+    return String(member.uid ?? member.id ?? member.email ?? '')
+  }
+
+  const loadSignedMemberImages = async (
+    sources: Array<{ key: string, imageUrl?: string | null }>,
+    onSignedImages: SignedMemberImageCallback,
+  ) => {
+    const signedImageEntries = await Promise.all(sources.map(async (source) => {
+      if (!source.key || !source.imageUrl || getImmediateImageUrl(source.imageUrl))
+        return null
+
+      try {
+        const signedImageUrl = await createSignedImageUrl(source.imageUrl)
+        return signedImageUrl ? [source.key, signedImageUrl] as const : null
+      }
+      catch (error) {
+        console.warn('Cannot load signed member image', { memberKey: source.key, error })
+        return null
+      }
+    }))
+
+    const signedImages = new Map<string, string>()
+    for (const entry of signedImageEntries) {
+      if (entry)
+        signedImages.set(entry[0], entry[1])
+    }
+
+    if (signedImages.size > 0)
+      onSignedImages(signedImages)
+  }
+
+  const loadOrganizationLogos = async (sourceOrganizations: Array<Organization & { id: number }>, run: number) => {
+    const signedLogoEntries = await Promise.all(sourceOrganizations.map(async (org) => {
+      const logoSource = org.logo_storage_path ?? org.logo
+      const { normalized, shouldSign } = resolveImagePath(logoSource)
+      if (!normalized || !shouldSign)
+        return null
+
+      try {
+        const signedLogo = await createSignedImageUrl(normalized)
+        return signedLogo ? [org.gid, { logo: signedLogo, logoStoragePath: normalized }] as const : null
+      }
+      catch (error) {
+        console.warn('Cannot load signed organization logo', { orgId: org.gid, error })
+        return null
+      }
+    }))
+
+    if (run !== organizationLogoLoadRun)
+      return
+
+    const nextOrganizations = new Map(_organizations.value)
+    let updated = false
+    for (const entry of signedLogoEntries) {
+      if (!entry)
+        continue
+
+      const [orgId, logoData] = entry
+      const organization = nextOrganizations.get(orgId)
+      if (!organization || organization.logo === logoData.logo)
+        continue
+
+      nextOrganizations.set(orgId, {
+        ...organization,
+        logo: logoData.logo,
+        logo_storage_path: logoData.logoStoragePath,
+      })
+      updated = true
+    }
+
+    if (!updated)
+      return
+
+    _organizations.value = nextOrganizations
+    if (currentOrganization.value)
+      currentOrganization.value = nextOrganizations.get(currentOrganization.value.gid)
+  }
 
   watch([currentOrganization, stripeEnabled], async ([currentOrganizationRaw, stripeEnabledValue], [previousOrganization]) => {
     if (!currentOrganizationRaw) {
@@ -326,7 +407,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     setCurrentOrganization(organization.gid)
   }
 
-  const getMembers = async (): Promise<ExtendedOrganizationMembers> => {
+  const getMembers = async (onSignedImages?: SignedMemberImageCallback): Promise<ExtendedOrganizationMembers> => {
     const currentOrgId = currentOrganization.value?.gid
     if (!currentOrgId)
       return []
@@ -341,16 +422,20 @@ export const useOrganizationStore = defineStore('organization', () => {
       return []
     }
 
-    return Promise.all(data.map(
-      async (item, id) => {
-        const resolvedImage = item.image_url ? await createSignedImageUrl(item.image_url) : ''
-        return {
-          id,
-          ...item,
-          image_url: resolvedImage || '',
-        }
-      },
-    ))
+    const memberImageSources = data.map(item => ({
+      key: getMemberImageKey(item),
+      imageUrl: item.image_url,
+    }))
+    const mappedMembers = data.map((item, id) => ({
+      id,
+      ...item,
+      image_url: getImmediateImageUrl(item.image_url) || '',
+    }))
+
+    if (onSignedImages)
+      void loadSignedMemberImages(memberImageSources, onSignedImages)
+
+    return mappedMembers
   }
 
   const fetchOrganizations = async () => {
@@ -385,19 +470,20 @@ export const useOrganizationStore = defineStore('organization', () => {
       throw error
     }
 
-    const mappedData = await Promise.all(data.map(async (item, id) => {
-      const resolvedLogo = item.logo ? await createSignedImageUrl(item.logo) : ''
+    const logoLoadRun = ++organizationLogoLoadRun
+    const mappedData = data.map((item, id) => {
       const logoStoragePath = resolveImagePath(item.logo).normalized
       return {
         id,
         ...item,
-        logo: resolvedLogo || null,
+        logo: getImmediateImageUrl(item.logo) || null,
         logo_storage_path: logoStoragePath || null,
         password_policy_config: item.password_policy_config as PasswordPolicyConfig | null,
       } as Organization & { id: number }
-    }))
+    })
 
     _organizations.value = new Map(mappedData.map(item => [item.gid, item as Organization]))
+    void loadOrganizationLogos(mappedData, logoLoadRun)
 
     const selectableOrganizations = mappedData
       .filter(org => isSelectableOrganization(org.role))
@@ -448,10 +534,11 @@ export const useOrganizationStore = defineStore('organization', () => {
     let updated = false
 
     for (const [orgId, org] of nextOrganizations.entries()) {
-      if (!org.logo)
+      const logoSource = org.logo_storage_path ?? org.logo
+      if (!logoSource)
         continue
 
-      const logoStoragePath = resolveImagePath(org.logo_storage_path ?? org.logo).normalized
+      const logoStoragePath = resolveImagePath(logoSource).normalized
       const refreshedLogo = await createSignedImageUrl(logoStoragePath || org.logo, { forceRefresh: true })
       if (!refreshedLogo || refreshedLogo === org.logo)
         continue
