@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { DevicesByPlatform, PluginBreakdownResult } from '../utils/cloudflare.ts'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
-import type { Database } from '../utils/supabase.types.ts'
+import type { Database, Json } from '../utils/supabase.types.ts'
 
 import { sql } from 'drizzle-orm'
 import { Hono } from 'hono/tiny'
@@ -980,6 +980,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     // Plugin version breakdown (percentage per version)
     plugin_version_breakdown: plugin_breakdown.version_breakdown,
     plugin_major_breakdown: plugin_breakdown.major_breakdown,
+    plugin_version_ladder: plugin_breakdown.version_ladder as unknown as Json,
     // Build statistics (all time)
     builds_total: build_stats.total,
     builds_ios: build_stats.ios,

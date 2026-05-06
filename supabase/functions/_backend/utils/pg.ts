@@ -1550,11 +1550,25 @@ export interface AdminPluginBreakdown {
   devices_last_month_android: number
   version_breakdown: Record<string, number>
   major_breakdown: Record<string, number>
+  version_ladder: AdminPluginVersionLadderEntry[]
   trend: Array<{
     date: string
     version_breakdown: Record<string, number>
     major_breakdown: Record<string, number>
   }>
+}
+
+export interface AdminPluginVersionTopApp {
+  app_id: string
+  device_count: number
+  share: number
+}
+
+export interface AdminPluginVersionLadderEntry {
+  version: string
+  device_count: number
+  percent: number
+  top_apps: AdminPluginVersionTopApp[]
 }
 
 function parseBreakdownJson(value: unknown): Record<string, number> {
@@ -1571,6 +1585,79 @@ function parseBreakdownJson(value: unknown): Record<string, number> {
   if (typeof value === 'object')
     return value as Record<string, number>
   return {}
+}
+
+function parsePluginTopApps(value: unknown): AdminPluginVersionTopApp[] {
+  if (!value)
+    return []
+
+  let rawValue: unknown = value
+  if (typeof value === 'string') {
+    try {
+      rawValue = JSON.parse(value) as unknown
+    }
+    catch {
+      return []
+    }
+  }
+
+  if (!Array.isArray(rawValue))
+    return []
+
+  return rawValue
+    .map((item) => {
+      if (!(item && typeof item === 'object'))
+        return null
+
+      const app = item as Record<string, unknown>
+      const appId = typeof app.app_id === 'string' ? app.app_id : ''
+      const deviceCount = Number(app.device_count) || 0
+      const share = Number(app.share) || 0
+
+      return {
+        app_id: appId,
+        device_count: deviceCount,
+        share,
+      }
+    })
+    .filter((app): app is AdminPluginVersionTopApp => !!app && app.app_id.length > 0 && app.device_count > 0)
+}
+
+function parsePluginVersionLadderJson(value: unknown): AdminPluginVersionLadderEntry[] {
+  if (!value)
+    return []
+
+  let rawValue: unknown = value
+  if (typeof value === 'string') {
+    try {
+      rawValue = JSON.parse(value) as unknown
+    }
+    catch {
+      return []
+    }
+  }
+
+  if (!Array.isArray(rawValue))
+    return []
+
+  return rawValue
+    .map((item) => {
+      if (!(item && typeof item === 'object'))
+        return null
+
+      const entry = item as Record<string, unknown>
+      const version = typeof entry.version === 'string' ? entry.version : ''
+      const deviceCount = Number(entry.device_count) || 0
+      const percent = Number(entry.percent) || 0
+
+      return {
+        version,
+        device_count: deviceCount,
+        percent,
+        top_apps: parsePluginTopApps(entry.top_apps),
+      }
+    })
+    .filter((entry): entry is AdminPluginVersionLadderEntry => !!entry && entry.version.length > 0 && entry.device_count > 0)
 }
 
 function normalizeTimestamp(value: unknown): string | null {
@@ -2041,7 +2128,8 @@ export async function getAdminPluginBreakdown(
         COALESCE(devices_last_month_ios, 0)::int AS devices_last_month_ios,
         COALESCE(devices_last_month_android, 0)::int AS devices_last_month_android,
         plugin_version_breakdown,
-        plugin_major_breakdown
+        plugin_major_breakdown,
+        plugin_version_ladder
       FROM global_stats
       WHERE date_id >= ${startDateOnly}
         AND date_id <= ${endDateOnly}
@@ -2059,6 +2147,7 @@ export async function getAdminPluginBreakdown(
         devices_last_month_android: 0,
         version_breakdown: {},
         major_breakdown: {},
+        version_ladder: [],
         trend: [],
       }
     }
@@ -2073,14 +2162,18 @@ export async function getAdminPluginBreakdown(
     })
     const latestRow = rows[rows.length - 1]
     const latestDate = latestRow.date instanceof Date ? latestRow.date.toISOString().split('T')[0] : String(latestRow.date)
+    const versionBreakdown = parseBreakdownJson(latestRow.plugin_version_breakdown)
+    const majorBreakdown = parseBreakdownJson(latestRow.plugin_major_breakdown)
+    const versionLadder = parsePluginVersionLadderJson(latestRow.plugin_version_ladder)
 
     return {
       date: latestDate,
       devices_last_month: Number(latestRow.devices_last_month) || 0,
       devices_last_month_ios: Number(latestRow.devices_last_month_ios) || 0,
       devices_last_month_android: Number(latestRow.devices_last_month_android) || 0,
-      version_breakdown: parseBreakdownJson(latestRow.plugin_version_breakdown),
-      major_breakdown: parseBreakdownJson(latestRow.plugin_major_breakdown),
+      version_breakdown: versionBreakdown,
+      major_breakdown: majorBreakdown,
+      version_ladder: versionLadder,
       trend,
     }
   }
@@ -2093,6 +2186,7 @@ export async function getAdminPluginBreakdown(
       devices_last_month_android: 0,
       version_breakdown: {},
       major_breakdown: {},
+      version_ladder: [],
       trend: [],
     }
   }
