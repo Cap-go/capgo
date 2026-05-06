@@ -98,6 +98,9 @@ async function proxyTusHead(c: Parameters<typeof tusProxy>[0]) {
   return tusProxy(c, jobId, apikey, 'HEAD')
 }
 
+app.on('HEAD', '/upload/:jobId', uploadWriteMiddleware, proxyTusHead)
+app.on('HEAD', '/upload/:jobId/*', uploadWriteMiddleware, proxyTusHead)
+
 function isTusHeadProbe(c: Parameters<typeof tusProxy>[0]) {
   return !!c.req.header('Tus-Resumable')
 }
