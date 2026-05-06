@@ -564,10 +564,9 @@ describe('[Encrypted Bundles Enforcement]', () => {
           storage_provider: 'r2',
           r2_path: originalR2Path,
           session_key: 'encrypted-session-key-for-ready-immutable',
-          min_update_version: '0.9.0',
           native_packages: originalNativePackages,
         })
-        .select('id, checksum, storage_provider, r2_path, external_url, min_update_version, native_packages')
+        .select('id, checksum, storage_provider, r2_path, external_url, native_packages')
         .single()
 
       expect(insertError).toBeNull()
@@ -581,7 +580,6 @@ describe('[Encrypted Bundles Enforcement]', () => {
           storage_provider: 'external',
           r2_path: `orgs/${ORG_ID_ENCRYPTED}/apps/${APP_NAME_ENCRYPTED}/rewritten.zip`,
           external_url: 'https://example.com/rewritten.zip',
-          min_update_version: '1.0.0',
           native_packages: [{ name: '@capacitor/core', version: '7.0.0' }],
         })
         .eq('id', inserted!.id)
@@ -591,7 +589,7 @@ describe('[Encrypted Bundles Enforcement]', () => {
 
       const { data: afterUpdate, error: fetchError } = await getSupabaseClient()
         .from('app_versions')
-        .select('name, checksum, storage_provider, r2_path, external_url, min_update_version, native_packages')
+        .select('name, checksum, storage_provider, r2_path, external_url, native_packages')
         .eq('id', inserted!.id)
         .single()
 
@@ -601,7 +599,6 @@ describe('[Encrypted Bundles Enforcement]', () => {
       expect(afterUpdate?.storage_provider).toBe('r2')
       expect(afterUpdate?.r2_path).toBe(originalR2Path)
       expect(afterUpdate?.external_url).toBeNull()
-      expect(afterUpdate?.min_update_version).toBe('0.9.0')
       expect(afterUpdate?.native_packages).toEqual(originalNativePackages)
 
       await getSupabaseClient()

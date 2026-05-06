@@ -28,7 +28,6 @@ BEGIN
         OR NEW.r2_path IS DISTINCT FROM OLD.r2_path
         OR NEW.external_url IS DISTINCT FROM OLD.external_url
         OR NEW.checksum IS DISTINCT FROM OLD.checksum
-        OR NEW.min_update_version IS DISTINCT FROM OLD.min_update_version
         OR NEW.manifest IS DISTINCT FROM OLD.manifest
         OR NEW.native_packages IS DISTINCT FROM OLD.native_packages
       )
@@ -147,7 +146,6 @@ storage_provider,
 r2_path,
 external_url,
 checksum,
-min_update_version,
 manifest,
 native_packages
 ON public.app_versions
