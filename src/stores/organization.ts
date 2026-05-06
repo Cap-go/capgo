@@ -241,6 +241,10 @@ export const useOrganizationStore = defineStore('organization', () => {
     if (!organization)
       return
 
+    const hasChanges = Object.entries(patch).some(([key, value]) => organization[key as keyof Organization] !== value)
+    if (!hasChanges)
+      return
+
     const nextOrganization = {
       ...organization,
       ...patch,
