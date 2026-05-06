@@ -70,4 +70,43 @@ describe('GET /private/config/google_oauth', () => {
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ enabled: false })
   })
+
+  it('returns a custom single scope when GOOGLE_OAUTH_SCOPES is set to one value', async () => {
+    const response = await get({
+      GOOGLE_OAUTH_CLIENT_ID: 'cid',
+      GOOGLE_OAUTH_CLIENT_SECRET: 'csec',
+      GOOGLE_OAUTH_SCOPES: 'https://www.googleapis.com/auth/cloud-platform',
+    })
+
+    expect(response.status).toBe(200)
+    const body = await response.json() as { scopes: string[] }
+    expect(body.scopes).toEqual(['https://www.googleapis.com/auth/cloud-platform'])
+  })
+
+  it('parses comma-separated scopes and trims whitespace around each entry', async () => {
+    const response = await get({
+      GOOGLE_OAUTH_CLIENT_ID: 'cid',
+      GOOGLE_OAUTH_CLIENT_SECRET: 'csec',
+      GOOGLE_OAUTH_SCOPES: ' https://www.googleapis.com/auth/androidpublisher , https://www.googleapis.com/auth/cloud-platform ',
+    })
+
+    expect(response.status).toBe(200)
+    const body = await response.json() as { scopes: string[] }
+    expect(body.scopes).toEqual([
+      'https://www.googleapis.com/auth/androidpublisher',
+      'https://www.googleapis.com/auth/cloud-platform',
+    ])
+  })
+
+  it('falls back to the default scope when GOOGLE_OAUTH_SCOPES is set but yields zero non-empty entries', async () => {
+    const response = await get({
+      GOOGLE_OAUTH_CLIENT_ID: 'cid',
+      GOOGLE_OAUTH_CLIENT_SECRET: 'csec',
+      GOOGLE_OAUTH_SCOPES: ' , , ',
+    })
+
+    expect(response.status).toBe(200)
+    const body = await response.json() as { scopes: string[] }
+    expect(body.scopes).toEqual(['https://www.googleapis.com/auth/androidpublisher'])
+  })
 })
