@@ -9,6 +9,7 @@ import { middlewareV2 } from '../../utils/hono_middleware.ts'
 import { cloudlog } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { getRetryablePostgrestStatus, isRetryablePostgrestError, isRetryablePostgrestResult, retryWithBackoff } from '../../utils/retry.ts'
+import { readNativeVersionUsage } from '../../utils/stats.ts'
 import { supabaseApikey, supabaseClient } from '../../utils/supabase.ts'
 import { isStripeConfigured } from '../../utils/utils.ts'
 import { buildDailyReportedCountsByName, convertCountsToPercentagesByName, fillMissingDailyCounts } from '../../utils/version_stats_helpers.ts'
@@ -112,6 +113,12 @@ interface AppUsageByVersion {
   get: number | null
   install: number | null
   uninstall: number | null
+}
+
+interface NativeVersionUsageRow {
+  date: string
+  version_build: string
+  devices: number | null
 }
 
 interface AppMetricRow {
@@ -641,6 +648,74 @@ async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLate
   }
 }
 
+function buildNativeVersionCounts(rows: NativeVersionUsageRow[], dates: string[], versions: string[]) {
+  const dateSet = new Set(dates)
+  const counts = dates.reduce((acc, date) => {
+    acc[date] = versions.reduce((versionAcc, version) => {
+      versionAcc[version] = 0
+      return versionAcc
+    }, {} as Record<string, number>)
+    return acc
+  }, {} as Record<string, Record<string, number>>)
+
+  rows.forEach((row) => {
+    const date = dayjs(row.date).utc().format('YYYY-MM-DD')
+    const version = row.version_build || 'unknown'
+    if (!dateSet.has(date) || !counts[date] || !versions.includes(version))
+      return
+
+    counts[date][version] += Math.max(0, Number(row.devices) || 0)
+  })
+
+  return counts
+}
+
+async function getAuthorizedStatsAppClient(c: Context, appId: string) {
+  const auth = c.get('auth') as AuthInfo
+
+  denyAppLimitedApiKeyOutsideScope(auth, appId)
+
+  if (!await checkPermission(c, 'app.read', { appId })) {
+    throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth?.userId ?? null })
+  }
+
+  const supabase = getAuthenticatedSupabase(c, auth)
+  await getStatsAppOwnerOrgOrThrow(c, auth, appId, supabase)
+
+  return supabase
+}
+
+async function getNativeVersionUsage(c: Context, appId: string, from: Date, to: Date) {
+  const dates = generateDateLabels(from, to)
+  const startDate = dayjs(from).utc().startOf('day').format('YYYY-MM-DD')
+  const endDate = dayjs(to).utc().startOf('day').add(1, 'day').format('YYYY-MM-DD')
+  let nativeVersionUsage: NativeVersionUsageRow[]
+  try {
+    nativeVersionUsage = await readNativeVersionUsage(c, appId, startDate, endDate) as NativeVersionUsageRow[]
+  }
+  catch (error) {
+    return { data: null, error }
+  }
+  const versions = [...new Set(nativeVersionUsage.map(row => row.version_build || 'unknown'))]
+  const dailyCounts = buildNativeVersionCounts(nativeVersionUsage, dates, versions)
+  const dailyPercentages = convertCountsToPercentagesByName(dailyCounts, dates, versions)
+  const activeVersions = getActiveVersionsByName(versions, dailyCounts)
+  const datasets = createDatasetsByName(activeVersions, dates, dailyPercentages, dailyCounts)
+  const latestVersion = getLatestDayVersionShare(activeVersions, dates, dailyCounts)
+
+  return {
+    data: {
+      labels: dates,
+      datasets,
+      latestVersion: {
+        name: latestVersion.name,
+        percentage: latestVersion.percentage.toFixed(1),
+      },
+    },
+    error: null,
+  }
+}
+
 // Filter out versions with no usage (by version_name)
 function getActiveVersionsByName(versions: string[], counts: { [date: string]: { [version: string]: number } }) {
   return versions.filter(version =>
@@ -845,21 +920,29 @@ app.get('/app/:app_id/bundle_usage', async (c) => {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
-  const auth = c.get('auth') as AuthInfo
-
-  denyAppLimitedApiKeyOutsideScope(auth, appId)
-
-  // Use unified RBAC permission check
-  if (!await checkPermission(c, 'app.read', { appId })) {
-    throw quickError(401, 'no_access_to_app', 'No access to app', { data: auth?.userId ?? null })
-  }
-
-  // Use authenticated client - RLS will enforce access
-  const supabase = getAuthenticatedSupabase(c, auth)
-
-  await getStatsAppOwnerOrgOrThrow(c, auth, appId, supabase)
+  const supabase = await getAuthorizedStatsAppClient(c, appId)
 
   const { data, error } = await getBundleUsage(appId, body.from, body.to, useDashboard, supabase)
+
+  if (error) {
+    throw quickError(500, 'cannot_get_app_statistics', 'Cannot get app statistics', { error })
+  }
+
+  return c.json(data)
+})
+
+app.get('/app/:app_id/native_usage', async (c) => {
+  const appId = c.req.param('app_id')
+  const query = c.req.query()
+
+  const bodyParsed = safeParseSchema(bundleUsageSchema, query)
+  if (!bodyParsed.success) {
+    throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
+  }
+  const body = bodyParsed.data
+  await getAuthorizedStatsAppClient(c, appId)
+
+  const { data, error } = await getNativeVersionUsage(c, appId, body.from, body.to)
 
   if (error) {
     throw quickError(500, 'cannot_get_app_statistics', 'Cannot get app statistics', { error })

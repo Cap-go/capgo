@@ -18,6 +18,10 @@ import { useOrganizationStore } from '~/stores/organization'
 import ChartCard from './ChartCard.vue'
 
 const props = defineProps({
+  appId: {
+    type: String,
+    default: '',
+  },
   useBillingPeriod: {
     type: Boolean,
     default: true,
@@ -34,10 +38,14 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  usageKind: {
+    type: String,
+    default: 'bundle',
+  },
 })
 
 // Demo data generator for devices stats when forceDemo is true
-function generateDemoDevicesData(days: number): { labels: string[], datasets: { label: string, data: number[] }[] } {
+function generateDemoDevicesData(days: number, usageKind: string = 'bundle'): { labels: string[], datasets: { label: string, data: number[] }[] } {
   const labels: string[] = []
   const today = new Date()
 
@@ -67,11 +75,15 @@ function generateDemoDevicesData(days: number): { labels: string[], datasets: { 
     newVersionData.push(Math.round((newValue / total) * 100 * 10) / 10)
   }
 
+  const labelsByKind = usageKind === 'native'
+    ? ['1.0.0', '1.1.0']
+    : ['2.0.5', '2.1.0']
+
   return {
     labels,
     datasets: [
-      { label: '2.0.5', data: oldVersionData },
-      { label: '2.1.0', data: newVersionData },
+      { label: labelsByKind[0], data: oldVersionData },
+      { label: labelsByKind[1], data: newVersionData },
     ],
   }
 }
@@ -98,6 +110,9 @@ const supabase = useSupabase()
 const rawChartData = ref<ChartApiData | null>(null)
 
 const appId = ref('')
+const activeAppId = computed(() => props.appId || appId.value)
+const isNativeUsage = computed(() => props.usageKind === 'native')
+const titleKey = computed(() => isNativeUsage.value ? 'active_users_by_native_version' : 'active_users_by_version')
 
 // Cache for bundle ID lookups (version name -> bundle ID)
 const bundleIdCache = ref<Record<string, number>>({})
@@ -118,7 +133,7 @@ const versionByLabel = computed(() => {
 async function navigateToBundle(versionName: string) {
   // Check cache first
   if (bundleIdCache.value[versionName]) {
-    router.push(`/app/${appId.value}/bundle/${bundleIdCache.value[versionName]}`)
+    router.push(`/app/${activeAppId.value}/bundle/${bundleIdCache.value[versionName]}`)
     return
   }
 
@@ -126,7 +141,7 @@ async function navigateToBundle(versionName: string) {
   const { data } = await supabase
     .from('app_versions')
     .select('id')
-    .eq('app_id', appId.value)
+    .eq('app_id', activeAppId.value)
     .eq('name', versionName)
     .limit(1)
     .single()
@@ -134,14 +149,14 @@ async function navigateToBundle(versionName: string) {
   if (data?.id) {
     // Cache the result
     bundleIdCache.value[versionName] = data.id
-    router.push(`/app/${appId.value}/bundle/${data.id}`)
+    router.push(`/app/${activeAppId.value}/bundle/${data.id}`)
   }
 }
 
 // Click handler for tooltip items - navigates directly to bundle page
 // Disabled in demo mode to prevent navigation to non-existent bundles
 const tooltipClickHandler = computed<TooltipClickHandler | undefined>(() => {
-  if (props.forceDemo)
+  if (props.forceDemo || isNativeUsage.value)
     return undefined
   return {
     onAppClick: navigateToBundle,
@@ -265,8 +280,8 @@ const latestVersionCountDisplay = computed(() => {
 })
 
 function resolveOrganizationForCurrentContext(): Organization | undefined {
-  if (appId.value) {
-    const org = organizationStore.getOrgByAppId(appId.value)
+  if (activeAppId.value) {
+    const org = organizationStore.getOrgByAppId(activeAppId.value)
     if (org)
       return org
   }
@@ -301,18 +316,43 @@ function generateDayLabels(_totalLength: number) {
   return generateChartDayLabels(props.useBillingPeriod, startDate, endDate)
 }
 
+function formatRoundedPercentage(value: number) {
+  const rounded = Number(value.toFixed(1))
+  return Number.isInteger(rounded) ? Math.trunc(rounded).toString() : rounded.toFixed(1)
+}
+
 function roundPercentageInString(text: string) {
   if (!text)
     return text
 
-  return text.replace(/(\d+(?:\.\d+)?)(?=%)/g, (match) => {
-    const numeric = Number(match)
-    if (Number.isNaN(numeric))
-      return match
+  const segments = text.split('%')
+  return segments.map((segment, index) => {
+    if (index === segments.length - 1)
+      return segment
 
-    const rounded = Number(numeric.toFixed(1))
-    return Number.isInteger(rounded) ? Math.trunc(rounded).toString() : rounded.toFixed(1)
-  })
+    let numberStart = segment.length
+    let hasDecimal = false
+    while (numberStart > 0) {
+      const char = segment[numberStart - 1]
+      if (char >= '0' && char <= '9') {
+        numberStart--
+        continue
+      }
+      if (char === '.' && !hasDecimal) {
+        hasDecimal = true
+        numberStart--
+        continue
+      }
+      break
+    }
+
+    const numericText = segment.slice(numberStart)
+    const numeric = Number(numericText)
+    if (!numericText || numericText === '.' || !Number.isFinite(numeric))
+      return `${segment}%`
+
+    return `${segment.slice(0, numberStart)}${formatRoundedPercentage(numeric)}%`
+  }).join('')
 }
 
 const processedChartData = computed<ChartData<'line'> | null>(() => {
@@ -583,7 +623,7 @@ const chartOptions = computed<ChartOptions<'line'>>(() => {
 const chartPlugins = [verticalLinePlugin, todayLinePlugin] as unknown as Plugin<'line'>[]
 
 async function loadData(forceRefetch = false) {
-  if (!appId.value) {
+  if (!activeAppId.value) {
     rawChartData.value = null
     return
   }
@@ -592,7 +632,7 @@ async function loadData(forceRefetch = false) {
   if (props.forceDemo) {
     const { startDate, endDate } = getDateRange()
     const days = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1
-    const demoData = generateDemoDevicesData(days)
+    const demoData = generateDemoDevicesData(days, props.usageKind)
     rawChartData.value = demoData
     currentRange.value = { startDate, endDate }
     isLoading.value = false
@@ -640,7 +680,7 @@ async function loadData(forceRefetch = false) {
   currentRange.value = { startDate, endDate }
 
   try {
-    const data = await useChartData(supabase, appId.value, startDate, endDate)
+    const data = await useChartData(supabase, activeAppId.value, startDate, endDate, props.usageKind === 'native' ? 'native' : 'bundle')
 
     if (currentToken !== requestToken)
       return
@@ -671,25 +711,27 @@ async function loadData(forceRefetch = false) {
 
 // Watch billing period changes - use cached data if available
 watch(() => props.useBillingPeriod, async () => {
-  if (appId.value)
+  if (activeAppId.value)
     await loadData(false) // Use cache if available
 })
 
 // Watch forceDemo changes - reload with demo data or real data
 watch(() => props.forceDemo, async () => {
-  if (appId.value)
+  if (activeAppId.value)
     await loadData(true) // Force reload to switch between demo/real data
 })
 
 // Watch for reload trigger - force refetch
 watch(() => props.reloadTrigger, async () => {
-  if (appId.value)
+  if (activeAppId.value)
     await loadData(true) // Force refetch
 })
 
 watch(
   () => [route.path, route.params.app as string | undefined] as const,
   async ([path, packageId], old) => {
+    if (props.appId)
+      return
     const oldPackageId = old?.[1]
     // Check for app route pattern
     if (path.includes('/app/') && packageId) {
@@ -715,11 +757,34 @@ watch(
   },
   { immediate: true },
 )
+
+watch(
+  () => [props.appId, props.usageKind] as const,
+  async ([packageId, usageKind], old) => {
+    if (!packageId)
+      return
+
+    const oldPackageId = old?.[0]
+    const oldUsageKind = old?.[1]
+    const packageChanged = packageId !== oldPackageId || usageKind !== oldUsageKind
+    appId.value = packageId
+
+    if (packageChanged) {
+      cachedBillingData.value = null
+      cached30DayData.value = null
+      await loadData(true)
+    }
+    else if (!rawChartData.value) {
+      await loadData(true)
+    }
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
   <ChartCard
-    :title="t('active_users_by_version')"
+    :title="t(titleKey)"
     :is-loading="isLoading"
     :has-data="hasData"
     :is-demo-data="isDemoMode"
@@ -727,7 +792,7 @@ watch(
     <template #header>
       <div class="flex items-start justify-between flex-1 gap-2">
         <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight dark:text-white text-slate-600">
-          {{ t('active_users_by_version') }}
+          {{ t(titleKey) }}
         </h2>
 
         <div class="flex flex-col items-end text-right shrink-0">

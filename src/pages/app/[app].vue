@@ -7,6 +7,7 @@ import AppNotFoundModal from '~/components/AppNotFoundModal.vue'
 import BundleUploadsCard from '~/components/dashboard/BundleUploadsCard.vue'
 import DeploymentBanner from '~/components/dashboard/DeploymentBanner.vue'
 import DeploymentStatsCard from '~/components/dashboard/DeploymentStatsCard.vue'
+import DevicesStats from '~/components/dashboard/DevicesStats.vue'
 import ReleaseBanner from '~/components/dashboard/ReleaseBanner.vue'
 import UpdateStatsCard from '~/components/dashboard/UpdateStatsCard.vue'
 import { getCapgoVersion, useSupabase } from '~/services/supabase'
@@ -208,7 +209,7 @@ watchEffect(async () => {
           />
 
           <!-- Charts section -->
-          <div class="grid grid-cols-1 gap-6 mb-6 sm:grid-cols-12 xl:grid-cols-12">
+          <div class="grid grid-cols-1 gap-6 mb-6 sm:grid-cols-12 xl:grid-cols-16">
             <BundleUploadsCard
               :app-id="id"
               :use-billing-period="usageComponent?.useBillingPeriod ?? true"
@@ -229,6 +230,15 @@ watchEffect(async () => {
               :app-id="id"
               :use-billing-period="usageComponent?.useBillingPeriod ?? true"
               :accumulated="(usageComponent?.useBillingPeriod ?? true) && (usageComponent?.showCumulative ?? false)"
+              :reload-trigger="usageComponent?.reloadTrigger ?? 0"
+              :force-demo="appNotFound"
+              class="col-span-full sm:col-span-6 xl:col-span-4"
+            />
+            <DevicesStats
+              :app-id="id"
+              usage-kind="native"
+              :use-billing-period="usageComponent?.useBillingPeriod ?? true"
+              :accumulated="false"
               :reload-trigger="usageComponent?.reloadTrigger ?? 0"
               :force-demo="appNotFound"
               class="col-span-full sm:col-span-6 xl:col-span-4"
