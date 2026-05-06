@@ -498,6 +498,7 @@ describe('[Encrypted Bundles Enforcement]', () => {
         .eq('id', ORG_ID_ENCRYPTED)
 
       const sessionKey = 'encrypted-session-key-for-cli-ready-update'
+      const r2Path = `orgs/${ORG_ID_ENCRYPTED}/apps/${APP_NAME_ENCRYPTED}/cli-ready-update-${Date.now()}.zip`
       const bundleName = `1.0.0-cli-ready-update-${Date.now()}`
       const { data: inserted, error: insertError } = await getSupabaseClient()
         .from('app_versions')
@@ -520,6 +521,7 @@ describe('[Encrypted Bundles Enforcement]', () => {
         .update({
           storage_provider: 'r2',
           session_key: sessionKey,
+          r2_path: r2Path,
         })
         .eq('id', inserted!.id)
 
@@ -527,13 +529,80 @@ describe('[Encrypted Bundles Enforcement]', () => {
 
       const { data: afterUpdate, error: fetchError } = await getSupabaseClient()
         .from('app_versions')
-        .select('session_key, storage_provider')
+        .select('session_key, storage_provider, r2_path')
         .eq('id', inserted!.id)
         .single()
 
       expect(fetchError).toBeNull()
       expect(afterUpdate?.session_key).toBe(sessionKey)
       expect(afterUpdate?.storage_provider).toBe('r2')
+      expect(afterUpdate?.r2_path).toBe(r2Path)
+
+      await getSupabaseClient()
+        .from('orgs')
+        .update({ enforce_encrypted_bundles: false })
+        .eq('id', ORG_ID_ENCRYPTED)
+    })
+
+    it('should reject ready bundle content updates', async () => {
+      await getSupabaseClient()
+        .from('orgs')
+        .update({ enforce_encrypted_bundles: true })
+        .eq('id', ORG_ID_ENCRYPTED)
+
+      const originalChecksum = 'f789abcdef123456789abcdef123456789abcdef123456789abcdef12345'
+      const originalNativePackages = [{ name: '@capacitor/core', version: '6.0.0' }]
+      const bundleName = `1.0.0-ready-immutable-${Date.now()}`
+      const originalR2Path = `orgs/${ORG_ID_ENCRYPTED}/apps/${APP_NAME_ENCRYPTED}/${bundleName}.zip`
+      const { data: inserted, error: insertError } = await getSupabaseClient()
+        .from('app_versions')
+        .insert({
+          app_id: APP_NAME_ENCRYPTED,
+          name: bundleName,
+          checksum: originalChecksum,
+          owner_org: ORG_ID_ENCRYPTED,
+          storage_provider: 'r2',
+          r2_path: originalR2Path,
+          session_key: 'encrypted-session-key-for-ready-immutable',
+          min_update_version: '0.9.0',
+          native_packages: originalNativePackages,
+        })
+        .select('id, checksum, storage_provider, r2_path, external_url, min_update_version, native_packages')
+        .single()
+
+      expect(insertError).toBeNull()
+      expect(inserted?.storage_provider).toBe('r2')
+
+      const { error: updateError } = await getSupabaseClient()
+        .from('app_versions')
+        .update({
+          name: `${bundleName}-rewritten`,
+          checksum: '089abcdef123456789abcdef123456789abcdef123456789abcdef123456',
+          storage_provider: 'external',
+          r2_path: `orgs/${ORG_ID_ENCRYPTED}/apps/${APP_NAME_ENCRYPTED}/rewritten.zip`,
+          external_url: 'https://example.com/rewritten.zip',
+          min_update_version: '1.0.0',
+          native_packages: [{ name: '@capacitor/core', version: '7.0.0' }],
+        })
+        .eq('id', inserted!.id)
+
+      expect(updateError).not.toBeNull()
+      expect(updateError?.message).toContain('bundle_already_ready')
+
+      const { data: afterUpdate, error: fetchError } = await getSupabaseClient()
+        .from('app_versions')
+        .select('name, checksum, storage_provider, r2_path, external_url, min_update_version, native_packages')
+        .eq('id', inserted!.id)
+        .single()
+
+      expect(fetchError).toBeNull()
+      expect(afterUpdate?.name).toBe(bundleName)
+      expect(afterUpdate?.checksum).toBe(originalChecksum)
+      expect(afterUpdate?.storage_provider).toBe('r2')
+      expect(afterUpdate?.r2_path).toBe(originalR2Path)
+      expect(afterUpdate?.external_url).toBeNull()
+      expect(afterUpdate?.min_update_version).toBe('0.9.0')
+      expect(afterUpdate?.native_packages).toEqual(originalNativePackages)
 
       await getSupabaseClient()
         .from('orgs')

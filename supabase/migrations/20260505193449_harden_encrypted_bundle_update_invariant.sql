@@ -20,11 +20,20 @@ BEGIN
 
     IF bundle_was_ready
       AND (
-        NEW.session_key IS DISTINCT FROM OLD.session_key
+        NEW.name IS DISTINCT FROM OLD.name
+        OR NEW.app_id IS DISTINCT FROM OLD.app_id
+        OR NEW.session_key IS DISTINCT FROM OLD.session_key
         OR NEW.key_id IS DISTINCT FROM OLD.key_id
+        OR NEW.storage_provider IS DISTINCT FROM OLD.storage_provider
+        OR NEW.r2_path IS DISTINCT FROM OLD.r2_path
+        OR NEW.external_url IS DISTINCT FROM OLD.external_url
+        OR NEW.checksum IS DISTINCT FROM OLD.checksum
+        OR NEW.min_update_version IS DISTINCT FROM OLD.min_update_version
+        OR NEW.manifest IS DISTINCT FROM OLD.manifest
+        OR NEW.native_packages IS DISTINCT FROM OLD.native_packages
       )
     THEN
-      PERFORM public.pg_log('deny: BUNDLE_ENCRYPTION_METADATA_LOCKED_TRIGGER',
+      PERFORM public.pg_log('deny: BUNDLE_CONTENT_LOCKED_TRIGGER',
         jsonb_build_object(
           'org_id', OLD.owner_org,
           'app_id', OLD.app_id,
@@ -35,7 +44,7 @@ BEGIN
           'reason', 'bundle_ready'
         ));
       RAISE EXCEPTION '%',
-        'bundle_already_ready: Bundle encryption metadata cannot be changed '
+        'bundle_already_ready: Bundle content cannot be changed '
         || 'after upload is complete. Upload a new bundle instead.';
     END IF;
   END IF;
@@ -125,6 +134,25 @@ BEGIN
   RETURN NEW;
 END;
 $$;
+
+DROP TRIGGER IF EXISTS enforce_encrypted_bundle_trigger ON public.app_versions;
+
+CREATE TRIGGER enforce_encrypted_bundle_trigger
+BEFORE INSERT OR UPDATE OF
+name,
+app_id,
+session_key,
+key_id,
+storage_provider,
+r2_path,
+external_url,
+checksum,
+min_update_version,
+manifest,
+native_packages
+ON public.app_versions
+FOR EACH ROW
+EXECUTE FUNCTION public.check_encrypted_bundle_on_insert();
 
 ALTER FUNCTION public.check_encrypted_bundle_on_insert() OWNER TO postgres;
 REVOKE ALL ON FUNCTION public.check_encrypted_bundle_on_insert()
