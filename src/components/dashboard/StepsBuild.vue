@@ -337,7 +337,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="min-h-[70vh] overflow-y-auto bg-slate-100 py-8 dark:bg-slate-950 sm:py-10">
+  <section class="overflow-y-auto py-4 sm:py-6">
     <div class="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 sm:px-6 lg:px-8">
       <header class="flex flex-col gap-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
         <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -383,7 +383,7 @@ onUnmounted(() => {
             :key="option.value"
             type="button"
             class="flex min-h-12 items-center justify-between rounded-md px-4 text-left transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-azure-500"
-            :class="selectedPlatform === option.value ? 'bg-white text-slate-950 shadow-sm dark:bg-slate-950 dark:text-white' : 'text-slate-600 hover:bg-white/70 dark:text-slate-300 dark:hover:bg-slate-900/70'"
+            :class="selectedPlatform === option.value ? 'bg-white text-slate-950 shadow-sm dark:bg-slate-700 dark:text-white' : 'text-slate-600 hover:bg-white/70 dark:text-slate-300 dark:hover:bg-slate-700/70'"
             @click="selectPlatform(option.value)"
           >
             <span class="flex items-center gap-3 font-medium">
@@ -433,7 +433,7 @@ onUnmounted(() => {
               <button
                 v-if="s.command"
                 type="button"
-                class="mt-4 flex w-full items-start gap-3 rounded-lg bg-slate-950 p-4 text-left text-sm text-orange-300 transition-colors hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-black dark:hover:bg-slate-950 sm:text-base"
+                class="mt-4 flex w-full items-start gap-3 rounded-lg bg-slate-950 p-4 text-left text-sm text-orange-300 transition-colors hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-950 dark:hover:bg-slate-900 sm:text-base"
                 :disabled="step !== i"
                 :aria-label="t('copy-command')"
                 @click="copyToast(step === i, `build_step_${i}`, s.command)"
