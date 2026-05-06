@@ -1,15 +1,18 @@
 /*
- * Backfill admin revenue trend metrics stored in public.global_stats.
+ * Backfill admin revenue dashboard metrics stored in public.global_stats.
+ *
+ * Covers Subscription Type, Subscription Flow, MRR, ARR, ARR by Plan,
+ * Churn Revenue - Lost MRR, Total Paying Organizations, and upgraded orgs.
  *
  * Dry run, defaulting to the last 30 UTC calendar days:
- *   bun run stripe:backfill-revenue-trends
+ *   bun run stripe:backfill-admin-revenue-dashboard
  *
  * Apply a date range:
- *   bun run stripe:backfill-revenue-trends --apply --from=2026-04-01 --to=2026-04-30
+ *   bun run stripe:backfill-admin-revenue-dashboard --apply --from=2026-04-01 --to=2026-04-30
  *
  * Older history should use an exported Stripe events JSON file that includes
  * enough pre-range subscription events to seed the opening state:
- *   bun run stripe:backfill-revenue-trends --events-file=./tmp/stripe-events.json --from=2026-01-01 --to=2026-04-30
+ *   bun run stripe:backfill-admin-revenue-dashboard --events-file=./tmp/stripe-events.json --from=2026-01-01 --to=2026-04-30
  */
 import type Stripe from 'stripe'
 import type { Database } from '../supabase/functions/_backend/utils/supabase.types.ts'
@@ -46,6 +49,7 @@ type GlobalStatsRow = Pick<
   | 'date_id'
   | 'mrr'
   | 'new_paying_orgs'
+  | 'paying'
   | 'paying_monthly'
   | 'paying_yearly'
   | 'plan_enterprise'
@@ -65,6 +69,7 @@ type GlobalStatsRow = Pick<
   | 'revenue_solo'
   | 'revenue_team'
   | 'total_revenue'
+  | 'upgraded_orgs'
 >
 type GlobalStatsUpdate = Database['public']['Tables']['global_stats']['Update']
 type PlanRow = Pick<Database['public']['Tables']['plans']['Row'], 'name' | 'price_m' | 'price_m_id' | 'price_y' | 'price_y_id'>
@@ -93,6 +98,7 @@ interface DailyCounters {
   canceledCustomerIds: Set<string>
   churnRevenue: number
   newCustomerIds: Set<string>
+  upgradedCustomerIds: Set<string>
 }
 
 export interface RevenueTrendMetricValues {
@@ -100,6 +106,7 @@ export interface RevenueTrendMetricValues {
   churn_revenue: number
   mrr: number
   new_paying_orgs: number
+  paying: number
   paying_monthly: number
   paying_yearly: number
   plan_enterprise: number
@@ -119,6 +126,7 @@ export interface RevenueTrendMetricValues {
   revenue_solo: number
   revenue_team: number
   total_revenue: number
+  upgraded_orgs: number
 }
 
 export interface RevenueTrendBackfillRow extends RevenueTrendMetricValues {
@@ -197,6 +205,7 @@ function createEmptyMetrics(): RevenueTrendMetricValues {
     churn_revenue: 0,
     mrr: 0,
     new_paying_orgs: 0,
+    paying: 0,
     paying_monthly: 0,
     paying_yearly: 0,
     plan_enterprise: 0,
@@ -216,6 +225,7 @@ function createEmptyMetrics(): RevenueTrendMetricValues {
     revenue_solo: 0,
     revenue_team: 0,
     total_revenue: 0,
+    upgraded_orgs: 0,
   }
 }
 
@@ -473,6 +483,7 @@ function createDailyCounters() {
     canceledCustomerIds: new Set<string>(),
     churnRevenue: 0,
     newCustomerIds: new Set<string>(),
+    upgradedCustomerIds: new Set<string>(),
   }
 }
 
@@ -498,6 +509,17 @@ function recordTransition(
 
   if (!daily)
     return
+
+  if (
+    currentMrr > 0
+    && nextMrr > 0
+    && (
+      nextMrr > currentMrr
+      || (currentState?.interval === 'monthly' && nextState?.interval === 'yearly')
+    )
+  ) {
+    daily.upgradedCustomerIds.add(customerId)
+  }
 
   if (currentMrr > 0 && nextMrr <= 0) {
     daily.canceledCustomerIds.add(customerId)
@@ -638,8 +660,10 @@ function expireStatesForDate(states: Map<string, RevenueSubscriptionState>, date
 
 export function summarizeRevenueSnapshot(states: Iterable<RevenueSubscriptionState>, daily: DailyCounters = createDailyCounters()): RevenueTrendMetricValues {
   const metrics = createEmptyMetrics()
+  const payingCustomerIds = new Set<string>()
 
   for (const state of states) {
+    payingCustomerIds.add(state.customerId)
     metrics.mrr += state.mrr
 
     if (state.interval === 'monthly')
@@ -684,6 +708,8 @@ export function summarizeRevenueSnapshot(states: Iterable<RevenueSubscriptionSta
   metrics.new_paying_orgs = daily.newCustomerIds.size
   metrics.canceled_orgs = daily.canceledCustomerIds.size
   metrics.churn_revenue = daily.churnRevenue
+  metrics.paying = payingCustomerIds.size
+  metrics.upgraded_orgs = daily.upgradedCustomerIds.size
   metrics.mrr = roundMoney(metrics.mrr)
   metrics.total_revenue = roundMoney(metrics.mrr * 12)
   metrics.revenue_solo = roundMoney(metrics.revenue_solo)
@@ -874,6 +900,7 @@ async function fetchGlobalStatsRows(supabase: SupabaseClient, fromDateId: string
         paying_monthly,
         new_paying_orgs,
         canceled_orgs,
+        paying,
         mrr,
         total_revenue,
         revenue_solo,
@@ -892,7 +919,8 @@ async function fetchGlobalStatsRows(supabase: SupabaseClient, fromDateId: string
         plan_team_yearly,
         plan_enterprise_monthly,
         plan_enterprise_yearly,
-        churn_revenue
+        churn_revenue,
+        upgraded_orgs
       `)
       .gte('date_id', fromDateId)
       .lte('date_id', toDateId)
@@ -919,6 +947,7 @@ function toGlobalStatsUpdate(row: RevenueTrendBackfillRow): GlobalStatsUpdate {
     churn_revenue: row.churn_revenue,
     mrr: row.mrr,
     new_paying_orgs: row.new_paying_orgs,
+    paying: row.paying,
     paying_monthly: row.paying_monthly,
     paying_yearly: row.paying_yearly,
     plan_enterprise: row.plan_enterprise,
@@ -938,6 +967,7 @@ function toGlobalStatsUpdate(row: RevenueTrendBackfillRow): GlobalStatsUpdate {
     revenue_solo: row.revenue_solo,
     revenue_team: row.revenue_team,
     total_revenue: row.total_revenue,
+    upgraded_orgs: row.upgraded_orgs,
   }
 }
 
@@ -953,11 +983,11 @@ async function updateGlobalStatsRow(supabase: SupabaseClient, row: RevenueTrendB
 
 function printSampleRows(rows: RevenueTrendBackfillRow[]) {
   for (const row of rows.slice(0, 10)) {
-    console.log(`${row.date_id}: monthly=${row.paying_monthly}, yearly=${row.paying_yearly}, mrr=$${row.mrr.toFixed(2)}, arr=$${row.total_revenue.toFixed(2)}, new=${row.new_paying_orgs}, canceled=${row.canceled_orgs}, churn=$${row.churn_revenue.toFixed(2)}, plans=${row.plan_solo}/${row.plan_maker}/${row.plan_team}/${row.plan_enterprise}`)
+    console.log(`${row.date_id}: paying=${row.paying}, monthly=${row.paying_monthly}, yearly=${row.paying_yearly}, mrr=$${row.mrr.toFixed(2)}, arr=$${row.total_revenue.toFixed(2)}, new=${row.new_paying_orgs}, canceled=${row.canceled_orgs}, upgraded=${row.upgraded_orgs}, churn=$${row.churn_revenue.toFixed(2)}, plans=${row.plan_solo}/${row.plan_maker}/${row.plan_team}/${row.plan_enterprise}`)
   }
 }
 
-async function main(args = process.argv.slice(2), runtimeEnv: Record<string, string | undefined> = process.env) {
+export async function main(args = process.argv.slice(2), runtimeEnv: Record<string, string | undefined> = process.env) {
   const apply = args.includes('--apply')
   const skipSubscriptionBaseline = args.includes('--skip-subscription-baseline')
   const envFile = getArgValue(args, '--env-file') ?? DEFAULT_ENV_FILE

@@ -20,6 +20,7 @@ function globalStatsRow(dateId: string) {
     date_id: dateId,
     mrr: 0,
     new_paying_orgs: 0,
+    paying: 0,
     paying_monthly: 0,
     paying_yearly: 0,
     plan_enterprise: 0,
@@ -39,6 +40,7 @@ function globalStatsRow(dateId: string) {
     revenue_solo: 0,
     revenue_team: 0,
     total_revenue: 0,
+    upgraded_orgs: 0,
   }
 }
 
@@ -145,6 +147,7 @@ describe('revenue trend backfill metrics', () => {
       churn_revenue: 0,
       mrr: 12,
       new_paying_orgs: 1,
+      paying: 1,
       paying_monthly: 1,
       paying_yearly: 0,
       plan_solo: 1,
@@ -157,6 +160,7 @@ describe('revenue trend backfill metrics', () => {
       churn_revenue: 12,
       mrr: 0,
       new_paying_orgs: 0,
+      paying: 0,
       paying_monthly: 0,
       plan_solo: 0,
       total_revenue: 0,
@@ -214,6 +218,7 @@ describe('revenue trend backfill metrics', () => {
 
     expect(rows[0]).toMatchObject({
       mrr: 78,
+      paying: 2,
       paying_monthly: 1,
       paying_yearly: 1,
       plan_maker: 1,
@@ -255,6 +260,7 @@ describe('revenue trend backfill metrics', () => {
       churn_revenue: 0,
       mrr: 49,
       plan_solo: 0,
+      upgraded_orgs: 1,
       plan_team: 1,
       revenue_team: 588,
     })
@@ -304,8 +310,31 @@ describe('revenue trend backfill metrics', () => {
     expect(rows[0]).toMatchObject({
       mrr: 12,
       new_paying_orgs: 1,
+      paying: 1,
       paying_monthly: 1,
       plan_solo: 1,
+    })
+  })
+
+  it.concurrent('counts monthly-to-yearly changes as upgraded orgs', () => {
+    const rows = buildRevenueTrendBackfillRows([
+      globalStatsRow('2026-04-01'),
+    ], {
+      events: [
+        subscriptionEvent('evt_yearly_upgrade', 'customer.subscription.updated', DAY_1 + 3600, 'cus_yearly_upgrade', 'sub_yearly_upgrade', 'price_solo_yearly', {
+          previousPriceId: 'price_solo_monthly',
+          subscriptionCreated: DAY_1 - 86400,
+        }),
+      ],
+      fromDateId: '2026-04-01',
+      plans,
+      toDateId: '2026-04-01',
+    })
+
+    expect(rows[0]).toMatchObject({
+      paying: 1,
+      paying_yearly: 1,
+      upgraded_orgs: 1,
     })
   })
 

@@ -85,6 +85,7 @@
     "stripe:backfill-org-conversion-rate": "bun scripts/backfill_org_conversion_rate_trend.ts",
     "stripe:backfill-customer-countries": "bun scripts/backfill_stripe_customer_countries.ts",
     "stripe:backfill-revenue-trends": "bun scripts/backfill_revenue_trend_metrics.ts",
+    "stripe:backfill-admin-revenue-dashboard": "bun scripts/backfill_admin_revenue_dashboard_metrics.ts",
     "stripe:sync-org-names": "bun scripts/sync_stripe_org_names.ts",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",
     "fmt": "bun run lint:fix && bun run lint:sql",
