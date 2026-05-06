@@ -48,15 +48,14 @@ BEGIN
     END IF;
   END IF;
 
-  -- Derive org_id from app_id directly to avoid trigger ordering issues.
-  -- The force_valid_owner_org_app_versions trigger runs after this one
-  -- alphabetically, so NEW.owner_org may not be populated yet.
-  IF NEW.owner_org IS NOT NULL THEN
+  -- Derive org_id from NEW.app_id first because
+  -- force_valid_owner_org_app_versions runs after this trigger.
+  SELECT apps.owner_org INTO org_id
+  FROM public.apps
+  WHERE apps.app_id = NEW.app_id;
+
+  IF org_id IS NULL THEN
     org_id := NEW.owner_org;
-  ELSE
-    SELECT apps.owner_org INTO org_id
-    FROM public.apps
-    WHERE apps.app_id = NEW.app_id;
   END IF;
 
   -- If org not found, allow the existing foreign-key/owner checks to fail.
