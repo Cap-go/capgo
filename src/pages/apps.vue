@@ -52,7 +52,8 @@ async function loadAppIcons(sourceApps: AppRow[], runId: number) {
       const signedIcon = await createSignedImageUrl(app.icon_url)
       return signedIcon ? { appId: app.app_id, signedIcon } : null
     }
-    catch {
+    catch (error) {
+      console.warn('Cannot load signed app icon', { appId: app.app_id, error })
       return null
     }
   })))
