@@ -218,11 +218,13 @@ describe('dynamic translation worker helpers', () => {
   })
 
   it.concurrent('protects and restores inline placeholders and commands', () => {
-    const source = 'Run bunx @capgo/cli@latest bundle compatibility for {bundle} and email support@capgo.app'
+    const source = 'Run bunx @capgo/cli@latest bundle compatibility for {bundle}, %ORG_NAME%, %1, and email support@capgo.app'
     const protectedTokens = protectTranslationTokens(source)
 
     expect(protectedTokens.protectedText).toContain('__CAPGO_TOKEN_0__')
     expect(protectedTokens.protectedText).toContain('__CAPGO_TOKEN_1__')
+    expect(protectedTokens.protectedText).not.toContain('%ORG_NAME%')
+    expect(protectedTokens.protectedText).not.toContain('%1')
 
     const restored = restoreTranslationTokens(protectedTokens.protectedText, protectedTokens.tokens)
     expect(restored).toBe(source)

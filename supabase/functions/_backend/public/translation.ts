@@ -203,7 +203,7 @@ export function normalizeTranslationMessages(messages: unknown) {
 export function protectTranslationTokens(text: string) {
   let index = 0
   const tokens = new Map<string, string>()
-  const tokenPattern = /\{\w+\}|\$\d+|https?:\/\/[^\s)]+|\b[\w.%+-]+@[\w.-]+\.[a-z]{2,}\b|\b(?:bunx?|npx)(?:\s+[@\w./:-]+)+/gi
+  const tokenPattern = /\{\w+\}|\$\d+|%\w+%?|https?:\/\/[^\s)]+|\b[\w.%+-]+@[\w.-]+\.[a-z]{2,}\b|\b(?:bunx?|npx)(?:\s+[@\w./:-]+)+/gi
 
   const replaceMatch = (match: string) => {
     const token = `__CAPGO_TOKEN_${index++}__`

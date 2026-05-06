@@ -535,14 +535,12 @@ export function usePageTranslation() {
 
   watch(() => route.path, () => {
     lastRequestHash = ''
-    translationDisabled = false
     transientRetryCount = 0
     scheduleTranslation(80)
   }, { immediate: true })
 
   watch(selectedLanguage, () => {
     lastRequestHash = ''
-    translationDisabled = false
     transientRetryCount = 0
     scheduleTranslation(40)
   })
