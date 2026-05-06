@@ -63,6 +63,10 @@ export const ALLOWED_HEADERS = HEADERS.join(', ')
 export const ALLOWED_METHODS = REQUEST_METHODS.join(', ')
 export const EXPOSED_HEADERS = HEADERS.join(', ')
 
+export function encodeR2KeyForUploadLocation(r2Key: string): string {
+  return r2Key.split('/').map(segment => encodeURIComponent(segment)).join('/')
+}
+
 export function withNoTransformCacheControl(cacheControl: string | null | undefined): string {
   if (cacheControl == null || cacheControl.trim() === '') {
     return NO_TRANSFORM_CACHE_CONTROL

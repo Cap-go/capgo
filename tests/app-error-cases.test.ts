@@ -28,8 +28,6 @@ beforeAll(async () => {
     body: JSON.stringify({
       name: `app-error-cases-${id}`,
       mode: 'all',
-      limited_to_orgs: [testOrgId],
-      limited_to_apps: [],
     }),
   })
 
@@ -133,16 +131,11 @@ describe('[GET] /app - Error Cases', () => {
 
   it('should return 404 when app is not found', async () => {
     // Create an app first to get access, then delete it to test 404
-    const createResponse = await fetch(`${BASE_URL}/app`, {
-      method: 'POST',
-      headers: testHeaders,
-      body: JSON.stringify({
-        name: `App ${APPNAME}.notfound`,
-        app_id: NOT_FOUND_APP_ID,
-        owner_org: testOrgId,
-      }),
+    await resetAndSeedAppData(NOT_FOUND_APP_ID, {
+      orgId: testOrgId,
+      userId: USER_ID,
+      stripeCustomerId: testStripeCustomerId,
     })
-    expect(createResponse.status).toBe(200)
 
     // Delete the app from database directly
     await getSupabaseClient().from('apps').delete().eq('app_id', NOT_FOUND_APP_ID)
@@ -173,16 +166,11 @@ describe('[GET] /app - Error Cases', () => {
 describe('[PUT] /app - Error Cases', () => {
   beforeAll(async () => {
     // Ensure the test app exists for PUT tests
-    const createResponse = await fetch(`${BASE_URL}/app`, {
-      method: 'POST',
-      headers: testHeaders,
-      body: JSON.stringify({
-        name: `App ${APPNAME}.put`,
-        app_id: PUT_APP_ID,
-        owner_org: testOrgId,
-      }),
+    await resetAndSeedAppData(PUT_APP_ID, {
+      orgId: testOrgId,
+      userId: USER_ID,
+      stripeCustomerId: testStripeCustomerId,
     })
-    expect(createResponse.status).toBe(200)
   })
 
   it('should return 400 when user cannot access the app', async () => {
@@ -236,16 +224,11 @@ describe('[DELETE] /app - Error Cases', () => {
 
   it('should return 400 when app deletion fails', async () => {
     // Create an app to test deletion
-    const createResponse = await fetch(`${BASE_URL}/app`, {
-      method: 'POST',
-      headers: testHeaders,
-      body: JSON.stringify({
-        name: `App ${APPNAME}.delete`,
-        app_id: DELETE_APP_ID,
-        owner_org: testOrgId,
-      }),
+    await resetAndSeedAppData(DELETE_APP_ID, {
+      orgId: testOrgId,
+      userId: USER_ID,
+      stripeCustomerId: testStripeCustomerId,
     })
-    expect(createResponse.status).toBe(200)
 
     // Try to delete the app (this should work)
     const response = await fetch(`${BASE_URL}/app/${DELETE_APP_ID}`, {

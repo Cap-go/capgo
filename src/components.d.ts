@@ -26,6 +26,7 @@ declare module 'vue' {
     AppSetting: typeof import('./components/dashboard/AppSetting.vue')['default']
     AppTable: typeof import('./components/tables/AppTable.vue')['default']
     AuditLogTable: typeof import('./components/tables/AuditLogTable.vue')['default']
+    AuthPageShell: typeof import('./components/auth/AuthPageShell.vue')['default']
     Banner: typeof import('./components/Banner.vue')['default']
     BlurBg: typeof import('./components/BlurBg.vue')['default']
     BuildSetupInvite: typeof import('./components/dashboard/BuildSetupInvite.vue')['default']

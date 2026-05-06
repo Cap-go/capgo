@@ -1,8 +1,10 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
+import type { Database } from '../utils/supabase.types.ts'
 import { sValidator } from '@hono/standard-validator'
 import { and, eq, sql } from 'drizzle-orm'
-import { createHono, middlewareAuth, useCors } from '../utils/hono.ts'
+import { createHono, useCors } from '../utils/hono.ts'
+import { middlewareV2 } from '../utils/hono_middleware.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { closeClient, getDrizzleClient, getPgClient } from '../utils/pg.ts'
 import { schema } from '../utils/postgres_schema.ts'
@@ -43,11 +45,21 @@ const INVALID_APIKEY_ACCESS_ERROR = 'Invalid API key or access'
 export const app = createHono('', version)
 
 app.use('*', useCors)
-app.use('*', middlewareAuth)
+app.use('*', middlewareV2(['all']))
 
-async function requireUserAuth(c: Context<MiddlewareKeyVariables>, next: () => Promise<void>) {
-  if (!c.get('auth')?.userId) {
+async function requireAuthAndGuardLimitedKeys(c: Context<MiddlewareKeyVariables>, next: () => Promise<void>) {
+  const auth = c.get('auth')
+  if (!auth?.userId) {
     return c.json({ error: 'Unauthorized' }, 401)
+  }
+
+  // Prevent limited-scope API keys from managing role bindings
+  if (auth.authType === 'apikey') {
+    const apikey = c.get('apikey') as Database['public']['Tables']['apikeys']['Row'] | undefined
+    const hasLimitedScope = (apikey?.limited_to_orgs?.length ?? 0) > 0 || (apikey?.limited_to_apps?.length ?? 0) > 0
+    if (hasLimitedScope) {
+      return c.json({ error: 'Limited-scope API keys cannot manage role bindings' }, 403)
+    }
   }
 
   await next()
@@ -269,19 +281,44 @@ async function validateApiKeyPrincipalAccess(
     return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
   }
 
-  const [membership] = await drizzle
+  // Mirror the user-principal checks: only accept active (non-invite) memberships
+  const [activeMembership] = await drizzle
     .select({ id: schema.org_users.id })
     .from(schema.org_users)
     .where(
       and(
         eq(schema.org_users.user_id, apiKey.user_id),
         eq(schema.org_users.org_id, orgId),
+        sql`(${schema.org_users.user_right} IS NULL OR ${schema.org_users.user_right}::text NOT LIKE 'invite_%')`,
       ),
     )
     .limit(1)
 
-  if (membership) {
+  if (activeMembership) {
     return { ok: true, data: null }
+  }
+
+  // Check if the owner has a pending invite (same as user-principal validation)
+  const [pendingInvite] = await drizzle
+    .select({ id: schema.org_users.id })
+    .from(schema.org_users)
+    .where(
+      and(
+        eq(schema.org_users.user_id, apiKey.user_id),
+        eq(schema.org_users.org_id, orgId),
+        sql`${schema.org_users.user_right}::text LIKE 'invite_%'`,
+      ),
+    )
+    .limit(1)
+
+  if (pendingInvite) {
+    cloudlogErr({
+      message: 'validatePrincipalAccess: apiKey owner has pending invite, not active member',
+      principalId,
+      orgId,
+      apiKeyUserId: apiKey.user_id,
+    })
+    return { ok: false, status: 400, error: INVALID_APIKEY_ACCESS_ERROR }
   }
 
   cloudlogErr({
@@ -359,6 +396,15 @@ async function loadManagedBinding(
   return { ok: true, data: binding }
 }
 
+// Maps legacy org_users.user_right values to their equivalent RBAC role names.
+// Only admin-level rights are mapped because lower rights (write/upload/read)
+// cannot pass the checkPermission('org.update_user_roles') gate that precedes
+// every anti-escalation check.
+const LEGACY_RIGHT_TO_ROLE_NAME: Record<string, string> = {
+  super_admin: 'org_super_admin',
+  admin: 'org_admin',
+}
+
 async function loadAssignableRoleForBinding(
   c: Context<MiddlewareKeyVariables>,
   drizzle: ReturnType<typeof getDrizzleClient>,
@@ -417,7 +463,147 @@ async function getCallerMaxPriorityRank(
     )
     .limit(1)
 
-  return result[0]?.max_rank ?? 0
+  let maxRank = result[0]?.max_rank ?? 0
+
+  // For JWT callers, also consider legacy org_users.user_right so that admins
+  // who passed checkPermission via check_min_rights (legacy path) are not
+  // blocked by the anti-escalation check when they have no RBAC bindings yet.
+  if (authType === 'jwt') {
+    const [membership] = await drizzle
+      .select({ user_right: schema.org_users.user_right })
+      .from(schema.org_users)
+      .where(
+        and(
+          eq(schema.org_users.user_id, principalId),
+          eq(schema.org_users.org_id, orgId),
+          sql`${schema.org_users.user_right}::text NOT LIKE 'invite_%'`,
+        ),
+      )
+      .limit(1)
+
+    const mappedRoleName = membership?.user_right
+      ? LEGACY_RIGHT_TO_ROLE_NAME[membership.user_right]
+      : undefined
+
+    if (mappedRoleName) {
+      const [role] = await drizzle
+        .select({ priority_rank: schema.roles.priority_rank })
+        .from(schema.roles)
+        .where(eq(schema.roles.name, mappedRoleName))
+        .limit(1)
+
+      if (role && role.priority_rank > maxRank) {
+        maxRank = role.priority_rank
+      }
+    }
+  }
+
+  return maxRank
+}
+
+// Reusable binding creation logic - used by both the POST route and apikey/post.ts
+export interface CreateBindingParams {
+  principal_type: PrincipalType
+  principal_id: string
+  role_name: string
+  scope_type: ScopeType
+  org_id: string
+  app_id?: string | null
+  channel_id?: string | number | null
+  reason?: string
+}
+
+export type CreateBindingResult = {
+  ok: true
+  data: typeof schema.role_bindings.$inferSelect
+} | {
+  ok: false
+  status: number
+  error: string
+}
+
+export async function createRoleBindingForPrincipal(
+  drizzle: ReturnType<typeof getDrizzleClient>,
+  params: CreateBindingParams,
+  grantedBy: string,
+  authType: 'jwt' | 'apikey',
+  callerPrincipalId: string,
+): Promise<CreateBindingResult> {
+  const {
+    principal_type,
+    principal_id,
+    role_name,
+    scope_type,
+    org_id,
+    app_id,
+    channel_id,
+    reason,
+  } = params
+
+  // 1. Resolve role by name
+  const [role] = await drizzle
+    .select()
+    .from(schema.roles)
+    .where(eq(schema.roles.name, role_name))
+    .limit(1)
+
+  if (!role) {
+    return { ok: false, status: 404, error: 'Role not found' }
+  }
+
+  if (!role.is_assignable) {
+    return { ok: false, status: 403, error: 'Role is not assignable' }
+  }
+
+  // 2. Role scope must match binding scope
+  const roleScopeValidation = validateRoleScope(role.scope_type, scope_type)
+  if (!roleScopeValidation.ok) {
+    return { ok: false, status: roleScopeValidation.status, error: roleScopeValidation.error }
+  }
+
+  // 3. Anti-escalation: caller's max priority rank must be >= role.priority_rank
+  const callerMaxRank = await getCallerMaxPriorityRank(drizzle, authType, callerPrincipalId, org_id)
+  if (role.priority_rank > callerMaxRank) {
+    return { ok: false, status: 403, error: 'Cannot assign a role with higher privileges than your own' }
+  }
+
+  // 4. Scope field validation (app_id / channel_id required when scope demands it)
+  const scopeValidation = validateScope(scope_type, app_id, channel_id)
+  if (!scopeValidation.ok) {
+    return { ok: false, status: scopeValidation.status, error: scopeValidation.error }
+  }
+
+  // 5. App/channel ownership check; also normalises channel_id -> rbac_id
+  const scopedAppValidation = await validateScopedAppOwnership(drizzle, scope_type, org_id, app_id, channel_id)
+  if (!scopedAppValidation.ok) {
+    return { ok: false, status: scopedAppValidation.status, error: scopedAppValidation.error }
+  }
+  const normalizedChannelId = scopedAppValidation.data.channelRbacId
+
+  // 6. Principal existence & org-membership check
+  const principalValidation = await validatePrincipalAccess(drizzle, principal_type, principal_id, org_id)
+  if (!principalValidation.ok) {
+    return { ok: false, status: principalValidation.status, error: principalValidation.error }
+  }
+
+  // 7. Create the binding
+  const [binding] = await drizzle
+    .insert(schema.role_bindings)
+    .values({
+      principal_type,
+      principal_id,
+      role_id: role.id,
+      scope_type,
+      org_id,
+      app_id: app_id || null,
+      channel_id: normalizedChannelId,
+      granted_by: grantedBy,
+      reason: reason || null,
+      is_direct: true,
+    })
+    .returning()
+
+  return { ok: true, data: binding }
 }
 
 async function updateRoleBindingRole(
@@ -465,7 +651,7 @@ function isLastSuperAdminDemotionError(error: unknown): boolean {
 }
 
 // GET /private/role_bindings/:org_id - List role bindings for an org
-app.get('/:org_id', requireUserAuth, sValidator('param', orgIdParamSchema, invalidOrgIdHook), async (c) => {
+app.get('/:org_id', requireAuthAndGuardLimitedKeys, sValidator('param', orgIdParamSchema, invalidOrgIdHook), async (c) => {
   const { org_id: orgId } = c.req.valid('param')
 
   let pgClient
@@ -527,7 +713,7 @@ app.get('/:org_id', requireUserAuth, sValidator('param', orgIdParamSchema, inval
 })
 
 // POST /private/role_bindings - Assign a role
-app.post('/', requireUserAuth, async (c) => {
+app.post('/', requireAuthAndGuardLimitedKeys, async (c) => {
   const auth = c.get('auth')!
   const userId = auth.userId
 
@@ -671,7 +857,7 @@ app.post('/', requireUserAuth, async (c) => {
 // PATCH /private/role_bindings/:binding_id - Update a role binding
 app.patch(
   '/:binding_id',
-  requireUserAuth,
+  requireAuthAndGuardLimitedKeys,
   sValidator('param', bindingIdParamSchema, invalidBindingIdHook),
   async (c) => {
     const { binding_id: bindingId } = c.req.valid('param')
@@ -747,7 +933,7 @@ app.patch(
 )
 
 // DELETE /private/role_bindings/:binding_id - Remove a role
-app.delete('/:binding_id', requireUserAuth, sValidator('param', bindingIdParamSchema, invalidBindingIdHook), async (c) => {
+app.delete('/:binding_id', requireAuthAndGuardLimitedKeys, sValidator('param', bindingIdParamSchema, invalidBindingIdHook), async (c) => {
   const { binding_id: bindingId } = c.req.valid('param')
 
   let pgClient

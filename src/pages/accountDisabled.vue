@@ -3,7 +3,9 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
+import { authGhostButtonClass, authPrimaryButtonClass, authSecondaryButtonClass } from '~/components/auth/pageStyles'
 import { useSupabase } from '~/services/supabase'
+import { openSupport } from '~/services/support'
 import { useMainStore } from '~/stores/main'
 
 const { t } = useI18n()
@@ -31,6 +33,8 @@ const restoreTarget = computed(() => {
     return target
   return '/dashboard'
 })
+
+const accountDeletionRequestedText = computed(() => t('account-deletion-requested'))
 
 const accountDeletionSupportText = computed(() => t('account-deletion-support-full', { supportLink: SUPPORT_LINK_TOKEN }))
 const accountDeletionSupportParts = computed(() => {
@@ -152,56 +156,55 @@ const timeRemaining = computed(() => {
 </script>
 
 <template>
-  <section class="flex flex-col w-full h-full">
-    <!-- Capgo logo at top 10% -->
-    <div class="flex justify-center items-center pt-[5vh]">
-      <img src="/capgo.webp" alt="Capgo logo" class="w-16 h-16 rounded-sm invert dark:invert-0">
-    </div>
+  <AuthPageShell
+    card-width-class="max-w-md"
+    :card-kicker="accountDeletionRequestedText"
+    :card-title="accountDeletionRequestedText"
+  >
+    <div class="space-y-5 text-center text-slate-500 dark:text-slate-300">
+      <p class="text-sm leading-6">
+        {{ t("account-deletion-restore") }}
+      </p>
+      <p class="text-sm leading-6">
+        {{ accountDeletionSupportParts.before }}
+        <a
+          href="https://support.capgo.app/"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="font-semibold text-[rgb(255,114,17)] transition-colors duration-200 hover:text-[rgb(235,94,0)]"
+        >Capgo support</a>
+        {{ accountDeletionSupportParts.after }}
+      </p>
 
-    <!-- Main content positioned at 20% from top (80% from bottom) -->
-    <div class="flex justify-center items-start w-full pt-[12.5vh]">
-      <div class="px-4 max-w-2xl text-center">
-        <h1 class="mb-6 text-4xl font-bold text-gray-900 dark:text-white">
-          {{ t('account-deletion-requested') }}
-        </h1>
-        <p class="mb-4 text-lg text-gray-600 dark:text-gray-300">
-          {{ accountDeletionSupportParts.before }}
-          <a
-            href="https://support.capgo.app/"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-blue-500 underline hover:text-blue-600"
-          >Capgo support</a>
-          {{ accountDeletionSupportParts.after }}
+      <div class="rounded-3xl border border-rose-200 bg-rose-50 px-5 py-5 dark:border-rose-900/70 dark:bg-rose-950/30">
+        <p class="text-sm font-semibold tracking-[0.12em] uppercase text-rose-700 dark:text-rose-200">
+          {{ timeRemaining === t("account-deletion-very-soon") ? t("account-deletion-timer") : t("account-deletion-timer-in") }}
         </p>
-        <div class="p-4 mt-6 bg-red-50 rounded-lg border border-red-200 dark:border-red-800 dark:bg-red-900/20">
-          <p class="font-medium text-red-800 dark:text-red-200">
-            {{ timeRemaining === t('account-deletion-very-soon') ? t('account-deletion-timer') : t('account-deletion-timer-in') }}
-          </p>
-          <p class="mt-2 text-2xl font-bold text-red-900 dark:text-red-100">
-            {{ timeRemaining }}
-          </p>
-        </div>
+        <p class="mt-3 text-3xl font-semibold text-rose-900 dark:text-rose-100">
+          {{ timeRemaining }}
+        </p>
       </div>
+
+      <button :class="authPrimaryButtonClass" :disabled="isRestoring" :aria-busy="isRestoring" @click="handleRestore">
+        {{ isRestoring ? t("restoring-account") : t("restore-account") }}
+      </button>
+
+      <button :class="authSecondaryButtonClass" @click="handleLogout">
+        {{ t("sign-out") }}
+      </button>
     </div>
 
-    <!-- Logout button positioned 4vh below the content -->
-    <div class="flex flex-col gap-4 justify-center items-center pt-[35vh]">
-      <button
-        class="py-3 px-6 font-medium text-white bg-blue-600 rounded-lg transition-colors duration-200 hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-70"
-        :disabled="isRestoring"
-        @click="handleRestore"
-      >
-        {{ isRestoring ? t('restoring-account') : t('restore-account') }}
-      </button>
-      <button
-        class="py-3 px-6 font-medium text-white bg-gray-600 rounded-lg transition-colors duration-200 dark:bg-gray-700 hover:bg-gray-700 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:outline-none dark:hover:bg-gray-600"
-        @click="handleLogout"
-      >
-        {{ t('sign-out') }}
-      </button>
-    </div>
-  </section>
+    <template #footer>
+      <section class="mt-6 flex flex-col items-center">
+        <div class="mx-auto">
+          <LangSelector />
+        </div>
+        <button class="mt-3" :class="authGhostButtonClass" @click="openSupport">
+          {{ t("support") }}
+        </button>
+      </section>
+    </template>
+  </AuthPageShell>
 </template>
 
 <route lang="yaml">

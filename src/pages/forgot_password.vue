@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { setErrors } from '@formkit/core'
 import { FormKit, FormKitMessages } from '@formkit/vue'
-import { ref, watchEffect } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
 import VueTurnstile from 'vue-turnstile'
 import iconEmail from '~icons/oui/email?raw'
 import iconPassword from '~icons/ph/key?raw'
+import { authGhostButtonClass, authInsetCardClass, authPanelClass, authPrimaryButtonClass } from '~/components/auth/pageStyles'
 import { useSupabase } from '~/services/supabase'
+import { openSupport } from '~/services/support'
 import { useDialogV2Store } from '~/stores/dialogv2'
 
 const { t } = useI18n()
@@ -24,6 +26,7 @@ const captchaKey = ref(import.meta.env.VITE_CAPTCHA_KEY)
 
 const isLoading = ref(false)
 const isLoadingMain = ref(true)
+const cardDescription = computed(() => step.value === 1 ? t('enter-your-email-add') : t('enter-your-new-passw'))
 
 function getRecoveryParams() {
   const hashParams = new URLSearchParams(route.hash.replace('#', ''))
@@ -171,129 +174,124 @@ watchEffect(() => {
 </script>
 
 <template>
-  <section v-if="isLoadingMain" class="flex justify-center">
-    <Spinner size="w-40 h-40" class="my-auto" />
-  </section>
-  <div v-else>
-    <section class="flex overflow-y-auto py-10 my-auto w-full h-full sm:py-8 lg:py-2">
-      <div class="px-4 my-auto mx-auto max-w-7xl sm:px-6 lg:px-8">
-        <div class="mx-auto max-w-2xl text-center">
-          <img src="/capgo.webp" alt="logo" class="mx-auto mb-6 w-1/6 rounded-sm invert dark:invert-0">
-          <h1 class="text-3xl font-bold leading-tight text-black sm:text-4xl lg:text-5xl dark:text-white">
-            {{ t('reset-your-password') }}
-          </h1>
-          <p v-if="step === 1" class="mx-auto mt-4 max-w-xl text-base leading-relaxed text-gray-600 dark:text-gray-300">
-            {{ t('enter-your-email-add') }}
-          </p>
-          <p v-else>
-            {{ t('enter-your-new-passw') }}
-          </p>
+  <AuthPageShell
+    card-width-class="max-w-lg"
+    :card-kicker="t('forgot')"
+    :card-title="t('reset-your-password')"
+    :card-description="cardDescription"
+  >
+    <div v-if="isLoadingMain" class="flex justify-center py-10">
+      <Spinner size="w-14 h-14" class="my-auto" />
+    </div>
+
+    <FormKit v-else id="forgot-password" type="form" :actions="false" @submit="submit">
+      <div class="space-y-5 text-slate-500 dark:text-slate-300">
+        <div v-if="step === 1">
+          <FormKit
+            type="email"
+            name="email"
+            :label="t('email')"
+            :disabled="isLoading"
+            :prefix-icon="iconEmail"
+            data-test="email"
+            inputmode="email"
+            autocomplete="email"
+            validation="required:trim"
+          />
         </div>
 
-        <div class="relative mx-auto mt-8 max-w-md md:mt-4">
-          <div class="overflow-hidden bg-white rounded-md shadow-md dark:bg-slate-800">
-            <div class="py-6 px-4 sm:py-7 sm:px-8">
-              <FormKit id="forgot-password" type="form" :actions="false" @submit="submit">
-                <div class="space-y-5 text-gray-500">
-                  <div v-if="step === 1">
-                    <FormKit
-                      type="email"
-                      name="email"
-                      :label="t('email')"
-                      :disabled="isLoading"
-                      :prefix-icon="iconEmail"
-                      data-test="email"
-                      inputmode="email"
-                      autocomplete="email"
-                      validation="required:trim"
-                    />
-                    <template v-if="!!captchaKey">
-                      <VueTurnstile v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
-                    </template>
-                    <FormKitMessages />
-                  </div>
-
-                  <div v-if="step === 2">
-                    <FormKit
-                      type="password"
-                      name="password"
-                      :prefix-icon="iconPassword"
-                      autocomplete="new-password"
-                      enterkeyhint="send"
-                      :disabled="isLoading"
-                      :label="t('password')"
-                      :help="t('6-characters-minimum')"
-                      validation="required|length:6"
-                      validation-visibility="live"
-                    />
-                  </div>
-
-                  <div v-if="step === 2">
-                    <FormKit
-                      type="password"
-                      :prefix-icon="iconPassword"
-                      name="password_confirm"
-                      autocomplete="new-password"
-                      :disabled="isLoading"
-                      :label="t('confirm-password')"
-                      :help="t('confirm-password')"
-                      validation="required|confirm"
-                      validation-visibility="live"
-                      :validation-label="t('password-confirmatio')"
-                    />
-                  </div>
-
-                  <div>
-                    <button type="submit" data-test="submit" class="inline-flex justify-center items-center w-full">
-                      <svg v-if="isLoading" class="inline-block mr-3 -ml-1 w-5 h-5 text-gray-900 align-middle animate-spin dark:text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle
-                          class="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          stroke-width="4"
-                        />
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      <div v-if="!isLoading" class="inline-flex justify-center items-center py-4 px-4 w-full text-base font-semibold text-white rounded-md border border-transparent transition-all duration-200 hover:bg-blue-700 focus:bg-blue-700 bg-muted-blue-700 focus:outline-hidden">
-                        {{ t('reset-password') }}
-                      </div>
-                    </button>
-                  </div>
-                </div>
-              </FormKit>
-              <div class="flex flex-row justify-center mt-5 w-full">
-                <router-link to="/login" class="text-sm font-medium text-orange-500 transition-all duration-200 hover:text-orange-600 hover:underline focus:text-orange-600">
-                  {{ t('back-to-login-page') }}
-                </router-link>
-              </div>
-            </div>
-          </div>
+        <div v-if="step === 2">
+          <FormKit
+            type="password"
+            name="password"
+            :prefix-icon="iconPassword"
+            autocomplete="new-password"
+            enterkeyhint="send"
+            :disabled="isLoading"
+            :label="t('password')"
+            :help="t('6-characters-minimum')"
+            validation="required|length:6"
+            validation-visibility="dirty"
+          />
         </div>
-      </div>
-    </section>
 
-    <!-- Teleport Content for 2FA Input -->
-    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-2fa-required')" defer to="#dialog-v2-content">
-      <div class="space-y-4">
+        <div v-if="step === 2">
+          <FormKit
+            type="password"
+            :prefix-icon="iconPassword"
+            name="password_confirm"
+            autocomplete="new-password"
+            :disabled="isLoading"
+            :label="t('confirm-password')"
+            :help="t('confirm-password')"
+            validation="required|confirm"
+            validation-visibility="dirty"
+            :validation-label="t('password-confirmatio')"
+          />
+        </div>
+
+        <div v-if="step === 1 && captchaKey" :class="authInsetCardClass">
+          <VueTurnstile v-model="turnstileToken" size="flexible" :site-key="captchaKey" />
+        </div>
+
+        <FormKitMessages />
+
         <div>
-          <label for="mfa-code" class="block mb-2 text-sm font-medium">{{ t('enter-2fa-code') }}</label>
-          <input
-            v-model="mfaCode"
-            type="text"
-            placeholder="123456"
-            class="w-full input input-bordered"
-            maxlength="6"
-            inputmode="numeric"
-          >
+          <button type="submit" data-test="submit" :disabled="isLoading" :aria-busy="isLoading ? 'true' : 'false'" :class="authPrimaryButtonClass">
+            <svg v-if="isLoading" class="inline-block mr-1 h-5 w-5 animate-spin align-middle text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="4"
+              />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            {{ t('reset-password') }}
+          </button>
         </div>
-        <div class="text-sm text-gray-500">
-          {{ t('enter-the-6-digit-code-from-your-authenticator-app') }}
+
+        <div :class="authPanelClass">
+          <router-link to="/login" class="text-sm font-semibold text-[rgb(255,114,17)] transition-colors duration-200 hover:text-[rgb(235,94,0)]">
+            {{ t('back-to-login-page') }}
+          </router-link>
         </div>
       </div>
-    </Teleport>
-  </div>
+    </FormKit>
+
+    <template #footer>
+      <section class="mt-6 flex flex-col items-center">
+        <div class="mx-auto">
+          <LangSelector />
+        </div>
+        <button class="mt-3" :class="authGhostButtonClass" @click="openSupport">
+          {{ t('support') }}
+        </button>
+      </section>
+    </template>
+  </AuthPageShell>
+
+  <!-- Teleport Content for 2FA Input -->
+  <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('alert-2fa-required')" defer to="#dialog-v2-content">
+    <div class="space-y-4">
+      <div>
+        <label for="mfa-code" class="block mb-2 text-sm font-medium">{{ t('enter-2fa-code') }}</label>
+        <input
+          v-model="mfaCode"
+          type="text"
+          placeholder="123456"
+          class="w-full input input-bordered"
+          maxlength="6"
+          inputmode="numeric"
+        >
+      </div>
+      <div class="text-sm text-gray-500">
+        {{ t('enter-the-6-digit-code-from-your-authenticator-app') }}
+      </div>
+    </div>
+  </Teleport>
 </template>
 
 <route lang="yaml">

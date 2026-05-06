@@ -589,11 +589,73 @@ function optionsHandler(c: Context) {
   })
 }
 
+const ATTACHMENT_ROUTE_PREFIXES = [
+  `/files/upload/${ATTACHMENT_PREFIX}/`,
+  `/files/read/${ATTACHMENT_PREFIX}/`,
+  `/upload/${ATTACHMENT_PREFIX}/`,
+  `/read/${ATTACHMENT_PREFIX}/`,
+]
+
+function throwInvalidAttachmentPathEncoding(c: Context, value: string, context: string, error: unknown): never {
+  cloudlogErr({
+    requestId: c.get('requestId'),
+    message: `${context} - invalid attachment path percent encoding`,
+    value,
+    error: error instanceof Error ? error.message : String(error),
+  })
+
+  throw new HTTPException(400, {
+    res: c.json({
+      error: 'invalid_file_path_encoding',
+      message: 'Invalid attachment file path encoding',
+      moreInfo: { requestId: c.get('requestId') },
+    }),
+  })
+}
+
+function assertValidPercentEncodedAttachmentKey(c: Context, value: string, context: string): void {
+  if (!value.includes('%'))
+    return
+
+  try {
+    decodeURIComponent(value)
+  }
+  catch (error) {
+    throwInvalidAttachmentPathEncoding(c, value, context, error)
+  }
+}
+
+function getRawAttachmentRouteId(c: Context): string | null {
+  const pathname = new URL(c.req.url).pathname
+  for (const prefix of ATTACHMENT_ROUTE_PREFIXES) {
+    if (pathname.startsWith(prefix))
+      return pathname.slice(prefix.length)
+  }
+  return null
+}
+
+function assertRawAttachmentRouteIdHasValidEncoding(c: Context, context: string): void {
+  const rawRouteId = getRawAttachmentRouteId(c)
+  if (rawRouteId != null)
+    assertValidPercentEncodedAttachmentKey(c, rawRouteId, context)
+}
+
+function encodeUploadMetadataValue(value: string): string {
+  return toBase64(new TextEncoder().encode(value))
+}
+
+function buildNormalizedUploadMetadataHeader(c: Context, filename: string): string {
+  const originalMetadata = parseUploadMetadata(c, c.req.raw.headers)
+  const metadata = [`filename ${encodeUploadMetadataValue(filename)}`]
+  if (originalMetadata.filetype)
+    metadata.push(`filetype ${encodeUploadMetadataValue(originalMetadata.filetype)}`)
+  return metadata.join(',')
+}
+
 // TUS protocol requests (POST/PATCH/HEAD) that get forwarded to a durable object
 async function uploadHandler(c: Context) {
   const requestId = c.get('fileId') as string
-  // make requestId safe
-  const normalizedRequestId = decodeURIComponent(requestId)
+  const normalizedRequestId = requestId
   const durableObjNs: DurableObjectNamespace = c.env.ATTACHMENT_UPLOAD_HANDLER
 
   if (durableObjNs == null) {
@@ -604,11 +666,14 @@ async function uploadHandler(c: Context) {
   const handler = durableObjNs.get(durableObjNs.idFromName(normalizedRequestId))
   cloudlog({ requestId: c.get('requestId'), message: 'upload handler - forwarding to DO', method: c.req.raw.method, url: c.req.url })
 
-  // Pass requestId to DO via header so it can use it in logs
+  const method = c.req.raw.method
+  // Pass requestId to DO via header so it can use it in logs. For create requests,
+  // rewrite filename metadata to the normalized key that authorization checked.
   const headers = new Headers(c.req.raw.headers)
   headers.set('X-Request-Id', c.get('requestId') || 'unknown')
+  if (method === 'POST')
+    headers.set('Upload-Metadata', buildNormalizedUploadMetadataHeader(c, normalizedRequestId))
 
-  const method = c.req.raw.method
   const requestInit: RequestInit & { duplex?: 'half' } = {
     // HEAD must not forward a request body and must preserve the verb (Hono/tiny maps HEAD to GET).
     method,
@@ -670,7 +735,7 @@ async function setKeyFromMetadata(c: Context, next: Next) {
     })
   }
 
-  const normalizedFileId = decodeURIComponent(decodedFileId)
+  const normalizedFileId = decodedFileId
   cloudlog({ requestId: c.get('requestId'), message: 'setKeyFromMetadata - final normalized fileId', normalizedFileId })
   c.set('fileId', normalizedFileId)
   await next()
@@ -690,7 +755,8 @@ async function setKeyFromIdParam(c: Context, next: Next) {
     return c.json({ error: 'not_found', message: 'Not found' }, 404)
   }
 
-  const normalizedFileId = decodeURIComponent(fileId)
+  assertRawAttachmentRouteIdHasValidEncoding(c, 'setKeyFromIdParam')
+  const normalizedFileId = fileId
 
   // Check if this is a Supabase TUS upload ID (base64 encoded)
   // TUS upload IDs from Supabase are base64-encoded paths like: capgo/orgs/xxx/apps/yyy/file.zip/uuid
