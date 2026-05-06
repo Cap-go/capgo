@@ -37,7 +37,9 @@ type StripeInfoRevenueState = {
   product_id?: string | null
   status?: Database['public']['Enums']['stripe_status'] | null
 } | null | undefined
-type RevenuePlanRow = Pick<PlanRow, 'price_m' | 'price_m_id' | 'price_y' | 'price_y_id' | 'stripe_id'>
+type RevenuePlanRow = Pick<PlanRow, 'name' | 'price_m' | 'price_m_id' | 'price_y' | 'price_y_id' | 'stripe_id'>
+type RevenuePlanKey = 'solo' | 'maker' | 'team' | 'enterprise'
+type RevenuePlanBreakdown = Record<RevenuePlanKey, number>
 
 interface RevenueMovement {
   currentMrr: number
@@ -46,6 +48,7 @@ interface RevenueMovement {
   expansionMrr: number
   contractionMrr: number
   churnMrr: number
+  lostPlan: RevenuePlanKey | null
 }
 
 type PersistRevenueMovementResult = 'applied' | 'duplicate' | 'missing' | 'stale'
@@ -57,6 +60,7 @@ const ZERO_REVENUE_MOVEMENT: RevenueMovement = {
   expansionMrr: 0,
   contractionMrr: 0,
   churnMrr: 0,
+  lostPlan: null,
 }
 const STRIPE_INFO_TRANSACTION_COLUMNS = [
   'bandwidth_exceeded',
@@ -182,6 +186,29 @@ function getEventDateId(eventOccurredAtIso: string) {
   return new Date(eventOccurredAtIso).toISOString().slice(0, 10)
 }
 
+function getPlanKey(name: string | null | undefined): RevenuePlanKey | null {
+  const normalized = name?.toLowerCase()
+  if (normalized === 'solo' || normalized === 'maker' || normalized === 'team' || normalized === 'enterprise')
+    return normalized
+  return null
+}
+
+function createZeroPlanBreakdown(): RevenuePlanBreakdown {
+  return {
+    solo: 0,
+    maker: 0,
+    team: 0,
+    enterprise: 0,
+  }
+}
+
+function getMovementPlanBreakdown(movement: RevenueMovement, amount: number): RevenuePlanBreakdown {
+  const breakdown = createZeroPlanBreakdown()
+  if (movement.lostPlan && amount > 0)
+    breakdown[movement.lostPlan] = amount
+  return breakdown
+}
+
 function getPlanMrr(plan: RevenuePlanRow | null | undefined, priceId: string | null | undefined) {
   if (!plan || !priceId)
     return 0
@@ -202,11 +229,15 @@ function getPlanByProductId(plans: RevenuePlanRow[], productId: string | null | 
   return plans.find(plan => plan.stripe_id === productId) ?? null
 }
 
-function getSubscriptionMrr(plans: RevenuePlanRow[], stripeInfo: StripeInfoRevenueState) {
+function getSubscriptionPlan(plans: RevenuePlanRow[], stripeInfo: StripeInfoRevenueState) {
   if (!stripeInfo || stripeInfo.status !== 'succeeded' || stripeInfo.is_good_plan === false)
-    return 0
+    return null
 
-  return getPlanMrr(getPlanByProductId(plans, stripeInfo.product_id), stripeInfo.price_id)
+  return getPlanByProductId(plans, stripeInfo.product_id)
+}
+
+function getSubscriptionMrr(plans: RevenuePlanRow[], stripeInfo: StripeInfoRevenueState) {
+  return getPlanMrr(getSubscriptionPlan(plans, stripeInfo), stripeInfo?.price_id)
 }
 
 function classifyRevenueMovement(
@@ -214,8 +245,11 @@ function classifyRevenueMovement(
   nextStripeInfo: StripeInfoRevenueState,
   plans: RevenuePlanRow[],
 ): RevenueMovement {
-  const currentMrr = getSubscriptionMrr(plans, currentStripeInfo)
-  const nextMrr = getSubscriptionMrr(plans, nextStripeInfo)
+  const currentPlan = getSubscriptionPlan(plans, currentStripeInfo)
+  const nextPlan = getSubscriptionPlan(plans, nextStripeInfo)
+  const currentMrr = getPlanMrr(currentPlan, currentStripeInfo?.price_id)
+  const nextMrr = getPlanMrr(nextPlan, nextStripeInfo?.price_id)
+  const lostPlan = getPlanKey(currentPlan?.name)
 
   if (currentMrr === 0 && nextMrr === 0)
     return { ...ZERO_REVENUE_MOVEMENT }
@@ -244,6 +278,7 @@ function classifyRevenueMovement(
       currentMrr,
       nextMrr,
       churnMrr: currentMrr,
+      lostPlan,
     }
   }
 
@@ -262,6 +297,7 @@ function classifyRevenueMovement(
       currentMrr,
       nextMrr,
       contractionMrr: currentMrr - nextMrr,
+      lostPlan,
     }
   }
 
@@ -299,7 +335,7 @@ function isStaleStripeEvent(
 async function getRevenuePlans(c: Context): Promise<RevenuePlanRow[]> {
   const { data: plans, error } = await supabaseAdmin(c)
     .from('plans')
-    .select('stripe_id, price_m, price_y, price_m_id, price_y_id')
+    .select('name, stripe_id, price_m, price_y, price_m_id, price_y_id')
     .in('name', ['Solo', 'Maker', 'Team', 'Enterprise'])
 
   if (error) {
@@ -404,6 +440,8 @@ async function persistStripeInfoAndRevenueMovement(
     }
 
     if (shouldRecordMovement) {
+      const churnBreakdown = getMovementPlanBreakdown(movement, movement.churnMrr)
+      const contractionBreakdown = getMovementPlanBreakdown(movement, movement.contractionMrr)
       await pgClient.query(`
         INSERT INTO public.daily_revenue_metrics (
           date_id,
@@ -412,16 +450,32 @@ async function persistStripeInfoAndRevenueMovement(
           new_business_mrr,
           expansion_mrr,
           contraction_mrr,
-          churn_mrr
+          churn_mrr,
+          churn_mrr_solo,
+          churn_mrr_maker,
+          churn_mrr_team,
+          churn_mrr_enterprise,
+          contraction_mrr_solo,
+          contraction_mrr_maker,
+          contraction_mrr_team,
+          contraction_mrr_enterprise
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
         ON CONFLICT (date_id, customer_id)
         DO UPDATE SET
           updated_at = now(),
           new_business_mrr = public.daily_revenue_metrics.new_business_mrr + EXCLUDED.new_business_mrr,
           expansion_mrr = public.daily_revenue_metrics.expansion_mrr + EXCLUDED.expansion_mrr,
           contraction_mrr = public.daily_revenue_metrics.contraction_mrr + EXCLUDED.contraction_mrr,
-          churn_mrr = public.daily_revenue_metrics.churn_mrr + EXCLUDED.churn_mrr
+          churn_mrr = public.daily_revenue_metrics.churn_mrr + EXCLUDED.churn_mrr,
+          churn_mrr_solo = public.daily_revenue_metrics.churn_mrr_solo + EXCLUDED.churn_mrr_solo,
+          churn_mrr_maker = public.daily_revenue_metrics.churn_mrr_maker + EXCLUDED.churn_mrr_maker,
+          churn_mrr_team = public.daily_revenue_metrics.churn_mrr_team + EXCLUDED.churn_mrr_team,
+          churn_mrr_enterprise = public.daily_revenue_metrics.churn_mrr_enterprise + EXCLUDED.churn_mrr_enterprise,
+          contraction_mrr_solo = public.daily_revenue_metrics.contraction_mrr_solo + EXCLUDED.contraction_mrr_solo,
+          contraction_mrr_maker = public.daily_revenue_metrics.contraction_mrr_maker + EXCLUDED.contraction_mrr_maker,
+          contraction_mrr_team = public.daily_revenue_metrics.contraction_mrr_team + EXCLUDED.contraction_mrr_team,
+          contraction_mrr_enterprise = public.daily_revenue_metrics.contraction_mrr_enterprise + EXCLUDED.contraction_mrr_enterprise
       `, [
         getEventDateId(eventOccurredAtIso),
         customerId,
@@ -430,6 +484,14 @@ async function persistStripeInfoAndRevenueMovement(
         movement.expansionMrr,
         movement.contractionMrr,
         movement.churnMrr,
+        churnBreakdown.solo,
+        churnBreakdown.maker,
+        churnBreakdown.team,
+        churnBreakdown.enterprise,
+        contractionBreakdown.solo,
+        contractionBreakdown.maker,
+        contractionBreakdown.team,
+        contractionBreakdown.enterprise,
       ])
     }
 
@@ -1074,6 +1136,7 @@ export const stripeEventTestUtils = {
   buildSubscriptionEventMetadata,
   classifyRevenueMovement,
   getEventDateId,
+  getMovementPlanBreakdown,
   getPaidAtUpdate,
   getPlanChangeTrackingEventName,
   getSubscriptionMrr,
