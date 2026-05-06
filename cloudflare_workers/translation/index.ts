@@ -4,7 +4,7 @@ import type { MessageEntry, TranslationQueuePayload, TranslationStoreEntry } fro
 import {
   buildBatches,
   buildTranslationCacheRequests,
-  CACHE_TTL_SECONDS,
+  cacheReadyTranslationPayload,
   currentSourceChecksum,
   enqueueTranslationBatch,
   getTranslationModel,
@@ -271,7 +271,7 @@ async function processTranslationQueueBatch(c: Context, body: TranslationQueuePa
 
   const storedEntry = await readTranslationStoreEntry(c, checksum, targetLanguage)
   if (storedEntry?.status === 'ready') {
-    await cacheHelper.putJson(readyRequest, readyPayloadFromStore(storedEntry), CACHE_TTL_SECONDS)
+    await cacheReadyTranslationPayload(c, cacheHelper, readyRequest, readyPayloadFromStore(storedEntry), targetLanguage)
     return
   }
 
@@ -291,7 +291,7 @@ async function processTranslationQueueBatch(c: Context, body: TranslationQueuePa
       updatedAt: Math.floor(Date.now() / 1000),
     }
     await writeTranslationStoreEntry(c, readyEntry)
-    await cacheHelper.putJson(readyRequest, readyPayloadFromStore(readyEntry), CACHE_TTL_SECONDS)
+    await cacheReadyTranslationPayload(c, cacheHelper, readyRequest, readyPayloadFromStore(readyEntry), targetLanguage)
     return
   }
 
@@ -327,7 +327,7 @@ async function processTranslationQueueBatch(c: Context, body: TranslationQueuePa
       updatedAt: Math.floor(Date.now() / 1000),
     }
     await writeTranslationStoreEntry(c, readyEntry)
-    await cacheHelper.putJson(readyRequest, readyPayloadFromStore(readyEntry), CACHE_TTL_SECONDS)
+    await cacheReadyTranslationPayload(c, cacheHelper, readyRequest, readyPayloadFromStore(readyEntry), targetLanguage)
     cloudlog({
       requestId: c.get('requestId'),
       message: 'Message catalog translation cached',

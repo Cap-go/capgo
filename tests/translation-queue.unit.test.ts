@@ -20,4 +20,10 @@ describe('translation queue helpers', () => {
     expect(__translationTestUtils__.normalizeBatchIndex(1.5)).toBe(0)
     expect(__translationTestUtils__.normalizeBatchIndex(2)).toBe(2)
   })
+
+  it.concurrent('keeps pending queue state longer than ready cache entries', () => {
+    expect(__translationTestUtils__.translationStoreTtlSeconds({ status: 'pending' })).toBeGreaterThan(
+      __translationTestUtils__.translationStoreTtlSeconds({ status: 'ready' }),
+    )
+  })
 })

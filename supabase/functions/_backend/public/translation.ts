@@ -7,6 +7,7 @@ import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
 import { getEnv } from '../utils/utils.ts'
 
 export const CACHE_TTL_SECONDS = 5 * 60
+const PENDING_TRANSLATION_STORE_TTL_SECONDS = 60 * 60
 const DEFAULT_TRANSLATION_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast'
 const MAX_BATCH_CHARACTERS = 6_000
 const MAX_BATCH_ITEMS = 60
@@ -254,7 +255,11 @@ export async function readTranslationStoreEntry(c: Context, checksum: string, ta
   return parseTranslationStoreEntry(row)
 }
 
-async function upsertTranslationStoreEntry(db: D1Database, entry: TranslationStoreEntry, ttlSeconds = CACHE_TTL_SECONDS) {
+export function translationStoreTtlSeconds(entry: Pick<TranslationStoreEntry, 'status'>) {
+  return entry.status === 'pending' ? PENDING_TRANSLATION_STORE_TTL_SECONDS : CACHE_TTL_SECONDS
+}
+
+async function upsertTranslationStoreEntry(db: D1Database, entry: TranslationStoreEntry, ttlSeconds = translationStoreTtlSeconds(entry)) {
   await db.prepare(
     `INSERT INTO ${TRANSLATION_STORE_TABLE} (
        target_language,
@@ -308,7 +313,7 @@ async function insertPendingTranslationStoreEntry(c: Context, entry: Translation
          expires_at = excluded.expires_at,
          updated_at = unixepoch()
      WHERE ${TRANSLATION_STORE_TABLE}.expires_at <= unixepoch()`,
-  ).bind(entry.targetLanguage, entry.checksum, entry.model, entry.status, JSON.stringify(entry.messages), entry.nextBatchIndex, CACHE_TTL_SECONDS).run()
+  ).bind(entry.targetLanguage, entry.checksum, entry.model, entry.status, JSON.stringify(entry.messages), entry.nextBatchIndex, PENDING_TRANSLATION_STORE_TTL_SECONDS).run()
 
   return result.meta.changes > 0
 }
@@ -322,7 +327,22 @@ async function touchTranslationStoreEntry(c: Context, entry: TranslationStoreEnt
          updated_at = unixepoch()
      WHERE target_language = ?
        AND checksum = ?`,
-  ).bind(CACHE_TTL_SECONDS, entry.targetLanguage, entry.checksum).run()
+  ).bind(PENDING_TRANSLATION_STORE_TTL_SECONDS, entry.targetLanguage, entry.checksum).run()
+}
+
+export async function cacheReadyTranslationPayload(c: Context, cacheHelper: CacheHelper, readyRequest: Request, payload: TranslationMessagesResponsePayload, targetLanguage: string) {
+  try {
+    await cacheHelper.putJson(readyRequest, payload, CACHE_TTL_SECONDS)
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Unable to cache ready translation payload',
+      error: serializeError(error),
+      targetLanguage,
+      cacheKey: readyRequest.url,
+    })
+  }
 }
 
 export async function enqueueTranslationBatch(c: Context, payload: Required<TranslationQueuePayload>) {
@@ -407,7 +427,7 @@ app.post('/messages', async (c) => {
   const storedEntry = await readTranslationStoreEntry(c, checksum, targetLanguage)
   if (storedEntry?.status === 'ready') {
     const payload = readyPayloadFromStore(storedEntry)
-    await cacheHelper.putJson(readyRequest, payload, CACHE_TTL_SECONDS)
+    await cacheReadyTranslationPayload(c, cacheHelper, readyRequest, payload, targetLanguage)
     c.header('Cache-Control', `public, max-age=0, s-maxage=${CACHE_TTL_SECONDS}`)
     return c.json(payload)
   }
@@ -449,7 +469,7 @@ app.post('/messages', async (c) => {
 
     if (queuedEntry.status === 'ready') {
       const payload = readyPayloadFromStore(queuedEntry)
-      await cacheHelper.putJson(readyRequest, payload, CACHE_TTL_SECONDS)
+      await cacheReadyTranslationPayload(c, cacheHelper, readyRequest, payload, targetLanguage)
       c.header('Cache-Control', `public, max-age=0, s-maxage=${CACHE_TTL_SECONDS}`)
       return c.json(payload)
     }
@@ -472,4 +492,5 @@ app.post('/messages', async (c) => {
 export const __translationTestUtils__ = {
   buildBatches,
   normalizeBatchIndex,
+  translationStoreTtlSeconds,
 }
