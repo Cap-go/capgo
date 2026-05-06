@@ -141,13 +141,15 @@ describe('[GET] /statistics operations with and without subkey', () => {
     const fromDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
     const toDate = new Date().toISOString().split('T')[0]
     const timestamp = `${fromDate}T12:00:00.000Z`
+    const versionA = `${prefix}-1.0.0`
+    const versionB = `${prefix}-1.1.0`
 
     await getSupabaseClient()
       .from('device_usage')
       .insert([
-        { app_id: APPNAME, device_id: `${prefix}-a`, org_id: ORG_ID_STATS, timestamp, version_build: '1.0.0' },
-        { app_id: APPNAME, device_id: `${prefix}-a`, org_id: ORG_ID_STATS, timestamp, version_build: '1.0.0' },
-        { app_id: APPNAME, device_id: `${prefix}-b`, org_id: ORG_ID_STATS, timestamp, version_build: '1.1.0' },
+        { app_id: APPNAME, device_id: `${prefix}-a`, org_id: ORG_ID_STATS, timestamp, version_build: versionA },
+        { app_id: APPNAME, device_id: `${prefix}-a`, org_id: ORG_ID_STATS, timestamp, version_build: versionA },
+        { app_id: APPNAME, device_id: `${prefix}-b`, org_id: ORG_ID_STATS, timestamp, version_build: versionB },
       ])
       .throwOnError()
 
@@ -163,8 +165,8 @@ describe('[GET] /statistics operations with and without subkey', () => {
 
       if (process.env.USE_CLOUDFLARE_WORKERS !== 'true') {
         const dayIndex = nativeUsageData.labels.indexOf(fromDate)
-        const version100 = nativeUsageData.datasets.find(dataset => dataset.label === '1.0.0')
-        const version110 = nativeUsageData.datasets.find(dataset => dataset.label === '1.1.0')
+        const version100 = nativeUsageData.datasets.find(dataset => dataset.label === versionA)
+        const version110 = nativeUsageData.datasets.find(dataset => dataset.label === versionB)
         expect(dayIndex).toBeGreaterThanOrEqual(0)
         expect(version100?.metaCounts[dayIndex]).toBe(1)
         expect(version110?.metaCounts[dayIndex]).toBe(1)
