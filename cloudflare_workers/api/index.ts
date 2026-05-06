@@ -41,7 +41,7 @@ import { app as ok } from '../../supabase/functions/_backend/public/ok.ts'
 import { app as organization } from '../../supabase/functions/_backend/public/organization/index.ts'
 import { app as replication } from '../../supabase/functions/_backend/public/replication.ts'
 import { app as statistics } from '../../supabase/functions/_backend/public/statistics/index.ts'
-import { app as translation } from '../../supabase/functions/_backend/public/translation.ts'
+import { app as translation, queueApp as translation_messages } from '../../supabase/functions/_backend/public/translation.ts'
 import { app as webhooks } from '../../supabase/functions/_backend/public/webhooks/index.ts'
 import { app as credit_usage_alerts } from '../../supabase/functions/_backend/triggers/credit_usage_alerts.ts'
 import { app as cron_clean_orphan_images } from '../../supabase/functions/_backend/triggers/cron_clean_orphan_images.ts'
@@ -157,6 +157,7 @@ appTriggers.route('/cron_stat_app', cron_stat_app)
 appTriggers.route('/cron_stat_org', cron_stat_org)
 appTriggers.route('/cron_sync_sub', cron_sync_sub)
 appTriggers.route('/queue_consumer', queue_consumer)
+appTriggers.route('/translation_messages', translation_messages)
 appTriggers.route('/webhook_delivery', webhook_delivery)
 appTriggers.route('/webhook_dispatcher', webhook_dispatcher)
 

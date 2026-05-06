@@ -1,9 +1,10 @@
 import type { Context } from 'hono'
-import sourceMessages from '../../../../messages/en.json'
+import sourceMessages from '../../../../messages/en.json' with { type: 'json' }
 import { CacheHelper } from '../utils/cache.ts'
-import { honoFactory, parseBody, quickError, useCors } from '../utils/hono.ts'
-import { cloudlog } from '../utils/logging.ts'
-import { backgroundTask, getEnv } from '../utils/utils.ts'
+import { BRES, honoFactory, middlewareAPISecret, parseBody, quickError, useCors } from '../utils/hono.ts'
+import { cloudlog, cloudlogErr, serializeError } from '../utils/logging.ts'
+import { closeClient, getPgClient } from '../utils/pg.ts'
+import { getEnv } from '../utils/utils.ts'
 
 const CACHE_TTL_SECONDS = 5 * 60
 const DEFAULT_TRANSLATION_MODEL = '@cf/meta/llama-3.1-8b-instruct-fast'
@@ -11,6 +12,7 @@ const MAX_BATCH_CHARACTERS = 6_000
 const MAX_BATCH_ITEMS = 60
 const TRANSLATION_ATTEMPTS = 3
 const TRANSLATION_CACHE_PATH = '/translation/messages-cache'
+const TRANSLATION_QUEUE_NAME = 'translation_messages'
 const PLACEHOLDER_PATTERN = /\{[\w.]+\}|%\w+%?|\$\d+/g
 
 const SUPPORTED_LANGUAGES = new Set([
@@ -64,6 +66,24 @@ interface TranslationMessagesResponsePayload {
   status: 'ready'
 }
 
+type TranslationStoreStatus = 'pending' | 'ready'
+
+interface TranslationStoreEntry {
+  checksum: string
+  messages: Record<string, string>
+  model: string
+  nextBatchIndex: number
+  status: TranslationStoreStatus
+  targetLanguage: string
+}
+
+interface TranslationQueuePayload {
+  batchIndex?: number
+  checksum?: string
+  model?: string
+  targetLanguage?: string
+}
+
 interface AiBinding {
   run: (model: string, input: unknown) => Promise<unknown>
 }
@@ -71,7 +91,6 @@ interface AiBinding {
 type MessageEntry = [string, string]
 
 const sourceMessageCatalog = sourceMessages as Record<string, string>
-const pendingTranslations = new Map<string, Promise<void>>()
 
 function getTranslationModel(c: Context) {
   return getEnv(c, 'TRANSLATION_MODEL') || DEFAULT_TRANSLATION_MODEL
@@ -291,51 +310,351 @@ async function translateBatch(ai: AiBinding, model: string, targetLanguage: stri
   throw lastError ?? new Error('Message translation failed')
 }
 
-async function translateMessages(ai: AiBinding, messages: Record<string, string>, targetLanguage: string, model: string) {
-  const translated: Record<string, string> = {}
-  const batches = buildBatches(messages)
+function buildTranslationCacheRequests(cacheHelper: CacheHelper, checksum: string, targetLanguage: string) {
+  const params = {
+    checksum,
+    lang: targetLanguage,
+  }
 
-  for (const batch of batches)
-    Object.assign(translated, await translateBatch(ai, model, targetLanguage, batch))
-
-  return translated
+  return {
+    readyRequest: cacheHelper.buildRequest(TRANSLATION_CACHE_PATH, params),
+  }
 }
 
-function startTranslation(c: Context, cacheHelper: CacheHelper, cacheRequest: Request, payload: Omit<TranslationMessagesResponsePayload, 'messages' | 'status'>, messages: Record<string, string>, targetLanguage: string, model: string) {
-  const key = cacheRequest.url
-  const existing = pendingTranslations.get(key)
-  if (existing)
-    return existing
+function normalizeBatchIndex(value: unknown) {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0)
+    return 0
+  return value
+}
 
+function hasAiBinding(c: Context) {
+  return !!(c.env.AI as AiBinding | undefined)
+}
+
+function messageCatalogOf(value: unknown): Record<string, string> {
+  const record = recordOf(value)
+  if (!record)
+    return {}
+
+  return Object.fromEntries(
+    Object.entries(record).filter((entry): entry is [string, string] => typeof entry[1] === 'string'),
+  )
+}
+
+function parseTranslationStoreEntry(row: unknown): TranslationStoreEntry | null {
+  const record = recordOf(row)
+  if (!record)
+    return null
+
+  const status = record.status
+  const checksum = record.checksum
+  const model = record.model
+  const targetLanguage = record.target_language
+  const nextBatchIndex = Number(record.next_batch_index)
+  if ((status !== 'pending' && status !== 'ready') || typeof checksum !== 'string' || typeof model !== 'string' || typeof targetLanguage !== 'string' || !Number.isInteger(nextBatchIndex))
+    return null
+
+  return {
+    checksum,
+    messages: messageCatalogOf(record.messages),
+    model,
+    nextBatchIndex,
+    status,
+    targetLanguage,
+  }
+}
+
+function readyPayloadFromStore(entry: TranslationStoreEntry): TranslationMessagesResponsePayload {
+  return {
+    checksum: entry.checksum,
+    messages: entry.messages,
+    model: entry.model,
+    status: 'ready',
+  }
+}
+
+async function deleteExpiredTranslationStoreEntries(db: ReturnType<typeof getPgClient>) {
+  await db.query('DELETE FROM public.translation_messages_cache WHERE expires_at < now()')
+}
+
+async function readTranslationStoreEntry(c: Context, checksum: string, targetLanguage: string) {
+  const db = getPgClient(c)
+  try {
+    await deleteExpiredTranslationStoreEntries(db)
+    const result = await db.query(
+      `SELECT checksum, messages, model, next_batch_index, status, target_language
+       FROM public.translation_messages_cache
+       WHERE target_language = $1
+         AND checksum = $2
+         AND expires_at > now()
+       LIMIT 1`,
+      [targetLanguage, checksum],
+    )
+    return parseTranslationStoreEntry(result.rows[0])
+  }
+  finally {
+    closeClient(c, db)
+  }
+}
+
+async function upsertTranslationStoreEntry(db: ReturnType<typeof getPgClient>, entry: TranslationStoreEntry, ttlSeconds = CACHE_TTL_SECONDS) {
+  await db.query(
+    `INSERT INTO public.translation_messages_cache (
+       target_language,
+       checksum,
+       model,
+       status,
+       messages,
+       next_batch_index,
+       expires_at,
+       updated_at
+     )
+     VALUES ($1, $2, $3, $4, $5::jsonb, $6, now() + ($7::integer * interval '1 second'), now())
+     ON CONFLICT (target_language, checksum) DO UPDATE
+     SET model = EXCLUDED.model,
+         status = EXCLUDED.status,
+         messages = EXCLUDED.messages,
+         next_batch_index = EXCLUDED.next_batch_index,
+         expires_at = EXCLUDED.expires_at,
+         updated_at = now()`,
+    [entry.targetLanguage, entry.checksum, entry.model, entry.status, JSON.stringify(entry.messages), entry.nextBatchIndex, ttlSeconds],
+  )
+}
+
+async function writeTranslationStoreEntry(c: Context, entry: TranslationStoreEntry) {
+  const db = getPgClient(c)
+  try {
+    await deleteExpiredTranslationStoreEntries(db)
+    await upsertTranslationStoreEntry(db, entry)
+  }
+  finally {
+    closeClient(c, db)
+  }
+}
+
+async function sendTranslationQueueMessage(db: ReturnType<typeof getPgClient>, payload: Required<TranslationQueuePayload>) {
+  const message = {
+    function_name: TRANSLATION_QUEUE_NAME,
+    function_type: 'cloudflare',
+    payload,
+  }
+
+  await db.query(
+    'SELECT pgmq.send($1, $2::jsonb)',
+    [TRANSLATION_QUEUE_NAME, JSON.stringify(message)],
+  )
+}
+
+async function enqueueTranslationBatch(c: Context, payload: Required<TranslationQueuePayload>) {
+  const db = getPgClient(c)
+  try {
+    await sendTranslationQueueMessage(db, payload)
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Queued message catalog translation batch',
+      batchIndex: payload.batchIndex,
+      targetLanguage: payload.targetLanguage,
+    })
+  }
+  finally {
+    closeClient(c, db)
+  }
+}
+
+async function writeTranslationProgressAndEnqueue(c: Context, entry: TranslationStoreEntry, payload: Required<TranslationQueuePayload>) {
+  const db = getPgClient(c)
+  try {
+    await db.query('BEGIN')
+    await deleteExpiredTranslationStoreEntries(db)
+    await upsertTranslationStoreEntry(db, entry)
+    await sendTranslationQueueMessage(db, payload)
+    await db.query('COMMIT')
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Queued message catalog translation batch',
+      batchIndex: payload.batchIndex,
+      targetLanguage: payload.targetLanguage,
+    })
+  }
+  catch (error) {
+    await db.query('ROLLBACK').catch(() => {})
+    throw error
+  }
+  finally {
+    closeClient(c, db)
+  }
+}
+
+async function queueTranslationIfNeeded(c: Context, payload: Required<TranslationQueuePayload>) {
+  const pendingEntry: TranslationStoreEntry = {
+    checksum: payload.checksum,
+    messages: {},
+    model: payload.model,
+    nextBatchIndex: payload.batchIndex,
+    status: 'pending',
+    targetLanguage: payload.targetLanguage,
+  }
+  const db = getPgClient(c)
+  try {
+    await db.query('BEGIN')
+    await deleteExpiredTranslationStoreEntries(db)
+    const existingResult = await db.query(
+      `SELECT checksum, messages, model, next_batch_index, status, target_language
+       FROM public.translation_messages_cache
+       WHERE target_language = $1
+         AND checksum = $2
+         AND expires_at > now()
+       LIMIT 1
+       FOR UPDATE`,
+      [payload.targetLanguage, payload.checksum],
+    )
+    const existingEntry = parseTranslationStoreEntry(existingResult.rows[0])
+    if (existingEntry) {
+      await db.query('COMMIT')
+      return existingEntry
+    }
+
+    await upsertTranslationStoreEntry(db, pendingEntry)
+    await sendTranslationQueueMessage(db, payload)
+    await db.query('COMMIT')
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Queued message catalog translation batch',
+      batchIndex: payload.batchIndex,
+      targetLanguage: payload.targetLanguage,
+    })
+    return pendingEntry
+  }
+  catch (error) {
+    await db.query('ROLLBACK').catch(() => {})
+    throw error
+  }
+  finally {
+    closeClient(c, db)
+  }
+}
+
+async function currentSourceChecksum() {
+  return sha256Hex(JSON.stringify(sourceMessageCatalog))
+}
+
+async function processTranslationQueueBatch(c: Context, body: TranslationQueuePayload) {
+  const targetLanguage = typeof body.targetLanguage === 'string' ? body.targetLanguage.trim().toLowerCase() : ''
+  if (!SUPPORTED_LANGUAGES.has(targetLanguage) || targetLanguage === 'en') {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Ignoring unsupported queued translation language',
+      targetLanguage,
+    })
+    return
+  }
+
+  const checksum = await currentSourceChecksum()
+  if (body.checksum !== checksum) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Ignoring stale queued translation message',
+      queuedChecksum: body.checksum,
+      checksum,
+      targetLanguage,
+    })
+    return
+  }
+
+  const model = typeof body.model === 'string' && body.model.trim() ? body.model : getTranslationModel(c)
   const ai = c.env.AI as AiBinding | undefined
   if (!ai)
     quickError(503, 'translation_unavailable', 'Workers AI binding is not configured')
 
-  const pending = translateMessages(ai, messages, targetLanguage, model)
-    .then(async translatedMessages => cacheHelper.putJson(cacheRequest, {
-      ...payload,
-      messages: translatedMessages,
-      status: 'ready',
-    } satisfies TranslationMessagesResponsePayload, CACHE_TTL_SECONDS))
-    .catch((error) => {
-      cloudlog({
-        requestId: c.get('requestId'),
-        message: 'Workers AI message catalog translation failed',
-        error,
-        targetLanguage,
-        messageCount: Object.keys(messages).length,
-      })
-    })
-    .finally(() => {
-      pendingTranslations.delete(key)
-    })
+  const cacheHelper = new CacheHelper(c)
+  const { readyRequest } = buildTranslationCacheRequests(cacheHelper, checksum, targetLanguage)
+  const cached = await cacheHelper.matchJson<TranslationMessagesResponsePayload>(readyRequest)
+  if (cached)
+    return
 
-  pendingTranslations.set(key, pending)
-  void backgroundTask(c, pending)
-  return pending
+  const storedEntry = await readTranslationStoreEntry(c, checksum, targetLanguage)
+  if (storedEntry?.status === 'ready') {
+    await cacheHelper.putJson(readyRequest, readyPayloadFromStore(storedEntry), CACHE_TTL_SECONDS)
+    return
+  }
+
+  const batches = buildBatches(sourceMessageCatalog)
+  const translatedMessages = storedEntry?.messages ?? {}
+  const nextBatchIndex = storedEntry?.nextBatchIndex ?? 0
+  const batchIndex = normalizeBatchIndex(body.batchIndex)
+
+  if (nextBatchIndex >= batches.length) {
+    const readyEntry: TranslationStoreEntry = {
+      checksum,
+      messages: translatedMessages,
+      model,
+      nextBatchIndex,
+      status: 'ready',
+      targetLanguage,
+    }
+    await writeTranslationStoreEntry(c, readyEntry)
+    await cacheHelper.putJson(readyRequest, readyPayloadFromStore(readyEntry), CACHE_TTL_SECONDS)
+    return
+  }
+
+  if (batchIndex !== nextBatchIndex) {
+    await enqueueTranslationBatch(c, {
+      batchIndex: nextBatchIndex,
+      checksum,
+      model,
+      targetLanguage,
+    })
+    return
+  }
+
+  const batch = batches[batchIndex]
+  if (!batch)
+    return
+
+  const translatedBatch = await translateBatch(ai, model, targetLanguage, batch)
+  const mergedMessages = {
+    ...translatedMessages,
+    ...translatedBatch,
+  }
+  const followingBatchIndex = batchIndex + 1
+
+  if (followingBatchIndex >= batches.length) {
+    const readyEntry: TranslationStoreEntry = {
+      checksum,
+      messages: mergedMessages,
+      model,
+      nextBatchIndex: followingBatchIndex,
+      status: 'ready',
+      targetLanguage,
+    }
+    await writeTranslationStoreEntry(c, readyEntry)
+    await cacheHelper.putJson(readyRequest, readyPayloadFromStore(readyEntry), CACHE_TTL_SECONDS)
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Message catalog translation cached',
+      targetLanguage,
+      batchCount: batches.length,
+    })
+    return
+  }
+
+  await writeTranslationProgressAndEnqueue(c, {
+    checksum,
+    messages: mergedMessages,
+    model,
+    nextBatchIndex: followingBatchIndex,
+    status: 'pending',
+    targetLanguage,
+  }, {
+    batchIndex: followingBatchIndex,
+    checksum,
+    model,
+    targetLanguage,
+  })
 }
 
 export const app = honoFactory.createApp()
+export const queueApp = honoFactory.createApp()
 
 app.use('*', useCors)
 
@@ -348,23 +667,73 @@ app.post('/messages', async (c) => {
   if (targetLanguage === 'en')
     quickError(400, 'unsupported_translation_language', 'English messages are already bundled')
 
-  const messages = sourceMessageCatalog
-  const checksum = await sha256Hex(JSON.stringify(messages))
+  const checksum = await currentSourceChecksum()
   const model = getTranslationModel(c)
   const cacheHelper = new CacheHelper(c)
-  const cacheRequest = cacheHelper.buildRequest(TRANSLATION_CACHE_PATH, {
-    checksum,
-    lang: targetLanguage,
-  })
+  const { readyRequest } = buildTranslationCacheRequests(cacheHelper, checksum, targetLanguage)
 
-  const cached = await cacheHelper.matchJson<TranslationMessagesResponsePayload>(cacheRequest)
+  const cached = await cacheHelper.matchJson<TranslationMessagesResponsePayload>(readyRequest)
   if (cached) {
     c.header('Cache-Control', `public, max-age=0, s-maxage=${CACHE_TTL_SECONDS}`)
     return c.json(cached)
   }
 
-  startTranslation(c, cacheHelper, cacheRequest, { checksum, model }, messages, targetLanguage, model)
+  const storedEntry = await readTranslationStoreEntry(c, checksum, targetLanguage)
+  if (storedEntry?.status === 'ready') {
+    const payload = readyPayloadFromStore(storedEntry)
+    await cacheHelper.putJson(readyRequest, payload, CACHE_TTL_SECONDS)
+    c.header('Cache-Control', `public, max-age=0, s-maxage=${CACHE_TTL_SECONDS}`)
+    return c.json(payload)
+  }
+
+  if (!hasAiBinding(c))
+    quickError(503, 'translation_unavailable', 'Workers AI binding is not configured')
+
+  if (storedEntry?.status === 'pending') {
+    c.header('Cache-Control', 'no-store')
+    c.header('Retry-After', '10')
+    return c.json({ checksum, status: 'pending' }, 202)
+  }
+
+  try {
+    const queuedEntry = await queueTranslationIfNeeded(c, {
+      batchIndex: 0,
+      checksum,
+      model,
+      targetLanguage,
+    })
+
+    if (queuedEntry.status === 'ready') {
+      const payload = readyPayloadFromStore(queuedEntry)
+      await cacheHelper.putJson(readyRequest, payload, CACHE_TTL_SECONDS)
+      c.header('Cache-Control', `public, max-age=0, s-maxage=${CACHE_TTL_SECONDS}`)
+      return c.json(payload)
+    }
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId: c.get('requestId'),
+      message: 'Unable to queue message catalog translation',
+      error: serializeError(error),
+      targetLanguage,
+    })
+    quickError(503, 'translation_unavailable', 'Translation queue is not available')
+  }
+
   c.header('Cache-Control', 'no-store')
   c.header('Retry-After', '10')
   return c.json({ checksum, status: 'pending' }, 202)
 })
+
+queueApp.post('/', middlewareAPISecret, async (c) => {
+  const body = await parseBody<TranslationQueuePayload>(c)
+  await processTranslationQueueBatch(c, body)
+  return c.json(BRES)
+})
+
+export const __translationTestUtils__ = {
+  buildBatches,
+  keepTranslation,
+  normalizeBatchIndex,
+  parseTranslationObject,
+}
