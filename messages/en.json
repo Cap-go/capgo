@@ -32,7 +32,6 @@
   "2fa-step-send-code": "Send verification code",
   "2fa-step-verify-totp": "Verify authenticator code",
   "2fa-verify-and-enable": "Verify & Enable 2FA",
-  "qr-code-for-2fa-setup": "QR Code for 2FA setup",
   "30-days": "Last 30 Days",
   "6-characters-minimum": "6 characters minimum, 1 uppercase, 1 lowercase, 1 special character",
   "90-days": "Last 90 Days",
@@ -61,7 +60,6 @@
   "account-password-error": "Error happened, please try again",
   "account-password-heading": "Change my password",
   "account-updated-succ": "Account updated successfully",
-  "confirm-new-email-sent": "A confirmation email was sent. Click the link to confirm your new email.",
   "action": "Action",
   "action-app-moved-to-background": "App moved to background",
   "action-app-moved-to-foreground": "App moved to foreground",
@@ -755,8 +753,6 @@
   "delete-account": "Delete Account",
   "delete-account-0": "Delete account",
   "delete-account-verify-hint": "You cannot start account deletion while email is unverified. Verify your address to continue.",
-  "delete-account-warning-delay": "Your account will be deleted after 30 days",
-  "delete-account-warning-description": "This action cannot be undone. Your account and all associated data will be permanently deleted.",
   "delete-app": "Delete app",
   "delete-org": "Delete organization",
   "delete-webhook": "Delete Webhook",
@@ -855,7 +851,6 @@
   "edit-role": "Edit role",
   "edit-webhook": "Edit Webhook",
   "email": "Email",
-  "email-already-taken": "Email is already taken.",
   "email-not-verified": "Please verify your email before deleting your account.",
   "email-otp-2fa-description": "Verify your email with a one-time code before enabling 2FA. Verification expires after 1 hour.",
   "email-otp-2fa-title": "Email verification for 2FA",
@@ -1803,7 +1798,6 @@
   "user-id": "User Id",
   "user-registration": "User registration",
   "user-registrations": "User registrations",
-  "user-upload-alt": "User avatar",
   "users": "Users",
   "users-activity-trend": "Users Activity Trend",
   "users-and-revenue": "Users & Revenue",
@@ -1883,5 +1877,6 @@
   "start-of-selected-period-help": "{count} devices were on {version} on {date}.",
   "restore-account": "Restore account",
   "restoring-account": "Restoring account...",
-  "account-deletion-support-full": "Please contact {supportLink} if you would like to restore it"
+  "translation-not-ready": "Translation is being prepared. Try again in a bit.",
+  "translation-unavailable": "This language is not available right now."
 }

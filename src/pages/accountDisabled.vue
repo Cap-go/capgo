@@ -13,7 +13,6 @@ const route = useRoute()
 const router = useRouter()
 const main = useMainStore()
 const supabase = useSupabase()
-const SUPPORT_LINK_TOKEN = '__CAPGO_SUPPORT_LINK__'
 
 async function handleLogout() {
   await main.logout()
@@ -32,20 +31,6 @@ const restoreTarget = computed(() => {
   if (target.startsWith('/') && target !== '/accountDisabled')
     return target
   return '/dashboard'
-})
-
-const accountDeletionRequestedText = computed(() => t('account-deletion-requested'))
-
-const accountDeletionSupportText = computed(() => t('account-deletion-support-full', { supportLink: SUPPORT_LINK_TOKEN }))
-const accountDeletionSupportParts = computed(() => {
-  const supportLinkIndex = accountDeletionSupportText.value.indexOf(SUPPORT_LINK_TOKEN)
-  if (supportLinkIndex < 0)
-    return { before: accountDeletionSupportText.value, after: '' }
-
-  return {
-    before: accountDeletionSupportText.value.slice(0, supportLinkIndex),
-    after: accountDeletionSupportText.value.slice(supportLinkIndex + SUPPORT_LINK_TOKEN.length),
-  }
 })
 
 async function handleRestore() {
@@ -78,6 +63,8 @@ async function handleRestore() {
     isRestoring.value = false
   }
 }
+
+// Use i18n component interpolation in the template; no HTML parsing here
 
 // Fetch removal date and start timer
 onMounted(async () => {
@@ -158,39 +145,39 @@ const timeRemaining = computed(() => {
 <template>
   <AuthPageShell
     card-width-class="max-w-md"
-    :card-kicker="accountDeletionRequestedText"
-    :card-title="accountDeletionRequestedText"
+    :card-kicker="t('account-deletion-requested')"
+    :card-title="t('account-deletion-requested')"
   >
     <div class="space-y-5 text-center text-slate-500 dark:text-slate-300">
       <p class="text-sm leading-6">
-        {{ t("account-deletion-restore") }}
+        {{ t('account-deletion-restore') }}
       </p>
-      <p class="text-sm leading-6">
-        {{ accountDeletionSupportParts.before }}
-        <a
-          href="https://support.capgo.app/"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="font-semibold text-[rgb(255,114,17)] transition-colors duration-200 hover:text-[rgb(235,94,0)]"
-        >Capgo support</a>
-        {{ accountDeletionSupportParts.after }}
-      </p>
+      <i18n-t keypath="account-deletion-support" tag="p" class="text-sm leading-6">
+        <template #link>
+          <a
+            href="https://support.capgo.app/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="font-semibold text-[rgb(255,114,17)] transition-colors duration-200 hover:text-[rgb(235,94,0)]"
+          >Capgo support</a>
+        </template>
+      </i18n-t>
 
       <div class="rounded-3xl border border-rose-200 bg-rose-50 px-5 py-5 dark:border-rose-900/70 dark:bg-rose-950/30">
         <p class="text-sm font-semibold tracking-[0.12em] uppercase text-rose-700 dark:text-rose-200">
-          {{ timeRemaining === t("account-deletion-very-soon") ? t("account-deletion-timer") : t("account-deletion-timer-in") }}
+          {{ timeRemaining === t('account-deletion-very-soon') ? t('account-deletion-timer') : t('account-deletion-timer-in') }}
         </p>
         <p class="mt-3 text-3xl font-semibold text-rose-900 dark:text-rose-100">
           {{ timeRemaining }}
         </p>
       </div>
 
-      <button :class="authPrimaryButtonClass" :disabled="isRestoring" :aria-busy="isRestoring" @click="handleRestore">
-        {{ isRestoring ? t("restoring-account") : t("restore-account") }}
+      <button :class="authPrimaryButtonClass" :disabled="isRestoring" :aria-busy="isRestoring ? 'true' : 'false'" @click="handleRestore">
+        {{ isRestoring ? t('restoring-account') : t('restore-account') }}
       </button>
 
       <button :class="authSecondaryButtonClass" @click="handleLogout">
-        {{ t("sign-out") }}
+        {{ t('sign-out') }}
       </button>
     </div>
 
@@ -200,7 +187,7 @@ const timeRemaining = computed(() => {
           <LangSelector />
         </div>
         <button class="mt-3" :class="authGhostButtonClass" @click="openSupport">
-          {{ t("support") }}
+          {{ t('support') }}
         </button>
       </section>
     </template>

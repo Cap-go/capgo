@@ -17,8 +17,6 @@ export function getRightKey(keyname) {
 
   if (!keys || !keys[keyname])
     return ''
-  if (keys[keyname][branch] !== undefined)
-    return keys[keyname][branch]
   if (branch === 'alpha')
     return keys[keyname].development
   else if (branch === 'local')

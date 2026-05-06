@@ -12,13 +12,11 @@
     "paths": {
       "~/*": [
         "./src/*"
-      ],
-      "vue-i18n": [
-        "./src/shims/vueI18n.ts"
       ]
     },
     "resolveJsonModule": true,
     "types": [
+      "@intlify/unplugin-vue-i18n/messages",
       "@cloudflare/workers-types",
       "unplugin-icons/types/vue",
       "vitest",

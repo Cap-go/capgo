@@ -18,8 +18,8 @@ export default defineConfig(({ mode }) => ({
     testTimeout: 30_000, // Increased timeout for Cloudflare Workers
     hookTimeout: 15_000, // Match the main config for slower CI setup hooks
     retry: 2,
-    maxConcurrency: 5, // Keep local Workers below the database pool pressure seen in CI
-    maxWorkers: 3, // Keep local Workers below the database pool pressure seen in CI
+    maxConcurrency: 10, // Reduced for replica sync reliability
+    maxWorkers: 5, // Reduced for replica sync reliability
     env: {
       ...loadEnv(mode, cwd(), ''),
       // Override to use Cloudflare Workers instead of Supabase Edge Functions

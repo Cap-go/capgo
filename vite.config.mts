@@ -1,4 +1,6 @@
+import { readdirSync } from 'node:fs'
 import path from 'node:path'
+import VueI18n from '@intlify/unplugin-vue-i18n/vite'
 import tailwindcss from '@tailwindcss/vite'
 import Vue from '@vitejs/plugin-vue'
 import AutoImport from 'unplugin-auto-import/vite'
@@ -27,6 +29,12 @@ function getUrl(key = 'base_domain'): string {
     return `https://${getRightKey(key)}`
 }
 
+const locales: string[] = []
+readdirSync('./messages/')
+  .forEach((file) => {
+    if (file.split('.')[0] !== 'README')
+      locales.push(file.split('.')[0])
+  })
 
 export default defineConfig({
   define: {
@@ -35,7 +43,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '~/': `${path.resolve(__dirname, 'src')}/`,
-      'vue-i18n': path.resolve(__dirname, 'src/shims/vueI18n.ts'),
     },
   },
   plugins: [
@@ -60,6 +67,7 @@ export default defineConfig({
       ],
     }),
     EnvironmentPlugin({
+      locales: locales.join(','),
       VITE_APP_VERSION: pack.version,
       VITE_SUPABASE_ANON_KEY: getRightKey('supa_anon'),
       VITE_SUPABASE_URL: getRightKey('supa_url'),
@@ -103,6 +111,14 @@ export default defineConfig({
       vueTemplate: true,
     }),
 
+    // https://github.com/intlify/bundle-tools/tree/main/packages/unplugin-vue-i18n
+    VueI18n({
+      module: 'vue-i18n',
+      runtimeOnly: true,
+      compositionOnly: true,
+      fullInstall: true,
+      include: [path.resolve(__dirname, 'locales/**')],
+    }),
 
     // https://github.com/feat-agency/vite-plugin-webfont-dl
     WebfontDownload(),

@@ -516,7 +516,7 @@ onBeforeUnmount(async () => {
               <div v-if="mfaQRCode" class="flex justify-center p-4 rounded-lg bg-white dark:bg-slate-700/50">
                 <img
                   :src="mfaQRCode"
-                  :alt="t('qr-code-for-2fa-setup')"
+                  alt="QR Code for 2FA setup"
                   class="w-48 h-48"
                 >
               </div>

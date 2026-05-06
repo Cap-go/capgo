@@ -1,8 +1,27 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-describe('i18n fallback loading', () => {
+const mocks = vi.hoisted(() => ({
+  changeLocale: vi.fn(),
+  toast: {
+    error: vi.fn(),
+    info: vi.fn(),
+  },
+}))
+
+vi.mock('@formkit/vue', () => ({
+  changeLocale: mocks.changeLocale,
+}))
+
+vi.mock('vue-sonner', () => ({
+  toast: mocks.toast,
+}))
+
+describe('i18n remote message loading', () => {
   beforeEach(() => {
     vi.resetModules()
+    mocks.changeLocale.mockReset()
+    mocks.toast.error.mockReset()
+    mocks.toast.info.mockReset()
     vi.stubGlobal('localStorage', {
       clear: vi.fn(),
       getItem: vi.fn(() => null),
@@ -17,7 +36,6 @@ describe('i18n fallback loading', () => {
         setAttribute: vi.fn(),
       },
     })
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(null, { status: 503 })))
   })
 
   afterEach(() => {
@@ -25,64 +43,61 @@ describe('i18n fallback loading', () => {
     vi.restoreAllMocks()
   })
 
-  it('keeps the English fallback bundle when runtime translation is unavailable', async () => {
-    const { i18n, loadLanguageAsync } = await import('../src/modules/i18n.ts')
+  it('keeps the current locale and shows a pending toast when the backend is still preparing translations', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ status: 'pending' }), { status: 202 })))
 
-    await loadLanguageAsync('fr')
+    const { changeLanguage } = await import('../src/services/i18n.ts')
+    const { i18n } = await import('../src/modules/i18n.ts')
 
+    const selectedLanguage = await changeLanguage('fr')
+
+    expect(selectedLanguage).toBe('en')
+    expect(i18n.global.locale.value).toBe('en')
+    expect(mocks.changeLocale).not.toHaveBeenCalled()
+    expect(mocks.toast.info).toHaveBeenCalledWith('Translation is being prepared. Try again in a bit.')
+  })
+
+  it('keeps the current locale and shows an unavailable toast when the backend fails', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'translation_unavailable' }), { status: 503 })))
+
+    const { changeLanguage } = await import('../src/services/i18n.ts')
+    const { i18n } = await import('../src/modules/i18n.ts')
+
+    const selectedLanguage = await changeLanguage('fr')
+
+    expect(selectedLanguage).toBe('en')
+    expect(i18n.global.locale.value).toBe('en')
+    expect(mocks.changeLocale).not.toHaveBeenCalled()
+    expect(mocks.toast.error).toHaveBeenCalledWith('This language is not available right now.')
+  })
+
+  it('loads backend messages before switching locale', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      messages: {
+        'credits-plan-overage': '{included}, puis {price}',
+      },
+    }), {
+      headers: { 'Content-Type': 'application/json' },
+      status: 200,
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { changeLanguage } = await import('../src/services/i18n.ts')
+    const { i18n } = await import('../src/modules/i18n.ts')
+
+    const selectedLanguage = await changeLanguage('fr')
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit]
+    const request = JSON.parse(init.body as string) as { checksum?: string, messages?: Record<string, string>, targetLanguage?: string }
+
+    expect(selectedLanguage).toBe('fr')
     expect(i18n.global.locale.value).toBe('fr')
+    expect(mocks.changeLocale).toHaveBeenCalledWith('fr')
+    expect(request.targetLanguage).toBe('fr')
+    expect(request.checksum).toEqual(expect.any(String))
+    expect(request.messages?.['credits-plan-overage']).toBe('{included}, then {price}')
     expect(i18n.global.t('credits-plan-overage', {
       included: 'Included in plan',
       price: '$0.08 per minute',
-    })).toBe('Included in plan, then $0.08 per minute')
-  })
-
-  it('retries message catalog translation after a transient 503', async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(null, { status: 503 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        messages: {
-          account: 'Compte',
-        },
-      }), {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        status: 200,
-      }))
-    vi.stubGlobal('fetch', fetchMock)
-
-    const { loadLanguageAsync, translateMessage } = await import('../src/modules/i18n.ts')
-
-    await loadLanguageAsync('fr')
-    await new Promise(resolve => setTimeout(resolve, 0))
-
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(translateMessage('account')).toBe('Compte')
-  })
-
-  it('keeps partial catalog translations when the background full fetch fails', async () => {
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify({
-        messages: {
-          account: 'Compte',
-        },
-      }), {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        status: 200,
-      }))
-      .mockResolvedValueOnce(new Response(null, { status: 503 }))
-    vi.stubGlobal('fetch', fetchMock)
-
-    const { loadLanguageAsync, translateMessage } = await import('../src/modules/i18n.ts')
-
-    translateMessage('account')
-    await loadLanguageAsync('fr')
-    await new Promise(resolve => setTimeout(resolve, 0))
-
-    expect(fetchMock).toHaveBeenCalledTimes(2)
-    expect(translateMessage('account')).toBe('Compte')
+    })).toBe('Included in plan, puis $0.08 per minute')
   })
 })

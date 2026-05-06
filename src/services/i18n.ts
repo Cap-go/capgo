@@ -1,27 +1,49 @@
+import { changeLocale } from '@formkit/vue'
 import countryCodeToFlagEmoji from 'country-code-to-flag-emoji'
-import { getLanguageConfig, getSelectedLanguage, loadLanguageAsync, normalizeLanguage } from '../modules/i18n'
+import { toast } from 'vue-sonner'
+import { getSelectedLanguage, i18n, loadLanguageAsync, normalizeLanguage, RemoteLanguageError } from '../modules/i18n'
 
-export function getEmoji(countryCode: string) {
-  return countryCodeToFlagEmoji(countryCode.trim().toUpperCase())
+const countryCodes: Record<string, string> = {
+  'en': 'US',
+  'hi': 'IN',
+  'ja': 'JP',
+  'ko': 'KR',
+  'pt-br': 'BR',
+  'vi': 'VN',
+  'zh-cn': 'CN',
 }
 
-export function getLanguageEmoji(lang: string) {
-  return countryCodeToFlagEmoji(getLanguageConfig(lang).countryCode)
+const formkitLocales: Record<string, string> = {
+  'pt-br': 'pt',
+  'zh-cn': 'zh',
 }
 
-export async function changeLanguage(lang: string, options?: { reload?: boolean }) {
+export function getEmoji(locale: string) {
+  return countryCodeToFlagEmoji((countryCodes[locale] ?? locale).toUpperCase())
+}
+
+export function getLanguageEmoji(locale: string) {
+  return getEmoji(locale)
+}
+
+export async function changeLanguage(lang: string) {
   const currentLanguage = getSelectedLanguage()
   const nextLanguage = normalizeLanguage(lang)
 
   if (currentLanguage === nextLanguage)
+    return currentLanguage
+
+  try {
+    await loadLanguageAsync(nextLanguage)
+    changeLocale(formkitLocales[nextLanguage] ?? nextLanguage)
     return nextLanguage
+  }
+  catch (error) {
+    if (error instanceof RemoteLanguageError && error.reason === 'pending')
+      toast.info(i18n.global.t('translation-not-ready'))
+    else
+      toast.error(i18n.global.t('translation-unavailable'))
 
-  await loadLanguageAsync(nextLanguage)
-
-  // Runtime message bundles now update `t(...)` output without a full reload.
-  // Keep opt-in reload support for callers that still need a hard refresh.
-  if (options?.reload === true && typeof window !== 'undefined')
-    window.location.reload()
-
-  return nextLanguage
+    return currentLanguage
+  }
 }

@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.127.12",
+  "version": "12.127.14",
   "private": true,
   "workspaces": [
     "cli"
@@ -28,7 +28,6 @@
     "build": "vite build",
     "build:mobile": "vite build && cap copy",
     "build:dev": "BRANCH=development vite build",
-    "build:preprod": "BRANCH=preprod vite build",
     "build:dev:mobile": "BRANCH=development vite build && cap copy",
     "capacitor:assets": "bunx @capacitor/assets generate --assetPath assets --iconBackgroundColor '#111827' --iconBackgroundColorDark '#111827' --splashBackgroundColor '#111827' --splashBackgroundColorDark '#111827' --logoSplashScale 0.3",
     "resources": "cordova-res --skip-config --copy --icon-background-source '#ffffff'",
@@ -217,6 +216,7 @@
     "vue": "3.5.33",
     "vue-chartjs": "^5.3.3",
     "vue-demi": "0.14.10",
+    "vue-i18n": "^11.4.0",
     "vue-router": "^5.0.6",
     "vue-sonner": "^2.0.9",
     "vue-turnstile": "^1.0.11",
@@ -233,6 +233,7 @@
     "@formkit/core": "2.0.0",
     "@iconify-json/simple-icons": "^1.2.80",
     "@iconify/json": "^2.2.467",
+    "@intlify/unplugin-vue-i18n": "^11.1.2",
     "@playwright/test": "1.59.1",
     "@standard-schema/spec": "^1.1.0",
     "@tailwindcss/aspect-ratio": "^0.4.2",
