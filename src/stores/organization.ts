@@ -280,8 +280,12 @@ export const useOrganizationStore = defineStore('organization', () => {
   }
 
   const loadOrganizationLogos = (sourceOrganizations: Array<Organization & { id: number }>, run: number) => {
-    for (const org of sourceOrganizations)
-      void loadOrganizationLogo(org, run)
+    for (const org of sourceOrganizations) {
+      loadOrganizationLogo(org, run).catch((error) => {
+        console.warn('Cannot load signed organization logo', { orgId: org.gid, error })
+        updateOrganizationLogoState(org.gid, { logo_is_loading: false }, run)
+      })
+    }
   }
 
   watch([currentOrganization, stripeEnabled], async ([currentOrganizationRaw, stripeEnabledValue], [previousOrganization]) => {
@@ -437,8 +441,11 @@ export const useOrganizationStore = defineStore('organization', () => {
       image_url: getImmediateImageUrl(item.image_url) || '',
     }))
 
-    if (onSignedImages)
-      void loadSignedMemberImages(memberImageSources, onSignedImages)
+    if (onSignedImages) {
+      loadSignedMemberImages(memberImageSources, onSignedImages).catch((error) => {
+        console.warn('Cannot load signed member images', error)
+      })
+    }
 
     return mappedMembers
   }
@@ -489,7 +496,7 @@ export const useOrganizationStore = defineStore('organization', () => {
     })
 
     _organizations.value = new Map(mappedData.map(item => [item.gid, item as Organization]))
-    void loadOrganizationLogos(mappedData, logoLoadRun)
+    loadOrganizationLogos(mappedData, logoLoadRun)
 
     const selectableOrganizations = mappedData
       .filter(org => isSelectableOrganization(org.role))

@@ -75,8 +75,12 @@ async function loadAppIcon(app: AppRow, runId: number) {
 }
 
 function loadAppIcons(sourceApps: AppRow[], runId: number) {
-  for (const app of sourceApps)
-    void loadAppIcon(app, runId)
+  for (const app of sourceApps) {
+    loadAppIcon(app, runId).catch((error) => {
+      console.warn('Cannot load signed app icon', { appId: app.app_id, error })
+      updateAppIconState(app.app_id, { icon_url_loading: false }, runId)
+    })
+  }
 }
 
 async function getMyApps() {
@@ -133,7 +137,7 @@ async function getMyApps() {
 
     apps.value = data?.map(appWithImmediateIcon) ?? []
     if (data?.length)
-      void loadAppIcons(data, currentRun)
+      loadAppIcons(data, currentRun)
   }
   finally {
     isTableLoading.value = false
