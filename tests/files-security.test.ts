@@ -6,7 +6,6 @@ import {
   fetchWithRetry,
   getEndpointUrl,
   getSupabaseClient,
-  headers,
   USER_ID,
 } from './test-utils.ts'
 
@@ -195,7 +194,6 @@ describe('attachment cleanup on app deletion regression', () => {
     const deleteResponse = await fetchWithRetry(`${BASE_URL}/app/${appId}`, {
       method: 'DELETE',
       headers: {
-        ...headers,
         Authorization: deleteKey!,
       },
     })

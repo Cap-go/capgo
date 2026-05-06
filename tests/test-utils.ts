@@ -440,12 +440,17 @@ export function getVersionFromAction(action: string): string {
   return `1.0.0-${sanitizedAction}.1`
 }
 
-export async function createAppVersions(version: string, appId: string) {
+export async function createAppVersions(
+  version: string,
+  appId: string,
+  values: Partial<Database['public']['Tables']['app_versions']['Insert']> = {},
+) {
   const supabase = getSupabaseClient()
   const { error, data } = await supabase.from('app_versions').upsert({
     app_id: appId,
     name: version,
     owner_org: ORG_ID,
+    ...values,
   }, {
     onConflict: 'app_id,name',
   }).select('id,name').single()
