@@ -35,7 +35,7 @@ cat > package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -55,7 +55,7 @@ cat > package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -75,7 +75,7 @@ cat > package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -95,7 +95,7 @@ cat > package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -123,7 +123,7 @@ cat > apps/mobile/package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -154,7 +154,7 @@ cat > apps/mobile/package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -180,7 +180,7 @@ packages:
   - 'apps/*'
 
 catalog:
-  '@capgo/capacitor-updater': ^$PACKAGE_VERSION
+  '@capgo/capacitor-updater': $PACKAGE_VERSION
 EOF
 cat > apps/mobile/package.json << EOF
 {
@@ -216,7 +216,7 @@ cat > apps/mobile/package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -252,7 +252,7 @@ cat > apps/mobile/package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -286,7 +286,7 @@ cat > apps/mobile/package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -321,7 +321,7 @@ cat > packages/mobile/package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -348,7 +348,7 @@ cat > package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -364,7 +364,7 @@ cat > package.json << EOF
   }
 }
 EOF
-echo "   ✓ version mismatch trap created (package.json says 6.14.10, node_modules has latest)"
+echo "   ✓ version mismatch trap created (package.json says 6.14.10, node_modules has the fixture version)"
 
 # ============================================================================
 # 12. Fake nested package.json: Wrong version in a nested fake location
@@ -380,7 +380,7 @@ cat > package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -393,7 +393,7 @@ cat > "src/@capgo/capacitor-updater/package.json" << EOF
   "version": "1.0.0-FAKE"
 }
 EOF
-echo "   ✓ wrong nested version trap created (fake 1.0.0-FAKE in src/, real in node_modules)"
+echo "   ✓ wrong nested version trap created (fake 1.0.0-FAKE in src/, fixture version in node_modules)"
 
 # ============================================================================
 # 13. Monorepo with different versions: root and app have different versions
@@ -418,7 +418,7 @@ cat > apps/mobile/package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -435,7 +435,7 @@ cat > apps/mobile/package.json << EOF
   }
 }
 EOF
-echo "   ✓ monorepo fake version trap created (app package.json lies, node_modules has real)"
+echo "   ✓ monorepo fake version trap created (app package.json lies, node_modules has the fixture version)"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
