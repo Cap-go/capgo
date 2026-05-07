@@ -97,6 +97,7 @@ interface TranslationQueuePayload {
 }
 
 type MessageEntry = [string, string]
+type TranslationStoreEntryInput = Omit<TranslationStoreEntry, 'updatedAt'>
 
 class PublicHttpError extends Error {
   constructor(
@@ -206,6 +207,26 @@ function extractContentText(content: unknown): string {
   }).join('')
 }
 
+function extractAiFieldText(value: unknown): string {
+  if (typeof value === 'string')
+    return value
+
+  if (Array.isArray(value))
+    return extractContentText(value)
+
+  const valueRecord = recordOf(value)
+  return valueRecord ? extractAiText(valueRecord) : ''
+}
+
+function extractAiChoiceText(choice: unknown): string {
+  const choiceRecord = recordOf(choice)
+  if (typeof choiceRecord?.text === 'string')
+    return choiceRecord.text
+
+  const message = recordOf(choiceRecord?.message)
+  return extractContentText(message?.content)
+}
+
 function extractAiText(result: unknown): string {
   if (typeof result === 'string')
     return result
@@ -215,27 +236,19 @@ function extractAiText(result: unknown): string {
     return ''
 
   for (const key of ['response', 'text', 'result', 'output']) {
-    const value = resultRecord[key]
-    if (typeof value === 'string')
-      return value
-    const valueRecord = recordOf(value)
-    if (valueRecord)
-      return extractAiText(valueRecord)
-    if (Array.isArray(value))
-      return extractContentText(value)
+    const text = extractAiFieldText(resultRecord[key])
+    if (text)
+      return text
   }
 
   const choices = resultRecord.choices
-  if (Array.isArray(choices)) {
-    for (const choice of choices) {
-      const choiceRecord = recordOf(choice)
-      if (typeof choiceRecord?.text === 'string')
-        return choiceRecord.text
-      const message = recordOf(choiceRecord?.message)
-      const text = extractContentText(message?.content)
-      if (text)
-        return text
-    }
+  if (!Array.isArray(choices))
+    return ''
+
+  for (const choice of choices) {
+    const text = extractAiChoiceText(choice)
+    if (text)
+      return text
   }
 
   return ''
@@ -486,6 +499,22 @@ function nowSeconds() {
   return Math.floor(Date.now() / 1000)
 }
 
+function translationStoreEntry(input: TranslationStoreEntryInput): TranslationStoreEntry {
+  return {
+    ...input,
+    updatedAt: nowSeconds(),
+  }
+}
+
+function translationQueuePayload(checksum: string, targetLanguage: string, model: string, batchIndex: number): Required<TranslationQueuePayload> {
+  return {
+    batchIndex,
+    checksum,
+    model,
+    targetLanguage,
+  }
+}
+
 function isPendingTranslationStale(entry: TranslationStoreEntry) {
   return entry.status === 'pending' && nowSeconds() - entry.updatedAt >= TRANSLATION_REQUEUE_AFTER_SECONDS
 }
@@ -703,15 +732,14 @@ async function enqueueTranslationBatch(env: TranslationWorkerBindings, payload: 
 }
 
 async function queueTranslationIfNeeded(env: TranslationWorkerBindings, payload: Required<TranslationQueuePayload>, requestId?: string) {
-  const pendingEntry: TranslationStoreEntry = {
+  const pendingEntry = translationStoreEntry({
     checksum: payload.checksum,
     messages: {},
     model: payload.model,
     nextBatchIndex: payload.batchIndex,
     status: 'pending',
     targetLanguage: payload.targetLanguage,
-    updatedAt: nowSeconds(),
-  }
+  })
 
   const claimed = await insertPendingTranslationStoreEntry(env, pendingEntry)
   if (!claimed) {
@@ -743,6 +771,43 @@ function currentSourceChecksum() {
   return sourceCatalogChecksumPromise
 }
 
+function pendingTranslationResponse(checksum: string) {
+  return jsonResponse({ checksum, status: 'pending' }, 202, {
+    'Cache-Control': 'no-store',
+    'Retry-After': '10',
+  })
+}
+
+async function readyTranslationResponse(requestId: string | undefined, readyRequest: Request, entry: TranslationStoreEntry, targetLanguage: string) {
+  const payload = readyPayloadFromStore(entry)
+  await cacheReadyTranslationPayload(requestId, readyRequest, payload, targetLanguage)
+  return jsonResponse(payload, 200, {
+    'Cache-Control': `public, max-age=0, s-maxage=${CACHE_TTL_SECONDS}`,
+  })
+}
+
+async function requeueStaleTranslation(env: TranslationWorkerBindings, storedEntry: TranslationStoreEntry, checksum: string, targetLanguage: string, requestId: string) {
+  try {
+    await enqueueTranslationBatch(env, translationQueuePayload(
+      checksum,
+      targetLanguage,
+      storedEntry.model,
+      translationBatchIndexFromStore(storedEntry.nextBatchIndex),
+    ), requestId)
+    if (claimedTranslationBatchIndex(storedEntry.nextBatchIndex) === null)
+      await touchTranslationStoreEntry(env, storedEntry)
+  }
+  catch (error) {
+    cloudlogErr({
+      requestId,
+      message: 'Unable to requeue stale message catalog translation',
+      error: serializeError(error),
+      targetLanguage,
+    })
+    fail(503, 'translation_unavailable', 'Translation queue is not available')
+  }
+}
+
 async function handleTranslationMessages(request: Request, env: TranslationWorkerBindings) {
   const requestId = requestIdFrom(request)
   const body = await parseJsonBody<TranslationBody>(request)
@@ -765,58 +830,19 @@ async function handleTranslationMessages(request: Request, env: TranslationWorke
   }
 
   const storedEntry = await readTranslationStoreEntry(env, checksum, targetLanguage)
-  if (storedEntry?.status === 'ready') {
-    const payload = readyPayloadFromStore(storedEntry)
-    await cacheReadyTranslationPayload(requestId, readyRequest, payload, targetLanguage)
-    return jsonResponse(payload, 200, {
-      'Cache-Control': `public, max-age=0, s-maxage=${CACHE_TTL_SECONDS}`,
-    })
-  }
+  if (storedEntry?.status === 'ready')
+    return readyTranslationResponse(requestId, readyRequest, storedEntry, targetLanguage)
 
   if (storedEntry?.status === 'pending') {
-    if (isPendingTranslationStale(storedEntry)) {
-      try {
-        await enqueueTranslationBatch(env, {
-          batchIndex: translationBatchIndexFromStore(storedEntry.nextBatchIndex),
-          checksum,
-          model: storedEntry.model,
-          targetLanguage,
-        }, requestId)
-        if (claimedTranslationBatchIndex(storedEntry.nextBatchIndex) === null)
-          await touchTranslationStoreEntry(env, storedEntry)
-      }
-      catch (error) {
-        cloudlogErr({
-          requestId,
-          message: 'Unable to requeue stale message catalog translation',
-          error: serializeError(error),
-          targetLanguage,
-        })
-        fail(503, 'translation_unavailable', 'Translation queue is not available')
-      }
-    }
-
-    return jsonResponse({ checksum, status: 'pending' }, 202, {
-      'Cache-Control': 'no-store',
-      'Retry-After': '10',
-    })
+    if (isPendingTranslationStale(storedEntry))
+      await requeueStaleTranslation(env, storedEntry, checksum, targetLanguage, requestId)
+    return pendingTranslationResponse(checksum)
   }
 
   try {
-    const queuedEntry = await queueTranslationIfNeeded(env, {
-      batchIndex: 0,
-      checksum,
-      model,
-      targetLanguage,
-    }, requestId)
-
-    if (queuedEntry.status === 'ready') {
-      const payload = readyPayloadFromStore(queuedEntry)
-      await cacheReadyTranslationPayload(requestId, readyRequest, payload, targetLanguage)
-      return jsonResponse(payload, 200, {
-        'Cache-Control': `public, max-age=0, s-maxage=${CACHE_TTL_SECONDS}`,
-      })
-    }
+    const queuedEntry = await queueTranslationIfNeeded(env, translationQueuePayload(checksum, targetLanguage, model, 0), requestId)
+    if (queuedEntry.status === 'ready')
+      return readyTranslationResponse(requestId, readyRequest, queuedEntry, targetLanguage)
   }
   catch (error) {
     cloudlogErr({
@@ -828,88 +854,159 @@ async function handleTranslationMessages(request: Request, env: TranslationWorke
     fail(503, 'translation_unavailable', 'Translation queue is not available')
   }
 
-  return jsonResponse({ checksum, status: 'pending' }, 202, {
-    'Cache-Control': 'no-store',
-    'Retry-After': '10',
+  return pendingTranslationResponse(checksum)
+}
+
+function queuedTargetLanguage(body: TranslationQueuePayload, requestId: string | undefined) {
+  const targetLanguage = typeof body.targetLanguage === 'string' ? body.targetLanguage.trim().toLowerCase() : ''
+  if (SUPPORTED_LANGUAGES.has(targetLanguage) && targetLanguage !== 'en')
+    return targetLanguage
+
+  cloudlogErr({
+    requestId,
+    message: 'Ignoring unsupported queued translation language',
+    targetLanguage,
+  })
+  return null
+}
+
+function queuedModel(body: TranslationQueuePayload, env: TranslationWorkerBindings) {
+  return typeof body.model === 'string' && body.model.trim() ? body.model : getTranslationModel(env)
+}
+
+function logStaleQueuedMessage(body: TranslationQueuePayload, checksum: string, targetLanguage: string, requestId: string | undefined) {
+  cloudlog({
+    requestId,
+    message: 'Ignoring stale queued translation message',
+    queuedChecksum: body.checksum,
+    checksum,
+    targetLanguage,
   })
 }
 
-async function processTranslationQueueBatch(env: TranslationWorkerBindings, body: TranslationQueuePayload, requestId?: string) {
-  const targetLanguage = typeof body.targetLanguage === 'string' ? body.targetLanguage.trim().toLowerCase() : ''
-  if (!SUPPORTED_LANGUAGES.has(targetLanguage) || targetLanguage === 'en') {
-    cloudlogErr({
+async function cacheReadyStoreEntry(env: TranslationWorkerBindings, checksum: string, targetLanguage: string, requestId: string | undefined, readyRequest: Request) {
+  const storedEntry = await readTranslationStoreEntry(env, checksum, targetLanguage)
+  if (storedEntry?.status !== 'ready')
+    return storedEntry
+
+  await cacheReadyTranslationPayload(requestId, readyRequest, readyPayloadFromStore(storedEntry), targetLanguage)
+  return storedEntry
+}
+
+async function nextProcessableBatchIndex(env: TranslationWorkerBindings, storedEntry: TranslationStoreEntry, checksum: string, targetLanguage: string, batchIndex: number) {
+  const claimedBatchIndex = claimedTranslationBatchIndex(storedEntry.nextBatchIndex)
+  if (claimedBatchIndex === null)
+    return storedEntry.nextBatchIndex
+
+  if (batchIndex !== claimedBatchIndex || !isPendingTranslationStale(storedEntry))
+    return null
+
+  const released = await releaseTranslationBatchClaim(env, checksum, targetLanguage, batchIndex)
+  return released ? claimedBatchIndex : null
+}
+
+async function writeReadyTranslation(env: TranslationWorkerBindings, checksum: string, targetLanguage: string, model: string, messages: Record<string, string>, nextBatchIndex: number, readyRequest: Request, requestId: string | undefined, batchCount?: number) {
+  const readyEntry = translationStoreEntry({
+    checksum,
+    messages,
+    model,
+    nextBatchIndex,
+    status: 'ready',
+    targetLanguage,
+  })
+  await writeTranslationStoreEntry(env, readyEntry)
+  await cacheReadyTranslationPayload(requestId, readyRequest, readyPayloadFromStore(readyEntry), targetLanguage)
+
+  if (batchCount !== undefined) {
+    cloudlog({
       requestId,
-      message: 'Ignoring unsupported queued translation language',
+      message: 'Message catalog translation cached',
       targetLanguage,
+      batchCount,
     })
-    return
   }
+}
+
+async function translateOwnedBatch(ai: AiBinding, env: TranslationWorkerBindings, checksum: string, targetLanguage: string, model: string, batches: MessageEntry[][], batchIndex: number) {
+  const batch = batches[batchIndex]
+  if (!batch) {
+    await releaseTranslationBatchClaim(env, checksum, targetLanguage, batchIndex).catch(() => {})
+    return null
+  }
+
+  try {
+    return await translateBatch(ai, model, targetLanguage, batch)
+  }
+  catch (error) {
+    await releaseTranslationBatchClaim(env, checksum, targetLanguage, batchIndex).catch(() => {})
+    throw error
+  }
+}
+
+async function persistTranslatedBatch(env: TranslationWorkerBindings, checksum: string, targetLanguage: string, model: string, previousMessages: Record<string, string>, mergedMessages: Record<string, string>, batchIndex: number, batches: MessageEntry[][], readyRequest: Request, requestId: string | undefined) {
+  const followingBatchIndex = batchIndex + 1
+
+  try {
+    if (followingBatchIndex >= batches.length) {
+      await writeReadyTranslation(env, checksum, targetLanguage, model, mergedMessages, followingBatchIndex, readyRequest, requestId, batches.length)
+      return
+    }
+
+    await writeTranslationStoreEntry(env, translationStoreEntry({
+      checksum,
+      messages: mergedMessages,
+      model,
+      nextBatchIndex: followingBatchIndex,
+      status: 'pending',
+      targetLanguage,
+    }))
+    await enqueueTranslationBatch(env, translationQueuePayload(checksum, targetLanguage, model, followingBatchIndex), requestId)
+  }
+  catch (error) {
+    await writeTranslationStoreEntry(env, translationStoreEntry({
+      checksum,
+      messages: previousMessages,
+      model,
+      nextBatchIndex: batchIndex,
+      status: 'pending',
+      targetLanguage,
+    })).catch(() => {})
+    throw error
+  }
+}
+
+async function processTranslationQueueBatch(env: TranslationWorkerBindings, body: TranslationQueuePayload, requestId?: string) {
+  const targetLanguage = queuedTargetLanguage(body, requestId)
+  if (!targetLanguage)
+    return
 
   const checksum = await currentSourceChecksum()
   if (body.checksum !== checksum) {
-    cloudlog({
-      requestId,
-      message: 'Ignoring stale queued translation message',
-      queuedChecksum: body.checksum,
-      checksum,
-      targetLanguage,
-    })
+    logStaleQueuedMessage(body, checksum, targetLanguage, requestId)
     return
   }
 
-  const model = typeof body.model === 'string' && body.model.trim() ? body.model : getTranslationModel(env)
+  const model = queuedModel(body, env)
   const ai = env.AI
   if (!ai)
     fail(503, 'translation_unavailable', 'Workers AI binding is not configured')
 
   const readyRequest = buildTranslationCacheRequest(checksum, targetLanguage)
-  const cached = await matchReadyTranslationPayload(readyRequest)
-  if (cached)
+  if (await matchReadyTranslationPayload(readyRequest))
     return
 
-  const storedEntry = await readTranslationStoreEntry(env, checksum, targetLanguage)
-  if (!storedEntry)
-    return
-
-  if (storedEntry.status === 'ready') {
-    await cacheReadyTranslationPayload(requestId, readyRequest, readyPayloadFromStore(storedEntry), targetLanguage)
-    return
-  }
-
-  if (storedEntry.status !== 'pending')
+  const storedEntry = await cacheReadyStoreEntry(env, checksum, targetLanguage, requestId, readyRequest)
+  if (!storedEntry || storedEntry.status !== 'pending')
     return
 
   const batches = buildBatches(sourceMessageCatalog)
-  const translatedMessages = storedEntry.messages
-  let nextBatchIndex = storedEntry.nextBatchIndex
   const batchIndex = normalizeBatchIndex(body.batchIndex)
-  const claimedBatchIndex = claimedTranslationBatchIndex(nextBatchIndex)
-
-  if (claimedBatchIndex !== null) {
-    if (batchIndex !== claimedBatchIndex)
-      return
-    if (!isPendingTranslationStale(storedEntry))
-      return
-
-    const released = await releaseTranslationBatchClaim(env, checksum, targetLanguage, batchIndex)
-    if (!released)
-      return
-
-    nextBatchIndex = claimedBatchIndex
-  }
+  const nextBatchIndex = await nextProcessableBatchIndex(env, storedEntry, checksum, targetLanguage, batchIndex)
+  if (nextBatchIndex === null)
+    return
 
   if (nextBatchIndex >= batches.length) {
-    const readyEntry: TranslationStoreEntry = {
-      checksum,
-      messages: translatedMessages,
-      model,
-      nextBatchIndex,
-      status: 'ready',
-      targetLanguage,
-      updatedAt: nowSeconds(),
-    }
-    await writeTranslationStoreEntry(env, readyEntry)
-    await cacheReadyTranslationPayload(requestId, readyRequest, readyPayloadFromStore(readyEntry), targetLanguage)
+    await writeReadyTranslation(env, checksum, targetLanguage, model, storedEntry.messages, nextBatchIndex, readyRequest, requestId)
     return
   }
 
@@ -917,12 +1014,7 @@ async function processTranslationQueueBatch(env: TranslationWorkerBindings, body
     return
 
   if (batchIndex !== nextBatchIndex) {
-    await enqueueTranslationBatch(env, {
-      batchIndex: nextBatchIndex,
-      checksum,
-      model,
-      targetLanguage,
-    }, requestId)
+    await enqueueTranslationBatch(env, translationQueuePayload(checksum, targetLanguage, model, nextBatchIndex), requestId)
     return
   }
 
@@ -930,77 +1022,15 @@ async function processTranslationQueueBatch(env: TranslationWorkerBindings, body
   if (!claimed)
     return
 
-  const batch = batches[batchIndex]
-  if (!batch) {
-    await releaseTranslationBatchClaim(env, checksum, targetLanguage, batchIndex).catch(() => {})
+  const translatedBatch = await translateOwnedBatch(ai, env, checksum, targetLanguage, model, batches, batchIndex)
+  if (!translatedBatch)
     return
-  }
-
-  let translatedBatch: Record<string, string>
-  try {
-    translatedBatch = await translateBatch(ai, model, targetLanguage, batch)
-  }
-  catch (error) {
-    await releaseTranslationBatchClaim(env, checksum, targetLanguage, batchIndex).catch(() => {})
-    throw error
-  }
 
   const mergedMessages = {
-    ...translatedMessages,
+    ...storedEntry.messages,
     ...translatedBatch,
   }
-  const followingBatchIndex = batchIndex + 1
-
-  try {
-    if (followingBatchIndex >= batches.length) {
-      const readyEntry: TranslationStoreEntry = {
-        checksum,
-        messages: mergedMessages,
-        model,
-        nextBatchIndex: followingBatchIndex,
-        status: 'ready',
-        targetLanguage,
-        updatedAt: nowSeconds(),
-      }
-      await writeTranslationStoreEntry(env, readyEntry)
-      await cacheReadyTranslationPayload(requestId, readyRequest, readyPayloadFromStore(readyEntry), targetLanguage)
-      cloudlog({
-        requestId,
-        message: 'Message catalog translation cached',
-        targetLanguage,
-        batchCount: batches.length,
-      })
-      return
-    }
-
-    await writeTranslationStoreEntry(env, {
-      checksum,
-      messages: mergedMessages,
-      model,
-      nextBatchIndex: followingBatchIndex,
-      status: 'pending',
-      targetLanguage,
-      updatedAt: nowSeconds(),
-    })
-    await enqueueTranslationBatch(env, {
-      batchIndex: followingBatchIndex,
-      checksum,
-      model,
-      targetLanguage,
-    }, requestId)
-  }
-  catch (error) {
-    await writeTranslationStoreEntry(env, {
-      checksum,
-      messages: translatedMessages,
-      model,
-      nextBatchIndex: batchIndex,
-      status: 'pending',
-      targetLanguage,
-      updatedAt: nowSeconds(),
-    }).catch(() => {})
-    throw error
-  }
+  await persistTranslatedBatch(env, checksum, targetLanguage, model, storedEntry.messages, mergedMessages, batchIndex, batches, readyRequest, requestId)
 }
 
 async function fetchHandler(request: Request, env: TranslationWorkerBindings) {
