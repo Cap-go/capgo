@@ -79,6 +79,18 @@ describe('builder payload shape', () => {
     ])
   })
 
+  it.concurrent('drops timeoutSeconds from buildOptions', () => {
+    const payload = buildBuilderPayload({
+      orgId: 'org-timeout',
+      uploadPath: 'path/to/artifact.zip',
+      platform: 'ios',
+      buildOptions: { platform: 'ios', timeoutSeconds: 999999 },
+      buildCredentials: {},
+    })
+
+    expect(payload.buildOptions).toEqual({ platform: 'ios' })
+  })
+
   it('passes through buildOptions and buildCredentials contents unchanged', () => {
     const complexOptions = {
       platform: 'ios',
