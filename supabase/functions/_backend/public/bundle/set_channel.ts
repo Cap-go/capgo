@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import type { Database } from '../../utils/supabase.types.ts'
-import { quickError, simpleError } from '../../utils/hono.ts'
+import { simpleError } from '../../utils/hono.ts'
 import { closeClient, getPgClient, logPgError } from '../../utils/pg.ts'
 import { checkPermission } from '../../utils/rbac.ts'
 import { supabaseApikey } from '../../utils/supabase.ts'
@@ -30,7 +30,7 @@ export async function setChannel(c: Context<MiddlewareKeyVariables>, body: SetCh
     .single()
 
   if (orgError || !org) {
-    throw quickError(404, 'cannot_find_app', 'Cannot find app', { supabaseError: orgError })
+    throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, supabaseError: orgError })
   }
 
   // Verify the bundle exists and belongs to the app
