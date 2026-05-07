@@ -5,11 +5,14 @@ import { render } from 'ink'
 import React from 'react'
 import { getAppId, getConfig } from '../../utils.js'
 import { getPlatformDirFromCapacitorConfig } from '../platform-paths.js'
+import { loadAndroidProgress } from './android/progress.js'
+import AndroidOnboardingApp from './android/ui/app.js'
 import { loadProgress } from './progress.js'
 import OnboardingApp from './ui/app.js'
 
 export interface OnboardingBuilderOptions {
   apikey?: string
+  platform?: string
 }
 
 export async function onboardingBuilderCommand(options: OnboardingBuilderOptions = {}): Promise<void> {
@@ -21,13 +24,22 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
     process.exit(1)
   }
 
-  // Detect app ID and iOS directory from capacitor.config.ts
+  const requested = (options.platform || '').toLowerCase()
+  if (requested && requested !== 'ios' && requested !== 'android') {
+    log.error(`Invalid --platform: "${options.platform}". Use "ios" or "android".`)
+    process.exit(1)
+  }
+  const platform: 'ios' | 'android' = requested === 'android' ? 'android' : 'ios'
+
+  // Detect app ID and platform directories from capacitor.config.ts
   let appId: string | undefined
-  let iosDir = 'ios' // default
+  let iosDir = 'ios'
+  let androidDir = 'android'
   try {
     const extConfig = await getConfig()
     appId = getAppId(undefined, extConfig?.config)
     iosDir = getPlatformDirFromCapacitorConfig(extConfig?.config, 'ios')
+    androidDir = getPlatformDirFromCapacitorConfig(extConfig?.config, 'android')
   }
   catch {
     // getConfig may throw if not in a Capacitor project
@@ -38,13 +50,22 @@ export async function onboardingBuilderCommand(options: OnboardingBuilderOptions
     process.exit(1)
   }
 
-  // Load any existing progress
-  const progress = await loadProgress(appId)
+  if (platform === 'android') {
+    const androidProgress = await loadAndroidProgress(appId)
+    const { waitUntilExit } = render(
+      React.createElement(AndroidOnboardingApp, {
+        appId,
+        initialProgress: androidProgress,
+        androidDir,
+      }),
+    )
+    await waitUntilExit()
+    return
+  }
 
-  // Launch Ink app
+  const progress = await loadProgress(appId)
   const { waitUntilExit } = render(
     React.createElement(OnboardingApp, { appId, initialProgress: progress, iosDir, apikey: options.apikey }),
   )
-
   await waitUntilExit()
 }
