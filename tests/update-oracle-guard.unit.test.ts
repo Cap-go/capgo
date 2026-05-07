@@ -42,8 +42,10 @@ function createGuardApp() {
 }
 
 describe('update enumeration guard', () => {
+  let cache: ReturnType<typeof createMemoryCache>
+
   beforeEach(() => {
-    const cache = createMemoryCache()
+    cache = createMemoryCache()
     vi.stubGlobal('caches', {
       open: vi.fn(async () => cache),
     })
@@ -129,6 +131,25 @@ describe('update enumeration guard', () => {
     }))
     expect(blocked.status).toBe(429)
     await expect(blocked.json()).resolves.toMatchObject({ error: 'on_premise_app' })
+  })
+
+  it('reads only the touched bucket when recording a miss', async () => {
+    const app = createGuardApp()
+    const headers = {
+      'Content-Type': 'application/json',
+      'cf-connecting-ip': '203.0.113.14',
+    }
+
+    await app.fetch(new Request('http://localhost/updates', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ app_id: 'com.missing.single-bucket' }),
+    }))
+
+    const bucketReads = cache.match.mock.calls
+      .map(([key]) => cacheKeyToString(key))
+      .filter(key => key.includes('/rate-limit/update-enumeration/bucket'))
+    expect(bucketReads).toHaveLength(1)
   })
 
   it('does not increase the distinct miss count for repeated app IDs', async () => {

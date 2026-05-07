@@ -6,6 +6,7 @@ import { getClientIP } from './rate_limit.ts'
 import { getEnv } from './utils.ts'
 
 const UPDATE_ENUMERATION_BUCKET_PATH = '/rate-limit/update-enumeration/bucket'
+const UPDATE_ENUMERATION_COUNT_PATH = '/rate-limit/update-enumeration/count'
 const UPDATE_ENUMERATION_LIMIT_PATH = '/rate-limit/update-enumeration/limited'
 const UPDATE_ENUMERATION_TTL_SECONDS = 60 * 15
 const DEFAULT_UPDATE_ENUMERATION_MISS_LIMIT = 5
@@ -18,6 +19,11 @@ interface UpdateEnumerationData {
 }
 
 interface UpdateEnumerationLimitData {
+  resetAt: number
+}
+
+interface UpdateEnumerationCountData {
+  count: number
   resetAt: number
 }
 
@@ -90,6 +96,10 @@ function buildUpdateEnumerationBucketRequest(helper: CacheHelper, ip: string, bu
   return helper.buildRequest(UPDATE_ENUMERATION_BUCKET_PATH, { ip, bucket })
 }
 
+function buildUpdateEnumerationCountRequest(helper: CacheHelper, ip: string) {
+  return helper.buildRequest(UPDATE_ENUMERATION_COUNT_PATH, { ip })
+}
+
 function buildUpdateEnumerationLimitRequest(helper: CacheHelper, ip: string) {
   return helper.buildRequest(UPDATE_ENUMERATION_LIMIT_PATH, { ip })
 }
@@ -117,35 +127,6 @@ export async function isUpdateEnumerationLimited(c: Context): Promise<RateLimitS
   return { limited: false }
 }
 
-async function countDistinctMisses(c: Context, helper: CacheHelper, ip: string) {
-  const bucketRequests = Array.from({ length: UPDATE_ENUMERATION_BUCKET_COUNT }, (_, index) => (
-    buildUpdateEnumerationBucketRequest(helper, ip, index.toString())
-  ))
-
-  try {
-    const buckets = await Promise.all(bucketRequests.map(request => helper.matchJson<UpdateEnumerationData>(request)))
-    const appIds = new Set<string>()
-    let resetAt: number | undefined
-    for (const bucket of buckets) {
-      if (!bucket)
-        continue
-      for (const appIdHash of bucket.appIds)
-        appIds.add(appIdHash)
-      if (!resetAt || bucket.resetAt > resetAt)
-        resetAt = bucket.resetAt
-    }
-    return { count: appIds.size, resetAt }
-  }
-  catch (error) {
-    cloudlog({
-      requestId: c.get('requestId'),
-      message: 'Update enumeration guard bucket read failed',
-      error,
-    })
-    return { count: 0, resetAt: undefined }
-  }
-}
-
 function appendAppIdHash(existingData: UpdateEnumerationData | null, appIdHash: string, resetAt: number) {
   const existingAppIds = existingData?.appIds ?? []
   const appIds = existingAppIds.includes(appIdHash)
@@ -162,6 +143,7 @@ export async function recordUpdateEnumerationMiss(c: Context, appId: string): Pr
   const bucket = getUpdateEnumerationBucket(appIdHash)
   const resetAt = Date.now() + UPDATE_ENUMERATION_TTL_SECONDS * 1000
   let cacheEntry: ReturnType<typeof buildUpdateEnumerationCacheEntry>
+  let missState: UpdateEnumerationCountData = { count: 0, resetAt }
 
   try {
     cacheEntry = buildUpdateEnumerationCacheEntry(c)
@@ -174,10 +156,19 @@ export async function recordUpdateEnumerationMiss(c: Context, appId: string): Pr
       return { limited: true, resetAt: existingLimit.resetAt }
 
     const bucketRequest = buildUpdateEnumerationBucketRequest(cacheEntry.helper, cacheEntry.ip, bucket)
+    const countRequest = buildUpdateEnumerationCountRequest(cacheEntry.helper, cacheEntry.ip)
     const existingBucket = await cacheEntry.helper.matchJson<UpdateEnumerationData>(bucketRequest)
+    const existingCount = await cacheEntry.helper.matchJson<UpdateEnumerationCountData>(countRequest)
+    const alreadyTracked = existingBucket?.appIds.includes(appIdHash) ?? false
+    const currentCount = existingCount?.count ?? existingBucket?.appIds.length ?? 0
+    const missCount = alreadyTracked ? currentCount : currentCount + 1
+    const missResetAt = Math.max(existingCount?.resetAt ?? 0, existingBucket?.resetAt ?? 0, resetAt)
+
     // Bucket selection uses a server-side keyed hash when available, and the
     // bucket payload stores exact app hashes so collisions cannot hide probes.
     await cacheEntry.helper.putJson(bucketRequest, appendAppIdHash(existingBucket, appIdHash, resetAt), UPDATE_ENUMERATION_TTL_SECONDS)
+    missState = { count: missCount, resetAt: missResetAt }
+    await cacheEntry.helper.putJson(countRequest, missState, UPDATE_ENUMERATION_TTL_SECONDS)
   }
   catch (error) {
     cloudlog({
@@ -188,13 +179,12 @@ export async function recordUpdateEnumerationMiss(c: Context, appId: string): Pr
     return { limited: false }
   }
 
-  const missState = await countDistinctMisses(c, cacheEntry.helper, cacheEntry.ip)
   const limit = getUpdateEnumerationMissLimit(c)
   const limited = missState.count >= limit
   if (limited) {
     await cacheEntry.helper.putJson(
       buildUpdateEnumerationLimitRequest(cacheEntry.helper, cacheEntry.ip),
-      { resetAt: missState.resetAt ?? resetAt },
+      { resetAt: missState.resetAt },
       UPDATE_ENUMERATION_TTL_SECONDS,
     )
   }
