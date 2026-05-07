@@ -647,6 +647,81 @@ $$;
 ALTER FUNCTION "public"."apikeys_strip_plain_key_for_hashed"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."app_versions_readable_app_ids"() RETURNS character varying[]
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+DECLARE
+  v_user_id uuid;
+  v_api_key_text text;
+  v_api_key public.apikeys%ROWTYPE;
+  v_allowed character varying[] := '{}'::character varying[];
+BEGIN
+  SELECT auth.uid() INTO v_user_id;
+
+  -- If no authenticated user is present, authenticate through the Capgo API key
+  -- header once. No API key means the anon request can read no app_versions.
+  IF v_user_id IS NULL THEN
+    SELECT public.get_apikey_header() INTO v_api_key_text;
+    IF v_api_key_text IS NULL THEN
+      RETURN v_allowed;
+    END IF;
+
+    SELECT *
+    FROM public.find_apikey_by_value(v_api_key_text)
+    INTO v_api_key;
+
+    IF v_api_key.id IS NULL THEN
+      RETURN v_allowed;
+    END IF;
+
+    IF public.is_apikey_expired(v_api_key.expires_at) THEN
+      RETURN v_allowed;
+    END IF;
+
+    IF v_api_key.mode IS NOT NULL THEN
+      IF NOT (v_api_key.mode = ANY('{read,upload,write,all}'::public.key_mode[])) THEN
+        RETURN v_allowed;
+      END IF;
+
+      v_user_id := v_api_key.user_id;
+    END IF;
+  END IF;
+
+  SELECT COALESCE(array_agg(DISTINCT apps.app_id), '{}'::character varying[])
+  INTO v_allowed
+  FROM public.apps
+  WHERE (
+      v_api_key.id IS NULL
+      OR COALESCE(array_length(v_api_key.limited_to_orgs, 1), 0) = 0
+      OR apps.owner_org = ANY(v_api_key.limited_to_orgs)
+    )
+    AND (
+      v_api_key.id IS NULL
+      OR v_api_key.limited_to_apps IS NULL
+      OR v_api_key.limited_to_apps = '{}'::character varying[]
+      OR apps.app_id = ANY(v_api_key.limited_to_apps)
+    )
+    AND public.check_min_rights(
+      'read'::public.user_min_right,
+      v_user_id,
+      apps.owner_org,
+      apps.app_id,
+      NULL::bigint
+    );
+
+  RETURN v_allowed;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."app_versions_readable_app_ids"() OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."app_versions_readable_app_ids"() IS 'Returns the app IDs whose bundle rows are readable by the current authenticated user or Capgo API key. This intentionally reveals only app IDs the caller can already list through normal app/bundle read access, and is used by app_versions RLS to avoid per-row auth work on unfiltered PostgREST requests.';
+
+
+
 CREATE OR REPLACE FUNCTION "public"."apply_usage_overage"("p_org_id" "uuid", "p_metric" "public"."credit_metric_type", "p_overage_amount" numeric, "p_billing_cycle_start" timestamp with time zone, "p_billing_cycle_end" timestamp with time zone, "p_details" "jsonb" DEFAULT NULL::"jsonb") RETURNS TABLE("overage_amount" numeric, "credits_required" numeric, "credits_applied" numeric, "credits_remaining" numeric, "credit_step_id" bigint, "overage_covered" numeric, "overage_unpaid" numeric, "overage_event_id" "uuid")
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -12350,25 +12425,27 @@ CREATE OR REPLACE FUNCTION "public"."refresh_orgs_has_usage_credits"() RETURNS "
     SET "search_path" TO ''
     AS $$
 BEGIN
-  -- Update orgs that have at least one grant (credits mode enabled).
-  UPDATE "public"."orgs" AS o
-  SET "has_usage_credits" = true
-  WHERE EXISTS (
-    SELECT 1
-    FROM "public"."usage_credit_grants" AS g
-    WHERE g."org_id" = o."id"
+  WITH credit_state AS (
+    SELECT
+      o."id",
+      COALESCE(g."has_usage_credits", false) AS "has_usage_credits"
+    FROM "public"."orgs" AS o
+    LEFT JOIN (
+      SELECT
+        grant_rows."org_id",
+        bool_or(
+          grant_rows."expires_at" >= now()
+          AND grant_rows."credits_consumed" < grant_rows."credits_total"
+        ) AS "has_usage_credits"
+      FROM "public"."usage_credit_grants" AS grant_rows
+      GROUP BY grant_rows."org_id"
+    ) AS g ON g."org_id" = o."id"
   )
-  AND o."has_usage_credits" IS DISTINCT FROM true;
-
-  -- Orgs without any grants should be false (fallback for edge cases).
   UPDATE "public"."orgs" AS o
-  SET "has_usage_credits" = false
-  WHERE NOT EXISTS (
-    SELECT 1
-    FROM "public"."usage_credit_grants" AS g
-    WHERE g."org_id" = o."id"
-  )
-  AND o."has_usage_credits" IS DISTINCT FROM false;
+  SET "has_usage_credits" = credit_state."has_usage_credits"
+  FROM credit_state
+  WHERE o."id" = credit_state."id"
+    AND o."has_usage_credits" IS DISTINCT FROM credit_state."has_usage_credits";
 END;
 $$;
 
@@ -13489,21 +13566,28 @@ CREATE OR REPLACE FUNCTION "public"."sync_org_has_usage_credits_from_grants"() R
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
+DECLARE
+  v_org_id uuid;
 BEGIN
-  -- Keep it simple: usage_credit_grants writes are low-frequency and this must work
-  -- on all Postgres versions. Row-level trigger avoids transition table limitations.
-  UPDATE "public"."orgs" AS o
-  SET "has_usage_credits" = EXISTS (
-    SELECT 1
-    FROM "public"."usage_credit_grants" AS g
-    WHERE g."org_id" = COALESCE(NEW."org_id", OLD."org_id")
-  )
-  WHERE o."id" = COALESCE(NEW."org_id", OLD."org_id")
-    AND o."has_usage_credits" IS DISTINCT FROM EXISTS (
-      SELECT 1
-      FROM "public"."usage_credit_grants" AS g
-      WHERE g."org_id" = COALESCE(NEW."org_id", OLD."org_id")
-    );
+  FOR v_org_id IN
+    SELECT DISTINCT affected."org_id"
+    FROM (VALUES (NEW."org_id"), (OLD."org_id")) AS affected("org_id")
+    WHERE affected."org_id" IS NOT NULL
+  LOOP
+    UPDATE "public"."orgs" AS o
+    SET "has_usage_credits" = credit_state."has_usage_credits"
+    FROM (
+      SELECT EXISTS (
+        SELECT 1
+        FROM "public"."usage_credit_grants" AS g
+        WHERE g."org_id" = v_org_id
+          AND g."expires_at" >= now()
+          AND g."credits_consumed" < g."credits_total"
+      ) AS "has_usage_credits"
+    ) AS credit_state
+    WHERE o."id" = v_org_id
+      AND o."has_usage_credits" IS DISTINCT FROM credit_state."has_usage_credits";
+  END LOOP;
 
   RETURN NULL;
 END;
@@ -15373,7 +15457,15 @@ CREATE TABLE IF NOT EXISTS "public"."daily_revenue_metrics" (
     "new_business_mrr" double precision DEFAULT 0 NOT NULL,
     "expansion_mrr" double precision DEFAULT 0 NOT NULL,
     "contraction_mrr" double precision DEFAULT 0 NOT NULL,
-    "churn_mrr" double precision DEFAULT 0 NOT NULL
+    "churn_mrr" double precision DEFAULT 0 NOT NULL,
+    "churn_mrr_solo" double precision DEFAULT 0 NOT NULL,
+    "churn_mrr_maker" double precision DEFAULT 0 NOT NULL,
+    "churn_mrr_team" double precision DEFAULT 0 NOT NULL,
+    "churn_mrr_enterprise" double precision DEFAULT 0 NOT NULL,
+    "contraction_mrr_solo" double precision DEFAULT 0 NOT NULL,
+    "contraction_mrr_maker" double precision DEFAULT 0 NOT NULL,
+    "contraction_mrr_team" double precision DEFAULT 0 NOT NULL,
+    "contraction_mrr_enterprise" double precision DEFAULT 0 NOT NULL
 );
 
 
@@ -15401,6 +15493,38 @@ COMMENT ON COLUMN "public"."daily_revenue_metrics"."contraction_mrr" IS 'Monthly
 
 
 COMMENT ON COLUMN "public"."daily_revenue_metrics"."churn_mrr" IS 'Monthly recurring revenue fully lost to churn on the day.';
+
+
+
+COMMENT ON COLUMN "public"."daily_revenue_metrics"."churn_mrr_solo" IS 'Solo plan MRR fully lost to churn on the day.';
+
+
+
+COMMENT ON COLUMN "public"."daily_revenue_metrics"."churn_mrr_maker" IS 'Maker plan MRR fully lost to churn on the day.';
+
+
+
+COMMENT ON COLUMN "public"."daily_revenue_metrics"."churn_mrr_team" IS 'Team plan MRR fully lost to churn on the day.';
+
+
+
+COMMENT ON COLUMN "public"."daily_revenue_metrics"."churn_mrr_enterprise" IS 'Enterprise plan MRR fully lost to churn on the day.';
+
+
+
+COMMENT ON COLUMN "public"."daily_revenue_metrics"."contraction_mrr_solo" IS 'Solo plan MRR lost to downgrades on the day.';
+
+
+
+COMMENT ON COLUMN "public"."daily_revenue_metrics"."contraction_mrr_maker" IS 'Maker plan MRR lost to downgrades on the day.';
+
+
+
+COMMENT ON COLUMN "public"."daily_revenue_metrics"."contraction_mrr_team" IS 'Team plan MRR lost to downgrades on the day.';
+
+
+
+COMMENT ON COLUMN "public"."daily_revenue_metrics"."contraction_mrr_enterprise" IS 'Enterprise plan MRR lost to downgrades on the day.';
 
 
 
@@ -15643,7 +15767,12 @@ CREATE TABLE IF NOT EXISTS "public"."global_stats" (
     "build_avg_seconds_day_ios" double precision DEFAULT 0 NOT NULL,
     "build_avg_seconds_day_android" double precision DEFAULT 0 NOT NULL,
     "nrr" double precision DEFAULT 100 NOT NULL,
-    "churn_revenue" double precision DEFAULT 0 NOT NULL
+    "churn_revenue" double precision DEFAULT 0 NOT NULL,
+    "churn_revenue_solo" double precision DEFAULT 0 NOT NULL,
+    "churn_revenue_maker" double precision DEFAULT 0 NOT NULL,
+    "churn_revenue_team" double precision DEFAULT 0 NOT NULL,
+    "churn_revenue_enterprise" double precision DEFAULT 0 NOT NULL,
+    "plugin_version_ladder" "jsonb" DEFAULT '[]'::"jsonb" NOT NULL
 );
 
 
@@ -15799,6 +15928,22 @@ COMMENT ON COLUMN "public"."global_stats"."nrr" IS 'Net Revenue Retention percen
 
 
 COMMENT ON COLUMN "public"."global_stats"."churn_revenue" IS 'Total monthly recurring revenue lost to churn and downgrades on the day in dollars.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."churn_revenue_solo" IS 'Solo plan MRR lost to churn and downgrades on the day.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."churn_revenue_maker" IS 'Maker plan MRR lost to churn and downgrades on the day.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."churn_revenue_team" IS 'Team plan MRR lost to churn and downgrades on the day.';
+
+
+
+COMMENT ON COLUMN "public"."global_stats"."churn_revenue_enterprise" IS 'Enterprise plan MRR lost to churn and downgrades on the day.';
 
 
 
@@ -15978,7 +16123,7 @@ COMMENT ON COLUMN "public"."orgs"."use_new_rbac" IS 'Feature flag: when true, or
 
 
 
-COMMENT ON COLUMN "public"."orgs"."has_usage_credits" IS 'Replicated flag: true when the org uses usage credits (top-up billing). Must be replica-safe for plugin endpoints.';
+COMMENT ON COLUMN "public"."orgs"."has_usage_credits" IS 'True only with positive, unexpired usage credits.';
 
 
 
@@ -18386,7 +18531,9 @@ CREATE POLICY "Allow delete for auth, api keys (write+)" ON "public"."channel_de
 
 
 
-CREATE POLICY "Allow for auth, api keys (read+)" ON "public"."app_versions" FOR SELECT TO "anon", "authenticated" USING ("public"."check_min_rights"('read'::"public"."user_min_right", "public"."get_identity_org_appid"('{read,upload,write,all}'::"public"."key_mode"[], "owner_org", "app_id"), "owner_org", "app_id", NULL::bigint));
+CREATE POLICY "Allow for auth, api keys (read+)" ON "public"."app_versions" FOR SELECT TO "anon", "authenticated" USING (((("app_id")::"text" = ANY ((COALESCE(( SELECT "public"."app_versions_readable_app_ids"() AS "app_versions_readable_app_ids"), '{}'::character varying[]))::"text"[])) AND (EXISTS ( SELECT 1
+   FROM "public"."apps"
+  WHERE ((("apps"."app_id")::"text" = ("app_versions"."app_id")::"text") AND ("apps"."owner_org" = "app_versions"."owner_org"))))));
 
 
 
@@ -19577,6 +19724,13 @@ GRANT ALL ON FUNCTION "public"."apikeys_force_server_key"() TO "service_role";
 
 REVOKE ALL ON FUNCTION "public"."apikeys_strip_plain_key_for_hashed"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."apikeys_strip_plain_key_for_hashed"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."app_versions_readable_app_ids"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."app_versions_readable_app_ids"() TO "service_role";
+GRANT ALL ON FUNCTION "public"."app_versions_readable_app_ids"() TO "anon";
+GRANT ALL ON FUNCTION "public"."app_versions_readable_app_ids"() TO "authenticated";
 
 
 

@@ -2886,6 +2886,7 @@ export type Database = {
     }
     Functions: {
       accept_invitation_to_org: { Args: { org_id: string }; Returns: string }
+      app_versions_readable_app_ids: { Args: never; Returns: string[] }
       apply_usage_overage: {
         Args: {
           p_billing_cycle_end: string
