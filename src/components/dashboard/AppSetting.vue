@@ -647,8 +647,18 @@ const defaultChannelByPlatform = computed<Record<DownloadPlatform, DownloadChann
 }))
 
 const filteredCombinedOptions = computed(() => filterChannels(combinedOptions.value, combinedSearch.value))
-const visibleCombinedOptions = computed(() => combinedSearch.value.trim() ? filteredCombinedOptions.value : filteredCombinedOptions.value.slice(0, 3))
-const combinedHasHidden = computed(() => !combinedSearch.value.trim() && filteredCombinedOptions.value.length > 3)
+const visibleCombinedOptions = computed(() => {
+  const filtered = filteredCombinedOptions.value
+  if (combinedSearch.value.trim())
+    return filtered
+
+  const visible = filtered.slice(0, 3)
+  const selected = filtered.find(channel => channel.id === selectedCombinedChannelId.value)
+  return selected && !visible.some(channel => channel.id === selected.id)
+    ? [...visible, selected]
+    : visible
+})
+const combinedHasHidden = computed(() => !combinedSearch.value.trim() && filteredCombinedOptions.value.length > visibleCombinedOptions.value.length)
 
 function getFilteredPlatformOptions(platform: DownloadPlatform) {
   return filterChannels(platformOptions.value[platform], downloadSearches[platform])
@@ -656,11 +666,18 @@ function getFilteredPlatformOptions(platform: DownloadPlatform) {
 
 function getVisiblePlatformOptions(platform: DownloadPlatform) {
   const filtered = getFilteredPlatformOptions(platform)
-  return downloadSearches[platform].trim() ? filtered : filtered.slice(0, 3)
+  if (downloadSearches[platform].trim())
+    return filtered
+
+  const visible = filtered.slice(0, 3)
+  const selected = filtered.find(channel => channel.id === selectedDownloadChannelIds.value[platform])
+  return selected && !visible.some(channel => channel.id === selected.id)
+    ? [...visible, selected]
+    : visible
 }
 
 function platformHasHidden(platform: DownloadPlatform) {
-  return !downloadSearches[platform].trim() && getFilteredPlatformOptions(platform).length > 3
+  return !downloadSearches[platform].trim() && getFilteredPlatformOptions(platform).length > getVisiblePlatformOptions(platform).length
 }
 
 const downloadChannelSections = computed(() => availableDownloadPlatforms.value.map(platform => ({
