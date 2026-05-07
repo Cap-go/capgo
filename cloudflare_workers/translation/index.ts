@@ -857,7 +857,8 @@ async function readyTranslationResponse(requestId: string | undefined, readyRequ
 }
 
 async function requeueStaleTranslation(env: TranslationWorkerBindings, storedEntry: TranslationStoreEntry, checksum: string, targetLanguage: string, requestId: string) {
-  if (claimedTranslationBatchIndex(storedEntry.nextBatchIndex) !== null)
+  const claimedBatchIndex = claimedTranslationBatchIndex(storedEntry.nextBatchIndex)
+  if (claimedBatchIndex !== null && !isTranslationBatchLeaseExpired(storedEntry))
     return
 
   try {
@@ -867,7 +868,8 @@ async function requeueStaleTranslation(env: TranslationWorkerBindings, storedEnt
       storedEntry.model,
       translationBatchIndexFromStore(storedEntry.nextBatchIndex),
     ), requestId)
-    await touchTranslationStoreEntry(env, storedEntry)
+    if (claimedBatchIndex === null)
+      await touchTranslationStoreEntry(env, storedEntry)
   }
   catch (error) {
     cloudlogErr({
@@ -972,7 +974,7 @@ async function nextProcessableBatchIndex(env: TranslationWorkerBindings, storedE
     return null
 
   if (!isTranslationBatchLeaseExpired(storedEntry))
-    throw new Error('Translation batch claim is still active')
+    return null
 
   const released = await releaseTranslationBatchClaim(env, checksum, targetLanguage, batchIndex)
   return released ? claimedBatchIndex : null
