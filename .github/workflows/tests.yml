@@ -136,6 +136,24 @@ jobs:
           echo "capgo=$run_capgo" >> "$GITHUB_OUTPUT"
           echo "cli=$run_cli" >> "$GITHUB_OUTPUT"
 
+  dead_code:
+    needs: changes
+    if: needs.changes.outputs.run_capgo == 'true' || needs.changes.outputs.run_cli == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    name: Check dead code
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6 # v6
+      - name: Setup bun
+        run: bash scripts/setup-bun.sh
+      - name: Install dependencies
+        run: bun install
+      - name: Check dead code
+        run: bun run lint:deadcode
+
   test_all:
     needs: changes
     if: needs.changes.outputs.run_capgo == 'true'

@@ -170,17 +170,6 @@ export const DEMO_APP_NAMES: { [key: string]: string } = {
 }
 
 /**
- * Generate demo data broken down by fake apps
- * @deprecated Use generateConsistentDemoData instead for consistent total/byApp data
- */
-export function generateDemoDataByApp(days: number = 30, dataGenerator: (days: number) => number[]): { [appId: string]: number[] } {
-  return {
-    'demo-app-1': dataGenerator(days),
-    'demo-app-2': dataGenerator(days),
-  }
-}
-
-/**
  * Generate consistent demo data where the total is derived from the per-app breakdown.
  * This ensures the chart totals match when displaying stacked per-app data.
  */

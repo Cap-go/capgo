@@ -276,7 +276,7 @@ async function fetchWithRetry(
   throw new Error('Unexpected error in fetchWithRetry')
 }
 
-export type { BuildCredentials, BuildRequestOptions, BuildRequestResponse, BuildRequestResult } from '../schemas/build'
+export type { BuildCredentials, BuildRequestOptions, BuildRequestResult } from '../schemas/build'
 
 /**
  * Stream build logs from the server via WebSocket.

@@ -11,7 +11,6 @@ export {
   allCredentialsSchema,
   buildCredentialsSchema,
   buildRequestOptionsSchema,
-  buildRequestResponseSchema,
   buildRequestResultSchema,
   credentialFileSchema,
   savedCredentialsSchema,
@@ -20,7 +19,6 @@ export type {
   AllCredentials,
   BuildCredentials,
   BuildRequestOptions,
-  BuildRequestResponse,
   BuildRequestResult,
   CredentialFile,
   SavedCredentials,
@@ -34,7 +32,6 @@ export {
   bundleDeleteOptionsSchema,
   bundleEncryptOptionsSchema,
   bundleReleaseTypeOptionsSchema,
-  bundleUnlinkOptionsSchema,
   bundleZipOptionsSchema,
   decryptResultSchema,
   encryptResultSchema,
@@ -49,7 +46,6 @@ export type {
   BundleDeleteOptions,
   BundleEncryptOptions,
   BundleReleaseTypeOptions,
-  BundleUnlinkOptions,
   BundleZipOptions,
   DecryptResult,
   EncryptResult,
@@ -63,16 +59,12 @@ export { channelAddOptionsSchema, channelCurrentBundleOptionsSchema, channelDele
 export type { Channel, ChannelAddOptions, ChannelCurrentBundleOptions, ChannelDeleteOptions, OptionsSetChannel } from './channel'
 
 // Common
-export { compatibilityDetailsSchema, compatibilitySchema, incompatibilityReasonSchema, nativePackageSchema, parsedSecurityErrorSchema, regexSemver, reverseDomainRegex, uploadUrlsSchema } from './common'
-export type { Compatibility, CompatibilityDetails, IncompatibilityReason, NativePackage, ParsedSecurityError, uploadUrlsType } from './common'
+export { compatibilityDetailsSchema, compatibilitySchema, incompatibilityReasonSchema, nativePackageSchema, parsedSecurityErrorSchema } from './common'
+export type { Compatibility, CompatibilityDetails, IncompatibilityReason, NativePackage, ParsedSecurityError } from './common'
 
 // Config
 export { capacitorConfigSchema, extConfigPairsSchema } from './config'
 export type { CapacitorConfig, ExtConfigPairs } from './config'
-
-// Crypto
-export { rsaKeysSchema } from './crypto'
-export type { RSAKeys } from './crypto'
 
 // Organization
 export { organizationAddOptionsSchema, organizationDeleteOptionsSchema, organizationSetOptionsSchema, passwordPolicyConfigSchema } from './organization'
@@ -102,7 +94,6 @@ export {
   saveKeyOptionsSchema,
   bundleCompatibilityOptionsSchema as sdkBundleCompatibilityOptionsSchema,
   requestBuildOptionsSchema as sdkRequestBuildOptionsSchema,
-  sdkResultSchema,
   setSettingOptionsSchema,
   statsOrderSchema,
   updateAppOptionsSchema,

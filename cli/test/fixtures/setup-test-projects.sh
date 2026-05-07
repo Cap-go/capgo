@@ -7,7 +7,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FIXTURES_DIR="$SCRIPT_DIR"
 PACKAGE_NAME="@capgo/capacitor-updater"
-PACKAGE_VERSION="6.25.5"
+PACKAGE_VERSION="6.45.10"
 
 echo "🧹 Cleaning up old fixtures..."
 rm -rf "$FIXTURES_DIR/npm-project"
@@ -35,7 +35,7 @@ cat > package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -55,7 +55,7 @@ cat > package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -75,7 +75,7 @@ cat > package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -95,7 +95,7 @@ cat > package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -123,7 +123,7 @@ cat > apps/mobile/package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -154,7 +154,7 @@ cat > apps/mobile/package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -180,7 +180,7 @@ packages:
   - 'apps/*'
 
 catalog:
-  '@capgo/capacitor-updater': ^$PACKAGE_VERSION
+  '@capgo/capacitor-updater': $PACKAGE_VERSION
 EOF
 cat > apps/mobile/package.json << EOF
 {
@@ -216,7 +216,7 @@ cat > apps/mobile/package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -252,7 +252,7 @@ cat > apps/mobile/package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -286,7 +286,7 @@ cat > apps/mobile/package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -321,7 +321,7 @@ cat > packages/mobile/package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -348,7 +348,7 @@ cat > package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -380,7 +380,7 @@ cat > package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF
@@ -418,7 +418,7 @@ cat > apps/mobile/package.json << EOF
   "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "$PACKAGE_NAME": "^$PACKAGE_VERSION"
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
   }
 }
 EOF

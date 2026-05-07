@@ -4,10 +4,6 @@ import { z } from 'zod'
 // Shared Regex Validators
 // ============================================================================
 
-export const regexSemver = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[a-z-][0-9a-z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-z-][0-9a-z-]*))*))?(?:\+([0-9a-z-]+(?:\.[0-9a-z-]+)*))?$/i
-
-export const reverseDomainRegex = /^[a-z0-9]+(\.[\w-]+)+$/i
-
 // ============================================================================
 // Native Package Schema
 // ============================================================================
@@ -59,15 +55,6 @@ export type CompatibilityDetails = z.infer<typeof compatibilityDetailsSchema>
 // ============================================================================
 // Upload URLs Schema
 // ============================================================================
-
-export const uploadUrlsSchema = z.object({
-  path: z.string(),
-  hash: z.string(),
-  uploadLink: z.string(),
-  finalPath: z.string(),
-})
-
-export type uploadUrlsType = z.infer<typeof uploadUrlsSchema>
 
 // ============================================================================
 // Security Policy Error Schema

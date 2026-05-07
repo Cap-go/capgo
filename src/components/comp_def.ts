@@ -1,8 +1,6 @@
 import type { FunctionalComponent, Ref, ShallowRef } from 'vue'
 import type { ComposerTranslation } from 'vue-i18n'
 
-export type MobileColType = 'header' | 'title' | 'footer' | 'after' | 'none'
-
 export interface Stat {
   label: string | ComposerTranslation
   value: string | Ref<string> | number | Ref<number> | undefined

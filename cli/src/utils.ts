@@ -687,13 +687,6 @@ export async function isAllowedActionAppIdApiKey(supabase: SupabaseClient<Databa
   return !!data
 }
 
-export async function isAllowedApp(supabase: SupabaseClient<Database>, apikey: string, appId: string): Promise<boolean> {
-  const { data } = await supabase
-    .rpc('is_app_owner', { apikey, appid: appId })
-    .single()
-  return !!data
-}
-
 export enum OrganizationPerm {
   none = 0,
   read = 1,
@@ -1242,8 +1235,6 @@ export async function generateManifest(path: string): Promise<{ file: string, ha
 }
 
 export type manifestType = Awaited<ReturnType<typeof generateManifest>>
-export type { uploadUrlsType } from './schemas/common'
-
 export async function zipFile(filePath: string): Promise<Buffer> {
   if (osPlatform() === 'win32') {
     return zipFileWindows(filePath)
@@ -1479,57 +1470,6 @@ export function show2FADeniedError(organizationName?: string): never {
   throw new Error('2FA required for this organization')
 }
 
-export async function getOrganization(supabase: SupabaseClient<Database>, roles: string[]): Promise<Organization> {
-  const { error: orgError, data: allOrganizations } = await supabase
-    .rpc('get_orgs_v7')
-
-  if (orgError) {
-    log.error('Cannot get the list of organizations - exiting')
-    log.error(`Error ${JSON.stringify(orgError)}`)
-    throw new Error('Cannot get the list of organizations')
-  }
-
-  const normalizeRole = (role: string | null | undefined) => role?.replace(/^org_/, '') ?? ''
-  const normalizedRoles = roles.map(role => normalizeRole(role))
-  const adminOrgs = allOrganizations.filter(org => normalizedRoles.includes(normalizeRole(org.role)))
-
-  if (allOrganizations.length === 0) {
-    log.error('Could not get organization please create an organization first')
-    throw new Error('No organizations available')
-  }
-
-  if (adminOrgs.length === 0) {
-    log.error(`Could not find organization with roles: ${roles.join(' or ')} please create an organization or ask the admin to add you to the organization with this roles`)
-    throw new Error('Could not find organization with required roles')
-  }
-
-  const organizationUidRaw = (adminOrgs.length > 1)
-    ? await select({
-        message: 'Please pick the organization that you want to insert to',
-        options: adminOrgs.map((org) => {
-          const twoFaWarning = (org.enforcing_2fa && !org['2fa_has_access']) ? ' ⚠️ (2FA required)' : ''
-          return { value: org.gid, label: `${org.name}${twoFaWarning}` }
-        }),
-      })
-    : adminOrgs[0].gid
-
-  if (isCancel(organizationUidRaw)) {
-    log.error('Canceled organization selection, exiting')
-    throw new Error('Organization selection cancelled')
-  }
-
-  const organizationUid = organizationUidRaw as string
-  const organization = allOrganizations.find(org => org.gid === organizationUid)!
-
-  // Check 2FA compliance for selected organization
-  if (organization.enforcing_2fa && !organization['2fa_has_access']) {
-    show2FADeniedError(organization.name)
-  }
-
-  log.info(`Using the organization "${organization.name}" as the app owner`)
-  return organization
-}
-
 export async function filterOrgsByPermission(
   supabase: SupabaseClient<Database>,
   apikey: string,
@@ -1682,21 +1622,6 @@ export async function assertOrgPermission(
   await assertCliPermission(supabase, apikey, permissionKey, { orgId }, { message, silent })
 }
 
-export async function getAccessibleAppsForApiKey(
-  supabase: SupabaseClient<Database>,
-  apikey: string,
-): Promise<Database['public']['Tables']['apps']['Row'][]> {
-  const { data, error } = await supabase.rpc('get_accessible_apps_for_apikey_v2' as any, { apikey })
-
-  if (error) {
-    log.error('Cannot get accessible apps for API key')
-    log.error(formatError(error))
-    throw new Error('Cannot get accessible apps for API key')
-  }
-
-  return (data || []) as Database['public']['Tables']['apps']['Row'][]
-}
-
 export async function getOrganizationId(supabase: SupabaseClient<Database>, appId: string) {
   const { data, error } = await supabase.from('apps')
     .select('owner_org')
@@ -1709,27 +1634,6 @@ export async function getOrganizationId(supabase: SupabaseClient<Database>, appI
     throw new Error(`Cannot get organization id for app id ${appId}`)
   }
   return data.owner_org
-}
-
-export async function requireUpdateMetadata(supabase: SupabaseClient<Database>, channel: string, appId: string): Promise<boolean> {
-  const { data, error } = await supabase
-    .from('channels')
-    .select('disable_auto_update')
-    .eq('name', channel)
-    .eq('app_id', appId)
-    .limit(1)
-
-  if (error) {
-    log.error(`Cannot check if disableAutoUpdate is required ${formatError(error)}`)
-    throw new Error('Cannot check if disableAutoUpdate is required')
-  }
-
-  // Channel does not exist and the default is never 'version_number'
-  if (data.length === 0)
-    return false
-
-  const { disable_auto_update } = (data[0])
-  return disable_auto_update === 'version_number'
 }
 
 export function getHumanDate(createdA: string | null) {
