@@ -51,7 +51,17 @@
             "retry_delay": 30
           }
         ]
-      }
+      },
+      "routes": [
+        {
+          "pattern": "api.capgo.app/translation*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "api.usecapgo.com/translation*",
+          "zone_name": "usecapgo.com"
+        }
+      ]
     },
     "preprod": {
       "name": "capgo_translation-preprod",
@@ -87,7 +97,17 @@
             "retry_delay": 30
           }
         ]
-      }
+      },
+      "routes": [
+        {
+          "pattern": "api.preprod.capgo.app/translation*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "api.preprod.usecapgo.com/translation*",
+          "zone_name": "usecapgo.com"
+        }
+      ]
     },
     "alpha": {
       "name": "capgo_translation-alpha",
@@ -123,7 +143,17 @@
             "retry_delay": 30
           }
         ]
-      }
+      },
+      "routes": [
+        {
+          "pattern": "api.dev.capgo.app/translation*",
+          "zone_name": "capgo.app"
+        },
+        {
+          "pattern": "api.dev.usecapgo.com/translation*",
+          "zone_name": "usecapgo.com"
+        }
+      ]
     },
     "local": {
       "name": "capgo_translation-local",

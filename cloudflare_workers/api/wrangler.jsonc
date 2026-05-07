@@ -10,11 +10,17 @@
   "placement": {
     "mode": "smart"
   },
+  "ai": {
+    "binding": "AI"
+  },
   "workers_dev": false,
   "upload_source_maps": true,
   "env": {
     "prod": {
       "name": "capgo_api-prod",
+      "ai": {
+        "binding": "AI"
+      },
       "vars": {
         "ENV_NAME": "capgo_api-prod"
       },
@@ -64,18 +70,13 @@
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
-      ],
-      "queues": {
-        "producers": [
-          {
-            "binding": "TRANSLATION_MESSAGES_QUEUE",
-            "queue": "capgo-api-prod-translation-messages"
-          }
-        ]
-      }
+      ]
     },
     "preprod": {
       "name": "capgo_api-preprod",
+      "ai": {
+        "binding": "AI"
+      },
       "vars": {
         "ENV_NAME": "capgo_api-preprod"
       },
@@ -124,18 +125,13 @@
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
-      ],
-      "queues": {
-        "producers": [
-          {
-            "binding": "TRANSLATION_MESSAGES_QUEUE",
-            "queue": "capgo-api-preprod-translation-messages"
-          }
-        ]
-      }
+      ]
     },
     "alpha": {
       "name": "capgo_api-alpha",
+      "ai": {
+        "binding": "AI"
+      },
       "vars": {
         "ENV_NAME": "capgo_api-alpha"
       },
@@ -184,36 +180,16 @@
           "database_name": "capgo_prod_storeapps",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
-      ],
-      "queues": {
-        "producers": [
-          {
-            "binding": "TRANSLATION_MESSAGES_QUEUE",
-            "queue": "capgo-api-alpha-translation-messages"
-          }
-        ]
-      }
+      ]
     },
     "local": {
       "name": "capgo_api-local",
+      "ai": {
+        "binding": "AI"
+      },
       "vars": {
         "ENV_NAME": "capgo_api-local"
-      },
-      "queues": {
-        "producers": [
-          {
-            "binding": "TRANSLATION_MESSAGES_QUEUE",
-            "queue": "capgo-api-local-translation-messages"
-          }
-        ]
-      },
-      "d1_databases": [
-        {
-          "binding": "DB_STOREAPPS",
-          "database_name": "capgo_prod_storeapps",
-          "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
-        }
-      ]
+      }
     }
   }
 }
