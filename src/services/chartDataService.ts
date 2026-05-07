@@ -80,17 +80,3 @@ export async function useChartData(supabase: SupabaseClient, appId: string, from
   chartDataCache.value.set(cacheKey, finalData)
   return finalData
 }
-
-export function clearChartDataCache(appId?: string) {
-  if (!appId) {
-    chartDataCache.value.clear()
-    return
-  }
-
-  const keysToDelete: string[] = []
-  chartDataCache.value.forEach((_value, key) => {
-    if (key.startsWith(`${appId}|`))
-      keysToDelete.push(key)
-  })
-  keysToDelete.forEach(key => chartDataCache.value.delete(key))
-}
