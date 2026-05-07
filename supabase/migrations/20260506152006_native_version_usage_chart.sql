@@ -14,45 +14,10 @@ DROP POLICY IF EXISTS "Deny insert on device_usage" ON public.device_usage;
 DROP POLICY IF EXISTS "Deny update on device_usage" ON public.device_usage;
 DROP POLICY IF EXISTS "Deny delete on device_usage" ON public.device_usage;
 
-CREATE POLICY "Allow org members to select device_usage"
+CREATE POLICY "Disable for all"
 ON public.device_usage
-FOR SELECT
-TO authenticated, anon
-USING (
-    public.check_min_rights(
-        'read'::public.user_min_right,
-        public.get_identity_org_appid(
-            '{read,upload,write,all}'::public.key_mode[],
-            org_id::uuid,
-            app_id
-        ),
-        org_id::uuid,
-        app_id,
-        NULL::bigint
-    )
-);
-
-CREATE POLICY "Deny insert on device_usage"
-ON public.device_usage
-AS RESTRICTIVE
-FOR INSERT
-TO authenticated, anon
-WITH CHECK (false);
-
-CREATE POLICY "Deny update on device_usage"
-ON public.device_usage
-AS RESTRICTIVE
-FOR UPDATE
-TO authenticated, anon
 USING (false)
 WITH CHECK (false);
-
-CREATE POLICY "Deny delete on device_usage"
-ON public.device_usage
-AS RESTRICTIVE
-FOR DELETE
-TO authenticated, anon
-USING (false);
 
 CREATE OR REPLACE FUNCTION public.read_native_version_usage(
     p_app_id character varying,
@@ -66,12 +31,29 @@ RETURNS TABLE (
     devices bigint
 )
 LANGUAGE plpgsql
-SECURITY INVOKER
+SECURITY DEFINER
 SET search_path = ''
 AS $$
 BEGIN
     RETURN QUERY
-    WITH daily_version_usage AS (
+    WITH authorized_app AS (
+        SELECT apps.app_id
+        FROM public.apps
+        WHERE
+            apps.app_id = p_app_id
+            AND public.check_min_rights(
+                'read'::public.user_min_right,
+                public.get_identity_org_appid(
+                    '{read,upload,write,all}'::public.key_mode[],
+                    apps.owner_org,
+                    apps.app_id
+                ),
+                apps.owner_org,
+                apps.app_id,
+                NULL::bigint
+            )
+    ),
+    daily_version_usage AS (
         SELECT
             date_trunc('day', du.timestamp)::date AS usage_date,
             COALESCE(
@@ -85,12 +67,13 @@ BEGIN
             )::character varying AS usage_version_build,
             du.device_id
         FROM public.device_usage AS du
+        INNER JOIN authorized_app AS aa
+            ON aa.app_id = du.app_id
         LEFT JOIN public.devices AS d
             ON d.app_id = du.app_id
             AND d.device_id = du.device_id
         WHERE
-            du.app_id = p_app_id
-            AND du.timestamp >= p_period_start
+            du.timestamp >= p_period_start
             AND du.timestamp < p_period_end
     )
     SELECT
@@ -150,4 +133,4 @@ COMMENT ON FUNCTION public.read_native_version_usage(
     character varying,
     timestamp without time zone,
     timestamp without time zone
-) IS 'Authenticated aggregate for native version usage by platform.';
+) IS 'Authorized aggregate for native version usage by platform. Raw device_usage rows remain denied by RLS.';

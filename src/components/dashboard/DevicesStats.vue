@@ -707,15 +707,22 @@ watch(
 watch(
   () => [props.appId, props.usageKind] as const,
   async ([packageId, usageKind], old) => {
-    if (!packageId)
-      return
-
     const oldPackageId = old?.[0]
     const oldUsageKind = old?.[1]
-    const packageChanged = packageId !== oldPackageId || usageKind !== oldUsageKind
-    appId.value = packageId
+    const usageKindChanged = oldUsageKind !== undefined && usageKind !== oldUsageKind
 
-    if (packageChanged) {
+    if (!packageId && !usageKindChanged)
+      return
+
+    if (packageId)
+      appId.value = packageId
+
+    if (!activeAppId.value)
+      return
+
+    const packageChanged = !!packageId && packageId !== oldPackageId
+
+    if (packageChanged || usageKindChanged) {
       cachedBillingData.value = null
       cached30DayData.value = null
       await loadData(true)
