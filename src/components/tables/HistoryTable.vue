@@ -45,9 +45,9 @@ const props = defineProps<{
 }>()
 
 const canRollbackBundle = computedAsync(async () => {
-  if (!props.appId)
+  if (!props.appId || !props.channelId)
     return false
-  return await checkPermissions('channel.rollback_bundle', { appId: props.appId })
+  return await checkPermissions('channel.rollback_bundle', { appId: props.appId, channelId: props.channelId })
 }, false)
 
 const members = ref([] as ExtendedOrganizationMembers)

@@ -65,6 +65,10 @@ export async function setChannel(c: Context<MiddlewareKeyVariables>, body: SetCh
     throw simpleError('cannot_find_channel', 'Cannot find channel', { supabaseError: channelError })
   }
 
+  if (!(await checkPermission(c, 'channel.promote_bundle', { appId: body.app_id, channelId: body.channel_id }))) {
+    throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id, channel_id: body.channel_id })
+  }
+
   const effectiveApikey = apikey.key ?? c.get('capgkey')
   if (!effectiveApikey) {
     throw simpleError('cannot_set_bundle_to_channel', 'Cannot set bundle to channel', { error: 'Missing API key context for audit logging' })

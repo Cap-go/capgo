@@ -46,36 +46,43 @@ const selectedChannelForLink = ref<Database['public']['Tables']['channels']['Row
 const currentChannelAction = ref<'set' | 'open' | 'unlink' | null>(null)
 const channelSearchVal = ref('')
 const filteredChannels = ref<(Database['public']['Tables']['channels']['Row'])[]>([])
+const promotableChannelIds = ref<Set<number>>(new Set())
+
+function canPromoteChannel(channelId: number) {
+  return promotableChannelIds.value.has(channelId)
+}
+
+function getPromotableChannels() {
+  return channels.value.filter(channel => canPromoteChannel(channel.id))
+}
 
 // Watch for search changes
 watch(() => channelSearchVal.value, () => {
+  const promotableChannels = getPromotableChannels()
   if (channelSearchVal.value.trim()) {
-    filteredChannels.value = channels.value.filter(channel =>
+    filteredChannels.value = promotableChannels.filter(channel =>
       channel.name.toLowerCase().includes(channelSearchVal.value.toLowerCase()),
     )
   }
   else {
-    filteredChannels.value = channels.value
+    filteredChannels.value = promotableChannels
   }
 })
 
 // Update filtered channels when channels change
-watch(() => channels.value, () => {
+watch([() => channels.value, () => promotableChannelIds.value], () => {
+  const promotableChannels = getPromotableChannels()
   if (channelSearchVal.value.trim()) {
-    filteredChannels.value = channels.value.filter(channel =>
+    filteredChannels.value = promotableChannels.filter(channel =>
       channel.name.toLowerCase().includes(channelSearchVal.value.toLowerCase()),
     )
   }
   else {
-    filteredChannels.value = channels.value
+    filteredChannels.value = promotableChannels
   }
 }, { immediate: true })
 
-const canPromoteBundle = computedAsync(async () => {
-  if (!version.value?.app_id)
-    return false
-  return await checkPermissions('channel.promote_bundle', { appId: version.value.app_id })
-}, false)
+const canPromoteBundle = computed(() => promotableChannelIds.value.size > 0)
 
 const canDeleteBundle = computedAsync(async () => {
   if (!version.value?.app_id)
@@ -121,13 +128,19 @@ async function getChannels() {
   if (!version.value)
     return
   channel.value = undefined
+  const appId = version.value.app_id
   const { data: dataChannel } = await supabase
     .from('channels')
     .select()
-    .eq('app_id', version.value.app_id)
+    .eq('app_id', appId)
     // .eq('version', version.value.id)
     .order('updated_at', { ascending: false })
   channels.value = dataChannel || channels.value
+  const channelPermissions = await Promise.all(channels.value.map(async (channel) => {
+    const allowed = await checkPermissions('channel.promote_bundle', { appId, channelId: channel.id })
+    return { channelId: channel.id, allowed }
+  }))
+  promotableChannelIds.value = new Set(channelPermissions.filter(result => result.allowed).map(result => result.channelId))
   showBundleMetadataInput.value = !!channels.value.find(c => c.disable_auto_update === 'version_number')
 }
 
@@ -166,6 +179,11 @@ async function getUnknownBundleId() {
 }
 // add check compatibility here
 async function setChannel(channel: Database['public']['Tables']['channels']['Row'], id: number) {
+  if (!canPromoteChannel(channel.id)) {
+    toast.error(t('no-permission'))
+    return Promise.reject(new Error('No permission'))
+  }
+
   if (!id || typeof id !== 'number') {
     console.error('Invalid version ID:', id)
     toast.error(t('error-invalid-version'))
@@ -191,7 +209,7 @@ async function ASChannelChooser() {
   selectedChannelForLink.value = null
   currentChannelAction.value = 'set'
   channelSearchVal.value = ''
-  filteredChannels.value = channels.value
+  filteredChannels.value = getPromotableChannels()
 
   dialogStore.openDialog({
     title: t('channel-linking'),
@@ -221,6 +239,11 @@ async function ASChannelChooser() {
 async function handleChannelLink(chan: Database['public']['Tables']['channels']['Row']) {
   if (!version.value)
     return
+  if (!canPromoteChannel(chan.id)) {
+    toast.error(t('no-permission'))
+    return
+  }
+
   try {
     const {
       finalCompatibility,
@@ -1104,7 +1127,7 @@ async function deleteBundle() {
 
           <!-- Unlink Channel (if user has permissions) -->
           <div
-            v-if="canPromoteBundle"
+            v-if="selectedChannelForLink && canPromoteChannel(selectedChannelForLink.id)"
             class="p-3 border border-red-300 rounded-lg cursor-pointer dark:border-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
             @click="handleChannelAction('unlink')"
           >
