@@ -34,9 +34,9 @@ BEGIN
       IF NOT (v_api_key.mode = ANY('{read,upload,write,all}'::public.key_mode[])) THEN
         RETURN v_allowed;
       END IF;
-
-      v_user_id := v_api_key.user_id;
     END IF;
+
+    v_user_id := v_api_key.user_id;
   END IF;
 
   WITH candidate_apps AS (
