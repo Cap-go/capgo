@@ -213,5 +213,5 @@ export async function recordUpdateEnumerationMiss(c: Context, appId: string): Pr
 }
 
 export function updateEnumerationLimitedResponse(c: Context) {
-  return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
+  return c.json({ error: 'on_premise_app' }, 429)
 }
