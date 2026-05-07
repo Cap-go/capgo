@@ -1185,7 +1185,6 @@ The build will be processed and sent directly to app stores.
     after build completion. Build outputs may optionally be uploaded for time-limited download links.
 📋 PREREQUISITE: Save credentials first with:
    `npx @capgo/cli build credentials save --appId <app-id> --platform <ios|android>`
-If you omit `--platform` in an interactive terminal, the CLI asks whether to build iOS or Android.
 
 **Example:**
 
@@ -1199,7 +1198,7 @@ npx @capgo/cli@latest build request com.example.app --platform ios --path .
 | -------------- | ------------- | -------------------- |
 | **--path** | <code>string</code> | Path to the project directory to build (default: current directory) |
 | **--node-modules** | <code>string</code> | Paths to node_modules directories for monorepos (comma-separated) |
-| **--platform** | <code>string</code> | Target platform: ios or android. In an interactive terminal, omit it to choose from a prompt. Non-interactive runs must pass it explicitly. |
+| **--platform** | <code>string</code> | Target platform: ios or android (required) |
 | **--build-mode** | <code>string</code> | Build mode: debug or release (default: release) |
 | **--build-certificate-base64** | <code>string</code> | iOS: Base64-encoded .p12 certificate |
 | **--p12-password** | <code>string</code> | iOS: Certificate password (optional if cert has no password) |
