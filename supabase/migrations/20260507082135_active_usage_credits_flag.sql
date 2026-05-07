@@ -84,6 +84,15 @@ GRANT EXECUTE
 ON FUNCTION public.sync_org_has_usage_credits_from_grants()
 TO service_role;
 
+DROP TRIGGER IF EXISTS trg_sync_org_has_usage_credits
+ON public.usage_credit_grants;
+
+CREATE TRIGGER trg_sync_org_has_usage_credits
+AFTER INSERT OR UPDATE OR DELETE
+ON public.usage_credit_grants
+FOR EACH ROW
+EXECUTE FUNCTION public.sync_org_has_usage_credits_from_grants();
+
 SELECT public.refresh_orgs_has_usage_credits();
 
 UPDATE public.cron_tasks
