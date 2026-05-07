@@ -18,12 +18,14 @@ function clampToToday(date: Date): Date {
   return date > today ? today : date
 }
 
-function buildCacheKey(appId: string, from: Date, to: Date) {
-  return `${appId}|${formatDateParam(from)}|${formatDateParam(to)}`
+type VersionUsageKind = 'bundle' | 'native'
+
+function buildCacheKey(appId: string, from: Date, to: Date, kind: VersionUsageKind) {
+  return `${appId}|${kind}|${formatDateParam(from)}|${formatDateParam(to)}`
 }
 
-export async function useChartData(supabase: SupabaseClient, appId: string, from: Date, to: Date) {
-  const cacheKey = buildCacheKey(appId, from, to)
+export async function useChartData(supabase: SupabaseClient, appId: string, from: Date, to: Date, kind: VersionUsageKind = 'bundle') {
+  const cacheKey = buildCacheKey(appId, from, to, kind)
 
   if (chartDataCache.value.has(cacheKey))
     return chartDataCache.value.get(cacheKey)
@@ -32,7 +34,8 @@ export async function useChartData(supabase: SupabaseClient, appId: string, from
   const clampedTo = clampToToday(to)
   const fromParam = formatDateParam(from)
   const toParam = formatDateParam(clampedTo)
-  const { error, data } = await supabase.functions.invoke(`statistics/app/${appId}/bundle_usage?from=${fromParam}&to=${toParam}`, {
+  const usagePath = kind === 'native' ? 'native_usage' : 'bundle_usage'
+  const { error, data } = await supabase.functions.invoke(`statistics/app/${appId}/${usagePath}?from=${fromParam}&to=${toParam}`, {
     method: 'GET',
   })
   if (error)

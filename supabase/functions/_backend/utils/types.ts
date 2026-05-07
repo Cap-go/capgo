@@ -57,6 +57,13 @@ export interface VersionUsage {
   uninstall: number
 }
 
+export interface NativeVersionUsage {
+  date: string
+  platform: string
+  version_build: string
+  devices: number
+}
+
 export interface ReadDevicesParams {
   app_id: string
   version_name?: string | undefined

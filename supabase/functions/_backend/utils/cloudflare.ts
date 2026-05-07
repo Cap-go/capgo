@@ -2,7 +2,7 @@ import type { AnalyticsEngineDataPoint, D1Database, Hyperdrive } from '@cloudfla
 import type { Context } from 'hono'
 import type { DeviceComparable } from './deviceComparison.ts'
 import type { Database } from './supabase.types.ts'
-import type { DeviceRes, DeviceWithoutCreatedAt, ReadDevicesParams, ReadStatsParams, VersionUsage } from './types.ts'
+import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevicesParams, ReadStatsParams, VersionUsage } from './types.ts'
 import dayjs from 'dayjs'
 import { CacheHelper } from './cache.ts'
 import { hasComparableDeviceChanged, toComparableDevice } from './deviceComparison.ts'
@@ -61,6 +61,22 @@ const TRACK_DEVICE_USAGE_CACHE_PATH = '/.track-device-usage-cache'
 // Cache per device per day to ensure rolling windows still see active devices.
 const TRACK_DEVICE_USAGE_CACHE_MAX_AGE_SECONDS = 2 * 24 * 60 * 60
 
+function normalizeUsagePlatform(platform?: string | null) {
+  return platform?.trim().toLowerCase() || 'unknown'
+}
+
+function getUsagePlatformValue(platform?: string | null) {
+  const normalized = normalizeUsagePlatform(platform)
+  if (normalized === 'ios')
+    return 1
+  if (normalized === 'electron')
+    return 2
+  if (normalized === 'android')
+    return 0
+
+  return -1
+}
+
 /**
  * Track device usage (MAU) in Cloudflare Analytics Engine
  *
@@ -79,9 +95,12 @@ const TRACK_DEVICE_USAGE_CACHE_MAX_AGE_SECONDS = 2 * 24 * 60 * 60
  * @param org_id - Organization identifier (optional, defaults to empty string)
  * @param platform - Device platform ('ios' or 'android')
  */
-export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: string, org_id: string, platform: string) {
+export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: string, org_id: string, platform: string, version_build?: string | null) {
   if (!c.env.DEVICE_USAGE)
     return
+
+  const normalizedPlatform = normalizeUsagePlatform(platform)
+  const normalizedVersionBuild = version_build || 'unknown'
 
   try {
     const usageCache = new CacheHelper(c)
@@ -89,38 +108,38 @@ export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: 
       app_id,
       device_id,
       day: dayjs().format('YYYY-MM-DD'),
+      platform: normalizedPlatform,
+      version_build: normalizedVersionBuild,
     })
 
-    // Check if device was already tracked within the cache period (29 days)
+    // Check if device/version was already tracked for the current day
     if (usageCache.available) {
       const cachedUsage = await usageCache.matchJson<{ t: number }>(usageCacheRequest)
       if (cachedUsage) {
-        // Device already tracked within 29 days, skip write
+        // Device/version already tracked for this day, skip write
         return
       }
     }
 
-    // Platform: 0 = android, 1 = ios
-    const platformValue = platform?.toLowerCase() === 'ios' ? 1 : 0
+    const platformValue = getUsagePlatformValue(normalizedPlatform)
 
     // Write to Analytics Engine
     c.env.DEVICE_USAGE.writeDataPoint({
-      blobs: [device_id, org_id],
+      blobs: [device_id, org_id, normalizedVersionBuild, normalizedPlatform],
       doubles: [platformValue],
       indexes: [app_id],
     })
 
-    // Cache the write for 29 days
+    // Cache the write for this native version during the current day
     if (usageCache.available) {
       await usageCache.putJson(usageCacheRequest, { t: Date.now() }, TRACK_DEVICE_USAGE_CACHE_MAX_AGE_SECONDS)
     }
   }
   catch {
-    // Platform: 0 = android, 1 = ios
-    const platformValue = platform?.toLowerCase() === 'ios' ? 1 : 0
+    const platformValue = getUsagePlatformValue(normalizedPlatform)
     // On error, still try to write to Analytics Engine without caching
     c.env.DEVICE_USAGE.writeDataPoint({
-      blobs: [device_id, org_id],
+      blobs: [device_id, org_id, normalizedVersionBuild, normalizedPlatform],
       doubles: [platformValue],
       indexes: [app_id],
     })
@@ -507,6 +526,33 @@ ORDER BY date`
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading version usage', error: serializeError(e), query })
+  }
+  return []
+}
+
+export async function readNativeVersionUsageCF(c: Context, app_id: string, period_start: string, period_end: string): Promise<NativeVersionUsage[]> {
+  if (!c.env.DEVICE_USAGE)
+    return []
+
+  const query = `SELECT
+  formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
+  multiIf(blob4 != '', blob4, double1 = 1, 'ios', double1 = 2, 'electron', double1 = 0, 'android', 'unknown') AS platform,
+  if(blob3 = '', 'unknown', blob3) AS version_build,
+  COUNT(DISTINCT blob1) AS devices
+FROM device_usage
+WHERE
+  index1 = '${escapeSqlString(app_id)}'
+  AND timestamp >= toDateTime('${formatDateCF(period_start)}')
+  AND timestamp < toDateTime('${formatDateCF(period_end)}')
+GROUP BY date, platform, version_build
+ORDER BY date, platform, version_build`
+
+  cloudlog({ requestId: c.get('requestId'), message: 'readNativeVersionUsageCF query', query })
+  try {
+    return await runQueryToCFA<NativeVersionUsage>(c, query)
+  }
+  catch (e) {
+    cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading native version usage', error: serializeError(e), query })
   }
   return []
 }

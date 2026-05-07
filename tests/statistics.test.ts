@@ -136,6 +136,57 @@ describe('[GET] /statistics operations with and without subkey', () => {
     expect(bundleUsageData).toHaveProperty('datasets')
   })
 
+  it('should get native version usage statistics without subkey', async () => {
+    const prefix = `native-version-${randomUUID()}`
+    const fromDate = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const toDate = new Date().toISOString().split('T')[0]
+    const timestamp = `${fromDate}T12:00:00.000Z`
+    const versionA = `${prefix}-1.0.0`
+    const versionB = `${prefix}-1.1.0`
+    const iosLabel = `iOS ${versionA}`
+    const androidLabel = `Android ${versionA}`
+    const electronLabel = `Electron ${versionB}`
+
+    await getSupabaseClient()
+      .from('device_usage')
+      .insert([
+        { app_id: APPNAME, device_id: `${prefix}-a`, org_id: ORG_ID_STATS, platform: 'ios', timestamp, version_build: versionA },
+        { app_id: APPNAME, device_id: `${prefix}-a`, org_id: ORG_ID_STATS, platform: 'ios', timestamp, version_build: versionA },
+        { app_id: APPNAME, device_id: `${prefix}-b`, org_id: ORG_ID_STATS, platform: 'android', timestamp, version_build: versionA },
+        { app_id: APPNAME, device_id: `${prefix}-c`, org_id: ORG_ID_STATS, platform: 'electron', timestamp, version_build: versionB },
+      ])
+      .throwOnError()
+
+    try {
+      const getNativeUsage = await fetch(`${BASE_URL}/statistics/app/${APPNAME}/native_usage?from=${fromDate}&to=${toDate}`, {
+        method: 'GET',
+        headers: headersStats,
+      })
+      expect(getNativeUsage.status).toBe(200)
+      const nativeUsageData = await getNativeUsage.json() as { labels: string[], datasets: Array<{ label: string, metaCounts: number[] }> }
+      expect(nativeUsageData).toHaveProperty('labels')
+      expect(nativeUsageData).toHaveProperty('datasets')
+
+      if (process.env.USE_CLOUDFLARE_WORKERS !== 'true') {
+        const dayIndex = nativeUsageData.labels.indexOf(fromDate)
+        const iosVersion = nativeUsageData.datasets.find(dataset => dataset.label === iosLabel)
+        const androidVersion = nativeUsageData.datasets.find(dataset => dataset.label === androidLabel)
+        const electronVersion = nativeUsageData.datasets.find(dataset => dataset.label === electronLabel)
+        expect(dayIndex).toBeGreaterThanOrEqual(0)
+        expect(iosVersion?.metaCounts[dayIndex]).toBe(1)
+        expect(androidVersion?.metaCounts[dayIndex]).toBe(1)
+        expect(electronVersion?.metaCounts[dayIndex]).toBe(1)
+      }
+    }
+    finally {
+      await getSupabaseClient()
+        .from('device_usage')
+        .delete()
+        .like('device_id', `${prefix}%`)
+        .throwOnError()
+    }
+  })
+
   it('should create app and subkey with limited rights', async () => {
     // Create a subkey with limited rights to this app
     const createSubkey = await fetch(`${BASE_URL}/apikey`, {
@@ -247,6 +298,20 @@ describe('[GET] /statistics operations with and without subkey', () => {
     const bundleUsageData = await getBundleUsage.json()
     expect(bundleUsageData).toHaveProperty('labels')
     expect(bundleUsageData).toHaveProperty('datasets')
+  })
+
+  it('should get native version usage statistics with subkey', async () => {
+    const subkeyHeaders = { 'x-limited-key-id': String(subkeyId) }
+    const fromDate = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    const toDate = new Date().toISOString().split('T')[0]
+    const getNativeUsage = await fetch(`${BASE_URL}/statistics/app/${APPNAME}/native_usage?from=${fromDate}&to=${toDate}`, {
+      method: 'GET',
+      headers: { ...headersStats, ...subkeyHeaders },
+    })
+    expect(getNativeUsage.status).toBe(200)
+    const nativeUsageData = await getNativeUsage.json()
+    expect(nativeUsageData).toHaveProperty('labels')
+    expect(nativeUsageData).toHaveProperty('datasets')
   })
 
   it('should fail to get app statistics with subkey for app not belonging to user', async () => {
