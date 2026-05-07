@@ -159,9 +159,9 @@ SELECT
 
 SELECT
     is(
-        to_regprocedure('public.get_accessible_apps_for_apikey_v2(text)'),
-        NULL::regprocedure,
-        'legacy apikey app listing RPC stays removed'
+        to_regprocedure('public.get_accessible_apps_for_apikey_v2(text)') IS NULL,
+        true,
+        'deprecated app enumeration RPC is removed'
     );
 
 INSERT INTO storage.objects (bucket_id, name)
@@ -205,6 +205,7 @@ SELECT
         false,
         'anon cannot use cli_check_permission with only an apikey argument'
     );
+
 
 DO $$
 BEGIN
@@ -250,6 +251,7 @@ SELECT
         'anon can use cli_check_permission when apikey matches capgkey header'
     );
 
+
 SELECT
     is(
         public.cli_check_permission(
@@ -262,6 +264,7 @@ SELECT
         false,
         'anon cannot use cli_check_permission when apikey argument differs from capgkey header'
     );
+
 
 DO $$
 BEGIN
