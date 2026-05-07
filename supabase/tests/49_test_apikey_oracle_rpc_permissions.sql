@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(26);
+SELECT plan(24);
 
 SELECT
     is(
@@ -157,6 +157,13 @@ SELECT
         || ' get_org_perm_for_apikey(text, text)'
     );
 
+SELECT
+    is(
+        to_regprocedure('public.get_accessible_apps_for_apikey_v2(text)') IS NULL,
+        true,
+        'deprecated app enumeration RPC is removed'
+    );
+
 INSERT INTO storage.objects (bucket_id, name)
 VALUES (
     'apps',
@@ -199,17 +206,6 @@ SELECT
         'anon cannot use cli_check_permission with only an apikey argument'
     );
 
-SELECT
-    is(
-        (
-            SELECT count(*)
-            FROM public.get_accessible_apps_for_apikey_v2(
-                'ae6e7458-c46d-4c00-aa3b-153b0b8520ea'
-            )
-        ),
-        0::bigint,
-        'anon cannot enumerate apps with only an apikey argument'
-    );
 
 DO $$
 BEGIN
@@ -255,16 +251,6 @@ SELECT
         'anon can use cli_check_permission when apikey matches capgkey header'
     );
 
-SELECT
-    ok(
-        (
-            SELECT count(*) > 0
-            FROM public.get_accessible_apps_for_apikey_v2(
-                'ae6e7458-c46d-4c00-aa3b-153b0b8520ea'
-            )
-        ),
-        'anon can list accessible apps when apikey matches capgkey header'
-    );
 
 SELECT
     is(
@@ -279,15 +265,6 @@ SELECT
         'anon cannot use cli_check_permission when apikey argument differs from capgkey header'
     );
 
-SELECT
-    is(
-        (
-            SELECT count(*)
-            FROM public.get_accessible_apps_for_apikey_v2('different-key')
-        ),
-        0::bigint,
-        'anon cannot list accessible apps when apikey argument differs from capgkey header'
-    );
 
 DO $$
 BEGIN
