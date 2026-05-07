@@ -60,14 +60,10 @@ async function findCanonicalAuthUserIdByEmail(pgClient: ReturnType<typeof getPgC
         ) then 0 else 1 end,
         au.created_at asc,
         au.id asc
-      limit 2
+      limit 1
     `,
     [email, excludedUserId, trustedProviders],
   )
-
-  if (result.rows.length > 1) {
-    throw new Error('ambiguous_existing_auth_users')
-  }
 
   return result.rows[0]?.id ?? null
 }
@@ -303,6 +299,162 @@ async function ensurePublicUserRowExists(
   }
 }
 
+async function ensurePublicUserRowExistsInTransaction(
+  pgClient: ReturnType<typeof getPgClient>,
+  requestId: string,
+  user: PublicUserSeed,
+): Promise<void> {
+  try {
+    await pgClient.query(
+      `
+        insert into public.users (id, email, first_name, last_name, enable_notifications, opt_for_newsletters)
+        values ($1, $2, $3, $4, true, true)
+        on conflict (id) do update
+        set email = excluded.email
+        where public.users.email is distinct from excluded.email
+      `,
+      [user.id, user.email, user.first_name, user.last_name],
+    )
+  }
+  catch (error) {
+    cloudlogErr({ requestId, message: 'Failed to sync public.users row during SSO merge transaction', userId: user.id, email: user.email, error })
+    throw new Error('public_user_sync_failed')
+  }
+}
+
+async function ensureOrgMembershipInTransaction(
+  pgClient: ReturnType<typeof getPgClient>,
+  requestId: string,
+  userId: string,
+  orgId: string,
+  fallbackRole: Exclude<OrgMembershipRight, `invite_${string}`> = 'read',
+): Promise<void> {
+  const promoteExistingInvite = async (membershipId: string, currentRight: OrgMembershipRight | null) => {
+    if (!isInviteRole(currentRight)) {
+      return
+    }
+
+    const promotedRole = promoteInviteRole(currentRight)
+    await pgClient.query(
+      `
+        update public.org_users
+        set user_right = $1
+        where id = $2
+      `,
+      [promotedRole, membershipId],
+    )
+  }
+
+  try {
+    const existingMembership = await pgClient.query<{ id: string, user_right: OrgMembershipRight | null }>(
+      `
+        select id, user_right
+        from public.org_users
+        where user_id = $1
+          and org_id = $2
+        for update
+      `,
+      [userId, orgId],
+    )
+
+    const existing = existingMembership.rows[0]
+    if (existing) {
+      await promoteExistingInvite(existing.id, existing.user_right)
+      return
+    }
+
+    const insertedMembership = await pgClient.query(
+      `
+        insert into public.org_users (user_id, org_id, user_right)
+        values ($1, $2, $3)
+        on conflict do nothing
+      `,
+      [userId, orgId, fallbackRole],
+    )
+
+    if ((insertedMembership.rowCount ?? 0) > 0) {
+      return
+    }
+
+    const racedMembership = await pgClient.query<{ id: string, user_right: OrgMembershipRight | null }>(
+      `
+        select id, user_right
+        from public.org_users
+        where user_id = $1
+          and org_id = $2
+        for update
+      `,
+      [userId, orgId],
+    )
+
+    const raced = racedMembership.rows[0]
+    if (raced) {
+      await promoteExistingInvite(raced.id, raced.user_right)
+      return
+    }
+
+    throw new Error('membership_insert_failed')
+  }
+  catch (error) {
+    cloudlogErr({ requestId, message: 'Failed to ensure org membership during SSO merge transaction', userId, orgId, fallbackRole, error })
+    throw new Error('provision_failed')
+  }
+}
+
+async function mergeSsoIdentityWithExistingAccount(
+  pgClient: ReturnType<typeof getPgClient>,
+  requestId: string,
+  params: {
+    originalUserId: string
+    duplicateUserId: string
+    publicUser: PublicUserSeed
+    orgId: string
+    authorizedSsoProviders: string[]
+    enforceSso: boolean
+  },
+): Promise<void> {
+  await pgClient.query('begin')
+  try {
+    let transferredIdentityCount = 0
+    try {
+      transferredIdentityCount = await transferSsoIdentities(pgClient, params.originalUserId, params.duplicateUserId, params.authorizedSsoProviders)
+    }
+    catch (identityTransferError) {
+      cloudlogErr({ requestId, message: 'Failed to transfer SSO identity during merge', userId: params.duplicateUserId, originalUserId: params.originalUserId, error: identityTransferError })
+      throw new Error('identity_transfer_failed')
+    }
+
+    if (transferredIdentityCount === 0) {
+      cloudlogErr({ requestId, message: 'No SSO identities were transferred during merge', userId: params.duplicateUserId, originalUserId: params.originalUserId })
+      throw new Error('identity_transfer_failed')
+    }
+
+    await ensurePublicUserRowExistsInTransaction(pgClient, requestId, params.publicUser)
+    await ensureOrgMembershipInTransaction(pgClient, requestId, params.originalUserId, params.orgId)
+
+    if (params.enforceSso) {
+      try {
+        await setAuthUserSsoOnly(pgClient, params.originalUserId)
+      }
+      catch (ssoFlagError) {
+        cloudlogErr({ requestId, message: 'Failed to set is_sso_user on original user during merge', originalUserId: params.originalUserId, error: ssoFlagError })
+        throw new Error('sso_flag_update_failed')
+      }
+    }
+
+    await pgClient.query('commit')
+  }
+  catch (error) {
+    try {
+      await pgClient.query('rollback')
+    }
+    catch (rollbackError) {
+      cloudlogErr({ requestId, message: 'Failed to roll back SSO merge transaction', userId: params.duplicateUserId, originalUserId: params.originalUserId, error: rollbackError })
+    }
+    throw error
+  }
+}
+
 app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
   const auth = c.get('auth')
   if (!auth) {
@@ -359,41 +511,23 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       return quickError(400, 'invalid_email', 'User email has no domain')
     }
 
-    // Detect pre-existing user with the same email (different UUID).
+    // Detect pre-existing auth identity with the same trusted email (different UUID).
     // This happens when SSO is enabled for a domain where users already had email/password accounts.
     // Supabase Auth creates a new auth.users record instead of linking — we fix this by merging.
     //
-    // Security note: the email match only selects a merge candidate. The merge must not proceed
-    // until the domain's active SSO provider is resolved and matched against the provider that
-    // authenticated this session; a valid SAML signature alone does not prove email-domain control.
-    const { data: existingUser, error: existingUserError } = await (admin as any)
-      .from('users')
-      .select('id')
-      .eq('email', userEmail)
-      .neq('id', userId)
-      .maybeSingle()
-
-    if (existingUserError) {
-      cloudlogErr({ requestId, message: 'Failed to check for pre-existing user by email', userId, email: userEmail, error: existingUserError })
-      return quickError(500, 'user_lookup_failed', 'Failed to check for existing user')
+    // Security note: never resolve the merge candidate from public.users.email. That profile
+    // column is user-editable; only auth.users.email and the current verified SSO session are
+    // trusted identity sources for account linking.
+    let resolvedExistingUserId: string | null = null
+    try {
+      resolvedExistingUserId = await findCanonicalAuthUserIdByEmail(getSharedPgClient(), userEmail, userId, trustedSsoProviders)
+      if (resolvedExistingUserId) {
+        cloudlog({ requestId, message: 'Canonical pre-existing auth account found — will merge SSO identity after provider authorization', userId, originalUserId: resolvedExistingUserId, email: userEmail })
+      }
     }
-
-    // Fallback: check auth.users directly in case the existing account has no public.users row yet.
-    // This covers cases where the original user authenticated via SSO (with a now-deleted provider)
-    // and their public.users was never created, or was cleaned up.
-    let resolvedExistingUserId: string | null = existingUser?.id ?? null
-    if (!resolvedExistingUserId) {
-      try {
-        const existingAuthUserId = await findCanonicalAuthUserIdByEmail(getSharedPgClient(), userEmail, userId, trustedSsoProviders)
-        if (existingAuthUserId) {
-          cloudlog({ requestId, message: 'Canonical pre-existing auth account found (no public.users row yet) — will merge SSO identity', userId, originalUserId: existingAuthUserId, email: userEmail })
-          resolvedExistingUserId = existingAuthUserId
-        }
-      }
-      catch (existingAuthUserError) {
-        cloudlogErr({ requestId, message: 'Failed to check auth.users for pre-existing account by email', userId, email: userEmail, error: existingAuthUserError })
-        return quickError(500, 'user_lookup_failed', 'Failed to resolve existing account for SSO merge')
-      }
+    catch (existingAuthUserError) {
+      cloudlogErr({ requestId, message: 'Failed to check auth.users for pre-existing account by email', userId, email: userEmail, error: existingAuthUserError })
+      return quickError(500, 'user_lookup_failed', 'Failed to resolve existing account for SSO merge')
     }
 
     if (resolvedExistingUserId) {
@@ -429,47 +563,38 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
         return quickError(403, 'provider_mismatch', 'SSO provider does not match the email domain provider')
       }
 
+      // Step 2: Transfer the SSO identity and provision the merged account atomically.
       try {
-        await ensurePublicUserRowExists(admin, requestId, {
-          ...publicUserSeed,
-          id: originalUserId,
+        await mergeSsoIdentityWithExistingAccount(getSharedPgClient(), requestId, {
+          originalUserId,
+          duplicateUserId: userId,
+          publicUser: {
+            ...publicUserSeed,
+            id: originalUserId,
+          },
+          orgId: mergeProvider.org_id,
+          authorizedSsoProviders,
+          enforceSso: mergeProvider?.enforce_sso === true,
         })
       }
-      catch {
-        return quickError(500, 'public_user_sync_failed', 'Failed to create user profile for merged SSO account')
-      }
-
-      try {
-        await ensureOrgMembership(admin, requestId, originalUserId, mergeProvider.org_id)
-      }
-      catch {
-        return quickError(500, 'provision_failed', 'Failed to provision user to organization')
-      }
-
-      // Step 2: Transfer SSO identity from duplicate user (userId) → original user (originalUserId)
-      try {
-        const transferredIdentityCount = await transferSsoIdentities(getSharedPgClient(), originalUserId, userId, authorizedSsoProviders)
-        if (transferredIdentityCount === 0) {
-          cloudlogErr({ requestId, message: 'No SSO identities were transferred during merge', userId, originalUserId })
-          return quickError(500, 'identity_transfer_failed', 'Failed to merge SSO identity with existing account')
+      catch (mergeError) {
+        if (mergeError instanceof Error) {
+          if (mergeError.message === 'identity_transfer_failed') {
+            return quickError(500, 'identity_transfer_failed', 'Failed to merge SSO identity with existing account')
+          }
+          if (mergeError.message === 'public_user_sync_failed') {
+            return quickError(500, 'public_user_sync_failed', 'Failed to create user profile for merged SSO account')
+          }
+          if (mergeError.message === 'provision_failed') {
+            return quickError(500, 'provision_failed', 'Failed to provision user to organization')
+          }
+          if (mergeError.message === 'sso_flag_update_failed') {
+            return quickError(500, 'sso_flag_update_failed', 'Failed to enforce SSO on merged account')
+          }
         }
-      }
-      catch (identityTransferError) {
-        cloudlogErr({ requestId, message: 'Failed to transfer SSO identity during merge', userId, originalUserId, error: identityTransferError })
-        return quickError(500, 'identity_transfer_failed', 'Failed to merge SSO identity with existing account')
-      }
 
-      // Step 2b: Mark the merged account as SSO-only immediately when enforce_sso is active.
-      // Provider updates sync auth.users.is_sso_user by domain when enforcement changes later,
-      // so this write reflects the current provider state instead of becoming permanently sticky.
-      if (mergeProvider?.enforce_sso === true) {
-        try {
-          await setAuthUserSsoOnly(getSharedPgClient(), originalUserId)
-        }
-        catch (ssoFlagError) {
-          cloudlogErr({ requestId, message: 'Failed to set is_sso_user on original user during merge', originalUserId, error: ssoFlagError })
-          return quickError(500, 'sso_flag_update_failed', 'Failed to enforce SSO on merged account')
-        }
+        cloudlogErr({ requestId, message: 'Failed to complete SSO merge transaction', userId, originalUserId, error: mergeError })
+        return quickError(500, 'merge_failed', 'Failed to merge SSO account')
       }
 
       // Step 3: Delete the duplicate auth user (cascades to public.users, orgs, org_users)
