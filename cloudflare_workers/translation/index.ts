@@ -177,34 +177,45 @@ function getTranslationModel(env: TranslationWorkerBindings) {
   return env.TRANSLATION_MODEL || DEFAULT_TRANSLATION_MODEL
 }
 
-function getTargetLanguageName(targetLanguage: string) {
-  return LANGUAGE_NAMES[targetLanguage] ?? targetLanguage
+function targetLanguageLabel(targetLanguage: string) {
+  const label = LANGUAGE_NAMES[targetLanguage]
+  return typeof label === 'string' ? label : targetLanguage
 }
 
 async function sha256Hex(value: string) {
-  const buffer = new TextEncoder().encode(value)
-  const digest = await crypto.subtle.digest('SHA-256', buffer)
-  return Array.from(new Uint8Array(digest))
-    .map(byte => byte.toString(16).padStart(2, '0'))
-    .join('')
+  const data = new TextEncoder().encode(value)
+  const hash = await crypto.subtle.digest('SHA-256', data)
+  let encoded = ''
+  for (const byte of new Uint8Array(hash))
+    encoded += byte.toString(16).padStart(2, '0')
+  return encoded
 }
 
 function recordOf(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null
+  if (value === null || typeof value !== 'object' || Array.isArray(value))
+    return null
+  return value as Record<string, unknown>
 }
 
 function extractContentText(content: unknown): string {
   if (typeof content === 'string')
     return content
-  if (!Array.isArray(content))
-    return ''
 
-  return content.map((item) => {
-    if (typeof item === 'string')
-      return item
-    const itemRecord = recordOf(item)
-    return typeof itemRecord?.text === 'string' ? itemRecord.text : ''
-  }).join('')
+  const parts: string[] = []
+  if (Array.isArray(content)) {
+    for (const item of content) {
+      if (typeof item === 'string') {
+        parts.push(item)
+      }
+      else {
+        const itemRecord = recordOf(item)
+        if (typeof itemRecord?.text === 'string') {
+          parts.push(itemRecord.text)
+        }
+      }
+    }
+  }
+  return parts.join('')
 }
 
 function extractAiFieldText(value: unknown): string {
@@ -254,57 +265,75 @@ function extractAiText(result: unknown): string {
   return ''
 }
 
+function stringMapFromRecord(record: Record<string, unknown> | null): Record<string, string> | null {
+  if (!record)
+    return null
+
+  const output: Record<string, string> = {}
+  for (const [key, entry] of Object.entries(record)) {
+    if (typeof entry !== 'string')
+      return null
+    output[key] = entry
+  }
+  return output
+}
+
+function jsonCandidates(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed)
+    return []
+
+  const candidates = [trimmed]
+  const firstBrace = trimmed.indexOf('{')
+  const lastBrace = trimmed.lastIndexOf('}')
+  if (firstBrace >= 0 && lastBrace > firstBrace)
+    candidates.push(trimmed.slice(firstBrace, lastBrace + 1))
+
+  return [...new Set(candidates)]
+}
+
+function parseJsonCandidate(value: string) {
+  try {
+    return JSON.parse(value) as unknown
+  }
+  catch {
+    return undefined
+  }
+}
+
 function parseTranslationObject(value: unknown): Record<string, string> | null {
   const record = recordOf(value)
-  if (record) {
-    const translations = recordOf(record.translations)
-    if (translations && Object.values(translations).every(entry => typeof entry === 'string'))
-      return translations as Record<string, string>
-    if (Object.values(record).every(entry => typeof entry === 'string'))
-      return record as Record<string, string>
-  }
+  const wrappedRecord = stringMapFromRecord(recordOf(record?.translations))
+  if (wrappedRecord)
+    return wrappedRecord
+
+  const flatRecord = stringMapFromRecord(record)
+  if (flatRecord)
+    return flatRecord
 
   if (typeof value !== 'string')
     return null
 
-  const trimmed = value.trim()
-  if (!trimmed)
-    return null
-
-  try {
-    return parseTranslationObject(JSON.parse(trimmed))
+  for (const candidate of jsonCandidates(value)) {
+    const parsed = parseJsonCandidate(candidate)
+    const parsedRecord = parsed === undefined ? null : parseTranslationObject(parsed)
+    if (parsedRecord)
+      return parsedRecord
   }
-  catch {
-    const start = trimmed.indexOf('{')
-    const end = trimmed.lastIndexOf('}')
-    if (start < 0 || end <= start)
-      return null
-    try {
-      return parseTranslationObject(JSON.parse(trimmed.slice(start, end + 1)))
-    }
-    catch {
-      return null
-    }
-  }
-}
-
-function placeholders(value: string) {
-  return value.match(PLACEHOLDER_PATTERN) ?? []
+  return null
 }
 
 function keepTranslation(source: string, translated: unknown) {
-  if (typeof translated !== 'string')
+  const candidate = typeof translated === 'string' ? translated.trim() : ''
+  if (!candidate)
     return source
 
-  const normalized = translated.trim()
-  if (!normalized)
-    return source
+  const missingPlaceholder = (source.match(PLACEHOLDER_PATTERN) ?? []).some(token => !candidate.includes(token))
+  return missingPlaceholder ? source : candidate
+}
 
-  const requiredPlaceholders = placeholders(source)
-  if (!requiredPlaceholders.every(token => normalized.includes(token)))
-    return source
-
-  return normalized
+function shouldFlushBatch(current: MessageEntry[], currentCharacters: number, nextCharacters: number) {
+  return current.length > 0 && (current.length >= MAX_BATCH_ITEMS || currentCharacters + nextCharacters > MAX_BATCH_CHARACTERS)
 }
 
 function buildBatches(messages: Record<string, string>) {
@@ -312,38 +341,83 @@ function buildBatches(messages: Record<string, string>) {
   let current: MessageEntry[] = []
   let currentCharacters = 0
 
-  for (const entry of Object.entries(messages)) {
-    const nextCharacters = entry[0].length + entry[1].length
-    if (current.length > 0 && (current.length >= MAX_BATCH_ITEMS || currentCharacters + nextCharacters > MAX_BATCH_CHARACTERS)) {
-      batches.push(current)
-      current = []
-      currentCharacters = 0
-    }
-
-    current.push(entry)
-    currentCharacters += nextCharacters
+  const flush = () => {
+    if (!current.length)
+      return
+    batches.push(current)
+    current = []
+    currentCharacters = 0
   }
 
-  if (current.length > 0)
-    batches.push(current)
+  for (const [key, message] of Object.entries(messages)) {
+    const entry: MessageEntry = [key, message]
+    const entryCharacters = key.length + message.length
+    if (shouldFlushBatch(current, currentCharacters, entryCharacters))
+      flush()
+    current.push(entry)
+    currentCharacters += entryCharacters
+  }
 
+  flush()
   return batches
 }
 
-function translationSchema() {
-  return {
-    type: 'object',
-    additionalProperties: false,
-    properties: {
-      translations: {
-        type: 'object',
-        additionalProperties: {
-          type: 'string',
-        },
+const translationResponseSchema = {
+  type: 'object',
+  additionalProperties: false,
+  properties: {
+    translations: {
+      type: 'object',
+      additionalProperties: {
+        type: 'string',
       },
     },
-    required: ['translations'],
+  },
+  required: ['translations'],
+}
+
+function translationPrompt(targetLanguage: string) {
+  return [
+    `Translate Capgo application UI messages from English to ${targetLanguageLabel(targetLanguage)}.`,
+    'Return JSON only, with a translations object keyed by the exact input keys.',
+    'Translate user-facing text naturally. Keep product names, code, URLs, commands, numbers, and placeholders unchanged.',
+    'Every placeholder like {count}, %name%, or $1 must be copied exactly.',
+  ].join(' ')
+}
+
+function translationRequest(targetLanguage: string, batch: MessageEntry[]) {
+  return {
+    temperature: 0,
+    max_tokens: 8192,
+    response_format: {
+      type: 'json_schema',
+      json_schema: translationResponseSchema,
+    },
+    messages: [
+      {
+        role: 'system',
+        content: translationPrompt(targetLanguage),
+      },
+      {
+        role: 'user',
+        content: JSON.stringify({ messages: Object.fromEntries(batch) }),
+      },
+    ],
   }
+}
+
+function translatedBatch(batch: MessageEntry[], translations: Record<string, string>) {
+  if (!batch.some(([key]) => typeof translations[key] === 'string'))
+    throw new Error('Workers AI returned no translated messages')
+
+  return Object.fromEntries(batch.map(([key, source]) => [
+    key,
+    keepTranslation(source, translations[key]),
+  ] as const))
+}
+
+function normalizeTranslationError(error: unknown) {
+  return error instanceof Error ? error : new Error(String(error))
 }
 
 async function translateBatch(ai: AiBinding, model: string, targetLanguage: string, batch: MessageEntry[]) {
@@ -351,45 +425,14 @@ async function translateBatch(ai: AiBinding, model: string, targetLanguage: stri
 
   for (let attempt = 1; attempt <= TRANSLATION_ATTEMPTS; attempt += 1) {
     try {
-      const result = await ai.run(model, {
-        temperature: 0,
-        max_tokens: 8192,
-        response_format: {
-          type: 'json_schema',
-          json_schema: translationSchema(),
-        },
-        messages: [
-          {
-            role: 'system',
-            content: [
-              `Translate Capgo application UI messages from English to ${getTargetLanguageName(targetLanguage)}.`,
-              'Return JSON only, with a translations object keyed by the exact input keys.',
-              'Translate user-facing text naturally. Keep product names, code, URLs, commands, numbers, and placeholders unchanged.',
-              'Every placeholder like {count}, %name%, or $1 must be copied exactly.',
-            ].join(' '),
-          },
-          {
-            role: 'user',
-            content: JSON.stringify({
-              messages: Object.fromEntries(batch),
-            }),
-          },
-        ],
-      })
-
+      const result = await ai.run(model, translationRequest(targetLanguage, batch))
       const translations = parseTranslationObject(extractAiText(result) || result)
       if (!translations)
         throw new Error('Workers AI returned invalid JSON')
-
-      if (!batch.some(([key]) => typeof translations[key] === 'string'))
-        throw new Error('Workers AI returned no translated messages')
-
-      return Object.fromEntries(
-        batch.map(([key, source]) => [key, keepTranslation(source, translations[key])] as const),
-      )
+      return translatedBatch(batch, translations)
     }
     catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error))
+      lastError = normalizeTranslationError(error)
       cloudlog({
         message: 'Message translation batch failed',
         targetLanguage,
@@ -886,10 +929,8 @@ function logStaleQueuedMessage(body: TranslationQueuePayload, checksum: string, 
 
 async function cacheReadyStoreEntry(env: TranslationWorkerBindings, checksum: string, targetLanguage: string, requestId: string | undefined, readyRequest: Request) {
   const storedEntry = await readTranslationStoreEntry(env, checksum, targetLanguage)
-  if (storedEntry?.status !== 'ready')
-    return storedEntry
-
-  await cacheReadyTranslationPayload(requestId, readyRequest, readyPayloadFromStore(storedEntry), targetLanguage)
+  if (storedEntry?.status === 'ready')
+    await cacheReadyTranslationPayload(requestId, readyRequest, readyPayloadFromStore(storedEntry), targetLanguage)
   return storedEntry
 }
 
@@ -996,7 +1037,7 @@ async function processTranslationQueueBatch(env: TranslationWorkerBindings, body
     return
 
   const storedEntry = await cacheReadyStoreEntry(env, checksum, targetLanguage, requestId, readyRequest)
-  if (!storedEntry || storedEntry.status !== 'pending')
+  if (storedEntry?.status !== 'pending')
     return
 
   const batches = buildBatches(sourceMessageCatalog)
