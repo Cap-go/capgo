@@ -1,0 +1,62 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreExportsUsedInFile": true,
+  "ignoreIssues": {
+    "src/auto-imports.d.ts": [
+      "types"
+    ],
+    "src/components.d.ts": [
+      "types"
+    ],
+    "supabase/functions/_backend/utils/postgres_schema.ts": [
+      "exports"
+    ],
+    "cli/src/schemas/sdk.ts": [
+      "duplicates"
+    ]
+  },
+  "ignoreUnresolved": [
+    "~icons/*",
+    "virtual:*",
+    "vue-router/auto-routes"
+  ],
+  "workspaces": {
+    ".": {
+      "entry": [
+        "src/main.ts!",
+        "src/App.vue!",
+        "src/layouts/**/*.vue!",
+        "src/pages/**/*.vue!",
+        "cloudflare_workers/**/*.{ts,js}!",
+        "supabase/functions/**/*.ts!",
+        "aliproxy/index.js!",
+        "scripts/**/*.{ts,js,mjs,cjs}!",
+        "benches/**/*.ts!",
+        "playwright/e2e/**/*.ts!",
+        "playwright/support/**/*.ts!",
+        "formkit.config.ts!",
+        "formkit.theme.ts!"
+      ],
+      "project": [
+        "src/**/*.{ts,vue}!",
+        "cloudflare_workers/**/*.{ts,js}!",
+        "supabase/functions/**/*.ts!",
+        "aliproxy/**/*.js!",
+        "scripts/**/*.{ts,js,mjs,cjs}!",
+        "benches/**/*.ts!",
+        "playwright/**/*.ts!",
+        "*.{ts,mts}!"
+      ]
+    },
+    "cli": {
+      "entry": [
+        "src/index.ts!",
+        "src/sdk.ts!",
+        "src/mcp/server.ts!"
+      ],
+      "project": [
+        "src/**/*.{ts,tsx}!"
+      ]
+    }
+  }
+}

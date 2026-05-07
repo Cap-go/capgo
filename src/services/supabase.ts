@@ -113,12 +113,6 @@ export async function hashEmail(email: string) {
   return hashHex
 }
 
-export function deleteSupabaseToken() {
-  return localStorage.removeItem(`sb-${config.supbaseId}-auth-token`)
-}
-export function getSupabaseToken() {
-  return localStorage.getItem(`sb-${config.supbaseId}-auth-token`)
-}
 export function unspoofUser() {
   const textData: string | null = localStorage.getItem(`supabase-${config.supbaseId}.spoof_admin_jwt`)
   if (!textData || !isSpoofed())
@@ -193,14 +187,6 @@ export interface AppUsageByApp {
   bandwidth: number
   build_time_seconds: number
   get: number
-}
-
-export interface AppUsageByVersion {
-  date: string
-  app_id: string
-  version_name: string
-  install: number | null
-  uninstall: number | null
 }
 
 export interface AppUsageGlobal {
@@ -324,59 +310,6 @@ export async function getCapgoVersion(appId: string, versionId: string | null | 
   return ''
 }
 
-export interface VersionName {
-  id: number
-  name: string
-  created_at: string
-}
-
-export async function getVersionNames(appId: string, versionIds: number[]): Promise<VersionName[]> {
-  const { data, error: vError } = await useSupabase()
-    .from('app_versions')
-    .select('id, name, created_at')
-    .eq('app_id', appId)
-    .in('id', versionIds)
-
-  if (vError)
-    return []
-
-  return data as VersionName[]
-}
-
-export async function getDailyVersion(appId: string, startDate?: string, endDate?: string): Promise<AppUsageByVersion[]> {
-  // Query uses version_name column - cast needed because auto-generated types are stale
-  const { data, error } = await useSupabase()
-    .from('daily_version')
-    .select('date, app_id, version_name, install, uninstall')
-    .eq('app_id', appId)
-    .gte('date', startDate)
-    .lte('date', endDate)
-    .not('version_name', 'is', null)
-    .order('date', { ascending: true })
-
-  if (error || !data) {
-    console.error('Error fetching data from daily_version:', error)
-    return []
-  }
-  // Cast to our interface - the SQL table has version_name but auto-generated types are stale
-  return data as unknown as AppUsageByVersion[]
-}
-
-export async function getTotalAppStorage(orgId?: string, appid?: string): Promise<number> {
-  if (!orgId)
-    return 0
-  if (!appid)
-    return getTotalStorage(orgId)
-
-  const { data, error } = await useSupabase()
-    .rpc('get_total_app_storage_size_orgs', { org_id: orgId, app_id: appid })
-    .single()
-  if (error)
-    throw new Error(error.message)
-
-  return data ?? 0
-}
-
 export async function getTotalStorage(orgId?: string): Promise<number> {
   if (!orgId)
     return 0
@@ -389,33 +322,12 @@ export async function getTotalStorage(orgId?: string): Promise<number> {
   return data ?? 0
 }
 
-export async function isTrialOrg(orgId: string): Promise<number> {
-  const { data, error } = await useSupabase()
-    .rpc('is_trial_org', { orgid: orgId })
-    .single()
-  if (error)
-    throw new Error(error.message)
-
-  return data ?? 0
-}
 // Canonical frontend platform-admin verification.
 // Use this only for platform-rights checks in the UI flow; no other path should use
 // user-id based admin function checks from the browser.
 export async function isPlatformAdmin(): Promise<boolean> {
   const rpc = useSupabase().rpc('is_platform_admin')
   const { data, error } = await rpc.single()
-  if (error)
-    throw new Error(error.message)
-
-  return data ?? false
-}
-
-export async function isCanceled(orgId?: string): Promise<boolean> {
-  if (!orgId)
-    return false
-  const { data, error } = await useSupabase()
-    .rpc('is_canceled_org', { orgid: orgId })
-    .single()
   if (error)
     throw new Error(error.message)
 
@@ -659,21 +571,6 @@ export async function getRemoteDependencies(appId: string, channel: string) {
     throw new Error(error.message)
   }
   return convertNativePackages((remoteNativePackages.version.native_packages as any) ?? [])
-}
-
-export async function getVersionRemoteDependencies(appId: string, bundleId: string) {
-  const { data, error } = await useSupabase()
-    .from('app_versions')
-    .select()
-    .eq('name', bundleId)
-    .eq('app_id', appId)
-    .single()
-
-  if (error) {
-    throw new Error(error.message)
-  }
-
-  return convertNativePackages((data.native_packages as any) ?? [])
 }
 
 interface Compatibility {

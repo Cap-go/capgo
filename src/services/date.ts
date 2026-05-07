@@ -67,21 +67,6 @@ export function formatDate(date: string | undefined) {
   return dayjs(date).format('YYYY-MM-DD HH:mm')
 }
 
-export function formatDateCH(date: string | undefined) {
-  return dayjs(date).format('YYYY-MM-DD HH:mm')
-}
-
-export function convertAllDatesToCH(obj: any) {
-  // look in all objects for dates fields ( created_at or updated_at ) and convert them if need
-  const datesFields = ['created_at', 'updated_at']
-  const newObj = { ...obj }
-  datesFields.forEach((field) => {
-    if (newObj[field])
-      newObj[field] = formatDateCH(newObj[field])
-  })
-  return newObj
-}
-
 export function getDaysInCurrentMonth() {
   const date = new Date()
 
@@ -102,29 +87,6 @@ export function normalizeToStartOfDay(date: Date) {
   const normalized = new Date(date)
   normalized.setHours(0, 0, 0, 0)
   return normalized
-}
-
-export const DAY_IN_MS = 24 * 60 * 60 * 1000
-
-export function enumerateDates(startDate: Date, endDate: Date) {
-  const start = normalizeToStartOfDay(startDate)
-  const end = normalizeToStartOfDay(endDate)
-
-  if (start.getTime() > end.getTime())
-    return []
-
-  const dates: Date[] = []
-  let cursor = start
-  while (cursor.getTime() <= end.getTime()) {
-    dates.push(new Date(cursor))
-    cursor = new Date(cursor.getTime() + DAY_IN_MS)
-  }
-
-  return dates
-}
-
-export function enumerateDayNumbers(startDate: Date, endDate: Date) {
-  return enumerateDates(startDate, endDate).map(date => date.getDate())
 }
 
 export function getDayNumbers(startDate: Date, endDate: Date) {

@@ -76,10 +76,6 @@ export async function saveKeyInternal(options: SaveOptions, silent = false) {
   return true
 }
 
-export async function saveKey(options: SaveOptions) {
-  await saveKeyInternal(options, false)
-}
-
 export async function deleteOldPrivateKeyInternal(options: Options, silent = false): Promise<boolean> {
   if (!silent)
     intro('Deleting old private key 🗑️')
@@ -126,10 +122,6 @@ export async function deleteOldPrivateKeyInternal(options: Options, silent = fal
     log.info('No old private key found in config file')
 
   return false
-}
-
-export async function deleteOldPrivateKey(options: Options, logg = true): Promise<boolean> {
-  return deleteOldPrivateKeyInternal(options, !logg)
 }
 
 export async function saveKeyCommand(options: SaveOptions) {
