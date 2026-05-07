@@ -869,14 +869,14 @@ async function openDefaultDownloadChannelDialog() {
               continue
 
             const selectedChannel = selectedChannels[platform]
-            const platformUpdate = supabase
+            let platformUpdate = supabase
               .from('channels')
               .update({ public: false })
               .eq('app_id', props.appId)
               .eq(platform, true)
 
             if (selectedChannel)
-              platformUpdate.neq('id', selectedChannel.id)
+              platformUpdate = platformUpdate.neq('id', selectedChannel.id)
 
             const { error } = await platformUpdate
             if (error) {
