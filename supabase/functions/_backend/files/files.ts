@@ -338,13 +338,142 @@ function parseAppScopedAttachmentPath(fileId: unknown): AppScopedAttachmentPath 
   return { kind: 'scoped', app_id, owner_org }
 }
 
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+}
+
+function getRawQueryParam(c: Context, name: string) {
+  const rawQuery = new URL(c.req.url).search.slice(1)
+  if (!rawQuery)
+    return null
+
+  for (const part of rawQuery.split('&')) {
+    const [rawName, ...rawValueParts] = part.split('=')
+    if (!rawName)
+      continue
+
+    try {
+      if (decodeURIComponent(rawName) !== name)
+        continue
+      return decodeURIComponent(rawValueParts.join('='))
+    }
+    catch {
+      return rawValueParts.join('=')
+    }
+  }
+
+  return null
+}
+
+function getAttachmentReadKey(c: Context) {
+  const key = getRawQueryParam(c, 'key')?.trim()
+  return key || null
+}
+
+function getManifestVersionIdFromReadKey(key: string | null) {
+  if (!key || !/^[1-9]\d*$/.test(key))
+    return null
+  const versionId = Number.parseInt(key, 10)
+  return Number.isSafeInteger(versionId) ? versionId : null
+}
+
+function isUploadAttachmentRoute(c: Context) {
+  const pathname = new URL(c.req.url).pathname
+  return pathname.startsWith(`/upload/${ATTACHMENT_PREFIX}/`)
+    || pathname.startsWith(`/files/upload/${ATTACHMENT_PREFIX}/`)
+}
+
+async function hasSignedBundleRead(
+  pgClient: ReturnType<typeof getPgClient>,
+  fileId: string,
+  key: string | null,
+  scopedPath: Extract<AppScopedAttachmentPath, { kind: 'scoped' }> | null,
+) {
+  if (!key)
+    return false
+
+  const result = await pgClient.query<{ exists: boolean }>(
+    `
+      SELECT true AS exists
+      FROM public.app_versions
+      WHERE r2_path = $1
+        AND checksum = $2
+        AND COALESCE(deleted, false) = false
+        AND ($3::text IS NULL OR app_id = $3)
+        AND ($4::uuid IS NULL OR owner_org = $4::uuid)
+      LIMIT 1
+    `,
+    [fileId, key, scopedPath?.app_id ?? null, scopedPath?.owner_org ?? null],
+  )
+
+  return result.rows.length > 0
+}
+
+async function hasSignedManifestRead(
+  pgClient: ReturnType<typeof getPgClient>,
+  fileId: string,
+  key: string | null,
+  scopedPath: Extract<AppScopedAttachmentPath, { kind: 'scoped' }> | null,
+) {
+  const versionId = getManifestVersionIdFromReadKey(key)
+  if (versionId == null)
+    return false
+
+  const result = await pgClient.query<{ exists: boolean }>(
+    `
+      SELECT true AS exists
+      FROM public.manifest AS manifest
+      INNER JOIN public.app_versions AS app_versions
+        ON app_versions.id = manifest.app_version_id
+      WHERE manifest.s3_path = $1
+        AND app_versions.id = $2
+        AND COALESCE(app_versions.deleted, false) = false
+        AND ($3::text IS NULL OR app_versions.app_id = $3)
+        AND ($4::uuid IS NULL OR app_versions.owner_org = $4::uuid)
+      LIMIT 1
+    `,
+    [fileId, versionId, scopedPath?.app_id ?? null, scopedPath?.owner_org ?? null],
+  )
+
+  return result.rows.length > 0
+}
+
+async function hasSignedAttachmentRead(
+  pgClient: ReturnType<typeof getPgClient>,
+  c: Context,
+  fileId: string,
+  scopedPath: Extract<AppScopedAttachmentPath, { kind: 'scoped' }> | null,
+) {
+  const key = getAttachmentReadKey(c)
+  return await hasSignedBundleRead(pgClient, fileId, key, scopedPath)
+    || await hasSignedManifestRead(pgClient, fileId, key, scopedPath)
+}
+
+async function hasAuthenticatedAttachmentRead(
+  c: Context,
+  drizzleClient: ReturnType<typeof getDrizzleClient>,
+  scopedPath: Extract<AppScopedAttachmentPath, { kind: 'scoped' }>,
+) {
+  const auth = c.get('auth')
+  if (!auth?.userId)
+    return false
+
+  const permission = isUploadAttachmentRoute(c) ? 'app.upload_bundle' : 'app.read_bundles'
+  const capgkey = c.get('capgkey') ?? auth.apikey?.key ?? null
+  return checkPermissionPg(c, permission, { appId: scopedPath.app_id }, drizzleClient, auth.userId, capgkey)
+}
+
 async function assertReadableAppScopedAttachment(c: Context, fileId: unknown): Promise<void> {
+  if (typeof fileId !== 'string') {
+    quickError(404, 'not_found', 'Not found')
+  }
+
   const scopedPath = parseAppScopedAttachmentPath(fileId)
   if (scopedPath?.kind === 'invalid_scoped') {
     quickError(404, 'not_found', 'Not found')
   }
-  if (!scopedPath) {
-    return
+  if (scopedPath?.kind === 'scoped' && !isUuid(scopedPath.owner_org)) {
+    quickError(404, 'not_found', 'Not found')
   }
 
   // Attachment reads must use the primary to avoid replica lag serving deleted-app files.
@@ -352,10 +481,23 @@ async function assertReadableAppScopedAttachment(c: Context, fileId: unknown): P
   const drizzleClient = getDrizzleClient(pgClient)
 
   try {
-    const app = await getAppByAppIdPg(c, scopedPath.app_id, drizzleClient)
-    if (!app || app.owner_org !== scopedPath.owner_org) {
+    const signedScopedPath = scopedPath?.kind === 'scoped' ? scopedPath : null
+    if (await hasSignedAttachmentRead(pgClient, c, fileId, signedScopedPath))
+      return
+
+    if (!signedScopedPath) {
       quickError(404, 'not_found', 'Not found')
     }
+
+    const app = await getAppByAppIdPg(c, signedScopedPath.app_id, drizzleClient)
+    if (app?.owner_org !== signedScopedPath.owner_org) {
+      quickError(404, 'not_found', 'Not found')
+    }
+
+    if (await hasAuthenticatedAttachmentRead(c, drizzleClient, signedScopedPath))
+      return
+
+    quickError(404, 'not_found', 'Not found')
   }
   finally {
     await closeClient(c, pgClient)
@@ -1078,7 +1220,18 @@ app.get(
     return getHandler(c)
   },
 )
-app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, setKeyFromIdParam, getHandler)
+const attachmentReadAuth = middlewareKey(['all', 'read'], true)
+
+async function optionalAttachmentReadAuth(c: Context, next: Next) {
+  if (getAttachmentReadKey(c) || (!c.req.header('authorization') && !c.req.header('capgkey'))) {
+    await next()
+    return
+  }
+
+  return attachmentReadAuth(c, next)
+}
+
+app.get(`/read/${ATTACHMENT_PREFIX}/:id{.+}`, optionalAttachmentReadAuth, setKeyFromIdParam, getHandler)
 app.patch(`/upload/${ATTACHMENT_PREFIX}/:id{.+}`, middlewareKey(['all', 'write', 'upload'], true), setKeyFromIdParam, checkWriteAppAccess, (c) => {
   if (getRuntimeKey() !== 'workerd') {
     return supabaseTusPatchHandler(c)

@@ -250,7 +250,23 @@ describe('attachment cleanup on app deletion regression', () => {
     })
     expect(patchResponse.status).toBe(204)
 
-    const readBeforeDelete = await fetch(getEndpointUrl(`/files/read/attachments/${filePath}`))
+    const readKey = randomUUID().replaceAll('-', '')
+    await getSupabaseClient()
+      .from('app_versions')
+      .insert({
+        app_id: appId,
+        name: `delete-read-${randomUUID()}`,
+        checksum: readKey,
+        owner_org: orgId,
+        user_id: USER_ID,
+        storage_provider: 'r2',
+        r2_path: filePath,
+        deleted: false,
+        session_key: `delete-read-session-${randomUUID()}`,
+      })
+      .throwOnError()
+
+    const readBeforeDelete = await fetch(getEndpointUrl(`/files/read/attachments/${filePath}?key=${readKey}`))
     expect(readBeforeDelete.status).toBe(200)
     expect(await readBeforeDelete.text()).toBe('delete-me-after-app-delete')
 
@@ -262,7 +278,7 @@ describe('attachment cleanup on app deletion regression', () => {
     })
     expect(deleteResponse.status).toBe(200)
 
-    const readAfterDelete = await fetch(getEndpointUrl(`/files/read/attachments/${filePath}`))
+    const readAfterDelete = await fetch(getEndpointUrl(`/files/read/attachments/${filePath}?key=${readKey}`))
     expect(readAfterDelete.status).toBe(404)
   })
 })
