@@ -50,11 +50,13 @@ describe('update enumeration guard', () => {
       open: vi.fn(async () => cache),
     })
     process.env.RATE_LIMIT_UPDATE_ENUMERATION_MISSES = '2'
+    process.env.RATE_LIMIT_UPDATE_ENUMERATION_HASH_SECRET = 'test-secret'
   })
 
   afterEach(() => {
     vi.unstubAllGlobals()
     delete process.env.RATE_LIMIT_UPDATE_ENUMERATION_MISSES
+    delete process.env.RATE_LIMIT_UPDATE_ENUMERATION_HASH_SECRET
   })
 
   it('blocks missing app checks after distinct misses reach the configured limit', async () => {
@@ -133,7 +135,7 @@ describe('update enumeration guard', () => {
     await expect(blocked.json()).resolves.toMatchObject({ error: 'on_premise_app' })
   })
 
-  it('reads only the touched bucket when recording a miss', async () => {
+  it('checks bounded miss slots instead of scanning legacy buckets', async () => {
     const app = createGuardApp()
     const headers = {
       'Content-Type': 'application/json',
@@ -146,10 +148,11 @@ describe('update enumeration guard', () => {
       body: JSON.stringify({ app_id: 'com.missing.single-bucket' }),
     }))
 
-    const bucketReads = cache.match.mock.calls
-      .map(([key]) => cacheKeyToString(key))
-      .filter(key => key.includes('/rate-limit/update-enumeration/bucket'))
-    expect(bucketReads).toHaveLength(1)
+    const cacheReads = cache.match.mock.calls.map(([key]) => cacheKeyToString(key))
+    const slotReads = cacheReads.filter(key => key.includes('/rate-limit/update-enumeration/slot'))
+    const legacyBucketReads = cacheReads.filter(key => key.includes('/rate-limit/update-enumeration/bucket'))
+    expect(slotReads).toHaveLength(8)
+    expect(legacyBucketReads).toHaveLength(0)
   })
 
   it('does not increase the distinct miss count for repeated app IDs', async () => {

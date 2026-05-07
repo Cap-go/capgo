@@ -5,16 +5,13 @@ import { cloudlog } from './logging.ts'
 import { getClientIP } from './rate_limit.ts'
 import { getEnv } from './utils.ts'
 
-const UPDATE_ENUMERATION_BUCKET_PATH = '/rate-limit/update-enumeration/bucket'
-const UPDATE_ENUMERATION_COUNT_PATH = '/rate-limit/update-enumeration/count'
+const UPDATE_ENUMERATION_SLOT_PATH = '/rate-limit/update-enumeration/slot'
 const UPDATE_ENUMERATION_LIMIT_PATH = '/rate-limit/update-enumeration/limited'
 const UPDATE_ENUMERATION_TTL_SECONDS = 60 * 15
 const DEFAULT_UPDATE_ENUMERATION_MISS_LIMIT = 5
-const UPDATE_ENUMERATION_BUCKET_COUNT = 256
-const MAX_TRACKED_APP_IDS_PER_BUCKET = 64
+const UPDATE_ENUMERATION_SLOT_MULTIPLIER = 4
 
-interface UpdateEnumerationData {
-  appIds: string[]
+interface UpdateEnumerationSlotData {
   resetAt: number
 }
 
@@ -22,9 +19,9 @@ interface UpdateEnumerationLimitData {
   resetAt: number
 }
 
-interface UpdateEnumerationCountData {
+interface UpdateEnumerationMissState {
   count: number
-  resetAt: number
+  resetAt?: number
 }
 
 function getUpdateEnumerationMissLimit(c: Context) {
@@ -73,9 +70,13 @@ async function hashAppId(c: Context, appId: string) {
   return await sha256Hex(normalized)
 }
 
-function getUpdateEnumerationBucket(appIdHash: string) {
+function getUpdateEnumerationSlotCount(limit: number) {
+  return limit * UPDATE_ENUMERATION_SLOT_MULTIPLIER
+}
+
+function getUpdateEnumerationSlot(appIdHash: string, slotCount: number) {
   const prefix = appIdHash.slice(0, 8)
-  return (Number.parseInt(prefix, 16) % UPDATE_ENUMERATION_BUCKET_COUNT).toString()
+  return (Number.parseInt(prefix, 16) % slotCount).toString()
 }
 
 function buildUpdateEnumerationCacheEntry(c: Context) {
@@ -92,12 +93,8 @@ function buildUpdateEnumerationCacheEntry(c: Context) {
   return { helper, ip }
 }
 
-function buildUpdateEnumerationBucketRequest(helper: CacheHelper, ip: string, bucket: string) {
-  return helper.buildRequest(UPDATE_ENUMERATION_BUCKET_PATH, { ip, bucket })
-}
-
-function buildUpdateEnumerationCountRequest(helper: CacheHelper, ip: string) {
-  return helper.buildRequest(UPDATE_ENUMERATION_COUNT_PATH, { ip })
+function buildUpdateEnumerationSlotRequest(helper: CacheHelper, ip: string, slot: string) {
+  return helper.buildRequest(UPDATE_ENUMERATION_SLOT_PATH, { ip, slot })
 }
 
 function buildUpdateEnumerationLimitRequest(helper: CacheHelper, ip: string) {
@@ -127,23 +124,45 @@ export async function isUpdateEnumerationLimited(c: Context): Promise<RateLimitS
   return { limited: false }
 }
 
-function appendAppIdHash(existingData: UpdateEnumerationData | null, appIdHash: string, resetAt: number) {
-  const existingAppIds = existingData?.appIds ?? []
-  const appIds = existingAppIds.includes(appIdHash)
-    ? existingAppIds
-    : [...existingAppIds, appIdHash].slice(-MAX_TRACKED_APP_IDS_PER_BUCKET)
-  return { appIds, resetAt }
+async function countOccupiedMissSlots(c: Context, helper: CacheHelper, ip: string, slotCount: number): Promise<UpdateEnumerationMissState> {
+  const slotRequests = Array.from({ length: slotCount }, (_, index) => (
+    buildUpdateEnumerationSlotRequest(helper, ip, index.toString())
+  ))
+
+  try {
+    const slots = await Promise.all(slotRequests.map(request => helper.matchJson<UpdateEnumerationSlotData>(request)))
+    let count = 0
+    let resetAt: number | undefined
+    for (const slot of slots) {
+      if (!slot)
+        continue
+      count += 1
+      if (!resetAt || slot.resetAt > resetAt)
+        resetAt = slot.resetAt
+    }
+    return { count, resetAt }
+  }
+  catch (error) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Update enumeration guard slot read failed',
+      error,
+    })
+    return { count: 0 }
+  }
 }
 
 export async function recordUpdateEnumerationMiss(c: Context, appId: string): Promise<RateLimitStatus> {
   if (!appId?.trim())
     return { limited: false }
 
+  const limit = getUpdateEnumerationMissLimit(c)
+  const slotCount = getUpdateEnumerationSlotCount(limit)
   const appIdHash = await hashAppId(c, appId)
-  const bucket = getUpdateEnumerationBucket(appIdHash)
+  const slot = getUpdateEnumerationSlot(appIdHash, slotCount)
   const resetAt = Date.now() + UPDATE_ENUMERATION_TTL_SECONDS * 1000
   let cacheEntry: ReturnType<typeof buildUpdateEnumerationCacheEntry>
-  let missState: UpdateEnumerationCountData = { count: 0, resetAt }
+  let missState: UpdateEnumerationMissState
 
   try {
     cacheEntry = buildUpdateEnumerationCacheEntry(c)
@@ -155,36 +174,26 @@ export async function recordUpdateEnumerationMiss(c: Context, appId: string): Pr
     if (existingLimit)
       return { limited: true, resetAt: existingLimit.resetAt }
 
-    const bucketRequest = buildUpdateEnumerationBucketRequest(cacheEntry.helper, cacheEntry.ip, bucket)
-    const countRequest = buildUpdateEnumerationCountRequest(cacheEntry.helper, cacheEntry.ip)
-    const existingBucket = await cacheEntry.helper.matchJson<UpdateEnumerationData>(bucketRequest)
-    const existingCount = await cacheEntry.helper.matchJson<UpdateEnumerationCountData>(countRequest)
-    const alreadyTracked = existingBucket?.appIds.includes(appIdHash) ?? false
-    const currentCount = existingCount?.count ?? existingBucket?.appIds.length ?? 0
-    const missCount = alreadyTracked ? currentCount : currentCount + 1
-    const missResetAt = Math.max(existingCount?.resetAt ?? 0, existingBucket?.resetAt ?? 0, resetAt)
-
-    // Bucket selection uses a server-side keyed hash when available, and the
-    // bucket payload stores exact app hashes so collisions cannot hide probes.
-    await cacheEntry.helper.putJson(bucketRequest, appendAppIdHash(existingBucket, appIdHash, resetAt), UPDATE_ENUMERATION_TTL_SECONDS)
-    missState = { count: missCount, resetAt: missResetAt }
-    await cacheEntry.helper.putJson(countRequest, missState, UPDATE_ENUMERATION_TTL_SECONDS)
+    // Slot markers are idempotent writes. Concurrent misses cannot overwrite a
+    // shared counter, and the keyed hash prevents useful precomputed slot collisions.
+    const slotRequest = buildUpdateEnumerationSlotRequest(cacheEntry.helper, cacheEntry.ip, slot)
+    await cacheEntry.helper.putJson(slotRequest, { resetAt }, UPDATE_ENUMERATION_TTL_SECONDS)
+    missState = await countOccupiedMissSlots(c, cacheEntry.helper, cacheEntry.ip, slotCount)
   }
   catch (error) {
     cloudlog({
       requestId: c.get('requestId'),
-      message: 'Update enumeration guard bucket write failed while recording miss',
+      message: 'Update enumeration guard slot write failed while recording miss',
       error,
     })
     return { limited: false }
   }
 
-  const limit = getUpdateEnumerationMissLimit(c)
   const limited = missState.count >= limit
   if (limited) {
     await cacheEntry.helper.putJson(
       buildUpdateEnumerationLimitRequest(cacheEntry.helper, cacheEntry.ip),
-      { resetAt: missState.resetAt },
+      { resetAt: missState.resetAt ?? resetAt },
       UPDATE_ENUMERATION_TTL_SECONDS,
     )
   }
@@ -193,7 +202,7 @@ export async function recordUpdateEnumerationMiss(c: Context, appId: string): Pr
     requestId: c.get('requestId'),
     message: 'Recorded update enumeration miss',
     appIdHash: appIdHash.slice(0, 12),
-    bucket,
+    slot,
     count: missState.count,
     limit,
     limited,
