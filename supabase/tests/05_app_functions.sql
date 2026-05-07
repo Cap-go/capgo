@@ -1,7 +1,7 @@
 BEGIN;
 
 
-SELECT plan(12);
+SELECT plan(16);
 
 SELECT tests.authenticate_as('test_user');
 
@@ -40,6 +40,57 @@ SELECT
     );
 
 SELECT tests.clear_authentication();
+
+-- Test exist_app_versions authorization
+SELECT
+    set_config('request.headers', '{}', true);
+
+SELECT
+    is(
+        exist_app_versions('com.demo.app', '1.0.0'),
+        false,
+        'exist_app_versions test - anonymous caller without capgkey cannot enumerate version'
+    );
+
+SELECT
+    set_config(
+        'request.headers',
+        '{"capgkey":"ae6e7458-c46d-4c00-aa3b-153b0b8520ea"}',
+        true
+    );
+
+SELECT
+    is(
+        exist_app_versions('com.demo.app', '1.0.0'),
+        true,
+        'exist_app_versions test - valid capgkey header can read existing version'
+    );
+
+SELECT
+    set_config('request.headers', '{}', true);
+
+SELECT
+    is(
+        exist_app_versions(
+            'com.demo.app',
+            '1.0.0',
+            'ae6e7458-c46d-4c00-aa3b-153b0b8520ea'
+        ),
+        true,
+        'exist_app_versions test - valid apikey argument can read existing version'
+    );
+
+SELECT
+    is(
+        exist_app_versions('com.demo.app', '1.0.0', 'not-a-real-key'),
+        false,
+        'exist_app_versions test - invalid apikey argument cannot enumerate version'
+    );
+
+SELECT tests.clear_authentication();
+
+SELECT
+    set_config('request.headers', '{}', true);
 
 -- Test get_app_versions
 SELECT tests.authenticate_as('test_user');
