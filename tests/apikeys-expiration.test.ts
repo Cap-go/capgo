@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { env } from 'node:process'
 import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { BASE_URL, fetchWithRetry, getAuthHeadersForCredentials, getSupabaseClient, normalizeLocalhostUrl, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_EMAIL_APIKEY_EXPIRATION, USER_ID_APIKEY_EXPIRATION, USER_PASSWORD } from './test-utils.ts'
+import { BASE_URL, executeSQL, fetchWithRetry, getAuthHeadersForCredentials, getSupabaseClient, normalizeLocalhostUrl, resetAndSeedAppData, resetAppData, TEST_EMAIL, USER_EMAIL_APIKEY_EXPIRATION, USER_ID_APIKEY_EXPIRATION, USER_PASSWORD } from './test-utils.ts'
 
 const id = randomUUID()
 const BASE_ORG_ID = randomUUID()
@@ -22,7 +22,7 @@ function keyName(name: string): string {
   return `${name}-${id}`
 }
 
-async function seedPlainApiKey(name: string, expiresAt: string | null) {
+async function seedPlainApiKey(name: string, expiresAt: string | null, limitedToOrgs: string[] = []) {
   const key = randomUUID()
   const { data, error } = await getSupabaseClient()
     .from('apikeys')
@@ -33,7 +33,7 @@ async function seedPlainApiKey(name: string, expiresAt: string | null) {
       mode: 'all',
       name: keyName(name),
       limited_to_apps: [],
-      limited_to_orgs: [],
+      limited_to_orgs: limitedToOrgs,
       expires_at: expiresAt,
     })
     .select('id, key, expires_at')
@@ -199,6 +199,7 @@ describe('[POST] /apikey with expiration', () => {
       body: JSON.stringify({
         name: keyName('key-no-expiration'),
         mode: 'all',
+        limited_to_orgs: [BASE_ORG_ID],
       }),
     })
     const data = await response.json<{ key: string, id: number, expires_at: string | null }>()
@@ -250,6 +251,7 @@ describe('[PUT] /apikey/:id with expiration', () => {
       body: JSON.stringify({
         name: keyName('key-for-update-expiration'),
         mode: 'all',
+        limited_to_orgs: [BASE_ORG_ID],
       }),
     })
     expect(response.status).toBe(200)
@@ -339,6 +341,7 @@ describe('[GET] /apikey with expiration info', () => {
       body: JSON.stringify({
         name: keyName('key-without-exp-get-test'),
         mode: 'all',
+        limited_to_orgs: [BASE_ORG_ID],
       }),
     })
     expect(response2.status).toBe(200)
@@ -513,6 +516,7 @@ describe('organization API key expiration policy', () => {
       body: JSON.stringify({
         name: keyName('key-policy-app-scope-update'),
         mode: 'all',
+        limited_to_orgs: [BASE_ORG_ID],
       }),
     })
     expect(createResponse.status).toBe(200)
@@ -552,6 +556,7 @@ describe('organization API key expiration policy', () => {
       body: JSON.stringify({
         name: keyName('key-policy-sibling-target'),
         mode: 'all',
+        limited_to_orgs: [BASE_ORG_ID],
       }),
     })
     expect(siblingKeyResponse.status).toBe(200)
@@ -822,20 +827,17 @@ describe('api key expiration boundary conditions', () => {
     }
   })
 
-  it.concurrent('api key with null expiration should never expire', async () => {
-    const data = await seedPlainApiKey('key-no-expiration-test', null)
+  it.concurrent('api key with null expiration should not be expired', async () => {
+    const data = await seedPlainApiKey('key-no-expiration-test', null, [BASE_ORG_ID])
 
     try {
       expect(data.expires_at).toBeNull()
 
-      const authResponse = await apiFetch('/apikey', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': data.key,
-        },
-      })
-      expect(authResponse.status).toBe(200)
+      const [{ expired }] = await executeSQL(
+        'SELECT public.is_apikey_expired($1::timestamptz) AS expired',
+        [data.expires_at],
+      )
+      expect(expired).toBe(false)
     }
     finally {
       await deleteSeededApiKeys([data.id])

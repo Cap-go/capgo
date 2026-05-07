@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(24);
+SELECT plan(26);
 
 SELECT tests.authenticate_as_service_role();
 
@@ -441,6 +441,72 @@ SELECT
     ok(
         (SELECT count(*) > 0 FROM get_user_org_ids()),
         'get_user_org_ids: Returns results for valid (not expired) API key'
+    );
+
+-- Test 25: Unscoped keys must honor expiration-required org memberships
+UPDATE orgs
+SET
+    require_apikey_expiration = TRUE,
+    max_apikey_expiration_days = 30
+WHERE id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8';
+
+SELECT
+    throws_ok(
+        $$
+        INSERT INTO apikeys (
+            id,
+            user_id,
+            key,
+            mode,
+            name,
+            expires_at,
+            limited_to_orgs,
+            limited_to_apps
+        )
+        VALUES (
+            99913,
+            '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
+            'test-unscoped-key-missing-expiration',
+            'all',
+            'Test unscoped missing expiration',
+            NULL,
+            '{}'::uuid[],
+            '{}'::text[]
+        )
+        $$,
+        'P0001',
+        'expiration_required',
+        'enforce_apikey_expiration_policy: unscoped keys inherit membership expiration requirement'
+    );
+
+-- Test 26: Unscoped keys must honor max expiration days from org memberships
+SELECT
+    throws_ok(
+        $$
+        INSERT INTO apikeys (
+            id,
+            user_id,
+            key,
+            mode,
+            name,
+            expires_at,
+            limited_to_orgs,
+            limited_to_apps
+        )
+        VALUES (
+            99914,
+            '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
+            'test-unscoped-key-too-long-expiration',
+            'all',
+            'Test unscoped too long expiration',
+            now() + interval '31 days',
+            '{}'::uuid[],
+            '{}'::text[]
+        )
+        $$,
+        'P0001',
+        'expiration_exceeds_max',
+        'enforce_apikey_expiration_policy: unscoped keys inherit membership max expiration days'
     );
 
 SELECT *
