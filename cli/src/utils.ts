@@ -1682,21 +1682,6 @@ export async function assertOrgPermission(
   await assertCliPermission(supabase, apikey, permissionKey, { orgId }, { message, silent })
 }
 
-export async function getAccessibleAppsForApiKey(
-  supabase: SupabaseClient<Database>,
-  apikey: string,
-): Promise<Database['public']['Tables']['apps']['Row'][]> {
-  const { data, error } = await supabase.rpc('get_accessible_apps_for_apikey_v2' as any, { apikey })
-
-  if (error) {
-    log.error('Cannot get accessible apps for API key')
-    log.error(formatError(error))
-    throw new Error('Cannot get accessible apps for API key')
-  }
-
-  return (data || []) as Database['public']['Tables']['apps']['Row'][]
-}
-
 export async function getOrganizationId(supabase: SupabaseClient<Database>, appId: string) {
   const { data, error } = await supabase.from('apps')
     .select('owner_org')
