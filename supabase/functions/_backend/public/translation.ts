@@ -15,6 +15,7 @@ const TRANSLATION_CACHE_PATH = '/translation/messages-cache'
 const TRANSLATION_STORE_CLEANUP_INTERVAL_SECONDS = 60
 const TRANSLATION_REQUEUE_AFTER_SECONDS = 60
 const TRANSLATION_STORE_TABLE = 'translation_messages_cache'
+const CLAIMED_TRANSLATION_BATCH_INDEX_OFFSET = 1_000_000_000
 
 export const SUPPORTED_LANGUAGES = new Set([
   'de',
@@ -231,15 +232,15 @@ export function isPendingTranslationStale(entry: TranslationStoreEntry) {
 }
 
 export function claimedTranslationBatchIndex(nextBatchIndex: number) {
-  return nextBatchIndex < 0 ? Math.abs(nextBatchIndex) - 1 : null
+  return nextBatchIndex >= CLAIMED_TRANSLATION_BATCH_INDEX_OFFSET ? nextBatchIndex - CLAIMED_TRANSLATION_BATCH_INDEX_OFFSET : null
 }
 
 export function translationBatchIndexFromStore(nextBatchIndex: number) {
   return claimedTranslationBatchIndex(nextBatchIndex) ?? nextBatchIndex
 }
 
-function claimedTranslationBatchMarker(batchIndex: number) {
-  return -batchIndex - 1
+export function translationBatchClaimMarker(batchIndex: number) {
+  return CLAIMED_TRANSLATION_BATCH_INDEX_OFFSET + batchIndex
 }
 
 async function deleteExpiredTranslationStoreEntries(db: D1Database) {
@@ -355,7 +356,7 @@ export async function claimTranslationBatch(c: Context, checksum: string, target
        AND status = 'pending'
        AND next_batch_index = ?
        AND expires_at > unixepoch()`,
-  ).bind(claimedTranslationBatchMarker(batchIndex), PENDING_TRANSLATION_STORE_TTL_SECONDS, targetLanguage, checksum, batchIndex).run()
+  ).bind(translationBatchClaimMarker(batchIndex), PENDING_TRANSLATION_STORE_TTL_SECONDS, targetLanguage, checksum, batchIndex).run()
 
   return result.meta.changes > 0
 }
@@ -372,7 +373,7 @@ export async function releaseTranslationBatchClaim(c: Context, checksum: string,
        AND checksum = ?
        AND status = 'pending'
        AND next_batch_index = ?`,
-  ).bind(batchIndex, PENDING_TRANSLATION_STORE_TTL_SECONDS, targetLanguage, checksum, claimedTranslationBatchMarker(batchIndex)).run()
+  ).bind(batchIndex, PENDING_TRANSLATION_STORE_TTL_SECONDS, targetLanguage, checksum, translationBatchClaimMarker(batchIndex)).run()
 
   return result.meta.changes > 0
 }
@@ -488,7 +489,8 @@ app.post('/messages', async (c) => {
           model: storedEntry.model,
           targetLanguage,
         })
-        await touchTranslationStoreEntry(c, storedEntry)
+        if (claimedTranslationBatchIndex(storedEntry.nextBatchIndex) === null)
+          await touchTranslationStoreEntry(c, storedEntry)
       }
       catch (error) {
         cloudlogErr({
@@ -540,6 +542,7 @@ export const __translationTestUtils__ = {
   buildBatches,
   claimedTranslationBatchIndex,
   normalizeBatchIndex,
+  translationBatchClaimMarker,
   translationBatchIndexFromStore,
   translationStoreTtlSeconds,
 }

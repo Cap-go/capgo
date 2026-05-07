@@ -22,10 +22,12 @@ describe('translation queue helpers', () => {
   })
 
   it.concurrent('maps claimed queue batch indexes back to their batch', () => {
-    expect(__translationTestUtils__.claimedTranslationBatchIndex(-1)).toBe(0)
-    expect(__translationTestUtils__.claimedTranslationBatchIndex(-3)).toBe(2)
+    const marker = __translationTestUtils__.translationBatchClaimMarker(2)
+
+    expect(marker).toBeGreaterThan(2)
+    expect(__translationTestUtils__.claimedTranslationBatchIndex(marker)).toBe(2)
     expect(__translationTestUtils__.claimedTranslationBatchIndex(2)).toBeNull()
-    expect(__translationTestUtils__.translationBatchIndexFromStore(-2)).toBe(1)
+    expect(__translationTestUtils__.translationBatchIndexFromStore(marker)).toBe(2)
   })
 
   it.concurrent('keeps pending queue state longer than ready cache entries', () => {
