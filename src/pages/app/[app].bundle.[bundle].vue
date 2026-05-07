@@ -84,6 +84,12 @@ watch([() => channels.value, () => promotableChannelIds.value], () => {
 
 const canPromoteBundle = computed(() => promotableChannelIds.value.size > 0)
 
+const canEditBundleMetadata = computedAsync(async () => {
+  if (!version.value?.app_id)
+    return false
+  return await checkPermissions('app.upload_bundle', { appId: version.value.app_id })
+}, false)
+
 const canDeleteBundle = computedAsync(async () => {
   if (!version.value?.app_id)
     return false
@@ -457,6 +463,11 @@ async function saveCustomId(input: string) {
   if (!id.value)
     return
 
+  if (!canEditBundleMetadata.value) {
+    toast.error(t('no-permission'))
+    return
+  }
+
   if (input.length === 0) {
     const { error: errorNull } = await supabase
       .from('app_versions')
@@ -495,7 +506,7 @@ async function saveCustomId(input: string) {
 }
 
 function guardMinAutoUpdate(event: Event) {
-  if (!canPromoteBundle.value) {
+  if (!canEditBundleMetadata.value) {
     toast.error(t('no-permission'))
     event.preventDefault()
     return false
@@ -503,7 +514,7 @@ function guardMinAutoUpdate(event: Event) {
 }
 
 function preventInputChangePerm(event: Event) {
-  if (!canPromoteBundle.value) {
+  if (!canEditBundleMetadata.value) {
     event.preventDefault()
     return false
   }
@@ -779,7 +790,7 @@ async function deleteBundle() {
               <InfoRow
                 v-if="showBundleMetadataInput" id="metadata-bundle"
                 :label="t('min-update-version')" editable
-                :readonly="!canPromoteBundle"
+                :readonly="!canEditBundleMetadata"
                 @click="guardMinAutoUpdate" @update:value="(saveCustomId as any)" @keydown="preventInputChangePerm"
               >
                 {{ version.min_update_version }}
