@@ -732,8 +732,17 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           <Select
             options={[
               { label: '  iOS', value: 'ios' },
+              { label: '🤖  Android', value: 'android' },
             ]}
-            onChange={async () => {
+            onChange={async (value) => {
+              if (value === 'android') {
+                // The Android flow lives in a separate Ink app — this iOS app
+                // can't host it inline. Exit cleanly and tell the user to
+                // re-run with --platform android.
+                addLog('Re-run with `npx @capgo/cli@latest build init --platform android` to set up Android.', 'cyan')
+                exitOnboarding()
+                return
+              }
               // Check for existing credentials before proceeding
               const existing = await loadSavedCredentials(appId)
               if (existing?.ios) {
@@ -744,13 +753,6 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
               }
             }}
           />
-          <Newline />
-          <Text dimColor>
-            Android onboarding coming soon. Use
-            <Text bold color="white">capgo build credentials save</Text>
-            {' '}
-            for Android.
-          </Text>
         </Box>
       )}
 
