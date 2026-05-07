@@ -72,9 +72,10 @@ SELECT
         )
         AND cmd = 'SELECT'
         AND qual LIKE '%usage_credit_readable_org_ids%'
+        AND qual ~* '[(][[:space:]]*select[[:space:]]+.*usage_credit_readable_org_ids[(][)]'
     ),
     4::bigint,
-    'usage credit SELECT policies use the initPlan readable-org helper'
+    'usage credit SELECT policies use the initPlan readable-org helper via subselect'
   );
 
 SELECT
