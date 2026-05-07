@@ -7,7 +7,7 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FIXTURES_DIR="$SCRIPT_DIR"
 PACKAGE_NAME="@capgo/capacitor-updater"
-PACKAGE_VERSION="6.25.5"
+PACKAGE_VERSION="6.45.10"
 
 echo "🧹 Cleaning up old fixtures..."
 rm -rf "$FIXTURES_DIR/npm-project"
@@ -334,8 +334,8 @@ echo "   ✓ lerna monorepo created"
 # ============================================================================
 
 # ============================================================================
-# 11. Version Mismatch: package.json says old, node_modules has new
-# This simulates: user has ^6.14.10 in package.json but 6.30.0 installed
+# 11. Version Mismatch: package.json says old, node_modules has the installed fixture version
+# This simulates: user has ^6.14.10 in package.json but a newer fixture version installed
 # ============================================================================
 echo ""
 echo "🎭 Creating version mismatch trap (package.json lies)..."
