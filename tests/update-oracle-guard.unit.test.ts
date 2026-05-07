@@ -1,6 +1,6 @@
 import { Hono } from 'hono/tiny'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { recordUpdateEnumerationMiss, updateEnumerationLimitedResponse } from '../supabase/functions/_backend/utils/updateOracleGuard.ts'
+import { isUpdateEnumerationLimited, recordUpdateEnumerationMiss, updateEnumerationLimitedResponse } from '../supabase/functions/_backend/utils/updateOracleGuard.ts'
 
 type CacheKey = Request | string
 
@@ -30,6 +30,13 @@ function createGuardApp() {
       return updateEnumerationLimitedResponse(c)
 
     return c.json({ status: 'recorded' })
+  })
+  app.post('/limited', async (c) => {
+    const limit = await isUpdateEnumerationLimited(c)
+    if (limit.limited)
+      return updateEnumerationLimitedResponse(c)
+
+    return c.json({ status: 'not_limited' })
   })
   return app
 }
@@ -96,6 +103,32 @@ describe('update enumeration guard', () => {
     }))
     expect(known.status).toBe(200)
     await expect(known.json()).resolves.toMatchObject({ status: 'known' })
+  })
+
+  it('short-circuits already limited IPs before recording another app ID', async () => {
+    const app = createGuardApp()
+    const headers = {
+      'Content-Type': 'application/json',
+      'cf-connecting-ip': '203.0.113.13',
+    }
+
+    await app.fetch(new Request('http://localhost/updates', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ app_id: 'com.missing.first' }),
+    }))
+    await app.fetch(new Request('http://localhost/updates', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ app_id: 'com.missing.second' }),
+    }))
+
+    const blocked = await app.fetch(new Request('http://localhost/limited', {
+      method: 'POST',
+      headers,
+    }))
+    expect(blocked.status).toBe(429)
+    await expect(blocked.json()).resolves.toMatchObject({ error: 'on_premise_app' })
   })
 
   it('does not increase the distinct miss count for repeated app IDs', async () => {

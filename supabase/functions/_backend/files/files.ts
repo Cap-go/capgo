@@ -352,13 +352,23 @@ function getRawQueryParam(c: Context, name: string) {
     if (!rawName)
       continue
 
+    let decodedName: string
     try {
-      if (decodeURIComponent(rawName) !== name)
-        continue
-      return decodeURIComponent(rawValueParts.join('='))
+      decodedName = decodeURIComponent(rawName)
     }
     catch {
-      return rawValueParts.join('=')
+      continue
+    }
+
+    if (decodedName !== name)
+      continue
+
+    const rawValue = rawValueParts.join('=')
+    try {
+      return decodeURIComponent(rawValue)
+    }
+    catch {
+      return rawValue
     }
   }
 
@@ -381,6 +391,25 @@ function isUploadAttachmentRoute(c: Context) {
   const pathname = new URL(c.req.url).pathname
   return pathname.startsWith(`/upload/${ATTACHMENT_PREFIX}/`)
     || pathname.startsWith(`/files/upload/${ATTACHMENT_PREFIX}/`)
+}
+
+const attachmentReadAuth = middlewareKey(['all', 'read'], true)
+
+function hasAttachmentAuthHeader(c: Context) {
+  return !!(c.req.header('authorization') || c.req.header('capgkey'))
+}
+
+async function tryAttachmentReadAuth(c: Context) {
+  try {
+    let completed = false
+    await attachmentReadAuth(c, async () => {
+      completed = true
+    })
+    return completed
+  }
+  catch {
+    return false
+  }
 }
 
 async function hasSignedBundleRead(
@@ -496,6 +525,11 @@ async function assertReadableAppScopedAttachment(c: Context, fileId: unknown): P
 
     if (await hasAuthenticatedAttachmentRead(c, drizzleClient, signedScopedPath))
       return
+
+    if (hasAttachmentAuthHeader(c) && !c.get('auth') && await tryAttachmentReadAuth(c)) {
+      if (await hasAuthenticatedAttachmentRead(c, drizzleClient, signedScopedPath))
+        return
+    }
 
     quickError(404, 'not_found', 'Not found')
   }
@@ -1220,8 +1254,6 @@ app.get(
     return getHandler(c)
   },
 )
-const attachmentReadAuth = middlewareKey(['all', 'read'], true)
-
 async function optionalAttachmentReadAuth(c: Context, next: Next) {
   if (getAttachmentReadKey(c) || (!c.req.header('authorization') && !c.req.header('capgkey'))) {
     await next()

@@ -146,6 +146,57 @@ describe('files app-scoped read guard', () => {
     expect(await response.text()).toBe('cached plus-key bytes')
   })
 
+  it('ignores malformed non-key query params while finding signed bundle keys', async () => {
+    pgQueryMock.mockImplementationOnce(async (_query, params) => {
+      expect(params[1]).toBe('signed-key')
+      return { rows: [{ exists: true }] }
+    })
+    setCachedAttachment('cached signed bytes')
+
+    const appGlobal = await createFilesTestApp()
+    const response = await appGlobal.fetch(
+      new Request('http://localhost/read/attachments/orgs/00000000-0000-4000-8000-000000000001/apps/test-app/bundle.zip?%E0%A4%A=ignored&key=signed-key'),
+      {
+        ATTACHMENT_BUCKET: {},
+      },
+      { waitUntil: () => { } } as any,
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.text()).toBe('cached signed bytes')
+  })
+
+  it('falls back to API-key read auth when a signed bundle key is invalid', async () => {
+    getAppByAppIdPgMock.mockResolvedValue({ app_id: 'test-app', owner_org: '00000000-0000-4000-8000-000000000001' })
+    checkPermissionPgMock.mockResolvedValue(true)
+    pgQueryMock.mockResolvedValueOnce({ rows: [] })
+    setCachedAttachment('cached api-key bytes')
+
+    const appGlobal = await createFilesTestApp()
+    const response = await appGlobal.fetch(
+      new Request('http://localhost/read/attachments/orgs/00000000-0000-4000-8000-000000000001/apps/test-app/bundle.zip?key=wrong-key', {
+        headers: {
+          authorization: 'test-api-key',
+        },
+      }),
+      {
+        ATTACHMENT_BUCKET: {},
+      },
+      { waitUntil: () => { } } as any,
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.text()).toBe('cached api-key bytes')
+    expect(checkPermissionPgMock).toHaveBeenCalledWith(
+      expect.anything(),
+      'app.read_bundles',
+      { appId: 'test-app' },
+      expect.anything(),
+      'auth-user-id',
+      'test-api-key',
+    )
+  })
+
   it('allows authenticated range existence probes for live app-scoped files', async () => {
     getAppByAppIdPgMock.mockResolvedValue({ app_id: 'test-app', owner_org: '00000000-0000-4000-8000-000000000001' })
     checkPermissionPgMock.mockResolvedValue(true)

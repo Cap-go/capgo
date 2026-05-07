@@ -94,6 +94,29 @@ function buildUpdateEnumerationLimitRequest(helper: CacheHelper, ip: string) {
   return helper.buildRequest(UPDATE_ENUMERATION_LIMIT_PATH, { ip })
 }
 
+export async function isUpdateEnumerationLimited(c: Context): Promise<RateLimitStatus> {
+  try {
+    const cacheEntry = buildUpdateEnumerationCacheEntry(c)
+    if (!cacheEntry)
+      return { limited: false }
+
+    const existingLimit = await cacheEntry.helper.matchJson<UpdateEnumerationLimitData>(
+      buildUpdateEnumerationLimitRequest(cacheEntry.helper, cacheEntry.ip),
+    )
+    if (existingLimit)
+      return { limited: true, resetAt: existingLimit.resetAt }
+  }
+  catch (error) {
+    cloudlog({
+      requestId: c.get('requestId'),
+      message: 'Update enumeration guard limit read failed',
+      error,
+    })
+  }
+
+  return { limited: false }
+}
+
 async function countDistinctMisses(c: Context, helper: CacheHelper, ip: string) {
   const bucketRequests = Array.from({ length: UPDATE_ENUMERATION_BUCKET_COUNT }, (_, index) => (
     buildUpdateEnumerationBucketRequest(helper, ip, index.toString())
