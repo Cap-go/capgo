@@ -48,7 +48,7 @@ export async function zipBundleInternal(appId: string, options: BundleZipOptions
 
     const uuid = randomUUID().split('-')[0]
     const packVersion = getBundleVersion('', options.packageJson)
-    bundle = bundle || packVersion || `0.0.1-beta.g${uuid}`
+    bundle = bundle || packVersion || `0.0.1-beta.local-${uuid}`
 
     if (shouldShowPrompts)
       intro(`Zipping ${resolvedAppId}@${bundle}`)

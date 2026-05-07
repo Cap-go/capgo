@@ -2,8 +2,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const createSignedUrlMock = vi.fn()
 const getAppByAppIdPgMock = vi.fn()
-const pgQueryMock = vi.fn()
-const getPgClientMock = vi.fn(() => ({ query: pgQueryMock }))
+const getPgClientMock = vi.fn(() => ({}))
 const storageFromMock = vi.fn(() => ({
   createSignedUrl: createSignedUrlMock,
 }))
@@ -47,7 +46,6 @@ describe('files local read proxy', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.clearAllMocks()
-    pgQueryMock.mockResolvedValue({ rows: [{ exists: true }] })
     globalThis.fetch = originalFetch
   })
 
@@ -56,7 +54,7 @@ describe('files local read proxy', () => {
   })
 
   it('proxies local storage reads instead of redirecting to a public URL', async () => {
-    getAppByAppIdPgMock.mockResolvedValue({ app_id: 'test-app', owner_org: '00000000-0000-4000-8000-000000000001' })
+    getAppByAppIdPgMock.mockResolvedValue({ app_id: 'test-app', owner_org: 'test-org' })
     createSignedUrlMock.mockResolvedValue({
       data: { signedUrl: 'https://storage.example/object?token=test' },
       error: null,
@@ -84,7 +82,7 @@ describe('files local read proxy', () => {
     createAllCatch(appGlobal, 'files')
 
     const response = await appGlobal.fetch(
-      new Request('http://localhost/read/attachments/orgs/00000000-0000-4000-8000-000000000001/apps/test-app/local.txt?key=signed-key'),
+      new Request('http://localhost/read/attachments/orgs/test-org/apps/test-app/local.txt'),
       {},
       { waitUntil: () => { } } as any,
     )
@@ -92,14 +90,14 @@ describe('files local read proxy', () => {
     expect(response.status).toBe(200)
     expect(await response.text()).toBe('proxied local bytes')
     expect(response.headers.get('cache-control')).toBe('public, max-age=60, no-transform')
-    expect(response.headers.get('content-disposition')).toBe('attachment; filename="orgs/00000000-0000-4000-8000-000000000001/apps/test-app/local.txt"')
+    expect(response.headers.get('content-disposition')).toBe('attachment; filename="orgs/test-org/apps/test-app/local.txt"')
     expect(getPgClientMock).toHaveBeenCalledWith(expect.anything(), false)
     expect(storageFromMock).toHaveBeenCalledWith('capgo')
-    expect(createSignedUrlMock).toHaveBeenCalledWith('orgs/00000000-0000-4000-8000-000000000001/apps/test-app/local.txt', 60)
+    expect(createSignedUrlMock).toHaveBeenCalledWith('orgs/test-org/apps/test-app/local.txt', 60)
   })
 
   it('preserves HEAD requests without downloading bytes from the signed URL proxy', async () => {
-    getAppByAppIdPgMock.mockResolvedValue({ app_id: 'test-app', owner_org: '00000000-0000-4000-8000-000000000001' })
+    getAppByAppIdPgMock.mockResolvedValue({ app_id: 'test-app', owner_org: 'test-org' })
     createSignedUrlMock.mockResolvedValue({
       data: { signedUrl: 'https://storage.example/object?token=test' },
       error: null,
@@ -126,13 +124,13 @@ describe('files local read proxy', () => {
     createAllCatch(appGlobal, 'files')
 
     const response = await appGlobal.fetch(
-      new Request('http://localhost/read/attachments/orgs/00000000-0000-4000-8000-000000000001/apps/test-app/local.txt?key=signed-key', { method: 'HEAD' }),
+      new Request('http://localhost/read/attachments/orgs/test-org/apps/test-app/local.txt', { method: 'HEAD' }),
       {},
       { waitUntil: () => { } } as any,
     )
 
     expect(response.status).toBe(200)
     expect(response.headers.get('cache-control')).toBe('public, max-age=60, no-transform')
-    expect(response.headers.get('content-disposition')).toBe('attachment; filename="orgs/00000000-0000-4000-8000-000000000001/apps/test-app/local.txt"')
+    expect(response.headers.get('content-disposition')).toBe('attachment; filename="orgs/test-org/apps/test-app/local.txt"')
   })
 })

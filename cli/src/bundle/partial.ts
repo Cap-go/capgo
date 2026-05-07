@@ -17,14 +17,13 @@ import { encryptChecksum, encryptChecksumV3, encryptSource } from '../api/crypto
 import { BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, findRoot, generateManifest, getContentType, getInstalledVersion, getLocalConfig, isDeprecatedPluginVersion, sendEvent } from '../utils'
 
 // Check if file already exists on server (bypass cache and force storage lookup)
-async function fileExists(localConfig: any, filename: string, apikey: string): Promise<boolean> {
+async function fileExists(localConfig: any, filename: string): Promise<boolean> {
   try {
     const url = new URL(`${localConfig.hostFilesApi}/files/read/attachments/${encodeURIComponent(filename)}`)
     url.searchParams.set('nocache', `${Date.now()}`)
     const response = await fetch(url.toString(), {
       method: 'GET',
       headers: {
-        'authorization': apikey,
         'range': 'bytes=0-0',
         'cache-control': 'no-cache',
       },
@@ -286,7 +285,7 @@ export async function uploadPartial(
       // Check if file already exists on server
       // Skip reuse when encryption is enabled because the session key changes per upload
       // and reusing a file encrypted with a different session key would cause decryption to fail
-      if (!encryptionOptions && await fileExists(localConfig, filename, apikey)) {
+      if (!encryptionOptions && await fileExists(localConfig, filename)) {
         uploadedFiles++
         return Promise.resolve({
           file_name: filePathUnixSafe,

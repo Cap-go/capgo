@@ -77,7 +77,7 @@ async function getBundle(config: CapacitorConfig, options: OptionsUpload) {
   const bundle = options.bundle
     || config?.plugins?.CapacitorUpdater?.version
     || pkgVersion
-    || `0.0.1-beta.g${randomUUID().split('-')[0]}`
+    || `0.0.1-beta.local-${randomUUID().split('-')[0]}`
 
   if (!regexSemver.test(bundle)) {
     uploadFail(`Your bundle name ${bundle}, is not valid it should follow semver convention : https://semver.org/`)

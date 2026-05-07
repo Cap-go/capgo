@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
 
-const getAppByAppIdPgMock = vi.fn()
-const pgQueryMock = vi.fn()
-const getPgClientMock = vi.fn(() => ({ query: pgQueryMock }))
 const retryGetMock = vi.fn()
 const retryHeadMock = vi.fn()
 
@@ -17,18 +14,6 @@ vi.mock('hono/adapter', async (importOriginal) => {
 vi.mock('../supabase/functions/_backend/utils/discord.ts', () => ({
   sendDiscordAlert500: () => Promise.resolve(),
   sendDiscordAlert: () => Promise.resolve(),
-}))
-
-vi.mock('../supabase/functions/_backend/utils/pg.ts', () => ({
-  closeClient: () => Promise.resolve(),
-  getAppOwnerPostgres: vi.fn(),
-  getDrizzleClient: vi.fn(() => ({})),
-  getPgClient: getPgClientMock,
-}))
-
-vi.mock('../supabase/functions/_backend/utils/pg_files.ts', () => ({
-  getAppByAppIdPg: getAppByAppIdPgMock,
-  getUserIdFromApikey: vi.fn(),
 }))
 
 vi.mock('../supabase/functions/_backend/files/retry.ts', () => ({
@@ -48,8 +33,6 @@ vi.mock('../supabase/functions/_backend/files/retry.ts', () => ({
 describe('files R2 error handling', () => {
   it('should return 503 when R2 get fails', async () => {
     vi.resetModules()
-    vi.clearAllMocks()
-    pgQueryMock.mockResolvedValue({ rows: [{ exists: true }] })
     retryHeadMock.mockResolvedValue(null)
     retryGetMock.mockImplementation(() => {
       throw new Error('r2 unavailable')
@@ -70,7 +53,7 @@ describe('files R2 error handling', () => {
     appGlobal.route('/', files)
     createAllCatch(appGlobal, 'files')
 
-    const request = new Request('http://localhost/read/attachments/orgs/00000000-0000-4000-8000-000000000001/apps/test-app/test.zip?key=signed-key')
+    const request = new Request('http://localhost/read/attachments/test.zip')
     const response = await appGlobal.fetch(
       request,
       { ATTACHMENT_BUCKET: {} },
@@ -84,8 +67,6 @@ describe('files R2 error handling', () => {
 
   it('should add no-transform on cached responses', async () => {
     vi.resetModules()
-    vi.clearAllMocks()
-    pgQueryMock.mockResolvedValue({ rows: [{ exists: true }] })
     retryHeadMock.mockResolvedValue(null)
     retryGetMock.mockResolvedValue(null)
 
@@ -108,7 +89,7 @@ describe('files R2 error handling', () => {
     appGlobal.route('/', files)
     createAllCatch(appGlobal, 'files')
 
-    const request = new Request('http://localhost/read/attachments/orgs/00000000-0000-4000-8000-000000000001/apps/test-app/test.zip?key=signed-key')
+    const request = new Request('http://localhost/read/attachments/test.zip')
     const response = await appGlobal.fetch(
       request,
       {
