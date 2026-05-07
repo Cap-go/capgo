@@ -34,4 +34,22 @@ describe('translation queue helpers', () => {
       __translationWorkerTestUtils__.translationStoreTtlSeconds({ status: 'ready' }),
     )
   })
+
+  it.concurrent('keeps active batch claims leased past stale polling checks', () => {
+    type TranslationStoreEntryForTest = Parameters<typeof __translationWorkerTestUtils__.isTranslationBatchLeaseExpired>[0]
+
+    const now = Math.floor(Date.now() / 1000)
+    const entry: TranslationStoreEntryForTest = {
+      checksum: 'checksum',
+      messages: {},
+      model: 'model',
+      nextBatchIndex: __translationWorkerTestUtils__.translationBatchClaimMarker(0),
+      status: 'pending',
+      targetLanguage: 'fr',
+      updatedAt: now - 61,
+    }
+
+    expect(__translationWorkerTestUtils__.isTranslationBatchLeaseExpired(entry)).toBe(false)
+    expect(__translationWorkerTestUtils__.isTranslationBatchLeaseExpired({ ...entry, updatedAt: now - (15 * 60 + 1) })).toBe(true)
+  })
 })

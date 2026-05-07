@@ -10,6 +10,7 @@ const TRANSLATION_ATTEMPTS = 3
 const TRANSLATION_CACHE_PATH = '/translation/messages-cache'
 const TRANSLATION_STORE_CLEANUP_INTERVAL_SECONDS = 60
 const TRANSLATION_REQUEUE_AFTER_SECONDS = 60
+const TRANSLATION_BATCH_LEASE_SECONDS = 15 * 60
 const TRANSLATION_STORE_TABLE = 'translation_messages_cache'
 const CLAIMED_TRANSLATION_BATCH_INDEX_OFFSET = 1_000_000_000
 const PLACEHOLDER_PATTERN = /\{[\w.]+\}|%\w+%?|\$\d+/g
@@ -562,6 +563,10 @@ function isPendingTranslationStale(entry: TranslationStoreEntry) {
   return entry.status === 'pending' && nowSeconds() - entry.updatedAt >= TRANSLATION_REQUEUE_AFTER_SECONDS
 }
 
+function isTranslationBatchLeaseExpired(entry: TranslationStoreEntry) {
+  return entry.status === 'pending' && nowSeconds() - entry.updatedAt >= TRANSLATION_BATCH_LEASE_SECONDS
+}
+
 function claimedTranslationBatchIndex(nextBatchIndex: number) {
   return nextBatchIndex >= CLAIMED_TRANSLATION_BATCH_INDEX_OFFSET ? nextBatchIndex - CLAIMED_TRANSLATION_BATCH_INDEX_OFFSET : null
 }
@@ -631,6 +636,28 @@ async function writeTranslationStoreEntry(env: TranslationWorkerBindings, entry:
   await ensureTranslationStore(db)
   await deleteExpiredTranslationStoreEntries(db)
   await upsertTranslationStoreEntry(db, entry)
+}
+
+async function writeClaimedTranslationStoreEntry(env: TranslationWorkerBindings, entry: TranslationStoreEntry, batchIndex: number) {
+  const db = getTranslationStore(env)
+  await ensureTranslationStore(db)
+  await deleteExpiredTranslationStoreEntries(db)
+  const result = await db.prepare(
+    `UPDATE ${TRANSLATION_STORE_TABLE}
+     SET model = ?,
+         status = ?,
+         messages = ?,
+         next_batch_index = ?,
+         expires_at = unixepoch() + ?,
+         updated_at = unixepoch()
+     WHERE target_language = ?
+       AND checksum = ?
+       AND status = 'pending'
+       AND next_batch_index = ?
+       AND expires_at > unixepoch()`,
+  ).bind(entry.model, entry.status, JSON.stringify(entry.messages), entry.nextBatchIndex, translationStoreTtlSeconds(entry), entry.targetLanguage, entry.checksum, translationBatchClaimMarker(batchIndex)).run()
+
+  return result.meta.changes > 0
 }
 
 async function insertPendingTranslationStoreEntry(env: TranslationWorkerBindings, entry: TranslationStoreEntry) {
@@ -830,6 +857,9 @@ async function readyTranslationResponse(requestId: string | undefined, readyRequ
 }
 
 async function requeueStaleTranslation(env: TranslationWorkerBindings, storedEntry: TranslationStoreEntry, checksum: string, targetLanguage: string, requestId: string) {
+  if (claimedTranslationBatchIndex(storedEntry.nextBatchIndex) !== null)
+    return
+
   try {
     await enqueueTranslationBatch(env, translationQueuePayload(
       checksum,
@@ -837,8 +867,7 @@ async function requeueStaleTranslation(env: TranslationWorkerBindings, storedEnt
       storedEntry.model,
       translationBatchIndexFromStore(storedEntry.nextBatchIndex),
     ), requestId)
-    if (claimedTranslationBatchIndex(storedEntry.nextBatchIndex) === null)
-      await touchTranslationStoreEntry(env, storedEntry)
+    await touchTranslationStoreEntry(env, storedEntry)
   }
   catch (error) {
     cloudlogErr({
@@ -939,14 +968,17 @@ async function nextProcessableBatchIndex(env: TranslationWorkerBindings, storedE
   if (claimedBatchIndex === null)
     return storedEntry.nextBatchIndex
 
-  if (batchIndex !== claimedBatchIndex || !isPendingTranslationStale(storedEntry))
+  if (batchIndex !== claimedBatchIndex)
     return null
+
+  if (!isTranslationBatchLeaseExpired(storedEntry))
+    throw new Error('Translation batch claim is still active')
 
   const released = await releaseTranslationBatchClaim(env, checksum, targetLanguage, batchIndex)
   return released ? claimedBatchIndex : null
 }
 
-async function writeReadyTranslation(env: TranslationWorkerBindings, checksum: string, targetLanguage: string, model: string, messages: Record<string, string>, nextBatchIndex: number, readyRequest: Request, requestId: string | undefined, batchCount?: number) {
+async function writeReadyTranslation(env: TranslationWorkerBindings, checksum: string, targetLanguage: string, model: string, messages: Record<string, string>, nextBatchIndex: number, readyRequest: Request, requestId: string | undefined, batchCount?: number, claimedBatchIndex?: number) {
   const readyEntry = translationStoreEntry({
     checksum,
     messages,
@@ -955,7 +987,12 @@ async function writeReadyTranslation(env: TranslationWorkerBindings, checksum: s
     status: 'ready',
     targetLanguage,
   })
-  await writeTranslationStoreEntry(env, readyEntry)
+  const written = claimedBatchIndex === undefined
+    ? (await writeTranslationStoreEntry(env, readyEntry), true)
+    : await writeClaimedTranslationStoreEntry(env, readyEntry, claimedBatchIndex)
+  if (!written)
+    return false
+
   await cacheReadyTranslationPayload(requestId, readyRequest, readyPayloadFromStore(readyEntry), targetLanguage)
 
   if (batchCount !== undefined) {
@@ -966,6 +1003,7 @@ async function writeReadyTranslation(env: TranslationWorkerBindings, checksum: s
       batchCount,
     })
   }
+  return true
 }
 
 async function translateOwnedBatch(ai: AiBinding, env: TranslationWorkerBindings, checksum: string, targetLanguage: string, model: string, batches: MessageEntry[][], batchIndex: number) {
@@ -984,36 +1022,26 @@ async function translateOwnedBatch(ai: AiBinding, env: TranslationWorkerBindings
   }
 }
 
-async function persistTranslatedBatch(env: TranslationWorkerBindings, checksum: string, targetLanguage: string, model: string, previousMessages: Record<string, string>, mergedMessages: Record<string, string>, batchIndex: number, batches: MessageEntry[][], readyRequest: Request, requestId: string | undefined) {
+async function persistTranslatedBatch(env: TranslationWorkerBindings, checksum: string, targetLanguage: string, model: string, mergedMessages: Record<string, string>, batchIndex: number, batches: MessageEntry[][], readyRequest: Request, requestId: string | undefined) {
   const followingBatchIndex = batchIndex + 1
 
-  try {
-    if (followingBatchIndex >= batches.length) {
-      await writeReadyTranslation(env, checksum, targetLanguage, model, mergedMessages, followingBatchIndex, readyRequest, requestId, batches.length)
-      return
-    }
+  if (followingBatchIndex >= batches.length) {
+    await writeReadyTranslation(env, checksum, targetLanguage, model, mergedMessages, followingBatchIndex, readyRequest, requestId, batches.length, batchIndex)
+    return
+  }
 
-    await writeTranslationStoreEntry(env, translationStoreEntry({
-      checksum,
-      messages: mergedMessages,
-      model,
-      nextBatchIndex: followingBatchIndex,
-      status: 'pending',
-      targetLanguage,
-    }))
-    await enqueueTranslationBatch(env, translationQueuePayload(checksum, targetLanguage, model, followingBatchIndex), requestId)
-  }
-  catch (error) {
-    await writeTranslationStoreEntry(env, translationStoreEntry({
-      checksum,
-      messages: previousMessages,
-      model,
-      nextBatchIndex: batchIndex,
-      status: 'pending',
-      targetLanguage,
-    })).catch(() => {})
-    throw error
-  }
+  const written = await writeClaimedTranslationStoreEntry(env, translationStoreEntry({
+    checksum,
+    messages: mergedMessages,
+    model,
+    nextBatchIndex: followingBatchIndex,
+    status: 'pending',
+    targetLanguage,
+  }), batchIndex)
+  if (!written)
+    return
+
+  await enqueueTranslationBatch(env, translationQueuePayload(checksum, targetLanguage, model, followingBatchIndex), requestId)
 }
 
 async function processTranslationQueueBatch(env: TranslationWorkerBindings, body: TranslationQueuePayload, requestId?: string) {
@@ -1071,7 +1099,7 @@ async function processTranslationQueueBatch(env: TranslationWorkerBindings, body
     ...storedEntry.messages,
     ...translatedBatch,
   }
-  await persistTranslatedBatch(env, checksum, targetLanguage, model, storedEntry.messages, mergedMessages, batchIndex, batches, readyRequest, requestId)
+  await persistTranslatedBatch(env, checksum, targetLanguage, model, mergedMessages, batchIndex, batches, readyRequest, requestId)
 }
 
 async function fetchHandler(request: Request, env: TranslationWorkerBindings) {
@@ -1123,6 +1151,7 @@ export default {
 export const __translationWorkerTestUtils__ = {
   buildBatches,
   claimedTranslationBatchIndex,
+  isTranslationBatchLeaseExpired,
   keepTranslation,
   normalizeBatchIndex,
   parseTranslationObject,
