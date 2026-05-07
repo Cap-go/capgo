@@ -70,7 +70,7 @@ android {
         }
     }
 }`
-  const ids = await imp().then(m => m.extractApplicationIds(src))
+  const ids = extractApplicationIds(src)
   assert(ids.includes('com.example.app'))
   assert(ids.includes('com.example.app.free'))
   assert(ids.includes('com.example.app.pro'))

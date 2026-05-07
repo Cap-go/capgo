@@ -124,7 +124,7 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [keystorePathMode, setKeystorePathMode] = useState<'choose' | 'manual'>('choose')
 
   // Phase 1 — keystore
-  const [keystoreMethod, setKeystoreMethod] = useState<'existing' | 'generate' | null>(
+  const [, setKeystoreMethod] = useState<'existing' | 'generate' | null>(
     initialProgress?.keystoreMethod || null,
   )
   const [keystoreExistingPath, setKeystoreExistingPath] = useState(initialProgress?.keystoreExistingPath || '')
@@ -140,13 +140,12 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
   const [detectedAliases, setDetectedAliases] = useState<string[]>([])
 
   // Phase 2 — Google sign-in
-  const [googleSignIn, setGoogleSignIn] = useState<GoogleSignInComplete | null>(
+  const [, setGoogleSignIn] = useState<GoogleSignInComplete | null>(
     initialProgress?.completedSteps.googleSignInComplete || null,
   )
   const [accessToken, setAccessToken] = useState<string>('')
   const [refreshTokenState, setRefreshTokenState] = useState<string>(initialProgress?._oauthRefreshToken || '')
   const [oauthClientId, setOauthClientId] = useState<string>('')
-  const [oauthClientSecret, setOauthClientSecret] = useState<string | undefined>(undefined)
   const [oauthStatusMessages, setOauthStatusMessages] = useState<string[]>([])
 
   // Phase 3 — Play developer account (user pastes ID or URL)
@@ -176,10 +175,10 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
 
   // Phase 5 — provisioning status stream
   const [setupStatus, setSetupStatus] = useState<string[]>([])
-  const [serviceAccountProvisioned, setServiceAccountProvisioned] = useState<ServiceAccountProvisioned | null>(
+  const [, setServiceAccountProvisioned] = useState<ServiceAccountProvisioned | null>(
     initialProgress?.completedSteps.serviceAccountProvisioned || null,
   )
-  const [playInviteProvisioned, setPlayInviteProvisioned] = useState<PlayInviteProvisioned | null>(
+  const [, setPlayInviteProvisioned] = useState<PlayInviteProvisioned | null>(
     initialProgress?.completedSteps.playInviteProvisioned || null,
   )
   const [serviceAccountKeyBase64, setServiceAccountKeyBase64] = useState<string>(
@@ -487,7 +486,6 @@ const AndroidOnboardingApp: FC<AppProps> = ({ appId, initialProgress, androidDir
         try {
           const cfg = await getCapgoConfig()
           setOauthClientId(cfg.clientId)
-          setOauthClientSecret(cfg.clientSecret)
 
           setOauthStatusMessages([])
           const tokens = await runOAuthFlow(
