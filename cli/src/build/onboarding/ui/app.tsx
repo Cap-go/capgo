@@ -731,7 +731,7 @@ const OnboardingApp: FC<AppProps> = ({ appId, initialProgress, iosDir, apikey })
           <Newline />
           <Select
             options={[
-              { label: '  iOS', value: 'ios' },
+              { label: '🍎  iOS', value: 'ios' },
               { label: '🤖  Android', value: 'android' },
             ]}
             onChange={async (value) => {
