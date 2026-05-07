@@ -76,7 +76,7 @@ function generateDemoDevicesData(days: number, usageKind: string = 'bundle'): { 
   }
 
   const labelsByKind = usageKind === 'native'
-    ? ['1.0.0', '1.1.0']
+    ? ['iOS 1.0.0', 'Android 1.1.0']
     : ['2.0.5', '2.1.0']
 
   return {
@@ -741,13 +741,17 @@ watch(
           {{ t(titleKey) }}
         </h2>
 
-        <div class="flex flex-col items-end text-right shrink-0">
+        <div class="flex max-w-[11rem] flex-col items-end text-right shrink-0">
           <div
             class="inline-flex items-center justify-center px-2 py-1 text-xs font-bold text-white rounded-full shadow-lg whitespace-nowrap bg-cyan-500"
           >
             {{ latestVersionPercentageDisplay }}
           </div>
-          <div v-if="latestVersion" class="text-3xl font-bold dark:text-white text-slate-600">
+          <div
+            v-if="latestVersion"
+            class="font-bold leading-tight break-words dark:text-white text-slate-600"
+            :class="isNativeUsage ? 'text-xl sm:text-2xl' : 'text-3xl'"
+          >
             {{ latestVersion.name }}
           </div>
           <div v-if="latestVersion" class="text-xs text-slate-500 dark:text-slate-400">
