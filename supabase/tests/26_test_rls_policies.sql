@@ -312,7 +312,12 @@ SELECT
     policies_are(
         'public',
         'device_usage',
-        ARRAY['Disable for all'],
+        ARRAY[
+            'Allow org members to select device_usage',
+            'Deny delete on device_usage',
+            'Deny insert on device_usage',
+            'Deny update on device_usage'
+        ],
         'device_usage should have correct policies'
     );
 
