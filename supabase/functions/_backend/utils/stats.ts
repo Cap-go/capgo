@@ -15,7 +15,7 @@ export function createStatsMau(c: Context, device_id: string, app_id: string, or
   const lowerDeviceId = device_id
   const jobs: Promise<unknown>[] = []
   if (!c.env.DEVICE_USAGE) {
-    jobs.push(Promise.resolve(trackDeviceUsageSB(c, lowerDeviceId, app_id, org_id, version_build)))
+    jobs.push(Promise.resolve(trackDeviceUsageSB(c, lowerDeviceId, app_id, org_id, platform, version_build)))
   }
   else {
     jobs.push(Promise.resolve(trackDeviceUsageCF(c, lowerDeviceId, app_id, org_id, platform, version_build)))

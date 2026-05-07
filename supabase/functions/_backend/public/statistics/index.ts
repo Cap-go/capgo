@@ -117,6 +117,7 @@ interface AppUsageByVersion {
 
 interface NativeVersionUsageRow {
   date: string
+  platform: string
   version_build: string
   devices: number | null
 }
@@ -648,23 +649,45 @@ async function getBundleUsage(appId: string, from: Date, to: Date, shouldGetLate
   }
 }
 
-function buildNativeVersionCounts(rows: NativeVersionUsageRow[], dates: string[], versions: string[]) {
+function normalizeNativePlatform(platform: string | null | undefined) {
+  return platform?.trim().toLowerCase() || 'unknown'
+}
+
+function formatNativePlatform(platform: string | null | undefined) {
+  const normalized = normalizeNativePlatform(platform)
+  if (normalized === 'ios')
+    return 'iOS'
+  if (normalized === 'android')
+    return 'Android'
+  if (normalized === 'electron')
+    return 'Electron'
+  if (normalized === 'unknown')
+    return 'Unknown'
+
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1)
+}
+
+function getNativeVersionSeriesName(row: NativeVersionUsageRow) {
+  return `${formatNativePlatform(row.platform)} ${row.version_build || 'unknown'}`
+}
+
+function buildNativeVersionCounts(rows: NativeVersionUsageRow[], dates: string[], seriesNames: string[]) {
   const dateSet = new Set(dates)
   const counts = dates.reduce((acc, date) => {
-    acc[date] = versions.reduce((versionAcc, version) => {
-      versionAcc[version] = 0
-      return versionAcc
+    acc[date] = seriesNames.reduce((seriesAcc, seriesName) => {
+      seriesAcc[seriesName] = 0
+      return seriesAcc
     }, {} as Record<string, number>)
     return acc
   }, {} as Record<string, Record<string, number>>)
 
   rows.forEach((row) => {
     const date = dayjs(row.date).utc().format('YYYY-MM-DD')
-    const version = row.version_build || 'unknown'
-    if (!dateSet.has(date) || !counts[date] || !versions.includes(version))
+    const seriesName = getNativeVersionSeriesName(row)
+    if (!dateSet.has(date) || !counts[date] || !seriesNames.includes(seriesName))
       return
 
-    counts[date][version] += Math.max(0, Number(row.devices) || 0)
+    counts[date][seriesName] += Math.max(0, Number(row.devices) || 0)
   })
 
   return counts
@@ -696,10 +719,10 @@ async function getNativeVersionUsage(c: Context, appId: string, from: Date, to: 
   catch (error) {
     return { data: null, error }
   }
-  const versions = [...new Set(nativeVersionUsage.map(row => row.version_build || 'unknown'))]
-  const dailyCounts = buildNativeVersionCounts(nativeVersionUsage, dates, versions)
-  const dailyPercentages = convertCountsToPercentagesByName(dailyCounts, dates, versions)
-  const activeVersions = getActiveVersionsByName(versions, dailyCounts)
+  const seriesNames = [...new Set(nativeVersionUsage.map(getNativeVersionSeriesName))]
+  const dailyCounts = buildNativeVersionCounts(nativeVersionUsage, dates, seriesNames)
+  const dailyPercentages = convertCountsToPercentagesByName(dailyCounts, dates, seriesNames)
+  const activeVersions = getActiveVersionsByName(seriesNames, dailyCounts)
   const datasets = createDatasetsByName(activeVersions, dates, dailyPercentages, dailyCounts)
   const latestVersion = getLatestDayVersionShare(activeVersions, dates, dailyCounts)
 

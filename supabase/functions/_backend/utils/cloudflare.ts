@@ -61,6 +61,22 @@ const TRACK_DEVICE_USAGE_CACHE_PATH = '/.track-device-usage-cache'
 // Cache per device per day to ensure rolling windows still see active devices.
 const TRACK_DEVICE_USAGE_CACHE_MAX_AGE_SECONDS = 2 * 24 * 60 * 60
 
+function normalizeUsagePlatform(platform?: string | null) {
+  return platform?.trim().toLowerCase() || 'unknown'
+}
+
+function getUsagePlatformValue(platform?: string | null) {
+  const normalized = normalizeUsagePlatform(platform)
+  if (normalized === 'ios')
+    return 1
+  if (normalized === 'electron')
+    return 2
+  if (normalized === 'android')
+    return 0
+
+  return -1
+}
+
 /**
  * Track device usage (MAU) in Cloudflare Analytics Engine
  *
@@ -83,13 +99,17 @@ export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: 
   if (!c.env.DEVICE_USAGE)
     return
 
+  const normalizedPlatform = normalizeUsagePlatform(platform)
+  const normalizedVersionBuild = version_build || 'unknown'
+
   try {
     const usageCache = new CacheHelper(c)
     const usageCacheRequest = usageCache.buildRequest(TRACK_DEVICE_USAGE_CACHE_PATH, {
       app_id,
       device_id,
       day: dayjs().format('YYYY-MM-DD'),
-      version_build: version_build || 'unknown',
+      platform: normalizedPlatform,
+      version_build: normalizedVersionBuild,
     })
 
     // Check if device/version was already tracked for the current day
@@ -101,12 +121,11 @@ export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: 
       }
     }
 
-    // Platform: 0 = android, 1 = ios
-    const platformValue = platform?.toLowerCase() === 'ios' ? 1 : 0
+    const platformValue = getUsagePlatformValue(normalizedPlatform)
 
     // Write to Analytics Engine
     c.env.DEVICE_USAGE.writeDataPoint({
-      blobs: [device_id, org_id, version_build || 'unknown'],
+      blobs: [device_id, org_id, normalizedVersionBuild, normalizedPlatform],
       doubles: [platformValue],
       indexes: [app_id],
     })
@@ -117,11 +136,10 @@ export async function trackDeviceUsageCF(c: Context, device_id: string, app_id: 
     }
   }
   catch {
-    // Platform: 0 = android, 1 = ios
-    const platformValue = platform?.toLowerCase() === 'ios' ? 1 : 0
+    const platformValue = getUsagePlatformValue(normalizedPlatform)
     // On error, still try to write to Analytics Engine without caching
     c.env.DEVICE_USAGE.writeDataPoint({
-      blobs: [device_id, org_id, version_build || 'unknown'],
+      blobs: [device_id, org_id, normalizedVersionBuild, normalizedPlatform],
       doubles: [platformValue],
       indexes: [app_id],
     })
@@ -518,6 +536,7 @@ export async function readNativeVersionUsageCF(c: Context, app_id: string, perio
 
   const query = `SELECT
   formatDateTime(toStartOfInterval(timestamp, INTERVAL '1' DAY), '%Y-%m-%d') AS date,
+  multiIf(blob4 != '', blob4, double1 = 1, 'ios', double1 = 2, 'electron', double1 = 0, 'android', 'unknown') AS platform,
   if(blob3 = '', 'unknown', blob3) AS version_build,
   COUNT(DISTINCT blob1) AS devices
 FROM device_usage
@@ -525,8 +544,8 @@ WHERE
   index1 = '${escapeSqlString(app_id)}'
   AND timestamp >= toDateTime('${formatDateCF(period_start)}')
   AND timestamp < toDateTime('${formatDateCF(period_end)}')
-GROUP BY date, version_build
-ORDER BY date`
+GROUP BY date, platform, version_build
+ORDER BY date, platform, version_build`
 
   cloudlog({ requestId: c.get('requestId'), message: 'readNativeVersionUsageCF query', query })
   try {

@@ -143,13 +143,17 @@ describe('[GET] /statistics operations with and without subkey', () => {
     const timestamp = `${fromDate}T12:00:00.000Z`
     const versionA = `${prefix}-1.0.0`
     const versionB = `${prefix}-1.1.0`
+    const iosLabel = `iOS ${versionA}`
+    const androidLabel = `Android ${versionA}`
+    const electronLabel = `Electron ${versionB}`
 
     await getSupabaseClient()
       .from('device_usage')
       .insert([
-        { app_id: APPNAME, device_id: `${prefix}-a`, org_id: ORG_ID_STATS, timestamp, version_build: versionA },
-        { app_id: APPNAME, device_id: `${prefix}-a`, org_id: ORG_ID_STATS, timestamp, version_build: versionA },
-        { app_id: APPNAME, device_id: `${prefix}-b`, org_id: ORG_ID_STATS, timestamp, version_build: versionB },
+        { app_id: APPNAME, device_id: `${prefix}-a`, org_id: ORG_ID_STATS, platform: 'ios', timestamp, version_build: versionA },
+        { app_id: APPNAME, device_id: `${prefix}-a`, org_id: ORG_ID_STATS, platform: 'ios', timestamp, version_build: versionA },
+        { app_id: APPNAME, device_id: `${prefix}-b`, org_id: ORG_ID_STATS, platform: 'android', timestamp, version_build: versionA },
+        { app_id: APPNAME, device_id: `${prefix}-c`, org_id: ORG_ID_STATS, platform: 'electron', timestamp, version_build: versionB },
       ])
       .throwOnError()
 
@@ -165,11 +169,13 @@ describe('[GET] /statistics operations with and without subkey', () => {
 
       if (process.env.USE_CLOUDFLARE_WORKERS !== 'true') {
         const dayIndex = nativeUsageData.labels.indexOf(fromDate)
-        const version100 = nativeUsageData.datasets.find(dataset => dataset.label === versionA)
-        const version110 = nativeUsageData.datasets.find(dataset => dataset.label === versionB)
+        const iosVersion = nativeUsageData.datasets.find(dataset => dataset.label === iosLabel)
+        const androidVersion = nativeUsageData.datasets.find(dataset => dataset.label === androidLabel)
+        const electronVersion = nativeUsageData.datasets.find(dataset => dataset.label === electronLabel)
         expect(dayIndex).toBeGreaterThanOrEqual(0)
-        expect(version100?.metaCounts[dayIndex]).toBe(1)
-        expect(version110?.metaCounts[dayIndex]).toBe(1)
+        expect(iosVersion?.metaCounts[dayIndex]).toBe(1)
+        expect(androidVersion?.metaCounts[dayIndex]).toBe(1)
+        expect(electronVersion?.metaCounts[dayIndex]).toBe(1)
       }
     }
     finally {

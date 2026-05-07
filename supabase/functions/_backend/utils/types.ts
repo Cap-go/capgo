@@ -59,6 +59,7 @@ export interface VersionUsage {
 
 export interface NativeVersionUsage {
   date: string
+  platform: string
   version_build: string
   devices: number
 }

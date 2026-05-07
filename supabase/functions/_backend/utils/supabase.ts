@@ -1038,6 +1038,7 @@ export function trackDeviceUsageSB(
   deviceId: string,
   appId: string,
   orgId: string,
+  platform: string,
   versionBuild?: string | null,
 ) {
   return supabaseAdmin(c)
@@ -1047,6 +1048,7 @@ export function trackDeviceUsageSB(
         device_id: deviceId.toLowerCase(),
         app_id: appId,
         org_id: orgId,
+        platform: platform || 'unknown',
         version_build: versionBuild || 'unknown',
       },
     ])

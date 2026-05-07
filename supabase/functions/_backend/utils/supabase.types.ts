@@ -1140,6 +1140,7 @@ export type Database = {
           device_id: string
           id: number
           org_id: string
+          platform: string | null
           timestamp: string
           version_build: string | null
         }
@@ -1148,6 +1149,7 @@ export type Database = {
           device_id: string
           id?: number
           org_id: string
+          platform?: string | null
           timestamp?: string
           version_build?: string | null
         }
@@ -1156,6 +1158,7 @@ export type Database = {
           device_id?: string
           id?: number
           org_id?: string
+          platform?: string | null
           timestamp?: string
           version_build?: string | null
         }
@@ -4220,6 +4223,7 @@ export type Database = {
         Returns: {
           date: string
           devices: number
+          platform: string
           version_build: string
         }[]
       }
