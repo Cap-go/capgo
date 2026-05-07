@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
@@ -137,9 +138,9 @@ export function readStatsVersion(c: Context, app_id: string, start_date: string,
   return readStatsVersionCF(c, app_id, start_date, end_date)
 }
 
-export function readNativeVersionUsage(c: Context, app_id: string, start_date: string, end_date: string): Promise<NativeVersionUsage[]> {
+export function readNativeVersionUsage(c: Context, app_id: string, start_date: string, end_date: string, supabase: SupabaseClient<Database>): Promise<NativeVersionUsage[]> {
   if (!c.env.DEVICE_USAGE)
-    return readNativeVersionUsageSB(c, app_id, start_date, end_date)
+    return readNativeVersionUsageSB(c, app_id, start_date, end_date, supabase)
   return readNativeVersionUsageCF(c, app_id, start_date, end_date)
 }
 

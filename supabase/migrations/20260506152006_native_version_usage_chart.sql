@@ -8,6 +8,52 @@ ON public.device_usage USING btree (app_id, timestamp, version_build);
 CREATE INDEX IF NOT EXISTS idx_device_usage_app_timestamp_platform_version_build
 ON public.device_usage USING btree (app_id, timestamp, platform, version_build);
 
+DROP POLICY IF EXISTS "Disable for all" ON public.device_usage;
+DROP POLICY IF EXISTS "Allow org members to select device_usage" ON public.device_usage;
+DROP POLICY IF EXISTS "Deny insert on device_usage" ON public.device_usage;
+DROP POLICY IF EXISTS "Deny update on device_usage" ON public.device_usage;
+DROP POLICY IF EXISTS "Deny delete on device_usage" ON public.device_usage;
+
+CREATE POLICY "Allow org members to select device_usage"
+ON public.device_usage
+FOR SELECT
+TO authenticated, anon
+USING (
+    public.check_min_rights(
+        'read'::public.user_min_right,
+        public.get_identity_org_appid(
+            '{read,upload,write,all}'::public.key_mode[],
+            org_id::uuid,
+            app_id
+        ),
+        org_id::uuid,
+        app_id,
+        NULL::bigint
+    )
+);
+
+CREATE POLICY "Deny insert on device_usage"
+ON public.device_usage
+AS RESTRICTIVE
+FOR INSERT
+TO authenticated, anon
+WITH CHECK (false);
+
+CREATE POLICY "Deny update on device_usage"
+ON public.device_usage
+AS RESTRICTIVE
+FOR UPDATE
+TO authenticated, anon
+USING (false)
+WITH CHECK (false);
+
+CREATE POLICY "Deny delete on device_usage"
+ON public.device_usage
+AS RESTRICTIVE
+FOR DELETE
+TO authenticated, anon
+USING (false);
+
 CREATE OR REPLACE FUNCTION public.read_native_version_usage(
     p_app_id character varying,
     p_period_start timestamp without time zone,
@@ -20,7 +66,7 @@ RETURNS TABLE (
     devices bigint
 )
 LANGUAGE plpgsql
-SECURITY DEFINER
+SECURITY INVOKER
 SET search_path = ''
 AS $$
 BEGIN
@@ -88,8 +134,20 @@ GRANT ALL ON FUNCTION public.read_native_version_usage(
     timestamp without time zone
 ) TO service_role;
 
+GRANT ALL ON FUNCTION public.read_native_version_usage(
+    character varying,
+    timestamp without time zone,
+    timestamp without time zone
+) TO authenticated;
+
+GRANT ALL ON FUNCTION public.read_native_version_usage(
+    character varying,
+    timestamp without time zone,
+    timestamp without time zone
+) TO anon;
+
 COMMENT ON FUNCTION public.read_native_version_usage(
     character varying,
     timestamp without time zone,
     timestamp without time zone
-) IS 'Service-role aggregate for native version usage by platform.';
+) IS 'Authenticated aggregate for native version usage by platform.';

@@ -1162,8 +1162,8 @@ export async function readStatsVersionSB(c: Context, app_id: string, period_star
   return (data ?? []) as unknown as VersionUsage[]
 }
 
-export async function readNativeVersionUsageSB(c: Context, app_id: string, period_start: string, period_end: string): Promise<NativeVersionUsage[]> {
-  const { data, error } = await supabaseAdmin(c)
+export async function readNativeVersionUsageSB(c: Context, app_id: string, period_start: string, period_end: string, supabase: SupabaseClient<Database>): Promise<NativeVersionUsage[]> {
+  const { data, error } = await supabase
     .rpc('read_native_version_usage' as any, { p_app_id: app_id, p_period_start: period_start, p_period_end: period_end })
 
   if (error) {

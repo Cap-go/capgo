@@ -708,13 +708,13 @@ async function getAuthorizedStatsAppClient(c: Context, appId: string) {
   return supabase
 }
 
-async function getNativeVersionUsage(c: Context, appId: string, from: Date, to: Date) {
+async function getNativeVersionUsage(c: Context, appId: string, from: Date, to: Date, supabase: ReturnType<typeof supabaseClient>) {
   const dates = generateDateLabels(from, to)
   const startDate = dayjs(from).utc().startOf('day').format('YYYY-MM-DD')
   const endDate = dayjs(to).utc().startOf('day').add(1, 'day').format('YYYY-MM-DD')
   let nativeVersionUsage: NativeVersionUsageRow[]
   try {
-    nativeVersionUsage = await readNativeVersionUsage(c, appId, startDate, endDate) as NativeVersionUsageRow[]
+    nativeVersionUsage = await readNativeVersionUsage(c, appId, startDate, endDate, supabase) as NativeVersionUsageRow[]
   }
   catch (error) {
     return { data: null, error }
@@ -963,9 +963,9 @@ app.get('/app/:app_id/native_usage', async (c) => {
     throw simpleError('invalid_body', 'Invalid body', { error: bodyParsed.error })
   }
   const body = bodyParsed.data
-  await getAuthorizedStatsAppClient(c, appId)
+  const supabase = await getAuthorizedStatsAppClient(c, appId)
 
-  const { data, error } = await getNativeVersionUsage(c, appId, body.from, body.to)
+  const { data, error } = await getNativeVersionUsage(c, appId, body.from, body.to, supabase)
 
   if (error) {
     throw quickError(500, 'cannot_get_app_statistics', 'Cannot get app statistics', { error })
