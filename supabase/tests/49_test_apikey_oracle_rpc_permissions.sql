@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(20);
+SELECT plan(26);
 
 SELECT
     is(
@@ -166,6 +166,11 @@ ON CONFLICT (bucket_id, name) DO NOTHING;
 
 SET LOCAL ROLE anon;
 
+DO $$
+BEGIN
+    PERFORM set_config('request.headers', '{}', true);
+END $$;
+
 SELECT
     is(
         (
@@ -179,6 +184,31 @@ SELECT
         ),
         0::bigint,
         'anon without capgkey cannot read app-scoped storage objects'
+    );
+
+SELECT
+    is(
+        public.cli_check_permission(
+            'ae6e7458-c46d-4c00-aa3b-153b0b8520ea',
+            public.rbac_perm_app_read(),
+            '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid,
+            'com.demo.app',
+            NULL::bigint
+        ),
+        false,
+        'anon cannot use cli_check_permission with only an apikey argument'
+    );
+
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM public.get_accessible_apps_for_apikey_v2(
+                'ae6e7458-c46d-4c00-aa3b-153b0b8520ea'
+            )
+        ),
+        0::bigint,
+        'anon cannot enumerate apps with only an apikey argument'
     );
 
 DO $$
@@ -210,6 +240,53 @@ SELECT
         ),
         1::bigint,
         'anon API-key apps query still works through RLS helper identity'
+    );
+
+SELECT
+    is(
+        public.cli_check_permission(
+            'ae6e7458-c46d-4c00-aa3b-153b0b8520ea',
+            public.rbac_perm_app_read(),
+            '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid,
+            'com.demo.app',
+            NULL::bigint
+        ),
+        true,
+        'anon can use cli_check_permission when apikey matches capgkey header'
+    );
+
+SELECT
+    ok(
+        (
+            SELECT count(*) > 0
+            FROM public.get_accessible_apps_for_apikey_v2(
+                'ae6e7458-c46d-4c00-aa3b-153b0b8520ea'
+            )
+        ),
+        'anon can list accessible apps when apikey matches capgkey header'
+    );
+
+SELECT
+    is(
+        public.cli_check_permission(
+            'different-key',
+            public.rbac_perm_app_read(),
+            '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid,
+            'com.demo.app',
+            NULL::bigint
+        ),
+        false,
+        'anon cannot use cli_check_permission when apikey argument differs from capgkey header'
+    );
+
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM public.get_accessible_apps_for_apikey_v2('different-key')
+        ),
+        0::bigint,
+        'anon cannot list accessible apps when apikey argument differs from capgkey header'
     );
 
 DO $$
