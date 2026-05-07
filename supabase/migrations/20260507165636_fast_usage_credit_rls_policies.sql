@@ -6,6 +6,7 @@ AS $$
 DECLARE
   v_auth_user_id uuid;
   v_user_id uuid;
+  v_check_user_id uuid;
   v_api_key_text text;
   v_api_key public.apikeys%ROWTYPE;
   v_has_valid_api_key boolean := false;
@@ -14,6 +15,7 @@ DECLARE
 BEGIN
   SELECT auth.uid() INTO v_auth_user_id;
   v_user_id := v_auth_user_id;
+  v_check_user_id := v_auth_user_id;
 
   SELECT public.get_apikey_header() INTO v_api_key_text;
   IF v_api_key_text IS NOT NULL THEN
@@ -24,12 +26,16 @@ BEGIN
     v_has_valid_api_key := v_api_key.id IS NOT NULL
       AND NOT public.is_apikey_expired(v_api_key.expires_at);
 
-    IF v_auth_user_id IS NULL AND v_has_valid_api_key AND v_api_key.mode IS NOT NULL THEN
-      IF v_api_key.mode = ANY('{read,upload,write,all}'::public.key_mode[]) THEN
-        -- Legacy-mode API keys inherit their owner's org-level grants and stay
-        -- restricted to the key's configured org scope.
-        v_user_id := v_api_key.user_id;
-        v_user_candidates_need_key_scope := true;
+    IF v_auth_user_id IS NULL AND v_has_valid_api_key THEN
+      v_check_user_id := v_api_key.user_id;
+
+      IF v_api_key.mode IS NOT NULL THEN
+        IF v_api_key.mode = ANY('{read,upload,write,all}'::public.key_mode[]) THEN
+          -- Legacy-mode API keys inherit their owner's org-level grants and stay
+          -- restricted to the key's configured org scope.
+          v_user_id := v_api_key.user_id;
+          v_user_candidates_need_key_scope := true;
+        END IF;
       END IF;
     END IF;
   END IF;
@@ -102,7 +108,7 @@ BEGIN
     -- legacy/RBAC permission semantics, 2FA, password policy, and API-key scope.
     AND public.check_min_rights(
       'admin'::public.user_min_right,
-      v_user_id,
+      v_check_user_id,
       candidate_orgs.org_id,
       NULL::character varying,
       NULL::bigint
@@ -135,6 +141,37 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Deny insert for org members"
+ON "public"."usage_overage_events";
+
+CREATE POLICY "Deny insert for org members"
+ON "public"."usage_overage_events"
+AS RESTRICTIVE
+FOR INSERT
+TO "anon", "authenticated"
+WITH CHECK (false);
+
+DROP POLICY IF EXISTS "Deny update for org members"
+ON "public"."usage_overage_events";
+
+CREATE POLICY "Deny update for org members"
+ON "public"."usage_overage_events"
+AS RESTRICTIVE
+FOR UPDATE
+TO "anon", "authenticated"
+USING (false)
+WITH CHECK (false);
+
+DROP POLICY IF EXISTS "Deny delete for org members"
+ON "public"."usage_overage_events";
+
+CREATE POLICY "Deny delete for org members"
+ON "public"."usage_overage_events"
+AS RESTRICTIVE
+FOR DELETE
+TO "anon", "authenticated"
+USING (false);
+
 DROP POLICY IF EXISTS "Allow org members to select usage_credit_consumptions"
 ON "public"."usage_credit_consumptions";
 
@@ -147,6 +184,37 @@ USING (
     COALESCE((SELECT "public"."usage_credit_readable_org_ids"()), '{}'::uuid[])
   )
 );
+
+DROP POLICY IF EXISTS "Deny insert for org members"
+ON "public"."usage_credit_consumptions";
+
+CREATE POLICY "Deny insert for org members"
+ON "public"."usage_credit_consumptions"
+AS RESTRICTIVE
+FOR INSERT
+TO "anon", "authenticated"
+WITH CHECK (false);
+
+DROP POLICY IF EXISTS "Deny update for org members"
+ON "public"."usage_credit_consumptions";
+
+CREATE POLICY "Deny update for org members"
+ON "public"."usage_credit_consumptions"
+AS RESTRICTIVE
+FOR UPDATE
+TO "anon", "authenticated"
+USING (false)
+WITH CHECK (false);
+
+DROP POLICY IF EXISTS "Deny delete for org members"
+ON "public"."usage_credit_consumptions";
+
+CREATE POLICY "Deny delete for org members"
+ON "public"."usage_credit_consumptions"
+AS RESTRICTIVE
+FOR DELETE
+TO "anon", "authenticated"
+USING (false);
 
 DROP POLICY IF EXISTS "Allow org members to select usage_credit_grants"
 ON "public"."usage_credit_grants";
@@ -161,6 +229,37 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Deny insert for org members"
+ON "public"."usage_credit_grants";
+
+CREATE POLICY "Deny insert for org members"
+ON "public"."usage_credit_grants"
+AS RESTRICTIVE
+FOR INSERT
+TO "anon", "authenticated"
+WITH CHECK (false);
+
+DROP POLICY IF EXISTS "Deny update for org members"
+ON "public"."usage_credit_grants";
+
+CREATE POLICY "Deny update for org members"
+ON "public"."usage_credit_grants"
+AS RESTRICTIVE
+FOR UPDATE
+TO "anon", "authenticated"
+USING (false)
+WITH CHECK (false);
+
+DROP POLICY IF EXISTS "Deny delete for org members"
+ON "public"."usage_credit_grants";
+
+CREATE POLICY "Deny delete for org members"
+ON "public"."usage_credit_grants"
+AS RESTRICTIVE
+FOR DELETE
+TO "anon", "authenticated"
+USING (false);
+
 DROP POLICY IF EXISTS "Allow org members to select usage_credit_transactions"
 ON "public"."usage_credit_transactions";
 
@@ -173,3 +272,34 @@ USING (
     COALESCE((SELECT "public"."usage_credit_readable_org_ids"()), '{}'::uuid[])
   )
 );
+
+DROP POLICY IF EXISTS "Deny insert for org members"
+ON "public"."usage_credit_transactions";
+
+CREATE POLICY "Deny insert for org members"
+ON "public"."usage_credit_transactions"
+AS RESTRICTIVE
+FOR INSERT
+TO "anon", "authenticated"
+WITH CHECK (false);
+
+DROP POLICY IF EXISTS "Deny update for org members"
+ON "public"."usage_credit_transactions";
+
+CREATE POLICY "Deny update for org members"
+ON "public"."usage_credit_transactions"
+AS RESTRICTIVE
+FOR UPDATE
+TO "anon", "authenticated"
+USING (false)
+WITH CHECK (false);
+
+DROP POLICY IF EXISTS "Deny delete for org members"
+ON "public"."usage_credit_transactions";
+
+CREATE POLICY "Deny delete for org members"
+ON "public"."usage_credit_transactions"
+AS RESTRICTIVE
+FOR DELETE
+TO "anon", "authenticated"
+USING (false);
