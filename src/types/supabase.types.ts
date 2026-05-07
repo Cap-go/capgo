@@ -4455,6 +4455,7 @@ export type Database = {
         Args: { p_app_id: string; p_size: number; p_version_id: number }
         Returns: boolean
       }
+      usage_credit_readable_org_ids: { Args: never; Returns: string[] }
       user_has_app_update_user_roles: {
         Args: { p_app_id: string; p_user_id: string }
         Returns: boolean
