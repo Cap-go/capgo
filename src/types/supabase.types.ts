@@ -3643,6 +3643,10 @@ export type Database = {
               website: string
             }[]
           }
+      get_owner_org_by_app_id_internal: {
+        Args: { p_app_id: string }
+        Returns: string
+      }
       get_password_policy_hash: {
         Args: { policy_config: Json }
         Returns: string

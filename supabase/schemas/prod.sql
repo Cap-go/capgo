@@ -1338,23 +1338,6 @@ $$;
 ALTER FUNCTION "public"."auto_apikey_name_by_id"() OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."get_owner_org_by_app_id_internal"("p_app_id" "text")
-RETURNS "uuid"
-LANGUAGE "sql" SECURITY DEFINER STABLE
-SET "search_path" TO ''
-AS $$
-  SELECT owner_org FROM public.apps WHERE apps.app_id = p_app_id LIMIT 1;
-$$;
-
-
-ALTER FUNCTION "public"."get_owner_org_by_app_id_internal"("p_app_id" "text") OWNER TO "postgres";
-REVOKE ALL ON FUNCTION "public"."get_owner_org_by_app_id_internal"("p_app_id" "text") FROM PUBLIC;
-
-
-COMMENT ON FUNCTION "public"."get_owner_org_by_app_id_internal"("p_app_id" "text") IS
-'Internal helper for the auto_owner_org_by_app_id trigger only. Resolves the owning org for an app without performing auth checks — the trigger fires after RLS has already validated the caller.';
-
-
 CREATE OR REPLACE FUNCTION "public"."auto_owner_org_by_app_id"() RETURNS "trigger"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -6632,6 +6615,21 @@ $$;
 
 
 ALTER FUNCTION "public"."get_orgs_v7"("userid" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."get_owner_org_by_app_id_internal"("p_app_id" "text") RETURNS "uuid"
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+  SELECT owner_org FROM public.apps WHERE apps.app_id = p_app_id LIMIT 1;
+$$;
+
+
+ALTER FUNCTION "public"."get_owner_org_by_app_id_internal"("p_app_id" "text") OWNER TO "postgres";
+
+
+COMMENT ON FUNCTION "public"."get_owner_org_by_app_id_internal"("p_app_id" "text") IS 'Internal helper for the auto_owner_org_by_app_id trigger only. Resolves the owning org for an app without performing auth checks — the trigger fires after RLS has already validated the caller.';
+
 
 
 CREATE OR REPLACE FUNCTION "public"."get_password_policy_hash"("policy_config" "jsonb") RETURNS "text"
@@ -20809,6 +20807,11 @@ GRANT ALL ON FUNCTION "public"."get_orgs_v7"() TO "authenticated";
 
 REVOKE ALL ON FUNCTION "public"."get_orgs_v7"("userid" "uuid") FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."get_orgs_v7"("userid" "uuid") TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."get_owner_org_by_app_id_internal"("p_app_id" "text") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."get_owner_org_by_app_id_internal"("p_app_id" "text") TO "service_role";
 
 
 
