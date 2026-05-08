@@ -42,7 +42,7 @@ export interface PreparedUpdateProbe {
 
 export type PrepareUpdateProbeResult
   = | { ok: true, context: PreparedUpdateProbe }
-    | { ok: false, error: string }
+  | { ok: false, error: string }
 
 interface ParsedUpdateResponse {
   status: 'available' | 'retry' | 'failed'
@@ -55,14 +55,14 @@ interface ParsedUpdateResponse {
 
 export type UpdateProbeResult
   = | { success: true, availableVersion: string }
-    | {
-      success: false
-      reason: string
-      backendRefusal: boolean
-      errorCode?: string
-      backendMessage?: string
-      extra?: Record<string, unknown>
-    }
+  | {
+    success: false
+    reason: string
+    backendRefusal: boolean
+    errorCode?: string
+    backendMessage?: string
+    extra?: Record<string, unknown>
+  }
 
 function readTextIfExists(filePath: string): string | undefined {
   if (!existsSync(filePath))
@@ -485,11 +485,11 @@ const errorHints: Record<string, { cause: string, fix: string, docsUrl?: string 
   },
   invalid_json_body: {
     cause: 'Updates endpoint rejected the request body as invalid JSON.',
-    fix: 'This is likely a CLI bug — please report it at https://github.com/Cap-go/CLI/issues.',
+    fix: 'This is likely a CLI bug — please report it at https://github.com/Cap-go/capgo/issues.',
   },
   invalid_query_parameters: {
     cause: 'Updates endpoint rejected the query parameters.',
-    fix: 'This is likely a CLI bug — please report it at https://github.com/Cap-go/CLI/issues.',
+    fix: 'This is likely a CLI bug — please report it at https://github.com/Cap-go/capgo/issues.',
   },
 }
 
