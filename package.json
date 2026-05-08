@@ -268,7 +268,7 @@
     "knip": "^6.12.0",
     "sass": "1.99.0",
     "simple-git-hooks": "^2.13.1",
-    "supabase": "^2.95.6",
+    "supabase": "^2.98.2",
     "tailwindcss": "^4.2.4",
     "typescript": "6.0.3",
     "unplugin-auto-import": "^21.0.0",

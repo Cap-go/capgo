@@ -119,7 +119,7 @@
         "knip": "^6.12.0",
         "sass": "1.99.0",
         "simple-git-hooks": "^2.13.1",
-        "supabase": "^2.95.6",
+        "supabase": "^2.98.2",
         "tailwindcss": "^4.2.4",
         "typescript": "6.0.3",
         "unplugin-auto-import": "^21.0.0",
@@ -140,7 +140,7 @@
     },
     "cli": {
       "name": "@capgo/cli",
-      "version": "7.95.10",
+      "version": "7.95.13",
       "bin": {
         "capgo": "dist/index.js",
       },
@@ -2471,7 +2471,7 @@
 
     "strnum": ["strnum@2.2.3", "", {}, "sha512-oKx6RUCuHfT3oyVjtnrmn19H1SiCqgJSg+54XqURKp5aCMbrXrhLjRN9TjuwMjiYstZ0MzDrHqkGZ5dFTKd+zg=="],
 
-    "supabase": ["supabase@2.96.0", "", { "dependencies": { "bin-links": "^6.0.0", "https-proxy-agent": "^9.0.0", "node-fetch": "^3.3.2", "tar": "7.5.13" }, "bin": { "supabase": "bin/supabase" } }, "sha512-yjbFMvKiT9bX4FpkmfzC07AprhbVOTUTACTPD2FImgEQ9d9WtFtEsyDLta3klV1gQutlp0bywWDdJWUgz+wH1g=="],
+    "supabase": ["supabase@2.98.2", "", { "dependencies": { "bin-links": "^6.0.0", "https-proxy-agent": "^9.0.0", "node-fetch": "^3.3.2", "tar": "7.5.13" }, "bin": { "supabase": "bin/supabase" } }, "sha512-COSz57JyuUGbj75GSGM5mmyz/behBiYSiJ4A9qJVVC/vNp9bYS+9RCTXBtEt8kgqDDYWZsOmzk+mPbIBdr9bPg=="],
 
     "superjson": ["superjson@2.2.6", "", { "dependencies": { "copy-anything": "^4" } }, "sha512-H+ue8Zo4vJmV2nRjpx86P35lzwDT3nItnIsocgumgr0hHMQ+ZGq5vrERg9kJBo5AWGmxZDhzDo+WVIJqkB0cGA=="],
 
