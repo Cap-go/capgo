@@ -366,6 +366,10 @@ import_map = "./functions/deno.json"
 verify_jwt = false
 import_map = "./functions/deno.json"
 
+[functions.plugin_regions]
+verify_jwt = false
+import_map = "./functions/deno.json"
+
 [functions.build]
 verify_jwt = false
 import_map = "./functions/deno.json"
