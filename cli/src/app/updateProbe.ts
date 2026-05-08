@@ -42,7 +42,7 @@ export interface PreparedUpdateProbe {
 
 export type PrepareUpdateProbeResult
   = | { ok: true, context: PreparedUpdateProbe }
-  | { ok: false, error: string }
+    | { ok: false, error: string }
 
 interface ParsedUpdateResponse {
   status: 'available' | 'retry' | 'failed'
@@ -55,14 +55,14 @@ interface ParsedUpdateResponse {
 
 export type UpdateProbeResult
   = | { success: true, availableVersion: string }
-  | {
-    success: false
-    reason: string
-    backendRefusal: boolean
-    errorCode?: string
-    backendMessage?: string
-    extra?: Record<string, unknown>
-  }
+    | {
+      success: false
+      reason: string
+      backendRefusal: boolean
+      errorCode?: string
+      backendMessage?: string
+      extra?: Record<string, unknown>
+    }
 
 function readTextIfExists(filePath: string): string | undefined {
   if (!existsSync(filePath))
