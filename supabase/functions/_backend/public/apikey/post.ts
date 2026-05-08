@@ -222,7 +222,22 @@ app.post('/', middlewareV2(['all']), async (c) => {
           throw new Error('Created API key is missing rbac_id')
         }
 
-        for (const binding of bindings) {
+        // Mirror the user-binding invariant: every org that has app-level bindings
+        // must also have an org-level binding (at minimum org_member) so that the
+        // API key carries org.read — required by get_organization_cli_warnings and
+        // other org-scoped checks.
+        const enrichedBindings: BindingInput[] = [...bindings]
+        const orgsWithOrgBinding = new Set(
+          bindings.filter(b => b.scope_type === 'org').map(b => b.org_id),
+        )
+        for (const b of bindings) {
+          if (b.scope_type === 'app' && !orgsWithOrgBinding.has(b.org_id)) {
+            enrichedBindings.push({ role_name: 'org_member', scope_type: 'org', org_id: b.org_id })
+            orgsWithOrgBinding.add(b.org_id)
+          }
+        }
+
+        for (const binding of enrichedBindings) {
           const bindingParams: CreateBindingParams = {
             principal_type: 'apikey',
             principal_id: apikeyData.rbac_id,
