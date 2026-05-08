@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { dirname, isAbsolute, join, normalize, relative } from 'node:path'
+import { dirname, join } from 'node:path'
 
 export const CAPGO_UPDATER_PACKAGE = '@capgo/capacitor-updater'
 
@@ -20,7 +20,6 @@ interface PackageJsonDependencies {
   dependencies?: Record<string, unknown>
   devDependencies?: Record<string, unknown>
   optionalDependencies?: Record<string, unknown>
-  workspaces?: unknown
 }
 
 function readPackageJson(packageJsonPath: string): PackageJsonDependencies | null {
@@ -56,76 +55,15 @@ function getDeclaredDependency(packageJsonPath: string, packageName: string) {
   return { version: null, section: null }
 }
 
-function isPathInside(parentPath: string, childPath: string): boolean {
-  const relativePath = relative(parentPath, childPath)
-  return relativePath === '' || (!!relativePath && !relativePath.startsWith('..') && !isAbsolute(relativePath))
-}
-
-function isWorkspaceRootCandidate(directory: string): boolean {
-  const packageJson = readPackageJson(join(directory, 'package.json'))
-  if (packageJson?.workspaces)
-    return true
-
-  return [
-    'pnpm-workspace.yaml',
-    'lerna.json',
-    'nx.json',
-    'turbo.json',
-  ].some(marker => existsSync(join(directory, marker)))
-}
-
-function findWorkspaceRoot(projectDir: string): string {
-  let workspaceRoot = projectDir
-  let currentDir = projectDir
-
-  while (true) {
-    if (isWorkspaceRootCandidate(currentDir))
-      workspaceRoot = currentDir
-
-    const parentDir = dirname(currentDir)
-    if (parentDir === currentDir)
-      break
-    currentDir = parentDir
-  }
-
-  return workspaceRoot
-}
-
-function isProjectPackageResolution(projectDir: string, workspaceRoot: string, packageName: string, resolvedPath: string): boolean {
-  const normalizedResolvedPath = normalize(resolvedPath)
-  const packageJsonSuffix = normalize(join(packageName, 'package.json'))
-  if (!normalizedResolvedPath.endsWith(packageJsonSuffix))
-    return false
-
-  let currentDir = projectDir
-  while (true) {
-    if (isPathInside(join(currentDir, 'node_modules'), normalizedResolvedPath))
-      return true
-
-    if (currentDir === workspaceRoot)
-      break
-
-    const parentDir = dirname(currentDir)
-    if (parentDir === currentDir || !isPathInside(workspaceRoot, parentDir))
-      break
-    currentDir = parentDir
-  }
-
-  return false
-}
-
 function readInstalledPackageVersion(packageJsonPath: string, packageName: string): string | null {
   const projectDir = dirname(packageJsonPath)
-  const workspaceRoot = findWorkspaceRoot(projectDir)
 
   try {
     const requireFromProject = createRequire(join(projectDir, 'package.json'))
     const resolvedPath = requireFromProject.resolve(`${packageName}/package.json`)
-    if (isProjectPackageResolution(projectDir, workspaceRoot, packageName, resolvedPath)) {
-      const packageJson = JSON.parse(readFileSync(resolvedPath, 'utf-8')) as { version?: unknown }
-      if (typeof packageJson.version === 'string')
-        return packageJson.version
-    }
+    const packageJson = JSON.parse(readFileSync(resolvedPath, 'utf-8')) as { version?: unknown }
+    if (typeof packageJson.version === 'string')
+      return packageJson.version
   }
   catch {
     // Fall through to direct node_modules lookup.
@@ -145,11 +83,8 @@ function readInstalledPackageVersion(packageJsonPath: string, packageName: strin
       }
     }
 
-    if (currentDir === workspaceRoot)
-      break
-
     const parentDir = dirname(currentDir)
-    if (parentDir === currentDir || !isPathInside(workspaceRoot, parentDir))
+    if (parentDir === currentDir)
       break
     currentDir = parentDir
   }
