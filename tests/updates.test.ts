@@ -790,20 +790,22 @@ describe('update scenarios', () => {
   })
 
   it('disable auto update to minor blocks cross-major updates', async () => {
-    // Minor strategy: blocks if major OR minor changed
-    // This test ensures that updates across major versions are blocked even if minor is the same
-    await updateChannel('production', { disableAutoUpdate: 'minor', version: '1.361.0' })
+    const targetVersion = '2.4.0'
+    await createAppVersions(targetVersion, APP_NAME_UPDATE, {
+      external_url: `https://example.com/${APP_NAME_UPDATE}/${targetVersion}.zip`,
+    })
+    await updateChannel('production', { disableAutoUpdate: 'minor', version: targetVersion })
 
     try {
       const baseData = getBaseData(APP_NAME_UPDATE)
-      // Device is on 0.361.0, channel has 1.361.0 - same minor, different major
-      baseData.version_name = '0.361.0'
+      baseData.version_build = targetVersion
+      baseData.version_name = '1.4.0'
 
       const response = await postUpdate(baseData)
       expect(response.status).toBe(200)
       const json = await response.json<UpdateRes>()
-      // Should block because major version changed (0 -> 1)
       expect(json.error).toBe('disable_auto_update_to_minor')
+      expect(json.old).toBe('1.4.0')
     }
     finally {
       await updateChannel('production', { disableAutoUpdate: 'major', version: '1.0.0' })

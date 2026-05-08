@@ -237,6 +237,9 @@ export async function updateWithPG(
 
   const version = channelOverride?.version ?? channelData.version
   const manifestEntries = (channelOverride?.manifestEntries ?? channelData?.manifestEntries ?? []) as Partial<Database['public']['Tables']['manifest']['Row']>[]
+  const targetVersion = isInternalVersionName(version.name) ? undefined : parse(version.name)
+  // Channel update strategies compare against the installed bundle, not the native baseline.
+  const currentVersion = tryParse(fixSemver(version_name)) ?? coerce
   // device.version = versionData ? versionData.id : version.id
 
   // TODO: find better solution to check if device is from apple or google, currently not working in
@@ -294,13 +297,13 @@ export async function updateWithPG(
         old: version_name,
       })
     }
-    if (!isInternalVersionName(version.name) && channelData?.channels.disable_auto_update === 'major' && parse(version.name).major > parse(version_build).major) {
+    if (targetVersion && channelData?.channels.disable_auto_update === 'major' && targetVersion.major > currentVersion.major) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot upgrade major version', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMajor', versionName: version.name }])
       return updateError200(c, 'disable_auto_update_to_major', 'Cannot upgrade major version', {
         major: true,
         version: version.name,
-        old: version_build,
+        old: version_name,
       })
     }
 
@@ -313,31 +316,31 @@ export async function updateWithPG(
       return updateError200(c, 'cannot_update_via_private_channel', errorMessage)
     }
 
-    if (!isInternalVersionName(version.name) && channelData.channels.disable_auto_update === 'minor' && (
-      parse(version.name).major !== parse(version_build).major
-      || parse(version.name).minor !== parse(version_build).minor
+    if (targetVersion && channelData.channels.disable_auto_update === 'minor' && (
+      targetVersion.major !== currentVersion.major
+      || targetVersion.minor !== currentVersion.minor
     )) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot upgrade minor version', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToMinor', versionName: version.name }])
       return updateError200(c, 'disable_auto_update_to_minor', 'Cannot upgrade minor version', {
         major: true,
         version: version.name,
-        old: version_build,
+        old: version_name,
       })
     }
 
     cloudlog({ requestId: c.get('requestId'), message: 'version', version: version.name, old: version_name })
-    if (!isInternalVersionName(version.name) && channelData.channels.disable_auto_update === 'patch' && (
-      parse(version.name).major !== parse(version_build).major
-      || parse(version.name).minor !== parse(version_build).minor
-      || parse(version.name).patch !== parse(version_build).patch
+    if (targetVersion && channelData.channels.disable_auto_update === 'patch' && (
+      targetVersion.major !== currentVersion.major
+      || targetVersion.minor !== currentVersion.minor
+      || targetVersion.patch !== currentVersion.patch
     )) {
       cloudlog({ requestId: c.get('requestId'), message: 'Cannot upgrade patch version', id: device_id, date: new Date().toISOString() })
       await sendStatsAndDevice(c, device, [{ action: 'disableAutoUpdateToPatch', versionName: version.name }])
       return updateError200(c, 'disable_auto_update_to_patch', 'Cannot upgrade patch version', {
         major: true,
         version: version.name,
-        old: version_build,
+        old: version_name,
       })
     }
 
