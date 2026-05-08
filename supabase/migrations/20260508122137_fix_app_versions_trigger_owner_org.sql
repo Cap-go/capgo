@@ -26,8 +26,10 @@ REVOKE ALL ON FUNCTION "public"."get_owner_org_by_app_id_internal"("p_app_id" "t
 COMMENT ON FUNCTION "public"."get_owner_org_by_app_id_internal"("p_app_id" "text") IS
 'Internal helper for the auto_owner_org_by_app_id trigger only. Resolves the owning org for an app without performing auth checks — the trigger fires after RLS has already validated the caller.';
 
+-- The trigger runs as SECURITY DEFINER (owner = postgres) so it can call
+-- get_owner_org_by_app_id_internal without granting EXECUTE to anon/authenticated.
 CREATE OR REPLACE FUNCTION "public"."auto_owner_org_by_app_id"() RETURNS "trigger"
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
 AS $$
 BEGIN

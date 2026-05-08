@@ -1356,7 +1356,7 @@ COMMENT ON FUNCTION "public"."get_owner_org_by_app_id_internal"("p_app_id" "text
 
 
 CREATE OR REPLACE FUNCTION "public"."auto_owner_org_by_app_id"() RETURNS "trigger"
-    LANGUAGE "plpgsql"
+    LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
 BEGIN
