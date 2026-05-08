@@ -167,7 +167,7 @@ describe('[POST] /private/sso/check-enforcement', () => {
         management_email: `sso-enforcement-${enforcementOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: enforcementCustomerId,
-          })
+      })
       if (enforcementOrgError)
         throw enforcementOrgError
 
@@ -322,7 +322,7 @@ describe('[POST] /private/sso/prelink-users', () => {
         management_email: `sso-prelink-${prelinkOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: prelinkCustomerId,
-          })
+      })
       if (prelinkOrgError)
         throw prelinkOrgError
 
@@ -351,7 +351,7 @@ describe('[POST] /private/sso/prelink-users', () => {
         management_email: `sso-foreign-${foreignOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: foreignCustomerId,
-          })
+      })
       if (foreignOrgError)
         throw foreignOrgError
 
@@ -531,7 +531,7 @@ describe('generate_org_on_user_create', () => {
         management_email: `managed-sso-${managedOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: managedCustomerId,
-          })
+      })
       if (orgError)
         throw orgError
 
@@ -617,7 +617,7 @@ describe('generate_org_on_user_create', () => {
         management_email: `email-managed-${managedOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: managedCustomerId,
-          })
+      })
       if (orgError)
         throw orgError
 
@@ -771,7 +771,7 @@ describe('[POST] /private/sso/provision-user', () => {
         management_email: `sso-missing-profile-${managedOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: managedCustomerId,
-          })
+      })
       if (orgError)
         throw orgError
 
@@ -1002,7 +1002,7 @@ describe('[POST] /private/sso/provision-user', () => {
         management_email: `sso-invite-promotion-${managedOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: managedCustomerId,
-          })
+      })
       if (orgError)
         throw orgError
 
@@ -1140,7 +1140,7 @@ describe('[POST] /private/sso/provision-user', () => {
         management_email: `sso-merge-${managedOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: managedCustomerId,
-          })
+      })
       if (orgError)
         throw orgError
 
@@ -1167,6 +1167,13 @@ describe('[POST] /private/sso/provision-user', () => {
       })
       if (originalPublicUserError)
         throw originalPublicUserError
+
+      await getAuthHeadersForCredentials(targetEmail, password)
+      const originalSessionsBeforeMerge = await pool.query<{ count: string }>(
+        'select count(*) from auth.sessions where user_id = $1',
+        [originalUser.user.id],
+      )
+      expect(Number(originalSessionsBeforeMerge.rows[0]?.count ?? 0)).toBeGreaterThan(0)
 
       const duplicateAuthHeaders = await getAuthHeadersForCredentials(tempSsoEmail, password)
 
@@ -1256,6 +1263,8 @@ describe('[POST] /private/sso/provision-user', () => {
         && row.user_id === originalUser.user.id
         && row.email === targetEmail,
       )).toBe(true)
+      expect(identitiesAfterMerge.rows.every(row => row.provider === identityProvider)).toBe(true)
+      expect(identitiesAfterMerge.rows.some(row => row.provider === 'email')).toBe(false)
       expect(identitiesAfterMerge.rows.some(row =>
         row.provider === 'github'
         && row.provider_id === unrelatedProviderId,
@@ -1264,6 +1273,22 @@ describe('[POST] /private/sso/provision-user', () => {
         row.provider === unrelatedSsoProvider
         && row.provider_id === unrelatedSsoProviderId,
       )).toBe(false)
+
+      const mergedAuthUser = await pool.query<{ encrypted_password: string | null, is_sso_user: boolean }>(
+        'select encrypted_password, is_sso_user from auth.users where id = $1',
+        [originalUser.user.id],
+      )
+
+      expect(mergedAuthUser.rows[0]).toMatchObject({
+        encrypted_password: null,
+        is_sso_user: true,
+      })
+
+      const originalSessionsAfterMerge = await pool.query<{ count: string }>(
+        'select count(*) from auth.sessions where user_id = $1',
+        [originalUser.user.id],
+      )
+      expect(Number(originalSessionsAfterMerge.rows[0]?.count ?? 0)).toBe(0)
     }
     finally {
       await Promise.allSettled([
@@ -1643,7 +1668,7 @@ describe('[POST] /private/sso/provision-user', () => {
         management_email: `sso-first-login-${managedOrgId}@capgo.app`,
         created_by: USER_ID,
         customer_id: managedCustomerId,
-          })
+      })
       if (orgError)
         throw orgError
 

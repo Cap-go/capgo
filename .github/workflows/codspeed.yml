@@ -42,4 +42,4 @@ jobs:
         uses: CodSpeedHQ/action@v4
         with:
           mode: simulation
-          run: npx vitest bench --config vitest.config.bench.ts --run
+          run: bun run bench

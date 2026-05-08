@@ -82,6 +82,8 @@ const isCompletingTopUp = ref(false)
 const isProcessingCheckout = computed(() => isStartingCheckout.value || isCompletingTopUp.value)
 const currentPage = ref(1)
 const pageSize = 5
+const CREDIT_PRICING_HASH = '#credit-pricing'
+const isCreditPricingOpen = ref(route.hash === CREDIT_PRICING_HASH)
 const DEFAULT_TOP_UP_QUANTITY = 100
 const QUICK_TOP_UP_OPTIONS = [50, 500, 5000] as const
 const CREDIT_TAX_MULTIPLIER = 1.2
@@ -415,6 +417,10 @@ async function handleBuyCredits() {
   }
 }
 
+function handleCreditPricingToggle(event: Event) {
+  isCreditPricingOpen.value = (event.currentTarget as HTMLDetailsElement).open
+}
+
 async function handleCreditCheckoutReturn() {
   if (isCompletingTopUp.value)
     return
@@ -460,6 +466,11 @@ async function handleCreditCheckoutReturn() {
     await router.replace({ query: newQuery })
   }
 }
+
+watch(() => route.hash, (hash) => {
+  if (hash === CREDIT_PRICING_HASH)
+    isCreditPricingOpen.value = true
+})
 
 onMounted(async () => {
   displayStore.NavTitle = t('credits')
@@ -617,7 +628,7 @@ watch(() => currentOrganization.value?.gid, async (newOrgId: string | undefined,
       </div>
     </div>
 
-    <details class="group rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800">
+    <details id="credit-pricing" class="group rounded-3xl border border-gray-200 bg-white shadow-sm dark:border-gray-700 dark:bg-gray-800" :open="isCreditPricingOpen" @toggle="handleCreditPricingToggle">
       <summary class="flex w-full cursor-pointer items-center justify-between gap-4 p-6 text-left [&::-webkit-details-marker]:hidden">
         <div>
           <h2 class="text-2xl font-semibold text-gray-900 dark:text-white">

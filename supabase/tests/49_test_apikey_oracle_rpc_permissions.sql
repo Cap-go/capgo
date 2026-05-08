@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(26);
+SELECT plan(24);
 
 SELECT
     is(
@@ -201,14 +201,9 @@ SELECT
 
 SELECT
     is(
-        (
-            SELECT count(*)
-            FROM public.get_accessible_apps_for_apikey_v2(
-                'ae6e7458-c46d-4c00-aa3b-153b0b8520ea'
-            )
-        ),
-        0::bigint,
-        'anon cannot enumerate apps with only an apikey argument'
+        to_regprocedure('public.get_accessible_apps_for_apikey_v2(text)'),
+        NULL::regprocedure,
+        'API-key app-list RPC is removed to avoid app enumeration'
     );
 
 DO $$
@@ -256,17 +251,6 @@ SELECT
     );
 
 SELECT
-    ok(
-        (
-            SELECT count(*) > 0
-            FROM public.get_accessible_apps_for_apikey_v2(
-                'ae6e7458-c46d-4c00-aa3b-153b0b8520ea'
-            )
-        ),
-        'anon can list accessible apps when apikey matches capgkey header'
-    );
-
-SELECT
     is(
         public.cli_check_permission(
             'different-key',
@@ -277,16 +261,6 @@ SELECT
         ),
         false,
         'anon cannot use cli_check_permission when apikey argument differs from capgkey header'
-    );
-
-SELECT
-    is(
-        (
-            SELECT count(*)
-            FROM public.get_accessible_apps_for_apikey_v2('different-key')
-        ),
-        0::bigint,
-        'anon cannot list accessible apps when apikey argument differs from capgkey header'
     );
 
 DO $$

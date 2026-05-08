@@ -403,13 +403,16 @@ echo ""
 echo "🎭 Creating monorepo different versions trap..."
 mkdir -p "$FIXTURES_DIR/fake-version-trap/apps/mobile"
 cd "$FIXTURES_DIR/fake-version-trap"
-# Only the app has the dependency - this is the common case
+# Root and app both install the package so root lookups stay inside this fixture
 cat > package.json << EOF
 {
   "name": "fake-version-trap-monorepo",
   "version": "1.0.0",
   "private": true,
-  "workspaces": ["apps/*"]
+  "workspaces": ["apps/*"],
+  "dependencies": {
+    "$PACKAGE_NAME": "$PACKAGE_VERSION"
+  }
 }
 EOF
 cat > apps/mobile/package.json << EOF

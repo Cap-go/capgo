@@ -1,5 +1,5 @@
-import { bench, describe } from 'vitest'
 import type { DeviceWithoutCreatedAt } from '../supabase/functions/_backend/utils/types.ts'
+import { bench, describe } from 'vitest'
 import {
   buildNormalizedDeviceForWrite,
   hasComparableDeviceChanged,

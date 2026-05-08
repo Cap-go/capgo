@@ -1,7 +1,7 @@
 {
   "name": "capgo-app",
   "type": "module",
-  "version": "12.128.7",
+  "version": "12.128.12",
   "private": true,
   "workspaces": [
     "cli"
@@ -81,11 +81,13 @@
     "test:cloudflare:plugin": "USE_CLOUDFLARE_WORKERS=true vitest run tests/updates*.test.ts tests/stats*.test.ts tests/channel_self*.test.ts --config vitest.config.cloudflare-plugin.ts",
     "test:cloudflare:api": "vitest run --exclude=tests/cli* --exclude=tests/updates* --exclude=tests/stats* --exclude=tests/channel_self* --config vitest.config.cloudflare.ts",
     "test:cloudflare:updates": "vitest run tests/updates* --config vitest.config.cloudflare.ts",
+    "bench": "vitest bench --config vitest.config.bench.ts --run",
     "admin:backfill-plugin-version-ladder": "bun scripts/backfill_plugin_version_ladder.ts",
     "stripe:backfill-retention-metrics": "bun scripts/backfill_retention_metrics.ts",
     "stripe:backfill-org-conversion-rate": "bun scripts/backfill_org_conversion_rate_trend.ts",
     "stripe:backfill-customer-countries": "bun scripts/backfill_stripe_customer_countries.ts",
     "stripe:backfill-revenue-trends": "bun scripts/backfill_revenue_trend_metrics.ts",
+    "stripe:backfill-admin-revenue-dashboard": "bun scripts/backfill_admin_revenue_dashboard_metrics.ts",
     "stripe:sync-org-names": "bun scripts/sync_stripe_org_names.ts",
     "lint": "eslint \"src/**/*.{vue,ts,js}\"",
     "fmt": "bun run lint:fix && bun run lint:sql",
@@ -266,7 +268,7 @@
     "knip": "^6.12.0",
     "sass": "1.99.0",
     "simple-git-hooks": "^2.13.1",
-    "supabase": "^2.95.6",
+    "supabase": "^2.98.2",
     "tailwindcss": "^4.2.4",
     "typescript": "6.0.3",
     "unplugin-auto-import": "^21.0.0",

@@ -146,12 +146,41 @@ async function transferSsoIdentities(pgClient: ReturnType<typeof getPgClient>, o
   return result.rowCount ?? 0
 }
 
-async function setAuthUserSsoOnly(pgClient: ReturnType<typeof getPgClient>, userId: string): Promise<void> {
+async function setAuthUserSsoOnly(pgClient: ReturnType<typeof getPgClient>, userId: string, authorizedSsoProviders: string[]): Promise<void> {
+  const primarySsoProvider = authorizedSsoProviders[0]
+  if (!primarySsoProvider) {
+    throw new Error('missing_sso_provider')
+  }
+
   await pgClient.query(
     `
       update auth.users
-      set is_sso_user = true
+      set is_sso_user = true,
+          encrypted_password = null,
+          raw_app_meta_data = coalesce(raw_app_meta_data, '{}'::jsonb)
+            || jsonb_build_object(
+              'provider', $2::text,
+              'providers', to_jsonb($3::text[])
+            ),
+          updated_at = now()
       where id = $1
+    `,
+    [userId, primarySsoProvider, authorizedSsoProviders],
+  )
+
+  await pgClient.query(
+    `
+      delete from auth.identities
+      where user_id = $1
+        and provider <> all($2::text[])
+    `,
+    [userId, authorizedSsoProviders],
+  )
+
+  await pgClient.query(
+    `
+      delete from auth.sessions
+      where user_id = $1
     `,
     [userId],
   )
@@ -410,7 +439,6 @@ async function mergeSsoIdentityWithExistingAccount(
     publicUser: PublicUserSeed
     orgId: string
     authorizedSsoProviders: string[]
-    enforceSso: boolean
   },
 ): Promise<void> {
   await pgClient.query('begin')
@@ -432,14 +460,12 @@ async function mergeSsoIdentityWithExistingAccount(
     await ensurePublicUserRowExistsInTransaction(pgClient, requestId, params.publicUser)
     await ensureOrgMembershipInTransaction(pgClient, requestId, params.originalUserId, params.orgId)
 
-    if (params.enforceSso) {
-      try {
-        await setAuthUserSsoOnly(pgClient, params.originalUserId)
-      }
-      catch (ssoFlagError) {
-        cloudlogErr({ requestId, message: 'Failed to set is_sso_user on original user during merge', originalUserId: params.originalUserId, error: ssoFlagError })
-        throw new Error('sso_flag_update_failed')
-      }
+    try {
+      await setAuthUserSsoOnly(pgClient, params.originalUserId, params.authorizedSsoProviders)
+    }
+    catch (ssoFlagError) {
+      cloudlogErr({ requestId, message: 'Failed to enforce SSO-only auth state on original user during merge', originalUserId: params.originalUserId, error: ssoFlagError })
+      throw new Error('sso_flag_update_failed')
     }
 
     await pgClient.query('commit')
@@ -542,7 +568,7 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       // Step 1: Resolve the SSO provider org so we can ensure the original user is a member
       const { data: mergeProvider, error: mergeProviderError } = await (admin as any)
         .from('sso_providers')
-        .select('id, org_id, provider_id, enforce_sso')
+        .select('id, org_id, provider_id')
         .eq('domain', userDomain)
         .eq('status', 'active')
         .maybeSingle()
@@ -574,7 +600,6 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
           },
           orgId: mergeProvider.org_id,
           authorizedSsoProviders,
-          enforceSso: mergeProvider?.enforce_sso === true,
         })
       }
       catch (mergeError) {
@@ -602,18 +627,6 @@ app.post('/', async (c: Context<MiddlewareKeyVariables>) => {
       if (deleteError) {
         cloudlogErr({ requestId, message: 'Failed to delete duplicate SSO user after identity transfer', userId, originalUserId, error: deleteError })
         // Identity already transferred — log but still return merged so frontend redirects to login
-      }
-
-      // Update app_metadata.provider on the original user to reflect the SSO provider.
-      // Our raw identity transfer bypasses Supabase Auth's normal flow, which would otherwise
-      // update this field. Without this, the next SSO login returns provider='email' and
-      // the provider check above rejects the user with sso_auth_required.
-      const { error: updateProviderError } = await admin.auth.admin.updateUserById(originalUserId, {
-        app_metadata: { provider: authorizedSsoProviders[0] },
-      })
-      if (updateProviderError) {
-        cloudlogErr({ requestId, message: 'Failed to update app_metadata.provider on original user after merge', originalUserId, error: updateProviderError })
-        // Non-fatal: identity transfer succeeded; log but continue
       }
 
       cloudlog({ requestId, message: 'SSO account merged successfully — user must re-login', userId, originalUserId })

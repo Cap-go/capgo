@@ -19,6 +19,7 @@ import { closeClient, getAppOwnerPostgres, getDrizzleClient, getPgClient, reques
 import { makeDevice } from './plugin_parser.ts'
 import { s3 } from './s3.ts'
 import { createStatsBandwidth, createStatsMau, createStatsVersion, onPremStats, sendStatsAndDevice } from './stats.ts'
+import { isUpdateEnumerationLimited, recordUpdateEnumerationMiss, updateEnumerationLimitedResponse } from './updateOracleGuard.ts'
 import { backgroundTask, BROTLI_MIN_UPDATER_VERSION_V5, BROTLI_MIN_UPDATER_VERSION_V6, BROTLI_MIN_UPDATER_VERSION_V7, fixSemver, isDeprecatedPluginVersion, isInternalVersionName } from './utils.ts'
 
 const PLAN_LIMIT: Array<'mau' | 'bandwidth' | 'storage'> = ['mau', 'bandwidth']
@@ -110,6 +111,10 @@ export async function updateWithPG(
   const cachedAppStatus = await getAppStatus(c, app_id)
   const cachedStatus = cachedAppStatus.status
   if (cachedStatus === 'onprem') {
+    const updateEnumerationLimit = await recordUpdateEnumerationMiss(c, app_id)
+    if (updateEnumerationLimit.limited)
+      return updateEnumerationLimitedResponse(c)
+
     const device = makeDevice(body, cachedAppStatus.allow_device_custom_id)
     return onPremStats(c, app_id, 'get', device)
   }
@@ -119,10 +124,18 @@ export async function updateWithPG(
     await sendStatsAndDevice(c, device, [{ action: 'needPlanUpgrade' }])
     return c.json({ error: 'on_premise_app', message: 'On-premise app detected' }, 429)
   }
+  const existingUpdateEnumerationLimit = await isUpdateEnumerationLimited(c)
+  if (existingUpdateEnumerationLimit.limited)
+    return updateEnumerationLimitedResponse(c)
+
   const appOwner = await getAppOwnerPostgres(c, app_id, drizzleClient, PLAN_LIMIT)
   // if version_build is not semver, then make it semver
   const device = makeDevice(body, appOwner?.allow_device_custom_id)
   if (!appOwner) {
+    const updateEnumerationLimit = await recordUpdateEnumerationMiss(c, app_id)
+    if (updateEnumerationLimit.limited)
+      return updateEnumerationLimitedResponse(c)
+
     await setAppStatus(c, app_id, 'onprem', true)
     return onPremStats(c, app_id, 'get', device)
   }

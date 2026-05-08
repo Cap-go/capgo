@@ -21,6 +21,15 @@ describe('build upload HEAD routing', () => {
     expect([400, 401]).toContain(response.status)
   })
 
+  it.concurrent('routes HEAD /build/upload/:jobId/* without Tus-Resumable through auth middleware', async () => {
+    const response = await createMountedBuildApp().request(new Request('http://localhost/build/upload/test-job/file.zip', {
+      method: 'HEAD',
+    }))
+
+    expect(response.status).not.toBe(404)
+    expect([400, 401]).toContain(response.status)
+  })
+
   it.concurrent('routes HEAD /build/upload/:jobId through auth middleware', async () => {
     const response = await createMountedBuildApp().request(new Request('http://localhost/build/upload/test-job', {
       method: 'HEAD',
