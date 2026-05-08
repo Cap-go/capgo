@@ -24,8 +24,12 @@ function withTempProject(fn) {
   }
 }
 
+function writePackageJson(root, packageJson) {
+  writeFile(join(root, 'package.json'), JSON.stringify(packageJson))
+}
+
 function writeProjectPackage(root, dependencies) {
-  writeFile(join(root, 'package.json'), JSON.stringify({ dependencies }))
+  writePackageJson(root, { dependencies })
 }
 
 function writeUpdaterInstall(root, version = '7.0.1') {
@@ -120,6 +124,41 @@ t('updater install state passes with declaration and install', () => {
       throw new Error('Expected declared updater version')
     if (state.installedVersion !== '7.0.1')
       throw new Error('Expected installed updater version')
+  })
+})
+
+t('updater install state ignores parent installs above standalone project', () => {
+  withTempProject((root) => {
+    const project = join(root, 'apps', 'mobile')
+    writeProjectPackage(project, {
+      '@capacitor/core': '^7.0.0',
+      [CAPGO_UPDATER_PACKAGE]: '^7.0.0',
+    })
+    writeUpdaterInstall(root)
+
+    const state = readUpdaterState(project)
+    if (state.ready)
+      throw new Error('Expected standalone nested project to ignore parent node_modules install')
+    if (state.installedVersion)
+      throw new Error('Expected standalone nested project to have no installed updater version')
+  })
+})
+
+t('updater install state accepts workspace root installs', () => {
+  withTempProject((root) => {
+    const project = join(root, 'apps', 'mobile')
+    writePackageJson(root, { private: true, workspaces: ['apps/*'] })
+    writeProjectPackage(project, {
+      '@capacitor/core': '^7.0.0',
+      [CAPGO_UPDATER_PACKAGE]: '^7.0.0',
+    })
+    writeUpdaterInstall(root, '7.2.0')
+
+    const state = readUpdaterState(project)
+    if (!state.ready)
+      throw new Error(`Expected workspace root install to pass: ${state.details.join(', ')}`)
+    if (state.installedVersion !== '7.2.0')
+      throw new Error('Expected workspace root updater version')
   })
 })
 
