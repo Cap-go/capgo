@@ -1041,22 +1041,23 @@ program.parseAsync().catch(async (error: unknown) => {
     if (commanderError.code === 'commander.version' || commanderError.code === 'commander.helpDisplayed') {
       exit(0)
     }
-    if (shouldCapturePosthogException(error)) {
-      await capturePosthogException({
-        error,
-        functionName: currentCommandPath,
-        kind: 'unhandled_error',
-        status: commanderError.exitCode ?? 1,
-      })
-    }
+    const capturePromise = shouldCapturePosthogException(error)
+      ? capturePosthogException({
+          error,
+          functionName: currentCommandPath,
+          kind: 'unhandled_error',
+          status: commanderError.exitCode ?? 1,
+        })
+      : Promise.resolve(false)
     // For actual errors, show just the message without the full stack trace
     if (commanderError.message) {
       log.error(commanderError.message)
     }
+    await capturePromise
     const exitCode = commanderError.exitCode ?? 1
     exit(exitCode)
   }
-  await capturePosthogException({
+  const capturePromise = capturePosthogException({
     error,
     functionName: currentCommandPath,
     kind: 'unhandled_error',
@@ -1064,5 +1065,6 @@ program.parseAsync().catch(async (error: unknown) => {
   })
   // For non-Commander errors, show full error details
   log.error(`Error: ${formatError(error)}`)
+  await capturePromise
   exit(1)
 })

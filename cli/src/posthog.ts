@@ -64,8 +64,9 @@ function serializeError(error: unknown): SerializedError {
   }
 
   try {
+    const message = JSON.stringify(error)
     return {
-      message: JSON.stringify(error),
+      message: message ?? String(error),
       name: 'Error',
       stack: undefined,
     }
@@ -90,6 +91,28 @@ function sanitizeFilename(filename: string) {
     sanitized = sanitized.replaceAll(homeDirectory, '~')
 
   return sanitized
+}
+
+function sanitizeTelemetryText(value: string) {
+  let sanitized = value
+  const workingDirectory = cwd()
+  const homeDirectory = homedir()
+
+  if (workingDirectory)
+    sanitized = sanitized.replaceAll(workingDirectory, '<cwd>')
+  if (homeDirectory)
+    sanitized = sanitized.replaceAll(homeDirectory, '~')
+
+  return sanitized
+    .replace(/<cwd>\/[^\s"',)]+/g, '<cwd>/<path>')
+    .replace(/~\/[^\s"',)]+/g, '~/<path>')
+    .replace(/[\w.%+-]+@[\w.-]+\.[A-Z]{2,}/gi, '<email>')
+    .replace(/(https?:\/\/)([^/\s:@]+):([^/\s@]+)@/gi, '$1<redacted>@')
+    .replace(/\b[a-z][\w-]*(?:\.[\w-]+){2,}\b/gi, '<app_id>')
+    .replace(/\b[a-z]:\\[^\s"',)]+/gi, '<path>')
+    .replace(/(^|[\s"'(])\/[^\s"',)]+/g, '$1<path>')
+    .replace(/(--(?:token|api[-_]?key|key|password|secret|private[-_]?key|jwt|session|auth)(?:=|\s+))("[^"]+"|'[^']+'|\S+)/gi, '$1<redacted>')
+    .replace(/\b((?:token|api[-_]?key|password|secret|authorization)\s*[:=]\s*)[^\s,;]+/gi, '$1<redacted>')
 }
 
 function parseExceptionFrames(stack: string | undefined, fallbackFunctionName: string) {
@@ -186,6 +209,7 @@ export async function capturePosthogException(payload: CapturePosthogExceptionPa
   }
 
   const serializedError = serializeError(payload.error)
+  const sanitizedMessage = sanitizeTelemetryText(serializedError.message)
   const distinctId = `cli:${pack.version}:${payload.functionName}`
   const frames = parseExceptionFrames(serializedError.stack, payload.functionName)
   const topFrame = frames[0]
@@ -205,7 +229,7 @@ export async function capturePosthogException(payload: CapturePosthogExceptionPa
       distinct_id: distinctId,
       $exception_list: [{
         type: serializedError.name || 'Error',
-        value: serializedError.message,
+        value: sanitizedMessage,
         mechanism: {
           handled: true,
           synthetic: false,

@@ -73,6 +73,32 @@ try {
   assert.equal(requests[0].init.signal instanceof AbortSignal, true)
 
   requests.length = 0
+  const sensitiveError = new Error(`Cannot upload ${cwd()}/bundle.zip for test@example.com app com.example.secret --token abc123`)
+  await capturePosthogException({
+    error: sensitiveError,
+    functionName: 'bundle upload',
+    kind: 'unhandled_error',
+    status: 1,
+  })
+
+  const sensitiveBody = JSON.parse(requests[0].init.body)
+  assert.equal(
+    sensitiveBody.properties.$exception_list[0].value,
+    'Cannot upload <cwd>/<path> for <email> app <app_id> --token <redacted>',
+  )
+
+  requests.length = 0
+  await capturePosthogException({
+    error: undefined,
+    functionName: 'bundle upload',
+    kind: 'unhandled_error',
+    status: 1,
+  })
+
+  const undefinedBody = JSON.parse(requests[0].init.body)
+  assert.equal(undefinedBody.properties.$exception_list[0].value, 'undefined')
+
+  requests.length = 0
   process.env.CAPGO_DISABLE_TELEMETRY = 'true'
   const disabledSent = await capturePosthogException({
     error,
