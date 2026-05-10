@@ -33,10 +33,10 @@ BEGIN
   RETURN NEXT is(app_metrics.mau, 10::bigint, 'Get metrics mau = 10');
   RETURN NEXT is(app_metrics.bandwidth, convert_gb_to_bytes(0.13)::bigint, 'Get metrics bandwidth = 0.13 GB');
 
-  -- Solo has 500 mau, 10 mau = 2%
+  -- Solo has 2000 mau; the percent helper reports sub-1% usage as 0%.
   SELECT * from get_plan_usage_percent_detailed('046a36ac-e03c-4590-9257-bd6c9dba9ee8') limit 1 into usage;
   RETURN NEXT IS(usage.storage_percent, (SELECT CAST ('30.0' AS DOUBLE PRECISION)), 'Storage usage = 30% for "Solo" plan');
-  RETURN NEXT IS(usage.mau_percent, (SELECT CAST ('1.0' AS DOUBLE PRECISION)), 'Mau usage = 2% for "Solo" plan');
+  RETURN NEXT IS(usage.mau_percent, (SELECT CAST ('0.0' AS DOUBLE PRECISION)), 'Mau usage = 0% for "Solo" plan');
   RETURN NEXT IS(usage.bandwidth_percent, (SELECT CAST ('1.0' AS DOUBLE PRECISION)), 'Bandwidth usage = 1% for "Solo" plan');
 
   -- Let's now add a second app to this org.
@@ -75,7 +75,7 @@ BEGIN
 
   SELECT * from get_plan_usage_percent_detailed('046a36ac-e03c-4590-9257-bd6c9dba9ee8') limit 1 into usage;
   RETURN NEXT IS(usage.storage_percent, (SELECT CAST ('40.0' AS DOUBLE PRECISION)), 'Storage usage = 40% for "Solo" plan (2 apps)');
-  RETURN NEXT IS(usage.mau_percent, (SELECT CAST ('2.0' AS DOUBLE PRECISION)), 'Mau usage = 2% for "Solo" plan (2 apps)');
+  RETURN NEXT IS(usage.mau_percent, (SELECT CAST ('1.0' AS DOUBLE PRECISION)), 'Mau usage = 1% for "Solo" plan (2 apps)');
   RETURN NEXT IS(usage.bandwidth_percent, (SELECT CAST ('2.0' AS DOUBLE PRECISION)), 'Bandwidth usage = 2% for "Solo" plan (2 apps)');
 END;
 $$ LANGUAGE plpgsql;
