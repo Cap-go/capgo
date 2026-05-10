@@ -142,6 +142,10 @@ async function post(c: Context, drizzleClient: ReturnType<typeof getDrizzleClien
   return { success: true }
 }
 
+// Plugin endpoints are intentionally public device endpoints: their responses are
+// considered public data, so we do not require Capgo JWT/API-key auth or add
+// checks beyond Supabase/platform protections. Endpoint-specific validation, plan
+// checks, and rate limits still apply.
 export const app = new Hono<MiddlewareKeyVariables>()
 
 async function parseBodyRaw(c: Context): Promise<AppStats | AppStats[]> {

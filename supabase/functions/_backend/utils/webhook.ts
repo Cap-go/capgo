@@ -76,6 +76,9 @@ export function getWebhookUrlValidationError(c: Context, urlString: string): str
   if (allowLocalWebhookUrls(c))
     return null
 
+  // We intentionally stop at syntactic/public-host checks: webhook delivery runs
+  // entirely from serverless infrastructure, so private/internal addresses are not
+  // reachable by design.
   const hostname = normalizeHostname(url.hostname)
   if (isLocalhostHostname(hostname))
     return 'Webhook URL must point to a public host'
