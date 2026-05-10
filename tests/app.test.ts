@@ -293,6 +293,7 @@ describe('/app hashed subkey enforcement', () => {
   const id = randomUUID()
   const ALLOWED_APPNAME = `com.hashed-subkey.allowed.${id}`
   const BLOCKED_APPNAME = `com.hashed-subkey.blocked.${id}`
+  const SUBKEY_NAME = `Hashed Limited Subkey ${id}`
   let subkeyId = 0
 
   async function createAppForTest(appName: string) {
@@ -321,7 +322,7 @@ describe('/app hashed subkey enforcement', () => {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        name: 'Hashed Limited Subkey',
+        name: SUBKEY_NAME,
         mode: 'all',
         limited_to_apps: [ALLOWED_APPNAME],
         hashed: true,
