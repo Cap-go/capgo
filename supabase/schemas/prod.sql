@@ -4424,7 +4424,10 @@ CREATE TABLE IF NOT EXISTS "public"."apps" (
     "ios_store_url" "text",
     "android_store_url" "text",
     "stats_updated_at" timestamp without time zone,
-    "stats_refresh_requested_at" timestamp without time zone
+    "stats_refresh_requested_at" timestamp without time zone,
+    "build_timeout_seconds" bigint DEFAULT 900 NOT NULL,
+    "build_timeout_updated_at" timestamp with time zone DEFAULT "now"() NOT NULL,
+    CONSTRAINT "apps_build_timeout_seconds_check" CHECK ((("build_timeout_seconds" >= 300) AND ("build_timeout_seconds" <= 21600)))
 );
 
 ALTER TABLE ONLY "public"."apps" REPLICA IDENTITY FULL;
@@ -4462,6 +4465,14 @@ COMMENT ON COLUMN "public"."apps"."ios_store_url" IS 'Optional App Store URL col
 
 
 COMMENT ON COLUMN "public"."apps"."android_store_url" IS 'Optional Google Play URL collected during onboarding to prefill metadata for existing apps.';
+
+
+
+COMMENT ON COLUMN "public"."apps"."build_timeout_seconds" IS 'Maximum native cloud build runtime in seconds before the job is cancelled and billable time is capped.';
+
+
+
+COMMENT ON COLUMN "public"."apps"."build_timeout_updated_at" IS 'Timestamp when the native cloud build timeout setting last changed.';
 
 
 
@@ -4974,7 +4985,7 @@ $$;
 ALTER FUNCTION "public"."get_app_versions"("appid" character varying, "name_version" character varying, "apikey" "text") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."get_current_plan_max_org"("orgid" "uuid") RETURNS TABLE("mau" bigint, "bandwidth" bigint, "storage" bigint, "build_time_unit" bigint)
+CREATE OR REPLACE FUNCTION "public"."get_current_plan_max_org"("orgid" "uuid") RETURNS TABLE("mau" bigint, "bandwidth" bigint, "storage" bigint, "build_time_unit" bigint, "native_build_concurrency" integer)
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     SET "search_path" TO ''
     AS $$
@@ -5008,7 +5019,12 @@ BEGIN
   END IF;
 
   RETURN QUERY
-  SELECT p.mau, p.bandwidth, p.storage, p.build_time_unit
+  SELECT
+    p.mau,
+    p.bandwidth,
+    p.storage,
+    p.build_time_unit,
+    p.native_build_concurrency
   FROM public.orgs o
   JOIN public.stripe_info si ON o.customer_id = si.customer_id
   JOIN public.plans p ON si.product_id = p.stripe_id
@@ -14738,6 +14754,27 @@ $$;
 ALTER FUNCTION "public"."update_app_versions_retention"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."update_apps_build_timeout_updated_at"() RETURNS "trigger"
+    LANGUAGE "plpgsql" SECURITY DEFINER
+    SET "search_path" TO ''
+    AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    NEW."build_timeout_updated_at" := COALESCE(NEW."build_timeout_updated_at", now());
+  ELSIF NEW."build_timeout_seconds" IS DISTINCT FROM OLD."build_timeout_seconds" THEN
+    NEW."build_timeout_updated_at" := now();
+  ELSE
+    NEW."build_timeout_updated_at" := OLD."build_timeout_updated_at";
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+
+ALTER FUNCTION "public"."update_apps_build_timeout_updated_at"() OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."update_org_invite_role_rbac"("p_org_id" "uuid", "p_user_id" "uuid", "p_new_role_name" "text") RETURNS "text"
     LANGUAGE "plpgsql" SECURITY DEFINER
     SET "search_path" TO ''
@@ -15609,11 +15646,16 @@ CREATE TABLE IF NOT EXISTS "public"."build_requests" (
     "upload_url" character varying NOT NULL,
     "upload_expires_at" timestamp with time zone NOT NULL,
     "last_error" "text",
+    "runner_wait_seconds" bigint DEFAULT 0 NOT NULL,
     CONSTRAINT "build_requests_platform_check" CHECK ((("platform")::"text" = ANY ((ARRAY['ios'::character varying, 'android'::character varying])::"text"[])))
 );
 
 
 ALTER TABLE "public"."build_requests" OWNER TO "postgres";
+
+
+COMMENT ON COLUMN "public"."build_requests"."runner_wait_seconds" IS 'Self-hosted runner wait time reported by builder, in seconds. Informational only; not used for billing.';
+
 
 
 CREATE TABLE IF NOT EXISTS "public"."capgo_credits_steps" (
@@ -16614,7 +16656,9 @@ CREATE TABLE IF NOT EXISTS "public"."plans" (
     "mau" bigint DEFAULT '0'::bigint NOT NULL,
     "market_desc" character varying DEFAULT ''::character varying,
     "build_time_unit" bigint DEFAULT 0 NOT NULL,
-    "credit_id" "text" NOT NULL
+    "credit_id" "text" NOT NULL,
+    "native_build_concurrency" integer DEFAULT 2 NOT NULL,
+    CONSTRAINT "plans_native_build_concurrency_positive" CHECK (("native_build_concurrency" > 0))
 );
 
 ALTER TABLE ONLY "public"."plans" REPLICA IDENTITY FULL;
@@ -16628,6 +16672,10 @@ COMMENT ON COLUMN "public"."plans"."build_time_unit" IS 'Maximum build time in s
 
 
 COMMENT ON COLUMN "public"."plans"."credit_id" IS 'Stripe product identifier used for purchasing additional credits.';
+
+
+
+COMMENT ON COLUMN "public"."plans"."native_build_concurrency" IS 'Maximum number of active native builds allowed concurrently for this plan.';
 
 
 
@@ -18548,6 +18596,10 @@ COMMENT ON TRIGGER "sync_org_user_to_role_binding_on_insert" ON "public"."org_us
 
 
 CREATE OR REPLACE TRIGGER "trg_sync_org_has_usage_credits" AFTER INSERT OR DELETE OR UPDATE ON "public"."usage_credit_grants" FOR EACH ROW EXECUTE FUNCTION "public"."sync_org_has_usage_credits_from_grants"();
+
+
+
+CREATE OR REPLACE TRIGGER "update_apps_build_timeout_updated_at" BEFORE INSERT OR UPDATE ON "public"."apps" FOR EACH ROW EXECUTE FUNCTION "public"."update_apps_build_timeout_updated_at"();
 
 
 
@@ -20682,8 +20734,8 @@ GRANT ALL ON FUNCTION "public"."get_app_versions"("appid" character varying, "na
 
 
 REVOKE ALL ON FUNCTION "public"."get_current_plan_max_org"("orgid" "uuid") FROM PUBLIC;
-GRANT ALL ON FUNCTION "public"."get_current_plan_max_org"("orgid" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."get_current_plan_max_org"("orgid" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."get_current_plan_max_org"("orgid" "uuid") TO "authenticated";
 
 
 
@@ -22195,6 +22247,11 @@ REVOKE ALL ON FUNCTION "public"."trigger_webhook_on_audit_log"() FROM PUBLIC;
 
 REVOKE ALL ON FUNCTION "public"."update_app_versions_retention"() FROM PUBLIC;
 GRANT ALL ON FUNCTION "public"."update_app_versions_retention"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."update_apps_build_timeout_updated_at"() FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."update_apps_build_timeout_updated_at"() TO "service_role";
 
 
 
