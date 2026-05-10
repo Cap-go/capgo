@@ -31,7 +31,7 @@
       "d1_databases": [
         {
           "binding": "DB_STOREAPPS",
-          "database_name": "capgo_prod_storeapps",
+          "database_name": "capgo_prod_storeapp",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
       ],
@@ -77,7 +77,7 @@
       "d1_databases": [
         {
           "binding": "DB_STOREAPPS",
-          "database_name": "capgo_prod_storeapps",
+          "database_name": "capgo_prod_storeapp",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
       ],
@@ -123,7 +123,7 @@
       "d1_databases": [
         {
           "binding": "DB_STOREAPPS",
-          "database_name": "capgo_prod_storeapps",
+          "database_name": "capgo_prod_storeapp",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
       ],
@@ -166,7 +166,7 @@
       "d1_databases": [
         {
           "binding": "DB_STOREAPPS",
-          "database_name": "capgo_prod_storeapps",
+          "database_name": "capgo_prod_storeapp",
           "database_id": "81236a0c-db6e-454d-87da-944fa9bc100c"
         }
       ],
