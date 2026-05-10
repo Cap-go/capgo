@@ -1086,6 +1086,7 @@ export interface AdminGlobalStatsTrend {
   users_active: number
   paying: number
   org_conversion_rate: number
+  plan_total_conversion_rate: number
   plan_solo_conversion_rate: number
   plan_maker_conversion_rate: number
   plan_team_conversion_rate: number
@@ -1179,6 +1180,7 @@ export async function getAdminGlobalStatsTrend(
         users_active::int,
         paying::int,
         org_conversion_rate::float,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_total_conversion_rate', '')::float, 0)::float AS plan_total_conversion_rate,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_solo_conversion_rate', '')::float, 0)::float AS plan_solo_conversion_rate,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_maker_conversion_rate', '')::float, 0)::float AS plan_maker_conversion_rate,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_team_conversion_rate', '')::float, 0)::float AS plan_team_conversion_rate,
@@ -1289,6 +1291,7 @@ export async function getAdminGlobalStatsTrend(
       users_active: Number(row.users_active) || 0,
       paying: Number(row.paying) || 0,
       org_conversion_rate: Number(row.org_conversion_rate) || 0,
+      plan_total_conversion_rate: Number(row.plan_total_conversion_rate) || 0,
       plan_solo_conversion_rate: Number(row.plan_solo_conversion_rate) || 0,
       plan_maker_conversion_rate: Number(row.plan_maker_conversion_rate) || 0,
       plan_team_conversion_rate: Number(row.plan_team_conversion_rate) || 0,

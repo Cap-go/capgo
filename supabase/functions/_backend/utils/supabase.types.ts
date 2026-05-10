@@ -1274,6 +1274,7 @@ export type Database = {
           plan_maker_conversion_rate: number
           plan_solo_conversion_rate: number
           plan_team_conversion_rate: number
+          plan_total_conversion_rate: number
           paying: number | null
           paying_monthly: number | null
           paying_yearly: number | null
@@ -1354,6 +1355,7 @@ export type Database = {
           plan_maker_conversion_rate?: number
           plan_solo_conversion_rate?: number
           plan_team_conversion_rate?: number
+          plan_total_conversion_rate?: number
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
@@ -1434,6 +1436,7 @@ export type Database = {
           plan_maker_conversion_rate?: number
           plan_solo_conversion_rate?: number
           plan_team_conversion_rate?: number
+          plan_total_conversion_rate?: number
           paying?: number | null
           paying_monthly?: number | null
           paying_yearly?: number | null
