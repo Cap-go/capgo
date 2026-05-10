@@ -45,7 +45,7 @@ export async function reserveNativeBuildSlot(
   c: Context,
   input: ReserveNativeBuildSlotInput,
 ): Promise<NativeBuildSlotReservation> {
-  let planName = 'Solo'
+  let planName: string
   let limit: number
   let pgPool: ReturnType<typeof getPgClient> | null = null
   let client: PgClient | null = null
