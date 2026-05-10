@@ -21,6 +21,7 @@ interface LogData {
   action: string
   version_name: string
   version?: number
+  metadata?: Record<string, string> | string | null
   created_at: string
 }
 type Element = LogData
@@ -89,141 +90,148 @@ function initializeDateRange(): [Date, Date] {
 const range = ref<[Date, Date]>(initializeDateRange())
 const DOC_LOGS = 'https://capgo.app/docs/plugin/debugging/#sent-from-the-backend'
 
-// All available actions - none selected by default (shows all results)
-const actionFilters = ref<Record<string, boolean>>({
-  'action-ping': false,
-  'action-delete': false,
-  'action-reset': false,
-  'action-set': false,
-  'action-get': false,
-  'action-set-fail': false,
-  'action-update-fail': false,
-  'action-download-fail': false,
-  'action-windows-path-fail': false,
-  'action-canonical-path-fail': false,
-  'action-directory-path-fail': false,
-  'action-unzip-fail': false,
-  'action-low-mem-fail': false,
-  'action-download-0': false,
-  'action-download-10': false,
-  'action-download-20': false,
-  'action-download-30': false,
-  'action-download-40': false,
-  'action-download-50': false,
-  'action-download-60': false,
-  'action-download-70': false,
-  'action-download-80': false,
-  'action-download-90': false,
-  'action-download-complete': false,
-  'action-download-manifest-start': false,
-  'action-download-manifest-complete': false,
-  'action-download-zip-start': false,
-  'action-download-zip-complete': false,
-  'action-download-manifest-file-fail': false,
-  'action-download-manifest-checksum-fail': false,
-  'action-download-manifest-brotli-fail': false,
-  'action-decrypt-fail': false,
-  'action-app-moved-to-foreground': false,
-  'action-app-moved-to-background': false,
-  'action-uninstall': false,
-  'action-need-plan-upgrade': false,
-  'action-missing-bundle': false,
-  'action-no-new': false,
-  'action-disable-platform-ios': false,
-  'action-disable-platform-android': false,
-  'action-disable-auto-update-to-major': false,
-  'action-cannot-update-via-private-channel': false,
-  'action-disable-auto-update-to-minor': false,
-  'action-disable-auto-update-to-patch': false,
-  'action-channel-misconfigured': false,
-  'action-disable-auto-update-metadata': false,
-  'action-disable-auto-update-under-native': false,
-  'action-disable-dev-build': false,
-  'action-disable-prod-build': false,
-  'action-disable-emulator': false,
-  'action-disable-device': false,
-  'action-cannot-get-bundle': false,
-  'action-checksum-fail': false,
-  'action-no-channel-or-override': false,
-  'action-set-channel': false,
-  'action-get-channel': false,
-  'action-rate-limited': false,
-  'action-disable-auto-update': false,
-  'action-invalid-ip': false,
-  'action-blocked-by-server-url': false,
-  'action-backend-refusal': false,
-})
-
-// Map filter keys to actual action values
-const filterToAction: Record<string, string> = {
-  'action-ping': 'ping',
-  'action-delete': 'delete',
-  'action-reset': 'reset',
-  'action-set': 'set',
-  'action-get': 'get',
-  'action-set-fail': 'set_fail',
-  'action-update-fail': 'update_fail',
-  'action-download-fail': 'download_fail',
-  'action-windows-path-fail': 'windows_path_fail',
-  'action-canonical-path-fail': 'canonical_path_fail',
-  'action-directory-path-fail': 'directory_path_fail',
-  'action-unzip-fail': 'unzip_fail',
-  'action-low-mem-fail': 'low_mem_fail',
-  'action-download-0': 'download_0',
-  'action-download-10': 'download_10',
-  'action-download-20': 'download_20',
-  'action-download-30': 'download_30',
-  'action-download-40': 'download_40',
-  'action-download-50': 'download_50',
-  'action-download-60': 'download_60',
-  'action-download-70': 'download_70',
-  'action-download-80': 'download_80',
-  'action-download-90': 'download_90',
-  'action-download-complete': 'download_complete',
-  'action-download-manifest-start': 'download_manifest_start',
-  'action-download-manifest-complete': 'download_manifest_complete',
-  'action-download-zip-start': 'download_zip_start',
-  'action-download-zip-complete': 'download_zip_complete',
-  'action-download-manifest-file-fail': 'download_manifest_file_fail',
-  'action-download-manifest-checksum-fail': 'download_manifest_checksum_fail',
-  'action-download-manifest-brotli-fail': 'download_manifest_brotli_fail',
-  'action-decrypt-fail': 'decrypt_fail',
-  'action-app-moved-to-foreground': 'app_moved_to_foreground',
-  'action-app-moved-to-background': 'app_moved_to_background',
-  'action-uninstall': 'uninstall',
-  'action-need-plan-upgrade': 'needPlanUpgrade',
-  'action-missing-bundle': 'missingBundle',
-  'action-no-new': 'noNew',
-  'action-disable-platform-ios': 'disablePlatformIos',
-  'action-disable-platform-android': 'disablePlatformAndroid',
-  'action-disable-auto-update-to-major': 'disableAutoUpdateToMajor',
-  'action-cannot-update-via-private-channel': 'cannotUpdateViaPrivateChannel',
-  'action-disable-auto-update-to-minor': 'disableAutoUpdateToMinor',
-  'action-disable-auto-update-to-patch': 'disableAutoUpdateToPatch',
-  'action-channel-misconfigured': 'channelMisconfigured',
-  'action-disable-auto-update-metadata': 'disableAutoUpdateMetadata',
-  'action-disable-auto-update-under-native': 'disableAutoUpdateUnderNative',
-  'action-disable-dev-build': 'disableDevBuild',
-  'action-disable-prod-build': 'disableProdBuild',
-  'action-disable-emulator': 'disableEmulator',
-  'action-disable-device': 'disableDevice',
-  'action-cannot-get-bundle': 'cannotGetBundle',
-  'action-checksum-fail': 'checksum_fail',
-  'action-no-channel-or-override': 'NoChannelOrOverride',
-  'action-set-channel': 'setChannel',
-  'action-get-channel': 'getChannel',
-  'action-rate-limited': 'rateLimited',
-  'action-disable-auto-update': 'disableAutoUpdate',
-  'action-invalid-ip': 'InvalidIp',
-  'action-blocked-by-server-url': 'blocked_by_server_url',
-  'action-backend-refusal': 'backend_refusal',
+function normalizeMetadata(metadata: LogData['metadata']): Record<string, string> | null {
+  if (!metadata)
+    return null
+  if (typeof metadata === 'string') {
+    try {
+      const parsed = JSON.parse(metadata)
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed))
+        return parsed as Record<string, string>
+    }
+    catch {
+      return null
+    }
+    return null
+  }
+  return metadata
 }
+
+function formatMetadata(elem: Element): string {
+  const metadata = normalizeMetadata(elem.metadata)
+  if (!metadata)
+    return '-'
+
+  const entries = Object.entries(metadata)
+  if (!entries.length)
+    return '-'
+
+  const preview = entries.slice(0, 3).map(([key, value]) => `${key}: ${value}`).join(', ')
+  return entries.length > 3 ? `${preview}, +${entries.length - 3}` : preview
+}
+
+async function copyMetadata(elem: Element) {
+  const metadata = normalizeMetadata(elem.metadata)
+  if (!metadata)
+    return
+
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(metadata, null, 2))
+    toast.success(t('copied-to-clipboard'))
+  }
+  catch (error) {
+    console.error(error)
+    toast.error(t('copy-fail'))
+  }
+}
+
+const statsActionFilters = [
+  ['action-ping', 'ping'],
+  ['action-delete', 'delete'],
+  ['action-reset', 'reset'],
+  ['action-set', 'set'],
+  ['action-get', 'get'],
+  ['action-set-fail', 'set_fail'],
+  ['action-update-fail', 'update_fail'],
+  ['action-download-fail', 'download_fail'],
+  ['action-windows-path-fail', 'windows_path_fail'],
+  ['action-canonical-path-fail', 'canonical_path_fail'],
+  ['action-directory-path-fail', 'directory_path_fail'],
+  ['action-unzip-fail', 'unzip_fail'],
+  ['action-low-mem-fail', 'low_mem_fail'],
+  ['action-download-0', 'download_0'],
+  ['action-download-10', 'download_10'],
+  ['action-download-20', 'download_20'],
+  ['action-download-30', 'download_30'],
+  ['action-download-40', 'download_40'],
+  ['action-download-50', 'download_50'],
+  ['action-download-60', 'download_60'],
+  ['action-download-70', 'download_70'],
+  ['action-download-80', 'download_80'],
+  ['action-download-90', 'download_90'],
+  ['action-download-complete', 'download_complete'],
+  ['action-download-manifest-start', 'download_manifest_start'],
+  ['action-download-manifest-complete', 'download_manifest_complete'],
+  ['action-download-zip-start', 'download_zip_start'],
+  ['action-download-zip-complete', 'download_zip_complete'],
+  ['action-download-manifest-file-fail', 'download_manifest_file_fail'],
+  ['action-download-manifest-checksum-fail', 'download_manifest_checksum_fail'],
+  ['action-download-manifest-brotli-fail', 'download_manifest_brotli_fail'],
+  ['action-decrypt-fail', 'decrypt_fail'],
+  ['action-app-moved-to-foreground', 'app_moved_to_foreground'],
+  ['action-app-moved-to-background', 'app_moved_to_background'],
+  ['action-app-crash', 'app_crash'],
+  ['action-app-crash-native', 'app_crash_native'],
+  ['action-app-anr', 'app_anr'],
+  ['action-app-killed-low-memory', 'app_killed_low_memory'],
+  ['action-app-killed-excessive-resource-usage', 'app_killed_excessive_resource_usage'],
+  ['action-app-initialization-failure', 'app_initialization_failure'],
+  ['action-app-memory-warning', 'app_memory_warning'],
+  ['action-webview-javascript-error', 'webview_javascript_error'],
+  ['action-webview-unhandled-rejection', 'webview_unhandled_rejection'],
+  ['action-webview-resource-error', 'webview_resource_error'],
+  ['action-webview-security-policy-violation', 'webview_security_policy_violation'],
+  ['action-webview-unclean-restart', 'webview_unclean_restart'],
+  ['action-webview-render-process-gone', 'webview_render_process_gone'],
+  ['action-webview-content-process-terminated', 'webview_content_process_terminated'],
+  ['action-uninstall', 'uninstall'],
+  ['action-need-plan-upgrade', 'needPlanUpgrade'],
+  ['action-missing-bundle', 'missingBundle'],
+  ['action-no-new', 'noNew'],
+  ['action-disable-platform-ios', 'disablePlatformIos'],
+  ['action-disable-platform-android', 'disablePlatformAndroid'],
+  ['action-disable-platform-electron', 'disablePlatformElectron'],
+  ['action-disable-auto-update-to-major', 'disableAutoUpdateToMajor'],
+  ['action-cannot-update-via-private-channel', 'cannotUpdateViaPrivateChannel'],
+  ['action-disable-auto-update-to-minor', 'disableAutoUpdateToMinor'],
+  ['action-disable-auto-update-to-patch', 'disableAutoUpdateToPatch'],
+  ['action-channel-misconfigured', 'channelMisconfigured'],
+  ['action-disable-auto-update-metadata', 'disableAutoUpdateMetadata'],
+  ['action-disable-auto-update-under-native', 'disableAutoUpdateUnderNative'],
+  ['action-disable-dev-build', 'disableDevBuild'],
+  ['action-disable-prod-build', 'disableProdBuild'],
+  ['action-disable-emulator', 'disableEmulator'],
+  ['action-disable-device', 'disableDevice'],
+  ['action-cannot-get-bundle', 'cannotGetBundle'],
+  ['action-checksum-fail', 'checksum_fail'],
+  ['action-key-mismatch', 'keyMismatch'],
+  ['action-no-channel-or-override', 'NoChannelOrOverride'],
+  ['action-set-channel', 'setChannel'],
+  ['action-get-channel', 'getChannel'],
+  ['action-rate-limited', 'rateLimited'],
+  ['action-disable-auto-update', 'disableAutoUpdate'],
+  ['action-invalid-ip', 'InvalidIp'],
+  ['action-blocked-by-server-url', 'blocked_by_server_url'],
+  ['action-backend-refusal', 'backend_refusal'],
+  ['action-custom-id-blocked', 'customIdBlocked'],
+] as const
+
+const actionFilters = ref<Record<string, boolean>>(
+  Object.fromEntries(statsActionFilters.map(([filterKey]) => [filterKey, false])),
+)
+
+const filterToAction: Record<string, string> = Object.fromEntries(statsActionFilters)
 
 // Create reverse mapping from action values to filter keys
 const actionToFilter: Record<string, string> = {}
 Object.entries(filterToAction).forEach(([filterKey, actionValue]) => {
   actionToFilter[actionValue] = filterKey
 })
+
+function formatAction(elem: Element): string {
+  const filterKey = actionToFilter[elem.action]
+  return filterKey ? t(filterKey) : elem.action
+}
 
 // Initialize action filters from URL query parameter
 function initializeActionFilters(): void {
@@ -428,6 +436,7 @@ columns.value = [
     class: 'truncate max-w-8',
     sortable: true,
     head: true,
+    displayFunction: (elem: Element) => formatAction(elem),
     onClick: () => window.open(DOC_LOGS, '_blank', 'noopener,noreferrer'),
   },
   {
@@ -443,6 +452,15 @@ columns.value = [
         : parsed.version
     },
     onClick: (elem: Element) => openOneVersion(elem),
+  },
+  {
+    label: t('metadata'),
+    key: 'metadata',
+    class: 'truncate max-w-48',
+    mobile: false,
+    sortable: false,
+    displayFunction: (elem: Element) => formatMetadata(elem),
+    onClick: (elem: Element) => copyMetadata(elem),
   },
 ]
 

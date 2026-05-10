@@ -32,6 +32,9 @@ type UnknownRecord = Record<string, unknown>
 type DevicePlatform = 'ios' | 'android' | 'electron'
 
 const DEVICE_PLATFORMS = new Set<DevicePlatform>(['ios', 'android', 'electron'])
+const MAX_STATS_METADATA_FIELDS = 30
+const MAX_STATS_METADATA_KEY_LENGTH = 64
+const MAX_STATS_METADATA_VALUE_LENGTH = 2048
 
 function isRecord(value: unknown): value is UnknownRecord {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -200,6 +203,37 @@ function validateOptionalAction(input: UnknownRecord, issues: ValidationIssue[])
   return value
 }
 
+function validateOptionalStatsMetadata(input: UnknownRecord, issues: ValidationIssue[]) {
+  const metadata = input.metadata
+  if (metadata === undefined) {
+    return
+  }
+  if (!isRecord(metadata)) {
+    issues.push(fieldIssue('metadata', 'metadata must be an object with string values'))
+    return
+  }
+
+  const entries = Object.entries(metadata)
+  if (entries.length > MAX_STATS_METADATA_FIELDS) {
+    issues.push(fieldIssue('metadata', `metadata must contain at most ${MAX_STATS_METADATA_FIELDS} fields`))
+    return
+  }
+
+  for (const [key, value] of entries) {
+    if (key.length > MAX_STATS_METADATA_KEY_LENGTH) {
+      issues.push(fieldIssue(`metadata.${key}`, `metadata keys must contain at most ${MAX_STATS_METADATA_KEY_LENGTH} characters`))
+      continue
+    }
+    if (typeof value !== 'string') {
+      issues.push(fieldIssue(`metadata.${key}`, 'metadata values must be strings'))
+      continue
+    }
+    if (value.length > MAX_STATS_METADATA_VALUE_LENGTH) {
+      issues.push(fieldIssue(`metadata.${key}`, `metadata values must contain at most ${MAX_STATS_METADATA_VALUE_LENGTH} characters`))
+    }
+  }
+}
+
 function validateBasePluginBooleans(input: UnknownRecord, issues: ValidationIssue[]) {
   validateRequiredBoolean(input, 'is_emulator', issues)
   validateRequiredBoolean(input, 'is_prod', issues)
@@ -257,6 +291,7 @@ export const statsRequestSchema = createPluginSchema<AppStats>((input, issues) =
   validateBasePluginBooleans(input, issues)
   validateOptionalCommonStrings(input, issues)
   validateOptionalAction(input, issues)
+  validateOptionalStatsMetadata(input, issues)
   validateOptionalString(input, 'version_build', issues)
 })
 

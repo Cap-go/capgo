@@ -165,7 +165,7 @@ afterAll(async () => {
   await getSupabaseClient().from('org_users').delete().eq('org_id', ORG_ID)
   await getSupabaseClient().from('orgs').delete().eq('id', ORG_ID)
   await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
-})
+}, 60_000)
 
 describe('[GET] /organization/audit', () => {
   it('get audit logs for organization', async () => {

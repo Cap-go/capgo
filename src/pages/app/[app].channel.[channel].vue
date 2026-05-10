@@ -158,19 +158,23 @@ async function getChannel(force = false) {
 }
 
 async function saveChannelChange<K extends EditableChannelKey>(key: K, val: ChannelUpdate[K]) {
-  if (!canUpdateChannelSettings.value) {
+  const canUpdate = key === 'version'
+    ? canPromoteBundle.value
+    : canUpdateChannelSettings.value
+
+  if (!canUpdate) {
     toast.error(t('no-permission'))
-    return
+    return false
   }
 
   if (!id.value || !channel.value)
-    return
+    return false
 
   // Validate version ID if updating version field
   if (key === 'version' && (val === undefined || val === null || typeof val !== 'number')) {
     console.error('Invalid version ID:', val)
     toast.error(t('error-invalid-version'))
-    return
+    return false
   }
 
   try {
@@ -181,17 +185,20 @@ async function saveChannelChange<K extends EditableChannelKey>(key: K, val: Chan
       .from('channels')
       .update(update)
       .eq('id', id.value)
-    getChannel(true)
     if (error) {
       toast.error(t('error-update-channel'))
       console.error('no channel update', error)
+      return false
     }
     else {
+      await getChannel(true)
       toast.info(t('cloud-replication-delay'))
+      return true
     }
   }
   catch (error) {
     console.error(error)
+    return false
   }
 }
 
@@ -343,19 +350,7 @@ async function handleRevert() {
             return
           }
 
-          const { error: updateError } = await supabase
-            .from('channels')
-            .update({ version: revertVersionId })
-            .eq('id', id.value)
-
-          if (updateError) {
-            console.error(updateError)
-            toast.error(t('error-revert-to-builtin'))
-            return
-          }
-
-          await getChannel(true)
-          toast.info(t('cloud-replication-delay'))
+          await saveChannelChange('version', revertVersionId)
         },
       },
     ],
