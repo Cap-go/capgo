@@ -1,7 +1,7 @@
 import type { Context } from 'hono'
 import type { MiddlewareKeyVariables } from '../../utils/hono.ts'
 import { quickError } from '../../utils/hono.ts'
-import { readResponseBytesWithLimit } from '../../utils/response.ts'
+import { bytesToBase64, readResponseBytesWithLimit } from '../../utils/response.ts'
 
 export interface FetchStoreMetadataBody {
   url?: string
@@ -24,18 +24,6 @@ const ALLOWED_STORE_HOSTS = new Set([
 ])
 const MAX_ICON_BYTES = 512 * 1024
 
-function uint8ArrayToBase64(bytes: Uint8Array) {
-  let binary = ''
-  const chunkSize = 0x8000
-
-  for (let index = 0; index < bytes.length; index += chunkSize) {
-    const chunk = bytes.subarray(index, index + chunkSize)
-    binary += String.fromCharCode(...chunk)
-  }
-
-  return btoa(binary)
-}
-
 async function fetchIconDataUrl(iconUrl: string | null) {
   if (!iconUrl)
     return null
@@ -57,7 +45,7 @@ async function fetchIconDataUrl(iconUrl: string | null) {
     if (!bytes || bytes.byteLength === 0)
       return null
 
-    return `data:${contentType};base64,${uint8ArrayToBase64(bytes)}`
+    return `data:${contentType};base64,${bytesToBase64(bytes)}`
   }
   catch {
     return null
