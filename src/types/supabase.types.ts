@@ -490,6 +490,7 @@ export type Database = {
           owner_org: string
           platform: string
           requested_by: string
+          runner_wait_seconds: number
           status: string
           updated_at: string
           upload_expires_at: string
@@ -508,6 +509,7 @@ export type Database = {
           owner_org: string
           platform: string
           requested_by: string
+          runner_wait_seconds?: number
           status?: string
           updated_at?: string
           upload_expires_at: string
@@ -526,6 +528,7 @@ export type Database = {
           owner_org?: string
           platform?: string
           requested_by?: string
+          runner_wait_seconds?: number
           status?: string
           updated_at?: string
           upload_expires_at?: string
