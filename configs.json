@@ -28,5 +28,11 @@
     "preprod": "0x4AAAAAAAxItBa5rCQ3Vvhl",
     "development": "0x4AAAAAAAxDbvW2bw7mcEZs",
     "local": ""
+  },
+  "plugin_region_targets": {
+    "prod": "[{\"name\":\"eu\",\"envName\":\"capgo_plugin-eu-prod\",\"url\":\"https://plugin.eu.capgo.app/ok\"},{\"name\":\"me\",\"envName\":\"capgo_plugin-me-prod\",\"url\":\"https://plugin.me.capgo.app/ok\"},{\"name\":\"hk\",\"envName\":\"capgo_plugin-hk-prod\",\"url\":\"https://plugin.hk.capgo.app/ok\"},{\"name\":\"jp\",\"envName\":\"capgo_plugin-jp-prod\",\"url\":\"https://plugin.jp.capgo.app/ok\"},{\"name\":\"as\",\"envName\":\"capgo_plugin-as-prod\",\"url\":\"https://plugin.as.capgo.app/ok\"},{\"name\":\"na\",\"envName\":\"capgo_plugin-na-prod\",\"url\":\"https://plugin.na.capgo.app/ok\"},{\"name\":\"af\",\"envName\":\"capgo_plugin-af-prod\",\"url\":\"https://plugin.af.capgo.app/ok\"},{\"name\":\"oc\",\"envName\":\"capgo_plugin-oc-prod\",\"url\":\"https://plugin.oc.capgo.app/ok\"},{\"name\":\"sa\",\"envName\":\"capgo_plugin-sa-prod\",\"url\":\"https://plugin.sa.capgo.app/ok\"}]",
+    "preprod": "[{\"name\":\"eu\",\"envName\":\"capgo_plugin-eu-preprod\",\"url\":\"https://plugin.preprod.capgo.app/ok\"}]",
+    "development": "[{\"name\":\"alpha\",\"envName\":\"capgo_plugin-alpha\",\"url\":\"https://plugin.dev.capgo.app/ok\"}]",
+    "local": "[{\"name\":\"local\",\"envName\":\"capgo_plugin-local\",\"url\":\"http://localhost:8788/ok\"}]"
   }
 }
