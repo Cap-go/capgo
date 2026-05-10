@@ -950,6 +950,56 @@ describe('[DELETE] /organization/members', () => {
 })
 
 describe('[POST] /organization', () => {
+  async function expectCreatedOrganizationPlan(estimatedMau: number, planName: string) {
+    const name = `Created ${planName} Plan Organization ${randomUUID()}`
+    const response = await fetch(`${BASE_URL}/organization`, {
+      headers,
+      method: 'POST',
+      body: JSON.stringify({ name, estimatedMau }),
+    })
+    expect(response.status).toBe(200)
+    const responseType = type({
+      id: 'string.uuid',
+    })
+    const safe = safeParseSchema(responseType, await response.json())
+    expect(safe.success).toBe(true)
+    if (!safe.success)
+      throw safe.error
+
+    let customerId: string | null = null
+
+    try {
+      const { data: expectedPlan, error: planError } = await getSupabaseClient()
+        .from('plans')
+        .select('stripe_id')
+        .eq('name', planName)
+        .single()
+      expect(planError).toBeNull()
+
+      const { data: org, error: orgError } = await getSupabaseClient()
+        .from('orgs')
+        .select('customer_id')
+        .eq('id', safe.data.id)
+        .single()
+      expect(orgError).toBeNull()
+      customerId = org?.customer_id ?? null
+      expect(customerId).toBeTruthy()
+
+      const { data: stripeInfo, error: stripeError } = await getSupabaseClient()
+        .from('stripe_info')
+        .select('product_id')
+        .eq('customer_id', customerId!)
+        .single()
+      expect(stripeError).toBeNull()
+      expect(stripeInfo?.product_id).toBe(expectedPlan?.stripe_id)
+    }
+    finally {
+      await getSupabaseClient().from('orgs').delete().eq('id', safe.data.id)
+      if (customerId)
+        await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
+    }
+  }
+
   it.concurrent('create organization', async () => {
     const name = `Created Organization ${new Date().toISOString()}`
     const website = 'HTTPS://capgo.app'
@@ -1042,53 +1092,15 @@ describe('[POST] /organization', () => {
   })
 
   it.concurrent('create organization uses the estimated active users to choose the initial plan', async () => {
-    const name = `Created Team Plan Organization ${randomUUID()}`
-    const response = await fetch(`${BASE_URL}/organization`, {
-      headers,
-      method: 'POST',
-      body: JSON.stringify({ name, estimatedMau: 100000 }),
-    })
-    expect(response.status).toBe(200)
-    const responseType = type({
-      id: 'string.uuid',
-    })
-    const safe = safeParseSchema(responseType, await response.json())
-    expect(safe.success).toBe(true)
-    if (!safe.success)
-      throw safe.error
+    await expectCreatedOrganizationPlan(100000, 'Team')
+  })
 
-    let customerId: string | null = null
+  it.concurrent('create organization keeps Solo through 2K active users', async () => {
+    await expectCreatedOrganizationPlan(2000, 'Solo')
+  })
 
-    try {
-      const { data: teamPlan, error: planError } = await getSupabaseClient()
-        .from('plans')
-        .select('stripe_id')
-        .eq('name', 'Team')
-        .single()
-      expect(planError).toBeNull()
-
-      const { data: org, error: orgError } = await getSupabaseClient()
-        .from('orgs')
-        .select('customer_id')
-        .eq('id', safe.data.id)
-        .single()
-      expect(orgError).toBeNull()
-      customerId = org?.customer_id ?? null
-      expect(customerId).toBeTruthy()
-
-      const { data: stripeInfo, error: stripeError } = await getSupabaseClient()
-        .from('stripe_info')
-        .select('product_id')
-        .eq('customer_id', customerId!)
-        .single()
-      expect(stripeError).toBeNull()
-      expect(stripeInfo?.product_id).toBe(teamPlan?.stripe_id)
-    }
-    finally {
-      await getSupabaseClient().from('orgs').delete().eq('id', safe.data.id)
-      if (customerId)
-        await getSupabaseClient().from('stripe_info').delete().eq('customer_id', customerId)
-    }
+  it.concurrent('create organization moves above the Solo active user limit to Maker', async () => {
+    await expectCreatedOrganizationPlan(2001, 'Maker')
   })
 
   it.concurrent('create organization rejects an estimated active user count above the largest plan stop', async () => {

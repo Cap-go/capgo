@@ -34,6 +34,12 @@ interface WebsitePreview {
   website: string
 }
 
+interface UserCountStop {
+  value: number
+  label: string
+  planName: string
+}
+
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
@@ -58,16 +64,15 @@ const websitePreview = ref<WebsitePreview | null>(null)
 const inviteModalRef = ref<InviteTeammateModalRef | null>(null)
 const logoInputRef = useTemplateRef<HTMLInputElement>('logoInput')
 const isAdditionalOrgFlow = ref(false)
-const estimatedUsersIndex = ref(0)
+const estimatedUsersIndex = ref<number | null>(null)
 
-const fallbackUserCountStops = [
-  { value: 0, label: '0', planName: 'Solo' },
-  { value: 1000, label: '1K', planName: 'Solo' },
+const fallbackUserCountStops: UserCountStop[] = [
+  { value: 2000, label: '2K', planName: 'Solo' },
   { value: 10000, label: '10K', planName: 'Maker' },
   { value: 100000, label: '100K', planName: 'Team' },
   { value: 1000000, label: '1M+', planName: 'Enterprise' },
 ]
-const planNameOrder = ['Solo', 'Maker', 'Team', 'Enterprise']
+const planNameOrder = ['Solo', 'Maker', 'Team', 'Enterprise'] as const
 
 const onboardingSteps: Array<{ id: OnboardingStep, label: string }> = [
   { id: 'details', label: t('organization-onboarding-step-details') },
@@ -82,7 +87,7 @@ const activeOrgName = computed(() => {
   return orgNameInput.value.trim() || websitePreview.value?.name || ''
 })
 const hasSavedLogo = computed(() => currentOrganization.value?.gid === activeOrgId.value && !!currentOrganization.value.logo)
-const userCountStops = computed(() => {
+const userCountStops = computed<UserCountStop[]>(() => {
   const planStops = planNameOrder
     .map(planName => main.plans.find(plan => plan.name === planName))
     .filter(plan => plan?.mau)
@@ -96,15 +101,16 @@ const userCountStops = computed(() => {
     })
 
   if (planStops.length === planNameOrder.length) {
-    return [
-      { value: 0, label: '0', planName: planStops[0].planName },
-      ...planStops,
-    ]
+    return planStops
   }
 
   return fallbackUserCountStops
 })
-const selectedUserCountStop = computed(() => userCountStops.value[Math.min(estimatedUsersIndex.value, userCountStops.value.length - 1)] ?? userCountStops.value[0])
+const selectedUserCountStop = computed<UserCountStop | null>(() => {
+  if (estimatedUsersIndex.value === null)
+    return null
+  return userCountStops.value[Math.min(estimatedUsersIndex.value, userCountStops.value.length - 1)] ?? null
+})
 
 const websiteHostname = computed(() => {
   const value = websiteInput.value.trim()
@@ -126,7 +132,7 @@ const canCreateOrganization = computed(() => {
   if (!main.auth || isSubmitting.value || isLoadingWebsitePreview.value || !mode.value)
     return false
 
-  return !!orgNameInput.value.trim()
+  return !!orgNameInput.value.trim() && !!selectedUserCountStop.value
 })
 const hasExistingOrganization = computed(() => organizationStore.organizations.some(org => !org.role.includes('invite')))
 const inviteSuccessCount = computed(() => sentInvites.value.length)
@@ -161,6 +167,20 @@ function formatUserCount(value: number, plus = false) {
   if (value >= 1000)
     return `${value / 1000}K`
   return String(value)
+}
+
+function getUserCountStopTitle(stop: UserCountStop) {
+  if (stop.value >= 1_000_000)
+    return t('organization-onboarding-active-users-plus', { count: stop.label })
+  return t('organization-onboarding-active-users-up-to', { count: stop.label })
+}
+
+function isUserCountStopSelected(index: number) {
+  return estimatedUsersIndex.value === index
+}
+
+function selectUserCountStop(index: number) {
+  estimatedUsersIndex.value = index
 }
 
 function getInviteDisplayName(invite: SentInvite) {
@@ -328,6 +348,11 @@ async function createOrganization() {
   const orgName = orgNameInput.value.trim()
   if (!orgName) {
     toast.error(t('org-name-required'))
+    return
+  }
+
+  if (!selectedUserCountStop.value) {
+    toast.error(t('organization-onboarding-user-scale-required'))
     return
   }
 
@@ -690,53 +715,78 @@ onUnmounted(() => {
                   </p>
                 </div>
 
-                <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-4 dark:border-slate-200 dark:bg-slate-50/70">
-                  <div class="flex items-start justify-between gap-4">
+                <div class="border-t border-slate-200 pt-5">
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div class="min-w-0">
-                      <label for="estimated-users" class="flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-800">
+                      <p id="estimated-users-label" class="flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-800">
                         <IconUsers class="h-4 w-4 text-azure-500" />
                         {{ t('organization-onboarding-existing-users-label') }}
-                      </label>
-                      <p class="mt-1 text-xs text-slate-500 dark:text-slate-500">
+                      </p>
+                      <p id="estimated-users-help" class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-500">
                         {{ t('organization-onboarding-existing-users-helper') }}
                       </p>
                     </div>
-                    <div class="shrink-0 rounded-lg border border-slate-200 bg-white px-3 py-2 text-right dark:border-slate-200 dark:bg-white">
-                      <div class="text-sm font-semibold text-slate-900">
-                        {{ selectedUserCountStop.label }}
+                    <div
+                      class="shrink-0 rounded-lg border px-3 py-2 text-left sm:text-right"
+                      :class="selectedUserCountStop ? 'border-azure-200 bg-white text-slate-800 shadow-sm' : 'border-slate-200 bg-slate-50 text-slate-500'"
+                    >
+                      <div class="text-xs font-medium uppercase">
+                        {{ t('organization-onboarding-starting-plan') }}
                       </div>
-                      <div class="text-[11px] font-medium text-slate-500">
-                        {{ selectedUserCountStop.planName }}
+                      <div class="mt-0.5 text-sm font-semibold">
+                        {{ selectedUserCountStop
+                          ? `${selectedUserCountStop.planName} · ${selectedUserCountStop.label}`
+                          : t('organization-onboarding-user-scale-required') }}
                       </div>
                     </div>
                   </div>
 
-                  <input
+                  <div
                     id="estimated-users"
-                    v-model.number="estimatedUsersIndex"
-                    type="range"
-                    min="0"
-                    :max="userCountStops.length - 1"
-                    step="1"
-                    class="mt-5 h-2 w-full cursor-pointer accent-azure-500"
+                    class="mt-4 grid gap-3 sm:grid-cols-2"
+                    role="radiogroup"
+                    aria-labelledby="estimated-users-label"
+                    aria-describedby="estimated-users-help"
                     data-test="onboarding-estimated-users"
                   >
-                  <div
-                    class="mt-3 grid gap-2"
-                    :style="{ gridTemplateColumns: `repeat(${userCountStops.length}, minmax(0, 1fr))` }"
-                  >
-                    <button
+                    <label
                       v-for="(stop, index) in userCountStops"
                       :key="`${stop.planName}-${stop.value}`"
-                      type="button"
-                      class="rounded-lg px-1.5 py-2 text-center text-xs font-medium transition"
-                      :class="index === estimatedUsersIndex ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-100'"
-                      :aria-pressed="index === estimatedUsersIndex"
-                      @click="estimatedUsersIndex = index"
+                      class="group cursor-pointer"
+                      :data-value="stop.value"
+                      data-test="onboarding-estimated-users-option"
                     >
-                      <span class="block">{{ stop.label }}</span>
-                      <span class="mt-1 block truncate text-[10px] opacity-75">{{ stop.planName }}</span>
-                    </button>
+                      <input
+                        type="radio"
+                        name="estimated-users"
+                        class="peer sr-only"
+                        :value="index"
+                        :checked="isUserCountStopSelected(index)"
+                        @change="selectUserCountStop(index)"
+                      >
+                      <span
+                        class="flex min-h-20 items-center justify-between gap-3 rounded-xl border p-4 text-left transition peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-azure-400 peer-focus-visible:ring-offset-2"
+                        :class="isUserCountStopSelected(index)
+                          ? 'border-azure-500 bg-white text-slate-950 shadow-sm ring-2 ring-azure-100'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'"
+                      >
+                        <span class="min-w-0">
+                          <span class="block text-sm font-semibold text-slate-950">
+                            {{ getUserCountStopTitle(stop) }}
+                          </span>
+                          <span class="mt-1 block text-xs text-slate-500">
+                            {{ t('organization-onboarding-plan-match') }}: {{ stop.planName }}
+                          </span>
+                        </span>
+                        <span
+                          class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition"
+                          :class="isUserCountStopSelected(index) ? 'border-azure-500 bg-azure-500 text-white' : 'border-slate-300 bg-white text-transparent group-hover:border-slate-400'"
+                          aria-hidden="true"
+                        >
+                          <IconCheck class="h-3.5 w-3.5" />
+                        </span>
+                      </span>
+                    </label>
                   </div>
                 </div>
 
@@ -808,7 +858,9 @@ onUnmounted(() => {
                       {{ t('organization-onboarding-starting-plan') }}
                     </div>
                     <div class="mt-1 text-base text-white">
-                      {{ selectedUserCountStop.planName }} · {{ selectedUserCountStop.label }}
+                      {{ selectedUserCountStop
+                        ? `${selectedUserCountStop.planName} · ${selectedUserCountStop.label}`
+                        : t('organization-onboarding-user-scale-required') }}
                     </div>
                   </div>
                   <div>
