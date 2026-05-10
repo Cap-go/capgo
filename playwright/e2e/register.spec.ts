@@ -36,6 +36,8 @@ test.describe('Registration', () => {
 
     await page.click('[data-test="onboarding-mode-name"]')
     await page.fill('[data-test="onboarding-org-name"]', `No Org E2E ${uniqueSuffix}`)
+    await page.locator('[data-test="onboarding-estimated-users-option"]').first().click()
+    await expect(page.locator('[data-test="onboarding-create-org"]')).toBeEnabled()
     await page.click('[data-test="onboarding-create-org"]')
 
     await page.waitForURL(/step=logo/)

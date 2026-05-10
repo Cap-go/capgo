@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import IconCheck from '~icons/lucide/check'
 import IconLoader from '~icons/lucide/loader-2'
+import IconUsers from '~icons/lucide/users-round'
 import IconBack from '~icons/material-symbols/arrow-back-ios-rounded'
 import InviteTeammateModal from '~/components/dashboard/InviteTeammateModal.vue'
 import { uploadOrgLogoFile } from '~/services/photos'
@@ -33,6 +34,12 @@ interface WebsitePreview {
   website: string
 }
 
+interface UserCountStop {
+  value: number
+  label: string
+  planName: string
+}
+
 const route = useRoute()
 const router = useRouter()
 const { t } = useI18n()
@@ -57,6 +64,15 @@ const websitePreview = ref<WebsitePreview | null>(null)
 const inviteModalRef = ref<InviteTeammateModalRef | null>(null)
 const logoInputRef = useTemplateRef<HTMLInputElement>('logoInput')
 const isAdditionalOrgFlow = ref(false)
+const estimatedUsersIndex = ref<number | null>(null)
+
+const fallbackUserCountStops: UserCountStop[] = [
+  { value: 2000, label: '2K', planName: 'Solo' },
+  { value: 10000, label: '10K', planName: 'Maker' },
+  { value: 100000, label: '100K', planName: 'Team' },
+  { value: 1000000, label: '1M+', planName: 'Enterprise' },
+]
+const planNameOrder = ['Solo', 'Maker', 'Team', 'Enterprise'] as const
 
 const onboardingSteps: Array<{ id: OnboardingStep, label: string }> = [
   { id: 'details', label: t('organization-onboarding-step-details') },
@@ -71,6 +87,35 @@ const activeOrgName = computed(() => {
   return orgNameInput.value.trim() || websitePreview.value?.name || ''
 })
 const hasSavedLogo = computed(() => currentOrganization.value?.gid === activeOrgId.value && !!currentOrganization.value.logo)
+const userCountStops = computed<UserCountStop[]>(() => {
+  const planStops = planNameOrder
+    .map(planName => main.plans.find(plan => plan.name === planName))
+    .flatMap((plan) => {
+      if (!plan?.mau)
+        return []
+
+      const mau = Number(plan.mau)
+      if (!Number.isFinite(mau) || mau <= 0)
+        return []
+
+      return [{
+        value: mau,
+        label: formatUserCount(mau, plan.name === 'Enterprise'),
+        planName: plan.name,
+      }]
+    })
+
+  if (planStops.length === planNameOrder.length) {
+    return planStops
+  }
+
+  return fallbackUserCountStops
+})
+const selectedUserCountStop = computed<UserCountStop | null>(() => {
+  if (estimatedUsersIndex.value === null)
+    return null
+  return userCountStops.value[Math.min(estimatedUsersIndex.value, userCountStops.value.length - 1)] ?? null
+})
 
 const websiteHostname = computed(() => {
   const value = websiteInput.value.trim()
@@ -92,7 +137,7 @@ const canCreateOrganization = computed(() => {
   if (!main.auth || isSubmitting.value || isLoadingWebsitePreview.value || !mode.value)
     return false
 
-  return !!orgNameInput.value.trim()
+  return !!orgNameInput.value.trim() && !!selectedUserCountStop.value
 })
 const hasExistingOrganization = computed(() => organizationStore.organizations.some(org => !org.role.includes('invite')))
 const inviteSuccessCount = computed(() => sentInvites.value.length)
@@ -119,6 +164,28 @@ function whiteCardSecondaryButtonClass() {
 
 function whiteCardPrimaryButtonClass() {
   return 'border-slate-900 bg-slate-900 text-white hover:border-slate-800 hover:bg-slate-800 disabled:border-slate-300 disabled:bg-slate-300 disabled:text-white disabled:opacity-100'
+}
+
+function formatUserCount(value: number, plus = false) {
+  if (value >= 1_000_000)
+    return plus ? '1M+' : '1M'
+  if (value >= 1000)
+    return `${value / 1000}K`
+  return String(value)
+}
+
+function getUserCountStopTitle(stop: UserCountStop) {
+  if (stop.value >= 1_000_000)
+    return t('organization-onboarding-active-users-plus', { count: stop.label })
+  return t('organization-onboarding-active-users-up-to', { count: stop.label })
+}
+
+function isUserCountStopSelected(index: number) {
+  return estimatedUsersIndex.value === index
+}
+
+function selectUserCountStop(index: number) {
+  estimatedUsersIndex.value = index
 }
 
 function getInviteDisplayName(invite: SentInvite) {
@@ -289,6 +356,11 @@ async function createOrganization() {
     return
   }
 
+  if (!selectedUserCountStop.value) {
+    toast.error(t('organization-onboarding-user-scale-required'))
+    return
+  }
+
   isSubmitting.value = true
 
   try {
@@ -301,6 +373,7 @@ async function createOrganization() {
       body: {
         name: orgName,
         email: main.auth.email ?? '',
+        estimatedMau: selectedUserCountStop.value.value,
         website: normalizedWebsite,
       },
     })
@@ -647,6 +720,81 @@ onUnmounted(() => {
                   </p>
                 </div>
 
+                <div class="border-t border-slate-200 pt-5">
+                  <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="min-w-0">
+                      <p id="estimated-users-label" class="flex items-center gap-2 text-sm font-medium text-slate-800 dark:text-slate-800">
+                        <IconUsers class="h-4 w-4 text-azure-500" />
+                        {{ t('organization-onboarding-existing-users-label') }}
+                      </p>
+                      <p id="estimated-users-help" class="mt-1 text-sm leading-6 text-slate-500 dark:text-slate-500">
+                        {{ t('organization-onboarding-existing-users-helper') }}
+                      </p>
+                    </div>
+                    <div
+                      class="shrink-0 rounded-lg border px-3 py-2 text-left sm:text-right"
+                      :class="selectedUserCountStop ? 'border-azure-200 bg-white text-slate-800 shadow-sm' : 'border-slate-200 bg-slate-50 text-slate-500'"
+                    >
+                      <div class="text-xs font-medium uppercase">
+                        {{ t('organization-onboarding-starting-plan') }}
+                      </div>
+                      <div class="mt-0.5 text-sm font-semibold">
+                        {{ selectedUserCountStop
+                          ? `${selectedUserCountStop.planName} · ${selectedUserCountStop.label}`
+                          : t('organization-onboarding-user-scale-required') }}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div
+                    id="estimated-users"
+                    class="mt-4 grid gap-3 sm:grid-cols-2"
+                    role="radiogroup"
+                    aria-labelledby="estimated-users-label"
+                    aria-describedby="estimated-users-help"
+                    data-test="onboarding-estimated-users"
+                  >
+                    <label
+                      v-for="(stop, index) in userCountStops"
+                      :key="`${stop.planName}-${stop.value}`"
+                      class="group cursor-pointer"
+                      :data-value="stop.value"
+                      data-test="onboarding-estimated-users-option"
+                    >
+                      <input
+                        type="radio"
+                        name="estimated-users"
+                        class="peer sr-only"
+                        :value="index"
+                        :checked="isUserCountStopSelected(index)"
+                        @change="selectUserCountStop(index)"
+                      >
+                      <span
+                        class="flex min-h-20 items-center justify-between gap-3 rounded-xl border p-4 text-left transition peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-azure-400 peer-focus-visible:ring-offset-2"
+                        :class="isUserCountStopSelected(index)
+                          ? 'border-azure-500 bg-white text-slate-950 shadow-sm ring-2 ring-azure-100'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'"
+                      >
+                        <span class="min-w-0">
+                          <span class="block text-sm font-semibold text-slate-950">
+                            {{ getUserCountStopTitle(stop) }}
+                          </span>
+                          <span class="mt-1 block text-xs text-slate-500">
+                            {{ t('organization-onboarding-plan-match') }}: {{ stop.planName }}
+                          </span>
+                        </span>
+                        <span
+                          class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border transition"
+                          :class="isUserCountStopSelected(index) ? 'border-azure-500 bg-azure-500 text-white' : 'border-slate-300 bg-white text-transparent group-hover:border-slate-400'"
+                          aria-hidden="true"
+                        >
+                          <IconCheck class="h-3.5 w-3.5" />
+                        </span>
+                      </span>
+                    </label>
+                  </div>
+                </div>
+
                 <div class="flex flex-wrap gap-3">
                   <button
                     type="button"
@@ -708,6 +856,16 @@ onUnmounted(() => {
                         : mode === 'name'
                           ? t('organization-onboarding-mode-name')
                           : t('organization-onboarding-no-choice') }}
+                    </div>
+                  </div>
+                  <div>
+                    <div class="text-xs font-medium uppercase text-slate-500">
+                      {{ t('organization-onboarding-starting-plan') }}
+                    </div>
+                    <div class="mt-1 text-base text-white">
+                      {{ selectedUserCountStop
+                        ? `${selectedUserCountStop.planName} · ${selectedUserCountStop.label}`
+                        : t('organization-onboarding-user-scale-required') }}
                     </div>
                   </div>
                   <div>
