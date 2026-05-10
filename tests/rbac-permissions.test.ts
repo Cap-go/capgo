@@ -739,6 +739,88 @@ describe('rbac permission system', () => {
         expect(deniedResult.rows[0].allowed).toBe(false)
         expect(allowedResult.rows[0].allowed).toBe(true)
       })
+
+      it('returns no CLI warnings for an app-scoped API key without org read', async () => {
+        const id = randomUUID()
+        const orgId = randomUUID()
+        const appUuid = randomUUID()
+        const appId = `com.cli.warning.${id}`
+        const scopedKey = `rbac-cli-warning-${id}`
+
+        await query(`
+          INSERT INTO public.orgs (id, name, management_email, created_by, use_new_rbac)
+          VALUES ($1::uuid, $2, $3, $4::uuid, true)
+        `, [orgId, `CLI Warning Org ${id}`, `cli-warning-${id}@capgo.app`, USER_ID])
+
+        await query(`
+          INSERT INTO public.apps (id, app_id, icon_url, owner_org, name)
+          VALUES ($1::uuid, $2, $3, $4::uuid, $5)
+        `, [appUuid, appId, 'https://example.com/icon.png', orgId, `CLI Warning App ${id}`])
+
+        await query(`
+          INSERT INTO public.apikeys (user_id, key, key_hash, mode, name, limited_to_orgs, limited_to_apps)
+          VALUES ($1::uuid, $2, NULL, NULL, $3, ARRAY[$4::uuid], ARRAY[$5]::varchar[])
+        `, [USER_ID, scopedKey, `CLI warning scoped ${id}`, orgId, appId])
+
+        await query(`
+          INSERT INTO public.role_bindings (
+            principal_type,
+            principal_id,
+            role_id,
+            scope_type,
+            org_id,
+            app_id,
+            granted_by,
+            reason,
+            is_direct
+          )
+          SELECT
+            public.rbac_principal_apikey(),
+            ak.rbac_id,
+            r.id,
+            public.rbac_scope_app(),
+            $2::uuid,
+            $3::uuid,
+            $4::uuid,
+            'cli warning app-scoped key regression',
+            true
+          FROM public.apikeys ak
+          CROSS JOIN public.roles r
+          WHERE ak.key = $1
+            AND r.name = public.rbac_role_app_admin()
+          LIMIT 1
+        `, [scopedKey, orgId, appUuid, USER_ID])
+
+        await query(`SELECT set_config('request.headers', jsonb_build_object('capgkey', $1::text)::text, true)`, [scopedKey])
+
+        const orgReadResult = await query(`
+          SELECT public.check_min_rights(
+            'read'::public.user_min_right,
+            public.get_identity_apikey_only('{write,all,upload,read}'::public.key_mode[]),
+            $1::uuid,
+            NULL::varchar,
+            NULL::bigint
+          ) AS allowed
+        `, [orgId])
+
+        const uploadResult = await query(`
+          SELECT public.check_min_rights(
+            'upload'::public.user_min_right,
+            public.get_identity_apikey_only('{write,all,upload,read}'::public.key_mode[]),
+            $1::uuid,
+            $2,
+            NULL::bigint
+          ) AS allowed
+        `, [orgId, appId])
+
+        const warningsResult = await query(`
+          SELECT cardinality(public.get_organization_cli_warnings($1::uuid, '7.95.12')) AS warning_count
+        `, [orgId])
+
+        expect(orgReadResult.rows[0].allowed).toBe(false)
+        expect(uploadResult.rows[0].allowed).toBe(true)
+        expect(warningsResult.rows[0].warning_count).toBe(0)
+      })
     })
 
     describe('feature flag routing', () => {
