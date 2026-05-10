@@ -100,6 +100,9 @@ function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
     : `${plan.bandwidth.toLocaleString()} ${t('plan-bandwidth')}`
 
   const buildTimeFeature = buildTimeDisplay ? planFeature(buildTimeDisplay, true) : null
+  const nativeBuildConcurrencyFeature = plan.native_build_concurrency
+    ? planFeature(t('plan-native-build-concurrency', { count: plan.native_build_concurrency.toLocaleString() }))
+    : null
 
   const planName = plan.name?.toLowerCase() ?? ''
   const extraFeatures = (planFeatureLabelKeysByPlan[planName] ?? [])
@@ -110,6 +113,7 @@ function planFeatures(plan: Database['public']['Tables']['plans']['Row']) {
     planFeature(storageFeature),
     planFeature(bandwidthFeature),
     buildTimeFeature,
+    nativeBuildConcurrencyFeature,
     ...extraFeatures,
   ].filter((feature): feature is PlanFeature => !!feature)
 }
