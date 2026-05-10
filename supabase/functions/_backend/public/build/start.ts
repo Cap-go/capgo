@@ -4,8 +4,9 @@ import { HTTPException } from 'hono/http-exception'
 import { simpleError } from '../../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../../utils/logging.ts'
 import { checkPermission } from '../../utils/rbac.ts'
-import { supabaseApikey } from '../../utils/supabase.ts'
+import { supabaseAdmin, supabaseApikey } from '../../utils/supabase.ts'
 import { getEnv } from '../../utils/utils.ts'
+import { reserveNativeBuildSlot } from './concurrency.ts'
 
 interface BuilderStartResponse {
   status: string
@@ -75,15 +76,19 @@ async function generateLogStreamToken(
   }, jwtSecret)
 }
 
+function normalizeStartedBuildStatus(status?: string): string {
+  return status && status.toLowerCase() !== 'pending' ? status : 'running'
+}
+
 async function markBuildAsFailed(
   c: Context,
   jobId: string,
+  appId: string,
   errorMessage: string,
-  apikeyKey: string,
 ): Promise<void> {
-  // Use authenticated client - RLS will enforce access
-  const supabase = supabaseApikey(c, apikeyKey)
-  const { error: updateError } = await supabase
+  // Access was already checked before starting the build. This trusted backend
+  // status write uses service role because API-key RLS must stay read-only here.
+  const { error: updateError } = await supabaseAdmin(c)
     .from('build_requests')
     .update({
       status: 'failed',
@@ -91,6 +96,7 @@ async function markBuildAsFailed(
       updated_at: new Date().toISOString(),
     })
     .eq('builder_job_id', jobId)
+    .eq('app_id', appId)
 
   if (updateError) {
     cloudlogErr({
@@ -151,7 +157,7 @@ export async function startBuild(
 
     const { data: buildRequest, error: buildRequestError } = await supabase
       .from('build_requests')
-      .select('app_id')
+      .select('id, app_id, owner_org')
       .eq('builder_job_id', jobId)
       .eq('app_id', appId)
       .maybeSingle()
@@ -179,6 +185,13 @@ export async function startBuild(
     }
 
     const boundAppId = appId
+
+    await reserveNativeBuildSlot(c, {
+      buildRequestId: buildRequest.id,
+      orgId: buildRequest.owner_org,
+      appId: boundAppId,
+      jobId,
+    })
 
     cloudlog({
       requestId: c.get('requestId'),
@@ -208,26 +221,28 @@ export async function startBuild(
       })
 
       // Update build_requests to mark as failed
-      await markBuildAsFailed(c, jobId, errorMsg, apikeyKey)
+      await markBuildAsFailed(c, jobId, boundAppId, errorMsg)
       alreadyMarkedAsFailed = true
       throw simpleError('builder_error', errorMsg)
     }
 
     const builderJob = await builderResponse.json() as BuilderStartResponse
+    const startedStatus = normalizeStartedBuildStatus(builderJob.status)
 
     cloudlog({
       requestId: c.get('requestId'),
       message: 'Build started',
       job_id: jobId,
-      status: builderJob.status,
+      status: startedStatus,
+      builder_status: builderJob.status,
     })
 
-    // Update build_requests status to running
-    // Use authenticated client - RLS will enforce access
-    const { error: updateError } = await supabase
+    // Update build_requests status to running. The builder response is trusted
+    // backend data, and this write must not be exposed through API-key RLS.
+    const { error: updateError } = await supabaseAdmin(c)
       .from('build_requests')
       .update({
-        status: builderJob.status || 'running',
+        status: startedStatus,
         updated_at: new Date().toISOString(),
       })
       .eq('builder_job_id', jobId)
@@ -288,7 +303,7 @@ export async function startBuild(
 
     return c.json({
       job_id: jobId,
-      status: builderJob.status || 'running',
+      status: startedStatus,
       ...(logsUrl && logsToken ? { logs_url: logsUrl, logs_token: logsToken } : {}),
     }, 200)
   }
@@ -296,7 +311,7 @@ export async function startBuild(
     // Mark build as failed for any unexpected error (but only if not already marked)
     if (!alreadyMarkedAsFailed && apikeyKey && !(error instanceof HTTPException)) {
       const errorMsg = error instanceof Error ? error.message : String(error)
-      await markBuildAsFailed(c, jobId, errorMsg, apikeyKey)
+      await markBuildAsFailed(c, jobId, appId, errorMsg)
     }
     throw error
   }
