@@ -122,6 +122,15 @@ const hasData = computed(() => effectiveTotalUpdates.value > 0 || isDemoMode.val
 
 const PAGE_SIZE = 1000
 
+const compactNumberFormatter = new Intl.NumberFormat(undefined, {
+  maximumFractionDigits: 1,
+  notation: 'compact',
+})
+
+function formatCompactNumber(value: number) {
+  return compactNumberFormatter.format(value)
+}
+
 async function fetchDailyVersionStats(targetAppIds: string[], startDate: string, endDate: string) {
   const supabase = useSupabase()
   const allRows: any[] = []
@@ -383,55 +392,59 @@ onMounted(async () => {
     :is-demo-data="isDemoMode"
   >
     <template #header>
-      <div class="flex flex-col gap-2 justify-between items-start">
-        <h2 class="flex-1 min-w-0 text-2xl font-semibold leading-tight dark:text-white text text-slate-600">
+      <div class="min-w-0">
+        <h2 class="text-xl font-semibold leading-tight text-slate-900 dark:text-white sm:text-2xl">
           {{ t('update_statistics') }}
         </h2>
-        <div class="flex flex-wrap gap-2 items-center text-xs sm:gap-3 sm:text-sm">
-          <div class="flex gap-2 items-center">
-            <div class="w-3 h-3 rounded-full" style="background-color: hsl(210, 65%, 55%)" />
-            <div
-              class="flex gap-1 items-center min-w-0 text-xs text-slate-600 dark:text-slate-300 sm:text-sm"
-              :aria-label="`${actionDisplayNames.requested}: ${effectiveTotalRequested.toLocaleString()}`"
-            >
-              <GlobeAltIcon class="w-3.5 h-3.5 sm:w-4 sm:h-4" aria-hidden="true" />
-              <span>{{ effectiveTotalRequested.toLocaleString() }}</span>
-            </div>
-          </div>
-          <div class="flex gap-2 items-center">
-            <div class="w-3 h-3 rounded-full" style="background-color: hsl(135, 55%, 50%)" />
-            <div
-              class="flex gap-1 items-center min-w-0 text-xs text-slate-600 dark:text-slate-300 sm:text-sm"
-              :aria-label="`${actionDisplayNames.install}: ${effectiveTotalInstalled.toLocaleString()}`"
-            >
-              <ArrowDownOnSquareIcon class="w-3.5 h-3.5 sm:w-4 sm:h-4" aria-hidden="true" />
-              <span>{{ effectiveTotalInstalled.toLocaleString() }}</span>
-            </div>
-          </div>
-          <div class="flex gap-2 items-center">
-            <div class="w-3 h-3 rounded-full" style="background-color: hsl(0, 50%, 60%)" />
-            <div
-              class="flex gap-1 items-center min-w-0 text-xs text-slate-600 dark:text-slate-300 sm:text-sm"
-              :aria-label="`${actionDisplayNames.fail}: ${effectiveTotalFailed.toLocaleString()}`"
-            >
-              <XCircleIcon class="w-3.5 h-3.5 sm:w-4 sm:h-4" aria-hidden="true" />
-              <span>{{ effectiveTotalFailed.toLocaleString() }}</span>
-            </div>
-          </div>
-        </div>
       </div>
     </template>
 
-    <UpdateStatsChart
-      :key="JSON.stringify(effectiveChartDataByAction)"
-      :title="t('update_statistics')"
-      :colors="colors.blue"
-      :data="effectiveChartData"
-      :use-billing-period="useBillingPeriod"
-      :accumulated="accumulated"
-      :data-by-app="effectiveChartDataByAction"
-      :app-names="actionDisplayNames"
-      :app-id="appId"
-    />
+    <div class="flex h-full min-h-0 flex-col gap-3">
+      <div class="flex flex-wrap items-center gap-2 text-xs sm:gap-3">
+        <div
+          class="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/80 px-2.5 py-1 text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300"
+          :aria-label="`${actionDisplayNames.requested}: ${effectiveTotalRequested.toLocaleString()}`"
+          :title="`${actionDisplayNames.requested}: ${effectiveTotalRequested.toLocaleString()}`"
+        >
+          <span class="h-2 w-2 shrink-0 rounded-full" style="background-color: hsl(210, 65%, 55%)" />
+          <GlobeAltIcon class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span class="truncate tabular-nums">{{ formatCompactNumber(effectiveTotalRequested) }}</span>
+        </div>
+
+        <div
+          class="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/80 px-2.5 py-1 text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300"
+          :aria-label="`${actionDisplayNames.install}: ${effectiveTotalInstalled.toLocaleString()}`"
+          :title="`${actionDisplayNames.install}: ${effectiveTotalInstalled.toLocaleString()}`"
+        >
+          <span class="h-2 w-2 shrink-0 rounded-full" style="background-color: hsl(135, 55%, 50%)" />
+          <ArrowDownOnSquareIcon class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span class="truncate tabular-nums">{{ formatCompactNumber(effectiveTotalInstalled) }}</span>
+        </div>
+
+        <div
+          class="inline-flex min-w-0 items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/80 px-2.5 py-1 text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-800/70 dark:text-slate-300"
+          :aria-label="`${actionDisplayNames.fail}: ${effectiveTotalFailed.toLocaleString()}`"
+          :title="`${actionDisplayNames.fail}: ${effectiveTotalFailed.toLocaleString()}`"
+        >
+          <span class="h-2 w-2 shrink-0 rounded-full" style="background-color: hsl(0, 50%, 60%)" />
+          <XCircleIcon class="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span class="truncate tabular-nums">{{ formatCompactNumber(effectiveTotalFailed) }}</span>
+        </div>
+      </div>
+
+      <div class="min-h-0 flex-1">
+        <UpdateStatsChart
+          :key="JSON.stringify(effectiveChartDataByAction)"
+          :title="t('update_statistics')"
+          :colors="colors.blue"
+          :data="effectiveChartData"
+          :use-billing-period="useBillingPeriod"
+          :accumulated="accumulated"
+          :data-by-app="effectiveChartDataByAction"
+          :app-names="actionDisplayNames"
+          :app-id="appId"
+        />
+      </div>
+    </div>
   </ChartCard>
 </template>
