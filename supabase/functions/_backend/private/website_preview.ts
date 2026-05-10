@@ -1,5 +1,6 @@
 import type { Context } from 'hono'
 import { createHono, middlewareAuth, parseBody, quickError, useCors } from '../utils/hono.ts'
+import { isPrivateIp } from '../utils/ip.ts'
 import { version } from '../utils/version.ts'
 import { getWebhookUrlValidationError } from '../utils/webhook.ts'
 
@@ -132,44 +133,6 @@ function findIconHref(html: string) {
   }
 
   return candidates.sort((a, b) => b.priority - a.priority)[0]?.href ?? ''
-}
-
-function isPrivateIpv4(ip: string) {
-  const octets = ip.split('.').map(part => Number.parseInt(part, 10))
-  if (octets.length !== 4 || octets.some(part => Number.isNaN(part) || part < 0 || part > 255))
-    return true
-
-  const [a, b] = octets
-  return a === 0
-    || a === 10
-    || a === 127
-    || (a === 169 && b === 254)
-    || (a === 172 && b >= 16 && b <= 31)
-    || (a === 192 && b === 168)
-    || (a === 100 && b >= 64 && b <= 127)
-    || (a === 198 && (b === 18 || b === 19))
-  // Reserved TEST-NET ranges are also non-public for this fetch path.
-    || (a === 192 && b === 0)
-    || (a === 192 && b === 0 && octets[2] === 2)
-    || (a === 198 && b === 51 && octets[2] === 100)
-    || (a === 203 && b === 0 && octets[2] === 113)
-}
-
-function isPrivateIpv6(ip: string) {
-  const normalized = ip.toLowerCase()
-  if (normalized === '::1' || normalized === '::')
-    return true
-  if (normalized.startsWith('fe80:') || normalized.startsWith('fc') || normalized.startsWith('fd'))
-    return true
-  if (normalized.startsWith('::ffff:')) {
-    const mappedIpv4 = normalized.slice(7)
-    return isPrivateIpv4(mappedIpv4)
-  }
-  return false
-}
-
-function isPrivateIp(ip: string) {
-  return ip.includes(':') ? isPrivateIpv6(ip) : isPrivateIpv4(ip)
 }
 
 function isIpLiteral(value: string) {
