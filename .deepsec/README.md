@@ -50,7 +50,7 @@ in your agent to fill in INFO.md.
 
 ## Layout
 
-```
+```text
 deepsec.config.ts        Project list (one entry per scanned repo)
 data/capgo/
   INFO.md                Repo context — checked into git, hand-curated

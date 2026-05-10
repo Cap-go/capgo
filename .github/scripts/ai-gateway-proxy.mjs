@@ -6,6 +6,7 @@ import process from 'node:process'
 const port = Number(process.env.PROXY_PORT ?? 8787)
 const upstream = new URL(process.env.AI_GATEWAY_UPSTREAM ?? 'https://ai-gateway.vercel.sh')
 const maxRequestBytes = Number(process.env.MAX_AI_PROXY_REQUEST_BYTES ?? 10 * 1024 * 1024)
+const upstreamTimeoutMs = Number(process.env.AI_GATEWAY_UPSTREAM_TIMEOUT_MS ?? 30000)
 const allowedPaths = new Set([
   '/v1/chat/completions',
   '/v1/embeddings',
@@ -80,37 +81,61 @@ const server = http.createServer(async (req, res) => {
     const upstreamUrl = new URL(requestUrl.pathname, upstream)
     upstreamUrl.search = requestUrl.search
 
-    const upstreamResponse = await fetch(upstreamUrl, {
-      method: req.method,
-      headers,
-      body: body.length > 0 ? body : undefined,
-      redirect: 'manual',
-    })
-
-    for (const [key, value] of upstreamResponse.headers.entries()) {
-      const lowerKey = key.toLowerCase()
-      if (lowerKey === 'content-encoding' || lowerKey === 'transfer-encoding' || lowerKey === 'connection')
-        continue
-      res.setHeader(key, value)
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), upstreamTimeoutMs)
+    const abortOnClose = () => {
+      if (!res.writableEnded)
+        controller.abort()
     }
+    let reader
+    res.on('close', abortOnClose)
 
-    res.statusCode = upstreamResponse.status
-    if (!upstreamResponse.body) {
+    try {
+      const upstreamResponse = await fetch(upstreamUrl, {
+        method: req.method,
+        headers,
+        body: body.length > 0 ? body : undefined,
+        redirect: 'manual',
+        signal: controller.signal,
+      })
+
+      for (const [key, value] of upstreamResponse.headers.entries()) {
+        const lowerKey = key.toLowerCase()
+        if (lowerKey === 'content-encoding' || lowerKey === 'transfer-encoding' || lowerKey === 'connection')
+          continue
+        res.setHeader(key, value)
+      }
+
+      res.statusCode = upstreamResponse.status
+      if (!upstreamResponse.body) {
+        res.end()
+        return
+      }
+
+      reader = upstreamResponse.body.getReader()
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done)
+          break
+        res.write(value)
+      }
       res.end()
-      return
     }
-
-    const reader = upstreamResponse.body.getReader()
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done)
-        break
-      res.write(value)
+    finally {
+      clearTimeout(timeout)
+      res.off('close', abortOnClose)
+      if (controller.signal.aborted && reader)
+        await reader.cancel().catch(() => {})
     }
-    res.end()
   }
   catch (error) {
     console.error('AI Gateway proxy request failed:', error instanceof Error ? error.message : String(error))
+    if (res.writableEnded)
+      return
+    if (res.headersSent) {
+      res.end()
+      return
+    }
     writePlain(res, 502, 'AI Gateway proxy request failed')
   }
 })

@@ -88,6 +88,7 @@ jobs:
           done
 
           if ! curl -fsS http://127.0.0.1:8787/health >/dev/null 2>&1; then
+            echo "AI gateway proxy failed to become healthy after 5s; dumping log at $RUNNER_TEMP/ai-gateway-proxy.log"
             cat "$RUNNER_TEMP/ai-gateway-proxy.log"
             exit 1
           fi
