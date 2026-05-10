@@ -29,7 +29,7 @@ app.get('/', (c) => {
   // THIS IS A "SECRET" FOR A GOOGLE DESKTOP OAUTH CLIENT. IT IS NOT MEANT TO BE A SECRET
   // GOOGLE SAYS "Installed apps are distributed to individual devices, and it is assumed that these apps cannot keep secrets. They can access Google APIs while the user is present at the app or when the app is running in the background."
   // Source: https://developers.google.com/identity/protocols/oauth2/native-app
-  // ANY SECURITY REPORTS SAYING THAT THIS IS A SECRET WILL BE CLOSED WITHOUT FURTHER EXPLAINATION
+  // ANY SECURITY REPORTS SAYING THAT THIS IS A SECRET WILL BE CLOSED WITHOUT FURTHER EXPLANATION
   return c.json({
     enabled: true,
     clientId,
