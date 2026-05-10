@@ -2,7 +2,7 @@ import type { AnalyticsEngineDataPoint, D1Database, Hyperdrive } from '@cloudfla
 import type { Context } from 'hono'
 import type { DeviceComparable } from './deviceComparison.ts'
 import type { Database } from './supabase.types.ts'
-import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevicesParams, ReadStatsParams, VersionUsage } from './types.ts'
+import type { DeviceRes, DeviceWithoutCreatedAt, NativeVersionUsage, ReadDevicesParams, ReadStatsParams, StatsMetadata, VersionUsage } from './types.ts'
 import dayjs from 'dayjs'
 import { CacheHelper } from './cache.ts'
 import { hasComparableDeviceChanged, toComparableDevice } from './deviceComparison.ts'
@@ -171,24 +171,43 @@ export function trackVersionUsageCF(c: Context, version_name: string, app_id: st
   return Promise.resolve()
 }
 
-export function trackLogsCF(c: Context, app_id: string, device_id: string, action: string, version_name: string) {
+function serializeStatsMetadata(metadata?: StatsMetadata): string {
+  return metadata && Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : ''
+}
+
+function parseStatsMetadata(metadata: unknown): StatsMetadata | null {
+  if (typeof metadata !== 'string' || metadata === '')
+    return null
+
+  try {
+    const parsed = JSON.parse(metadata)
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
+      return null
+    return parsed as StatsMetadata
+  }
+  catch {
+    return null
+  }
+}
+
+export function trackLogsCF(c: Context, app_id: string, device_id: string, action: string, version_name: string, metadata?: StatsMetadata) {
   if (!c.env.APP_LOG)
     return Promise.resolve()
 
   c.env.APP_LOG.writeDataPoint({
-    blobs: [device_id, action, version_name],
+    blobs: [device_id, action, version_name, serializeStatsMetadata(metadata)],
     indexes: [app_id],
   })
 
   return Promise.resolve()
 }
 
-export function trackLogsCFExternal(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_name: string) {
+export function trackLogsCFExternal(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_name: string, metadata?: StatsMetadata) {
   if (!c.env.APP_LOG_EXTERNAL)
     return Promise.resolve()
 
   c.env.APP_LOG_EXTERNAL.writeDataPoint({
-    blobs: [device_id, action, version_name],
+    blobs: [device_id, action, version_name, serializeStatsMetadata(metadata)],
     indexes: [app_id],
   })
 
@@ -811,6 +830,7 @@ interface StatRowCF {
   device_id: string
   action: string
   version_name: string
+  metadata: string | null
   created_at: string
 }
 
@@ -849,9 +869,9 @@ export async function readStatsCF(c: Context, params: ReadStatsParams) {
   if (params.search) {
     const searchLower = params.search.toLowerCase()
     if (params.deviceIds?.length)
-      searchFilter = `AND (position('${escapeSqlString(searchLower)}' IN toLower(action)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob3)) > 0)`
+      searchFilter = `AND (position('${escapeSqlString(searchLower)}' IN toLower(action)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob3)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob4)) > 0)`
     else
-      searchFilter = `AND (position('${escapeSqlString(searchLower)}' IN toLower(device_id)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(action)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob3)) > 0)`
+      searchFilter = `AND (position('${escapeSqlString(searchLower)}' IN toLower(device_id)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(action)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob3)) > 0 OR position('${escapeSqlString(searchLower)}' IN toLower(blob4)) > 0)`
   }
   const orderFilters: string[] = []
   const allowedOrderKeys = new Set(['created_at', 'app_id', 'device_id', 'action', 'version_name'])
@@ -873,17 +893,22 @@ export async function readStatsCF(c: Context, params: ReadStatsParams) {
   blob1 as device_id,
   blob2 as action,
   blob3 as version_name,
+  blob4 as metadata,
   timestamp as created_at
 FROM app_log
 WHERE
   app_id = '${escapeSqlString(params.app_id)}' ${deviceFilter} ${actionsFilter} ${searchFilter} ${startFilter} ${endFilter}
-GROUP BY app_id, created_at, action, device_id, version_name
+GROUP BY app_id, created_at, action, device_id, version_name, metadata
 ${orderFilter}
 LIMIT ${limit}`
 
   cloudlog({ requestId: c.get('requestId'), message: 'readStatsCF query', query })
   try {
-    return await runQueryToCFA<StatRowCF>(c, query)
+    const rows = await runQueryToCFA<StatRowCF>(c, query)
+    return rows.map(row => ({
+      ...row,
+      metadata: parseStatsMetadata(row.metadata),
+    }))
   }
   catch (e) {
     cloudlogErr({ requestId: c.get('requestId'), message: 'Error reading stats list', error: serializeError(e), query })

@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Context } from 'hono'
 import type { AuthInfo, MiddlewareKeyVariables } from './hono.ts'
 import type { Database } from './supabase.types.ts'
-import type { DeviceWithoutCreatedAt, NativeVersionUsage, Order, ReadDevicesParams, ReadStatsParams, VersionUsage } from './types.ts'
+import type { DeviceWithoutCreatedAt, NativeVersionUsage, Order, ReadDevicesParams, ReadStatsParams, StatsMetadata, VersionUsage } from './types.ts'
 import { createClient } from '@supabase/supabase-js'
 import { buildNormalizedDeviceForWrite, hasComparableDeviceChanged, nullableString } from './deviceComparison.ts'
 import { simpleError } from './hono.ts'
@@ -1123,7 +1123,7 @@ export async function trackDevicesSB(c: Context, device: DeviceWithoutCreatedAt)
     .upsert(payload, { onConflict: 'device_id,app_id' })
 }
 
-export function trackLogsSB(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_name: string) {
+export function trackLogsSB(c: Context, app_id: string, device_id: string, action: Database['public']['Enums']['stats_action'], version_name: string, metadata?: StatsMetadata) {
   return supabaseAdmin(c)
     .from('stats')
     .insert(
@@ -1133,6 +1133,7 @@ export function trackLogsSB(c: Context, app_id: string, device_id: string, actio
         device_id,
         action,
         version_name,
+        metadata,
       },
     )
 }

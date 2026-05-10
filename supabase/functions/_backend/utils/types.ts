@@ -1,5 +1,7 @@
 import type { Database } from './supabase.types.ts'
 
+export type StatsMetadata = Record<string, string>
+
 export interface Customer {
   id: string
   stripe_customer_id: string
@@ -23,6 +25,7 @@ export interface AppInfos {
 export interface AppStats extends AppInfos {
   action: string
   old_version_name?: string
+  metadata?: StatsMetadata
 }
 
 export interface BaseHeaders {
@@ -90,6 +93,7 @@ export type DeviceWithoutCreatedAt = Omit<Database['public']['Tables']['devices'
 export interface StatsActions {
   action: Database['public']['Enums']['stats_action']
   versionName?: string
+  metadata?: StatsMetadata
 }
 
 export const DEFAULT_LIMIT = 1000
