@@ -1,5 +1,16 @@
 import type { MiddlewareKeyVariables } from '../utils/hono.ts'
 import { Hono } from 'hono/tiny'
+import {
+  BUILD_TIMEOUT_STATUS,
+  calculateBuildRuntimeSeconds,
+  calculateTimeoutCompletedAt,
+  capBuildRuntimeSeconds,
+  formatBuildTimeoutError,
+  isTerminalBuildStatus,
+  normalizeBuildTimeoutSeconds,
+  shouldApplyBuildTimeout,
+  TERMINAL_BUILD_STATUSES,
+} from '../utils/build_timeout.ts'
 import { BRES, middlewareAPISecret } from '../utils/hono.ts'
 import { cloudlog, cloudlogErr } from '../utils/logging.ts'
 import { recordBuildTime, supabaseAdmin } from '../utils/supabase.ts'
@@ -16,16 +27,31 @@ interface BuilderStatusResponse {
   uploadUrl?: string
 }
 
-const TERMINAL_STATUSES = new Set(['succeeded', 'failed', 'expired', 'released', 'cancelled'])
 const STALE_THRESHOLD_MINUTES = 5
 const ORPHAN_THRESHOLD_HOURS = 1
 const BATCH_LIMIT = 500
 
 export const app = new Hono<MiddlewareKeyVariables>()
 
+async function cancelTimedOutBuilderJob(builderUrl: string, builderApiKey: string, jobId: string): Promise<Response> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 5000)
+  try {
+    return await fetch(`${builderUrl}/jobs/${jobId}/cancel`, {
+      method: 'POST',
+      headers: { 'x-api-key': builderApiKey },
+      signal: controller.signal,
+    })
+  }
+  finally {
+    clearTimeout(timeoutId)
+  }
+}
+
 app.post('/', middlewareAPISecret, async (c) => {
   const startTime = Date.now()
   let reconciled = 0
+  let timedOut = 0
   let orphaned = 0
   let errors = 0
 
@@ -41,7 +67,7 @@ app.post('/', middlewareAPISecret, async (c) => {
   const { data: staleBuilds, error: queryError } = await supabase
     .from('build_requests')
     .select('id, builder_job_id, app_id, owner_org, requested_by, platform, status, created_at')
-    .not('status', 'in', `(${[...TERMINAL_STATUSES].join(',')})`)
+    .not('status', 'in', `(${[...TERMINAL_BUILD_STATUSES].join(',')})`)
     .lt('updated_at', new Date(Date.now() - STALE_THRESHOLD_MINUTES * 60 * 1000).toISOString())
     .order('updated_at', { ascending: true })
     .limit(BATCH_LIMIT)
@@ -67,7 +93,7 @@ app.post('/', middlewareAPISecret, async (c) => {
       const { error: updateError } = await supabase
         .from('build_requests')
         .update({
-          status: 'failed',
+          status: BUILD_TIMEOUT_STATUS,
           last_error: 'Build request was never submitted to builder',
           updated_at: new Date().toISOString(),
         })
@@ -88,6 +114,27 @@ app.post('/', middlewareAPISecret, async (c) => {
     }
   }
 
+  const appTimeouts = new Map<string, { timeoutSeconds: number, timeoutUpdatedAt: string }>()
+  if (builderBuilds.length > 0) {
+    const appIds = [...new Set(builderBuilds.map(build => build.app_id))]
+    const { data: appTimeoutRows, error: appTimeoutError } = await supabase
+      .from('apps')
+      .select('app_id, build_timeout_seconds, build_timeout_updated_at')
+      .in('app_id', appIds)
+
+    if (appTimeoutError) {
+      cloudlogErr({ requestId: c.get('requestId'), message: 'Failed to query app build timeouts', error: appTimeoutError.message })
+      return c.json(BRES)
+    }
+
+    for (const app of appTimeoutRows ?? []) {
+      appTimeouts.set(app.app_id, {
+        timeoutSeconds: app.build_timeout_seconds,
+        timeoutUpdatedAt: app.build_timeout_updated_at,
+      })
+    }
+  }
+
   const builderResults = await Promise.allSettled(
     builderBuilds.map(async (build) => {
       const response = await fetch(`${builderUrl}/jobs/${build.builder_job_id}`, {
@@ -100,12 +147,70 @@ app.post('/', middlewareAPISecret, async (c) => {
 
       const builderJob = await response.json() as BuilderStatusResponse
       const jobStatus = builderJob.job.status
+      const appTimeout = appTimeouts.get(build.app_id)
+      const timeoutSeconds = normalizeBuildTimeoutSeconds(appTimeout?.timeoutSeconds)
+      const runtimeSeconds = calculateBuildRuntimeSeconds(builderJob.job.started_at, builderJob.job.completed_at)
+      const buildTimedOut = shouldApplyBuildTimeout(
+        builderJob.job.started_at,
+        builderJob.job.completed_at,
+        jobStatus,
+        timeoutSeconds,
+        appTimeout?.timeoutUpdatedAt,
+      )
+      const timeoutCompletedAt = buildTimedOut && typeof builderJob.job.started_at === 'number'
+        ? calculateTimeoutCompletedAt(builderJob.job.started_at, timeoutSeconds)
+        : null
+      let timeoutApplied = false
+
+      if (buildTimedOut && builderJob.job.completed_at) {
+        timeoutApplied = true
+      }
+      else if (buildTimedOut) {
+        try {
+          const cancelResponse = await cancelTimedOutBuilderJob(builderUrl, builderApiKey, build.builder_job_id!)
+          if (cancelResponse.ok) {
+            timeoutApplied = true
+          }
+          else {
+            const errorText = await cancelResponse.text()
+            cloudlogErr({
+              requestId: c.get('requestId'),
+              message: 'Failed to cancel timed out build in builder',
+              buildId: build.id,
+              jobId: build.builder_job_id,
+              status: cancelResponse.status,
+              error: errorText,
+            })
+          }
+        }
+        catch (error) {
+          cloudlogErr({
+            requestId: c.get('requestId'),
+            message: 'Failed to cancel timed out build in builder',
+            buildId: build.id,
+            jobId: build.builder_job_id,
+            error: String(error),
+          })
+        }
+      }
+
+      const effectiveStatus = timeoutApplied ? BUILD_TIMEOUT_STATUS : jobStatus
+      const effectiveError = timeoutApplied ? formatBuildTimeoutError(timeoutSeconds) : builderJob.job.error || null
+      const effectiveCompletedAt = timeoutApplied ? timeoutCompletedAt : builderJob.job.completed_at
+      const effectiveBuildTimeSeconds = runtimeSeconds === null
+        ? null
+        : timeoutApplied
+          ? capBuildRuntimeSeconds(runtimeSeconds, timeoutSeconds)
+          : runtimeSeconds
+
+      if (timeoutApplied)
+        timedOut++
 
       const { error: updateError } = await supabase
         .from('build_requests')
         .update({
-          status: jobStatus,
-          last_error: builderJob.job.error || null,
+          status: effectiveStatus,
+          last_error: effectiveError,
           updated_at: new Date().toISOString(),
         })
         .eq('id', build.id)
@@ -114,12 +219,11 @@ app.post('/', middlewareAPISecret, async (c) => {
         throw new Error(updateError.message)
 
       if (
-        TERMINAL_STATUSES.has(jobStatus)
+        (isTerminalBuildStatus(effectiveStatus) || timeoutApplied)
         && builderJob.job.started_at
-        && builderJob.job.completed_at
+        && effectiveCompletedAt
+        && effectiveBuildTimeSeconds !== null
       ) {
-        const buildTimeSeconds = Math.floor((builderJob.job.completed_at - builderJob.job.started_at) / 1000)
-
         if (build.platform !== 'ios' && build.platform !== 'android') {
           cloudlogErr({ requestId: c.get('requestId'), message: 'Unexpected platform, skipping recordBuildTime', buildId: build.id, platform: build.platform })
         }
@@ -130,8 +234,8 @@ app.post('/', middlewareAPISecret, async (c) => {
             build.requested_by,
             build.builder_job_id!,
             build.platform,
-            buildTimeSeconds,
-            builderJob.job.completed_at,
+            effectiveBuildTimeSeconds,
+            effectiveCompletedAt,
             build.app_id,
           )
         }
@@ -155,6 +259,7 @@ app.post('/', middlewareAPISecret, async (c) => {
     duration_ms: Date.now() - startTime,
     total: staleBuilds.length,
     reconciled,
+    timed_out: timedOut,
     orphaned,
     errors,
   })
