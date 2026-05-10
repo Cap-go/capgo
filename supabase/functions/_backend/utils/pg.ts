@@ -1194,7 +1194,11 @@ export async function getAdminGlobalStatsTrend(
         canceled_orgs::int,
         COALESCE(upgraded_orgs, 0)::int AS upgraded_orgs,
         mrr::float,
-        COALESCE(LAG(COALESCE(mrr, 0)::float) OVER (ORDER BY date_id ASC), 0)::float AS previous_mrr,
+        COALESCE((
+          SELECT prev.mrr
+          FROM global_stats prev
+          WHERE prev.date_id = (gs.date_id::date - 1)::text
+        ), 0)::float AS previous_mrr,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'nrr', '')::float, 100)::float AS nrr,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue', '')::float, 0)::float AS churn_revenue,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue_solo', '')::float, 0)::float AS churn_revenue_solo,
