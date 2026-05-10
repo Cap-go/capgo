@@ -428,6 +428,11 @@ function buttonStyle(p: Database['public']['Tables']['plans']['Row']) {
           <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {{ t('plan-desc') }}
           </p>
+          <p class="mt-2 text-sm">
+            <a class="font-medium text-blue-600 hover:underline dark:text-blue-300" href="https://capgo.app/pricing/#compare-plans">
+              {{ t('plan-full-comparison-link') }}
+            </a>
+          </p>
         </div>
 
         <!-- Toggle -->
