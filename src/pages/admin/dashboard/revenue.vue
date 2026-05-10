@@ -32,6 +32,11 @@ const globalStatsTrendData = ref<Array<{
   users: number
   users_active: number
   paying: number
+  org_conversion_rate: number
+  plan_solo_conversion_rate: number
+  plan_maker_conversion_rate: number
+  plan_team_conversion_rate: number
+  plan_enterprise_conversion_rate: number
   trial: number
   not_paying: number
   updates: number
@@ -163,6 +168,54 @@ const upgradeTrendSeries = computed(() => {
         value: item.upgraded_orgs || 0,
       })),
       color: '#10b981', // green
+    },
+  ]
+})
+
+const planConversionSeries = computed(() => {
+  if (globalStatsTrendData.value.length === 0)
+    return []
+
+  return [
+    {
+      label: 'Total Conversion (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.org_conversion_rate || 0,
+      })),
+      color: '#3b82f6', // blue
+    },
+    {
+      label: 'Solo Conversion (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.plan_solo_conversion_rate || 0,
+      })),
+      color: '#8b5cf6', // purple
+    },
+    {
+      label: 'Maker Conversion (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.plan_maker_conversion_rate || 0,
+      })),
+      color: '#ec4899', // pink
+    },
+    {
+      label: 'Team Conversion (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.plan_team_conversion_rate || 0,
+      })),
+      color: '#10b981', // green
+    },
+    {
+      label: 'Enterprise Conversion (%)',
+      data: globalStatsTrendData.value.map(item => ({
+        date: item.date,
+        value: item.plan_enterprise_conversion_rate || 0,
+      })),
+      color: '#f59e0b', // amber
     },
   ]
 })
@@ -638,6 +691,20 @@ displayStore.defaultBack = '/dashboard'
               <AdminMultiLineChart
                 :series="subscriptionTypeSeries"
                 :is-loading="isLoadingGlobalStatsTrend"
+              />
+            </ChartCard>
+          </div>
+
+          <div class="grid grid-cols-1 gap-6">
+            <ChartCard
+              title="Plan Conversion Rate"
+              :is-loading="isLoadingGlobalStatsTrend"
+              :has-data="planConversionSeries.length > 0"
+            >
+              <AdminMultiLineChart
+                :series="planConversionSeries"
+                :is-loading="isLoadingGlobalStatsTrend"
+                value-suffix="%"
               />
             </ChartCard>
           </div>

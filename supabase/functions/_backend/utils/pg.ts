@@ -1086,6 +1086,10 @@ export interface AdminGlobalStatsTrend {
   users_active: number
   paying: number
   org_conversion_rate: number
+  plan_solo_conversion_rate: number
+  plan_maker_conversion_rate: number
+  plan_team_conversion_rate: number
+  plan_enterprise_conversion_rate: number
   trial: number
   not_paying: number
   updates: number
@@ -1175,6 +1179,10 @@ export async function getAdminGlobalStatsTrend(
         users_active::int,
         paying::int,
         org_conversion_rate::float,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_solo_conversion_rate', '')::float, 0)::float AS plan_solo_conversion_rate,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_maker_conversion_rate', '')::float, 0)::float AS plan_maker_conversion_rate,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_team_conversion_rate', '')::float, 0)::float AS plan_team_conversion_rate,
+        COALESCE(NULLIF(to_jsonb(gs) ->> 'plan_enterprise_conversion_rate', '')::float, 0)::float AS plan_enterprise_conversion_rate,
         trial::int,
         not_paying::int,
         updates::int,
@@ -1198,11 +1206,31 @@ export async function getAdminGlobalStatsTrend(
         canceled_orgs::int,
         COALESCE(upgraded_orgs, 0)::int AS upgraded_orgs,
         mrr::float,
-        COALESCE(prev.mrr, 0)::float AS previous_mrr,
-        (COALESCE(prev.revenue_solo, 0)::float / 12)::float AS previous_mrr_solo,
-        (COALESCE(prev.revenue_maker, 0)::float / 12)::float AS previous_mrr_maker,
-        (COALESCE(prev.revenue_team, 0)::float / 12)::float AS previous_mrr_team,
-        (COALESCE(prev.revenue_enterprise, 0)::float / 12)::float AS previous_mrr_enterprise,
+        COALESCE((
+          SELECT prev.mrr
+          FROM global_stats prev
+          WHERE prev.date_id = (gs.date_id::date - 1)::text
+        ), 0)::float AS previous_mrr,
+        (COALESCE((
+          SELECT prev.revenue_solo
+          FROM global_stats prev
+          WHERE prev.date_id = (gs.date_id::date - 1)::text
+        ), 0)::float / 12)::float AS previous_mrr_solo,
+        (COALESCE((
+          SELECT prev.revenue_maker
+          FROM global_stats prev
+          WHERE prev.date_id = (gs.date_id::date - 1)::text
+        ), 0)::float / 12)::float AS previous_mrr_maker,
+        (COALESCE((
+          SELECT prev.revenue_team
+          FROM global_stats prev
+          WHERE prev.date_id = (gs.date_id::date - 1)::text
+        ), 0)::float / 12)::float AS previous_mrr_team,
+        (COALESCE((
+          SELECT prev.revenue_enterprise
+          FROM global_stats prev
+          WHERE prev.date_id = (gs.date_id::date - 1)::text
+        ), 0)::float / 12)::float AS previous_mrr_enterprise,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'nrr', '')::float, 100)::float AS nrr,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue', '')::float, 0)::float AS churn_revenue,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'churn_revenue_solo', '')::float, 0)::float AS churn_revenue_solo,
@@ -1262,7 +1290,6 @@ export async function getAdminGlobalStatsTrend(
         COALESCE(NULLIF(to_jsonb(gs) ->> 'builder_active_paying_clients_60d', '')::int, 0)::int AS builder_active_paying_clients_60d,
         COALESCE(NULLIF(to_jsonb(gs) ->> 'live_updates_active_paying_clients_60d', '')::int, 0)::int AS live_updates_active_paying_clients_60d
       FROM global_stats gs
-      LEFT JOIN global_stats prev ON prev.date_id = (gs.date_id::date - 1)::text
       WHERE gs.date_id <= ${endDateOnly}
       )
       SELECT *
@@ -1281,6 +1308,10 @@ export async function getAdminGlobalStatsTrend(
       users_active: Number(row.users_active) || 0,
       paying: Number(row.paying) || 0,
       org_conversion_rate: Number(row.org_conversion_rate) || 0,
+      plan_solo_conversion_rate: Number(row.plan_solo_conversion_rate) || 0,
+      plan_maker_conversion_rate: Number(row.plan_maker_conversion_rate) || 0,
+      plan_team_conversion_rate: Number(row.plan_team_conversion_rate) || 0,
+      plan_enterprise_conversion_rate: Number(row.plan_enterprise_conversion_rate) || 0,
       trial: Number(row.trial) || 0,
       not_paying: Number(row.not_paying) || 0,
       updates: Number(row.updates) || 0,
