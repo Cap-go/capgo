@@ -46,7 +46,7 @@ export async function reserveNativeBuildSlot(
   input: ReserveNativeBuildSlotInput,
 ): Promise<NativeBuildSlotReservation> {
   let planName = 'Solo'
-  let limit = getNativeBuildConcurrencyLimit(planName)
+  let limit: number
   let pgPool: ReturnType<typeof getPgClient> | null = null
   let client: PgClient | null = null
 
