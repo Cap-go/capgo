@@ -943,16 +943,28 @@ export async function createStripeCustomer(c: Context, org: Database['public']['
   const customer = await createCustomer(c, org.management_email, org.created_by, org.id, org.name)
   const trial_at = new Date()
   trial_at.setDate(trial_at.getDate() + 15)
-  const soloPlan = await getDefaultPlan(c)
-  if (!soloPlan) {
+  const plan = org.customer_id?.startsWith('pending_')
+    ? await getStripeCustomer(c, org.customer_id).then(async (pendingStripeInfo) => {
+        if (!pendingStripeInfo?.product_id)
+          return null
+        const { data } = await supabaseAdmin(c)
+          .from('plans')
+          .select()
+          .eq('stripe_id', pendingStripeInfo.product_id)
+          .single()
+        return data
+      })
+    : await getDefaultPlan(c)
+  const selectedPlan = plan ?? await getDefaultPlan(c)
+  if (!selectedPlan) {
     cloudlog({ requestId: c.get('requestId'), message: 'no default plan' })
     throw new Error('no default plan')
   }
-  cloudlog({ requestId: c.get('requestId'), message: 'createInfo', soloPlan, customer })
+  cloudlog({ requestId: c.get('requestId'), message: 'createInfo', plan: selectedPlan, customer })
   const { error: createInfoError } = await supabaseAdmin(c)
     .from('stripe_info')
     .insert({
-      product_id: soloPlan.stripe_id,
+      product_id: selectedPlan.stripe_id,
       customer_id: customer.id,
       trial_at: trial_at.toISOString(),
     })
@@ -977,7 +989,7 @@ export async function finalizePendingStripeCustomer(c: Context, org: Database['p
     return
   }
 
-  await createStripeCustomer(c, { ...org, customer_id: null })
+  await createStripeCustomer(c, org)
 
   const { data: updatedOrg } = await supabaseAdmin(c)
     .from('orgs')
