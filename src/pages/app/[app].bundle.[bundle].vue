@@ -14,6 +14,7 @@ import IconDocumentDuplicate from '~icons/heroicons/document-duplicate'
 import IconTrash from '~icons/heroicons/trash'
 import IconSearch from '~icons/ic/round-search?raw'
 import IconAlertCircle from '~icons/lucide/alert-circle'
+import IconPencil from '~icons/lucide/pencil'
 import { formatBytes, getChecksumInfo } from '~/services/conversion'
 import { formatDate, formatLocalDate } from '~/services/date'
 import { checkPermissions } from '~/services/permissions'
@@ -40,6 +41,8 @@ const version_meta = ref<Database['public']['Tables']['app_versions_meta']['Row'
 const showBundleMetadataInput = ref<boolean>(false)
 const hasManifest = ref<boolean>(false)
 const showChecksumTooltip = ref(false)
+const metadataLink = ref('')
+const metadataComment = ref('')
 
 // Channel chooser state
 const selectedChannelForLink = ref<Database['public']['Tables']['channels']['Row'] | null>(null)
@@ -81,6 +84,12 @@ const canDeleteBundle = computedAsync(async () => {
   if (!version.value?.app_id)
     return false
   return await checkPermissions('bundle.delete', { appId: version.value.app_id })
+}, false)
+
+const canUpdateBundleMetadata = computedAsync(async () => {
+  if (!version.value?.app_id)
+    return false
+  return await checkPermissions('app.update_settings', { appId: version.value.app_id })
 }, false)
 
 // Function to open link in a new tab
@@ -371,6 +380,72 @@ async function openDownload() {
         handler: async () => {
           await downloadNow()
         },
+      },
+    ],
+  })
+  return dialogStore.onDialogDismiss()
+}
+
+function normalizeOptionalMetadata(value: string) {
+  const trimmedValue = value.trim()
+  return trimmedValue.length > 0 ? trimmedValue : null
+}
+
+async function saveBundleMetadata() {
+  if (!version.value)
+    return false
+
+  if (!canUpdateBundleMetadata.value) {
+    toast.error(t('no-permission'))
+    return false
+  }
+
+  const { data, error } = await supabase
+    .from('app_versions')
+    .update({
+      link: normalizeOptionalMetadata(metadataLink.value),
+      comment: normalizeOptionalMetadata(metadataComment.value),
+    })
+    .eq('app_id', version.value.app_id)
+    .eq('id', version.value.id)
+    .select()
+    .single()
+
+  if (error || !data) {
+    console.error('Cannot update bundle metadata', error)
+    toast.error(t('cannot-update-bundle-metadata'))
+    return false
+  }
+
+  version.value = data
+  toast.success(t('bundle-metadata-updated'))
+  return true
+}
+
+async function openBundleMetadataDialog() {
+  if (!version.value)
+    return
+
+  if (!canUpdateBundleMetadata.value) {
+    toast.error(t('no-permission'))
+    return
+  }
+
+  metadataLink.value = version.value.link ?? ''
+  metadataComment.value = version.value.comment ?? ''
+
+  dialogStore.openDialog({
+    title: t('edit-bundle-metadata'),
+    size: 'lg',
+    buttons: [
+      {
+        text: t('button-cancel'),
+        role: 'cancel',
+      },
+      {
+        text: t('update'),
+        role: 'primary',
+        handler: saveBundleMetadata,
       },
     ],
   })
@@ -824,17 +899,54 @@ async function deleteBundle() {
               </InfoRow>
               <!-- Bundle Link -->
               <InfoRow
-                v-if="version.link" :label="t('bundle-link')" :is-link="true"
-                @click="openLink(version.link)"
+                v-if="version.link || !version.deleted" :label="t('bundle-link')"
+                @click="version.link ? openLink(version.link) : null"
               >
-                {{ version.link }}
+                <div class="flex items-center justify-end w-full gap-3 text-right">
+                  <span
+                    :class="{
+                      'cursor-pointer font-bold text-blue-600 underline underline-offset-4 dark:text-blue-500': version.link,
+                      'text-gray-500 dark:text-gray-400': !version.link,
+                    }"
+                  >
+                    {{ version.link || t('bundle-link-empty') }}
+                  </span>
+                  <button
+                    v-if="!version.deleted"
+                    type="button"
+                    class="inline-flex items-center gap-2 py-1.5 pr-3 pl-2 text-sm font-medium text-gray-700 no-underline transition-colors border border-gray-200 rounded-md dark:text-gray-200 dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                    :disabled="!canUpdateBundleMetadata"
+                    :title="t('edit-bundle-metadata')"
+                    :aria-label="t('edit-bundle-metadata')"
+                    @click.stop="openBundleMetadataDialog"
+                  >
+                    <IconPencil class="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                    <span>{{ t('change') }}</span>
+                  </button>
+                </div>
               </InfoRow>
               <!-- Bundle Comment -->
               <InfoRow
-                v-if="version.comment" :label="t('bundle-comment')"
-                @click="copyToast(version?.comment ?? '')"
+                v-if="version.comment || !version.deleted" :label="t('bundle-comment')"
+                @click="version.comment ? copyToast(version.comment) : null"
               >
-                {{ version.comment }}
+                <div class="flex items-center justify-end w-full gap-3 text-right">
+                  <span :class="{ 'text-gray-500 dark:text-gray-400': !version.comment }">
+                    {{ version.comment || t('bundle-comment-empty') }}
+                  </span>
+                  <button
+                    v-if="!version.deleted"
+                    type="button"
+                    class="inline-flex items-center gap-2 py-1.5 pr-3 pl-2 text-sm font-medium text-gray-700 no-underline transition-colors border border-gray-200 rounded-md dark:text-gray-200 dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                    :disabled="!canUpdateBundleMetadata"
+                    :title="t('edit-bundle-metadata')"
+                    :aria-label="t('edit-bundle-metadata')"
+                    @click.stop="openBundleMetadataDialog"
+                  >
+                    <IconPencil class="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                    <span>{{ t('change') }}</span>
+                  </button>
+                </div>
               </InfoRow>
               <!-- zip -->
               <InfoRow :label="t('zip-bundle')">
@@ -951,6 +1063,36 @@ async function deleteBundle() {
             {{ t('here') }}
           </a>
         </p>
+      </div>
+    </Teleport>
+
+    <!-- Teleport Content for Bundle Metadata Editor -->
+    <Teleport v-if="dialogStore.showDialog && dialogStore.dialogOptions?.title === t('edit-bundle-metadata')" defer to="#dialog-v2-content">
+      <div class="w-full space-y-4">
+        <div>
+          <label for="bundle-link-input" class="text-sm font-medium text-gray-700 dark:text-gray-200">
+            {{ t('bundle-link') }}
+          </label>
+          <input
+            id="bundle-link-input"
+            v-model="metadataLink"
+            type="url"
+            class="mt-2 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
+            :placeholder="t('bundle-link-placeholder')"
+          >
+        </div>
+        <div>
+          <label for="bundle-comment-input" class="text-sm font-medium text-gray-700 dark:text-gray-200">
+            {{ t('bundle-comment') }}
+          </label>
+          <textarea
+            id="bundle-comment-input"
+            v-model="metadataComment"
+            rows="4"
+            class="mt-2 block w-full resize-y rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-gray-600 dark:bg-gray-700 dark:text-white dark:placeholder-gray-400 dark:focus:border-blue-500 dark:focus:ring-blue-900/40"
+            :placeholder="t('bundle-comment-placeholder')"
+          />
+        </div>
       </div>
     </Teleport>
 
