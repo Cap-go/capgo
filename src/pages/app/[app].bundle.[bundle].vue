@@ -98,13 +98,13 @@ function openLink(url?: string): void {
     return
 
   try {
-    const parsedUrl = new URL(url, window.location.origin)
+    const parsedUrl = new URL(url, globalThis.location.origin)
     if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
       console.warn('Blocked unsafe bundle link protocol')
       return
     }
 
-    window.open(parsedUrl.toString(), '_blank', 'noopener,noreferrer')
+    globalThis.open(parsedUrl.toString(), '_blank', 'noopener,noreferrer')
   }
   catch {
     console.warn('Cannot open invalid bundle link')
