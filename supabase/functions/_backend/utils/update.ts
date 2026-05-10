@@ -259,7 +259,6 @@ export async function updateWithPG(
     })
   }
 
-  // cloudlog(c.get('requestId'), 'signedURL', device_id, version_name, version.name)
   if (version_name === version.name) {
     cloudlog({ requestId: c.get('requestId'), message: 'No new version available', id: device_id, version_name, version: version.name, date: new Date().toISOString() })
     // TODO: check why this event is send with wrong version_name
@@ -445,7 +444,7 @@ export async function updateWithPG(
   cloudlog({ requestId: c.get('requestId'), message: 'bundle_url_timing', duration: `${endBundleUrl - startBundleUrl}ms`, date: new Date().toISOString() })
   //  check signedURL and if it's url
   if ((!signedURL || (!(signedURL.startsWith('http://') || signedURL.startsWith('https://')))) && !manifest.length) {
-    cloudlog({ requestId: c.get('requestId'), message: 'Cannot get bundle signedURL', url: signedURL, id: app_id, date: new Date().toISOString() })
+    cloudlog({ requestId: c.get('requestId'), message: 'Cannot get bundle download URL', hasDownloadUrl: Boolean(signedURL), id: app_id, date: new Date().toISOString() })
     await sendStatsAndDevice(c, device, [{ action: 'cannotGetBundle', versionName: version.name }])
     return updateError200(c, 'no_bundle_url', 'Cannot get bundle url')
   }
@@ -459,7 +458,7 @@ export async function updateWithPG(
     createStatsVersion(c, version.name, app_id, 'get'),
     sendStatsAndDevice(c, device, [{ action: 'get', versionName: version.name }]),
   ])
-  cloudlog({ requestId: c.get('requestId'), message: 'New version available', app_id, version: version.name, signedURL, date: new Date().toISOString() })
+  cloudlog({ requestId: c.get('requestId'), message: 'New version available', app_id, version: version.name, hasDownloadUrl: Boolean(signedURL), manifestEntries: manifest.length, date: new Date().toISOString() })
   const res = resToVersion(plugin_version, signedURL, version as any, manifest, needsMetadata)
   if (!res.url && !res.manifest) {
     cloudlog({ requestId: c.get('requestId'), message: 'No url or manifest', id: app_id, version: version.name, date: new Date().toISOString() })

@@ -67,7 +67,7 @@ export async function getBundleUrl(
   if (getRuntimeKey() !== 'workerd') {
     try {
       const signedUrl = await s3.getSignedUrl(c, r2_path, EXPIRATION_SECONDS)
-      cloudlog({ requestId: c.get('requestId'), message: 'getBundleUrl', signedUrl })
+      cloudlog({ requestId: c.get('requestId'), message: 'getBundleUrl', hasDownloadUrl: Boolean(signedUrl), source: 's3' })
       const url = signedUrl
       // Since it's signed url we cannot add extra query params like checksum and device id
       // TODO: switch to our own file endpoint instead of direct s3 signed url
