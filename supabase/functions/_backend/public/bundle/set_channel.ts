@@ -22,6 +22,11 @@ export async function setChannel(c: Context<MiddlewareKeyVariables>, body: SetCh
     throw simpleError('invalid_app_id', 'App ID must be a reverse domain string', { app_id: body.app_id })
   }
 
+  // Preserve the existing app-level failure shape for unknown or inaccessible apps.
+  if (!(await checkPermission(c, 'channel.promote_bundle', { appId: body.app_id }))) {
+    throw simpleError('cannot_access_app', 'You can\'t access this app', { app_id: body.app_id })
+  }
+
   // Get organization info
   const { data: org, error: orgError } = await supabaseApikey(c, apikey.key)
     .from('apps')
