@@ -59,13 +59,27 @@ describe('release scope matching', () => {
   it.concurrent('falls back to the pushed range when no component tag exists', () => {
     const run = (args: string[]) => {
       if (args[0] === 'describe') {
-        throw new Error('no matching tag')
+        throw Object.assign(new Error('git describe failed'), {
+          stderr: 'fatal: No names found, cannot describe anything.',
+        })
       }
 
       throw new Error(`Unexpected git call: ${args.join(' ')}`)
     }
 
     expect(getReleaseRangeBase('capgo', 'previous-push-sha', 'HEAD', run)).toBe('previous-push-sha')
+  })
+
+  it.concurrent('rethrows unexpected git describe failures', () => {
+    const run = (args: string[]) => {
+      if (args[0] === 'describe') {
+        throw new Error('fatal: bad revision HEAD')
+      }
+
+      throw new Error(`Unexpected git call: ${args.join(' ')}`)
+    }
+
+    expect(() => getReleaseRangeBase('cli', 'previous-push-sha', 'HEAD', run)).toThrow('fatal: bad revision HEAD')
   })
 
   it.concurrent('keeps missed CLI changes releasable after a later Capgo-only push', () => {
