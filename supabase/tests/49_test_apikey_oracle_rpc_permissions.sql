@@ -1,6 +1,6 @@
 BEGIN;
 
-SELECT plan(24);
+SELECT plan(27);
 
 SELECT
     is(
@@ -164,6 +164,101 @@ VALUES (
 )
 ON CONFLICT (bucket_id, name) DO NOTHING;
 
+DO $$
+DECLARE
+    v_policy jsonb := '{
+        "enabled": true,
+        "min_length": 6,
+        "require_uppercase": false,
+        "require_number": false,
+        "require_special": false
+    }'::jsonb;
+    v_apikey text := 'rbac-v2-password-policy-rls-key';
+    v_apikey_rbac_id uuid;
+BEGIN
+    DELETE FROM public.role_bindings
+    WHERE
+        principal_type = public.rbac_principal_apikey()
+        AND principal_id IN (
+            SELECT rbac_id
+            FROM public.apikeys
+            WHERE key = v_apikey
+        );
+
+    DELETE FROM public.apikeys
+    WHERE key = v_apikey;
+
+    UPDATE public.orgs
+    SET
+        use_new_rbac = true,
+        password_policy_config = v_policy
+    WHERE id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid;
+
+    INSERT INTO public.user_password_compliance (
+        user_id,
+        org_id,
+        policy_hash
+    )
+    VALUES (
+        '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
+        '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid,
+        public.get_password_policy_hash(v_policy)
+    )
+    ON CONFLICT (user_id, org_id) DO UPDATE
+    SET
+        policy_hash = EXCLUDED.policy_hash,
+        validated_at = now(),
+        updated_at = now();
+
+    INSERT INTO public.apikeys (
+        user_id,
+        key,
+        key_hash,
+        mode,
+        name,
+        limited_to_orgs,
+        limited_to_apps
+    )
+    VALUES (
+        '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
+        v_apikey,
+        NULL,
+        NULL,
+        'RBAC v2 password policy RLS key',
+        ARRAY['046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid],
+        ARRAY[]::character varying[]
+    )
+    RETURNING rbac_id INTO v_apikey_rbac_id;
+
+    INSERT INTO public.role_bindings (
+        principal_type,
+        principal_id,
+        role_id,
+        scope_type,
+        org_id,
+        app_id,
+        granted_by,
+        reason,
+        is_direct
+    )
+    SELECT
+        public.rbac_principal_apikey(),
+        v_apikey_rbac_id,
+        roles.id,
+        public.rbac_scope_app(),
+        '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid,
+        apps.id,
+        '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid,
+        'pgTAP RBAC v2 password policy regression',
+        true
+    FROM public.roles
+    CROSS JOIN public.apps
+    WHERE
+        roles.name = public.rbac_role_app_reader()
+        AND apps.app_id = 'com.demo.app'
+    LIMIT 1;
+END $$;
+
 SET LOCAL ROLE anon;
 
 DO $$
@@ -236,6 +331,27 @@ SELECT
         1::bigint,
         'anon API-key apps query still works through RLS helper identity'
     );
+
+DO $$
+BEGIN
+    PERFORM set_config('request.headers', '{"capgkey": "rbac-v2-password-policy-rls-key"}', true);
+END $$;
+
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM public.apps
+            WHERE app_id = 'com.demo.app'
+        ),
+        1::bigint,
+        'anon RBAC v2 API key can read apps when password policy is satisfied'
+    );
+
+DO $$
+BEGIN
+    PERFORM set_config('request.headers', '{"capgkey": "ae6e7458-c46d-4c00-aa3b-153b0b8520ea"}', true);
+END $$;
 
 SELECT
     is(
@@ -319,6 +435,44 @@ SELECT
         'perm_owner',
         'authenticated execution of'
         || ' get_org_perm_for_apikey(text, text) still works'
+    );
+
+RESET ROLE;
+
+DELETE FROM public.user_password_compliance
+WHERE
+    user_id = '6aa76066-55ef-4238-ade6-0b32334a4097'::uuid
+    AND org_id = '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid;
+
+SET LOCAL ROLE anon;
+
+DO $$
+BEGIN
+    PERFORM set_config('request.headers', '{"capgkey": "rbac-v2-password-policy-rls-key"}', true);
+END $$;
+
+SELECT
+    is(
+        (
+            SELECT count(*)
+            FROM public.apps
+            WHERE app_id = 'com.demo.app'
+        ),
+        0::bigint,
+        'anon RBAC v2 API key cannot read apps when password policy is stale'
+    );
+
+SELECT
+    is(
+        public.check_min_rights(
+            'read'::public.user_min_right,
+            NULL::uuid,
+            '046a36ac-e03c-4590-9257-bd6c9dba9ee8'::uuid,
+            'com.demo.app',
+            NULL::bigint
+        ),
+        false,
+        'anon RBAC v2 API key fails check_min_rights when password policy is stale'
     );
 
 RESET ROLE;
