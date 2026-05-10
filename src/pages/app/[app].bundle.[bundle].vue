@@ -922,13 +922,13 @@ async function deleteBundle() {
                   <button
                     v-if="!version.deleted"
                     type="button"
-                    class="p-1 transition-colors border border-gray-200 rounded-md dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800 cursor-pointer"
+                    class="p-1 transition-colors border border-gray-200 rounded-md dark:border-gray-700 hover:bg-gray-50 hover:border-gray-300 dark:hover:border-gray-600 dark:hover:bg-gray-800"
                     :disabled="!canUpdateBundleMetadata"
                     :title="t('edit-bundle-metadata')"
                     :aria-label="t('edit-bundle-metadata')"
                     @click.stop="openBundleMetadataDialog"
                   >
-                    <IconPencil class="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                    <IconPencil class="w-4 h-4 text-gray-500 cursor-pointer dark:text-gray-400 hover:text-blue-500 dark:hover:text-blue-400" />
                   </button>
                 </div>
               </InfoRow>
