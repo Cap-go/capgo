@@ -79,9 +79,6 @@ export const statsActionFilters = [
   ['action-custom-id-blocked', 'customIdBlocked'],
 ] as const
 
-export type StatsActionFilterKey = typeof statsActionFilters[number][0]
-export type StatsAction = typeof statsActionFilters[number][1]
-
 export const filterToAction: Record<string, string> = Object.fromEntries(statsActionFilters)
 export const actionToFilter: Record<string, string> = Object.fromEntries(
   statsActionFilters.map(([filterKey, actionValue]) => [actionValue, filterKey]),
