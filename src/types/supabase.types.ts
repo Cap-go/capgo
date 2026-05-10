@@ -1850,6 +1850,7 @@ export type Database = {
           market_desc: string | null
           mau: number
           name: string
+          native_build_concurrency: number
           price_m: number
           price_m_id: string
           price_y: number
@@ -1868,6 +1869,7 @@ export type Database = {
           market_desc?: string | null
           mau?: number
           name?: string
+          native_build_concurrency?: number
           price_m?: number
           price_m_id: string
           price_y?: number
@@ -1886,6 +1888,7 @@ export type Database = {
           market_desc?: string | null
           mau?: number
           name?: string
+          native_build_concurrency?: number
           price_m?: number
           price_m_id?: string
           price_y?: number
@@ -3339,6 +3342,7 @@ export type Database = {
           bandwidth: number
           build_time_unit: number
           mau: number
+          native_build_concurrency: number
           storage: number
         }[]
       }
