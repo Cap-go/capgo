@@ -3237,6 +3237,8 @@ export type Database = {
           allow_preview: boolean
           android_store_url: string | null
           app_id: string
+          build_timeout_seconds: number
+          build_timeout_updated_at: string
           channel_device_count: number
           created_at: string | null
           default_upload_channel: string

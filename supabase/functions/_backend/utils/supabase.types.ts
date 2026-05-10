@@ -1853,6 +1853,7 @@ export type Database = {
           market_desc: string | null
           mau: number
           name: string
+          native_build_concurrency: number
           price_m: number
           price_m_id: string
           price_y: number
@@ -1871,6 +1872,7 @@ export type Database = {
           market_desc?: string | null
           mau?: number
           name?: string
+          native_build_concurrency?: number
           price_m?: number
           price_m_id: string
           price_y?: number
@@ -1889,6 +1891,7 @@ export type Database = {
           market_desc?: string | null
           mau?: number
           name?: string
+          native_build_concurrency?: number
           price_m?: number
           price_m_id?: string
           price_y?: number
@@ -3234,6 +3237,8 @@ export type Database = {
           allow_preview: boolean
           android_store_url: string | null
           app_id: string
+          build_timeout_seconds: number
+          build_timeout_updated_at: string
           channel_device_count: number
           created_at: string | null
           default_upload_channel: string
@@ -3342,6 +3347,7 @@ export type Database = {
           bandwidth: number
           build_time_unit: number
           mau: number
+          native_build_concurrency: number
           storage: number
         }[]
       }
