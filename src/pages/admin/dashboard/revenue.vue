@@ -53,6 +53,10 @@ const globalStatsTrendData = ref<Array<{
   upgraded_orgs: number
   mrr: number
   previous_mrr: number
+  previous_mrr_solo: number
+  previous_mrr_maker: number
+  previous_mrr_team: number
+  previous_mrr_enterprise: number
   nrr: number
   churn_revenue: number
   churn_revenue_solo: number
@@ -265,7 +269,7 @@ const churnRateSeries = computed(() => {
       label: 'Solo Churn (%)',
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
-        value: toChurnRate(item.churn_revenue_solo || 0, item.previous_mrr || 0),
+        value: toChurnRate(item.churn_revenue_solo || 0, item.previous_mrr_solo || 0),
       })),
       color: '#8b5cf6', // purple
     },
@@ -273,7 +277,7 @@ const churnRateSeries = computed(() => {
       label: 'Maker Churn (%)',
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
-        value: toChurnRate(item.churn_revenue_maker || 0, item.previous_mrr || 0),
+        value: toChurnRate(item.churn_revenue_maker || 0, item.previous_mrr_maker || 0),
       })),
       color: '#ec4899', // pink
     },
@@ -281,7 +285,7 @@ const churnRateSeries = computed(() => {
       label: 'Team Churn (%)',
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
-        value: toChurnRate(item.churn_revenue_team || 0, item.previous_mrr || 0),
+        value: toChurnRate(item.churn_revenue_team || 0, item.previous_mrr_team || 0),
       })),
       color: '#10b981', // green
     },
@@ -289,7 +293,7 @@ const churnRateSeries = computed(() => {
       label: 'Enterprise Churn (%)',
       data: globalStatsTrendData.value.map(item => ({
         date: item.date,
-        value: toChurnRate(item.churn_revenue_enterprise || 0, item.previous_mrr || 0),
+        value: toChurnRate(item.churn_revenue_enterprise || 0, item.previous_mrr_enterprise || 0),
       })),
       color: '#f59e0b', // amber
     },
