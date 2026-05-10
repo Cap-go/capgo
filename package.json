@@ -85,6 +85,7 @@
     "admin:backfill-paid-product-activity": "bun scripts/backfill_paid_product_activity.ts",
     "admin:backfill-plugin-version-ladder": "bun scripts/backfill_plugin_version_ladder.ts",
     "admin:backfill-missing-app-icons": "bun scripts/backfill_missing_app_icons.ts",
+    "admin:backfill-missing-store-urls": "bun scripts/backfill_missing_store_urls.ts",
     "stripe:backfill-retention-metrics": "bun scripts/backfill_retention_metrics.ts",
     "stripe:backfill-org-conversion-rate": "bun scripts/backfill_org_conversion_rate_trend.ts",
     "stripe:backfill-customer-countries": "bun scripts/backfill_stripe_customer_countries.ts",
